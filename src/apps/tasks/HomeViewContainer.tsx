@@ -407,14 +407,6 @@ export function HomeViewContainer() {
     [tasks, addTask, viewedDate, getCurrentUserMember],
   );
 
-  // ── Weekly-planning support (reconstructed from App.tsx) ──
-  // Current-quarter incomplete goal actions, surfaced in the weekly session so
-  // quarterly intentions can be pulled into the week.
-  const currentQuarterGoalActions = useMemo<GoalAction[]>(() => {
-    const q = getCurrentQuarter();
-    return goals.flatMap(g => g.actions).filter(a => a.quarter === q && !a.completed);
-  }, [goals, getCurrentQuarter]);
-
   // Persist a completed weekly planning session as a vault note.
   const saveWeeklyPlanToVault = useCallback(
     async ({ weekId, priorities, concerns }: { weekId: string; priorities: Task[]; concerns: string }): Promise<{ ok: boolean }> => {
@@ -431,20 +423,6 @@ export function HomeViewContainer() {
       return { ok: !!result?.success };
     },
     [vaultWrite],
-  );
-
-  // Break a quarterly goal action into a horizon: create a LINKED task (carries
-  // the action's projectId so the why-chain Task → Project → Goal resolves). The
-  // action persists — it's an umbrella that can spawn several chunks over the
-  // quarter, so completing one chunk must NOT complete the action.
-  const pullGoalActionToBucket = useCallback(async (action: GoalAction, bucket: 'week' | 'month' | 'quarter') => {
-    // Bucket rides the INSERT — a follow-up setBucket can race tasksRef and drop.
-    await addTask(action.description, undefined, action.projectId, undefined, { bucket });
-  }, [addTask]);
-
-  const handleAddGoalActionToWeek = useCallback(
-    (action: GoalAction) => pullGoalActionToBucket(action, 'week'),
-    [pullGoalActionToBucket],
   );
 
   // Mid-session capture: create a task straight into a cadence session's bucket
@@ -663,8 +641,6 @@ export function HomeViewContainer() {
             onUpdateTask={updateTask}
             onPushTask={pushTask}
             onSavePlanToVault={saveWeeklyPlanToVault}
-            goalActions={currentQuarterGoalActions}
-            onAddGoalAction={handleAddGoalActionToWeek}
             onSelectDay={(date) => { setViewedDate(date); setWeeklyPlanningOpen(false); }}
             allRoutines={allRoutines}
             onUpdateRoutine={updateRoutine}
@@ -708,8 +684,6 @@ export function HomeViewContainer() {
             onSetBucket={setBucket}
             onCompleteTask={toggleTask}
             onCreateTask={(title) => createTaskInBucket(title, 'month')}
-            goalActions={currentQuarterGoalActions}
-            onPullGoalAction={(a) => pullGoalActionToBucket(a, 'month')}
             links={[
               { label: 'Review routines & delegation', onClick: () => { setMonthlyPlanningOpen(false); navigate('/routines'); } },
               { label: 'Review shopping lists', onClick: () => { setMonthlyPlanningOpen(false); navigate('/lists'); } },
@@ -728,8 +702,7 @@ export function HomeViewContainer() {
             onSetBucket={setBucket}
             onCompleteTask={toggleTask}
             onCreateTask={(title) => createTaskInBucket(title, 'quarter')}
-            goalActions={currentQuarterGoalActions}
-            onPullGoalAction={(a) => pullGoalActionToBucket(a, 'quarter')}
+            referenceGoals={goals}
           />
         </Suspense>
       )}

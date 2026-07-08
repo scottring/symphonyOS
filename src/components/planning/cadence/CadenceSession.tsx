@@ -1,16 +1,18 @@
 // src/components/planning/cadence/CadenceSession.tsx
 //
-// Phase 3 — the generic monthly / seasonal / annual planning session. One calm,
-// scrollable screen following the verbatim agenda shape: review → plan (pull from
-// the next-higher pool, the cascade) → reflective text → financial handoff →
-// hand down to the next-lower session. Substance persists to the shared
+// The generic monthly / seasonal / annual planning session. One calm,
+// scrollable screen following Scott + Iris's model: each level keeps its OWN
+// plain list, and planning a level means LOOKING at the level above while
+// writing this one — review what's here → look up (read-only reference) →
+// write new items → reflective text → financial handoff → hand down. Nothing
+// is moved out of an upper list by planning below it, so every list stays
+// intact for its own end-of-period review. Substance persists to the shared
 // `planning_sessions` row via usePlanningSession. Money stays OUT of Symphony —
 // the financial step is a handoff tick only.
 
 import { useState, useMemo, useCallback } from 'react'
-import { X, ArrowRight, ArrowDownToLine, CircleDollarSign, Target, Plus } from 'lucide-react'
+import { X, ArrowRight, ArrowDownToLine, CircleDollarSign, Target, Plus, Check } from 'lucide-react'
 import type { Task, TaskBucket } from '@/types/task'
-import type { GoalAction } from '@/types/goal'
 import { TriageWhenMenu } from '@/components/schedule/TriageWhenMenu'
 import { applyTriageWhen } from '@/lib/triage/applyWhen'
 import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
@@ -34,9 +36,17 @@ interface CadenceSessionProps {
   /** Bucket pulled items land in (monthly→'month', seasonal→'quarter'); null for
    *  annual, which is goals-level and has no task bucket of its own. */
   thisBucket: 'month' | 'quarter' | null
-  /** Higher pool to pull from in the cascade; null = no task pull (annual). */
+  /** Promote parked ideas by MOVING them in (someday → season only — Someday
+   *  has no end-of-period review, so moving out of it loses nothing). */
   pullFromBucket: TaskBucket | null
-  pullFromLabel?: string            // "Pull from this season"
+  pullFromLabel?: string            // "Pull from someday"
+  /** The level above, read-only — you LOOK at it while writing this level's
+   *  list. Copy-down duplicates a line into this horizon and leaves the
+   *  original in place, so the upper list stays intact for its own review. */
+  reference?: {
+    label: string                   // "Your Summer list"
+    items: Array<{ id: string; title: string; subtitle?: string }>
+  }
   textFields: CadenceTextField[]
   onPushTask: (id: string, target: Date | 'week' | 'month' | 'quarter') => void
   onClose: () => void
@@ -48,14 +58,9 @@ interface CadenceSessionProps {
   onSetBucket?: (id: string, bucket: TaskBucket) => void
   onCompleteTask?: (id: string) => void
   /** Capture something NEW into this horizon's pool mid-session (the notebook
-   *  moment: plans are born in the ritual, not only pulled down from above).
-   *  Rendered whenever `thisBucket` is set. */
+   *  moment: plans are born in the ritual, not derived from above). Also used
+   *  by the reference list's copy-down. Rendered whenever `thisBucket` is set. */
   onCreateTask?: (title: string) => void | Promise<void>
-  /** Current-quarter goal actions to break into this horizon. Pulling one creates
-   *  a LINKED task (carries the action's projectId so the why-chain resolves);
-   *  the action persists — it's an umbrella that can spawn several chunks. */
-  goalActions?: GoalAction[]
-  onPullGoalAction?: (action: GoalAction) => void
   /** Override the financial-handoff copy (annual = long-term + big-expense). */
   financialLabel?: string
   /** When provided, renders an "Annual goals" section linking to the Goals app. */
@@ -68,8 +73,8 @@ const SECTION = 'text-[11px] uppercase tracking-wider text-neutral-400 mb-3'
 
 export function CadenceSession({
   horizon, periodToken, title, periodLabel, tasks, tasksLoading, thisBucket,
-  pullFromBucket, pullFromLabel, textFields, onPushTask, onClose, handDown,
-  onSetBucket, onCompleteTask, onCreateTask, goalActions, onPullGoalAction,
+  pullFromBucket, pullFromLabel, reference, textFields, onPushTask, onClose, handDown,
+  onSetBucket, onCompleteTask, onCreateTask,
   financialLabel, onOpenGoals, links,
 }: CadenceSessionProps) {
   const { notes, patchNotes } = usePlanningSession(horizon, periodToken)
@@ -82,7 +87,10 @@ export function CadenceSession({
       : []),
     [tasks, thisBucket, matchAll],
   )
-  // The cascade pool — the next-higher bucket you pull down from.
+  // Titles already on this level's list — lets the reference list show
+  // "on this list" instead of offering a second copy.
+  const inHorizonTitles = useMemo(() => new Set(inHorizon.map((t) => t.title)), [inHorizon])
+  // The pool promoted by MOVING (someday → season).
   const pullPool = useMemo(
     () => (pullFromBucket
       ? tasks.filter((t) => !t.completed && t.bucket === pullFromBucket && matchAll(t.assignedTo, t.assignedToAll))
@@ -161,7 +169,54 @@ export function CadenceSession({
             </section>
           )}
 
-          {/* Plan — pull from the next-higher pool (the cascade). */}
+          {/* Look up — the level above, read-only. You consult it while
+              writing this level's list; nothing here is moved or required to
+              line up. Copy-down duplicates a line (original stays put). Lines
+              already on this level's list show a quiet check instead. */}
+          {reference && (
+            <section>
+              <h2 className={SECTION}>
+                <Target className="w-3.5 h-3.5 inline mr-1 -mt-0.5" />
+                {reference.label} — for reference
+              </h2>
+              {reference.items.length === 0 ? (
+                <p className="text-sm text-neutral-400">Nothing there yet.</p>
+              ) : (
+                <ul className="space-y-1">
+                  {reference.items.map((it) => {
+                    const alreadyHere = inHorizonTitles.has(it.title)
+                    return (
+                      <li key={it.id} className="flex items-center gap-3 rounded-lg bg-neutral-50/70 px-3 py-1.5">
+                        <span className="flex-1 min-w-0 text-sm text-neutral-700 truncate">
+                          {it.title}
+                          {it.subtitle && <span className="text-xs text-neutral-400"> · {it.subtitle}</span>}
+                        </span>
+                        {alreadyHere ? (
+                          <span className="shrink-0 inline-flex items-center gap-1 text-xs text-primary-700">
+                            <Check className="w-3 h-3" strokeWidth={3} /> on this list
+                          </span>
+                        ) : (
+                          onCreateTask && (
+                            <button
+                              type="button"
+                              onClick={() => void onCreateTask(it.title)}
+                              title="Copy onto this list (stays on the list above too)"
+                              className="shrink-0 inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-md text-primary-700 bg-primary-50 hover:bg-primary-100 transition-colors"
+                            >
+                              <Plus className="w-3 h-3" /> Copy down
+                            </button>
+                          )
+                        )}
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+            </section>
+          )}
+
+          {/* Promote parked ideas — MOVE from Someday (it has no review of its
+              own, so moving out of it loses nothing). */}
           {pullFromBucket && (
             <section>
               <h2 className={SECTION}>{pullFromLabel ?? 'Pull down'}{!tasksLoading && ` (${pullPool.length})`}</h2>
@@ -224,25 +279,6 @@ export function CadenceSession({
                   className="flex-1 min-w-0 text-sm bg-transparent placeholder:text-neutral-400 focus:outline-none"
                 />
               </div>
-            </section>
-          )}
-
-          {/* Break goals down — current-quarter goal actions. Pulling one creates
-              a linked task in this horizon (a chunk); the goal action persists. */}
-          {goalActions && goalActions.length > 0 && onPullGoalAction && (
-            <section>
-              <h2 className={SECTION}><Target className="w-3.5 h-3.5 inline mr-1" /> Break goals down ({goalActions.length})</h2>
-              <ul className="space-y-2">
-                {goalActions.map((a) => (
-                  <li key={a.id} className="flex items-center gap-2 rounded-xl border border-primary-100 bg-primary-50/30 px-3 py-2">
-                    <span className="flex-1 min-w-0 text-sm text-neutral-800 truncate">{a.description}</span>
-                    <button type="button" onClick={() => onPullGoalAction(a)}
-                      className="shrink-0 inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-md bg-primary-600 text-white hover:bg-primary-700 transition-colors">
-                      <Plus className="w-3 h-3" /> Plan it
-                    </button>
-                  </li>
-                ))}
-              </ul>
             </section>
           )}
 

@@ -92,24 +92,28 @@ describe('CadenceSession', () => {
     expect(onActivate).toHaveBeenCalled()
   })
 
-  it('breaks a goal action into this horizon (linked task via onPullGoalAction)', async () => {
-    const onPullGoalAction = vi.fn()
-    const goalActions = [
-      { id: 'ga1', goalId: 'g1', description: 'Renovate backyard', quarter: 'Q2', completed: false, projectId: 'p1', sortOrder: 0, createdAt: new Date() },
-    ]
+  it('shows the level above as a read-only reference, and copy-down duplicates a line', async () => {
+    const onCreateTask = vi.fn()
     const { user } = render(
       <CadenceSession {...monthlyProps} tasks={[]} onPushTask={vi.fn()} onClose={vi.fn()}
-        goalActions={goalActions as never} onPullGoalAction={onPullGoalAction} />
+        onCreateTask={onCreateTask}
+        reference={{ label: 'Your Summer list', items: [{ id: 'r1', title: 'Get bikes' }] }} />
     )
-    expect(screen.getByText(/Break goals down \(1\)/)).toBeInTheDocument()
-    expect(screen.getByText('Renovate backyard')).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: /Plan it/ }))
-    expect(onPullGoalAction).toHaveBeenCalledWith(goalActions[0])
+    expect(screen.getByText(/Your Summer list — for reference/)).toBeInTheDocument()
+    expect(screen.getByText('Get bikes')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /Copy down/ }))
+    expect(onCreateTask).toHaveBeenCalledWith('Get bikes')
   })
 
-  it('hides the goals section when there are no goal actions', () => {
-    render(<CadenceSession {...monthlyProps} tasks={[]} onPushTask={vi.fn()} onClose={vi.fn()} goalActions={[]} onPullGoalAction={vi.fn()} />)
-    expect(screen.queryByText(/Break goals down/)).not.toBeInTheDocument()
+  it('reference lines already on this list show a check instead of a copy button', () => {
+    render(
+      <CadenceSession {...monthlyProps}
+        tasks={[task({ id: 'm1', title: 'Get bikes', bucket: 'month' })]}
+        onPushTask={vi.fn()} onClose={vi.fn()} onCreateTask={vi.fn()}
+        reference={{ label: 'Your Summer list', items: [{ id: 'r1', title: 'Get bikes' }] }} />
+    )
+    expect(screen.getByText('on this list')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Copy down/ })).not.toBeInTheDocument()
   })
 
   it('annual config (no buckets) renders text only, no pull section', () => {

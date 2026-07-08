@@ -13,7 +13,7 @@
 
 import { useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CalendarRange, Target, Plus, ChevronRight, FolderOpen } from 'lucide-react';
+import { CalendarRange, Target, Plus, ChevronRight, FolderOpen, Check } from 'lucide-react';
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
 import { useGoogleCalendar } from '@/hooks/useGoogleCalendar';
 import { useEventNotes } from '@/hooks/useEventNotes';
@@ -39,8 +39,6 @@ import { useConvertTaskToProject } from '@/hooks/useConvertTaskToProject';
 import { applyTriageWhen } from '@/lib/triage/applyWhen';
 import { useGoalsContext } from '@/contexts/GoalsContext';
 import { periodLabel, periodProgress } from '@/lib/cadence/periods';
-import { groupGuidingGoals, guidingGoalsSummary } from '@/lib/cadence/guidingGoals';
-import type { GoalAction } from '@/types/goal';
 import type { Task } from '@/types/task';
 
 // ── The cascade rail: the rhythm spine rendered as a walkable path, with the
@@ -150,34 +148,33 @@ export function HorizonView({ horizon }: HorizonViewProps) {
     return counts;
   }, [tasks, match]);
 
-  // Guiding goals — this season's goal actions (annual goals broken into
-  // quarterly moves), shown on the month/season rungs; the year rung shows the
-  // full goals-by-area picture.
-  const { areas, goals, getCurrentQuarter } = useGoalsContext();
-  const seasonGoalActions = useMemo(() => {
-    const q = getCurrentQuarter();
-    return goals
-      .filter((g) => g.status === 'active')
-      .flatMap((g) => g.actions.map((a) => ({ action: a, goal: g })))
-      .filter(({ action }) => action.quarter === q && !action.completed);
-  }, [goals, getCurrentQuarter]);
-
-  // Grouped by goal + tagged with what's already underway in this pool.
-  // Collapsed by default (the horizon's own plan leads); auto-open on a blank
-  // slate where the goals ARE the invitation to plan.
-  const guidingGroups = useMemo(
-    () => groupGuidingGoals(seasonGoalActions, pool),
-    [seasonGoalActions, pool],
-  );
-  const guidingSummary = useMemo(() => guidingGoalsSummary(guidingGroups), [guidingGroups]);
-  const [goalsOpen, setGoalsOpen] = useState(false);
+  // The level above, for reference — each level keeps its OWN list; planning
+  // means LOOKING at the level above while writing this one. Month looks at
+  // the season list; season looks at the year's goals. Read-only, folded by
+  // default (this level's own list leads the page); auto-open on a blank
+  // slate, where the level above is the invitation.
+  const { areas, goals } = useGoalsContext();
+  const referenceItems = useMemo<Array<{ id: string; title: string; goalId?: string }>>(() => {
+    if (horizon === 'month') {
+      return selectHorizonPool(tasks, 'season', match).map((t) => ({ id: t.id, title: t.title }));
+    }
+    if (horizon === 'season') {
+      return goals
+        .filter((g) => g.status === 'active')
+        .map((g) => ({ id: g.id, title: g.name, goalId: g.id }));
+    }
+    return [];
+  }, [horizon, tasks, match, goals]);
+  const referenceLabel = horizon === 'month' ? `Your ${periodLabel('season')?.split(' ')[0]} list` : `Your ${new Date().getFullYear()} goals`;
+  const poolTitles = useMemo(() => new Set(pool.map((t) => t.title)), [pool]);
+  const [refOpen, setRefOpen] = useState(false);
   const autoOpenedRef = useRef(false);
   useEffect(() => {
-    if (!autoOpenedRef.current && pool.length === 0 && guidingGroups.length > 0) {
+    if (!autoOpenedRef.current && pool.length === 0 && referenceItems.length > 0) {
       autoOpenedRef.current = true;
-      setGoalsOpen(true);
+      setRefOpen(true);
     }
-  }, [pool.length, guidingGroups.length]);
+  }, [pool.length, referenceItems.length]);
 
   // Where this rung sits in the cascade + how far through its period we are.
   const period = periodLabel(horizon);
@@ -233,17 +230,6 @@ export function HorizonView({ horizon }: HorizonViewProps) {
     setDraft('');
     await onCreateTaskFromValue(title);
   }, [draft, onCreateTaskFromValue]);
-
-  // Break a goal action into this horizon: create a linked task carrying the
-  // action's project (why-chain resolves through it); the action persists —
-  // it's an umbrella that can spawn several chunks over the season.
-  const pullGoalAction = useCallback(
-    async (action: GoalAction) => {
-      if (!horizonBucket) return;
-      await addTask(action.description, undefined, action.projectId, undefined, { bucket: horizonBucket });
-    },
-    [addTask, horizonBucket],
-  );
 
   // Projects in motion — a month/season is mostly its projects, so the pool
   // groups by project (biggest first); loose tasks follow.
@@ -582,63 +568,59 @@ export function HorizonView({ horizon }: HorizonViewProps) {
             </div>
           )}
 
-          {/* Guiding goals — this season's moves, grouped by goal and folded
-              into one quiet card. Collapsed by default so the horizon's OWN
-              plan leads the page; auto-open on a blank slate, where the goals
-              are the invitation. Moves already served by pool tasks show "In
-              motion" instead of asking to be planned again. */}
-          {(horizon === 'month' || horizon === 'season') && guidingGroups.length > 0 && (
+          {/* The level above, for reference — folded into one quiet line so
+              this level's OWN list leads the page. Month looks at the season
+              list; season looks at the year's goals. Read-only: nothing moves,
+              nothing has to line up. "Copy down" duplicates a line onto this
+              list (the original stays where it lives, so the upper list is
+              intact for its own review); lines already here show a check. */}
+          {(horizon === 'month' || horizon === 'season') && referenceItems.length > 0 && (
             <section className="mb-8">
               <button
                 type="button"
-                onClick={() => setGoalsOpen((v) => !v)}
-                aria-expanded={goalsOpen}
+                onClick={() => setRefOpen((v) => !v)}
+                aria-expanded={refOpen}
                 className="w-full flex items-center gap-2 rounded-xl border border-primary-100 bg-primary-50/30 px-4 py-3 text-left hover:bg-primary-50/60 transition-colors"
               >
                 <Target className="w-4 h-4 text-primary-500 shrink-0" />
                 <span className="flex-1 min-w-0 text-sm text-neutral-700">
-                  <span className="font-medium">Guiding goals</span>
-                  <span className="text-neutral-400">
-                    {' '}— {guidingSummary.moves} moves this season
-                    {guidingSummary.inMotion > 0 && `, ${guidingSummary.inMotion} in motion`}
-                  </span>
+                  <span className="font-medium">{referenceLabel}</span>
+                  <span className="text-neutral-400"> — {referenceItems.length} for reference</span>
                 </span>
-                <ChevronRight className={`w-4 h-4 text-neutral-400 shrink-0 transition-transform ${goalsOpen ? 'rotate-90' : ''}`} />
+                <ChevronRight className={`w-4 h-4 text-neutral-400 shrink-0 transition-transform ${refOpen ? 'rotate-90' : ''}`} />
               </button>
-              {goalsOpen && (
-                <div className="mt-3 space-y-4 rounded-xl border border-neutral-100 bg-white px-4 py-3">
-                  {guidingGroups.map(({ goal, moves }) => (
-                    <div key={goal.id}>
-                      <button
-                        type="button"
-                        onClick={() => navigate(`/goals/${goal.id}`)}
-                        className="text-xs font-medium uppercase tracking-wide text-neutral-400 hover:text-primary-700 transition-colors mb-1.5"
-                      >
-                        {goal.name}
-                      </button>
-                      <ul>
-                        {moves.map(({ action, inMotion }) => (
-                          <li key={action.id} className="flex items-center gap-3 py-1">
-                            <span className="flex-1 min-w-0 text-sm text-neutral-800 truncate">{action.description}</span>
-                            {inMotion > 0 ? (
-                              <span className="shrink-0 text-xs font-medium text-primary-700 bg-primary-50 px-2 py-0.5 rounded-full">
-                                In motion · {inMotion}
-                              </span>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => void pullGoalAction(action)}
-                                className="shrink-0 inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-md text-primary-700 bg-primary-50 hover:bg-primary-100 transition-colors"
-                              >
-                                <Plus className="w-3 h-3" /> Plan it
-                              </button>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
+              {refOpen && (
+                <ul className="mt-3 space-y-1 rounded-xl border border-neutral-100 bg-white px-4 py-3">
+                  {referenceItems.map((it) => (
+                    <li key={it.id} className="flex items-center gap-3 py-1">
+                      {it.goalId ? (
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/goals/${it.goalId}`)}
+                          className="flex-1 min-w-0 text-left text-sm text-neutral-800 truncate hover:text-primary-700 transition-colors"
+                        >
+                          {it.title}
+                        </button>
+                      ) : (
+                        <span className="flex-1 min-w-0 text-sm text-neutral-800 truncate">{it.title}</span>
+                      )}
+                      {poolTitles.has(it.title) ? (
+                        <span className="shrink-0 inline-flex items-center gap-1 text-xs text-primary-700">
+                          <Check className="w-3 h-3" strokeWidth={3} /> on this list
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => void onCreateTaskFromValue(it.title)}
+                          title="Copy onto this list (stays on the list above too)"
+                          className="shrink-0 inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-md text-primary-700 bg-primary-50 hover:bg-primary-100 transition-colors"
+                        >
+                          <Plus className="w-3 h-3" /> Copy down
+                        </button>
+                      )}
+                    </li>
                   ))}
-                </div>
+                </ul>
               )}
             </section>
           )}

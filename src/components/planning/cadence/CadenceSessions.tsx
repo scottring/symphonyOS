@@ -1,12 +1,17 @@
 // src/components/planning/cadence/CadenceSessions.tsx
 //
-// Phase 3 — the monthly / seasonal / annual sessions, each a thin config over the
-// generic CadenceSession. Period tokens match getDueSession so a nudge dismissal
-// and the opened session refer to the same period. Agendas follow the verbatim
-// Scott+Iris requirements (relationships, hopes/fears, fun&joy, review).
+// The monthly / seasonal / annual sessions, each a thin config over the
+// generic CadenceSession. Period tokens match getDueSession so a nudge
+// dismissal and the opened session refer to the same period. Agendas follow
+// the verbatim Scott+Iris requirements (relationships, hopes/fears, fun&joy).
+//
+// The levels connect by LOOKING, not linking: each session shows the level
+// above as a read-only reference (month ← season list, season ← annual
+// goals) while you write this level's own list. Nothing is moved out of an
+// upper list, so it stays intact for its own end-of-period review.
 
 import type { Task, TaskBucket } from '@/types/task'
-import type { GoalAction } from '@/types/goal'
+import type { Goal } from '@/types/goal'
 import { CadenceSession } from './CadenceSession'
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
@@ -29,17 +34,21 @@ interface BaseProps {
   onCompleteTask?: (id: string) => void
   /** Capture something new straight into this session's bucket. */
   onCreateTask?: (title: string) => void | Promise<void>
-  /** Current-quarter goal actions + a handler that breaks one into this horizon. */
-  goalActions?: GoalAction[]
-  onPullGoalAction?: (action: GoalAction) => void
+  /** Active annual goals — the seasonal session's read-only reference. */
+  referenceGoals?: Goal[]
   /** Open the Goals app (used by the annual session's goal-setting step). */
   onOpenGoals?: () => void
   /** "Review & tools" links (monthly: routines/delegation, shopping lists). */
   links?: Array<{ label: string; onClick: () => void }>
 }
 
-export function MonthlyPlanningSession({ tasks, tasksLoading, onPushTask, onClose, onHandDown, onSetBucket, onCompleteTask, onCreateTask, goalActions, onPullGoalAction, links }: BaseProps) {
+export function MonthlyPlanningSession({ tasks, tasksLoading, onPushTask, onClose, onHandDown, onSetBucket, onCompleteTask, onCreateTask, links }: BaseProps) {
   const now = new Date()
+  const seasonName = SEASONS[seasonIndex(now)]
+  // The season's list, read-only — looked at while writing the month's list.
+  const seasonList = tasks
+    .filter((t) => !t.completed && t.bucket === 'quarter')
+    .map((t) => ({ id: t.id, title: t.title }))
   return (
     <CadenceSession
       horizon="monthly"
@@ -49,10 +58,10 @@ export function MonthlyPlanningSession({ tasks, tasksLoading, onPushTask, onClos
       tasks={tasks}
       tasksLoading={tasksLoading}
       thisBucket="month"
-      pullFromBucket="quarter"
-      pullFromLabel="Pull from this season"
+      pullFromBucket={null}
+      reference={{ label: `Your ${seasonName} list`, items: seasonList }}
       // Verbatim monthly agenda. (Big-rock schedule review = the In-review list;
-      // projects/goals = pull-down + break-goals; routines & lists = links below.)
+      // the season list is the look-up; routines & lists = links below.)
       textFields={[
         { key: 'relationships', label: 'Relationships & parenting', placeholder: 'What needs attention with each other and the kids this month?' },
         { key: 'concerns', label: 'Bigger-picture concerns & topics', placeholder: 'Less-urgent things to discuss this month.' },
@@ -63,17 +72,19 @@ export function MonthlyPlanningSession({ tasks, tasksLoading, onPushTask, onClos
       onSetBucket={onSetBucket}
       onCompleteTask={onCompleteTask}
       onCreateTask={onCreateTask}
-      goalActions={goalActions}
-      onPullGoalAction={onPullGoalAction}
       links={links}
       financialLabel="Update the budget, review expenditures, discuss big budget items — in your finance tool"
     />
   )
 }
 
-export function SeasonalPlanningSession({ tasks, tasksLoading, onPushTask, onClose, onHandDown, onSetBucket, onCompleteTask, onCreateTask, goalActions, onPullGoalAction }: BaseProps) {
+export function SeasonalPlanningSession({ tasks, tasksLoading, onPushTask, onClose, onHandDown, onSetBucket, onCompleteTask, onCreateTask, referenceGoals }: BaseProps) {
   const now = new Date()
   const s = seasonIndex(now)
+  // The year's goals, read-only — looked at while writing the season's list.
+  const goalList = (referenceGoals ?? [])
+    .filter((g) => g.status === 'active')
+    .map((g) => ({ id: g.id, title: g.name }))
   return (
     <CadenceSession
       horizon="seasonal"
@@ -85,7 +96,8 @@ export function SeasonalPlanningSession({ tasks, tasksLoading, onPushTask, onClo
       thisBucket="quarter"
       pullFromBucket="someday"
       pullFromLabel="Pull from someday"
-      // Verbatim seasonal agenda (goals/projects = pull-down + break-goals).
+      reference={{ label: `Your ${now.getFullYear()} goals`, items: goalList }}
+      // Verbatim seasonal agenda.
       textFields={[
         { key: 'review', label: 'Season in review', placeholder: 'What happened this season — wins and what slipped?' },
         { key: 'hopesFears', label: 'Hopes & fears', placeholder: 'What are you hoping for, and what are you worried about?' },
@@ -99,8 +111,6 @@ export function SeasonalPlanningSession({ tasks, tasksLoading, onPushTask, onClo
       onSetBucket={onSetBucket}
       onCompleteTask={onCompleteTask}
       onCreateTask={onCreateTask}
-      goalActions={goalActions}
-      onPullGoalAction={onPullGoalAction}
       financialLabel="Compare actual vs budget, update the plan, make a seasonal budget — in your finance tool"
     />
   )
