@@ -83,7 +83,7 @@ const TOOLS = [
       type: 'object',
       properties: {
         title: { type: 'string' },
-        scheduled_for: { type: 'string', description: 'YYYY-MM-DD or ISO8601' },
+        scheduled_for: { type: 'string', description: "YYYY-MM-DD, or ISO8601 with a time. A time without a UTC offset (e.g. 2026-07-10T15:00:00) is read as the user's LOCAL time (US Eastern)." },
         is_all_day: { type: 'boolean' },
         context: { type: 'string', enum: CONTEXT_ENUM },
         category: { type: 'string', enum: ['task', 'chore', 'errand', 'event', 'activity'] },
@@ -434,6 +434,15 @@ function normalizeSchedule(
     const offMin = etOffsetMinutes(dateStr)
     const utcMs = Date.parse(`${dateStr}T00:00:00Z`) - offMin * 60000
     sf = new Date(utcMs).toISOString()
+  } else if (hasTime && !/(?:Z|[+-]\d{2}:?\d{2})$/.test(scheduledFor)) {
+    // A timed value WITHOUT an explicit offset ("2026-07-10T15:00:00") means
+    // local wall-clock time to the model ("3pm"). Stored raw, Postgres reads
+    // it as UTC and it lands hours off (the camp-show-at-11am bug) — convert
+    // from APP_TZ to UTC instead.
+    const dateStr = scheduledFor.slice(0, 10)
+    const offMin = etOffsetMinutes(dateStr)
+    const utcMs = Date.parse(`${scheduledFor}Z`) - offMin * 60000
+    if (!Number.isNaN(utcMs)) sf = new Date(utcMs).toISOString()
   }
   return { scheduled_for: sf, is_all_day: allDay, bucket: 'timed' }
 }
@@ -491,15 +500,28 @@ async function runTool(
         const { id: _id, scheduled_for, is_all_day, bucket: rawBucket, ...rest } = input as Record<string, unknown>
         const sched = normalizeSchedule(scheduled_for, is_all_day)
         const bucket = sched.scheduled_for ? 'timed' : ((rawBucket as string) ?? 'inbox')
+        const row: Record<string, unknown> = {
+          ...rest,
+          scheduled_for: sched.scheduled_for,
+          is_all_day: sched.is_all_day,
+          bucket,
+          user_id: userId,
+          completed: false,
+        }
+        // Assign the caller by default (mirrors QuickCapture and the routine
+        // tool below): Today's "my tasks" filter hides unassigned items, so
+        // an agent-created task/event would otherwise silently never render.
+        if (row.assigned_to == null && currentMemberId) {
+          row.assigned_to = currentMemberId
+          row.assigned_to_all = [currentMemberId]
+        }
+        // Scope defaults from the life domain (defaultScopeForArea in the app):
+        // family items are household-visible, everything else stays private.
+        if (row.scope == null) {
+          row.scope = row.context === 'family' ? 'compound' : 'individual'
+        }
         const { data, error } = await db.from('tasks')
-          .insert({
-            ...rest,
-            scheduled_for: sched.scheduled_for,
-            is_all_day: sched.is_all_day,
-            bucket,
-            user_id: userId,
-            completed: false,
-          })
+          .insert(row)
           .select().single()
         if (error) throw error
         return JSON.stringify(data, null, 2)

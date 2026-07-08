@@ -222,3 +222,40 @@ describe('useSymphonyAssistant', () => {
     })
   })
 })
+
+describe('useSymphonyAssistant empty-reply resilience', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('fills the placeholder bubble when the stream ends with no text', async () => {
+    vi.mocked(streamSymphonyAgent).mockImplementation(async (_messages, h) => {
+      h.onDone?.('', null) // agent finished silently (e.g. tool-only turn)
+    })
+    const { result } = renderHook(() => useSymphonyAssistant())
+    await act(async () => { await result.current.sendMessage('hi') })
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    const assistant = result.current.messages[1]
+    expect(assistant.role).toBe('assistant')
+    expect(assistant.content.length).toBeGreaterThan(0)
+  })
+
+  it('fills the placeholder bubble on a stream error event', async () => {
+    vi.mocked(streamSymphonyAgent).mockImplementation(async (_messages, h) => {
+      h.onError?.('Assistant offline')
+    })
+    const { result } = renderHook(() => useSymphonyAssistant())
+    await act(async () => { await result.current.sendMessage('hi') })
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(result.current.messages[1].content).toMatch(/went wrong|offline/i)
+  })
+
+  it('fills the placeholder bubble and clears loading when the stream throws', async () => {
+    vi.mocked(streamSymphonyAgent).mockImplementation(async () => {
+      throw new Error('network dropped')
+    })
+    const { result } = renderHook(() => useSymphonyAssistant())
+    await act(async () => { await result.current.sendMessage('hi') })
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(result.current.messages[1].content.length).toBeGreaterThan(0)
+    expect(result.current.error).toBeTruthy()
+  })
+})

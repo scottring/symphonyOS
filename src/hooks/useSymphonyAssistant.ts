@@ -206,24 +206,46 @@ export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
         }
       : undefined
 
-    await streamSymphonyAgent(apiMessages, {
-      onText: appendText,
-      onTool: (name) => {
-        if (WRITE_TOOLS.has(name)) didWrite = true
-        setToolActivity((prev) => [...prev, name])
-      },
-      onDone: (reply) => {
-        // Fall back to the authoritative final reply if no text streamed.
-        if (assistantText.length === 0) assistantText = reply
-        setMessages((prev) => prev.map((m) =>
-          m.id === assistantId && m.content.length === 0
-            ? { ...m, content: reply } : m))
-      },
-      onError: (message) => setError(message),
-      attachment: attachmentMeta,
-      currentMemberId: getCurrentUserMember()?.id,
-      taskContext,
-    })
+    let streamError: string | null = null
+    try {
+      await streamSymphonyAgent(apiMessages, {
+        onText: appendText,
+        onTool: (name) => {
+          if (WRITE_TOOLS.has(name)) didWrite = true
+          setToolActivity((prev) => [...prev, name])
+        },
+        onDone: (reply) => {
+          // Fall back to the authoritative final reply if no text streamed.
+          if (assistantText.length === 0) assistantText = reply
+          setMessages((prev) => prev.map((m) =>
+            m.id === assistantId && m.content.length === 0
+              ? { ...m, content: reply } : m))
+        },
+        onError: (message) => {
+          streamError = message
+          setError(message)
+        },
+        attachment: attachmentMeta,
+        currentMemberId: getCurrentUserMember()?.id,
+        taskContext,
+      })
+    } catch {
+      streamError = 'Connection dropped'
+      setError('The assistant connection dropped.')
+    }
+
+    // Never leave the placeholder bubble empty: an invisible failure reads as
+    // the assistant ignoring the message, so the user re-sends and double-posts
+    // (and a silent tool-only turn looks the same). Always say something.
+    if (assistantText.length === 0) {
+      assistantText = streamError
+        ? `Something went wrong on my end (${streamError}). Please try that again.`
+        : 'Something went wrong on my end — please try that again.'
+      const fallback = assistantText
+      setMessages((prev) => prev.map((m) =>
+        m.id === assistantId && m.content.length === 0
+          ? { ...m, content: fallback } : m))
+    }
 
     if (didWrite) onMutate?.()
     setLoading(false)
