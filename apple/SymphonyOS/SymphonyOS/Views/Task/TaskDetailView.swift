@@ -196,6 +196,9 @@ struct TaskDetailView: View {
                     )
                 }
 
+                // Photos — attachments (e.g. the photo behind a photo capture)
+                TaskAttachmentsSection(taskId: task.id)
+
                 // Links — product pages, reservations, docs (web parity)
                 VStack(alignment: .leading, spacing: 8) {
                     Label("Links", systemImage: "link")

@@ -13,6 +13,14 @@ struct LinkedActivity: Codable, Hashable {
     var id: String
 }
 
+/// Mirrors the `tasks.capture_meta` jsonb column (photo-first capture).
+/// status: "pending" (awaiting AI analysis) | "done" | "failed".
+struct CaptureMeta: Codable, Hashable {
+    var status: String?
+    var storage_path: String?
+    var suggested_task_id: String?
+}
+
 // MARK: - SymphonyTask
 
 @Model
@@ -56,6 +64,11 @@ final class SymphonyTask {
     var linkedTo: LinkedActivity?
     var linkType: String? // "prep", "followup"
 
+    // Photo-first capture (tasks.capture_meta jsonb, flattened for SwiftUI)
+    var captureStatus: String? // "pending" | "done" | "failed"
+    var captureStoragePath: String?
+    var captureSuggestedTaskId: UUID?
+
     // Sync
     var syncStatus: SyncStatus
     var lastSyncedAt: Date?
@@ -96,6 +109,9 @@ final class SymphonyTask {
         self.parentTaskId = nil
         self.linkedTo = nil
         self.linkType = nil
+        self.captureStatus = nil
+        self.captureStoragePath = nil
+        self.captureSuggestedTaskId = nil
         self.syncStatus = syncStatus
         self.lastSyncedAt = nil
         self.createdAt = Date()

@@ -15,9 +15,12 @@ struct MainView: View {
 
 // MARK: - iOS Tab View
 
+#if os(iOS)
 struct iOSMainView: View {
     @Environment(AppState.self) private var appState
     @Environment(AuthService.self) private var auth
+    @Environment(\.modelContext) private var modelContext
+    @Environment(\.scenePhase) private var scenePhase
     @State private var showCapture = false
 
     var body: some View {
@@ -38,6 +41,11 @@ struct iOSMainView: View {
                 CaptureSheet(userId: userId)
                     .presentationDetents([.medium])
             }
+        }
+        // Re-drive photo captures that never finished (offline snap, killed app).
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active else { return }
+            Task { await PhotoCaptureService.retryPending(modelContext: modelContext) }
         }
     }
 }
@@ -233,6 +241,7 @@ private struct CaptureSheet: View {
         dismiss()
     }
 }
+#endif
 
 // MARK: - macOS Split View
 

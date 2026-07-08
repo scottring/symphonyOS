@@ -7,6 +7,7 @@ struct QuickCaptureBar: View {
     var defaultDate: Date? = nil
     @Environment(\.modelContext) private var modelContext
     @State private var title = ""
+    @State private var showCamera = false
     @FocusState private var isFocused: Bool
 
     private var placeholder: String { defaultDate != nil ? "Add to today…" : "Add a task…" }
@@ -39,6 +40,23 @@ struct QuickCaptureBar: View {
                 .buttonStyle(.plain)
                 .transition(.scale.combined(with: .opacity))
             }
+
+            #if os(iOS)
+            // Photo capture: snap a thing → AI turns it into an enriched inbox
+            // task in the background (fire-and-forget).
+            if title.isEmpty {
+                Button {
+                    showCamera = true
+                } label: {
+                    Image(systemName: "camera.fill")
+                        .font(.system(size: 22))
+                        .foregroundStyle(Color.primaryTint)
+                        .symbolRenderingMode(.hierarchical)
+                }
+                .buttonStyle(.plain)
+                .transition(.scale.combined(with: .opacity))
+            }
+            #endif
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 14)
@@ -64,6 +82,17 @@ struct QuickCaptureBar: View {
                 .frame(height: 0.5)
         }
         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: !title.isEmpty)
+        #if os(iOS)
+        .fullScreenCover(isPresented: $showCamera) {
+            CameraPicker { data in
+                showCamera = false
+                guard let data else { return }
+                PhotoCaptureService.capture(jpegData: data, userId: userId, modelContext: modelContext)
+                UINotificationFeedbackGenerator().notificationOccurred(.success)
+            }
+            .ignoresSafeArea()
+        }
+        #endif
     }
 
     private func submit() {

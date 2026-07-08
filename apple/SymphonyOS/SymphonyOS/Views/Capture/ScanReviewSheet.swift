@@ -1,3 +1,4 @@
+#if os(iOS)
 import SwiftUI
 
 /// Review/edit the AI-extracted fields for a scanned document before saving it as a task.
@@ -99,3 +100,4 @@ struct ScanReviewSheet: View {
         return f
     }()
 }
+#endif

@@ -130,8 +130,29 @@ struct SyncSerializationTests {
             "linked_activity_type", "linked_activity_id", "category", "google_event_id",
             "assigned_to_all", "is_waiting", "waiting_since", "bucket", "needs_discussion",
             "discussion_note", "week_deferred_at", "group_members", "scope", "directions",
+            "capture_meta",
         ]
         #expect(Set(row.keys).isSubset(of: prodColumns))
+        // Non-capture tasks must NOT send capture_meta — a null would wipe the
+        // server-side capture state written by the analyze-capture edge function.
+        #expect(row["capture_meta"] == nil)
+    }
+
+    @Test func captureTaskRowRoundTripsCaptureMeta() throws {
+        let context = try makeContext()
+        let task = SymphonyTask(userId: UUID(), title: "Analyzing photo…")
+        task.captureStatus = "pending"
+        task.captureStoragePath = "user/capture/abc.jpg"
+        let suggested = UUID()
+        task.captureSuggestedTaskId = suggested
+        context.insert(task)
+        try context.save()
+
+        let row = try #require(SyncEngine.serializeRow(table: "tasks", id: task.id, context: context))
+        let meta = try #require(row["capture_meta"]?.objectValue)
+        #expect(meta["status"]?.stringValue == "pending")
+        #expect(meta["storage_path"]?.stringValue == "user/capture/abc.jpg")
+        #expect(meta["suggested_task_id"]?.stringValue == suggested.uuidString)
     }
 
     @Test func queueSyncDedupesIdenticalChanges() throws {

@@ -150,32 +150,74 @@ struct InboxTaskRow: View {
     }
 
     private var rowContent: some View {
-        HStack(spacing: 12) {
-            // Title (completion is via swipe-left now — no checkbox)
-            Text(task.title)
-                .font(.bodyMedium)
-                .foregroundStyle(Color.textPrimary)
-                .lineLimit(2)
-
-            Spacer()
-
-            HStack(spacing: 8) {
-                if task.location != nil {
-                    Image(systemName: "mappin")
-                        .font(.system(size: 12))
-                        .foregroundStyle(Color.textTertiary)
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 12) {
+                // A photo capture still being analyzed shows a spinner by its title.
+                if task.captureStatus == "pending" {
+                    ProgressView()
+                        .controlSize(.small)
                 }
-                // Context shown as a colored dot (per the mobile design spec)
-                if task.context != nil {
-                    Circle()
-                        .fill(contextColor)
-                        .frame(width: 10, height: 10)
+
+                // Title (completion is via swipe-left now — no checkbox)
+                Text(task.title)
+                    .font(.bodyMedium)
+                    .foregroundStyle(Color.textPrimary)
+                    .lineLimit(2)
+
+                Spacer()
+
+                HStack(spacing: 8) {
+                    if task.location != nil {
+                        Image(systemName: "mappin")
+                            .font(.system(size: 12))
+                            .foregroundStyle(Color.textTertiary)
+                    }
+                    // Context shown as a colored dot (per the mobile design spec)
+                    if task.context != nil {
+                        Circle()
+                            .fill(contextColor)
+                            .frame(width: 10, height: 10)
+                    }
+                    AssigneeAvatars(memberIds: assignedMemberIds, members: familyMembers, size: 20)
                 }
-                AssigneeAvatars(memberIds: assignedMemberIds, members: familyMembers, size: 20)
+            }
+
+            // Destination chip: an analyzed photo capture that matched an open
+            // task — one tap merges the note + photo onto it.
+            if let target = suggestedTarget {
+                Button {
+                    Task {
+                        if await PhotoCaptureService.merge(capture: task, into: target, modelContext: modelContext) {
+                            #if os(iOS)
+                            UINotificationFeedbackGenerator().notificationOccurred(.success)
+                            #endif
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "arrow.turn.down.right")
+                            .font(.system(size: 12, weight: .semibold))
+                        Text("Add to: \(target.title)")
+                            .font(.captionBold)
+                            .lineLimit(1)
+                    }
+                    .foregroundStyle(Color.primaryTint)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Color.primaryTint.opacity(0.12), in: Capsule())
+                }
+                .buttonStyle(.plain)
             }
         }
         .padding(12)
         .cardStyle(padding: 0)
+    }
+
+    /// Resolve the AI-suggested destination task, if it still exists and is open.
+    private var suggestedTarget: SymphonyTask? {
+        guard task.captureStatus == "done", let targetId = task.captureSuggestedTaskId else { return nil }
+        let descriptor = FetchDescriptor<SymphonyTask>(predicate: #Predicate { $0.id == targetId && !$0.completed })
+        return try? modelContext.fetch(descriptor).first
     }
 
     private static let todayAmber = Color(red: 0.88, green: 0.64, blue: 0.23)

@@ -348,7 +348,7 @@ actor SyncEngine {
     }
 
     private static func taskRow(_ t: SymphonyTask) -> [String: AnyJSON] {
-        return [
+        var row: [String: AnyJSON] = [
             "id": .string(t.id.uuidString),
             "user_id": .string(t.userId.uuidString),
             "title": .string(t.title),
@@ -375,6 +375,17 @@ actor SyncEngine {
             "created_at": .string(isoOut.string(from: t.createdAt)),
             "updated_at": .string(isoOut.string(from: Date())),
         ]
+        // Only send capture_meta when this task IS a photo capture — a blanket
+        // null would wipe server-side capture state written by analyze-capture
+        // (UPDATE only touches the columns present in the row).
+        if let status = t.captureStatus {
+            row["capture_meta"] = j(CaptureMeta(
+                status: status,
+                storage_path: t.captureStoragePath,
+                suggested_task_id: t.captureSuggestedTaskId?.uuidString
+            ))
+        }
+        return row
     }
 
     // Column sets below are the intersection of the iOS model's fields and the

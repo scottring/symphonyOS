@@ -16,8 +16,11 @@ enum DocumentIngest {
 
     // MARK: - Pure helpers (unit-tested)
 
+    /// Lowercased: the storage RLS upload policy compares the first path folder
+    /// to auth.uid()::text, which is lowercase — an uppercase UUID folder is
+    /// silently rejected.
     static func storagePath(userId: UUID, fileId: String, ext: String) -> String {
-        "\(userId.uuidString)/scans/\(fileId).\(ext)"
+        "\(userId.uuidString.lowercased())/scans/\(fileId.lowercased()).\(ext)"
     }
 
     static func fallbackTitle(fileName: String?) -> String {

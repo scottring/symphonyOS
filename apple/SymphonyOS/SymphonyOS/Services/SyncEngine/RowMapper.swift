@@ -70,6 +70,10 @@ enum RowMapper {
         task.parentTaskId = row.uuid("parent_task_id")
         task.linkedTo = row.codable("linked_to")
         task.linkType = row.string("link_type")
+        let captureMeta: CaptureMeta? = row.codable("capture_meta")
+        task.captureStatus = captureMeta?.status
+        task.captureStoragePath = captureMeta?.storage_path
+        task.captureSuggestedTaskId = captureMeta?.suggested_task_id.flatMap(UUID.init(uuidString:))
         task.lastSyncedAt = Date()
         task.createdAt = row.date("created_at") ?? Date()
         task.updatedAt = row.date("updated_at") ?? Date()
