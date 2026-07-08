@@ -1,7 +1,7 @@
 import type { TodayDataInput, TodayData } from './types'
 import { SECTIONS_ORDER } from './types'
 import { makeAssigneeFilter } from './assigneeFilter'
-import { selectOverdue, selectInbox, selectWeek, selectCompletedInbox, selectTimed } from './taskPools'
+import { selectOverdue, selectInbox, selectWeek, selectMonth, selectCompletedInbox, selectTimed } from './taskPools'
 import { buildRoutineStatusMap, buildEventStatusMap, selectVisibleRoutines } from './statusMaps'
 import { buildGroupedSections } from './grouping'
 
@@ -22,6 +22,7 @@ export function computeTodayData(input: TodayDataInput): TodayData {
   const overdueTasks = selectOverdue(input.tasks, isToday, match)
   const inboxTasks = selectInbox(input.tasks, isToday, match)
   const weekTasks = selectWeek(input.tasks, isToday, match)
+  const monthTasks = selectMonth(input.tasks, isToday, match)
   const completedInboxTasks = selectCompletedInbox(input.tasks, input.viewedDate, match)
   const timedTasks = selectTimed(input.tasks, input.viewedDate, match)
 
@@ -90,6 +91,7 @@ export function computeTodayData(input: TodayDataInput): TodayData {
     overdueTasks: displayOverdueTasks,
     inboxTasks,
     weekTasks,
+    monthTasks,
     completedInboxTasks,
     grouped,
     sectionsOrder: SECTIONS_ORDER,

@@ -11,9 +11,9 @@
 // Data + action scaffolding mirror InboxViewContainer so the existing
 // DenseInboxRow + global DetailPanel (tap-to-detail) work unchanged.
 
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CalendarRange, Target } from 'lucide-react';
+import { CalendarRange, Target, Plus } from 'lucide-react';
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
 import { useGoogleCalendar } from '@/hooks/useGoogleCalendar';
 import { useEventNotes } from '@/hooks/useEventNotes';
@@ -118,17 +118,38 @@ export function HorizonView({ horizon }: HorizonViewProps) {
     return overrides;
   }, [eventNotesMap]);
 
+  // Create INTO this horizon's bucket — not dated-today. A task added on the
+  // This Month page belongs in the month pool, or it vanishes from the page
+  // the moment it's created.
+  const horizonBucket = def?.bucket && def.bucket !== 'timed' ? def.bucket : null;
   const onCreateTaskFromValue = useCallback(
     async (title: string) => {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      await addTask(title, undefined, undefined, today, {
+      const id = await addTask(title, undefined, undefined, undefined, {
         assignedTo: getCurrentUserMember()?.id,
         context: currentDomain !== 'universal' ? currentDomain : undefined,
-        isAllDay: true,
       });
+      if (id && horizonBucket) await setBucket(id, horizonBucket);
     },
-    [addTask, getCurrentUserMember, currentDomain],
+    [addTask, getCurrentUserMember, currentDomain, horizonBucket, setBucket],
+  );
+
+  // Inline add-a-task draft for the pool section.
+  const [draft, setDraft] = useState('');
+  const submitDraft = useCallback(async () => {
+    const title = draft.trim();
+    if (!title) return;
+    setDraft('');
+    await onCreateTaskFromValue(title);
+  }, [draft, onCreateTaskFromValue]);
+
+  // Create a new project from a row's inline picker and attach the task to it.
+  const handleCreateProjectForTask = useCallback(
+    (taskId: string) => async (name: string, context: import('@/types/task').TaskContext | null) => {
+      const project = await addProject({ name, context: context ?? undefined });
+      if (!project) return;
+      await updateTask(taskId, { projectId: project.id });
+    },
+    [addProject, updateTask],
   );
 
   // Expand a task into a new project (subtasks absorbed, parent task deleted).
@@ -239,10 +260,12 @@ export function HorizonView({ horizon }: HorizonViewProps) {
           onUpdate={(updates) => updateTask(task.id, updates)}
           onSelect={() => handleSelect(task.id)}
           onAssign={(memberIds) => scheduleActions.onAssignTaskAll(task.id, memberIds)}
+          onCreateProject={handleCreateProjectForTask(task.id)}
+          onOpenProject={(projectId) => navigate(`/projects/${projectId}`)}
         />
       );
     },
-    [projects, familyMembers, applyWhen, deleteTask, toggleTask, updateTask, handleSelect, scheduleActions],
+    [projects, familyMembers, applyWhen, deleteTask, toggleTask, updateTask, handleSelect, scheduleActions, handleCreateProjectForTask, navigate],
   );
 
   // ── "Plan the [horizon]" — routes to the Today rung with a ?plan flag; the
@@ -341,10 +364,32 @@ export function HorizonView({ horizon }: HorizonViewProps) {
             {pool.length === 0 ? (
               <div className="text-center py-12 text-neutral-400">
                 <p className="font-display text-lg text-neutral-600 mb-1">Nothing in {label.toLowerCase()}</p>
-                <p className="text-sm">Triage items here from your Inbox.</p>
+                <p className="text-sm">Triage items here from your Inbox, or add one below.</p>
               </div>
             ) : (
               <div className="space-y-2">{pool.map(renderRow)}</div>
+            )}
+
+            {/* Add a task directly into this horizon's pool. */}
+            {horizonBucket && (
+              <div className="mt-3 flex items-center gap-2 px-2 py-1.5 rounded-xl border border-neutral-200 bg-white focus-within:border-primary-400 transition-colors">
+                <button
+                  type="button"
+                  onClick={() => void submitDraft()}
+                  aria-label="Add task"
+                  className="shrink-0 w-6 h-6 rounded-full bg-primary-600 text-white grid place-items-center hover:bg-primary-700 transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+                <input
+                  type="text"
+                  value={draft}
+                  onChange={(e) => setDraft(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') void submitDraft() }}
+                  placeholder={`Add a task to ${label.toLowerCase()}…`}
+                  className="flex-1 min-w-0 text-sm bg-transparent placeholder:text-neutral-400 focus:outline-none"
+                />
+              </div>
             )}
           </section>
         </div>

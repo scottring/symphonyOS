@@ -87,7 +87,7 @@ function ProjectControl({ project, projects, onOpenProject, onAssign, onClear, o
         type="button"
         aria-label="Assign project"
         onClick={() => setOpen((v) => !v)}
-        className="opacity-0 group-hover:opacity-100 aria-expanded:opacity-100 transition-opacity p-1 rounded-md text-neutral-400 hover:text-blue-600 hover:bg-blue-50"
+        className="opacity-50 hover:opacity-100 group-hover:opacity-100 aria-expanded:opacity-100 transition-opacity p-1 rounded-md text-neutral-400 hover:text-blue-600 hover:bg-blue-50"
         aria-expanded={open}
         title="Assign project"
       >

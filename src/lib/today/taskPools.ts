@@ -55,6 +55,17 @@ export function selectWeek(tasks: Task[], isToday: boolean, match: Match): Task[
   })
 }
 
+/** Month staging pool — mirrors selectWeek for bucket 'month'. */
+export function selectMonth(tasks: Task[], isToday: boolean, match: Match): Task[] {
+  if (!isToday) return []
+  return tasks.filter((task) => {
+    if (task.completed) return false
+    if (task.bucket !== 'month') return false
+    if (!match(task.assignedTo, task.assignedToAll)) return false
+    return true
+  })
+}
+
 /** Ports TodaySchedule.completedInboxTasks (~697-713). */
 export function selectCompletedInbox(tasks: Task[], viewedDate: Date, match: Match): Task[] {
   const startOfDay = new Date(viewedDate)

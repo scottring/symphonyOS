@@ -351,23 +351,27 @@ export function TodayView({
   const onLinkNote = onLinkNoteProp ?? ctx.onLinkNote
   const timelineNotes = timelineNotesProp ?? ctx.timelineNotes
 
+  const stagingHandlers = {
+    allTasks: tasks,
+    projects: projects ?? [],
+    familyMembers,
+    onPullToToday: (taskId: string) => {
+      const t = new Date(); t.setHours(0, 0, 0, 0)
+      ctx.onUpdateTask?.(taskId, { bucket: 'timed' as const, scheduledFor: t, isAllDay: true })
+    },
+    onSelectTask: (taskId: string) => onSelectItem(`task-${taskId}`),
+    onCompleteTask: onToggleTask,
+    onDeferTask: ctx.onPushTask ? (taskId: string, target: 'month' | 'quarter') => ctx.onPushTask!(taskId, target) : undefined,
+    onDeleteTask: ctx.onDeleteTask,
+    onUpdateTask: ctx.onUpdateTask,
+  }
+
   const weekTrigger = (
-    <StagingFloat
-      weekTasks={data.weekTasks}
-      allTasks={tasks}
-      projects={projects ?? []}
-      familyMembers={familyMembers}
-      onPullToToday={(taskId) => {
-        const t = new Date(); t.setHours(0, 0, 0, 0)
-        ctx.onUpdateTask?.(taskId, { bucket: 'timed' as const, scheduledFor: t, isAllDay: true })
-      }}
-      onSelectTask={(taskId) => onSelectItem(`task-${taskId}`)}
-      onCompleteTask={onToggleTask}
-      onDeferTask={ctx.onPushTask ? (taskId, target: 'month' | 'quarter') => ctx.onPushTask!(taskId, target) : undefined}
-      onDeleteTask={ctx.onDeleteTask}
-      onUpdateTask={ctx.onUpdateTask}
-      inline
-    />
+    <StagingFloat tasks={data.weekTasks} horizon="week" {...stagingHandlers} inline />
+  )
+
+  const monthTrigger = (
+    <StagingFloat tasks={data.monthTasks} horizon="month" {...stagingHandlers} inline />
   )
 
   const discussion = discussionItems(tasks)
@@ -542,6 +546,7 @@ export function TodayView({
           total={tasks.filter((t) => !t.completed).length}
           aiAvailable={false}
           weekTrigger={weekTrigger}
+          monthTrigger={monthTrigger}
           clarityTrigger={clarityTrigger}
           discussionTrigger={discussion.length > 0 ? <DiscussionBadge items={discussion} onSelectItem={onSelectItem} /> : undefined}
           emailTrigger={emailNudge}

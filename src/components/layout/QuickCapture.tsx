@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useMemo, type ReactNode } from 'react'
-import { Sparkles } from 'lucide-react'
+import { Sparkles, Camera } from 'lucide-react'
+import { usePhotoCapture } from '@/hooks/usePhotoCapture'
 import { hasParsedFields } from '@/lib/quickInputParser'
 import type { TaskCategory, TaskContext } from '@/types/task'
 import { useDomain } from '@/hooks/useDomain'
@@ -72,6 +73,19 @@ export function QuickCapture({
 
   // Get current domain for smart context defaulting
   const { currentDomain } = useDomain()
+
+  // Photo-first capture: snap/import a photo → AI-enriched inbox task.
+  const photo = usePhotoCapture()
+  const photoInputRef = useRef<HTMLInputElement>(null)
+  const handlePhotoPicked = async (file: File | undefined) => {
+    if (!file) return
+    const ctx = currentDomain !== 'universal' ? (currentDomain as TaskContext) : null
+    const ok = await photo.captureFromFile(file, ctx)
+    if (ok) {
+      // Fire-and-forget: the enriched item lands in the inbox via realtime.
+      setTimeout(() => { photo.reset(); handleClose() }, 1600)
+    }
+  }
 
   // Parser context — memoized so useQuickParse's parse memo stays stable
   const parserCtx = useMemo(
@@ -378,6 +392,40 @@ export function QuickCapture({
                   {' '}<span className="text-neutral-500">"event: dentist thu 2pm 45m"</span>, or
                   {' '}<span className="text-neutral-500">"#porch buy lumber"</span>
                 </p>
+              )}
+
+              {/* Photo capture — snap a thing, AI files it (on a Mac, the file
+                  dialog's "Import from iPhone" makes the phone the camera). */}
+              {!title.trim() && (
+                <div>
+                  <input
+                    ref={photoInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      void handlePhotoPicked(e.target.files?.[0])
+                      e.target.value = ''
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => photoInputRef.current?.click()}
+                    disabled={photo.status === 'working'}
+                    className="w-full flex items-center gap-2 rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-600 hover:bg-neutral-100 disabled:opacity-60 transition-colors"
+                  >
+                    <Camera className="w-4 h-4 shrink-0 text-primary-600" />
+                    <span className="flex-1 text-left">
+                      {photo.status === 'working'
+                        ? 'Uploading photo…'
+                        : photo.status === 'started'
+                        ? 'On it — the analyzed item will appear in your inbox'
+                        : photo.status === 'error'
+                        ? `Photo capture failed: ${photo.error}`
+                        : 'Snap a photo of a thing — AI identifies it and files it'}
+                    </span>
+                  </button>
+                </div>
               )}
 
               {/* Preview card - only show if fields were parsed */}

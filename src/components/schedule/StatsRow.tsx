@@ -13,6 +13,8 @@ interface StatsRowProps {
   /** Interactive Clarity ring + remediation popover, rendered among the stats. */
   clarityTrigger?: React.ReactNode
   weekTrigger?: React.ReactNode
+  /** This-month staging popup trigger, rendered beside the week trigger. */
+  monthTrigger?: React.ReactNode
   /** Glanceable "N to discuss" badge, rendered among the stats. */
   discussionTrigger?: React.ReactNode
   /** Compact weather chip, rendered among the stats. */
@@ -23,13 +25,18 @@ interface StatsRowProps {
   endControls?: React.ReactNode
 }
 
-export function StatsRow({ weekTrigger, clarityTrigger, discussionTrigger, weatherTrigger, emailTrigger, endControls }: StatsRowProps) {
+export function StatsRow({ weekTrigger, monthTrigger, clarityTrigger, discussionTrigger, weatherTrigger, emailTrigger, endControls }: StatsRowProps) {
   return (
     <div data-testid="today-controls" className="flex items-center flex-wrap gap-x-5 gap-y-2 text-[15px] text-neutral-600">
-      {/* This week staging trigger — desktop only, demoted */}
+      {/* This week / this month staging triggers — desktop only, demoted */}
       {weekTrigger && (
         <span className="hidden md:inline-flex items-center gap-1.5 text-[12px] text-neutral-400">
           {weekTrigger}
+        </span>
+      )}
+      {monthTrigger && (
+        <span className="hidden md:inline-flex items-center gap-1.5 text-[12px] text-neutral-400">
+          {monthTrigger}
         </span>
       )}
 

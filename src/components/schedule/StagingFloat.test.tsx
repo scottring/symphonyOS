@@ -60,7 +60,7 @@ vi.mock('@/hooks/usePinnedItems', () => ({
 
 describe('StagingFloat', () => {
   const baseProps = {
-    weekTasks: [
+    tasks: [
       createMockTask({ id: 'w1', title: 'Week task A', bucket: 'week' as const }),
       createMockTask({ id: 'w2', title: 'Week task B', bucket: 'week' as const }),
     ],
@@ -131,14 +131,14 @@ describe('StagingFloat', () => {
   })
 
   it('still renders the trigger (count 0) when there are no week tasks', () => {
-    render(<StagingFloat {...baseProps} weekTasks={[]} />)
+    render(<StagingFloat {...baseProps} tasks={[]} />)
     const trigger = screen.getByRole('button', { name: /this week/i })
     expect(trigger).toBeInTheDocument()
     expect(trigger).toHaveTextContent('0')
   })
 
   it('shows an empty state in the dialog when opened with no week tasks', () => {
-    render(<StagingFloat {...baseProps} weekTasks={[]} />)
+    render(<StagingFloat {...baseProps} tasks={[]} />)
     fireEvent.click(screen.getByRole('button', { name: /this week/i }))
     expect(screen.getByText(/nothing scheduled this week/i)).toBeInTheDocument()
   })

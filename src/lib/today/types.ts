@@ -45,6 +45,7 @@ export interface TodayData {
   overdueTasks: Task[]
   inboxTasks: Task[]
   weekTasks: Task[]
+  monthTasks: Task[]
   completedInboxTasks: Task[]
   grouped: Record<DaySection, TimelineItem[]>
   sectionsOrder: DaySection[]
@@ -58,6 +59,7 @@ export const EMPTY_TODAY_DATA: TodayData = {
   overdueTasks: [],
   inboxTasks: [],
   weekTasks: [],
+  monthTasks: [],
   completedInboxTasks: [],
   grouped: { allday: [], morning: [], afternoon: [], evening: [], unscheduled: [] },
   sectionsOrder: SECTIONS_ORDER,

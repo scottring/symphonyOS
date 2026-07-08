@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { CalendarRange, Star, Folder, Circle, CheckCircle2, ChevronDown, ChevronRight, Plus } from 'lucide-react'
+import { CalendarRange, CalendarDays, Star, Folder, Circle, CheckCircle2, ChevronDown, ChevronRight, Plus } from 'lucide-react'
 import type { Task, TaskContext } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { FamilyMember } from '@/types/family'
@@ -15,7 +15,10 @@ import { DenseInboxRow, type QuickAction } from './DenseInboxRow'
 import { InboxUndoToast } from './InboxUndoToast'
 
 interface StagingFloatProps {
-  weekTasks: Task[]
+  tasks: Task[]
+  /** Which horizon this popup stages — drives the title, target bucket, quick
+   *  actions, and (persisted) group-mode key. Defaults to 'week'. */
+  horizon?: 'week' | 'month'
   projects: Project[]
   familyMembers: FamilyMember[]
   onPullToToday: (taskId: string) => void
@@ -36,6 +39,40 @@ const WEEK_ACTIONS: QuickAction[] = [
   { kind: 'today' }, { kind: 'next-week' }, { kind: 'someday' }, { kind: 'note' }, { kind: 'delete' }
 ]
 
+// Month rows pull forward (into the week) rather than deferring a week.
+const MONTH_ACTIONS: QuickAction[] = [
+  { kind: 'today' }, { kind: 'week' }, { kind: 'someday' }, { kind: 'note' }, { kind: 'delete' }
+]
+
+const HORIZON_CONFIG = {
+  week: {
+    title: 'This Week',
+    aria: 'This week',
+    bucket: 'week' as const,
+    storageKey: 'symphony.thisweek.group',
+    empty: 'Nothing scheduled this week.',
+    actions: WEEK_ACTIONS,
+    Icon: CalendarRange,
+  },
+  month: {
+    title: 'This Month',
+    aria: 'This month',
+    bucket: 'month' as const,
+    storageKey: 'symphony.thismonth.group',
+    empty: 'Nothing scheduled this month.',
+    actions: MONTH_ACTIONS,
+    Icon: CalendarDays,
+  },
+} satisfies Record<'week' | 'month', {
+  title: string
+  aria: string
+  bucket: 'week' | 'month'
+  storageKey: string
+  empty: string
+  actions: QuickAction[]
+  Icon: typeof CalendarRange
+}>
+
 type UndoEntry = {
   taskId: string
   message: string
@@ -45,15 +82,14 @@ type UndoEntry = {
   onUndoExtra?: () => Promise<void>
 }
 
-const GROUP_MODE_KEY = 'symphony.thisweek.group'
 type GroupMode = 'list' | 'project'
 
-function loadGroupMode(): GroupMode {
+function loadGroupMode(storageKey: string): GroupMode {
   // Default to 'project' grouping — long flat lists of 15+ items repeat
   // project context per row and feel cramped. Users can still toggle to
   // 'list' (preference is persisted across sessions).
   try {
-    const v = localStorage.getItem(GROUP_MODE_KEY)
+    const v = localStorage.getItem(storageKey)
     return v === 'list' ? 'list' : 'project'
   } catch {
     return 'project'
@@ -83,16 +119,17 @@ function computeGroupProgress(args: { groupKey: string; scope: Task[] }): number
 }
 
 export function StagingFloat({
-  weekTasks, projects, familyMembers,
+  tasks: horizonTasks, horizon = 'week', projects, familyMembers,
   onPullToToday, onSelectTask, onCompleteTask, onDeferTask, onDeleteTask, onUpdateTask,
   inline,
   allTasks,
 }: StagingFloatProps) {
+  const config = HORIZON_CONFIG[horizon]
   const [open, setOpen] = useState(false)
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
   const [leavingIds, setLeavingIds] = useState<Set<string>>(new Set())
   const [undo, setUndo] = useState<UndoEntry | null>(null)
-  const [groupMode, setGroupModeState] = useState<GroupMode>(() => loadGroupMode())
+  const [groupMode, setGroupModeState] = useState<GroupMode>(() => loadGroupMode(config.storageKey))
   const [notePickerTaskId, setNotePickerTaskId] = useState<string | null>(null)
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set())
   const [draft, setDraft] = useState('')
@@ -117,14 +154,14 @@ export function StagingFloat({
     })
   }, [])
 
-  const addWeekTask = useCallback(async () => {
+  const addStagedTask = useCallback(async () => {
     const title = draft.trim()
     if (!title) return
     setDraft('')
     const ctx = currentDomain !== 'universal' ? currentDomain : undefined
     const id = await addTask(title, undefined, undefined, undefined, { context: ctx })
-    if (id) await updateTask(id, { bucket: 'week' })
-  }, [draft, currentDomain, addTask, updateTask])
+    if (id) await updateTask(id, { bucket: config.bucket })
+  }, [draft, currentDomain, addTask, updateTask, config.bucket])
 
   // Restore a task snapshot after a note-route deletion — two-step to preserve rich fields
   const restoreTask = useCallback(async (snapshot: Task) => {
@@ -248,8 +285,8 @@ export function StagingFloat({
 
   const setGroupMode = useCallback((mode: GroupMode) => {
     setGroupModeState(mode)
-    try { localStorage.setItem(GROUP_MODE_KEY, mode) } catch { /* ignore */ }
-  }, [])
+    try { localStorage.setItem(config.storageKey, mode) } catch { /* ignore */ }
+  }, [config.storageKey])
 
   const buttonRef = useRef<HTMLButtonElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
@@ -278,7 +315,7 @@ export function StagingFloat({
     }
   }, [open])
 
-  const sorted = [...weekTasks].sort((a, b) => {
+  const sorted = [...horizonTasks].sort((a, b) => {
     if (!a.weekDeferredAt && !b.weekDeferredAt) {
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
     }
@@ -306,6 +343,9 @@ export function StagingFloat({
       if (action.kind === 'today') {
         onPullToToday(task.id)
         message = 'Pulled to Today'
+      } else if (action.kind === 'week') {
+        onUpdateTask?.(task.id, { bucket: 'week' })
+        message = 'Moved to This Week'
       } else if (action.kind === 'next-week') {
         onUpdateTask?.(task.id, { weekDeferredAt: new Date() })
         message = 'Bumped to next week'
@@ -348,7 +388,7 @@ export function StagingFloat({
         project={project}
         projects={projects}
         familyMembers={familyMembers}
-        quickActions={WEEK_ACTIONS}
+        quickActions={config.actions}
         isLeaving={leavingIds.has(task.id)}
         onQuickAction={(action) => applyAction(task, action)}
         onToggleComplete={() => onCompleteTask?.(task.id)}
@@ -386,11 +426,11 @@ export function StagingFloat({
         type="button"
         onClick={() => setOpen((v) => !v)}
         className={triggerClass}
-        aria-label="This week"
-        title="This week"
+        aria-label={config.aria}
+        title={config.aria}
       >
-        <CalendarRange className="w-5 h-5" />
-        <span className="font-semibold tabular-nums">{weekTasks.length}</span>
+        <config.Icon className="w-5 h-5" />
+        <span className="font-semibold tabular-nums">{horizonTasks.length}</span>
       </button>
 
       {open && pos && createPortal(
@@ -399,11 +439,11 @@ export function StagingFloat({
           style={{ position: 'fixed', top: pos.top, left: pos.left, width: 'min(860px, calc(100vw - 24px))' }}
           className="z-50 bg-white rounded-xl border border-neutral-200 shadow-xl p-3 max-h-[70vh] overflow-y-auto"
           role="dialog"
-          aria-label="This Week"
+          aria-label={config.title}
         >
           <div className="flex items-center justify-between mb-3 px-1">
             <h3 className="font-display text-sm font-medium text-neutral-700">
-              This Week · {sorted.length} item{sorted.length !== 1 ? 's' : ''}
+              {config.title} · {sorted.length} item{sorted.length !== 1 ? 's' : ''}
             </h3>
             <div className="flex items-center gap-1 text-[11px]">
               <button
@@ -444,7 +484,7 @@ export function StagingFloat({
           )}
 
           {sorted.length === 0 ? (
-            <p className="text-sm text-neutral-400 text-center py-6">Nothing scheduled this week.</p>
+            <p className="text-sm text-neutral-400 text-center py-6">{config.empty}</p>
           ) : groupMode === 'list' ? (
             <div className="space-y-1.5">
               {sorted.map((task) => renderRow(task, projects.find((p) => p.id === task.projectId), true))}
@@ -531,16 +571,21 @@ export function StagingFloat({
             </div>
           )}
 
-          {/* Add a task to the week, inline. */}
+          {/* Add a task to this horizon, inline. */}
           <div className="mt-3 flex items-center gap-2 px-2 py-1.5 rounded-xl border border-neutral-200 bg-white focus-within:border-primary-400 transition-colors">
-            <span className="shrink-0 w-6 h-6 rounded-full bg-primary-600 text-white grid place-items-center">
+            <button
+              type="button"
+              onClick={() => void addStagedTask()}
+              aria-label="Add task"
+              className="shrink-0 w-6 h-6 rounded-full bg-primary-600 text-white grid place-items-center hover:bg-primary-700 transition-colors"
+            >
               <Plus className="w-4 h-4" />
-            </span>
+            </button>
             <input
               type="text"
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') void addWeekTask() }}
+              onKeyDown={(e) => { if (e.key === 'Enter') void addStagedTask() }}
               placeholder="Add a task…"
               className="flex-1 min-w-0 text-sm bg-transparent placeholder:text-neutral-400 focus:outline-none"
             />
