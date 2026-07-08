@@ -38,6 +38,10 @@ import { useMealEventsForDate } from '@/shell/providers/MealEventsProvider';
 import { removeFromGroup, ungroupTasks, deleteTaskGroup } from '@/lib/today/groupTasks';
 import { TapContextPanel } from '@/components/surface/TapContextPanel';
 import { TapRoutinePanel } from '@/components/surface/TapRoutinePanel';
+import { TapStepPanel } from '@/components/surface/TapStepPanel';
+import { groupRoutineSteps } from '@/lib/today/routineCollections';
+import { nextStepOrder } from '@/lib/today/stepOrdering';
+import type { Routine } from '@/types/actionable';
 import { TapEventPanel } from '@/components/surface/TapEventPanel';
 import { TapMealPanel } from '@/components/surface/TapMealPanel';
 import { WhyChain } from '@/components/why/WhyChain';
@@ -278,23 +282,67 @@ function TaskPanelBody({ id }: { id: string }) {
 
 // ── Routine ─────────────────────────────────────────────────────────────────
 function RoutinePanelBody({ id }: { id: string }) {
-  const { clearSelection } = useSelection();
+  const { clearSelection, setSelection } = useSelection();
   // Search ALL routines (not just active): flipping a routine to "reference"
   // visibility removes it from the active set/timeline but the panel must stay
   // populated so it doesn't go blank (and so the user can flip it back).
-  const { routines, updateRoutine, refetch: refetchRoutines } = useRoutines();
+  const { routines, updateRoutine, addRoutine, deleteRoutine, refetch: refetchRoutines } = useRoutines();
   const { members: familyMembers } = useFamilyMembers();
 
   const routine = useMemo(() => routines.find((r) => r.id === id), [routines, id]);
+  // Steps of this collection, sorted the same way /routines sorts them.
+  const steps = useMemo(
+    () => groupRoutineSteps(routines).collections.find((c) => c.id === id)?.steps ?? [],
+    [routines, id],
+  );
+  const parent = useMemo(
+    () => (routine?.parent_routine_id ? routines.find((r) => r.id === routine.parent_routine_id) : undefined),
+    [routines, routine],
+  );
   const handleClose = useCallback(() => clearSelection(), [clearSelection]);
 
   if (!routine) return <PanelLoading />;
+
+  // A collection STEP opens the step panel (doses, instructions, remove/delete)
+  // with back-navigation to its parent — mirrors /routines.
+  if (parent) {
+    return (
+      <TapStepPanel
+        step={routine}
+        parentName={parent.name}
+        onClose={() => setSelection({ kind: 'routine', id: parent.id })}
+        onRename={(name) => updateRoutine(routine.id, { name })}
+        onDosesChange={(times) => updateRoutine(routine.id, { times_per_day: times })}
+        onNotesChange={(description) => updateRoutine(routine.id, { description })}
+        onScheduleChange={(pattern) => updateRoutine(routine.id, { recurrence_pattern: pattern })}
+        onPromote={() => {
+          updateRoutine(routine.id, { parent_routine_id: null, step_order: null });
+          setSelection({ kind: 'routine', id: parent.id });
+        }}
+        onDelete={() => {
+          deleteRoutine(routine.id);
+          setSelection({ kind: 'routine', id: parent.id });
+        }}
+      />
+    );
+  }
 
   return (
     <TapRoutinePanel
       routine={routine}
       familyMembers={familyMembers}
       onClose={handleClose}
+      {...(steps.length > 0
+        ? {
+            steps,
+            onSelectStep: (s: Routine) => setSelection({ kind: 'routine', id: s.id }),
+            onAddStep: (name: string) =>
+              addRoutine({ name, parent_routine_id: routine.id, step_order: nextStepOrder(steps) }),
+            onReorderSteps: (writes: { id: string; step_order: number }[]) => {
+              for (const w of writes) updateRoutine(w.id, { step_order: w.step_order });
+            },
+          }
+        : {})}
       onRename={(name) => updateRoutine(routine.id, { name })}
       onNotesChange={(n) => updateRoutine(routine.id, { description: n })}
       onContextChange={(ctx) => updateRoutine(routine.id, { context: ctx ?? null })}

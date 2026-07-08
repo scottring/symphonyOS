@@ -107,3 +107,17 @@ describe('TapStepPanel', () => {
     expect(screen.queryByRole('button', { name: /^Mon$/i })).not.toBeInTheDocument()
   })
 })
+
+describe('TapStepPanel delete', () => {
+  it('renders Delete step only when onDelete is provided, and fires it', () => {
+    setup()
+    expect(screen.queryByRole('button', { name: /delete step/i })).not.toBeInTheDocument()
+  })
+
+  it('fires onDelete', () => {
+    const onDelete = vi.fn()
+    setup({ onDelete })
+    fireEvent.click(screen.getByRole('button', { name: /delete step/i }))
+    expect(onDelete).toHaveBeenCalled()
+  })
+})

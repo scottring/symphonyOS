@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Link2Off } from 'lucide-react'
+import { Link2Off, Trash2 } from 'lucide-react'
 import type { Routine, RecurrencePattern } from '@/types/actionable'
 import { WEEKDAY_KEYS } from '@/lib/routineUtils'
 import { PanelHeader } from './sections/PanelHeader'
@@ -15,6 +15,8 @@ interface TapStepPanelProps {
   onNotesChange: (next: string) => void
   onPromote: () => void
   onScheduleChange?: (pattern: RecurrencePattern) => void
+  /** Delete the step routine entirely (swap-out). Rendered only when provided. */
+  onDelete?: () => void
 }
 
 export function TapStepPanel(props: TapStepPanelProps) {
@@ -103,13 +105,24 @@ export function TapStepPanel(props: TapStepPanelProps) {
 
       <PanelWhy key={step.id} label="Instructions" notes={step.description ?? undefined} onChange={props.onNotesChange} />
 
-      <button
-        type="button"
-        onClick={props.onPromote}
-        className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-neutral-600 hover:text-red-600"
-      >
-        <Link2Off className="w-4 h-4" /> Remove from routine
-      </button>
+      <div className="mt-4 flex items-center gap-5">
+        <button
+          type="button"
+          onClick={props.onPromote}
+          className="inline-flex items-center gap-2 text-sm font-medium text-neutral-600 hover:text-red-600"
+        >
+          <Link2Off className="w-4 h-4" /> Remove from routine
+        </button>
+        {props.onDelete && (
+          <button
+            type="button"
+            onClick={props.onDelete}
+            className="inline-flex items-center gap-2 text-sm font-medium text-neutral-600 hover:text-red-600"
+          >
+            <Trash2 className="w-4 h-4" /> Delete step
+          </button>
+        )}
+      </div>
     </article>
   )
 }

@@ -53,6 +53,8 @@ interface RoutinesListProps {
   onAddStep: (collectionId: string, name: string) => void
   onReorderSteps: (writes: { id: string; step_order: number }[]) => void
   onPromoteStep: (stepId: string) => void
+  /** Delete a step routine entirely (swap-out). Optional — hides the action when absent. */
+  onDeleteStep?: (stepId: string) => void
   onCreateCollection?: (name: string) => Promise<import('@/types/actionable').Routine | null> | void
   onGroupIntoCollection?: (name: string, routineIds: string[]) => void
 }
@@ -168,7 +170,7 @@ function SectionHeader({ title, count, collapsed, onToggle }: SectionHeaderProps
   )
 }
 
-export function RoutinesListRedesign({ routines, contacts = [], familyMembers = [], onCreateRoutine: _onCreateRoutine, onUpdateRoutine, onAddStep, onReorderSteps, onPromoteStep, onCreateCollection, onGroupIntoCollection }: RoutinesListProps) {
+export function RoutinesListRedesign({ routines, contacts = [], familyMembers = [], onCreateRoutine: _onCreateRoutine, onUpdateRoutine, onAddStep, onReorderSteps, onPromoteStep, onDeleteStep, onCreateCollection, onGroupIntoCollection }: RoutinesListProps) {
   // Pause modal state
   const [pauseModalRoutine, setPauseModalRoutine] = useState<Routine | null>(null)
 
@@ -809,6 +811,7 @@ export function RoutinesListRedesign({ routines, contacts = [], familyMembers = 
                 onNotesChange={description => onUpdateRoutine(openStep.id, { description })}
                 onScheduleChange={pattern => onUpdateRoutine(openStep.id, { recurrence_pattern: pattern })}
                 onPromote={() => { onPromoteStep(openStep.id); setOpen({ kind: 'routine', id: parentOfOpenStep.id }) }}
+                onDelete={onDeleteStep ? () => { onDeleteStep(openStep.id); setOpen({ kind: 'routine', id: parentOfOpenStep.id }) } : undefined}
               />
             )}
           </div>

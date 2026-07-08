@@ -31,7 +31,7 @@ import { LoadingFallback } from '@/components/layout/LoadingFallback'
 function RoutinesIndex() {
   const navigate = useNavigate()
   const { currentDomain } = useDomain()
-  const { routines, addRoutine, updateRoutine } = useRoutines()
+  const { routines, addRoutine, updateRoutine, deleteRoutine } = useRoutines()
   const { contacts } = useContacts()
   const { members: familyMembers } = useFamilyMembers()
 
@@ -75,6 +75,7 @@ function RoutinesIndex() {
         onAddStep={handleAddStep}
         onReorderSteps={handleReorderSteps}
         onPromoteStep={handlePromoteStep}
+        onDeleteStep={deleteRoutine}
         onCreateCollection={handleCreateCollection}
         onGroupIntoCollection={handleGroupIntoCollection}
       />
