@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronDown, ChevronRight, Check, SkipForward, Clock } from 'lucide-react'
+import { ChevronDown, ChevronRight, Check, SkipForward, Clock, MoreHorizontal, EyeOff, Pencil, Archive } from 'lucide-react'
 import type { TimelineItem, CollectionDose } from '@/types/timeline'
 
 interface Props {
@@ -11,6 +11,10 @@ interface Props {
   onSkipStep?: (stepEntityId: string) => void
   /** Complete a dose recording when it was actually done ("did the 7am at 8:15"). */
   onCompleteStepAt?: (stepEntityId: string, completedAt: Date) => void
+  /** Pause the whole collection until tomorrow (auto-resumes). */
+  onHideToday?: () => void
+  /** Archive the whole collection to reference (reactivate on /routines). */
+  onRemove?: () => void
 }
 
 function fmt(t: string | null): string {
@@ -30,8 +34,9 @@ function fmtShort(t: string | null): string {
   return m === 0 ? `${hr}${ampm}` : `${hr}:${String(m).padStart(2, '0')}${ampm}`
 }
 
-export function RoutineCollectionRow({ item, onSelectStep, onCompleteStep, onSkipStep, onCompleteStepAt }: Props) {
+export function RoutineCollectionRow({ item, onSelect, onSelectStep, onCompleteStep, onSkipStep, onCompleteStepAt, onHideToday, onRemove }: Props) {
   const [open, setOpen] = useState(false)
+  const [mgmtOpen, setMgmtOpen] = useState(false)
   // Missed-dose menu: which dose has its Done-now / Done-at / Skip popover open.
   const [menuDoseId, setMenuDoseId] = useState<string | null>(null)
   const [menuTime, setMenuTime] = useState('')
@@ -73,18 +78,66 @@ export function RoutineCollectionRow({ item, onSelectStep, onCompleteStep, onSki
     <div className={`${open ? 'rounded-xl' : 'rounded-full'} border border-neutral-200 bg-white`}>
       {/* Collapsed: a single slim line — name · progress · next step — so the
           routine reads as a pill on the timeline instead of a two-line card. */}
-      <button onClick={() => setOpen(o => !o)} className="w-full flex items-center gap-2 px-3 py-1.5 text-left min-w-0">
-        {open ? <ChevronDown className="w-4 h-4 text-neutral-400 shrink-0" /> : <ChevronRight className="w-4 h-4 text-neutral-400 shrink-0" />}
-        <span className="text-sm font-medium text-neutral-800 truncate shrink-0 max-w-[50%]">{item.title}</span>
-        <span className="text-xs text-neutral-400 tabular-nums shrink-0">{p.done}/{p.total}</span>
-        {item.completed
-          ? <span className="text-xs text-neutral-400 truncate">· done</span>
-          : nextUp && (
-              <span className="text-xs text-neutral-500 truncate min-w-0">
-                · {fmt(nextUp.time)} {nextUp.stepName}
-              </span>
-            )}
-      </button>
+      <div className="flex items-center min-w-0">
+        <button onClick={() => setOpen(o => !o)} className="flex-1 flex items-center gap-2 px-3 py-1.5 text-left min-w-0">
+          {open ? <ChevronDown className="w-4 h-4 text-neutral-400 shrink-0" /> : <ChevronRight className="w-4 h-4 text-neutral-400 shrink-0" />}
+          <span className="text-sm font-medium text-neutral-800 truncate shrink-0 max-w-[50%]">{item.title}</span>
+          <span className="text-xs text-neutral-400 tabular-nums shrink-0">{p.done}/{p.total}</span>
+          {item.completed
+            ? <span className="text-xs text-neutral-400 truncate">· done</span>
+            : nextUp && (
+                <span className="text-xs text-neutral-500 truncate min-w-0">
+                  · {fmt(nextUp.time)} {nextUp.stepName}
+                </span>
+              )}
+        </button>
+        {/* Management menu: hide-for-today / edit / archive, mirroring task rows. */}
+        <div className="relative shrink-0 pr-2">
+          <button
+            aria-label="Routine options"
+            onClick={() => setMgmtOpen(o => !o)}
+            className="p-1.5 rounded-full text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100"
+          >
+            <MoreHorizontal className="w-4 h-4" />
+          </button>
+          {mgmtOpen && (
+            <>
+              <div className="fixed inset-0 z-10" aria-hidden onClick={() => setMgmtOpen(false)} />
+              <div
+                role="menu"
+                className="absolute right-0 top-full z-20 mt-1 w-44 rounded-xl border border-neutral-200 bg-white py-1 shadow-lg"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {onHideToday && (
+                  <button
+                    role="menuitem"
+                    onClick={() => { onHideToday(); setMgmtOpen(false) }}
+                    className="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-neutral-700 hover:bg-neutral-50"
+                  >
+                    <EyeOff className="w-4 h-4 text-neutral-400" /> Hide for today
+                  </button>
+                )}
+                <button
+                  role="menuitem"
+                  onClick={() => { onSelect(); setMgmtOpen(false) }}
+                  className="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-neutral-700 hover:bg-neutral-50"
+                >
+                  <Pencil className="w-4 h-4 text-neutral-400" /> Edit routine
+                </button>
+                {onRemove && (
+                  <button
+                    role="menuitem"
+                    onClick={() => { onRemove(); setMgmtOpen(false) }}
+                    className="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-neutral-700 hover:bg-neutral-50"
+                  >
+                    <Archive className="w-4 h-4 text-neutral-400" /> Remove from Today
+                  </button>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
       {open && (
         <div className="border-t border-neutral-100 px-3 py-2 space-y-2.5">
           {/* Bulk resolve: complete or skip every remaining dose in one tap. */}

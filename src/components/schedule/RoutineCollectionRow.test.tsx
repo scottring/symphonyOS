@@ -131,3 +131,50 @@ describe('RoutineCollectionRow dose handling', () => {
     expect(handlers.onCompleteStep).toHaveBeenCalledWith('routine-chin#1', true)
   })
 })
+
+describe('RoutineCollectionRow management menu', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  const mgmtHandlers = { onHideToday: vi.fn(), onRemove: vi.fn() }
+
+  function renderWithMenu() {
+    return render(<RoutineCollectionRow item={collectionItem()} {...handlers} {...mgmtHandlers} />)
+  }
+
+  it('opens the options menu with Hide / Edit / Remove', () => {
+    renderWithMenu()
+    fireEvent.click(screen.getByRole('button', { name: /routine options/i }))
+    expect(screen.getByRole('menuitem', { name: /hide for today/i })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: /edit routine/i })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: /remove from today/i })).toBeInTheDocument()
+  })
+
+  it('Hide for today fires onHideToday and closes the menu', () => {
+    renderWithMenu()
+    fireEvent.click(screen.getByRole('button', { name: /routine options/i }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /hide for today/i }))
+    expect(mgmtHandlers.onHideToday).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole('menuitem', { name: /hide for today/i })).not.toBeInTheDocument()
+  })
+
+  it('Edit routine fires onSelect (opens the routine panel)', () => {
+    renderWithMenu()
+    fireEvent.click(screen.getByRole('button', { name: /routine options/i }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /edit routine/i }))
+    expect(handlers.onSelect).toHaveBeenCalledTimes(1)
+  })
+
+  it('Remove from Today fires onRemove', () => {
+    renderWithMenu()
+    fireEvent.click(screen.getByRole('button', { name: /routine options/i }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /remove from today/i }))
+    expect(mgmtHandlers.onRemove).toHaveBeenCalledTimes(1)
+  })
+
+  it('hides Hide/Remove items when handlers are not provided, keeps Edit', () => {
+    render(<RoutineCollectionRow item={collectionItem()} {...handlers} />)
+    fireEvent.click(screen.getByRole('button', { name: /routine options/i }))
+    expect(screen.queryByRole('menuitem', { name: /hide for today/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: /edit routine/i })).toBeInTheDocument()
+  })
+})
