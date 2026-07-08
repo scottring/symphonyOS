@@ -58,7 +58,16 @@ export function CameraCaptureModal({ onCapture, onPickFile, onClose }: CameraCap
         }
       }
     } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
+      const name = e instanceof Error ? e.name : ''
+      if (name === 'NotAllowedError' || name === 'SecurityError') {
+        setError(
+          'Camera access is blocked for Symphony. In Chrome, click the icon left of the address bar → Site settings → Camera → Allow, then reload. In the Mac app, allow Symphony under System Settings → Privacy & Security → Camera.',
+        )
+      } else if (name === 'NotFoundError' || name === 'OverconstrainedError') {
+        setError('No camera found. On a Mac, an unlocked iPhone nearby (same Apple ID, Wi-Fi and Bluetooth on) appears as a camera automatically.')
+      } else {
+        setError(e instanceof Error ? e.message : String(e))
+      }
     }
   }, [stopStream])
 
@@ -103,16 +112,25 @@ export function CameraCaptureModal({ onCapture, onPickFile, onClose }: CameraCap
 
         {error ? (
           <div className="px-6 py-10 text-center space-y-4">
-            <p className="text-sm text-neutral-300">
-              Camera unavailable: {error}
+            <p className="text-sm text-neutral-300 text-left leading-relaxed">
+              {error}
             </p>
-            <button
-              type="button"
-              onClick={() => { stopStream(); onPickFile() }}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/10 text-white text-sm hover:bg-white/20 transition-colors"
-            >
-              <ImageUp className="w-4 h-4" /> Choose an image instead
-            </button>
+            <div className="flex items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => void startStream(deviceId)}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white text-neutral-900 text-sm font-medium hover:bg-neutral-200 transition-colors"
+              >
+                <Camera className="w-4 h-4" /> Try again
+              </button>
+              <button
+                type="button"
+                onClick={() => { stopStream(); onPickFile() }}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/10 text-white text-sm hover:bg-white/20 transition-colors"
+              >
+                <ImageUp className="w-4 h-4" /> Choose an image instead
+              </button>
+            </div>
           </div>
         ) : (
           <>
