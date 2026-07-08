@@ -1,5 +1,22 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { X, Camera, ImageUp } from 'lucide-react'
+import { X, Camera, ImageUp, RotateCw } from 'lucide-react'
+
+type Rotation = 0 | 90 | 180 | 270
+
+/** Some cameras deliver rotated frames (upside-down USB mounts, Continuity
+ *  Camera in odd orientations). Remember the correction per device. */
+function loadRotation(deviceId: string | null): Rotation {
+  if (!deviceId) return 0
+  try {
+    const v = Number(localStorage.getItem(`symphony.camera.rotation.${deviceId}`))
+    return v === 90 || v === 180 || v === 270 ? (v as Rotation) : 0
+  } catch { return 0 }
+}
+
+function saveRotation(deviceId: string | null, rotation: Rotation) {
+  if (!deviceId) return
+  try { localStorage.setItem(`symphony.camera.rotation.${deviceId}`, String(rotation)) } catch { /* ignore */ }
+}
 
 interface CameraCaptureModalProps {
   /** Called with the captured JPEG. The modal closes itself afterwards. */
@@ -20,8 +37,18 @@ export function CameraCaptureModal({ onCapture, onPickFile, onClose }: CameraCap
   const streamRef = useRef<MediaStream | null>(null)
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([])
   const [deviceId, setDeviceId] = useState<string | null>(null)
+  const [activeDeviceId, setActiveDeviceId] = useState<string | null>(null)
+  const [rotation, setRotation] = useState<Rotation>(0)
   const [error, setError] = useState<string | null>(null)
   const [ready, setReady] = useState(false)
+
+  const cycleRotation = useCallback(() => {
+    setRotation((prev) => {
+      const next = (((prev + 90) % 360) as Rotation)
+      saveRotation(activeDeviceId, next)
+      return next
+    })
+  }, [activeDeviceId])
 
   const stopStream = useCallback(() => {
     streamRef.current?.getTracks().forEach((t) => t.stop())
@@ -42,6 +69,9 @@ export function CameraCaptureModal({ onCapture, onPickFile, onClose }: CameraCap
         videoRef.current.srcObject = stream
         await videoRef.current.play()
       }
+      const currentId = stream.getVideoTracks()[0]?.getSettings().deviceId ?? null
+      setActiveDeviceId(currentId)
+      setRotation(loadRotation(currentId))
       setReady(true)
 
       // Labels are only populated after permission is granted.
@@ -80,10 +110,19 @@ export function CameraCaptureModal({ onCapture, onPickFile, onClose }: CameraCap
   const snap = useCallback(() => {
     const video = videoRef.current
     if (!video || !ready) return
+    const w = video.videoWidth
+    const h = video.videoHeight
     const canvas = document.createElement('canvas')
-    canvas.width = video.videoWidth
-    canvas.height = video.videoHeight
-    canvas.getContext('2d')?.drawImage(video, 0, 0)
+    const sideways = rotation === 90 || rotation === 270
+    canvas.width = sideways ? h : w
+    canvas.height = sideways ? w : h
+    const ctx = canvas.getContext('2d')
+    if (ctx) {
+      // Bake the user's rotation correction into the captured frame.
+      ctx.translate(canvas.width / 2, canvas.height / 2)
+      ctx.rotate((rotation * Math.PI) / 180)
+      ctx.drawImage(video, -w / 2, -h / 2)
+    }
     canvas.toBlob(
       (blob) => {
         stopStream()
@@ -93,7 +132,7 @@ export function CameraCaptureModal({ onCapture, onPickFile, onClose }: CameraCap
       'image/jpeg',
       0.85,
     )
-  }, [ready, onCapture, stopStream])
+  }, [ready, rotation, onCapture, stopStream])
 
   const close = useCallback(() => { stopStream(); onClose() }, [stopStream, onClose])
 
@@ -134,7 +173,15 @@ export function CameraCaptureModal({ onCapture, onPickFile, onClose }: CameraCap
           </div>
         ) : (
           <>
-            <video ref={videoRef} playsInline muted className="w-full max-h-[60vh] bg-black object-contain" />
+            <div className="grid place-items-center bg-black max-h-[60vh] overflow-hidden">
+              <video
+                ref={videoRef}
+                playsInline
+                muted
+                className="w-full max-h-[60vh] object-contain"
+                style={rotation ? { transform: `rotate(${rotation}deg)` } : undefined}
+              />
+            </div>
             <div className="flex items-center gap-3 px-4 py-3">
               {devices.length > 1 && (
                 <select
@@ -156,6 +203,15 @@ export function CameraCaptureModal({ onCapture, onPickFile, onClose }: CameraCap
                 className="text-xs text-neutral-400 hover:text-white transition-colors shrink-0"
               >
                 choose a file
+              </button>
+              <button
+                type="button"
+                onClick={cycleRotation}
+                aria-label="Rotate image"
+                title="Image sideways or upside down? Rotate it — remembered for this camera"
+                className="shrink-0 p-2 rounded-lg text-neutral-300 hover:text-white hover:bg-white/10 transition-colors"
+              >
+                <RotateCw className="w-4 h-4" />
               </button>
               <button
                 type="button"
