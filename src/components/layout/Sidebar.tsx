@@ -4,7 +4,6 @@ import { PinnedSection } from '@/components/pins'
 import { useDomain } from '@/hooks/useDomain'
 import { appRegistry } from '@/shell/appRegistry'
 import { SidebarGroup } from './SidebarGroup'
-import { RecentlyUpdated } from './RecentlyUpdated'
 import { useSidebarGroupState } from '@/hooks/useSidebarGroupState'
 import { useHomes } from '@/hooks/useHomes'
 import { useSpaces } from '@/hooks/useSpaces'
@@ -518,8 +517,6 @@ export function Sidebar({
             })}
         </SidebarGroup>
 
-        {/* Recently touched projects/lists/routines — re-entry points. */}
-        {!collapsed && <RecentlyUpdated />}
       </nav>
 
       {/* Footer: Settings + Sign out + illustration + tagline */}
