@@ -32,8 +32,16 @@ interface AssistDrawerProps {
 }
 
 export function AssistDrawer({ item, onClose, onMutate }: AssistDrawerProps) {
-  const assistant = useSymphonyAssistant({ taskContext: item, onMutate })
   const isRoutine = item.kind === 'routine'
+  // Persist every conversation, linked to this task/routine — a planning chat
+  // (specs, store advice, decisions) is task context the user must be able to
+  // reopen later from the entity's panel.
+  const assistant = useSymphonyAssistant({
+    taskContext: item,
+    onMutate,
+    persistKey: isRoutine ? 'routine' : 'task',
+    persistEntityId: item.id,
+  })
 
   return (
     <div className="fixed inset-0 z-[60]" role="dialog" aria-label={`Plan ${item.title}`}>
@@ -57,6 +65,11 @@ export function AssistDrawer({ item, onClose, onMutate }: AssistDrawerProps) {
           onClose={onClose}
           onNewChat={assistant.resetSession}
           toolActivity={assistant.toolActivity}
+          sessions={assistant.sessions}
+          sessionsLoading={assistant.sessionsLoading}
+          onLoadSession={assistant.loadSession}
+          onDeleteSession={assistant.deleteSession}
+          activeSessionId={assistant.activeSessionId}
         />
       </aside>
     </div>

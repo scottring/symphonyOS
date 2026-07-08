@@ -12,6 +12,7 @@ import { PanelPeople } from './sections/PanelPeople'
 import { PanelLinked } from './sections/PanelLinked'
 import { PanelLinks } from './sections/PanelLinks'
 import { PanelPhotos } from './sections/PanelPhotos'
+import { PanelConversations } from './sections/PanelConversations'
 import { PanelLocation } from './sections/PanelLocation'
 import { PanelMightBeRelevant } from './sections/PanelMightBeRelevant'
 import { PanelClassify } from './sections/PanelClassify'
@@ -166,6 +167,7 @@ export function TapContextPanel(props: TapContextPanelProps) {
       />
       <PanelWhy key={task.id} label="Notes" notes={task.notes} onChange={props.onNotesChange} onSaveToVault={props.onSaveNoteToVault} />
       <PanelPhotos taskId={task.id} />
+      <PanelConversations taskId={task.id} />
       <PanelSubtasks
         subtasks={task.subtasks ?? []}
         onToggleSubtask={props.onToggleSubtask}

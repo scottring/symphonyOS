@@ -31,8 +31,11 @@ export interface UseSymphonyAssistantOptions {
   /** Scope the conversation to one task/routine (sent to the edge fn every turn). */
   taskContext?: AssistantTaskContext
   /** Persist conversations to chat_sessions under this entity_type (e.g.
-   *  'symphony_rail'). Omit for ephemeral chats (drawers). */
+   *  'symphony_rail', 'task'). Omit only for truly ephemeral chats. */
   persistKey?: string
+  /** Link persisted conversations to a specific entity (task/routine id) so
+   *  they can be surfaced on that entity's panel later. */
+  persistEntityId?: string
 }
 
 type StoredMessage = { role: 'user' | 'assistant'; content: string; timestamp?: string }
@@ -61,7 +64,7 @@ function hydrateMessages(raw: unknown, sessionId: string): ChatMessage[] {
  * chat_sessions so conversations survive reloads (history dropdown).
  */
 export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
-  const { onMutate, taskContext, persistKey } = options ?? {}
+  const { onMutate, taskContext, persistKey, persistEntityId } = options ?? {}
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -80,10 +83,12 @@ export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
     ;(async () => {
       setSessionsLoading(true)
       try {
-        const { data } = await supabase
+        let query = supabase
           .from('chat_sessions')
           .select('id, title, entity_type, entity_id, mode, messages, created_at, updated_at')
           .eq('entity_type', persistKey)
+        if (persistEntityId) query = query.eq('entity_id', persistEntityId)
+        const { data } = await query
           .order('updated_at', { ascending: false })
           .limit(SESSIONS_LIMIT)
         if (cancelled || !data) return
@@ -102,7 +107,7 @@ export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
       }
     })()
     return () => { cancelled = true }
-  }, [persistKey])
+  }, [persistKey, persistEntityId])
 
   /** Insert or update the chat_sessions row for the current conversation. */
   const persistTurn = useCallback(async (finalMessages: ChatMessage[]) => {
@@ -125,7 +130,7 @@ export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
         const title = stored.find((m) => m.role === 'user')?.content.slice(0, 80) ?? 'Chat'
         const { data } = await supabase
           .from('chat_sessions')
-          .insert({ user_id: user.id, title, entity_type: persistKey, mode: 'chat', messages: stored })
+          .insert({ user_id: user.id, title, entity_type: persistKey, entity_id: persistEntityId ?? null, mode: 'chat', messages: stored })
           .select()
           .single()
         if (data?.id) {
@@ -135,7 +140,7 @@ export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
             id: data.id,
             title,
             entityType: persistKey,
-            entityId: null,
+            entityId: persistEntityId ?? null,
             mode: 'chat',
             messages: finalMessages,
             createdAt: new Date(),
@@ -146,7 +151,7 @@ export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
     } catch {
       // Persistence is best-effort; the live conversation is unaffected.
     }
-  }, [persistKey])
+  }, [persistKey, persistEntityId])
 
   const sendMessage = useCallback(async (text: string, attachment?: ChatAttachment) => {
     if ((!text.trim() && !attachment) || loading) return
