@@ -1,7 +1,8 @@
 // src/components/schedule/InboxView.tsx
 import { useMemo, useCallback, useState } from 'react'
-import { X } from 'lucide-react'
+import { X, CornerDownRight } from 'lucide-react'
 import type { Task, TaskContext } from '@/types/task'
+import { mergeCaptureIntoTask } from '@/lib/captureMerge'
 import type { Project } from '@/types/project'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
 import { useDomain } from '@/hooks/useDomain'
@@ -407,8 +408,26 @@ export function InboxView({
     applyTriage(task, { kind: 'delete' })
   }, [filteredTasks, applyTriage])
 
+  // Merge a photo capture into its AI-suggested destination task.
+  const [mergingCaptureId, setMergingCaptureId] = useState<string | null>(null)
+  const handleMergeCapture = useCallback(async (capture: Task, target: Task) => {
+    if (!onUpdateTask || !onDeleteTask) return
+    setMergingCaptureId(capture.id)
+    try {
+      await mergeCaptureIntoTask(capture, target, { updateTask: onUpdateTask, deleteTask: onDeleteTask })
+    } finally {
+      setMergingCaptureId(null)
+    }
+  }, [onUpdateTask, onDeleteTask])
+
   const renderRow = (task: Task) => {
     const project = projects.find((p) => p.id === task.projectId)
+    // Photo-capture suggestion: the AI matched this capture to an open task —
+    // one tap merges note + photo onto it (mirrors the iOS inbox chip).
+    const suggestedTarget =
+      task.captureMeta?.status === 'done' && task.captureMeta.suggestedTaskId
+        ? tasks.find((t) => t.id === task.captureMeta?.suggestedTaskId && !t.completed)
+        : undefined
     return (
       <div key={task.id} className="relative">
         <DenseInboxRow
@@ -443,6 +462,19 @@ export function InboxView({
           onAssign={onAssignTaskAll ? (memberIds) => onAssignTaskAll(task.id, memberIds) : undefined}
           onCreateProject={makeOnCreateProject(task.id)}
         />
+        {suggestedTarget && (
+          <button
+            type="button"
+            onClick={() => void handleMergeCapture(task, suggestedTarget)}
+            disabled={mergingCaptureId === task.id}
+            className="mt-1 ml-8 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary-50 text-primary-700 border border-primary-100 text-xs font-medium hover:bg-primary-100 disabled:opacity-60 transition-colors"
+          >
+            <CornerDownRight className="w-3 h-3 shrink-0" />
+            <span className="truncate max-w-[320px]">
+              {mergingCaptureId === task.id ? 'Merging…' : `Add to: ${suggestedTarget.title}`}
+            </span>
+          </button>
+        )}
         {notePickerTaskId === task.id && (
           <NotePicker
             task={task}

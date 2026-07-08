@@ -4,7 +4,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useFamilyMembers } from './useFamilyMembers'
 import { showToast } from './useToast'
 import { logger } from '@/lib/logger'
-import type { Task, TaskBucket, TaskLink, TaskContext, TaskCategory, LinkedActivity, LinkType, LinkedActivityType, GroupMemberRef } from '@/types/task'
+import type { Task, TaskBucket, TaskLink, TaskContext, TaskCategory, TaskCaptureMeta, LinkedActivity, LinkType, LinkedActivityType, GroupMemberRef } from '@/types/task'
 import type { TaskDirections } from '@/types/directions'
 import { defaultScopeForArea, type Scope } from '@/lib/scope'
 
@@ -45,6 +45,7 @@ export interface DbTask {
   needs_discussion: boolean | null
   discussion_note: string | null
   week_deferred_at: string | null
+  capture_meta: { status?: string; storage_path?: string; suggested_task_id?: string } | null
   created_at: string
   updated_at: string
 }
@@ -110,6 +111,13 @@ export function dbTaskToTask(dbTask: DbTask): Task {
     needsDiscussion: dbTask.needs_discussion ?? undefined,
     discussionNote: dbTask.discussion_note ?? undefined,
     weekDeferredAt: dbTask.week_deferred_at ? new Date(dbTask.week_deferred_at) : undefined,
+    captureMeta: dbTask.capture_meta
+      ? {
+          status: dbTask.capture_meta.status as TaskCaptureMeta['status'],
+          storagePath: dbTask.capture_meta.storage_path,
+          suggestedTaskId: dbTask.capture_meta.suggested_task_id,
+        }
+      : undefined,
   }
 }
 

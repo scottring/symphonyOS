@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useMemo, type ReactNode } from 'react'
 import { Sparkles, Camera } from 'lucide-react'
 import { usePhotoCapture } from '@/hooks/usePhotoCapture'
+import { CameraCaptureModal } from '@/components/capture/CameraCaptureModal'
 import { hasParsedFields } from '@/lib/quickInputParser'
 import type { TaskCategory, TaskContext } from '@/types/task'
 import { useDomain } from '@/hooks/useDomain'
@@ -74,13 +75,18 @@ export function QuickCapture({
   // Get current domain for smart context defaulting
   const { currentDomain } = useDomain()
 
-  // Photo-first capture: snap/import a photo → AI-enriched inbox task.
+  // Photo-first capture: live camera → AI-enriched inbox task. On macOS,
+  // Continuity Camera lists the iPhone as a camera device, making the phone
+  // the desktop's camera. The file picker remains as the fallback.
   const photo = usePhotoCapture()
   const photoInputRef = useRef<HTMLInputElement>(null)
-  const handlePhotoPicked = async (file: File | undefined) => {
+  const [showCamera, setShowCamera] = useState(false)
+  const cameraSupported = typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia
+  const handlePhotoPicked = async (file: Blob | undefined) => {
     if (!file) return
     const ctx = currentDomain !== 'universal' ? (currentDomain as TaskContext) : null
-    const ok = await photo.captureFromFile(file, ctx)
+    const named = file instanceof File ? file : new File([file], 'camera.jpg', { type: 'image/jpeg' })
+    const ok = await photo.captureFromFile(named, ctx)
     if (ok) {
       // Fire-and-forget: the enriched item lands in the inbox via realtime.
       setTimeout(() => { photo.reset(); handleClose() }, 1600)
@@ -394,8 +400,8 @@ export function QuickCapture({
                 </p>
               )}
 
-              {/* Photo capture — snap a thing, AI files it (on a Mac, the file
-                  dialog's "Import from iPhone" makes the phone the camera). */}
+              {/* Photo capture — live camera (Continuity Camera lists the
+                  iPhone as a device on macOS); file picker as fallback. */}
               {!title.trim() && (
                 <div>
                   <input
@@ -410,7 +416,7 @@ export function QuickCapture({
                   />
                   <button
                     type="button"
-                    onClick={() => photoInputRef.current?.click()}
+                    onClick={() => (cameraSupported ? setShowCamera(true) : photoInputRef.current?.click())}
                     disabled={photo.status === 'working'}
                     className="w-full flex items-center gap-2 rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-3 text-sm text-neutral-600 hover:bg-neutral-100 disabled:opacity-60 transition-colors"
                   >
@@ -426,6 +432,14 @@ export function QuickCapture({
                     </span>
                   </button>
                 </div>
+              )}
+
+              {showCamera && (
+                <CameraCaptureModal
+                  onCapture={(blob) => { setShowCamera(false); void handlePhotoPicked(blob) }}
+                  onPickFile={() => { setShowCamera(false); photoInputRef.current?.click() }}
+                  onClose={() => setShowCamera(false)}
+                />
               )}
 
               {/* Preview card - only show if fields were parsed */}
