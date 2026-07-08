@@ -30,6 +30,7 @@ Rules:
 Grounding and verification (important):
 - Only state facts you have actually read from a tool result. Never assert a prior value, schedule, date, or history you have not looked up. If you are not sure, look it up or say you don't know. Do not invent.
 - The user's data spans tasks, routines, projects, contacts, lists, notes, and calendar events. Before acting on "X", check the right entity type: a recurring item like "Feed Jax dinner" is a routine (symphony_list_routines), not a task. Look it up before assuming it doesn't exist.
+- A dated occasion someone ATTENDS (a show, appointment, party, pickup, reservation) belongs on the real calendar: use symphony_create_calendar_event, never symphony_create_task, for it. Tasks are to-dos someone DOES. Family occasions go on the family calendar (domain "family").
 - After ANY write (create / update / complete / delete / add / check), VERIFY before you claim success: read the affected item back with the matching list_/get_ tool and confirm the fields you intended actually changed. If the change did not take or a value looks wrong, say so and retry or ask. Never report a change you have not verified.
 - When updating an item, change only the fields the user asked about. Do not modify unrelated fields (schedule, time, name, context) as a side effect.
 
@@ -380,6 +381,24 @@ const TOOLS = [
     },
   },
   {
+    name: 'symphony_create_calendar_event',
+    description:
+      "Create a REAL Google Calendar event on the user's calendar. Use this — NOT symphony_create_task — for anything that belongs on a calendar: a show, appointment, party, reservation, or any occasion with a fixed date and time. Times without a UTC offset are read as the user's LOCAL time (US Eastern).",
+    input_schema: {
+      type: 'object',
+      properties: {
+        title: { type: 'string' },
+        start_time: { type: 'string', description: 'ISO8601, e.g. 2026-07-10T15:00:00 (local time when no offset)' },
+        end_time: { type: 'string', description: 'ISO8601; defaults to one hour after start_time' },
+        all_day: { type: 'boolean' },
+        domain: { type: 'string', enum: ['family', 'personal', 'work'], description: 'which calendar to write to — family occasions go on the shared family calendar' },
+        location: { type: 'string' },
+        description: { type: 'string', description: 'details worth keeping on the event (phone numbers, pickup instructions)' },
+      },
+      required: ['title', 'start_time', 'domain'],
+    },
+  },
+  {
     name: 'symphony_delete_routine',
     description: 'Delete a routine by id. Permanent. (Pausing a routine is not yet supported via the assistant.)',
     input_schema: {
@@ -476,6 +495,7 @@ async function runTool(
   input: Record<string, unknown>,
   attachment: AttachmentMeta | null,
   currentMemberId: string | null,
+  authHeader: string,
 ): Promise<string> {
   const now = () => new Date().toISOString()
   try {
@@ -551,6 +571,52 @@ async function runTool(
           .update({ completed, updated_at: now() }).eq('id', input.id).select().single()
         if (error) throw error
         return `Task "${data.title}" ${completed ? 'completed' : 'uncompleted'}`
+      }
+      case 'symphony_create_calendar_event': {
+        // Convert offsetless local times to UTC (same convention as tasks).
+        const toUtcIso = (v: string): string => {
+          if (/(?:Z|[+-]\d{2}:?\d{2})$/.test(v) || !/T\d{2}:\d{2}/.test(v)) return v
+          const offMin = etOffsetMinutes(v.slice(0, 10))
+          const ms = Date.parse(`${v}Z`) - offMin * 60000
+          return Number.isNaN(ms) ? v : new Date(ms).toISOString()
+        }
+        const start = toUtcIso(String(input.start_time))
+        const end = input.end_time
+          ? toUtcIso(String(input.end_time))
+          : new Date(Date.parse(start) + 60 * 60000).toISOString()
+        // The user's default WRITABLE calendar for the requested domain.
+        const { data: mappings, error: mapErr } = await db
+          .from('calendar_domain_mappings')
+          .select('calendar_id, calendar_name, access_role, is_default')
+          .eq('user_id', userId)
+          .eq('domain', input.domain)
+          .in('access_role', ['owner', 'writer'])
+        if (mapErr) throw mapErr
+        const writable = mappings ?? []
+        const target = writable.find((m) => m.is_default) ?? writable[0]
+        if (!target) {
+          return `Error: no writable ${input.domain} calendar is connected. The user needs to connect Google Calendar (Settings) or pick a different domain.`
+        }
+        // Reuse the app's create-event edge fn (token refresh, idempotency)
+        // by forwarding the caller's JWT.
+        const res = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/google-calendar-create-event`, {
+          method: 'POST',
+          headers: { Authorization: authHeader, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: input.title,
+            description: input.description,
+            startTime: start,
+            endTime: end,
+            allDay: input.all_day === true,
+            timeZone: APP_TZ,
+            location: input.location,
+            calendarId: target.calendar_id,
+            requestId: crypto.randomUUID(),
+          }),
+        })
+        const body = await res.text()
+        if (!res.ok) return `Error creating calendar event (${res.status}): ${body.slice(0, 300)}`
+        return `Created Google Calendar event on "${target.calendar_name}" (${start} to ${end} UTC): ${body.slice(0, 400)}`
       }
       case 'symphony_list_projects': {
         let q = db.from('projects').select('*').order('updated_at', { ascending: false })
@@ -915,7 +981,7 @@ Deno.serve(async (req) => {
               send({ type: 'text', text: block.text })
             } else if (block.type === 'tool_use' && block.name) {
               send({ type: 'tool', name: block.name })
-              const result = await runTool(db, user.id, block.name, block.input ?? {}, attachment, currentMemberId)
+              const result = await runTool(db, user.id, block.name, block.input ?? {}, attachment, currentMemberId, authHeader)
               toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: result })
             }
           }

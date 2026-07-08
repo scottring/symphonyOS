@@ -9,6 +9,7 @@ import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 // to refresh so the change shows without a page reload.
 const WRITE_TOOLS = new Set([
   'symphony_create_task',
+  'symphony_create_calendar_event',
   'symphony_update_task',
   'symphony_complete_task',
   'symphony_delete_task',
