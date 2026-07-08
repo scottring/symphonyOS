@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import { useFamilyMembers } from './useFamilyMembers'
@@ -162,6 +162,15 @@ export function useSupabaseTasks() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const { members: familyMembers } = useFamilyMembers()
+
+  // Always-current mirror of `tasks` for lookups inside stored closures.
+  // Mutation callbacks (updateTask, pushTask, …) get captured by UI that
+  // outlives a render — confirmation toasts, menus — and a lookup against the
+  // closed-over `tasks` array misses tasks created after capture, silently
+  // no-oping the write ("scheduled for today" that never lands). Refs don't
+  // go stale.
+  const tasksRef = useRef<Task[]>(tasks)
+  tasksRef.current = tasks
 
   // Fetch tasks. Exposed as `refetch` so an external write (e.g. the assistant
   // creating a task server-side) can force an immediate refresh, since realtime
@@ -479,7 +488,7 @@ export function useSupabaseTasks() {
 
   // Helper to find a task by id, including in subtasks
   const findTaskById = useCallback((id: string): Task | undefined => {
-    for (const task of tasks) {
+    for (const task of tasksRef.current) {
       if (task.id === id) return task
       if (task.subtasks) {
         const subtask = task.subtasks.find((s) => s.id === id)
@@ -487,12 +496,12 @@ export function useSupabaseTasks() {
       }
     }
     return undefined
-  }, [tasks])
+  }, [])
 
   // Helper to find parent of a subtask
   const findParentOfSubtask = useCallback((subtaskId: string): Task | undefined => {
-    return tasks.find((t) => t.subtasks?.some((s) => s.id === subtaskId))
-  }, [tasks])
+    return tasksRef.current.find((t) => t.subtasks?.some((s) => s.id === subtaskId))
+  }, [])
 
   const toggleTask = useCallback(async (id: string) => {
     const task = findTaskById(id)
@@ -711,7 +720,9 @@ export function useSupabaseTasks() {
     logger.debug('[updateTask] Called with:', { id, updates })
     const task = findTaskById(id)
     if (!task) {
-      logger.debug('[updateTask] Task not found!')
+      // Should be rare now that lookups read tasksRef — surface it loudly so a
+      // dropped write is never silent again.
+      console.warn('[updateTask] Task not found, write dropped:', id, updates)
       return
     }
 
