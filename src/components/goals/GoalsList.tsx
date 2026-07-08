@@ -8,6 +8,7 @@ interface GoalsListProps {
   year: number
   onSelectGoal: (goalId: string) => void
   onAddArea: (name: string) => Promise<GoalArea | null>
+  onRenameArea: (areaId: string, name: string) => void
   onAddGoal: (areaId: string, name: string) => Promise<Goal | null>
   onToggleAction: (actionId: string) => void
   onDeleteArea: (areaId: string) => void
@@ -20,6 +21,7 @@ export function GoalsList({
   year,
   onSelectGoal,
   onAddArea,
+  onRenameArea,
   onAddGoal,
   onToggleAction,
   onDeleteArea,
@@ -30,12 +32,20 @@ export function GoalsList({
   const [newGoalName, setNewGoalName] = useState('')
   const [savingArea, setSavingArea] = useState(false)
   const [savingGoal, setSavingGoal] = useState(false)
+  // Click-to-edit for area titles (mirrors the goal-title pattern in GoalView).
+  const [editingAreaId, setEditingAreaId] = useState<string | null>(null)
+  const [editingAreaName, setEditingAreaName] = useState('')
   const areaInputRef = useRef<HTMLInputElement>(null)
   const goalInputRef = useRef<HTMLInputElement>(null)
+  const renameInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (creatingArea) areaInputRef.current?.focus()
   }, [creatingArea])
+
+  useEffect(() => {
+    if (editingAreaId) renameInputRef.current?.focus()
+  }, [editingAreaId])
 
   useEffect(() => {
     if (addingGoalAreaId) goalInputRef.current?.focus()
@@ -61,6 +71,12 @@ export function GoalsList({
       setAddingGoalAreaId(null)
       setNewGoalName('')
     }
+  }
+
+  const commitAreaRename = (area: GoalArea) => {
+    const name = editingAreaName.trim()
+    if (name && name !== area.name) onRenameArea(area.id, name)
+    setEditingAreaId(null)
   }
 
   const getGoalsForArea = (areaId: string) =>
@@ -174,9 +190,29 @@ export function GoalsList({
               <section key={area.id}>
                 {/* Area header */}
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="font-display text-lg font-semibold text-neutral-700">
-                    {area.name}
-                  </h2>
+                  {editingAreaId === area.id ? (
+                    <input
+                      ref={renameInputRef}
+                      type="text"
+                      value={editingAreaName}
+                      onChange={(e) => setEditingAreaName(e.target.value)}
+                      onBlur={() => commitAreaRename(area)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') commitAreaRename(area)
+                        if (e.key === 'Escape') setEditingAreaId(null)
+                      }}
+                      className="font-display text-lg font-semibold text-neutral-700 bg-transparent border-b border-primary-300 focus:outline-none focus:border-primary-500 min-w-0 flex-1 mr-3"
+                      aria-label="Area name"
+                    />
+                  ) : (
+                    <h2
+                      onClick={() => { setEditingAreaId(area.id); setEditingAreaName(area.name) }}
+                      title="Click to rename"
+                      className="font-display text-lg font-semibold text-neutral-700 cursor-pointer hover:text-primary-700 transition-colors"
+                    >
+                      {area.name}
+                    </h2>
+                  )}
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => { setAddingGoalAreaId(area.id); setNewGoalName('') }}

@@ -8,6 +8,7 @@ export interface GoalsContextValue {
   areas: GoalArea[]
   goals: Goal[]
   addArea: (name: string) => Promise<GoalArea | null>
+  updateArea: (id: string, updates: { name?: string; sortOrder?: number }) => Promise<void>
   deleteArea: (id: string) => Promise<void>
   addGoal: (areaId: string, name: string, context?: 'work' | 'family' | 'personal') => Promise<Goal | null>
   updateGoal: (id: string, updates: Partial<Pick<Goal, 'name' | 'notes' | 'status' | 'areaId' | 'sortOrder' | 'strategy' | 'domainSlug' | 'layerId' | 'context'>>) => Promise<void>
@@ -46,6 +47,7 @@ export function GoalsProvider({ children }: { children: ReactNode }) {
     areas,
     goals,
     addArea,
+    updateArea,
     deleteArea,
     addGoal,
     updateGoal,
@@ -76,6 +78,7 @@ export function GoalsProvider({ children }: { children: ReactNode }) {
         areas,
         goals,
         addArea,
+        updateArea,
         deleteArea,
         addGoal,
         updateGoal,
