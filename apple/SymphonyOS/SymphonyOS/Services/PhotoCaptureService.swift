@@ -155,6 +155,44 @@ enum PhotoCaptureService {
         try? modelContext.save()
     }
 
+    // MARK: - Attach to an existing task
+
+    /// Add a photo to an existing task (no AI, no new task): upload to the
+    /// attachments bucket and insert the attachments row. Web parity with the
+    /// task panel's Photos section.
+    static func attachImage(jpegData: Data, taskId: UUID, userId: UUID) async -> Bool {
+        let path = "\(userId.uuidString.lowercased())/attach/\(UUID().uuidString.lowercased()).jpg"
+        do {
+            try await supabase.storage.from("attachments").upload(
+                path,
+                data: jpegData,
+                options: FileOptions(contentType: "image/jpeg", upsert: false)
+            )
+            struct NewAttachment: Encodable {
+                let user_id: String
+                let entity_type: String
+                let entity_id: String
+                let file_name: String
+                let file_type: String
+                let file_size: Int
+                let storage_path: String
+            }
+            try await supabase.from("attachments").insert(NewAttachment(
+                user_id: userId.uuidString.lowercased(),
+                entity_type: "task",
+                entity_id: taskId.uuidString.lowercased(),
+                file_name: "photo.jpg",
+                file_type: "image/jpeg",
+                file_size: jpegData.count,
+                storage_path: path
+            )).execute()
+            return true
+        } catch {
+            print("PhotoCaptureService: attachImage failed: \(error)")
+            return false
+        }
+    }
+
     // MARK: - Merge (suggestion chip)
 
     /// Fold an enriched capture into the suggested destination task: append the

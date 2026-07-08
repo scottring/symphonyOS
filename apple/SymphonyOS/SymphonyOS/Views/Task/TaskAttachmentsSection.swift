@@ -1,15 +1,25 @@
 import SwiftUI
 import Supabase
+#if os(iOS)
+import PhotosUI
+#endif
 
 /// Photos attached to a task (the `attachments` table + bucket) — most
 /// importantly the photo behind a photo-first capture, so the picture is in
 /// hand at the store. Images load via short-lived signed URLs; tap for
-/// full screen.
+/// full screen. Camera + photo-library buttons add to an existing task
+/// (web-panel parity).
 struct TaskAttachmentsSection: View {
     let taskId: UUID
 
+    @Environment(AuthService.self) private var auth
     @State private var images: [LoadedAttachment] = []
     @State private var fullScreenImage: LoadedAttachment?
+    @State private var isUploading = false
+    #if os(iOS)
+    @State private var showCamera = false
+    @State private var libraryItem: PhotosPickerItem?
+    #endif
 
     struct LoadedAttachment: Identifiable {
         let id: UUID
@@ -18,38 +28,43 @@ struct TaskAttachmentsSection: View {
     }
 
     var body: some View {
-        Group {
-            if !images.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
-                    Label("Photos", systemImage: "photo")
-                        .font(.bodySmallBold)
-                        .foregroundStyle(Color.textSecondary)
+        VStack(alignment: .leading, spacing: 8) {
+            Label("Photos", systemImage: "photo")
+                .font(.bodySmallBold)
+                .foregroundStyle(Color.textSecondary)
 
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
-                            ForEach(images) { attachment in
-                                Button {
-                                    fullScreenImage = attachment
-                                } label: {
-                                    AsyncImage(url: attachment.url) { phase in
-                                        switch phase {
-                                        case .success(let image):
-                                            image.resizable().scaledToFill()
-                                        case .failure:
-                                            Image(systemName: "photo")
-                                                .foregroundStyle(Color.textTertiary)
-                                        default:
-                                            ProgressView()
-                                        }
-                                    }
-                                    .frame(width: 140, height: 140)
-                                    .background(Color.bgElevated)
-                                    .clipShape(RoundedRectangle(cornerRadius: 10))
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(images) { attachment in
+                        Button {
+                            fullScreenImage = attachment
+                        } label: {
+                            AsyncImage(url: attachment.url) { phase in
+                                switch phase {
+                                case .success(let image):
+                                    image.resizable().scaledToFill()
+                                case .failure:
+                                    Image(systemName: "photo")
+                                        .foregroundStyle(Color.textTertiary)
+                                default:
+                                    ProgressView()
                                 }
-                                .buttonStyle(.plain)
                             }
+                            .frame(width: 140, height: 140)
+                            .background(Color.bgElevated)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
                         }
+                        .buttonStyle(.plain)
                     }
+
+                    #if os(iOS)
+                    addTile(systemImage: "camera.fill") { showCamera = true }
+                    PhotosPicker(selection: $libraryItem, matching: .images) {
+                        addTileLabel(systemImage: "photo.on.rectangle")
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isUploading)
+                    #endif
                 }
             }
         }
@@ -58,8 +73,63 @@ struct TaskAttachmentsSection: View {
         .fullScreenCover(item: $fullScreenImage) { attachment in
             AttachmentViewer(attachment: attachment) { fullScreenImage = nil }
         }
+        .fullScreenCover(isPresented: $showCamera) {
+            CameraPicker { data in
+                showCamera = false
+                if let data { Task { await attach(data) } }
+            }
+            .ignoresSafeArea()
+        }
+        .onChange(of: libraryItem) { _, item in
+            guard let item else { return }
+            Task {
+                if let data = try? await item.loadTransferable(type: Data.self),
+                   let ui = UIImage(data: data),
+                   let jpeg = PhotoCaptureService.preparedJPEG(from: ui) {
+                    await attach(jpeg)
+                }
+                libraryItem = nil
+            }
+        }
         #endif
     }
+
+    #if os(iOS)
+    private func addTile(systemImage: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) { addTileLabel(systemImage: systemImage) }
+            .buttonStyle(.plain)
+            .disabled(isUploading)
+    }
+
+    private func addTileLabel(systemImage: String) -> some View {
+        Group {
+            if isUploading {
+                ProgressView()
+            } else {
+                Image(systemName: systemImage)
+                    .font(.system(size: 22))
+                    .foregroundStyle(Color.textTertiary)
+            }
+        }
+        .frame(width: 64, height: 140)
+        .background(Color.bgElevated)
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .strokeBorder(Color.textTertiary.opacity(0.3), style: StrokeStyle(lineWidth: 1, dash: [4]))
+        )
+    }
+
+    private func attach(_ jpeg: Data) async {
+        guard let userId = auth.currentUser?.id else { return }
+        isUploading = true
+        if await PhotoCaptureService.attachImage(jpegData: jpeg, taskId: taskId, userId: userId) {
+            await load()
+            UINotificationFeedbackGenerator().notificationOccurred(.success)
+        }
+        isUploading = false
+    }
+    #endif
 
     private func load() async {
         struct Row: Decodable {
