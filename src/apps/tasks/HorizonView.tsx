@@ -11,7 +11,7 @@
 // Data + action scaffolding mirror InboxViewContainer so the existing
 // DenseInboxRow + global DetailPanel (tap-to-detail) work unchanged.
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { CalendarRange, Target, Plus, ChevronRight, FolderOpen } from 'lucide-react';
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
@@ -39,6 +39,7 @@ import { useConvertTaskToProject } from '@/hooks/useConvertTaskToProject';
 import { applyTriageWhen } from '@/lib/triage/applyWhen';
 import { useGoalsContext } from '@/contexts/GoalsContext';
 import { periodLabel, periodProgress } from '@/lib/cadence/periods';
+import { groupGuidingGoals, guidingGoalsSummary } from '@/lib/cadence/guidingGoals';
 import type { GoalAction } from '@/types/goal';
 import type { Task } from '@/types/task';
 
@@ -160,6 +161,23 @@ export function HorizonView({ horizon }: HorizonViewProps) {
       .flatMap((g) => g.actions.map((a) => ({ action: a, goal: g })))
       .filter(({ action }) => action.quarter === q && !action.completed);
   }, [goals, getCurrentQuarter]);
+
+  // Grouped by goal + tagged with what's already underway in this pool.
+  // Collapsed by default (the horizon's own plan leads); auto-open on a blank
+  // slate where the goals ARE the invitation to plan.
+  const guidingGroups = useMemo(
+    () => groupGuidingGoals(seasonGoalActions, pool),
+    [seasonGoalActions, pool],
+  );
+  const guidingSummary = useMemo(() => guidingGoalsSummary(guidingGroups), [guidingGroups]);
+  const [goalsOpen, setGoalsOpen] = useState(false);
+  const autoOpenedRef = useRef(false);
+  useEffect(() => {
+    if (!autoOpenedRef.current && pool.length === 0 && guidingGroups.length > 0) {
+      autoOpenedRef.current = true;
+      setGoalsOpen(true);
+    }
+  }, [pool.length, guidingGroups.length]);
 
   // Where this rung sits in the cascade + how far through its period we are.
   const period = periodLabel(horizon);
@@ -564,31 +582,64 @@ export function HorizonView({ horizon }: HorizonViewProps) {
             </div>
           )}
 
-          {/* Guiding goals — this season's moves from your annual goals. Pull
-              one in to break it into this horizon's plan. */}
-          {(horizon === 'month' || horizon === 'season') && seasonGoalActions.length > 0 && (
-            <section className="mb-6">
-              <h2 className="font-display text-sm tracking-wide text-neutral-400 uppercase mb-3">
-                <Target className="w-3.5 h-3.5 inline mr-1 -mt-0.5" />
-                Guiding goals — {periodLabel('season')}
-              </h2>
-              <div className="space-y-2">
-                {seasonGoalActions.map(({ action, goal }) => (
-                  <div key={action.id} className="flex items-center gap-3 rounded-xl border border-primary-100 bg-primary-50/30 px-3 py-2">
-                    <span className="flex-1 min-w-0">
-                      <span className="block text-sm text-neutral-800 truncate">{action.description}</span>
-                      <span className="block text-xs text-neutral-400 truncate">{goal.name}</span>
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => void pullGoalAction(action)}
-                      className="shrink-0 inline-flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-md bg-primary-600 text-white hover:bg-primary-700 transition-colors"
-                    >
-                      <Plus className="w-3 h-3" /> Plan it
-                    </button>
-                  </div>
-                ))}
-              </div>
+          {/* Guiding goals — this season's moves, grouped by goal and folded
+              into one quiet card. Collapsed by default so the horizon's OWN
+              plan leads the page; auto-open on a blank slate, where the goals
+              are the invitation. Moves already served by pool tasks show "In
+              motion" instead of asking to be planned again. */}
+          {(horizon === 'month' || horizon === 'season') && guidingGroups.length > 0 && (
+            <section className="mb-8">
+              <button
+                type="button"
+                onClick={() => setGoalsOpen((v) => !v)}
+                aria-expanded={goalsOpen}
+                className="w-full flex items-center gap-2 rounded-xl border border-primary-100 bg-primary-50/30 px-4 py-3 text-left hover:bg-primary-50/60 transition-colors"
+              >
+                <Target className="w-4 h-4 text-primary-500 shrink-0" />
+                <span className="flex-1 min-w-0 text-sm text-neutral-700">
+                  <span className="font-medium">Guiding goals</span>
+                  <span className="text-neutral-400">
+                    {' '}— {guidingSummary.moves} moves this season
+                    {guidingSummary.inMotion > 0 && `, ${guidingSummary.inMotion} in motion`}
+                  </span>
+                </span>
+                <ChevronRight className={`w-4 h-4 text-neutral-400 shrink-0 transition-transform ${goalsOpen ? 'rotate-90' : ''}`} />
+              </button>
+              {goalsOpen && (
+                <div className="mt-3 space-y-4 rounded-xl border border-neutral-100 bg-white px-4 py-3">
+                  {guidingGroups.map(({ goal, moves }) => (
+                    <div key={goal.id}>
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/goals/${goal.id}`)}
+                        className="text-xs font-medium uppercase tracking-wide text-neutral-400 hover:text-primary-700 transition-colors mb-1.5"
+                      >
+                        {goal.name}
+                      </button>
+                      <ul>
+                        {moves.map(({ action, inMotion }) => (
+                          <li key={action.id} className="flex items-center gap-3 py-1">
+                            <span className="flex-1 min-w-0 text-sm text-neutral-800 truncate">{action.description}</span>
+                            {inMotion > 0 ? (
+                              <span className="shrink-0 text-xs font-medium text-primary-700 bg-primary-50 px-2 py-0.5 rounded-full">
+                                In motion · {inMotion}
+                              </span>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => void pullGoalAction(action)}
+                                className="shrink-0 inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-md text-primary-700 bg-primary-50 hover:bg-primary-100 transition-colors"
+                              >
+                                <Plus className="w-3 h-3" /> Plan it
+                              </button>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              )}
             </section>
           )}
 
