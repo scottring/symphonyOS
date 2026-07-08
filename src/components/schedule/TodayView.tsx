@@ -902,6 +902,19 @@ export function TodayView({
                                 const entityId = slot === null ? routineId : `${routineId}#${slot}`
                                 onCompleteRoutine(entityId, true, completedAt)
                               } : undefined}
+                              onHideToday={onUpdateRoutine ? () => {
+                                // Pause until tomorrow: reference + paused_until, so the
+                                // useRoutines auto-resume brings it back on the next day.
+                                const parentId = item.id.replace('routine-collection-', '')
+                                const tomorrow = new Date()
+                                tomorrow.setHours(0, 0, 0, 0)
+                                tomorrow.setDate(tomorrow.getDate() + 1)
+                                onUpdateRoutine(parentId, { visibility: 'reference', paused_until: tomorrow.toISOString() })
+                              } : undefined}
+                              onRemove={onUpdateRoutine ? () => {
+                                const parentId = item.id.replace('routine-collection-', '')
+                                onUpdateRoutine(parentId, { visibility: 'reference' })
+                              } : undefined}
                             />
                           </div>
                         )

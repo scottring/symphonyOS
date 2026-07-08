@@ -143,6 +143,12 @@ export function HomeViewContainer() {
         clearSelection();
         return;
       }
+      // Collection headers ("routine-collection-<uuid>") open the PARENT
+      // routine's panel — the generic parse below would mangle the id.
+      if (itemId.startsWith('routine-collection-')) {
+        setSelection({ kind: 'routine', id: itemId.slice('routine-collection-'.length) });
+        return;
+      }
       // legacy itemId is "<kind>-<id>" — translate to selection ref
       const dashIdx = itemId.indexOf('-');
       if (dashIdx <= 0) return;
