@@ -374,10 +374,15 @@ const TOOLS = [
   },
   {
     name: 'symphony_list_events',
-    description: 'List calendar events for a day (defaults to today). Read-only. Use for "what is on my calendar".',
+    description:
+      'Search calendar events. Read-only. No arguments = today. Pass start_date/end_date to cover a range (a week, a whole month). Pass query to find an event by name — for "when is X?" call with just query and it searches a year in each direction. Multi-day events that overlap the range are included.',
     input_schema: {
       type: 'object',
-      properties: { date: { type: 'string', description: 'YYYY-MM-DD; defaults to today' } },
+      properties: {
+        start_date: { type: 'string', description: 'YYYY-MM-DD; defaults to today' },
+        end_date: { type: 'string', description: 'YYYY-MM-DD inclusive; defaults to start_date' },
+        query: { type: 'string', description: 'case-insensitive match on event title, e.g. "catskills"' },
+      },
     },
   },
   {
@@ -808,13 +813,30 @@ async function runTool(
         return JSON.stringify(data, null, 2)
       }
       case 'symphony_list_events': {
-        const date = typeof input.date === 'string' ? input.date : new Date().toISOString().split('T')[0]
-        const { data, error } = await db.from('calendar_events')
-          .select('id, title, start_time, end_time, all_day, location, meeting_url')
-          .gte('start_time', `${date}T00:00:00`).lte('start_time', `${date}T23:59:59`)
-          .order('start_time')
+        const shiftDate = (iso: string, days: number) => {
+          const d = new Date(`${iso}T00:00:00Z`)
+          d.setUTCDate(d.getUTCDate() + days)
+          return d.toISOString().split('T')[0]
+        }
+        const today = new Date().toISOString().split('T')[0]
+        const search = typeof input.query === 'string' && input.query.trim() ? input.query.trim() : null
+        let start = typeof input.start_date === 'string' ? input.start_date : null
+        let end = typeof input.end_date === 'string' ? input.end_date : start
+        if (!start) {
+          // Bare title search sweeps a year in each direction; a plain listing means today.
+          start = search ? shiftDate(today, -365) : today
+          end = search ? shiftDate(today, 365) : today
+        }
+        // Overlap semantics so multi-day events mid-range still match.
+        let q = db.from('calendar_events')
+          .select('id, title, start_time, end_time, all_day, location, meeting_url, calendar_name')
+          .lte('start_time', `${end}T23:59:59`)
+          .gte('end_time', `${start}T00:00:00`)
+        if (search) q = q.ilike('title', `%${search}%`)
+        const { data, error } = await q.order('start_time').limit(100)
         if (error) throw error
-        return `${(data || []).length} events on ${date}:\n${JSON.stringify(data, null, 2)}`
+        const range = start === end ? `on ${start}` : `from ${start} to ${end}`
+        return `${(data || []).length} events ${range}${search ? ` matching "${search}"` : ''}:\n${JSON.stringify(data, null, 2)}`
       }
       case 'symphony_delete_routine': {
         if (!input.id) return 'Error: id is required'
