@@ -27,7 +27,9 @@ export interface PlanningNotes {
   tripChildcare?: string     // specific trip + childcare planning
   /** The financial review is done in an external tool — we only track the tick. */
   financialDone?: boolean
-  [key: string]: string | boolean | undefined
+  /** Guided session shell (Five Horizons): resume position within the step list. */
+  stepIndex?: number
+  [key: string]: string | boolean | number | undefined
 }
 
 export function usePlanningSession(horizon: PlanningHorizon, periodToken: string) {

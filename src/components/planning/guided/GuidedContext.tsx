@@ -1,0 +1,54 @@
+// src/components/planning/guided/GuidedContext.tsx
+//
+// Context bridging the shell and the step components. `GuidedHost` is the
+// only doorway to app data/actions — step components never import hooks that
+// need providers, which keeps them individually testable.
+import { createContext, useContext } from 'react'
+import type { Task, TaskBucket } from '@/types/task'
+import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
+import type { Routine } from '@/types/actionable'
+import type { Goal, GoalArea, GoalStatus } from '@/types/goal'
+import type { GuidedStepConfig, GuidedStepRenderContext } from './types'
+
+export interface GuidedHost {
+  tasks: Task[]
+  tasksLoading: boolean
+  events: CalendarEvent[]
+  calendarConnected: boolean
+  fetchEvents: (start: Date, end: Date) => Promise<unknown>
+  createEvent: (input: { title: string; startTime: Date; endTime: Date; allDay?: boolean }) => Promise<unknown>
+  onPushTask: (id: string, target: Date | 'week' | 'month' | 'quarter') => void
+  onSetBucket: (id: string, bucket: TaskBucket) => void
+  onCompleteTask: (id: string) => void
+  onUpdateTask: (id: string, updates: Partial<Task>) => void
+  /** Single atomic create-into-bucket (bucket rides in AddTaskOptions). */
+  createTaskInBucket: (title: string, bucket: TaskBucket) => Promise<void>
+  /** Dated all-day task (book-next fallback when calendar is disconnected). */
+  createDatedTask: (title: string, date: Date) => Promise<void>
+  // Goals (flattened: areas + goal statements only)
+  goals: Goal[]
+  goalAreas: GoalArea[]
+  addGoal: (areaId: string, name: string) => Promise<unknown>
+  addArea: (name: string) => Promise<unknown>
+  updateGoalStatus: (id: string, status: GoalStatus) => Promise<void>
+  // Weekly grid pass-through
+  routines: Routine[]
+  draggableRoutines: Routine[]
+  onScheduleRoutine: (routineId: string, date: Date, time: string) => void
+  getRoutinesForDate: (date: Date) => Routine[]
+}
+
+export interface GuidedValue extends GuidedStepRenderContext {
+  host: GuidedHost
+  step: GuidedStepConfig
+  goNext: () => void
+}
+
+const Ctx = createContext<GuidedValue | null>(null)
+export const GuidedProvider = Ctx.Provider
+
+export function useGuided(): GuidedValue {
+  const v = useContext(Ctx)
+  if (!v) throw new Error('useGuided outside GuidedSession')
+  return v
+}
