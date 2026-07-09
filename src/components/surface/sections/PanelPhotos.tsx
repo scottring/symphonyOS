@@ -66,7 +66,10 @@ export function PanelPhotos({ entityType, entityId }: PanelPhotosProps) {
   }, [reload, flashNotice])
 
   // The Paste tile — reads the clipboard on click, for people (and iPads)
-  // that won't reach for ⌘V. Requires the async Clipboard API.
+  // that won't reach for ⌘V. Requires the async Clipboard API. A copied FILE
+  // (Finder / the screenshot thumbnail) is only a reference on the clipboard —
+  // the async API surfaces it as an item with no web-readable types and can't
+  // deliver its contents; only a real ⌘V keystroke or a drag-drop can.
   const pasteFromClipboard = useCallback(async () => {
     try {
       const items = await navigator.clipboard.read()
@@ -78,23 +81,48 @@ export function PanelPhotos({ entityType, entityId }: PanelPhotosProps) {
           return
         }
       }
-      flashNotice('No image on the clipboard')
+      if (items.some((item) => item.types.length === 0)) {
+        flashNotice('That looks like a copied file — press ⌘V here, or drag it in')
+      } else {
+        flashNotice('No image on the clipboard')
+      }
     } catch {
       flashNotice("Couldn't read the clipboard — try ⌘V instead")
     }
   }, [attach, flashNotice])
 
-  // ⌘V an image (e.g. a screenshot) anywhere while this panel is open.
+  // ⌘V anywhere while this panel is open. Unlike the async API, the paste
+  // event carries real file contents — a screenshot's pixels AND copied files
+  // (the screenshot thumbnail, a PDF from Finder) both arrive here.
   useEffect(() => {
     function onPaste(e: ClipboardEvent) {
-      const item = Array.from(e.clipboardData?.items ?? []).find((i) => i.type.startsWith('image/'))
-      const file = item?.getAsFile()
+      const items = Array.from(e.clipboardData?.items ?? [])
+      const image = items.find((i) => i.type.startsWith('image/'))?.getAsFile()
+      if (image) {
+        e.preventDefault()
+        void attach(image, image.name || `pasted-${Date.now()}.png`)
+        return
+      }
+      const file = items.find((i) => i.kind === 'file')?.getAsFile()
+        ?? e.clipboardData?.files?.[0]
+        ?? null
       if (!file) return
       e.preventDefault()
-      void attach(file, `pasted-${Date.now()}.png`)
+      void attach(file, file.name || undefined)
     }
     document.addEventListener('paste', onPaste)
     return () => document.removeEventListener('paste', onPaste)
+  }, [attach])
+
+  // Drag & drop — the other route that carries real file contents. Dropping
+  // the macOS screenshot thumbnail (or any file) onto the section attaches it.
+  const [dragOver, setDragOver] = useState(false)
+  const onDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault()
+    setDragOver(false)
+    for (const file of Array.from(e.dataTransfer?.files ?? [])) {
+      void attach(file, file.name || undefined)
+    }
   }, [attach])
 
   const images = attachments.filter((a) => a.fileType.startsWith('image/'))
@@ -113,7 +141,12 @@ export function PanelPhotos({ entityType, entityId }: PanelPhotosProps) {
     'grid place-items-center transition-colors disabled:opacity-60'
 
   return (
-    <section>
+    <section
+      onDrop={onDrop}
+      onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
+      onDragLeave={() => setDragOver(false)}
+      className={dragOver ? 'rounded-lg outline-2 outline-dashed outline-primary-400 outline-offset-4' : undefined}
+    >
       <div className="text-[10px] uppercase tracking-wider font-semibold text-neutral-400 mb-2">Photos &amp; files</div>
 
       <div className="flex flex-wrap gap-2">
@@ -210,7 +243,7 @@ export function PanelPhotos({ entityType, entityId }: PanelPhotosProps) {
       )}
 
       <p className="text-[11px] text-neutral-400 mt-1.5" aria-live="polite">
-        {notice ?? 'Snap, choose a file (PDF and docs welcome), or paste a screenshot'}
+        {notice ?? 'Snap, choose a file (PDF and docs welcome), paste (⌘V), or drag one in'}
       </p>
 
       {showCamera && (

@@ -84,6 +84,40 @@ describe('PanelPhotos', () => {
     )
   })
 
+  it('points at ⌘V/drag when the clipboard holds a file reference (empty types)', async () => {
+    // A screenshot FILE copied in Finder surfaces as one ClipboardItem with no
+    // web-readable types — the async API can't see file contents.
+    const fileRefItem = { types: [] as string[], getType: vi.fn() }
+    const { user } = render(<PanelPhotos entityType="event_note" entityId="e1" />)
+    vi.spyOn(navigator.clipboard, 'read').mockResolvedValue([fileRefItem as unknown as ClipboardItem])
+    await user.click(screen.getByRole('button', { name: /paste/i }))
+    await waitFor(() =>
+      expect(screen.getByText(/copied file/i)).toBeInTheDocument(),
+    )
+    expect(attachFile).not.toHaveBeenCalled()
+  })
+
+  it('attaches files dropped onto the section', async () => {
+    const { container } = render(<PanelPhotos entityType="event_note" entityId="e1" />)
+    const section = container.querySelector('section') as HTMLElement
+    const file = new File(['png'], 'shot.png', { type: 'image/png' })
+    const drop = new Event('drop', { bubbles: true, cancelable: true }) as unknown as { dataTransfer: unknown }
+    Object.defineProperty(drop, 'dataTransfer', { value: { files: [file], types: ['Files'] } })
+    section.dispatchEvent(drop as unknown as Event)
+    await waitFor(() => expect(attachFile).toHaveBeenCalledWith('event_note', 'e1', file, 'shot.png'))
+  })
+
+  it('⌘V paste accepts a non-image file (copied PDF) too', async () => {
+    render(<PanelPhotos entityType="task" entityId="t1" />)
+    const pdf = new File(['%PDF'], 'slip.pdf', { type: 'application/pdf' })
+    const paste = new Event('paste', { bubbles: true, cancelable: true })
+    Object.defineProperty(paste, 'clipboardData', {
+      value: { items: [{ kind: 'file', type: 'application/pdf', getAsFile: () => pdf }], files: [pdf] },
+    })
+    document.dispatchEvent(paste)
+    await waitFor(() => expect(attachFile).toHaveBeenCalledWith('task', 't1', pdf, 'slip.pdf'))
+  })
+
   it('attaches a picked file to the entity', async () => {
     const { container } = render(<PanelPhotos entityType="event_note" entityId="gcal-1" />)
     const input = container.querySelector('input[type="file"]') as HTMLInputElement
