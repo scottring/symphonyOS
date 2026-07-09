@@ -17,12 +17,11 @@ export function useNarrationPlayer(horizon: string, clipUrl: string | null) {
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
   const toggleMuted = useCallback(() => {
-    setMuted((m) => {
-      localStorage.setItem(`guided.muted.${horizon}`, m ? '0' : '1')
-      if (!m && audioRef.current) { audioRef.current.pause() }
-      return !m
-    })
-  }, [horizon])
+    const next = !muted
+    localStorage.setItem(`guided.muted.${horizon}`, next ? '1' : '0')
+    if (next && audioRef.current) { audioRef.current.pause() }
+    setMuted(next)
+  }, [horizon, muted])
 
   useEffect(() => {
     if (muted || !clipUrl) return
