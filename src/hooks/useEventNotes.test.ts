@@ -16,6 +16,10 @@ const mockEq = vi.fn()
 const mockIn = vi.fn()
 const mockMaybeSingle = vi.fn()
 const mockSingle = vi.fn()
+const mockChannelOn = vi.fn()
+const mockChannelSubscribe = vi.fn()
+const mockRemoveChannel = vi.fn()
+let realtimeCallback: ((payload: Record<string, unknown>) => void) | null = null
 
 // Mock useAuth
 vi.mock('@/hooks/useAuth', () => ({
@@ -70,6 +74,22 @@ const createDeleteChain = () => ({
   },
 })
 
+// Chainable mock channel for realtime subscriptions
+const mockChannelObj: {
+  on: (event: string, filter: unknown, cb: (payload: Record<string, unknown>) => void) => typeof mockChannelObj
+  subscribe: () => typeof mockChannelObj
+} = {
+  on: (event, filter, cb) => {
+    mockChannelOn(event, filter)
+    realtimeCallback = cb
+    return mockChannelObj
+  },
+  subscribe: () => {
+    mockChannelSubscribe()
+    return mockChannelObj
+  },
+}
+
 // Mock Supabase
 vi.mock('@/lib/supabase', () => ({
   supabase: {
@@ -84,6 +104,8 @@ vi.mock('@/lib/supabase', () => ({
         return createDeleteChain()
       },
     }),
+    channel: () => mockChannelObj,
+    removeChannel: (ch: unknown) => mockRemoveChannel(ch),
   },
 }))
 
@@ -94,6 +116,7 @@ describe('useEventNotes', () => {
     mockFetchResult = null
     mockUpsertResult = null
     mockUserState = mockUser
+    realtimeCallback = null
     vi.clearAllMocks()
   })
 
@@ -545,6 +568,134 @@ describe('useEventNotes', () => {
       })
 
       expect(mockIn).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('auto-load + realtime (eventIds param)', () => {
+    const dbRow = (overrides: Record<string, unknown> = {}) => ({
+      id: 'note-1',
+      user_id: mockUser.id,
+      google_event_id: 'event-1',
+      notes: null,
+      assigned_to: null,
+      created_at: '2024-01-01T00:00:00Z',
+      updated_at: '2024-01-01T00:00:00Z',
+      ...overrides,
+    })
+
+    it('auto-fetches notes for the provided event ids on mount', async () => {
+      mockFetchResult = [dbRow({ context: 'family', shared_with_family: true })]
+
+      const { result } = renderHook(() => useEventNotes(['event-1', 'event-2']))
+
+      await waitFor(() => {
+        expect(mockIn).toHaveBeenCalledWith('google_event_id', ['event-1', 'event-2'])
+      })
+      await waitFor(() => {
+        expect(result.current.notes.get('event-1')?.context).toBe('family')
+        expect(result.current.notes.get('event-1')?.sharedWithFamily).toBe(true)
+      })
+    })
+
+    it('does not refetch ids it already requested', async () => {
+      mockFetchResult = []
+      const { rerender } = renderHook(({ ids }) => useEventNotes(ids), {
+        initialProps: { ids: ['event-1'] },
+      })
+
+      await waitFor(() => expect(mockIn).toHaveBeenCalledTimes(1))
+
+      // Same content, new array identity — must not refetch (note rows are
+      // sparse: most events have none, so "in cache" can't be the guard)
+      await act(async () => {
+        rerender({ ids: [...['event-1']] })
+      })
+      expect(mockIn).toHaveBeenCalledTimes(1)
+    })
+
+    it('fetches only the new ids when the visible set grows', async () => {
+      mockFetchResult = []
+      const { rerender } = renderHook(({ ids }) => useEventNotes(ids), {
+        initialProps: { ids: ['event-1'] },
+      })
+      await waitFor(() => expect(mockIn).toHaveBeenCalledWith('google_event_id', ['event-1']))
+
+      await act(async () => {
+        rerender({ ids: ['event-1', 'event-2'] })
+      })
+      await waitFor(() => expect(mockIn).toHaveBeenCalledWith('google_event_id', ['event-2']))
+    })
+
+    it('does not fetch or subscribe when no eventIds param is given', async () => {
+      renderHook(() => useEventNotes())
+      await act(async () => {})
+      expect(mockIn).not.toHaveBeenCalled()
+      expect(mockChannelSubscribe).not.toHaveBeenCalled()
+    })
+
+    it('subscribes to event_notes changes and applies UPDATE payloads', async () => {
+      const { result } = renderHook(() => useEventNotes([]))
+
+      await waitFor(() => expect(mockChannelSubscribe).toHaveBeenCalled())
+
+      act(() => {
+        realtimeCallback?.({
+          eventType: 'UPDATE',
+          new: dbRow({ context: 'family', shared_with_family: true }),
+        })
+      })
+
+      expect(result.current.notes.get('event-1')?.context).toBe('family')
+      expect(result.current.notes.get('event-1')?.sharedWithFamily).toBe(true)
+    })
+
+    it('applies INSERT payloads for events not yet in the cache', async () => {
+      const { result } = renderHook(() => useEventNotes([]))
+      await waitFor(() => expect(mockChannelSubscribe).toHaveBeenCalled())
+
+      act(() => {
+        realtimeCallback?.({
+          eventType: 'INSERT',
+          new: dbRow({ google_event_id: 'event-9', assigned_to_all: ['m1', 'm2'] }),
+        })
+      })
+
+      expect(result.current.notes.get('event-9')?.assignedToAll).toEqual(['m1', 'm2'])
+    })
+
+    it('ignores realtime rows belonging to other users', async () => {
+      const { result } = renderHook(() => useEventNotes([]))
+      await waitFor(() => expect(mockChannelSubscribe).toHaveBeenCalled())
+
+      act(() => {
+        realtimeCallback?.({
+          eventType: 'UPDATE',
+          new: dbRow({ user_id: 'someone-else' }),
+        })
+      })
+
+      expect(result.current.notes.has('event-1')).toBe(false)
+    })
+
+    it('DELETE payload removes the matching cached note', async () => {
+      mockFetchResult = [dbRow()]
+      const { result } = renderHook(() => useEventNotes(['event-1']))
+      await waitFor(() => expect(result.current.notes.has('event-1')).toBe(true))
+
+      act(() => {
+        // DELETE payloads only carry the primary key
+        realtimeCallback?.({ eventType: 'DELETE', old: { id: 'note-1' } })
+      })
+
+      expect(result.current.notes.has('event-1')).toBe(false)
+    })
+
+    it('removes the realtime channel on unmount', async () => {
+      const { unmount } = renderHook(() => useEventNotes([]))
+      await waitFor(() => expect(mockChannelSubscribe).toHaveBeenCalled())
+
+      unmount()
+      expect(mockRemoveChannel).toHaveBeenCalled()
     })
   })
 

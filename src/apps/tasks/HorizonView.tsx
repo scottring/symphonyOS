@@ -102,7 +102,9 @@ export function HorizonView({ horizon }: HorizonViewProps) {
     tasks, addTask, toggleTask, toggleWaiting, deleteTask, updateTask, updateTasksBulk, pushTask, setBucket,
   } = useSupabaseTasks();
   const { events } = useGoogleCalendar();
-  const { notes: eventNotesMap, updateEventAssignment, updateEventAssignmentAll, updateEventContext, updateEventProject } = useEventNotes();
+  // Event ids opt in to auto-loaded, realtime event notes (see useEventNotes)
+  const visibleEventIds = useMemo(() => events.map((e) => e.google_event_id || e.id), [events]);
+  const { notes: eventNotesMap, updateEventAssignment, updateEventAssignmentAll, updateEventContext, updateEventProject } = useEventNotes(visibleEventIds);
   const { contacts, contactsMap, addContact, searchContacts } = useContacts();
   const { projects, projectsMap, addProject, deleteProject } = useProjects();
   const { routines: allRoutines, updateRoutine, deleteRoutine } = useRoutines();

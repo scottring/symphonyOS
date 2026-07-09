@@ -27,7 +27,6 @@ import { parseQuickInput } from '@/lib/quickInputParser';
 import type { ParserContext } from '@/lib/quickInputParser';
 import type { ResolverContext } from '@/lib/entityResolver';
 import type { TodayCaptureResult } from '@/components/schedule/TodayAddInput';
-import type { GoalAction } from '@/types/goal';
 import type { Task } from '@/types/task';
 import type { TimelineCaptureResult } from '@/components/schedule/TimelineQuickInput';
 import { useEventNotes } from '@/hooks/useEventNotes';
@@ -55,7 +54,11 @@ export function HomeViewContainer() {
   // Data hooks
   const { tasks, loading: tasksLoading, addTask, toggleTask, toggleWaiting, deleteTask, updateTask, pushTask, setBucket, getLinkedTasks, refetch } = useSupabaseTasks();
   const { isConnected, events, fetchEvents, isFetching: eventsFetching, updateEvent, createEvent, deleteEvent, removeEventLocal, restoreEventLocal } = useGoogleCalendar();
-  const { notes: eventNotesMap, updateEventAssignment, updateEventAssignmentAll, updateEventContext, updateEventProject, updateEventSharedWithFamily, dismissShareNudge } = useEventNotes();
+  // Passing the visible event ids opts in to auto-loading notes (context
+  // overrides, assignees, shared-with-family) + realtime — without it those
+  // persist to the DB but render stale on every fresh window.
+  const visibleEventIds = useMemo(() => events.map((e) => e.google_event_id || e.id), [events]);
+  const { notes: eventNotesMap, updateEventAssignment, updateEventAssignmentAll, updateEventContext, updateEventProject, updateEventSharedWithFamily, dismissShareNudge } = useEventNotes(visibleEventIds);
   const { contacts, contactsMap, addContact, searchContacts } = useContacts();
   const { projects, projectsMap, addProject } = useProjects();
   const {
@@ -73,7 +76,7 @@ export function HomeViewContainer() {
   const { lists, listsByCategory } = useListsContext();
   const { addNote } = useNotesContext();
   const { currentDomain } = useDomain();
-  const { goals, getCurrentQuarter } = useGoalsContext();
+  const { goals } = useGoalsContext();
   const vaultWrite = useVaultWrite();
   const undo = useUndo();
   const { aliases, recordOutcome } = useResolutionLearning();

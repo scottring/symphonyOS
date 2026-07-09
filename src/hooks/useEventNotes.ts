@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import { detectRecipeUrl } from '@/lib/recipeDetection'
@@ -62,7 +62,21 @@ function dbNoteToEventNote(dbNote: DbEventNote): EventNote {
   }
 }
 
-export function useEventNotes() {
+// Unique per-mount channel names: two list views can overlap during route
+// transitions, and same-topic channels conflict in supabase-js.
+let eventNotesChannelSeq = 0
+
+/**
+ * Event-note state (context override, assignees, shared-with-family, notes…).
+ *
+ * Pass `eventIds` (the google event ids currently on screen) to opt in to
+ * auto-loading: notes for those events are bulk-fetched on mount / when the
+ * set grows, and a realtime subscription keeps them live across windows.
+ * Without it the hook is a write-through cache that only knows about edits
+ * made through this instance — list views MUST pass it or overrides persist
+ * to the DB but render stale everywhere else.
+ */
+export function useEventNotes(eventIds?: string[]) {
   const { user } = useAuth()
   const [notes, setNotes] = useState<Map<string, EventNote>>(new Map())
   const [loading, setLoading] = useState(false)
@@ -287,6 +301,65 @@ export function useEventNotes() {
       })
     }
   }, [user, notes])
+
+  // ── Auto-load for list views (opt-in via the eventIds param) ──
+  // Note rows are sparse (most events have none), so "is it in the cache?"
+  // can't gate refetches — track which ids this instance has already asked
+  // for. Keyed on the joined ids so a same-content array doesn't refire.
+  const requestedIdsRef = useRef<Set<string>>(new Set())
+  const fetchNotesForEventsRef = useRef(fetchNotesForEvents)
+  fetchNotesForEventsRef.current = fetchNotesForEvents
+  const idsKey = eventIds === undefined ? undefined : eventIds.join('\n')
+
+  useEffect(() => {
+    if (!user || idsKey === undefined) return
+    const ids = idsKey === '' ? [] : idsKey.split('\n')
+    const fresh = ids.filter((id) => !requestedIdsRef.current.has(id))
+    if (fresh.length === 0) return
+    for (const id of fresh) requestedIdsRef.current.add(id)
+    void fetchNotesForEventsRef.current(fresh)
+  }, [user, idsKey])
+
+  // ── Realtime: keep notes live across windows/devices ──
+  // Only for opted-in (list view) instances; panel instances piggyback on
+  // their own fetch-per-open. Without this, a context/share/assign change in
+  // one window never reaches another until its next full reload.
+  const wantsRealtime = eventIds !== undefined
+  useEffect(() => {
+    if (!user || !wantsRealtime) return
+    const channel = supabase
+      .channel(`event-notes-changes-${++eventNotesChannelSeq}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'event_notes', filter: `user_id=eq.${user.id}` },
+        (payload) => {
+          if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+            const row = payload.new as DbEventNote
+            if (row.user_id !== user.id) return
+            const note = dbNoteToEventNote(row)
+            setNotes((prev) => new Map(prev).set(note.googleEventId, note))
+          } else if (payload.eventType === 'DELETE') {
+            // DELETE payloads only carry the primary key
+            const oldId = (payload.old as { id?: string } | null)?.id
+            if (!oldId) return
+            setNotes((prev) => {
+              for (const [key, n] of prev) {
+                if (n.id === oldId) {
+                  const next = new Map(prev)
+                  next.delete(key)
+                  return next
+                }
+              }
+              return prev
+            })
+          }
+        }
+      )
+      .subscribe()
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [user, wantsRealtime])
 
   // Update assignment for an event (upsert)
   const updateEventAssignment = useCallback(async (googleEventId: string, memberId: string | null) => {
