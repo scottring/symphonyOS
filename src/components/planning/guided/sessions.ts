@@ -20,35 +20,35 @@ export const SESSIONS: Record<PlanningHorizon, GuidedSessionConfig> = {
       {
         id: 'looking-back', type: 'reflect', title: 'Look back',
         narration: 'Start with the year behind you. Take twenty or thirty minutes if you have them. What went well — what are you genuinely proud of? And which habits or routines did not serve you? Write freely; this is for you and whoever you share your planning with.',
-        props: { notesKey: 'review', placeholder: "Wins worth celebrating, and what didn't serve you…" },
+        props: { notesKey: 'review', placeholder: "Wins worth celebrating, and what didn’t serve you…" },
       },
       {
         id: 'one-year-out', type: 'reflect', title: 'One year from now',
         narration: 'Now jump forward twelve months. It is this same week, next year, and things went well. Write down what you are most proud of having accomplished — and the specific steps you took to get there. Write it in the past tense, as if it already happened.',
-        props: { notesKey: 'lookingBack', placeholder: "It's a year from now. I'm most proud that…" },
+        props: { notesKey: 'lookingBack', placeholder: "It’s a year from now. I’m most proud that…" },
       },
       {
-        id: 'goal-review', type: 'review', title: "Last year's goals",
+        id: 'goal-review', type: 'review', title: "Last year’s goals",
         narration: 'Here are the goals you set before. For each one: if it happened, mark it achieved and enjoy that for a second. If it still matters, carry it into the new year. And if it no longer fits who you are, let it go — that is not failure, that is editing.',
         props: { source: 'goals' },
       },
       {
-        id: 'mountain-ranges', type: 'calendar', title: "The year's mountain ranges",
+        id: 'mountain-ranges', type: 'calendar', title: "The year’s mountain ranges",
         narration: 'Look at the shape of the year ahead. These are the commitments already set in stone — trips, school calendars, birthdays, heavy stretches of work. You are not planning around them yet; you are just noticing where the mountains are. Jot anything worth remembering.',
         props: { notesKey: 'annualCalendar' },
       },
       {
         id: 'someday', type: 'review', title: 'Someday possibilities',
-        narration: "This is your someday list — the ideas you parked because the timing wasn't right. Read through it slowly. If something is finally ready, move it into this season. Everything else can keep waiting; that is what the list is for.",
+        narration: "This is your someday list — the ideas you parked because the timing wasn’t right. Read through it slowly. If something is finally ready, move it into this season. Everything else can keep waiting; that is what the list is for.",
         props: { source: 'someday' },
       },
       {
-        id: 'write-goals', type: 'domains-goals', title: "This year's goals",
-        narration: "Now write the year's goals. Pick three to eight areas of life — health, family, work, home, fun — and under each one, write what you want without censoring yourself. One rule of thumb: aim for two goals that make you smile for every one that feels like an obligation.",
+        id: 'write-goals', type: 'domains-goals', title: "This year’s goals",
+        narration: "Now write the year’s goals. Pick three to eight areas of life — health, family, work, home, fun — and under each one, write what you want without censoring yourself. One rule of thumb: aim for two goals that make you smile for every one that feels like an obligation.",
       },
       {
         id: 'book-next', type: 'book-next', title: 'Anchor the next step',
-        narration: "Last thing, and it is the one that makes this system real: put your seasonal planning session on the calendar right now, before you close this. A plan with a next appointment survives. One without usually doesn't.",
+        narration: "Last thing, and it is the one that makes this system real: put your seasonal planning session on the calendar right now, before you close this. A plan with a next appointment survives. One without usually doesn’t.",
         props: { bookHorizon: 'seasonal', bookTitle: 'Seasonal planning session' },
       },
     ],
@@ -61,21 +61,21 @@ export const SESSIONS: Record<PlanningHorizon, GuidedSessionConfig> = {
     steps: [
       {
         id: 'welcome', type: 'narration', title: 'A fresh season',
-        narration: "This is your seasonal planning session — about half an hour to close out the season that is ending and shape the one ahead. Seasons are the honest unit of life: school terms, summers, the stretch before the holidays. Let's look at what happened, and then decide what this next one is for.",
+        narration: "This is your seasonal planning session — about half an hour to close out the season that is ending and shape the one ahead. Seasons are the honest unit of life: school terms, summers, the stretch before the holidays. Let’s look at what happened, and then decide what this next one is for.",
       },
       {
-        id: 'season-review', type: 'review', title: "Last season's list",
-        narration: "Here is everything still open from this season's list. Celebrate what got done. For each item that didn't: carry it into the new season if it still matters, park it on Someday if the timing is wrong, or let it go. If you carry something, take one second to notice what stopped it last time.",
+        id: 'season-review', type: 'review', title: "Last season’s list",
+        narration: "Here is everything still open from this season’s list. Celebrate what got done. For each item that didn’t: carry it into the new season if it still matters, park it on Someday if the timing is wrong, or let it go. If you carry something, take one second to notice what stopped it last time.",
         props: { bucket: 'quarter' },
       },
       {
         id: 'look-at-year', type: 'look-above', title: 'Your goals for the year',
-        narration: "These are the goals you set for the year — read them slowly, but don't move anything. You are just asking one question: which of these fit this season's energy and timing? The season list you write next is its own list; it doesn't have to line up with anything.",
+        narration: "These are the goals you set for the year — read them slowly, but don’t move anything. You are just asking one question: which of these fit this season’s energy and timing? The season list you write next is its own list; it doesn’t have to line up with anything.",
         props: { aboveBucket: 'goals', aboveLabel: 'Your goals for the year' },
       },
       {
         id: 'season-ahead', type: 'calendar', title: 'The season ahead',
-        narration: "Scan the season's calendar — trips, deadlines, school breaks, the weeks that are already spoken for. Notice how much open space actually exists. Plans that respect the calendar get done; plans that ignore it get abandoned.",
+        narration: "Scan the season’s calendar — trips, deadlines, school breaks, the weeks that are already spoken for. Notice how much open space actually exists. Plans that respect the calendar get done; plans that ignore it get abandoned.",
         props: { notesKey: 'tripChildcare' },
       },
       {
@@ -84,8 +84,8 @@ export const SESSIONS: Record<PlanningHorizon, GuidedSessionConfig> = {
         props: { notesKey: 'energy', placeholder: 'Energy, health, and mood going into this season…' },
       },
       {
-        id: 'write-season', type: 'write-list', title: "Write the season's list",
-        narration: "Now write this season's list — concrete, specific things you want to be true by the end of it. Look back at your year goals if it helps, or don't. This list is allowed to contain things that appear nowhere else.",
+        id: 'write-season', type: 'write-list', title: "Write the season’s list",
+        narration: "Now write this season’s list — concrete, specific things you want to be true by the end of it. Look back at your year goals if it helps, or don’t. This list is allowed to contain things that appear nowhere else.",
         props: { bucket: 'quarter' },
       },
       {
@@ -106,8 +106,8 @@ export const SESSIONS: Record<PlanningHorizon, GuidedSessionConfig> = {
         narration: 'This is your monthly planning session — a clean slate, twelve times a year. Twenty minutes to close last month, look at the season, and write a short list for the next four weeks.',
       },
       {
-        id: 'month-review', type: 'review', title: "Last month's list",
-        narration: "Here is what is still open from the month's list. Mark off what actually happened — more got done than you think. Carry forward what still matters. Let go of what doesn't; a shorter list you believe is worth more than a long one you ignore.",
+        id: 'month-review', type: 'review', title: "Last month’s list",
+        narration: "Here is what is still open from the month’s list. Mark off what actually happened — more got done than you think. Carry forward what still matters. Let go of what doesn’t; a shorter list you believe is worth more than a long one you ignore.",
         props: { bucket: 'month' },
       },
       {
@@ -125,13 +125,13 @@ export const SESSIONS: Record<PlanningHorizon, GuidedSessionConfig> = {
         props: { notesKey: 'relationships', placeholder: 'Energy — and what needs attention with each other and the kids…' },
       },
       {
-        id: 'write-month', type: 'write-list', title: "Write the month's list",
-        narration: "Write the month's list. Keep it honest — and put at least one thing on it that exists purely because it will be fun. A month with nothing to look forward to is a scheduling failure.",
+        id: 'write-month', type: 'write-list', title: "Write the month’s list",
+        narration: "Write the month’s list. Keep it honest — and put at least one thing on it that exists purely because it will be fun. A month with nothing to look forward to is a scheduling failure.",
         props: { bucket: 'month' },
       },
       {
         id: 'book-next', type: 'book-next', title: 'Anchor the next step',
-        narration: "Book next month's session before you close. First weekend of the month works well.",
+        narration: "Book next month’s session before you close. First weekend of the month works well.",
         props: { bookHorizon: 'monthly', bookTitle: 'Monthly planning session' },
       },
     ],
@@ -148,16 +148,16 @@ export const SESSIONS: Record<PlanningHorizon, GuidedSessionConfig> = {
       },
       {
         id: 'look-around', type: 'inbox', title: 'Look around',
-        narration: "First, get current. Here is everything captured into the inbox that hasn't been dealt with. Give each one a home — a day, a list, Someday — or mark it done. An empty inbox is not tidiness; it is the difference between planning from reality and planning from memory.",
+        narration: "First, get current. Here is everything captured into the inbox that hasn’t been dealt with. Give each one a home — a day, a list, Someday — or mark it done. An empty inbox is not tidiness; it is the difference between planning from reality and planning from memory.",
       },
       {
-        id: 'week-review', type: 'review', title: "Last week's list",
+        id: 'week-review', type: 'review', title: "Last week’s list",
         narration: "Here is what is still open from last week. For each item, actively choose its fate: carry it forward, give it a specific day, make it smaller, hand it to someone else, or let it go. No item gets to just linger.",
         props: { bucket: 'week' },
       },
       {
         id: 'look-at-month', type: 'look-above', title: 'Your month list',
-        narration: "Your month list, for reference. Which of these does this week need to move? Copy down anything you want on the week's list — the month list keeps its copy.",
+        narration: "Your month list, for reference. Which of these does this week need to move? Copy down anything you want on the week’s list — the month list keeps its copy.",
         props: { aboveBucket: 'month', aboveLabel: 'Your month list' },
       },
       {
@@ -166,12 +166,12 @@ export const SESSIONS: Record<PlanningHorizon, GuidedSessionConfig> = {
       },
       {
         id: 'look-within', type: 'reflect', title: 'Look within',
-        narration: "Check in with yourself before you commit to anything: sleep debt, physical energy, emotional capacity. Set the week's expectations to match the human doing it.",
+        narration: "Check in with yourself before you commit to anything: sleep debt, physical energy, emotional capacity. Set the week’s expectations to match the human doing it.",
         props: { notesKey: 'energy', placeholder: 'Sleep, energy, capacity going into this week…' },
       },
       {
-        id: 'write-week', type: 'write-list', title: "Write the week's list",
-        narration: "Write the week's task list. Keep it focused — around fifteen items is the honest ceiling for a week that also contains a life. The counter is a nudge, not a wall.",
+        id: 'write-week', type: 'write-list', title: "Write the week’s list",
+        narration: "Write the week’s task list. Keep it focused — around fifteen items is the honest ceiling for a week that also contains a life. The counter is a nudge, not a wall.",
         props: { bucket: 'week', softCap: 15 },
       },
       {
@@ -193,12 +193,12 @@ export const SESSIONS: Record<PlanningHorizon, GuidedSessionConfig> = {
     steps: [
       {
         id: 'look-back', type: 'review', title: 'Look back',
-        narration: "A quick look at what carried over. Nothing here is a failure — it is just yesterday's honest remainder. Give each item a new home in one tap.",
+        narration: "A quick look at what carried over. Nothing here is a failure — it is just yesterday’s honest remainder. Give each item a new home in one tap.",
         props: { source: 'overdue' },
       },
       {
         id: 'look-ahead', type: 'calendar', title: 'Look ahead',
-        narration: "Here is today's shape — the hard commitments and, more importantly, the gaps between them. The gaps are the day's actual capacity.",
+        narration: "Here is today’s shape — the hard commitments and, more importantly, the gaps between them. The gaps are the day’s actual capacity.",
       },
       {
         id: 'look-within', type: 'reflect', title: 'Look within',
