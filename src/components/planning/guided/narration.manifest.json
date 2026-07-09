@@ -1,5 +1,146 @@
 {
-  "bootstrap": true,
-  "voiceId": "",
-  "clips": {}
+  "bootstrap": false,
+  "voiceId": "JBFqnCBsd6RMkjVDRZzb",
+  "clips": {
+    "annual.welcome": {
+      "text": "This is your annual planning session. Over the next forty-five minutes or so, you will look back at the year that is ending, imagine the one ahead, and write a short list of goals for the areas of life that matter most. There is nothing to get right here — every step can be skipped, and you can come back anytime. Find somewhere quiet, and when you are ready, continue.",
+      "file": "annual-welcome.30d41716.mp3"
+    },
+    "annual.looking-back": {
+      "text": "Start with the year behind you. Take twenty or thirty minutes if you have them. What went well — what are you genuinely proud of? And which habits or routines did not serve you? Write freely; this is for you and whoever you share your planning with.",
+      "file": "annual-looking-back.a9c2ad7b.mp3"
+    },
+    "annual.one-year-out": {
+      "text": "Now jump forward twelve months. It is this same week, next year, and things went well. Write down what you are most proud of having accomplished — and the specific steps you took to get there. Write it in the past tense, as if it already happened.",
+      "file": "annual-one-year-out.043fe752.mp3"
+    },
+    "annual.goal-review": {
+      "text": "Here are the goals you set before. For each one: if it happened, mark it achieved and enjoy that for a second. If it still matters, carry it into the new year. And if it no longer fits who you are, let it go — that is not failure, that is editing.",
+      "file": "annual-goal-review.f9e5f116.mp3"
+    },
+    "annual.mountain-ranges": {
+      "text": "Look at the shape of the year ahead. These are the commitments already set in stone — trips, school calendars, birthdays, heavy stretches of work. You are not planning around them yet; you are just noticing where the mountains are. Jot anything worth remembering.",
+      "file": "annual-mountain-ranges.ff18f87a.mp3"
+    },
+    "annual.someday": {
+      "text": "This is your someday list — the ideas you parked because the timing wasn’t right. Read through it slowly. If something is finally ready, move it into this season. Everything else can keep waiting; that is what the list is for.",
+      "file": "annual-someday.3e47c184.mp3"
+    },
+    "annual.write-goals": {
+      "text": "Now write the year’s goals. Pick three to eight areas of life — health, family, work, home, fun — and under each one, write what you want without censoring yourself. One rule of thumb: aim for two goals that make you smile for every one that feels like an obligation.",
+      "file": "annual-write-goals.cb1f9b0b.mp3"
+    },
+    "annual.book-next": {
+      "text": "Last thing, and it is the one that makes this system real: put your seasonal planning session on the calendar right now, before you close this. A plan with a next appointment survives. One without usually doesn’t.",
+      "file": "annual-book-next.3c88591a.mp3"
+    },
+    "seasonal.welcome": {
+      "text": "This is your seasonal planning session — about half an hour to close out the season that is ending and shape the one ahead. Seasons are the honest unit of life: school terms, summers, the stretch before the holidays. Let’s look at what happened, and then decide what this next one is for.",
+      "file": "seasonal-welcome.a4c127a8.mp3"
+    },
+    "seasonal.season-review": {
+      "text": "Here is everything still open from this season’s list. Celebrate what got done. For each item that didn’t: carry it into the new season if it still matters, park it on Someday if the timing is wrong, or let it go. If you carry something, take one second to notice what stopped it last time.",
+      "file": "seasonal-season-review.f6885a93.mp3"
+    },
+    "seasonal.look-at-year": {
+      "text": "These are the goals you set for the year — read them slowly, but don’t move anything. You are just asking one question: which of these fit this season’s energy and timing? The season list you write next is its own list; it doesn’t have to line up with anything.",
+      "file": "seasonal-look-at-year.f6df0371.mp3"
+    },
+    "seasonal.season-ahead": {
+      "text": "Scan the season’s calendar — trips, deadlines, school breaks, the weeks that are already spoken for. Notice how much open space actually exists. Plans that respect the calendar get done; plans that ignore it get abandoned.",
+      "file": "seasonal-season-ahead.214e44b8.mp3"
+    },
+    "seasonal.look-within": {
+      "text": "Before you write anything: how are you, actually? Energy, health, mood. A season planned for the person you wish you were will fall apart in a week. Plan for the person you are right now.",
+      "file": "seasonal-look-within.0a405d2a.mp3"
+    },
+    "seasonal.write-season": {
+      "text": "Now write this season’s list — concrete, specific things you want to be true by the end of it. Look back at your year goals if it helps, or don’t. This list is allowed to contain things that appear nowhere else.",
+      "file": "seasonal-write-season.39da0d01.mp3"
+    },
+    "seasonal.book-next": {
+      "text": "Before you close: book the monthly planning session. Ten seconds now buys you a system that keeps running without willpower.",
+      "file": "seasonal-book-next.e0babf55.mp3"
+    },
+    "monthly.welcome": {
+      "text": "This is your monthly planning session — a clean slate, twelve times a year. Twenty minutes to close last month, look at the season, and write a short list for the next four weeks.",
+      "file": "monthly-welcome.39086f37.mp3"
+    },
+    "monthly.month-review": {
+      "text": "Here is what is still open from the month’s list. Mark off what actually happened — more got done than you think. Carry forward what still matters. Let go of what doesn’t; a shorter list you believe is worth more than a long one you ignore.",
+      "file": "monthly-month-review.463a0786.mp3"
+    },
+    "monthly.look-at-season": {
+      "text": "This is your season list, for reference. Watch how the big items naturally suggest month-sized moves — renovate the kitchen becomes order the dishwasher. Copy a line down if you want it in front of you this month; the original stays on the season list.",
+      "file": "monthly-look-at-season.436c2f32.mp3"
+    },
+    "monthly.month-ahead": {
+      "text": "Scan the next four to five weeks. The calendar is fairly solid at this range — look for conflicts, trips, and the weeks that are already full, and plan around them instead of colliding with them.",
+      "file": "monthly-month-ahead.0c3beb07.mp3"
+    },
+    "monthly.look-within": {
+      "text": "A quick check on yourself, and on the people around you. How is your energy? And is there anything with each other or the kids that needs attention this month?",
+      "file": "monthly-look-within.1ce0ad44.mp3"
+    },
+    "monthly.write-month": {
+      "text": "Write the month’s list. Keep it honest — and put at least one thing on it that exists purely because it will be fun. A month with nothing to look forward to is a scheduling failure.",
+      "file": "monthly-write-month.3a6ef1da.mp3"
+    },
+    "monthly.book-next": {
+      "text": "Book next month’s session before you close. First weekend of the month works well.",
+      "file": "monthly-book-next.c4d60f1a.mp3"
+    },
+    "weekly.welcome": {
+      "text": "This is your weekly planning session — the one that keeps the whole system honest. You will clear the inbox, review last week, look at the month and the calendar, and then place the big rocks. Give it half an hour and the week stops happening TO you.",
+      "file": "weekly-welcome.3e7cf993.mp3"
+    },
+    "weekly.look-around": {
+      "text": "First, get current. Here is everything captured into the inbox that hasn’t been dealt with. Give each one a home — a day, a list, Someday — or mark it done. An empty inbox is not tidiness; it is the difference between planning from reality and planning from memory.",
+      "file": "weekly-look-around.93a3940a.mp3"
+    },
+    "weekly.week-review": {
+      "text": "Here is what is still open from last week. For each item, actively choose its fate: carry it forward, give it a specific day, make it smaller, hand it to someone else, or let it go. No item gets to just linger.",
+      "file": "weekly-week-review.db341e87.mp3"
+    },
+    "weekly.look-at-month": {
+      "text": "Your month list, for reference. Which of these does this week need to move? Copy down anything you want on the week’s list — the month list keeps its copy.",
+      "file": "weekly-look-at-month.e46b78e5.mp3"
+    },
+    "weekly.week-ahead": {
+      "text": "Now audit the week day by day. Look for sneak additions, double bookings, and days with no slack at all. Where are the tight transitions? Which day is secretly already full?",
+      "file": "weekly-week-ahead.b2d683a7.mp3"
+    },
+    "weekly.look-within": {
+      "text": "Check in with yourself before you commit to anything: sleep debt, physical energy, emotional capacity. Set the week’s expectations to match the human doing it.",
+      "file": "weekly-look-within.002bfc13.mp3"
+    },
+    "weekly.write-week": {
+      "text": "Write the week’s task list. Keep it focused — around fifteen items is the honest ceiling for a week that also contains a life. The counter is a nudge, not a wall.",
+      "file": "weekly-write-week.87169525.mp3"
+    },
+    "weekly.place-rocks": {
+      "text": "Now put the most important items on actual days. Drag what matters onto the week — anything with a slot is dramatically more likely to happen than anything floating in a list.",
+      "file": "weekly-place-rocks.8a2a7096.mp3"
+    },
+    "weekly.concerns": {
+      "text": "Last: anything that needs to be talked about, not just done. Logistics to coordinate, decisions pending, worries worth naming. This note is shared — it is the written half of the weekly conversation.",
+      "file": "weekly-concerns.15204a78.mp3"
+    },
+    "daily.look-back": {
+      "text": "A quick look at what carried over. Nothing here is a failure — it is just yesterday’s honest remainder. Give each item a new home in one tap.",
+      "file": "daily-look-back.747b75c9.mp3"
+    },
+    "daily.look-ahead": {
+      "text": "Here is today’s shape — the hard commitments and, more importantly, the gaps between them. The gaps are the day’s actual capacity.",
+      "file": "daily-look-ahead.23e3c872.mp3"
+    },
+    "daily.look-within": {
+      "text": "One word for today — how you want it to feel, or how you are. Then size the plan to match: on a packed or foggy day, one real task is a victory.",
+      "file": "daily-look-within.a0065ea2.mp3"
+    },
+    "daily.pick-today": {
+      "text": "Here is your week list. Tap the items today should carry — they move onto today. Match the count to the open space you just saw, not to your ambition.",
+      "file": "daily-pick-today.43c83afa.mp3"
+    }
+  }
 }
