@@ -125,3 +125,29 @@ export async function attachFile(
     return false
   }
 }
+
+/**
+ * Delete an attachment: remove the row (RLS enforces ownership), then
+ * best-effort remove the stored file. Row first — a failed storage removal
+ * only orphans a private blob; the reverse would leave a dead link in the UI.
+ */
+export async function deleteAttachment(id: string): Promise<boolean> {
+  try {
+    const { data: row, error: fetchErr } = await supabase
+      .from('attachments')
+      .select('storage_path')
+      .eq('id', id)
+      .single()
+    if (fetchErr || !row) throw new Error(fetchErr?.message ?? 'Attachment not found')
+
+    const { error: deleteErr } = await supabase.from('attachments').delete().eq('id', id)
+    if (deleteErr) throw new Error(deleteErr.message)
+
+    const { error: storageErr } = await supabase.storage.from('attachments').remove([row.storage_path])
+    if (storageErr) console.warn('deleteAttachment: row removed but storage cleanup failed:', storageErr.message)
+    return true
+  } catch (err) {
+    console.error('deleteAttachment failed:', err)
+    return false
+  }
+}

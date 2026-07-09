@@ -4,10 +4,12 @@ import { PanelPhotos } from './PanelPhotos'
 
 const listAttachments = vi.fn()
 const attachFile = vi.fn()
+const deleteAttachment = vi.fn()
 
 vi.mock('@/lib/taskAttachments', () => ({
   listAttachments: (...args: unknown[]) => listAttachments(...args),
   attachFile: (...args: unknown[]) => attachFile(...args),
+  deleteAttachment: (...args: unknown[]) => deleteAttachment(...args),
   ATTACHMENT_ACCEPT: 'image/*,application/pdf',
 }))
 
@@ -15,6 +17,7 @@ describe('PanelPhotos', () => {
   beforeEach(() => {
     listAttachments.mockReset().mockResolvedValue([])
     attachFile.mockReset().mockResolvedValue(true)
+    deleteAttachment.mockReset().mockResolvedValue(true)
   })
 
   it('lists attachments for the given entity', async () => {
@@ -45,6 +48,40 @@ describe('PanelPhotos', () => {
     const input = container.querySelector('input[type="file"]')
     expect(input?.getAttribute('accept')).toContain('image/*')
     expect(input?.getAttribute('accept')).toContain('application/pdf')
+  })
+
+  it('removes an attachment via its ✕ button and reloads', async () => {
+    listAttachments.mockResolvedValue([
+      { id: 'a1', fileName: 'fixture.jpg', fileType: 'image/jpeg', url: 'https://signed/fixture.jpg' },
+    ])
+    const { user } = render(<PanelPhotos entityType="task" entityId="t1" />)
+    await waitFor(() => expect(screen.getByAltText('fixture.jpg')).toBeInTheDocument())
+    await user.click(screen.getByRole('button', { name: 'Remove fixture.jpg' }))
+    await waitFor(() => expect(deleteAttachment).toHaveBeenCalledWith('a1'))
+    expect(listAttachments.mock.calls.length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('offers a ✕ on document chips too', async () => {
+    listAttachments.mockResolvedValue([
+      { id: 'a2', fileName: 'slip.pdf', fileType: 'application/pdf', url: 'https://signed/slip.pdf' },
+    ])
+    const { user } = render(<PanelPhotos entityType="event_note" entityId="e1" />)
+    await waitFor(() => expect(screen.getByText('slip.pdf')).toBeInTheDocument())
+    await user.click(screen.getByRole('button', { name: 'Remove slip.pdf' }))
+    await waitFor(() => expect(deleteAttachment).toHaveBeenCalledWith('a2'))
+  })
+
+  it('attaches a clipboard image via the Paste button', async () => {
+    const blob = new Blob(['png-bytes'], { type: 'image/png' })
+    const clipboardItem = { types: ['image/png'], getType: vi.fn().mockResolvedValue(blob) }
+
+    const { user } = render(<PanelPhotos entityType="event_note" entityId="e1" />)
+    // userEvent installs its own navigator.clipboard stub at setup — spy on that.
+    vi.spyOn(navigator.clipboard, 'read').mockResolvedValue([clipboardItem as unknown as ClipboardItem])
+    await user.click(screen.getByRole('button', { name: /paste/i }))
+    await waitFor(() =>
+      expect(attachFile).toHaveBeenCalledWith('event_note', 'e1', blob, expect.stringMatching(/^pasted-.*\.png$/)),
+    )
   })
 
   it('attaches a picked file to the entity', async () => {
