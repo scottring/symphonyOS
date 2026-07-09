@@ -3,12 +3,13 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import { detectRecipeUrl } from '@/lib/recipeDetection'
 import { logger } from '@/lib/logger'
-import type { TaskContext } from '@/types/task'
+import type { TaskContext, TaskLink } from '@/types/task'
 
 export interface EventNote {
   id: string
   googleEventId: string
   notes: string | null
+  links?: TaskLink[] // User-attached links (reservations, docs, agendas)
   assignedTo?: string | null // Legacy single assignment (for backwards compat)
   assignedToAll?: string[] // Multi-member assignment
   recipeUrl?: string | null
@@ -27,6 +28,7 @@ interface DbEventNote {
   user_id: string
   google_event_id: string
   notes: string | null
+  links: TaskLink[] | null
   assigned_to: string | null
   assigned_to_all: string[] | null
   recipe_url: string | null
@@ -45,6 +47,7 @@ function dbNoteToEventNote(dbNote: DbEventNote): EventNote {
     id: dbNote.id,
     googleEventId: dbNote.google_event_id,
     notes: dbNote.notes,
+    links: dbNote.links ?? [],
     assignedTo: dbNote.assigned_to,
     assignedToAll: dbNote.assigned_to_all || [],
     recipeUrl: dbNote.recipe_url,
@@ -158,6 +161,64 @@ export function useEventNotes() {
     }
 
     // Update with real data from DB
+    if (data) {
+      const realNote = dbNoteToEventNote(data as DbEventNote)
+      setNotes((prev) => new Map(prev).set(googleEventId, realNote))
+    }
+  }, [user, notes])
+
+  // Append a link to an event (upsert). Reads the cached row for the current
+  // list — callers fetch the note before rendering the panel, so the cache is
+  // warm by the time a link can be added.
+  const addEventLink = useCallback(async (googleEventId: string, url: string) => {
+    if (!user) return
+
+    const existingNote = notes.get(googleEventId)
+    const currentLinks = existingNote?.links ?? []
+    if (currentLinks.some((l) => l.url === url)) return
+    const nextLinks: TaskLink[] = [...currentLinks, { url }]
+
+    // Optimistic update
+    const optimisticNote: EventNote = existingNote
+      ? { ...existingNote, links: nextLinks, updatedAt: new Date() }
+      : {
+          id: crypto.randomUUID(),
+          googleEventId,
+          notes: null,
+          links: nextLinks,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        }
+    setNotes((prev) => new Map(prev).set(googleEventId, optimisticNote))
+
+    const { data, error: upsertError } = await supabase
+      .from('event_notes')
+      .upsert(
+        {
+          user_id: user.id,
+          google_event_id: googleEventId,
+          links: nextLinks,
+        },
+        { onConflict: 'user_id,google_event_id' }
+      )
+      .select()
+      .single()
+
+    if (upsertError) {
+      // Rollback on error
+      if (existingNote) {
+        setNotes((prev) => new Map(prev).set(googleEventId, existingNote))
+      } else {
+        setNotes((prev) => {
+          const newMap = new Map(prev)
+          newMap.delete(googleEventId)
+          return newMap
+        })
+      }
+      setError(upsertError.message)
+      return
+    }
+
     if (data) {
       const realNote = dbNoteToEventNote(data as DbEventNote)
       setNotes((prev) => new Map(prev).set(googleEventId, realNote))
@@ -647,6 +708,7 @@ export function useEventNotes() {
     fetchNote,
     fetchNotesForEvents,
     updateNote,
+    addEventLink,
     updateEventAssignment,
     updateEventAssignmentAll,
     updateRecipeUrl,

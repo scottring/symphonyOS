@@ -145,6 +145,65 @@ describe('TapEventPanel', () => {
     expect(screen.queryByRole('button', { name: /change duration/i })).not.toBeInTheDocument()
   })
 
+  it('adds a prep task on Enter and clears the input', async () => {
+    const { user } = render(<TapEventPanel
+      event={mockEvent} notes={undefined} allTasks={[]} {...baseHandlers}
+    />)
+    const input = screen.getByPlaceholderText(/add a prep task/i)
+    await user.type(input, 'Print the financial plan{Enter}')
+    expect(baseHandlers.onAddPrepTask).toHaveBeenCalledWith('Print the financial plan')
+    expect(input).toHaveValue('')
+  })
+
+  it('renders saved links and passes new URLs to onAddLink', async () => {
+    const { user } = render(<TapEventPanel
+      event={mockEvent} notes={undefined} allTasks={[]} {...baseHandlers}
+      links={[{ url: 'https://example.com/agenda', title: 'Agenda' }]}
+    />)
+    expect(screen.getByText('Agenda')).toBeInTheDocument()
+    await user.type(screen.getByPlaceholderText(/paste a url/i), 'https://example.com/doc{Enter}')
+    expect(baseHandlers.onAddLink).toHaveBeenCalledWith('https://example.com/doc')
+  })
+
+  describe('discussion flag', () => {
+    it('hides the Discuss chip when onToggleDiscussion is not provided', () => {
+      render(<TapEventPanel event={mockEvent} notes={undefined} allTasks={[]} {...baseHandlers} />)
+      expect(screen.queryByRole('button', { name: /discuss/i })).not.toBeInTheDocument()
+    })
+
+    it('flags an unflagged event via the Discuss chip', async () => {
+      const onToggleDiscussion = vi.fn()
+      const { user } = render(<TapEventPanel
+        event={mockEvent} notes={undefined} allTasks={[]} {...baseHandlers}
+        discussion={{ flagged: false }}
+        onToggleDiscussion={onToggleDiscussion}
+      />)
+      await user.click(screen.getByRole('button', { name: /discuss/i }))
+      expect(onToggleDiscussion).toHaveBeenCalledWith(true)
+    })
+
+    it('flagged event: shows the To discuss state, note field, and saves the note on blur', async () => {
+      const onToggleDiscussion = vi.fn()
+      const onDiscussionNoteChange = vi.fn()
+      const { user } = render(<TapEventPanel
+        event={mockEvent} notes={undefined} allTasks={[]} {...baseHandlers}
+        discussion={{ flagged: true, note: '' }}
+        onToggleDiscussion={onToggleDiscussion}
+        onDiscussionNoteChange={onDiscussionNoteChange}
+      />)
+      const chip = screen.getByRole('button', { name: /to discuss/i })
+      expect(chip).toHaveAttribute('aria-pressed', 'true')
+
+      const noteField = screen.getByPlaceholderText(/what's the question/i)
+      await user.type(noteField, 'Do we move the retirement money?')
+      await user.tab()
+      expect(onDiscussionNoteChange).toHaveBeenCalledWith('Do we move the retirement money?')
+
+      await user.click(chip)
+      expect(onToggleDiscussion).toHaveBeenCalledWith(false)
+    })
+  })
+
   describe('calendar access', () => {
     it('view-only calendar: badge shown, reschedule/duration hidden', () => {
       render(<TapEventPanel

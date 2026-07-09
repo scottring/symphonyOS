@@ -31,6 +31,7 @@ import { useProjects } from '@/hooks/useProjects';
 import { useGoals } from '@/hooks/useGoals';
 import { useGoogleCalendar, CalendarReconnectError, type GoogleCalendarInfo, type CalendarEvent } from '@/hooks/useGoogleCalendar';
 import { useEventNotes } from '@/hooks/useEventNotes';
+import { useEventDiscussionFlags } from '@/hooks/useEventDiscussionFlags';
 import { useRoutines } from '@/hooks/useRoutines';
 import { useFamilyMembers } from '@/hooks/useFamilyMembers';
 import { usePinnedItems } from '@/hooks/usePinnedItems';
@@ -391,8 +392,15 @@ function EventPanelBody({ id }: { id: string }) {
   const { clearSelection } = useSelection();
   const navigate = useNavigate();
   const { events, updateEvent, moveEvent, fetchEvents, fetchCalendarList, isFetching, isLoading } = useGoogleCalendar();
-  const { getNote, updateNote } = useEventNotes();
-  const { tasks } = useSupabaseTasks();
+  const { getNote, updateNote, fetchNote, addEventLink } = useEventNotes();
+  const { tasks, addPrepTask } = useSupabaseTasks();
+  const {
+    isFlagged,
+    getFlag,
+    flagEvent,
+    unflagEvent,
+    updateNote: updateDiscussionNote,
+  } = useEventDiscussionFlags();
 
   // The calendar list tells us the event's access level (Google rejects writes
   // to view-only calendars) and which calendars it could move to.
@@ -409,6 +417,12 @@ function EventPanelBody({ id }: { id: string }) {
     [events, id],
   );
   const handleClose = useCallback(() => clearSelection(), [clearSelection]);
+
+  // Warm the event-notes cache. getNote is cache-only and each hook instance
+  // starts empty — without this fetch, saved notes/links never displayed.
+  useEffect(() => {
+    if (event) fetchNote(event.google_event_id || event.id);
+  }, [event, fetchNote]);
 
   // Close the panel (rather than hang on "Loading…") when the selected event has
   // been rescheduled off this day or deleted — see shouldCloseStaleEventPanel.
@@ -472,8 +486,22 @@ function EventPanelBody({ id }: { id: string }) {
       }}
       onClose={handleClose}
       onNotesChange={(html) => updateNote(eventId, html)}
-      onAddPrepTask={() => { /* TODO: integrate addPrepTask */ }}
-      onAddLink={() => {}}
+      onAddPrepTask={(title) => {
+        // Prep tasks land on the event's day (a plain timed task linked to it).
+        const when = getEventDayStart(event) ?? new Date();
+        addPrepTask(title, eventId, when);
+      }}
+      links={getNote(eventId)?.links}
+      onAddLink={(url) => addEventLink(eventId, url)}
+      discussion={{ flagged: isFlagged(eventId), note: getFlag(eventId)?.discussionNote }}
+      onToggleDiscussion={async (flagged) => {
+        if (flagged) {
+          await flagEvent(eventId, { title: event.title, calendarId: eventCalendarId ?? undefined });
+        } else {
+          await unflagEvent(eventId);
+        }
+      }}
+      onDiscussionNoteChange={(note) => updateDiscussionNote(eventId, note)}
       onOpenTask={(tid) => navigate(`/today?detail=task:${tid}`)}
       onOpenProject={() => {}}
       onOpenRelated={() => {}}

@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { Video } from 'lucide-react'
+import { MessageSquare, Video } from 'lucide-react'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
-import type { Task } from '@/types/task'
+import type { Task, TaskLink } from '@/types/task'
 import { PanelHeader } from './sections/PanelHeader'
 import { PanelWhy } from './sections/PanelWhy'
 import { PanelLinks } from './sections/PanelLinks'
@@ -19,6 +19,8 @@ interface TapEventPanelProps {
   event: CalendarEvent
   /** User's notes for the event (from event_notes table). */
   notes: string | undefined
+  /** Links saved on this event (from event_notes table). */
+  links?: TaskLink[]
   allTasks: Task[]
 
   onClose: () => void
@@ -43,6 +45,12 @@ interface TapEventPanelProps {
   writableCalendars?: { id: string; summary: string }[]
   /** Move the event onto another (writable) calendar. */
   onMoveToCalendar?: (destinationCalendarId: string) => void
+  /** Needs-discussion flag — surfaces on the family kiosk's For Discussion list. */
+  discussion?: { flagged: boolean; note?: string }
+  /** Flag/unflag this event for discussion. When omitted, the Discuss chip hides. */
+  onToggleDiscussion?: (flagged: boolean) => void
+  /** Save the discussion note ("what's the question?"). */
+  onDiscussionNoteChange?: (note: string) => void
 }
 
 type AnyEvent = { start_time?: string; startTime?: string; end_time?: string; endTime?: string }
@@ -82,6 +90,7 @@ export function TapEventPanel(props: TapEventPanelProps) {
   const { event, allTasks } = props
   const [showDirections, setShowDirections] = useState(false)
   const [showDurationMenu, setShowDurationMenu] = useState(false)
+  const [prepDraft, setPrepDraft] = useState('')
 
   const relations = useEntityRelations({
     kind: 'event',
@@ -100,6 +109,8 @@ export function TapEventPanel(props: TapEventPanelProps) {
   const readOnlyCalendar = props.calendarAccess?.readOnly === true
   const canEdit = !readOnlyCalendar
   const moveTargets = (props.writableCalendars ?? []).filter((c) => c.id !== (calendarId ?? ''))
+
+  const discussionFlagged = props.discussion?.flagged === true
 
   // Current duration in minutes, when both ends are known.
   const durationMinutes =
@@ -136,181 +147,242 @@ export function TapEventPanel(props: TapEventPanelProps) {
     props.onReschedule?.(newStart, newEnd)
   }
 
+  const commitPrepTask = () => {
+    const title = prepDraft.trim()
+    if (!title) return
+    props.onAddPrepTask(title)
+    setPrepDraft('')
+  }
+
   return (
-    <article className="bg-bg-elevated rounded-2xl p-6 max-w-md w-full">
-      <PanelHeader
-        title={event.title}
-        onTitleChange={() => { /* event title is read-only from gcal */ }}
-        onClose={props.onClose}
-      />
+    // Same section rhythm as the task panel (TapContextPanel): hairline dividers
+    // with even vertical padding, so grouped blocks never scrunch together.
+    <article
+      className="
+        bg-bg-elevated max-w-md w-full
+        rounded-2xl
+        px-4 md:px-5 py-3 md:py-5
+        divide-y divide-neutral-200/60
+        [&>*]:py-4 [&>*:first-child]:pt-0 [&>*:last-child]:pb-0
+      "
+    >
+      {/* Identity block: title, when, calendar, and the action chips read as one unit. */}
+      <header>
+        <PanelHeader
+          title={event.title}
+          onTitleChange={() => { /* event title is read-only from gcal */ }}
+          onClose={props.onClose}
+        />
 
-      {/* When — the one fact that defines an event, stated plainly. */}
-      {startTime && (
-        <div className="mt-1.5 flex items-baseline gap-2 flex-wrap">
-          <span className="text-[15px] font-medium text-neutral-800">{formatDayLabel(startTime)}</span>
-          <span className="text-[15px] text-neutral-600 tabular-nums">
-            {formatClock(startTime)}
-            {endTime ? ` \u2013 ${formatClock(endTime)}` : ''}
-          </span>
-          {durationMinutes !== null && durationMinutes > 0 && (
-            <span className="text-[13px] text-neutral-400">· {formatDuration(durationMinutes)}</span>
-          )}
-        </div>
-      )}
-
-      {/* Which calendar this event lives on + move / view-only affordance */}
-      {props.calendarAccess && (
-        <div className="mt-2 flex items-center gap-2 flex-wrap text-[13px]">
-          <span className="text-neutral-500">
-            {props.calendarAccess.name ?? 'Primary calendar'}
-          </span>
-          {readOnlyCalendar ? (
-            <span
-              className="px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-500 text-[11px] font-medium"
-              title="This calendar is shared with you view-only — Google doesn't allow Symphony (or you) to change its events"
-            >
-              view-only
+        {/* When — the one fact that defines an event, stated plainly. */}
+        {startTime && (
+          <div className="mt-1.5 flex items-baseline gap-2 flex-wrap">
+            <span className="text-[15px] font-medium text-neutral-800">{formatDayLabel(startTime)}</span>
+            <span className="text-[15px] text-neutral-600 tabular-nums">
+              {formatClock(startTime)}
+              {endTime ? ` – ${formatClock(endTime)}` : ''}
             </span>
-          ) : (
-            props.onMoveToCalendar && moveTargets.length > 0 && (
-              <select
-                aria-label="Move to calendar"
-                value=""
-                onChange={(e) => { if (e.target.value) props.onMoveToCalendar?.(e.target.value) }}
-                className="text-[12px] text-neutral-500 bg-transparent border border-neutral-200 rounded-md px-1.5 py-0.5 hover:border-neutral-300 focus:outline-none"
-              >
-                <option value="">Move to…</option>
-                {moveTargets.map((c) => (
-                  <option key={c.id} value={c.id}>{c.summary}</option>
-                ))}
-              </select>
-            )
-          )}
-        </div>
-      )}
-
-      <div className="mt-4 flex flex-wrap gap-2 pb-5 mb-6 border-b border-neutral-200/70">
-        {/* Physical address → Directions toggle. Video meeting → Join link (or a
-            non-clickable label when no join URL is known). Never offer directions
-            to a Teams/Zoom/Meet "location". */}
-        {event.location && isPhysicalLocation && (
-          <button
-            onClick={() => setShowDirections((v) => !v)}
-            aria-expanded={showDirections}
-            className="px-3 py-1.5 rounded-lg text-sm font-medium bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition-colors"
-          >
-            <ConceptIcon name="location" decorative /> Directions {showDirections ? '▾' : '▸'}
-          </button>
-        )}
-        {event.location && joinUrl && (
-          <a
-            href={joinUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-primary-50 text-primary-700 hover:bg-primary-100 transition-colors"
-          >
-            <Video className="w-4 h-4" aria-hidden /> Join meeting
-          </a>
-        )}
-        {event.location && isVirtualMeeting && !joinUrl && (
-          <span className="px-3 py-1.5 rounded-lg text-sm font-medium bg-neutral-100 text-neutral-500">
-            {event.location}
-          </span>
-        )}
-        {canEdit && props.onReschedule && (
-          <SchedulePopover
-            value={startTime ? new Date(startTime) : undefined}
-            onSchedule={handleReschedule}
-            itemTitle={event.title}
-            trigger={
-              <button className="px-3 py-1.5 rounded-lg text-sm font-medium bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition-colors">
-                <ConceptIcon name="when" decorative /> Reschedule
-              </button>
-            }
-          />
-        )}
-        {canEdit && props.onReschedule && durationMinutes !== null && durationMinutes > 0 && (
-          <div className="relative">
-            <button
-              onClick={() => setShowDurationMenu((v) => !v)}
-              aria-expanded={showDurationMenu}
-              aria-label="Change duration"
-              className="px-3 py-1.5 rounded-lg text-sm font-medium bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition-colors"
-            >
-              <ConceptIcon name="time" decorative /> {formatDuration(durationMinutes)} {showDurationMenu ? '▾' : '▸'}
-            </button>
-            {showDurationMenu && (
-              <div className="absolute left-0 top-full mt-1 z-20 bg-white rounded-xl shadow-lg border border-neutral-100 py-1 min-w-[7rem]">
-                {DURATION_PRESETS.map((m) => (
-                  <button
-                    key={m}
-                    onClick={() => handleDurationChange(m)}
-                    className={`block w-full text-left px-4 py-2 text-sm transition-colors hover:bg-neutral-50 ${
-                      m === durationMinutes ? 'text-primary-700 font-medium' : 'text-neutral-700'
-                    }`}
-                  >
-                    {formatDuration(m)}
-                  </button>
-                ))}
-              </div>
+            {durationMinutes !== null && durationMinutes > 0 && (
+              <span className="text-[13px] text-neutral-400">· {formatDuration(durationMinutes)}</span>
             )}
           </div>
         )}
-      </div>
 
-      {/* Body sections — one consistent rhythm so the panel reads as grouped
-          blocks instead of a scrunched column. */}
-      <div className="space-y-6 [&_section]:!mb-0">
-        {/* Location editor: for physical addresses or to add one. A virtual
-            meeting is handled by the Join/label chip above, not a Places field. */}
-        {!isVirtualMeeting && (
-          <PanelLocation
-            location={event.location ?? undefined}
-            title={event.title}
-            showDirections={isPhysicalLocation && showDirections}
-            onUpdateLocation={(addr) => props.onUpdateEventLocation?.(eventId, addr, calendarId)}
-            onClearLocation={() => props.onUpdateEventLocation?.(eventId, null, calendarId)}
-          />
-        )}
-
-        <PanelWhy
-          key={event.id}
-          notes={props.notes}
-          onChange={props.onNotesChange}
-          label="What to bring"
-        />
-
-        {relations.tasks.length > 0 && (
-          <section>
-            <div className="text-[10px] uppercase tracking-wider font-semibold text-neutral-400 mb-2">
-              Prep tasks
-            </div>
-            {relations.tasks.map(t => (
-              <button
-                key={t.id}
-                onClick={() => props.onOpenTask(t.id)}
-                className="flex items-center gap-2 w-full text-left mb-1 py-1.5 px-2 rounded-md bg-white shadow-[inset_0_0_0_1px_#e5e7eb] hover:bg-neutral-50"
+        {/* Which calendar this event lives on + move / view-only affordance */}
+        {props.calendarAccess && (
+          <div className="mt-2 flex items-center gap-2 flex-wrap text-[13px]">
+            <span className="text-neutral-500">
+              {props.calendarAccess.name ?? 'Primary calendar'}
+            </span>
+            {readOnlyCalendar ? (
+              <span
+                className="px-2 py-0.5 rounded-full bg-neutral-100 text-neutral-500 text-[11px] font-medium"
+                title="This calendar is shared with you view-only — Google doesn't allow Symphony (or you) to change its events"
               >
-                <span className="w-6 h-6 flex items-center justify-center rounded-md bg-amber-100"><ConceptIcon name="list" decorative /></span>
-                <span className="text-sm text-neutral-800 flex-1">{t.title}</span>
-              </button>
-            ))}
-          </section>
+                view-only
+              </span>
+            ) : (
+              props.onMoveToCalendar && moveTargets.length > 0 && (
+                <select
+                  aria-label="Move to calendar"
+                  value=""
+                  onChange={(e) => { if (e.target.value) props.onMoveToCalendar?.(e.target.value) }}
+                  className="text-[12px] text-neutral-500 bg-transparent border border-neutral-200 rounded-md px-1.5 py-0.5 hover:border-neutral-300 focus:outline-none"
+                >
+                  <option value="">Move to…</option>
+                  {moveTargets.map((c) => (
+                    <option key={c.id} value={c.id}>{c.summary}</option>
+                  ))}
+                </select>
+              )
+            )}
+          </div>
         )}
 
-        <PanelLinks links={undefined} onAddLink={props.onAddLink} />
+        <div className="mt-4 flex flex-wrap gap-2">
+          {/* Physical address → Directions toggle. Video meeting → Join link (or a
+              non-clickable label when no join URL is known). Never offer directions
+              to a Teams/Zoom/Meet "location". */}
+          {event.location && isPhysicalLocation && (
+            <button
+              onClick={() => setShowDirections((v) => !v)}
+              aria-expanded={showDirections}
+              className="px-3 py-1.5 rounded-lg text-sm font-medium bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition-colors"
+            >
+              <ConceptIcon name="location" decorative /> Directions {showDirections ? '▾' : '▸'}
+            </button>
+          )}
+          {event.location && joinUrl && (
+            <a
+              href={joinUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-primary-50 text-primary-700 hover:bg-primary-100 transition-colors"
+            >
+              <Video className="w-4 h-4" aria-hidden /> Join meeting
+            </a>
+          )}
+          {event.location && isVirtualMeeting && !joinUrl && (
+            <span className="px-3 py-1.5 rounded-lg text-sm font-medium bg-neutral-100 text-neutral-500">
+              {event.location}
+            </span>
+          )}
+          {canEdit && props.onReschedule && (
+            <SchedulePopover
+              value={startTime ? new Date(startTime) : undefined}
+              onSchedule={handleReschedule}
+              itemTitle={event.title}
+              trigger={
+                <button className="px-3 py-1.5 rounded-lg text-sm font-medium bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition-colors">
+                  <ConceptIcon name="when" decorative /> Reschedule
+                </button>
+              }
+            />
+          )}
+          {canEdit && props.onReschedule && durationMinutes !== null && durationMinutes > 0 && (
+            <div className="relative">
+              <button
+                onClick={() => setShowDurationMenu((v) => !v)}
+                aria-expanded={showDurationMenu}
+                aria-label="Change duration"
+                className="px-3 py-1.5 rounded-lg text-sm font-medium bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition-colors"
+              >
+                <ConceptIcon name="time" decorative /> {formatDuration(durationMinutes)} {showDurationMenu ? '▾' : '▸'}
+              </button>
+              {showDurationMenu && (
+                <div className="absolute left-0 top-full mt-1 z-20 bg-white rounded-xl shadow-lg border border-neutral-100 py-1 min-w-[7rem]">
+                  {DURATION_PRESETS.map((m) => (
+                    <button
+                      key={m}
+                      onClick={() => handleDurationChange(m)}
+                      className={`block w-full text-left px-4 py-2 text-sm transition-colors hover:bg-neutral-50 ${
+                        m === durationMinutes ? 'text-primary-700 font-medium' : 'text-neutral-700'
+                      }`}
+                    >
+                      {formatDuration(m)}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+          {props.onToggleDiscussion && (
+            <button
+              onClick={() => props.onToggleDiscussion?.(!discussionFlagged)}
+              aria-pressed={discussionFlagged}
+              title={discussionFlagged
+                ? 'Remove from the For Discussion list'
+                : 'Flag to talk through together — shows on the For Discussion list'}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                discussionFlagged
+                  ? 'bg-amber-100 text-amber-800 hover:bg-amber-200'
+                  : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
+              }`}
+            >
+              <MessageSquare className={`w-4 h-4 ${discussionFlagged ? 'text-amber-600' : ''}`} aria-hidden />
+              {discussionFlagged ? 'To discuss' : 'Discuss'}
+            </button>
+          )}
+        </div>
+      </header>
 
-        <PanelMightBeRelevant items={[]} onOpen={props.onOpenRelated} />
-      </div>
+      {/* Location editor: for physical addresses or to add one. A virtual
+          meeting is handled by the Join/label chip above, not a Places field. */}
+      {!isVirtualMeeting && (
+        <PanelLocation
+          location={event.location ?? undefined}
+          title={event.title}
+          showDirections={isPhysicalLocation && showDirections}
+          onUpdateLocation={(addr) => props.onUpdateEventLocation?.(eventId, addr, calendarId)}
+          onClearLocation={() => props.onUpdateEventLocation?.(eventId, null, calendarId)}
+        />
+      )}
+
+      <PanelWhy
+        key={event.id}
+        notes={props.notes}
+        onChange={props.onNotesChange}
+        label="What to bring"
+      />
+
+      {discussionFlagged && props.onDiscussionNoteChange && (
+        <section>
+          <div className="text-[10px] uppercase tracking-wider font-semibold text-neutral-400 mb-2">
+            For discussion
+          </div>
+          <textarea
+            key={eventId}
+            defaultValue={props.discussion?.note ?? ''}
+            onBlur={(e) => {
+              if ((e.target.value || '') !== (props.discussion?.note ?? '')) {
+                props.onDiscussionNoteChange?.(e.target.value)
+              }
+            }}
+            placeholder="What's the question?"
+            rows={2}
+            className="w-full px-2 py-1.5 text-sm rounded-md bg-white text-neutral-700 placeholder:text-neutral-400 shadow-[inset_0_0_0_1px_#e5e7eb] focus:outline-none focus:shadow-[inset_0_0_0_1px_#d97706] resize-none"
+          />
+        </section>
+      )}
+
+      {/* Prep tasks are the event's subtasks — real tasks linked to this event. */}
+      <section>
+        <div className="text-[10px] uppercase tracking-wider font-semibold text-neutral-400 mb-2">
+          Prep tasks
+        </div>
+        <div className="flex flex-col gap-1.5">
+          {relations.tasks.map(t => (
+            <button
+              key={t.id}
+              onClick={() => props.onOpenTask(t.id)}
+              className="flex items-center gap-2 w-full text-left py-1.5 px-2 rounded-md bg-white shadow-[inset_0_0_0_1px_#e5e7eb] hover:bg-neutral-50"
+            >
+              <span className="w-6 h-6 flex items-center justify-center rounded-md bg-amber-100"><ConceptIcon name="list" decorative /></span>
+              <span className="text-sm text-neutral-800 flex-1">{t.title}</span>
+            </button>
+          ))}
+          <input
+            type="text"
+            value={prepDraft}
+            onChange={(e) => setPrepDraft(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') commitPrepTask() }}
+            onBlur={commitPrepTask}
+            placeholder="+ Add a prep task…"
+            className="text-sm px-2 py-1.5 rounded-md bg-transparent text-neutral-500 placeholder:text-neutral-400 focus:outline-none focus:bg-neutral-50 hover:bg-neutral-50"
+          />
+        </div>
+      </section>
+
+      <PanelLinks links={props.links} onAddLink={props.onAddLink} />
+
+      <PanelMightBeRelevant items={[]} onOpen={props.onOpenRelated} />
 
       {/* Events carry no created/updated timestamps; show the start time when present. */}
       {startTime && (
-        <div className="mt-8 pt-4 border-t border-neutral-100">
-          <PanelFooter
-            createdAt={new Date(startTime)}
-            updatedAt={new Date(startTime)}
-          />
-        </div>
+        <PanelFooter
+          createdAt={new Date(startTime)}
+          updatedAt={new Date(startTime)}
+        />
       )}
     </article>
   )

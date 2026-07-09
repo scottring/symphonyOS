@@ -118,8 +118,9 @@ export function PanelWhy({ notes, onChange, label = 'Why', onSaveToVault }: Pane
   }
 
   // ── Inline (default) ──
+  // No margin of its own: the panel's divide-y rhythm owns section spacing.
   return (
-    <section className="mb-4">
+    <section>
       <div className="flex items-center justify-between mb-1">
         <div className="text-[10px] uppercase tracking-wider font-semibold text-neutral-400">{label}</div>
         <div className="flex items-center gap-3">
