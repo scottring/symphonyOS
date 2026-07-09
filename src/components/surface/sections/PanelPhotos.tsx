@@ -1,40 +1,48 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Camera, ImageUp, Loader2 } from 'lucide-react'
-import { listTaskImages, attachImageToTask, type TaskImage } from '@/lib/taskAttachments'
+import { Camera, FileText, ImageUp, Loader2 } from 'lucide-react'
+import {
+  listAttachments,
+  attachFile,
+  ATTACHMENT_ACCEPT,
+  type Attachment,
+  type AttachmentEntityType,
+} from '@/lib/taskAttachments'
 import { CameraCaptureModal } from '@/components/capture/CameraCaptureModal'
 
 interface PanelPhotosProps {
-  taskId: string
+  entityType: AttachmentEntityType
+  entityId: string
 }
 
 /**
- * Photos on a task — the context that photo-first capture is about (the
- * fixture you photographed, the screenshot with the specs). Three ways in:
- * camera (Continuity Camera on a Mac), file picker, and plain ⌘V paste while
- * the panel is open. Thumbnails open full size in a new tab.
+ * Photos & files on an entity — the context capture is about (the fixture you
+ * photographed, the permission slip PDF, the screenshot with the specs).
+ * Three ways in: camera (Continuity Camera on a Mac), file picker (images and
+ * documents), and plain ⌘V paste of an image while the panel is open. Images
+ * render as thumbnails; documents as file chips. Both open in a new tab.
  */
-export function PanelPhotos({ taskId }: PanelPhotosProps) {
-  const [images, setImages] = useState<TaskImage[]>([])
+export function PanelPhotos({ entityType, entityId }: PanelPhotosProps) {
+  const [attachments, setAttachments] = useState<Attachment[]>([])
   const [busy, setBusy] = useState(false)
   const [showCamera, setShowCamera] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const reload = useCallback(async () => {
-    setImages(await listTaskImages(taskId))
-  }, [taskId])
+    setAttachments(await listAttachments(entityType, entityId))
+  }, [entityType, entityId])
 
   useEffect(() => { void reload() }, [reload])
 
   const attach = useCallback(async (blob: Blob, fileName?: string) => {
     setBusy(true)
     try {
-      if (await attachImageToTask(taskId, blob, fileName)) await reload()
+      if (await attachFile(entityType, entityId, blob, fileName)) await reload()
     } finally {
       setBusy(false)
     }
-  }, [taskId, reload])
+  }, [entityType, entityId, reload])
 
-  // ⌘V an image (e.g. a screenshot) anywhere while this task's panel is open.
+  // ⌘V an image (e.g. a screenshot) anywhere while this panel is open.
   useEffect(() => {
     function onPaste(e: ClipboardEvent) {
       const item = Array.from(e.clipboardData?.items ?? []).find((i) => i.type.startsWith('image/'))
@@ -47,9 +55,12 @@ export function PanelPhotos({ taskId }: PanelPhotosProps) {
     return () => document.removeEventListener('paste', onPaste)
   }, [attach])
 
+  const images = attachments.filter((a) => a.fileType.startsWith('image/'))
+  const documents = attachments.filter((a) => !a.fileType.startsWith('image/'))
+
   return (
     <section>
-      <div className="text-[10px] uppercase tracking-wider font-semibold text-neutral-400 mb-2">Photos</div>
+      <div className="text-[10px] uppercase tracking-wider font-semibold text-neutral-400 mb-2">Photos &amp; files</div>
 
       <div className="flex flex-wrap gap-2">
         {images.map((img) => (
@@ -68,7 +79,7 @@ export function PanelPhotos({ taskId }: PanelPhotosProps) {
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/*"
+          accept={ATTACHMENT_ACCEPT}
           className="hidden"
           onChange={(e) => {
             const f = e.target.files?.[0]
@@ -89,14 +100,32 @@ export function PanelPhotos({ taskId }: PanelPhotosProps) {
           type="button"
           onClick={() => fileInputRef.current?.click()}
           disabled={busy}
-          title="Choose an image file"
+          title="Choose an image or document"
           className="w-20 h-20 rounded-lg border border-dashed border-neutral-300 text-neutral-400 hover:text-neutral-600 hover:border-neutral-400 hover:bg-neutral-50 grid place-items-center transition-colors disabled:opacity-60"
         >
           <ImageUp className="w-5 h-5" />
         </button>
       </div>
 
-      <p className="text-[11px] text-neutral-400 mt-1.5">Snap, choose a file, or paste a screenshot (⌘V)</p>
+      {documents.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mt-2">
+          {documents.map((doc) => (
+            <a
+              key={doc.id}
+              href={doc.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              title={doc.fileName}
+              className="inline-flex items-center gap-1.5 max-w-full px-2.5 py-1.5 rounded-lg bg-white shadow-[inset_0_0_0_1px_#e5e7eb] text-sm text-neutral-700 hover:bg-neutral-50"
+            >
+              <FileText className="w-4 h-4 text-neutral-400 shrink-0" aria-hidden />
+              <span className="truncate">{doc.fileName}</span>
+            </a>
+          ))}
+        </div>
+      )}
+
+      <p className="text-[11px] text-neutral-400 mt-1.5">Snap, choose a file (PDF and docs welcome), or paste a screenshot (⌘V)</p>
 
       {showCamera && (
         <CameraCaptureModal

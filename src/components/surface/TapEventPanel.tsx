@@ -5,6 +5,7 @@ import type { Task, TaskLink } from '@/types/task'
 import { PanelHeader } from './sections/PanelHeader'
 import { PanelWhy } from './sections/PanelWhy'
 import { PanelLinks } from './sections/PanelLinks'
+import { PanelPhotos } from './sections/PanelPhotos'
 import { PanelMightBeRelevant } from './sections/PanelMightBeRelevant'
 import { PanelFooter } from './sections/PanelFooter'
 import { useEntityRelations } from './hooks/useEntityRelations'
@@ -372,6 +373,10 @@ export function TapEventPanel(props: TapEventPanelProps) {
           />
         </div>
       </section>
+
+      {/* Attachments key on the stable Google event id (the same key event
+          notes use), under the 'event_note' entity type the table allows. */}
+      <PanelPhotos entityType="event_note" entityId={eventId} />
 
       <PanelLinks links={props.links} onAddLink={props.onAddLink} />
 

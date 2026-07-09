@@ -1,10 +1,30 @@
 import { supabase } from '@/lib/supabase'
 
-export interface TaskImage {
+/** Entity kinds the `attachments` table accepts (its CHECK constraint). Events
+ *  attach under 'event_note', keyed by the stable Google event id — the same
+ *  key event notes use — so no note row needs to exist first. */
+export type AttachmentEntityType = 'task' | 'project' | 'event_note' | 'instance_note' | 'note' | 'routine'
+
+export interface Attachment {
   id: string
   fileName: string
+  fileType: string
   url: string
 }
+
+/** Document types the storage bucket's allowed_mime_types accepts. Images are
+ *  handled separately (converted to JPEG so HEIC/WebP pastes always land). */
+const DOCUMENT_MIME_TYPES: Record<string, string> = {
+  'application/pdf': 'pdf',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
+  'text/csv': 'csv',
+  'text/plain': 'txt',
+  'audio/mpeg': 'mp3',
+}
+
+/** `accept` attribute for a picker offering everything attachFile can take. */
+export const ATTACHMENT_ACCEPT = ['image/*', ...Object.keys(DOCUMENT_MIME_TYPES)].join(',')
 
 /** Longest side of an uploaded JPEG — plenty for viewing/vision, kind to egress. */
 const MAX_DIMENSION = 1600
@@ -26,54 +46,82 @@ export async function toJpeg(file: Blob): Promise<Blob> {
   })
 }
 
-/** Image attachments on a task (the `attachments` table + bucket), with
- *  short-lived signed URLs for display. */
-export async function listTaskImages(taskId: string): Promise<TaskImage[]> {
+/** Attachments on an entity (the `attachments` table + bucket), with
+ *  short-lived signed URLs for display/download. */
+export async function listAttachments(
+  entityType: AttachmentEntityType,
+  entityId: string,
+): Promise<Attachment[]> {
   const { data: rows, error } = await supabase
     .from('attachments')
     .select('id, file_name, file_type, storage_path')
-    .eq('entity_type', 'task')
-    .eq('entity_id', taskId)
+    .eq('entity_type', entityType)
+    .eq('entity_id', entityId)
     .order('created_at', { ascending: true })
   if (error || !rows) return []
 
-  const images: TaskImage[] = []
+  const attachments: Attachment[] = []
   for (const row of rows) {
-    if (!row.file_type?.startsWith('image/')) continue
     const { data } = await supabase.storage
       .from('attachments')
       .createSignedUrl(row.storage_path, 3600)
-    if (data?.signedUrl) images.push({ id: row.id, fileName: row.file_name, url: data.signedUrl })
+    if (data?.signedUrl) {
+      attachments.push({ id: row.id, fileName: row.file_name, fileType: row.file_type, url: data.signedUrl })
+    }
   }
-  return images
+  return attachments
 }
 
-/** Attach an image to an existing task: downscale → upload → attachments row. */
-export async function attachImageToTask(taskId: string, image: Blob, fileName?: string): Promise<boolean> {
+/**
+ * Attach a file to an entity: upload to storage → insert an attachments row.
+ * Images are downscaled/re-encoded to JPEG; documents upload as-is when the
+ * bucket accepts their MIME type. Returns false (and logs) on anything else.
+ */
+export async function attachFile(
+  entityType: AttachmentEntityType,
+  entityId: string,
+  file: Blob,
+  fileName?: string,
+): Promise<boolean> {
   try {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error('Not signed in')
-    const jpeg = await toJpeg(image)
-    const storagePath = `${user.id}/attach/${crypto.randomUUID()}.jpg`
+
+    let upload: Blob
+    let contentType: string
+    let extension: string
+    if (file.type.startsWith('image/') || file.type === '') {
+      upload = await toJpeg(file)
+      contentType = 'image/jpeg'
+      extension = 'jpg'
+    } else if (DOCUMENT_MIME_TYPES[file.type]) {
+      upload = file
+      contentType = file.type
+      extension = DOCUMENT_MIME_TYPES[file.type]
+    } else {
+      throw new Error(`Unsupported file type: ${file.type}`)
+    }
+
+    const storagePath = `${user.id}/attach/${crypto.randomUUID()}.${extension}`
 
     const { error: uploadErr } = await supabase.storage
       .from('attachments')
-      .upload(storagePath, jpeg, { contentType: 'image/jpeg', upsert: false })
+      .upload(storagePath, upload, { contentType, upsert: false })
     if (uploadErr) throw new Error(uploadErr.message)
 
     const { error: insertErr } = await supabase.from('attachments').insert({
       user_id: user.id,
-      entity_type: 'task',
-      entity_id: taskId,
-      file_name: fileName || 'photo.jpg',
-      file_type: 'image/jpeg',
-      file_size: jpeg.size,
+      entity_type: entityType,
+      entity_id: entityId,
+      file_name: fileName || `attachment.${extension}`,
+      file_type: contentType,
+      file_size: upload.size,
       storage_path: storagePath,
     })
     if (insertErr) throw new Error(insertErr.message)
     return true
   } catch (err) {
-    console.error('attachImageToTask failed:', err)
+    console.error('attachFile failed:', err)
     return false
   }
 }

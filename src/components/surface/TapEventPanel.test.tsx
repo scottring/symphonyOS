@@ -56,6 +56,13 @@ describe('TapEventPanel', () => {
     expect(screen.getByText('Annual physical')).toBeInTheDocument()
   })
 
+  it('renders a Photos & files section keyed to the event', () => {
+    render(<TapEventPanel
+      event={mockEvent} notes={undefined} allTasks={[]} {...baseHandlers}
+    />)
+    expect(screen.getByText('Photos & files')).toBeInTheDocument()
+  })
+
   it('renders prep tasks linked to the event', () => {
     const prep = createMockTask({ id: 't1', linkedEventId: 'e1', title: 'Bring vaccine card' })
     render(<TapEventPanel
