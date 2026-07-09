@@ -36,4 +36,19 @@ describe('DomainsGoalsStep', () => {
     renderStep(<DomainsGoalsStep />, { step, host, horizon: 'annual' })
     expect(screen.getByText('Run a 5k')).toBeInTheDocument()
   })
+
+  it('renders orphaned goals in an Uncategorized section', () => {
+    const host = makeHost({
+      goalAreas: [{ id: 'a1', name: 'Health' } as unknown as GoalArea],
+      goals: [
+        { id: 'g1', name: 'Run a 5k', status: 'active', areaId: 'a1' } as unknown as Goal,
+        { id: 'g2', name: 'Learn Spanish', status: 'active', areaId: 'gone' } as unknown as Goal,
+      ],
+    })
+    renderStep(<DomainsGoalsStep />, { step, host, horizon: 'annual' })
+    expect(screen.getByText('Run a 5k')).toBeInTheDocument()
+    const uncategorizedHeader = screen.getByText('Uncategorized')
+    expect(uncategorizedHeader).toBeInTheDocument()
+    expect(screen.getByText('Learn Spanish')).toBeInTheDocument()
+  })
 })
