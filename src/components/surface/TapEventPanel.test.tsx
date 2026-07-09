@@ -211,6 +211,46 @@ describe('TapEventPanel', () => {
     })
   })
 
+  describe('mark done', () => {
+    it('hides the Complete pill when onToggleComplete is not provided', () => {
+      render(<TapEventPanel event={mockEvent} notes={undefined} allTasks={[]} {...baseHandlers} />)
+      expect(screen.queryByRole('button', { name: /complete/i })).not.toBeInTheDocument()
+    })
+
+    it('open event: shows Complete and fires onToggleComplete on click', async () => {
+      const onToggleComplete = vi.fn()
+      const { user } = render(<TapEventPanel
+        event={mockEvent} notes={undefined} allTasks={[]} {...baseHandlers}
+        completed={false}
+        onToggleComplete={onToggleComplete}
+      />)
+      await user.click(screen.getByRole('button', { name: 'Complete' }))
+      expect(onToggleComplete).toHaveBeenCalledTimes(1)
+    })
+
+    it('completed event: shows the Completed state; click fires onToggleComplete to reopen', async () => {
+      const onToggleComplete = vi.fn()
+      const { user } = render(<TapEventPanel
+        event={mockEvent} notes={undefined} allTasks={[]} {...baseHandlers}
+        completed={true}
+        onToggleComplete={onToggleComplete}
+      />)
+      const pill = screen.getByRole('button', { name: /completed/i })
+      await user.click(pill)
+      expect(onToggleComplete).toHaveBeenCalledTimes(1)
+    })
+
+    it('shows Complete even on a view-only calendar (completion is Symphony-side)', () => {
+      render(<TapEventPanel
+        event={mockEvent} notes={undefined} allTasks={[]} {...baseHandlers}
+        completed={false}
+        onToggleComplete={vi.fn()}
+        calendarAccess={{ name: 'Work Schedule', readOnly: true }}
+      />)
+      expect(screen.getByRole('button', { name: 'Complete' })).toBeInTheDocument()
+    })
+  })
+
   describe('calendar access', () => {
     it('view-only calendar: badge shown, reschedule/duration hidden', () => {
       render(<TapEventPanel

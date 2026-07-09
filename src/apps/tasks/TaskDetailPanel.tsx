@@ -32,6 +32,7 @@ import { useGoals } from '@/hooks/useGoals';
 import { useGoogleCalendar, CalendarReconnectError, type GoogleCalendarInfo, type CalendarEvent } from '@/hooks/useGoogleCalendar';
 import { useEventNotes } from '@/hooks/useEventNotes';
 import { useEventDiscussionFlags } from '@/hooks/useEventDiscussionFlags';
+import { useActionableInstances } from '@/hooks/useActionableInstances';
 import { useRoutines } from '@/hooks/useRoutines';
 import { useFamilyMembers } from '@/hooks/useFamilyMembers';
 import { usePinnedItems } from '@/hooks/usePinnedItems';
@@ -424,6 +425,38 @@ function EventPanelBody({ id }: { id: string }) {
     if (event) fetchNote(event.google_event_id || event.id);
   }, [event, fetchNote]);
 
+  // Done state lives in actionable_instances (Symphony-side, never a Google
+  // write), keyed by the event's OWN start day — so completing works even when
+  // the panel was opened from another day's view. Optimistic toggle; the Today
+  // timeline picks the change up via its actionable_instances realtime refresh.
+  const { getInstance, markDone, undoDone } = useActionableInstances();
+  const [completed, setCompleted] = useState(false);
+  const instanceDate = useMemo(() => (event ? getEventDayStart(event) : null), [event]);
+  useEffect(() => {
+    if (!event || !instanceDate) return;
+    let cancelled = false;
+    getInstance('calendar_event', event.google_event_id || event.id, instanceDate).then((instance) => {
+      if (!cancelled) setCompleted(instance?.status === 'completed');
+    });
+    return () => { cancelled = true; };
+  }, [event, getInstance, instanceDate]);
+
+  const handleToggleComplete = useCallback(async () => {
+    if (!event || !instanceDate) return;
+    const eid = event.google_event_id || event.id;
+    const next = !completed;
+    setCompleted(next);
+    const ok = next
+      ? await markDone('calendar_event', eid, instanceDate)
+      : await undoDone('calendar_event', eid, instanceDate);
+    if (!ok) {
+      setCompleted(!next);
+      showToast('Could not update the event', 'error');
+      return;
+    }
+    showToast(next ? 'Event completed' : 'Event marked incomplete', 'success');
+  }, [event, instanceDate, completed, markDone, undoDone]);
+
   // Close the panel (rather than hang on "Loading…") when the selected event has
   // been rescheduled off this day or deleted — see shouldCloseStaleEventPanel.
   useEffect(() => {
@@ -464,6 +497,8 @@ function EventPanelBody({ id }: { id: string }) {
       event={event}
       notes={getNote(eventId)?.notes ?? undefined}
       allTasks={tasks}
+      completed={completed}
+      onToggleComplete={handleToggleComplete}
       calendarAccess={calendarAccess}
       writableCalendars={writableCalendars}
       onMoveToCalendar={async (destinationCalendarId) => {

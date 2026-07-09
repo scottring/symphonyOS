@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { MessageSquare, Video } from 'lucide-react'
+import { Check, MessageSquare, Video } from 'lucide-react'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Task, TaskLink } from '@/types/task'
 import { PanelHeader } from './sections/PanelHeader'
@@ -23,6 +23,14 @@ interface TapEventPanelProps {
   /** Links saved on this event (from event_notes table). */
   links?: TaskLink[]
   allTasks: Task[]
+
+  /** Whether the event is marked done (actionable_instances, Symphony-side). */
+  completed?: boolean
+  /**
+   * Toggle done/undone. Completion is Symphony state, not a Google write, so
+   * it's offered even on read-only calendars. When omitted, the pill hides.
+   */
+  onToggleComplete?: () => void
 
   onClose: () => void
   onNotesChange: (next: string) => void
@@ -221,6 +229,20 @@ export function TapEventPanel(props: TapEventPanelProps) {
         )}
 
         <div className="mt-4 flex flex-wrap gap-2">
+          {/* Mark done — same pill as the task panel (PanelActions): outline when
+              open, greyed + checked when done (click to reopen). */}
+          {props.onToggleComplete && (
+            <button
+              onClick={props.onToggleComplete}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+                props.completed
+                  ? 'border-neutral-200 bg-neutral-100 text-neutral-400 hover:bg-neutral-200'
+                  : 'border-primary-600 text-primary-700 hover:bg-primary-50'
+              }`}
+            >
+              {props.completed ? <><Check className="w-4 h-4" /> Completed</> : 'Complete'}
+            </button>
+          )}
           {/* Physical address → Directions toggle. Video meeting → Join link (or a
               non-clickable label when no join URL is known). Never offer directions
               to a Teams/Zoom/Meet "location". */}

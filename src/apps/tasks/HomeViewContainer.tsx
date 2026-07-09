@@ -37,6 +37,7 @@ import { useActionableInstances } from '@/hooks/useActionableInstances';
 import { useFamilyMembers } from '@/hooks/useFamilyMembers';
 import { useHiddenCalendarEvents } from '@/hooks/useHiddenCalendarEvents';
 import { useScheduleFiltering } from '@/hooks/useScheduleFiltering';
+import { useInstancesRealtime } from '@/hooks/useInstancesRealtime';
 import { useScheduleActions } from '@/hooks/useScheduleActions';
 import { useDomain } from '@/hooks/useDomain';
 import { useCalendarDomainMappings } from '@/hooks/useCalendarDomainMappings';
@@ -214,6 +215,11 @@ export function HomeViewContainer() {
     addTask,
     getCurrentUserMember,
   });
+
+  // Completions land in actionable_instances from outside this tree too — the
+  // event detail panel (mounts at the Shell level), other windows, the wall,
+  // iOS. Refresh the day's instances whenever any of them writes.
+  useInstancesRealtime(refreshDateInstances);
 
   // Schedule action handlers
   const scheduleActions = useScheduleActions({
