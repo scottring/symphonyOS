@@ -432,7 +432,9 @@ export function useGoals(year?: number) {
     return 'Q4'
   }, [])
 
-  // Allow external updates to milestones (used by useGoalMilestones)
+  // Allow external updates to milestones. UI-facing exports; the Goals app
+  // UI no longer creates/edits actions or milestones (Task 13), but this
+  // plumbing and the underlying DB tables stay intact.
   const addMilestoneLocal = useCallback((milestone: GoalMilestone) => {
     setAllMilestones(prev => [...prev, milestone])
   }, [])
@@ -463,7 +465,7 @@ export function useGoals(year?: number) {
     updateAction,
     toggleAction,
     deleteAction,
-    // Milestone state helpers (for useGoalMilestones)
+    // Milestone state helpers
     addMilestoneLocal,
     updateMilestoneLocal,
     removeMilestoneLocal,

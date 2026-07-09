@@ -104,41 +104,10 @@ export interface DbGoalMilestone {
   updated_at: string
 }
 
-export interface DbGoalConversation {
-  id: string
-  goal_id: string
-  user_id: string
-  messages: ConversationMessage[]
-  status: 'in_progress' | 'completed'
-  created_at: string
-  updated_at: string
-}
-
 export interface ConversationMessage {
   role: 'assistant' | 'user'
   content: string
   timestamp: string
-}
-
-// AI planning result returned from goal-planning-chat finish action
-export interface GoalPlanningResult {
-  strategy: string
-  milestones: Array<{
-    title: string
-    description?: string
-    targetDate?: string
-    targetValue?: number
-    unit?: string
-  }>
-  suggestedBlocks: Array<{
-    label: string
-    blockType: string
-    timeSlot: string
-    narrative: string
-    coachingNote?: string
-    items?: Array<{ who: string; action: string; context?: string; coaching?: string }>
-    dayTypes: string[]
-  }>
 }
 
 export interface DbGoalAction {

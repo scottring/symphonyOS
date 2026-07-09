@@ -10,7 +10,6 @@ interface GoalsListProps {
   onAddArea: (name: string) => Promise<GoalArea | null>
   onRenameArea: (areaId: string, name: string) => void
   onAddGoal: (areaId: string, name: string) => Promise<Goal | null>
-  onToggleAction: (actionId: string) => void
   onDeleteArea: (areaId: string) => void
 }
 
@@ -23,7 +22,6 @@ export function GoalsList({
   onAddArea,
   onRenameArea,
   onAddGoal,
-  onToggleAction,
   onDeleteArea,
 }: GoalsListProps) {
   const [creatingArea, setCreatingArea] = useState(false)
@@ -81,12 +79,6 @@ export function GoalsList({
 
   const getGoalsForArea = (areaId: string) =>
     goals.filter(g => g.areaId === areaId && g.status !== 'archived')
-
-  const getActionStats = (goal: Goal) => {
-    const quarterActions = goal.actions.filter(a => a.quarter === currentQuarter)
-    const completed = quarterActions.filter(a => a.completed).length
-    return { total: quarterActions.length, completed }
-  }
 
   return (
     <div className="h-full overflow-auto bg-[var(--color-bg-base)]">
@@ -277,113 +269,35 @@ export function GoalsList({
                   <p className="text-sm text-neutral-400 italic pl-1">No goals yet in this area</p>
                 ) : (
                   <div className="space-y-3">
-                    {areaGoals.map((goal) => {
-                      const stats = getActionStats(goal)
-                      const quarterActions = goal.actions.filter(a => a.quarter === currentQuarter)
-
-                      return (
-                        <button
-                          key={goal.id}
-                          onClick={() => onSelectGoal(goal.id)}
-                          className="w-full text-left p-5 rounded-2xl bg-white border border-neutral-100
-                                     hover:border-primary-200 hover:shadow-md transition-all duration-200 group"
-                        >
-                          <div className="flex items-start justify-between gap-3">
-                            <div className="flex-1 min-w-0">
-                              <h3 className="font-medium text-neutral-800 group-hover:text-primary-700 transition-colors">
-                                {goal.name}
-                              </h3>
-
-                              {/* Strategy + milestone badges */}
-                              {(goal.strategy || goal.milestones?.length > 0) && (
-                                <div className="flex items-center gap-2 mt-1.5">
-                                  {goal.strategy && (
-                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-medium bg-primary-50 text-primary-600 rounded">
-                                      <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
-                                        <path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clipRule="evenodd" />
-                                      </svg>
-                                      AI Planned
-                                    </span>
-                                  )}
-                                  {goal.milestones?.length > 0 && (
-                                    <span className="text-[10px] font-medium text-neutral-400">
-                                      {goal.milestones.filter(m => m.status === 'achieved').length}/{goal.milestones.length} milestones
-                                    </span>
-                                  )}
-                                </div>
-                              )}
-
-                              {/* Quarter actions preview */}
-                              {quarterActions.length > 0 && (
-                                <div className="mt-3 space-y-1.5">
-                                  {quarterActions.slice(0, 3).map((action) => (
-                                    <div
-                                      key={action.id}
-                                      className="flex items-center gap-2"
-                                      onClick={(e) => e.stopPropagation()}
-                                    >
-                                      <button
-                                        onClick={(e) => { e.stopPropagation(); onToggleAction(action.id) }}
-                                        className={`w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center transition-all
-                                          ${action.completed
-                                            ? 'bg-primary-500 border-primary-500 text-white'
-                                            : 'border-neutral-300 hover:border-primary-400'
-                                          }`}
-                                      >
-                                        {action.completed && (
-                                          <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
-                                            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                          </svg>
-                                        )}
-                                      </button>
-                                      <span className={`text-sm ${action.completed ? 'text-neutral-400 line-through' : 'text-neutral-600'}`}>
-                                        {action.description}
-                                      </span>
-                                    </div>
-                                  ))}
-                                  {quarterActions.length > 3 && (
-                                    <p className="text-xs text-neutral-400 pl-6">
-                                      +{quarterActions.length - 3} more
-                                    </p>
-                                  )}
-                                </div>
-                              )}
-
-                              {quarterActions.length === 0 && (
-                                <p className="text-sm text-neutral-400 mt-1">
-                                  No {currentQuarter} actions yet
-                                </p>
-                              )}
-                            </div>
-
-                            {/* Progress + chevron */}
-                            <div className="flex items-center gap-3 flex-shrink-0">
-                              {stats.total > 0 && (
-                                <div className="flex items-center gap-2">
-                                  <div className="w-12 h-1.5 bg-neutral-200 rounded-full overflow-hidden">
-                                    <div
-                                      className="h-full bg-primary-500 rounded-full transition-all duration-500 ease-out"
-                                      style={{ width: `${stats.total > 0 ? (stats.completed / stats.total) * 100 : 0}%` }}
-                                    />
-                                  </div>
-                                  <span className="text-xs text-neutral-400 font-medium tabular-nums">
-                                    {stats.completed}/{stats.total}
-                                  </span>
-                                </div>
-                              )}
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                className="w-5 h-5 text-neutral-300 group-hover:text-primary-400 group-hover:translate-x-1 transition-all flex-shrink-0"
-                                viewBox="0 0 20 20"
-                                fill="currentColor"
-                              >
-                                <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
-                              </svg>
-                            </div>
+                    {areaGoals.map((goal) => (
+                      <button
+                        key={goal.id}
+                        onClick={() => onSelectGoal(goal.id)}
+                        className="w-full text-left p-5 rounded-2xl bg-white border border-neutral-100
+                                   hover:border-primary-200 hover:shadow-md transition-all duration-200 group"
+                      >
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <h3 className="font-medium text-neutral-800 group-hover:text-primary-700 transition-colors truncate">
+                              {goal.name}
+                            </h3>
+                            {goal.status === 'completed' && (
+                              <span className="shrink-0 text-[10px] font-medium px-1.5 py-0.5 bg-primary-50 text-primary-600 rounded">
+                                Completed
+                              </span>
+                            )}
                           </div>
-                        </button>
-                      )
-                    })}
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="w-5 h-5 text-neutral-300 group-hover:text-primary-400 group-hover:translate-x-1 transition-all flex-shrink-0"
+                            viewBox="0 0 20 20"
+                            fill="currentColor"
+                          >
+                            <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                          </svg>
+                        </div>
+                      </button>
+                    ))}
                   </div>
                 )}
               </section>

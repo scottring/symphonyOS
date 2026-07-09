@@ -68,9 +68,6 @@ export const GoalsList = lazy(() =>
 export const GoalView = lazy(() =>
   import('./goals/GoalView').then(m => ({ default: m.GoalView }))
 )
-export const GoalPlanningChat = lazy(() =>
-  import('./goals/GoalPlanningChat').then(m => ({ default: m.GoalPlanningChat }))
-)
 
 // Settings
 export const SettingsPage = lazy(() =>
@@ -83,25 +80,11 @@ export const FocusMode = lazy(() =>
 export const PlanningSession = lazy(() =>
   import('./planning/PlanningSession').then(m => ({ default: m.PlanningSession }))
 )
-export const WeeklyPlanningSession = lazy(() =>
-  import('./planning/weekly/WeeklyPlanningSession').then(m => ({ default: m.WeeklyPlanningSession }))
-)
-export const PlanTodaySession = lazy(() =>
-  import('./planning/daily/PlanTodaySession').then(m => ({ default: m.PlanTodaySession }))
-)
-export const MonthlyPlanningSession = lazy(() =>
-  import('./planning/cadence/CadenceSessions').then(m => ({ default: m.MonthlyPlanningSession }))
-)
-export const SeasonalPlanningSession = lazy(() =>
-  import('./planning/cadence/CadenceSessions').then(m => ({ default: m.SeasonalPlanningSession }))
-)
-export const AnnualPlanningSession = lazy(() =>
-  import('./planning/cadence/CadenceSessions').then(m => ({ default: m.AnnualPlanningSession }))
-)
 
 // Guided sessions (Five Horizons) — one ritual shell, five horizons. Replaces
-// the five sessions above at the mount point; old exports stay until Task 13
-// removes the legacy components.
+// the per-cadence sessions that used to live here (weekly/daily/monthly/
+// seasonal/annual) — removed in Task 13 once GuidedSessionContainer took
+// over the mount point.
 export const GuidedSessionContainer = lazy(() =>
   import('./planning/guided/GuidedSessionContainer').then(m => ({ default: m.GuidedSessionContainer }))
 )

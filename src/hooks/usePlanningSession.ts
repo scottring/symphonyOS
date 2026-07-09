@@ -25,11 +25,13 @@ export interface PlanningNotes {
   /** Seasonal-horizon fields. */
   exerciseNutrition?: string // seasonal exercise & nutrition patterns
   tripChildcare?: string     // specific trip + childcare planning
-  /** The financial review is done in an external tool — we only track the tick. */
-  financialDone?: boolean
+  /** Guided-session additions. */
+  lookingBack?: string   // annual: write from one year in the future
+  energy?: string        // look-within
+  oneWord?: string       // daily tone word
   /** Guided session shell (Five Horizons): resume position within the step list. */
   stepIndex?: number
-  [key: string]: string | boolean | number | undefined
+  [key: string]: string | number | boolean | undefined
 }
 
 export function usePlanningSession(horizon: PlanningHorizon, periodToken: string) {

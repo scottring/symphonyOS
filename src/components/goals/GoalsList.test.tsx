@@ -15,7 +15,6 @@ const baseProps = {
   onAddArea: vi.fn().mockResolvedValue(null),
   onRenameArea: vi.fn(),
   onAddGoal: vi.fn().mockResolvedValue(null),
-  onToggleAction: vi.fn(),
   onDeleteArea: vi.fn(),
 }
 
