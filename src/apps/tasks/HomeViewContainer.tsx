@@ -15,11 +15,10 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
 import { useGoogleCalendar, CalendarReconnectError } from '@/hooks/useGoogleCalendar';
 import { showToast } from '@/hooks/useToast';
-import { useVaultWrite } from '@/hooks/useVaultWrite';
-import { useGoalsContext } from '@/contexts/GoalsContext';
-import { PlanningSession, WeeklyPlanningSession, PlanTodaySession, MonthlyPlanningSession, SeasonalPlanningSession, AnnualPlanningSession } from '@/components/lazy';
+import { PlanningSession, GuidedSessionContainer } from '@/components/lazy';
 import { LoadingFallback } from '@/components/layout/LoadingFallback';
 import { isEverydayRoutine, scheduleRoutineOnDate } from '@/lib/routineUtils';
+import type { PlanningHorizon } from '@/hooks/usePlanningSession';
 import { parseRoutineTimelineId } from '@/lib/today/doseExpansion';
 import { groupItems } from '@/lib/today/groupTasks';
 import { useConvertTaskToProject } from '@/hooks/useConvertTaskToProject';
@@ -27,7 +26,6 @@ import { parseQuickInput } from '@/lib/quickInputParser';
 import type { ParserContext } from '@/lib/quickInputParser';
 import type { ResolverContext } from '@/lib/entityResolver';
 import type { TodayCaptureResult } from '@/components/schedule/TodayAddInput';
-import type { Task } from '@/types/task';
 import type { TimelineCaptureResult } from '@/components/schedule/TimelineQuickInput';
 import { useEventNotes } from '@/hooks/useEventNotes';
 import { useContacts } from '@/hooks/useContacts';
@@ -53,7 +51,7 @@ import { useMealEventsForDate } from '@/shell/providers/MealEventsProvider';
 
 export function HomeViewContainer() {
   // Data hooks
-  const { tasks, loading: tasksLoading, addTask, toggleTask, toggleWaiting, deleteTask, updateTask, pushTask, setBucket, getLinkedTasks, refetch } = useSupabaseTasks();
+  const { tasks, loading: tasksLoading, addTask, toggleTask, toggleWaiting, deleteTask, updateTask, pushTask, getLinkedTasks, refetch } = useSupabaseTasks();
   const { isConnected, events, fetchEvents, isFetching: eventsFetching, updateEvent, createEvent, deleteEvent, removeEventLocal, restoreEventLocal } = useGoogleCalendar();
   // Passing the visible event ids opts in to auto-loading notes (context
   // overrides, assignees, shared-with-family) + realtime — without it those
@@ -77,40 +75,32 @@ export function HomeViewContainer() {
   const { lists, listsByCategory } = useListsContext();
   const { addNote } = useNotesContext();
   const { currentDomain } = useDomain();
-  const { goals } = useGoalsContext();
-  const vaultWrite = useVaultWrite();
   const undo = useUndo();
   const { aliases, recordOutcome } = useResolutionLearning();
 
   // UI state local to this container
   const [viewedDate, setViewedDate] = useState<Date>(() => new Date());
-  // Planning overlays. In the Shell these are booleans (the legacy app drove the
-  // weekly session off a `weekly-planning` stateView; the Shell uses local state).
+  // Planning overlays. `planningOpen` drives the standalone time-block grid
+  // (a Today-only feature, untouched by the guided-session rewrite).
+  // `guidedHorizon` drives the one guided-session shell that now covers all
+  // five horizons (daily/weekly/monthly/seasonal/annual).
   const [planningOpen, setPlanningOpen] = useState(false);
-  const [weeklyPlanningOpen, setWeeklyPlanningOpen] = useState(false);
-  const [planTodayOpen, setPlanTodayOpen] = useState(false);
-  // Time-block opened from inside Plan-today: Done should return to the wizard,
-  // not strand you on Today with the ritual half-finished.
-  const [planningFromWizard, setPlanningFromWizard] = useState(false);
-  const [monthlyPlanningOpen, setMonthlyPlanningOpen] = useState(false);
-  const [seasonalPlanningOpen, setSeasonalPlanningOpen] = useState(false);
-  const [annualPlanningOpen, setAnnualPlanningOpen] = useState(false);
+  const [guidedHorizon, setGuidedHorizon] = useState<PlanningHorizon | null>(null);
   const { selection, setSelection, clearSelection } = useSelection();
 
   // "Plan the …" from a horizon rung (or the rhythm nudge) routes here with
-  // ?plan=week|month|season|year — open the matching session, then strip the
-  // param so a refresh doesn't re-open it.
+  // ?plan=week|month|season|year|today — open the matching guided session,
+  // then strip the param so a refresh doesn't re-open it.
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
   useEffect(() => {
     const plan = searchParams.get('plan');
     if (!plan) return;
-    if (plan === 'week') setWeeklyPlanningOpen(true);
-    else if (plan === 'month') setMonthlyPlanningOpen(true);
-    else if (plan === 'season') setSeasonalPlanningOpen(true);
-    else if (plan === 'year') setAnnualPlanningOpen(true);
-    else if (plan === 'today') setPlanTodayOpen(true);
-    else return;
+    const map: Record<string, PlanningHorizon> = {
+      year: 'annual', season: 'seasonal', month: 'monthly', week: 'weekly', today: 'daily',
+    };
+    const horizon = map[plan];
+    if (horizon) setGuidedHorizon(horizon);
     const next = new URLSearchParams(searchParams);
     next.delete('plan');
     setSearchParams(next, { replace: true });
@@ -416,37 +406,6 @@ export function HomeViewContainer() {
     [tasks, addTask, viewedDate, getCurrentUserMember],
   );
 
-  // Persist a completed weekly planning session as a vault note.
-  const saveWeeklyPlanToVault = useCallback(
-    async ({ weekId, priorities, concerns }: { weekId: string; priorities: Task[]; concerns: string }): Promise<{ ok: boolean }> => {
-      const { formatWeeklyNote } = await import('@/components/planning/weekly/weeklyPlanning');
-      const scheduleSummary = priorities
-        .filter(t => t.scheduledFor)
-        .map(t => `- ${t.title} (${new Date(t.scheduledFor as Date).toLocaleDateString()})`)
-        .join('\n');
-      const note = formatWeeklyNote({ weekId, priorities, scheduleSummary, concerns });
-      const result = await vaultWrite.createVaultNote(
-        { title: note.title, content: note.content, path: note.path },
-        `Weekly plan: ${weekId}`,
-      );
-      return { ok: !!result?.success };
-    },
-    [vaultWrite],
-  );
-
-  // Mid-session capture: create a task straight into a cadence session's bucket
-  // (the notebook moment — commitments born during the ritual, not pulled down).
-  const createTaskInBucket = useCallback(
-    async (title: string, bucket: 'month' | 'quarter') => {
-      await addTask(title, undefined, undefined, undefined, {
-        assignedTo: getCurrentUserMember()?.id,
-        context: currentDomain !== 'universal' ? currentDomain : undefined,
-        bucket,
-      });
-    },
-    [addTask, getCurrentUserMember, currentDomain],
-  );
-
   // Bulk-select grouping (Today): wrap a mix of tasks/events/routines into a new
   // wrapper task. Tasks reparent via parentTaskId; events/routines ride as
   // group_members refs (grouping.ts relocates them under the wrapper card).
@@ -599,8 +558,8 @@ export function HomeViewContainer() {
         viewedDate={viewedDate}
         onDateChange={setViewedDate}
         currentUserMemberId={getCurrentUserMember()?.id}
-        onOpenWeeklyPlanning={() => setWeeklyPlanningOpen(true)}
-        onOpenPlanToday={() => setPlanTodayOpen(true)}
+        onOpenWeeklyPlanning={() => setGuidedHorizon('weekly')}
+        onOpenPlanToday={() => setGuidedHorizon('daily')}
       />
 
       {planningOpen && (
@@ -624,13 +583,7 @@ export function HomeViewContainer() {
               })
             }
             initialDate={viewedDate}
-            onClose={() => {
-              setPlanningOpen(false);
-              if (planningFromWizard) {
-                setPlanningFromWizard(false);
-                setPlanTodayOpen(true);
-              }
-            }}
+            onClose={() => setPlanningOpen(false)}
             onUpdateTask={updateTask}
             onPushTask={pushTask}
             familyMembers={familyMembers}
@@ -639,90 +592,20 @@ export function HomeViewContainer() {
         </Suspense>
       )}
 
-      {weeklyPlanningOpen && (
+      {/* Guided sessions (Five Horizons) — one ritual shell for all five
+          horizons. Mounted with `key={guidedHorizon}` so switching horizons
+          in place (e.g. book-next → daily) remounts cleanly instead of
+          resyncing stale notes into the new horizon's session. */}
+      {guidedHorizon && (
         <Suspense fallback={<LoadingFallback />}>
-          <WeeklyPlanningSession
-            tasks={tasks}
-            events={filteredEvents}
-            routines={filteredRoutines}
-            initialDate={viewedDate}
-            onClose={() => setWeeklyPlanningOpen(false)}
-            onUpdateTask={updateTask}
-            onPushTask={pushTask}
-            onSavePlanToVault={saveWeeklyPlanToVault}
-            onSelectDay={(date) => { setViewedDate(date); setWeeklyPlanningOpen(false); }}
-            allRoutines={allRoutines}
-            onUpdateRoutine={updateRoutine}
-            onCompleteTask={toggleTask}
-            onDeleteTask={deleteTask}
-          />
-        </Suspense>
-      )}
-
-      {planTodayOpen && (
-        <Suspense fallback={<LoadingFallback />}>
-          <PlanTodaySession
-            tasks={tasks}
-            events={filteredEvents}
-            viewedDate={viewedDate}
-            onClose={() => setPlanTodayOpen(false)}
-            onPushTask={pushTask}
-            onCompleteTask={toggleTask}
-            onSetBucket={setBucket}
-            onOpenTimeBlock={() => { setPlanTodayOpen(false); setPlanningFromWizard(true); setPlanningOpen(true); }}
-            onFlagDiscussion={(taskId, note) => updateTask(taskId, { needsDiscussion: true, discussionNote: note })}
-            onRefetchTasks={refetch}
-            contacts={contacts}
-            routines={allRoutines}
-            onUpdateRoutine={(id, input) => updateRoutine(id, input)}
-            onCompleteRoutine={(id) => scheduleActions.onCompleteRoutine(id, true)}
-          />
-        </Suspense>
-      )}
-
-      {/* Cadence sessions (Phase 3). Hand-down chains the descent:
-          annual → seasonal → monthly → weekly. */}
-      {monthlyPlanningOpen && (
-        <Suspense fallback={<LoadingFallback />}>
-          <MonthlyPlanningSession
-            tasks={tasks}
-            tasksLoading={tasksLoading}
-            onPushTask={pushTask}
-            onClose={() => setMonthlyPlanningOpen(false)}
-            onHandDown={() => { setMonthlyPlanningOpen(false); setWeeklyPlanningOpen(true); }}
-            onSetBucket={setBucket}
-            onCompleteTask={toggleTask}
-            onCreateTask={(title) => createTaskInBucket(title, 'month')}
-            links={[
-              { label: 'Review routines & delegation', onClick: () => { setMonthlyPlanningOpen(false); navigate('/routines'); } },
-              { label: 'Review shopping lists', onClick: () => { setMonthlyPlanningOpen(false); navigate('/lists'); } },
-            ]}
-          />
-        </Suspense>
-      )}
-      {seasonalPlanningOpen && (
-        <Suspense fallback={<LoadingFallback />}>
-          <SeasonalPlanningSession
-            tasks={tasks}
-            tasksLoading={tasksLoading}
-            onPushTask={pushTask}
-            onClose={() => setSeasonalPlanningOpen(false)}
-            onHandDown={() => { setSeasonalPlanningOpen(false); setMonthlyPlanningOpen(true); }}
-            onSetBucket={setBucket}
-            onCompleteTask={toggleTask}
-            onCreateTask={(title) => createTaskInBucket(title, 'quarter')}
-            referenceGoals={goals}
-          />
-        </Suspense>
-      )}
-      {annualPlanningOpen && (
-        <Suspense fallback={<LoadingFallback />}>
-          <AnnualPlanningSession
-            tasks={tasks}
-            onPushTask={pushTask}
-            onClose={() => setAnnualPlanningOpen(false)}
-            onHandDown={() => { setAnnualPlanningOpen(false); setSeasonalPlanningOpen(true); }}
-            onOpenGoals={() => { setAnnualPlanningOpen(false); navigate('/goals'); }}
+          <GuidedSessionContainer
+            key={guidedHorizon}
+            horizon={guidedHorizon}
+            onClose={() => setGuidedHorizon(null)}
+            onScheduleRoutine={(routineId, date, time) => {
+              const routine = allRoutines.find(r => r.id === routineId);
+              if (routine) updateRoutine(routineId, scheduleRoutineOnDate(routine, date, time));
+            }}
           />
         </Suspense>
       )}

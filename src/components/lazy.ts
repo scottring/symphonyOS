@@ -99,6 +99,13 @@ export const AnnualPlanningSession = lazy(() =>
   import('./planning/cadence/CadenceSessions').then(m => ({ default: m.AnnualPlanningSession }))
 )
 
+// Guided sessions (Five Horizons) — one ritual shell, five horizons. Replaces
+// the five sessions above at the mount point; old exports stay until Task 13
+// removes the legacy components.
+export const GuidedSessionContainer = lazy(() =>
+  import('./planning/guided/GuidedSessionContainer').then(m => ({ default: m.GuidedSessionContainer }))
+)
+
 // Detail panel (only renders when an item is selected)
 export const DetailPanelRedesign = lazy(() =>
   import('./detail/DetailPanelRedesign').then(m => ({ default: m.DetailPanelRedesign }))

@@ -19,6 +19,13 @@ const REGISTRY: Partial<Record<StepType, ComponentType>> = {}
 export function registerStepType(type: StepType, component: ComponentType) {
   REGISTRY[type] = component
 }
+// Test/integrity-check hook: registry.test.ts verifies every step type used by
+// a session config has a registered component. Step components register via
+// the `./stepTypes` side-effect import, which GuidedSessionContainer pulls in
+// before rendering — GuidedSession.tsx itself must NOT import it (cycle).
+export function getRegisteredTypes(): StepType[] {
+  return Object.keys(REGISTRY) as StepType[]
+}
 
 interface Props {
   horizon: PlanningHorizon
@@ -115,7 +122,7 @@ export function GuidedSession({ horizon, host, onClose }: Props) {
                 periodStart: period.start, periodEnd: period.end,
                 notes, patchNotes, host, step, goNext: () => (last ? finish() : go(safeIndex + 1)),
               }}>
-                {Body ? <Body /> : null}
+                {Body ? <Body key={step.id} /> : null}
               </GuidedProvider>
             </>
           )}
