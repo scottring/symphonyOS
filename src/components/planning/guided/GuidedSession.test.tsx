@@ -87,6 +87,42 @@ describe('GuidedSession shell', () => {
     expect(onClose).toHaveBeenCalled()
   })
 
+  it('Finish prefers onFinished over onClose when provided', () => {
+    mockNotes = { stepIndex: 6 }
+    const onClose = vi.fn()
+    const onFinished = vi.fn()
+    render(<GuidedSession horizon="seasonal" host={makeHost()} onClose={onClose} onFinished={onFinished} />)
+    fireEvent.click(screen.getByRole('button', { name: /Finish/ }))
+    expect(onFinished).toHaveBeenCalled()
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('the header X abandons via onClose, never onFinished', () => {
+    const onClose = vi.fn()
+    const onFinished = vi.fn()
+    render(<GuidedSession horizon="seasonal" host={makeHost()} onClose={onClose} onFinished={onFinished} />)
+    fireEvent.click(screen.getByRole('button', { name: /^Close$/ }))
+    expect(onClose).toHaveBeenCalled()
+    expect(onFinished).not.toHaveBeenCalled()
+  })
+
+  it('chain button on the last step completes and hands over to the next horizon', () => {
+    mockNotes = { stepIndex: 6 } // seasonal last step; seasonal chains to monthly
+    const onClose = vi.fn()
+    const onChain = vi.fn()
+    render(<GuidedSession horizon="seasonal" host={makeHost()} onClose={onClose} onChain={onChain} />)
+    fireEvent.click(screen.getByRole('button', { name: /Plan the month now/ }))
+    expect(patchNotes).toHaveBeenCalledWith({ stepIndex: 0 })
+    expect(onChain).toHaveBeenCalledWith('monthly')
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('no chain button without an onChain handler or on unchained sessions', () => {
+    mockNotes = { stepIndex: 6 }
+    render(<GuidedSession horizon="seasonal" host={makeHost()} onClose={vi.fn()} />)
+    expect(screen.queryByRole('button', { name: /Plan the month now/ })).toBeNull()
+  })
+
   it('daily completion flips the daily auto-mute flag', () => {
     mockNotes = { stepIndex: 3 }
     render(<GuidedSession horizon="daily" host={makeHost()} onClose={vi.fn()} />)

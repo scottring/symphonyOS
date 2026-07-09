@@ -52,6 +52,11 @@ export interface GuidedSessionConfig {
   horizon: PlanningHorizon
   title: string        // "Plan the season"
   estMinutes: [number, number]
+  /** Optional cascade: offered as a secondary action on the final step
+   *  ("Plan the season now") for days with energy to keep descending.
+   *  Finishing normally never auto-chains — the booked next session is
+   *  the default path. */
+  chain?: { horizon: PlanningHorizon; label: string }
   steps: GuidedStepConfig[]
 }
 

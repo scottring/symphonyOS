@@ -30,10 +30,18 @@ export function getRegisteredTypes(): StepType[] {
 interface Props {
   horizon: PlanningHorizon
   host: GuidedHost
+  /** Abandon (the header X): close the overlay, stay where you were. */
   onClose: () => void
+  /** Completing the ritual (Finish). Falls back to onClose when omitted —
+   *  hosts use it to land on the finished horizon's own page. */
+  onFinished?: () => void
+  /** Cascade into the next-lower session ("Plan the season now"). The host
+   *  swaps `horizon`; the `key={horizon}` remount gives the new session a
+   *  clean shell. Rendered only when the config declares a chain. */
+  onChain?: (next: PlanningHorizon) => void
 }
 
-export function GuidedSession({ horizon, host, onClose }: Props) {
+export function GuidedSession({ horizon, host, onClose, onFinished, onChain }: Props) {
   const config = SESSIONS[horizon]
   const period = useMemo(() => guidedPeriod(horizon), [horizon])
   const { notes, patchNotes, loading } = usePlanningSession(horizon, period.token)
@@ -68,11 +76,23 @@ export function GuidedSession({ horizon, host, onClose }: Props) {
     patchNotes({ stepIndex: clamped })
   }, [config.steps.length, patchNotes])
 
-  const finish = useCallback(() => {
+  // Shared completion bookkeeping: reset the resume position (the flushed
+  // unmount persist carries it to the DB) and stamp the daily first-run flag.
+  const completeSession = useCallback(() => {
     patchNotes({ stepIndex: 0 })
     if (horizon === 'daily') localStorage.setItem('guided.daily.completed', '1')
-    onClose()
-  }, [patchNotes, horizon, onClose])
+  }, [patchNotes, horizon])
+
+  const finish = useCallback(() => {
+    completeSession()
+    ;(onFinished ?? onClose)()
+  }, [completeSession, onFinished, onClose])
+
+  const chain = useCallback(() => {
+    if (!config.chain || !onChain) return
+    completeSession()
+    onChain(config.chain.horizon)
+  }, [completeSession, config.chain, onChain])
 
   const clipUrl = loading ? null : narrationClip(horizon, step.id, step.narration)
   const { muted, toggleMuted } = useNarrationPlayer(horizon, clipUrl)
@@ -143,10 +163,19 @@ export function GuidedSession({ horizon, host, onClose }: Props) {
             </button>
           )}
           {last ? (
-            <button type="button" onClick={finish} disabled={loading}
-              className="inline-flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-lg bg-primary-600 text-white hover:bg-primary-700 transition-colors disabled:cursor-not-allowed disabled:opacity-50">
-              <Check className="w-4 h-4" /> Finish
-            </button>
+            <>
+              {config.chain && onChain && (
+                <button type="button" onClick={chain} disabled={loading}
+                  className="inline-flex items-center gap-1.5 text-sm font-medium px-3 py-2 rounded-lg text-primary-700 bg-primary-50 hover:bg-primary-100 transition-colors disabled:cursor-not-allowed disabled:opacity-50">
+                  {config.chain.label}
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              )}
+              <button type="button" onClick={finish} disabled={loading}
+                className="inline-flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-lg bg-primary-600 text-white hover:bg-primary-700 transition-colors disabled:cursor-not-allowed disabled:opacity-50">
+                <Check className="w-4 h-4" /> Finish
+              </button>
+            </>
           ) : (
             <button type="button" onClick={() => go(safeIndex + 1)} disabled={loading}
               className="inline-flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-lg bg-primary-600 text-white hover:bg-primary-700 transition-colors disabled:cursor-not-allowed disabled:opacity-50">

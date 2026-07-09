@@ -12,6 +12,7 @@ export const SESSIONS: Record<PlanningHorizon, GuidedSessionConfig> = {
     horizon: 'annual',
     title: 'Plan the year',
     estMinutes: [45, 60],
+    chain: { horizon: 'seasonal', label: 'Plan the season now' },
     steps: [
       {
         id: 'welcome', type: 'narration', title: 'A year, on purpose',
@@ -58,6 +59,7 @@ export const SESSIONS: Record<PlanningHorizon, GuidedSessionConfig> = {
     horizon: 'seasonal',
     title: 'Plan the season',
     estMinutes: [25, 35],
+    chain: { horizon: 'monthly', label: 'Plan the month now' },
     steps: [
       {
         id: 'welcome', type: 'narration', title: 'A fresh season',
@@ -100,6 +102,7 @@ export const SESSIONS: Record<PlanningHorizon, GuidedSessionConfig> = {
     horizon: 'monthly',
     title: 'Plan the month',
     estMinutes: [15, 25],
+    chain: { horizon: 'weekly', label: 'Plan the week now' },
     steps: [
       {
         id: 'welcome', type: 'narration', title: 'A clean slate',

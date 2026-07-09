@@ -20,11 +20,13 @@ import type { GoalStatus } from '@/types/goal'
 interface Props {
   horizon: PlanningHorizon
   onClose: () => void
+  onFinished?: () => void
+  onChain?: (next: PlanningHorizon) => void
   /** Reuse the host page's routine-scheduling handler (drag onto the grid). */
   onScheduleRoutine: (routineId: string, date: Date, time: string) => void
 }
 
-export function GuidedSessionContainer({ horizon, onClose, onScheduleRoutine }: Props) {
+export function GuidedSessionContainer({ horizon, onClose, onFinished, onChain, onScheduleRoutine }: Props) {
   const { tasks, loading: tasksLoading, addTask, toggleTask, updateTask, pushTask, setBucket } = useSupabaseTasks()
   const { isConnected, events, fetchEvents, createEvent } = useGoogleCalendar()
   const { areas, goals, addGoal, addArea, updateGoal } = useGoalsContext()
@@ -63,5 +65,5 @@ export function GuidedSessionContainer({ horizon, onClose, onScheduleRoutine }: 
     getRoutinesForDate,
   }), [tasks, tasksLoading, events, isConnected, fetchEvents, createEvent, pushTask, setBucket, toggleTask, updateTask, createTaskInBucket, createDatedTask, goals, areas, addGoal, addArea, updateGoal, allRoutines, onScheduleRoutine, getRoutinesForDate, currentDomain])
 
-  return <GuidedSession horizon={horizon} host={host} onClose={onClose} />
+  return <GuidedSession horizon={horizon} host={host} onClose={onClose} onFinished={onFinished} onChain={onChain} />
 }

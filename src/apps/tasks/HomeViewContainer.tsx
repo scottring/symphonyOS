@@ -86,6 +86,25 @@ export function HomeViewContainer() {
   // five horizons (daily/weekly/monthly/seasonal/annual).
   const [planningOpen, setPlanningOpen] = useState(false);
   const [guidedHorizon, setGuidedHorizon] = useState<PlanningHorizon | null>(null);
+
+  // Where "Finish" lands, per horizon (the rung's own one-pager; daily's
+  // page is Today itself).
+  const GUIDED_LANDING: Record<PlanningHorizon, string> = {
+    annual: 'year', seasonal: 'season', monthly: 'month', weekly: 'week', daily: 'today',
+  };
+
+  // Shared by abandon (X) and finish: drop the overlay and restore the viewed
+  // day's events — a session's own calendar fetches (e.g. the annual Jan–Dec
+  // scan) can replace the shared GoogleCalendarProvider cache with a range
+  // that doesn't include today.
+  const closeGuidedSession = useCallback(() => {
+    setGuidedHorizon(null);
+    if (isConnected) {
+      const startOfDay = new Date(viewedDate); startOfDay.setHours(0, 0, 0, 0);
+      const endOfDay = new Date(viewedDate); endOfDay.setHours(23, 59, 59, 999);
+      fetchEvents(startOfDay, endOfDay);
+    }
+  }, [isConnected, viewedDate, fetchEvents]);
   const { selection, setSelection, clearSelection } = useSelection();
 
   // "Plan the …" from a horizon rung (or the rhythm nudge) routes here with
@@ -601,19 +620,16 @@ export function HomeViewContainer() {
           <GuidedSessionContainer
             key={guidedHorizon}
             horizon={guidedHorizon}
-            onClose={() => {
-              setGuidedHorizon(null);
-              // A guided session's own calendar fetches (e.g. the annual
-              // session's Jan–Dec scan in CalendarStep/ScheduleGridStep) can
-              // replace the shared GoogleCalendarProvider cache with a range
-              // that doesn't include today. Restore the viewed day's events
-              // so the timeline isn't left missing anything after closing.
-              if (isConnected) {
-                const startOfDay = new Date(viewedDate); startOfDay.setHours(0, 0, 0, 0);
-                const endOfDay = new Date(viewedDate); endOfDay.setHours(23, 59, 59, 999);
-                fetchEvents(startOfDay, endOfDay);
-              }
+            onClose={closeGuidedSession}
+            onFinished={() => {
+              // Finishing (vs abandoning via X) lands on the finished
+              // horizon's own page — the "done" moment is seeing the list
+              // you just wrote. Capture the horizon before clearing state.
+              const page = guidedHorizon && GUIDED_LANDING[guidedHorizon];
+              closeGuidedSession();
+              if (page) navigate(`/${page}`);
             }}
+            onChain={(next) => setGuidedHorizon(next)}
             onScheduleRoutine={(routineId, date, time) => {
               const routine = allRoutines.find(r => r.id === routineId);
               if (routine) updateRoutine(routineId, scheduleRoutineOnDate(routine, date, time));
