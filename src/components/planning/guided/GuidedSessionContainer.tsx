@@ -54,14 +54,14 @@ export function GuidedSessionContainer({ horizon, onClose, onScheduleRoutine }: 
     onPushTask: pushTask, onSetBucket: setBucket, onCompleteTask: toggleTask, onUpdateTask: updateTask,
     createTaskInBucket, createDatedTask,
     goals, goalAreas: areas,
-    addGoal: (areaId: string, name: string) => addGoal(areaId, name),
+    addGoal: (areaId: string, name: string) => addGoal(areaId, name, currentDomain !== 'universal' ? currentDomain : undefined),
     addArea: (name: string) => addArea(name),
     updateGoalStatus: (id: string, status: GoalStatus) => updateGoal(id, { status }),
     routines: allRoutines,
     draggableRoutines: allRoutines.filter((r) => r.visibility === 'active' && !isEverydayRoutine(r.recurrence_pattern) && !r.time_of_day),
     onScheduleRoutine,
     getRoutinesForDate,
-  }), [tasks, tasksLoading, events, isConnected, fetchEvents, createEvent, pushTask, setBucket, toggleTask, updateTask, createTaskInBucket, createDatedTask, goals, areas, addGoal, addArea, updateGoal, allRoutines, onScheduleRoutine, getRoutinesForDate])
+  }), [tasks, tasksLoading, events, isConnected, fetchEvents, createEvent, pushTask, setBucket, toggleTask, updateTask, createTaskInBucket, createDatedTask, goals, areas, addGoal, addArea, updateGoal, allRoutines, onScheduleRoutine, getRoutinesForDate, currentDomain])
 
   return <GuidedSession horizon={horizon} host={host} onClose={onClose} />
 }

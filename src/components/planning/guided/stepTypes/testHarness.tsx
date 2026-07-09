@@ -7,9 +7,14 @@ import { GuidedProvider, type GuidedHost, type GuidedValue } from '../GuidedCont
 import type { GuidedStepConfig } from '../types'
 
 export function makeHost(overrides: Partial<GuidedHost> = {}): GuidedHost {
+  // Default fetchEvents resolves with the same list passed as `events` —
+  // CalendarStep reads the fetchEvents return value (not `host.events`) to
+  // avoid clobbering the app-wide calendar cache, so keep the two in sync
+  // for tests that only set `events`.
+  const events = overrides.events ?? []
   return {
-    tasks: [], tasksLoading: false, events: [], calendarConnected: false,
-    fetchEvents: vi.fn(async () => {}), createEvent: vi.fn(async () => {}),
+    tasks: [], tasksLoading: false, events, calendarConnected: false,
+    fetchEvents: vi.fn(async () => events), createEvent: vi.fn(async () => {}),
     onPushTask: vi.fn(), onSetBucket: vi.fn(), onCompleteTask: vi.fn(), onUpdateTask: vi.fn(),
     createTaskInBucket: vi.fn(async () => {}), createDatedTask: vi.fn(async () => {}),
     goals: [], goalAreas: [], addGoal: vi.fn(async () => null), addArea: vi.fn(async () => null),

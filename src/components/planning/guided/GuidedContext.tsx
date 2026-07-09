@@ -15,7 +15,11 @@ export interface GuidedHost {
   tasksLoading: boolean
   events: CalendarEvent[]
   calendarConnected: boolean
-  fetchEvents: (start: Date, end: Date) => Promise<unknown>
+  /** Returns the fetched events (mirrors useGoogleCalendar's fetchEvents) — steps
+   *  that need a range wider than the app-wide cache (e.g. CalendarStep's annual
+   *  scan) should read this return value rather than `events`, since fetchEvents
+   *  replaces the shared GoogleCalendarProvider cache as a side effect. */
+  fetchEvents: (start: Date, end: Date) => Promise<CalendarEvent[]>
   createEvent: (input: { title: string; startTime: Date; endTime: Date; allDay?: boolean }) => Promise<unknown>
   onPushTask: (id: string, target: Date | 'week' | 'month' | 'quarter') => void
   onSetBucket: (id: string, bucket: TaskBucket) => void

@@ -18,7 +18,7 @@ describe('CalendarStep', () => {
     const host = makeHost({ calendarConnected: true, events: [ev('Dentist', 14)] })
     renderStep(<CalendarStep />, { step, host })
     await waitFor(() => expect(host.fetchEvents).toHaveBeenCalledWith(expect.any(Date), expect.any(Date)))
-    expect(screen.getByText('Dentist')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByText('Dentist')).toBeInTheDocument())
   })
 
   it('renders events that only carry the edge-function snake_case start_time', async () => {
@@ -29,7 +29,18 @@ describe('CalendarStep', () => {
     const host = makeHost({ calendarConnected: true, events: [snakeCaseEvent] })
     renderStep(<CalendarStep />, { step, host })
     await waitFor(() => expect(host.fetchEvents).toHaveBeenCalledWith(expect.any(Date), expect.any(Date)))
-    expect(screen.getByText('Snake Case Checkup')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByText('Snake Case Checkup')).toBeInTheDocument())
+  })
+
+  it('reads events from the fetchEvents return value, not host.events (avoids clobbering the shared calendar cache)', async () => {
+    // host.events simulates the app-wide cache already holding something
+    // else (e.g. Today's events) — the step must render from what its own
+    // fetchEvents call resolved with, not this shared array.
+    const host = makeHost({ calendarConnected: true, events: [ev('Stale Cached Event', 5)] })
+    host.fetchEvents = vi.fn(async () => [ev('Fresh Fetched Event', 14)])
+    renderStep(<CalendarStep />, { step, host })
+    await waitFor(() => expect(screen.getByText('Fresh Fetched Event')).toBeInTheDocument())
+    expect(screen.queryByText('Stale Cached Event')).not.toBeInTheDocument()
   })
 
   it('disconnected: shows a quiet notice, no fetch', () => {

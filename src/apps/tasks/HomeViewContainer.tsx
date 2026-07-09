@@ -601,7 +601,19 @@ export function HomeViewContainer() {
           <GuidedSessionContainer
             key={guidedHorizon}
             horizon={guidedHorizon}
-            onClose={() => setGuidedHorizon(null)}
+            onClose={() => {
+              setGuidedHorizon(null);
+              // A guided session's own calendar fetches (e.g. the annual
+              // session's Jan–Dec scan in CalendarStep/ScheduleGridStep) can
+              // replace the shared GoogleCalendarProvider cache with a range
+              // that doesn't include today. Restore the viewed day's events
+              // so the timeline isn't left missing anything after closing.
+              if (isConnected) {
+                const startOfDay = new Date(viewedDate); startOfDay.setHours(0, 0, 0, 0);
+                const endOfDay = new Date(viewedDate); endOfDay.setHours(23, 59, 59, 999);
+                fetchEvents(startOfDay, endOfDay);
+              }
+            }}
             onScheduleRoutine={(routineId, date, time) => {
               const routine = allRoutines.find(r => r.id === routineId);
               if (routine) updateRoutine(routineId, scheduleRoutineOnDate(routine, date, time));

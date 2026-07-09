@@ -4,7 +4,7 @@
 // commitments — per-day rows for ranges up to ~9 weeks, per-month counts for
 // longer spans (the annual "mountain ranges" view). Read-only; an optional
 // notes field captures what's worth remembering.
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { CalendarDays } from 'lucide-react'
 import { useGuided } from '../GuidedContext'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
@@ -29,19 +29,30 @@ export function CalendarStep() {
   const { step, host, periodStart, periodEnd, notes, patchNotes } = useGuided()
   const notesKey = step.props?.notesKey
 
+  // fetchEvents REPLACES the app-wide GoogleCalendarProvider cache as a side
+  // effect (it's shared with Today's timeline). A wide guided-session range
+  // (e.g. the annual session's Jan–Dec scan) would otherwise clobber that
+  // cache for the rest of the app. Keep this step's own copy of the fetched
+  // events instead of reading the shared `host.events`.
+  const [fetchedEvents, setFetchedEvents] = useState<CalendarEvent[]>([])
+
   useEffect(() => {
     if (!host.calendarConnected) return
-    void host.fetchEvents(periodStart, periodEnd)
+    let cancelled = false
+    void host.fetchEvents(periodStart, periodEnd).then((result) => {
+      if (!cancelled) setFetchedEvents(result)
+    })
+    return () => { cancelled = true }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- fetch once per mount for this period
   }, [])
 
   const inRange = useMemo(
-    () => host.events
+    () => fetchedEvents
       .map((e) => ({ e, st: eventStart(e) }))
       .filter((x): x is { e: CalendarEvent; st: Date } => x.st !== null && x.st >= periodStart && x.st <= periodEnd)
       .sort((a, b) => a.st.getTime() - b.st.getTime())
       .map((x) => x.e),
-    [host.events, periodStart, periodEnd],
+    [fetchedEvents, periodStart, periodEnd],
   )
   const wide = (periodEnd.getTime() - periodStart.getTime()) / DAY_MS > 63
 

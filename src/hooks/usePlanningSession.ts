@@ -39,6 +39,21 @@ export function usePlanningSession(horizon: PlanningHorizon, periodToken: string
   const [notes, setNotes] = useState<PlanningNotes>({})
   const [loading, setLoading] = useState(true)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Tracks the latest merged notes + whether a persist for them is still
+  // outstanding, so unmount can flush instead of silently dropping the write.
+  const pendingRef = useRef<{ notes: PlanningNotes; dirty: boolean } | null>(null)
+  // Refs for user/horizon/periodToken so the unmount-flush effect (which must
+  // run only its cleanup, with no re-run mid-session) always upserts against
+  // current identity without needing them in its dependency array. Synced via
+  // effect (not during render) so refs are only ever written outside render.
+  const userRef = useRef(user)
+  const horizonRef = useRef(horizon)
+  const periodTokenRef = useRef(periodToken)
+  useEffect(() => {
+    userRef.current = user
+    horizonRef.current = horizon
+    periodTokenRef.current = periodToken
+  }, [user, horizon, periodToken])
 
   // Load (or default) the row for this period.
   useEffect(() => {
@@ -60,30 +75,53 @@ export function usePlanningSession(horizon: PlanningHorizon, periodToken: string
     return () => { cancelled = true }
   }, [user, horizon, periodToken])
 
-  // Cleanup the debounce on unmount.
-  useEffect(() => () => { if (saveTimer.current) clearTimeout(saveTimer.current) }, [])
-
   const persist = useCallback(
     (next: PlanningNotes) => {
-      if (!user) return
+      const authorId = userRef.current?.id
+      if (!authorId) return
       supabase
         .from('planning_sessions')
         .upsert(
-          { author_id: user.id, horizon, period_token: periodToken, notes: next, updated_at: new Date().toISOString() },
+          {
+            author_id: authorId,
+            horizon: horizonRef.current,
+            period_token: periodTokenRef.current,
+            notes: next,
+            updated_at: new Date().toISOString(),
+          },
           { onConflict: 'author_id,horizon,period_token' },
         )
         .then(() => {})
     },
-    [user, horizon, periodToken],
+    [],
   )
+
+  // On unmount, flush any pending debounced write instead of discarding it —
+  // without this, closing a session (or navigating away) within the 600ms
+  // debounce window silently drops the last patchNotes call (e.g. the
+  // stepIndex reset on finish(), or reflect text typed right before close).
+  useEffect(() => () => {
+    if (saveTimer.current) {
+      clearTimeout(saveTimer.current)
+      saveTimer.current = null
+    }
+    if (pendingRef.current?.dirty) {
+      persist(pendingRef.current.notes)
+      pendingRef.current.dirty = false
+    }
+  }, [persist])
 
   /** Merge a partial into notes and debounce-save the shared row. */
   const patchNotes = useCallback(
     (partial: PlanningNotes) => {
       setNotes((prev) => {
         const merged = { ...prev, ...partial }
+        pendingRef.current = { notes: merged, dirty: true }
         if (saveTimer.current) clearTimeout(saveTimer.current)
-        saveTimer.current = setTimeout(() => persist(merged), 600)
+        saveTimer.current = setTimeout(() => {
+          persist(merged)
+          if (pendingRef.current?.notes === merged) pendingRef.current.dirty = false
+        }, 600)
         return merged
       })
     },

@@ -424,8 +424,8 @@ export function HorizonView({ horizon }: HorizonViewProps) {
               <Target className="w-8 h-8 text-primary-400 mx-auto mb-4" />
               <p className="font-display text-lg text-neutral-700 mb-2">{period} doesn't have goals yet</p>
               <p className="text-neutral-500 mb-6">
-                Set the year's goals by life area — family, home, health, money. Each goal
-                breaks into seasonal moves that flow down this cascade to your months and weeks.
+                Set this year's goals by life area — family, home, health, money. You'll look
+                at them each season while writing that season's own list.
               </p>
               <div className="flex items-center justify-center gap-3">
                 <button
@@ -450,28 +450,18 @@ export function HorizonView({ horizon }: HorizonViewProps) {
                 <section key={area.id} className="mb-6">
                   <h2 className="font-display text-sm tracking-wide text-neutral-400 uppercase mb-3">{area.name}</h2>
                   <div className="space-y-2">
-                    {items.map((g) => {
-                      const done = g.actions.filter((a) => a.completed).length;
-                      return (
-                        <button
-                          key={g.id}
-                          type="button"
-                          onClick={() => navigate(`/goals/${g.id}`)}
-                          className="w-full flex items-center gap-3 rounded-xl border border-neutral-100 bg-white px-4 py-3 text-left hover:bg-neutral-50 transition-colors"
-                        >
-                          <Target className="w-4 h-4 text-primary-500 shrink-0" />
-                          <span className="flex-1 min-w-0">
-                            <span className="block text-sm font-medium text-neutral-800 truncate">{g.name}</span>
-                            {g.actions.length > 0 && (
-                              <span className="block text-xs text-neutral-400 mt-0.5">
-                                {done} of {g.actions.length} moves done
-                              </span>
-                            )}
-                          </span>
-                          <ChevronRight className="w-4 h-4 text-neutral-300 shrink-0" />
-                        </button>
-                      );
-                    })}
+                    {items.map((g) => (
+                      <button
+                        key={g.id}
+                        type="button"
+                        onClick={() => navigate(`/goals/${g.id}`)}
+                        className="w-full flex items-center gap-3 rounded-xl border border-neutral-100 bg-white px-4 py-3 text-left hover:bg-neutral-50 transition-colors"
+                      >
+                        <Target className="w-4 h-4 text-primary-500 shrink-0" />
+                        <span className="flex-1 min-w-0 text-sm font-medium text-neutral-800 truncate">{g.name}</span>
+                        <ChevronRight className="w-4 h-4 text-neutral-300 shrink-0" />
+                      </button>
+                    ))}
                   </div>
                 </section>
               ))}
