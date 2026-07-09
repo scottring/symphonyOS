@@ -44,7 +44,7 @@ export const SESSIONS: Record<PlanningHorizon, GuidedSessionConfig> = {
       },
       {
         id: 'write-goals', type: 'domains-goals', title: "This year's goals",
-        narration: 'Now write the year\'s goals. Pick three to eight areas of life — health, family, work, home, fun — and under each one, write what you want without censoring yourself. One rule of thumb: aim for two goals that make you smile for every one that feels like an obligation.',
+        narration: "Now write the year's goals. Pick three to eight areas of life — health, family, work, home, fun — and under each one, write what you want without censoring yourself. One rule of thumb: aim for two goals that make you smile for every one that feels like an obligation.",
       },
       {
         id: 'book-next', type: 'book-next', title: 'Anchor the next step',
