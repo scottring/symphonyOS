@@ -7,9 +7,23 @@
 import { useEffect, useMemo } from 'react'
 import { CalendarDays } from 'lucide-react'
 import { useGuided } from '../GuidedContext'
+import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+
+/**
+ * Resolve an event's start time, preferring camelCase (possibly
+ * cached/transformed) but falling back to the snake_case field the
+ * google-calendar-events edge function actually emits. Returns null when
+ * neither is present or the value doesn't parse to a valid date.
+ */
+function eventStart(e: CalendarEvent): Date | null {
+  const raw = e.startTime ?? e.start_time
+  if (!raw) return null
+  const d = new Date(raw)
+  return Number.isNaN(d.getTime()) ? null : d
+}
 
 export function CalendarStep() {
   const { step, host, periodStart, periodEnd, notes, patchNotes } = useGuided()
@@ -23,15 +37,10 @@ export function CalendarStep() {
 
   const inRange = useMemo(
     () => host.events
-      .filter((e) => {
-        const st = e.startTime instanceof Date ? e.startTime : new Date(e.startTime ?? '')
-        return st >= periodStart && st <= periodEnd
-      })
-      .sort((a, b) => {
-        const ast = a.startTime instanceof Date ? a.startTime : new Date(a.startTime ?? '')
-        const bst = b.startTime instanceof Date ? b.startTime : new Date(b.startTime ?? '')
-        return ast.getTime() - bst.getTime()
-      }),
+      .map((e) => ({ e, st: eventStart(e) }))
+      .filter((x): x is { e: CalendarEvent; st: Date } => x.st !== null && x.st >= periodStart && x.st <= periodEnd)
+      .sort((a, b) => a.st.getTime() - b.st.getTime())
+      .map((x) => x.e),
     [host.events, periodStart, periodEnd],
   )
   const wide = (periodEnd.getTime() - periodStart.getTime()) / DAY_MS > 63
@@ -40,7 +49,8 @@ export function CalendarStep() {
     if (!wide) return []
     const counts = new Map<number, number>()
     for (const e of inRange) {
-      const st = e.startTime instanceof Date ? e.startTime : new Date(e.startTime ?? '')
+      const st = eventStart(e)
+      if (!st) continue
       counts.set(st.getMonth(), (counts.get(st.getMonth()) ?? 0) + 1)
     }
     return [...counts.entries()]
@@ -66,18 +76,18 @@ export function CalendarStep() {
         </ul>
       ) : (
         <ul className="space-y-1 max-h-72 overflow-auto pr-1">
-          {inRange.map((e) => (
-            <li key={e.id ?? `${e.title}-${e.startTime?.toString() ?? ''}`}
-              className="flex items-center gap-2 rounded-lg bg-neutral-50/70 px-3 py-1.5 text-sm text-neutral-700">
-              <span className="shrink-0 w-24 text-xs text-neutral-400">
-                {(() => {
-                  const st = e.startTime instanceof Date ? e.startTime : new Date(e.startTime ?? '')
-                  return st.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
-                })()}
-              </span>
-              <span className="flex-1 min-w-0 truncate">{e.title}</span>
-            </li>
-          ))}
+          {inRange.map((e) => {
+            const st = eventStart(e)
+            return (
+              <li key={e.id ?? `${e.title}-${st?.toISOString() ?? ''}`}
+                className="flex items-center gap-2 rounded-lg bg-neutral-50/70 px-3 py-1.5 text-sm text-neutral-700">
+                <span className="shrink-0 w-24 text-xs text-neutral-400">
+                  {st?.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+                </span>
+                <span className="flex-1 min-w-0 truncate">{e.title}</span>
+              </li>
+            )
+          })}
         </ul>
       )}
       {notesKey && (

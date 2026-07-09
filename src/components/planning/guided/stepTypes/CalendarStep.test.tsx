@@ -21,6 +21,17 @@ describe('CalendarStep', () => {
     expect(screen.getByText('Dentist')).toBeInTheDocument()
   })
 
+  it('renders events that only carry the edge-function snake_case start_time', async () => {
+    const snakeCaseEvent = {
+      id: 'e-snake', title: 'Snake Case Checkup', start_time: new Date(2026, 6, 14, 10).toISOString(),
+      end_time: new Date(2026, 6, 14, 11).toISOString(),
+    } as unknown as CalendarEvent
+    const host = makeHost({ calendarConnected: true, events: [snakeCaseEvent] })
+    renderStep(<CalendarStep />, { step, host })
+    await waitFor(() => expect(host.fetchEvents).toHaveBeenCalledWith(expect.any(Date), expect.any(Date)))
+    expect(screen.getByText('Snake Case Checkup')).toBeInTheDocument()
+  })
+
   it('disconnected: shows a quiet notice, no fetch', () => {
     const host = makeHost({ calendarConnected: false })
     renderStep(<CalendarStep />, { step, host })
