@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { screen, waitFor } from '@testing-library/react'
 import { CalendarStep } from './CalendarStep'
 import { renderStep, makeHost } from './testHarness'
+import { GuidedProvider } from '../GuidedContext'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 
 const step = {
@@ -48,6 +49,28 @@ describe('CalendarStep', () => {
     renderStep(<CalendarStep />, { step, host })
     expect(host.fetchEvents).not.toHaveBeenCalled()
     expect(screen.getByText(/calendar isn't connected/i)).toBeInTheDocument()
+  })
+
+  it('shows a checking state while the connection is being validated', () => {
+    const host = makeHost({ calendarConnected: false, calendarChecking: true })
+    renderStep(<CalendarStep />, { step, host })
+    expect(screen.getByText(/Checking your calendar/)).toBeInTheDocument()
+    expect(screen.queryByText(/isn't connected/)).toBeNull()
+  })
+
+  it('fetches when the connection validates AFTER mount (late flip)', async () => {
+    const host = makeHost({ calendarConnected: false, calendarChecking: true })
+    const { rerender, value } = renderStep(<CalendarStep />, { step, host })
+    expect(host.fetchEvents).not.toHaveBeenCalled()
+    const connected = { ...host, calendarConnected: true, calendarChecking: false,
+      fetchEvents: vi.fn(async () => [ev('Dentist', 14)]) }
+    rerender(
+      <GuidedProvider value={{ ...value, host: connected }}>
+        <CalendarStep />
+      </GuidedProvider>,
+    )
+    await waitFor(() => expect(connected.fetchEvents).toHaveBeenCalled())
+    expect(await screen.findByText('Dentist')).toBeInTheDocument()
   })
 
   it('renders the notes textarea when notesKey is configured', () => {

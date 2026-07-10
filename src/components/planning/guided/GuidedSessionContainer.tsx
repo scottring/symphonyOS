@@ -29,7 +29,7 @@ interface Props {
 
 export function GuidedSessionContainer({ horizon, onClose, onFinished, onChain, onScheduleRoutine }: Props) {
   const { tasks, loading: tasksLoading, addTask, toggleTask, updateTask, pushTask, setBucket } = useSupabaseTasks()
-  const { isConnected, events, fetchEvents, createEvent } = useGoogleCalendar()
+  const { isConnected, isLoading: calendarChecking, events, fetchEvents, createEvent } = useGoogleCalendar()
   const { areas, goals, addGoal, addArea, updateGoal } = useGoalsContext()
   const { projects, projectsMap } = useProjects()
   const { routines: allRoutines, getRoutinesForDate } = useRoutines()
@@ -53,7 +53,7 @@ export function GuidedSessionContainer({ horizon, onClose, onFinished, onChain, 
 
   const host = useMemo<GuidedHost>(() => ({
     tasks, tasksLoading,
-    events, calendarConnected: isConnected,
+    events, calendarConnected: isConnected, calendarChecking,
     fetchEvents, createEvent,
     onPushTask: pushTask, onSetBucket: setBucket, onCompleteTask: toggleTask, onUpdateTask: updateTask,
     createTaskInBucket, createDatedTask,
@@ -66,7 +66,7 @@ export function GuidedSessionContainer({ horizon, onClose, onFinished, onChain, 
     draggableRoutines: allRoutines.filter((r) => r.visibility === 'active' && !isEverydayRoutine(r.recurrence_pattern) && !r.time_of_day),
     onScheduleRoutine,
     getRoutinesForDate,
-  }), [tasks, tasksLoading, events, isConnected, fetchEvents, createEvent, pushTask, setBucket, toggleTask, updateTask, createTaskInBucket, createDatedTask, projects, projectsMap, goals, areas, addGoal, addArea, updateGoal, allRoutines, onScheduleRoutine, getRoutinesForDate, currentDomain])
+  }), [tasks, tasksLoading, events, isConnected, calendarChecking, fetchEvents, createEvent, pushTask, setBucket, toggleTask, updateTask, createTaskInBucket, createDatedTask, projects, projectsMap, goals, areas, addGoal, addArea, updateGoal, allRoutines, onScheduleRoutine, getRoutinesForDate, currentDomain])
 
   return <GuidedSession horizon={horizon} host={host} onClose={onClose} onFinished={onFinished} onChain={onChain} />
 }

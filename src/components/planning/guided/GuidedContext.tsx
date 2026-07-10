@@ -16,6 +16,9 @@ export interface GuidedHost {
   tasksLoading: boolean
   events: CalendarEvent[]
   calendarConnected: boolean
+  /** True while the provider is still validating the Google connection —
+   *  distinct from "checked and not connected". */
+  calendarChecking: boolean
   /** Returns the fetched events (mirrors useGoogleCalendar's fetchEvents) — steps
    *  that need a range wider than the app-wide cache (e.g. CalendarStep's annual
    *  scan) should read this return value rather than `events`, since fetchEvents

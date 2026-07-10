@@ -13,7 +13,7 @@ export function makeHost(overrides: Partial<GuidedHost> = {}): GuidedHost {
   // for tests that only set `events`.
   const events = overrides.events ?? []
   return {
-    tasks: [], tasksLoading: false, events, calendarConnected: false,
+    tasks: [], tasksLoading: false, events, calendarConnected: false, calendarChecking: false,
     fetchEvents: vi.fn(async () => events), createEvent: vi.fn(async () => {}),
     onPushTask: vi.fn(), onSetBucket: vi.fn(), onCompleteTask: vi.fn(), onUpdateTask: vi.fn(),
     createTaskInBucket: vi.fn(async () => {}), createDatedTask: vi.fn(async () => {}),

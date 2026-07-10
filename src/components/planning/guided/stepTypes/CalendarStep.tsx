@@ -4,7 +4,7 @@
 // commitments — per-day rows for ranges up to ~9 weeks, per-month counts for
 // longer spans (the annual "mountain ranges" view). Read-only; an optional
 // notes field captures what's worth remembering.
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { CalendarDays } from 'lucide-react'
 import { useGuided } from '../GuidedContext'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
@@ -36,15 +36,22 @@ export function CalendarStep() {
   // events instead of reading the shared `host.events`.
   const [fetchedEvents, setFetchedEvents] = useState<CalendarEvent[]>([])
 
+  // Fetch once — but only once CONNECTED. The provider re-validates the
+  // Google connection when a session opens (an edge-function round trip), so
+  // `calendarConnected` can flip true seconds after this step mounts; keying
+  // the effect on it (with a once-guard) catches that late flip instead of
+  // stranding the step on a mount-time snapshot.
+  const fetchedRef = useRef(false)
   useEffect(() => {
-    if (!host.calendarConnected) return
+    if (!host.calendarConnected || fetchedRef.current) return
+    fetchedRef.current = true
     let cancelled = false
     void host.fetchEvents(periodStart, periodEnd).then((result) => {
       if (!cancelled) setFetchedEvents(result)
     })
     return () => { cancelled = true }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- fetch once per mount for this period
-  }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, when first connected
+  }, [host.calendarConnected])
 
   const inRange = useMemo(
     () => fetchedEvents
@@ -69,7 +76,9 @@ export function CalendarStep() {
 
   return (
     <div className="space-y-4">
-      {!host.calendarConnected ? (
+      {host.calendarChecking && !host.calendarConnected ? (
+        <p className="text-sm text-neutral-400">Checking your calendar…</p>
+      ) : !host.calendarConnected ? (
         <p className="text-sm text-neutral-400">
           Your calendar isn't connected right now — scan your calendar app instead, then note anything worth remembering below.
         </p>
