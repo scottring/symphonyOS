@@ -17,7 +17,6 @@ vi.mock('@/hooks/useProjects', () => ({ useProjects: () => ({ projects: [], load
 vi.mock('@/hooks/useNotes', () => ({ useNotes: () => ({ notes: [], loading: false, addNote: vi.fn(), updateNote: vi.fn(), deleteNote: vi.fn() }) }))
 vi.mock('@/hooks/useSupabaseTasks', () => ({ useSupabaseTasks: () => ({ tasks: [], loading: false, addTask: vi.fn(), updateTask: vi.fn(), deleteTask: vi.fn() }) }))
 vi.mock('@/hooks/usePinnedItems', () => ({ usePinnedItems: () => ({ isPinned: () => false, pin: vi.fn(), unpin: vi.fn() }) }))
-vi.mock('@/hooks/useEmailActionItems', () => ({ useEmailActionItems: () => ({ items: [], urgentItems: [], loading: false, acknowledge: vi.fn(), dismiss: vi.fn(), snooze: vi.fn(), markDone: vi.fn(), getByCategory: vi.fn(), refetch: vi.fn() }) }))
 vi.mock('@/hooks/useActionQueue', () => ({ useActionQueue: () => ({ actions: [], loading: false, approveAction: vi.fn(), rejectAction: vi.fn(), pendingCount: 0, refetch: vi.fn() }) }))
 vi.mock('@/hooks/useDomain.tsx', async (importOriginal) => {
   const actual = await importOriginal() as Record<string, unknown>
@@ -190,12 +189,6 @@ describe('TodayView', () => {
     // onToggleWaiting was passed into context — ScheduleItem renders a waiting toggle
     // when onToggleWaiting is provided; verify it's reachable (no prop-threading crash)
     expect(screen.getByRole('region', { name: /carried over tasks/i })).toBeInTheDocument()
-  })
-
-  it('mounts EmailActionsBanner without breaking the Today render', () => {
-    renderView()
-    // EmailActionsBanner self-hides when items empty; assert the Today view still renders intact
-    expect(screen.getAllByText(/done today|tasks total|your day is clear|nothing scheduled/i).length).toBeGreaterThan(0)
   })
 
   it('renders timeline insert (+) slots when create-at handlers are available', () => {

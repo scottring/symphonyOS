@@ -31,7 +31,7 @@ import { useTimelineInsert } from '@/hooks/useTimelineInsert'
 import { useDomain } from '@/hooks/useDomain'
 import { computeAnchorTime } from '@/lib/timelineAnchor'
 
-import { Eye, EyeOff, Repeat, Mail, Binoculars, Sun, ChevronDown, ChevronRight } from 'lucide-react'
+import { Eye, EyeOff, Repeat, Binoculars, Sun, ChevronDown, ChevronRight } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { AssigneeFilter } from '@/components/home/AssigneeFilter'
 
@@ -58,8 +58,6 @@ import { ShareToFamilyNudge } from './ShareToFamilyNudge'
 import { OverdueSection } from './OverdueSection'
 import { BulkActionToolbar } from './BulkActionToolbar'
 import { TimelineNoteComposer } from './TimelineNoteComposer'
-
-import { useEmailActionItems } from '@/hooks/useEmailActionItems'
 
 import { discussionItems } from '@/lib/discussionItems'
 import { DiscussionBadge } from './DiscussionBadge'
@@ -310,7 +308,6 @@ export function TodayView({
   }, [])
 
   const proactive = useProactiveSuggestions()
-  const emailActions = useEmailActionItems()
   const { getStats: getRoutineStats } = useRoutineStats()
   const { isPromotionSuggested } = useRecurringEventDetection(events, eventNotesMap)
 
@@ -375,20 +372,6 @@ export function TodayView({
   )
 
   const discussion = discussionItems(tasks)
-
-  // ── Email nudge for StatsRow ──────────────────────────────────────────────
-  const activeEmailCount = emailActions.items.filter(i => i.status === 'new').length
-  const emailNudge = data.isToday && activeEmailCount > 0 ? (
-    <button
-      type="button"
-      onClick={() => navigate('/inbox')}
-      className="inline-flex items-center gap-1.5 text-[15px] text-neutral-600 hover:text-neutral-700 transition-colors"
-      aria-label={`${activeEmailCount} email action${activeEmailCount !== 1 ? 's' : ''} in Inbox`}
-    >
-      <Mail className="w-5 h-5 text-blue-500" />
-      {activeEmailCount} from email
-    </button>
-  ) : undefined
 
   // ── Clarity binoculars + remediation popover for StatsRow ─────────────────────
   // Interactive Clarity readout restored to the Today header (a static status
@@ -549,7 +532,6 @@ export function TodayView({
           monthTrigger={monthTrigger}
           clarityTrigger={clarityTrigger}
           discussionTrigger={discussion.length > 0 ? <DiscussionBadge items={discussion} onSelectItem={onSelectItem} /> : undefined}
-          emailTrigger={emailNudge}
           endControls={
             <>
               {onSelectAssignees && ((assigneesWithTasks?.length ?? 0) > 0 || hasUnassignedTasks) && (

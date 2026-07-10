@@ -1,7 +1,7 @@
 // src/components/schedule/StatsRow.tsx
 // Controls-only strip: the unified Today header (TodayProgress) now owns the
 // numeric counts, so this row carries just the interactive triggers and
-// end-controls (Clarity, discussion, email nudge, assignee filter, toggles).
+// end-controls (Clarity, discussion, assignee filter, toggles).
 
 interface StatsRowProps {
   dueToday: number
@@ -19,13 +19,11 @@ interface StatsRowProps {
   discussionTrigger?: React.ReactNode
   /** Compact weather chip, rendered among the stats. */
   weatherTrigger?: React.ReactNode
-  /** Glanceable "N from email" nudge, navigates to Inbox when clicked. */
-  emailTrigger?: React.ReactNode
   /** Rendered at the trailing end of the bar (assignee filter + show-daily toggle) */
   endControls?: React.ReactNode
 }
 
-export function StatsRow({ weekTrigger, monthTrigger, clarityTrigger, discussionTrigger, weatherTrigger, emailTrigger, endControls }: StatsRowProps) {
+export function StatsRow({ weekTrigger, monthTrigger, clarityTrigger, discussionTrigger, weatherTrigger, endControls }: StatsRowProps) {
   return (
     <div data-testid="today-controls" className="flex items-center flex-wrap gap-x-5 gap-y-2 text-[15px] text-neutral-600">
       {/* This week / this month staging triggers — desktop only, demoted */}
@@ -50,12 +48,6 @@ export function StatsRow({ weekTrigger, monthTrigger, clarityTrigger, discussion
       {discussionTrigger && (
         <span className="hidden md:inline-flex items-center gap-1.5">
           {discussionTrigger}
-        </span>
-      )}
-
-      {emailTrigger && (
-        <span className="hidden md:inline-flex items-center gap-1.5">
-          {emailTrigger}
         </span>
       )}
 

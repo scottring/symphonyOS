@@ -24,19 +24,17 @@ describe('StatsRow', () => {
     expect(screen.getByText('Clarity Good')).toBeInTheDocument()
   })
 
-  it('renders the weekTrigger, emailTrigger and endControls when provided', () => {
+  it('renders the weekTrigger and endControls when provided', () => {
     render(
       <StatsRow
         dueToday={1}
         doneToday={0}
         thisWeek={1}
         weekTrigger={<span>This Week</span>}
-        emailTrigger={<span>4 from email</span>}
         endControls={<button>Show daily</button>}
       />,
     )
     expect(screen.getByText('This Week')).toBeInTheDocument()
-    expect(screen.getByText('4 from email')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Show daily' })).toBeInTheDocument()
   })
 })
