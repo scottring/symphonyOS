@@ -12,6 +12,7 @@ export type StepType =
   | 'reflect'        // voiced prompt + textarea -> planning_sessions.notes[key]
   | 'review'         // this horizon's open items: complete / migrate / let go
   | 'look-above'     // read-only level-above panel (+ copy-down / tap-to-pull)
+  | 'projects'       // read-only "projects in motion" reference (the WHAT axis)
   | 'calendar'       // period look-ahead
   | 'write-list'     // add items into this horizon's bucket
   | 'inbox'          // weekly "Look Around": triage inbox to zero

@@ -17,6 +17,7 @@ export function makeHost(overrides: Partial<GuidedHost> = {}): GuidedHost {
     fetchEvents: vi.fn(async () => events), createEvent: vi.fn(async () => {}),
     onPushTask: vi.fn(), onSetBucket: vi.fn(), onCompleteTask: vi.fn(), onUpdateTask: vi.fn(),
     createTaskInBucket: vi.fn(async () => {}), createDatedTask: vi.fn(async () => {}),
+    projects: [], projectsMap: new Map(),
     goals: [], goalAreas: [], addGoal: vi.fn(async () => null), addArea: vi.fn(async () => null),
     updateGoalStatus: vi.fn(async () => {}),
     routines: [], draggableRoutines: [], onScheduleRoutine: vi.fn(), getRoutinesForDate: () => [],

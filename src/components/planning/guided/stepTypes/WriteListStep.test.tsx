@@ -22,9 +22,20 @@ describe('WriteListStep', () => {
     const input = screen.getByPlaceholderText(/Add to this list/)
     fireEvent.change(input, { target: { value: 'Call the plumber' } })
     fireEvent.keyDown(input, { key: 'Enter' })
-    expect(host.createTaskInBucket).toHaveBeenCalledWith('Call the plumber', 'week')
+    expect(host.createTaskInBucket).toHaveBeenCalledWith('Call the plumber', 'week', undefined)
     // The atomic-create contract: WriteListStep must never call onSetBucket.
     expect(host.onSetBucket).not.toHaveBeenCalled()
+  })
+
+  it('a #project tag attaches the chunk to its project at birth', () => {
+    const host = makeHost({
+      projects: [{ id: 'p1', name: 'Kitchen Renovation' } as unknown as import('@/types/project').Project],
+    })
+    renderStep(<WriteListStep />, { step, host, horizon: 'weekly' })
+    const input = screen.getByPlaceholderText(/Add to this list/)
+    fireEvent.change(input, { target: { value: '#kitchen order dishwasher' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(host.createTaskInBucket).toHaveBeenCalledWith('order dishwasher', 'week', 'p1')
   })
 
   it('shows the soft-cap counter without blocking', () => {

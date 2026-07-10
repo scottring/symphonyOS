@@ -7,6 +7,7 @@ import { useState, useMemo, useCallback } from 'react'
 import { Plus } from 'lucide-react'
 import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
 import { useGuided } from '../GuidedContext'
+import { extractProjectTag } from '../projectTag'
 import { TaskTriageRow } from './ReviewStep'
 
 export function WriteListStep() {
@@ -21,10 +22,13 @@ export function WriteListStep() {
 
   const [draft, setDraft] = useState('')
   const submit = useCallback(async () => {
-    const title = draft.trim()
-    if (!title || !bucket) return
+    const raw = draft.trim()
+    if (!raw || !bucket) return
     setDraft('')
-    await host.createTaskInBucket(title, bucket)
+    // "#kitchen order dishwasher" attaches the chunk to its project at birth.
+    const { title, projectId } = extractProjectTag(raw, host.projects)
+    if (!title) return
+    await host.createTaskInBucket(title, bucket, projectId)
   }, [draft, bucket, host])
 
   if (!bucket) return null
@@ -40,7 +44,7 @@ export function WriteListStep() {
         <input type="text" value={draft} autoFocus
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') void submit() }}
-          placeholder="Add to this list…"
+          placeholder="Add to this list… (#project attaches it)"
           className="flex-1 min-w-0 text-sm bg-transparent placeholder:text-neutral-400 focus:outline-none"
         />
       </div>

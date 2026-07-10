@@ -53,33 +53,33 @@ describe('GuidedSession shell', () => {
 
   it('renders step 1 narration and progress', () => {
     render(<GuidedSession horizon="seasonal" host={makeHost()} onClose={vi.fn()} />)
-    expect(screen.getByText(/Step 1 of 7/)).toBeInTheDocument()
+    expect(screen.getByText(/Step 1 of 8/)).toBeInTheDocument()
     expect(screen.getByText('A fresh season')).toBeInTheDocument()
   })
 
   it('Next advances, Back returns, and progress persists', () => {
     render(<GuidedSession horizon="seasonal" host={makeHost()} onClose={vi.fn()} />)
     fireEvent.click(screen.getByRole('button', { name: /^Next$/ }))
-    expect(screen.getByText(/Step 2 of 7/)).toBeInTheDocument()
+    expect(screen.getByText(/Step 2 of 8/)).toBeInTheDocument()
     expect(patchNotes).toHaveBeenCalledWith({ stepIndex: 1 })
     fireEvent.click(screen.getByRole('button', { name: /Back/ }))
-    expect(screen.getByText(/Step 1 of 7/)).toBeInTheDocument()
+    expect(screen.getByText(/Step 1 of 8/)).toBeInTheDocument()
   })
 
   it('resumes from a persisted stepIndex', () => {
     mockNotes = { stepIndex: 3 }
     render(<GuidedSession horizon="seasonal" host={makeHost()} onClose={vi.fn()} />)
-    expect(screen.getByText(/Step 4 of 7/)).toBeInTheDocument()
+    expect(screen.getByText(/Step 4 of 8/)).toBeInTheDocument()
   })
 
   it('clamps an out-of-range persisted stepIndex', () => {
     mockNotes = { stepIndex: 99 }
     render(<GuidedSession horizon="seasonal" host={makeHost()} onClose={vi.fn()} />)
-    expect(screen.getByText(/Step 7 of 7/)).toBeInTheDocument()
+    expect(screen.getByText(/Step 8 of 8/)).toBeInTheDocument()
   })
 
   it('Finish on the last step resets progress and closes', () => {
-    mockNotes = { stepIndex: 6 }
+    mockNotes = { stepIndex: 7 }
     const onClose = vi.fn()
     render(<GuidedSession horizon="seasonal" host={makeHost()} onClose={onClose} />)
     fireEvent.click(screen.getByRole('button', { name: /Finish/ }))
@@ -88,7 +88,7 @@ describe('GuidedSession shell', () => {
   })
 
   it('Finish prefers onFinished over onClose when provided', () => {
-    mockNotes = { stepIndex: 6 }
+    mockNotes = { stepIndex: 7 }
     const onClose = vi.fn()
     const onFinished = vi.fn()
     render(<GuidedSession horizon="seasonal" host={makeHost()} onClose={onClose} onFinished={onFinished} />)
@@ -107,7 +107,7 @@ describe('GuidedSession shell', () => {
   })
 
   it('chain button on the last step completes and hands over to the next horizon', () => {
-    mockNotes = { stepIndex: 6 } // seasonal last step; seasonal chains to monthly
+    mockNotes = { stepIndex: 7 } // seasonal last step; seasonal chains to monthly
     const onClose = vi.fn()
     const onChain = vi.fn()
     render(<GuidedSession horizon="seasonal" host={makeHost()} onClose={onClose} onChain={onChain} />)
@@ -118,7 +118,7 @@ describe('GuidedSession shell', () => {
   })
 
   it('no chain button without an onChain handler or on unchained sessions', () => {
-    mockNotes = { stepIndex: 6 }
+    mockNotes = { stepIndex: 7 }
     render(<GuidedSession horizon="seasonal" host={makeHost()} onClose={vi.fn()} />)
     expect(screen.queryByRole('button', { name: /Plan the month now/ })).toBeNull()
   })
@@ -151,20 +151,20 @@ describe('GuidedSession shell', () => {
     // Nothing to resume from yet — the shell shows chrome, not step 1's content.
     expect(screen.getByText(/Gathering your session/)).toBeInTheDocument()
     await waitFor(() => {
-      expect(screen.getByText(/Step 4 of 7/)).toBeInTheDocument()
+      expect(screen.getByText(/Step 4 of 8/)).toBeInTheDocument()
     })
   })
 
   it('re-syncs safely when the horizon prop changes while mounted', () => {
     const { rerender } = render(<GuidedSession horizon="seasonal" host={makeHost()} onClose={vi.fn()} />)
-    // Navigate deep into the 7-step seasonal session — well past the daily
+    // Navigate deep into the 8-step seasonal session — well past the daily
     // session's 4 steps — before switching horizons.
     fireEvent.click(screen.getByRole('button', { name: /^Next$/ }))
     fireEvent.click(screen.getByRole('button', { name: /^Next$/ }))
     fireEvent.click(screen.getByRole('button', { name: /^Next$/ }))
     fireEvent.click(screen.getByRole('button', { name: /^Next$/ }))
     fireEvent.click(screen.getByRole('button', { name: /^Next$/ }))
-    expect(screen.getByText(/Step 6 of 7/)).toBeInTheDocument()
+    expect(screen.getByText(/Step 6 of 8/)).toBeInTheDocument()
 
     // Switching to daily (only 4 steps) must not crash reading a stale index,
     // and should resync to daily's own persisted position (none set -> Step 1).

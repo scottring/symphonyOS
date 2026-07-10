@@ -15,9 +15,13 @@ import { useGuided } from '../GuidedContext'
 
 export function TaskTriageRow({ task }: { task: Task }) {
   const { host } = useGuided()
+  const project = task.projectId ? host.projectsMap.get(task.projectId) : undefined
   return (
     <li className="flex items-center gap-2 rounded-xl border border-neutral-100 bg-white px-3 py-2">
-      <span className="flex-1 min-w-0 text-sm text-neutral-800 truncate">{task.title}</span>
+      <span className="flex-1 min-w-0 text-sm text-neutral-800 truncate">
+        {task.title}
+        {project && <span className="text-xs text-neutral-400"> · {project.name}</span>}
+      </span>
       <TriageWhenMenu
         onPick={(when) => applyTriageWhen(when, task.id, { onPushTask: host.onPushTask, onSetBucket: host.onSetBucket })}
         onPickDate={(date) => host.onPushTask(task.id, date)}

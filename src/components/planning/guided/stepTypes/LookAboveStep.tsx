@@ -17,6 +17,8 @@ const OWN_BUCKET: Partial<Record<string, TaskBucket>> = {
 
 export function LookAboveStep() {
   const { step, host, horizon } = useGuided()
+  const projectName = (projectId?: string) =>
+    projectId ? host.projectsMap.get(projectId)?.name : undefined
   const above = step.props?.aboveBucket
   const pick = step.props?.pick === true
   const ownBucket = OWN_BUCKET[horizon]
@@ -101,7 +103,10 @@ export function LookAboveStep() {
                 className={`w-full flex items-center gap-3 rounded-lg px-3 py-2 text-left text-sm transition-colors ${
                   picked ? 'bg-primary-50/60 text-primary-700' : 'bg-neutral-50/70 text-neutral-700 hover:bg-neutral-100'}`}>
                 {picked && <Check className="w-3.5 h-3.5 shrink-0" strokeWidth={3} />}
-                <span className="flex-1 min-w-0 truncate">{t.title}</span>
+                <span className="flex-1 min-w-0 truncate">
+                  {t.title}
+                  {projectName(t.projectId) && <span className="text-xs opacity-70"> · {projectName(t.projectId)}</span>}
+                </span>
                 {picked && <span className="text-xs">today</span>}
               </button>
             </li>
@@ -110,13 +115,16 @@ export function LookAboveStep() {
         const alreadyHere = ownTitles.has(t.title)
         return (
           <li key={t.id} className="flex items-center gap-3 rounded-lg bg-neutral-50/70 px-3 py-1.5">
-            <span className="flex-1 min-w-0 text-sm text-neutral-700 truncate">{t.title}</span>
+            <span className="flex-1 min-w-0 text-sm text-neutral-700 truncate">
+              {t.title}
+              {projectName(t.projectId) && <span className="text-xs text-neutral-400"> · {projectName(t.projectId)}</span>}
+            </span>
             {alreadyHere ? (
               <span className="shrink-0 inline-flex items-center gap-1 text-xs text-primary-700">
                 <Check className="w-3 h-3" strokeWidth={3} /> on this list
               </span>
             ) : ownBucket ? (
-              <button type="button" onClick={() => void host.createTaskInBucket(t.title, ownBucket)}
+              <button type="button" onClick={() => void host.createTaskInBucket(t.title, ownBucket, t.projectId)}
                 title="Copy onto this list (stays on the list above too)"
                 className="shrink-0 inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-md text-primary-700 bg-primary-50 hover:bg-primary-100 transition-colors">
                 <Plus className="w-3 h-3" /> Copy down

@@ -21,7 +21,7 @@ describe('LookAboveStep', () => {
       host, horizon: 'monthly',
     })
     fireEvent.click(screen.getByRole('button', { name: /Copy down/ }))
-    expect(host.createTaskInBucket).toHaveBeenCalledWith('Renovate kitchen', 'month')
+    expect(host.createTaskInBucket).toHaveBeenCalledWith('Renovate kitchen', 'month', undefined)
   })
 
   it('reference mode: an item already on this list shows a check, no button', () => {

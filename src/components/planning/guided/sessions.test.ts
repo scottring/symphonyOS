@@ -4,7 +4,7 @@ import { SESSIONS } from './sessions'
 import type { StepType } from './types'
 
 const KNOWN_TYPES: StepType[] = [
-  'narration', 'reflect', 'review', 'look-above', 'calendar',
+  'narration', 'reflect', 'review', 'look-above', 'projects', 'calendar',
   'write-list', 'inbox', 'schedule-grid', 'domains-goals', 'book-next',
 ]
 

@@ -5,6 +5,7 @@ import { NarrationStep } from './NarrationStep'
 import { ReflectStep } from './ReflectStep'
 import { ReviewStep } from './ReviewStep'
 import { LookAboveStep } from './LookAboveStep'
+import { ProjectsStep } from './ProjectsStep'
 import { CalendarStep } from './CalendarStep'
 import { WriteListStep } from './WriteListStep'
 import { InboxStep } from './InboxStep'
@@ -16,6 +17,7 @@ registerStepType('narration', NarrationStep)
 registerStepType('reflect', ReflectStep)
 registerStepType('review', ReviewStep)
 registerStepType('look-above', LookAboveStep)
+registerStepType('projects', ProjectsStep)
 registerStepType('calendar', CalendarStep)
 registerStepType('write-list', WriteListStep)
 registerStepType('inbox', InboxStep)

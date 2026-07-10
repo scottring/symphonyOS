@@ -76,6 +76,10 @@ export const SESSIONS: Record<PlanningHorizon, GuidedSessionConfig> = {
         props: { aboveBucket: 'goals', aboveLabel: 'Your goals for the year' },
       },
       {
+        id: 'projects-in-motion', type: 'projects', title: 'Projects in motion',
+        narration: "These are the projects you have in motion, with what’s still open in each. A season is mostly its projects — as you write this season’s list, ask which of these deserve a real push over the next three months, and which can idle without guilt.",
+      },
+      {
         id: 'season-ahead', type: 'calendar', title: 'The season ahead',
         narration: "Scan the season’s calendar — trips, deadlines, school breaks, the weeks that are already spoken for. Notice how much open space actually exists. Plans that respect the calendar get done; plans that ignore it get abandoned.",
         props: { notesKey: 'tripChildcare' },
@@ -117,6 +121,10 @@ export const SESSIONS: Record<PlanningHorizon, GuidedSessionConfig> = {
         id: 'look-at-season', type: 'look-above', title: 'Your season list',
         narration: "This is your season list, for reference. Watch how the big items naturally suggest month-sized moves — renovate the kitchen becomes order the dishwasher. Copy a line down if you want it in front of you this month; the original stays on the season list.",
         props: { aboveBucket: 'quarter', aboveLabel: 'Your season list' },
+      },
+      {
+        id: 'projects-in-motion', type: 'projects', title: 'Projects in motion',
+        narration: "Your projects in motion, for reference. A month moves a project one concrete chunk at a time — an order placed, a call made, a decision written down. Let these suggest month-sized moves for the list you’re about to write.",
       },
       {
         id: 'month-ahead', type: 'calendar', title: 'The month ahead',

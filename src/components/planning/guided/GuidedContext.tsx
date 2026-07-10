@@ -8,6 +8,7 @@ import type { Task, TaskBucket } from '@/types/task'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine } from '@/types/actionable'
 import type { Goal, GoalArea, GoalStatus } from '@/types/goal'
+import type { Project } from '@/types/project'
 import type { GuidedStepConfig, GuidedStepRenderContext } from './types'
 
 export interface GuidedHost {
@@ -26,9 +27,13 @@ export interface GuidedHost {
   onCompleteTask: (id: string) => void
   onUpdateTask: (id: string, updates: Partial<Task>) => void
   /** Single atomic create-into-bucket (bucket rides in AddTaskOptions). */
-  createTaskInBucket: (title: string, bucket: TaskBucket) => Promise<void>
+  /** projectId attaches the new task to a project — context, not linkage. */
+  createTaskInBucket: (title: string, bucket: TaskBucket, projectId?: string) => Promise<void>
   /** Dated all-day task (book-next fallback when calendar is disconnected). */
   createDatedTask: (title: string, date: Date) => Promise<void>
+  // Projects — the "what" axis: context containers the horizon lists chunk into
+  projects: Project[]
+  projectsMap: Map<string, Project>
   // Goals (flattened: areas + goal statements only)
   goals: Goal[]
   goalAreas: GoalArea[]
