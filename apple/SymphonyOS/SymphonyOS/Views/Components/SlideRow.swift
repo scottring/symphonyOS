@@ -57,6 +57,11 @@ struct SlideRow<Content: View>: View {
     // hsl(152 50% 32%) — same completion green as the web SwipeableCard
     private let completeGreen = Color(red: 0.16, green: 0.48, blue: 0.33)
 
+    // Optional so a SlideRow used outside a scroll coordinator (previews, macOS
+    // split view) skips the coordination instead of crashing on a missing
+    // environment value.
+    @Environment(SlideScrollLock.self) private var scrollLock: SlideScrollLock?
+
     @State private var translateX: CGFloat = 0
     @State private var showActions = false
     @State private var axisHorizontal: Bool? = nil
@@ -123,18 +128,27 @@ struct SlideRow<Content: View>: View {
                 .simultaneousGesture(dragGesture)
                 .onTapGestureCompat { if showActions { close() } }
         }
+        // Belt-and-suspenders: if the row leaves the screen mid-drag (or the
+        // gesture is cancelled rather than ended), make sure we never strand the
+        // enclosing ScrollView in the disabled state.
+        .onDisappear { releaseScroll() }
     }
 
     private var dragGesture: some Gesture {
-        DragGesture(minimumDistance: 24, coordinateSpace: .local)
+        // minimumDistance is deliberately small: the drag must recognize before
+        // the ScrollView commits to a vertical pan, otherwise (notably on iOS 27)
+        // the scroll view wins arbitration and the swipe never fires. The axis
+        // lock below still hands clearly-vertical pans back to the ScrollView, so
+        // scrolling anywhere on a row keeps working.
+        DragGesture(minimumDistance: 10, coordinateSpace: .local)
             .onChanged { value in
                 let w = value.translation.width
                 let h = value.translation.height
                 if axisHorizontal == nil {
-                    // Only claim the drag if it clearly leads horizontally — a higher
-                    // minimumDistance lets the ScrollView win ordinary vertical pans
-                    // first, so scrolling works anywhere on a row, not just the gaps.
-                    axisHorizontal = abs(w) > abs(h) + 6
+                    axisHorizontal = abs(w) > abs(h) + 4
+                    // Horizontal drag claimed → freeze the enclosing ScrollView so
+                    // it stops competing for the touch for the rest of the swipe.
+                    if axisHorizontal == true { scrollLock?.locked = true }
                 }
                 guard axisHorizontal == true else { return }
 
@@ -147,7 +161,10 @@ struct SlideRow<Content: View>: View {
                 translateX = dx
             }
             .onEnded { value in
-                defer { axisHorizontal = nil }
+                defer {
+                    axisHorizontal = nil
+                    releaseScroll()
+                }
                 guard axisHorizontal == true else { return }
 
                 let dx = value.translation.width + (showActions ? panelWidth : 0)
@@ -162,6 +179,10 @@ struct SlideRow<Content: View>: View {
                     snap(to: 0, openActions: false)
                 }
             }
+    }
+
+    private func releaseScroll() {
+        if scrollLock?.locked == true { scrollLock?.locked = false }
     }
 
     private func snap(to x: CGFloat, openActions: Bool) {

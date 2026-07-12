@@ -18,6 +18,7 @@
 		1BD65AFD55D34C8C58F44067 /* DomainSwitcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = C98347D43F09BA622FEB4503 /* DomainSwitcher.swift */; };
 		296C67879E486F3CBE93D3ED /* DocumentScanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 47BBD0F267EDEE37831CD019 /* DocumentScanner.swift */; };
 		2A74129707085D80D5C57282 /* TodayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CCA7DCDE1B3C18FAAD465BDB /* TodayView.swift */; };
+		2A93520AB588EE9AF389FDF0 /* SlideScrollLock.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D04BBBA27E356AEE09A8593 /* SlideScrollLock.swift */; };
 		2BF5BECF97E75FEA7A2B03EE /* TaskDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E66A3BA0E2CBF7FCE61EA47F /* TaskDetailView.swift */; };
 		30D02C1243BC999F654F3957 /* UserProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37846053B387BAA8FC10D3E6 /* UserProfile.swift */; };
 		3347A8A85D27BF705AE97C82 /* PendingChange.swift in Sources */ = {isa = PBXBuildFile; fileRef = 779DC68DE6348BF47C96A130 /* PendingChange.swift */; };
@@ -130,6 +131,7 @@
 		7C0DDF026CD23250BDF7AB83 /* ProjectListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectListView.swift; sourceTree = "<group>"; };
 		7F3522449230AFDDBFBBAA95 /* DateNavigator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DateNavigator.swift; sourceTree = "<group>"; };
 		81E58F1162C67DF3D96052F8 /* Date+Extensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Date+Extensions.swift"; sourceTree = "<group>"; };
+		8D04BBBA27E356AEE09A8593 /* SlideScrollLock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlideScrollLock.swift; sourceTree = "<group>"; };
 		8EBED2D101D6AFAD857742E3 /* SyncEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncEngine.swift; sourceTree = "<group>"; };
 		9031A67BD188FEA2743DE71D /* TaskViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskViewModel.swift; sourceTree = "<group>"; };
 		91980E464779ADF9B4FE89A3 /* SyncSerializationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncSerializationTests.swift; sourceTree = "<group>"; };
@@ -398,6 +400,7 @@
 			children = (
 				6BC4EC7581B16A756929F754 /* SafariView.swift */,
 				09BD930B3AFC90435DE5E822 /* SlideRow.swift */,
+				8D04BBBA27E356AEE09A8593 /* SlideScrollLock.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -618,6 +621,7 @@
 				F08C7F7216940A46A570861A /* ScanReviewSheet.swift in Sources */,
 				F13311D96ED0C89151D9A8B7 /* SettingsView.swift in Sources */,
 				A936C12D2B64DE7CFB1471C6 /* SlideRow.swift in Sources */,
+				2A93520AB588EE9AF389FDF0 /* SlideScrollLock.swift in Sources */,
 				0C4A58B20B67EBDA3028040D /* SupabaseClient.swift in Sources */,
 				EC475DE919BDE2B3F16AB6DD /* SymphonyApp.swift in Sources */,
 				5480BD7E5D83BED5704A2D87 /* SymphonyTask.swift in Sources */,

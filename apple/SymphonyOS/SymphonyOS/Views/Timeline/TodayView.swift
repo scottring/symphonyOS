@@ -11,6 +11,8 @@ struct TodayView: View {
     @State private var showSearch = false
     @State private var searchText = ""
     @FocusState private var searchFocused: Bool
+    // Lets a swiped SlideRow freeze this ScrollView so the swipe wins the touch.
+    @State private var scrollLock = SlideScrollLock()
 
     // SwiftData queries
     @Query private var allTasks: [SymphonyTask]
@@ -85,7 +87,9 @@ struct TodayView: View {
                         } // end: not searching
                     }
                     .padding(.bottom, 80) // Space for quick capture bar
+                    .environment(scrollLock)
                 }
+                .scrollDisabled(scrollLock.locked)
             }
 
             // Quick capture bar
