@@ -716,8 +716,11 @@ export const ScheduleItem = memo(function ScheduleItem({
         )}
 
         {/* Skip-today — routines only, always visible so skipping a single
-            instance doesn't require opening the '...' menu. */}
-        {variant !== 'minimal' && isRoutine && !item.completed && !item.skipped && (
+            instance doesn't require opening the '...' menu. Rendered on both
+            variants: TodayView draws routine rows as `minimal` (which drops the
+            '...' menu entirely), so gating this on the full variant would hide
+            it from exactly the rows it's meant for. */}
+        {isRoutine && !item.completed && !item.skipped && (
           <SkipRoutineButton item={item} />
         )}
 

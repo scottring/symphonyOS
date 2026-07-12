@@ -86,7 +86,10 @@ describe('ScheduleItem — inline Skip button (routines)', () => {
     expect(queryByRole('button', { name: /skip today/i })).toBeNull()
   })
 
-  it('does not show the Skip control on the minimal variant', () => {
+  it('shows the Skip control on the minimal variant (how TodayView renders routines)', () => {
+    // TodayView renders routine rows with variant="minimal" (which drops the
+    // '...' menu). The Skip icon must still appear there — that's its whole
+    // point — so it is intentionally NOT gated on the full variant.
     const { queryByRole } = render(
       <ScheduleItem
         item={baseRoutine}
@@ -95,6 +98,6 @@ describe('ScheduleItem — inline Skip button (routines)', () => {
         onToggleComplete={vi.fn()}
       />,
     )
-    expect(queryByRole('button', { name: /skip today/i })).toBeNull()
+    expect(queryByRole('button', { name: /skip today/i })).not.toBeNull()
   })
 })
