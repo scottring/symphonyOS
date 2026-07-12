@@ -161,6 +161,15 @@ enum PhotoCaptureService {
     /// attachments bucket and insert the attachments row. Web parity with the
     /// task panel's Photos section.
     static func attachImage(jpegData: Data, taskId: UUID, userId: UUID) async -> Bool {
+        await attachImage(jpegData: jpegData, entityType: "task",
+                          entityId: taskId.uuidString.lowercased(), userId: userId)
+    }
+
+    /// Generalized attach — writes an image to any attachable entity. Tasks use
+    /// entity_type "task" + lowercased task uuid; calendar events use "event_note"
+    /// + the Google event id (matching the web's storage convention). `entityId`
+    /// is written verbatim, so the caller lowercases uuids where needed.
+    static func attachImage(jpegData: Data, entityType: String, entityId: String, userId: UUID) async -> Bool {
         let path = "\(userId.uuidString.lowercased())/attach/\(UUID().uuidString.lowercased()).jpg"
         do {
             try await supabase.storage.from("attachments").upload(
@@ -179,8 +188,8 @@ enum PhotoCaptureService {
             }
             try await supabase.from("attachments").insert(NewAttachment(
                 user_id: userId.uuidString.lowercased(),
-                entity_type: "task",
-                entity_id: taskId.uuidString.lowercased(),
+                entity_type: entityType,
+                entity_id: entityId,
                 file_name: "photo.jpg",
                 file_type: "image/jpeg",
                 file_size: jpegData.count,

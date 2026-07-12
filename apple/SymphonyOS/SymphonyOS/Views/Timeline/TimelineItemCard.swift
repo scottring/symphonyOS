@@ -13,6 +13,7 @@ struct TimelineItemCard: View {
     @State private var isCompleted: Bool
     @State private var showContextPicker = false
     @State private var showDetail = false
+    @State private var showEventDetail = false
     @Query private var familyMembers: [FamilyMember]
 
     init(item: TimelineItem, modelContext: ModelContext, userId: UUID, date: Date = Date()) {
@@ -62,6 +63,26 @@ struct TimelineItemCard: View {
                 .presentationDetents([.large, .medium])
             }
         }
+        .sheet(isPresented: $showEventDetail) {
+            if let key = item.eventKey {
+                NavigationStack {
+                    EventDetailView(
+                        googleEventId: key,
+                        eventTitle: item.title,
+                        eventStart: item.startTime,
+                        eventLocation: item.location,
+                        date: date,
+                        userId: userId
+                    )
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            Button("Done") { showEventDetail = false }
+                        }
+                    }
+                }
+                .presentationDetents([.large, .medium])
+            }
+        }
     }
 
     /// Right-swipe actions. Tasks get push/context/more; routines get skip
@@ -91,6 +112,9 @@ struct TimelineItemCard: View {
         case .event:
             guard let key = item.eventKey else { return [] }
             return [
+                SlideAction(label: "Details", systemImage: "ellipsis", tint: .blue) {
+                    showEventDetail = true
+                },
                 SlideAction(label: "Skip", systemImage: "arrow.uturn.forward", tint: Self.neutralSlate) {
                     setInstanceStatus(entityType: "calendar_event", entityId: key, status: "skipped")
                 },

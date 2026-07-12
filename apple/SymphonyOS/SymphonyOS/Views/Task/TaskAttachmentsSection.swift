@@ -4,13 +4,16 @@ import Supabase
 import PhotosUI
 #endif
 
-/// Photos attached to a task (the `attachments` table + bucket) — most
-/// importantly the photo behind a photo-first capture, so the picture is in
-/// hand at the store. Images load via short-lived signed URLs; tap for
-/// full screen. Camera + photo-library buttons add to an existing task
-/// (web-panel parity).
-struct TaskAttachmentsSection: View {
-    let taskId: UUID
+/// Photos attached to any entity (the `attachments` table + bucket) — a task
+/// (`entity_type` "task", the lowercased task uuid) or a calendar event
+/// (`entity_type` "event_note", the Google event id), matching the web's
+/// storage convention. Most importantly it holds the photo behind a photo-first
+/// capture, so the picture is in hand at the store. Images load via short-lived
+/// signed URLs; tap for full screen. Camera + photo-library buttons add more.
+struct AttachmentsSection: View {
+    let entityType: String
+    /// Written/queried verbatim — caller lowercases uuids where needed.
+    let entityId: String
 
     @Environment(AuthService.self) private var auth
     @State private var images: [LoadedAttachment] = []
@@ -68,7 +71,7 @@ struct TaskAttachmentsSection: View {
                 }
             }
         }
-        .task(id: taskId) { await load() }
+        .task(id: entityId) { await load() }
         #if os(iOS)
         .fullScreenCover(item: $fullScreenImage) { attachment in
             AttachmentViewer(attachment: attachment) { fullScreenImage = nil }
@@ -123,7 +126,7 @@ struct TaskAttachmentsSection: View {
     private func attach(_ jpeg: Data) async {
         guard let userId = auth.currentUser?.id else { return }
         isUploading = true
-        if await PhotoCaptureService.attachImage(jpegData: jpeg, taskId: taskId, userId: userId) {
+        if await PhotoCaptureService.attachImage(jpegData: jpeg, entityType: entityType, entityId: entityId, userId: userId) {
             await load()
             UINotificationFeedbackGenerator().notificationOccurred(.success)
         }
@@ -138,11 +141,12 @@ struct TaskAttachmentsSection: View {
             let file_type: String
             let storage_path: String
         }
-        // entity_id is text and web writes lowercase uuids.
+        // entity_id is text; caller passes it exactly as stored (lowercased uuid
+        // for tasks, Google event id for events).
         guard let rows: [Row] = try? await supabase.from("attachments")
             .select("id, file_name, file_type, storage_path")
-            .eq("entity_type", value: "task")
-            .eq("entity_id", value: taskId.uuidString.lowercased())
+            .eq("entity_type", value: entityType)
+            .eq("entity_id", value: entityId)
             .execute()
             .value else { return }
 
@@ -161,7 +165,7 @@ struct TaskAttachmentsSection: View {
 /// Minimal full-screen photo viewer (pinch handled by the system scroll view
 /// would be overkill here — the store use case is "hold up the picture").
 private struct AttachmentViewer: View {
-    let attachment: TaskAttachmentsSection.LoadedAttachment
+    let attachment: AttachmentsSection.LoadedAttachment
     let onDismiss: () -> Void
 
     var body: some View {

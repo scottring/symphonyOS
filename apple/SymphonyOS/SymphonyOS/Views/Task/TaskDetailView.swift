@@ -197,7 +197,7 @@ struct TaskDetailView: View {
                 }
 
                 // Photos — attachments (e.g. the photo behind a photo capture)
-                TaskAttachmentsSection(taskId: task.id)
+                AttachmentsSection(entityType: "task", entityId: task.id.uuidString.lowercased())
 
                 // Links — product pages, reservations, docs (web parity)
                 VStack(alignment: .leading, spacing: 8) {

@@ -21,6 +21,8 @@ enum RowMapper {
             return familyMemberFromRow(row) as? T
         case is ActionableInstance.Type:
             return actionableInstanceFromRow(row) as? T
+        case is EventNote.Type:
+            return eventNoteFromRow(row) as? T
         case is PlaybookBlock.Type:
             return playbookBlockFromRow(row) as? T
         case is PlaybookInstance.Type:
@@ -175,6 +177,29 @@ enum RowMapper {
         instance.createdAt = row.date("created_at") ?? Date()
         instance.updatedAt = row.date("updated_at") ?? Date()
         return instance
+    }
+
+    private static func eventNoteFromRow(_ row: [String: AnyJSON]) -> EventNote? {
+        guard let id = row.uuid("id"),
+              let userId = row.uuid("user_id"),
+              let googleEventId = row.string("google_event_id") else { return nil }
+
+        let note = EventNote(id: id, userId: userId, googleEventId: googleEventId, syncStatus: .synced)
+        note.notes = row.string("notes")
+        note.links = row.codable("links")
+        note.eventTitle = row.string("event_title")
+        note.eventStartTime = row.date("event_start_time")
+        note.context = row.string("context")
+        note.sharedWithFamily = row.bool("shared_with_family") ?? false
+        note.shareNudgeDismissed = row.bool("share_nudge_dismissed") ?? false
+        note.assignedTo = row.uuid("assigned_to")
+        note.assignedToAll = row.uuidArray("assigned_to_all")
+        note.recipeUrl = row.string("recipe_url")
+        note.projectId = row.uuid("project_id")
+        note.lastSyncedAt = Date()
+        note.createdAt = row.date("created_at") ?? Date()
+        note.updatedAt = row.date("updated_at") ?? Date()
+        return note
     }
 
     private static func playbookBlockFromRow(_ row: [String: AnyJSON]) -> PlaybookBlock? {

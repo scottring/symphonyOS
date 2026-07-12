@@ -28,6 +28,7 @@ actor SyncEngine {
         ("tasks", SymphonyTask.self),
         ("routines", Routine.self),
         ("actionable_instances", ActionableInstance.self),
+        ("event_notes", EventNote.self),
         ("weekly_templates", WeeklyTemplate.self),
         ("playbook_blocks", PlaybookBlock.self),
         ("playbook_instances", PlaybookInstance.self),
@@ -137,6 +138,7 @@ actor SyncEngine {
         await pullTable("tasks", as: SymphonyTask.self, userId: userId, reconcile: false)
         await pullTable("routines", as: Routine.self, userId: userId)
         await pullTable("actionable_instances", as: ActionableInstance.self, userId: userId)
+        await pullTable("event_notes", as: EventNote.self, userId: userId)
         await pullTable("weekly_templates", as: WeeklyTemplate.self, userId: userId)
         await pullTable("playbook_blocks", as: PlaybookBlock.self, userId: userId)
         await pullTable("playbook_instances", as: PlaybookInstance.self, userId: userId)
@@ -220,8 +222,7 @@ actor SyncEngine {
             // created the same day's instance first (different id), conflict on
             // that natural key and update it instead of failing the push forever.
             guard let row = Self.serializeRow(table: change.tableName, id: change.recordId, context: context) else { return }
-            let conflictKey = change.tableName == "actionable_instances"
-                ? "user_id,entity_type,entity_id,date" : nil
+            let conflictKey = Self.naturalKey(for: change.tableName)?.joined(separator: ",")
             if let conflictKey {
                 var naturalRow = row
                 naturalRow.removeValue(forKey: "id")   // let the existing row keep its id
@@ -287,6 +288,7 @@ actor SyncEngine {
     private static func naturalKey(for table: String) -> [String]? {
         switch table {
         case "actionable_instances": ["user_id", "entity_type", "entity_id", "date"]
+        case "event_notes": ["user_id", "google_event_id"]
         default: nil
         }
     }
@@ -318,6 +320,9 @@ actor SyncEngine {
         case "actionable_instances":
             guard let i = find(ActionableInstance.self) else { return nil }
             return instanceRow(i)
+        case "event_notes":
+            guard let n = find(EventNote.self) else { return nil }
+            return eventNoteRow(n)
         default:
             return nil   // other tables aren't edited from iOS
         }
@@ -475,11 +480,36 @@ actor SyncEngine {
         ]
     }
 
+    /// Exact `event_notes` column set (model ∩ schema). Notes/links are what the
+    /// card edits; the rest are round-tripped so an iOS write never nulls a
+    /// server-set field. natural key (user_id, google_event_id) is dropped from
+    /// the row by the UPDATE path, which matches on it instead.
+    private static func eventNoteRow(_ n: EventNote) -> [String: AnyJSON] {
+        [
+            "id": .string(n.id.uuidString),
+            "user_id": .string(n.userId.uuidString),
+            "google_event_id": .string(n.googleEventId),
+            "notes": s(n.notes),
+            "links": j(n.links),
+            "event_title": s(n.eventTitle),
+            "event_start_time": d(n.eventStartTime),
+            "context": s(n.context),
+            "shared_with_family": .bool(n.sharedWithFamily),
+            "share_nudge_dismissed": .bool(n.shareNudgeDismissed),
+            "assigned_to": u(n.assignedTo),
+            "assigned_to_all": us(n.assignedToAll),
+            "recipe_url": s(n.recipeUrl),
+            "project_id": u(n.projectId),
+            "created_at": .string(isoOut.string(from: n.createdAt)),
+            "updated_at": .string(isoOut.string(from: Date())),
+        ]
+    }
+
     // MARK: - Realtime Subscriptions
 
     private func subscribeToRealtime() async {
         let tablesToWatch = ["tasks", "projects", "routines", "contacts", "family_members",
-                             "actionable_instances", "playbook_blocks", "playbook_instances",
+                             "actionable_instances", "event_notes", "playbook_blocks", "playbook_instances",
                              "family_rules", "responsibilities"]
 
         for table in tablesToWatch {
@@ -531,6 +561,8 @@ actor SyncEngine {
             if let model = RowMapper.toModel(FamilyMember.self, from: record) { upsert(model, context: context) }
         case "actionable_instances":
             if let model = RowMapper.toModel(ActionableInstance.self, from: record) { upsert(model, context: context) }
+        case "event_notes":
+            if let model = RowMapper.toModel(EventNote.self, from: record) { upsert(model, context: context) }
         case "playbook_blocks":
             if let model = RowMapper.toModel(PlaybookBlock.self, from: record) { upsert(model, context: context) }
         case "playbook_instances":
@@ -583,6 +615,8 @@ actor SyncEngine {
             deleteById(FamilyMember.self, id: id, context: context)
         case "actionable_instances":
             deleteById(ActionableInstance.self, id: id, context: context)
+        case "event_notes":
+            deleteById(EventNote.self, id: id, context: context)
         case "playbook_blocks":
             deleteById(PlaybookBlock.self, id: id, context: context)
         case "playbook_instances":
@@ -669,6 +703,7 @@ extension Routine: HasUUID {}
 extension Contact: HasUUID {}
 extension FamilyMember: HasUUID {}
 extension ActionableInstance: HasUUID {}
+extension EventNote: HasUUID {}
 extension WeeklyTemplate: HasUUID {}
 extension PlaybookBlock: HasUUID {}
 extension PlaybookInstance: HasUUID {}

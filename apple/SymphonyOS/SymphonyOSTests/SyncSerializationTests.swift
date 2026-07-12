@@ -14,7 +14,7 @@ struct SyncSerializationTests {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         let container = try ModelContainer(
             for: SymphonyTask.self, Project.self, Routine.self, Contact.self,
-            FamilyMember.self, ActionableInstance.self, PlaybookBlock.self,
+            FamilyMember.self, ActionableInstance.self, EventNote.self, PlaybookBlock.self,
             PlaybookInstance.self, WeeklyTemplate.self, FamilyRule.self,
             Responsibility.self, Household.self, UserProfile.self, PendingChange.self,
             configurations: config
@@ -153,6 +153,41 @@ struct SyncSerializationTests {
         #expect(meta["status"]?.stringValue == "pending")
         #expect(meta["storage_path"]?.stringValue == "user/capture/abc.jpg")
         #expect(meta["suggested_task_id"]?.stringValue == suggested.uuidString)
+    }
+
+    @Test func eventNoteRowMatchesProdColumns() throws {
+        let context = try makeContext()
+        let note = EventNote(userId: UUID(), googleEventId: "abc123googleid")
+        note.notes = "Bring insurance card"
+        note.links = [TaskLink(url: "https://portal.example.com", title: "Portal")]
+        note.eventTitle = "Dentist"
+        note.eventStartTime = Date()
+        context.insert(note)
+        try context.save()
+
+        let row = try #require(SyncEngine.serializeRow(table: "event_notes", id: note.id, context: context))
+        // Prod event_notes columns (fetched 2026-07-12).
+        let prodColumns: Set<String> = [
+            "id", "user_id", "google_event_id", "notes", "links", "event_title",
+            "event_start_time", "context", "shared_with_family", "share_nudge_dismissed",
+            "assigned_to", "assigned_to_all", "recipe_url", "project_id",
+            "created_at", "updated_at",
+        ]
+        #expect(Set(row.keys).isSubset(of: prodColumns))
+        #expect(row["google_event_id"]?.stringValue == "abc123googleid")
+        #expect(row["notes"]?.stringValue == "Bring insurance card")
+    }
+
+    @Test func eventNoteInsertUpsertsOnNaturalKey() throws {
+        // event_notes pushes must upsert on (user_id, google_event_id) so a note
+        // the web created first (different id) doesn't collide on insert.
+        let context = try makeContext()
+        let note = EventNote(userId: UUID(), googleEventId: "evt-1")
+        context.insert(note)
+        try context.save()
+        let row = try #require(SyncEngine.serializeRow(table: "event_notes", id: note.id, context: context))
+        #expect(row["user_id"] != nil)
+        #expect(row["google_event_id"]?.stringValue == "evt-1")
     }
 
     @Test func queueSyncDedupesIdenticalChanges() throws {

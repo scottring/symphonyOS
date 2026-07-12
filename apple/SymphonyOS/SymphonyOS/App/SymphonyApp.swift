@@ -32,6 +32,7 @@ struct SymphonyApp: App {
             Contact.self,
             FamilyMember.self,
             ActionableInstance.self,
+            EventNote.self,
             PlaybookBlock.self,
             PlaybookInstance.self,
             WeeklyTemplate.self,
