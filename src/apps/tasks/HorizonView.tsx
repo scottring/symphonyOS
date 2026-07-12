@@ -13,7 +13,7 @@
 
 import { useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CalendarRange, Target, Plus, ChevronRight, FolderOpen, Check } from 'lucide-react';
+import { CalendarRange, Target, Plus, ChevronRight, FolderOpen, Check, Pencil, Archive, Trash2 } from 'lucide-react';
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
 import { useGoogleCalendar } from '@/hooks/useGoogleCalendar';
 import { useEventNotes } from '@/hooks/useEventNotes';
@@ -340,6 +340,37 @@ export function HorizonView({ horizon }: HorizonViewProps) {
   const renderRow = useCallback(
     (task: Task) => {
       const project = projects.find((p) => p.id === task.projectId);
+      // Season rows speak the guided session's seasonal vocabulary — Change /
+      // Put aside — never the day/week/month routing chips, which belong to
+      // execution horizons. Months copy down during monthly planning instead.
+      const seasonMenu = (
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => handleSelect(task.id)}
+            className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md text-neutral-500 bg-neutral-50 hover:bg-neutral-100 transition-colors"
+          >
+            <Pencil className="w-3 h-3" /> Change
+          </button>
+          <button
+            type="button"
+            title="Park on Someday — the timing is wrong, not the idea"
+            onClick={() => setBucket(task.id, 'someday')}
+            className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md text-neutral-500 bg-neutral-50 hover:bg-neutral-100 transition-colors"
+          >
+            <Archive className="w-3 h-3" /> Put aside
+          </button>
+          <button
+            type="button"
+            aria-label="Delete"
+            title="Delete"
+            onClick={() => deleteTask(task.id)}
+            className="p-1.5 rounded-md text-neutral-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      );
       return (
         <DenseInboxRow
           key={task.id}
@@ -350,11 +381,13 @@ export function HorizonView({ horizon }: HorizonViewProps) {
           quickActions={[]}
           onQuickAction={() => {}}
           triageMenu={
-            <TriageWhenMenu
-              onPick={(when) => applyWhen(task, when)}
-              onPickDate={(date) => pushTask(task.id, date)}
-              onDelete={() => deleteTask(task.id)}
-            />
+            horizon === 'season' ? seasonMenu : (
+              <TriageWhenMenu
+                onPick={(when) => applyWhen(task, when)}
+                onPickDate={(date) => pushTask(task.id, date)}
+                onDelete={() => deleteTask(task.id)}
+              />
+            )
           }
           onToggleComplete={() => toggleTask(task.id)}
           onUpdate={(updates) => updateTask(task.id, updates)}
@@ -365,7 +398,7 @@ export function HorizonView({ horizon }: HorizonViewProps) {
         />
       );
     },
-    [projects, familyMembers, applyWhen, deleteTask, toggleTask, updateTask, handleSelect, scheduleActions, handleCreateProjectForTask, navigate],
+    [projects, familyMembers, horizon, setBucket, applyWhen, pushTask, deleteTask, toggleTask, updateTask, handleSelect, scheduleActions, handleCreateProjectForTask, navigate],
   );
 
   // ── "Plan the [horizon]" — routes to the Today rung with a ?plan flag; the
