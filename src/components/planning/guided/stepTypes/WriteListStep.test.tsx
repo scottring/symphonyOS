@@ -38,6 +38,23 @@ describe('WriteListStep', () => {
     expect(host.createTaskInBucket).toHaveBeenCalledWith('order dishwasher', 'week', 'p1')
   })
 
+  it('season list (rows: plain) shows no triage chips and no Done check', () => {
+    const seasonStep = {
+      id: 'write-season', type: 'write-list' as const, title: 'Write the season\'s list',
+      narration: 'Concrete, specific things.',
+      props: { bucket: 'quarter' as const, rows: 'plain' as const },
+    }
+    const host = makeHost({ tasks: [t({ id: 'q1', title: 'Make home into home', bucket: 'quarter' })] })
+    renderStep(<WriteListStep />, { step: seasonStep, host, horizon: 'seasonal' })
+    expect(screen.getByText('Make home into home')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Change/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Today' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Week' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Month' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Mark done' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Carry forward|Put aside/ })).not.toBeInTheDocument()
+  })
+
   it('shows the soft-cap counter without blocking', () => {
     const tasks = Array.from({ length: 16 }, (_, i) => t({ id: `w${i}`, title: `Task ${i}`, bucket: 'week' }))
     const host = makeHost({ tasks })

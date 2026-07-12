@@ -35,6 +35,53 @@ describe('ReviewStep — bucket source', () => {
   })
 })
 
+describe('ReviewStep — seasonal fate rows', () => {
+  const seasonStep = {
+    id: 'season-review', type: 'review' as const, title: 'Last season’s list',
+    narration: 'Carry it, change it, or put it aside.',
+    props: { bucket: 'quarter' as const, rows: 'fate' as const },
+  }
+
+  it('shows season verdicts instead of the day/week/month triage menu', () => {
+    const host = makeHost({ tasks: [task({ id: 'q1', title: 'Fix up outdoor spaces', bucket: 'quarter' })] })
+    renderStep(<ReviewStep />, { step: seasonStep, host, horizon: 'seasonal' })
+    expect(screen.getByRole('button', { name: /Carry forward/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Change/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Put aside/ })).toBeInTheDocument()
+    // No day-planning vocabulary and no Done check at season altitude.
+    expect(screen.queryByRole('button', { name: 'Today' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Week' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Month' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Mark done' })).not.toBeInTheDocument()
+  })
+
+  it('Carry forward keeps the item on the season list (no bucket write) and confirms', () => {
+    const host = makeHost({ tasks: [task({ id: 'q1', title: 'Fix up outdoor spaces', bucket: 'quarter' })] })
+    renderStep(<ReviewStep />, { step: seasonStep, host, horizon: 'seasonal' })
+    fireEvent.click(screen.getByRole('button', { name: /Carry forward/ }))
+    expect(screen.getByRole('button', { name: /Carried forward/ })).toBeInTheDocument()
+    expect(host.onSetBucket).not.toHaveBeenCalled()
+    expect(host.onPushTask).not.toHaveBeenCalled()
+  })
+
+  it('Put aside parks the item on Someday', () => {
+    const host = makeHost({ tasks: [task({ id: 'q1', title: 'Fix up outdoor spaces', bucket: 'quarter' })] })
+    renderStep(<ReviewStep />, { step: seasonStep, host, horizon: 'seasonal' })
+    fireEvent.click(screen.getByRole('button', { name: /Put aside/ }))
+    expect(host.onSetBucket).toHaveBeenCalledWith('q1', 'someday')
+  })
+
+  it('Change edits the title in place', () => {
+    const host = makeHost({ tasks: [task({ id: 'q1', title: 'Fix up outdoor spaces', bucket: 'quarter' })] })
+    renderStep(<ReviewStep />, { step: seasonStep, host, horizon: 'seasonal' })
+    fireEvent.click(screen.getByRole('button', { name: /Change/ }))
+    const input = screen.getByRole('textbox', { name: 'Edit item' })
+    fireEvent.change(input, { target: { value: 'Fix up the front porch' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(host.onUpdateTask).toHaveBeenCalledWith('q1', { title: 'Fix up the front porch' })
+  })
+})
+
 describe('ReviewStep — someday source', () => {
   const somedayStep = {
     id: 'annual-someday', type: 'review' as const, title: 'Someday list',

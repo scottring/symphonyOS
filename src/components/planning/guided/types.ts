@@ -36,6 +36,10 @@ export interface GuidedStepConfig {
     bucket?: TaskBucket
     /** review source override: 'someday' | 'overdue' | 'goals' (default: bucket). */
     source?: 'someday' | 'overdue' | 'goals'
+    /** review/write-list row style. Default: the TriageWhenMenu (day/week/month
+     *  routing + Done). 'fate' = seasonal review verdicts (Carry forward /
+     *  Change / Put aside). 'plain' = list only, no routing (seasonal write). */
+    rows?: 'fate' | 'plain'
     /** look-above: bucket of the level above ('quarter' for month, …) or 'goals'. */
     aboveBucket?: TaskBucket | 'goals'
     aboveLabel?: string

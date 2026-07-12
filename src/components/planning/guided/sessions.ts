@@ -68,7 +68,7 @@ export const SESSIONS: Record<PlanningHorizon, GuidedSessionConfig> = {
       {
         id: 'season-review', type: 'review', title: "Last season’s list",
         narration: "Here is everything still open from this season’s list. Celebrate what got done. For each item that didn’t: carry it into the new season if it still matters, park it on Someday if the timing is wrong, or let it go. If you carry something, take one second to notice what stopped it last time.",
-        props: { bucket: 'quarter' },
+        props: { bucket: 'quarter', rows: 'fate' },
       },
       {
         id: 'look-at-year', type: 'look-above', title: 'Your goals for the year',
@@ -92,7 +92,7 @@ export const SESSIONS: Record<PlanningHorizon, GuidedSessionConfig> = {
       {
         id: 'write-season', type: 'write-list', title: "Write the season’s list",
         narration: "Now write this season’s list — concrete, specific things you want to be true by the end of it. Look back at your year goals if it helps, or don’t. This list is allowed to contain things that appear nowhere else.",
-        props: { bucket: 'quarter' },
+        props: { bucket: 'quarter', rows: 'plain' },
       },
       {
         id: 'book-next', type: 'book-next', title: 'Anchor the next step',

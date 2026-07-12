@@ -8,7 +8,7 @@ import { Plus } from 'lucide-react'
 import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
 import { useGuided } from '../GuidedContext'
 import { extractProjectTag } from '../projectTag'
-import { TaskTriageRow } from './ReviewStep'
+import { TaskTriageRow, SeasonListRow } from './ReviewStep'
 
 export function WriteListStep() {
   const { step, host } = useGuided()
@@ -53,7 +53,15 @@ export function WriteListStep() {
           {pool.length} of ~{softCap}{over ? ' — a list you believe beats a list you admire' : ''}
         </p>
       )}
-      {pool.length > 0 && <ul className="space-y-2">{pool.map((t) => <TaskTriageRow key={t.id} task={t} />)}</ul>}
+      {pool.length > 0 && (
+        <ul className="space-y-2">
+          {pool.map((t) =>
+            // Season-altitude lists don't route items to days/weeks or complete
+            // them here — the list itself is the artifact. Plain rows only.
+            step.props?.rows === 'plain' ? <SeasonListRow key={t.id} task={t} /> : <TaskTriageRow key={t.id} task={t} />,
+          )}
+        </ul>
+      )}
     </div>
   )
 }
