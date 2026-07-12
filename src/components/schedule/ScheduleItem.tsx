@@ -7,7 +7,7 @@ import { formatTimeLong, formatTimeRangeLong, inferMealTime } from '@/lib/timeUt
 import { getProjectColor } from '@/lib/projectUtils'
 import { SchedulePopover, ContextPicker, DiscussionPicker, type ScheduleContextItem } from '@/components/triage'
 import { AssigneeDropdown, MultiAssigneeDropdown } from '@/components/family'
-import { Video, Tag, Check, Pencil } from 'lucide-react'
+import { Video, Tag, Check, Pencil, CircleSlash } from 'lucide-react'
 import { ScheduleItemActionsMenu } from './ScheduleItemActionsMenu'
 import { RescheduleButton } from './RescheduleButton'
 import { ConceptIcon } from '@/lib/conceptIcons'
@@ -195,6 +195,34 @@ function StartMeetingButton({ item }: { item: TimelineItem }) {
       aria-label="Start meeting"
     >
       <Video className="w-4 h-4" />
+    </button>
+  )
+}
+
+// Skip-today button — routines only. Surfaces the "Skip today" action that
+// otherwise hides in the '...' menu, so skipping a single instance is one tap.
+// Reads onSkipRoutine from context (same handler the menu uses; it fires the
+// undo toast) to avoid prop-drilling. The instance is skipped for the viewed
+// day only; the routine returns on its next scheduled occurrence.
+function SkipRoutineButton({ item }: { item: TimelineItem }) {
+  const ctx = useScheduleActionsContext()
+  const onSkipRoutine = ctx.onSkipRoutine
+
+  if (!onSkipRoutine) return null
+
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    onSkipRoutine(item.id.replace('routine-', ''))
+  }
+
+  return (
+    <button
+      onClick={handleClick}
+      className="shrink-0 p-1.5 rounded-lg text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors"
+      title="Skip today"
+      aria-label="Skip today"
+    >
+      <CircleSlash className="w-4 h-4" />
     </button>
   )
 }
@@ -685,6 +713,12 @@ export const ScheduleItem = memo(function ScheduleItem({
             doesn't require digging into the '...' menu. */}
         {variant !== 'minimal' && isTask && !item.completed && (
           <RescheduleButton item={item} />
+        )}
+
+        {/* Skip-today — routines only, always visible so skipping a single
+            instance doesn't require opening the '...' menu. */}
+        {variant !== 'minimal' && isRoutine && !item.completed && !item.skipped && (
+          <SkipRoutineButton item={item} />
         )}
 
         {/* Unified actions menu — always visible (touch + desktop) */}

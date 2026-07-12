@@ -31,16 +31,15 @@ const eventItem = {
 } as unknown as TimelineItem
 
 describe('ScheduleItemActionsMenu', () => {
-  it('shows Skip today + Delete routine for a routine and fires the handlers', () => {
-    const onSkipRoutine = vi.fn()
+  it('shows Delete routine (but NOT Skip today) for a routine and fires the handler', () => {
     const onDeleteRoutine = vi.fn()
-    renderMenu(routineItem, { onSkipRoutine, onDeleteRoutine })
+    renderMenu(routineItem, { onDeleteRoutine })
 
-    fireEvent.click(screen.getByText('Skip today'))
-    expect(onSkipRoutine).toHaveBeenCalledWith('1')
+    // Routine skip is surfaced by the inline SkipRoutineButton on the row now,
+    // so the menu no longer duplicates it.
+    expect(screen.queryByText('Skip today')).not.toBeInTheDocument()
 
-    // re-open, then confirm delete (two-step)
-    fireEvent.click(screen.getByLabelText('Item actions'))
+    // confirm delete (two-step)
     fireEvent.click(screen.getByText('Delete routine'))
     fireEvent.click(screen.getByText('Confirm delete'))
     expect(onDeleteRoutine).toHaveBeenCalledWith('1')

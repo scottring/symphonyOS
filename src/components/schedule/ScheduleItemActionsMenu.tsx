@@ -67,15 +67,14 @@ export function ScheduleItemActionsMenu({ item, onOpenDetail }: Props) {
             role="menu"
             className={`absolute right-0 z-50 min-w-[176px] py-1 bg-white rounded-xl border border-neutral-200 shadow-lg ${openUp ? 'bottom-full mb-1' : 'top-full mt-1'}`}
           >
-            {/* Skip today — routines and events */}
-            {(isRoutine || isEvent) && !item.completed && !item.skipped && (
+            {/* Skip today — events only. Routines surface a dedicated inline
+                skip icon on the row (SkipRoutineButton), so keeping it here too
+                would be redundant. */}
+            {isEvent && !item.completed && !item.skipped && (
               <button
                 type="button"
                 role="menuitem"
-                onClick={run(() => {
-                  if (isRoutine) ctx.onSkipRoutine?.(rid)
-                  else ctx.onSkipEvent?.(eid)
-                })}
+                onClick={run(() => ctx.onSkipEvent?.(eid))}
                 className="flex w-full items-center gap-2.5 px-3 py-2.5 text-sm text-neutral-700 hover:bg-neutral-50"
               >
                 <Redo2 className="w-4 h-4 text-neutral-400" />
