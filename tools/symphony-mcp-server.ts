@@ -427,6 +427,276 @@ server.tool(
   }
 )
 
+// ── Meals: recipes, week plans, lists, notes, restrictions, pantry ──
+
+const ok = (data: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] })
+const fail = (error: { message: string }) => ({ content: [{ type: 'text' as const, text: `Error: ${error.message}` }] })
+
+/** Get or create the signed-in user's meal plan for a week (week_start = Sunday). */
+async function ensureWeekPlan(weekStart: string): Promise<string> {
+  const { data: existing } = await supabase
+    .from('meal_plans')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('week_start', weekStart)
+    .maybeSingle()
+  if (existing) return existing.id as string
+  const { data, error } = await supabase
+    .from('meal_plans')
+    .insert({ user_id: userId, week_start: weekStart })
+    .select('id')
+    .single()
+  if (error) throw error
+  return data.id as string
+}
+
+server.tool(
+  'symphony_list_recipes',
+  'List recipes on the household recipe shelf. Filter by search text or tag.',
+  {
+    search: z.string().optional().describe('Case-insensitive title search'),
+    tag: z.string().optional().describe('Filter by tag, e.g. "pasta"'),
+    limit: z.number().default(50),
+  },
+  async (params) => {
+    let query = supabase
+      .from('recipes')
+      .select('id, title, prep_minutes, tags, is_prep_friendly, times_cooked, last_cooked_at')
+      .order('title')
+      .limit(params.limit)
+    if (params.search) query = query.ilike('title', `%${params.search}%`)
+    if (params.tag) query = query.contains('tags', [params.tag])
+    const { data, error } = await query
+    if (error) return fail(error)
+    return ok(data)
+  }
+)
+
+server.tool(
+  'symphony_get_recipe',
+  'Get one recipe with full ingredients and instructions.',
+  { id: z.string().describe('Recipe UUID') },
+  async (params) => {
+    const { data, error } = await supabase.from('recipes').select('*').eq('id', params.id).single()
+    if (error) return fail(error)
+    return ok(data)
+  }
+)
+
+server.tool(
+  'symphony_create_recipe',
+  'Add a recipe to the household shelf. Ingredients and instructions are arrays of plain strings (one ingredient / one step per string) — the wall recipe viewer renders them line by line.',
+  {
+    title: z.string(),
+    prep_minutes: z.number().optional().describe('Total minutes, prep + cook'),
+    ingredients: z.array(z.string()).describe('One ingredient per string, e.g. "3 oz bucatini"'),
+    instructions: z.array(z.string()).describe('One step per string'),
+    tags: z.array(z.string()).default([]),
+    source_label: z.string().optional(),
+    is_prep_friendly: z.boolean().default(false).describe('Batch-cooks well / leftovers-friendly'),
+  },
+  async (params) => {
+    const { data, error } = await supabase
+      .from('recipes')
+      .insert({ ...params, user_id: userId })
+      .select('id, title')
+      .single()
+    if (error) return fail(error)
+    return ok(data)
+  }
+)
+
+server.tool(
+  'symphony_get_week_plan',
+  'Get the meal plan for a week, creating an empty one if missing. week_start must be the Sunday of the week, YYYY-MM-DD. day_of_week in entries: 0=Sunday .. 6=Saturday.',
+  { week_start: z.string().describe('Sunday of the week, YYYY-MM-DD') },
+  async (params) => {
+    try {
+      const planId = await ensureWeekPlan(params.week_start)
+      const { data, error } = await supabase
+        .from('meal_plan_entries')
+        .select('id, day_of_week, slot, recipe_id, ad_hoc_title, notes, leftover_from, family_member_id, prepared_by_family_member_id, recipes(title)')
+        .eq('meal_plan_id', planId)
+        .order('day_of_week')
+        .order('slot')
+      if (error) return fail(error)
+      return ok({ meal_plan_id: planId, week_start: params.week_start, entries: data })
+    } catch (err) {
+      return fail(err as { message: string })
+    }
+  }
+)
+
+server.tool(
+  'symphony_add_meal_entry',
+  'Add an entry to a week plan. Provide recipe_id OR ad_hoc_title. day_of_week: 0=Sunday .. 6=Saturday. Use leftover_from to mark a reheat of an earlier entry.',
+  {
+    week_start: z.string().describe('Sunday of the week, YYYY-MM-DD'),
+    day_of_week: z.number().min(0).max(6),
+    slot: z.enum(['breakfast', 'lunch', 'snack', 'dinner', 'prep']),
+    recipe_id: z.string().optional().describe('Recipe UUID'),
+    ad_hoc_title: z.string().optional().describe('Free-text meal when there is no recipe'),
+    notes: z.string().optional(),
+    leftover_from: z.string().optional().describe('Entry UUID this reheats leftovers from'),
+  },
+  async (params) => {
+    try {
+      const { week_start, ...entry } = params
+      const planId = await ensureWeekPlan(week_start)
+      const { data, error } = await supabase
+        .from('meal_plan_entries')
+        .insert({ ...entry, meal_plan_id: planId })
+        .select('id, day_of_week, slot, recipe_id, ad_hoc_title')
+        .single()
+      if (error) return fail(error)
+      return ok(data)
+    } catch (err) {
+      return fail(err as { message: string })
+    }
+  }
+)
+
+server.tool(
+  'symphony_remove_meal_entry',
+  'Remove a meal plan entry by id.',
+  { id: z.string().describe('Entry UUID') },
+  async (params) => {
+    const { error } = await supabase.from('meal_plan_entries').delete().eq('id', params.id)
+    if (error) return fail(error)
+    return ok({ deleted: params.id })
+  }
+)
+
+server.tool(
+  'symphony_list_lists',
+  'List lists (grocery, food, etc.) with their items.',
+  { category: z.string().optional().describe('e.g. food_drink, shopping, home') },
+  async (params) => {
+    let query = supabase
+      .from('lists')
+      .select('id, title, category, visibility, list_items(id, text, note, completed)')
+    if (params.category) query = query.eq('category', params.category)
+    const { data, error } = await query
+    if (error) return fail(error)
+    return ok(data)
+  }
+)
+
+server.tool(
+  'symphony_add_list_item',
+  'Add an item to a list (e.g. a grocery list).',
+  {
+    list_id: z.string().describe('List UUID'),
+    text: z.string().describe('Item text, e.g. "2 lb chicken thighs"'),
+    note: z.string().optional(),
+  },
+  async (params) => {
+    const { data, error } = await supabase
+      .from('list_items')
+      .insert({ ...params, user_id: userId })
+      .select('id, text')
+      .single()
+    if (error) return fail(error)
+    return ok(data)
+  }
+)
+
+server.tool(
+  'symphony_get_note_by_title',
+  'Fetch the newest note with an exact title. The household meal preferences live in the note titled "Household Meal Preferences".',
+  { title: z.string().describe('Exact note title') },
+  async (params) => {
+    const { data, error } = await supabase
+      .from('notes')
+      .select('id, title, content, updated_at')
+      .eq('title', params.title)
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (error) return fail(error)
+    return ok(data ?? { found: false, title: params.title })
+  }
+)
+
+server.tool(
+  'symphony_upsert_note',
+  'Create or update (matched by exact title) a household-shared note.',
+  {
+    title: z.string(),
+    content: z.string(),
+  },
+  async (params) => {
+    const { data: existing } = await supabase
+      .from('notes')
+      .select('id')
+      .eq('title', params.title)
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    if (existing) {
+      const { data, error } = await supabase
+        .from('notes')
+        .update({ content: params.content, updated_at: new Date().toISOString() })
+        .eq('id', existing.id)
+        .select('id, title')
+        .single()
+      if (error) return fail(error)
+      return ok({ ...data, action: 'updated' })
+    }
+    const { data, error } = await supabase
+      .from('notes')
+      .insert({ title: params.title, content: params.content, type: 'general', user_id: userId })
+      .select('id, title')
+      .single()
+    if (error) return fail(error)
+    return ok({ ...data, action: 'created' })
+  }
+)
+
+server.tool(
+  'symphony_list_dietary_restrictions',
+  'List household dietary restrictions. These are HARD filters for meal planning (allergies, never-serve rules).',
+  {},
+  async () => {
+    const { data, error } = await supabase
+      .from('dietary_restrictions')
+      .select('id, label, family_member_id')
+    if (error) return fail(error)
+    return ok(data)
+  }
+)
+
+server.tool(
+  'symphony_list_pantry',
+  'List pantry inventory stock levels (high / medium / low / out).',
+  { level: z.enum(['high', 'medium', 'low', 'out']).optional() },
+  async (params) => {
+    let query = supabase.from('pantry_inventory').select('id, pattern, level').order('pattern')
+    if (params.level) query = query.eq('level', params.level)
+    const { data, error } = await query
+    if (error) return fail(error)
+    return ok(data)
+  }
+)
+
+server.tool(
+  'symphony_set_pantry_level',
+  'Set the stock level for a pantry item pattern (upserts).',
+  {
+    pattern: z.string().describe('Item pattern, e.g. "olive oil"'),
+    level: z.enum(['high', 'medium', 'low', 'out']),
+  },
+  async (params) => {
+    const { data, error } = await supabase
+      .from('pantry_inventory')
+      .upsert({ user_id: userId, pattern: params.pattern, level: params.level }, { onConflict: 'user_id,pattern' })
+      .select('pattern, level')
+      .single()
+    if (error) return fail(error)
+    return ok(data)
+  }
+)
+
 // --- Start ---
 
 async function main() {
