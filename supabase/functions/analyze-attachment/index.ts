@@ -1,0 +1,160 @@
+// ANALYZE-ATTACHMENT — given an attachments row (image or PDF), runs Claude
+// vision and writes a validated, closed-vocabulary facet list onto the row
+// (spec: docs/superpowers/specs/2026-07-14-attachment-facets-design.md).
+// Idempotent: analyzed_at set → no-op. Failures write facets [] + analyzed_at
+// after one retry so the panel quietly shows nothing. Auth: user JWT; row
+// reads/writes go through the caller-scoped client so RLS enforces ownership.
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+
+const MODEL = 'claude-sonnet-4-6'
+const MAX_FACETS = 12
+const MAX_ITEMS = 20
+const MAX_CONTEXT = 300
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+}
+const json = (b: unknown, status = 200) =>
+  new Response(JSON.stringify(b), { status, headers: { ...corsHeaders, 'content-type': 'application/json' } })
+
+function buildPrompt(entityContext: string): string {
+  return `You extract actionable facts from a file the user attached to an item in Symphony, their personal task/calendar app.
+Attached to: ${entityContext || '(no context)'}
+
+Respond with ONLY a JSON object (no markdown fences, no prose): {"facets":[...]}. Each facet is one of:
+{"type":"summary","text":"one sentence: what this file is"}
+{"type":"location","label":"Party address","address":"full address, complete enough to navigate to"}
+{"type":"access_code","label":"Door code","code":"exactly as printed"}
+{"type":"phone","label":"Host","number":"+1 ..."}
+{"type":"datetime","label":"Check-in","iso":"2026-07-18T16:00:00"}
+{"type":"link","label":"Registry","url":"https://..."}
+{"type":"checklist","label":"To do","items":["RSVP by Friday","Bring a bathing suit"]}
+{"type":"purchase_item","name":"item to buy","specs":"size, model, wattage — everything visible or inferable"}
+
+Rules:
+- Exactly one summary, first.
+- Only facets plainly supported by the file — never invent or pad.
+- Prefer fewer, higher-value facets; skip trivia.
+- datetime iso is the file's local time; no timezone guessing.
+- A photo of a broken/burned-out part or product → purchase_item with buy-ready specs.
+- A document/screenshot → transcribe the load-bearing facts into typed facets, not prose.`
+}
+
+// Twin of src/types/facets.ts parseFacets — duplicated because edge functions
+// can't import from src/. Keep the two in sync.
+function str(v: unknown): string | null {
+  return typeof v === 'string' && v.trim() ? v.trim() : null
+}
+function parseOne(raw: unknown): Record<string, unknown> | null {
+  if (typeof raw !== 'object' || raw === null) return null
+  const f = raw as Record<string, unknown>
+  const label = str(f.label) ?? undefined
+  switch (f.type) {
+    case 'summary': { const text = str(f.text); return text ? { type: 'summary', text } : null }
+    case 'location': { const address = str(f.address); return address ? { type: 'location', label, address } : null }
+    case 'access_code': { const code = str(f.code); return code ? { type: 'access_code', label: label ?? 'Code', code } : null }
+    case 'phone': { const number = str(f.number); return number ? { type: 'phone', label, number } : null }
+    case 'datetime': { const iso = str(f.iso); return iso && label ? { type: 'datetime', label, iso } : null }
+    case 'link': { const url = str(f.url); return url && /^https?:\/\//.test(url) ? { type: 'link', label, url } : null }
+    case 'checklist': {
+      const items = Array.isArray(f.items) ? f.items.map(str).filter((s): s is string => !!s).slice(0, MAX_ITEMS) : []
+      return items.length ? { type: 'checklist', label, items } : null
+    }
+    case 'purchase_item': { const name = str(f.name); const specs = str(f.specs); return name && specs ? { type: 'purchase_item', name, specs } : null }
+    default: return null
+  }
+}
+function parseFacets(text: string): Record<string, unknown>[] {
+  const stripped = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '')
+  const parsed = JSON.parse(stripped) as { facets?: unknown }
+  if (!Array.isArray(parsed.facets)) throw new Error('No facets array')
+  return parsed.facets.map(parseOne).filter((f): f is Record<string, unknown> => f !== null).slice(0, MAX_FACETS)
+}
+
+async function callVision(fileUrl: string, isPdf: boolean, prompt: string, apiKey: string): Promise<string> {
+  const fileBlock = isPdf
+    ? { type: 'document', source: { type: 'url', url: fileUrl } }
+    : { type: 'image', source: { type: 'url', url: fileUrl } }
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
+    body: JSON.stringify({
+      model: MODEL,
+      max_tokens: 1500,
+      messages: [{ role: 'user', content: [fileBlock, { type: 'text', text: prompt }] }],
+    }),
+  })
+  if (!res.ok) throw new Error(`Anthropic returned ${res.status}: ${(await res.text()).slice(0, 300)}`)
+  const data = (await res.json()) as { content?: { type: string; text?: string }[] }
+  const text = data.content?.find((b) => b.type === 'text')?.text
+  if (typeof text !== 'string') throw new Error('No text in Anthropic response')
+  return text
+}
+
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
+  if (req.method !== 'POST') return json({ error: 'POST only' }, 405)
+
+  const authHeader = req.headers.get('Authorization')
+  if (!authHeader?.startsWith('Bearer ')) return json({ error: 'Missing Authorization' }, 401)
+
+  const apiKey = Deno.env.get('ANTHROPIC_API_KEY')
+  const url = Deno.env.get('SUPABASE_URL')
+  const anon = Deno.env.get('SUPABASE_ANON_KEY')
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+  if (!apiKey || !url || !anon || !serviceKey) return json({ error: 'Missing server config' }, 500)
+
+  const service = createClient(url, serviceKey)
+  const { data: { user }, error: authErr } = await service.auth.getUser(authHeader.slice('Bearer '.length))
+  if (authErr || !user) return json({ error: 'Invalid token' }, 401)
+
+  // User-scoped client: every table op below is RLS-enforced as the caller.
+  const db = createClient(url, anon, { global: { headers: { Authorization: authHeader } } })
+
+  let body: { attachmentId?: string; entityContext?: string }
+  try { body = await req.json() } catch { return json({ error: 'Invalid JSON body' }, 400) }
+  const { attachmentId } = body
+  if (!attachmentId) return json({ error: 'attachmentId required' }, 400)
+  const entityContext = (body.entityContext ?? '').slice(0, MAX_CONTEXT)
+
+  const { data: row, error: rowErr } = await db
+    .from('attachments')
+    .select('id, storage_path, file_type, analyzed_at')
+    .eq('id', attachmentId)
+    .maybeSingle()
+  if (rowErr) return json({ error: `Attachment lookup failed: ${rowErr.message}` }, 500)
+  if (!row) return json({ error: 'Attachment not found' }, 404)
+  if (row.analyzed_at) return json({ status: 'already' })
+
+  const isImage = row.file_type?.startsWith('image/')
+  const isPdf = row.file_type === 'application/pdf'
+  const finish = async (facets: unknown[]) => {
+    const { error } = await db.from('attachments')
+      .update({ facets, analyzed_at: new Date().toISOString() })
+      .eq('id', attachmentId)
+    if (error) console.error('facets write failed:', error.message)
+  }
+  if (!isImage && !isPdf) { await finish([]); return json({ status: 'skipped' }) }
+
+  const { data: signed, error: signErr } = await service.storage
+    .from('attachments')
+    .createSignedUrl(row.storage_path, 600)
+  if (signErr || !signed?.signedUrl) return json({ error: `Could not sign URL: ${signErr?.message}` }, 500)
+
+  const prompt = buildPrompt(entityContext)
+  let facets: Record<string, unknown>[] = []
+  try {
+    facets = parseFacets(await callVision(signed.signedUrl, isPdf, prompt, apiKey))
+  } catch (err) {
+    console.error('first analysis attempt failed, retrying once:', err instanceof Error ? err.message : err)
+    try {
+      facets = parseFacets(await callVision(signed.signedUrl, isPdf, prompt, apiKey))
+    } catch (err2) {
+      console.error('analysis failed after retry:', err2 instanceof Error ? err2.message : err2)
+    }
+  }
+  await finish(facets)
+  return json({ status: 'done', facetCount: facets.length })
+})
