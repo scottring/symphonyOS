@@ -337,14 +337,44 @@ export function HorizonView({ horizon }: HorizonViewProps) {
     [pushTask, setBucket],
   );
 
+  // "Copy to week" (month rows): the weekly session's copy-down as a row action.
+  // A COPY, never a move — the original stays on the month list so the month
+  // review still gets to claim it. Bucket rides the INSERT (race guard above).
+  const [copiedToWeek, setCopiedToWeek] = useState<Set<string>>(new Set());
+  const copyToWeek = useCallback(
+    async (task: Task) => {
+      setCopiedToWeek((prev) => new Set(prev).add(task.id));
+      await addTask(task.title, task.contactId ?? undefined, task.projectId ?? undefined, undefined, {
+        assignedTo: task.assignedTo ?? getCurrentUserMember()?.id,
+        context: task.context,
+        bucket: 'week',
+      });
+    },
+    [addTask, getCurrentUserMember],
+  );
+
   const renderRow = useCallback(
     (task: Task) => {
       const project = projects.find((p) => p.id === task.projectId);
-      // Season rows speak the guided session's seasonal vocabulary — Change /
-      // Put aside — never the day/week/month routing chips, which belong to
-      // execution horizons. Months copy down during monthly planning instead.
-      const seasonMenu = (
+      // Season and month rows speak their altitude — Change / Put aside (month
+      // adds Copy to week) — never the day-routing chips, which belong to
+      // execution horizons. Week/Today route; Month/Season copy or park.
+      const parkingMenu = (
         <div className="flex items-center gap-1">
+          {horizon === 'month' && (copiedToWeek.has(task.id) ? (
+            <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md text-primary-700 bg-primary-100">
+              <Check className="w-3 h-3" strokeWidth={3} /> On the week list
+            </span>
+          ) : (
+            <button
+              type="button"
+              title="Copy onto this week's list (stays on the month list too)"
+              onClick={() => void copyToWeek(task)}
+              className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md text-primary-700 bg-primary-50 hover:bg-primary-100 transition-colors"
+            >
+              <Plus className="w-3 h-3" /> Copy to week
+            </button>
+          ))}
           <button
             type="button"
             onClick={() => handleSelect(task.id)}
@@ -381,7 +411,7 @@ export function HorizonView({ horizon }: HorizonViewProps) {
           quickActions={[]}
           onQuickAction={() => {}}
           triageMenu={
-            horizon === 'season' ? seasonMenu : (
+            horizon === 'season' || horizon === 'month' ? parkingMenu : (
               <TriageWhenMenu
                 onPick={(when) => applyWhen(task, when)}
                 onPickDate={(date) => pushTask(task.id, date)}
@@ -398,7 +428,7 @@ export function HorizonView({ horizon }: HorizonViewProps) {
         />
       );
     },
-    [projects, familyMembers, horizon, setBucket, applyWhen, pushTask, deleteTask, toggleTask, updateTask, handleSelect, scheduleActions, handleCreateProjectForTask, navigate],
+    [projects, familyMembers, horizon, setBucket, copiedToWeek, copyToWeek, applyWhen, pushTask, deleteTask, toggleTask, updateTask, handleSelect, scheduleActions, handleCreateProjectForTask, navigate],
   );
 
   // ── "Plan the [horizon]" — routes to the Today rung with a ?plan flag; the
