@@ -6,6 +6,7 @@
 // hook's existing behavior); disconnected falls back to a dated task.
 import { useState, useMemo, useCallback } from 'react'
 import { CalendarPlus, Check } from 'lucide-react'
+import { DOMAIN_LABELS } from '@/lib/today/domainFilter'
 import { useGuided } from '../GuidedContext'
 
 function toInputValue(d: Date): string {
@@ -15,8 +16,11 @@ function toInputValue(d: Date): string {
 }
 
 export function BookNextStep() {
-  const { step, host, periodEnd } = useGuided()
-  const title = step.props?.bookTitle ?? 'Planning session'
+  const { step, host, periodEnd, domain } = useGuided()
+  const baseTitle = step.props?.bookTitle ?? 'Planning session'
+  // Domain sessions book a domain-named next session ("Work — Seasonal
+  // planning session") so parallel cadences don't collide on the calendar.
+  const title = domain === 'universal' ? baseTitle : `${DOMAIN_LABELS[domain]} — ${baseTitle}`
   const defaultDate = useMemo(() => {
     const d = new Date(periodEnd)
     d.setDate(d.getDate() + 1)

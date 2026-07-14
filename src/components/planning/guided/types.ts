@@ -5,7 +5,8 @@
 // never import components.
 
 import type { PlanningHorizon, PlanningNotes } from '@/hooks/usePlanningSession'
-import type { TaskBucket } from '@/types/task'
+import type { TaskBucket, TaskContext } from '@/types/task'
+import type { PlanningDomain } from '@/lib/today/domainFilter'
 
 export type StepType =
   | 'narration'      // instruction moment, Continue
@@ -28,6 +29,11 @@ export interface GuidedStepConfig {
   title: string
   /** Shown on screen AND spoken. Single source of truth for the voice. */
   narration: string
+  /** Domain-session overrides for lines whose default wording is whole-life
+   *  ("each other and the kids"). Variant narration is text-only until its
+   *  audio is generated — narrationClip's exact-text match falls back to
+   *  silent display by design. Universal always uses the base fields. */
+  byDomain?: Partial<Record<TaskContext, { narration?: string; placeholder?: string }>>
   props?: {
     /** reflect: which notes key the textarea persists to. */
     notesKey?: string
@@ -68,6 +74,8 @@ export interface GuidedSessionConfig {
 /** Everything a step component receives. Passed via GuidedContext. */
 export interface GuidedStepRenderContext {
   horizon: PlanningHorizon
+  /** The domain this session runs in. 'universal' = whole-life (default). */
+  domain: PlanningDomain
   periodToken: string
   periodLabel: string
   periodStart: Date

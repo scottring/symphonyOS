@@ -46,6 +46,11 @@ export const SESSIONS: Record<PlanningHorizon, GuidedSessionConfig> = {
       {
         id: 'write-goals', type: 'domains-goals', title: "This year’s goals",
         narration: "Now write the year’s goals. Pick three to eight areas of life — health, family, work, home, fun — and under each one, write what you want without censoring yourself. One rule of thumb: aim for two goals that make you smile for every one that feels like an obligation.",
+        byDomain: {
+          work: { narration: "Now write the year’s work goals. Under each area work touches — the craft, the business, the money, the people — write what you want without censoring yourself. Keep the rule of thumb: aim for two goals that make you smile for every one that feels like an obligation." },
+          family: { narration: "Now write the year’s family goals. Under each area of family life — the kids, each other, the home, the traditions — write what you want without censoring yourself. Aim for two goals that make you smile for every one that feels like an obligation." },
+          personal: { narration: "Now write the year’s personal goals. Under each area that is yours alone — health, growth, fun, rest — write what you want without censoring yourself. Aim for two goals that make you smile for every one that feels like an obligation." },
+        },
       },
       {
         id: 'book-next', type: 'book-next', title: 'Anchor the next step',
@@ -134,6 +139,16 @@ export const SESSIONS: Record<PlanningHorizon, GuidedSessionConfig> = {
         id: 'look-within', type: 'reflect', title: 'Look within',
         narration: "A quick check on yourself, and on the people around you. How is your energy? And is there anything with each other or the kids that needs attention this month?",
         props: { notesKey: 'relationships', placeholder: 'Energy — and what needs attention with each other and the kids…' },
+        byDomain: {
+          work: {
+            narration: "A quick check on yourself, and on the people you work with. How is your energy for this? And is there anything with a colleague, a client, or a commitment that needs attention this month?",
+            placeholder: 'Energy — and what needs attention with colleagues, clients, commitments…',
+          },
+          personal: {
+            narration: "A quick check on yourself, for yourself. How is your energy, your health, your headspace? And is there a habit or a need of your own that deserves attention this month?",
+            placeholder: 'Energy, health, headspace — what of yours needs attention…',
+          },
+        },
       },
       {
         id: 'write-month', type: 'write-list', title: "Write the month’s list",
@@ -193,6 +208,16 @@ export const SESSIONS: Record<PlanningHorizon, GuidedSessionConfig> = {
         id: 'concerns', type: 'reflect', title: 'Concerns & communication',
         narration: 'Last: anything that needs to be talked about, not just done. Logistics to coordinate, decisions pending, worries worth naming. This note is shared — it is the written half of the weekly conversation.',
         props: { notesKey: 'concerns', placeholder: 'To discuss, coordinate, or keep an eye on…' },
+        byDomain: {
+          work: {
+            narration: 'Last: anything that needs to be talked about, not just done. Decisions pending, conversations you are avoiding, things to raise with the people you work with. Naming them here is how they stop circling in your head.',
+            placeholder: 'To raise, decide, or keep an eye on at work…',
+          },
+          personal: {
+            narration: 'Last: anything worth naming, just for you. Worries circling, decisions pending, things you keep putting off. Written down, they take up less room in your head.',
+            placeholder: 'Worries, decisions, things to keep an eye on…',
+          },
+        },
       },
     ],
   },

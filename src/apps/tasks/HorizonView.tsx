@@ -34,6 +34,7 @@ import { DenseInboxRow } from '@/components/schedule/DenseInboxRow';
 import { TriageWhenMenu, type TriageWhen } from '@/components/schedule/TriageWhenMenu';
 import { selectOverdue } from '@/lib/today/taskPools';
 import { selectHorizonPool, HORIZONS, type HorizonId } from '@/lib/today/horizons';
+import { matchesDomain } from '@/lib/today/domainFilter';
 import { makeAssigneeFilter } from '@/lib/today/assigneeFilter';
 import { useConvertTaskToProject } from '@/hooks/useConvertTaskToProject';
 import { applyTriageWhen } from '@/lib/triage/applyWhen';
@@ -123,6 +124,15 @@ export function HorizonView({ horizon }: HorizonViewProps) {
   // it later is a one-line change. ──
   const match = useMemo(() => makeAssigneeFilter([]), []);
 
+  // ── Domain lens: the horizon pages follow the app's domain switcher like
+  // the rest of the app. Universal = everything; a domain shows only its own
+  // items (untagged live at the whole-life level). Filtered ONCE here so the
+  // pool, carry-over, rail counts and reference panel all agree. ──
+  const domainTasks = useMemo(
+    () => (currentDomain === 'universal' ? tasks : tasks.filter((t) => matchesDomain(t.context, currentDomain))),
+    [tasks, currentDomain],
+  );
+
   // ── The scoped pool + carry-over. THE INVARIANT lives here. ──
   // Carry-over (overdue *dated* items) is a near-term concept: it belongs to
   // Today (rendered by HomeView) and to the weekly working set ("what you didn't
@@ -132,12 +142,12 @@ export function HorizonView({ horizon }: HorizonViewProps) {
   // bug where the same 5 items appeared as "carried over" everywhere.
   const showCarryOver = horizon === 'week';
   const carryOver = useMemo(
-    () => (showCarryOver ? selectOverdue(tasks, true, match) : []),
-    [showCarryOver, tasks, match],
+    () => (showCarryOver ? selectOverdue(domainTasks, true, match) : []),
+    [showCarryOver, domainTasks, match],
   );
   const pool = useMemo(
-    () => selectHorizonPool(tasks, horizon, match),
-    [tasks, horizon, match],
+    () => selectHorizonPool(domainTasks, horizon, match),
+    [domainTasks, horizon, match],
   );
 
   // Live counts for the cascade rail (bucketed rungs only — today and year
@@ -145,10 +155,10 @@ export function HorizonView({ horizon }: HorizonViewProps) {
   const railCounts = useMemo(() => {
     const counts: Partial<Record<HorizonId, number>> = {};
     for (const h of HORIZONS) {
-      if (h.bucket && h.bucket !== 'timed') counts[h.id] = selectHorizonPool(tasks, h.id, match).length;
+      if (h.bucket && h.bucket !== 'timed') counts[h.id] = selectHorizonPool(domainTasks, h.id, match).length;
     }
     return counts;
-  }, [tasks, match]);
+  }, [domainTasks, match]);
 
   // The level above, for reference — each level keeps its OWN list; planning
   // means LOOKING at the level above while writing this one. Month looks at
@@ -158,15 +168,15 @@ export function HorizonView({ horizon }: HorizonViewProps) {
   const { areas, goals } = useGoalsContext();
   const referenceItems = useMemo<Array<{ id: string; title: string; goalId?: string }>>(() => {
     if (horizon === 'month') {
-      return selectHorizonPool(tasks, 'season', match).map((t) => ({ id: t.id, title: t.title }));
+      return selectHorizonPool(domainTasks, 'season', match).map((t) => ({ id: t.id, title: t.title }));
     }
     if (horizon === 'season') {
       return goals
-        .filter((g) => g.status === 'active')
+        .filter((g) => g.status === 'active' && matchesDomain(g.context, currentDomain))
         .map((g) => ({ id: g.id, title: g.name, goalId: g.id }));
     }
     return [];
-  }, [horizon, tasks, match, goals]);
+  }, [horizon, domainTasks, match, goals, currentDomain]);
   const referenceLabel = horizon === 'month' ? `Your ${periodLabel('season')?.split(' ')[0]} list` : `Your ${new Date().getFullYear()} goals`;
   const poolTitles = useMemo(() => new Set(pool.map((t) => t.title)), [pool]);
   const [refOpen, setRefOpen] = useState(false);

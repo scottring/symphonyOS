@@ -5,9 +5,10 @@
 // from the registry; unknown types render nothing (the config integrity test
 // is the real guard).
 import { useMemo, useState, useCallback, useEffect, useRef, type ComponentType } from 'react'
-import { X, ArrowLeft, ArrowRight, Volume2, VolumeX, Check } from 'lucide-react'
+import { X, ArrowLeft, ArrowRight, Volume2, VolumeX, Check, Briefcase, Users, User } from 'lucide-react'
 import { usePlanningSession } from '@/hooks/usePlanningSession'
 import type { PlanningHorizon } from '@/hooks/usePlanningSession'
+import { domainSessionToken, DOMAIN_LABELS, type PlanningDomain } from '@/lib/today/domainFilter'
 import { SESSIONS } from './sessions'
 import { guidedPeriod } from './periods'
 import { narrationClip } from './narration'
@@ -27,8 +28,15 @@ export function getRegisteredTypes(): StepType[] {
   return Object.keys(REGISTRY) as StepType[]
 }
 
+const DOMAIN_ICONS = { work: Briefcase, family: Users, personal: User } as const
+
 interface Props {
   horizon: PlanningHorizon
+  /** Which domain this session runs in. 'universal' = the whole-life session
+   *  (bare period token — all pre-existing sessions). A domain gets its own
+   *  planning_sessions row via the suffixed token, so Work and Family can
+   *  plan the same week independently. */
+  domain: PlanningDomain
   host: GuidedHost
   /** Abandon (the header X): close the overlay, stay where you were. */
   onClose: () => void
@@ -41,10 +49,10 @@ interface Props {
   onChain?: (next: PlanningHorizon) => void
 }
 
-export function GuidedSession({ horizon, host, onClose, onFinished, onChain }: Props) {
+export function GuidedSession({ horizon, domain, host, onClose, onFinished, onChain }: Props) {
   const config = SESSIONS[horizon]
   const period = useMemo(() => guidedPeriod(horizon), [horizon])
-  const { notes, patchNotes, loading } = usePlanningSession(horizon, period.token)
+  const { notes, patchNotes, loading } = usePlanningSession(horizon, domainSessionToken(period.token, domain))
 
   // Resume position starts at 0 and is synced from notes.stepIndex exactly
   // once per horizon, the first time loading flips false. `syncedHorizonRef`
@@ -94,8 +102,14 @@ export function GuidedSession({ horizon, host, onClose, onFinished, onChain }: P
     onChain(config.chain.horizon)
   }, [completeSession, config.chain, onChain])
 
-  const clipUrl = loading ? null : narrationClip(horizon, step.id, step.narration)
+  // Domain sessions may override a step's whole-life wording. Variant text
+  // misses the narration manifest's exact-text match and displays silently —
+  // that fallback is the design until variant audio is generated.
+  const variant = domain !== 'universal' ? step.byDomain?.[domain] : undefined
+  const narrationText = variant?.narration ?? step.narration
+  const clipUrl = loading ? null : narrationClip(horizon, step.id, narrationText)
   const { muted, toggleMuted } = useNarrationPlayer(horizon, clipUrl)
+  const DomainIcon = domain !== 'universal' ? DOMAIN_ICONS[domain] : null
 
   const Body = REGISTRY[step.type]
 
@@ -103,7 +117,14 @@ export function GuidedSession({ horizon, host, onClose, onFinished, onChain }: P
     <div className="fixed inset-0 z-50 bg-bg-base flex flex-col" role="dialog" aria-label={config.title}>
       <header className="flex items-center justify-between px-6 py-4 border-b border-neutral-200/70 shrink-0">
         <div>
-          <h1 className="font-display text-2xl text-neutral-800">{config.title}</h1>
+          <div className="flex items-center gap-2.5">
+            <h1 className="font-display text-2xl text-neutral-800">{config.title}</h1>
+            {DomainIcon && domain !== 'universal' && (
+              <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full border border-primary-200 bg-primary-50 text-primary-700">
+                <DomainIcon className="w-3 h-3" /> {DOMAIN_LABELS[domain]}
+              </span>
+            )}
+          </div>
           <p className="text-sm text-neutral-500">
             {period.label} · Step {safeIndex + 1} of {config.steps.length}
           </p>
@@ -135,10 +156,10 @@ export function GuidedSession({ horizon, host, onClose, onFinished, onChain }: P
             <>
               <div>
                 <h2 className="font-display text-xl text-neutral-800 mb-2">{step.title}</h2>
-                <p className="text-[15px] leading-relaxed text-neutral-600">{step.narration}</p>
+                <p className="text-[15px] leading-relaxed text-neutral-600">{narrationText}</p>
               </div>
               <GuidedProvider value={{
-                horizon, periodToken: period.token, periodLabel: period.label,
+                horizon, domain, periodToken: period.token, periodLabel: period.label,
                 periodStart: period.start, periodEnd: period.end,
                 notes, patchNotes, host, step, goNext: () => (last ? finish() : go(safeIndex + 1)),
               }}>
