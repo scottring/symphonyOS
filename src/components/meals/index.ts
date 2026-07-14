@@ -1,5 +1,5 @@
 export { MemoryShelfPage } from './shelf/MemoryShelfPage'
-export { MealPlanRitualPage, PlannerPage } from './plan/MealPlanRitualPage'
+export { MealPlanPage, PlannerPage } from './plan/MealPlanPage'
 export { TodayPage } from './today/TodayPage'
 export { MealsTabs } from './MealsTabs'
 export { StandingHabitsPage } from './habits/StandingHabitsPage'

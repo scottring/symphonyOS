@@ -22,12 +22,9 @@ import { UndoToast } from './UndoToast'
 import { DistributeLeftoversModal } from './DistributeLeftoversModal'
 import { DAY_MEAL_SLOTS, MEAL_SLOT_LABEL } from '@/types/meal-planner'
 import type { MealPlanEntry, MealSlot, Recipe } from '@/types/meal-planner'
-import { RitualStatus } from './RitualStatus'
 import { InlineBriefComposer } from './InlineBriefComposer'
-import { RitualTour } from './RitualTour'
 import { GroceryReviewSection } from '../groceries/GroceryReviewSection'
 import { RestrictionsSection } from '../habits/RestrictionsSection'
-import { EmptyState as OnboardingEmptyState } from '../../onboarding/v2/EmptyState'
 
 /** Map FamilyMember color to Tailwind classes for initial chip. */
 function memberColorClass(color: string): string {
@@ -42,11 +39,9 @@ function memberColorClass(color: string): string {
   }
 }
 
-/** Surface 3 — Full Plan View (the document). The week as a single
- *  Family-Meal-Plan document with collapsible sections and day cards.
- *  Unified with the Brief composer (previously BriefComposerPage) and
- *  the inline grocery review (previously SendToGroceriesModal). */
-export function MealPlanRitualPage() {
+/** The week as a single Family-Meal-Plan document: day cards first,
+ *  supporting sections (brief, habits, batch, groceries) collapsed below. */
+export function MealPlanPage() {
   const navigate = useNavigate()
   const weekStart = useMemo(() => sundayOfWeek(new Date()), [])
   const { plan, loading, error, addMeal, removeMeal, setParameter, clearWeek, updateMealPreparer } = useMealPlan(weekStart)
@@ -60,12 +55,6 @@ export function MealPlanRitualPage() {
   const [picker, setPicker] = useState<{ dayOfWeek: number; slot: MealSlot; familyMemberId?: string; replaceEntryId?: string } | null>(null)
   const [chatOpen, setChatOpen] = useState(false)
   const [previewedDay, setPreviewedDay] = useState<number | null>(null)
-
-  const [tourMounted, setTourMounted] = useState(() => {
-    if (typeof window === 'undefined') return false
-    return localStorage.getItem('symphony_meal_tour_v1_completed') !== 'true'
-  })
-  const [lastSendAt, setLastSendAt] = useState<Date | null>(null)
 
   const recipesById = useMemo(() => {
     const map = new Map<string, Recipe>()
@@ -91,9 +80,8 @@ export function MealPlanRitualPage() {
   }, [habits, familyMembers])
 
   /** entries keyed first by dayOfWeek then by canonical slot. Each slot
-   *  bucket holds an array — multiple entries support per-person variants
-   *  (Iris / Scott / Kids). Legacy slots collapse: lunch_iris/lunch_scott →
-   *  lunch (preserving the family_member_id), kid_alternate → dinner. */
+   *  bucket holds an array — multiple entries support per-person variants.
+   *  Legacy slots collapse into their canonical day-meal slots. */
   const entriesByDayBySlot = useMemo(() => {
     const m = new Map<number, Map<MealSlot, MealPlanEntry[]>>()
     plan?.entries.forEach(e => {
@@ -312,27 +300,79 @@ export function MealPlanRitualPage() {
         </div>
       </div>
 
-      {/* 1. Status indicator — anchor #top */}
-      <section id="top" className="mt-4 mb-8 scroll-mt-8">
-        <RitualStatus
-          hasBrief={!!brief?.body?.trim()}
-          planDrafted={!!brief?.generatedAt || (plan?.entries.length ?? 0) > 0}
-          prepCount={sundayPrep.length}
-          missingGroceriesCount={status.missingItems.length}
-          onRestartTour={() => {
-            localStorage.removeItem('symphony_meal_tour_v1_completed')
-            setTourMounted(true)
-          }}
-        />
+      {/* 1. The week — day stack — anchor #plan */}
+      <section id="plan" className="mt-6 scroll-mt-8">
+        <div className="mt-2">
+          <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-neutral-500 mb-3">
+            THE WEEK
+          </div>
+          {[0, 1, 2, 3, 4, 5, 6].map(d => {
+            const date = dateForDayOfWeek(weekStart, d)
+            const today = isTodayHelper(date)
+            const slotMap = entriesByDayBySlot.get(d) ?? new Map<MealSlot, MealPlanEntry[]>()
+            return (
+              <DayCard
+                key={d}
+                dayOfWeek={d}
+                date={date}
+                isToday={today}
+                entriesBySlot={slotMap}
+                recipesById={recipesById}
+                familyMembers={familyMembers}
+                parameter={plan?.parameter}
+                parentLabelById={parentLabelById}
+                habitsByOwnerSlot={habitsByOwnerSlot}
+                highlighted={previewedDay === d}
+                onPickForSlot={(slot, familyMemberId) =>
+                  setPicker({ dayOfWeek: d, slot, familyMemberId })
+                }
+                onReplace={(entryId) => {
+                  const entry = plan?.entries.find(e => e.id === entryId)
+                  if (!entry) return
+                  setPicker({
+                    dayOfWeek: d,
+                    slot: canonicalSlot(entry.slot) ?? 'dinner',
+                    familyMemberId: entry.familyMemberId,
+                    replaceEntryId: entryId,
+                  })
+                }}
+                onRemove={(entryId) => removeMeal(entryId)}
+                onConsolidateSlot={handleConsolidateSlot}
+                onSplitSharedSlot={(slot, entry) => handleSplitSharedSlot(d, slot, entry, familyMembers)}
+                onAssignCook={(entryId, fmId) => updateMealPreparer(entryId, fmId)}
+              />
+            )
+          })}
+        </div>
       </section>
 
-      {/* 2. Brief composer — anchor #brief */}
-      <section id="brief" className="mb-8 scroll-mt-8">
-        <InlineBriefComposer weekStart={weekStart} />
+      {/* 2. Symphony's read on this week — anchor #read, visible when diffProse exists */}
+      {brief?.diffProse && (
+        <section id="read" className="mt-8 scroll-mt-8">
+          <div className="rounded-3xl border border-neutral-200 bg-bg-elevated shadow-card p-5">
+            <div className="text-[0.7rem] font-bold uppercase tracking-[0.25em] text-neutral-500 mb-2">
+              SYMPHONY'S READ ON THIS WEEK
+            </div>
+            <p className="font-display text-[1.05rem] text-neutral-700 leading-relaxed whitespace-pre-line">
+              {brief.diffProse}
+            </p>
+          </div>
+        </section>
+      )}
+
+      {/* 3. Weekly brief — anchor #brief, COLLAPSED by default */}
+      <section id="brief" className="mt-8 scroll-mt-8">
+        <CollapseSection
+          title="Weekly brief"
+          count={brief?.body?.trim() ? 1 : 0}
+          initialOpen={false}
+        >
+          <InlineBriefComposer weekStart={weekStart} />
+        </CollapseSection>
       </section>
 
-      {/* 3. Habits + Restrictions — anchor #habits, COLLAPSED by default */}
-      <section id="habits" className="scroll-mt-8">
+      {/* 4. Habits + Restrictions — anchor #habits, COLLAPSED by default */}
+      <section id="habits" className="mt-8 scroll-mt-8">
         <CollapseSection
           title="Standing habits + restrictions"
           count={habits.length}
@@ -389,80 +429,7 @@ export function MealPlanRitualPage() {
         </CollapseSection>
       </section>
 
-      {/* 4. Symphony's read on this week — anchor #read, visible when diffProse exists */}
-      {brief?.diffProse && (
-        <section id="read" className="mb-8 scroll-mt-8">
-          <div className="rounded-3xl border border-neutral-200 bg-bg-elevated shadow-card p-5">
-            <div className="text-[0.7rem] font-bold uppercase tracking-[0.25em] text-neutral-500 mb-2">
-              SYMPHONY'S READ ON THIS WEEK
-            </div>
-            <p className="font-display text-[1.05rem] text-neutral-700 leading-relaxed whitespace-pre-line">
-              {brief.diffProse}
-            </p>
-          </div>
-        </section>
-      )}
-
-      {/* 5. The week — day stack — anchor #plan. When the week is fully empty
-              (no brief + no entries), surface the onboarding-style EmptyState
-              in place of the day stack. The brief composer above (#brief) stays
-              visible so the user can write their first brief inline. */}
-      {!brief?.body?.trim() && (plan?.entries.length ?? 0) === 0 ? (
-        <section id="plan" className="scroll-mt-8">
-          <OnboardingEmptyState
-            weekStart={weekStart}
-            brief={brief}
-            habitsCount={habits.length}
-          />
-        </section>
-      ) : (
-      <section id="plan" className="scroll-mt-8">
-        <div className="mt-2">
-          <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-neutral-500 mb-3">
-            THE WEEK
-          </div>
-          {[0, 1, 2, 3, 4, 5, 6].map(d => {
-            const date = dateForDayOfWeek(weekStart, d)
-            const today = isTodayHelper(date)
-            const slotMap = entriesByDayBySlot.get(d) ?? new Map<MealSlot, MealPlanEntry[]>()
-            return (
-              <DayCard
-                key={d}
-                dayOfWeek={d}
-                date={date}
-                isToday={today}
-                entriesBySlot={slotMap}
-                recipesById={recipesById}
-                familyMembers={familyMembers}
-                parameter={plan?.parameter}
-                parentLabelById={parentLabelById}
-                habitsByOwnerSlot={habitsByOwnerSlot}
-                highlighted={previewedDay === d}
-                onPickForSlot={(slot, familyMemberId) =>
-                  setPicker({ dayOfWeek: d, slot, familyMemberId })
-                }
-                onReplace={(entryId) => {
-                  const entry = plan?.entries.find(e => e.id === entryId)
-                  if (!entry) return
-                  setPicker({
-                    dayOfWeek: d,
-                    slot: canonicalSlot(entry.slot) ?? 'dinner',
-                    familyMemberId: entry.familyMemberId,
-                    replaceEntryId: entryId,
-                  })
-                }}
-                onRemove={(entryId) => removeMeal(entryId)}
-                onConsolidateSlot={handleConsolidateSlot}
-                onSplitSharedSlot={(slot, entry) => handleSplitSharedSlot(d, slot, entry, familyMembers)}
-                onAssignCook={(entryId, fmId) => updateMealPreparer(entryId, fmId)}
-              />
-            )
-          })}
-        </div>
-      </section>
-      )}
-
-      {/* 6. Distribute the batch — anchor #prep, COLLAPSED by default */}
+      {/* 5. Distribute the batch — anchor #prep, COLLAPSED by default */}
       <section id="prep" className="mt-8 scroll-mt-8">
         <CollapseSection
           title="Distribute the batch"
@@ -506,7 +473,7 @@ export function MealPlanRitualPage() {
         </CollapseSection>
       </section>
 
-      {/* 7. Grocery review — anchor #groceries, COLLAPSED by default */}
+      {/* 6. Grocery review — anchor #groceries, COLLAPSED by default */}
       <section id="groceries" className="mt-8 scroll-mt-8">
         <CollapseSection
           title="Review & send to groceries"
@@ -520,7 +487,6 @@ export function MealPlanRitualPage() {
             currentItemTexts={[]}
             recipesById={recipesById}
             onSent={() => {
-              setLastSendAt(new Date())
               status.refresh()
             }}
           />
@@ -575,23 +541,12 @@ export function MealPlanRitualPage() {
           />
         )
       })()}
-
-      {/* Tour — mounts conditionally based on localStorage */}
-      {tourMounted && (
-        <RitualTour
-          briefBody={brief?.body ?? ''}
-          planGeneratedAt={brief?.generatedAt}
-          planEntryCount={plan?.entries.length ?? 0}
-          lastSendAt={lastSendAt}
-          onDismiss={() => setTourMounted(false)}
-        />
-      )}
     </div>
   )
 }
 
 // Re-export shim so existing imports of PlannerPage continue to work.
-export { MealPlanRitualPage as PlannerPage }
+export { MealPlanPage as PlannerPage }
 
 /** Map any legacy or canonical slot to a canonical day-meal slot. */
 function canonicalSlot(slot: string): MealSlot | undefined {
