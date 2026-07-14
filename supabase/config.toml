@@ -283,6 +283,9 @@ verify_jwt = false
 [functions.log-medication]
 verify_jwt = false
 
+[functions.log-symptom]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327
