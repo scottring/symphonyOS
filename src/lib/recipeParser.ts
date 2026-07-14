@@ -15,6 +15,21 @@ export interface RecipeData {
   ingredients: string[]
   instructions: string[]
   source: string
+  /** Non-blocking household alerts (e.g. allergy ingredients) — surface in the import UI. */
+  warnings?: string[]
+}
+
+// ── Household ingredient flags ──────────────────────────────────
+
+/** Ingredients that trigger a non-blocking household warning on import. */
+const FLAGGED_INGREDIENTS: Array<{ pattern: RegExp; warning: string }> = [
+  { pattern: /avocado/i, warning: 'Contains avocado — household allergy (hard restriction).' },
+]
+
+export function ingredientWarnings(ingredients: string[]): string[] {
+  return FLAGGED_INGREDIENTS
+    .filter(f => ingredients.some(i => f.pattern.test(i)))
+    .map(f => f.warning)
 }
 
 export interface ParsedIngredient {
@@ -136,6 +151,8 @@ function normalizeRecipe(data: unknown, url: string): RecipeData {
     image = (recipe.image as Record<string, unknown>).url as string
   }
 
+  const warnings = ingredientWarnings(ingredients)
+
   return {
     title: String(recipe.name || 'Untitled Recipe'),
     description: recipe.description ? String(recipe.description) : undefined,
@@ -147,6 +164,7 @@ function normalizeRecipe(data: unknown, url: string): RecipeData {
     ingredients,
     instructions,
     source: new URL(url).hostname.replace(/^www\./, ''),
+    ...(warnings.length ? { warnings } : {}),
   }
 }
 

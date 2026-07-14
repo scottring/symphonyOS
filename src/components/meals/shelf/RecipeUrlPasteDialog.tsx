@@ -95,6 +95,9 @@ export function RecipeUrlPasteDialog({ isOpen, onClose, onSave, onSwitchToManual
           <>
             <div className="space-y-3">
               <h3 className="font-display text-2xl text-neutral-800">{preview.title}</h3>
+              {preview.warnings?.map(w => (
+                <p key={w} className="text-[14px] text-accent-500 font-medium">⚠ {w}</p>
+              ))}
               <p className="text-[14px] text-neutral-500">
                 {preview.ingredients.length} ingredients · {preview.instructions.length} steps
                 {preview.totalTime && ` · ${preview.totalTime}`}
