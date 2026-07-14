@@ -398,7 +398,18 @@ export function TapEventPanel(props: TapEventPanelProps) {
 
       {/* Attachments key on the stable Google event id (the same key event
           notes use), under the 'event_note' entity type the table allows. */}
-      <PanelPhotos entityType="event_note" entityId={eventId} />
+      <PanelPhotos
+        entityType="event_note"
+        entityId={eventId}
+        entityContext={[event.title, startTime && new Date(startTime).toLocaleString(), event.location].filter(Boolean).join(' — ')}
+        promotions={{
+          onAddPrepTask: props.onAddPrepTask,
+          onAddLink: props.onAddLink,
+          onUseLocation: props.onUpdateEventLocation && canEdit
+            ? (address) => props.onUpdateEventLocation!(eventId, address, calendarId)
+            : undefined,
+        }}
+      />
 
       <PanelLinks links={props.links} onAddLink={props.onAddLink} />
 

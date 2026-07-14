@@ -4,15 +4,21 @@ import {
   listAttachments,
   attachFile,
   deleteAttachment,
+  analyzeAttachment,
   ATTACHMENT_ACCEPT,
   type Attachment,
   type AttachmentEntityType,
 } from '@/lib/taskAttachments'
 import { CameraCaptureModal } from '@/components/capture/CameraCaptureModal'
+import { AttachmentFacets, type FacetPromotions } from './AttachmentFacets'
 
 interface PanelPhotosProps {
   entityType: AttachmentEntityType
   entityId: string
+  /** Short "attached to X" string that steers facet extraction. */
+  entityContext?: string
+  /** Handlers for promoting extracted facets into the entity's fields. */
+  promotions?: FacetPromotions
 }
 
 /**
@@ -23,9 +29,10 @@ interface PanelPhotosProps {
  * render as thumbnails; documents as file chips. Hover (or touch) shows a ✕
  * to remove. Everything opens full size in a new tab.
  */
-export function PanelPhotos({ entityType, entityId }: PanelPhotosProps) {
+export function PanelPhotos({ entityType, entityId, entityContext, promotions }: PanelPhotosProps) {
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [busy, setBusy] = useState(false)
+  const [analyzingIds, setAnalyzingIds] = useState<Set<string>>(new Set())
   const [showCamera, setShowCamera] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -48,12 +55,23 @@ export function PanelPhotos({ entityType, entityId }: PanelPhotosProps) {
   const attach = useCallback(async (blob: Blob, fileName?: string) => {
     setBusy(true)
     try {
-      if (await attachFile(entityType, entityId, blob, fileName)) await reload()
-      else flashNotice("Couldn't attach that file")
+      const result = await attachFile(entityType, entityId, blob, fileName)
+      if (!result) { flashNotice("Couldn't attach that file"); return }
+      await reload()
+      // Facet extraction (images + PDFs). Fire-and-forget: the attachment
+      // stands on its own; a panel closed mid-analysis just finds the stored
+      // facets on next open.
+      if (result.contentType.startsWith('image/') || result.contentType === 'application/pdf') {
+        setAnalyzingIds((prev) => new Set(prev).add(result.id))
+        void analyzeAttachment(result.id, entityContext).then(async () => {
+          await reload()
+          setAnalyzingIds((prev) => { const next = new Set(prev); next.delete(result.id); return next })
+        })
+      }
     } finally {
       setBusy(false)
     }
-  }, [entityType, entityId, reload, flashNotice])
+  }, [entityType, entityId, entityContext, reload, flashNotice])
 
   const remove = useCallback(async (att: Attachment) => {
     setBusy(true)
@@ -241,6 +259,17 @@ export function PanelPhotos({ entityType, entityId }: PanelPhotosProps) {
           ))}
         </div>
       )}
+
+      {/* The morphing artifact: extracted facets per attachment, plus a quiet
+          in-flight line while the vision pass runs. */}
+      {attachments.map((att) => (
+        <div key={`facets-${att.id}`}>
+          {analyzingIds.has(att.id) && !att.analyzedAt && (
+            <p className="text-[11px] text-neutral-400 mt-1.5 animate-pulse">Reading {att.fileName}…</p>
+          )}
+          <AttachmentFacets facets={att.facets} promotions={promotions} />
+        </div>
+      ))}
 
       <p className="text-[11px] text-neutral-400 mt-1.5" aria-live="polite">
         {notice ?? 'Snap, choose a file (PDF and docs welcome), paste (⌘V), or drag one in'}

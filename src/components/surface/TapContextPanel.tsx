@@ -166,7 +166,16 @@ export function TapContextPanel(props: TapContextPanelProps) {
         onDirectionsChange={props.onDirectionsChange}
       />
       <PanelWhy key={task.id} label="Notes" notes={task.notes} onChange={props.onNotesChange} onSaveToVault={props.onSaveNoteToVault} />
-      <PanelPhotos entityType="task" entityId={task.id} />
+      <PanelPhotos
+        entityType="task"
+        entityId={task.id}
+        entityContext={[task.title, task.notes?.split('\n')[0]].filter(Boolean).join(' — ')}
+        promotions={{
+          onAddPrepTask: props.onAddSubtask,
+          onAddLink: props.onAddLink,
+          onUseLocation: (address) => props.onUpdateLocation(address),
+        }}
+      />
       <PanelConversations taskId={task.id} />
       <PanelSubtasks
         subtasks={task.subtasks ?? []}

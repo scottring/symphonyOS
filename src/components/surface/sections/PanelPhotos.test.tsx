@@ -5,18 +5,21 @@ import { PanelPhotos } from './PanelPhotos'
 const listAttachments = vi.fn()
 const attachFile = vi.fn()
 const deleteAttachment = vi.fn()
+const analyzeAttachment = vi.fn()
 
 vi.mock('@/lib/taskAttachments', () => ({
   listAttachments: (...args: unknown[]) => listAttachments(...args),
   attachFile: (...args: unknown[]) => attachFile(...args),
   deleteAttachment: (...args: unknown[]) => deleteAttachment(...args),
+  analyzeAttachment: (...args: unknown[]) => analyzeAttachment(...args),
   ATTACHMENT_ACCEPT: 'image/*,application/pdf',
 }))
 
 describe('PanelPhotos', () => {
   beforeEach(() => {
     listAttachments.mockReset().mockResolvedValue([])
-    attachFile.mockReset().mockResolvedValue(true)
+    attachFile.mockReset().mockResolvedValue({ id: 'att-1', contentType: 'image/jpeg' })
+    analyzeAttachment.mockReset().mockResolvedValue(true)
     deleteAttachment.mockReset().mockResolvedValue(true)
   })
 
@@ -27,7 +30,7 @@ describe('PanelPhotos', () => {
 
   it('renders image attachments as thumbnails', async () => {
     listAttachments.mockResolvedValue([
-      { id: '1', fileName: 'fixture.jpg', fileType: 'image/jpeg', url: 'https://signed/fixture.jpg' },
+      { id: '1', fileName: 'fixture.jpg', fileType: 'image/jpeg', url: 'https://signed/fixture.jpg', facets: [], analyzedAt: null },
     ])
     render(<PanelPhotos entityType="task" entityId="t1" />)
     await waitFor(() => expect(screen.getByAltText('fixture.jpg')).toBeInTheDocument())
@@ -35,7 +38,7 @@ describe('PanelPhotos', () => {
 
   it('renders document attachments as file chips (not thumbnails)', async () => {
     listAttachments.mockResolvedValue([
-      { id: '2', fileName: 'permission-slip.pdf', fileType: 'application/pdf', url: 'https://signed/slip.pdf' },
+      { id: '2', fileName: 'permission-slip.pdf', fileType: 'application/pdf', url: 'https://signed/slip.pdf', facets: [], analyzedAt: null },
     ])
     render(<PanelPhotos entityType="event_note" entityId="e1" />)
     await waitFor(() => expect(screen.getByText('permission-slip.pdf')).toBeInTheDocument())
@@ -52,7 +55,7 @@ describe('PanelPhotos', () => {
 
   it('removes an attachment via its ✕ button and reloads', async () => {
     listAttachments.mockResolvedValue([
-      { id: 'a1', fileName: 'fixture.jpg', fileType: 'image/jpeg', url: 'https://signed/fixture.jpg' },
+      { id: 'a1', fileName: 'fixture.jpg', fileType: 'image/jpeg', url: 'https://signed/fixture.jpg', facets: [], analyzedAt: null },
     ])
     const { user } = render(<PanelPhotos entityType="task" entityId="t1" />)
     await waitFor(() => expect(screen.getByAltText('fixture.jpg')).toBeInTheDocument())
@@ -63,7 +66,7 @@ describe('PanelPhotos', () => {
 
   it('offers a ✕ on document chips too', async () => {
     listAttachments.mockResolvedValue([
-      { id: 'a2', fileName: 'slip.pdf', fileType: 'application/pdf', url: 'https://signed/slip.pdf' },
+      { id: 'a2', fileName: 'slip.pdf', fileType: 'application/pdf', url: 'https://signed/slip.pdf', facets: [], analyzedAt: null },
     ])
     const { user } = render(<PanelPhotos entityType="event_note" entityId="e1" />)
     await waitFor(() => expect(screen.getByText('slip.pdf')).toBeInTheDocument())
@@ -82,6 +85,38 @@ describe('PanelPhotos', () => {
     await waitFor(() =>
       expect(attachFile).toHaveBeenCalledWith('event_note', 'e1', blob, expect.stringMatching(/^pasted-.*\.png$/)),
     )
+  })
+
+  it('auto-analyzes an attached image with the entity context', async () => {
+    const { container } = render(
+      <PanelPhotos entityType="event_note" entityId="e1" entityContext="Birthday party — Sat 2pm" />,
+    )
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement
+    const file = new File(['img'], 'invite.png', { type: 'image/png' })
+    await waitFor(() => expect(listAttachments).toHaveBeenCalled())
+    Object.defineProperty(input, 'files', { value: [file] })
+    input.dispatchEvent(new Event('change', { bubbles: true }))
+    await waitFor(() => expect(analyzeAttachment).toHaveBeenCalledWith('att-1', 'Birthday party — Sat 2pm'))
+  })
+
+  it('does not analyze a csv attachment', async () => {
+    attachFile.mockResolvedValue({ id: 'att-2', contentType: 'text/csv' })
+    const { container } = render(<PanelPhotos entityType="task" entityId="t1" />)
+    const input = container.querySelector('input[type="file"]') as HTMLInputElement
+    await waitFor(() => expect(listAttachments).toHaveBeenCalled())
+    Object.defineProperty(input, 'files', { value: [new File(['a,b'], 'data.csv', { type: 'text/csv' })] })
+    input.dispatchEvent(new Event('change', { bubbles: true }))
+    await waitFor(() => expect(attachFile).toHaveBeenCalled())
+    expect(analyzeAttachment).not.toHaveBeenCalled()
+  })
+
+  it('renders facets under an attachment', async () => {
+    listAttachments.mockResolvedValue([{
+      id: 'a1', fileName: 'x.jpg', fileType: 'image/jpeg', url: 'https://signed/x.jpg',
+      facets: [{ type: 'access_code', label: 'Door code', code: '4482#' }], analyzedAt: '2026-07-14T00:00:00Z',
+    }])
+    render(<PanelPhotos entityType="event_note" entityId="e1" />)
+    await waitFor(() => expect(screen.getByText('4482#')).toBeInTheDocument())
   })
 
   it('points at ⌘V/drag when the clipboard holds a file reference (empty types)', async () => {
