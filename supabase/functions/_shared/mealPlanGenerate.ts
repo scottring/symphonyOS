@@ -12,6 +12,7 @@ export interface PromptContextInput {
   habits:  Array<{ owner_auth_user_id: string; name: string; slot: string; grams_hint: number | null }>
   restrictions: Array<{ scope: 'household' | 'person'; person_name: string | null; label: string }>
   brief:   string
+  preferences?: string                           // household meal preferences doc (markdown)
 }
 
 export interface GeneratedEntry {
@@ -136,6 +137,8 @@ export function buildPromptContext(input: PromptContextInput): string {
           : `  - ${r.person_name}: ${JSON.stringify(r.label)}`
       ).join('\n')
 
+  const preferences = input.preferences?.trim()
+
   return [
     `WEEK: ${input.weekStart} (Mon-Sun)`,
     `MEAL_PLAN_ID: ${input.mealPlanId}`,
@@ -152,6 +155,9 @@ export function buildPromptContext(input: PromptContextInput): string {
     'RESTRICTIONS:',
     restrictions,
     '',
+    ...(preferences
+      ? ['PREFERENCES (household defaults; allergies are HARD rules — never violate):', preferences, '']
+      : []),
     'BRIEF:',
     JSON.stringify(input.brief),
   ].join('\n')

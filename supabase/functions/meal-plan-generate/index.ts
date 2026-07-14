@@ -91,6 +91,7 @@ Deno.serve(async (req) => {
       { data: habits,       error: habErr     },
       { data: members,      error: memErr     },
       { data: restrictions, error: restErr    },
+      { data: prefsRows,    error: prefErr    },
     ] = await Promise.all([
       supabase.from('meal_plans').select('id,user_id').eq('week_start', body.weekStart).order('created_at', { ascending: true }).limit(1),
       supabase.from('weekly_briefs').select('id,body,status,generated_at').eq('week_start', body.weekStart).order('created_at', { ascending: true }).limit(1),
@@ -98,9 +99,10 @@ Deno.serve(async (req) => {
       supabase.from('standing_habits').select('user_id,name,slot,grams_hint,paused_for_weeks,assigned_family_member_id').eq('paused', false),
       supabase.from('family_members').select('id,name,auth_user_id'),
       supabase.from('dietary_restrictions').select('family_member_id,label'),
+      supabase.from('notes').select('content').eq('title', 'Household Meal Preferences').order('updated_at', { ascending: false }).limit(1),
     ])
-    if (planErr || briefErr || recErr || habErr || memErr || restErr) {
-      return jsonError(500, `context load failed: ${(planErr || briefErr || recErr || habErr || memErr || restErr)?.message}`)
+    if (planErr || briefErr || recErr || habErr || memErr || restErr || prefErr) {
+      return jsonError(500, `context load failed: ${(planErr || briefErr || recErr || habErr || memErr || restErr || prefErr)?.message}`)
     }
 
     let plan = planRows?.[0]
@@ -141,6 +143,7 @@ Deno.serve(async (req) => {
         label: r.label,
       })),
       brief: brief.body,
+      preferences: prefsRows?.[0]?.content ?? undefined,
     })
 
     // ── Call Anthropic ──────────────────────────────────────────────────

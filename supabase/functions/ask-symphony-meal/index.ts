@@ -164,15 +164,19 @@ Deno.serve(async (req) => {
     { data: recipes,   error: recErr   },
     { data: habits,    error: habErr   },
     { data: members,   error: memErr   },
+    { data: prefsRows, error: prefErr  },
+    { data: restrictionRows, error: restrErr },
   ] = await Promise.all([
     supabase.from('meal_plans').select('id,user_id').eq('week_start', body.weekStart).order('created_at', { ascending: true }).limit(1),
     supabase.from('weekly_briefs').select('id,body').eq('week_start', body.weekStart).order('created_at', { ascending: true }).limit(1),
     supabase.from('recipes').select('id,title,tags,prep_minutes,acceptance_sentence,is_prep_friendly'),
     supabase.from('standing_habits').select('user_id,name,slot,grams_hint,paused_for_weeks').eq('paused', false),
     supabase.from('family_members').select('id,name,auth_user_id'),
+    supabase.from('notes').select('content').eq('title', 'Household Meal Preferences').order('updated_at', { ascending: false }).limit(1),
+    supabase.from('dietary_restrictions').select('label,family_member_id'),
   ])
-  if (planErr || briefErr || recErr || habErr || memErr) {
-    return jsonError(500, `context load failed: ${(planErr || briefErr || recErr || habErr || memErr)?.message}`)
+  if (planErr || briefErr || recErr || habErr || memErr || prefErr || restrErr) {
+    return jsonError(500, `context load failed: ${(planErr || briefErr || recErr || habErr || memErr || prefErr || restrErr)?.message}`)
   }
 
   const plan = planRows?.[0]
@@ -228,7 +232,16 @@ Deno.serve(async (req) => {
     habits: (habits ?? []).map(h => ({
       owner_auth_user_id: h.user_id, name: h.name, slot: h.slot, grams_hint: h.grams_hint,
     })),
+    restrictions: (restrictionRows ?? []).map(r => {
+      const person = r.family_member_id
+        ? (members ?? []).find(m => m.id === r.family_member_id)?.name ?? null
+        : null
+      return person
+        ? { scope: 'person' as const, person_name: person, label: r.label }
+        : { scope: 'household' as const, person_name: null, label: r.label }
+    }),
     brief: brief?.body ?? '',
+    preferences: prefsRows?.[0]?.content ?? undefined,
   })
 
   const recipeTitleById = new Map<string, string>()

@@ -198,6 +198,35 @@ describe('buildPromptContext', () => {
     expect(out).toContain('"A \\"fancy\\" dish"')
     expect(out).toContain('"Eat \\"well\\""')
   })
+
+  it('includes a PREFERENCES section when preferences text is provided', () => {
+    const out = buildPromptContext({
+      weekStart: '2026-04-27',
+      mealPlanId: 'mp-1',
+      members: [],
+      shelf: [],
+      habits: [],
+      restrictions: [],
+      brief: 'something',
+      preferences: 'No red meat. Mild spice at the table.',
+    })
+    expect(out).toContain('PREFERENCES')
+    expect(out).toContain('No red meat. Mild spice at the table.')
+  })
+
+  it('omits the PREFERENCES section when preferences are absent or blank', () => {
+    const base = {
+      weekStart: '2026-04-27',
+      mealPlanId: 'mp-1',
+      members: [],
+      shelf: [],
+      habits: [],
+      restrictions: [],
+      brief: 'something',
+    }
+    expect(buildPromptContext(base)).not.toContain('PREFERENCES')
+    expect(buildPromptContext({ ...base, preferences: '   ' })).not.toContain('PREFERENCES')
+  })
 })
 
 import * as denoMirror from '../../supabase/functions/_shared/mealPlanGenerate'
