@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, waitFor } from '@/test/test-utils'
+import { render, screen, waitFor, act } from '@/test/test-utils'
 import { QuickCapture } from './QuickCapture'
 
 describe('QuickCapture', () => {
@@ -374,6 +374,28 @@ describe('QuickCapture', () => {
         <QuickCapture onAdd={vi.fn()} isOpen={true} showFab={false} onAskSymphony={vi.fn()} />,
       )
       expect(screen.queryByRole('button', { name: /Ask Symphony/ })).not.toBeInTheDocument()
+    })
+  })
+
+  describe('idle behavior', () => {
+    // A silent auto-close leaks subsequent keystrokes to whatever global
+    // hotkey surface is underneath (Inbox Focus mode binds d=delete,
+    // c=complete, 1-4=triage). The modal must only close on explicit
+    // user action: Escape, ✕, click-outside, or a navigating submit.
+    it('stays open while idle with an empty input — never self-dismisses', () => {
+      vi.useFakeTimers()
+      try {
+        const onClose = vi.fn()
+        render(
+          <QuickCapture onAdd={vi.fn()} isOpen={true} onClose={onClose} showFab={false} />,
+        )
+        act(() => {
+          vi.advanceTimersByTime(60000)
+        })
+        expect(onClose).not.toHaveBeenCalled()
+      } finally {
+        vi.useRealTimers()
+      }
     })
   })
 })

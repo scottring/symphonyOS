@@ -70,7 +70,6 @@ export function QuickCapture({
   // position and the slide is invisible. Desktop ignores it (no transform).
   const [isEntering, setIsEntering] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
-  const autoCloseTimerRef = useRef<NodeJS.Timeout | null>(null)
 
   // Get current domain for smart context defaulting
   const { currentDomain } = useDomain()
@@ -116,16 +115,8 @@ export function QuickCapture({
     applyContext,
   } = qp
 
-  const clearAutoCloseTimer = () => {
-    if (autoCloseTimerRef.current) {
-      clearTimeout(autoCloseTimerRef.current)
-      autoCloseTimerRef.current = null
-    }
-  }
-
   const handleOpen = () => {
     setIsClosing(false)
-    clearAutoCloseTimer()
     if (onOpen) {
       onOpen()
     } else {
@@ -134,7 +125,6 @@ export function QuickCapture({
   }
 
   const handleClose = () => {
-    clearAutoCloseTimer()
     setIsClosing(true)
     // Wait for fade-out animation to complete before actually closing
     setTimeout(() => {
@@ -165,26 +155,10 @@ export function QuickCapture({
     }
   }, [isOpen])
 
-  // Auto-close timer: start when input is cleared after entry, reset when typing resumes
-  useEffect(() => {
-    if (!isOpen) return
-
-    // Clear any existing timer
-    clearAutoCloseTimer()
-
-    // If input is empty, start the auto-close timer (25 seconds)
-    if (title.trim() === '') {
-      autoCloseTimerRef.current = setTimeout(() => {
-        handleClose()
-      }, 25000) // 25 seconds
-    }
-
-    // Cleanup on unmount or when dependencies change
-    return () => {
-      clearAutoCloseTimer()
-    }
-  }, [isOpen, title]) // eslint-disable-line react-hooks/exhaustive-deps
-  // Note: handleClose is intentionally not in deps to avoid recreating timer unnecessarily
+  // No idle auto-close: a modal that silently dismisses itself leaks the
+  // user's next keystrokes to whatever global hotkey surface is underneath
+  // (Inbox Focus mode binds d=delete, c=complete, 1-4=triage). Closing is
+  // always explicit: Escape, ✕, click-outside, or a navigating submit.
 
   const showPreview = qp.hasFields
 
