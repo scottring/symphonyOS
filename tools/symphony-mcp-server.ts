@@ -432,13 +432,17 @@ server.tool(
 const ok = (data: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] })
 const fail = (error: { message: string }) => ({ content: [{ type: 'text' as const, text: `Error: ${error.message}` }] })
 
-/** Get or create the signed-in user's meal plan for a week (week_start = Sunday). */
+/** Get or create the household's meal plan for a week (week_start = Sunday).
+ *  Looks across the household (RLS scopes visibility), not just the signed-in
+ *  user — both partners' sessions must land on the SAME plan row, matching the
+ *  first-by-created_at convention the edge functions use. */
 async function ensureWeekPlan(weekStart: string): Promise<string> {
   const { data: existing } = await supabase
     .from('meal_plans')
     .select('id')
-    .eq('user_id', userId)
     .eq('week_start', weekStart)
+    .order('created_at', { ascending: true })
+    .limit(1)
     .maybeSingle()
   if (existing) return existing.id as string
   const { data, error } = await supabase
