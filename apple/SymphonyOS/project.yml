@@ -30,6 +30,13 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.scottkaufman.symphonyos
         INFOPLIST_FILE: SymphonyOS/App/Info.plist
+        # MUST be NO: with a manual INFOPLIST_FILE, GENERATE_INFOPLIST_FILE=YES makes
+        # Xcode inject CFBundleVersion from CURRENT_PROJECT_VERSION — and Xcode Cloud
+        # sets CURRENT_PROJECT_VERSION to its low build-run number (14, 15, …),
+        # clobbering the high number ci_pre_xcodebuild writes into Info.plist. That
+        # made every CI build land in TestFlight numbered below build 101, so it never
+        # offered as an update. NO → the manual Info.plist's CFBundleVersion wins.
+        GENERATE_INFOPLIST_FILE: "NO"
         PRODUCT_NAME: Symphony
         MARKETING_VERSION: "1.0.0"
         CURRENT_PROJECT_VERSION: "1201"
