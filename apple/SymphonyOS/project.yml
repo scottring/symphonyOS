@@ -38,7 +38,15 @@ targets:
         # offered as an update. NO → the manual Info.plist's CFBundleVersion wins.
         GENERATE_INFOPLIST_FILE: "NO"
         PRODUCT_NAME: Symphony
-        MARKETING_VERSION: "1.0.0"
+        # Xcode Cloud FORCES CFBundleVersion = CI_BUILD_NUMBER (14, 15, …) during the
+        # archive, after ci_pre_xcodebuild — unoverridable from the project (verified
+        # by reading the archived app's Info.plist: build 20 shipped as "20" despite
+        # the script writing 2020). Those low numbers sit below the old manual builds
+        # (100/101/1200), so TestFlight never offered CI builds as updates. Fix: order
+        # by MARKETING_VERSION instead — TestFlight compares the version string first,
+        # so a 1.0.1 build (even build 21) is newer than every 1.0.0 build. Bump this
+        # whenever you need CI builds to supersede a manual/App Store upload.
+        MARKETING_VERSION: "1.0.1"
         CURRENT_PROJECT_VERSION: "1201"
         # Signing team lives here (not just in the generated pbxproj) so `xcodegen`
         # regeneration is safe and reproducible — regenerating no longer wipes the
