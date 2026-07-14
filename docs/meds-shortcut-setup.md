@@ -33,3 +33,33 @@ app build. It POSTs to the `log-medication` edge function.
   either way — Siri will just read the raw JSON if it's an `error` case — but
   if you want a cleaner spoken message in all cases, use a **Get Dictionary
   Value** action to read `message` first and fall back to `error`.
+
+## Voice symptom logging — "Log Symptom" shortcut
+
+Same pattern, same token. You dictate one sentence; the server figures out the
+symptom, severity, and note. It POSTs to the `log-symptom` edge function.
+
+### Setup
+1. On iPhone, open **Shortcuts** → **+** → name it exactly **Log Symptom**.
+2. Add action **Ask for Input** (type Text), prompt: `What symptom?`
+   (When invoked by voice, Siri asks this and you answer by dictation.)
+3. Add action **Get Contents of URL**. Configure:
+   - URL: `https://mwadppyrqzuzgstmwpuy.supabase.co/functions/v1/log-symptom`
+   - Method: **POST**
+   - Headers:
+     - `x-med-token` = *(the same token as Log Meds — Health → Manage → "Show voice-logging token")*
+     - `Content-Type` = `application/json`
+   - Request Body: **JSON** → key `utterance` = *(Provided Input variable)*
+4. Add action **Show Result** with "Contents of URL" so Siri speaks the confirmation.
+
+### Using it
+- "Hey Siri, Log Symptom" → "What symptom?" → "severe tremor after workout"
+  → "Logged Tremor, severe, at 2:47 PM". The leftover words ("after workout")
+  are saved as the log's note.
+- Severity words: mild/light/slight, moderate/medium, severe/bad/intense/strong.
+  Say none and it logs as **moderate**.
+- Say two symptoms ("tremor and stiffness") and both log at the same severity.
+- The confirmation always states what was understood — if it mis-heard, fix the
+  log in Health → Timing (tap the entry to edit).
+- Unknown symptoms are never auto-created; the reply lists what you track.
+  Add new symptoms in Health → Manage first.
