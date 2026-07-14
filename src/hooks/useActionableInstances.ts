@@ -1,5 +1,6 @@
 import { useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
+import { emitInstancesChanged } from '@/lib/instancesChangedSignal'
 import type {
   ActionableInstance,
   InstanceNote,
@@ -207,6 +208,9 @@ export function useActionableInstances() {
         .eq('id', instance.id)
 
       if (updateError) throw updateError
+      // No realtime on actionable_instances — announce the write so other
+      // mounted views (Today schedule, detail-panel checklists) re-fetch.
+      emitInstancesChanged()
       return true
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to mark done'
@@ -247,6 +251,7 @@ export function useActionableInstances() {
         .eq('id', instance.id)
 
       if (updateError) throw updateError
+      emitInstancesChanged()
       return true
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to undo'
@@ -284,6 +289,7 @@ export function useActionableInstances() {
         .eq('id', instance.id)
 
       if (updateError) throw updateError
+      emitInstancesChanged()
       return true
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to skip'
@@ -318,6 +324,7 @@ export function useActionableInstances() {
         .eq('id', instance.id)
 
       if (updateError) throw updateError
+      emitInstancesChanged()
       return true
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to defer'
@@ -400,6 +407,7 @@ export function useActionableInstances() {
         if (updateError) throw updateError
       }
 
+      emitInstancesChanged()
       return true
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to reschedule'

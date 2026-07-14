@@ -3,6 +3,7 @@ import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { ActionableInstance, Routine } from '@/types/actionable'
 import type { Task, LinkedActivityType } from '@/types/task'
 import type { FamilyMember } from '@/types/family'
+import { onInstancesChanged } from '@/lib/instancesChangedSignal'
 
 interface UseScheduleFilteringParams {
   viewedDate: Date
@@ -57,6 +58,10 @@ export function useScheduleFiltering({
 
   useEffect(() => {
     refreshDateInstances()
+    // Instance writes from outside the schedule's own handlers (e.g. checking a
+    // routine step in the detail panel) announce themselves via this signal —
+    // there is no realtime subscription on actionable_instances.
+    return onInstancesChanged(() => void refreshDateInstances())
   }, [refreshDateInstances])
 
   // Filter events to exclude skipped/completed items

@@ -16,6 +16,7 @@ import { ConceptIcon } from '@/lib/conceptIcons'
 import { AssistDrawer } from '@/components/assist/AssistDrawer'
 import { useRoutineStats } from '@/hooks/useRoutineStats'
 import { useAttachments } from '@/hooks/useAttachments'
+import { useRoutineStepChecklist } from '@/hooks/useRoutineStepChecklist'
 
 function recurrenceSummary(r: Routine): string {
   const p = r.recurrence_pattern
@@ -59,6 +60,10 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
   const [showDirections, setShowDirections] = useState(false)
   const [assistOpen, setAssistOpen] = useState(false)
   const onTimeline = routine.visibility === 'active'
+
+  // Today-completion checklist for the steps — same instance keys as the
+  // Today collection row, so checking here updates its progress too.
+  const { checkedByStep, toggleStep } = useRoutineStepChecklist(props.steps ?? [])
 
   // Load source document from the parent project (if any)
   const { getAttachments, getSignedUrl, fetchAttachments } = useAttachments()
@@ -175,6 +180,8 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
             onSelectStep={props.onSelectStep}
             onAddStep={props.onAddStep}
             onReorderSteps={props.onReorderSteps}
+            checkedByStep={checkedByStep}
+            onToggleStep={(s) => void toggleStep(s)}
           />
         </section>
       )}

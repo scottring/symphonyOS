@@ -38,4 +38,29 @@ describe('RoutineStepsSection', () => {
     fireEvent.click(screen.getByText('Chin tuck'))
     expect(onSelectStep).toHaveBeenCalledWith(expect.objectContaining({ id: 's1' }))
   })
+
+  describe('today checklist', () => {
+    it('renders no checkboxes without checklist props', () => {
+      setup()
+      expect(screen.queryByRole('button', { name: /done for today/i })).not.toBeInTheDocument()
+    })
+
+    it('renders a checkbox per step in the map and toggles it', () => {
+      const onToggleStep = vi.fn()
+      const { steps } = setup({
+        checkedByStep: new Map([['s1', false], ['s2', true]]),
+        onToggleStep,
+      }) as { steps: Routine[]; onToggleStep: ReturnType<typeof vi.fn> }
+      fireEvent.click(screen.getByRole('button', { name: 'Mark Chin tuck done for today' }))
+      expect(onToggleStep).toHaveBeenCalledWith(expect.objectContaining({ id: steps[0].id }))
+      // A checked step offers the reverse action
+      expect(screen.getByRole('button', { name: 'Mark Nerve glide not done for today' })).toBeInTheDocument()
+    })
+
+    it('steps missing from the map (not scheduled today) get no checkbox', () => {
+      setup({ checkedByStep: new Map([['s1', false]]), onToggleStep: vi.fn() })
+      expect(screen.getByRole('button', { name: /mark chin tuck done/i })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /nerve glide.*today/i })).not.toBeInTheDocument()
+    })
+  })
 })

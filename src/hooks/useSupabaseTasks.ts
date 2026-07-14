@@ -147,7 +147,11 @@ function nestSubtasks(tasks: Task[]): Task[] {
       const taskWithSubtasks = taskMap.get(task.id)!
       const subtasks = subtasksByParent.get(task.id)
       if (subtasks && subtasks.length > 0) {
-        taskWithSubtasks.subtasks = subtasks
+        // The fetch is newest-first; a checklist reads top-to-bottom in the
+        // order its items were created, so flip to oldest-first here.
+        taskWithSubtasks.subtasks = [...subtasks].sort(
+          (a, b) => a.createdAt.getTime() - b.createdAt.getTime()
+        )
       }
       result.push(taskWithSubtasks)
     }

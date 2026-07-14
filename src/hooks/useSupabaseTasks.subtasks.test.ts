@@ -175,6 +175,26 @@ describe('useSupabaseTasks - Subtasks', () => {
       expect(result.current.tasks[0].subtasks![1].id).toBe('subtask-2')
     })
 
+    it('orders subtasks oldest-first even when the fetch returns newest-first', async () => {
+      // The tasks query orders created_at DESC, so an assistant that creates
+      // subtasks in checklist order arrives here reversed. Display must be
+      // creation order (step 1 at the top).
+      mockSupabaseData.push(
+        createMockDbTask({ id: 'sub-3', title: 'Step 3', parent_task_id: 'parent-1', created_at: '2024-01-01T00:00:03Z' }),
+        createMockDbTask({ id: 'sub-2', title: 'Step 2', parent_task_id: 'parent-1', created_at: '2024-01-01T00:00:02Z' }),
+        createMockDbTask({ id: 'sub-1', title: 'Step 1', parent_task_id: 'parent-1', created_at: '2024-01-01T00:00:01Z' }),
+        createMockDbTask({ id: 'parent-1', title: 'Parent Task' })
+      )
+
+      const { result } = renderHook(() => useSupabaseTasks())
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false)
+      })
+
+      expect(result.current.tasks[0].subtasks!.map(s => s.id)).toEqual(['sub-1', 'sub-2', 'sub-3'])
+    })
+
     it('should filter subtasks out of top-level array', async () => {
       mockSupabaseData.push(
         createMockDbTask({ id: 'parent-1', title: 'Parent Task' }),

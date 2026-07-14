@@ -10,6 +10,12 @@ vi.mock('@/hooks/useRoutineStats', () => ({
   useRoutineStats: () => ({ getStats: () => ({ currentStreak: 5 }), loading: false, stats: new Map(), refetch: vi.fn() }),
 }))
 
+// useRoutineStepChecklist fetches today's actionable_instances; mock it so
+// render tests stay pure.
+vi.mock('@/hooks/useRoutineStepChecklist', () => ({
+  useRoutineStepChecklist: () => ({ checkedByStep: new Map(), toggleStep: vi.fn() }),
+}))
+
 // useAttachments needs auth/supabase; mock it out for render-only tests.
 vi.mock('@/hooks/useAttachments', () => ({
   useAttachments: () => ({
