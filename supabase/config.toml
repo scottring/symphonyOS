@@ -283,6 +283,10 @@ verify_jwt = false
 [functions.log-medication]
 verify_jwt = false
 
+# Health tracker voice symptom logger: authenticated via the same durable
+# per-user x-med-token as log-medication (Siri Shortcut caller has no
+# Supabase session). JWT verification must stay off or the request 401s
+# at the gateway before the token check runs.
 [functions.log-symptom]
 verify_jwt = false
 

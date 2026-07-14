@@ -19,7 +19,7 @@ function json(body: unknown, status = 200): Response {
 }
 
 function fmtTime(d: Date): string {
-  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZone: 'America/New_York' })
 }
 
 // @ts-ignore Deno global present at runtime
