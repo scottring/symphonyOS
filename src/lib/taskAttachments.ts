@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase'
+import { parseFacets, type Facet } from '@/types/facets'
 
 /** Entity kinds the `attachments` table accepts (its CHECK constraint). Events
  *  attach under 'event_note', keyed by the stable Google event id — the same
@@ -10,6 +11,9 @@ export interface Attachment {
   fileName: string
   fileType: string
   url: string
+  /** Typed facts extracted by analyze-attachment; [] = analyzed, nothing found. */
+  facets: Facet[]
+  analyzedAt: string | null
 }
 
 /** Document types the storage bucket's allowed_mime_types accepts. Images are
@@ -54,7 +58,7 @@ export async function listAttachments(
 ): Promise<Attachment[]> {
   const { data: rows, error } = await supabase
     .from('attachments')
-    .select('id, file_name, file_type, storage_path')
+    .select('id, file_name, file_type, storage_path, facets, analyzed_at')
     .eq('entity_type', entityType)
     .eq('entity_id', entityId)
     .order('created_at', { ascending: true })
@@ -66,7 +70,14 @@ export async function listAttachments(
       .from('attachments')
       .createSignedUrl(row.storage_path, 3600)
     if (data?.signedUrl) {
-      attachments.push({ id: row.id, fileName: row.file_name, fileType: row.file_type, url: data.signedUrl })
+      attachments.push({
+        id: row.id,
+        fileName: row.file_name,
+        fileType: row.file_type,
+        url: data.signedUrl,
+        facets: parseFacets(row.facets),
+        analyzedAt: row.analyzed_at ?? null,
+      })
     }
   }
   return attachments
@@ -75,14 +86,15 @@ export async function listAttachments(
 /**
  * Attach a file to an entity: upload to storage → insert an attachments row.
  * Images are downscaled/re-encoded to JPEG; documents upload as-is when the
- * bucket accepts their MIME type. Returns false (and logs) on anything else.
+ * bucket accepts their MIME type. Returns the new row's id + stored content
+ * type (the caller decides whether to analyze), or null on failure.
  */
 export async function attachFile(
   entityType: AttachmentEntityType,
   entityId: string,
   file: Blob,
   fileName?: string,
-): Promise<boolean> {
+): Promise<{ id: string; contentType: string } | null> {
   try {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error('Not signed in')
@@ -109,7 +121,7 @@ export async function attachFile(
       .upload(storagePath, upload, { contentType, upsert: false })
     if (uploadErr) throw new Error(uploadErr.message)
 
-    const { error: insertErr } = await supabase.from('attachments').insert({
+    const { data: inserted, error: insertErr } = await supabase.from('attachments').insert({
       user_id: user.id,
       entity_type: entityType,
       entity_id: entityId,
@@ -117,11 +129,25 @@ export async function attachFile(
       file_type: contentType,
       file_size: upload.size,
       storage_path: storagePath,
-    })
-    if (insertErr) throw new Error(insertErr.message)
-    return true
+    }).select('id').single()
+    if (insertErr || !inserted) throw new Error(insertErr?.message ?? 'Insert returned nothing')
+    return { id: inserted.id as string, contentType }
   } catch (err) {
     console.error('attachFile failed:', err)
+    return null
+  }
+}
+
+/** Fire the vision extraction for an attachment (image/PDF). Fire-and-forget
+ *  friendly: returns false on any error; the attachment stands on its own. */
+export async function analyzeAttachment(attachmentId: string, entityContext?: string): Promise<boolean> {
+  try {
+    const { error } = await supabase.functions.invoke('analyze-attachment', {
+      body: { attachmentId, entityContext },
+    })
+    return !error
+  } catch (err) {
+    console.error('analyzeAttachment failed:', err)
     return false
   }
 }
