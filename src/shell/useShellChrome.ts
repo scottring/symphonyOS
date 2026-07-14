@@ -86,9 +86,10 @@ export function useShellChrome() {
       setConfirmationToast({
         id: taskId,
         message: 'Added to Inbox',
+        hint: 'All set — or schedule it now:',
         actions: [
-          { label: 'Today', onClick: () => scheduleFor(0), variant: 'primary' },
-          { label: 'Tomorrow', onClick: () => scheduleFor(1), variant: 'secondary' },
+          { label: 'Today', onClick: () => scheduleFor(0) },
+          { label: 'Tomorrow', onClick: () => scheduleFor(1) },
         ],
       });
       confirmTimerRef.current = setTimeout(() => setConfirmationToast(null), 8000);
