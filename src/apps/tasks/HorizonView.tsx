@@ -792,6 +792,11 @@ export function HorizonView({ horizon }: HorizonViewProps) {
                     </li>
                     );
                   })}
+                  {horizon === 'season' && (
+                    <li className="pt-1.5 mt-1 border-t border-neutral-100 text-[11px] text-neutral-400 italic">
+                      Goals you don't start stay on the shelf — every seasonal session offers them again.
+                    </li>
+                  )}
                 </ul>
               )}
             </section>

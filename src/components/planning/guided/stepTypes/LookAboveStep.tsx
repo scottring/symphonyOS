@@ -140,6 +140,11 @@ export function LookAboveStep() {
             <ul className="space-y-1">{uncategorized.map(renderGoal)}</ul>
           </section>
         )}
+        {promotable && (
+          <p className="text-[11px] text-neutral-400 italic">
+            Goals you don't start stay on the shelf — every seasonal session offers them again. Starting none is a valid answer.
+          </p>
+        )}
       </div>
     )
   }
