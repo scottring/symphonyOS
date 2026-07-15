@@ -9,7 +9,7 @@ export interface GoalsContextValue {
   updateArea: (id: string, updates: { name?: string; sortOrder?: number }) => Promise<void>
   deleteArea: (id: string) => Promise<void>
   addGoal: (areaId: string, name: string, context?: 'work' | 'family' | 'personal') => Promise<Goal | null>
-  updateGoal: (id: string, updates: Partial<Pick<Goal, 'name' | 'notes' | 'status' | 'areaId' | 'sortOrder' | 'strategy' | 'domainSlug' | 'layerId' | 'context'>>) => Promise<void>
+  updateGoal: (id: string, updates: Partial<Pick<Goal, 'name' | 'notes' | 'status' | 'areaId' | 'sortOrder' | 'strategy' | 'domainSlug' | 'layerId' | 'context' | 'year'>>) => Promise<void>
   deleteGoal: (id: string) => Promise<void>
   getGoalById: (id: string) => Goal | undefined
   getCurrentQuarter: () => Quarter

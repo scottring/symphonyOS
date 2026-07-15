@@ -49,6 +49,9 @@ export interface GuidedHost {
   addGoal: (areaId: string, name: string) => Promise<unknown>
   addArea: (name: string) => Promise<unknown>
   updateGoalStatus: (id: string, status: GoalStatus) => Promise<void>
+  /** Annual review "Carry forward": stamps the goal into the year being
+   *  planned (goals are fetched per-year, so the stamp is what carries it). */
+  carryGoal: (id: string) => Promise<void>
   // Weekly grid pass-through
   routines: Routine[]
   draggableRoutines: Routine[]

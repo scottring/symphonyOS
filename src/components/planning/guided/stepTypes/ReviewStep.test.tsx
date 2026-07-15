@@ -133,6 +133,23 @@ describe('ReviewStep — goals source', () => {
     expect(host.updateGoalStatus).toHaveBeenCalledWith('g1', 'archived')
   })
 
+  it('carries a goal forward into the year being planned', () => {
+    const host = makeHost({ goals: [goal] })
+    renderStep(<ReviewStep />, { step: goalsStep, host })
+    fireEvent.click(screen.getByRole('button', { name: /Carry forward/ }))
+    expect(host.carryGoal).toHaveBeenCalledWith('g1')
+  })
+
+  it('a verdicted goal stays on screen showing its fate instead of vanishing', () => {
+    const host = makeHost({ goals: [goal] })
+    renderStep(<ReviewStep />, { step: goalsStep, host })
+    fireEvent.click(screen.getByRole('button', { name: /Carry forward/ }))
+    // Row remains, now read-only with the fate label; action buttons are gone.
+    expect(screen.getByText('Run a 5k')).toBeInTheDocument()
+    expect(screen.getByText('Carried into the new year')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Achieved/ })).toBeNull()
+  })
+
   it('shows the empty state when no goals are waiting on a verdict', () => {
     renderStep(<ReviewStep />, { step: goalsStep })
     expect(screen.getByText(/No goals waiting on a verdict/)).toBeInTheDocument()

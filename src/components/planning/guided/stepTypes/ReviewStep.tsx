@@ -100,6 +100,9 @@ export function ReviewStep() {
   const { step, host } = useGuided()
   const source = step.props?.source
   const match = useMemo(() => makeAssigneeFilter([]), [])
+  // Session-local goal verdicts (goals source only): keeps decided rows on
+  // screen with their fate — a status write drops them from the active pool.
+  const [goalVerdicts, setGoalVerdicts] = useState<Map<string, 'carried' | 'achieved' | 'letgo'>>(() => new Map())
 
   const pool = useMemo(() => {
     if (source === 'goals') return []
@@ -110,23 +113,49 @@ export function ReviewStep() {
   }, [source, step.props?.bucket, host.tasks, match])
 
   if (source === 'goals') {
-    const open = host.goals.filter((g) => g.status === 'active')
+    // Three fates, matching the narration: carry forward (the proactive
+    // default — stamps the goal into the year being planned), achieved, let
+    // go. Verdicted rows stay visible with their fate instead of vanishing
+    // mid-ritual (status changes drop them from the active pool; the
+    // session-local verdict map keeps them on screen until the step closes).
+    const open = host.goals.filter((g) => g.status === 'active' || goalVerdicts.has(g.id))
     if (open.length === 0) return <p className="text-sm text-neutral-400">No goals waiting on a verdict.</p>
+    const decide = (id: string, verdict: 'carried' | 'achieved' | 'letgo', act: () => Promise<void>) => {
+      setGoalVerdicts((prev) => new Map(prev).set(id, verdict))
+      void act()
+    }
+    const FATE_LABEL = { carried: 'Carried into the new year', achieved: 'Achieved', letgo: 'Let go' } as const
     return (
       <ul className="space-y-2">
-        {open.map((g) => (
-          <li key={g.id} className="flex items-center gap-2 rounded-xl border border-neutral-100 bg-white px-3 py-2">
-            <span className="flex-1 min-w-0 text-sm text-neutral-800 truncate">{g.name}</span>
-            <button type="button" onClick={() => void host.updateGoalStatus(g.id, 'completed')}
-              className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md text-primary-700 bg-primary-50 hover:bg-primary-100 transition-colors">
-              <Sparkles className="w-3 h-3" /> Achieved
-            </button>
-            <button type="button" onClick={() => void host.updateGoalStatus(g.id, 'archived')}
-              className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md text-neutral-500 bg-neutral-50 hover:bg-neutral-100 transition-colors">
-              <Archive className="w-3 h-3" /> Let go
-            </button>
-          </li>
-        ))}
+        {open.map((g) => {
+          const verdict = goalVerdicts.get(g.id)
+          if (verdict) {
+            return (
+              <li key={g.id} className="flex items-center gap-2 rounded-xl border border-primary-100 bg-primary-50/40 px-3 py-2">
+                <Check className="w-3.5 h-3.5 text-primary-600 shrink-0" strokeWidth={3} />
+                <span className={`flex-1 min-w-0 text-sm truncate ${verdict === 'letgo' ? 'text-neutral-400 line-through' : 'text-neutral-700'}`}>{g.name}</span>
+                <span className="text-xs text-primary-700">{FATE_LABEL[verdict]}</span>
+              </li>
+            )
+          }
+          return (
+            <li key={g.id} className="flex items-center gap-2 rounded-xl border border-neutral-100 bg-white px-3 py-2">
+              <span className="flex-1 min-w-0 text-sm text-neutral-800 truncate">{g.name}</span>
+              <button type="button" onClick={() => decide(g.id, 'carried', () => host.carryGoal(g.id))}
+                className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-md text-white bg-primary-600 hover:bg-primary-700 transition-colors">
+                <ArrowRight className="w-3 h-3" /> Carry forward
+              </button>
+              <button type="button" onClick={() => decide(g.id, 'achieved', () => host.updateGoalStatus(g.id, 'completed'))}
+                className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md text-primary-700 bg-primary-50 hover:bg-primary-100 transition-colors">
+                <Sparkles className="w-3 h-3" /> Achieved
+              </button>
+              <button type="button" onClick={() => decide(g.id, 'letgo', () => host.updateGoalStatus(g.id, 'archived'))}
+                className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md text-neutral-500 bg-neutral-50 hover:bg-neutral-100 transition-colors">
+                <Archive className="w-3 h-3" /> Let go
+              </button>
+            </li>
+          )
+        })}
       </ul>
     )
   }

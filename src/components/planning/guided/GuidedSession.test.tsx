@@ -40,6 +40,7 @@ function makeHost(): GuidedHost {
     createTaskInBucket: vi.fn(async () => {}), createDatedTask: vi.fn(async () => {}),
     goals: [], goalAreas: [], addGoal: vi.fn(async () => null), addArea: vi.fn(async () => null),
     updateGoalStatus: vi.fn(async () => {}),
+    carryGoal: vi.fn(async () => {}),
     routines: [], draggableRoutines: [], onScheduleRoutine: vi.fn(), getRoutinesForDate: () => [],
   }
 }

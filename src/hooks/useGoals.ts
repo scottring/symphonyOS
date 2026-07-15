@@ -277,7 +277,7 @@ export function useGoals(year?: number) {
     return real
   }, [user, currentYear, goals])
 
-  const updateGoal = useCallback(async (id: string, updates: Partial<Pick<Goal, 'name' | 'notes' | 'status' | 'areaId' | 'sortOrder' | 'strategy' | 'domainSlug' | 'layerId' | 'context'>>) => {
+  const updateGoal = useCallback(async (id: string, updates: Partial<Pick<Goal, 'name' | 'notes' | 'status' | 'areaId' | 'sortOrder' | 'strategy' | 'domainSlug' | 'layerId' | 'context' | 'year'>>) => {
     const goal = goals.find(g => g.id === id)
     if (!goal) return
 
@@ -293,6 +293,7 @@ export function useGoals(year?: number) {
     if (updates.domainSlug !== undefined) dbUpdates.domain_slug = updates.domainSlug ?? null
     if (updates.layerId !== undefined) dbUpdates.layer_id = updates.layerId ?? null
     if (updates.context !== undefined) dbUpdates.context = updates.context ?? null
+    if (updates.year !== undefined) dbUpdates.year = updates.year
 
     const { error: updateError } = await supabase
       .from('goals')
