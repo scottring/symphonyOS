@@ -53,7 +53,11 @@ export function WriteListStep() {
         <input type="text" value={draft} autoFocus
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') void submit() }}
-          placeholder="Add to this list… (#project attaches it)"
+          placeholder={
+            bucket === 'quarter' ? 'Add an outcome for this season… (#project attaches it)'
+            : bucket === 'month' ? 'Add a chunk to this month… (#project attaches it)'
+            : 'Add a task to this week… (#project attaches it)'
+          }
           className="flex-1 min-w-0 text-sm bg-transparent placeholder:text-neutral-400 focus:outline-none"
         />
       </div>

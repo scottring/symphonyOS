@@ -857,7 +857,9 @@ export function HorizonView({ horizon }: HorizonViewProps) {
               <div className="space-y-2">{grouped.loose.map(renderRow)}</div>
             )}
 
-            {/* Add a task directly into this horizon's pool. */}
+            {/* Add directly into this horizon's pool. The placeholder speaks
+                the level's grain (outcome / chunk / task) — the input is where
+                the grain gauge either holds or leaks. */}
             {horizonBucket && (
               <div className="mt-3 flex items-center gap-2 px-2 py-1.5 rounded-xl border border-neutral-200 bg-white focus-within:border-primary-400 transition-colors">
                 <button
@@ -873,7 +875,12 @@ export function HorizonView({ horizon }: HorizonViewProps) {
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') void submitDraft() }}
-                  placeholder={`Add a task to ${label.toLowerCase()}…`}
+                  placeholder={
+                    horizonBucket === 'quarter' ? 'Add an outcome for this season — finishable by its end…'
+                    : horizonBucket === 'month' ? 'Add a chunk to this month — an order placed, a call made…'
+                    : horizonBucket === 'someday' ? 'Park an idea on Someday — no timeline attached…'
+                    : `Add a task to ${label.toLowerCase()}…`
+                  }
                   className="flex-1 min-w-0 text-sm bg-transparent placeholder:text-neutral-400 focus:outline-none"
                 />
               </div>

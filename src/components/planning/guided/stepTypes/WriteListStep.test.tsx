@@ -19,7 +19,7 @@ describe('WriteListStep', () => {
   it('creates into the bucket ATOMICALLY via createTaskInBucket (race guard)', async () => {
     const host = makeHost()
     renderStep(<WriteListStep />, { step, host, horizon: 'weekly' })
-    const input = screen.getByPlaceholderText(/Add to this list/)
+    const input = screen.getByPlaceholderText(/Add a task to this week|Add a chunk to this month|Add an outcome for this season/)
     fireEvent.change(input, { target: { value: 'Call the plumber' } })
     fireEvent.keyDown(input, { key: 'Enter' })
     expect(host.createTaskInBucket).toHaveBeenCalledWith('Call the plumber', 'week', { projectId: undefined })
@@ -32,7 +32,7 @@ describe('WriteListStep', () => {
       projects: [{ id: 'p1', name: 'Kitchen Renovation' } as unknown as import('@/types/project').Project],
     })
     renderStep(<WriteListStep />, { step, host, horizon: 'weekly' })
-    const input = screen.getByPlaceholderText(/Add to this list/)
+    const input = screen.getByPlaceholderText(/Add a task to this week|Add a chunk to this month|Add an outcome for this season/)
     fireEvent.change(input, { target: { value: '#kitchen order dishwasher' } })
     fireEvent.keyDown(input, { key: 'Enter' })
     expect(host.createTaskInBucket).toHaveBeenCalledWith('order dishwasher', 'week', { projectId: 'p1' })
@@ -60,6 +60,6 @@ describe('WriteListStep', () => {
     const host = makeHost({ tasks })
     renderStep(<WriteListStep />, { step, host, horizon: 'weekly' })
     expect(screen.getByText(/16 of ~15/)).toBeInTheDocument()
-    expect(screen.getByPlaceholderText(/Add to this list/)).toBeEnabled()
+    expect(screen.getByPlaceholderText(/Add a task to this week|Add a chunk to this month|Add an outcome for this season/)).toBeEnabled()
   })
 })
