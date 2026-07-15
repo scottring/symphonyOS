@@ -34,6 +34,14 @@ export function WriteListStep() {
 
   if (!bucket) return null
   const over = softCap !== undefined && pool.length > softCap
+  // The grain rule, stated where lists get written. One line, always visible:
+  // this is what keeps season lists from filling with week-sized crumbs.
+  const GRAIN_HINT: Partial<Record<string, string>> = {
+    quarter: 'Season grain: outcomes you can finish in these three months. One sitting belongs on a week; one chunk on a month.',
+    month: 'Month grain: one concrete chunk each — an order placed, a call made, a decision written down.',
+    week: 'Week grain: single sittings. If it needs several, it’s a month item wearing a week costume.',
+  }
+  const grainHint = GRAIN_HINT[bucket]
 
   return (
     <div className="space-y-4">
@@ -49,6 +57,7 @@ export function WriteListStep() {
           className="flex-1 min-w-0 text-sm bg-transparent placeholder:text-neutral-400 focus:outline-none"
         />
       </div>
+      {grainHint && <p className="text-xs text-neutral-400 italic">{grainHint}</p>}
       {softCap !== undefined && (
         <p className={`text-xs ${over ? 'text-amber-600' : 'text-neutral-400'}`}>
           {pool.length} of ~{softCap}{over ? ' — a list you believe beats a list you admire' : ''}

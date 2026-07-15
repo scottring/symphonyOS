@@ -28,6 +28,10 @@ export function LookAboveStep() {
   // bucket to 'timed' and it drops out of the above-bucket filter. Remember picked
   // ids so the item stays visible (checked, disabled) for the rest of the session.
   const [pickedIds, setPickedIds] = useState<Set<string>>(() => new Set())
+  // Goal-promotion translation prompt (goals mode): which goal is being
+  // translated into a season-sized move, and the editable draft.
+  const [translatingGoalId, setTranslatingGoalId] = useState<string | null>(null)
+  const [translationDraft, setTranslationDraft] = useState('')
 
   const abovePool = useMemo(
     () => (above && above !== 'goals'
@@ -63,6 +67,42 @@ export function LookAboveStep() {
     const promotable = ownBucket === 'quarter'
     const renderGoal = (g: (typeof activeGoals)[number]) => {
       const covered = coveredGoalIds.has(g.id) || quarterTitles.has(g.name)
+      // Promotion is a TRANSLATION, not a copy: a year-sized sentence must
+      // become a season-sized move before it can live on a task list.
+      // ("Promote goals, don't copy their names.") The inline prompt is
+      // prefilled with the goal for editing into this season's slice.
+      if (translatingGoalId === g.id) {
+        return (
+          <li key={g.id} className="rounded-lg bg-primary-50/60 border border-primary-200 px-3 py-2">
+            <p className="text-xs text-primary-800 mb-1.5">
+              What's the first <b>season-sized</b> move on “{g.name}”? An outcome you can finish in these three months.
+            </p>
+            <div className="flex items-center gap-2">
+              <input type="text" autoFocus value={translationDraft}
+                onChange={(e) => setTranslationDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && translationDraft.trim()) {
+                    void host.createTaskInBucket(translationDraft.trim(), 'quarter', { goalId: g.id })
+                    setTranslatingGoalId(null)
+                  }
+                  if (e.key === 'Escape') setTranslatingGoalId(null)
+                }}
+                className="flex-1 min-w-0 text-sm bg-white border border-primary-200 rounded-md px-2.5 py-1.5 focus:outline-none focus:border-primary-400"
+              />
+              <button type="button" disabled={!translationDraft.trim()}
+                onClick={() => {
+                  void host.createTaskInBucket(translationDraft.trim(), 'quarter', { goalId: g.id })
+                  setTranslatingGoalId(null)
+                }}
+                className="shrink-0 text-xs font-semibold px-2.5 py-1.5 rounded-md text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-40 transition-colors">
+                Add to season
+              </button>
+              <button type="button" onClick={() => setTranslatingGoalId(null)} aria-label="Cancel"
+                className="shrink-0 text-xs px-1.5 py-1.5 text-neutral-400 hover:text-neutral-600">✕</button>
+            </div>
+          </li>
+        )
+      }
       return (
         <li key={g.id} className="flex items-center gap-2 rounded-lg bg-neutral-50/70 px-3 py-1.5 text-sm text-neutral-700">
           <Target className="w-3.5 h-3.5 text-neutral-300 shrink-0" />
@@ -73,8 +113,8 @@ export function LookAboveStep() {
             </span>
           ) : (
             <button type="button"
-              onClick={() => void host.createTaskInBucket(g.name, 'quarter', { goalId: g.id })}
-              title="Start this goal this season — creates a season item threaded to the goal"
+              onClick={() => { setTranslatingGoalId(g.id); setTranslationDraft(g.name) }}
+              title="Start this goal this season — translate it into a season-sized move, threaded to the goal"
               className="shrink-0 inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-md text-primary-700 bg-primary-50 hover:bg-primary-100 transition-colors">
               <Plus className="w-3 h-3" /> Start this season
             </button>

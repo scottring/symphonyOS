@@ -224,6 +224,10 @@ export function HorizonView({ horizon }: HorizonViewProps) {
     [poolTitles, poolSourceIds, poolGoalIds],
   );
   const [refOpen, setRefOpen] = useState(false);
+  // Goal-promotion translation prompt in the reference panel (season page):
+  // which reference row is being translated, and the editable draft.
+  const [translatingRefId, setTranslatingRefId] = useState<string | null>(null);
+  const [refDraft, setRefDraft] = useState('');
   const autoOpenedRef = useRef(false);
   useEffect(() => {
     if (!autoOpenedRef.current && pool.length === 0 && referenceItems.length > 0) {
@@ -692,7 +696,41 @@ export function HorizonView({ horizon }: HorizonViewProps) {
               </button>
               {refOpen && (
                 <ul className="mt-3 space-y-1 rounded-xl border border-neutral-100 bg-white px-4 py-3">
-                  {referenceItems.map((it) => (
+                  {referenceItems.map((it) => {
+                    {/* Goals don't copy verbatim — a year-sized sentence must be
+                        translated into a season-sized move first (the inline
+                        prompt). Season→month task copies stay one-tap: the
+                        grains are adjacent. */}
+                    if (translatingRefId === it.id) {
+                      return (
+                        <li key={it.id} className="rounded-lg bg-primary-50/60 border border-primary-200 px-3 py-2 my-1">
+                          <p className="text-xs text-primary-800 mb-1.5">
+                            What's the first <span className="font-semibold">season-sized</span> move on “{it.title}”? An outcome you can finish this season.
+                          </p>
+                          <div className="flex items-center gap-2">
+                            <input type="text" autoFocus value={refDraft}
+                              onChange={(e) => setRefDraft(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' && refDraft.trim()) {
+                                  void onCreateTaskFromValue(refDraft.trim(), it.lineage);
+                                  setTranslatingRefId(null);
+                                }
+                                if (e.key === 'Escape') setTranslatingRefId(null);
+                              }}
+                              className="flex-1 min-w-0 text-sm bg-white border border-primary-200 rounded-md px-2.5 py-1.5 focus:outline-none focus:border-primary-400"
+                            />
+                            <button type="button" disabled={!refDraft.trim()}
+                              onClick={() => { void onCreateTaskFromValue(refDraft.trim(), it.lineage); setTranslatingRefId(null); }}
+                              className="shrink-0 text-xs font-semibold px-2.5 py-1.5 rounded-md text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-40 transition-colors">
+                              Add to season
+                            </button>
+                            <button type="button" onClick={() => setTranslatingRefId(null)} aria-label="Cancel"
+                              className="shrink-0 text-xs px-1.5 py-1.5 text-neutral-400 hover:text-neutral-600">✕</button>
+                          </div>
+                        </li>
+                      );
+                    }
+                    return (
                     <li key={it.id} className="flex items-center gap-3 py-1">
                       {it.goalId ? (
                         <button
@@ -709,6 +747,15 @@ export function HorizonView({ horizon }: HorizonViewProps) {
                         <span className="shrink-0 inline-flex items-center gap-1 text-xs text-primary-700">
                           <Check className="w-3 h-3" strokeWidth={3} /> on this list
                         </span>
+                      ) : it.goalId ? (
+                        <button
+                          type="button"
+                          onClick={() => { setTranslatingRefId(it.id); setRefDraft(it.title); }}
+                          title="Start this goal this season — translate it into a season-sized move"
+                          className="shrink-0 inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-md text-primary-700 bg-primary-50 hover:bg-primary-100 transition-colors"
+                        >
+                          <Plus className="w-3 h-3" /> Start this season
+                        </button>
                       ) : (
                         <button
                           type="button"
@@ -720,7 +767,8 @@ export function HorizonView({ horizon }: HorizonViewProps) {
                         </button>
                       )}
                     </li>
-                  ))}
+                    );
+                  })}
                 </ul>
               )}
             </section>

@@ -100,3 +100,40 @@ describe('LookAboveStep', () => {
     expect(screen.getByText('today')).toBeInTheDocument()
   })
 })
+
+describe('LookAboveStep — goal promotion translates, never copies verbatim', () => {
+  const seasonalStep = {
+    id: 'look-at-year', type: 'look-above' as const, title: 'Your goals for the year',
+    narration: 'Read them slowly.', props: { aboveBucket: 'goals' as const },
+  }
+  const goal = { id: 'g1', name: 'Make home into home', status: 'active', areaId: 'ar1' } as unknown as Goal
+
+  it('opens the translation prompt instead of creating the row', () => {
+    const host = makeHost({ goals: [goal] })
+    renderStep(<LookAboveStep />, { step: seasonalStep, host, horizon: 'seasonal' })
+    fireEvent.click(screen.getByRole('button', { name: /Start this season/ }))
+    expect(host.createTaskInBucket).not.toHaveBeenCalled()
+    expect(screen.getByText(/season-sized/)).toBeInTheDocument()
+    // Prefilled with the goal name, ready to edit.
+    expect(screen.getByDisplayValue('Make home into home')).toBeInTheDocument()
+  })
+
+  it('creates the edited translation threaded to the goal', () => {
+    const host = makeHost({ goals: [goal] })
+    renderStep(<LookAboveStep />, { step: seasonalStep, host, horizon: 'seasonal' })
+    fireEvent.click(screen.getByRole('button', { name: /Start this season/ }))
+    const input = screen.getByDisplayValue('Make home into home')
+    fireEvent.change(input, { target: { value: 'Living room furnished and usable' } })
+    fireEvent.click(screen.getByRole('button', { name: /Add to season/ }))
+    expect(host.createTaskInBucket).toHaveBeenCalledWith('Living room furnished and usable', 'quarter', { goalId: 'g1' })
+  })
+
+  it('Escape cancels without creating anything', () => {
+    const host = makeHost({ goals: [goal] })
+    renderStep(<LookAboveStep />, { step: seasonalStep, host, horizon: 'seasonal' })
+    fireEvent.click(screen.getByRole('button', { name: /Start this season/ }))
+    fireEvent.keyDown(screen.getByDisplayValue('Make home into home'), { key: 'Escape' })
+    expect(host.createTaskInBucket).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: /Start this season/ })).toBeInTheDocument()
+  })
+})
