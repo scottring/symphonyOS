@@ -14,9 +14,6 @@ struct InboxView: View {
     }, sort: \SymphonyTask.createdAt, order: .reverse)
     private var inboxTasks: [SymphonyTask]
 
-    // Lets a swiped SlideRow freeze this ScrollView so the swipe wins the touch.
-    @State private var scrollLock = SlideScrollLock()
-
     var body: some View {
         ZStack {
             Color.bgBase.ignoresSafeArea()
@@ -37,9 +34,7 @@ struct InboxView: View {
                     }
                     .padding(.vertical, 8)
                     .padding(.bottom, 80)
-                    .environment(scrollLock)
                 }
-                .scrollDisabled(scrollLock.locked)
             }
 
             // Quick capture
