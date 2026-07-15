@@ -16,45 +16,45 @@ export const SESSIONS: Record<PlanningHorizon, GuidedSessionConfig> = {
     steps: [
       {
         id: 'welcome', type: 'narration', title: 'A year, on purpose',
-        narration: 'This is your annual planning session. Over the next forty-five minutes or so, you will look back at the year that is ending, imagine the one ahead, and write a short list of goals for the areas of life that matter most. There is nothing to get right here — every step can be skipped, and you can come back anytime. Find somewhere quiet, and when you are ready, continue.',
+        narration: 'This is the annual session. One hour, once a year: look back honestly, decide where the next twelve months should end up, and write it down where the rest of the system can see it. Every step is skippable and you can come back anytime. Find somewhere quiet, and when you are ready, continue.',
       },
       {
         id: 'looking-back', type: 'reflect', title: 'Look back',
-        narration: 'Start with the year behind you. Take twenty or thirty minutes if you have them. What went well — what are you genuinely proud of? And which habits or routines did not serve you? Write freely; this is for you and whoever you share your planning with.',
-        props: { notesKey: 'review', placeholder: "Wins worth celebrating, and what didn’t serve you…" },
+        narration: 'Start with the year behind you. What actually moved, and what are you proud of? And which habits or commitments cost more than they returned? Read the failures like data, not verdicts — what happened, not whose fault. Write freely; this is for you.',
+        props: { notesKey: 'review', placeholder: "What moved, what stalled, and what it cost…" },
       },
       {
         id: 'one-year-out', type: 'reflect', title: 'One year from now',
-        narration: 'Now jump forward twelve months. It is this same week, next year, and things went well. Write down what you are most proud of having accomplished — and the specific steps you took to get there. Write it in the past tense, as if it already happened.',
-        props: { notesKey: 'lookingBack', placeholder: "It’s a year from now. I’m most proud that…" },
+        narration: 'Now jump forward twelve months and assume it went well. Write it in the past tense: shipped, fixed, finally did. Past tense forces specifics; future tense lets you stay vague. Name what happened, and the two or three moves that made it happen.',
+        props: { notesKey: 'lookingBack', placeholder: "It’s July 2027. What actually happened:" },
       },
       {
         id: 'goal-review', type: 'review', title: "Last year’s goals",
-        narration: 'Here are the goals you set before. For each one: if it happened, mark it achieved and enjoy that for a second. If it still matters, carry it into the new year. And if it no longer fits who you are, let it go — that is not failure, that is editing.',
+        narration: 'Here are the goals you set before. If one happened, mark it achieved and take the second of credit. If it still matters, carry it into the new year. If it no longer fits, let it go — dropping a goal on purpose is editing, not failing.',
         props: { source: 'goals' },
       },
       {
         id: 'mountain-ranges', type: 'calendar', title: "The year’s mountain ranges",
-        narration: 'Look at the shape of the year ahead. These are the commitments already set in stone — trips, school calendars, birthdays, heavy stretches of work. You are not planning around them yet; you are just noticing where the mountains are. Jot anything worth remembering.',
+        narration: 'Before you write anything new, look at what is already fixed: school calendars, trips, launches, the stretches that will eat whole weeks. You are not planning around them yet — you are mapping the terrain, because goals that ignore the terrain die in February.',
         props: { notesKey: 'annualCalendar' },
       },
       {
         id: 'someday', type: 'review', title: 'Someday possibilities',
-        narration: "This is your someday list — the ideas you parked because the timing wasn’t right. Read through it slowly. If something is finally ready, move it into this season. Everything else can keep waiting; that is what the list is for.",
+        narration: "This is the someday list — the ideas you parked on purpose. Read it slowly. If the timing has finally turned for one of them, move it into this season. Everything else keeps waiting; that is the point of the list.",
         props: { source: 'someday' },
       },
       {
         id: 'write-goals', type: 'domains-goals', title: "This year’s goals",
-        narration: "Now write the year’s goals. Pick three to eight areas of life — health, family, work, home, fun — and under each one, write what you want without censoring yourself. One rule of thumb: aim for two goals that make you smile for every one that feels like an obligation.",
+        narration: "Now write the goals. Pick three to eight areas of life, and under each one write plain sentences: what you want to be true by this time next year. Do not filter yet — cutting comes later. And keep the ratio honest: two goals you actually want for every one you merely should.",
         byDomain: {
-          work: { narration: "Now write the year’s work goals. Under each area work touches — the craft, the business, the money, the people — write what you want without censoring yourself. Keep the rule of thumb: aim for two goals that make you smile for every one that feels like an obligation." },
-          family: { narration: "Now write the year’s family goals. Under each area of family life — the kids, each other, the home, the traditions — write what you want without censoring yourself. Aim for two goals that make you smile for every one that feels like an obligation." },
-          personal: { narration: "Now write the year’s personal goals. Under each area that is yours alone — health, growth, fun, rest — write what you want without censoring yourself. Aim for two goals that make you smile for every one that feels like an obligation." },
+          work: { narration: "Now write the year’s work goals. Under each area work touches — the product, the money, the pipeline, the people — write plain sentences: what you want true by this time next year. Do not filter yet, and keep two goals you actually want for every one you merely should." },
+          family: { narration: "Now write the year’s family goals. The kids, each other, the home, the traditions — plain sentences, what you want true by this time next year. Do not filter yet, and keep two goals you actually want for every one you merely should." },
+          personal: { narration: "Now write the year’s personal goals. Health, training, headspace, your own fun — plain sentences, what you want true by this time next year. Do not filter yet, and keep two goals you actually want for every one you merely should." },
         },
       },
       {
         id: 'book-next', type: 'book-next', title: 'Anchor the next step',
-        narration: "Last thing, and it is the one that makes this system real: put your seasonal planning session on the calendar right now, before you close this. A plan with a next appointment survives. One without usually doesn’t.",
+        narration: "Last step, and it is the one that makes this real: put the seasonal session on the calendar before you close this. If the next session is not booked, this was journaling.",
         props: { bookHorizon: 'seasonal', bookTitle: 'Seasonal planning session' },
       },
     ],
