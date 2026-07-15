@@ -16,6 +16,8 @@ import { useNarrationPlayer } from './useNarrationPlayer'
 import { GuidedProvider, type GuidedHost } from './GuidedContext'
 import { CoachLines } from './CoachLines'
 import { GuideChat } from './GuideChat'
+import { GuidedScene } from './GuidedScene'
+import { placeAt } from './altitude'
 import type { StepType } from './types'
 
 const REGISTRY: Partial<Record<StepType, ComponentType>> = {}
@@ -115,9 +117,17 @@ export function GuidedSession({ horizon, domain, host, onClose, onFinished, onCh
 
   const Body = REGISTRY[step.type]
 
+  // The descent: session progress drives the scene camera and the altimeter.
+  // On step 1 you're at this horizon's highest point; Finish is the doorstep.
+  const progress = config.steps.length > 1 ? safeIndex / (config.steps.length - 1) : 1
+  const altitude = placeAt(horizon, progress)
+
   return (
-    <div className="fixed inset-0 z-50 bg-bg-base flex flex-col" role="dialog" aria-label={config.title}>
-      <header className="flex items-center justify-between px-6 py-4 border-b border-neutral-200/70 shrink-0">
+    <div className="fixed inset-0 z-50 flex flex-col" role="dialog" aria-label={config.title}>
+      <GuidedScene horizon={horizon} progress={progress} />
+
+      {/* floating header — session name left, altimeter + controls right */}
+      <header className="relative z-10 flex items-start justify-between px-6 pt-5 shrink-0">
         <div>
           <div className="flex items-center gap-2.5">
             <h1 className="font-display text-2xl text-neutral-800">{config.title}</h1>
@@ -131,34 +141,62 @@ export function GuidedSession({ horizon, domain, host, onClose, onFinished, onCh
             {period.label} · Step {safeIndex + 1} of {config.steps.length}
           </p>
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-3">
+          {/* altimeter — where you are on the mountain */}
+          <div className="hidden sm:block text-right mr-1">
+            <div className="font-display italic text-[15px] leading-tight text-primary-700">{altitude.place}</div>
+            <div className="text-[10px] tracking-[.18em] uppercase text-neutral-400">{altitude.sub}</div>
+          </div>
           <button type="button" onClick={toggleMuted}
             aria-label={muted ? 'Unmute narration' : 'Mute narration'}
-            className="p-2 rounded-lg text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors">
+            className="p-2 rounded-lg text-neutral-400 hover:text-neutral-700 hover:bg-white/60 transition-colors">
             {muted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
           </button>
           <button type="button" onClick={onClose} aria-label="Close"
-            className="p-2 rounded-lg text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors">
+            className="p-2 rounded-lg text-neutral-400 hover:text-neutral-700 hover:bg-white/60 transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>
       </header>
 
-      {/* thin progress track */}
-      <div className="h-1 bg-neutral-100 shrink-0">
-        <div className="h-full bg-primary-500 transition-all"
-          style={{ width: `${((safeIndex + 1) / config.steps.length) * 100}%` }} />
-      </div>
+      {/* waypoint trail — the progress bar you can feel (and tap). Labels live
+          in title/aria-label only: visible text here would duplicate the step
+          h2 in the accessibility tree (and in getByText). */}
+      {!loading && (
+        <nav aria-label="Session waypoints"
+          className="hidden md:flex absolute left-7 top-0 bottom-0 z-10 flex-col justify-center">
+          {config.steps.map((s, j) => {
+            const done = j < safeIndex
+            const here = j === safeIndex
+            return (
+              <button key={s.id} type="button" onClick={() => go(j)}
+                className="relative flex items-center py-[7px]" title={s.title}
+                aria-label={`Go to step ${j + 1}: ${s.title}`} aria-current={here ? 'step' : undefined}>
+                {j > 0 && <span className={`absolute left-[7px] -top-[9px] h-[18px] w-[2px] rounded ${done || here ? 'bg-primary-600' : 'bg-neutral-300/70'}`} />}
+                <span aria-hidden className={`grid place-items-center w-4 h-4 rounded-full border-2 shrink-0 transition-all text-[8px] text-white ${
+                  done ? 'bg-primary-600 border-primary-600'
+                  : here ? 'bg-white border-primary-600 scale-110 shadow-[0_0_0_5px_rgba(46,93,67,.14)]'
+                  : 'bg-white/80 border-neutral-300'}`}>
+                  {done ? '✓' : ''}
+                </span>
+              </button>
+            )
+          })}
+        </nav>
+      )}
 
-      <div className="flex-1 min-h-0 overflow-auto">
-        <div className="max-w-[680px] w-full mx-auto px-6 py-8 space-y-6">
+      <div className="relative z-10 flex-1 min-h-0 overflow-auto">
+        <div className="max-w-[680px] w-full mx-auto px-6 py-10 md:py-14 space-y-7">
           {loading ? (
-            <p className="text-sm text-neutral-400">Gathering your session…</p>
+            <p className="text-sm text-neutral-500">Gathering your session…</p>
           ) : (
             <>
               <div>
-                <h2 className="font-display text-xl text-neutral-800 mb-2">{step.title}</h2>
-                <p className="text-[15px] leading-relaxed text-neutral-600">{narrationText}</p>
+                <div className="text-[11px] font-bold tracking-[.22em] uppercase text-primary-700 mb-3">
+                  {config.title} · {safeIndex + 1} / {config.steps.length}
+                </div>
+                <h2 className="font-display text-4xl md:text-[44px] leading-[1.06] tracking-tight text-neutral-800 mb-4">{step.title}</h2>
+                <p className="text-lg leading-relaxed text-neutral-600 max-w-[58ch]">{narrationText}</p>
               </div>
               <GuidedProvider value={{
                 horizon, domain, periodToken: period.token, periodLabel: period.label,
@@ -175,16 +213,16 @@ export function GuidedSession({ horizon, domain, host, onClose, onFinished, onCh
         </div>
       </div>
 
-      <footer className="flex items-center justify-between px-6 py-4 border-t border-neutral-200/70 shrink-0">
+      <footer className="relative z-10 flex items-center justify-between px-8 pb-6 pt-10 shrink-0 bg-gradient-to-t from-[#faf7f0] via-[#faf7f0]/80 to-transparent">
         <button type="button" onClick={() => go(safeIndex - 1)} disabled={loading || safeIndex === 0}
-          className={`inline-flex items-center gap-1.5 text-sm font-medium px-3 py-2 rounded-lg transition-colors ${
-            loading || safeIndex === 0 ? 'text-neutral-300 cursor-not-allowed' : 'text-neutral-600 hover:bg-neutral-100'}`}>
+          className={`inline-flex items-center gap-1.5 text-[15px] font-medium px-4 py-2.5 rounded-xl transition-colors ${
+            loading || safeIndex === 0 ? 'text-neutral-300 cursor-not-allowed' : 'text-neutral-600 hover:bg-white/70'}`}>
           <ArrowLeft className="w-4 h-4" /> Back
         </button>
         <div className="flex items-center gap-2">
           {!last && (
             <button type="button" onClick={() => go(safeIndex + 1)} disabled={loading}
-              className="text-sm font-medium px-3 py-2 rounded-lg text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-colors disabled:cursor-not-allowed disabled:opacity-50">
+              className="text-[15px] font-medium px-4 py-2.5 rounded-xl text-neutral-400 hover:text-neutral-600 hover:bg-white/70 transition-colors disabled:cursor-not-allowed disabled:opacity-50">
               Skip
             </button>
           )}
@@ -192,19 +230,19 @@ export function GuidedSession({ horizon, domain, host, onClose, onFinished, onCh
             <>
               {config.chain && onChain && (
                 <button type="button" onClick={chain} disabled={loading}
-                  className="inline-flex items-center gap-1.5 text-sm font-medium px-3 py-2 rounded-lg text-primary-700 bg-primary-50 hover:bg-primary-100 transition-colors disabled:cursor-not-allowed disabled:opacity-50">
+                  className="inline-flex items-center gap-1.5 text-[15px] font-medium px-4 py-2.5 rounded-xl text-primary-700 bg-primary-50 hover:bg-primary-100 transition-colors disabled:cursor-not-allowed disabled:opacity-50">
                   {config.chain.label}
                   <ArrowRight className="w-4 h-4" />
                 </button>
               )}
               <button type="button" onClick={finish} disabled={loading}
-                className="inline-flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-lg bg-primary-600 text-white hover:bg-primary-700 transition-colors disabled:cursor-not-allowed disabled:opacity-50">
+                className="inline-flex items-center gap-1.5 text-[15px] font-semibold px-6 py-2.5 rounded-xl bg-primary-600 text-white hover:bg-primary-700 shadow-[0_6px_18px_-6px_rgba(46,93,67,.5)] transition-all hover:-translate-y-px disabled:cursor-not-allowed disabled:opacity-50 disabled:translate-y-0">
                 <Check className="w-4 h-4" /> Finish
               </button>
             </>
           ) : (
             <button type="button" onClick={() => go(safeIndex + 1)} disabled={loading}
-              className="inline-flex items-center gap-1.5 text-sm font-medium px-4 py-2 rounded-lg bg-primary-600 text-white hover:bg-primary-700 transition-colors disabled:cursor-not-allowed disabled:opacity-50">
+              className="inline-flex items-center gap-1.5 text-[15px] font-semibold px-6 py-2.5 rounded-xl bg-primary-600 text-white hover:bg-primary-700 shadow-[0_6px_18px_-6px_rgba(46,93,67,.5)] transition-all hover:-translate-y-px disabled:cursor-not-allowed disabled:opacity-50 disabled:translate-y-0">
               Next <ArrowRight className="w-4 h-4" />
             </button>
           )}
