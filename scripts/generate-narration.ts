@@ -64,6 +64,11 @@ for (const [horizon, cfg] of Object.entries(SESSIONS)) {
     writeFileSync(resolve(outDir, file), audio)
     next.clips[key] = { text: step.narration, file }
     generated++
+    // Checkpoint after every paid API call: a mid-run failure (quota, network)
+    // must not lose the manifest entries for clips already generated and billed.
+    // Merges over the old clips so not-yet-processed steps keep their entries;
+    // the final write below still prunes steps that no longer exist.
+    writeFileSync(manifestPath, JSON.stringify({ ...next, clips: { ...manifest.clips, ...next.clips } }, null, 2) + '\n')
     console.log(`${(audio.length / 1024).toFixed(0)}kB`)
   }
 }
