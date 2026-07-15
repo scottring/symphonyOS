@@ -13,7 +13,7 @@
 
 import { useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CalendarRange, Target, Plus, ChevronRight, FolderOpen, Check, Pencil, Archive, Trash2 } from 'lucide-react';
+import { CalendarRange, Target, Plus, ChevronRight, FolderOpen, Check, Pencil, Archive, Trash2, CornerRightDown } from 'lucide-react';
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
 import { useGoogleCalendar } from '@/hooks/useGoogleCalendar';
 import { useEventNotes } from '@/hooks/useEventNotes';
@@ -442,6 +442,29 @@ export function HorizonView({ horizon }: HorizonViewProps) {
               <Plus className="w-3 h-3" /> Copy to week
             </button>
           ))}
+          {/* Re-file down an altitude — a MOVE, not a copy-down. Copy-down is
+              planned descent (the upper list keeps its line); this is for
+              items that were mis-graded and never belonged here. */}
+          {horizon === 'season' && (
+            <button
+              type="button"
+              title="Move to the month list — for items that are month-sized, not season-sized"
+              onClick={() => setBucket(task.id, 'month')}
+              className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md text-neutral-500 bg-neutral-50 hover:bg-neutral-100 transition-colors"
+            >
+              <CornerRightDown className="w-3 h-3" /> To month
+            </button>
+          )}
+          {horizon === 'month' && (
+            <button
+              type="button"
+              title="Move to the week list — for items that are week-sized, not month-sized"
+              onClick={() => setBucket(task.id, 'week')}
+              className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md text-neutral-500 bg-neutral-50 hover:bg-neutral-100 transition-colors"
+            >
+              <CornerRightDown className="w-3 h-3" /> To week
+            </button>
+          )}
           <button
             type="button"
             onClick={() => handleSelect(task.id)}
