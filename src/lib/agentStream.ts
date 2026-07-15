@@ -47,6 +47,26 @@ export interface AssistantTaskContext {
   projectName?: string | null
 }
 
+/** The planning session a conversation is happening inside. Sent to the edge
+ *  fn, which injects it as context so the guide can coach the current step —
+ *  what's on the list, what the level above holds — without the user
+ *  re-describing any of it. All lists are titles only (small + fast). */
+export interface AssistantSessionContext {
+  /** 'annual' | 'seasonal' | 'monthly' | 'weekly' | 'daily' */
+  horizon: string
+  periodLabel: string
+  stepId: string
+  stepTitle: string
+  /** This step's bucket, when it reads/writes one ('quarter', 'month', …). */
+  bucket?: string
+  /** Open items on this horizon's list right now. */
+  listTitles?: string[]
+  /** The level above, for breaking big items into level-sized moves. */
+  aboveTitles?: string[]
+  /** Active year goals (seasonal sessions look at these). */
+  goalNames?: string[]
+}
+
 export interface StreamHandlers {
   onText?: (text: string) => void
   onTool?: (name: string) => void
@@ -60,6 +80,8 @@ export interface StreamHandlers {
   currentMemberId?: string
   /** When set, the whole conversation is scoped to this task. */
   taskContext?: AssistantTaskContext
+  /** When set, the whole conversation is scoped to this planning session. */
+  sessionContext?: AssistantSessionContext
 }
 
 export type AgentContentBlock =
@@ -101,6 +123,7 @@ export async function streamSymphonyAgent(
         ...(handlers.attachment ? { attachment: handlers.attachment } : {}),
         ...(handlers.currentMemberId ? { currentMemberId: handlers.currentMemberId } : {}),
         ...(handlers.taskContext ? { taskContext: handlers.taskContext } : {}),
+        ...(handlers.sessionContext ? { sessionContext: handlers.sessionContext } : {}),
       }),
     },
   )

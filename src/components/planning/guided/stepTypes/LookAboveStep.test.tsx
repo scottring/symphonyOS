@@ -21,7 +21,8 @@ describe('LookAboveStep', () => {
       host, horizon: 'monthly',
     })
     fireEvent.click(screen.getByRole('button', { name: /Copy down/ }))
-    expect(host.createTaskInBucket).toHaveBeenCalledWith('Renovate kitchen', 'month', undefined)
+    // Copy-down carries the cascade thread: the source task's id (+ its goal, if any).
+    expect(host.createTaskInBucket).toHaveBeenCalledWith('Renovate kitchen', 'month', { projectId: undefined, sourceId: 'q1', goalId: undefined })
   })
 
   it('reference mode: an item already on this list shows a check, no button', () => {

@@ -77,4 +77,13 @@ export interface Task {
   // Needs-discussion flag — surfaces on family kiosk's For Discussion list
   needsDiscussion?: boolean
   discussionNote?: string
+  // ── Planning-cascade lineage (2026-07-15_task_lineage) ──
+  /** The task this one was copied down from (season→month, month→week).
+   *  Immediate cascade parent — distinct from parentTaskId (subtask nesting). */
+  sourceId?: string
+  /** The annual goal this task ultimately serves. Stamped on goal promotion,
+   *  inherited by every copy below, so goal roll-up is a flat filter. */
+  goalId?: string
+  /** Fun-audit mark (Best Laid Plans): this item exists because it's fun. */
+  isFun?: boolean
 }

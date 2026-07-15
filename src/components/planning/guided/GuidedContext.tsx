@@ -29,9 +29,15 @@ export interface GuidedHost {
   onSetBucket: (id: string, bucket: TaskBucket) => void
   onCompleteTask: (id: string) => void
   onUpdateTask: (id: string, updates: Partial<Task>) => void
-  /** Single atomic create-into-bucket (bucket rides in AddTaskOptions). */
-  /** projectId attaches the new task to a project — context, not linkage. */
-  createTaskInBucket: (title: string, bucket: TaskBucket, projectId?: string) => Promise<void>
+  /** Single atomic create-into-bucket (bucket rides in AddTaskOptions).
+   *  projectId attaches the new task to a project — context, not linkage.
+   *  sourceId/goalId are the cascade thread: stamped on copy-down and goal
+   *  promotion so ancestry and roll-up stay legible (lineage.ts). */
+  createTaskInBucket: (
+    title: string,
+    bucket: TaskBucket,
+    opts?: { projectId?: string; sourceId?: string; goalId?: string },
+  ) => Promise<void>
   /** Dated all-day task (book-next fallback when calendar is disconnected). */
   createDatedTask: (title: string, date: Date) => Promise<void>
   // Projects — the "what" axis: context containers the horizon lists chunk into

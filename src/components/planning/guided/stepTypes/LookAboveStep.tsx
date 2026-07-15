@@ -8,6 +8,7 @@
 import { useMemo, useState } from 'react'
 import { Target, Check, Plus } from 'lucide-react'
 import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
+import { inheritedLineage } from '@/lib/planning/lineage'
 import type { TaskBucket } from '@/types/task'
 import { useGuided } from '../GuidedContext'
 
@@ -53,6 +54,34 @@ export function LookAboveStep() {
     if (activeGoals.length === 0) return <p className="text-sm text-neutral-400">No goals written for this year yet.</p>
     const areaIds = new Set(host.goalAreas.map((a) => a.id))
     const uncategorized = activeGoals.filter((g) => !areaIds.has(g.areaId))
+    // A goal is "in this season" when any quarter task carries its id (the
+    // lineage thread) — title matching is only the pre-lineage fallback.
+    const coveredGoalIds = new Set(
+      host.tasks.filter((t) => t.bucket === 'quarter' && t.goalId).map((t) => t.goalId as string),
+    )
+    const quarterTitles = new Set(host.tasks.filter((t) => !t.completed && t.bucket === 'quarter').map((t) => t.title))
+    const promotable = ownBucket === 'quarter'
+    const renderGoal = (g: (typeof activeGoals)[number]) => {
+      const covered = coveredGoalIds.has(g.id) || quarterTitles.has(g.name)
+      return (
+        <li key={g.id} className="flex items-center gap-2 rounded-lg bg-neutral-50/70 px-3 py-1.5 text-sm text-neutral-700">
+          <Target className="w-3.5 h-3.5 text-neutral-300 shrink-0" />
+          <span className="flex-1 min-w-0 truncate">{g.name}</span>
+          {promotable && (covered ? (
+            <span className="shrink-0 inline-flex items-center gap-1 text-xs text-primary-700">
+              <Check className="w-3 h-3" strokeWidth={3} /> on this season
+            </span>
+          ) : (
+            <button type="button"
+              onClick={() => void host.createTaskInBucket(g.name, 'quarter', { goalId: g.id })}
+              title="Start this goal this season — creates a season item threaded to the goal"
+              className="shrink-0 inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-md text-primary-700 bg-primary-50 hover:bg-primary-100 transition-colors">
+              <Plus className="w-3 h-3" /> Start this season
+            </button>
+          ))}
+        </li>
+      )
+    }
     return (
       <div className="space-y-4">
         {host.goalAreas.map((area) => {
@@ -61,26 +90,14 @@ export function LookAboveStep() {
           return (
             <section key={area.id}>
               <h3 className="text-[11px] uppercase tracking-wider text-neutral-400 mb-1.5">{area.name}</h3>
-              <ul className="space-y-1">
-                {inArea.map((g) => (
-                  <li key={g.id} className="flex items-center gap-2 rounded-lg bg-neutral-50/70 px-3 py-1.5 text-sm text-neutral-700">
-                    <Target className="w-3.5 h-3.5 text-neutral-300 shrink-0" /> {g.name}
-                  </li>
-                ))}
-              </ul>
+              <ul className="space-y-1">{inArea.map(renderGoal)}</ul>
             </section>
           )
         })}
         {uncategorized.length > 0 && (
           <section>
             <h3 className="text-[11px] uppercase tracking-wider text-neutral-400 mb-1.5">Uncategorized</h3>
-            <ul className="space-y-1">
-              {uncategorized.map((g) => (
-                <li key={g.id} className="flex items-center gap-2 rounded-lg bg-neutral-50/70 px-3 py-1.5 text-sm text-neutral-700">
-                  <Target className="w-3.5 h-3.5 text-neutral-300 shrink-0" /> {g.name}
-                </li>
-              ))}
-            </ul>
+            <ul className="space-y-1">{uncategorized.map(renderGoal)}</ul>
           </section>
         )}
       </div>
@@ -124,7 +141,8 @@ export function LookAboveStep() {
                 <Check className="w-3 h-3" strokeWidth={3} /> on this list
               </span>
             ) : ownBucket ? (
-              <button type="button" onClick={() => void host.createTaskInBucket(t.title, ownBucket, t.projectId)}
+              <button type="button"
+                onClick={() => void host.createTaskInBucket(t.title, ownBucket, { projectId: t.projectId, ...inheritedLineage(t) })}
                 title="Copy onto this list (stays on the list above too)"
                 className="shrink-0 inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-md text-primary-700 bg-primary-50 hover:bg-primary-100 transition-colors">
                 <Plus className="w-3 h-3" /> Copy down

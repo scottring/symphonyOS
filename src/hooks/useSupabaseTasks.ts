@@ -46,6 +46,9 @@ export interface DbTask {
   discussion_note: string | null
   week_deferred_at: string | null
   capture_meta: { status?: string; storage_path?: string; suggested_task_id?: string } | null
+  source_id: string | null
+  goal_id: string | null
+  is_fun: boolean | null
   created_at: string
   updated_at: string
 }
@@ -111,6 +114,9 @@ export function dbTaskToTask(dbTask: DbTask): Task {
     needsDiscussion: dbTask.needs_discussion ?? undefined,
     discussionNote: dbTask.discussion_note ?? undefined,
     weekDeferredAt: dbTask.week_deferred_at ? new Date(dbTask.week_deferred_at) : undefined,
+    sourceId: dbTask.source_id ?? undefined,
+    goalId: dbTask.goal_id ?? undefined,
+    isFun: dbTask.is_fun ?? undefined,
     captureMeta: dbTask.capture_meta
       ? {
           status: dbTask.capture_meta.status as TaskCaptureMeta['status'],
@@ -312,6 +318,12 @@ export function useSupabaseTasks() {
      *  can hit tasksRef before the temp→real id swap has rendered, and be
      *  silently dropped ("Task not found"). Ignored when scheduledFor is set. */
     bucket?: TaskBucket
+    /** Cascade lineage: the task this one is copied down from. */
+    sourceId?: string
+    /** Cascade lineage: the annual goal this task serves (inherited by copies). */
+    goalId?: string
+    /** Fun-audit mark. */
+    isFun?: boolean
   }
 
   const addTask = useCallback(async (
@@ -356,6 +368,9 @@ export function useSupabaseTasks() {
       isAllDay: options?.isAllDay,
       parentTaskId: options?.parentTaskId,
       phoneNumber: options?.phoneNumber,
+      sourceId: options?.sourceId,
+      goalId: options?.goalId,
+      isFun: options?.isFun,
     }
     setTasks((prev) => [optimisticTask, ...prev])
 
@@ -382,6 +397,9 @@ export function useSupabaseTasks() {
         is_all_day: options?.isAllDay ?? null,
         parent_task_id: options?.parentTaskId ?? null,
         phone_number: options?.phoneNumber ?? null,
+        source_id: options?.sourceId ?? null,
+        goal_id: options?.goalId ?? null,
+        is_fun: options?.isFun ?? false,
       })
       .select()
       .single()
@@ -830,6 +848,9 @@ export function useSupabaseTasks() {
     if ('waitingSince' in updates) dbUpdates.waiting_since = updates.waitingSince?.toISOString() ?? null
     if ('needsDiscussion' in updates) dbUpdates.needs_discussion = updates.needsDiscussion ?? false
     if ('discussionNote' in updates) dbUpdates.discussion_note = updates.discussionNote ?? null
+    if ('sourceId' in updates) dbUpdates.source_id = updates.sourceId ?? null
+    if ('goalId' in updates) dbUpdates.goal_id = updates.goalId ?? null
+    if ('isFun' in updates) dbUpdates.is_fun = updates.isFun ?? false
     if ('weekDeferredAt' in updates) dbUpdates.week_deferred_at = updates.weekDeferredAt?.toISOString() ?? null
 
     logger.debug('[updateTask] Sending to DB:', { id, dbUpdates })
@@ -939,6 +960,9 @@ export function useSupabaseTasks() {
     if ('waitingSince' in updates) dbUpdates.waiting_since = updates.waitingSince?.toISOString() ?? null
     if ('needsDiscussion' in updates) dbUpdates.needs_discussion = updates.needsDiscussion ?? false
     if ('discussionNote' in updates) dbUpdates.discussion_note = updates.discussionNote ?? null
+    if ('sourceId' in updates) dbUpdates.source_id = updates.sourceId ?? null
+    if ('goalId' in updates) dbUpdates.goal_id = updates.goalId ?? null
+    if ('isFun' in updates) dbUpdates.is_fun = updates.isFun ?? false
     if ('weekDeferredAt' in updates) dbUpdates.week_deferred_at = updates.weekDeferredAt?.toISOString() ?? null
 
     logger.debug('[updateTasksBulk] Sending to DB:', { taskIds, dbUpdates })

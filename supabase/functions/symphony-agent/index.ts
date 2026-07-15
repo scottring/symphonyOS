@@ -941,6 +941,17 @@ Deno.serve(async (req) => {
     rawTaskContext && typeof rawTaskContext.id === 'string' && typeof rawTaskContext.title === 'string'
       ? rawTaskContext
       : null
+  // Optional planning-session scoping: the client says which guided session +
+  // step the user is inside, with the live lists, so the agent can coach the
+  // moment without any re-describing. Titles only; lists are capped client-side.
+  const rawSessionContext = body.sessionContext
+  const sessionContext: {
+    horizon: string; periodLabel: string; stepId: string; stepTitle: string
+    bucket?: string; listTitles?: string[]; aboveTitles?: string[]; goalNames?: string[]
+  } | null =
+    rawSessionContext && typeof rawSessionContext.horizon === 'string' && typeof rawSessionContext.stepTitle === 'string'
+      ? rawSessionContext
+      : null
   if (!Array.isArray(incoming) || incoming.length === 0) return json({ error: 'messages is required' }, 400)
 
   // Who's who: inject the household roster so names like "Iris" or "Kaleb"
@@ -978,6 +989,22 @@ Deno.serve(async (req) => {
         ' (symphony_create_task with parent_task_id), enrich its notes with what you find out,' +
         ' or — when the real next step is a conversation with someone — set needs_discussion true' +
         ' with a discussion_note via symphony_update_task. Look the task up by id before writing to it.)'
+  }
+  if (sessionContext) {
+    const strList = (label: string, items?: string[]) =>
+      items && items.length > 0 ? ` ${label}: ${items.map((t) => `"${t}"`).join(', ')}.` : ''
+    datePrefix +=
+      `\n(The user is INSIDE their ${sessionContext.horizon} planning session — period ${sessionContext.periodLabel},` +
+      ` step "${sessionContext.stepTitle}".` +
+      strList('Their current list', sessionContext.listTitles) +
+      strList('The level above', sessionContext.aboveTitles) +
+      strList('Their year goals', sessionContext.goalNames) +
+      ' You are their planning guide for this moment: be warm and brief, help break big items into' +
+      ' moves sized to this horizon, name what the lists reveal, and keep plans honest about time and energy.' +
+      ' Never restate the lists back at them. Suggest — do not write. Only create or change tasks when' +
+      ' the user explicitly asks; then use the right bucket for this horizon' +
+      (sessionContext.bucket ? ` (bucket "${sessionContext.bucket}")` : '') + '.' +
+      ' When asked for moves/suggestions in JSON, return ONLY the JSON array.)'
   }
   const convo: Array<{ role: string; content: unknown }> = incoming.map(
     (m: { role: string; content: unknown }, i: number) => {

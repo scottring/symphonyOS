@@ -14,6 +14,8 @@ import { guidedPeriod } from './periods'
 import { narrationClip } from './narration'
 import { useNarrationPlayer } from './useNarrationPlayer'
 import { GuidedProvider, type GuidedHost } from './GuidedContext'
+import { CoachLines } from './CoachLines'
+import { GuideChat } from './GuideChat'
 import type { StepType } from './types'
 
 const REGISTRY: Partial<Record<StepType, ComponentType>> = {}
@@ -163,7 +165,10 @@ export function GuidedSession({ horizon, domain, host, onClose, onFinished, onCh
                 periodStart: period.start, periodEnd: period.end,
                 notes, patchNotes, host, step, goNext: () => (last ? finish() : go(safeIndex + 1)),
               }}>
+                {/* The data-aware coach: what the scripted narration can't say. */}
+                <CoachLines />
                 {Body ? <Body key={step.id} /> : null}
+                <GuideChat />
               </GuidedProvider>
             </>
           )}

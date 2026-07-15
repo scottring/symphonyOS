@@ -40,7 +40,9 @@ import { useConvertTaskToProject } from '@/hooks/useConvertTaskToProject';
 import { applyTriageWhen } from '@/lib/triage/applyWhen';
 import { useGoalsContext } from '@/contexts/GoalsContext';
 import { periodLabel, periodProgress } from '@/lib/cadence/periods';
+import { lineageLabel, goalRollup, inheritedLineage } from '@/lib/planning/lineage';
 import type { Task } from '@/types/task';
+import type { Goal } from '@/types/goal';
 
 // ── The cascade rail: the rhythm spine rendered as a walkable path, with the
 // current rung emphasized and live counts on the bucketed rungs. This is what
@@ -88,6 +90,36 @@ function CascadeRail({ current, counts, onGo }: {
         );
       })}
     </nav>
+  );
+}
+
+// A year goal on the Year rung, with its cascade roll-up: every task anywhere
+// that carries this goal's id (goal_id thread, stamped on promotion and
+// inherited by copies). No moves yet = a quiet invitation, not a zero.
+function YearGoalRow({ goal, tasks, onOpen }: { goal: Goal; tasks: Task[]; onOpen: () => void }) {
+  const { total, done } = goalRollup(goal.id, tasks);
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="w-full flex items-center gap-3 rounded-xl border border-neutral-100 bg-white px-4 py-3 text-left hover:bg-neutral-50 transition-colors"
+    >
+      <Target className="w-4 h-4 text-primary-500 shrink-0" />
+      <span className="flex-1 min-w-0">
+        <span className="block text-sm font-medium text-neutral-800 truncate">{goal.name}</span>
+        {total > 0 ? (
+          <span className="mt-1 flex items-center gap-2">
+            <span className="h-1 w-24 rounded-full bg-neutral-100 overflow-hidden inline-block">
+              <span className="block h-full bg-primary-400" style={{ width: `${Math.round((done / total) * 100)}%` }} />
+            </span>
+            <span className="text-[11px] text-neutral-400">{done} of {total} moves done</span>
+          </span>
+        ) : (
+          <span className="block mt-0.5 text-[11px] text-neutral-300">no moves threaded yet — promote it in a seasonal session</span>
+        )}
+      </span>
+      <ChevronRight className="w-4 h-4 text-neutral-300 shrink-0" />
+    </button>
   );
 }
 
@@ -166,19 +198,31 @@ export function HorizonView({ horizon }: HorizonViewProps) {
   // default (this level's own list leads the page); auto-open on a blank
   // slate, where the level above is the invitation.
   const { areas, goals } = useGoalsContext();
-  const referenceItems = useMemo<Array<{ id: string; title: string; goalId?: string }>>(() => {
+  // Reference rows carry their lineage payload so "Copy down" threads the
+  // cascade: a month copy records its season source; a season line created
+  // from a goal records the goal itself.
+  const referenceItems = useMemo<Array<{ id: string; title: string; goalId?: string; lineage?: { sourceId?: string; goalId?: string } }>>(() => {
     if (horizon === 'month') {
-      return selectHorizonPool(domainTasks, 'season', match).map((t) => ({ id: t.id, title: t.title }));
+      return selectHorizonPool(domainTasks, 'season', match).map((t) => ({ id: t.id, title: t.title, lineage: inheritedLineage(t) }));
     }
     if (horizon === 'season') {
       return goals
         .filter((g) => g.status === 'active' && matchesDomain(g.context, currentDomain))
-        .map((g) => ({ id: g.id, title: g.name, goalId: g.id }));
+        .map((g) => ({ id: g.id, title: g.name, goalId: g.id, lineage: { goalId: g.id } }));
     }
     return [];
   }, [horizon, domainTasks, match, goals, currentDomain]);
   const referenceLabel = horizon === 'month' ? `Your ${periodLabel('season')?.split(' ')[0]} list` : `Your ${new Date().getFullYear()} goals`;
+  // "on this list" reads the lineage thread first (a copy renamed later still
+  // counts); title equality is the pre-lineage fallback.
   const poolTitles = useMemo(() => new Set(pool.map((t) => t.title)), [pool]);
+  const poolSourceIds = useMemo(() => new Set(pool.map((t) => t.sourceId).filter(Boolean)), [pool]);
+  const poolGoalIds = useMemo(() => new Set(pool.map((t) => t.goalId).filter(Boolean)), [pool]);
+  const isOnThisList = useCallback(
+    (it: { id: string; title: string; goalId?: string }) =>
+      poolTitles.has(it.title) || poolSourceIds.has(it.id) || (!!it.goalId && poolGoalIds.has(it.goalId)),
+    [poolTitles, poolSourceIds, poolGoalIds],
+  );
   const [refOpen, setRefOpen] = useState(false);
   const autoOpenedRef = useRef(false);
   useEffect(() => {
@@ -222,13 +266,15 @@ export function HorizonView({ horizon }: HorizonViewProps) {
   // the moment it's created.
   const horizonBucket = def?.bucket && def.bucket !== 'timed' ? def.bucket : null;
   const onCreateTaskFromValue = useCallback(
-    async (title: string) => {
+    async (title: string, lineage?: { sourceId?: string; goalId?: string }) => {
       // Bucket rides the INSERT — a follow-up setBucket can race tasksRef
       // (temp→real id swap not yet rendered) and be silently dropped.
       await addTask(title, undefined, undefined, undefined, {
         assignedTo: getCurrentUserMember()?.id,
         context: currentDomain !== 'universal' ? currentDomain : undefined,
         bucket: horizonBucket ?? undefined,
+        sourceId: lineage?.sourceId,
+        goalId: lineage?.goalId,
       });
     },
     [addTask, getCurrentUserMember, currentDomain, horizonBucket],
@@ -358,14 +404,21 @@ export function HorizonView({ horizon }: HorizonViewProps) {
         assignedTo: task.assignedTo ?? getCurrentUserMember()?.id,
         context: task.context,
         bucket: 'week',
+        ...inheritedLineage(task),
       });
     },
     [addTask, getCurrentUserMember],
   );
 
+  // Lineage lookups for breadcrumbs ("← Ship auth layer ← Firebase rebuild").
+  // Full (unfiltered) task list: an ancestor may live outside this domain lens.
+  const tasksById = useMemo(() => new Map(tasks.map((t) => [t.id, t])), [tasks]);
+  const goalsById = useMemo(() => new Map(goals.map((g) => [g.id, g])), [goals]);
+
   const renderRow = useCallback(
     (task: Task) => {
       const project = projects.find((p) => p.id === task.projectId);
+      const lineage = lineageLabel(task, tasksById, goalsById);
       // Season and month rows speak their altitude — Change / Put aside (month
       // adds Copy to week) — never the day-routing chips, which belong to
       // execution horizons. Week/Today route; Month/Season copy or park.
@@ -417,6 +470,7 @@ export function HorizonView({ horizon }: HorizonViewProps) {
           task={task}
           project={project}
           projects={projects}
+          lineage={lineage}
           familyMembers={familyMembers}
           quickActions={[]}
           onQuickAction={() => {}}
@@ -438,7 +492,7 @@ export function HorizonView({ horizon }: HorizonViewProps) {
         />
       );
     },
-    [projects, familyMembers, horizon, setBucket, copiedToWeek, copyToWeek, applyWhen, pushTask, deleteTask, toggleTask, updateTask, handleSelect, scheduleActions, handleCreateProjectForTask, navigate],
+    [projects, familyMembers, horizon, setBucket, copiedToWeek, copyToWeek, applyWhen, pushTask, deleteTask, toggleTask, updateTask, handleSelect, scheduleActions, handleCreateProjectForTask, navigate, tasksById, goalsById],
   );
 
   // ── "Plan the [horizon]" — routes to the Today rung with a ?plan flag; the
@@ -524,16 +578,7 @@ export function HorizonView({ horizon }: HorizonViewProps) {
                   <h2 className="font-display text-sm tracking-wide text-neutral-400 uppercase mb-3">{area.name}</h2>
                   <div className="space-y-2">
                     {items.map((g) => (
-                      <button
-                        key={g.id}
-                        type="button"
-                        onClick={() => navigate(`/goals/${g.id}`)}
-                        className="w-full flex items-center gap-3 rounded-xl border border-neutral-100 bg-white px-4 py-3 text-left hover:bg-neutral-50 transition-colors"
-                      >
-                        <Target className="w-4 h-4 text-primary-500 shrink-0" />
-                        <span className="flex-1 min-w-0 text-sm font-medium text-neutral-800 truncate">{g.name}</span>
-                        <ChevronRight className="w-4 h-4 text-neutral-300 shrink-0" />
-                      </button>
+                      <YearGoalRow key={g.id} goal={g} tasks={tasks} onOpen={() => navigate(`/goals/${g.id}`)} />
                     ))}
                   </div>
                 </section>
@@ -543,16 +588,7 @@ export function HorizonView({ horizon }: HorizonViewProps) {
                   <h2 className="font-display text-sm tracking-wide text-neutral-400 uppercase mb-3">Goals</h2>
                   <div className="space-y-2">
                     {orphanGoals.map((g) => (
-                      <button
-                        key={g.id}
-                        type="button"
-                        onClick={() => navigate(`/goals/${g.id}`)}
-                        className="w-full flex items-center gap-3 rounded-xl border border-neutral-100 bg-white px-4 py-3 text-left hover:bg-neutral-50 transition-colors"
-                      >
-                        <Target className="w-4 h-4 text-primary-500 shrink-0" />
-                        <span className="flex-1 min-w-0 text-sm font-medium text-neutral-800 truncate">{g.name}</span>
-                        <ChevronRight className="w-4 h-4 text-neutral-300 shrink-0" />
-                      </button>
+                      <YearGoalRow key={g.id} goal={g} tasks={tasks} onOpen={() => navigate(`/goals/${g.id}`)} />
                     ))}
                   </div>
                 </section>
@@ -669,14 +705,14 @@ export function HorizonView({ horizon }: HorizonViewProps) {
                       ) : (
                         <span className="flex-1 min-w-0 text-sm text-neutral-800 truncate">{it.title}</span>
                       )}
-                      {poolTitles.has(it.title) ? (
+                      {isOnThisList(it) ? (
                         <span className="shrink-0 inline-flex items-center gap-1 text-xs text-primary-700">
                           <Check className="w-3 h-3" strokeWidth={3} /> on this list
                         </span>
                       ) : (
                         <button
                           type="button"
-                          onClick={() => void onCreateTaskFromValue(it.title)}
+                          onClick={() => void onCreateTaskFromValue(it.title, it.lineage)}
                           title="Copy onto this list (stays on the list above too)"
                           className="shrink-0 inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-md text-primary-700 bg-primary-50 hover:bg-primary-100 transition-colors"
                         >

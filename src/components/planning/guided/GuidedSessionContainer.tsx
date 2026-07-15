@@ -68,11 +68,17 @@ export function GuidedSessionContainer({ horizon, onClose, onFinished, onChain, 
     void stampDomain(id).then(() => setBucket(id, bucket))
   }, [stampDomain, setBucket])
 
-  const createTaskInBucket = useCallback(async (title: string, bucket: TaskBucket, projectId?: string) => {
-    await addTask(title, undefined, projectId, undefined, {
+  const createTaskInBucket = useCallback(async (
+    title: string,
+    bucket: TaskBucket,
+    opts?: { projectId?: string; sourceId?: string; goalId?: string },
+  ) => {
+    await addTask(title, undefined, opts?.projectId, undefined, {
       assignedTo: getCurrentUserMember()?.id,
       context: currentDomain !== 'universal' ? currentDomain : undefined,
       bucket,
+      sourceId: opts?.sourceId,
+      goalId: opts?.goalId,
     })
   }, [addTask, getCurrentUserMember, currentDomain])
 

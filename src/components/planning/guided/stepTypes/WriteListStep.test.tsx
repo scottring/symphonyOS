@@ -22,7 +22,7 @@ describe('WriteListStep', () => {
     const input = screen.getByPlaceholderText(/Add to this list/)
     fireEvent.change(input, { target: { value: 'Call the plumber' } })
     fireEvent.keyDown(input, { key: 'Enter' })
-    expect(host.createTaskInBucket).toHaveBeenCalledWith('Call the plumber', 'week', undefined)
+    expect(host.createTaskInBucket).toHaveBeenCalledWith('Call the plumber', 'week', { projectId: undefined })
     // The atomic-create contract: WriteListStep must never call onSetBucket.
     expect(host.onSetBucket).not.toHaveBeenCalled()
   })
@@ -35,7 +35,7 @@ describe('WriteListStep', () => {
     const input = screen.getByPlaceholderText(/Add to this list/)
     fireEvent.change(input, { target: { value: '#kitchen order dishwasher' } })
     fireEvent.keyDown(input, { key: 'Enter' })
-    expect(host.createTaskInBucket).toHaveBeenCalledWith('order dishwasher', 'week', 'p1')
+    expect(host.createTaskInBucket).toHaveBeenCalledWith('order dishwasher', 'week', { projectId: 'p1' })
   })
 
   it('season list (rows: plain) shows no triage chips and no Done check', () => {

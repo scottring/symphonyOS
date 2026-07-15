@@ -4,8 +4,9 @@
 // bucket in options (host.createTaskInBucket) — never create-then-setBucket.
 // The soft cap is a nudge, never a wall.
 import { useState, useMemo, useCallback } from 'react'
-import { Plus } from 'lucide-react'
+import { Plus, Sparkles } from 'lucide-react'
 import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
+import { funRatio } from '@/lib/planning/coachLines'
 import { useGuided } from '../GuidedContext'
 import { extractProjectTag } from '../projectTag'
 import { TaskTriageRow, SeasonListRow } from './ReviewStep'
@@ -28,7 +29,7 @@ export function WriteListStep() {
     // "#kitchen order dishwasher" attaches the chunk to its project at birth.
     const { title, projectId } = extractProjectTag(raw, host.projects)
     if (!title) return
-    await host.createTaskInBucket(title, bucket, projectId)
+    await host.createTaskInBucket(title, bucket, { projectId })
   }, [draft, bucket, host])
 
   if (!bucket) return null
@@ -53,13 +54,34 @@ export function WriteListStep() {
           {pool.length} of ~{softCap}{over ? ' — a list you believe beats a list you admire' : ''}
         </p>
       )}
+      {/* The fun audit, live: tally chip + per-row ✨ toggle (Best Laid Plans'
+          2:1 rule). Marking is one tap; the coach line reads the same data. */}
+      {pool.length > 0 && (
+        <p className="text-xs text-neutral-400 inline-flex items-center gap-1">
+          <Sparkles className="w-3 h-3 text-amber-500" />
+          {funRatio(pool).fun} fun · {funRatio(pool).obligation} obligation — tap ✨ on the ones that make you smile
+        </p>
+      )}
       {pool.length > 0 && (
         <ul className="space-y-2">
-          {pool.map((t) =>
-            // Season-altitude lists don't route items to days/weeks or complete
-            // them here — the list itself is the artifact. Plain rows only.
-            step.props?.rows === 'plain' ? <SeasonListRow key={t.id} task={t} /> : <TaskTriageRow key={t.id} task={t} />,
-          )}
+          {pool.map((t) => (
+            <li key={t.id} className="flex items-start gap-1.5">
+              <button type="button"
+                onClick={() => host.onUpdateTask(t.id, { isFun: !t.isFun })}
+                aria-label={t.isFun ? 'Unmark as fun' : 'Mark as fun'}
+                aria-pressed={t.isFun === true}
+                title={t.isFun ? 'Marked fun' : 'This one makes me smile'}
+                className={`shrink-0 mt-1.5 p-1 rounded-md transition-colors ${
+                  t.isFun ? 'text-amber-500 bg-amber-50' : 'text-neutral-300 hover:text-amber-500 hover:bg-amber-50'}`}>
+                <Sparkles className="w-3.5 h-3.5" />
+              </button>
+              <div className="flex-1 min-w-0">
+                {/* Season-altitude lists don't route items to days/weeks or complete
+                    them here — the list itself is the artifact. Plain rows only. */}
+                {step.props?.rows === 'plain' ? <SeasonListRow task={t} /> : <TaskTriageRow task={t} />}
+              </div>
+            </li>
+          ))}
         </ul>
       )}
     </div>

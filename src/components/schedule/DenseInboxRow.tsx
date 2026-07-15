@@ -60,6 +60,10 @@ interface DenseInboxRowProps {
    *  (e.g. the fan-out TriageWhenMenu). The wrapper's hover-chrome behaviour is
    *  preserved. */
   triageMenu?: React.ReactNode
+  /** Cascade ancestry ("← Ship auth layer ← Firebase rebuild") — one quiet
+   *  line under the title, showing WHY this item exists. Computed by the
+   *  horizon surfaces via lineageLabel(); absent = no thread recorded. */
+  lineage?: string | null
   /** When provided, shows a persistent star toggle (the "Focus" affordance used
    *  by the This Week dropdown). Filled amber when active. */
   focusToggle?: { active: boolean; onToggle: () => void }
@@ -93,6 +97,7 @@ export const DenseInboxRow = memo(function DenseInboxRow({
   onToggleSelection,
   triageMenu,
   focusToggle,
+  lineage,
 }: DenseInboxRowProps) {
   const [contextOpen, setContextOpen] = useState(false)
 
@@ -168,6 +173,11 @@ export const DenseInboxRow = memo(function DenseInboxRow({
         }`}
       >
         {task.title}
+        {lineage && (
+          <span className="block text-[11px] leading-tight text-neutral-400 font-normal no-underline mt-0.5 truncate">
+            {lineage}
+          </span>
+        )}
       </button>
 
       {/* Project chip (assigned) or picker (unassigned). Hidden inside
