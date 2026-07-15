@@ -732,6 +732,7 @@ export function HorizonView({ horizon }: HorizonViewProps) {
                           </p>
                           <div className="flex items-center gap-2">
                             <input type="text" autoFocus value={refDraft}
+                              placeholder="An outcome finishable this season — the goal stays on the shelf…"
                               onChange={(e) => setRefDraft(e.target.value)}
                               onKeyDown={(e) => {
                                 if (e.key === 'Enter' && refDraft.trim()) {
@@ -773,7 +774,7 @@ export function HorizonView({ horizon }: HorizonViewProps) {
                       ) : it.goalId ? (
                         <button
                           type="button"
-                          onClick={() => { setTranslatingRefId(it.id); setRefDraft(it.title); }}
+                          onClick={() => { setTranslatingRefId(it.id); setRefDraft(''); }}
                           title="Start this goal this season — translate it into a season-sized move"
                           className="shrink-0 inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-md text-primary-700 bg-primary-50 hover:bg-primary-100 transition-colors"
                         >

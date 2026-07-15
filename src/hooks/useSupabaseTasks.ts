@@ -8,6 +8,9 @@ import type { Task, TaskBucket, TaskLink, TaskContext, TaskCategory, TaskCapture
 import type { TaskDirections } from '@/types/directions'
 import { defaultScopeForArea, type Scope } from '@/lib/scope'
 
+// Monotonic suffix so every hook instance gets its own realtime channel topic.
+let tasksChannelSeq = 0
+
 export interface DbTask {
   id: string
   user_id: string
@@ -223,9 +226,15 @@ export function useSupabaseTasks() {
 
     fetchTasks()
 
-    // Subscribe to real-time changes for tasks
+    // Subscribe to real-time changes for tasks.
+    // The topic MUST be unique per hook instance: several instances mount at
+    // once (ShellLayout, ShellSearch, the active view, the detail panel), and
+    // supabase-js returns the SAME channel object for a repeated topic — the
+    // second .subscribe() errors, and any instance's unmount cleanup killed
+    // the shared channel for everyone else. That was the "edits in the detail
+    // panel don't appear in the list until refresh" bug.
     const channel = supabase
-      .channel('tasks-changes')
+      .channel(`tasks-changes-${++tasksChannelSeq}`)
       .on(
         'postgres_changes',
         {

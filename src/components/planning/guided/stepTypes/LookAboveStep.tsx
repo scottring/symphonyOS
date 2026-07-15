@@ -79,6 +79,7 @@ export function LookAboveStep() {
             </p>
             <div className="flex items-center gap-2">
               <input type="text" autoFocus value={translationDraft}
+                placeholder="An outcome finishable this season — the goal stays on the shelf…"
                 onChange={(e) => setTranslationDraft(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && translationDraft.trim()) {
@@ -113,7 +114,7 @@ export function LookAboveStep() {
             </span>
           ) : (
             <button type="button"
-              onClick={() => { setTranslatingGoalId(g.id); setTranslationDraft(g.name) }}
+              onClick={() => { setTranslatingGoalId(g.id); setTranslationDraft('') }}
               title="Start this goal this season — translate it into a season-sized move, threaded to the goal"
               className="shrink-0 inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-md text-primary-700 bg-primary-50 hover:bg-primary-100 transition-colors">
               <Plus className="w-3 h-3" /> Start this season

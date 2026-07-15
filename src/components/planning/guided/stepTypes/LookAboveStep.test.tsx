@@ -114,15 +114,16 @@ describe('LookAboveStep — goal promotion translates, never copies verbatim', (
     fireEvent.click(screen.getByRole('button', { name: /Start this season/ }))
     expect(host.createTaskInBucket).not.toHaveBeenCalled()
     expect(screen.getByText(/season-sized/)).toBeInTheDocument()
-    // Prefilled with the goal name, ready to edit.
-    expect(screen.getByDisplayValue('Make home into home')).toBeInTheDocument()
+    // EMPTY, not prefilled — a prefilled goal name reads as renaming the goal.
+    // The goal is named in the prompt line; the input invites the translation.
+    expect(screen.getByPlaceholderText(/finishable this season/)).toHaveValue('')
   })
 
   it('creates the edited translation threaded to the goal', () => {
     const host = makeHost({ goals: [goal] })
     renderStep(<LookAboveStep />, { step: seasonalStep, host, horizon: 'seasonal' })
     fireEvent.click(screen.getByRole('button', { name: /Start this season/ }))
-    const input = screen.getByDisplayValue('Make home into home')
+    const input = screen.getByPlaceholderText(/finishable this season/)
     fireEvent.change(input, { target: { value: 'Living room furnished and usable' } })
     fireEvent.click(screen.getByRole('button', { name: /Add to season/ }))
     expect(host.createTaskInBucket).toHaveBeenCalledWith('Living room furnished and usable', 'quarter', { goalId: 'g1' })
@@ -132,7 +133,7 @@ describe('LookAboveStep — goal promotion translates, never copies verbatim', (
     const host = makeHost({ goals: [goal] })
     renderStep(<LookAboveStep />, { step: seasonalStep, host, horizon: 'seasonal' })
     fireEvent.click(screen.getByRole('button', { name: /Start this season/ }))
-    fireEvent.keyDown(screen.getByDisplayValue('Make home into home'), { key: 'Escape' })
+    fireEvent.keyDown(screen.getByPlaceholderText(/finishable this season/), { key: 'Escape' })
     expect(host.createTaskInBucket).not.toHaveBeenCalled()
     expect(screen.getByRole('button', { name: /Start this season/ })).toBeInTheDocument()
   })
