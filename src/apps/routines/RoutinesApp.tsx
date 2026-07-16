@@ -80,6 +80,7 @@ function RoutinesIndex() {
         onReorderSteps={handleReorderSteps}
         onPromoteStep={handlePromoteStep}
         onDeleteStep={deleteRoutine}
+        onDelete={deleteRoutine}
         onCreateCollection={handleCreateCollection}
         onGroupIntoCollection={handleGroupIntoCollection}
       />
