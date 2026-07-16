@@ -55,6 +55,8 @@ interface RoutinesListProps {
   onPromoteStep: (stepId: string) => void
   /** Delete a step routine entirely (swap-out). Optional — hides the action when absent. */
   onDeleteStep?: (stepId: string) => void
+  /** Delete a top-level routine (RoutinesApp already passes this — it was silently dropped before). */
+  onDelete?: (id: string) => void
   onCreateCollection?: (name: string) => Promise<import('@/types/actionable').Routine | null> | void
   onGroupIntoCollection?: (name: string, routineIds: string[]) => void
 }
@@ -170,7 +172,7 @@ function SectionHeader({ title, count, collapsed, onToggle }: SectionHeaderProps
   )
 }
 
-export function RoutinesListRedesign({ routines, contacts = [], familyMembers = [], onCreateRoutine: _onCreateRoutine, onUpdateRoutine, onAddStep, onReorderSteps, onPromoteStep, onDeleteStep, onCreateCollection, onGroupIntoCollection }: RoutinesListProps) {
+export function RoutinesListRedesign({ routines, contacts = [], familyMembers = [], onCreateRoutine: _onCreateRoutine, onUpdateRoutine, onAddStep, onReorderSteps, onPromoteStep, onDeleteStep, onCreateCollection, onGroupIntoCollection, onDelete }: RoutinesListProps) {
   // Pause modal state
   const [pauseModalRoutine, setPauseModalRoutine] = useState<Routine | null>(null)
 
@@ -792,6 +794,7 @@ export function RoutinesListRedesign({ routines, contacts = [], familyMembers = 
                 onScheduleChange={(pattern, timeOfDay) =>
                   onUpdateRoutine(openRoutineItem.id, { recurrence_pattern: pattern, time_of_day: timeOfDay || null })}
                 onNotesChange={description => onUpdateRoutine(openRoutineItem.id, { description })}
+                onDelete={onDelete ? () => { onDelete(openRoutineItem.id); setOpen(null) } : undefined}
                 {...(openWithSteps ? {
                   steps: openRoutineItem.steps,
                   onSelectStep: (s: import('@/types/actionable').Routine) => setOpen({ kind: 'step', id: s.id }),

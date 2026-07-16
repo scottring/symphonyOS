@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Flame } from 'lucide-react'
+import { Flame, Trash2 } from 'lucide-react'
 import type { Routine, RoutineVisibility, RecurrencePattern } from '@/types/routine'
 import type { TaskContext } from '@/types/task'
 import type { FamilyMember } from '@/types/family'
@@ -40,6 +40,8 @@ interface TapRoutinePanelProps {
   /** Set/change the routine's location (enables directions). When omitted, the Location section is hidden. */
   onUpdateLocation?: (location: string, placeId?: string) => void
   onClearLocation?: () => void
+  /** Delete the routine entirely. Rendered (with an inline confirm) only when provided. */
+  onDelete?: () => void
   /** Optional steps (child routines). When all four are provided, the Steps section is rendered. */
   steps?: Routine[]
   onSelectStep?: (step: Routine) => void
@@ -57,6 +59,7 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
     ? routine.assigned_to_all
     : (routine.assigned_to ? [routine.assigned_to] : [])
   const [editingSchedule, setEditingSchedule] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
   const [showDirections, setShowDirections] = useState(false)
   const [assistOpen, setAssistOpen] = useState(false)
   const onTimeline = routine.visibility === 'active'
@@ -228,6 +231,29 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
             } : undefined}
           />
         </section>
+      )}
+
+      {props.onDelete && (
+        <div className="px-1 pb-2">
+          {confirmDelete ? (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-neutral-600">Delete this routine and its history?</span>
+              <button type="button" onClick={props.onDelete}
+                className="text-sm font-medium text-white bg-red-500 hover:bg-red-600 rounded-lg px-3 py-1.5">
+                Delete
+              </button>
+              <button type="button" onClick={() => setConfirmDelete(false)}
+                className="text-sm font-medium text-neutral-500 hover:text-neutral-700 px-2 py-1.5">
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <button type="button" onClick={() => setConfirmDelete(true)}
+              className="inline-flex items-center gap-2 text-sm font-medium text-neutral-600 hover:text-red-600">
+              <Trash2 className="w-4 h-4" /> Delete routine
+            </button>
+          )}
+        </div>
       )}
 
       <PanelFooter

@@ -43,7 +43,8 @@ function RoutinesIndex() {
   const handleAddStep = useCallback(async (collectionId: string, name: string) => {
     const { collections } = groupRoutineSteps(routines)
     const steps = collections.find(c => c.id === collectionId)?.steps ?? []
-    await addRoutine({ name, parent_routine_id: collectionId, step_order: nextStepOrder(steps) })
+    const parent = routines.find(r => r.id === collectionId)
+    await addRoutine({ name, parent_routine_id: collectionId, step_order: nextStepOrder(steps), context: parent?.context ?? undefined })
   }, [routines, addRoutine])
 
   const handleReorderSteps = useCallback(async (writes: { id: string; step_order: number }[]) => {
@@ -54,12 +55,15 @@ function RoutinesIndex() {
     await updateRoutine(stepId, { parent_routine_id: null, step_order: null })
   }, [updateRoutine])
 
+  // Stamp the active domain lens on creation: an unstamped routine is
+  // invisible in a domain-filtered list the instant it's created — the
+  // "New routine button does nothing" bug (it worked; the lens hid it).
   const handleCreateCollection = useCallback(async (name: string) => {
-    return addRoutine({ name })
-  }, [addRoutine])
+    return addRoutine({ name, context: currentDomain !== 'universal' ? currentDomain : undefined })
+  }, [addRoutine, currentDomain])
 
   const handleGroupIntoCollection = useCallback(async (name: string, ids: string[]) => {
-    const parent = await addRoutine({ name })
+    const parent = await addRoutine({ name, context: currentDomain !== 'universal' ? currentDomain : undefined })
     if (!parent) return
     await Promise.all(ids.map((id, i) => updateRoutine(id, { parent_routine_id: parent.id, step_order: i })))
   }, [addRoutine, updateRoutine])
