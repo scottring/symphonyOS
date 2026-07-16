@@ -3,7 +3,7 @@
 // "What's still open" for this horizon, with an explicit fate per item.
 // Sources: the horizon's bucket (default), 'someday' (annual), 'overdue'
 // (daily look-back), or 'goals' (annual goal review). Task rows reuse the
-// canonical TriageWhenMenu; goal rows get Achieved / Let go.
+// canonical TriageWhenMenu; goal rows get Carry forward / Achieved / Let go.
 import { useMemo, useState } from 'react'
 import { Check, Archive, Sparkles, ArrowRight, Pencil } from 'lucide-react'
 import { TriageWhenMenu } from '@/components/schedule/TriageWhenMenu'
@@ -31,16 +31,19 @@ export function TaskTriageRow({ task }: { task: Task }) {
   )
 }
 
-// Season-altitude row: no day/week/month routing, no Done check. The item is a
-// season-sized intention, so its verdicts are seasonal — Carry forward (stays on
-// the season list), Change (reword it in place), Put aside (→ Someday). Also
-// used by the seasonal write-list (fate=false: title + Change only).
-export function SeasonListRow({ task, fate = false }: { task: Task; fate?: boolean }) {
+// Season-altitude row: no day/week/month routing. The item is a season-sized
+// intention, so its verdicts are seasonal — Done (it happened; celebrate),
+// Carry forward (stays on the season list), Change (reword it in place),
+// Put aside (→ Someday). Also used by the seasonal write-list (fate=false:
+// title + Change only). Titles wrap rather than truncate: outcome sentences
+// are the payload here, and four buttons were eating them.
+export function SeasonListRow({ task, fate = false, onCelebrated }: { task: Task; fate?: boolean; onCelebrated?: (id: string) => void }) {
   const { host } = useGuided()
   const project = task.projectId ? host.projectsMap.get(task.projectId) : undefined
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(task.title)
   const [carried, setCarried] = useState(false)
+  const [celebrated, setCelebrated] = useState(false)
 
   const save = () => {
     const title = draft.trim()
@@ -62,13 +65,26 @@ export function SeasonListRow({ task, fate = false }: { task: Task; fate?: boole
           className="flex-1 min-w-[10rem] text-sm text-neutral-800 bg-transparent border-b border-primary-300 focus:outline-none"
         />
       ) : (
-        <span className="flex-1 min-w-0 text-sm text-neutral-800 truncate">
+        <span className="flex-1 min-w-[12rem] text-sm text-neutral-800 leading-snug">
           {task.title}
-          {project && <span className="text-xs text-neutral-400"> · {project.name}</span>}
+          {project && <span className="text-xs text-neutral-400 whitespace-nowrap"> · {project.name}</span>}
         </span>
       )}
-      {!editing && (
+      {!editing && celebrated && (
+        <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md text-primary-700 bg-primary-100 shrink-0">
+          <Sparkles className="w-3 h-3" /> Done — nice.
+        </span>
+      )}
+      {!editing && !celebrated && (
         <span className="flex items-center gap-1 shrink-0">
+          {fate && (
+            <button type="button"
+              onClick={() => { setCelebrated(true); onCelebrated?.(task.id); host.onCompleteTask(task.id) }}
+              title="It happened — mark it done and take the second of credit"
+              className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md text-primary-700 bg-primary-50 hover:bg-primary-100 transition-colors">
+              <Check className="w-3 h-3" /> Done
+            </button>
+          )}
           {fate && (carried ? (
             <button type="button" onClick={() => setCarried(false)}
               className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md text-primary-700 bg-primary-100">
@@ -103,14 +119,17 @@ export function ReviewStep() {
   // Session-local goal verdicts (goals source only): keeps decided rows on
   // screen with their fate — a status write drops them from the active pool.
   const [goalVerdicts, setGoalVerdicts] = useState<Map<string, 'carried' | 'achieved' | 'letgo'>>(() => new Map())
+  // Fate rows: completing an item flips t.completed and would drop it from the
+  // pool mid-celebration — remember celebrated ids so the row stays visible.
+  const [celebratedIds, setCelebratedIds] = useState<Set<string>>(() => new Set())
 
   const pool = useMemo(() => {
     if (source === 'goals') return []
     if (source === 'overdue') return selectOverdue(host.tasks, true, match)
     const bucket = source === 'someday' ? 'someday' : step.props?.bucket
     if (!bucket) return []
-    return host.tasks.filter((t) => !t.completed && t.bucket === bucket && match(t.assignedTo, t.assignedToAll))
-  }, [source, step.props?.bucket, host.tasks, match])
+    return host.tasks.filter((t) => (!t.completed || celebratedIds.has(t.id)) && t.bucket === bucket && match(t.assignedTo, t.assignedToAll))
+  }, [source, step.props?.bucket, host.tasks, match, celebratedIds])
 
   if (source === 'goals') {
     // Three fates, matching the narration: carry forward (the proactive
@@ -169,7 +188,14 @@ export function ReviewStep() {
     )
   }
   if (step.props?.rows === 'fate') {
-    return <ul className="space-y-2">{pool.map((t) => <SeasonListRow key={t.id} task={t} fate />)}</ul>
+    return (
+      <ul className="space-y-2">
+        {pool.map((t) => (
+          <SeasonListRow key={t.id} task={t} fate
+            onCelebrated={(id) => setCelebratedIds((prev) => new Set(prev).add(id))} />
+        ))}
+      </ul>
+    )
   }
   return <ul className="space-y-2">{pool.map((t) => <TaskTriageRow key={t.id} task={t} />)}</ul>
 }
