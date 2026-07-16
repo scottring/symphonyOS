@@ -12,6 +12,7 @@ import { ContextPicker } from '@/components/triage/ContextPicker'
 import { MultiAssigneeDropdown } from '@/components/family'
 import { RoutineScheduleEditor } from '@/components/routine/RoutineScheduleEditor'
 import { RoutineStepsSection } from './sections/RoutineStepsSection'
+import { PanelAttachments } from './sections/PanelAttachments'
 import { ConceptIcon } from '@/lib/conceptIcons'
 import { AssistDrawer } from '@/components/assist/AssistDrawer'
 import { useRoutineStats } from '@/hooks/useRoutineStats'
@@ -217,6 +218,9 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
         notes={routine.description ?? undefined}
         onChange={props.onNotesChange}
       />
+
+      {/* Photos & Files — the PT sheet, exercise photos, any source doc */}
+      <PanelAttachments entityType="routine" entityId={routine.id} />
 
       {(routine.image_url || projectDoc) && (
         <section className="pb-4 mb-4 border-b border-neutral-200">

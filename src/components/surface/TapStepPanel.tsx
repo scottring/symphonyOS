@@ -4,6 +4,7 @@ import type { Routine, RecurrencePattern } from '@/types/actionable'
 import { WEEKDAY_KEYS } from '@/lib/routineUtils'
 import { PanelHeader } from './sections/PanelHeader'
 import { PanelWhy } from './sections/PanelWhy'
+import { PanelAttachments } from './sections/PanelAttachments'
 import { DosePills } from './sections/DosePills'
 
 interface TapStepPanelProps {
@@ -104,6 +105,9 @@ export function TapStepPanel(props: TapStepPanelProps) {
       )}
 
       <PanelWhy key={step.id} label="Instructions" notes={step.description ?? undefined} onChange={props.onNotesChange} />
+
+      {/* Photos & Files — exercise photos / form diagrams for this step */}
+      <PanelAttachments entityType="routine" entityId={step.id} />
 
       <div className="mt-4 flex items-center gap-5">
         <button

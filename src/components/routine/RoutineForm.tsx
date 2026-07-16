@@ -9,6 +9,7 @@ import { SemanticRoutine } from './SemanticRoutine'
 import { RoutineScheduleEditor } from './RoutineScheduleEditor'
 import { PinButton } from '@/components/pins'
 import { TiptapEditor } from '@/components/notes/TiptapEditor'
+import { PanelAttachments } from '@/components/surface/sections/PanelAttachments'
 
 interface RoutineFormProps {
   routine: Routine
@@ -374,6 +375,11 @@ export function RoutineForm({ routine, contacts = [], familyMembers = [], onBack
               {isSaving ? 'Saving...' : 'Save Changes'}
             </button>
           )}
+
+          {/* Photos & Files — the PT sheet, exercise photos, any source doc */}
+          <div className="pt-6 border-t border-neutral-200">
+            <PanelAttachments entityType="routine" entityId={routine.id} />
+          </div>
 
           {/* Danger zone */}
           <div className="pt-6 border-t border-neutral-200">
