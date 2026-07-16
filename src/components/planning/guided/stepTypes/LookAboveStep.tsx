@@ -9,6 +9,7 @@ import { useMemo, useState } from 'react'
 import { Target, Check, Plus } from 'lucide-react'
 import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
 import { inheritedLineage } from '@/lib/planning/lineage'
+import { SeasonMoveSuggestions } from '@/components/planning/SeasonMoveSuggestions'
 import type { TaskBucket } from '@/types/task'
 import { useGuided } from '../GuidedContext'
 
@@ -101,6 +102,8 @@ export function LookAboveStep() {
               <button type="button" onClick={() => setTranslatingGoalId(null)} aria-label="Cancel"
                 className="shrink-0 text-xs px-1.5 py-1.5 text-neutral-400 hover:text-neutral-600">✕</button>
             </div>
+            {/* Blank-page helper: tap-to-fill candidates; the human edits + confirms. */}
+            <SeasonMoveSuggestions goalName={g.name} onPick={setTranslationDraft} />
           </li>
         )
       }

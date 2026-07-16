@@ -113,7 +113,7 @@ describe('LookAboveStep — goal promotion translates, never copies verbatim', (
     renderStep(<LookAboveStep />, { step: seasonalStep, host, horizon: 'seasonal' })
     fireEvent.click(screen.getByRole('button', { name: /Start this season/ }))
     expect(host.createTaskInBucket).not.toHaveBeenCalled()
-    expect(screen.getByText(/season-sized/)).toBeInTheDocument()
+    expect(screen.getAllByText(/season-sized/).length).toBeGreaterThan(0)
     // EMPTY, not prefilled — a prefilled goal name reads as renaming the goal.
     // The goal is named in the prompt line; the input invites the translation.
     expect(screen.getByPlaceholderText(/finishable this season/)).toHaveValue('')

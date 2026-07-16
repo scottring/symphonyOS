@@ -41,6 +41,7 @@ import { applyTriageWhen } from '@/lib/triage/applyWhen';
 import { useGoalsContext } from '@/contexts/GoalsContext';
 import { periodLabel, periodProgress } from '@/lib/cadence/periods';
 import { lineageLabel, goalRollup, inheritedLineage } from '@/lib/planning/lineage';
+import { SeasonMoveSuggestions } from '@/components/planning/SeasonMoveSuggestions';
 import type { Task } from '@/types/task';
 import type { Goal } from '@/types/goal';
 
@@ -751,6 +752,7 @@ export function HorizonView({ horizon }: HorizonViewProps) {
                             <button type="button" onClick={() => setTranslatingRefId(null)} aria-label="Cancel"
                               className="shrink-0 text-xs px-1.5 py-1.5 text-neutral-400 hover:text-neutral-600">✕</button>
                           </div>
+                          <SeasonMoveSuggestions goalName={it.title} onPick={setRefDraft} />
                         </li>
                       );
                     }
