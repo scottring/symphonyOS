@@ -51,6 +51,8 @@ interface RoutinesListProps {
   onCreateRoutine: () => void
   onUpdateRoutine: (id: string, updates: UpdateRoutineInput) => Promise<boolean> | void
   onAddStep: (collectionId: string, name: string) => void
+  /** Batch step creation (document → steps extraction). */
+  onAddSteps?: (collectionId: string, steps: { name: string; detail?: string }[]) => void | Promise<unknown>
   onReorderSteps: (writes: { id: string; step_order: number }[]) => void
   onPromoteStep: (stepId: string) => void
   /** Delete a step routine entirely (swap-out). Optional — hides the action when absent. */
@@ -174,7 +176,7 @@ function SectionHeader({ title, count, collapsed, onToggle }: SectionHeaderProps
   )
 }
 
-export function RoutinesListRedesign({ routines, contacts = [], familyMembers = [], onCreateRoutine: _onCreateRoutine, onUpdateRoutine, onAddStep, onReorderSteps, onPromoteStep, onDeleteStep, onCreateCollection, onGroupIntoCollection, onDelete, onBuildWithAI }: RoutinesListProps) {
+export function RoutinesListRedesign({ routines, contacts = [], familyMembers = [], onCreateRoutine: _onCreateRoutine, onUpdateRoutine, onAddStep, onReorderSteps, onPromoteStep, onDeleteStep, onCreateCollection, onGroupIntoCollection, onDelete, onBuildWithAI, onAddSteps }: RoutinesListProps) {
   // Pause modal state
   const [pauseModalRoutine, setPauseModalRoutine] = useState<Routine | null>(null)
 
@@ -807,6 +809,7 @@ export function RoutinesListRedesign({ routines, contacts = [], familyMembers = 
                   onUpdateRoutine(openRoutineItem.id, { recurrence_pattern: pattern, time_of_day: timeOfDay || null })}
                 onNotesChange={description => onUpdateRoutine(openRoutineItem.id, { description })}
                 onDelete={onDelete ? () => { onDelete(openRoutineItem.id); setOpen(null) } : undefined}
+                onAddSteps={onAddSteps ? (steps) => onAddSteps(openRoutineItem.id, steps) : undefined}
                 {...(openWithSteps ? {
                   steps: openRoutineItem.steps,
                   onSelectStep: (s: import('@/types/actionable').Routine) => setOpen({ kind: 'step', id: s.id }),

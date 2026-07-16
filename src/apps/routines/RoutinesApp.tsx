@@ -52,6 +52,25 @@ function RoutinesIndex() {
     await addRoutine({ name, parent_routine_id: collectionId, step_order: nextStepOrder(steps), context: parent?.context ?? undefined })
   }, [routines, addRoutine])
 
+  // Batch add (document → steps extraction): order is computed once up front
+  // so sequential inserts don't all land on the same step_order.
+  const handleAddSteps = useCallback(async (collectionId: string, stepsToAdd: { name: string; detail?: string }[]) => {
+    const { collections } = groupRoutineSteps(routines)
+    const existing = collections.find(c => c.id === collectionId)?.steps ?? []
+    const base = nextStepOrder(existing)
+    const parent = routines.find(r => r.id === collectionId)
+    for (let i = 0; i < stepsToAdd.length; i++) {
+      await addRoutine({
+        name: stepsToAdd[i].name,
+        description: stepsToAdd[i].detail,
+        parent_routine_id: collectionId,
+        step_order: base + i,
+        recurrence_pattern: parent?.recurrence_pattern,
+        context: parent?.context ?? undefined,
+      })
+    }
+  }, [routines, addRoutine])
+
   const handleReorderSteps = useCallback(async (writes: { id: string; step_order: number }[]) => {
     await Promise.all(writes.map(w => updateRoutine(w.id, { step_order: w.step_order })))
   }, [updateRoutine])
@@ -82,6 +101,7 @@ function RoutinesIndex() {
         onCreateRoutine={() => navigate('/routines/new')}
         onUpdateRoutine={updateRoutine}
         onAddStep={handleAddStep}
+        onAddSteps={handleAddSteps}
         onReorderSteps={handleReorderSteps}
         onPromoteStep={handlePromoteStep}
         onDeleteStep={deleteRoutine}

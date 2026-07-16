@@ -13,6 +13,7 @@ import { MultiAssigneeDropdown } from '@/components/family'
 import { RoutineScheduleEditor } from '@/components/routine/RoutineScheduleEditor'
 import { RoutineStepsSection } from './sections/RoutineStepsSection'
 import { PanelAttachments } from './sections/PanelAttachments'
+import { ExtractSteps } from '@/components/routine/ExtractSteps'
 import { ConceptIcon } from '@/lib/conceptIcons'
 import { AssistDrawer } from '@/components/assist/AssistDrawer'
 import { useRoutineStats } from '@/hooks/useRoutineStats'
@@ -43,6 +44,8 @@ interface TapRoutinePanelProps {
   onClearLocation?: () => void
   /** Delete the routine entirely. Rendered (with an inline confirm) only when provided. */
   onDelete?: () => void
+  /** Batch-create steps with instructions (used by document → steps extraction). */
+  onAddSteps?: (steps: { name: string; detail?: string }[]) => Promise<unknown> | void
   /** Optional steps (child routines). When all four are provided, the Steps section is rendered. */
   steps?: Routine[]
   onSelectStep?: (step: Routine) => void
@@ -221,6 +224,11 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
 
       {/* Photos & Files — the PT sheet, exercise photos, any source doc */}
       <PanelAttachments entityType="routine" entityId={routine.id} />
+
+      {/* Attached document → proposed steps (AI proposes, your tap writes) */}
+      {props.onAddSteps && (
+        <ExtractSteps routine={routine} onAddSteps={props.onAddSteps} />
+      )}
 
       {(routine.image_url || projectDoc) && (
         <section className="pb-4 mb-4 border-b border-neutral-200">
