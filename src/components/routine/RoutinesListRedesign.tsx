@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { List, ChevronRight, Plus } from 'lucide-react'
+import { List, ChevronRight, Plus, Sparkles } from 'lucide-react'
 import type { Routine, RecurrencePattern } from '@/types/actionable'
 import type { UpdateRoutineInput } from '@/hooks/useRoutines'
 import { parseRoutine } from '@/lib/parseRoutine'
@@ -59,6 +59,8 @@ interface RoutinesListProps {
   onDelete?: (id: string) => void
   onCreateCollection?: (name: string) => Promise<import('@/types/actionable').Routine | null> | void
   onGroupIntoCollection?: (name: string, routineIds: string[]) => void
+  /** Open the AI routine builder (paste text / drop a PDF → proposed routine). */
+  onBuildWithAI?: () => void
 }
 
 function formatRecurrence(routine: Routine): string {
@@ -172,7 +174,7 @@ function SectionHeader({ title, count, collapsed, onToggle }: SectionHeaderProps
   )
 }
 
-export function RoutinesListRedesign({ routines, contacts = [], familyMembers = [], onCreateRoutine: _onCreateRoutine, onUpdateRoutine, onAddStep, onReorderSteps, onPromoteStep, onDeleteStep, onCreateCollection, onGroupIntoCollection, onDelete }: RoutinesListProps) {
+export function RoutinesListRedesign({ routines, contacts = [], familyMembers = [], onCreateRoutine: _onCreateRoutine, onUpdateRoutine, onAddStep, onReorderSteps, onPromoteStep, onDeleteStep, onCreateCollection, onGroupIntoCollection, onDelete, onBuildWithAI }: RoutinesListProps) {
   // Pause modal state
   const [pauseModalRoutine, setPauseModalRoutine] = useState<Routine | null>(null)
 
@@ -541,6 +543,16 @@ export function RoutinesListRedesign({ routines, contacts = [], familyMembers = 
           </div>
 
           <div className="flex items-center gap-2">
+            {onBuildWithAI && (
+              <button
+                onClick={onBuildWithAI}
+                className="flex items-center gap-2 px-4 py-2.5 bg-white text-neutral-700 rounded-xl font-medium
+                           border border-neutral-200 hover:border-amber-300 transition-colors shadow-sm"
+              >
+                <Sparkles className="w-4 h-4 text-amber-500" />
+                Build with AI
+              </button>
+            )}
             <button
               aria-label="Select"
               onClick={() => { setSelecting(v => !v); setSelected(new Set()) }}

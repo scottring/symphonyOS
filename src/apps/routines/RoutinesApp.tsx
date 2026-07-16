@@ -1,4 +1,4 @@
-import { Suspense, useCallback, useMemo } from 'react'
+import { Suspense, useCallback, useMemo, useState, lazy } from 'react'
 import {
   Routes,
   Route,
@@ -17,6 +17,10 @@ import { groupRoutineSteps } from '@/lib/today/routineCollections'
 import { nextStepOrder } from '@/lib/today/stepOrdering'
 import { LoadingFallback } from '@/components/layout/LoadingFallback'
 
+const RoutineBuilderModal = lazy(() =>
+  import('@/components/routine/RoutineBuilderModal').then(m => ({ default: m.RoutineBuilderModal }))
+)
+
 /**
  * Routines surface, mounted by the Shell at /routines/*. The inner <Routes>
  * match segments relative to /routines (the parent route ends in /*):
@@ -34,6 +38,7 @@ function RoutinesIndex() {
   const { routines, addRoutine, updateRoutine, deleteRoutine } = useRoutines()
   const { contacts } = useContacts()
   const { members: familyMembers } = useFamilyMembers()
+  const [builderOpen, setBuilderOpen] = useState(false)
 
   const filtered =
     currentDomain === 'universal'
@@ -83,7 +88,17 @@ function RoutinesIndex() {
         onDelete={deleteRoutine}
         onCreateCollection={handleCreateCollection}
         onGroupIntoCollection={handleGroupIntoCollection}
+        onBuildWithAI={() => setBuilderOpen(true)}
       />
+      {builderOpen && (
+        <RoutineBuilderModal
+          onClose={() => setBuilderOpen(false)}
+          onCreated={(routineId) => {
+            setBuilderOpen(false)
+            navigate(`/routines/${routineId}`)
+          }}
+        />
+      )}
     </Suspense>
   )
 }
