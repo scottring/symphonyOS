@@ -76,12 +76,21 @@ if (ACTIVE_THEME === 'kinetic') {
   await import('./index.css')
 }
 
+// Apply the cached place theme before first paint so there's no color flash;
+// PlaceProvider owns it (and syncs with the DB) once React mounts.
+const savedPlace = localStorage.getItem('symphony-place')
+if (savedPlace && savedPlace !== 'cabin' &&
+    ['urban', 'small-city', 'mountain-town', 'farm'].includes(savedPlace)) {
+  document.documentElement.dataset.place = savedPlace
+}
+
 import { Suspense, lazy } from 'react'
 import { CalendarCallback } from './pages/CalendarCallback'
 import { isDesktopShell } from './lib/desktop'
 import { JoinHousehold } from './components/JoinHousehold'
 import { GoogleCalendarProvider } from './hooks/useGoogleCalendar'
 import { DomainProvider } from './hooks/useDomain'
+import { PlaceProvider } from './hooks/usePlace'
 import { Shell } from './shell/Shell'
 import { AuthGate } from './components/auth/AuthGate'
 import { ErrorBoundary } from './components/ErrorBoundary'
@@ -123,6 +132,7 @@ const cutoverShell = <AuthGate>{() => <Shell />}</AuthGate>
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ErrorBoundary>
+      <PlaceProvider>
       <DomainProvider>
         <BrowserRouter>
           <GoogleCalendarProvider>
@@ -159,6 +169,7 @@ createRoot(document.getElementById('root')!).render(
           </GoogleCalendarProvider>
         </BrowserRouter>
       </DomainProvider>
+      </PlaceProvider>
     </ErrorBoundary>
   </StrictMode>,
 )

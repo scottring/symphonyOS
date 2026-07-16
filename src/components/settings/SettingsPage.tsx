@@ -4,6 +4,7 @@ import { useHouseholdInvitations } from '@/hooks/useHouseholdInvitations'
 import { CalendarSettings } from './CalendarSettings'
 import { WaitlistAdmin } from './WaitlistAdmin'
 import { ThemeSelector } from './ThemeSelector'
+import { PlacePicker } from './PlacePicker'
 import { useTextSize } from '@/hooks/useTextSize'
 import { HomeAddressSettings } from './HomeAddressSettings'
 import { PlanningRhythmSettings } from './PlanningRhythmSettings'
@@ -303,6 +304,9 @@ export function SettingsPage({
         {/* Tab Content */}
         {activeTab === 'general' && (
           <div className="space-y-8">
+            {/* Place theme — artwork + accent colors */}
+            <PlacePicker />
+
             {/* Theme Selector */}
             <ThemeSelector />
 

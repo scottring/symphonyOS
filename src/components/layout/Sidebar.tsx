@@ -9,6 +9,7 @@ import { useHomes } from '@/hooks/useHomes'
 import { useSpaces } from '@/hooks/useSpaces'
 import { useLists } from '@/hooks/useLists'
 import { WeatherChip } from '@/components/schedule/WeatherChip'
+import { PlaceMedallion } from '@/components/place/PlaceMedallion'
 import type { PinnedItem } from '@/types/pin'
 import type { PinnableEntityType } from '@/types/pin'
 import type { Task } from '@/types/task'
@@ -553,12 +554,9 @@ export function Sidebar({
         {/* Illustration + tagline */}
         {!collapsed && (
           <div className="mt-4 px-3">
-            <img
-              src="/house-photo.jpg"
-              alt=""
-              aria-hidden="true"
-              className="w-32 h-32 rounded-full object-cover select-none pointer-events-none"
-            />
+            <div aria-hidden="true" className="w-32 h-32 select-none pointer-events-none">
+              <PlaceMedallion className="w-full h-full" />
+            </div>
             <p className="text-xs text-neutral-400 mt-2 leading-relaxed">
               Everything in its Right Place
             </p>

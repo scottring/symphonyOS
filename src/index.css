@@ -173,6 +173,106 @@
 }
 
 /* =============================================================================
+   PLACE THEMES — accent-deep re-tints keyed by html[data-place]
+   Five illustrated "places" (see src/config/places.ts). Each shifts the
+   primary + accent hue families; the warm paper neutrals never move, so
+   every place keeps Nordic Journal's calm. Woodsy Cabin (the default) IS
+   the base palette — no override block needed.
+   ============================================================================= */
+
+/* Densely Urban — steel blue + streetlight amber */
+:root[data-place='urban'] {
+  --color-primary-50: hsl(218 25% 96%);
+  --color-primary-100: hsl(218 24% 90%);
+  --color-primary-200: hsl(218 22% 78%);
+  --color-primary-300: hsl(218 24% 62%);
+  --color-primary-400: hsl(218 30% 45%);
+  --color-primary-500: hsl(218 38% 30%);
+  --color-primary-600: hsl(218 42% 24%);
+  --color-primary-700: hsl(218 44% 20%);
+  --color-primary-800: hsl(218 42% 16%);
+  --color-primary-900: hsl(218 40% 12%);
+  --color-primary-950: hsl(218 42% 7%);
+  --color-accent-50: hsl(38 60% 97%);
+  --color-accent-100: hsl(38 55% 92%);
+  --color-accent-200: hsl(38 50% 82%);
+  --color-accent-300: hsl(38 48% 68%);
+  --color-accent-400: hsl(38 55% 55%);
+  --color-accent-500: hsl(38 60% 44%);
+  --shadow-primary: 0 8px 24px -6px hsl(218 38% 30% / 0.3);
+  --shadow-accent: 0 8px 24px -6px hsl(38 60% 44% / 0.25);
+}
+
+/* Small City — dusk violet + sunset rose */
+:root[data-place='small-city'] {
+  --color-primary-50: hsl(262 25% 96%);
+  --color-primary-100: hsl(262 24% 90%);
+  --color-primary-200: hsl(262 22% 78%);
+  --color-primary-300: hsl(262 24% 62%);
+  --color-primary-400: hsl(262 28% 45%);
+  --color-primary-500: hsl(262 36% 30%);
+  --color-primary-600: hsl(262 40% 24%);
+  --color-primary-700: hsl(262 42% 20%);
+  --color-primary-800: hsl(262 40% 16%);
+  --color-primary-900: hsl(262 38% 12%);
+  --color-primary-950: hsl(262 40% 7%);
+  --color-accent-50: hsl(345 55% 97%);
+  --color-accent-100: hsl(345 50% 92%);
+  --color-accent-200: hsl(345 46% 82%);
+  --color-accent-300: hsl(345 44% 68%);
+  --color-accent-400: hsl(345 45% 55%);
+  --color-accent-500: hsl(345 50% 45%);
+  --shadow-primary: 0 8px 24px -6px hsl(262 36% 30% / 0.3);
+  --shadow-accent: 0 8px 24px -6px hsl(345 50% 45% / 0.25);
+}
+
+/* Small Mountain Town — alpine blue + autumn orange */
+:root[data-place='mountain-town'] {
+  --color-primary-50: hsl(210 30% 96%);
+  --color-primary-100: hsl(210 28% 90%);
+  --color-primary-200: hsl(210 26% 78%);
+  --color-primary-300: hsl(210 28% 62%);
+  --color-primary-400: hsl(210 35% 45%);
+  --color-primary-500: hsl(210 45% 30%);
+  --color-primary-600: hsl(210 50% 24%);
+  --color-primary-700: hsl(210 52% 20%);
+  --color-primary-800: hsl(210 50% 16%);
+  --color-primary-900: hsl(210 48% 12%);
+  --color-primary-950: hsl(210 50% 7%);
+  --color-accent-50: hsl(28 60% 97%);
+  --color-accent-100: hsl(28 55% 92%);
+  --color-accent-200: hsl(28 50% 82%);
+  --color-accent-300: hsl(28 48% 68%);
+  --color-accent-400: hsl(28 55% 55%);
+  --color-accent-500: hsl(28 60% 45%);
+  --shadow-primary: 0 8px 24px -6px hsl(210 45% 30% / 0.3);
+  --shadow-accent: 0 8px 24px -6px hsl(28 60% 45% / 0.25);
+}
+
+/* Farm — barn red + wheat gold */
+:root[data-place='farm'] {
+  --color-primary-50: hsl(10 35% 96%);
+  --color-primary-100: hsl(10 33% 90%);
+  --color-primary-200: hsl(10 30% 78%);
+  --color-primary-300: hsl(10 32% 62%);
+  --color-primary-400: hsl(10 40% 46%);
+  --color-primary-500: hsl(10 48% 32%);
+  --color-primary-600: hsl(10 52% 26%);
+  --color-primary-700: hsl(10 54% 21%);
+  --color-primary-800: hsl(10 52% 17%);
+  --color-primary-900: hsl(10 50% 13%);
+  --color-primary-950: hsl(10 52% 8%);
+  --color-accent-50: hsl(44 60% 97%);
+  --color-accent-100: hsl(44 55% 92%);
+  --color-accent-200: hsl(44 50% 82%);
+  --color-accent-300: hsl(44 48% 68%);
+  --color-accent-400: hsl(44 55% 52%);
+  --color-accent-500: hsl(44 60% 42%);
+  --shadow-primary: 0 8px 24px -6px hsl(10 48% 32% / 0.3);
+  --shadow-accent: 0 8px 24px -6px hsl(44 60% 42% / 0.25);
+}
+
+/* =============================================================================
    BASE STYLES
    ============================================================================= */
 
