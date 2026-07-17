@@ -51,6 +51,7 @@ import { getRoutinesForDatePure } from '@/lib/routineUtils'
 import { StagingFloat } from './StagingFloat'
 import { EveningMealCard } from './EveningMealCard'
 import { EndOfDayCard } from './EndOfDayCard'
+import { EndOfDayReview } from './EndOfDayReview'
 import { ScheduleItem } from './ScheduleItem'
 import { RoutineCollectionRow } from './RoutineCollectionRow'
 import { DayNavCluster } from './DayNavCluster'
@@ -165,6 +166,7 @@ export function TodayView({
 
   // ── Bulk multi-select (hover checkbox on any row → bottom action bar) ──────
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(() => new Set())
+  const [eodReviewOpen, setEodReviewOpen] = useState(false)
   const clearBulkSelection = useCallback(() => setSelectedKeys(new Set()), [])
   const toggleBulkSelect = useCallback((key: string) => {
     setSelectedKeys((prev) => {
@@ -1086,11 +1088,17 @@ export function TodayView({
       </div>
 
       {/* End of day — closing chapter for the timeline. Desktop-only; mobile
-          keeps a tighter schedule-focused view. onOpenReview is a no-op until
-          Phase 2 wires the review flow (intentional handoff). */}
+          keeps a tighter schedule-focused view. */}
       <div className="mt-5 hidden md:block">
-        <EndOfDayCard onOpenReview={() => {}} />
+        <EndOfDayCard onOpenReview={() => setEodReviewOpen(true)} />
       </div>
+      <EndOfDayReview
+        isOpen={eodReviewOpen}
+        onClose={() => setEodReviewOpen(false)}
+        tasks={tasks}
+        viewedDate={viewedDate}
+        onUpdateTask={(id, u) => onUpdateTask?.(id, u)}
+      />
 
       {/* Clarity curtain — pulled down by the binoculars in the header. */}
       <ClarityCurtain
