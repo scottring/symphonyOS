@@ -153,7 +153,7 @@ export const SESSIONS: Record<PlanningHorizon, GuidedSessionConfig> = {
       {
         id: 'write-month', type: 'write-list', title: "Write the month’s list",
         narration: "Write the month’s list. Keep it honest — and put at least one thing on it that exists purely because it will be fun. A month with nothing to look forward to is a scheduling failure.",
-        props: { bucket: 'month' },
+        props: { bucket: 'month', rows: 'plain' },
       },
       {
         id: 'book-next', type: 'book-next', title: 'Anchor the next step',
@@ -198,7 +198,7 @@ export const SESSIONS: Record<PlanningHorizon, GuidedSessionConfig> = {
       {
         id: 'write-week', type: 'write-list', title: "Write the week’s list",
         narration: "Write the week’s task list. Keep it focused — around fifteen items is the honest ceiling for a week that also contains a life. The counter is a nudge, not a wall.",
-        props: { bucket: 'week', softCap: 15 },
+        props: { bucket: 'week', softCap: 15, rows: 'plain' },
       },
       {
         id: 'place-rocks', type: 'schedule-grid', title: 'Place the big rocks',

@@ -104,11 +104,11 @@ function YearGoalRow({ goal, tasks, onOpen }: { goal: Goal; tasks: Task[]; onOpe
     <button
       type="button"
       onClick={onOpen}
-      className="w-full flex items-center gap-3 rounded-xl border border-neutral-100 bg-white px-4 py-3 text-left hover:bg-neutral-50 transition-colors"
+      className="w-full flex items-start gap-3 rounded-xl border border-neutral-100 bg-white px-4 py-3 text-left hover:bg-neutral-50 transition-colors"
     >
-      <Target className="w-4 h-4 text-primary-500 shrink-0" />
+      <Target className="w-4 h-4 text-primary-500 shrink-0 mt-0.5" />
       <span className="flex-1 min-w-0">
-        <span className="block text-sm font-medium text-neutral-800 truncate">{goal.name}</span>
+        <span className="block text-sm font-medium text-neutral-800 leading-snug">{goal.name}</span>
         {total > 0 ? (
           <span className="mt-1 flex items-center gap-2">
             <span className="h-1 w-24 rounded-full bg-neutral-100 overflow-hidden inline-block">

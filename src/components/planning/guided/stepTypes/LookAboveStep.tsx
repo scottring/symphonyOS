@@ -108,9 +108,9 @@ export function LookAboveStep() {
         )
       }
       return (
-        <li key={g.id} className="flex items-center gap-2 rounded-lg bg-neutral-50/70 px-3 py-1.5 text-sm text-neutral-700">
-          <Target className="w-3.5 h-3.5 text-neutral-300 shrink-0" />
-          <span className="flex-1 min-w-0 truncate">{g.name}</span>
+        <li key={g.id} className="flex items-start gap-2 rounded-lg bg-neutral-50/70 px-3 py-1.5 text-sm text-neutral-700">
+          <Target className="w-3.5 h-3.5 text-neutral-300 shrink-0 mt-0.5" />
+          <span className="flex-1 min-w-[10rem] leading-snug">{g.name}</span>
           {promotable && (covered ? (
             <span className="shrink-0 inline-flex items-center gap-1 text-xs text-primary-700">
               <Check className="w-3 h-3" strokeWidth={3} /> on this season

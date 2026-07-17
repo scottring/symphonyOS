@@ -17,10 +17,10 @@ export function TaskTriageRow({ task }: { task: Task }) {
   const { host } = useGuided()
   const project = task.projectId ? host.projectsMap.get(task.projectId) : undefined
   return (
-    <li className="flex items-center gap-2 rounded-xl border border-neutral-100 bg-white px-3 py-2">
-      <span className="flex-1 min-w-0 text-sm text-neutral-800 truncate">
+    <li className="flex items-start gap-2 rounded-xl border border-neutral-100 bg-white px-3 py-2">
+      <span className="flex-1 min-w-[10rem] text-sm text-neutral-800 leading-snug">
         {task.title}
-        {project && <span className="text-xs text-neutral-400"> · {project.name}</span>}
+        {project && <span className="text-xs text-neutral-400 whitespace-nowrap"> · {project.name}</span>}
       </span>
       <TriageWhenMenu
         onPick={(when) => applyTriageWhen(when, task.id, { onPushTask: host.onPushTask, onSetBucket: host.onSetBucket })}
@@ -150,16 +150,16 @@ export function ReviewStep() {
           const verdict = goalVerdicts.get(g.id)
           if (verdict) {
             return (
-              <li key={g.id} className="flex items-center gap-2 rounded-xl border border-primary-100 bg-primary-50/40 px-3 py-2">
-                <Check className="w-3.5 h-3.5 text-primary-600 shrink-0" strokeWidth={3} />
-                <span className={`flex-1 min-w-0 text-sm truncate ${verdict === 'letgo' ? 'text-neutral-400 line-through' : 'text-neutral-700'}`}>{g.name}</span>
+              <li key={g.id} className="flex items-start gap-2 rounded-xl border border-primary-100 bg-primary-50/40 px-3 py-2">
+                <Check className="w-3.5 h-3.5 text-primary-600 shrink-0 mt-0.5" strokeWidth={3} />
+                <span className={`flex-1 min-w-[10rem] text-sm leading-snug ${verdict === 'letgo' ? 'text-neutral-400 line-through' : 'text-neutral-700'}`}>{g.name}</span>
                 <span className="text-xs text-primary-700">{FATE_LABEL[verdict]}</span>
               </li>
             )
           }
           return (
-            <li key={g.id} className="flex items-center gap-2 rounded-xl border border-neutral-100 bg-white px-3 py-2">
-              <span className="flex-1 min-w-0 text-sm text-neutral-800 truncate">{g.name}</span>
+            <li key={g.id} className="flex items-start gap-2 rounded-xl border border-neutral-100 bg-white px-3 py-2">
+              <span className="flex-1 min-w-[10rem] text-sm text-neutral-800 leading-snug">{g.name}</span>
               <button type="button" onClick={() => decide(g.id, 'carried', () => host.carryGoal(g.id))}
                 className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-md text-white bg-primary-600 hover:bg-primary-700 transition-colors">
                 <ArrowRight className="w-3 h-3" /> Carry forward
