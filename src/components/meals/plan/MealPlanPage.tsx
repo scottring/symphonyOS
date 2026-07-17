@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { PAGE_COLUMN } from '@/components/layout/pageLayout'
 import { useNavigate } from 'react-router-dom'
 import { ConceptIcon } from '@/lib/conceptIcons'
 import { useMealPlan } from '@/hooks/useMealPlan'
@@ -247,7 +248,7 @@ export function MealPlanPage() {
 
   if (loading) {
     return (
-      <div className="px-12 py-12 max-w-3xl mx-auto">
+      <div className={PAGE_COLUMN}>
         <MealsTabs />
         <div className="text-[12px] uppercase tracking-widest text-neutral-400">Loading…</div>
       </div>
@@ -256,7 +257,7 @@ export function MealPlanPage() {
 
   if (error) {
     return (
-      <div className="px-12 py-12 max-w-3xl mx-auto">
+      <div className={PAGE_COLUMN}>
         <MealsTabs />
         <div className="text-accent-500">{error}</div>
       </div>
@@ -267,7 +268,7 @@ export function MealPlanPage() {
   const weekLabel = formatDateMonthDay(weekStart)
 
   return (
-    <div className="px-12 py-12 max-w-3xl mx-auto">
+    <div className={PAGE_COLUMN}>
       <UndoToast />
       <MealsTabs />
 

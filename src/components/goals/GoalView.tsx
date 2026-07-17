@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { PAGE_COLUMN } from '@/components/layout/pageLayout'
 import type { Goal, GoalArea } from '@/types/goal'
 
 interface GoalViewProps {
@@ -54,7 +55,7 @@ export function GoalView({
 
   return (
     <div className="h-full overflow-auto bg-[var(--color-bg-base)]">
-      <div className="max-w-3xl mx-auto px-6 md:px-8 py-8">
+      <div className={PAGE_COLUMN}>
         {/* Back button + area breadcrumb */}
         <div className="flex items-center gap-2 mb-6">
           <button

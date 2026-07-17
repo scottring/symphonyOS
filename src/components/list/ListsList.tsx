@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import { PAGE_COLUMN } from '@/components/layout/pageLayout'
 import type { List, ListCategory } from '@/types/list'
 import { getCategoryLabel, getCategoryIcon, LIST_CATEGORIES } from '@/types/list'
 
@@ -63,7 +64,7 @@ export function ListsList({ lists, loading = false, listsByCategory, onSelectLis
 
   return (
     <div className="h-full overflow-auto">
-      <div className="p-6 max-w-2xl mx-auto">
+      <div className={PAGE_COLUMN}>
         {/* Header */}
         <div className="mb-6">
           <div className="flex items-center justify-between">

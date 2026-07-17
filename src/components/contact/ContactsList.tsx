@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { PAGE_COLUMN } from '@/components/layout/pageLayout'
 import type { Contact, ContactCategory } from '@/types/contact'
 
 interface ContactsListProps {
@@ -56,7 +57,7 @@ export function ContactsList({ contacts, onSelectContact, onBack, onAddContact }
   }
 
   return (
-    <div className="max-w-2xl mx-auto py-8 px-4">
+    <div className={PAGE_COLUMN}>
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-3">

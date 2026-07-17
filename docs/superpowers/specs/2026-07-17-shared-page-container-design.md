@@ -14,40 +14,34 @@ There is no shared page wrapper. `ShellRoutes` renders each app's `Component` wi
 
 ## Approach
 
-A single `<PageContainer>` component that owns the gutter, max-width, and vertical rhythm. Every rhythm/library page renders its content inside it instead of a bespoke wrapper. Kiosk/full-bleed surfaces (e.g. `/wall`, which is `chromeless`) simply don't use it.
-
 **Alignment: left-aligned with a fixed gutter** (decided with Scott). Content pins to one consistent left gutter on every page and never shifts when the right detail/AI pane opens — the pane's space is already reserved by `ShellLayout`'s `marginRight`, so a left-aligned column only reflows its right edge, no horizontal jump. A centered column would re-center (slide left + narrow) each time the pane toggles.
 
-### Component
+**Mechanism: a shared className constant, not a wrapping component.** The gutter inconsistency lives entirely in each page's *column* className. Wrapping the wildly varying page structures (modals/asides as siblings, multi-return branches, Today's separate header column) in a component would force risky restructuring. Instead, `pageLayout.ts` exports the one column class; each page swaps its bespoke column className for it. Zero structural change; one tuning point.
 
-```tsx
-// src/components/layout/PageContainer.tsx
-interface PageContainerProps {
-  children: ReactNode
-  /** 'default' = 940px (rhythm + library lists); 'wide' = 1152px (detail pages). */
-  width?: 'default' | 'wide'
-  /** Extra classes on the inner column. */
-  className?: string
-}
+```ts
+// src/components/layout/pageLayout.ts
+const PAGE_GUTTER = 'px-6 md:px-10 lg:px-14 py-8'
+export const PAGE_COLUMN      = `w-full max-w-[940px]  ${PAGE_GUTTER}`   // rhythm + library lists
+export const PAGE_COLUMN_WIDE = `w-full max-w-[1152px] ${PAGE_GUTTER}`   // detail pages
 ```
 
-- Outer: `h-full overflow-auto bg-[var(--color-bg-base)]` (the scroll container each page has today).
-- Inner column: left-aligned (no `mx-auto`), responsive horizontal padding, `py-8`, `w-full` with `max-w-[940px]` (or `max-w-[1152px]` for `wide`).
-- The exact gutter value is tuned **visually in the browser** against `/today` (pane open + closed) rather than guessed. Starting point ≈ `px-6 md:px-10`.
+Left-aligned (no `mx-auto`); the scroll container, decorative gradients, and modals each page already has stay untouched. Kiosk/full-bleed surfaces (e.g. `/wall`) don't use it.
 
 ### Pages converted
 
-`GoalsList`, `GoalView`, `ProjectsListRedesign`, `ProjectViewRedesign` (`wide`), `RoutinesListRedesign`, `ListsList`, `ContactsList`, `MealPlanPage`, the shared `HorizonView` wrapper (covers year/week/month/season), and `HomeView` (Today). Decorative absolute layers (e.g. GoalsList's gradient) stay; only the column wrapper is swapped.
+`GoalsList`, `GoalView`, `ProjectsListRedesign`, `ProjectViewRedesign` (`wide`), `RoutinesListRedesign`, `ListsList`, `ContactsList`, `MealPlanPage`, the shared `HorizonView` wrapper (year/week/month/season), and `InboxView`.
+
+**Today (`HomeView`/`TodayView`) is intentionally NOT converted this pass.** Its layout is spread across a header column, a nudge, and the content column, each with its own vertical rhythm, and the content wrapper drives the mobile timeline (currently full-bleed `px-0`) — folding it into the shared gutter risks a mobile regression on the most-used page. Today keeps its centered hero treatment; converting it is a flagged follow-up pending Scott's call.
 
 ### #4 truncation
 
 In `GoalsList`, the goal-title `<h3>` drops `truncate` so long titles wrap (matching `DomainsGoalsStep`). The wider 940px column reduces the need, but removing `truncate` is the actual fix.
 
-## Testing
+## Testing / verification
 
-- Unit: a `PageContainer` render test (renders children; applies `wide` max-width when asked; left-aligned = no `mx-auto`).
-- Existing page/list tests must stay green (wrapper swap is presentational).
-- **Visual verification** in the browser is the real gate here: confirm every converted page shares the same left gutter, that it's stable across the pane opening, and that `/goals` long titles wrap. Tune the gutter to match Today.
+- The changes are presentational className swaps + one export; a bare class constant has nothing meaningful to unit-test. The gate is `tsc` + the full existing suite staying green (they do: tsc clean, 3404 pass, eslint 0 errors) and **visual verification**.
+- Visual, done in the dev browser: `/goals` and `/projects` render at an identical column left edge (256px, 940px wide, `lg:px-14` gutter); opening the AI rail leaves the column left edge unchanged at 256px — **no horizontal jump** (the core pane requirement). Empty states render without the load flash.
+- Not reachable in that browser session: the horizon pages (a route-specific auth artifact on the seed account dropped `/year` to a login screen — unrelated to this CSS change, no console errors), and long-title wrap (`/goals` had no data). Both are covered by the identical shared-constant swap and left for Scott's preview pass.
 
 ## Out of scope
 

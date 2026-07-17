@@ -12,6 +12,7 @@
 // DenseInboxRow + global DetailPanel (tap-to-detail) work unchanged.
 
 import { useCallback, useMemo, useState, useEffect, useRef } from 'react';
+import { PAGE_COLUMN } from '@/components/layout/pageLayout';
 import { useNavigate } from 'react-router-dom';
 import { CalendarRange, Target, Plus, ChevronRight, FolderOpen, Check, Pencil, Archive, Trash2, CornerRightDown } from 'lucide-react';
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
@@ -542,7 +543,7 @@ export function HorizonView({ horizon }: HorizonViewProps) {
 
     return (
       <div className="h-full overflow-y-auto">
-        <div className="max-w-[940px] w-full px-4 py-4 md:pl-10 md:pr-8 md:py-8">
+        <div className={PAGE_COLUMN}>
           <header className="mb-4 flex items-start justify-between gap-4">
             <div>
               <p className="text-[11px] uppercase tracking-wider text-neutral-400">This Year</p>
@@ -647,7 +648,7 @@ export function HorizonView({ horizon }: HorizonViewProps) {
   return (
     <ScheduleActionsProvider value={scheduleActionsValue}>
       <div className="h-full overflow-y-auto">
-        <div className="max-w-[940px] w-full px-4 py-4 md:pl-10 md:pr-8 md:py-8">
+        <div className={PAGE_COLUMN}>
           <header className="mb-4 flex items-start justify-between gap-4">
             <div>
               <p className="text-[11px] uppercase tracking-wider text-neutral-400">{label}</p>

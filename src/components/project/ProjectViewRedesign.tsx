@@ -1,4 +1,5 @@
 import { useMemo, useState, useCallback } from 'react'
+import { PAGE_COLUMN_WIDE } from '@/components/layout/pageLayout'
 import type { Project, ProjectStatus } from '@/types/project'
 import type { Task } from '@/types/task'
 import type { Contact } from '@/types/contact'
@@ -167,7 +168,7 @@ export function ProjectViewRedesign({
       {/* Top accent */}
       <div className="absolute top-0 left-0 right-0 h-48 bg-gradient-to-b from-blue-50/50 to-transparent pointer-events-none" />
 
-      <div className="relative max-w-6xl mx-auto px-6 py-8">
+      <div className={`relative ${PAGE_COLUMN_WIDE}`}>
         {/* Back button */}
         <button
           onClick={onBack}

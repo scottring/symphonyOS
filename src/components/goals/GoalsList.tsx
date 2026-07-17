@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import type { Goal, GoalArea, Quarter } from '@/types/goal'
+import { PAGE_COLUMN } from '@/components/layout/pageLayout'
 
 interface GoalsListProps {
   areas: GoalArea[]
@@ -87,7 +88,7 @@ export function GoalsList({
       {/* Subtle accent gradient */}
       <div className="absolute top-0 left-0 right-0 h-48 bg-gradient-to-b from-primary-50/50 to-transparent pointer-events-none" />
 
-      <div className="relative max-w-3xl mx-auto px-6 md:px-8 py-8">
+      <div className={`relative ${PAGE_COLUMN}`}>
         {/* Header */}
         <div className="flex items-start justify-between mb-8">
           <div>
@@ -283,9 +284,9 @@ export function GoalsList({
                         className="w-full text-left p-5 rounded-2xl bg-white border border-neutral-100
                                    hover:border-primary-200 hover:shadow-md transition-all duration-200 group"
                       >
-                        <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-start justify-between gap-3">
                           <div className="flex items-center gap-2 min-w-0">
-                            <h3 className="font-medium text-neutral-800 group-hover:text-primary-700 transition-colors truncate">
+                            <h3 className="font-medium text-neutral-800 group-hover:text-primary-700 transition-colors">
                               {goal.name}
                             </h3>
                             {goal.status === 'completed' && (

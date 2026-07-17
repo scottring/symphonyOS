@@ -1,5 +1,6 @@
 // src/components/schedule/InboxView.tsx
 import { useMemo, useCallback, useState } from 'react'
+import { PAGE_COLUMN } from '@/components/layout/pageLayout'
 import { X, CornerDownRight } from 'lucide-react'
 import type { Task, TaskContext } from '@/types/task'
 import { mergeCaptureIntoTask } from '@/lib/captureMerge'
@@ -487,7 +488,7 @@ export function InboxView({
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="max-w-[940px] w-full px-4 py-4 md:pl-10 md:pr-8 md:py-8">
+      <div className={PAGE_COLUMN}>
       <header className="mb-6 flex items-start justify-between">
         <div>
           <h1 className="font-display text-2xl font-semibold text-neutral-800">Inbox</h1>

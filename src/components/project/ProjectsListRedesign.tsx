@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
+import { PAGE_COLUMN } from '@/components/layout/pageLayout'
 import type { Project } from '@/types/project'
 import type { Task } from '@/types/task'
 
@@ -195,7 +196,7 @@ export function ProjectsListRedesign({ projects, loading = false, tasks = [], on
       {/* Subtle green gradient accent */}
       <div className="absolute top-0 left-0 right-0 h-48 bg-gradient-to-b from-primary-50/50 to-transparent pointer-events-none" />
 
-      <div className="relative max-w-3xl mx-auto px-6 md:px-8 py-8">
+      <div className={`relative ${PAGE_COLUMN}`}>
         {/* Header */}
         <div className="flex items-start justify-between mb-8">
           <div>
