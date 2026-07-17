@@ -62,6 +62,23 @@ export function WriteListStep() {
         />
       </div>
       {grainHint && <p className="text-xs text-neutral-400 italic">{grainHint}</p>}
+      {/* The pivotal shift from looking → writing. When the list is still empty,
+          say plainly that THIS is where you compose it, and frame the list as
+          its own artifact (look, don't link) so the standalone list reads as
+          intentional, not disconnected (walkthrough #11, #12). */}
+      {pool.length === 0 && (
+        <div className="rounded-xl border border-dashed border-primary-200 bg-primary-50/40 px-4 py-3">
+          <p className="text-sm font-medium text-neutral-700">
+            {bucket === 'quarter' ? 'This is your season list — write it here.'
+              : bucket === 'month' ? 'This is your month list — write it here.'
+              : 'This is your week list — write it here.'}
+          </p>
+          <p className="text-xs text-neutral-500 mt-1">
+            Type in the box above and press Enter. It&rsquo;s your own list — the goals and
+            projects you just looked at are fuel, not a checklist to copy.
+          </p>
+        </div>
+      )}
       {softCap !== undefined && (
         <p className={`text-xs ${over ? 'text-amber-600' : 'text-neutral-400'}`}>
           {pool.length} of ~{softCap}{over ? ' — a list you believe beats a list you admire' : ''}

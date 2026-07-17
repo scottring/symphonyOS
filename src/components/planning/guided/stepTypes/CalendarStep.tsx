@@ -5,7 +5,7 @@
 // longer spans (the annual "mountain ranges" view). Read-only; an optional
 // notes field captures what's worth remembering.
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { CalendarDays } from 'lucide-react'
+import { CalendarDays, ChevronRight } from 'lucide-react'
 import { useGuided } from '../GuidedContext'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 
@@ -65,14 +65,24 @@ export function CalendarStep() {
 
   const byMonth = useMemo(() => {
     if (!wide) return []
-    const counts = new Map<number, number>()
+    const groups = new Map<number, CalendarEvent[]>()
     for (const e of inRange) {
       const st = eventStart(e)
       if (!st) continue
-      counts.set(st.getMonth(), (counts.get(st.getMonth()) ?? 0) + 1)
+      const arr = groups.get(st.getMonth()) ?? []
+      arr.push(e)
+      groups.set(st.getMonth(), arr)
     }
-    return [...counts.entries()]
+    return [...groups.entries()]
   }, [inRange, wide])
+  // Expand a month to its actual events — the count alone is a dead end (#9).
+  const [expandedMonths, setExpandedMonths] = useState<Set<number>>(new Set())
+  const toggleMonth = (m: number) =>
+    setExpandedMonths((s) => {
+      const n = new Set(s)
+      if (n.has(m)) n.delete(m); else n.add(m)
+      return n
+    })
 
   return (
     <div className="space-y-4">
@@ -86,13 +96,37 @@ export function CalendarStep() {
         <p className="text-sm text-neutral-400">Nothing on the calendar in this stretch yet.</p>
       ) : wide ? (
         <ul className="space-y-1">
-          {byMonth.map(([m, count]) => (
-            <li key={m} className="flex items-center gap-2 rounded-lg bg-neutral-50/70 px-3 py-1.5 text-sm text-neutral-700">
-              <CalendarDays className="w-3.5 h-3.5 text-neutral-300" />
-              <span className="flex-1">{MONTHS[m]}</span>
-              <span className="text-xs text-neutral-400">{count} commitment{count === 1 ? '' : 's'}</span>
-            </li>
-          ))}
+          {byMonth.map(([m, evs]) => {
+            const isOpen = expandedMonths.has(m)
+            return (
+              <li key={m} className="rounded-lg bg-neutral-50/70">
+                <button
+                  type="button"
+                  onClick={() => toggleMonth(m)}
+                  aria-expanded={isOpen}
+                  className="w-full flex items-center gap-2 px-3 py-1.5 text-sm text-neutral-700 text-left"
+                >
+                  <ChevronRight className={`w-3.5 h-3.5 text-neutral-300 shrink-0 transition-transform ${isOpen ? 'rotate-90' : ''}`} />
+                  <CalendarDays className="w-3.5 h-3.5 text-neutral-300 shrink-0" />
+                  <span className="flex-1">{MONTHS[m]}</span>
+                  <span className="text-xs text-neutral-400 shrink-0">{evs.length} commitment{evs.length === 1 ? '' : 's'}</span>
+                </button>
+                {isOpen && (
+                  <ul className="pb-2 pl-9 pr-3 space-y-0.5">
+                    {evs.map((e) => {
+                      const st = eventStart(e)
+                      return (
+                        <li key={e.id ?? `${e.title}-${st?.toISOString() ?? ''}`} className="flex gap-2 text-xs text-neutral-500 leading-snug">
+                          <span className="shrink-0 text-neutral-400">{st?.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                          <span className="min-w-0">{e.title}</span>
+                        </li>
+                      )
+                    })}
+                  </ul>
+                )}
+              </li>
+            )
+          })}
         </ul>
       ) : (
         <ul className="space-y-1 max-h-72 overflow-auto pr-1">
