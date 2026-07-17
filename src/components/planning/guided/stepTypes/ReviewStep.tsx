@@ -40,6 +40,12 @@ export function TaskTriageRow({ task }: { task: Task }) {
 export function SeasonListRow({ task, fate = false, onCelebrated }: { task: Task; fate?: boolean; onCelebrated?: (id: string) => void }) {
   const { host } = useGuided()
   const project = task.projectId ? host.projectsMap.get(task.projectId) : undefined
+  // Read-only provenance (look, don't link): a move translated from a year goal
+  // carries its goalId — surface "from {area}" so the standalone list reads as
+  // intentional, not floating/disconnected (walkthrough #12). No hard cascade.
+  const goal = task.goalId ? host.goals.find((g) => g.id === task.goalId) : undefined
+  const goalArea = goal ? host.goalAreas.find((a) => a.id === goal.areaId) : undefined
+  const provenance = goalArea?.name ?? goal?.name
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(task.title)
   const [carried, setCarried] = useState(false)
@@ -67,7 +73,9 @@ export function SeasonListRow({ task, fate = false, onCelebrated }: { task: Task
       ) : (
         <span className="flex-1 min-w-[12rem] text-sm text-neutral-800 leading-snug">
           {task.title}
-          {project && <span className="text-xs text-neutral-400 whitespace-nowrap"> · {project.name}</span>}
+          {provenance
+            ? <span className="text-xs text-primary-600/80 whitespace-nowrap"> · from {provenance}</span>
+            : project && <span className="text-xs text-neutral-400 whitespace-nowrap"> · {project.name}</span>}
         </span>
       )}
       {!editing && celebrated && (

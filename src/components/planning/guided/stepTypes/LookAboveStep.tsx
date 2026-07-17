@@ -83,9 +83,12 @@ export function LookAboveStep() {
                 placeholder="An outcome finishable this season — the goal stays on the shelf…"
                 onChange={(e) => setTranslationDraft(e.target.value)}
                 onKeyDown={(e) => {
+                  // A goal usually needs SEVERAL season-sized moves — add and
+                  // keep the prompt open (clear the draft) instead of closing
+                  // after one (walkthrough #5). ✕/Escape/Done ends it.
                   if (e.key === 'Enter' && translationDraft.trim()) {
                     void host.createTaskInBucket(translationDraft.trim(), 'quarter', { goalId: g.id })
-                    setTranslatingGoalId(null)
+                    setTranslationDraft('')
                   }
                   if (e.key === 'Escape') setTranslatingGoalId(null)
                 }}
@@ -94,14 +97,15 @@ export function LookAboveStep() {
               <button type="button" disabled={!translationDraft.trim()}
                 onClick={() => {
                   void host.createTaskInBucket(translationDraft.trim(), 'quarter', { goalId: g.id })
-                  setTranslatingGoalId(null)
+                  setTranslationDraft('')
                 }}
                 className="shrink-0 text-xs font-semibold px-2.5 py-1.5 rounded-md text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-40 transition-colors">
                 Add to season
               </button>
-              <button type="button" onClick={() => setTranslatingGoalId(null)} aria-label="Cancel"
-                className="shrink-0 text-xs px-1.5 py-1.5 text-neutral-400 hover:text-neutral-600">✕</button>
+              <button type="button" onClick={() => setTranslatingGoalId(null)}
+                className="shrink-0 text-xs font-medium px-2 py-1.5 text-primary-700 hover:text-primary-900">Done</button>
             </div>
+            <p className="text-[11px] text-neutral-400 mt-1">Add as many season-sized moves as this goal needs — Enter for each, Done when finished.</p>
             {/* Blank-page helper: tap-to-fill candidates; the human edits + confirms. */}
             <SeasonMoveSuggestions goalName={g.name} onPick={setTranslationDraft} />
           </li>
@@ -112,8 +116,14 @@ export function LookAboveStep() {
           <Target className="w-3.5 h-3.5 text-neutral-300 shrink-0 mt-0.5" />
           <span className="flex-1 min-w-[10rem] leading-snug">{g.name}</span>
           {promotable && (covered ? (
-            <span className="shrink-0 inline-flex items-center gap-1 text-xs text-primary-700">
-              <Check className="w-3 h-3" strokeWidth={3} /> on this season
+            <span className="shrink-0 inline-flex items-center gap-2 text-xs text-primary-700">
+              <span className="inline-flex items-center gap-1"><Check className="w-3 h-3" strokeWidth={3} /> on this season</span>
+              <button type="button"
+                onClick={() => { setTranslatingGoalId(g.id); setTranslationDraft('') }}
+                title="Add another season-sized move for this goal"
+                className="inline-flex items-center gap-0.5 font-medium px-1.5 py-0.5 rounded-md text-primary-700 hover:bg-primary-100 transition-colors">
+                <Plus className="w-3 h-3" /> add
+              </button>
             </span>
           ) : (
             <button type="button"
