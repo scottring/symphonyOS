@@ -106,6 +106,17 @@ export function PlanningSession({
   const allUnscheduledTasks = useMemo(() => {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
+    // Bounds of the days currently on the grid. A task scheduled onto one of
+    // these days is PLACED — it belongs on the grid, not also in the unscheduled
+    // rail — even if that day is earlier this week (the week-planning grid spans
+    // past + future days, so "past" alone can't mean "unscheduled" here). For
+    // the single-day Today view this is a no-op: a same-day task was already
+    // excluded, and genuinely-overdue tasks fall before the range and still
+    // resurface.
+    const rangeStart = dateRange.length ? new Date(dateRange[0]) : null
+    rangeStart?.setHours(0, 0, 0, 0)
+    const rangeEnd = dateRange.length ? new Date(dateRange[dateRange.length - 1]) : null
+    rangeEnd?.setHours(23, 59, 59, 999)
 
     return tasks.filter((task) => {
       if (task.completed) return false
@@ -121,12 +132,15 @@ export function PlanningSession({
       if (task.isAllDay) return true
 
       if (!task.scheduledFor) return true
-      // Include tasks scheduled for past dates (they need to be rescheduled)
       const taskDate = new Date(task.scheduledFor)
-      taskDate.setHours(0, 0, 0, 0)
-      return taskDate < today
+      // Placed on a day shown on the grid → it's on the grid, not unscheduled.
+      if (rangeStart && rangeEnd && taskDate >= rangeStart && taskDate <= rangeEnd) return false
+      // Otherwise, past-scheduled tasks resurface so they can be rescheduled.
+      const taskDay = new Date(taskDate)
+      taskDay.setHours(0, 0, 0, 0)
+      return taskDay < today
     })
-  }, [tasks])
+  }, [tasks, dateRange])
 
   // The rail defaults to today-relevant candidates — carried-over, all-day, and
   // this-week tasks. Dumping the whole backlog (inbox/month/someday) made the
