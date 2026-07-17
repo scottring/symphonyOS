@@ -25,12 +25,6 @@ const INBOX_ACTIONS: QuickAction[] = [
   { kind: 'today' }, { kind: 'week' }, { kind: 'month' }, { kind: 'someday' }, { kind: 'note' }, { kind: 'delete' }
 ]
 
-const BUCKET_LABELS: Record<'week' | 'month' | 'quarter', string> = {
-  week: 'This Week',
-  month: 'This Month',
-  quarter: 'Someday',
-}
-
 type UndoEntry = {
   taskId: string
   message: string
@@ -268,20 +262,12 @@ export function InboxView({
     () => filteredTasks.filter((t) => !t.completed && t.bucket === 'inbox').sort(sortByCreated),
     [filteredTasks],
   )
-  const weekTasks = useMemo(
-    () => filteredTasks.filter((t) => !t.completed && t.bucket === 'week').sort(sortByCreated),
-    [filteredTasks],
-  )
-  const monthTasks = useMemo(
-    () => filteredTasks.filter((t) => !t.completed && t.bucket === 'month').sort(sortByCreated),
-    [filteredTasks],
-  )
-  const quarterTasks = useMemo(
-    () => filteredTasks.filter((t) => !t.completed && t.bucket === 'quarter').sort(sortByCreated),
-    [filteredTasks],
-  )
-
-  const totalCount = inboxTasks.length + weekTasks.length + monthTasks.length + quarterTasks.length
+  // The inbox is capture-triage ONLY: true captures (bucket 'inbox'), not
+  // already-planned month/season/week tasks. Those belong to their horizon views
+  // (This Month / This Season / This Week). Surfacing them here made the inbox
+  // show planning outputs — and their per-horizon copies — as "items to triage",
+  // which is exactly the confusing duplication the inbox should never show.
+  const totalCount = inboxTasks.length
 
   const [leavingIds, setLeavingIds] = useState<Set<string>>(new Set())
   const [undo, setUndo] = useState<UndoEntry | null>(null)
@@ -549,26 +535,8 @@ export function InboxView({
           onExitFocus={() => setMode('dense')}
         />
       ) : (
-        <div className="space-y-6">
-          {inboxTasks.length > 0 && (
-            <section>
-              <h2 className="font-display text-sm tracking-wide text-neutral-400 uppercase mb-3">
-                New ({inboxTasks.length})
-              </h2>
-              <div className="space-y-2">
-                {inboxTasks.map(renderRow)}
-              </div>
-            </section>
-          )}
-          {(['week', 'month', 'quarter'] as const).map((bucket) => {
-            const list = bucket === 'week' ? weekTasks : bucket === 'month' ? monthTasks : quarterTasks
-            if (list.length === 0) return null
-            return (
-              <BucketSection key={bucket} title={BUCKET_LABELS[bucket]} count={list.length}>
-                {list.map(renderRow)}
-              </BucketSection>
-            )
-          })}
+        <div className="space-y-2">
+          {inboxTasks.map(renderRow)}
         </div>
       )}
 
@@ -603,26 +571,3 @@ export function InboxView({
   )
 }
 
-interface BucketSectionProps {
-  title: string
-  count: number
-  children: React.ReactNode
-}
-
-function BucketSection({ title, count, children }: BucketSectionProps) {
-  const [open, setOpen] = useState(false)
-  return (
-    <section>
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-2 mb-3 text-neutral-500 hover:text-neutral-700"
-      >
-        <span className={`transition-transform ${open ? 'rotate-90' : ''}`}>▸</span>
-        <h2 className="font-display text-sm tracking-wide uppercase">{title}</h2>
-        <span className="text-xs text-neutral-400">({count})</span>
-      </button>
-      {open && <div className="space-y-2">{children}</div>}
-    </section>
-  )
-}
