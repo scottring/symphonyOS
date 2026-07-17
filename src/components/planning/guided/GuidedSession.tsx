@@ -116,6 +116,11 @@ export function GuidedSession({ horizon, domain, host, onClose, onFinished, onCh
   const DomainIcon = domain !== 'universal' ? DOMAIN_ICONS[domain] : null
 
   const Body = REGISTRY[step.type]
+  // Terrain-review and schedule steps need room — a calendar/grid crammed into
+  // the 680px reading column overflows and can't show more than a sliver of the
+  // week (walkthrough #10, #16). Give them a wide container; the title/narration
+  // stay at reading width inside it.
+  const wideStep = step.type === 'calendar' || step.type === 'schedule-grid'
 
   // The descent: session progress drives the scene camera and the altimeter.
   // On step 1 you're at this horizon's highest point; Finish is the doorstep.
@@ -193,12 +198,12 @@ export function GuidedSession({ horizon, domain, host, onClose, onFinished, onCh
       )}
 
       <div className="relative z-10 flex-1 min-h-0 overflow-auto">
-        <div className="max-w-[680px] w-full mx-auto px-6 py-10 md:py-14 space-y-7">
+        <div className={`w-full mx-auto px-6 py-10 md:py-14 space-y-7 ${wideStep ? 'max-w-[1120px]' : 'max-w-[680px]'}`}>
           {loading ? (
             <p className="text-sm text-neutral-500">Gathering your session…</p>
           ) : (
             <>
-              <div>
+              <div className={wideStep ? 'max-w-[680px]' : undefined}>
                 <div className="text-[11px] font-bold tracking-[.22em] uppercase text-primary-700 mb-3">
                   {config.title} · {safeIndex + 1} / {config.steps.length}
                 </div>
