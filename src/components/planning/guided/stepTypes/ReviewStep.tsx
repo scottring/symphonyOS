@@ -130,6 +130,9 @@ export function ReviewStep() {
   // Fate rows: completing an item flips t.completed and would drop it from the
   // pool mid-celebration — remember celebrated ids so the row stays visible.
   const [celebratedIds, setCelebratedIds] = useState<Set<string>>(() => new Set())
+  // Someday step: promoting an item flips its bucket and would drop it mid-step;
+  // remember moved ids so the row stays visible (checked).
+  const [movedIds, setMovedIds] = useState<Set<string>>(() => new Set())
 
   const pool = useMemo(() => {
     if (source === 'goals') return []
@@ -202,6 +205,36 @@ export function ReviewStep() {
           <SeasonListRow key={t.id} task={t} fate
             onCelebrated={(id) => setCelebratedIds((prev) => new Set(prev).add(id))} />
         ))}
+      </ul>
+    )
+  }
+  // Someday: the narration's one gesture is "move it into this season" — offer
+  // exactly that (season-altitude promotion), not the day/week/month triage that
+  // doesn't fit the annual altitude (walkthrough #3). Everything else keeps waiting.
+  if (source === 'someday') {
+    const somedayPool = host.tasks.filter((t) => (t.bucket === 'someday' || movedIds.has(t.id)) && match(t.assignedTo, t.assignedToAll))
+    if (somedayPool.length === 0) return <p className="text-sm text-neutral-400">Your someday list is empty.</p>
+    return (
+      <ul className="space-y-2">
+        {somedayPool.map((t) => {
+          const moved = movedIds.has(t.id)
+          return (
+            <li key={t.id} className="flex items-start gap-2 rounded-xl border border-neutral-100 bg-white px-3 py-2">
+              <span className="flex-1 min-w-[10rem] text-sm text-neutral-800 leading-snug">{t.title}</span>
+              {moved ? (
+                <span className="shrink-0 inline-flex items-center gap-1 text-xs text-primary-700">
+                  <Check className="w-3 h-3" strokeWidth={3} /> in this season
+                </span>
+              ) : (
+                <button type="button"
+                  onClick={() => { setMovedIds((prev) => new Set(prev).add(t.id)); host.onSetBucket(t.id, 'quarter') }}
+                  className="shrink-0 inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md text-primary-700 bg-primary-50 hover:bg-primary-100 transition-colors">
+                  <ArrowRight className="w-3 h-3" /> Move into this season
+                </button>
+              )}
+            </li>
+          )
+        })}
       </ul>
     )
   }
