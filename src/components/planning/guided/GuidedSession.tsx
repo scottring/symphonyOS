@@ -140,6 +140,13 @@ export function GuidedSession({ horizon, domain, host, onClose, onFinished, onCh
           <p className="text-sm text-neutral-500">
             {period.label} · Step {safeIndex + 1} of {config.steps.length}
           </p>
+          {/* Persistence is real (usePlanningSession autosaves + flushes on
+              exit, resumes at this step) — say so, so leaving to e.g. connect a
+              calendar never feels like a gamble (walkthrough #8). */}
+          <p className="mt-0.5 inline-flex items-center gap-1 text-xs text-neutral-400">
+            <Check className="w-3 h-3 text-primary-500" strokeWidth={3} />
+            Saved — you can leave and come back anytime
+          </p>
         </div>
         <div className="flex items-center gap-3">
           {/* altimeter — where you are on the mountain */}

@@ -13,7 +13,7 @@ describe('DomainsGoalsStep', () => {
   it('adds a goal statement under an area', () => {
     const host = makeHost({ goalAreas: [{ id: 'a1', name: 'Health' } as unknown as GoalArea] })
     renderStep(<DomainsGoalsStep />, { step, host, horizon: 'annual' })
-    const input = screen.getByPlaceholderText(/A goal for Health/)
+    const input = screen.getByPlaceholderText(/Add a goal to Health/)
     fireEvent.change(input, { target: { value: 'Sleep 7 hours' } })
     fireEvent.keyDown(input, { key: 'Enter' })
     expect(host.addGoal).toHaveBeenCalledWith('a1', 'Sleep 7 hours')
