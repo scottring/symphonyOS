@@ -294,10 +294,13 @@ export function InboxView({
         today.setHours(0, 0, 0, 0)
         if (onPushTask) onPushTask(task.id, today)
         message = 'Sent to Today'
-      } else if (action.kind === 'week' || action.kind === 'month' || action.kind === 'someday') {
-        const bucket = action.kind === 'someday' ? 'quarter' : action.kind
-        if (onPushTask) onPushTask(task.id, bucket as 'week' | 'month' | 'quarter')
-        message = `Sent to ${BUCKET_LABELS[bucket as 'week' | 'month' | 'quarter']}`
+      } else if (action.kind === 'week' || action.kind === 'month') {
+        if (onPushTask) onPushTask(task.id, action.kind)
+        message = action.kind === 'week' ? 'Sent to This Week' : 'Sent to This Month'
+      } else if (action.kind === 'someday') {
+        // Real someday bucket — the old code sent "Someday" to quarter/season.
+        if (onUpdateTask) onUpdateTask(task.id, { bucket: 'someday', scheduledFor: undefined })
+        message = 'Sent to Someday'
       } else if (action.kind === 'complete') {
         if (onUpdateTask) onUpdateTask(task.id, { completed: true })
         message = 'Completed'
