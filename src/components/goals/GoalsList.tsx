@@ -1,6 +1,12 @@
 import { useState, useRef, useEffect } from 'react'
+import { Sparkles } from 'lucide-react'
 import type { Goal, GoalArea, Quarter } from '@/types/goal'
 import { PAGE_COLUMN } from '@/components/layout/pageLayout'
+import { looksVague } from '@/lib/planning/goalQuality'
+import { useGoalSharpen, type GoalSharpenState } from '@/hooks/useGoalSharpen'
+
+/** Reused from the guided planning narration — teaches past-tense + a finish line. */
+const GOAL_PLACEHOLDER = "What's true by next year? Past tense — 'shipped…', 'finally…'"
 
 interface GoalsListProps {
   areas: GoalArea[]
@@ -12,6 +18,7 @@ interface GoalsListProps {
   onAddArea: (name: string) => Promise<GoalArea | null>
   onRenameArea: (areaId: string, name: string) => void
   onAddGoal: (areaId: string, name: string) => Promise<Goal | null>
+  onUpdateGoal: (goalId: string, updates: { name: string }) => void
   onDeleteArea: (areaId: string) => void
 }
 
@@ -25,8 +32,10 @@ export function GoalsList({
   onAddArea,
   onRenameArea,
   onAddGoal,
+  onUpdateGoal,
   onDeleteArea,
 }: GoalsListProps) {
+  const sharpen = useGoalSharpen()
   const [creatingArea, setCreatingArea] = useState(false)
   const [newAreaName, setNewAreaName] = useState('')
   const [addingGoalAreaId, setAddingGoalAreaId] = useState<string | null>(null)
@@ -249,7 +258,7 @@ export function GoalsList({
                         if (e.key === 'Enter') { e.preventDefault(); handleCreateGoal() }
                         if (e.key === 'Escape') { setAddingGoalAreaId(null); setNewGoalName('') }
                       }}
-                      placeholder="What's the goal?"
+                      placeholder={GOAL_PLACEHOLDER}
                       className="w-full px-3 py-2 rounded-lg border border-neutral-200 bg-neutral-50
                                  text-neutral-800 placeholder:text-neutral-400 text-lg font-display
                                  focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
@@ -278,33 +287,15 @@ export function GoalsList({
                 ) : (
                   <div className="space-y-3">
                     {areaGoals.map((goal) => (
-                      <button
+                      <GoalRow
                         key={goal.id}
-                        onClick={() => onSelectGoal(goal.id)}
-                        className="w-full text-left p-5 rounded-2xl bg-white border border-neutral-100
-                                   hover:border-primary-200 hover:shadow-md transition-all duration-200 group"
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <h3 className="font-medium text-neutral-800 group-hover:text-primary-700 transition-colors">
-                              {goal.name}
-                            </h3>
-                            {goal.status === 'completed' && (
-                              <span className="shrink-0 text-[10px] font-medium px-1.5 py-0.5 bg-primary-50 text-primary-600 rounded">
-                                Completed
-                              </span>
-                            )}
-                          </div>
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            className="w-5 h-5 text-neutral-300 group-hover:text-primary-400 group-hover:translate-x-1 transition-all flex-shrink-0"
-                            viewBox="0 0 20 20"
-                            fill="currentColor"
-                          >
-                            <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
-                          </svg>
-                        </div>
-                      </button>
+                        goal={goal}
+                        sharpenState={sharpen.stateFor(goal.id)}
+                        onSelect={() => onSelectGoal(goal.id)}
+                        onSharpen={() => sharpen.sharpen({ id: goal.id, name: goal.name, areaName: area.name, context: goal.context })}
+                        onDismissSharpen={() => sharpen.dismiss(goal.id)}
+                        onUseSuggestion={(name) => { onUpdateGoal(goal.id, { name }); sharpen.dismiss(goal.id) }}
+                      />
                     ))}
                   </div>
                 )}
@@ -314,6 +305,104 @@ export function GoalsList({
         </div>
 
       </div>
+    </div>
+  )
+}
+
+interface GoalRowProps {
+  goal: Goal
+  sharpenState: GoalSharpenState
+  onSelect: () => void
+  onSharpen: () => void
+  onDismissSharpen: () => void
+  onUseSuggestion: (name: string) => void
+}
+
+/**
+ * One goal in the list: opens on tap, with an always-available ✨ Sharpen (AI
+ * proposes a past-tense, finish-lined rewrite the user taps to accept) and a
+ * quiet, dismissible hint on goals that read clearly vague. Extracted from the
+ * map so the open action stays a real <button> while the sharpen controls sit
+ * beside it (no nested buttons).
+ */
+function GoalRow({ goal, sharpenState, onSelect, onSharpen, onDismissSharpen, onUseSuggestion }: GoalRowProps) {
+  const [hintDismissed, setHintDismissed] = useState(false)
+  const vague = looksVague(goal.name)
+  const { loading, suggestion, error } = sharpenState
+
+  return (
+    <div className="p-5 rounded-2xl bg-white border border-neutral-100 hover:border-primary-200 hover:shadow-md transition-all duration-200">
+      <button onClick={onSelect} className="w-full text-left group">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <h3 className="font-medium text-neutral-800 group-hover:text-primary-700 transition-colors">
+              {goal.name}
+            </h3>
+            {goal.status === 'completed' && (
+              <span className="shrink-0 text-[10px] font-medium px-1.5 py-0.5 bg-primary-50 text-primary-600 rounded">
+                Completed
+              </span>
+            )}
+          </div>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            className="w-5 h-5 text-neutral-300 group-hover:text-primary-400 group-hover:translate-x-1 transition-all flex-shrink-0"
+            viewBox="0 0 20 20"
+            fill="currentColor"
+          >
+            <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+          </svg>
+        </div>
+      </button>
+
+      {/* Sharpen affordance + vague hint — hidden while a suggestion is showing. */}
+      {!suggestion && !loading && (
+        <div className="mt-2 flex items-center gap-3 text-xs">
+          <button
+            onClick={onSharpen}
+            className="inline-flex items-center gap-1 font-medium text-primary-600 hover:text-primary-700 transition-colors"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            Sharpen
+          </button>
+          {vague && !hintDismissed && (
+            <span className="inline-flex items-center gap-1.5 text-amber-700/90">
+              name what&rsquo;s true by next year
+              <button
+                onClick={() => setHintDismissed(true)}
+                aria-label="Dismiss hint"
+                className="text-amber-400 hover:text-amber-600 leading-none"
+              >
+                &times;
+              </button>
+            </span>
+          )}
+        </div>
+      )}
+
+      {loading && <p className="mt-2 text-xs text-neutral-400">Sharpening&hellip;</p>}
+      {error && <p className="mt-2 text-xs text-red-500">Couldn&rsquo;t sharpen &mdash; try again.</p>}
+
+      {suggestion && (
+        <div className="mt-3 p-3 rounded-xl bg-primary-50/70 border border-primary-100">
+          <p className="text-sm text-neutral-800">{suggestion.suggestion}</p>
+          {suggestion.why && <p className="text-xs text-neutral-500 mt-1">{suggestion.why}</p>}
+          <div className="flex gap-2 mt-3">
+            <button
+              onClick={() => onUseSuggestion(suggestion.suggestion)}
+              className="px-3 py-1.5 text-xs font-medium text-white bg-primary-500 hover:bg-primary-600 rounded-lg transition-colors"
+            >
+              Use this
+            </button>
+            <button
+              onClick={onDismissSharpen}
+              className="px-3 py-1.5 text-xs font-medium text-neutral-600 hover:bg-neutral-100 rounded-lg transition-colors"
+            >
+              Keep mine
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

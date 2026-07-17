@@ -25,7 +25,7 @@ function GoalsIndex() {
   const { currentDomain } = useDomain()
   const {
     areas, goals, loading, getCurrentQuarter,
-    addArea, updateArea, deleteArea, addGoal,
+    addArea, updateArea, deleteArea, addGoal, updateGoal,
   } = useGoalsContext()
 
   const filteredGoals =
@@ -43,6 +43,7 @@ function GoalsIndex() {
         onAddArea={addArea}
         onRenameArea={(areaId, name) => updateArea(areaId, { name })}
         onAddGoal={(areaId, name) => addGoal(areaId, name, currentDomain !== 'universal' ? currentDomain : undefined)}
+        onUpdateGoal={(goalId, updates) => { void updateGoal(goalId, updates) }}
         onDeleteArea={deleteArea}
       />
     </Suspense>

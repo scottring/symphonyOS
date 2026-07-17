@@ -11,12 +11,14 @@
 
 ## Layer 1 — Passive coaching (deterministic, no network)
 
-**Teaching placeholder.** The goal add input placeholder becomes copy reused from the guided narration (`sessions.ts`): *"What's true by next year? Past tense — 'shipped…', 'finally…'"*. Applied in both `GoalsList` (the /goals inline add) and `DomainsGoalsStep` (guided add) so they match.
+**Teaching placeholder.** The `GoalsList` (/goals) inline add-goal input placeholder becomes copy echoing the guided narration (`sessions.ts`): *"What's true by next year? Past tense — 'shipped…', 'finally…'"*. (The guided `DomainsGoalsStep` is left as-is — it already coaches via its narration and per-area placeholder; changing it would only dilute the area context. #3 is about *raw* entry.)
 
-**Conservative vague-flag.** A quiet, dismissible hint appears under a saved goal *only* when it reads clearly vague. Heuristic (deterministic, unit-tested), all three required:
-- ≤ 3 words, AND
-- no digit, AND
-- no past-tense / outcome verb (small suffix + keyword check: `-ed` words, "shipped/finished/launched/hit/reached/…").
+**Conservative vague-flag.** A quiet, dismissible hint appears under a saved goal *only* when it reads clearly vague. Heuristic (deterministic, unit-tested) — vague when ALL of:
+- no past-tense / outcome verb (an `-ed` word, or a small irregular set: hit/ran/wrote/sold/lost/built/made/won/…), AND
+- no digit (a number usually implies a finish line), AND
+- ≤ 6 words (a length cap so a thoughtfully-written longer goal is never nagged).
+
+So "Make home into home" (present tense, no number, 4 words) flags; "Shipped the beta to 10 customers" and "Renovated the kitchen" do not. Past-tense detection errs toward *not* flagging (the conservative direction).
 
 Copy: a single line, e.g. *"name what's true by next year"*, with a dismiss ✗ and a Sharpen affordance. Never blocks; dismiss is per-goal (session-local). Deliberately narrow — most goals show no hint.
 
