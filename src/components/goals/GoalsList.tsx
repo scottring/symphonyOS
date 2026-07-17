@@ -4,6 +4,7 @@ import type { Goal, GoalArea, Quarter } from '@/types/goal'
 interface GoalsListProps {
   areas: GoalArea[]
   goals: Goal[]
+  loading: boolean
   currentQuarter: Quarter
   year: number
   onSelectGoal: (goalId: string) => void
@@ -16,6 +17,7 @@ interface GoalsListProps {
 export function GoalsList({
   areas,
   goals,
+  loading,
   currentQuarter,
   year,
   onSelectGoal,
@@ -148,8 +150,13 @@ export function GoalsList({
           </div>
         )}
 
+        {/* Loading state — hold the empty state until goals settle */}
+        {loading && areas.length === 0 && (
+          <p className="text-center py-16 text-neutral-400">Loading goals…</p>
+        )}
+
         {/* Empty state */}
-        {areas.length === 0 && !creatingArea && (
+        {!loading && areas.length === 0 && !creatingArea && (
           <div className="text-center py-16 animate-fade-in-up">
             <div className="w-20 h-20 rounded-2xl bg-primary-100 flex items-center justify-center mx-auto mb-5">
               <svg xmlns="http://www.w3.org/2000/svg" className="w-10 h-10 text-primary-500" viewBox="0 0 20 20" fill="currentColor">

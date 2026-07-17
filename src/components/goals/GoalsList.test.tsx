@@ -9,6 +9,7 @@ const area: GoalArea = { id: 'a1', name: 'Home Organization', sortOrder: 0, crea
 const baseProps = {
   areas: [area],
   goals: [],
+  loading: false,
   currentQuarter: 'Q3' as const,
   year: 2026,
   onSelectGoal: vi.fn(),
@@ -44,5 +45,19 @@ describe('GoalsList area rename', () => {
     await user.click(screen.getByText('Home Organization'))
     await user.keyboard('{Enter}') // unchanged
     expect(onRenameArea).not.toHaveBeenCalled()
+  })
+})
+
+describe('GoalsList loading gate', () => {
+  it('while loading with no areas, shows "Loading goals…" and not the empty state', () => {
+    render(<GoalsList {...baseProps} areas={[]} loading />)
+    expect(screen.getByText('Loading goals…')).toBeInTheDocument()
+    expect(screen.queryByText('No goals yet')).not.toBeInTheDocument()
+  })
+
+  it('once settled with no areas, shows the empty state and not the loading text', () => {
+    render(<GoalsList {...baseProps} areas={[]} loading={false} />)
+    expect(screen.getByText('No goals yet')).toBeInTheDocument()
+    expect(screen.queryByText('Loading goals…')).not.toBeInTheDocument()
   })
 })

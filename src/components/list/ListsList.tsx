@@ -4,12 +4,14 @@ import { getCategoryLabel, getCategoryIcon, LIST_CATEGORIES } from '@/types/list
 
 interface ListsListProps {
   lists: List[]
+  /** Hold the empty state until the first load settles. */
+  loading?: boolean
   listsByCategory: Record<ListCategory, List[]>
   onSelectList: (listId: string) => void
   onAddList?: (list: { title: string; category: ListCategory }) => Promise<List | null>
 }
 
-export function ListsList({ lists, listsByCategory, onSelectList, onAddList }: ListsListProps) {
+export function ListsList({ lists, loading = false, listsByCategory, onSelectList, onAddList }: ListsListProps) {
   const [isCreating, setIsCreating] = useState(false)
   const [newListTitle, setNewListTitle] = useState('')
   const [newListCategory, setNewListCategory] = useState<ListCategory>('other')
@@ -138,7 +140,9 @@ export function ListsList({ lists, listsByCategory, onSelectList, onAddList }: L
         )}
 
         {/* Lists by category */}
-        {lists.length === 0 ? (
+        {loading && lists.length === 0 ? (
+          <p className="text-center py-12 text-neutral-400">Loading lists…</p>
+        ) : lists.length === 0 ? (
           <div className="text-center py-12">
             <div className="w-16 h-16 rounded-full bg-purple-100 flex items-center justify-center mx-auto mb-4">
               <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 text-purple-500" viewBox="0 0 20 20" fill="currentColor">

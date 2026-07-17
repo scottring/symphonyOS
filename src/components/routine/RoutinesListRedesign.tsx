@@ -46,6 +46,8 @@ const FREQUENCY_ORDER: Record<string, number> = {
 
 interface RoutinesListProps {
   routines: Routine[]
+  /** Hold the empty state until the first load settles. */
+  loading?: boolean
   contacts?: Contact[]
   familyMembers?: FamilyMember[]
   onCreateRoutine: () => void
@@ -176,7 +178,7 @@ function SectionHeader({ title, count, collapsed, onToggle }: SectionHeaderProps
   )
 }
 
-export function RoutinesListRedesign({ routines, contacts = [], familyMembers = [], onCreateRoutine: _onCreateRoutine, onUpdateRoutine, onAddStep, onReorderSteps, onPromoteStep, onDeleteStep, onCreateCollection, onGroupIntoCollection, onDelete, onBuildWithAI, onAddSteps }: RoutinesListProps) {
+export function RoutinesListRedesign({ routines, loading = false, contacts = [], familyMembers = [], onCreateRoutine: _onCreateRoutine, onUpdateRoutine, onAddStep, onReorderSteps, onPromoteStep, onDeleteStep, onCreateCollection, onGroupIntoCollection, onDelete, onBuildWithAI, onAddSteps }: RoutinesListProps) {
   // Pause modal state
   const [pauseModalRoutine, setPauseModalRoutine] = useState<Routine | null>(null)
 
@@ -637,8 +639,13 @@ export function RoutinesListRedesign({ routines, contacts = [], familyMembers = 
           </div>
         )}
 
+        {/* Loading state — hold the empty state until routines settle */}
+        {loading && routines.length === 0 && (
+          <p className="text-center py-16 text-neutral-400">Loading routines…</p>
+        )}
+
         {/* Empty state */}
-        {routines.length === 0 && (
+        {!loading && routines.length === 0 && (
           <div className="text-center py-16 animate-fade-in-up">
             <div className="w-20 h-20 rounded-2xl bg-amber-100 flex items-center justify-center mx-auto mb-5">
               <svg xmlns="http://www.w3.org/2000/svg" className="w-10 h-10 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>

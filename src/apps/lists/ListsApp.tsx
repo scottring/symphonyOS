@@ -15,6 +15,7 @@ import { LoadingFallback } from '@/components/layout/LoadingFallback'
 function ListsInner() {
   const {
     lists,
+    loading,
     listsByCategory,
     selectedListId,
     setSelectedListId,
@@ -36,6 +37,7 @@ function ListsInner() {
         <Suspense fallback={<LoadingFallback />}>
           <ListsList
             lists={lists}
+            loading={loading}
             listsByCategory={listsByCategory}
             onSelectList={setSelectedListId}
             onAddList={addList}

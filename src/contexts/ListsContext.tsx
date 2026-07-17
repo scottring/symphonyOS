@@ -5,6 +5,7 @@ import type { List, ListItem, ListCategory, ListVisibility } from '@/types/list'
 
 export interface ListsContextValue {
   lists: List[]
+  loading: boolean
   listsByCategory: Record<ListCategory, List[]>
   selectedListId: string | null
   setSelectedListId: (id: string | null) => void
@@ -28,6 +29,7 @@ export function ListsProvider({ children }: { children: ReactNode }) {
 
   const {
     lists,
+    loading,
     listsByCategory,
     addList,
     updateList,
@@ -53,6 +55,7 @@ export function ListsProvider({ children }: { children: ReactNode }) {
     <ListsContext.Provider
       value={{
         lists,
+        loading,
         listsByCategory,
         selectedListId,
         setSelectedListId,

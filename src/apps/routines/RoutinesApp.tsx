@@ -35,7 +35,7 @@ const RoutineBuilderModal = lazy(() =>
 function RoutinesIndex() {
   const navigate = useNavigate()
   const { currentDomain } = useDomain()
-  const { routines, addRoutine, updateRoutine, deleteRoutine } = useRoutines()
+  const { routines, addRoutine, updateRoutine, deleteRoutine, loading } = useRoutines()
   const { contacts } = useContacts()
   const { members: familyMembers } = useFamilyMembers()
   const [builderOpen, setBuilderOpen] = useState(false)
@@ -96,6 +96,7 @@ function RoutinesIndex() {
     <Suspense fallback={<LoadingFallback />}>
       <RoutinesList
         routines={filtered}
+        loading={loading}
         contacts={contacts}
         familyMembers={familyMembers}
         onCreateRoutine={() => navigate('/routines/new')}

@@ -4,6 +4,8 @@ import type { Task } from '@/types/task'
 
 interface ProjectsListProps {
   projects: Project[]
+  /** Hold the empty state until the first load settles. */
+  loading?: boolean
   tasks?: Task[]
   onSelectProject: (projectId: string) => void
   onAddProject?: (project: { name: string }) => Promise<Project | null>
@@ -50,7 +52,7 @@ function SectionHeader({ title, count, collapsed, onToggle }: SectionHeaderProps
   )
 }
 
-export function ProjectsListRedesign({ projects, tasks = [], onSelectProject, onAddProject }: ProjectsListProps) {
+export function ProjectsListRedesign({ projects, loading = false, tasks = [], onSelectProject, onAddProject }: ProjectsListProps) {
   const [isCreating, setIsCreating] = useState(false)
   const [newProjectName, setNewProjectName] = useState('')
   const [isSaving, setIsSaving] = useState(false)
@@ -259,8 +261,13 @@ export function ProjectsListRedesign({ projects, tasks = [], onSelectProject, on
           </div>
         )}
 
+        {/* Loading state — hold the empty state until projects settle */}
+        {loading && !hasProjects && (
+          <p className="text-center py-16 text-neutral-400">Loading projects…</p>
+        )}
+
         {/* Empty state */}
-        {!hasProjects && (
+        {!loading && !hasProjects && (
           <div className="text-center py-16 animate-fade-in-up">
             <div className="w-20 h-20 rounded-2xl bg-primary-100 flex items-center justify-center mx-auto mb-5">
               <svg xmlns="http://www.w3.org/2000/svg" className="w-10 h-10 text-primary-500" viewBox="0 0 20 20" fill="currentColor">

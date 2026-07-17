@@ -24,7 +24,7 @@ function GoalsIndex() {
   const navigate = useNavigate()
   const { currentDomain } = useDomain()
   const {
-    areas, goals, getCurrentQuarter,
+    areas, goals, loading, getCurrentQuarter,
     addArea, updateArea, deleteArea, addGoal,
   } = useGoalsContext()
 
@@ -36,6 +36,7 @@ function GoalsIndex() {
       <GoalsList
         areas={areas}
         goals={filteredGoals}
+        loading={loading}
         currentQuarter={getCurrentQuarter()}
         year={new Date().getFullYear()}
         onSelectGoal={(id) => navigate(`/goals/${id}`)}

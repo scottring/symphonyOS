@@ -5,6 +5,7 @@ import type { GoalArea, Goal, Quarter } from '@/types/goal'
 export interface GoalsContextValue {
   areas: GoalArea[]
   goals: Goal[]
+  loading: boolean
   addArea: (name: string) => Promise<GoalArea | null>
   updateArea: (id: string, updates: { name?: string; sortOrder?: number }) => Promise<void>
   deleteArea: (id: string) => Promise<void>
@@ -21,6 +22,7 @@ export function GoalsProvider({ children }: { children: ReactNode }) {
   const {
     areas,
     goals,
+    loading,
     addArea,
     updateArea,
     deleteArea,
@@ -36,6 +38,7 @@ export function GoalsProvider({ children }: { children: ReactNode }) {
       value={{
         areas,
         goals,
+        loading,
         addArea,
         updateArea,
         deleteArea,

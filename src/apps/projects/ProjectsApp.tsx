@@ -26,7 +26,7 @@ import { LoadingFallback } from '@/components/layout/LoadingFallback'
 function ProjectsIndex() {
   const navigate = useNavigate()
   const { currentDomain } = useDomain()
-  const { projects, addProject } = useProjects()
+  const { projects, addProject, loading } = useProjects()
   const { tasks } = useSupabaseTasks()
 
   const filtered =
@@ -38,6 +38,7 @@ function ProjectsIndex() {
     <Suspense fallback={<LoadingFallback />}>
       <ProjectsList
         projects={filtered}
+        loading={loading}
         tasks={tasks}
         onSelectProject={(id) => navigate(`/projects/${id}`)}
         onAddProject={(project) =>
