@@ -13,7 +13,6 @@ const EXPECTED = [
   'symphony_get_week_plan', 'symphony_add_meal_entry', 'symphony_remove_meal_entry',
   'symphony_list_lists', 'symphony_add_list_item',
   'symphony_get_note_by_title', 'symphony_upsert_note',
-  'symphony_list_dietary_restrictions', 'symphony_list_pantry', 'symphony_set_pantry_level',
 ]
 
 const transport = new StdioClientTransport({

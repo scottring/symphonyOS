@@ -427,7 +427,7 @@ server.tool(
   }
 )
 
-// ── Meals: recipes, week plans, lists, notes, restrictions, pantry ──
+// ── Meals: recipes, week plans, lists, notes ──
 
 const ok = (data: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(data, null, 2) }] })
 const fail = (error: { message: string }) => ({ content: [{ type: 'text' as const, text: `Error: ${error.message}` }] })
@@ -654,50 +654,6 @@ server.tool(
       .single()
     if (error) return fail(error)
     return ok({ ...data, action: 'created' })
-  }
-)
-
-server.tool(
-  'symphony_list_dietary_restrictions',
-  'List household dietary restrictions. These are HARD filters for meal planning (allergies, never-serve rules).',
-  {},
-  async () => {
-    const { data, error } = await supabase
-      .from('dietary_restrictions')
-      .select('id, label, family_member_id')
-    if (error) return fail(error)
-    return ok(data)
-  }
-)
-
-server.tool(
-  'symphony_list_pantry',
-  'List pantry inventory stock levels (high / medium / low / out).',
-  { level: z.enum(['high', 'medium', 'low', 'out']).optional() },
-  async (params) => {
-    let query = supabase.from('pantry_inventory').select('id, pattern, level').order('pattern')
-    if (params.level) query = query.eq('level', params.level)
-    const { data, error } = await query
-    if (error) return fail(error)
-    return ok(data)
-  }
-)
-
-server.tool(
-  'symphony_set_pantry_level',
-  'Set the stock level for a pantry item pattern (upserts).',
-  {
-    pattern: z.string().describe('Item pattern, e.g. "olive oil"'),
-    level: z.enum(['high', 'medium', 'low', 'out']),
-  },
-  async (params) => {
-    const { data, error } = await supabase
-      .from('pantry_inventory')
-      .upsert({ user_id: userId, pattern: params.pattern, level: params.level }, { onConflict: 'user_id,pattern' })
-      .select('pattern, level')
-      .single()
-    if (error) return fail(error)
-    return ok(data)
   }
 )
 
