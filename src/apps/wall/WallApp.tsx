@@ -5,13 +5,8 @@
 // is still available at /wall-v2 for iteration — flip the import below
 // when ready to promote it back to /wall.
 
-import { GeneratePlanProvider } from '@/contexts/GeneratePlanContext';
 import { WallCalendar } from '@/components/wall/WallCalendar';
 
 export function WallApp() {
-  return (
-    <GeneratePlanProvider>
-      <WallCalendar />
-    </GeneratePlanProvider>
-  );
+  return <WallCalendar />;
 }

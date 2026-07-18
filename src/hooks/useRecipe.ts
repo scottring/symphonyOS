@@ -13,7 +13,7 @@ interface UseRecipeResult {
   error: string | null
   refresh: () => Promise<void>
   updateAcceptance: (input: UpdateAcceptanceInput) => Promise<void>
-  recordCooked: (outcome?: Record<string, 'loves' | 'eats' | 'rejects' | 'skipped'>) => Promise<void>
+  recordCooked: () => Promise<void>
 }
 
 export function useRecipe(id: string | null): UseRecipeResult {
@@ -48,18 +48,8 @@ export function useRecipe(id: string | null): UseRecipeResult {
     if (updErr) { setRecipe(previous); setError(updErr.message) }
   }, [id, recipe])
 
-  const recordCooked = useCallback(async (
-    outcome: Record<string, 'loves' | 'eats' | 'rejects' | 'skipped'> = {},
-  ) => {
+  const recordCooked = useCallback(async () => {
     if (!id) return
-    const { data: userResult } = await supabase.auth.getUser()
-    const userId = userResult?.user?.id
-    if (!userId) return
-    await supabase.from('cooking_history').insert({
-      user_id: userId,
-      recipe_id: id,
-      outcome,
-    })
     await supabase
       .from('recipes')
       .update({
