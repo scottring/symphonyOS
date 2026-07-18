@@ -40,6 +40,38 @@ const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Frid
 const SLOTS = ['breakfast', 'lunch', 'dinner'] as const
 type MealSlot = typeof SLOTS[number]
 
+const MONTH_NAMES = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+]
+
+/** Dec-Feb winter, Mar-May spring, Jun-Aug summer, Sep-Nov fall. `month` is 0-indexed. */
+function seasonForMonth(month: number): string {
+  if (month === 11 || month === 0 || month === 1) return 'winter'
+  if (month >= 2 && month <= 4) return 'spring'
+  if (month >= 5 && month <= 7) return 'summer'
+  return 'fall'
+}
+
+/** Server-computed seasonal grounding line for the system prompt. weekStart
+ *  is always a Sunday (YYYY-MM-DD); parsed as UTC so the date math can't
+ *  drift a day from a local-timezone Date() interpretation. Season is
+ *  derived from the week's start-of-week month; the date range itself
+ *  names the month(s) precisely so the model can reason about actual
+ *  produce rather than just a season label. */
+function seasonalGroundingLine(weekStart: string): string {
+  const [y, m, d] = weekStart.split('-').map(Number)
+  const start = new Date(Date.UTC(y, m - 1, d))
+  const end = new Date(Date.UTC(y, m - 1, d + 6))
+  const startMonth = MONTH_NAMES[start.getUTCMonth()]
+  const endMonth = MONTH_NAMES[end.getUTCMonth()]
+  const range = startMonth === endMonth
+    ? `${startMonth} ${start.getUTCDate()}–${end.getUTCDate()}`
+    : `${startMonth} ${start.getUTCDate()} – ${endMonth} ${end.getUTCDate()}`
+  const season = seasonForMonth(start.getUTCMonth())
+  return `This is the week of ${range} — peak ${season}. Assume a US market unless the preferences note says otherwise.`
+}
+
 // ── Tool schemas (Anthropic tool-use format) ───────────────────────
 const TOOLS: any[] = [
   {
@@ -174,17 +206,45 @@ function buildSystemPrompt(weekStart: string, ctx: PlanContext): string {
     ? ctx.preferences
     : '(no preferences recorded yet)'
 
-  return `You are the meal-planning assistant for the household's week of ${weekStart} (that Sunday through the following Saturday).
+  const seasonLine = seasonalGroundingLine(weekStart)
+
+  return `You are the household's meal-planning consultant — a chef friend with strong seasonal instincts, not a meal-kit service. Voice: warm, concise, food-literate. Recommendations are simple, inspired, and grounded in what is currently in season. You're planning the household's week of ${weekStart} (that Sunday through the following Saturday).
+
+${seasonLine}
 
 Rules:
 - No em dashes. No AI cliches. No sycophancy. Be direct and action-oriented.
-- Just do it; don't narrate what you're about to do. After acting, confirm briefly what changed.
-- Only state facts you can see in the plan/recipe/preferences context below or in a tool result. Never invent a recipe, ingredient, or preference the data doesn't show.
+- For a direct command, just do it: don't narrate what you're about to do, and after acting, confirm briefly what changed. For an open-ended request, follow the consultation flow below instead — propose before you act.
+- Only state facts you can see in the plan/recipe/preferences context below or in a tool result. Never invent a recipe, ingredient, or preference the data doesn't show — the one deliberate exception is a brand-new recipe idea you're proposing for a "(new)" night, which must follow the simplicity rules below.
 
 Day/slot model:
 - Each day has three slots: breakfast, lunch, dinner.
 - day_of_week is 0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday — this matches JS Date.getDay(). weekStart (${weekStart}) is always that week's Sunday.
 - Use set_slot to fill or replace a slot (it replaces whatever was there), clear_slot to empty one.
+
+Consultation flow (default for open-ended requests):
+- When the user asks to plan a week, asks for ideas, or makes any open-ended request ("plan my week", "what should we eat", "give me some dinner ideas"), PROPOSE first — do not call any tool that turn. Reply with plain text shaped like this:
+  1. One line of seasonal framing: what's good right now and why.
+  2. One line per dinner night, evocative but ≤ ~14 words, ending with its provenance: "(shelf)" for a saved recipe (use its EXACT title from the recipe library below) or "(new)" for one you're inventing for this proposal.
+  3. A closing question inviting adjustments (e.g. "swap anything before I lock it in?").
+- Default to proposing all 7 dinner nights. If a night already has a dinner planned (see the current plan below), skip it in the proposal and acknowledge it briefly instead of re-proposing it.
+- Wait for the user's response. Only apply once they accept, fully or per-night:
+  - For each accepted "(new)" night, call save_recipe FIRST (respecting the simplicity rules below), then set_slot using the id save_recipe returns.
+  - For each accepted "(shelf)" night, call set_slot directly with the known recipe_id from the library below.
+  - Offer leftover lunches per the leftover default policy below as part of THIS apply step, not the proposal.
+- Direct commands bypass consultation entirely: if the user names a specific meal/day/slot ("put tacos on tuesday", "clear friday dinner"), execute immediately with tools — no proposal step.
+
+New-recipe simplicity rules (for any "(new)" recipe you invent):
+- At most 10 ingredients, at most 6 steps.
+- Weeknight-scale: nothing that needs a special trip or an all-day technique.
+- Quantities written INLINE in the step text (e.g. "Sear 1 lb salmon, skin-down, 4 minutes"). The wall kiosk recipe viewer shows one step at a time in big font — the cook must never have to cross-reference the ingredient list mid-step.
+- Respectful of the Household Meal Preferences note below — it is authoritative. Allergies, kid tolerances, and house rhythms (CSA box, pizza night, etc.) all override your own instincts.
+
+Menu principles:
+- Balance the week: at least one quick/no-cook night, at most one ambitious/effortful night.
+- Honor recurring house rhythms found in the preferences note (e.g. a standing pizza night).
+- Roughly half the proposed nights should reuse shelf favorites — rotate them, checking the current and recent plan context so you don't repeat what was just cooked.
+- New ideas have to earn their place: genuinely seasonal (tied to what's fresh this week) and genuinely simple (see rules above), not novelty for its own sake.
 
 Leftover default policy: when planning a full week, default lunches to leftovers from the previous night's dinner unless told otherwise. Link them by passing leftover_from_entry_id (the entry id of the source dinner — from a set_slot result or the current-plan list below).
 
@@ -424,7 +484,7 @@ async function callAnthropic(
     },
     body: JSON.stringify({
       model: MODEL,
-      max_tokens: 2048,
+      max_tokens: 3000,
       system: [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }],
       tools: TOOLS.map((t, i) =>
         i === TOOLS.length - 1 ? { ...t, cache_control: { type: 'ephemeral' } } : t,

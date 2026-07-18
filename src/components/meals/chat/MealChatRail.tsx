@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
-import { Loader2, Send } from 'lucide-react'
+import { Loader2, Send, Sparkles } from 'lucide-react'
 import type { ChatMsg } from '@/hooks/useMealPlannerChat'
 
 export interface MealChatRailProps {
@@ -31,6 +31,11 @@ export function MealChatRail({ messages, busy, toolActivity, onSend, className }
     setDraft('')
   }
 
+  const handlePlanWeek = () => {
+    if (busy) return
+    onSend('Plan my week — propose a seasonal menu for the week.')
+  }
+
   return (
     <div className={`flex flex-col h-full min-h-0 ${className ?? ''}`}>
       <div className="px-5 py-4 border-b border-neutral-100 shrink-0">
@@ -39,9 +44,20 @@ export function MealChatRail({ messages, busy, toolActivity, onSend, className }
 
       <div ref={listRef} className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-3">
         {messages.length === 0 && (
-          <p className="font-display italic text-[0.95rem] text-neutral-400">
-            Try "taco tuesday, salmon wednesday, leftovers thursday lunch"
-          </p>
+          <div className="space-y-3">
+            <p className="font-display italic text-[0.95rem] text-neutral-400">
+              Try "taco tuesday" for a direct edit, or let me propose a seasonal week.
+            </p>
+            <button
+              type="button"
+              onClick={handlePlanWeek}
+              disabled={busy}
+              className="btn-primary px-3 py-2 text-[13px] inline-flex items-center gap-1.5 disabled:opacity-40"
+            >
+              <Sparkles className="w-4 h-4" />
+              Plan my week
+            </button>
+          </div>
         )}
         {messages.map((m, i) => {
           const showSpinner = m.pending && !m.content

@@ -44,4 +44,28 @@ describe('MealChatRail', () => {
     expect(onSend).toHaveBeenCalledWith('taco tuesday')
     expect(input).toHaveValue('')
   })
+
+  it('renders a "Plan my week" button in the empty state', () => {
+    render(<MealChatRail messages={[]} busy={false} toolActivity={null} onSend={vi.fn()} />)
+    expect(screen.getByRole('button', { name: /plan my week/i })).toBeInTheDocument()
+  })
+
+  it('calls onSend with a planning message when "Plan my week" is clicked', async () => {
+    const user = userEvent.setup()
+    const onSend = vi.fn()
+    render(<MealChatRail messages={[]} busy={false} toolActivity={null} onSend={onSend} />)
+    await user.click(screen.getByRole('button', { name: /plan my week/i }))
+    expect(onSend).toHaveBeenCalledWith('Plan my week — propose a seasonal menu for the week.')
+  })
+
+  it('hides the "Plan my week" button once the conversation has messages', () => {
+    const messages: ChatMsg[] = [{ role: 'user', content: 'taco tuesday' }]
+    render(<MealChatRail messages={messages} busy={false} toolActivity={null} onSend={vi.fn()} />)
+    expect(screen.queryByRole('button', { name: /plan my week/i })).not.toBeInTheDocument()
+  })
+
+  it('disables the "Plan my week" button while busy', () => {
+    render(<MealChatRail messages={[]} busy toolActivity={null} onSend={vi.fn()} />)
+    expect(screen.getByRole('button', { name: /plan my week/i })).toBeDisabled()
+  })
 })
