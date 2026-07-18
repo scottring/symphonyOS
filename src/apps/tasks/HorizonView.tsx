@@ -14,6 +14,7 @@
 import { useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import { PAGE_COLUMN } from '@/components/layout/pageLayout';
 import { MonthCalendarGrid } from '@/components/planning/horizon/MonthCalendarGrid';
+import { YearCalendarGrid } from '@/components/planning/horizon/YearCalendarGrid';
 import { useNavigate } from 'react-router-dom';
 import { CalendarRange, Target, Plus, ChevronRight, FolderOpen, Check, Pencil, Archive, Trash2, CornerRightDown } from 'lucide-react';
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
@@ -543,6 +544,16 @@ export function HorizonView({ horizon }: HorizonViewProps) {
 
           <div className="mb-8">
             <CascadeRail current="year" counts={railCounts} onGo={(h) => navigate(`/${h}`)} />
+          </div>
+
+          {/* The year as a 12-month landscape — the big items in each month. */}
+          <div className="mb-8">
+            <YearCalendarGrid
+              year={new Date().getFullYear()}
+              tasks={domainTasks}
+              events={events}
+              onOpenMonth={() => navigate('/month')}
+            />
           </div>
 
           {goalsByArea.length === 0 && orphanGoals.length === 0 ? (
