@@ -1,5 +1,5 @@
 export { MemoryShelfPage } from './shelf/MemoryShelfPage'
-export { MealPlanPage, PlannerPage } from './plan/MealPlanPage'
+export { PlanPage, PlannerPage } from './plan/PlanPage'
 export { MealsTabs } from './MealsTabs'
 export { CookPage } from './cook/CookPage'
 export { SendToGroceriesModalV2 } from './groceries-v2/SendToGroceriesModalV2'
