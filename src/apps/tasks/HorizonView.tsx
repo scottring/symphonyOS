@@ -400,23 +400,6 @@ export function HorizonView({ horizon }: HorizonViewProps) {
     [pushTask, setBucket],
   );
 
-  // "Copy to week" (month rows): the weekly session's copy-down as a row action.
-  // A COPY, never a move — the original stays on the month list so the month
-  // review still gets to claim it. Bucket rides the INSERT (race guard above).
-  const [copiedToWeek, setCopiedToWeek] = useState<Set<string>>(new Set());
-  const copyToWeek = useCallback(
-    async (task: Task) => {
-      setCopiedToWeek((prev) => new Set(prev).add(task.id));
-      await addTask(task.title, task.contactId ?? undefined, task.projectId ?? undefined, undefined, {
-        assignedTo: task.assignedTo ?? getCurrentUserMember()?.id,
-        context: task.context,
-        bucket: 'week',
-        ...inheritedLineage(task),
-      });
-    },
-    [addTask, getCurrentUserMember],
-  );
-
   // Lineage lookups for breadcrumbs ("← Ship auth layer ← Firebase rebuild").
   // Full (unfiltered) task list: an ancestor may live outside this domain lens.
   const tasksById = useMemo(() => new Map(tasks.map((t) => [t.id, t])), [tasks]);
@@ -431,20 +414,6 @@ export function HorizonView({ horizon }: HorizonViewProps) {
       // execution horizons. Week/Today route; Month/Season copy or park.
       const parkingMenu = (
         <div className="flex items-center gap-1">
-          {horizon === 'month' && (copiedToWeek.has(task.id) ? (
-            <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md text-primary-700 bg-primary-100">
-              <Check className="w-3 h-3" strokeWidth={3} /> On the week list
-            </span>
-          ) : (
-            <button
-              type="button"
-              title="Copy onto this week's list (stays on the month list too)"
-              onClick={() => void copyToWeek(task)}
-              className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md text-primary-700 bg-primary-50 hover:bg-primary-100 transition-colors"
-            >
-              <Plus className="w-3 h-3" /> Copy to week
-            </button>
-          ))}
           {/* Re-file down an altitude — a MOVE, not a copy-down. Copy-down is
               planned descent (the upper list keeps its line); this is for
               items that were mis-graded and never belonged here. */}
@@ -522,7 +491,7 @@ export function HorizonView({ horizon }: HorizonViewProps) {
         />
       );
     },
-    [projects, familyMembers, horizon, setBucket, copiedToWeek, copyToWeek, applyWhen, pushTask, deleteTask, toggleTask, updateTask, handleSelect, scheduleActions, handleCreateProjectForTask, navigate, tasksById, goalsById],
+    [projects, familyMembers, horizon, setBucket, applyWhen, pushTask, deleteTask, toggleTask, updateTask, handleSelect, scheduleActions, handleCreateProjectForTask, navigate, tasksById, goalsById],
   );
 
   // ── "Plan the [horizon]" — routes to the Today rung with a ?plan flag; the
@@ -708,6 +677,7 @@ export function HorizonView({ horizon }: HorizonViewProps) {
                 tasks={domainTasks}
                 events={events}
                 onPlaceTask={(id, day) => updateTask(id, { bucket: 'timed', scheduledFor: day })}
+                onUnscheduleTask={(id) => updateTask(id, { bucket: 'month', scheduledFor: undefined })}
                 onSelectTask={handleSelect}
               />
             </div>

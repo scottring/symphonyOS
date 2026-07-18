@@ -16,8 +16,10 @@ interface MonthCalendarGridProps {
   month: Date
   tasks: Task[]
   events: CalendarEvent[]
-  /** Place an undated rock onto a specific day. */
+  /** Place a rock (or re-place a scheduled item) onto a specific day. */
   onPlaceTask: (taskId: string, day: Date) => void
+  /** Send a scheduled item back to the unscheduled rail (clears its day). */
+  onUnscheduleTask: (taskId: string) => void
   onSelectTask?: (taskId: string) => void
 }
 
@@ -34,8 +36,9 @@ function eventStart(e: CalendarEvent): Date | null {
   return Number.isNaN(d.getTime()) ? null : d
 }
 
-export function MonthCalendarGrid({ month, tasks, events, onPlaceTask, onSelectTask }: MonthCalendarGridProps) {
+export function MonthCalendarGrid({ month, tasks, events, onPlaceTask, onUnscheduleTask, onSelectTask }: MonthCalendarGridProps) {
   const [dragOverKey, setDragOverKey] = useState<string | null>(null)
+  const [railOver, setRailOver] = useState(false)
 
   // 6-week grid starting on the Sunday of the week containing the 1st.
   const { cells, monthIndex, monthLabel } = useMemo(() => {
@@ -71,12 +74,26 @@ export function MonthCalendarGrid({ month, tasks, events, onPlaceTask, onSelectT
 
   return (
     <div className="space-y-4">
-      {/* Rocks rail — drag onto a day */}
-      {rocks.length > 0 && (
-        <div>
-          <p className="text-xs font-medium text-neutral-500 mb-2">
-            Drag onto a day to place it — {rocks.length} {rocks.length === 1 ? 'thing' : 'things'} to schedule
-          </p>
+      {/* Rocks rail — drag onto a day to schedule; drag a scheduled item back
+          here to unschedule it. Always present so it's a drop target even when
+          empty. */}
+      <div
+        onDragOver={(e) => { e.preventDefault(); setRailOver(true) }}
+        onDragLeave={() => setRailOver(false)}
+        onDrop={(e) => {
+          e.preventDefault()
+          setRailOver(false)
+          const id = e.dataTransfer.getData('text/task-id')
+          if (id) onUnscheduleTask(id)
+        }}
+        className={`rounded-xl border border-dashed p-3 transition-colors ${railOver ? 'border-primary-400 bg-primary-50/40' : 'border-neutral-200'}`}
+      >
+        <p className="text-xs font-medium text-neutral-500 mb-2">
+          {rocks.length > 0
+            ? `Drag onto a day to schedule — or drag a scheduled item back here to unschedule (${rocks.length} to place)`
+            : 'Drag a scheduled item here to unschedule it'}
+        </p>
+        {rocks.length > 0 && (
           <div className="flex flex-wrap gap-2">
             {rocks.map((t) => (
               <div
@@ -90,8 +107,8 @@ export function MonthCalendarGrid({ month, tasks, events, onPlaceTask, onSelectT
               </div>
             ))}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Calendar */}
       <div className="rounded-2xl border border-neutral-200 overflow-hidden bg-white">
@@ -118,7 +135,16 @@ export function MonthCalendarGrid({ month, tasks, events, onPlaceTask, onSelectT
                   e.preventDefault()
                   setDragOverKey(null)
                   const id = e.dataTransfer.getData('text/task-id')
-                  if (id) onPlaceTask(id, day)
+                  if (!id) return
+                  // Preserve an existing time-of-day when moving a timed item;
+                  // rocks (no prior time) land at the start of the day.
+                  const dragged = tasks.find((x) => x.id === id)
+                  const target = new Date(day)
+                  if (dragged?.scheduledFor) {
+                    const cur = new Date(dragged.scheduledFor)
+                    target.setHours(cur.getHours(), cur.getMinutes(), 0, 0)
+                  }
+                  onPlaceTask(id, target)
                 }}
                 className={`min-h-[92px] border-b border-r border-neutral-100 p-1.5 flex flex-col gap-1 ${
                   i % 7 === 0 ? 'border-l' : ''
@@ -136,8 +162,10 @@ export function MonthCalendarGrid({ month, tasks, events, onPlaceTask, onSelectT
                   <button
                     key={t.id}
                     type="button"
+                    draggable
+                    onDragStart={(e) => e.dataTransfer.setData('text/task-id', t.id)}
                     onClick={() => onSelectTask?.(t.id)}
-                    className="text-left text-[11px] leading-tight px-1 py-0.5 rounded bg-primary-50 text-primary-800 truncate hover:bg-primary-100 transition-colors"
+                    className="text-left text-[11px] leading-tight px-1 py-0.5 rounded bg-primary-50 text-primary-800 truncate hover:bg-primary-100 transition-colors cursor-grab active:cursor-grabbing"
                     title={t.title}
                   >
                     {t.title}
