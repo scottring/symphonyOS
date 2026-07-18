@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { dayLabelFor } from '@/lib/weekHelpers'
 import { KidAcceptanceLine } from '../shelf/KidAcceptanceLine'
-import { MealActionMenu } from './MealActionMenu'
 import type { Recipe, MealPlanEntry } from '@/types/meal-planner'
 
 interface Props {
@@ -39,16 +38,22 @@ export function DayStanza({ dayOfWeek, date, isToday, entry, recipe, onReplace, 
           </div>
         </div>
         <div className="relative">
-          <button onClick={() => setMenuOpen(true)} aria-label="Edit meal"
+          <button onClick={() => setMenuOpen(o => !o)} aria-label="Edit meal"
                   className="text-neutral-400 hover:text-neutral-700 px-2 py-1 text-[18px]">
             ⋯
           </button>
-          <MealActionMenu
-            isOpen={menuOpen}
-            onClose={() => setMenuOpen(false)}
-            onReplace={() => onReplace(entry.id)}
-            onRemove={() => onRemove(entry.id)}
-          />
+          {menuOpen && (
+            <div className="absolute right-0 top-full mt-1 z-10 min-w-[140px] rounded-xl border border-neutral-200 bg-bg-elevated shadow-card py-1">
+              <button onClick={() => { setMenuOpen(false); onReplace(entry.id) }}
+                      className="w-full text-left px-3 py-1.5 text-[13px] hover:bg-primary-50">
+                Replace
+              </button>
+              <button onClick={() => { setMenuOpen(false); onRemove(entry.id) }}
+                      className="w-full text-left px-3 py-1.5 text-[13px] hover:bg-accent-50 text-accent-500">
+                Remove
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>

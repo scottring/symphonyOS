@@ -6,14 +6,12 @@ import { AddRecipeButton } from './AddRecipeButton'
 import { RecipeUrlPasteDialog } from './RecipeUrlPasteDialog'
 import { RecipeManualEditor } from './RecipeManualEditor'
 import { RecipeDetailModal } from './RecipeDetailModal'
-import { RecipeDiscoverDialog, type DiscoveredRecipe } from './RecipeDiscoverDialog'
 import { MealsTabs } from '../MealsTabs'
 
 export function MemoryShelfPage() {
   const { recipes, loading, error, filter, setFilter, addByUrl, addManual } = useRecipes()
   const [pasteOpen, setPasteOpen] = useState(false)
   const [manualOpen, setManualOpen] = useState(false)
-  const [discoverOpen, setDiscoverOpen] = useState(false)
   const [detailRecipeId, setDetailRecipeId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
 
@@ -39,19 +37,6 @@ export function MemoryShelfPage() {
     await addManual(input)
   }
 
-  const handleSaveDiscovered = async (recipe: DiscoveredRecipe) => {
-    await addManual({
-      title: recipe.title,
-      ingredients: recipe.ingredients,
-      instructions: recipe.instructions,
-      prepMinutes: recipe.prep_minutes,
-      sourceLabel: 'Symphony AI',
-      tags: recipe.tags,
-      acceptanceSentence: recipe.acceptance_sentence,
-      isPrepFriendly: recipe.is_prep_friendly,
-    })
-  }
-
   return (
     <div className="px-12 py-12 max-w-6xl mx-auto">
       <MealsTabs />
@@ -70,7 +55,6 @@ export function MemoryShelfPage() {
         <AddRecipeButton
           onPasteUrl={() => setPasteOpen(true)}
           onManualEntry={() => setManualOpen(true)}
-          onFindRecipe={() => setDiscoverOpen(true)}
         />
       </div>
 
@@ -137,11 +121,6 @@ export function MemoryShelfPage() {
         isOpen={manualOpen}
         onClose={() => setManualOpen(false)}
         onSave={handleAddManual}
-      />
-      <RecipeDiscoverDialog
-        isOpen={discoverOpen}
-        onClose={() => setDiscoverOpen(false)}
-        onSave={handleSaveDiscovered}
       />
       <RecipeDetailModal
         recipeId={detailRecipeId}

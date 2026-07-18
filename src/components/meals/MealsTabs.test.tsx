@@ -12,12 +12,10 @@ function renderAt(path: string) {
 }
 
 describe('MealsTabs', () => {
-  it('renders Plan, Today, Recipes, and Habits tabs', () => {
+  it('renders Plan and Recipes tabs', () => {
     renderAt('/meals/plan')
     expect(screen.getByRole('button', { name: 'Plan' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Today' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Recipes' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Habits' })).toBeInTheDocument()
   })
 
   it('marks Recipes active on /meals/shelf', () => {
@@ -26,11 +24,6 @@ describe('MealsTabs', () => {
     const plan = screen.getByRole('button', { name: 'Plan' })
     expect(recipes.className).toContain('border-primary-500')
     expect(plan.className).not.toContain('border-primary-500')
-  })
-
-  it('marks Habits active on /meals/habits', () => {
-    renderAt('/meals/habits')
-    expect(screen.getByRole('button', { name: 'Habits' }).className).toContain('border-primary-500')
   })
 
   it('defaults to Plan active on /meals/plan', () => {

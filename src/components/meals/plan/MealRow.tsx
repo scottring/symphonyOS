@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { MealPlanEntry, MealSlot, Recipe } from '@/types/meal-planner'
 import { MEAL_SLOT_LABEL } from '@/types/meal-planner'
-import { sumGramsInTags } from '../today/grams'
+import { sumGramsInTags } from './grams'
 import { CookChip } from './CookChip'
 import type { FamilyMember } from '@/types/family'
 
