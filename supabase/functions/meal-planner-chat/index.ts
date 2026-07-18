@@ -238,6 +238,14 @@ function asNonEmptyString(v: unknown): string | null {
   return typeof v === 'string' && v.trim().length > 0 ? v.trim() : null
 }
 
+/** Strict day_of_week guard: only an actual integer number 0-6 passes.
+ *  `Number(...)` coercion would silently accept `null` (-> 0), `true`
+ *  (-> 1), `""` (-> 0), etc — reject those instead of miscoercing them. */
+function strictDayOfWeek(v: unknown): number | null {
+  if (typeof v !== 'number' || !Number.isInteger(v) || v < 0 || v > 6) return null
+  return v
+}
+
 async function runTool(
   db: SupabaseClient,
   userId: string,
@@ -249,9 +257,9 @@ async function runTool(
   try {
     switch (name) {
       case 'set_slot': {
-        const dayOfWeek = Number(input.day_of_week)
+        const dayOfWeek = strictDayOfWeek(input.day_of_week)
         const slot = String(input.slot ?? '') as MealSlot
-        if (!Number.isInteger(dayOfWeek) || dayOfWeek < 0 || dayOfWeek > 6) {
+        if (dayOfWeek === null) {
           return 'Error: day_of_week must be an integer 0-6 (0=Sunday..6=Saturday).'
         }
         if (!SLOTS.includes(slot)) return 'Error: slot must be one of breakfast, lunch, dinner.'
@@ -261,13 +269,26 @@ async function runTool(
         if (!recipeId && !title) return 'Error: provide either recipe_id or title.'
 
         const planId = await resolvePlanId(db, userId, weekStart, planCache)
-        // Replace-the-slot semantics: scoped to exactly this
-        // (meal_plan_id, day_of_week, slot) cell — never touches other
-        // days/slots or other households' rows (RLS also fences that).
-        const { error: delErr } = await db.from('meal_plan_entries').delete()
-          .eq('meal_plan_id', planId).eq('day_of_week', dayOfWeek).eq('slot', slot)
-        if (delErr) throw delErr
 
+        // leftover_from must point at a REAL entry in THIS SAME plan —
+        // otherwise a stale/cross-week id from earlier history would link
+        // silently to the wrong week (or nothing, if RLS just hides it).
+        if (leftoverFrom) {
+          const { data: sourceEntry, error: sourceErr } = await db
+            .from('meal_plan_entries').select('id, meal_plan_id')
+            .eq('id', leftoverFrom).maybeSingle()
+          if (sourceErr) throw sourceErr
+          if (!sourceEntry || sourceEntry.meal_plan_id !== planId) {
+            return `Error: leftover_from_entry_id ${leftoverFrom} does not refer to an entry in this week's plan. Look up a real entry id from the current plan or a prior set_slot result before linking a leftover.`
+          }
+        }
+
+        // Insert FIRST, then remove whatever else was in the cell. This way
+        // a failed insert (bad recipe_id / leftover_from FK) leaves the
+        // slot's existing entry untouched instead of vacating it. There is
+        // no unique constraint on (meal_plan_id, day_of_week, slot), so a
+        // transient "two rows in the cell" state between insert and delete
+        // is safe — nothing else reads mid-request.
         const { data, error: insErr } = await db.from('meal_plan_entries').insert({
           meal_plan_id: planId,
           day_of_week: dayOfWeek,
@@ -276,13 +297,19 @@ async function runTool(
           ad_hoc_title: title,
           leftover_from: leftoverFrom,
         }).select().single()
-        if (insErr) throw insErr
+        if (insErr) return `Error: could not set ${DAY_NAMES[dayOfWeek]} ${slot}: ${insErr.message}. The existing entry in that slot (if any) was left untouched.`
+
+        const { error: delErr } = await db.from('meal_plan_entries').delete()
+          .eq('meal_plan_id', planId).eq('day_of_week', dayOfWeek).eq('slot', slot)
+          .neq('id', data.id)
+        if (delErr) throw delErr
+
         return `Set ${DAY_NAMES[dayOfWeek]} ${slot} -> ${title ?? recipeId}. Entry: ${JSON.stringify(data)}`
       }
       case 'clear_slot': {
-        const dayOfWeek = Number(input.day_of_week)
+        const dayOfWeek = strictDayOfWeek(input.day_of_week)
         const slot = String(input.slot ?? '') as MealSlot
-        if (!Number.isInteger(dayOfWeek) || dayOfWeek < 0 || dayOfWeek > 6) {
+        if (dayOfWeek === null) {
           return 'Error: day_of_week must be an integer 0-6 (0=Sunday..6=Saturday).'
         }
         if (!SLOTS.includes(slot)) return 'Error: slot must be one of breakfast, lunch, dinner.'
