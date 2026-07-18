@@ -73,7 +73,7 @@ export function MealPlanColumn() {
               </div>
             )}
             {tonight.recipe?.acceptanceSentence && (
-              <div className="text-[0.7rem] italic text-white/80 mt-1.5 leading-snug" style={{ fontFamily: "'Instrument Serif', Georgia, serif" }}>
+              <div className="text-[0.7rem] italic text-white/80 mt-1.5 leading-snug" style={{ fontFamily: 'var(--font-family-display)' }}>
                 {tonight.recipe.acceptanceSentence}
               </div>
             )}

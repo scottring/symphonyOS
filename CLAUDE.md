@@ -253,14 +253,14 @@ src/
 **Theme file:** `src/index.css`
 
 **Fonts:**
-- Display: `font-display` → Fraunces (elegant serif)
-- Body: Default → DM Sans (warm geometric)
+- Display: `font-display` → Source Serif 4, weight 600 (editorial serif)
+- Body: Default → Source Sans 3 (humanist sans)
 
 **Key classes:**
 - `.card` — Elevated card with warm shadow
 - `.btn-primary` — Forest green gradient button
 - `.input-base` — Styled input field
-- `.font-display` — Fraunces serif for headlines
+- `.font-display` — Source Serif 4 for headlines
 
 **Entity creation inputs use large serif font:**
 ```tsx
