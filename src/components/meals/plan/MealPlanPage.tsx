@@ -1,21 +1,17 @@
 import { useState, useMemo } from 'react'
 import { PAGE_COLUMN } from '@/components/layout/pageLayout'
 import { useNavigate } from 'react-router-dom'
-import { ConceptIcon } from '@/lib/conceptIcons'
 import { useMealPlan } from '@/hooks/useMealPlan'
 import { useRecipes } from '@/hooks/useRecipes'
 import { useGroceryStatus } from '@/hooks/useGroceryStatus'
 import { useWeeklyBrief } from '@/hooks/useWeeklyBrief'
 import { useStandingHabits } from '@/hooks/useStandingHabits'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
-import { useApplyMealSuggestion } from '@/hooks/useApplyMealSuggestion'
 import { sundayOfWeek, dateForDayOfWeek, isToday as isTodayHelper, formatDateMonthDay, dayLabelFor, toIsoDate } from '@/lib/weekHelpers'
 import { DayCard } from './DayCard'
 import { CollapseSection } from './PlanDocSections'
 import { RecipePickerModal, type LeftoverCandidate } from './RecipePickerModal'
 import { MealsTabs } from '../MealsTabs'
-import { AskSymphonyRail } from '../chat/AskSymphonyRail'
-import type { Suggestion } from '../chat/types'
 import { UndoToast } from './UndoToast'
 import { DistributeLeftoversModal } from './DistributeLeftoversModal'
 import { DAY_MEAL_SLOTS, MEAL_SLOT_LABEL } from '@/types/meal-planner'
@@ -48,10 +44,7 @@ export function MealPlanPage() {
   const { brief } = useWeeklyBrief(weekStart)
   const { habits, toggleWeekPause } = useStandingHabits()
   const { members: familyMembers } = useFamilyMembers()
-  const { applySuggestion } = useApplyMealSuggestion(weekStart)
   const [picker, setPicker] = useState<{ dayOfWeek: number; slot: MealSlot; familyMemberId?: string; replaceEntryId?: string } | null>(null)
-  const [chatOpen, setChatOpen] = useState(false)
-  const [previewedDay, setPreviewedDay] = useState<number | null>(null)
 
   const recipesById = useMemo(() => {
     const map = new Map<string, Recipe>()
@@ -197,26 +190,6 @@ export function MealPlanPage() {
     })
   }
 
-  /** Preview a suggestion by scrolling to and pulse-highlighting the affected day. */
-  const onPreviewSuggestion = (s: Suggestion) => {
-    let dow: number | null = null
-    if (s.kind === 'add' || s.kind === 'swap') {
-      const apply = s.apply as { dayOfWeek?: number }
-      if (typeof apply.dayOfWeek === 'number') dow = apply.dayOfWeek
-    } else if (s.kind === 'remove') {
-      const apply = s.apply as { entryId?: string }
-      const entry = plan?.entries.find(e => e.id === apply.entryId)
-      if (entry) dow = entry.dayOfWeek
-    }
-    if (dow == null) return
-    setPreviewedDay(dow)
-    // Scroll to the matching DayCard
-    const el = document.querySelector(`[data-day-card="${dow}"]`)
-    if (el) (el as HTMLElement).scrollIntoView({ behavior: 'smooth', block: 'center' })
-    // Clear highlight after 2.5s
-    setTimeout(() => setPreviewedDay(prev => prev === dow ? null : prev), 2500)
-  }
-
   /** Split a single shared row into N per-person rows (one per core/full-user member),
    *  all referencing the same recipe/title.
    *
@@ -261,21 +234,13 @@ export function MealPlanPage() {
       <MealsTabs />
 
       {/* Doc title + kicker */}
-      <div className="flex items-start justify-between mb-2">
-        <div className="flex-1">
-          <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-neutral-500 mb-2">
-            WEEK OF {weekLabel.toUpperCase()}
-          </div>
-          <h1 className="font-display text-[3rem] leading-[1.05] text-neutral-800">
-            Family Meal <span className="italic text-primary-500">Plan.</span>
-          </h1>
+      <div className="mb-2">
+        <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-neutral-500 mb-2">
+          WEEK OF {weekLabel.toUpperCase()}
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={() => setChatOpen(true)}
-                  className="px-3 py-1.5 rounded-full text-[12px] font-medium bg-primary-500 text-white shadow-primary hover:bg-primary-600 flex items-center gap-1.5">
-            <ConceptIcon name="ai" size={14} decorative /> Ask Symphony
-          </button>
-        </div>
+        <h1 className="font-display text-[3rem] leading-[1.05] text-neutral-800">
+          Family Meal <span className="italic text-primary-500">Plan.</span>
+        </h1>
       </div>
 
       {/* 1. The week — day stack — anchor #plan */}
@@ -300,7 +265,6 @@ export function MealPlanPage() {
                 parameter={plan?.parameter}
                 parentLabelById={parentLabelById}
                 habitsByOwnerSlot={habitsByOwnerSlot}
-                highlighted={previewedDay === d}
                 onPickForSlot={(slot, familyMemberId) =>
                   setPicker({ dayOfWeek: d, slot, familyMemberId })
                 }
@@ -480,14 +444,6 @@ export function MealPlanPage() {
         onClose={() => setPicker(null)}
         onPick={handlePick}
         onPickLeftover={handlePickLeftover}
-      />
-
-      <AskSymphonyRail
-        isOpen={chatOpen}
-        weekStart={weekStart}
-        onClose={() => setChatOpen(false)}
-        onApplySuggestion={applySuggestion}
-        onPreviewSuggestion={onPreviewSuggestion}
       />
 
       {distributePrepId && plan && (() => {

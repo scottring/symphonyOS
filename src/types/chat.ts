@@ -9,7 +9,6 @@ export interface ChatMessage {
   content: string
   sources?: { id: string; title: string; vaultPath?: string }[]
   vaultDraft?: VaultDraft
-  mealRequest?: string
   timestamp: Date
 }
 

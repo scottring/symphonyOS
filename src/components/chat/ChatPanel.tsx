@@ -2,7 +2,6 @@ import { useRef, useEffect, useCallback, useState } from 'react'
 import { ChatMessage } from './ChatMessage'
 import { ChatInput } from './ChatInput'
 import { VaultDraftCard } from './VaultDraftCard'
-import { MealRequestCards } from './MealRequestCards'
 import type { ChatMessage as ChatMessageType, EntityContext, ChatMode, ChatSession } from '@/types/chat'
 import type { ChatAttachment } from './ChatAttachment'
 
@@ -295,9 +294,6 @@ export function ChatPanel({
                   onSave={(title, content) => onSaveToVault(title, content)}
                   onDismiss={() => setDismissedDrafts(prev => new Set([...prev, msg.id]))}
                 />
-              )}
-              {msg.mealRequest && (
-                <MealRequestCards request={msg.mealRequest} />
               )}
             </div>
           ))
