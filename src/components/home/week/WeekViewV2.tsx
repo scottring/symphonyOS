@@ -12,15 +12,8 @@ import type { Task } from '@/types/task'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import { useGoogleCalendar } from '@/hooks/useGoogleCalendar'
 import type { Routine, ActionableInstance } from '@/types/actionable'
-import { useMealPlan } from '@/hooks/useMealPlan'
-import { useRecipes } from '@/hooks/useRecipes'
-import { useGroceryStatus } from '@/hooks/useGroceryStatus'
-import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
-import { sundayOfWeek } from '@/lib/weekHelpers'
 import { taskToTimelineItem, eventToTimelineItem, routineToTimelineItem } from '@/types/timeline'
-import { familyDinnerSummary, groceriesSummary, prepAheadSummary } from '@/lib/weekHighlights'
-import { WeekSummaryRow } from './WeekSummaryRow'
 import { WeekGrid, dayKey } from './WeekGrid'
 import { WeekAllDayChip } from './WeekAllDayChip'
 import { WeekEventBlock } from './WeekEventBlock'
@@ -68,22 +61,6 @@ export function WeekViewV2(props: WeekViewV2Props) {
     dayCount = 7,
     pushAction,
   } = props
-
-  // Summary data
-  const { plan } = useMealPlan(sundayOfWeek(weekStart))
-  const { recipes } = useRecipes()
-  const { missingItems } = useGroceryStatus(plan, recipes)
-  const { members } = useFamilyMembers()
-
-  const familyDinner = useMemo(
-    () => familyDinnerSummary(plan, members, weekStart),
-    [plan, members, weekStart],
-  )
-  const groceries = useMemo(() => groceriesSummary(missingItems), [missingItems])
-  const prepAhead = useMemo(
-    () => prepAheadSummary(plan, recipes, new Date()),
-    [plan, recipes],
-  )
 
   // Create-gesture wiring
   const navigate = useNavigate()
@@ -385,11 +362,6 @@ export function WeekViewV2(props: WeekViewV2Props) {
           {hideRoutines ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
         </button>
       </div>
-      <WeekSummaryRow
-        familyDinner={familyDinner}
-        groceries={groceries}
-        prepAhead={prepAhead}
-      />
 
       <DndContext
         sensors={sensors}

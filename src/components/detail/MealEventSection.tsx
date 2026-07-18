@@ -5,7 +5,6 @@ import { ConceptIcon } from '@/lib/conceptIcons'
 import { useMealPlan } from '@/hooks/useMealPlan'
 import { useRecipes } from '@/hooks/useRecipes'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
-import { useMealTracking } from '@/hooks/useMealTracking'
 import { sundayOfWeek, dayLabelFor } from '@/lib/weekHelpers'
 import { MEAL_SLOT_LABEL } from '@/types/meal-planner'
 
@@ -21,7 +20,6 @@ export function MealEventSection({ mealEventId, viewedDate }: Props) {
   const { plan, refresh: mealRefresh } = useMealPlan(weekStart)
   const { recipes } = useRecipes()
   const { members } = useFamilyMembers()
-  const { skipEntry, confirmAsPlanned } = useMealTracking(() => void mealRefresh())
 
   const entryId = mealEventId.replace(/^meal:/, '')
   const primaryEntry = plan?.entries.find(e => e.id === entryId)
@@ -99,14 +97,6 @@ export function MealEventSection({ mealEventId, viewedDate }: Props) {
     if (error) console.error('mark cooked failed:', error.message)
   }
 
-  const handleSkip = async () => {
-    await skipEntry(primaryEntry.id)
-  }
-
-  const handleRestore = async () => {
-    await confirmAsPlanned(primaryEntry.id)
-  }
-
   const commitNote = async () => {
     const next = noteDraft.trim()
     if (next === (primaryEntry.notes ?? '').trim()) return
@@ -121,17 +111,8 @@ export function MealEventSection({ mealEventId, viewedDate }: Props) {
     void mealRefresh()
   }
 
-  const isSkipped = primaryEntry.trackingState === 'skipped'
-
   return (
     <div className="space-y-5 p-5">
-      {/* Skipped indicator */}
-      {isSkipped && (
-        <div className="font-display italic text-[13px] text-accent-500">
-          Skipped tonight.
-        </div>
-      )}
-
       {/* Header */}
       <div>
         <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-primary-500 mb-1">
@@ -234,22 +215,6 @@ export function MealEventSection({ mealEventId, viewedDate }: Props) {
             className="px-4 py-2 rounded-full border border-primary-200 text-primary-700 text-[12px] font-medium hover:bg-primary-50 disabled:opacity-50"
           >
             {marking ? 'Saving…' : <><ConceptIcon name="done" size={12} decorative /> Mark as cooked</>}
-          </button>
-        )}
-        {!isSkipped && (
-          <button
-            onClick={handleSkip}
-            className="px-4 py-2 rounded-full border border-neutral-200 text-neutral-700 text-[12px] hover:bg-neutral-50"
-          >
-            ⊘ Skip tonight
-          </button>
-        )}
-        {isSkipped && (
-          <button
-            onClick={handleRestore}
-            className="px-4 py-2 rounded-full border border-neutral-200 text-neutral-700 text-[12px] hover:bg-neutral-50"
-          >
-            ↶ Restore
           </button>
         )}
         {recipe && (
