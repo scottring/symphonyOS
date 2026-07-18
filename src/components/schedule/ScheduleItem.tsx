@@ -507,16 +507,22 @@ export const ScheduleItem = memo(function ScheduleItem({
           className={`absolute left-1.5 top-1/2 -translate-y-1/2 z-[2] grid place-items-center w-4 h-4 rounded-[4px] border-2 transition-all ${
             bulkSelected
               ? 'opacity-100 bg-primary-600 border-primary-600 text-white'
-              : `border-neutral-300 text-transparent ${showBulkAffordance ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`
+              : `bg-white border-neutral-300 text-transparent ${showBulkAffordance ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`
           }`}
         >
           <Check className="w-2.5 h-2.5" strokeWidth={3} />
         </button>
       )}
 
-      {/* Main row: time | checkbox/circle | title */}
+      {/* Main row: time | checkbox/circle | title.
+          The bulk checkbox is absolutely positioned at the left edge. We pad the
+          row to clear it ONLY in active bulk mode (something selected, or the
+          affordance pinned) — NOT on plain hover. Hover-padding used to slide the
+          whole row (check circle included) right, making the completion target
+          move out from under the cursor; on hover the checkbox now simply
+          overlays the time column's leading edge (it has a white fill) instead. */}
       <div className={`relative flex items-center gap-3 transition-[padding] ${
-        bulkSelectable ? (bulkSelected || showBulkAffordance ? 'pl-6' : 'group-hover:pl-6') : ''
+        bulkSelectable && (bulkSelected || showBulkAffordance) ? 'pl-6' : ''
       }`}>
         {/* Time column - fixed width for alignment */}
         {hideTime ? (
