@@ -169,7 +169,7 @@ export const SESSIONS: Record<PlanningHorizon, GuidedSessionConfig> = {
     estMinutes: [30, 45],
     steps: [
       {
-        id: 'welcome', type: 'narration', title: 'Time Tetris',
+        id: 'welcome', type: 'narration', title: 'The week’s shape',
         narration: 'This is your weekly planning session — the one that keeps the whole system honest. You will clear the inbox, review last week, look at the month and the calendar, and then place the big rocks. Give it half an hour and the week stops happening TO you.',
       },
       {
