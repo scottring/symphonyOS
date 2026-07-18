@@ -123,9 +123,9 @@ export const SESSIONS: Record<PlanningHorizon, GuidedSessionConfig> = {
         props: { bucket: 'month' },
       },
       {
-        id: 'look-at-season', type: 'look-above', title: 'Your season list',
-        narration: "This is your season list, for reference. Watch how the big items naturally suggest month-sized moves — renovate the kitchen becomes order the dishwasher. Copy a line down if you want it in front of you this month; the original stays on the season list.",
-        props: { aboveBucket: 'quarter', aboveLabel: 'Your season list' },
+        id: 'write-month', type: 'write-list', title: "Write the month’s list",
+        narration: "Write the month’s list. Keep it honest — and put at least one thing on it that exists purely because it will be fun. A month with nothing to look forward to is a scheduling failure.",
+        props: { bucket: 'month', rows: 'plain' },
       },
       {
         id: 'projects-in-motion', type: 'projects', title: 'Projects in motion',
@@ -151,9 +151,9 @@ export const SESSIONS: Record<PlanningHorizon, GuidedSessionConfig> = {
         },
       },
       {
-        id: 'write-month', type: 'write-list', title: "Write the month’s list",
-        narration: "Write the month’s list. Keep it honest — and put at least one thing on it that exists purely because it will be fun. A month with nothing to look forward to is a scheduling failure.",
-        props: { bucket: 'month', rows: 'plain' },
+        id: 'look-at-season', type: 'look-above', title: 'Your season list',
+        narration: "This is your season list, for reference. Watch how the big items naturally suggest month-sized moves — renovate the kitchen becomes order the dishwasher. Copy a line down if you want it in front of you this month; the original stays on the season list.",
+        props: { aboveBucket: 'quarter', aboveLabel: 'Your season list' },
       },
       {
         id: 'book-next', type: 'book-next', title: 'Anchor the next step',
