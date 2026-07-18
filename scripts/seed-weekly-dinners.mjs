@@ -76,32 +76,11 @@ const dateOf = (s) => { const [y,m,d] = s.split('-').map(Number); return new Dat
 
 // ═══════════════════════════════════════════════════════════════════════════
 // WEEK  — edit this block each week.  `date` is the calendar date the meal is
-//          eaten. `slot` is 'dinner' (tappable on the wall) or 'prep'.
-//          Put quantities INLINE in `steps`.
+//          eaten. `slot` must be 'breakfast', 'lunch', or 'dinner' (the DB
+//          check constraint rejects anything else). Put quantities INLINE
+//          in `steps`.
 // ═══════════════════════════════════════════════════════════════════════════
 const WEEK = [
-  {
-    date: '2026-07-04', slot: 'prep',
-    title: 'Saturday Prep — Make-Aheads for the Week',
-    prepMinutes: 60, tags: ['prep', 'make-ahead', 'summer'],
-    ingredients: [
-      '12 oz dark chocolate chips (bark)', '1/2 cup creamy peanut butter (bark)',
-      '1 tsp vanilla extract', '1 tsp flaky sea salt', '1/4 cup roasted peanuts, chopped',
-      '3 cups fresh basil (pesto)', '1/2 cup walnuts (pesto)', '2 garlic cloves (pesto)',
-      '3/4 cup parmesan, grated (pesto)', '1/2 cup olive oil (pesto)', '1 lemon (pesto)',
-      '2 lbs ripe tomatoes (soup)', '2 cans (15 oz) white beans (soup)', '1 large onion (soup)',
-      '4 garlic cloves (soup)', '3 cups vegetable stock (soup)', '1 parmesan rind (soup, optional)',
-      '2 cups pearled barley', '4 cups water or stock (barley)', '10 eggs (hard-boil)',
-      'Cucumber, carrots, bell peppers (cut veg)',
-    ],
-    steps: [
-      'PB BARK: Melt 12 oz dark chocolate in the microwave in 30-second bursts, stirring between each. Spread onto a parchment-lined sheet about 1/4 inch thick. Warm 1/2 cup peanut butter 20 seconds with 1 tsp vanilla, drop spoonfuls over the chocolate, and swirl. Scatter 1/4 cup chopped peanuts and 1 tsp flaky salt. Freeze at least 1 hour, then break into pieces (this is Sunday dessert).',
-      'WALNUT PESTO: Toast 1/2 cup walnuts in a dry skillet 3-4 minutes, then cool. Pulse the walnuts, 2 garlic cloves, and 3/4 cup parmesan in a food processor. Add 3 cups basil in handfuls, then drizzle in 1/2 cup olive oil until loose. Add the juice of 1 lemon, salt, and pepper. Jar it, cover the surface with a thin layer of oil, and refrigerate.',
-      'TOMATO + WHITE BEAN SOUP: Soften 1 diced onion in 3 tbsp olive oil for 6-7 minutes, then add 4 sliced garlic cloves for 2 minutes. Add 2 lbs chopped tomatoes and cook 5 minutes. Add 2 cans drained white beans, 3 cups stock, 1 tsp sugar, and a parmesan rind. Simmer 20 minutes, remove the rind, blend halfway, and stir in 1/2 cup torn basil. Store for lunches all week.',
-      'BIG-BATCH BARLEY: Add 2 cups rinsed pearl barley, 4 cups water or stock, 1 tsp salt, and 1 tbsp olive oil to the pressure cooker. Cook on high pressure 20 minutes, natural release 10 minutes, then fluff. This covers Monday, Tuesday, and Wednesday dinners.',
-      'KID EXTRAS: Hard-boil 10 eggs and refrigerate. Cut cucumber, carrots, and bell peppers into containers so the kid extras are grab-and-go every night.',
-    ],
-  },
   {
     date: '2026-07-04', slot: 'dinner',
     title: 'Peanut Chicken Slaw (No-Cook)',
@@ -241,9 +220,8 @@ async function upsertEntry(planId, dayOfWeek, slot, recipeId) {
   // idempotent: clear this (plan, day, slot) cell first
   await db.from('meal_plan_entries').delete()
     .eq('meal_plan_id', planId).eq('day_of_week', dayOfWeek).eq('slot', slot)
-    .is('family_member_id', null)
   const { error } = await db.from('meal_plan_entries').insert({
-    meal_plan_id: planId, day_of_week: dayOfWeek, slot, recipe_id: recipeId, family_member_id: null,
+    meal_plan_id: planId, day_of_week: dayOfWeek, slot, recipe_id: recipeId,
   })
   if (error) throw error
 }
