@@ -1,0 +1,153 @@
+// src/components/planning/horizon/MonthCalendarGrid.tsx
+//
+// The Month horizon as a real calendar grid (weeks × 7 days) — the first of the
+// per-horizon "big rock" calendar views (see the 2026-07-18 spec). Dated items
+// (tasks with scheduledFor in the month + calendar events) sit in their day
+// cells; the month's undated rocks (bucket='month') sit in a rail you drag onto
+// a day. Placing a rock stamps scheduledFor (bucket→timed), same as the weekly
+// "place the big rocks" grid.
+import { useMemo, useState } from 'react'
+import { GripVertical } from 'lucide-react'
+import type { Task } from '@/types/task'
+import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
+
+interface MonthCalendarGridProps {
+  /** Any date within the month to render. */
+  month: Date
+  tasks: Task[]
+  events: CalendarEvent[]
+  /** Place an undated rock onto a specific day. */
+  onPlaceTask: (taskId: string, day: Date) => void
+  onSelectTask?: (taskId: string) => void
+}
+
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+function sameDay(a: Date, b: Date): boolean {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
+}
+
+function eventStart(e: CalendarEvent): Date | null {
+  const raw = e.startTime ?? e.start_time
+  if (!raw) return null
+  const d = new Date(raw)
+  return Number.isNaN(d.getTime()) ? null : d
+}
+
+export function MonthCalendarGrid({ month, tasks, events, onPlaceTask, onSelectTask }: MonthCalendarGridProps) {
+  const [dragOverKey, setDragOverKey] = useState<string | null>(null)
+
+  // 6-week grid starting on the Sunday of the week containing the 1st.
+  const { cells, monthIndex, monthLabel } = useMemo(() => {
+    const first = new Date(month.getFullYear(), month.getMonth(), 1)
+    const gridStart = new Date(first)
+    gridStart.setDate(1 - first.getDay())
+    const days: Date[] = []
+    for (let i = 0; i < 42; i++) {
+      const d = new Date(gridStart)
+      d.setDate(gridStart.getDate() + i)
+      days.push(d)
+    }
+    return {
+      cells: days,
+      monthIndex: month.getMonth(),
+      monthLabel: month.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+    }
+  }, [month])
+
+  // Undated rocks = this month's bucket, no scheduled time — the things to place.
+  const rocks = useMemo(
+    () => tasks.filter((t) => !t.completed && t.bucket === 'month' && !t.scheduledFor),
+    [tasks],
+  )
+
+  const itemsFor = (day: Date) => {
+    const dayTasks = tasks.filter((t) => !t.completed && t.scheduledFor && sameDay(new Date(t.scheduledFor), day))
+    const dayEvents = events.filter((e) => { const s = eventStart(e); return s && sameDay(s, day) })
+    return { dayTasks, dayEvents }
+  }
+
+  const isToday = (d: Date) => sameDay(d, new Date())
+
+  return (
+    <div className="space-y-4">
+      {/* Rocks rail — drag onto a day */}
+      {rocks.length > 0 && (
+        <div>
+          <p className="text-xs font-medium text-neutral-500 mb-2">
+            Drag onto a day to place it — {rocks.length} {rocks.length === 1 ? 'thing' : 'things'} to schedule
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {rocks.map((t) => (
+              <div
+                key={t.id}
+                draggable
+                onDragStart={(e) => e.dataTransfer.setData('text/task-id', t.id)}
+                className="inline-flex items-center gap-1.5 max-w-[16rem] px-2.5 py-1.5 rounded-lg border border-primary-200 bg-primary-50/60 text-sm text-neutral-700 cursor-grab active:cursor-grabbing"
+              >
+                <GripVertical className="w-3.5 h-3.5 text-primary-400 shrink-0" />
+                <span className="truncate">{t.title}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Calendar */}
+      <div className="rounded-2xl border border-neutral-200 overflow-hidden bg-white">
+        <div className="px-4 py-3 border-b border-neutral-100">
+          <h2 className="font-display text-lg text-neutral-800">{monthLabel}</h2>
+        </div>
+        <div className="grid grid-cols-7 border-b border-neutral-100">
+          {WEEKDAYS.map((w) => (
+            <div key={w} className="px-2 py-1.5 text-[11px] font-medium uppercase tracking-wide text-neutral-400 text-center">{w}</div>
+          ))}
+        </div>
+        <div className="grid grid-cols-7">
+          {cells.map((day, i) => {
+            const key = day.toISOString()
+            const inMonth = day.getMonth() === monthIndex
+            const { dayTasks, dayEvents } = itemsFor(day)
+            const dragging = dragOverKey === key
+            return (
+              <div
+                key={key}
+                onDragOver={(e) => { e.preventDefault(); setDragOverKey(key) }}
+                onDragLeave={() => setDragOverKey((k) => (k === key ? null : k))}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  setDragOverKey(null)
+                  const id = e.dataTransfer.getData('text/task-id')
+                  if (id) onPlaceTask(id, day)
+                }}
+                className={`min-h-[92px] border-b border-r border-neutral-100 p-1.5 flex flex-col gap-1 ${
+                  i % 7 === 0 ? 'border-l' : ''
+                } ${inMonth ? 'bg-white' : 'bg-neutral-50/50'} ${dragging ? 'ring-2 ring-inset ring-primary-400 bg-primary-50/40' : ''}`}
+              >
+                <span className={`text-xs font-medium self-end ${
+                  isToday(day) ? 'w-5 h-5 grid place-items-center rounded-full bg-primary-600 text-white' : inMonth ? 'text-neutral-500' : 'text-neutral-300'
+                }`}>{day.getDate()}</span>
+                {dayEvents.map((e) => (
+                  <span key={e.id ?? `${e.title}-${key}`} className="text-[11px] leading-tight px-1 py-0.5 rounded bg-amber-50 text-amber-800 truncate" title={e.title}>
+                    {e.title}
+                  </span>
+                ))}
+                {dayTasks.map((t) => (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => onSelectTask?.(t.id)}
+                    className="text-left text-[11px] leading-tight px-1 py-0.5 rounded bg-primary-50 text-primary-800 truncate hover:bg-primary-100 transition-colors"
+                    title={t.title}
+                  >
+                    {t.title}
+                  </button>
+                ))}
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    </div>
+  )
+}

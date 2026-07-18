@@ -13,6 +13,7 @@
 
 import { useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import { PAGE_COLUMN } from '@/components/layout/pageLayout';
+import { MonthCalendarGrid } from '@/components/planning/horizon/MonthCalendarGrid';
 import { useNavigate } from 'react-router-dom';
 import { CalendarRange, Target, Plus, ChevronRight, FolderOpen, Check, Pencil, Archive, Trash2, CornerRightDown } from 'lucide-react';
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
@@ -695,6 +696,20 @@ export function HorizonView({ horizon }: HorizonViewProps) {
           {isCascadeRung && (
             <div className="mb-8">
               <CascadeRail current={horizon} counts={railCounts} onGo={(h) => navigate(`/${h}`)} />
+            </div>
+          )}
+
+          {/* Month as a real calendar grid — the month's big rocks placed on
+              actual days (the first of the per-horizon calendar views). */}
+          {horizon === 'month' && (
+            <div className="mb-8">
+              <MonthCalendarGrid
+                month={viewedDate}
+                tasks={domainTasks}
+                events={events}
+                onPlaceTask={(id, day) => updateTask(id, { bucket: 'timed', scheduledFor: day })}
+                onSelectTask={handleSelect}
+              />
             </div>
           )}
 
