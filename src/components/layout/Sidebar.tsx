@@ -202,7 +202,7 @@ export function Sidebar({
         <div className={`flex items-center gap-2 ${collapsed ? 'justify-center w-full' : ''}`}>
           <img src="/symphony-logo.jpg" alt="Symphony" className="w-7 h-7 rounded-full object-cover shrink-0" />
           {!collapsed && (
-            <span className="font-display text-2xl font-light text-neutral-900">Symphony</span>
+            <span className="text-xl font-semibold tracking-tight text-neutral-900">Symphony</span>
           )}
         </div>
         {!collapsed && (
@@ -239,7 +239,7 @@ export function Sidebar({
           </div>
           <div className="min-w-0">
             <p className="text-xs text-neutral-500">Good {greetingWord},</p>
-            <p className="font-display font-normal text-base text-neutral-900 leading-tight">
+            <p className="text-base font-medium text-neutral-900 leading-tight">
               {firstName}
               <Sun className="w-3.5 h-3.5 text-amber-500 inline ml-1" />
             </p>

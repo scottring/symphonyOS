@@ -253,7 +253,7 @@ src/
 **Theme file:** `src/index.css`
 
 **Fonts:**
-- Display: `font-display` → Source Serif 4 (default weight 600 via `:where()`, so weight utilities override)
+- Display: `font-display` → Source Serif 4 (default weight 600 in `@layer base`, so weight utilities override). Reserved for content mastheads — app chrome (sidebar, nav) stays sans.
 - Body: Default → Source Sans 3 (humanist sans)
 
 **Key classes:**
