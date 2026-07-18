@@ -20,11 +20,12 @@
 --   - Four sibling columns from 076_meal_today_tracking.sql
 --     (actual_grams, swap_grams, swap_title, tracking_updated_at) exist
 --     alongside tracking_state but were NOT named in the brief's drop list
---     and have no application references (grepped clean). Per the task's
---     explicit "unknown column → do not drop, flag it" instruction, these
---     were left in place. They look dead (same never-adopted "Today/Diet
---     Tracking" feature as tracking_state) and are a good candidate for a
---     follow-up teardown once confirmed with product sign-off.
+--     and had no application references (grepped clean). Initially left in
+--     place per the "unknown column → do not drop, flag it" instruction and
+--     flagged in the report; coordinator granted sign-off same day, citing
+--     the approved design spec's explicit line that "day-logs, grams
+--     tracking, what-we-ate tracking all die" — dropped as a follow-up
+--     statement below.
 
 -- ── meal_plan_entries: drop non-core slots, tighten the slot check ────────
 delete from meal_plan_entries where slot not in ('breakfast','lunch','dinner');
@@ -56,3 +57,11 @@ drop table if exists cooking_history;
 drop table if exists ai_undo_tokens;
 drop table if exists grocery_store_overrides;
 drop table if exists dietary_restrictions;
+
+-- ── follow-up (same day, sign-off granted): drop the 4 flagged diet-tracking
+--    columns above — approved spec explicitly cuts grams/what-we-ate tracking ──
+alter table meal_plan_entries
+  drop column if exists actual_grams,
+  drop column if exists swap_grams,
+  drop column if exists swap_title,
+  drop column if exists tracking_updated_at;
