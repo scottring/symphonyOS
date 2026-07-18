@@ -84,7 +84,7 @@ export interface DbMealPlan {
 export interface DbMealPlanEntry {
   id: string
   meal_plan_id: string
-  day_of_week: number  // 0=Mon, 6=Sun
+  day_of_week: number  // 0=Sunday .. 6=Saturday (JS Date.getDay()); week_start is that week's Sunday
   slot: MealSlot
   recipe_id: string | null
   ad_hoc_title: string | null

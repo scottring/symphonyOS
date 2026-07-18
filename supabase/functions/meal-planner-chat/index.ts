@@ -481,10 +481,15 @@ Deno.serve(async (req) => {
   const systemPrompt = buildSystemPrompt(weekStart, ctx)
 
   // `history` (client-persisted, no server-side session) is prepended so
-  // the conversation survives a page reload; only well-formed entries pass.
+  // the conversation survives a page reload; only well-formed, non-empty
+  // entries pass — an empty-string content block (e.g. a stored `done.reply`
+  // of '') would otherwise poison every later Anthropic call in the session
+  // with a 400 (empty content is rejected) — and we cap to the last 20 turns
+  // so a long-lived session doesn't balloon the request.
   const convo: Array<{ role: string; content: unknown }> = [
     ...history
-      .filter((h: any) => h && (h.role === 'user' || h.role === 'assistant') && typeof h.content === 'string')
+      .slice(-20)
+      .filter((h: any) => h && (h.role === 'user' || h.role === 'assistant') && typeof h.content === 'string' && h.content.trim() !== '')
       .map((h: any) => ({ role: h.role, content: h.content })),
     { role: 'user', content: message },
   ]
