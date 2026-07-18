@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react'
 
 interface Props {
-  /** 1-4 for the four numbered steps. Omit on welcome / now-what (terminal). */
-  stepNumber?: 1 | 2 | 3 | 4
+  /** 1-3 for the three numbered steps. Omit on welcome / now-what (terminal). */
+  stepNumber?: 1 | 2 | 3
   totalSteps?: number
   /** Section kicker shown above the title in the content region. */
   eyebrow?: string
@@ -20,7 +20,7 @@ interface Props {
  *  dots, content with optional eyebrow kicker, optional footer with back/next.
  *  See docs/design_handoff_onboarding_flow/README.md §"Per-screen specs". */
 export function OnboardingShell({
-  stepNumber, totalSteps = 4, eyebrow, allowSkip, onSkip,
+  stepNumber, totalSteps = 3, eyebrow, allowSkip, onSkip,
   footerLeft, footerRight, children,
 }: Props) {
   return (

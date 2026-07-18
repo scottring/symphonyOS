@@ -2,18 +2,16 @@ import { useState } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { OnboardingProvider } from '@/contexts/OnboardingContext'
-import { GeneratePlanProvider } from '@/contexts/GeneratePlanContext'
 import { WelcomeScreen } from './WelcomeScreen'
 import { HouseholdScreen } from './HouseholdScreen'
 import { GoalsScreen } from './GoalsScreen'
 import { RhythmsScreen } from './RhythmsScreen'
-import { BriefScreen } from './BriefScreen'
 import { NowWhatScreen } from './NowWhatScreen'
 
-type ScreenKey = 'welcome' | 'household' | 'goals' | 'rhythms' | 'brief' | 'nowwhat'
+type ScreenKey = 'welcome' | 'household' | 'goals' | 'rhythms' | 'nowwhat'
 
 /** Top-level route component for /onboarding. Owns the OnboardingProvider
- *  and dispatches between the 6 screens. Auth is required — unauthed users
+ *  and dispatches between the 5 screens. Auth is required — unauthed users
  *  bounce to the auth flow (handled by App.tsx, but we also redirect here
  *  in case someone hits the URL directly). */
 export function OnboardingFlow() {
@@ -36,9 +34,7 @@ export function OnboardingFlow() {
 
   return (
     <OnboardingProvider>
-      <GeneratePlanProvider>
-        <FlowController />
-      </GeneratePlanProvider>
+      <FlowController />
     </OnboardingProvider>
   )
 }
@@ -69,14 +65,7 @@ function FlowController() {
       return (
         <RhythmsScreen
           onBack={() => goto('goals')}
-          onContinue={() => goto('brief')}
-        />
-      )
-    case 'brief':
-      return (
-        <BriefScreen
-          onBack={() => goto('rhythms')}
-          onGenerated={() => goto('nowwhat')}
+          onContinue={() => goto('nowwhat')}
         />
       )
     case 'nowwhat':

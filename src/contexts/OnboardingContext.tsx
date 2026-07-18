@@ -154,21 +154,7 @@ export function useOnboarding(): OnboardingContextValue {
   return v
 }
 
-/** Map a parsed rhythm `when` to the canonical meal slot used by the
- *  plan generator. OFF-NIGHT and BATCH-DAY collapse to dinner; the rhythm
- *  context survives in standing_habits.when_label. */
-export function rhythmToSlot(when: RhythmWhen): 'breakfast' | 'lunch' | 'snack' | 'dinner' {
-  switch (when) {
-    case 'MORNINGS':       return 'breakfast'
-    case 'WEEKDAY LUNCH':  return 'lunch'
-    case 'SNACK':          return 'snack'
-    case 'EVENINGS':       return 'dinner'
-    case 'OFF-NIGHT':      return 'dinner'
-    case 'BATCH-DAY':      return 'dinner'
-  }
-}
-
-/** Human-readable label for the rhythms preview + standing-habits UI. */
+/** Human-readable label for the rhythms preview. */
 export function rhythmToLabel(when: RhythmWhen): string {
   switch (when) {
     case 'MORNINGS':       return 'Mornings'
