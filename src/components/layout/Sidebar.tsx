@@ -239,7 +239,7 @@ export function Sidebar({
           </div>
           <div className="min-w-0">
             <p className="text-xs text-neutral-500">Good {greetingWord},</p>
-            <p className="font-display text-base text-neutral-900 leading-tight">
+            <p className="font-display font-normal text-base text-neutral-900 leading-tight">
               {firstName}
               <Sun className="w-3.5 h-3.5 text-amber-500 inline ml-1" />
             </p>

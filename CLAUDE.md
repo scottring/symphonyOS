@@ -253,14 +253,14 @@ src/
 **Theme file:** `src/index.css`
 
 **Fonts:**
-- Display: `font-display` → Instrument Serif (distinctive display serif)
-- Body: Default → Satoshi (modern geometric sans)
+- Display: `font-display` → Source Serif 4 (default weight 600 via `:where()`, so weight utilities override)
+- Body: Default → Source Sans 3 (humanist sans)
 
 **Key classes:**
 - `.card` — Elevated card with warm shadow
 - `.btn-primary` — Forest green gradient button
 - `.input-base` — Styled input field
-- `.font-display` — Instrument Serif for headlines
+- `.font-display` — Source Serif 4 for headlines
 
 **Entity creation inputs use large serif font:**
 ```tsx
