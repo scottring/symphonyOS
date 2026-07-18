@@ -24,6 +24,7 @@ import { useMealPlan } from '@/hooks/useMealPlan';
 import { useRecipes } from '@/hooks/useRecipes';
 import { sundayOfWeek } from '@/lib/weekHelpers';
 import { SHOW_PLANNED_MEALS_ON_TIMELINE } from '@/lib/mealsVisibility';
+import { resolveMealTitle } from '@/lib/mealTitle';
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar';
 import type { MealPlan, Recipe } from '@/types/meal-planner';
 import type { FamilyMember } from '@/types/family';
@@ -48,13 +49,16 @@ export function synthesizeMealEvents(params: {
     breakfast: [7, 30], lunch: [12, 30], dinner: [18, 30],
   };
   const dow = viewedDate.getDay();
-  const recipeTitleById = new Map(recipes.map(r => [r.id, r.title]));
+  const recipesById = new Map(recipes.map(r => [r.id, r]));
   const recipeUrlById = new Map(recipes.map(r => [r.id, r.sourceUrl]));
+  // Keyed by ALL of this week's entries (not just today's) — a leftover's
+  // source entry can be a different day (e.g. Tuesday lunch <- Monday dinner).
+  const entriesById = new Map(mealPlan.entries.map(e => [e.id, e]));
   const groups = new Map<string, { slot: string; title: string; entryIds: string[]; recipeUrl?: string; recipeId?: string }>();
   for (const e of mealPlan.entries) {
     if (e.dayOfWeek !== dow) continue;
     if (!SLOT_TIMES[e.slot]) continue;
-    const title = e.recipeId ? (recipeTitleById.get(e.recipeId) ?? '(unnamed)') : (e.adHocTitle ?? '(unnamed)');
+    const title = resolveMealTitle(e, entriesById, recipesById);
     const recipeUrl = e.recipeId ? (recipeUrlById.get(e.recipeId) ?? undefined) : undefined;
     const key = `${e.slot}|${title}`;
     const existing = groups.get(key);

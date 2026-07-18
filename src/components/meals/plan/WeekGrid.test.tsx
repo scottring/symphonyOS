@@ -120,4 +120,21 @@ describe('WeekGrid', () => {
     await user.click(screen.getByLabelText('Dinner actions for SAT'))
     expect(screen.getByText('→ Lunch tomorrow')).toBeDisabled()
   })
+
+  it('renders plain "Leftovers" for a leftover-of-a-leftover (no recursive chase)', () => {
+    // Monday dinner (real) -> Tuesday lunch (leftover of Monday) -> Wednesday
+    // lunch (leftover of Tuesday's leftover entry, which has no own title).
+    const chainEntries: MealPlanEntry[] = [
+      ...entries,
+      { id: 'e-wed-lunch', mealPlanId: 'plan1', dayOfWeek: 3, slot: 'lunch', leftoverFrom: 'e-tue-lunch' },
+    ]
+    renderGrid(chainEntries)
+    // Tuesday's own cell still resolves through Monday.
+    expect(screen.getByText('Leftovers: Sheet-pan chicken')).toBeInTheDocument()
+    // Wednesday does NOT recurse through Tuesday to reach Monday's title,
+    // and does NOT show "Leftovers: (unnamed)" — plain "Leftovers" instead.
+    const leftoversOnly = screen.getAllByText('Leftovers')
+    expect(leftoversOnly.length).toBe(1)
+    expect(screen.queryByText('Leftovers: (unnamed)')).not.toBeInTheDocument()
+  })
 })

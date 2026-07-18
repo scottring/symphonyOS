@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
 import { dayLabelFor, dateForDayOfWeek, isToday as isTodayHelper, formatDateMonthDay } from '@/lib/weekHelpers'
+import { resolveMealTitle } from '@/lib/mealTitle'
 import { SlotCell } from './SlotCell'
 import { DAY_MEAL_SLOTS } from '@/types/meal-planner'
 import type { MealPlanEntry, MealSlot, Recipe } from '@/types/meal-planner'
@@ -15,11 +16,6 @@ export interface WeekGridProps {
   onChangeRecipe: (dayOfWeek: number, slot: MealSlot, entry: MealPlanEntry) => void
   onClear: (entryId: string) => void
   onLeftoverTomorrow: (dayOfWeek: number, entry: MealPlanEntry) => void
-}
-
-function titleFor(entry: MealPlanEntry, recipesById: Map<string, Recipe>): string {
-  const recipe = entry.recipeId ? recipesById.get(entry.recipeId) : undefined
-  return recipe?.title ?? entry.adHocTitle ?? '(unnamed)'
 }
 
 /** The week as a 7-day x 3-slot grid. Pure presentational — all writes
@@ -63,11 +59,6 @@ export function WeekGrid({
             <div>
               {DAY_MEAL_SLOTS.map(slot => {
                 const entry = slotMap?.get(slot)
-                const leftoverSourceTitle = entry?.leftoverFrom
-                  ? (entriesById.has(entry.leftoverFrom)
-                    ? titleFor(entriesById.get(entry.leftoverFrom)!, recipesById)
-                    : null)
-                  : undefined
 
                 return (
                   <SlotCell
@@ -75,11 +66,10 @@ export function WeekGrid({
                     dayOfWeek={d}
                     slot={slot}
                     entry={entry}
-                    title={entry ? titleFor(entry, recipesById) : undefined}
-                    leftoverSourceTitle={leftoverSourceTitle}
+                    title={entry ? resolveMealTitle(entry, entriesById, recipesById) : undefined}
                     canLeftoverTomorrow={slot === 'dinner' && d < 6}
                     canLeftoverFromLastNight={!entry && prevDinner != null}
-                    previousDinnerTitle={prevDinner ? titleFor(prevDinner, recipesById) : undefined}
+                    previousDinnerTitle={prevDinner ? resolveMealTitle(prevDinner, entriesById, recipesById) : undefined}
                     onChangeRecipe={() => entry && onChangeRecipe(d, slot, entry)}
                     onClear={() => entry && onClear(entry.id)}
                     onLeftoverTomorrow={() => entry && onLeftoverTomorrow(d, entry)}

@@ -8,12 +8,10 @@ export interface SlotCellProps {
   dayOfWeek: number
   slot: MealSlot
   entry?: MealPlanEntry
-  /** Resolved recipe/ad-hoc title for a filled, non-leftover entry. */
+  /** Fully resolved display title for a filled entry (via `resolveMealTitle`
+   *  — already accounts for leftover-from-source resolution, so this is
+   *  rendered verbatim, no further leftover logic here). */
   title?: string
-  /** Set only when `entry.leftoverFrom` is present: the resolved title of
-   *  the source entry, or `null` when the source entry no longer exists
-   *  (deleted) — renders a plain "Leftovers" fallback in that case. */
-  leftoverSourceTitle?: string | null
   /** Dinner cells only: whether "→ lunch tomorrow" is offered (false on Saturday). */
   canLeftoverTomorrow: boolean
   /** Empty cells only: whether "Leftovers from last night" is offered. */
@@ -32,7 +30,7 @@ export interface SlotCellProps {
  *  affordance with a pick/type/leftover menu; filled slots show the
  *  resolved title and a change/clear (+ leftover-tomorrow for dinner) menu. */
 export function SlotCell({
-  dayOfWeek, slot, entry, title, leftoverSourceTitle,
+  dayOfWeek, slot, entry, title,
   canLeftoverTomorrow, canLeftoverFromLastNight, previousDinnerTitle,
   onChangeRecipe, onClear, onLeftoverTomorrow,
   onPickRecipe, onTypeName, onLeftoverFromLastNight,
@@ -119,16 +117,11 @@ export function SlotCell({
   }
 
   // Filled state.
-  const isLeftover = entry.leftoverFrom != null
-  const displayTitle = isLeftover
-    ? (leftoverSourceTitle ? `Leftovers: ${leftoverSourceTitle}` : 'Leftovers')
-    : title
-
   return (
     <div className="relative grid grid-cols-[80px_1fr_auto] items-start gap-3 py-2 border-b border-neutral-100 last:border-b-0">
       <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-neutral-400 pt-1">{slotLabel}</div>
       <div className="font-display text-[1rem] leading-tight text-neutral-800">
-        {displayTitle}
+        {title}
       </div>
       <div className="relative">
         <button
