@@ -96,12 +96,6 @@ export function useMealPlan(weekStart: Date): UseMealPlanResult {
           slot: data.slot, recipeId: data.recipe_id ?? undefined,
           adHocTitle: data.ad_hoc_title ?? undefined, notes: data.notes ?? undefined,
           leftoverFrom: data.leftover_from ?? undefined,
-          trackingState: (data.tracking_state ?? 'as_planned'),
-          swapTitle: data.swap_title ?? undefined,
-          swapGrams: data.swap_grams ?? undefined,
-          actualGrams: data.actual_grams ?? undefined,
-          familyMemberId: data.family_member_id ?? undefined,
-          preparedBy: data.prepared_by_family_member_id ?? null,
         }],
       } : prev)
     }

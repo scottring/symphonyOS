@@ -42,27 +42,18 @@ export function synthesizeMealEvents(params: {
   familyMembers: FamilyMember[];
   currentMemberId: string | null;
 }): CalendarEvent[] {
-  const { viewedDate, mealPlan, recipes, familyMembers, currentMemberId } = params;
+  const { viewedDate, mealPlan, recipes } = params;
   if (!mealPlan) return [];
   const SLOT_TIMES: Record<string, [number, number]> = {
-    breakfast: [7, 30], lunch: [12, 30], snack: [15, 30], dinner: [18, 30], prep: [16, 0],
-    lunch_iris: [12, 30], lunch_scott: [12, 30], kid_alternate: [18, 30],
+    breakfast: [7, 30], lunch: [12, 30], dinner: [18, 30],
   };
   const dow = viewedDate.getDay();
-  const memberById = new Map(familyMembers.map(m => [m.id, m]));
   const recipeTitleById = new Map(recipes.map(r => [r.id, r.title]));
   const recipeUrlById = new Map(recipes.map(r => [r.id, r.sourceUrl]));
   const groups = new Map<string, { slot: string; title: string; entryIds: string[]; recipeUrl?: string; recipeId?: string }>();
   for (const e of mealPlan.entries) {
     if (e.dayOfWeek !== dow) continue;
     if (!SLOT_TIMES[e.slot]) continue;
-    // Per-user filter: show family-shared (null), self, or kids (members without auth_user_id).
-    if (e.familyMemberId != null) {
-      const isCurrent = e.familyMemberId === currentMemberId;
-      const target = memberById.get(e.familyMemberId);
-      const isKid = target ? !target.auth_user_id : false;
-      if (!isCurrent && !isKid) continue;
-    }
     const title = e.recipeId ? (recipeTitleById.get(e.recipeId) ?? '(unnamed)') : (e.adHocTitle ?? '(unnamed)');
     const recipeUrl = e.recipeId ? (recipeUrlById.get(e.recipeId) ?? undefined) : undefined;
     const key = `${e.slot}|${title}`;

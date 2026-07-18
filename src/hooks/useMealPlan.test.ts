@@ -80,7 +80,7 @@ describe('useMealPlan', () => {
     })
     const { result } = renderHook(() => useMealPlan(new Date('2026-04-27')))
     await waitFor(() => expect(result.current.loading).toBe(false))
-    expect(result.current.plan?.parameter).toBe('regular')
+    expect(result.current.plan?.id).toBe('p1')
   })
 
   it('addMeal calls insert into meal_plan_entries', async () => {

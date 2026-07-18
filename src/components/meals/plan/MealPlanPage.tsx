@@ -17,7 +17,7 @@ export function MealPlanPage() {
   const { plan, loading, error, addMeal, removeMeal } = useMealPlan(weekStart)
   const { recipes, refresh: refreshRecipes } = useRecipes()
   const { members: familyMembers } = useFamilyMembers()
-  const [picker, setPicker] = useState<{ dayOfWeek: number; slot: MealSlot; familyMemberId?: string; replaceEntryId?: string } | null>(null)
+  const [picker, setPicker] = useState<{ dayOfWeek: number; slot: MealSlot; replaceEntryId?: string } | null>(null)
 
   const recipesById = useMemo(() => {
     const map = new Map<string, Recipe>()
@@ -25,9 +25,8 @@ export function MealPlanPage() {
     return map
   }, [recipes])
 
-  /** entries keyed first by dayOfWeek then by canonical slot. Each slot
-   *  bucket holds an array — multiple entries support per-person variants.
-   *  Legacy slots collapse into their canonical day-meal slots. */
+  /** entries keyed first by dayOfWeek then by canonical slot. Legacy/unknown
+   *  slot values (e.g. from before the 3-slot core model) are dropped. */
   const entriesByDayBySlot = useMemo(() => {
     const m = new Map<number, Map<MealSlot, MealPlanEntry[]>>()
     plan?.entries.forEach(e => {
@@ -59,8 +58,8 @@ export function MealPlanPage() {
     setPicker(null)
   }
 
-  /** Leftover candidates: any prep entry, or any recipe-backed entry whose
-   *  recipe is_prep_friendly. Surfaced as a tab in the picker. */
+  /** Leftover candidates: any recipe-backed entry whose recipe is_prep_friendly.
+   *  Surfaced as a tab in the picker. */
   const leftoverCandidates = useMemo<LeftoverCandidate[]>(() => {
     if (!plan) return []
     const out: LeftoverCandidate[] = []
@@ -68,12 +67,8 @@ export function MealPlanPage() {
       // Don't list leftover entries themselves as candidates.
       if (e.leftoverFrom) continue
       const recipe = e.recipeId ? recipesById.get(e.recipeId) : undefined
-      const isCandidate = e.slot === 'prep' || (recipe?.isPrepFriendly === true)
-      if (!isCandidate) continue
-      const dayLabel = e.slot === 'prep'
-        ? `${dayLabelFor(e.dayOfWeek)} batch`
-        : `${dayLabelFor(e.dayOfWeek)} ${e.slot}`
-      out.push({ entry: e, recipe, dayLabel })
+      if (recipe?.isPrepFriendly !== true) continue
+      out.push({ entry: e, recipe, dayLabel: `${dayLabelFor(e.dayOfWeek)} ${e.slot}` })
     }
     return out
   }, [plan, recipesById])
@@ -87,10 +82,7 @@ export function MealPlanPage() {
       if (!e.leftoverFrom) continue
       const parent = byId.get(e.leftoverFrom)
       if (!parent) continue
-      const label = parent.slot === 'prep'
-        ? `${dayLabelFor(parent.dayOfWeek)} batch`
-        : `${dayLabelFor(parent.dayOfWeek)} ${parent.slot}`
-      map.set(e.id, label)
+      map.set(e.id, `${dayLabelFor(parent.dayOfWeek)} ${parent.slot}`)
     }
     return map
   }, [plan])
@@ -110,8 +102,8 @@ export function MealPlanPage() {
     setPicker(null)
   }
 
-  /** Collapse a split slot (multiple per-person entries that all reference
-   *  the same recipe or ad-hoc title) into a single family-default row. */
+  /** Collapse a slot with multiple entries that all reference the same
+   *  recipe or ad-hoc title into a single row. */
   const handleConsolidateSlot = async (
     dayOfWeek: number,
     slot: MealSlot,
@@ -127,23 +119,6 @@ export function MealPlanPage() {
       recipeId: shared.recipeId,
       adHocTitle: shared.adHocTitle,
     })
-  }
-
-  /** Split a single shared row into N per-person rows (one per core/full-user member),
-   *  all referencing the same recipe/title.
-   *
-   *  Disabled: per-person assignment was dropped from the meal write path
-   *  (Task 1 of the meal-planner rebuild removed familyMemberId from
-   *  AddMealInput), so there is no longer a way to distinguish the resulting
-   *  rows — looping here would just insert duplicate entries. This whole page
-   *  is slated for deletion in a later task; until then, split is a no-op. */
-  const handleSplitSharedSlot = async (
-    _dayOfWeek: number,
-    _slot: MealSlot,
-    _entry: MealPlanEntry,
-    _members: typeof familyMembers,
-  ) => {
-    // no-op — see comment above
   }
 
   if (loading) {
@@ -199,25 +174,19 @@ export function MealPlanPage() {
                 isToday={today}
                 entriesBySlot={slotMap}
                 recipesById={recipesById}
-                familyMembers={familyMembers}
-                parameter={plan?.parameter}
                 parentLabelById={parentLabelById}
-                onPickForSlot={(slot, familyMemberId) =>
-                  setPicker({ dayOfWeek: d, slot, familyMemberId })
-                }
+                onPickForSlot={(slot) => setPicker({ dayOfWeek: d, slot })}
                 onReplace={(entryId) => {
                   const entry = plan?.entries.find(e => e.id === entryId)
                   if (!entry) return
                   setPicker({
                     dayOfWeek: d,
                     slot: canonicalSlot(entry.slot) ?? 'dinner',
-                    familyMemberId: entry.familyMemberId,
                     replaceEntryId: entryId,
                   })
                 }}
                 onRemove={(entryId) => removeMeal(entryId)}
                 onConsolidateSlot={handleConsolidateSlot}
-                onSplitSharedSlot={(slot, entry) => handleSplitSharedSlot(d, slot, entry, familyMembers)}
               />
             )
           })}
@@ -228,7 +197,6 @@ export function MealPlanPage() {
       <RecipePickerModal
         isOpen={picker !== null}
         slot={picker?.slot}
-        initialFamilyMemberId={picker?.familyMemberId}
         familyMembers={familyMembers}
         leftoverCandidates={leftoverCandidates}
         onClose={() => setPicker(null)}
@@ -242,11 +210,8 @@ export function MealPlanPage() {
 // Re-export shim so existing imports of PlannerPage continue to work.
 export { MealPlanPage as PlannerPage }
 
-/** Map any legacy or canonical slot to a canonical day-meal slot. */
+/** Map a slot value to a canonical day-meal slot. Values outside the 3-slot
+ *  core model (legacy per-person / prep variants) are dropped. */
 function canonicalSlot(slot: string): MealSlot | undefined {
-  if (DAY_MEAL_SLOTS.includes(slot as MealSlot)) return slot as MealSlot
-  if (slot === 'prep') return 'prep'
-  if (slot === 'lunch_iris' || slot === 'lunch_scott') return 'lunch'
-  if (slot === 'kid_alternate') return 'dinner'
-  return undefined
+  return DAY_MEAL_SLOTS.includes(slot as MealSlot) ? (slot as MealSlot) : undefined
 }

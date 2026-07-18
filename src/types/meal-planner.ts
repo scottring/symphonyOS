@@ -12,36 +12,15 @@ export interface KidAcceptanceEntry {
 /** Keyed by family_member_id (uuid string). */
 export type KidAcceptanceMap = Record<string, KidAcceptanceEntry>
 
-// `(string & {})` preserves literal-autocomplete while still allowing arbitrary
-// freeform strings (e.g., "high-protein week", "Whole 30"). Without that, the
-// `| string` would widen the union and IDEs would stop suggesting the literals.
-export type MealParameter = 'regular' | '800g' | 'low-carb' | 'custom' | (string & {})
+export type MealSlot = 'breakfast' | 'lunch' | 'dinner'
 
-export type MealSlot =
-  | 'breakfast'
-  | 'lunch'
-  | 'snack'
-  | 'dinner'
-  | 'prep'
-  | 'lunch_iris'
-  | 'lunch_scott'
-  | 'kid_alternate'
-
-/** The four canonical day-meal slots, in display order. */
-export const DAY_MEAL_SLOTS: MealSlot[] = ['breakfast', 'lunch', 'snack', 'dinner']
-
-/** Slot order for day cards that include a PREP row (e.g. Sunday). */
-export const DAY_MEAL_SLOTS_WITH_PREP: MealSlot[] = ['prep', 'breakfast', 'lunch', 'snack', 'dinner']
+/** The three canonical day-meal slots, in display order. */
+export const DAY_MEAL_SLOTS: MealSlot[] = ['breakfast', 'lunch', 'dinner']
 
 export const MEAL_SLOT_LABEL: Record<MealSlot, string> = {
   breakfast: 'Breakfast',
   lunch: 'Lunch',
-  snack: 'Snack',
   dinner: 'Dinner',
-  prep: 'Prep',
-  lunch_iris: 'Lunch',
-  lunch_scott: 'Lunch',
-  kid_alternate: 'Kids',
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -98,12 +77,9 @@ export interface DbMealPlan {
   id: string
   user_id: string
   week_start: string  // YYYY-MM-DD
-  parameter: string | null
   created_at: string
   updated_at: string
 }
-
-export type TrackingState = 'as_planned' | 'swapped' | 'skipped' | 'added'
 
 export interface DbMealPlanEntry {
   id: string
@@ -115,22 +91,12 @@ export interface DbMealPlanEntry {
   notes: string | null
   leftover_from: string | null
   created_at: string
-  // S12 today-tracking columns (migration 076)
-  tracking_state?: TrackingState | null
-  swap_title?: string | null
-  swap_grams?: string | null
-  actual_grams?: string | null
-  tracking_updated_at?: string | null
-  // Per-person variants (migration 079)
-  family_member_id?: string | null
-  prepared_by_family_member_id?: string | null
 }
 
 export interface MealPlan {
   id: string
   userId: string
   weekStart: Date
-  parameter?: MealParameter
   entries: MealPlanEntry[]
   createdAt: Date
   updatedAt: Date
@@ -148,194 +114,6 @@ export interface MealPlanEntry {
   adHocTitle?: string
   notes?: string
   leftoverFrom?: string
-  trackingState: TrackingState
-  swapTitle?: string
-  swapGrams?: string
-  actualGrams?: string
-  /** NULL = family-default. Otherwise a family_members.id. */
-  familyMemberId?: string
-  /** NULL = unassigned. Otherwise a family_members.id of the cook. */
-  preparedBy?: string | null
-}
-
-// ─────────────────────────────────────────────────────────────────
-// weekly_briefs · the free-form Sunday-morning brief
-// ─────────────────────────────────────────────────────────────────
-
-export type BriefStatus = 'draft' | 'generated'
-
-export interface DbWeeklyBrief {
-  id: string
-  user_id: string
-  week_start: string
-  body: string
-  status: BriefStatus
-  generated_at: string | null
-  diff_prose: string | null
-  created_at: string
-  updated_at: string
-}
-
-export interface WeeklyBrief {
-  id: string
-  userId: string
-  weekStart: Date
-  body: string
-  status: BriefStatus
-  generatedAt?: Date
-  diffProse?: string
-}
-
-export function dbWeeklyBriefToWeeklyBrief(row: DbWeeklyBrief): WeeklyBrief {
-  return {
-    id: row.id,
-    userId: row.user_id,
-    weekStart: new Date(row.week_start + 'T00:00:00'),
-    body: row.body,
-    status: row.status,
-    generatedAt: row.generated_at ? new Date(row.generated_at) : undefined,
-    diffProse: row.diff_prose ?? undefined,
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────
-// standing_habits · durable per-user habits applied to every plan
-// ─────────────────────────────────────────────────────────────────
-
-export interface DbStandingHabit {
-  id: string
-  user_id: string
-  name: string
-  slot: 'breakfast' | 'lunch' | 'snack' | 'dinner'
-  grams_hint: number | null
-  sort_order: number
-  paused: boolean
-  paused_for_weeks: string[]
-  assigned_family_member_id: string | null
-  created_at: string
-  updated_at: string
-}
-
-export interface StandingHabit {
-  id: string
-  userId: string
-  name: string
-  slot: 'breakfast' | 'lunch' | 'snack' | 'dinner'
-  gramsHint?: number
-  sortOrder: number
-  paused: boolean
-  /** ISO date strings (YYYY-MM-DD, Mondays) of weeks this habit is paused for. */
-  pausedForWeeks: string[]
-  /** NULL = whole family. Otherwise a family_members.id. */
-  assignedFamilyMemberId: string | null
-}
-
-export function dbStandingHabitToStandingHabit(row: DbStandingHabit): StandingHabit {
-  return {
-    id: row.id,
-    userId: row.user_id,
-    name: row.name,
-    slot: row.slot,
-    gramsHint: row.grams_hint ?? undefined,
-    sortOrder: row.sort_order,
-    paused: row.paused,
-    pausedForWeeks: row.paused_for_weeks ?? [],
-    assignedFamilyMemberId: row.assigned_family_member_id ?? null,
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────
-// meal_day_logs · habits, notes, weight per calendar date
-// ─────────────────────────────────────────────────────────────────
-
-export type HabitMap = Record<string, boolean>
-
-export interface DbMealDayLog {
-  id: string
-  user_id: string
-  log_date: string  // YYYY-MM-DD
-  notes: string | null
-  weight_lb: number | null
-  weight_note: string | null
-  habits: HabitMap
-  total_grams_actual: number | null
-  created_at: string
-  updated_at: string
-}
-
-export interface MealDayLog {
-  id: string
-  userId: string
-  logDate: Date
-  notes?: string
-  weightLb?: number
-  weightNote?: string
-  habits: HabitMap
-  totalGramsActual?: number
-}
-
-// ─────────────────────────────────────────────────────────────────
-// cooking_history
-// ─────────────────────────────────────────────────────────────────
-
-export type CookingOutcome = AcceptanceLevel | 'skipped'
-
-export interface DbCookingHistory {
-  id: string
-  user_id: string
-  recipe_id: string
-  entry_id: string | null
-  cooked_at: string
-  outcome: Record<string, CookingOutcome>
-  notes: string | null
-}
-
-export interface CookingHistoryEntry {
-  id: string
-  userId: string
-  recipeId: string
-  entryId?: string
-  cookedAt: Date
-  outcome: Record<string, CookingOutcome>
-  notes?: string
-}
-
-// ─────────────────────────────────────────────────────────────────
-// ai_undo_tokens
-// ─────────────────────────────────────────────────────────────────
-
-export type InverseActionType =
-  | 'delete_meal_plan_entry'
-  | 'delete_list_item'
-  | 'restore_meal_plan_entry'
-  | 'restore_list_item'
-  | 'delete_meal_plan_entries_by_ids'
-  | 'restore_meal_plan_entries'
-  | 'restore_weekly_brief_status'
-
-export interface InverseAction {
-  type: InverseActionType
-  payload: Record<string, unknown>
-}
-
-export interface DbUndoToken {
-  id: string
-  user_id: string
-  description: string
-  inverse_actions: InverseAction[]
-  created_at: string
-  expires_at: string
-  used_at: string | null
-}
-
-export interface UndoToken {
-  id: string
-  userId: string
-  description: string
-  inverseActions: InverseAction[]
-  createdAt: Date
-  expiresAt: Date
-  usedAt?: Date
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -375,25 +153,6 @@ export function dbMealPlanEntryToMealPlanEntry(row: DbMealPlanEntry): MealPlanEn
     adHocTitle: row.ad_hoc_title ?? undefined,
     notes: row.notes ?? undefined,
     leftoverFrom: row.leftover_from ?? undefined,
-    trackingState: (row.tracking_state ?? 'as_planned') as TrackingState,
-    swapTitle: row.swap_title ?? undefined,
-    swapGrams: row.swap_grams ?? undefined,
-    actualGrams: row.actual_grams ?? undefined,
-    familyMemberId: row.family_member_id ?? undefined,
-    preparedBy: row.prepared_by_family_member_id ?? null,
-  }
-}
-
-export function dbMealDayLogToMealDayLog(row: DbMealDayLog): MealDayLog {
-  return {
-    id: row.id,
-    userId: row.user_id,
-    logDate: new Date(row.log_date + 'T00:00:00'),
-    notes: row.notes ?? undefined,
-    weightLb: row.weight_lb ?? undefined,
-    weightNote: row.weight_note ?? undefined,
-    habits: row.habits ?? {},
-    totalGramsActual: row.total_grams_actual ?? undefined,
   }
 }
 
@@ -405,137 +164,8 @@ export function dbMealPlanToMealPlan(
     id: row.id,
     userId: row.user_id,
     weekStart: new Date(row.week_start),
-    parameter: row.parameter ?? undefined,
     entries: entries.map(dbMealPlanEntryToMealPlanEntry),
     createdAt: new Date(row.created_at),
     updatedAt: new Date(row.updated_at),
-  }
-}
-
-export function dbCookingHistoryToEntry(row: DbCookingHistory): CookingHistoryEntry {
-  return {
-    id: row.id,
-    userId: row.user_id,
-    recipeId: row.recipe_id,
-    entryId: row.entry_id ?? undefined,
-    cookedAt: new Date(row.cooked_at),
-    outcome: row.outcome,
-    notes: row.notes ?? undefined,
-  }
-}
-
-export function dbUndoTokenToToken(row: DbUndoToken): UndoToken {
-  return {
-    id: row.id,
-    userId: row.user_id,
-    description: row.description,
-    inverseActions: row.inverse_actions,
-    createdAt: new Date(row.created_at),
-    expiresAt: new Date(row.expires_at),
-    usedAt: row.used_at ? new Date(row.used_at) : undefined,
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────
-// AI brief→plan generation (edge functions: meal-plan-generate / meal-plan-undo)
-// ─────────────────────────────────────────────────────────────────
-
-export interface GeneratedEntry {
-  day_of_week: number       // 0..6 (Mon..Sun)
-  slot: 'breakfast' | 'lunch' | 'snack' | 'dinner' | 'prep'
-  family_member_id: string | null
-  recipe_id: string | null
-  ad_hoc_title: string | null
-  prepared_by_family_member_id: string | null
-  leftover_from: string | null
-}
-
-export interface GeneratePlanResult {
-  insertedCount: number
-  undoToken: { id: string; expiresAt: string } | null
-  notesForPlanner: string
-  validationNotes: string[]
-}
-
-export interface UndoPlanResult {
-  ok: boolean
-  noop: boolean
-}
-
-// ─────────────────────────────────────────────────────────────────
-// dietary_restrictions · per-person and household-wide constraints
-// ─────────────────────────────────────────────────────────────────
-
-export interface DbDietaryRestriction {
-  id: string
-  user_id: string
-  family_member_id: string | null
-  label: string
-  created_at: string
-}
-
-export interface DietaryRestriction {
-  id: string
-  familyMemberId: string | null
-  label: string
-}
-
-export function dbRestrictionToRestriction(row: DbDietaryRestriction): DietaryRestriction {
-  return {
-    id: row.id,
-    familyMemberId: row.family_member_id,
-    label: row.label,
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────
-// grocery_store_overrides · routing rules per ingredient pattern
-// ─────────────────────────────────────────────────────────────────
-
-export interface DbStoreOverride {
-  id: string
-  user_id: string
-  pattern: string
-  target_list_id: string
-  created_at: string
-}
-
-export interface StoreOverride {
-  id: string
-  pattern: string
-  targetListId: string
-}
-
-export function dbStoreOverrideToOverride(row: DbStoreOverride): StoreOverride {
-  return { id: row.id, pattern: row.pattern, targetListId: row.target_list_id }
-}
-
-// ─────────────────────────────────────────────────────────────────
-// pantry_inventory · per-ingredient stock level
-// ─────────────────────────────────────────────────────────────────
-
-export type PantryLevel = 'high' | 'medium' | 'low' | 'out'
-
-export interface DbPantryInventory {
-  id: string
-  user_id: string
-  pattern: string
-  level: PantryLevel
-  last_checked_at: string
-}
-
-export interface PantryInventory {
-  id: string
-  pattern: string
-  level: PantryLevel
-  lastCheckedAt: Date
-}
-
-export function dbPantryToPantry(row: DbPantryInventory): PantryInventory {
-  return {
-    id: row.id,
-    pattern: row.pattern,
-    level: row.level,
-    lastCheckedAt: new Date(row.last_checked_at),
   }
 }

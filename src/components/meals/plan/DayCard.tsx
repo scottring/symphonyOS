@@ -1,11 +1,8 @@
 import { useNavigate } from 'react-router-dom'
 import { dayLabelFor } from '@/lib/weekHelpers'
-import { GramRing } from './GramRing'
-import { sumActualGrams, gramsTargetFor } from './grams'
 import { SlotSection } from './SlotSection'
-import { DAY_MEAL_SLOTS, DAY_MEAL_SLOTS_WITH_PREP } from '@/types/meal-planner'
-import type { MealPlanEntry, MealParameter, MealSlot, Recipe } from '@/types/meal-planner'
-import type { FamilyMember } from '@/types/family'
+import { DAY_MEAL_SLOTS } from '@/types/meal-planner'
+import type { MealPlanEntry, MealSlot, Recipe } from '@/types/meal-planner'
 
 interface Props {
   dayOfWeek: number
@@ -13,16 +10,11 @@ interface Props {
   isToday: boolean
   entriesBySlot: Map<MealSlot, MealPlanEntry[]>
   recipesById: Map<string, Recipe>
-  familyMembers: FamilyMember[]
-  parameter?: MealParameter
   /** entry.id → "from X" label, populated for leftover entries. */
   parentLabelById?: Map<string, string>
-  /** Map of `${owner_family_member_id}|${slot}` → set of habit names, used
-   *  to mark plan entries derived from a standing habit. */
-  habitsByOwnerSlot?: Map<string, Set<string>>
   /** When true, apply a highlight ring to this day card. */
   highlighted?: boolean
-  onPickForSlot: (slot: MealSlot, familyMemberId?: string) => void
+  onPickForSlot: (slot: MealSlot) => void
   onReplace: (entryId: string) => void
   onRemove: (entryId: string) => void
   onConsolidateSlot: (
@@ -31,30 +23,19 @@ interface Props {
     entries: MealPlanEntry[],
     shared: { recipeId?: string; adHocTitle?: string },
   ) => void
-  onSplitSharedSlot: (slot: MealSlot, entry: MealPlanEntry) => void
-  onAssignCook?: (entryId: string, familyMemberId: string | null) => void
 }
 
-/** Compact in-document day card — surface 4 (compact). Header row with ring
- *  + grams + day label, then a stacked breakfast/lunch/snack/dinner section. */
+/** Compact in-document day card — surface 4 (compact). Header row with day
+ *  label, then a stacked breakfast/lunch/dinner section. */
 export function DayCard({
   dayOfWeek, date, isToday,
-  entriesBySlot, recipesById, familyMembers, parameter,
-  parentLabelById, habitsByOwnerSlot, highlighted,
-  onPickForSlot, onReplace, onRemove, onConsolidateSlot, onSplitSharedSlot, onAssignCook,
+  entriesBySlot, recipesById,
+  parentLabelById, highlighted,
+  onPickForSlot, onReplace, onRemove, onConsolidateSlot,
 }: Props) {
   const navigate = useNavigate()
-  const target = gramsTargetFor(parameter)
-  const allEntries = Array.from(entriesBySlot.values()).flat()
-  const actual = sumActualGrams(allEntries, recipesById)
   const dateLabel = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
   const dateIso = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}-${String(date.getDate()).padStart(2,'0')}`
-
-  // Sun = 6 in our Mon=0..Sun=6 convention. Show PREP slot on Sundays, or any day
-  // that already has prep entries.
-  const isSunday = dayOfWeek === 6
-  const hasPrepEntries = (entriesBySlot.get('prep') ?? []).length > 0
-  const slotsToRender = (isSunday || hasPrepEntries) ? DAY_MEAL_SLOTS_WITH_PREP : DAY_MEAL_SLOTS
 
   const highlightClass = highlighted
     ? 'ring-2 ring-primary-400 ring-offset-2 transition-shadow duration-300'
@@ -70,50 +51,30 @@ export function DayCard({
       }`}
     >
       {/* Header */}
-      <div className="grid grid-cols-[1fr_auto] items-center gap-4 mb-3 pb-3 border-b border-neutral-100">
-        <div>
-          <div className={`text-[10px] font-bold uppercase tracking-[0.22em] mb-0.5 ${
-            isToday ? 'text-primary-600' : 'text-neutral-400'
-          }`}>
-            {dayLabelFor(dayOfWeek)} · {dateLabel.toUpperCase()}{isToday && ' · TODAY'}
-          </div>
-          <div className="font-display text-[1.5rem] text-neutral-800 leading-tight">
-            {date.toLocaleDateString('en-US', { weekday: 'long' })}
-          </div>
+      <div className="mb-3 pb-3 border-b border-neutral-100">
+        <div className={`text-[10px] font-bold uppercase tracking-[0.22em] mb-0.5 ${
+          isToday ? 'text-primary-600' : 'text-neutral-400'
+        }`}>
+          {dayLabelFor(dayOfWeek)} · {dateLabel.toUpperCase()}{isToday && ' · TODAY'}
         </div>
-        {target !== null && (
-          <div className="flex items-center gap-3">
-            <GramRing actual={actual} target={target} size={56} stroke={5} showValue={false} />
-            <div className="text-right">
-              <div className="font-display italic text-[1.05rem] text-primary-700 leading-tight">
-                ~{actual}g
-              </div>
-              <div className="text-[10px] uppercase tracking-[0.12em] text-neutral-400">
-                / {target}g
-              </div>
-            </div>
-          </div>
-        )}
+        <div className="font-display text-[1.5rem] text-neutral-800 leading-tight">
+          {date.toLocaleDateString('en-US', { weekday: 'long' })}
+        </div>
       </div>
 
-      {/* Stacked meal rows — each slot may render a single shared row,
-          per-person sub-rows, or both. */}
+      {/* Stacked meal rows — breakfast/lunch/dinner. */}
       <div>
-        {slotsToRender.map(slot => (
+        {DAY_MEAL_SLOTS.map(slot => (
           <SlotSection
             key={slot}
             slot={slot}
             entries={entriesBySlot.get(slot) ?? []}
             recipesById={recipesById}
-            familyMembers={familyMembers}
             parentLabelById={parentLabelById}
-            habitsByOwnerSlot={habitsByOwnerSlot}
-            onPick={(forWho) => onPickForSlot(slot, forWho)}
+            onPick={() => onPickForSlot(slot)}
             onReplace={onReplace}
             onRemove={onRemove}
             onConsolidate={(entries, shared) => onConsolidateSlot(dayOfWeek, slot, entries, shared)}
-            onSplitShared={(entry) => onSplitSharedSlot(slot, entry)}
-            onAssignCook={onAssignCook}
           />
         ))}
       </div>

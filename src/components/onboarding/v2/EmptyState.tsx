@@ -1,9 +1,7 @@
-import type { WeeklyBrief } from '@/types/meal-planner'
 import { formatDateMonthDay } from '@/lib/weekHelpers'
 
 interface Props {
   weekStart: Date
-  brief: WeeklyBrief | null
   /** Optional — most-recent prior brief (for the footnote line). */
   lastBrief?: { weekStart: Date; body: string } | null
   habitsCount?: number

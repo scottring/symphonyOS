@@ -4,7 +4,6 @@ import { supabase } from '@/lib/supabase'
 import { ConceptIcon } from '@/lib/conceptIcons'
 import { useMealPlan } from '@/hooks/useMealPlan'
 import { useRecipes } from '@/hooks/useRecipes'
-import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { sundayOfWeek, dayLabelFor } from '@/lib/weekHelpers'
 import { MEAL_SLOT_LABEL } from '@/types/meal-planner'
 
@@ -19,7 +18,6 @@ export function MealEventSection({ mealEventId, viewedDate }: Props) {
   const weekStart = useMemo(() => sundayOfWeek(viewedDate), [viewedDate])
   const { plan, refresh: mealRefresh } = useMealPlan(weekStart)
   const { recipes } = useRecipes()
-  const { members } = useFamilyMembers()
 
   const entryId = mealEventId.replace(/^meal:/, '')
   const primaryEntry = plan?.entries.find(e => e.id === entryId)
@@ -41,22 +39,6 @@ export function MealEventSection({ mealEventId, viewedDate }: Props) {
       </div>
     )
   }
-
-  // All entries that share the same (day, slot, title) — these are the
-  // per-person variants the timeline collapsed into one event.
-  const sameSlotEntries = (plan?.entries ?? []).filter(e =>
-    e.dayOfWeek === primaryEntry.dayOfWeek
-    && e.slot === primaryEntry.slot
-    && (
-      (primaryEntry.recipeId && e.recipeId === primaryEntry.recipeId)
-      || (!primaryEntry.recipeId && e.adHocTitle === primaryEntry.adHocTitle)
-    )
-  )
-
-  const eaters = sameSlotEntries
-    .map(e => e.familyMemberId
-      ? (members.find(m => m.id === e.familyMemberId)?.name ?? '?')
-      : 'Family')
 
   const title = recipe?.title ?? primaryEntry.adHocTitle ?? '(unnamed)'
   const slotLabel = MEAL_SLOT_LABEL[primaryEntry.slot] ?? primaryEntry.slot
@@ -125,18 +107,6 @@ export function MealEventSection({ mealEventId, viewedDate }: Props) {
           <div className="mt-1 text-[12px] text-neutral-500">~{recipe.prepMinutes} min</div>
         )}
       </div>
-
-      {/* Eaters */}
-      {eaters.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[10px] uppercase tracking-[0.18em] text-neutral-400">For:</span>
-          {Array.from(new Set(eaters)).map(name => (
-            <span key={name} className="px-2 py-0.5 rounded-full bg-primary-50 text-primary-700 text-[12px]">
-              {name}
-            </span>
-          ))}
-        </div>
-      )}
 
       {/* Kid acceptance */}
       {recipe?.acceptanceSentence && (
