@@ -507,7 +507,7 @@ export const ScheduleItem = memo(function ScheduleItem({
           className={`absolute left-1.5 top-1/2 -translate-y-1/2 z-[2] grid place-items-center w-4 h-4 rounded-[4px] border-2 transition-all ${
             bulkSelected
               ? 'opacity-100 bg-primary-600 border-primary-600 text-white'
-              : `bg-white border-neutral-300 text-transparent ${showBulkAffordance ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`
+              : `border-neutral-300 text-transparent ${showBulkAffordance ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'}`
           }`}
         >
           <Check className="w-2.5 h-2.5" strokeWidth={3} />
@@ -515,15 +515,13 @@ export const ScheduleItem = memo(function ScheduleItem({
       )}
 
       {/* Main row: time | checkbox/circle | title.
-          The bulk checkbox is absolutely positioned at the left edge. We pad the
-          row to clear it ONLY in active bulk mode (something selected, or the
-          affordance pinned) — NOT on plain hover. Hover-padding used to slide the
-          whole row (check circle included) right, making the completion target
-          move out from under the cursor; on hover the checkbox now simply
-          overlays the time column's leading edge (it has a white fill) instead. */}
-      <div className={`relative flex items-center gap-3 transition-[padding] ${
-        bulkSelectable && (bulkSelected || showBulkAffordance) ? 'pl-6' : ''
-      }`}>
+          The bulk checkbox is absolutely positioned at the left edge. We reserve
+          a permanent gutter for it whenever the row is bulk-selectable, so the
+          checkbox fades in on hover WITHOUT shifting the row (which used to slide
+          the check circle out from under the cursor) and WITHOUT overlapping the
+          time (which the gutterless version did). Every Today row is
+          bulk-selectable, so they all reserve the gutter and stay aligned. */}
+      <div className={`relative flex items-center gap-3 ${bulkSelectable ? 'pl-5' : ''}`}>
         {/* Time column - fixed width for alignment */}
         {hideTime ? (
           <div className="w-16 shrink-0" />
