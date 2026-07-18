@@ -36,7 +36,7 @@ export const SESSIONS: Record<PlanningHorizon, GuidedSessionConfig> = {
       {
         id: 'mountain-ranges', type: 'calendar', title: "The year’s mountain ranges",
         narration: 'Before you write anything new, look at what is already fixed: school calendars, trips, launches, the stretches that will eat whole weeks. You are not planning around them yet — you are mapping the terrain, because goals that ignore the terrain die in February.',
-        props: { notesKey: 'annualCalendar' },
+        props: { notesKey: 'annualCalendar', landscape: true },
       },
       {
         id: 'someday', type: 'review', title: 'Someday possibilities',

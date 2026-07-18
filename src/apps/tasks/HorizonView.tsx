@@ -15,6 +15,7 @@ import { useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import { PAGE_COLUMN } from '@/components/layout/pageLayout';
 import { MonthCalendarGrid } from '@/components/planning/horizon/MonthCalendarGrid';
 import { YearCalendarGrid } from '@/components/planning/horizon/YearCalendarGrid';
+import { MonthZoomSheet } from '@/components/planning/horizon/MonthZoomSheet';
 import { useNavigate } from 'react-router-dom';
 import { CalendarRange, Target, Plus, ChevronRight, FolderOpen, Check, Pencil, Archive, Trash2, CornerRightDown } from 'lucide-react';
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
@@ -228,6 +229,9 @@ export function HorizonView({ horizon }: HorizonViewProps) {
     [poolTitles, poolSourceIds, poolGoalIds],
   );
   const [refOpen, setRefOpen] = useState(false);
+  // Year landscape: which month (0–11) is zoomed into, or null. The year grid
+  // stays mounted underneath, so closing returns you to the landscape.
+  const [zoomMonth, setZoomMonth] = useState<number | null>(null);
   // Goal-promotion translation prompt in the reference panel (season page):
   // which reference row is being translated, and the editable draft.
   const [translatingRefId, setTranslatingRefId] = useState<string | null>(null);
@@ -546,15 +550,28 @@ export function HorizonView({ horizon }: HorizonViewProps) {
             <CascadeRail current="year" counts={railCounts} onGo={(h) => navigate(`/${h}`)} />
           </div>
 
-          {/* The year as a 12-month landscape — the big items in each month. */}
+          {/* The year as a 12-month landscape — the big items in each month.
+              Tapping a month zooms into it in place (drag rocks onto days)
+              without leaving the year. */}
           <div className="mb-8">
             <YearCalendarGrid
               year={new Date().getFullYear()}
               tasks={domainTasks}
               events={events}
-              onOpenMonth={() => navigate('/month')}
+              onOpenMonth={(m) => setZoomMonth(m)}
             />
           </div>
+          {zoomMonth !== null && (
+            <MonthZoomSheet
+              month={new Date(new Date().getFullYear(), zoomMonth, 1)}
+              tasks={domainTasks}
+              events={events}
+              onClose={() => setZoomMonth(null)}
+              onPlaceTask={(id, day) => updateTask(id, { bucket: 'timed', scheduledFor: day })}
+              onUnscheduleTask={(id) => updateTask(id, { bucket: 'month', scheduledFor: undefined })}
+              onSelectTask={handleSelect}
+            />
+          )}
 
           {goalsByArea.length === 0 && orphanGoals.length === 0 ? (
             <div className="card p-8 text-center">

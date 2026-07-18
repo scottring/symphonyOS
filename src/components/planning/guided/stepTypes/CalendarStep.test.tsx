@@ -1,9 +1,10 @@
 import { describe, it, expect, vi } from 'vitest'
-import { screen, waitFor } from '@testing-library/react'
+import { screen, waitFor, fireEvent } from '@testing-library/react'
 import { CalendarStep } from './CalendarStep'
 import { renderStep, makeHost } from './testHarness'
 import { GuidedProvider } from '../GuidedContext'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
+import type { Task } from '@/types/task'
 
 const step = {
   id: 'month-ahead', type: 'calendar' as const, title: 'The month ahead',
@@ -71,6 +72,30 @@ describe('CalendarStep', () => {
     )
     await waitFor(() => expect(connected.fetchEvents).toHaveBeenCalled())
     expect(await screen.findByText('Dentist')).toBeInTheDocument()
+  })
+
+  it('landscape: renders the 12-month grid with dated tasks, and zooms into a month', () => {
+    const yearStep = {
+      id: 'mountain-ranges', type: 'calendar' as const, title: "The year's mountain ranges",
+      narration: 'Map the terrain.', props: { notesKey: 'annualCalendar', landscape: true },
+    }
+    const septTask = {
+      id: 't-sep', title: 'Big launch', completed: false,
+      scheduledFor: new Date(2026, 8, 15), bucket: 'timed',
+    } as unknown as Task
+    renderStep(<CalendarStep />, {
+      step: yearStep,
+      host: makeHost({ calendarConnected: false, tasks: [septTask] }),
+    })
+    // Landscape shows every month name (unlike the count-list, which only lists
+    // months that have commitments).
+    expect(screen.getByText('January')).toBeInTheDocument()
+    expect(screen.getByText('December')).toBeInTheDocument()
+    // The dated task surfaces in its month cell.
+    expect(screen.getByText('Big launch')).toBeInTheDocument()
+    // Tapping September zooms into the month (opens the look-only dialog).
+    fireEvent.click(screen.getByText('September'))
+    expect(screen.getByRole('dialog', { name: /September 2026 calendar/i })).toBeInTheDocument()
   })
 
   it('renders the notes textarea when notesKey is configured', () => {

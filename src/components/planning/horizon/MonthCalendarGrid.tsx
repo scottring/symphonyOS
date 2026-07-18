@@ -17,10 +17,14 @@ interface MonthCalendarGridProps {
   tasks: Task[]
   events: CalendarEvent[]
   /** Place a rock (or re-place a scheduled item) onto a specific day. */
-  onPlaceTask: (taskId: string, day: Date) => void
+  onPlaceTask?: (taskId: string, day: Date) => void
   /** Send a scheduled item back to the unscheduled rail (clears its day). */
-  onUnscheduleTask: (taskId: string) => void
+  onUnscheduleTask?: (taskId: string) => void
   onSelectTask?: (taskId: string) => void
+  /** Look-only: hide the rocks rail and disable all drag/drop. Used when the
+   *  grid is a zoom-in reference (e.g. the annual session's month peek), where
+   *  the "look, don't link" model forbids scheduling from this surface. */
+  readOnly?: boolean
 }
 
 const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -36,7 +40,7 @@ function eventStart(e: CalendarEvent): Date | null {
   return Number.isNaN(d.getTime()) ? null : d
 }
 
-export function MonthCalendarGrid({ month, tasks, events, onPlaceTask, onUnscheduleTask, onSelectTask }: MonthCalendarGridProps) {
+export function MonthCalendarGrid({ month, tasks, events, onPlaceTask, onUnscheduleTask, onSelectTask, readOnly = false }: MonthCalendarGridProps) {
   const [dragOverKey, setDragOverKey] = useState<string | null>(null)
   const [railOver, setRailOver] = useState(false)
 
@@ -76,39 +80,41 @@ export function MonthCalendarGrid({ month, tasks, events, onPlaceTask, onUnsched
     <div className="space-y-4">
       {/* Rocks rail — drag onto a day to schedule; drag a scheduled item back
           here to unschedule it. Always present so it's a drop target even when
-          empty. */}
-      <div
-        onDragOver={(e) => { e.preventDefault(); setRailOver(true) }}
-        onDragLeave={() => setRailOver(false)}
-        onDrop={(e) => {
-          e.preventDefault()
-          setRailOver(false)
-          const id = e.dataTransfer.getData('text/task-id')
-          if (id) onUnscheduleTask(id)
-        }}
-        className={`rounded-xl border border-dashed p-3 transition-colors ${railOver ? 'border-primary-400 bg-primary-50/40' : 'border-neutral-200'}`}
-      >
-        <p className="text-xs font-medium text-neutral-500 mb-2">
-          {rocks.length > 0
-            ? `Drag onto a day to schedule — or drag a scheduled item back here to unschedule (${rocks.length} to place)`
-            : 'Drag a scheduled item here to unschedule it'}
-        </p>
-        {rocks.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {rocks.map((t) => (
-              <div
-                key={t.id}
-                draggable
-                onDragStart={(e) => e.dataTransfer.setData('text/task-id', t.id)}
-                className="inline-flex items-center gap-1.5 max-w-[16rem] px-2.5 py-1.5 rounded-lg border border-primary-200 bg-primary-50/60 text-sm text-neutral-700 cursor-grab active:cursor-grabbing"
-              >
-                <GripVertical className="w-3.5 h-3.5 text-primary-400 shrink-0" />
-                <span className="truncate">{t.title}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+          empty. Hidden in read-only (look-only) mode. */}
+      {!readOnly && (
+        <div
+          onDragOver={(e) => { e.preventDefault(); setRailOver(true) }}
+          onDragLeave={() => setRailOver(false)}
+          onDrop={(e) => {
+            e.preventDefault()
+            setRailOver(false)
+            const id = e.dataTransfer.getData('text/task-id')
+            if (id) onUnscheduleTask?.(id)
+          }}
+          className={`rounded-xl border border-dashed p-3 transition-colors ${railOver ? 'border-primary-400 bg-primary-50/40' : 'border-neutral-200'}`}
+        >
+          <p className="text-xs font-medium text-neutral-500 mb-2">
+            {rocks.length > 0
+              ? `Drag onto a day to schedule — or drag a scheduled item back here to unschedule (${rocks.length} to place)`
+              : 'Drag a scheduled item here to unschedule it'}
+          </p>
+          {rocks.length > 0 && (
+            <div className="flex flex-wrap gap-2">
+              {rocks.map((t) => (
+                <div
+                  key={t.id}
+                  draggable
+                  onDragStart={(e) => e.dataTransfer.setData('text/task-id', t.id)}
+                  className="inline-flex items-center gap-1.5 max-w-[16rem] px-2.5 py-1.5 rounded-lg border border-primary-200 bg-primary-50/60 text-sm text-neutral-700 cursor-grab active:cursor-grabbing"
+                >
+                  <GripVertical className="w-3.5 h-3.5 text-primary-400 shrink-0" />
+                  <span className="truncate">{t.title}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Calendar */}
       <div className="rounded-2xl border border-neutral-200 overflow-hidden bg-white">
@@ -129,9 +135,9 @@ export function MonthCalendarGrid({ month, tasks, events, onPlaceTask, onUnsched
             return (
               <div
                 key={key}
-                onDragOver={(e) => { e.preventDefault(); setDragOverKey(key) }}
-                onDragLeave={() => setDragOverKey((k) => (k === key ? null : k))}
-                onDrop={(e) => {
+                onDragOver={readOnly ? undefined : (e) => { e.preventDefault(); setDragOverKey(key) }}
+                onDragLeave={readOnly ? undefined : () => setDragOverKey((k) => (k === key ? null : k))}
+                onDrop={readOnly ? undefined : (e) => {
                   e.preventDefault()
                   setDragOverKey(null)
                   const id = e.dataTransfer.getData('text/task-id')
@@ -144,7 +150,7 @@ export function MonthCalendarGrid({ month, tasks, events, onPlaceTask, onUnsched
                     const cur = new Date(dragged.scheduledFor)
                     target.setHours(cur.getHours(), cur.getMinutes(), 0, 0)
                   }
-                  onPlaceTask(id, target)
+                  onPlaceTask?.(id, target)
                 }}
                 className={`min-h-[92px] border-b border-r border-neutral-100 p-1.5 flex flex-col gap-1 ${
                   i % 7 === 0 ? 'border-l' : ''
@@ -162,10 +168,10 @@ export function MonthCalendarGrid({ month, tasks, events, onPlaceTask, onUnsched
                   <button
                     key={t.id}
                     type="button"
-                    draggable
-                    onDragStart={(e) => e.dataTransfer.setData('text/task-id', t.id)}
+                    draggable={!readOnly}
+                    onDragStart={readOnly ? undefined : (e) => e.dataTransfer.setData('text/task-id', t.id)}
                     onClick={() => onSelectTask?.(t.id)}
-                    className="text-left text-[11px] leading-tight px-1 py-0.5 rounded bg-primary-50 text-primary-800 truncate hover:bg-primary-100 transition-colors cursor-grab active:cursor-grabbing"
+                    className={`text-left text-[11px] leading-tight px-1 py-0.5 rounded bg-primary-50 text-primary-800 truncate hover:bg-primary-100 transition-colors ${readOnly ? '' : 'cursor-grab active:cursor-grabbing'}`}
                     title={t.title}
                   >
                     {t.title}

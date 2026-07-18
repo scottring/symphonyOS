@@ -56,6 +56,9 @@ export interface GuidedStepConfig {
     /** book-next: which horizon's session to schedule. */
     bookHorizon?: PlanningHorizon
     bookTitle?: string
+    /** calendar: render the annual 12-month landscape (with zoom-into-month)
+     *  instead of the per-month commitment counts. Year session only. */
+    landscape?: boolean
   }
 }
 
