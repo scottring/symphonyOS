@@ -3,12 +3,13 @@
 // Write this horizon's list, fresh. Creation is ONE atomic addTask with the
 // bucket in options (host.createTaskInBucket) — never create-then-setBucket.
 // The soft cap is a nudge, never a wall.
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useRef } from 'react'
 import { Plus, Sparkles } from 'lucide-react'
 import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
 import { funRatio } from '@/lib/planning/coachLines'
 import { useGuided } from '../GuidedContext'
 import { extractProjectTag } from '../projectTag'
+import { ListSuggestions, type WriteBucket } from '../ListSuggestions'
 import { TaskTriageRow, SeasonListRow } from './ReviewStep'
 
 export function WriteListStep() {
@@ -21,6 +22,24 @@ export function WriteListStep() {
     [host.tasks, bucket, match],
   )
 
+  // The level above, as fuel for AI suggestions (look, don't link): the season
+  // draws from year goals, the month from the season list, the week from the
+  // month list. Only the three list-writing horizons get the helper.
+  const writeBucket: WriteBucket | null =
+    bucket === 'quarter' || bucket === 'month' || bucket === 'week' ? bucket : null
+  const above = useMemo(() => {
+    if (writeBucket === 'quarter') {
+      return { items: host.goals.filter((g) => g.status === 'active').map((g) => g.name), label: 'your year goals' }
+    }
+    const aboveBucket = writeBucket === 'month' ? 'quarter' : writeBucket === 'week' ? 'month' : null
+    if (!aboveBucket) return { items: [] as string[], label: '' }
+    const items = host.tasks
+      .filter((t) => !t.completed && t.bucket === aboveBucket && match(t.assignedTo, t.assignedToAll))
+      .map((t) => t.title)
+    return { items, label: aboveBucket === 'quarter' ? 'your season list' : 'your month list' }
+  }, [writeBucket, host.goals, host.tasks, match])
+
+  const inputRef = useRef<HTMLInputElement>(null)
   const [draft, setDraft] = useState('')
   const submit = useCallback(async () => {
     const raw = draft.trim()
@@ -50,7 +69,7 @@ export function WriteListStep() {
           className="shrink-0 w-6 h-6 rounded-full bg-primary-600 text-white grid place-items-center hover:bg-primary-700 transition-colors">
           <Plus className="w-4 h-4" />
         </button>
-        <input type="text" value={draft} autoFocus
+        <input type="text" value={draft} autoFocus ref={inputRef}
           onChange={(e) => setDraft(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') void submit() }}
           placeholder={
@@ -61,6 +80,16 @@ export function WriteListStep() {
           className="flex-1 min-w-0 text-sm bg-transparent placeholder:text-neutral-400 focus:outline-none"
         />
       </div>
+      {/* AI fuel for the blank page: a spread of this-horizon-sized moves drawn
+          from the level above. Tap-to-FILL only — the human always confirms. */}
+      {writeBucket && (
+        <ListSuggestions
+          bucket={writeBucket}
+          aboveItems={above.items}
+          aboveLabel={above.label}
+          onPick={(t) => { setDraft(t); inputRef.current?.focus() }}
+        />
+      )}
       {grainHint && <p className="text-xs text-neutral-400 italic">{grainHint}</p>}
       {/* The pivotal shift from looking → writing. When the list is still empty,
           say plainly that THIS is where you compose it, and frame the list as
