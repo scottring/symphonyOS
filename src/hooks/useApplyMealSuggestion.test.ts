@@ -15,15 +15,6 @@ vi.mock('@/hooks/useMealPlan', () => ({
     loading: false,
     error: null,
     refresh: vi.fn(),
-    setParameter: vi.fn(),
-    clearWeek: vi.fn(),
-    updateMealPreparer: vi.fn(),
-  }),
-}))
-
-vi.mock('@/hooks/useFamilyMembers', () => ({
-  useFamilyMembers: () => ({
-    members: [{ id: 'fm1', name: 'Iris' }],
   }),
 }))
 
@@ -45,7 +36,7 @@ describe('useApplyMealSuggestion', () => {
         kicker: '',
         title: '',
         why: '',
-        apply: { dayOfWeek: 2, slot: 'dinner', adHocTitle: 'Pasta', familyMemberId: null },
+        apply: { dayOfWeek: 2, slot: 'dinner', adHocTitle: 'Pasta' },
       })
     })
 
@@ -55,7 +46,6 @@ describe('useApplyMealSuggestion', () => {
       slot: 'dinner',
       recipeId: undefined,
       adHocTitle: 'Pasta',
-      familyMemberId: null,
     })
     expect(mockRemoveMeal).not.toHaveBeenCalled()
   })
@@ -70,7 +60,7 @@ describe('useApplyMealSuggestion', () => {
         title: '',
         why: '',
         originalEntryId: 'entry-abc',
-        apply: { dayOfWeek: 4, slot: 'lunch', recipeId: 'recipe-xyz', familyMemberId: null },
+        apply: { dayOfWeek: 4, slot: 'lunch', recipeId: 'recipe-xyz' },
       })
     })
 
@@ -82,7 +72,6 @@ describe('useApplyMealSuggestion', () => {
       slot: 'lunch',
       recipeId: 'recipe-xyz',
       adHocTitle: undefined,
-      familyMemberId: null,
     })
     // removeMeal must be called before addMeal
     expect(mockRemoveMeal.mock.invocationCallOrder[0]).toBeLessThan(
@@ -106,26 +95,5 @@ describe('useApplyMealSuggestion', () => {
     expect(mockRemoveMeal).toHaveBeenCalledOnce()
     expect(mockRemoveMeal).toHaveBeenCalledWith('entry-remove-me')
     expect(mockAddMeal).not.toHaveBeenCalled()
-  })
-
-  it('(d) add: resolves name "Iris" to id "fm1" when model emits a name instead of UUID', async () => {
-    // familyMemberId 'Iris' is not a UUID — the hook should look up by name
-    // and resolve it to 'fm1' (the id of the mocked member with name 'Iris').
-    const { result } = renderHook(() => useApplyMealSuggestion(weekStart))
-
-    await act(async () => {
-      await result.current.applySuggestion({
-        kind: 'add',
-        kicker: '',
-        title: '',
-        why: '',
-        apply: { dayOfWeek: 2, slot: 'dinner', adHocTitle: 'X', familyMemberId: 'Iris' },
-      })
-    })
-
-    expect(mockAddMeal).toHaveBeenCalledOnce()
-    expect(mockAddMeal).toHaveBeenCalledWith(
-      expect.objectContaining({ familyMemberId: 'fm1' }),
-    )
   })
 })

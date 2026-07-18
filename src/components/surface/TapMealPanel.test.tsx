@@ -19,9 +19,6 @@ vi.mock('@/hooks/useMealPlan', () => ({
     loading: false,
     error: null,
     refresh: vi.fn(),
-    setParameter: vi.fn(),
-    clearWeek: vi.fn(),
-    updateMealPreparer: vi.fn(),
   }),
 }))
 vi.mock('@/hooks/useRecipes', () => ({

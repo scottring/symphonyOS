@@ -1,10 +1,10 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { toIsoDate } from '@/lib/weekHelpers'
-import { useGeneratePlanContext } from '@/contexts/GeneratePlanContext'
+import { useAuth } from '@/hooks/useAuth'
 import {
   dbMealPlanToMealPlan, type MealPlan, type DbMealPlan, type DbMealPlanEntry,
-  type MealParameter, type MealSlot,
+  type MealSlot,
 } from '@/types/meal-planner'
 
 interface AddMealInput {
@@ -13,12 +13,8 @@ interface AddMealInput {
   recipeId?: string
   adHocTitle?: string
   notes?: string
-  /** NULL/undefined = family-default. Otherwise a family_members.id. */
-  familyMemberId?: string | null
   /** NULL/undefined = not a leftover. Otherwise the meal_plan_entries.id of the parent batch. */
   leftoverFromId?: string | null
-  /** NULL/undefined = unassigned. Otherwise a family_members.id. */
-  preparedByFamilyMemberId?: string | null
 }
 
 interface UseMealPlanResult {
@@ -28,17 +24,17 @@ interface UseMealPlanResult {
   refresh: () => Promise<void>
   addMeal: (input: AddMealInput) => Promise<void>
   removeMeal: (entryId: string) => Promise<void>
-  setParameter: (parameter: MealParameter | undefined) => Promise<void>
-  updateMealPreparer: (entryId: string, preparedByFamilyMemberId: string | null) => Promise<void>
-  clearWeek: () => Promise<{ ok: boolean; tokenId?: string; error?: string }>
 }
+
+// Unique per-mount channel names — same-topic channels conflict in supabase-js.
+let mealPlanChannelSeq = 0
 
 export function useMealPlan(weekStart: Date): UseMealPlanResult {
   const [plan, setPlan] = useState<MealPlan | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const weekStartIso = toIsoDate(weekStart)
-  const { refreshSignal, bumpRefreshSignal } = useGeneratePlanContext()
+  const { user } = useAuth()
 
   const refresh = useCallback(async () => {
     setLoading(true)
@@ -84,9 +80,7 @@ export function useMealPlan(weekStart: Date): UseMealPlanResult {
         recipe_id: input.recipeId ?? null,
         ad_hoc_title: input.adHocTitle ?? null,
         notes: input.notes ?? null,
-        family_member_id: input.familyMemberId ?? null,
         leftover_from: input.leftoverFromId ?? null,
-        prepared_by_family_member_id: input.preparedByFamilyMemberId ?? null,
       }).select().single()
     if (insertErr) {
       setError(insertErr.message)
@@ -124,74 +118,25 @@ export function useMealPlan(weekStart: Date): UseMealPlanResult {
     }
   }, [plan])
 
-  const setParameter = useCallback(async (parameter: MealParameter | undefined) => {
-    if (!plan) return
-    const previous = plan.parameter
-    setPlan(prev => prev ? { ...prev, parameter } : prev)
-    const { error: updErr } = await supabase
-      .from('meal_plans').update({ parameter: parameter ?? null }).eq('id', plan.id)
-    if (updErr) {
-      setPlan(prev => prev ? { ...prev, parameter: previous } : prev)
-      setError(updErr.message)
-    }
-  }, [plan])
+  // Refetch on mount and when the week changes.
+  useEffect(() => { refresh() }, [refresh])
 
-  const updateMealPreparer = useCallback(async (entryId: string, preparedByFamilyMemberId: string | null) => {
-    if (!plan) return
-    // Optimistic update
-    const previous = plan.entries
-    setPlan(prev => prev ? {
-      ...prev,
-      entries: prev.entries.map(e => e.id === entryId ? { ...e, preparedBy: preparedByFamilyMemberId } : e),
-    } : prev)
-    const { error: updErr } = await supabase
-      .from('meal_plan_entries')
-      .update({ prepared_by_family_member_id: preparedByFamilyMemberId })
-      .eq('id', entryId)
-    if (updErr) {
-      setPlan(prev => prev ? { ...prev, entries: previous } : prev)
-      setError(updErr.message)
-    }
-  }, [plan])
+  // Per-instance realtime subscription: any change to meal_plan_entries
+  // refetches this hook's plan. refreshRef avoids resubscribing on every
+  // refresh() identity change. Later tasks (chat, wall) rely on this instead
+  // of the old shared refresh-signal context.
+  const refreshRef = useRef(refresh)
+  refreshRef.current = refresh
+  useEffect(() => {
+    if (!user) return
+    const channel = supabase
+      .channel(`meal-plan-changes-${++mealPlanChannelSeq}`)
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'meal_plan_entries' },
+        () => { void refreshRef.current() })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [user])
 
-  const clearWeek = useCallback(async (): Promise<{ ok: boolean; tokenId?: string; error?: string }> => {
-    if (!plan) return { ok: false, error: 'no plan loaded' }
-    // Snapshot for undo
-    const { data: prior, error: snapErr } = await supabase
-      .from('meal_plan_entries').select('*').eq('meal_plan_id', plan.id)
-    if (snapErr) return { ok: false, error: snapErr.message }
-    // Wipe via RPC (acquires row lock; serializes concurrent writers)
-    const { error: rpcErr } = await supabase.rpc('regenerate_meal_plan', {
-      p_meal_plan_id: plan.id, p_entries: [],
-    })
-    if (rpcErr) return { ok: false, error: rpcErr.message }
-    // Persist undo token
-    const { data: { user } } = await supabase.auth.getUser()
-    const userId = user?.id
-    const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString()
-    const { data: tokenRow, error: tokenErr } = await supabase.from('ai_undo_tokens').insert({
-      user_id: userId,
-      description: `Cleared week of ${weekStartIso}`,
-      inverse_actions: [
-        { type: 'restore_meal_plan_entries', payload: { rows: prior ?? [] } },
-      ],
-      expires_at: expiresAt,
-    }).select('id').single()
-    await refresh()
-    // The wipe is a server-side mutation like generate/undo: bump the shared
-    // signal so every other useMealPlan consumer (the Today timeline in
-    // App.tsx, the wall, etc.) refetches instead of showing cleared meals.
-    bumpRefreshSignal()
-    if (tokenErr) {
-      // Wipe succeeded but undo token didn't — surface as ok-but-no-undo
-      return { ok: true }
-    }
-    return { ok: true, tokenId: tokenRow?.id }
-  }, [plan, refresh, weekStartIso, bumpRefreshSignal])
-
-  // Refetch on mount, when the week changes, and after a server-side
-  // generate/undo bumps the shared refresh signal.
-  useEffect(() => { refresh() }, [refresh, refreshSignal])
-
-  return { plan, loading, error, refresh, addMeal, removeMeal, setParameter, updateMealPreparer, clearWeek }
+  return { plan, loading, error, refresh, addMeal, removeMeal }
 }

@@ -8,15 +8,12 @@ import { useGroceryStatus } from '@/hooks/useGroceryStatus'
 import { useWeeklyBrief } from '@/hooks/useWeeklyBrief'
 import { useStandingHabits } from '@/hooks/useStandingHabits'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
-import { useGeneratePlanContext } from '@/contexts/GeneratePlanContext'
 import { useApplyMealSuggestion } from '@/hooks/useApplyMealSuggestion'
 import { sundayOfWeek, dateForDayOfWeek, isToday as isTodayHelper, formatDateMonthDay, dayLabelFor, toIsoDate } from '@/lib/weekHelpers'
 import { DayCard } from './DayCard'
 import { CollapseSection } from './PlanDocSections'
 import { RecipePickerModal, type LeftoverCandidate } from './RecipePickerModal'
 import { MealsTabs } from '../MealsTabs'
-import { ParameterDropdown } from './ParameterDropdown'
-import { ClearWeekButton } from './ClearWeekButton'
 import { AskSymphonyRail } from '../chat/AskSymphonyRail'
 import type { Suggestion } from '../chat/types'
 import { UndoToast } from './UndoToast'
@@ -45,14 +42,13 @@ function memberColorClass(color: string): string {
 export function MealPlanPage() {
   const navigate = useNavigate()
   const weekStart = useMemo(() => sundayOfWeek(new Date()), [])
-  const { plan, loading, error, addMeal, removeMeal, setParameter, clearWeek, updateMealPreparer } = useMealPlan(weekStart)
-  const { setLastUndoToken } = useGeneratePlanContext()
+  const { plan, loading, error, addMeal, removeMeal } = useMealPlan(weekStart)
   const { recipes, refresh: refreshRecipes } = useRecipes()
   const status = useGroceryStatus(plan, recipes)
   const { brief } = useWeeklyBrief(weekStart)
   const { habits, toggleWeekPause } = useStandingHabits()
   const { members: familyMembers } = useFamilyMembers()
-  const { applySuggestion } = useApplyMealSuggestion(weekStart, familyMembers)
+  const { applySuggestion } = useApplyMealSuggestion(weekStart)
   const [picker, setPicker] = useState<{ dayOfWeek: number; slot: MealSlot; familyMemberId?: string; replaceEntryId?: string } | null>(null)
   const [chatOpen, setChatOpen] = useState(false)
   const [previewedDay, setPreviewedDay] = useState<number | null>(null)
@@ -97,7 +93,7 @@ export function MealPlanPage() {
     return m
   }, [plan])
 
-  const handlePick = async (recipeId: string, familyMemberId: string | null) => {
+  const handlePick = async (recipeId: string, _familyMemberId: string | null) => {
     if (!picker) return
     if (picker.replaceEntryId) {
       await removeMeal(picker.replaceEntryId)
@@ -106,7 +102,6 @@ export function MealPlanPage() {
       dayOfWeek: picker.dayOfWeek,
       slot: picker.slot,
       recipeId,
-      familyMemberId,
     })
     // The picker has its own useRecipes instance and can add recipes that the
     // page's instance never fetched. Refresh so recipesById can resolve the
@@ -168,7 +163,7 @@ export function MealPlanPage() {
     return map
   }, [plan])
 
-  const handlePickLeftover = async (parentEntryId: string, familyMemberId: string | null) => {
+  const handlePickLeftover = async (parentEntryId: string, _familyMemberId: string | null) => {
     if (!picker) return
     const parent = plan?.entries.find(e => e.id === parentEntryId)
     if (!parent) return
@@ -178,7 +173,6 @@ export function MealPlanPage() {
       slot: picker.slot,
       recipeId: parent.recipeId,
       adHocTitle: parent.recipeId ? undefined : parent.adHocTitle,
-      familyMemberId,
       leftoverFromId: parentEntryId,
     })
     setPicker(null)
@@ -200,7 +194,6 @@ export function MealPlanPage() {
       slot,
       recipeId: shared.recipeId,
       adHocTitle: shared.adHocTitle,
-      familyMemberId: null,
     })
   }
 
@@ -225,25 +218,20 @@ export function MealPlanPage() {
   }
 
   /** Split a single shared row into N per-person rows (one per core/full-user member),
-   *  all referencing the same recipe/title. */
+   *  all referencing the same recipe/title.
+   *
+   *  Disabled: per-person assignment was dropped from the meal write path
+   *  (Task 1 of the meal-planner rebuild removed familyMemberId from
+   *  AddMealInput), so there is no longer a way to distinguish the resulting
+   *  rows — looping here would just insert duplicate entries. This whole page
+   *  is slated for deletion in a later task; until then, split is a no-op. */
   const handleSplitSharedSlot = async (
-    dayOfWeek: number,
-    slot: MealSlot,
-    entry: MealPlanEntry,
-    members: typeof familyMembers,
+    _dayOfWeek: number,
+    _slot: MealSlot,
+    _entry: MealPlanEntry,
+    _members: typeof familyMembers,
   ) => {
-    // Delete the shared entry
-    await removeMeal(entry.id)
-    // Add one personal entry per "core or full-user" member with the same recipe/title
-    for (const m of members.filter(x => x.is_full_user || x.member_type === 'core')) {
-      await addMeal({
-        dayOfWeek,
-        slot,
-        recipeId: entry.recipeId,
-        adHocTitle: entry.adHocTitle,
-        familyMemberId: m.id,
-      })
-    }
+    // no-op — see comment above
   }
 
   if (loading) {
@@ -283,17 +271,6 @@ export function MealPlanPage() {
           </h1>
         </div>
         <div className="flex items-center gap-2">
-          <ClearWeekButton
-            entryCount={plan?.entries.length ?? 0}
-            weekLabel={weekLabel}
-            onConfirm={async () => {
-              const r = await clearWeek()
-              if (r.ok && r.tokenId) {
-                setLastUndoToken({ id: r.tokenId, expiresAt: new Date(Date.now() + 30 * 60 * 1000).toISOString(), description: 'Week cleared.' })
-              }
-            }}
-          />
-          <ParameterDropdown value={plan?.parameter} onChange={setParameter} />
           <button onClick={() => setChatOpen(true)}
                   className="px-3 py-1.5 rounded-full text-[12px] font-medium bg-primary-500 text-white shadow-primary hover:bg-primary-600 flex items-center gap-1.5">
             <ConceptIcon name="ai" size={14} decorative /> Ask Symphony
@@ -340,7 +317,6 @@ export function MealPlanPage() {
                 onRemove={(entryId) => removeMeal(entryId)}
                 onConsolidateSlot={handleConsolidateSlot}
                 onSplitSharedSlot={(slot, entry) => handleSplitSharedSlot(d, slot, entry, familyMembers)}
-                onAssignCook={(entryId, fmId) => updateMealPreparer(entryId, fmId)}
               />
             )
           })}
@@ -526,13 +502,12 @@ export function MealPlanPage() {
             prep={{ id: prepEntry.id, title: prepTitle, recipeId: prepEntry.recipeId, adHocTitle: prepEntry.adHocTitle }}
             allEntries={plan.entries}
             familyMembers={familyMembers}
-            onAdd={async ({ dayOfWeek, slot, familyMemberId }) => {
+            onAdd={async ({ dayOfWeek, slot }) => {
               await addMeal({
                 dayOfWeek,
                 slot,
                 recipeId: prepEntry.recipeId,
                 adHocTitle: prepEntry.recipeId ? undefined : prepEntry.adHocTitle,
-                familyMemberId,
                 leftoverFromId: prepEntry.id,
               })
             }}

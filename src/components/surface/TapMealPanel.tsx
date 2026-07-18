@@ -43,7 +43,7 @@ export function TapMealPanel({ event, onClose }: TapMealPanelProps) {
   const entry = plan?.entries.find(e => e.id === entryId)
   const recipe = entry?.recipeId ? recipes.find(r => r.id === entry.recipeId) : undefined
 
-  const handlePick = useCallback(async (recipeId: string, familyMemberId: string | null) => {
+  const handlePick = useCallback(async (recipeId: string, _familyMemberId: string | null) => {
     setPickerOpen(false)
     if (!entry) return
     await removeMeal(entry.id)
@@ -51,7 +51,6 @@ export function TapMealPanel({ event, onClose }: TapMealPanelProps) {
       dayOfWeek: entry.dayOfWeek,
       slot: entry.slot,
       recipeId,
-      familyMemberId,
     })
     onClose()
   }, [entry, removeMeal, addMeal, onClose])
