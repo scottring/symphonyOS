@@ -15,6 +15,8 @@ interface AddMealInput {
   notes?: string
   /** NULL/undefined = not a leftover. Otherwise the meal_plan_entries.id of the parent batch. */
   leftoverFromId?: string | null
+  /** NULL/undefined = shared/whole-family meal; a family_members.id = that person's variant. */
+  forMemberId?: string | null
 }
 
 interface UseMealPlanResult {
@@ -85,6 +87,7 @@ export function useMealPlan(weekStart: Date): UseMealPlanResult {
         ad_hoc_title: input.adHocTitle ?? null,
         notes: input.notes ?? null,
         leftover_from: input.leftoverFromId ?? null,
+        for_member_id: input.forMemberId ?? null,
       }).select().single()
     if (insertErr) {
       setError(insertErr.message)
@@ -100,6 +103,7 @@ export function useMealPlan(weekStart: Date): UseMealPlanResult {
           slot: data.slot, recipeId: data.recipe_id ?? undefined,
           adHocTitle: data.ad_hoc_title ?? undefined, notes: data.notes ?? undefined,
           leftoverFrom: data.leftover_from ?? undefined,
+          forMemberId: data.for_member_id ?? undefined,
         }],
       } : prev)
     }

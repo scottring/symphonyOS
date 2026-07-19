@@ -82,7 +82,7 @@ function addDaysIso(iso: string, days: number): string {
 const TOOLS: any[] = [
   {
     name: 'set_slot',
-    description: 'Fill one meal slot for the week being planned. Replaces whatever is in that slot. Use recipe_id when the meal matches a saved recipe, otherwise title free text. For a leftovers lunch, set leftover_from_entry_id to the id of the source dinner entry (returned by previous set_slot calls or listed in the current plan below).',
+    description: 'Fill one meal slot for the week being planned. Replaces whatever is in that slot. Use recipe_id when the meal matches a saved recipe, otherwise title free text. For a leftovers lunch, set leftover_from_entry_id to the id of the source dinner entry (returned by previous set_slot calls or listed in the current plan below). To set a meal for ONE person (when the household eats differently — e.g. Scott and Iris have different lunches) pass for_member with that person\'s name; omit for_member for the shared whole-family meal. Setting a person\'s meal does not disturb the shared meal or other people\'s meals in that slot.',
     input_schema: {
       type: 'object',
       properties: {
@@ -91,6 +91,7 @@ const TOOLS: any[] = [
         recipe_id: { type: 'string' },
         title: { type: 'string' },
         leftover_from_entry_id: { type: 'string' },
+        for_member: { type: 'string', description: 'A household member\'s name (see the list in the system prompt) to set this meal for just that person. Omit for the shared whole-family meal.' },
       },
       required: ['day_of_week', 'slot'],
     },
@@ -157,12 +158,14 @@ interface PlanContext {
   planId: string | null
   startsOn: string | null
   endsOn: string | null
-  entries: Array<{ id: string; day_of_week: number; slot: string; recipe_id: string | null; ad_hoc_title: string | null; leftover_from: string | null }>
+  entries: Array<{ id: string; day_of_week: number; slot: string; recipe_id: string | null; ad_hoc_title: string | null; leftover_from: string | null; for_member_id: string | null }>
   recipes: Array<{ id: string; title: string; tags: string[] | null; prep_minutes: number | null }>
   preferences: string | null
   /** id of the canonical household preferences note (couple-scoped), so
    *  update_preferences edits the ONE shared master prompt. Null if none yet. */
   preferencesNoteId: string | null
+  /** Household members, so the AI can set a meal for one person by name. */
+  members: Array<{ id: string; name: string }>
 }
 
 async function loadContext(db: SupabaseClient, weekStart: string): Promise<PlanContext> {
@@ -181,7 +184,7 @@ async function loadContext(db: SupabaseClient, weekStart: string): Promise<PlanC
   if (planId) {
     const { data, error } = await db
       .from('meal_plan_entries')
-      .select('id, day_of_week, slot, recipe_id, ad_hoc_title, leftover_from')
+      .select('id, day_of_week, slot, recipe_id, ad_hoc_title, leftover_from, for_member_id')
       .eq('meal_plan_id', planId)
       .order('day_of_week', { ascending: true })
     if (error) throw error
@@ -203,6 +206,10 @@ async function loadContext(db: SupabaseClient, weekStart: string): Promise<PlanC
     .limit(1)
   if (prefErr) throw prefErr
 
+  const { data: memberRows, error: memberErr } = await db
+    .from('family_members').select('id, name').order('name')
+  if (memberErr) throw memberErr
+
   return {
     planId,
     startsOn: planRow?.starts_on ?? null,
@@ -211,20 +218,23 @@ async function loadContext(db: SupabaseClient, weekStart: string): Promise<PlanC
     recipes: recipes ?? [],
     preferences: prefRows?.[0]?.content ?? null,
     preferencesNoteId: prefRows?.[0]?.id ?? null,
+    members: memberRows ?? [],
   }
 }
 
 function buildSystemPrompt(weekStart: string, ctx: PlanContext): string {
   const recipeTitleById = new Map(ctx.recipes.map((r) => [r.id, r.title]))
 
+  const memberNameById = new Map(ctx.members.map((m) => [m.id, m.name]))
   const entryLines = ctx.entries.length > 0
     ? ctx.entries.map((e) => {
       const what = e.recipe_id
         ? (recipeTitleById.get(e.recipe_id) ?? `(recipe ${e.recipe_id})`)
         : (e.ad_hoc_title ?? '(untitled)')
       const leftoverNote = e.leftover_from ? ` [leftover from entry ${e.leftover_from}]` : ''
+      const memberNote = e.for_member_id ? ` [just for ${memberNameById.get(e.for_member_id) ?? 'one person'}]` : ''
       const dayName = DAY_NAMES[e.day_of_week] ?? `day ${e.day_of_week}`
-      return `- ${dayName} ${e.slot}: ${what} (entry id ${e.id})${leftoverNote}`
+      return `- ${dayName} ${e.slot}: ${what} (entry id ${e.id})${memberNote}${leftoverNote}`
     }).join('\n')
     : '(nothing planned yet this week)'
 
@@ -263,6 +273,7 @@ Day/slot model:
 - Each day has three slots: breakfast, lunch, dinner.
 - day_of_week is 0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday — this matches JS Date.getDay(). weekStart (${weekStart}) is always that week's Sunday.
 - Use set_slot to fill or replace a slot (it replaces whatever was there), clear_slot to empty one.
+- Meals can DIVERGE per person. A slot normally has one shared whole-family meal, but when the household eats differently that day (e.g. Scott and Iris have different lunches, or the kids eat separately on date night) call set_slot with for_member = a person's name to set just their meal. Omit for_member for the shared meal. Setting one person's meal leaves the shared meal and everyone else's untouched. Household members: ${ctx.members.map(m => m.name).join(', ') || '(none on record)'}.
 - The week can be PARTIAL. If the user says they are away or unavailable for part of the week ("we get back Tuesday", "we leave Friday morning"), call set_week_range with the first and/or last planned date, then plan only the days inside the range. Days outside the active range never get proposals, set_slot calls, or grocery items.
 
 Consultation flow (default for open-ended requests):
@@ -365,6 +376,7 @@ async function runTool(
   input: Record<string, unknown>,
   planCache: { id: string | null },
   prefsNoteId: string | null,
+  members: Array<{ id: string; name: string }>,
 ): Promise<string> {
   try {
     switch (name) {
@@ -379,6 +391,17 @@ async function runTool(
         const title = asNonEmptyString(input.title)
         const leftoverFrom = asNonEmptyString(input.leftover_from_entry_id)
         if (!recipeId && !title) return 'Error: provide either recipe_id or title.'
+
+        // Optional per-person target: resolve a member name to an id.
+        const forMemberName = asNonEmptyString(input.for_member)
+        let forMemberId: string | null = null
+        if (forMemberName) {
+          const match = members.find(m => m.name.toLowerCase() === forMemberName.toLowerCase())
+          if (!match) {
+            return `Error: no household member named "${forMemberName}". Known members: ${members.map(m => m.name).join(', ') || '(none)'}.`
+          }
+          forMemberId = match.id
+        }
 
         const planId = await resolvePlanId(db, userId, weekStart, planCache)
 
@@ -408,15 +431,22 @@ async function runTool(
           recipe_id: recipeId,
           ad_hoc_title: title,
           leftover_from: leftoverFrom,
+          for_member_id: forMemberId,
         }).select().single()
         if (insErr) return `Error: could not set ${DAY_NAMES[dayOfWeek]} ${slot}: ${insErr.message}. The existing entry in that slot (if any) was left untouched.`
 
-        const { error: delErr } = await db.from('meal_plan_entries').delete()
+        // Replace only the SAME scope: a shared meal replaces the shared meal;
+        // a person's meal replaces only that person's — never wiping the shared
+        // meal or other people's variants in the slot.
+        let delQuery = db.from('meal_plan_entries').delete()
           .eq('meal_plan_id', planId).eq('day_of_week', dayOfWeek).eq('slot', slot)
           .neq('id', data.id)
+        delQuery = forMemberId ? delQuery.eq('for_member_id', forMemberId) : delQuery.is('for_member_id', null)
+        const { error: delErr } = await delQuery
         if (delErr) throw delErr
 
-        return `Set ${DAY_NAMES[dayOfWeek]} ${slot} -> ${title ?? recipeId}. Entry: ${JSON.stringify(data)}`
+        const who = forMemberName ? ` (for ${forMemberName})` : ''
+        return `Set ${DAY_NAMES[dayOfWeek]} ${slot}${who} -> ${title ?? recipeId}. Entry: ${JSON.stringify(data)}`
       }
       case 'clear_slot': {
         const dayOfWeek = strictDayOfWeek(input.day_of_week)
@@ -645,7 +675,7 @@ Deno.serve(async (req) => {
               send({ type: 'text', text: block.text })
             } else if (block.type === 'tool_use' && block.name) {
               send({ type: 'tool', name: block.name })
-              const result = await runTool(db, user.id, weekStart, block.name, block.input ?? {}, planCache, ctx.preferencesNoteId)
+              const result = await runTool(db, user.id, weekStart, block.name, block.input ?? {}, planCache, ctx.preferencesNoteId, ctx.members)
               toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: result })
             }
           }

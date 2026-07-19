@@ -28,6 +28,8 @@ interface PickerState {
   slot: MealSlot
   /** Set when replacing an existing entry ("Change recipe") rather than filling an empty slot. */
   replaceEntryId?: string
+  /** Preselects the "for:" chip and is the member a new/AI-applied meal is written for. */
+  forMemberId?: string
 }
 
 /** Chat-first Plan page — a live week grid (WeekGrid) fed by useMealPlan's
@@ -78,23 +80,33 @@ export function PlanPage() {
   }, [])
 
   const handleChangeRecipe = useCallback((dayOfWeek: number, slot: MealSlot, entry: MealPlanEntry) => {
-    setPicker({ dayOfWeek, slot, replaceEntryId: entry.id })
+    setPicker({ dayOfWeek, slot, replaceEntryId: entry.id, forMemberId: entry.forMemberId })
   }, [])
 
-  const handlePick = async (recipeId: string, _familyMemberId: string | null) => {
+  // Default member to preselect when splitting a slot: the first adult, else anyone.
+  const defaultMemberId = useMemo(() => {
+    const adults = familyMembers.filter(m => m.is_full_user)
+    return (adults[0] ?? familyMembers[0])?.id
+  }, [familyMembers])
+
+  const handleAddForMember = useCallback((dayOfWeek: number, slot: MealSlot) => {
+    setPicker({ dayOfWeek, slot, forMemberId: defaultMemberId })
+  }, [defaultMemberId])
+
+  const handlePick = async (recipeId: string, familyMemberId: string | null) => {
     if (!picker) return
     if (picker.replaceEntryId) await removeMeal(picker.replaceEntryId)
-    await addMeal({ dayOfWeek: picker.dayOfWeek, slot: picker.slot, recipeId })
+    await addMeal({ dayOfWeek: picker.dayOfWeek, slot: picker.slot, recipeId, forMemberId: familyMemberId })
     // The picker has its own useRecipes instance and can add recipes this
     // page's instance never fetched — refresh so recipesById resolves titles.
     await refreshRecipes()
     setPicker(null)
   }
 
-  const handlePickLeftover = async (parentEntryId: string, _familyMemberId: string | null) => {
+  const handlePickLeftover = async (parentEntryId: string, familyMemberId: string | null) => {
     if (!picker) return
     if (picker.replaceEntryId) await removeMeal(picker.replaceEntryId)
-    await addMeal({ dayOfWeek: picker.dayOfWeek, slot: picker.slot, leftoverFromId: parentEntryId })
+    await addMeal({ dayOfWeek: picker.dayOfWeek, slot: picker.slot, leftoverFromId: parentEntryId, forMemberId: familyMemberId })
     setPicker(null)
   }
 
@@ -104,7 +116,7 @@ export function PlanPage() {
     if (!picker) return
     if (picker.replaceEntryId) await removeMeal(picker.replaceEntryId)
     const recipe = await addManual(input)
-    await addMeal({ dayOfWeek: picker.dayOfWeek, slot: picker.slot, recipeId: recipe.id })
+    await addMeal({ dayOfWeek: picker.dayOfWeek, slot: picker.slot, recipeId: recipe.id, forMemberId: picker.forMemberId })
     await refreshRecipes()
     setPicker(null)
   }
@@ -196,6 +208,7 @@ export function PlanPage() {
             activeRange={activeRange}
             entries={plan?.entries ?? []}
             recipesById={recipesById}
+            familyMembers={familyMembers}
             onPickRecipe={handlePickRecipe}
             onTypeName={handleTypeName}
             onLeftoverFromLastNight={handleLeftoverFromLastNight}
@@ -203,6 +216,7 @@ export function PlanPage() {
             onClear={handleClear}
             onLeftoverTomorrow={handleLeftoverTomorrow}
             onMoveMeal={handleMoveMeal}
+            onAddForMember={handleAddForMember}
           />
 
           {!isMobile && (
@@ -247,6 +261,7 @@ export function PlanPage() {
         isOpen={picker !== null}
         slot={picker?.slot}
         familyMembers={familyMembers}
+        initialFamilyMemberId={picker?.forMemberId}
         leftoverCandidates={leftoverCandidates}
         weekStart={weekStart}
         dayOfWeek={picker?.dayOfWeek}

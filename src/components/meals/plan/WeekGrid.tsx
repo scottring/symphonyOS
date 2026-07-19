@@ -2,9 +2,10 @@ import { useMemo } from 'react'
 import { dayLabelFor, dateForDayOfWeek, isToday as isTodayHelper, formatDateMonthDay, type ActiveDayRange } from '@/lib/weekHelpers'
 import { resolveMealTitle } from '@/lib/mealTitle'
 import { SlotCell } from './SlotCell'
-import { DAY_MEAL_SLOTS } from '@/types/meal-planner'
 import { adjacentCell } from '@/lib/mealGridOrder'
+import { DAY_MEAL_SLOTS } from '@/types/meal-planner'
 import type { MealPlanEntry, MealSlot, Recipe } from '@/types/meal-planner'
+import type { FamilyMember } from '@/types/family'
 
 export interface WeekGridProps {
   /** The Sunday that starts this week (matches `meal_plans.week_start`). */
@@ -14,6 +15,8 @@ export interface WeekGridProps {
   activeRange: ActiveDayRange
   entries: MealPlanEntry[]
   recipesById: Map<string, Recipe>
+  /** Household members, for resolving the name chip on a per-person meal. */
+  familyMembers: FamilyMember[]
   onPickRecipe: (dayOfWeek: number, slot: MealSlot) => void
   onTypeName: (dayOfWeek: number, slot: MealSlot, title: string) => void
   onLeftoverFromLastNight: (dayOfWeek: number, slot: MealSlot, sourceEntry: MealPlanEntry) => void
@@ -22,6 +25,8 @@ export interface WeekGridProps {
   onLeftoverTomorrow: (dayOfWeek: number, entry: MealPlanEntry) => void
   /** Move an entry to a target cell (day + slot); PlanPage handles swap-on-collision. */
   onMoveMeal: (entryId: string, targetDayOfWeek: number, targetSlot: MealSlot) => void
+  /** Open the picker to add a per-person variant to a slot ("split"). */
+  onAddForMember: (dayOfWeek: number, slot: MealSlot) => void
 }
 
 /** The week as a 7-day x 3-slot grid. Pure presentational — all writes
@@ -33,17 +38,23 @@ function skippedLabel(from: number, to: number): string {
 }
 
 export function WeekGrid({
-  weekStart, activeRange, entries, recipesById,
+  weekStart, activeRange, entries, recipesById, familyMembers,
   onPickRecipe, onTypeName, onLeftoverFromLastNight,
-  onChangeRecipe, onClear, onLeftoverTomorrow, onMoveMeal,
+  onChangeRecipe, onClear, onLeftoverTomorrow, onMoveMeal, onAddForMember,
 }: WeekGridProps) {
   const entriesById = useMemo(() => new Map(entries.map(e => [e.id, e])), [entries])
+  const memberNameById = useMemo(() => new Map(familyMembers.map(m => [m.id, m.name])), [familyMembers])
 
+  // A slot can hold the shared meal (for_member_id null) AND per-person
+  // variants. Group all entries for each (day, slot) instead of keeping only
+  // the last one.
   const entriesByDayBySlot = useMemo(() => {
-    const m = new Map<number, Map<MealSlot, MealPlanEntry>>()
+    const m = new Map<number, Map<MealSlot, MealPlanEntry[]>>()
     for (const e of entries) {
-      const dayMap = m.get(e.dayOfWeek) ?? new Map<MealSlot, MealPlanEntry>()
-      dayMap.set(e.slot, e)
+      const dayMap = m.get(e.dayOfWeek) ?? new Map<MealSlot, MealPlanEntry[]>()
+      const list = dayMap.get(e.slot) ?? []
+      list.push(e)
+      dayMap.set(e.slot, list)
       m.set(e.dayOfWeek, dayMap)
     }
     return m
@@ -68,7 +79,9 @@ export function WeekGrid({
         const date = dateForDayOfWeek(weekStart, d)
         const today = isTodayHelper(date)
         const slotMap = entriesByDayBySlot.get(d)
-        const prevDinner = d > 0 ? entriesByDayBySlot.get(d - 1)?.get('dinner') : undefined
+        // Previous night's SHARED dinner drives the "leftovers from last night" offer.
+        const prevDinnerList = d > 0 ? entriesByDayBySlot.get(d - 1)?.get('dinner') : undefined
+        const prevDinner = prevDinnerList?.find(e => !e.forMemberId) ?? prevDinnerList?.[0]
 
         return (
           <div
@@ -81,7 +94,15 @@ export function WeekGrid({
             </div>
             <div>
               {DAY_MEAL_SLOTS.map(slot => {
-                const entry = slotMap?.get(slot)
+                const slotEntries = slotMap?.get(slot) ?? []
+                const entry = slotEntries.find(e => !e.forMemberId)          // the shared meal
+                const memberEntries = slotEntries
+                  .filter(e => e.forMemberId)
+                  .map(e => ({
+                    entry: e,
+                    memberName: (e.forMemberId && memberNameById.get(e.forMemberId)) || 'Someone',
+                    title: resolveMealTitle(e, entriesById, recipesById),
+                  }))
                 // Clamp adjacency to the active range — moving a meal onto a
                 // hidden day would make it vanish from the grid.
                 const inRange = (cell: { dayOfWeek: number; slot: MealSlot } | null) =>
@@ -96,19 +117,21 @@ export function WeekGrid({
                     slot={slot}
                     entry={entry}
                     title={entry ? resolveMealTitle(entry, entriesById, recipesById) : undefined}
+                    memberEntries={memberEntries}
                     canLeftoverTomorrow={slot === 'dinner' && d < activeRange.lastDay}
-                    canLeftoverFromLastNight={!entry && prevDinner != null}
+                    canLeftoverFromLastNight={!entry && memberEntries.length === 0 && prevDinner != null}
                     previousDinnerTitle={prevDinner ? resolveMealTitle(prevDinner, entriesById, recipesById) : undefined}
                     canMoveUp={up != null}
                     canMoveDown={down != null}
-                    onChangeRecipe={() => entry && onChangeRecipe(d, slot, entry)}
-                    onClear={() => entry && onClear(entry.id)}
+                    onChangeRecipe={(target) => onChangeRecipe(d, slot, target ?? entry!)}
+                    onClear={(entryId) => onClear(entryId ?? entry?.id ?? '')}
                     onLeftoverTomorrow={() => entry && onLeftoverTomorrow(d, entry)}
                     onPickRecipe={() => onPickRecipe(d, slot)}
                     onTypeName={(t) => onTypeName(d, slot, t)}
                     onLeftoverFromLastNight={() => prevDinner && onLeftoverFromLastNight(d, slot, prevDinner)}
                     onMoveUp={() => { if (entry && up) onMoveMeal(entry.id, up.dayOfWeek, up.slot) }}
                     onMoveDown={() => { if (entry && down) onMoveMeal(entry.id, down.dayOfWeek, down.slot) }}
+                    onAddForMember={() => onAddForMember(d, slot)}
                   />
                 )
               })}

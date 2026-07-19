@@ -92,6 +92,8 @@ export interface DbMealPlanEntry {
   ad_hoc_title: string | null
   notes: string | null
   leftover_from: string | null
+  /** NULL = shared/whole-family meal; set = this member's personal variant. */
+  for_member_id: string | null
   created_at: string
 }
 
@@ -119,6 +121,8 @@ export interface MealPlanEntry {
   adHocTitle?: string
   notes?: string
   leftoverFrom?: string
+  /** undefined = shared/whole-family meal; set = this member's personal variant. */
+  forMemberId?: string
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -158,6 +162,7 @@ export function dbMealPlanEntryToMealPlanEntry(row: DbMealPlanEntry): MealPlanEn
     adHocTitle: row.ad_hoc_title ?? undefined,
     notes: row.notes ?? undefined,
     leftoverFrom: row.leftover_from ?? undefined,
+    forMemberId: row.for_member_id ?? undefined,
   }
 }
 

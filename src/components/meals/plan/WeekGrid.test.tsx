@@ -38,6 +38,7 @@ function renderGrid(overrideEntries: MealPlanEntry[] = entries, activeRange = { 
       entries={overrideEntries}
       recipesById={recipesById}
       activeRange={activeRange}
+      familyMembers={[]}
       onPickRecipe={vi.fn()}
       onTypeName={vi.fn()}
       onLeftoverFromLastNight={vi.fn()}
@@ -45,6 +46,7 @@ function renderGrid(overrideEntries: MealPlanEntry[] = entries, activeRange = { 
       onClear={vi.fn()}
       onLeftoverTomorrow={vi.fn()}
       onMoveMeal={vi.fn()}
+      onAddForMember={vi.fn()}
     />
   )
 }
@@ -100,12 +102,15 @@ describe('WeekGrid', () => {
           entries={entries.filter(e => e.id !== 'e-mon-dinner')}
           recipesById={recipesById}
           activeRange={{ firstDay: 0, lastDay: 6 }}
+          familyMembers={[]}
           onPickRecipe={vi.fn()}
           onTypeName={vi.fn()}
           onLeftoverFromLastNight={vi.fn()}
           onChangeRecipe={vi.fn()}
           onClear={vi.fn()}
           onLeftoverTomorrow={vi.fn()}
+          onMoveMeal={vi.fn()}
+          onAddForMember={vi.fn()}
         />
       )
     }).not.toThrow()
