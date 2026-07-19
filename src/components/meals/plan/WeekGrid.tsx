@@ -82,8 +82,12 @@ export function WeekGrid({
             <div>
               {DAY_MEAL_SLOTS.map(slot => {
                 const entry = slotMap?.get(slot)
-                const up = adjacentCell(d, slot, 'up')
-                const down = adjacentCell(d, slot, 'down')
+                // Clamp adjacency to the active range — moving a meal onto a
+                // hidden day would make it vanish from the grid.
+                const inRange = (cell: { dayOfWeek: number; slot: MealSlot } | null) =>
+                  cell && cell.dayOfWeek >= activeRange.firstDay && cell.dayOfWeek <= activeRange.lastDay ? cell : null
+                const up = inRange(adjacentCell(d, slot, 'up'))
+                const down = inRange(adjacentCell(d, slot, 'down'))
 
                 return (
                   <SlotCell

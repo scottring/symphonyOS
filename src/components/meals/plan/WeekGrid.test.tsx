@@ -44,6 +44,7 @@ function renderGrid(overrideEntries: MealPlanEntry[] = entries, activeRange = { 
       onChangeRecipe={vi.fn()}
       onClear={vi.fn()}
       onLeftoverTomorrow={vi.fn()}
+      onMoveMeal={vi.fn()}
     />
   )
 }
@@ -164,6 +165,22 @@ describe('WeekGrid partial weeks', () => {
     // Monday dinner entry exists but Monday is outside Tue→Sat.
     renderGrid(entries, { firstDay: 2, lastDay: 6 })
     expect(screen.queryByText('Sheet-pan chicken')).not.toBeInTheDocument()
+  })
+
+  it('disables move-up at the top of the active range (never onto a hidden day)', () => {
+    const tueEntries: MealPlanEntry[] = [
+      { id: 'e-tue-breakfast', mealPlanId: 'plan1', dayOfWeek: 2, slot: 'breakfast', recipeId: 'r1' },
+    ]
+    renderGrid(tueEntries, { firstDay: 2, lastDay: 6 })
+    expect(screen.getByLabelText('Move Breakfast for TUE up')).toBeDisabled()
+  })
+
+  it('disables move-down at the bottom of the active range', () => {
+    const friEntries: MealPlanEntry[] = [
+      { id: 'e-fri-dinner', mealPlanId: 'plan1', dayOfWeek: 5, slot: 'dinner', recipeId: 'r1' },
+    ]
+    renderGrid(friEntries, { firstDay: 0, lastDay: 5 })
+    expect(screen.getByLabelText('Move Dinner for FRI down')).toBeDisabled()
   })
 
   it('disables "→ lunch tomorrow" on the last ACTIVE day, not just Saturday', async () => {
