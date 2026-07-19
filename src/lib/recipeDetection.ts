@@ -114,7 +114,7 @@ export function isRecipeDomain(url: string): boolean {
  */
 export function extractRecipeNameHint(eventTitle: string): string | null {
   const patterns = [
-    /^(?:dinner|lunch|breakfast|meal|cook|make|bake|prepare|recipe):\s*(.+)/i,
+    /^(?:dinner|lunch|breakfast|brunch|meal|cook|make|bake|prepare|recipe)\s*[:·]\s*(.+)/i,
     /^(.+?)\s*(?:dinner|lunch|breakfast|meal)$/i,
   ]
 

@@ -78,6 +78,15 @@ function findDinnerEvent(events: CalendarEvent[], date: Date): CalendarEvent | n
     return null
 }
 
+const BREAKFAST_KEYWORDS = /\b(breakfast|brunch)\b/i
+
+// Explicit-keyword only (no food-word fallback like dinner has) — a morning
+// calendar event mentioning food is usually a restaurant plan, not the wall meal.
+function findBreakfastEvent(events: CalendarEvent[], date: Date): CalendarEvent | null {
+    const dateStr = toLocalDateStr(date)
+    return events.find(e => isOnDate(e, dateStr) && BREAKFAST_KEYWORDS.test(e.title)) ?? null
+}
+
 export function WallDinnerWidget({ calendarEvents, recipeUrl, onOpenRecipe }: WallDinnerWidgetProps) {
     const today = new Date()
     const tonightEvent = findDinnerEvent(calendarEvents, today)
@@ -125,4 +134,4 @@ export function WallDinnerWidget({ calendarEvents, recipeUrl, onOpenRecipe }: Wa
 }
 
 // Re-export helpers for use by WallCalendar
-export { findDinnerEvent, getMealIcon }
+export { findDinnerEvent, findBreakfastEvent, getMealIcon }

@@ -41,7 +41,8 @@ import {
 import { useWallData } from '@/hooks/useWallData';
 import { useWeather } from '@/hooks/useWeather';
 import { useMealEventsForDate } from '@/shell/providers/MealEventsProvider';
-import { findDinnerEvent, getMealIcon } from '@/components/wall/WallDinnerWidget';
+import { findDinnerEvent, findBreakfastEvent, getMealIcon } from '@/components/wall/WallDinnerWidget';
+import type { CalendarEvent } from '@/hooks/useGoogleCalendar';
 import { extractRecipeNameHint, resolveRecipeUrl } from '@/lib/recipeDetection';
 import { getNextWeekend, getWeekendAfterNext, formatShortDate } from '@/lib/dateHelpers';
 import { WallRecipeViewer } from '@/components/wall/WallRecipeViewer';
@@ -124,6 +125,34 @@ const PLACEHOLDER_GROCERY: WallV2GroceryData = {
 
 const THEME_KEY = 'symphony-wall-theme';
 
+// Everything the wall needs to present one meal card's recipe: display name,
+// detected source URL, and (for recipe-backed meals with no URL) the recipe's
+// stored ingredients/instructions so the tap still opens a usable recipe.
+function useMealCardData(event: CalendarEvent | null, fallbackName: string) {
+  const mealName = useMemo(
+    () => event ? (extractRecipeNameHint(event.title) || event.title) : fallbackName,
+    [event, fallbackName],
+  );
+  const recipeUrl = useMemo(
+    () => event ? resolveRecipeUrl(event.description) : null,
+    [event],
+  );
+  const { recipe } = useRecipe(event?.recipeId ?? null);
+  const recipeContent = useMemo(() => {
+    if (!recipe) return null;
+    if (recipe.ingredients.length === 0 && recipe.instructions.length === 0) return null;
+    return {
+      title: recipe.title,
+      ingredients: recipe.ingredients,
+      instructions: recipe.instructions,
+    };
+  }, [recipe]);
+  return useMemo(
+    () => ({ mealName, recipeUrl, recipeContent }),
+    [mealName, recipeUrl, recipeContent],
+  );
+}
+
 export function WallV2Shell() {
   const { user, loading: authLoading } = useAuth();
 
@@ -185,6 +214,11 @@ export function WallV2Shell() {
     [wallData.calendarEvents, mealEvents, now],
   );
 
+  const breakfastEvent = useMemo(
+    () => findBreakfastEvent([...wallData.calendarEvents, ...mealEvents], now),
+    [wallData.calendarEvents, mealEvents, now],
+  );
+
   const timeline = useMemo(
     () => adaptTimelineSections(
       todayData,
@@ -201,8 +235,8 @@ export function WallV2Shell() {
   // the rhythm sections. Dinner is promoted here, so adaptTimelineSections no
   // longer handles it.
   const scheduleBand = useMemo(
-    () => adaptScheduleBand(todayData, wallData.familyMembers, now, dinnerEvent),
-    [todayData, wallData.familyMembers, now, dinnerEvent],
+    () => adaptScheduleBand(todayData, wallData.familyMembers, now, dinnerEvent, breakfastEvent),
+    [todayData, wallData.familyMembers, now, dinnerEvent, breakfastEvent],
   );
 
   const upcoming = useMemo(
@@ -234,7 +268,7 @@ export function WallV2Shell() {
   // Guest mode: a privacy cover for when company's over — hides all content
   // behind a full-screen ambient clock/weather screen.
   const [guestMode, setGuestMode] = useState(false);
-  const [showRecipeViewer, setShowRecipeViewer] = useState(false);
+  const [recipeViewerMeal, setRecipeViewerMeal] = useState<'dinner' | 'breakfast' | null>(null);
   const [showDiscussion, setShowDiscussion] = useState(false);
   const [showQuickCapture, setShowQuickCapture] = useState(false);
   const [showPhone, setShowPhone] = useState(false);
@@ -255,28 +289,10 @@ export function WallV2Shell() {
   const { prompt: tonightPrompt, dismissed: tonightPromptDismissed } = useDailyDiscussionPrompt();
   const tonightQuestion = tonightPromptDismissed ? null : tonightPrompt;
 
-  const dinnerMealName = useMemo(
-    () => dinnerEvent ? (extractRecipeNameHint(dinnerEvent.title) || dinnerEvent.title) : 'Dinner',
-    [dinnerEvent],
-  );
-  const recipeUrl = useMemo(
-    () => dinnerEvent ? resolveRecipeUrl(dinnerEvent.description) : null,
-    [dinnerEvent],
-  );
-
-  // For recipe-backed meals with no source URL, fall back to the recipe's stored
-  // ingredients/instructions so tapping the dinner still opens a usable recipe.
-  const dinnerRecipeId = dinnerEvent?.recipeId ?? null;
-  const { recipe: dinnerRecipe } = useRecipe(dinnerRecipeId);
-  const recipeContent = useMemo(() => {
-    if (!dinnerRecipe) return null;
-    if (dinnerRecipe.ingredients.length === 0 && dinnerRecipe.instructions.length === 0) return null;
-    return {
-      title: dinnerRecipe.title,
-      ingredients: dinnerRecipe.ingredients,
-      instructions: dinnerRecipe.instructions,
-    };
-  }, [dinnerRecipe]);
+  const dinner = useMealCardData(dinnerEvent, 'Dinner');
+  const breakfast = useMealCardData(breakfastEvent, 'Breakfast');
+  const viewerMeal = recipeViewerMeal === 'breakfast' ? breakfast : dinner;
+  const viewerEvent = recipeViewerMeal === 'breakfast' ? breakfastEvent : dinnerEvent;
 
   const handleMarkDiscussed = useCallback(async (item: DiscussionItem) => {
     if (item.kind === 'task') {
@@ -353,11 +369,16 @@ export function WallV2Shell() {
   }, [discussionItems.length, showFlash]);
 
   const handleTapEvent = useCallback((id: string) => {
-    // Dinner card: open recipe viewer if a URL was detected, otherwise flash
-    // the meal name so the tap registers visibly even without a recipe.
+    // Meal cards: open recipe viewer if a URL/stored recipe was detected,
+    // otherwise flash the meal name so the tap registers visibly.
     if (id.startsWith('dinner-')) {
-      if (recipeUrl || recipeContent) setShowRecipeViewer(true);
-      else showFlash(`Tonight: ${dinnerMealName}`);
+      if (dinner.recipeUrl || dinner.recipeContent) setRecipeViewerMeal('dinner');
+      else showFlash(`Tonight: ${dinner.mealName}`);
+      return;
+    }
+    if (id.startsWith('breakfast-')) {
+      if (breakfast.recipeUrl || breakfast.recipeContent) setRecipeViewerMeal('breakfast');
+      else showFlash(`Breakfast: ${breakfast.mealName}`);
       return;
     }
     // Routine/event cards open the touch action sheet (Skip today / Mark done).
@@ -372,7 +393,7 @@ export function WallV2Shell() {
     } else {
       showFlash(tapped.title);
     }
-  }, [recipeUrl, recipeContent, dinnerMealName, timeline, showFlash]);
+  }, [dinner, breakfast, timeline, showFlash]);
 
   const handleWallSkip = useCallback(async (id: string, kind: 'event' | 'routine') => {
     const entityType = kind === 'routine' ? 'routine' : 'calendar_event';
@@ -549,13 +570,13 @@ export function WallV2Shell() {
         />
       )}
 
-      {showRecipeViewer && (recipeUrl || recipeContent) && (
+      {recipeViewerMeal && (viewerMeal.recipeUrl || viewerMeal.recipeContent) && (
         <WallRecipeViewer
-          url={recipeUrl ?? undefined}
-          content={!recipeUrl ? (recipeContent ?? undefined) : undefined}
-          mealName={dinnerMealName}
-          mealIcon={dinnerEvent ? getMealIcon(dinnerEvent.title) : '🍽️'}
-          onClose={() => setShowRecipeViewer(false)}
+          url={viewerMeal.recipeUrl ?? undefined}
+          content={!viewerMeal.recipeUrl ? (viewerMeal.recipeContent ?? undefined) : undefined}
+          mealName={viewerMeal.mealName}
+          mealIcon={viewerEvent ? getMealIcon(viewerEvent.title) : '🍽️'}
+          onClose={() => setRecipeViewerMeal(null)}
         />
       )}
 

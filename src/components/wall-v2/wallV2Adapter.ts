@@ -11,8 +11,8 @@
 
 import {
   Backpack, Bath, Briefcase, Calendar, Car, Check, ChefHat, ClipboardList,
-  Coffee, Heart, Moon, Music, Plane, Plug, RotateCw, ShoppingBag, Sparkles,
-  Sun, Sunrise, Trophy, Users, UtensilsCrossed, Clock, AlertCircle,
+  Coffee, Croissant, Heart, Moon, Music, Plane, Plug, RotateCw, ShoppingBag,
+  Sparkles, Sun, Sunrise, Trophy, Users, UtensilsCrossed, Clock, AlertCircle,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 
@@ -250,8 +250,9 @@ export function isCommitment(item: TimelineItem): boolean {
  *   - all-day calendar events → `allDay` strip
  *   - timed events + timed tasks → `timed`, sorted ascending by start time,
  *     each tagged with a formatted `time`
- *   - the structured dinner event (if any) → a special dinner card placed by
- *     time, replacing any raw "dinner" event so it isn't shown twice
+ *   - the structured dinner/breakfast events (if any) → special meal cards
+ *     placed by time, replacing any raw "dinner"/"breakfast" event so the
+ *     meal isn't shown twice
  * Routines and untimed tasks are excluded entirely (they belong to the rhythm zone).
  */
 export function adaptScheduleBand(
@@ -259,6 +260,7 @@ export function adaptScheduleBand(
   members: FamilyMember[],
   _now: Date,
   dinnerEvent: CalendarEvent | null,
+  breakfastEvent: CalendarEvent | null = null,
 ): WallV2ScheduleBandData {
   if (!today) return { allDay: [], timed: [] };
 
@@ -283,28 +285,35 @@ export function adaptScheduleBand(
     time: formatBandTime(i.startTime!),
   }));
 
-  if (dinnerEvent) {
-    const mealTitle = extractRecipeNameHint(dinnerEvent.title) || dinnerEvent.title;
-    const recipeUrl = resolveRecipeUrl(dinnerEvent.description);
-    const startStr = dinnerEvent.start_time || dinnerEvent.startTime;
+  // Promote a structured meal event to a highlighted card: drop any raw event
+  // for the same meal so it isn't listed twice, insert the card, re-sort.
+  const promoteMeal = (
+    event: CalendarEvent,
+    meal: 'dinner' | 'breakfast',
+    icon: LucideIcon,
+    tint: WallV2Tint,
+  ) => {
+    const startStr = event.start_time || event.startTime;
     const start = startStr ? new Date(startStr) : null;
-    const dinnerCard: WallV2TimelineEvent = {
-      id: `dinner-${dinnerEvent.id}`,
-      icon: UtensilsCrossed,
-      tint: 'peach',
-      title: 'Family dinner',
-      subtitle: mealTitle,
-      highlight: 'peach',
+    const card: WallV2TimelineEvent = {
+      id: `${meal}-${event.id}`,
+      icon,
+      tint,
+      title: meal === 'dinner' ? 'Family dinner' : 'Family breakfast',
+      subtitle: extractRecipeNameHint(event.title) || event.title,
+      highlight: tint,
       members: members.slice(0, 4).map(memberBubble),
-      recipeUrl,
+      recipeUrl: resolveRecipeUrl(event.description),
       time: start ? formatBandTime(start) : undefined,
     };
-    // Drop any raw "dinner" event so the meal isn't listed twice, then
-    // re-insert the dinner card and re-sort into chronological position.
-    timed = timed.filter((e) => !/dinner/i.test(e.title));
-    timed.push(dinnerCard);
+    const raw = new RegExp(meal, 'i');
+    timed = timed.filter((e) => !raw.test(e.title));
+    timed.push(card);
     timed.sort((a, b) => bandTimeKey(a) - bandTimeKey(b));
-  }
+  };
+
+  if (dinnerEvent) promoteMeal(dinnerEvent, 'dinner', UtensilsCrossed, 'peach');
+  if (breakfastEvent) promoteMeal(breakfastEvent, 'breakfast', Croissant, 'honey');
 
   return { allDay, timed };
 }

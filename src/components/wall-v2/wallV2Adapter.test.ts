@@ -394,6 +394,37 @@ describe('adaptScheduleBand', () => {
     // The raw "Family dinner" event is replaced by the dinner card, not shown twice.
     expect(band.timed.filter((e) => /dinner/i.test(e.title))).toHaveLength(1);
   });
+
+  it('inserts the breakfast card by time and drops a duplicate breakfast event', () => {
+    const day = makeDay({
+      isToday: true,
+      items: {
+        allday: [],
+        morning: [makeItem({ id: 'event-b', type: 'event', title: 'Breakfast · Pancakes', startTime: new Date('2026-06-03T07:30:00') })],
+        afternoon: [], evening: [],
+        unscheduled: [],
+      },
+    });
+    const breakfast = { id: 'b1', title: 'Breakfast · Pancakes', description: '', start_time: '2026-06-03T07:30:00' } as unknown as CalendarEvent;
+    const band = adaptScheduleBand(day, members, now, null, breakfast);
+    const breakfastCards = band.timed.filter((e) => e.id.startsWith('breakfast-'));
+    expect(breakfastCards).toHaveLength(1);
+    expect(breakfastCards[0].subtitle).toBe('Pancakes');
+    expect(breakfastCards[0].time).toBe('7:30 AM');
+    // The raw synthesized breakfast event is replaced by the card, not shown twice.
+    expect(band.timed.filter((e) => /breakfast/i.test(e.title))).toHaveLength(1);
+  });
+
+  it('sorts breakfast before dinner when both cards are present', () => {
+    const day = makeDay({
+      isToday: true,
+      items: { allday: [], morning: [], afternoon: [], evening: [], unscheduled: [] },
+    });
+    const breakfast = { id: 'b2', title: 'Breakfast · Granola', description: '', start_time: '2026-06-03T07:30:00' } as unknown as CalendarEvent;
+    const dinner = { id: 'd2', title: 'Dinner · Stir-fry', description: '', start_time: '2026-06-03T18:30:00' } as unknown as CalendarEvent;
+    const band = adaptScheduleBand(day, members, now, dinner, breakfast);
+    expect(band.timed.map((e) => e.id)).toEqual(['breakfast-b2', 'dinner-d2']);
+  });
 });
 
 describe('adaptTimelineSections — rhythm only', () => {
