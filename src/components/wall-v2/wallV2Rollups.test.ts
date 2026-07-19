@@ -15,7 +15,7 @@ function item(id: string, startTime: Date | null, over: Partial<TimelineItem> = 
 function day(date: Date, isToday: boolean, sections: Partial<Record<string, TimelineItem[]>>): WallDayData {
   return {
     date, isToday, birthdays: [], milestones: [],
-    items: { allday: [], unscheduled: [], morning: [], afternoon: [], evening: [], night: [], ...sections },
+    items: { allday: [], unscheduled: [], morning: [], afternoon: [], evening: [], ...sections },
   } as unknown as WallDayData;
 }
 
@@ -29,6 +29,10 @@ describe('computePrepWindow', () => {
   it('honors explicit prep minutes', () => {
     const w = computePrepWindow(new Date(2026, 6, 19, 18, 0), 30);
     expect(w.label).toBe('5:30 – 6:00');
+  });
+  it('keeps AM/PM suffix only for 12-o\'clock hours', () => {
+    const w = computePrepWindow(new Date(2026, 6, 19, 12, 30), 45);
+    expect(w.label).toBe('11:45 – 12:30 PM');
   });
 });
 
@@ -51,6 +55,28 @@ describe('adaptTomorrowMorning', () => {
   });
   it('returns [] when tomorrow is missing or empty', () => {
     expect(adaptTomorrowMorning([day(new Date(2026, 6, 19), true, {})], now)).toEqual([]);
+  });
+  it('excludes completed items', () => {
+    const tomorrow = day(new Date(2026, 6, 20), false, {
+      morning: [
+        item('a', at(7)),
+        item('b', at(7, 30), { completed: true } as Partial<TimelineItem>),
+        item('c', at(8, 15)),
+      ],
+    });
+    const rows = adaptTomorrowMorning([tomorrow], now);
+    expect(rows.map((r) => r.id)).toEqual(['a', 'c']);
+  });
+  it('excludes all-day items', () => {
+    const tomorrow = day(new Date(2026, 6, 20), false, {
+      morning: [
+        item('a', at(7)),
+        item('allday-event', at(0, 0), { allDay: true } as Partial<TimelineItem>),
+        item('c', at(8, 15)),
+      ],
+    });
+    const rows = adaptTomorrowMorning([tomorrow], now);
+    expect(rows.map((r) => r.id)).toEqual(['a', 'c']);
   });
 });
 
@@ -75,5 +101,13 @@ describe('adaptAtAGlanceRollup', () => {
     const rows = adaptAtAGlanceRollup(today, null, null, now);
     expect(rows.find((r) => r.icon === 'home')).toBeUndefined();
     expect(rows.find((r) => r.icon === 'dinner')).toBeUndefined();
+  });
+  it('excludes all-day events from count and evening-out check', () => {
+    const today = day(new Date(2026, 6, 19), true, {
+      allday: [item('birthday', at(0, 0), { type: 'event', allDay: true } as Partial<TimelineItem>)],
+    });
+    const rows = adaptAtAGlanceRollup(today, null, null, now);
+    expect(rows.find((r) => r.icon === 'calendar')).toBeUndefined();
+    expect(rows.find((r) => r.icon === 'home')).toBeDefined();
   });
 });

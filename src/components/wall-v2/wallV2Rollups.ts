@@ -6,8 +6,12 @@
 import type { WallDayData } from '@/hooks/useWallData';
 import type { TimelineItem } from '@/types/timeline';
 
-const clock = (d: Date) =>
-  d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }).replace(/\s?[AP]M$/i, '');
+const clock = (d: Date) => {
+  const formatted = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  // Keep AM/PM suffix only for 12-o'clock hours; strip for all others
+  const startsWithTwelve = formatted.startsWith('12:');
+  return startsWithTwelve ? formatted : formatted.replace(/\s?[AP]M$/i, '');
+};
 
 export function computePrepWindow(dinnerStart: Date, prepMinutes = 45): { start: Date; end: Date; label: string } {
   const start = new Date(dinnerStart.getTime() - prepMinutes * 60_000);
@@ -31,7 +35,7 @@ export function adaptTomorrowMorning(
   const tomorrow = days.find((d) => isTomorrow(d, now));
   if (!tomorrow) return [];
   const timed = allItems(tomorrow)
-    .filter((i): i is TimelineItem & { startTime: Date } => !!i.startTime && !i.completed)
+    .filter((i): i is TimelineItem & { startTime: Date } => !!i.startTime && !i.completed && !i.allDay)
     .sort((a, b) => a.startTime.getTime() - b.startTime.getTime());
   const morning = timed.filter((i) => i.startTime.getHours() < 12);
   return (morning.length > 0 ? morning : timed)
@@ -55,7 +59,7 @@ export function adaptAtAGlanceRollup(
   const items = allItems(today);
   const rows: GlanceRollupRow[] = [];
 
-  const events = items.filter((i) => i.type === 'event' && !i.completed);
+  const events = items.filter((i) => i.type === 'event' && !i.completed && !i.allDay);
   const nextEvent = events
     .filter((i): i is TimelineItem & { startTime: Date } => !!i.startTime && i.startTime >= now)
     .sort((a, b) => a.startTime.getTime() - b.startTime.getTime())[0];
