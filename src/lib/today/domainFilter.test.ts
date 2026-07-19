@@ -1,6 +1,14 @@
 import { describe, it, expect } from 'vitest'
-import { matchesDomain, filterTasksForPlanning, domainSessionToken } from './domainFilter'
-import type { Task } from '@/types/task'
+import {
+  matchesDomain,
+  filterTasksForPlanning,
+  filterEventsForDomain,
+  filterRoutinesForDomain,
+  domainSessionToken,
+} from './domainFilter'
+import type { Task, TaskContext } from '@/types/task'
+import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
+import type { Routine } from '@/types/actionable'
 
 const task = (overrides: Partial<Task>): Task => ({
   id: Math.random().toString(36).slice(2),
@@ -43,6 +51,77 @@ describe('filterTasksForPlanning', () => {
   it('untagged bucketed (non-inbox) items are hidden from domain sessions', () => {
     const ids = filterTasksForPlanning(pool, 'family').map((t) => t.id)
     expect(ids).toEqual(['f', 'ni'])
+  })
+})
+
+describe('filterEventsForDomain', () => {
+  const event = (overrides: Partial<CalendarEvent>): CalendarEvent =>
+    ({ id: Math.random().toString(36).slice(2), ...overrides }) as CalendarEvent
+
+  // calendar_id → domain mapping used by every test below
+  const byCalendar = (calendarId?: string): TaskContext | null =>
+    calendarId === 'cal-work' ? 'work' : calendarId === 'cal-family' ? 'family' : null
+
+  const pool = [
+    event({ id: 'w', calendar_id: 'cal-work' }),
+    event({ id: 'f', calendar_id: 'cal-family' }),
+    event({ id: 'u', calendar_id: 'cal-unmapped' }),
+  ]
+
+  it('universal shows everything', () => {
+    expect(filterEventsForDomain(pool, 'universal')).toEqual(pool)
+  })
+
+  it('a domain shows its own events plus untagged (unmapped calendars)', () => {
+    const ids = filterEventsForDomain(pool, 'work', { getDomainForCalendar: byCalendar }).map((e) => e.id)
+    expect(ids).toEqual(['w', 'u'])
+  })
+
+  it('other domains are hidden from a specific domain', () => {
+    const ids = filterEventsForDomain(pool, 'personal', { getDomainForCalendar: byCalendar }).map((e) => e.id)
+    expect(ids).toEqual(['u'])
+  })
+
+  it('a per-event override beats the calendar mapping', () => {
+    const overrides = new Map<string, TaskContext>([['w', 'personal']])
+    const ids = filterEventsForDomain(pool, 'personal', {
+      getDomainForCalendar: byCalendar,
+      eventContextOverrides: overrides,
+    }).map((e) => e.id)
+    expect(ids).toEqual(['w', 'u'])
+  })
+
+  it('family also shows private events explicitly shared with family', () => {
+    const notes = new Map([['w', { sharedWithFamily: true }]])
+    const ids = filterEventsForDomain(pool, 'family', {
+      getDomainForCalendar: byCalendar,
+      eventNotesMap: notes,
+    }).map((e) => e.id)
+    expect(ids).toEqual(['w', 'f', 'u'])
+  })
+
+  it('family hides private events that are not shared', () => {
+    const ids = filterEventsForDomain(pool, 'family', { getDomainForCalendar: byCalendar }).map((e) => e.id)
+    expect(ids).toEqual(['f', 'u'])
+  })
+})
+
+describe('filterRoutinesForDomain', () => {
+  const routine = (overrides: Partial<Routine>): Routine =>
+    ({ id: Math.random().toString(36).slice(2), name: 'r', ...overrides }) as Routine
+  const pool = [
+    routine({ id: 'w', context: 'work' }),
+    routine({ id: 'f', context: 'family' }),
+    routine({ id: 'u', context: null }),
+  ]
+
+  it('universal shows everything', () => {
+    expect(filterRoutinesForDomain(pool, 'universal')).toEqual(pool)
+  })
+
+  it('a domain shows only exact-context routines (untagged stay universal-only, mirroring HomeView)', () => {
+    expect(filterRoutinesForDomain(pool, 'work').map((r) => r.id)).toEqual(['w'])
+    expect(filterRoutinesForDomain(pool, 'family').map((r) => r.id)).toEqual(['f'])
   })
 })
 

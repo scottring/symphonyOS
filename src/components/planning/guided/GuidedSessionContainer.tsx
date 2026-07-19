@@ -14,8 +14,9 @@ import { useProjects } from '@/hooks/useProjects'
 import { useRoutines } from '@/hooks/useRoutines'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { useDomain } from '@/hooks/useDomain'
+import { useCalendarDomainMappings } from '@/hooks/useCalendarDomainMappings'
 import { isEverydayRoutine } from '@/lib/routineUtils'
-import { filterTasksForPlanning } from '@/lib/today/domainFilter'
+import { filterTasksForPlanning, filterEventsForDomain, filterRoutinesForDomain } from '@/lib/today/domainFilter'
 import type { TaskBucket } from '@/types/task'
 import type { GoalStatus } from '@/types/goal'
 
@@ -36,11 +37,12 @@ export function GuidedSessionContainer({ horizon, onClose, onFinished, onChain, 
   const { routines: allRoutines, getRoutinesForDate } = useRoutines()
   const { getCurrentUserMember } = useFamilyMembers()
   const { currentDomain } = useDomain()
+  const { getDomainForCalendar } = useCalendarDomainMappings()
 
   // Domain scoping — the ONE place the session pool narrows. Every step reads
-  // host.tasks/projects/goals, so filtering here scopes review, write-list,
-  // look-above, the grid, someday and overdue without per-step changes.
-  // Universal passes everything through (the whole-life session).
+  // host.tasks/projects/goals/events/routines, so filtering here scopes review,
+  // write-list, look-above, the grid, someday and overdue without per-step
+  // changes. Universal passes everything through (the whole-life session).
   const domainTasks = useMemo(() => filterTasksForPlanning(tasks, currentDomain), [tasks, currentDomain])
   const domainProjects = useMemo(
     () => (currentDomain === 'universal' ? projects : projects.filter((p) => p.context === currentDomain)),
@@ -49,6 +51,24 @@ export function GuidedSessionContainer({ horizon, onClose, onFinished, onChain, 
   const domainGoals = useMemo(
     () => (currentDomain === 'universal' ? goals : goals.filter((g) => g.context === currentDomain)),
     [goals, currentDomain],
+  )
+  // Events scope at the calendar→domain level (this container doesn't load
+  // event notes, so per-event overrides/family shares don't refine it here).
+  const domainEvents = useMemo(
+    () => filterEventsForDomain(events, currentDomain, { getDomainForCalendar }),
+    [events, currentDomain, getDomainForCalendar],
+  )
+  // CalendarStep reads fetchEvents' RETURN value (not host.events), so the
+  // range fetch must come back already domain-scoped too.
+  const domainFetchEvents = useCallback(
+    async (start: Date, end: Date) =>
+      filterEventsForDomain(await fetchEvents(start, end), currentDomain, { getDomainForCalendar }),
+    [fetchEvents, currentDomain, getDomainForCalendar],
+  )
+  const domainRoutines = useMemo(() => filterRoutinesForDomain(allRoutines, currentDomain), [allRoutines, currentDomain])
+  const domainGetRoutinesForDate = useCallback(
+    (date: Date) => filterRoutinesForDomain(getRoutinesForDate(date), currentDomain),
+    [getRoutinesForDate, currentDomain],
   )
 
   // Untagged inbox items stay visible in a domain session (pre-triage — see
@@ -92,8 +112,8 @@ export function GuidedSessionContainer({ horizon, onClose, onFinished, onChain, 
 
   const host = useMemo<GuidedHost>(() => ({
     tasks: domainTasks, tasksLoading,
-    events, calendarConnected: isConnected, calendarChecking,
-    fetchEvents, createEvent,
+    events: domainEvents, calendarConnected: isConnected, calendarChecking,
+    fetchEvents: domainFetchEvents, createEvent,
     onPushTask: pushTaskStamped, onSetBucket: setBucketStamped, onCompleteTask: toggleTask, onUpdateTask: updateTask,
     createTaskInBucket, createDatedTask,
     // projectsMap stays UNFILTERED — it's the name-lookup for task rows, and a
@@ -104,11 +124,11 @@ export function GuidedSessionContainer({ horizon, onClose, onFinished, onChain, 
     addArea: (name: string) => addArea(name),
     updateGoalStatus: (id: string, status: GoalStatus) => updateGoal(id, { status }),
     carryGoal: (id: string) => updateGoal(id, { year: new Date().getFullYear(), status: 'active' }),
-    routines: allRoutines,
-    draggableRoutines: allRoutines.filter((r) => r.visibility === 'active' && !isEverydayRoutine(r.recurrence_pattern) && !r.time_of_day),
+    routines: domainRoutines,
+    draggableRoutines: domainRoutines.filter((r) => r.visibility === 'active' && !isEverydayRoutine(r.recurrence_pattern) && !r.time_of_day),
     onScheduleRoutine,
-    getRoutinesForDate,
-  }), [domainTasks, tasksLoading, events, isConnected, calendarChecking, fetchEvents, createEvent, pushTaskStamped, setBucketStamped, toggleTask, updateTask, createTaskInBucket, createDatedTask, domainProjects, projectsMap, domainGoals, areas, addGoal, addArea, updateGoal, allRoutines, onScheduleRoutine, getRoutinesForDate, currentDomain])
+    getRoutinesForDate: domainGetRoutinesForDate,
+  }), [domainTasks, tasksLoading, domainEvents, isConnected, calendarChecking, domainFetchEvents, createEvent, pushTaskStamped, setBucketStamped, toggleTask, updateTask, createTaskInBucket, createDatedTask, domainProjects, projectsMap, domainGoals, areas, addGoal, addArea, updateGoal, domainRoutines, onScheduleRoutine, domainGetRoutinesForDate, currentDomain])
 
   return <GuidedSession horizon={horizon} domain={currentDomain} host={host} onClose={onClose} onFinished={onFinished} onChain={onChain} />
 }

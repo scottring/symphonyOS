@@ -1,6 +1,7 @@
 // src/apps/tasks/TasksApp.tsx
-import { useMemo, useRef } from 'react';
+import { Suspense, useMemo, useRef, useState } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
+import { HelpPanel } from '@/components/lazy';
 import { ListsProvider } from '@/contexts/ListsContext';
 import { NotesProvider } from '@/contexts/NotesContext';
 import { GoalsProvider } from '@/contexts/GoalsContext';
@@ -28,18 +29,19 @@ export function TasksApp() {
   // HomeHeader (rendered by HomeView) consumes AppShellChrome. The Today AI
   // button toggles the right-rail assistant, whose shared visibility lives in
   // useScratchpadHidden (the same state Shell.tsx's ShellAssistantHost reads),
-  // so the masthead button and the rail stay in sync. Help stays inert here.
+  // so the masthead button and the rail stay in sync.
   const helpButtonRef = useRef<HTMLButtonElement>(null);
+  const [helpOpen, setHelpOpen] = useState(false);
   const { hidden, setHidden } = useScratchpadHidden();
   const chrome = useMemo<AppShellChromeContextValue>(
     () => ({
       chatOpen: !hidden,
       onChatOpenChange: (open: boolean) => setHidden(!open),
-      helpOpen: false,
-      onHelpOpenChange: () => {},
+      helpOpen,
+      onHelpOpenChange: setHelpOpen,
       helpButtonRef,
     }),
-    [hidden, setHidden],
+    [hidden, setHidden, helpOpen],
   );
 
   return (
@@ -67,6 +69,12 @@ export function TasksApp() {
             <Route path="tasks-new/inbox" element={<InboxViewContainer />} />
             <Route path="tasks-new/task/:taskId" element={<TaskViewRoute />} />
             </Routes>
+            {/* Help panel — anchored to the ? button HomeHeader renders on Today */}
+            {helpOpen && (
+              <Suspense fallback={null}>
+                <HelpPanel open={helpOpen} onClose={() => setHelpOpen(false)} anchorRef={helpButtonRef} />
+              </Suspense>
+            )}
           </NotesProvider>
         </ListsProvider>
       </GoalsProvider>

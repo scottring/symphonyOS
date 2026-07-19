@@ -7,6 +7,9 @@
 // exception is the pre-triage inbox, where tagging IS the work (see
 // filterTasksForPlanning).
 import type { Task, TaskContext } from '@/types/task'
+import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
+import { resolveEventContext } from './eventContext'
+import { isEventVisibleToFamily } from './eventVisibility'
 
 /** Mirrors useDomain's Domain, kept here so pure lib code and tests don't
  *  import from a hook module. */
@@ -33,6 +36,48 @@ export function matchesDomain(
 export function filterTasksForPlanning(tasks: Task[], domain: PlanningDomain): Task[] {
   if (domain === 'universal') return tasks
   return tasks.filter((t) => t.context === domain || (!t.context && t.bucket === 'inbox'))
+}
+
+/** Resolution inputs for event domain filtering. All optional — a caller that
+ *  only has the calendar→domain mapping still gets correct calendar-level
+ *  scoping; overrides and family-share notes refine it where available. */
+export interface EventDomainDeps {
+  /** Manual per-event context overrides (from event notes) — beat the mapping. */
+  eventContextOverrides?: Map<string, TaskContext>
+  /** calendar_id/name → domain mapping (useCalendarDomainMappings). */
+  getDomainForCalendar?: (calendarId?: string, calendarName?: string) => TaskContext | null
+  /** Family domain also shows private events explicitly shared with family. */
+  eventNotesMap?: ReadonlyMap<string, { sharedWithFamily?: boolean }>
+}
+
+/** Domain-scope calendar events the same way HomeView scopes Today: a specific
+ *  domain shows its own events PLUS untagged ones (calendars with no domain
+ *  mapping stay visible everywhere until mapped); Universal shows all; Family
+ *  additionally shows private events explicitly shared with family. */
+export function filterEventsForDomain(
+  events: CalendarEvent[],
+  domain: PlanningDomain,
+  deps: EventDomainDeps = {},
+): CalendarEvent[] {
+  if (domain === 'universal') return events
+  return events.filter((event) => {
+    const resolved = resolveEventContext(event, deps.eventContextOverrides, deps.getDomainForCalendar)
+    if (domain === 'family') {
+      const note = deps.eventNotesMap?.get(event.google_event_id || event.id)
+      return isEventVisibleToFamily(resolved, !!note?.sharedWithFamily)
+    }
+    return resolved === domain || resolved == null
+  })
+}
+
+/** Domain-scope routines: exact context match only — untagged routines live at
+ *  the whole-life level and show only in Universal (mirrors HomeView). */
+export function filterRoutinesForDomain<T extends { context?: TaskContext | null }>(
+  routines: T[],
+  domain: PlanningDomain,
+): T[] {
+  if (domain === 'universal') return routines
+  return routines.filter((r) => r.context === domain)
 }
 
 /** planning_sessions period token for a domain session. Universal keeps the

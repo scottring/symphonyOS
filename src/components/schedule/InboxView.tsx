@@ -231,7 +231,10 @@ export function InboxView({
         if (assignees.length > 0 && !assignees.includes(currentUserMemberId)) return false
       }
       if (currentDomain === 'universal') return true
-      if (task.bucket === 'inbox' && !task.completed) return true
+      // UNTAGGED inbox items cross domains (pre-triage — tagging IS the work),
+      // but an item already tagged for another domain stays out of this one.
+      // Mirrors filterTasksForPlanning's untagged-inbox exception.
+      if (!task.context && task.bucket === 'inbox' && !task.completed) return true
       return task.context === currentDomain
     })
   }, [tasks, currentDomain, currentUserMemberId])

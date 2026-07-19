@@ -5,8 +5,7 @@ import type { Project } from '@/types/project'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine, ActionableInstance } from '@/types/actionable'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
-import { resolveEventContext } from '@/lib/today/eventContext'
-import { isEventVisibleToFamily } from '@/lib/today/eventVisibility'
+import { filterEventsForDomain, filterRoutinesForDomain } from '@/lib/today/domainFilter'
 import { useHomeView } from '@/hooks/useHomeView'
 import { useMobile } from '@/hooks/useMobile'
 import { useUndo } from '@/hooks/useUndo'
@@ -110,18 +109,16 @@ export function HomeView({
   // W4 — Today landing: whether a planning rhythm nudge is due right now.
   const dueSession = useMemo(() => getDueSession(cadenceConfig, new Date()), [cadenceConfig])
 
-  const filteredRoutines = useMemo(() => {
-    if (currentDomain === 'universal') return routines
-    return routines.filter(routine => routine.context === currentDomain)
-  }, [routines, currentDomain])
+  const filteredRoutines = useMemo(
+    () => filterRoutinesForDomain(routines, currentDomain),
+    [routines, currentDomain])
 
   // All active routines, domain-filtered — used by Week/Month which do their
   // own per-day recurrence matching. filteredRoutines is today-filtered and
   // unsuitable for multi-day views.
-  const filteredAllActiveRoutines = useMemo(() => {
-    if (currentDomain === 'universal') return allActiveRoutines
-    return allActiveRoutines.filter(routine => routine.context === currentDomain)
-  }, [allActiveRoutines, currentDomain])
+  const filteredAllActiveRoutines = useMemo(
+    () => filterRoutinesForDomain(allActiveRoutines, currentDomain),
+    [allActiveRoutines, currentDomain])
 
   const filteredProjects = useMemo(() => {
     if (currentDomain === 'universal') return projects
@@ -133,18 +130,13 @@ export function HomeView({
   // domain shows its own events PLUS untagged ones (calendars with no domain
   // mapping stay visible everywhere until mapped); Universal shows all. This
   // stops e.g. work-calendar events leaking into the Family/Personal views.
-  const filteredEvents = useMemo(() => {
-    if (currentDomain === 'universal') return events
-    return events.filter(event => {
-      const resolved = resolveEventContext(event, ctx.eventContextOverrides, ctx.getDomainForCalendar)
-      // Family view also includes work/personal events explicitly shared with family.
-      if (currentDomain === 'family') {
-        const note = ctx.eventNotesMap?.get(event.google_event_id || event.id)
-        return isEventVisibleToFamily(resolved, !!note?.sharedWithFamily)
-      }
-      return resolved === currentDomain || resolved == null
-    })
-  }, [events, currentDomain, ctx.eventContextOverrides, ctx.getDomainForCalendar, ctx.eventNotesMap])
+  const filteredEvents = useMemo(
+    () => filterEventsForDomain(events, currentDomain, {
+      eventContextOverrides: ctx.eventContextOverrides,
+      getDomainForCalendar: ctx.getDomainForCalendar,
+      eventNotesMap: ctx.eventNotesMap,
+    }),
+    [events, currentDomain, ctx.eventContextOverrides, ctx.getDomainForCalendar, ctx.eventNotesMap])
 
   // Assignee filter state — persisted, and defaulted to the logged-in person
   // ("my tasks") so each member sees their own world first and can tap to

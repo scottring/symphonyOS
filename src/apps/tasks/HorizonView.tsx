@@ -38,7 +38,7 @@ import { DenseInboxRow } from '@/components/schedule/DenseInboxRow';
 import { TriageWhenMenu, type TriageWhen } from '@/components/schedule/TriageWhenMenu';
 import { selectOverdue } from '@/lib/today/taskPools';
 import { selectHorizonPool, HORIZONS, type HorizonId } from '@/lib/today/horizons';
-import { matchesDomain } from '@/lib/today/domainFilter';
+import { matchesDomain, filterEventsForDomain } from '@/lib/today/domainFilter';
 import { makeAssigneeFilter } from '@/lib/today/assigneeFilter';
 import { useConvertTaskToProject } from '@/hooks/useConvertTaskToProject';
 import { applyTriageWhen } from '@/lib/triage/applyWhen';
@@ -272,6 +272,13 @@ export function HorizonView({ horizon }: HorizonViewProps) {
     }
     return overrides;
   }, [eventNotesMap]);
+
+  // Events on the month/year calendar grids scope to the current domain just
+  // like tasks — otherwise work-calendar events leak into Family/Personal.
+  const domainEvents = useMemo(
+    () => filterEventsForDomain(events, currentDomain, { eventContextOverrides, getDomainForCalendar, eventNotesMap }),
+    [events, currentDomain, eventContextOverrides, getDomainForCalendar, eventNotesMap],
+  );
 
   // Create INTO this horizon's bucket — not dated-today. A task added on the
   // This Month page belongs in the month pool, or it vanishes from the page
@@ -557,7 +564,7 @@ export function HorizonView({ horizon }: HorizonViewProps) {
             <YearCalendarGrid
               year={new Date().getFullYear()}
               tasks={domainTasks}
-              events={events}
+              events={domainEvents}
               onOpenMonth={(m) => setZoomMonth(m)}
             />
           </div>
@@ -565,7 +572,7 @@ export function HorizonView({ horizon }: HorizonViewProps) {
             <MonthZoomSheet
               month={new Date(new Date().getFullYear(), zoomMonth, 1)}
               tasks={domainTasks}
-              events={events}
+              events={domainEvents}
               onClose={() => setZoomMonth(null)}
               onPlaceTask={(id, day) => updateTask(id, { bucket: 'timed', scheduledFor: day })}
               onUnscheduleTask={(id) => updateTask(id, { bucket: 'month', scheduledFor: undefined })}
@@ -703,7 +710,7 @@ export function HorizonView({ horizon }: HorizonViewProps) {
               <MonthCalendarGrid
                 month={viewedDate}
                 tasks={domainTasks}
-                events={events}
+                events={domainEvents}
                 onPlaceTask={(id, day) => updateTask(id, { bucket: 'timed', scheduledFor: day })}
                 onUnscheduleTask={(id) => updateTask(id, { bucket: 'month', scheduledFor: undefined })}
                 onSelectTask={handleSelect}
