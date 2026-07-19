@@ -30,7 +30,7 @@ export function WallV2GuestScreen({
       <div className="font-display text-[10rem] leading-none tabular-nums drop-shadow-lg">
         {time}
       </div>
-      <div className={`text-3xl font-medium ${WALL.inkStrong}`}>
+      <div className={`font-display text-3xl font-medium ${WALL.inkStrong}`}>
         {weekday}, {fullDate}
       </div>
       <div className={`flex items-center gap-3 text-2xl ${WALL.muted}`}>

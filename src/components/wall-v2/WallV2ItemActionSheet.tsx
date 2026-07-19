@@ -144,7 +144,7 @@ export function WallV2ItemActionSheet({ event, onSkip, onMarkDone, onPushTask, o
                   <div className={`flex items-center gap-2 mb-1.5 ${WALL.label}`}>
                     <FileText className="w-4 h-4" /> Notes
                   </div>
-                  <div className={`whitespace-pre-wrap leading-snug ${WALL.ink}`}>
+                  <div className={`whitespace-pre-wrap leading-snug ${WALL.inkStrong}`}>
                     {event.notes}
                   </div>
                 </div>
