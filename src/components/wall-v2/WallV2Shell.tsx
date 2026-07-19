@@ -284,9 +284,9 @@ export function WallV2Shell() {
     () => adaptAtAGlanceRollup(todayData, dinnerStartDate, dinnerEvent ? dinner.mealName : null, now),
     [todayData, dinnerStartDate, dinnerEvent, dinner.mealName, now],
   );
-  // Keep Moving = task-kind items from every timeline section, incomplete first.
+  // Keep Moving = incomplete task-kind items from the timeline sections.
   const keepMovingTasks = useMemo(
-    () => timeline.flatMap((s) => s.events).filter((e) => e.kind === 'task'),
+    () => timeline.flatMap((s) => s.events).filter((e) => e.kind === 'task' && !e.completed),
     [timeline],
   );
 

@@ -39,10 +39,10 @@ const QUOTES = [
 
 /** Deterministic daily rotation — same quote all day, next quote tomorrow. */
 export function wallQuote(date: Date): { text: string; author: string } {
-  const y = date.getFullYear();
-  const m = date.getMonth();
-  const d = date.getDate();
-  // Deterministic index from local calendar day
-  const dayIndex = y * 10000 + m * 100 + d;
-  return QUOTES[dayIndex % QUOTES.length];
+  // Days since epoch for this local calendar day, so the index advances by
+  // exactly 1 per day (no same-month/DST aliasing from a y/m/d packed hash).
+  const dayIndex = Math.floor(
+    new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime() / 86_400_000,
+  );
+  return QUOTES[((dayIndex % QUOTES.length) + QUOTES.length) % QUOTES.length];
 }
