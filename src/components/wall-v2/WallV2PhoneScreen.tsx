@@ -9,6 +9,7 @@ import { useRef, useState } from 'react'
 import { Phone, X, PhoneCall } from 'lucide-react'
 import { useKidPhoneContacts } from '@/hooks/useKidPhoneContacts'
 import { placeCall } from '@/lib/telephony/placeCall'
+import { WALL } from './wallTheme'
 import type { KidPhoneContact } from '@/lib/telephony/listContacts'
 
 type Pending = { state: 'confirm' | 'calling' | 'error'; contact: KidPhoneContact; message?: string }
@@ -32,7 +33,7 @@ function ContactButton({ c, large, onTap }: { c: KidPhoneContact; large?: boolea
           ? <img src={c.photoURL} alt="" className="w-full h-full object-cover" />
           : <span className="font-bold">{initials(c.name)}</span>}
       </span>
-      <span className={`font-bold text-stone-800 dark:text-stone-100 ${label} leading-tight text-center`}>{c.name}</span>
+      <span className={`font-bold ${WALL.inkStrong} ${label} leading-tight text-center`}>{c.name}</span>
     </button>
   )
 }
@@ -71,16 +72,16 @@ export function WallV2PhoneScreen({ onClose }: { onClose: () => void }) {
   const empty = !loading && favorites.length === 0 && others.length === 0
 
   return (
-    <div className="fixed inset-0 z-40 bg-[var(--color-bg-base)] dark:bg-stone-950 overflow-auto">
+    <div className={`fixed inset-0 z-40 overflow-auto ${WALL.root}`}>
       <div className="sticky top-0 flex items-center justify-between px-8 py-6 bg-inherit">
-        <h1 className="flex items-center gap-3 text-3xl font-extrabold text-stone-800 dark:text-stone-100">
+        <h1 className={`flex items-center gap-3 text-3xl font-extrabold ${WALL.inkStrong}`}>
           <Phone className="w-8 h-8" /> Call someone
         </h1>
         <button
           type="button"
           onClick={onClose}
           aria-label="Close"
-          className="grid place-items-center w-14 h-14 rounded-full bg-white/85 dark:bg-stone-800/85 border border-stone-300/70 dark:border-stone-700/70 shadow-md hover:bg-white dark:hover:bg-stone-800 transition-colors"
+          className={`grid place-items-center w-14 h-14 ${WALL.card}`}
         >
           <X className="w-7 h-7" />
         </button>
@@ -88,9 +89,9 @@ export function WallV2PhoneScreen({ onClose }: { onClose: () => void }) {
 
       <div className="px-8 pb-16">
         {loading && favorites.length === 0 && others.length === 0 && (
-          <p className="mt-10 text-xl text-stone-500">Loading the phone book…</p>
+          <p className={`mt-10 text-xl ${WALL.muted}`}>Loading the phone book…</p>
         )}
-        {empty && <p className="mt-10 text-xl text-stone-500">No one to call yet.</p>}
+        {empty && <p className={`mt-10 text-xl ${WALL.muted}`}>No one to call yet.</p>}
         {error && (favorites.length > 0 || others.length > 0) && (
           <p className="mb-4 text-sm text-amber-700">Showing the last saved list.</p>
         )}
@@ -103,7 +104,7 @@ export function WallV2PhoneScreen({ onClose }: { onClose: () => void }) {
 
         {others.length > 0 && (
           <>
-            <h2 className="text-lg font-bold text-stone-500 uppercase tracking-wide mb-4">All contacts</h2>
+            <h2 className={`text-lg font-bold uppercase tracking-wide mb-4 ${WALL.muted}`}>All contacts</h2>
             <div className="flex flex-wrap gap-4 justify-center">
               {others.map((c) => <ContactButton key={c.contactId} c={c} onTap={(x) => setPending({ state: 'confirm', contact: x })} />)}
             </div>
@@ -113,7 +114,7 @@ export function WallV2PhoneScreen({ onClose }: { onClose: () => void }) {
 
       {pending && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-stone-900/60 backdrop-blur-sm p-8">
-          <div className="w-full max-w-md rounded-3xl bg-white dark:bg-stone-900 p-8 text-center shadow-2xl">
+          <div className={`w-full max-w-md p-8 text-center ${WALL.card}`}>
             <div className="grid place-items-center w-32 h-32 mx-auto rounded-full overflow-hidden bg-amber-100 text-amber-900 text-4xl font-bold border-4 border-white shadow-lg mb-5">
               {pending.contact.photoURL
                 ? <img src={pending.contact.photoURL} alt="" className="w-full h-full object-cover" />
@@ -121,29 +122,29 @@ export function WallV2PhoneScreen({ onClose }: { onClose: () => void }) {
             </div>
             {pending.state === 'calling' ? (
               <>
-                <p className="flex items-center justify-center gap-2 text-2xl font-bold text-stone-800 dark:text-stone-100">
+                <p className={`flex items-center justify-center gap-2 text-2xl font-bold ${WALL.inkStrong}`}>
                   <PhoneCall className="w-6 h-6 animate-pulse" /> Calling {pending.contact.name}…
                 </p>
-                <p className="mt-1 text-base text-stone-500">Pick up the phone when it rings.</p>
+                <p className={`mt-1 text-base ${WALL.muted}`}>Pick up the phone when it rings.</p>
                 <button
                   type="button"
                   onClick={cancelCalling}
-                  className="mt-6 w-full py-4 rounded-2xl bg-stone-100 dark:bg-stone-800 text-stone-700 dark:text-stone-200 text-xl font-bold"
+                  className={`mt-6 w-full py-4 text-xl font-bold ${WALL.cardInset} ${WALL.inkStrong}`}
                 >
                   Cancel
                 </button>
               </>
             ) : (
               <>
-                <p className="text-2xl font-extrabold text-stone-800 dark:text-stone-100 mb-1">Call {pending.contact.name}?</p>
+                <p className={`text-2xl font-extrabold mb-1 ${WALL.inkStrong}`}>Call {pending.contact.name}?</p>
                 {pending.state === 'error'
                   ? <p className="text-base text-red-600 font-semibold mb-6">{pending.message}</p>
-                  : <p className="text-base text-stone-500 mb-6">The phone will ring — pick it up to talk.</p>}
+                  : <p className={`text-base mb-6 ${WALL.muted}`}>The phone will ring — pick it up to talk.</p>}
                 <div className="flex gap-4">
                   <button
                     type="button"
                     onClick={() => setPending(null)}
-                    className="flex-1 py-4 rounded-2xl bg-stone-100 dark:bg-stone-800 text-stone-700 dark:text-stone-200 text-xl font-bold"
+                    className={`flex-1 py-4 text-xl font-bold ${WALL.cardInset} ${WALL.inkStrong}`}
                   >
                     Cancel
                   </button>

@@ -5,6 +5,7 @@
 // large clock, date, and weather over a calm gradient. Tap anywhere to exit.
 
 import type { LucideIcon } from 'lucide-react';
+import { WALL } from './wallTheme';
 
 interface Props {
   time: string;       // "9:41 AM"
@@ -24,20 +25,20 @@ export function WallV2GuestScreen({
       type="button"
       onClick={onExit}
       aria-label="Exit guest mode"
-      className="fixed inset-0 z-50 flex flex-col items-center justify-center gap-6 text-white cursor-pointer bg-gradient-to-br from-emerald-900 via-stone-900 to-stone-950"
+      className={`fixed inset-0 z-50 flex flex-col items-center justify-center gap-6 cursor-pointer ${WALL.root}`}
     >
       <div className="font-display text-[10rem] leading-none tabular-nums drop-shadow-lg">
         {time}
       </div>
-      <div className="text-3xl font-medium text-white/90">
+      <div className={`text-3xl font-medium ${WALL.inkStrong}`}>
         {weekday}, {fullDate}
       </div>
-      <div className="flex items-center gap-3 text-2xl text-white/80">
+      <div className={`flex items-center gap-3 text-2xl ${WALL.muted}`}>
         <WeatherIcon className="w-8 h-8" />
         <span>{Math.round(temp)}°</span>
-        <span className="text-white/60">{condition}</span>
+        <span>{condition}</span>
       </div>
-      <div className="absolute bottom-10 text-sm uppercase tracking-[0.25em] text-white/40">
+      <div className={`absolute bottom-10 text-sm uppercase tracking-[0.25em] ${WALL.muted}`}>
         Tap to exit guest mode
       </div>
     </button>

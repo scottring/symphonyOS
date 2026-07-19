@@ -1,6 +1,7 @@
 import { Redo2, Check, X, Phone, MapPin, FileText, Video, Link as LinkIcon } from 'lucide-react'
 import { useDragScroll } from '@/hooks/useDragScroll'
 import { getNextWeekend, getWeekendAfterNext, formatShortDate } from '@/lib/dateHelpers'
+import { WALL } from './wallTheme'
 import type { WallV2TimelineEvent } from './types'
 
 /**
@@ -58,8 +59,8 @@ function mapsUrlFor(location: string, placeId?: string): string {
 
 // Shared styling for a tappable context row (phone / location / link / meeting).
 const ctxRow =
-  'flex items-center gap-3 w-full min-h-[60px] px-4 rounded-2xl bg-stone-100 dark:bg-stone-800 ' +
-  'text-stone-800 dark:text-stone-100 active:scale-[0.98] transition-transform'
+  `flex items-center gap-3 w-full min-h-[60px] px-4 ${WALL.cardInset} ` +
+  `${WALL.inkStrong} active:scale-[0.98] transition-transform`
 
 export function WallV2ItemActionSheet({ event, onSkip, onMarkDone, onPushTask, onClose }: Props) {
   const kind: 'routine' | 'event' | 'task' = event.kind ?? 'event'
@@ -79,13 +80,13 @@ export function WallV2ItemActionSheet({ event, onSkip, onMarkDone, onPushTask, o
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50" onClick={onClose}>
       <div
-        className="w-[min(92vw,560px)] max-h-[88vh] bg-white dark:bg-stone-900 rounded-3xl shadow-2xl flex flex-col"
+        className={`w-[min(92vw,560px)] max-h-[88vh] flex flex-col ${WALL.card}`}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="px-6 pt-6 pb-4 text-center shrink-0">
-          <div className="text-[1.4rem] font-display text-stone-800 dark:text-stone-100">{event.title}</div>
-          {event.subtitle && <div className="text-stone-500 dark:text-stone-400 mt-1">{event.subtitle}</div>}
+          <div className={`text-[1.4rem] font-bold ${WALL.inkStrong}`}>{event.title}</div>
+          {event.subtitle && <div className={`${WALL.muted} mt-1`}>{event.subtitle}</div>}
         </div>
 
         {/* Context — the rich detail that was planned earlier, surfaced now.
@@ -101,7 +102,7 @@ export function WallV2ItemActionSheet({ event, onSkip, onMarkDone, onPushTask, o
                 <a href={`tel:${event.phoneNumber}`} className={ctxRow}>
                   <Phone className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
                   <span className="font-bold truncate">{event.phoneNumber}</span>
-                  <span className="ml-auto text-sm text-stone-500 dark:text-stone-400 shrink-0">Tap to call</span>
+                  <span className={`ml-auto text-sm shrink-0 ${WALL.muted}`}>Tap to call</span>
                 </a>
               )}
 
@@ -121,7 +122,7 @@ export function WallV2ItemActionSheet({ event, onSkip, onMarkDone, onPushTask, o
                 >
                   <MapPin className="w-5 h-5 text-rose-600 dark:text-rose-400 shrink-0" />
                   <span className="font-bold truncate">{event.location}</span>
-                  <span className="ml-auto text-sm text-stone-500 dark:text-stone-400 shrink-0">Directions</span>
+                  <span className={`ml-auto text-sm shrink-0 ${WALL.muted}`}>Directions</span>
                 </a>
               )}
 
@@ -139,11 +140,11 @@ export function WallV2ItemActionSheet({ event, onSkip, onMarkDone, onPushTask, o
               ))}
 
               {event.notes && (
-                <div className="rounded-2xl bg-stone-100 dark:bg-stone-800 px-4 py-3">
-                  <div className="flex items-center gap-2 text-[0.72rem] font-bold uppercase tracking-[0.18em] text-stone-500 dark:text-stone-400 mb-1.5">
+                <div className={`px-4 py-3 ${WALL.cardInset}`}>
+                  <div className={`flex items-center gap-2 mb-1.5 ${WALL.label}`}>
                     <FileText className="w-4 h-4" /> Notes
                   </div>
-                  <div className="text-stone-700 dark:text-stone-200 whitespace-pre-wrap leading-snug">
+                  <div className={`whitespace-pre-wrap leading-snug ${WALL.ink}`}>
                     {event.notes}
                   </div>
                 </div>
@@ -165,7 +166,7 @@ export function WallV2ItemActionSheet({ event, onSkip, onMarkDone, onPushTask, o
                 <Check className="w-6 h-6" /> Mark complete
               </button>
 
-              {/* Push presets — 2×2 grid of stone buttons */}
+              {/* Push presets — 2×2 grid of inset buttons */}
               <div className="grid grid-cols-2 gap-3">
                 {PUSH_PRESETS.map(({ preset, label }) => {
                   const dateFn = PRESET_DATE[preset]
@@ -175,11 +176,11 @@ export function WallV2ItemActionSheet({ event, onSkip, onMarkDone, onPushTask, o
                       key={preset}
                       type="button"
                       onClick={() => { onPushTask(event.id, preset); onClose() }}
-                      className="flex flex-col items-center justify-center w-full min-h-[64px] rounded-2xl bg-stone-100 dark:bg-stone-800 text-stone-700 dark:text-stone-200 text-lg font-bold leading-tight active:scale-[0.98] transition-transform"
+                      className={`flex flex-col items-center justify-center w-full min-h-[64px] text-lg font-bold leading-tight active:scale-[0.98] transition-transform ${WALL.cardInset} ${WALL.inkStrong}`}
                     >
                       <span>{label}</span>
                       {sub && (
-                        <span className="text-sm font-semibold text-stone-400 dark:text-stone-500 mt-0.5">{sub}</span>
+                        <span className={`text-sm font-semibold mt-0.5 ${WALL.muted}`}>{sub}</span>
                       )}
                     </button>
                   )
@@ -201,7 +202,7 @@ export function WallV2ItemActionSheet({ event, onSkip, onMarkDone, onPushTask, o
               <button
                 type="button"
                 onClick={() => { onSkip(event.id, kind); onClose() }}
-                className="flex items-center justify-center gap-3 w-full min-h-[64px] rounded-2xl bg-stone-100 dark:bg-stone-800 text-stone-700 dark:text-stone-200 text-lg font-bold active:scale-[0.98] transition-transform"
+                className={`flex items-center justify-center gap-3 w-full min-h-[64px] text-lg font-bold active:scale-[0.98] transition-transform ${WALL.cardInset} ${WALL.inkStrong}`}
               >
                 <Redo2 className="w-6 h-6" /> Skip today
               </button>
@@ -211,7 +212,7 @@ export function WallV2ItemActionSheet({ event, onSkip, onMarkDone, onPushTask, o
           <button
             type="button"
             onClick={onClose}
-            className="flex items-center justify-center gap-2 w-full min-h-[56px] rounded-2xl text-stone-500 dark:text-stone-400 text-base"
+            className={`flex items-center justify-center gap-2 w-full min-h-[56px] rounded-2xl text-base ${WALL.muted}`}
           >
             <X className="w-5 h-5" /> Cancel
           </button>
