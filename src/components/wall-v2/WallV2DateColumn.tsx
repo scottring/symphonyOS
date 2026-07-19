@@ -1,16 +1,15 @@
-// src/components/wall-v2/WallV2DateColumn.tsx
 //
-// The left rail: small household avatar (currently a tree mark), weekday
-// in giant Fraunces, full date in primary green, and a compact weather
-// hero (icon + temp + condition + hi/lo).
+// The rail: serif weekday/date, tagline, serif clock, weather chip, and the
+// daily quote pinned to the bottom. Fills the shell's left grid column.
 
-import { Sprout } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
+import { WALL, wallQuote } from './wallTheme';
 
 interface Props {
-  weekday: string;        // "Wednesday"
-  fullDate: string;       // "May 20, 2026"
-  time: string;           // "9:41 AM"
+  weekday: string;
+  fullDate: string;
+  time: string;
+  date: Date;
   weatherIcon: LucideIcon;
   weatherTint: { bg: string; fg: string };
   temp: number;
@@ -20,42 +19,33 @@ interface Props {
 }
 
 export function WallV2DateColumn({
-  weekday, fullDate, time, weatherIcon: WeatherIcon, weatherTint,
+  weekday, fullDate, time, date, weatherIcon: WeatherIcon, weatherTint,
   temp, condition, high, low,
 }: Props) {
+  const quote = wallQuote(date);
   return (
-    <div className="flex flex-col gap-5 pt-2 pl-1">
-      <div className="grid place-items-center w-12 h-12 rounded-full bg-emerald-50 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-200">
-        <Sprout className="w-5 h-5" />
+    <div className={`${WALL.rail} rounded-2xl h-full flex flex-col p-5`}>
+      <div className="font-display italic text-[2.3rem] leading-[1.05] text-[#2E4638] dark:text-[#4E7261]"><span>{weekday}</span>,<br />{fullDate.replace(/, \d{4}$/, '')}</div>
+      <div className={`mt-2 ${WALL.label}`}>Here's the shape of your day</div>
+      <div className={`mt-4 font-display text-[2.75rem] leading-none tabular-nums ${WALL.ink}`}>
+        {time}
       </div>
-
-      <div className="leading-none">
-        <div className="font-display text-[3.5rem] text-stone-800 dark:text-stone-100 leading-[0.95] tracking-tight">
-          {weekday}
-        </div>
-        <div className="mt-1.5 text-[1.05rem] font-bold text-emerald-800 dark:text-emerald-300">
-          {fullDate}
-        </div>
-        <div className="mt-2 font-display text-[2.6rem] text-stone-700 dark:text-stone-200 leading-none tabular-nums">
-          {time}
-        </div>
-      </div>
-
-      <div className="flex items-end gap-3">
-        <div className={`grid place-items-center w-12 h-12 rounded-2xl ${weatherTint.bg} ${weatherTint.fg}`}>
-          <WeatherIcon className="w-7 h-7" />
-        </div>
-        <div className="leading-tight">
-          <div className="flex items-baseline gap-1.5">
-            <span className="font-display text-[2.4rem] text-stone-800 dark:text-stone-100 leading-none">
-              {Math.round(temp)}°
-            </span>
-            <span className="text-[0.95rem] text-stone-500 dark:text-stone-400">{condition}</span>
+      <div className={`mt-4 ${WALL.cardInset} p-3`}>
+        <div className="flex items-center gap-2.5">
+          <div className={`grid place-items-center w-11 h-11 rounded-xl ${weatherTint.bg} ${weatherTint.fg}`}>
+            <WeatherIcon className="w-6 h-6" />
           </div>
-          <div className="text-[0.8rem] text-stone-500 dark:text-stone-400 mt-0.5">
-            High {Math.round(high)}°  ·  Low {Math.round(low)}°
+          <div className="leading-tight">
+            <div className="flex items-baseline gap-1.5">
+              <span className={`font-display text-[1.7rem] leading-none ${WALL.inkStrong}`}>{Math.round(temp)}°</span>
+              <span className={`text-[0.85rem] ${WALL.muted}`}>{condition}</span>
+            </div>
+            <div className={`text-[0.75rem] mt-0.5 ${WALL.muted}`}>↑ {Math.round(high)}° · ↓ {Math.round(low)}°</div>
           </div>
         </div>
+      </div>
+      <div className={`mt-auto pt-4 font-display italic text-center text-[0.85rem] leading-relaxed ${WALL.muted}`}>
+        "{quote.text}"<br />— {quote.author}
       </div>
     </div>
   );
