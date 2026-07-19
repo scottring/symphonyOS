@@ -14,7 +14,6 @@ import {
   adaptGlanceForMember,
   adaptScheduleBand,
   adaptTimelineSections,
-  adaptUpcoming,
   adaptWeather,
   adaptOverdueSection,
 } from './wallV2Adapter';
@@ -462,51 +461,6 @@ describe('adaptTimelineSections — rhythm only', () => {
     const sections = adaptTimelineSections(day, [], now, null, false, []);
     const titles = sections.flatMap((s) => s.events.map((e) => e.title));
     expect(titles).toContain('Untimed chore');
-  });
-});
-
-describe('adaptUpcoming', () => {
-  const today = new Date(2026, 4, 20);
-
-  it('labels the next day as "Tomorrow"', () => {
-    const days: WallDayData[] = [
-      makeDay({ date: today, isToday: true }),
-      makeDay({
-        date: new Date(2026, 4, 21),
-        items: {
-          allday: [], morning: [], afternoon: [],
-          evening: [makeItem({ title: 'Early release 1:15 PM' })],
-          unscheduled: [],
-        },
-      }),
-    ];
-    const result = adaptUpcoming(days, today);
-    expect(result[0].label).toBe('Tomorrow');
-    expect(result[0].detail).toBe('Early release 1:15 PM');
-  });
-
-  it('uses weekday name for days 2–6 out', () => {
-    const days: WallDayData[] = [
-      makeDay({ date: today, isToday: true }),
-      makeDay({
-        date: new Date(2026, 4, 22), // Friday
-        items: {
-          allday: [], morning: [],
-          afternoon: [makeItem({ title: 'Field trip' })],
-          evening: [], unscheduled: [],
-        },
-      }),
-    ];
-    const result = adaptUpcoming(days, today);
-    expect(result[0].label).toBe('Friday');
-  });
-
-  it('skips upcoming days with no items', () => {
-    const days: WallDayData[] = [
-      makeDay({ date: today, isToday: true }),
-      makeDay({ date: new Date(2026, 4, 21) }), // empty
-    ];
-    expect(adaptUpcoming(days, today)).toEqual([]);
   });
 });
 

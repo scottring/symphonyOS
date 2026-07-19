@@ -5,18 +5,15 @@
 // Supabase wiring. Task #3 swaps this for live data via useWallData.
 
 import {
-  Backpack, Bath, Calendar, Phone, Car, Check, MessageCircle,
-  Moon, Plus, ShoppingBag, ShoppingCart, Sun, Trophy, Users,
+  Backpack, Bath, Calendar, Car,
+  Moon, ShoppingBag, Sun, Trophy, Users,
   UtensilsCrossed, Flame, Sunrise,
 } from 'lucide-react';
 
 import type {
-  WallV2ActionDef,
   WallV2GlanceCard,
-  WallV2GroceryData,
   WallV2InsightData,
   WallV2TimelineSection,
-  WallV2UpcomingItem,
   WallV2WeatherData,
 } from './types';
 
@@ -148,36 +145,7 @@ export const MOCK_WEATHER: WallV2WeatherData = {
   icon: Sun,
 };
 
-export const MOCK_GROCERY: WallV2GroceryData = {
-  count: 2,
-  items: ['Snap peas', 'Brown rice'],
-};
-
-export const MOCK_UPCOMING: WallV2UpcomingItem[] = [
-  {
-    id: 'tomorrow',
-    label: 'Tomorrow',
-    detail: 'Early release 1:15 PM',
-    tint: 'sage',
-  },
-  {
-    id: 'friday',
-    label: 'Friday',
-    detail: 'Ella’s field trip',
-    tint: 'honey',
-  },
-];
-
 export const MOCK_INSIGHT: WallV2InsightData = {
   body: 'Thursday looks perfect for backyard upgrades. Should we plan to start in the morning?',
   cta: 'View weekend plan',
 };
-
-export const MOCK_ACTIONS: WallV2ActionDef[] = [
-  { id: 'reminder', label: 'Add reminder', caption: 'Everyone will see', icon: Plus, tint: 'sage' },
-  { id: 'grocery', label: 'Add grocery item', caption: 'Update the list', icon: ShoppingCart, tint: 'peach' },
-  { id: 'task', label: 'Add task', caption: 'For today or later', icon: Check, tint: 'sky' },
-  { id: 'discuss', label: 'Need to discuss', caption: 'Open a conversation', icon: MessageCircle, tint: 'lavender' },
-  { id: 'event', label: 'Add event', caption: 'On the calendar', icon: Calendar, tint: 'rose' },
-  { id: 'phone', label: 'Call someone', caption: 'Tap, then pick up', icon: Phone, tint: 'mint' },
-];

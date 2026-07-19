@@ -30,7 +30,6 @@ import type {
   WallV2TimelineEvent,
   WallV2TimelineSection,
   WallV2Tint,
-  WallV2UpcomingItem,
   WallV2WeatherData,
 } from './types';
 
@@ -408,58 +407,6 @@ export function adaptTimelineSections(
   // Reuse the overdue computation from the top of the function — same
   // inputs, same output, no point computing twice.
   return overdueOnlyEarly ? [overdueOnlyEarly, ...baseSections] : baseSections;
-}
-
-// ────────────────────────────────────────────────────────────────────────────
-// Upcoming days → upcoming list
-// ────────────────────────────────────────────────────────────────────────────
-
-const UPCOMING_TINTS: WallV2Tint[] = ['sage', 'honey', 'sky', 'lavender'];
-
-function dayLabel(d: Date, today: Date): string {
-  const oneDay = 24 * 60 * 60_000;
-  const diffDays = Math.round(
-    (new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
-      - new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime())
-    / oneDay,
-  );
-  if (diffDays === 1) return 'Tomorrow';
-  if (diffDays >= 2 && diffDays <= 6) {
-    return d.toLocaleDateString('en-US', { weekday: 'long' });
-  }
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-}
-
-// Find the first *calendar event* on a day. Routines and tasks are
-// intentionally skipped — the upcoming rail surfaces real plans (soccer,
-// appointments, trips), not the next morning's brush-teeth step.
-function firstUpcomingItem(day: WallDayData): TimelineItem | null {
-  for (const section of ['allday', 'morning', 'afternoon', 'evening'] as const) {
-    const items = day.items[section] ?? [];
-    const event = items.find((i) => i.type === 'event');
-    if (event) return event;
-  }
-  return null;
-}
-
-export function adaptUpcoming(
-  days: WallDayData[],
-  today: Date,
-  limit = 2,
-): WallV2UpcomingItem[] {
-  const upcoming = days.filter((d) => !d.isToday).slice(0, limit);
-  const out: WallV2UpcomingItem[] = [];
-  upcoming.forEach((day, idx) => {
-    const item = firstUpcomingItem(day);
-    if (!item) return;
-    out.push({
-      id: day.date.toISOString(),
-      label: dayLabel(day.date, today),
-      detail: item.title,
-      tint: UPCOMING_TINTS[idx % UPCOMING_TINTS.length],
-    });
-  });
-  return out;
 }
 
 // ────────────────────────────────────────────────────────────────────────────

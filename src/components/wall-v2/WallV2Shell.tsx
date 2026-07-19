@@ -1,17 +1,19 @@
 // src/components/wall-v2/WallV2Shell.tsx
 //
-// Orchestrates the WallV2 kiosk surface — three-column grid (date / center /
-// right widgets) with a six-button action dock at the bottom.
+// Orchestrates the WallV2 kiosk surface — three-column grid (rail / center
+// timeline+Keep Moving / right column) with a family-strip + 2x2 dock cluster
+// spanning the bottom row.
 //
 // The shell pulls live data via the existing wall hooks (useWallData,
 // useWeather, useMealEventsForDate, useShoppingList) and converts it to the
-// WallV2 view shape via the pure adapters in `wallV2Adapter.ts`. Each surface
-// renders an empty state when its live source has no data — production never
-// shows the design-payload mock. The design payload now lives only in the
-// dev-only `/wall-design` preview (see `wallV2Mock.ts`).
+// WallV2 view shape via the pure adapters in `wallV2Adapter.ts` and the
+// right-column rollups in `wallV2Rollups.ts`. Each surface renders an empty
+// state when its live source has no data — production never shows the
+// design-payload mock. The design payload now lives only in the dev-only
+// `/wall-design` preview (see `wallV2Mock.ts`).
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Eye, EyeOff, Moon, Sun, RefreshCw, ImageOff } from 'lucide-react';
+import { Sun } from 'lucide-react';
 import { useActionableInstances } from '@/hooks/useActionableInstances';
 import { useBuildAutoReload } from '@/hooks/useBuildAutoReload';
 import { WallV2GuestScreen } from './WallV2GuestScreen';
@@ -23,21 +25,21 @@ import {
 } from '@/lib/hideRoutinesSignal';
 import { TINTS } from './tints';
 import { WallV2DateColumn } from './WallV2DateColumn';
-import { WallV2AtAGlance } from './WallV2AtAGlance';
 import { WallV2NowNext } from './WallV2NowNext';
 import { WallV2Timeline } from './WallV2Timeline';
 import { WallV2RightColumn } from './WallV2RightColumn';
-import { WallV2ActionDock } from './WallV2ActionDock';
+import { WallV2KeepMoving } from './WallV2KeepMoving';
+import { WallV2FamilyStrip, type WallDockActionId } from './WallV2FamilyStrip';
+import { WallV2UtilitySheet } from './WallV2UtilitySheet';
 import { CallerIdTakeover } from './CallerIdTakeover';
 import { WallV2PhoneScreen } from './WallV2PhoneScreen';
-import { MOCK_ACTIONS } from './wallV2Mock';
 import {
-  adaptGlanceForMember,
   adaptScheduleBand,
   adaptTimelineSections,
-  adaptUpcoming,
   adaptWeather,
 } from './wallV2Adapter';
+import { adaptTomorrowMorning, adaptAtAGlanceRollup } from './wallV2Rollups';
+import { WALL } from './wallTheme';
 import { useWallData } from '@/hooks/useWallData';
 import { useWeather } from '@/hooks/useWeather';
 import { useMealEventsForDate } from '@/shell/providers/MealEventsProvider';
@@ -54,11 +56,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { AuthForm } from '@/components/AuthForm';
 import { useDailyDiscussionPrompt } from '@/hooks/useDailyDiscussionPrompt';
 import { supabase } from '@/lib/supabase';
-import type {
-  WallV2GlanceCard,
-  WallV2GroceryData,
-  WallV2TimelineEvent,
-} from './types';
+import type { WallV2TimelineEvent } from './types';
 import type { Task } from '@/types/task';
 
 /**
@@ -115,13 +113,6 @@ function formatDate(d: Date): { weekday: string; fullDate: string } {
   });
   return { weekday, fullDate };
 }
-
-// Right-column slot without a live source yet. Renders as a muted
-// placeholder rather than fake data, and is clearly aspirational.
-const PLACEHOLDER_GROCERY: WallV2GroceryData = {
-  count: 0,
-  items: ['Connect a list to see what is missing'],
-};
 
 const THEME_KEY = 'symphony-wall-theme';
 
@@ -214,6 +205,15 @@ export function WallV2Shell() {
     [wallData.calendarEvents, mealEvents, now],
   );
 
+  // CalendarEvent's start time is a string on either the snake_case
+  // (edge-function) or camelCase (cached) field — never a Date — so it needs
+  // parsing before it can feed the right column / rollups, which want Date.
+  const dinnerStartDate = useMemo(() => {
+    if (!dinnerEvent) return null;
+    const startStr = dinnerEvent.start_time || dinnerEvent.startTime;
+    return startStr ? new Date(startStr) : null;
+  }, [dinnerEvent]);
+
   const breakfastEvent = useMemo(
     () => findBreakfastEvent([...wallData.calendarEvents, ...mealEvents], now),
     [wallData.calendarEvents, mealEvents, now],
@@ -239,25 +239,6 @@ export function WallV2Shell() {
     [todayData, wallData.familyMembers, now, dinnerEvent, breakfastEvent],
   );
 
-  const upcoming = useMemo(
-    () => adaptUpcoming(wallData.days, now, 2),
-    [wallData.days, now],
-  );
-
-  // Per-member "next thing today" glance cards. Members with no upcoming item
-  // are skipped so the row collapses gracefully (1-4 cards depending on
-  // how many family members have something on their plate).
-  const glance: WallV2GlanceCard[] = useMemo(() => {
-    if (!todayData) return [];
-    const cards: WallV2GlanceCard[] = [];
-    for (const member of wallData.familyMembers) {
-      const card = adaptGlanceForMember(member, todayData, now);
-      if (card) cards.push(card);
-      if (cards.length >= 4) break;
-    }
-    return cards;
-  }, [wallData.familyMembers, todayData, now]);
-
   // Weather has a sensible static fallback when the geolocation/API path
   // hasn't resolved yet — it would otherwise leave the entire hero blank.
   const weatherData = liveWeather ?? {
@@ -272,6 +253,7 @@ export function WallV2Shell() {
   const [showDiscussion, setShowDiscussion] = useState(false);
   const [showQuickCapture, setShowQuickCapture] = useState(false);
   const [showPhone, setShowPhone] = useState(false);
+  const [showUtilities, setShowUtilities] = useState(false);
   const [flashMessage, setFlashMessage] = useState<string | null>(null);
   const flashTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -293,6 +275,20 @@ export function WallV2Shell() {
   const breakfast = useMealCardData(breakfastEvent, 'Breakfast');
   const viewerMeal = recipeViewerMeal === 'breakfast' ? breakfast : dinner;
   const viewerEvent = recipeViewerMeal === 'breakfast' ? breakfastEvent : dinnerEvent;
+
+  const tomorrowRows = useMemo(
+    () => adaptTomorrowMorning(wallData.days, now),
+    [wallData.days, now],
+  );
+  const glanceRows = useMemo(
+    () => adaptAtAGlanceRollup(todayData, dinnerStartDate, dinnerEvent ? dinner.mealName : null, now),
+    [todayData, dinnerStartDate, dinnerEvent, dinner.mealName, now],
+  );
+  // Keep Moving = task-kind items from every timeline section, incomplete first.
+  const keepMovingTasks = useMemo(
+    () => timeline.flatMap((s) => s.events).filter((e) => e.kind === 'task'),
+    [timeline],
+  );
 
   const handleMarkDiscussed = useCallback(async (item: DiscussionItem) => {
     if (item.kind === 'task') {
@@ -344,27 +340,15 @@ export function WallV2Shell() {
     }
   }, [user, showFlash, wallData]);
 
-  const handleAction = useCallback((id: string) => {
+  const handleDockAction = useCallback((id: WallDockActionId) => {
     switch (id) {
+      case 'task': setShowQuickCapture(true); break;
       case 'discuss':
         if (discussionItems.length > 0) setShowDiscussion(true);
         else showFlash('Nothing flagged for discussion right now');
         break;
-      case 'task':
-        setShowQuickCapture(true);
-        break;
-      case 'reminder':
-        showFlash('Tap the mic to capture a reminder by voice');
-        break;
-      case 'grocery':
-        showFlash('Grocery capture is coming soon');
-        break;
-      case 'event':
-        showFlash('Event capture is coming soon');
-        break;
-      case 'phone':
-        setShowPhone(true);
-        break;
+      case 'phone': setShowPhone(true); break;
+      case 'utilities': setShowUtilities(true); break;
     }
   }, [discussionItems.length, showFlash]);
 
@@ -466,51 +450,21 @@ export function WallV2Shell() {
   }
 
   return (
-    <div className={`${isDark ? 'dark ' : ''}wall-touch-root relative h-screen w-screen bg-[var(--color-bg-base)] dark:bg-stone-950 text-stone-800 dark:text-stone-100 overflow-hidden transition-colors`}>
-      <div className="absolute top-8 right-8 z-30 flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => setGuestMode(true)}
-          aria-label="Guest mode"
-          title="Guest mode — hide everything"
-          className="grid place-items-center w-14 h-14 rounded-full bg-white/80 dark:bg-stone-800/80 border border-stone-300/70 dark:border-stone-700/70 text-stone-700 dark:text-stone-200 backdrop-blur-md hover:bg-white dark:hover:bg-stone-800 transition-colors shadow-md"
-        >
-          <ImageOff className="w-6 h-6" />
-        </button>
-        <button
-          type="button"
-          onClick={() => { void wallData.refetch(); showFlash('Refreshing…'); }}
-          aria-label="Refresh"
-          title="Refresh"
-          className="grid place-items-center w-14 h-14 rounded-full bg-white/80 dark:bg-stone-800/80 border border-stone-300/70 dark:border-stone-700/70 text-stone-700 dark:text-stone-200 backdrop-blur-md hover:bg-white dark:hover:bg-stone-800 transition-colors shadow-md"
-        >
-          <RefreshCw className={`w-6 h-6 ${wallData.loading ? 'animate-spin' : ''}`} />
-        </button>
-        <button
-          type="button"
-          onClick={toggleHideRoutines}
-          aria-label={hideRoutines ? 'Show daily routines' : 'Hide daily routines'}
-          title={hideRoutines ? 'Show daily routines' : 'Hide daily routines'}
-          className="grid place-items-center w-14 h-14 rounded-full bg-white/80 dark:bg-stone-800/80 border border-stone-300/70 dark:border-stone-700/70 text-stone-700 dark:text-stone-200 backdrop-blur-md hover:bg-white dark:hover:bg-stone-800 transition-colors shadow-md"
-        >
-          {hideRoutines ? <EyeOff className="w-6 h-6" /> : <Eye className="w-6 h-6" />}
-        </button>
-        <button
-          type="button"
-          onClick={toggleTheme}
-          aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
-          className="grid place-items-center w-14 h-14 rounded-full bg-white/80 dark:bg-stone-800/80 border border-stone-300/70 dark:border-stone-700/70 text-stone-700 dark:text-stone-200 backdrop-blur-md hover:bg-white dark:hover:bg-stone-800 transition-colors shadow-md"
-        >
-          {isDark ? <Sun className="w-6 h-6" /> : <Moon className="w-6 h-6" />}
-        </button>
-      </div>
-      <div className="h-full w-full p-6 grid grid-cols-[280px_1fr_360px] grid-rows-[minmax(0,1fr)_auto] gap-4">
-        {/* Row 1 — Left rail */}
-        <div className="row-span-1 col-start-1">
+    <div className={`${isDark ? 'dark ' : ''}wall-touch-root relative h-screen w-screen overflow-hidden transition-colors ${WALL.root}`}>
+      <img
+        src="/wall/treeline.svg"
+        alt=""
+        aria-hidden
+        className="absolute top-0 right-0 w-[340px] h-[110px] opacity-30 dark:opacity-15 pointer-events-none"
+      />
+      <div className="h-full w-full p-4 grid grid-cols-[220px_minmax(0,1fr)_264px] grid-rows-[minmax(0,1fr)_116px] gap-3">
+        {/* Row 1 — rail */}
+        <div className="row-span-1 col-start-1 min-h-0">
           <WallV2DateColumn
             weekday={weekday}
             fullDate={fullDate}
             time={clock}
+            date={now}
             weatherIcon={weatherData.icon ?? Sun}
             weatherTint={{ bg: TINTS.honey.bg, fg: TINTS.honey.fg }}
             temp={weatherData.temp}
@@ -520,10 +474,9 @@ export function WallV2Shell() {
           />
         </div>
 
-        {/* Row 1 — Center column (glance strip + timeline) */}
-        <div className="row-span-1 col-start-2 flex flex-col gap-4 min-h-0 min-w-0">
+        {/* Row 1 — center: NOW + timeline + Keep Moving */}
+        <div className="row-span-1 col-start-2 flex flex-col gap-3 min-h-0 min-w-0">
           <WallV2NowNext today={todayData} familyMembers={wallData.familyMembers} now={now} />
-          <WallV2AtAGlance cards={glance} />
           <div className="min-h-0 flex-1">
             <WallV2Timeline
               band={scheduleBand}
@@ -534,19 +487,28 @@ export function WallV2Shell() {
               onTapFullDay={handleTapFullDay}
             />
           </div>
+          <div className="h-[104px] shrink-0">
+            <WallV2KeepMoving tasks={keepMovingTasks} onToggleComplete={handleToggleComplete} onTapTask={handleTapEvent} />
+          </div>
         </div>
 
-        {/* Row 1 — Right column (4 widgets) */}
+        {/* Row 1 — right column */}
         <div className="row-span-1 col-start-3 min-h-0">
           <WallV2RightColumn
-            grocery={PLACEHOLDER_GROCERY}
-            upcoming={upcoming}
+            dinner={{
+              mealName: dinnerEvent ? dinner.mealName : null,
+              dinnerStart: dinnerStartDate,
+              photoUrl: null,
+              onTap: () => handleTapEvent(`dinner-${dinnerEvent?.id ?? 'none'}`),
+            }}
+            tomorrowRows={tomorrowRows}
+            glanceRows={glanceRows}
             question={tonightQuestion}
           />
         </div>
 
-        {/* Row 2 — Full-width action dock */}
-        <div className="row-start-2 col-span-3 relative">
+        {/* Row 2 — family strip + dock cluster */}
+        <div className="row-start-2 col-span-3 relative min-h-0">
           {flashMessage && (
             <div
               role="status"
@@ -555,9 +517,22 @@ export function WallV2Shell() {
               {flashMessage}
             </div>
           )}
-          <WallV2ActionDock actions={MOCK_ACTIONS} onTap={handleAction} />
+          <WallV2FamilyStrip familyMembers={wallData.familyMembers} today={todayData} now={now} onDockAction={handleDockAction} />
         </div>
       </div>
+
+      {showUtilities && (
+        <WallV2UtilitySheet
+          hideRoutines={hideRoutines}
+          isDark={isDark}
+          refreshing={wallData.loading}
+          onGuestMode={() => { setShowUtilities(false); setGuestMode(true); }}
+          onRefresh={() => { void wallData.refetch(); showFlash('Refreshing…'); }}
+          onToggleHideRoutines={toggleHideRoutines}
+          onToggleTheme={toggleTheme}
+          onClose={() => setShowUtilities(false)}
+        />
+      )}
 
       {/* ─── Overlays ─── */}
       {actionSheetItem && (

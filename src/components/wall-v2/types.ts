@@ -108,35 +108,12 @@ export interface WallV2WeatherData {
   icon: LucideIcon;
 }
 
-/** A row in the UPCOMING widget. */
-export interface WallV2UpcomingItem {
-  id: string;
-  label: string;
-  detail: string;
-  tint: WallV2Tint;
-}
-
-/** Grocery-card payload. */
-export interface WallV2GroceryData {
-  count: number;
-  items: string[];
-}
-
 /** AI Insight card payload. */
 export interface WallV2InsightData {
   body: string;
   cta?: string;
   /** Internal href for the CTA — leave undefined to render as static text. */
   href?: string;
-}
-
-/** Single action-dock button. */
-export interface WallV2ActionDef {
-  id: string;
-  label: string;
-  caption: string;
-  icon: LucideIcon;
-  tint: WallV2Tint;
 }
 
 /** The prioritized timed-agenda band: all-day commitments + chronological timed rows. */
