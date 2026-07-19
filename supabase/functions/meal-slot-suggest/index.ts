@@ -92,7 +92,7 @@ function buildPrompt(ctx: PlanContext, dayOfWeek: number, slot: string, intent: 
 
   const intentLine = intent.trim()
     ? `\nThe user described what they want: "${intent.trim()}"\n`
-    : '\nThe user didn't say anything specific — just suggest good fits for this slot.\n'
+    : '\nThe user gave no specifics — just suggest good fits for this slot.\n'
 
   return `You are the meal-planning consultant for Symphony, a household planner. The user is changing ONE meal: ${dayName} ${slot}. Suggest UP TO 3 replacement ideas.
 ${intentLine}
