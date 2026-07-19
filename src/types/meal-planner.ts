@@ -77,6 +77,8 @@ export interface DbMealPlan {
   id: string
   user_id: string
   week_start: string  // YYYY-MM-DD
+  starts_on: string | null  // YYYY-MM-DD within the week; null = week start
+  ends_on: string | null    // YYYY-MM-DD within the week; null = week end
   created_at: string
   updated_at: string
 }
@@ -97,6 +99,9 @@ export interface MealPlan {
   id: string
   userId: string
   weekStart: Date
+  /** ISO YYYY-MM-DD bounds of the active (planned) range; null = week edge. */
+  startsOn: string | null
+  endsOn: string | null
   entries: MealPlanEntry[]
   createdAt: Date
   updatedAt: Date
@@ -164,6 +169,8 @@ export function dbMealPlanToMealPlan(
     id: row.id,
     userId: row.user_id,
     weekStart: new Date(row.week_start),
+    startsOn: row.starts_on ?? null,
+    endsOn: row.ends_on ?? null,
     entries: entries.map(dbMealPlanEntryToMealPlanEntry),
     createdAt: new Date(row.created_at),
     updatedAt: new Date(row.updated_at),

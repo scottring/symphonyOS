@@ -27,6 +27,7 @@ interface UseMealPlanResult {
   /** Move an entry to a different day/slot. If the target cell is occupied,
    *  the two entries swap places. */
   moveMeal: (entryId: string, targetDayOfWeek: number, targetSlot: MealSlot) => Promise<void>
+  setWeekRange: (startsOn: string | null, endsOn: string | null) => Promise<void>
 }
 
 // Unique per-mount channel names — same-topic channels conflict in supabase-js.
@@ -151,6 +152,19 @@ export function useMealPlan(weekStart: Date): UseMealPlanResult {
     }
   }, [plan])
 
+  const setWeekRange = useCallback(async (startsOn: string | null, endsOn: string | null) => {
+    if (!plan) return
+    const prev = { startsOn: plan.startsOn, endsOn: plan.endsOn }
+    setPlan(p => p ? { ...p, startsOn, endsOn } : p)
+    const { error: updErr } = await supabase.from('meal_plans')
+      .update({ starts_on: startsOn, ends_on: endsOn })
+      .eq('id', plan.id)
+    if (updErr) {
+      setPlan(p => p ? { ...p, ...prev } : p)
+      setError(updErr.message)
+    }
+  }, [plan])
+
   // Refetch on mount and when the week changes.
   useEffect(() => { refresh() }, [refresh])
 
@@ -167,9 +181,14 @@ export function useMealPlan(weekStart: Date): UseMealPlanResult {
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'meal_plan_entries' },
         () => { void refreshRef.current() })
+      // Range changes (starts_on/ends_on) land on the plan row itself — e.g.
+      // the chat edge function's set_week_range tool.
+      .on('postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'meal_plans' },
+        () => { void refreshRef.current() })
       .subscribe()
     return () => { supabase.removeChannel(channel) }
   }, [user])
 
-  return { plan, loading, error, refresh, addMeal, removeMeal, moveMeal }
+  return { plan, loading, error, refresh, addMeal, removeMeal, moveMeal, setWeekRange }
 }
