@@ -5,6 +5,9 @@ import type { ChatMsg } from '@/hooks/useMealPlannerChat'
 export interface MealChatRailProps {
   messages: ChatMsg[]
   busy: boolean
+  /** True while the persisted transcript is loading — suppresses the empty-state
+   *  prompt so it doesn't flash before saved messages arrive. */
+  loadingHistory?: boolean
   /** Current tool name while the assistant is writing to the plan; null when idle. */
   toolActivity: string | null
   onSend: (text: string) => void
@@ -15,7 +18,7 @@ export interface MealChatRailProps {
  *  by the desktop rail (PlanPage) and the mobile bottom sheet
  *  (MealChatSheet) — grid updates land via useMealPlan's own realtime
  *  subscription, this component only carries the conversation. */
-export function MealChatRail({ messages, busy, toolActivity, onSend, className }: MealChatRailProps) {
+export function MealChatRail({ messages, busy, loadingHistory, toolActivity, onSend, className }: MealChatRailProps) {
   const [draft, setDraft] = useState('')
   const listRef = useRef<HTMLDivElement>(null)
 
@@ -43,7 +46,13 @@ export function MealChatRail({ messages, busy, toolActivity, onSend, className }
       </div>
 
       <div ref={listRef} className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-3">
-        {messages.length === 0 && (
+        {loadingHistory && messages.length === 0 && (
+          <div className="flex items-center gap-2 text-[11px] uppercase tracking-widest text-neutral-400">
+            <Loader2 className="w-3 h-3 animate-spin" aria-hidden />
+            Loading…
+          </div>
+        )}
+        {!loadingHistory && messages.length === 0 && (
           <div className="space-y-3">
             <p className="font-display italic text-[0.95rem] text-neutral-400">
               Try "taco tuesday" for a direct edit, or let me propose a seasonal week.

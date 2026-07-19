@@ -169,6 +169,7 @@ export function PlanPage() {
               <MealChatRail
                 messages={chat.messages}
                 busy={chat.busy}
+                loadingHistory={chat.loadingHistory}
                 toolActivity={chat.toolActivity}
                 onSend={chat.send}
               />
@@ -191,6 +192,7 @@ export function PlanPage() {
             onClose={() => setChatSheetOpen(false)}
             messages={chat.messages}
             busy={chat.busy}
+            loadingHistory={chat.loadingHistory}
             toolActivity={chat.toolActivity}
             onSend={chat.send}
           />

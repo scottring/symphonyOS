@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { toIsoDate } from '@/lib/weekHelpers'
 
@@ -56,6 +56,8 @@ export function parseSseEvents(chunk: string, buffer: string): { events: SseEven
 export interface UseMealPlannerChatResult {
   messages: ChatMsg[]
   busy: boolean
+  /** True while the persisted transcript for this week is being loaded. */
+  loadingHistory: boolean
   /** Latest tool name while a tool call is in flight; null when idle. */
   toolActivity: string | null
   send: (text: string) => Promise<void>
@@ -65,13 +67,22 @@ export interface UseMealPlannerChatResult {
 /**
  * SSE client for the `meal-planner-chat` edge function. Carries the
  * conversation only — grid updates land via useMealPlan's realtime
- * subscription, not through this hook. Conversation history is held in
- * memory and re-sent with every turn (the edge fn is stateless; no
- * server-side session).
+ * subscription, not through this hook. The edge fn is stateless (no
+ * server-side session); the client owns the history it re-sends each turn.
+ *
+ * That history is persisted to `meal_chat_messages` so navigating away from
+ * /meals no longer wipes the conversation. The transcript is household-shared
+ * and keyed by week_start (RLS mirrors meal_plans), so it is loaded on mount /
+ * week change and each finalized message is written back. Persistence is
+ * best-effort: a failed read/write degrades to the old in-memory behaviour
+ * rather than breaking the live chat — the meals are the source of truth, the
+ * transcript is a convenience.
  */
 export function useMealPlannerChat(weekStart: Date): UseMealPlannerChatResult {
+  const weekStartIso = toIsoDate(weekStart)
   const [messages, setMessages] = useState<ChatMsg[]>([])
   const [busy, setBusy] = useState(false)
+  const [loadingHistory, setLoadingHistory] = useState(true)
   const [toolActivity, setToolActivity] = useState<string | null>(null)
   // Mirrors `messages` synchronously so send() can read the pre-turn history
   // and patch the in-flight assistant message without waiting on React state.
@@ -81,6 +92,49 @@ export function useMealPlannerChat(weekStart: Date): UseMealPlannerChatResult {
     messagesRef.current = next
     setMessages(next)
   }, [])
+
+  // Persist one finalized message. Best-effort: swallow failures so the live
+  // chat keeps working even if the write is rejected.
+  const persist = useCallback(async (role: ChatMsg['role'], content: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      await supabase
+        .from('meal_chat_messages')
+        .insert({ user_id: user.id, week_start: weekStartIso, role, content })
+    } catch (err) {
+      console.warn('meal chat persist failed', err)
+    }
+  }, [weekStartIso])
+
+  // Load the persisted transcript for this week on mount / week change.
+  // RLS handles household visibility, so we query by week_start only — one
+  // shared thread, merged across the household by created_at.
+  useEffect(() => {
+    let cancelled = false
+    setLoadingHistory(true)
+    applyMessages([])
+    void (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('meal_chat_messages')
+          .select('role, content')
+          .eq('week_start', weekStartIso)
+          .order('created_at', { ascending: true })
+        if (cancelled) return
+        // Only seed if the user hasn't already started chatting while the load
+        // was in flight — a slow load must never clobber live messages.
+        if (!error && Array.isArray(data) && messagesRef.current.length === 0) {
+          applyMessages(data.map((r) => ({ role: r.role as ChatMsg['role'], content: r.content })))
+        }
+      } catch (err) {
+        if (!cancelled) console.warn('meal chat history load failed', err)
+      } finally {
+        if (!cancelled) setLoadingHistory(false)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [weekStartIso, applyMessages])
 
   const patchLastMessage = useCallback((patch: Partial<ChatMsg>) => {
     const current = messagesRef.current
@@ -102,6 +156,9 @@ export function useMealPlannerChat(weekStart: Date): UseMealPlannerChatResult {
       { role: 'user', content: trimmed },
       { role: 'assistant', content: '', pending: true },
     ])
+    // Write the user message straight away so it survives even if the tab
+    // closes before the assistant's reply lands.
+    void persist('user', trimmed)
 
     try {
       const { data: { session } } = await supabase.auth.getSession()
@@ -116,7 +173,7 @@ export function useMealPlannerChat(weekStart: Date): UseMealPlannerChatResult {
           Authorization: `Bearer ${session.access_token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ message: trimmed, weekStart: toIsoDate(weekStart), history }),
+        body: JSON.stringify({ message: trimmed, weekStart: weekStartIso, history }),
       })
 
       if (!res.ok || !res.body) {
@@ -141,7 +198,12 @@ export function useMealPlannerChat(weekStart: Date): UseMealPlannerChatResult {
           } else if (evt.type === 'tool' && typeof evt.name === 'string') {
             setToolActivity(evt.name)
           } else if (evt.type === 'done') {
-            patchLastMessage({ content: evt.reply ?? messagesRef.current.at(-1)?.content ?? '', pending: false })
+            const reply = evt.reply ?? messagesRef.current.at(-1)?.content ?? ''
+            patchLastMessage({ content: reply, pending: false })
+            // Persist the authoritative final reply. Error replies (below) are
+            // deliberately not persisted — no point reloading "Something went
+            // wrong" on the next visit.
+            if (reply) void persist('assistant', reply)
           } else if (evt.type === 'error') {
             patchLastMessage({ content: `Something went wrong: ${evt.message ?? 'unknown error'}`, pending: false })
           }
@@ -154,12 +216,20 @@ export function useMealPlannerChat(weekStart: Date): UseMealPlannerChatResult {
       setBusy(false)
       setToolActivity(null)
     }
-  }, [weekStart, busy, applyMessages, patchLastMessage])
+  }, [weekStartIso, busy, applyMessages, patchLastMessage, persist])
 
   const clear = useCallback(() => {
     applyMessages([])
     setToolActivity(null)
-  }, [applyMessages])
+    // Wipe the whole household's thread for this week (RLS-scoped delete).
+    void (async () => {
+      try {
+        await supabase.from('meal_chat_messages').delete().eq('week_start', weekStartIso)
+      } catch (err) {
+        console.warn('meal chat clear failed', err)
+      }
+    })()
+  }, [applyMessages, weekStartIso])
 
-  return { messages, busy, toolActivity, send, clear }
+  return { messages, busy, loadingHistory, toolActivity, send, clear }
 }

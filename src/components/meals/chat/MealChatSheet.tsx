@@ -6,13 +6,14 @@ export interface MealChatSheetProps {
   onClose: () => void
   messages: ChatMsg[]
   busy: boolean
+  loadingHistory?: boolean
   toolActivity: string | null
   onSend: (text: string) => void
 }
 
 /** Mobile bottom sheet for meal-planning chat — same scrim + rounded-t-2xl +
  *  translate-y + safe-area-bottom skeleton as `layout/MoreSheet.tsx`. */
-export function MealChatSheet({ isOpen, onClose, messages, busy, toolActivity, onSend }: MealChatSheetProps) {
+export function MealChatSheet({ isOpen, onClose, messages, busy, loadingHistory, toolActivity, onSend }: MealChatSheetProps) {
   return (
     <>
       {isOpen && (
@@ -36,6 +37,7 @@ export function MealChatSheet({ isOpen, onClose, messages, busy, toolActivity, o
         <MealChatRail
           messages={messages}
           busy={busy}
+          loadingHistory={loadingHistory}
           toolActivity={toolActivity}
           onSend={onSend}
         />

@@ -58,13 +58,51 @@ describe('parseSseEvents', () => {
 
 // ── useMealPlannerChat (hook) ───────────────────────────────────────────
 
+// A chainable, thenable stand-in for the supabase query builder so the hook's
+// history load (select), per-message persistence (insert), and clear (delete)
+// can be exercised and asserted. `db` records what the hook wrote.
+const { db, makeQuery } = vi.hoisted(() => {
+  const db: {
+    history: Array<{ role: string; content: string }>
+    inserts: Array<Record<string, unknown>>
+    deletes: Array<{ column: string; value: unknown }>
+  } = { history: [], inserts: [], deletes: [] }
+
+  function makeQuery() {
+    const state: { op: 'select' | 'insert' | 'delete' | null } = { op: null }
+    const q: Record<string, unknown> = {
+      select() { state.op = 'select'; return q },
+      insert(rows: Record<string, unknown>) { state.op = 'insert'; db.inserts.push(rows); return q },
+      delete() { state.op = 'delete'; return q },
+      eq(column: string, value: unknown) {
+        if (state.op === 'delete') db.deletes.push({ column, value })
+        return q
+      },
+      order() { return q },
+      then(onF: (v: unknown) => unknown, onR?: (e: unknown) => unknown) {
+        const value = state.op === 'select'
+          ? { data: db.history, error: null }
+          : { data: null, error: null }
+        return Promise.resolve(value).then(onF, onR)
+      },
+    }
+    return q
+  }
+
+  return { db, makeQuery }
+})
+
 vi.mock('@/lib/supabase', () => ({
   supabase: {
     auth: {
       getSession: vi.fn(() =>
         Promise.resolve({ data: { session: { access_token: 'tok-123' } }, error: null }),
       ),
+      getUser: vi.fn(() =>
+        Promise.resolve({ data: { user: { id: 'user-1' } }, error: null }),
+      ),
     },
+    from: vi.fn(() => makeQuery()),
   },
 }))
 
@@ -131,10 +169,18 @@ describe('useMealPlannerChat', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    db.history = []
+    db.inserts = []
+    db.deletes = []
     vi.mocked(supabase.auth.getSession).mockResolvedValue({
       data: { session: { access_token: 'tok-123' } as never },
       error: null,
     } as never)
+    vi.mocked(supabase.auth.getUser).mockResolvedValue({
+      data: { user: { id: 'user-1' } as never },
+      error: null,
+    } as never)
+    vi.mocked(supabase.from).mockImplementation(() => makeQuery() as never)
   })
 
   afterEach(() => {
@@ -283,5 +329,68 @@ describe('useMealPlannerChat', () => {
     close()
     await act(async () => { await sendPromise })
     await waitFor(() => expect(result.current.busy).toBe(false))
+  })
+
+  // ── persistence ───────────────────────────────────────────────────────
+
+  it('loads the persisted transcript for the week on mount', async () => {
+    db.history = [
+      { role: 'user', content: 'plan my week' },
+      { role: 'assistant', content: 'Here is a seasonal menu…' },
+    ]
+    const { result } = renderHook(() => useMealPlannerChat(weekStart))
+
+    await waitFor(() => expect(result.current.loadingHistory).toBe(false))
+    expect(result.current.messages).toEqual([
+      { role: 'user', content: 'plan my week' },
+      { role: 'assistant', content: 'Here is a seasonal menu…' },
+    ])
+  })
+
+  it('persists the user message on send and the assistant reply on done', async () => {
+    vi.stubGlobal('fetch', fetchResolvedWith([frame({ type: 'done', reply: 'Set Monday dinner to Tacos.' })]))
+
+    const { result } = renderHook(() => useMealPlannerChat(weekStart))
+    await waitFor(() => expect(result.current.loadingHistory).toBe(false))
+
+    await act(async () => { await result.current.send('plan Monday dinner') })
+    await waitFor(() => expect(result.current.busy).toBe(false))
+
+    // Both the user turn and the authoritative assistant reply are written,
+    // each scoped to this user + week.
+    await waitFor(() => expect(db.inserts).toHaveLength(2))
+    expect(db.inserts).toEqual([
+      { user_id: 'user-1', week_start: '2026-07-19', role: 'user', content: 'plan Monday dinner' },
+      { user_id: 'user-1', week_start: '2026-07-19', role: 'assistant', content: 'Set Monday dinner to Tacos.' },
+    ])
+  })
+
+  it('does not persist an error reply', async () => {
+    vi.stubGlobal('fetch', fetchResolvedWith([frame({ type: 'error', message: 'Anthropic 500' })]))
+
+    const { result } = renderHook(() => useMealPlannerChat(weekStart))
+    await waitFor(() => expect(result.current.loadingHistory).toBe(false))
+
+    await act(async () => { await result.current.send('hi') })
+    await waitFor(() => expect(result.current.busy).toBe(false))
+
+    // The user message is still persisted, but the "Something went wrong" reply is not.
+    expect(db.inserts).toEqual([
+      { user_id: 'user-1', week_start: '2026-07-19', role: 'user', content: 'hi' },
+    ])
+  })
+
+  it('clear() deletes the week thread and empties local state', async () => {
+    vi.stubGlobal('fetch', fetchResolvedWith([frame({ type: 'done', reply: 'ok' })]))
+    const { result } = renderHook(() => useMealPlannerChat(weekStart))
+    await waitFor(() => expect(result.current.loadingHistory).toBe(false))
+
+    await act(async () => { await result.current.send('hi') })
+    await waitFor(() => expect(result.current.busy).toBe(false))
+    expect(result.current.messages).toHaveLength(2)
+
+    await act(async () => { result.current.clear() })
+    expect(result.current.messages).toHaveLength(0)
+    await waitFor(() => expect(db.deletes).toContainEqual({ column: 'week_start', value: '2026-07-19' }))
   })
 })
