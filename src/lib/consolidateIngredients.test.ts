@@ -67,6 +67,68 @@ describe('consolidateIngredients', () => {
   })
 })
 
+describe('consolidateIngredients — canonical ingredient merge (the "basil x3" bug)', () => {
+  function planOf(...ingredientsPerRecipe: string[][]): { plan: MealPlan; recipes: Recipe[] } {
+    const recipes = ingredientsPerRecipe.map((ings, i) => ({
+      id: `r${i}`, userId: 'u1', title: `R${i}`, ingredients: ings,
+      instructions: [], tags: [], kidAcceptance: {}, isPrepFriendly: false, timesCooked: 0,
+      createdAt: new Date(), updatedAt: new Date(),
+    }))
+    const plan: MealPlan = {
+      id: 'p', userId: 'u1', weekStart: new Date('2026-04-27'),
+      entries: recipes.map((r, i) => ({ id: `e${i}`, mealPlanId: 'p', dayOfWeek: i % 7, slot: 'dinner' as const, recipeId: r.id, recipe: r })),
+      createdAt: new Date(), updatedAt: new Date(),
+    }
+    return { plan, recipes }
+  }
+
+  it('collapses every fresh-basil phrasing into ONE line', () => {
+    const { plan, recipes } = planOf(
+      ['1 cup fresh basil leaves'],
+      ['1/2 cup fresh basil, torn'],
+      ['½ cup Fresh basil, torn'],       // unicode fraction
+      ['1 packed cup Fresh basil, torn'], // stray "packed"
+      ['1 Tbsp. chopped fresh basil leaves'],
+      ['Fresh basil (handful), torn'],    // no quantity
+    )
+    const result = consolidateIngredients(plan, recipes)
+    const basil = result.filter(i => /basil/i.test(i.text))
+    expect(basil).toHaveLength(1)
+    expect(basil[0].fromRecipeIds.length).toBe(6)
+  })
+
+  it('does NOT merge basil with basil pesto (different item)', () => {
+    const { plan, recipes } = planOf(
+      ['1 cup fresh basil leaves'],
+      ['3/4 cup basil pesto'],
+    )
+    const result = consolidateIngredients(plan, recipes)
+    expect(result.filter(i => /basil/i.test(i.text)).length).toBe(2)
+  })
+
+  it('does not truncate on a quantity range dash ("¾–1 cup basil pesto")', () => {
+    const { plan, recipes } = planOf(
+      ['¾–1 cup Basil pesto, see [Fresh Basil Pesto](../x.md)'],
+      ['¾ cup basil pesto'],
+    )
+    const result = consolidateIngredients(plan, recipes)
+    const pesto = result.filter(i => /pesto/i.test(i.text))
+    expect(pesto).toHaveLength(1)           // both are "basil pesto", one line
+    expect(result.some(i => i.text.trim() === '')).toBe(false) // no blank line
+  })
+
+  it('still sums same-unit quantities into one clean line', () => {
+    const { plan, recipes } = planOf(
+      ['1 cup fresh basil leaves'],
+      ['1/2 cup fresh basil leaves'],
+    )
+    const result = consolidateIngredients(plan, recipes)
+    const basil = result.filter(i => /basil/i.test(i.text))
+    expect(basil).toHaveLength(1)
+    expect(basil[0].text).toMatch(/1 1\/2 cups/)
+  })
+})
+
 describe('consolidateIngredients — quantity aggregation + prep stripping', () => {
   function makeRecipe(id: string, ingredients: string[]): Recipe {
     return {
@@ -122,21 +184,22 @@ describe('consolidateIngredients — quantity aggregation + prep stripping', () 
     expect(result[0].text).toBe('3 tomatoes')
   })
 
-  it('keeps separate rows when units differ (parsed cup vs unitless)', () => {
+  it('merges the same ingredient into ONE line even across units/phrasings', () => {
     const a = makeRecipe('a', ['fresh parsley'])
     const b = makeRecipe('b', ['2 tbsp parsley, chopped'])
-    // Different keys (no-quantity "fresh parsley" vs "parsley|tbsp"). Two rows is correct.
+    // Canonical key is "parsley" for both — one shopping line, not two.
     const result = consolidateIngredients(planWith([a, b]), [a, b])
-    expect(result).toHaveLength(2)
+    expect(result).toHaveLength(1)
+    expect(result[0].fromRecipeIds).toEqual(['a', 'b'])
+    expect(result[0].text).toMatch(/parsley/i)
   })
 
-  it('falls back to first ingredient when quantities cannot be summed (mixed units)', () => {
+  it('produces one line when quantities cannot be summed (mixed units)', () => {
     const a = makeRecipe('a', ['1 cup parsley'])
     const b = makeRecipe('b', ['1 bunch parsley'])
-    // Same noun "parsley" but different units (cup vs bunch). With our key
-    // including unit, these stay separate. (If keys ever merge, the fallback
-    // is exercised; this test documents the current behavior.)
+    // Same ingredient, un-summable units (cup vs bunch) — still ONE line.
     const result = consolidateIngredients(planWith([a, b]), [a, b])
-    expect(result.length).toBe(2)
+    expect(result.length).toBe(1)
+    expect(result[0].text).toMatch(/parsley/i)
   })
 })

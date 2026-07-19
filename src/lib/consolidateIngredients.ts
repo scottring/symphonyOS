@@ -44,6 +44,14 @@ const PLURAL_OVERRIDES: Record<string, string> = {
   loaf: 'loaves',
 }
 
+// Unicode single-character fractions recipes love to use (½ cup, ¾ tsp).
+const UNICODE_FRACTIONS: Record<string, number> = {
+  '½': 0.5, '⅓': 1 / 3, '⅔': 2 / 3, '¼': 0.25, '¾': 0.75,
+  '⅛': 0.125, '⅜': 0.375, '⅝': 0.625, '⅞': 0.875,
+  '⅕': 0.2, '⅖': 0.4, '⅗': 0.6, '⅘': 0.8, '⅙': 1 / 6, '⅚': 5 / 6,
+}
+const UNICODE_FRACTION_CLASS = Object.keys(UNICODE_FRACTIONS).join('')
+
 function parseQuantity(s: string): number | null {
   const t = s.trim()
   // mixed: "1 1/2"
@@ -52,15 +60,70 @@ function parseQuantity(s: string): number | null {
   // fraction: "1/2"
   const frac = t.match(/^(\d+)\/(\d+)$/)
   if (frac) return parseInt(frac[1]) / parseInt(frac[2])
+  // digit + unicode fraction: "1½"
+  const uMixed = t.match(new RegExp(`^(\\d+)\\s*([${UNICODE_FRACTION_CLASS}])$`))
+  if (uMixed) return parseInt(uMixed[1]) + UNICODE_FRACTIONS[uMixed[2]]
+  // single unicode fraction: "½"
+  if (t.length === 1 && UNICODE_FRACTIONS[t] != null) return UNICODE_FRACTIONS[t]
   // decimal or integer
   const n = Number(t)
   return Number.isFinite(n) ? n : null
 }
 
+/** Prep/state/size words that describe an ingredient but don't change WHAT it
+ *  is. Stripped when building the merge key so "fresh basil leaves", "chopped
+ *  basil", and "½ cup basil, torn" all collapse to the same shopping item.
+ *  Deliberately excludes color words (red/green) and nouns like pesto/sauce/
+ *  paste/powder that DO distinguish a different product. */
+const DESCRIPTORS = new Set([
+  'fresh', 'dried', 'frozen', 'canned', 'jarred', 'ground', 'whole', 'halved', 'quartered',
+  'chopped', 'minced', 'diced', 'sliced', 'shredded', 'grated', 'crushed', 'torn', 'cubed',
+  'julienned', 'crumbled', 'melted', 'softened', 'packed', 'peeled', 'seeded', 'pitted',
+  'cooked', 'raw', 'roasted', 'toasted', 'beaten', 'divided', 'rinsed', 'drained', 'trimmed',
+  'large', 'small', 'medium', 'extra', 'jumbo', 'ripe', 'boneless', 'skinless', 'lean',
+  'thin', 'thick', 'fine', 'coarse',
+  'roughly', 'finely', 'coarsely', 'thinly', 'freshly', 'lightly', 'well',
+  'of', 'plus', 'more', 'for', 'to', 'taste', 'garnish', 'finishing', 'serving', 'optional',
+  'and', 'or', 'total', 'about', 'approximately', 'approx', 'room', 'temperature', 'cold', 'warm', 'hot',
+  'leaves', 'leaf', 'sprigs', 'sprig', 'stalks', 'stalk',
+])
+
+// All unit tokens (singular + plural, from UNIT_TO_BASE keys) — stripped from
+// the merge key too, so differing units never splinter one ingredient.
+const UNIT_WORDS = new Set(Object.keys(UNIT_TO_BASE))
+
+/** The canonical "what is this ingredient" key: lowercase, drop markdown links,
+ *  parentheticals, everything after a comma/dash, then all numbers, units, and
+ *  descriptor words — leaving the core noun ("basil", "parsley", "basil pesto").
+ *  Same core → one shopping line, regardless of quantity, unit, or phrasing. */
+function canonicalKey(raw: string): string {
+  let s = raw.toLowerCase()
+  s = s.replace(/\[[^\]]*\]\([^)]*\)/g, ' ') // markdown links [x](y)
+  s = s.replace(/\([^)]*\)/g, ' ')           // parentheticals
+  // Cut a trailing prep clause: at a comma, or a space-padded dash ("basil — torn").
+  // NOT a bare dash, which appears inside quantity ranges like "¾–1 cup".
+  const cut = s.search(/,|\s[—–]/)
+  if (cut >= 0) s = s.slice(0, cut)
+  const tokens = s.split(/[^a-z]+/).filter(Boolean)
+  const core = tokens.filter(t => !UNIT_WORDS.has(t) && !DESCRIPTORS.has(t))
+  return (core.length > 0 ? core : tokens).join(' ').trim()
+}
+
+/** One clean display line for an un-summable group: first contribution's text
+ *  with the markdown/parenthetical/prep-clause noise removed. */
+function cleanDisplay(raw: string): string {
+  let s = raw.replace(/\[[^\]]*\]\([^)]*\)/g, '').replace(/\([^)]*\)/g, '').trim()
+  const cut = s.search(/,|\s[—–]/)
+  if (cut >= 0) s = s.slice(0, cut).trim()
+  return s.replace(/\s+/g, ' ')
+}
+
 function parseIngredient(ingredient: string): Parsed | null {
   const lower = ingredient.toLowerCase().trim()
-  // Quantity: integer, fraction, mixed, or decimal at the start.
-  const qtyMatch = lower.match(/^(\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:\.\d+)?)\s*/)
+  // Quantity: integer, fraction, mixed, decimal, or unicode fraction at the start.
+  const qtyMatch = lower.match(
+    new RegExp(`^(\\d+\\s+\\d+\\/\\d+|\\d+\\/\\d+|\\d+\\s*[${UNICODE_FRACTION_CLASS}]|[${UNICODE_FRACTION_CLASS}]|\\d+(?:\\.\\d+)?)\\s*`),
+  )
   if (!qtyMatch) return null
   const value = parseQuantity(qtyMatch[1])
   if (value == null) return null
@@ -132,15 +195,11 @@ function pluralizeUnit(unit: string, count: number): string {
   return unit + 's'
 }
 
-/** Build a key that merges ingredients differing only by quantity or prep. */
-function ingredientKey(parsed: Parsed | null, raw: string): string {
-  if (parsed) {
-    return `${parsed.noun}|${parsed.unit ?? ''}`
-  }
-  // No quantity — strip trailing prep clause and lowercase.
-  const lower = raw.toLowerCase().trim()
-  const splitIdx = lower.search(/[,—]/)
-  return (splitIdx >= 0 ? lower.slice(0, splitIdx) : lower).trim()
+/** Merge key = the canonical core ingredient, so the SAME ingredient collapses
+ *  to one line no matter how each recipe phrases it (quantity, unit, prep, or
+ *  descriptors). `parsed` is unused for keying now but kept for the signature. */
+function ingredientKey(_parsed: Parsed | null, raw: string): string {
+  return canonicalKey(raw)
 }
 
 interface Accumulator {
@@ -166,8 +225,9 @@ function renderText(acc: Accumulator): string {
       return `${formatNumber(total)} ${displayNoun}`.trim()
     }
   }
-  // Fall back: use the first contribution's raw text.
-  return acc.contributions[0]?.raw ?? ''
+  // Un-summable (mixed units, or some without quantities): one clean line from
+  // the first contribution rather than repeating the ingredient N times.
+  return cleanDisplay(acc.contributions[0]?.raw ?? '')
 }
 
 export function consolidateIngredients(plan: MealPlan, recipes: Recipe[]): ConsolidatedIngredient[] {
