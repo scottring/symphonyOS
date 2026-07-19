@@ -72,6 +72,12 @@ function seasonalGroundingLine(weekStart: string): string {
   return `This is the week of ${range} — peak ${season}. Assume a US market unless the preferences note says otherwise.`
 }
 
+/** Add days to a YYYY-MM-DD string in UTC (no timezone drift). */
+function addDaysIso(iso: string, days: number): string {
+  const [y, m, d] = iso.split('-').map(Number)
+  return new Date(Date.UTC(y, m - 1, d + days)).toISOString().slice(0, 10)
+}
+
 // ── Tool schemas (Anthropic tool-use format) ───────────────────────
 const TOOLS: any[] = [
   {
@@ -133,11 +139,24 @@ const TOOLS: any[] = [
       required: ['content'],
     },
   },
+  {
+    name: 'set_week_range',
+    description: 'Set which days of this week are actively planned, e.g. when the household is away for part of the week. Pass starts_on and/or ends_on as YYYY-MM-DD dates inside this week. Omit a bound to leave that side at the week edge; omit both to reset to the full week. Never propose or set meals on days outside the active range.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        starts_on: { type: 'string', description: 'First planned day, YYYY-MM-DD, within this week. Omit for the week start (Sunday).' },
+        ends_on: { type: 'string', description: 'Last planned day, YYYY-MM-DD, within this week. Omit for the week end (Saturday).' },
+      },
+    },
+  },
 ]
 
 // ── Context loading (RLS-scoped via the anon+Authorization client) ─
 interface PlanContext {
   planId: string | null
+  startsOn: string | null
+  endsOn: string | null
   entries: Array<{ id: string; day_of_week: number; slot: string; recipe_id: string | null; ad_hoc_title: string | null; leftover_from: string | null }>
   recipes: Array<{ id: string; title: string; tags: string[] | null; prep_minutes: number | null }>
   preferences: string | null
@@ -147,12 +166,13 @@ async function loadContext(db: SupabaseClient, weekStart: string): Promise<PlanC
   // "Oldest wins" — same determinism rule as useMealPlan.refresh if more
   // than one household member somehow created a plan for the same week.
   const { data: planRows, error: planErr } = await db
-    .from('meal_plans').select('id')
+    .from('meal_plans').select('id, starts_on, ends_on')
     .eq('week_start', weekStart)
     .order('created_at', { ascending: true })
     .limit(1)
   if (planErr) throw planErr
-  const planId: string | null = planRows?.[0]?.id ?? null
+  const planRow = planRows?.[0] ?? null
+  const planId: string | null = planRow?.id ?? null
 
   let entries: PlanContext['entries'] = []
   if (planId) {
@@ -177,7 +197,14 @@ async function loadContext(db: SupabaseClient, weekStart: string): Promise<PlanC
     .limit(1)
   if (prefErr) throw prefErr
 
-  return { planId, entries, recipes: recipes ?? [], preferences: prefRows?.[0]?.content ?? null }
+  return {
+    planId,
+    startsOn: planRow?.starts_on ?? null,
+    endsOn: planRow?.ends_on ?? null,
+    entries,
+    recipes: recipes ?? [],
+    preferences: prefRows?.[0]?.content ?? null,
+  }
 }
 
 function buildSystemPrompt(weekStart: string, ctx: PlanContext): string {
@@ -208,9 +235,15 @@ function buildSystemPrompt(weekStart: string, ctx: PlanContext): string {
 
   const seasonLine = seasonalGroundingLine(weekStart)
 
+  const weekEnd = addDaysIso(weekStart, 6)
+  const rangeLine = (ctx.startsOn || ctx.endsOn)
+    ? `ACTIVE RANGE: this week is PARTIAL. Only ${ctx.startsOn ?? weekStart} through ${ctx.endsOn ?? weekEnd} is being planned. Never propose meals, call set_slot, or suggest groceries for days outside this range.`
+    : ''
+
   return `You are the household's meal-planning consultant — a chef friend with strong seasonal instincts, not a meal-kit service. Voice: warm, concise, food-literate. Recommendations are simple, inspired, and grounded in what is currently in season. You're planning the household's week of ${weekStart} (that Sunday through the following Saturday).
 
 ${seasonLine}
+${rangeLine}
 
 Rules:
 - No em dashes in your own sentences. No AI cliches. No sycophancy. Be direct and action-oriented. (Exception: the per-night proposal lines use a single em dash after the day name — see the formatting rule below.)
@@ -223,6 +256,7 @@ Day/slot model:
 - Each day has three slots: breakfast, lunch, dinner.
 - day_of_week is 0=Sunday, 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday — this matches JS Date.getDay(). weekStart (${weekStart}) is always that week's Sunday.
 - Use set_slot to fill or replace a slot (it replaces whatever was there), clear_slot to empty one.
+- The week can be PARTIAL. If the user says they are away or unavailable for part of the week ("we get back Tuesday", "we leave Friday morning"), call set_week_range with the first and/or last planned date, then plan only the days inside the range. Days outside the active range never get proposals, set_slot calls, or grocery items.
 
 Consultation flow (default for open-ended requests):
 - When the user asks to plan a week, asks for ideas, or makes any open-ended request ("plan my week", "what should we eat", "give me some dinner ideas"), PROPOSE first — do not call any tool that turn. Reply with plain text shaped like this:
@@ -230,7 +264,7 @@ Consultation flow (default for open-ended requests):
   2. One line per dinner night, plain text, day name then an em dash then the idea (evocative but ≤ ~14 words), ending with its provenance: "(shelf)" for a saved recipe (use its EXACT title from the recipe library below) or "(new)" for one you're inventing for this proposal. Example: "Tuesday — seared salmon with charred scallions (shelf)". No markdown, no bullets, no bold.
   3. A closing question inviting adjustments (e.g. "swap anything before I lock it in?").
   4. Then, on its own line, ask about the week's logistics, since you can't see a calendar — e.g. "Anything on the calendar that week I should plan around — late activities, evenings out, guests?" The menu proposal always comes in this SAME turn as this question; never ask about the schedule first and withhold the menu.
-- Default to proposing all 7 dinner nights. If a night already has a dinner planned (see the current plan below), skip it in the proposal and acknowledge it briefly instead of re-proposing it.
+- Default to proposing a dinner for every night in the active range (all 7 when the week is full). If a night already has a dinner planned (see the current plan below), skip it in the proposal and acknowledge it briefly instead of re-proposing it.
 - If the user answers with schedule constraints (a late activity, an evening out, dinner guests, someone traveling, etc.), REVISE the proposal accordingly before applying anything: a crunched night gets leftovers, a no-cook meal, or something ≤20 minutes; the most ambitious cook moves to the freest evening; a guest night scales up or goes crowd-friendly; a night out means no dinner slot for that night — leave it empty or note it rather than proposing food. Restate only the nights that changed (not the whole week again), then confirm before applying.
 - Wait for the user's response. Only apply once they accept, fully or per-night:
   - For each accepted "(new)" night, call save_recipe FIRST (respecting the simplicity rules below), then set_slot using the id save_recipe returns.
@@ -456,6 +490,30 @@ async function runTool(
         })
         if (error) throw error
         return 'Created the Household Meal Preferences note.'
+      }
+      case 'set_week_range': {
+        const weekEnd = addDaysIso(weekStart, 6)
+        const parseBound = (v: unknown, label: string): { value: string | null } | { err: string } => {
+          const s = asNonEmptyString(v)
+          if (!s) return { value: null }
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return { err: `Error: ${label} must be YYYY-MM-DD.` }
+          if (s < weekStart || s > weekEnd) return { err: `Error: ${label} must be within ${weekStart}..${weekEnd} (this week).` }
+          return { value: s }
+        }
+        const start = parseBound(input.starts_on, 'starts_on')
+        if ('err' in start) return start.err
+        const end = parseBound(input.ends_on, 'ends_on')
+        if ('err' in end) return end.err
+        if (start.value && end.value && start.value > end.value) {
+          return 'Error: starts_on must not be after ends_on.'
+        }
+
+        const planId = await resolvePlanId(db, userId, weekStart, planCache)
+        const { error } = await db.from('meal_plans')
+          .update({ starts_on: start.value, ends_on: end.value })
+          .eq('id', planId)
+        if (error) throw error
+        return `Active range set: ${start.value ?? weekStart} through ${end.value ?? weekEnd}.`
       }
       default:
         return `Error: unknown tool ${name}`
