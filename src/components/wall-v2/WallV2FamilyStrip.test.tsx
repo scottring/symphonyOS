@@ -24,4 +24,13 @@ describe('WallV2FamilyStrip', () => {
     fireEvent.click(screen.getByLabelText('Utilities'));
     expect(onDock).toHaveBeenCalledWith('utilities');
   });
+  it('shows monogram medallion when portrait fails to load', () => {
+    render(<WallV2FamilyStrip familyMembers={members} today={undefined} now={new Date()} onDockAction={() => {}} />);
+    const scottPortrait = screen.getByAltText('Scott');
+    fireEvent.error(scottPortrait);
+    // After error, monogram should appear
+    expect(screen.getByText('S')).toBeInTheDocument();
+    // Portrait img should be gone
+    expect(screen.queryByAltText('Scott')).not.toBeInTheDocument();
+  });
 });

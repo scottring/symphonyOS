@@ -25,7 +25,8 @@ function Portrait({ member }: { member: FamilyMember }) {
   if (failed) {
     return (
       <div className="w-[60px] h-[60px] shrink-0 rounded-xl border-2 border-[#EEE1C7] dark:border-[#4A3D28] bg-[radial-gradient(circle_at_35%_28%,#F4E5CA,#DCC49A)] dark:bg-[radial-gradient(circle_at_35%_28%,#4A3D28,#332C22)] grid place-items-center font-display text-[1.4rem] text-[#6E5A3A] dark:text-[#D8BC85]">
-        {member.name.charAt(0).toUpperCase()}
+        {/* Serif initial is per spec §7 — monogram medallion */}
+        {member.name.charAt(0).toUpperCase() || '?'}
       </div>
     );
   }
