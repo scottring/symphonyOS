@@ -28,7 +28,7 @@ export function WallV2UtilitySheet({
     { id: 'theme', label: isDark ? 'Day theme' : 'Night theme', icon: isDark ? Sun : Moon, onTap: onToggleTheme },
   ];
   return (
-    <div className="fixed inset-0 z-40">
+    <div className="fixed inset-0 z-50">
       <div data-testid="utility-scrim" onClick={onClose} className="absolute inset-0 bg-black/40" />
       <div className={`absolute bottom-0 inset-x-0 ${WALL.root} rounded-t-3xl p-5 pb-7`}>
         <div className="flex items-center justify-between mb-3">

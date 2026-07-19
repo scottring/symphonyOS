@@ -33,4 +33,14 @@ describe('WallV2UtilitySheet', () => {
     expect(screen.getByText(/show daily routines/i)).toBeInTheDocument();
     expect(screen.getByText(/day theme/i)).toBeInTheDocument();
   });
+  it('RefreshCw icon spins when refreshing', () => {
+    const p = props();
+    const { rerender } = render(<WallV2UtilitySheet {...p} />);
+    const refreshButton = screen.getByText('Refresh').closest('button');
+    const icon = refreshButton?.querySelector('svg');
+    expect(icon?.getAttribute('class')).not.toContain('animate-spin');
+    rerender(<WallV2UtilitySheet {...p} refreshing={true} />);
+    const updatedIcon = refreshButton?.querySelector('svg');
+    expect(updatedIcon?.getAttribute('class')).toContain('animate-spin');
+  });
 });
