@@ -38,7 +38,15 @@ export function BookNextStep() {
       const end = new Date(start.getTime() + 45 * 60 * 1000)
       await host.createEvent({ title, startTime: start, endTime: end })
     } else {
-      await host.createDatedTask(title, start)
+      // Re-running the session must not stack duplicate reminder tasks
+      // (observed: 3× "Seasonal planning session" piled on one day). Same
+      // title + same day + still open = already booked.
+      const already = host.tasks.some((t) => {
+        if (t.completed || t.title !== title || !t.scheduledFor) return false
+        const s = new Date(t.scheduledFor)
+        return s.getFullYear() === y && s.getMonth() === m - 1 && s.getDate() === d
+      })
+      if (!already) await host.createDatedTask(title, start)
     }
     setBooked(true)
   }, [dateStr, host, title])

@@ -5,6 +5,8 @@ import type { Routine } from '@/types/actionable'
 
 interface Props {
   weekDate: Date
+  /** Reject task drops on days before this date (see PlanningSession). */
+  minDropDate?: Date
   priorities: Task[]
   events: CalendarEvent[]
   routines: Routine[]
@@ -20,6 +22,7 @@ interface Props {
 
 export function StepSchedule({
   weekDate,
+  minDropDate,
   priorities,
   events,
   routines,
@@ -42,6 +45,7 @@ export function StepSchedule({
         onPushTask={onPushTask}
         onClose={() => {}}
         initialDate={weekDate}
+        minDropDate={minDropDate}
         embedded
       />
     </div>

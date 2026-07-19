@@ -37,7 +37,8 @@ import { useSelection } from '@/shell/providers/SelectionProvider';
 import { DenseInboxRow } from '@/components/schedule/DenseInboxRow';
 import { TriageWhenMenu, type TriageWhen } from '@/components/schedule/TriageWhenMenu';
 import { selectOverdue } from '@/lib/today/taskPools';
-import { selectHorizonPool, HORIZONS, type HorizonId } from '@/lib/today/horizons';
+import { selectHorizonPool, selectPlacedInWeek, HORIZONS, type HorizonId } from '@/lib/today/horizons';
+import { readCadenceConfig, weekStartAnchor } from '@/lib/cadence/config';
 import { matchesDomain, filterEventsForDomain } from '@/lib/today/domainFilter';
 import { makeAssigneeFilter } from '@/lib/today/assigneeFilter';
 import { useConvertTaskToProject } from '@/hooks/useConvertTaskToProject';
@@ -186,6 +187,20 @@ export function HorizonView({ horizon }: HorizonViewProps) {
     () => selectHorizonPool(domainTasks, horizon, match),
     [domainTasks, horizon, match],
   );
+
+  // The week's placed rocks (bucket week→timed on scheduling drains the pool;
+  // without this section a fully-placed plan reads as an empty week). Items
+  // already surfaced as carried over (placed on a day now past) stay there —
+  // this section is the still-ahead placements.
+  const placedThisWeek = useMemo(() => {
+    if (horizon !== 'week') return [];
+    const carried = new Set(carryOver.map((t) => t.id));
+    return selectPlacedInWeek(
+      domainTasks,
+      weekStartAnchor(new Date(), readCadenceConfig().weekStartsOn),
+      match,
+    ).filter((t) => !carried.has(t.id));
+  }, [horizon, domainTasks, match, carryOver]);
 
   // Live counts for the cascade rail (bucketed rungs only — today and year
   // have no bucket of their own).
@@ -669,9 +684,11 @@ export function HorizonView({ horizon }: HorizonViewProps) {
                       style={{ width: `${Math.round((progress.day / progress.total) * 100)}%` }}
                     />
                   </span>
-                  {total > 0 && (
+                  {(total > 0 || placedThisWeek.length > 0) && (
                     <span>
-                      · {pool.length} open{carryOver.length > 0 ? ` · ${carryOver.length} carried over` : ''}
+                      · {pool.length} open
+                      {placedThisWeek.length > 0 ? ` · ${placedThisWeek.length} placed` : ''}
+                      {carryOver.length > 0 ? ` · ${carryOver.length} carried over` : ''}
                     </span>
                   )}
                 </div>
@@ -836,6 +853,18 @@ export function HorizonView({ horizon }: HorizonViewProps) {
             </section>
           )}
 
+          {/* Placed this week — rocks already on a day (bucket 'timed' inside
+              the week). Scheduling drains the week pool, so without this a
+              fully-placed plan reads as an empty week (week-boundary spec). */}
+          {placedThisWeek.length > 0 && (
+            <section className="mb-6">
+              <h2 className="font-display text-sm tracking-wide text-neutral-400 uppercase mb-3">
+                Placed this week ({placedThisWeek.length})
+              </h2>
+              <div className="space-y-2">{placedThisWeek.map(renderRow)}</div>
+            </section>
+          )}
+
           {/* Projects in motion — the pool grouped by project, loose tasks after. */}
           {grouped.groups.map(({ project, items }) => (
             <section key={project.id} className="mb-6">
@@ -862,7 +891,14 @@ export function HorizonView({ horizon }: HorizonViewProps) {
                 {grouped.groups.length > 0 ? `More in ${rungName}` : label} ({grouped.groups.length > 0 ? grouped.loose.length : pool.length})
               </h2>
             )}
-            {pool.length === 0 ? (
+            {pool.length === 0 && placedThisWeek.length > 0 ? (
+              // Every rock is placed on a day — that's a planned week, not an
+              // empty one. No invitation needed; the placed section above
+              // carries the page.
+              <p className="text-center py-4 text-sm text-neutral-400">
+                Everything on the {rungName} list is placed on a day.
+              </p>
+            ) : pool.length === 0 ? (
               <div className="text-center py-10 text-neutral-400">
                 <p className="font-display text-lg text-neutral-600 mb-1">
                   {period ? `Nothing planned for ${period.split(' ')[0]} yet` : `Nothing in ${label.toLowerCase()}`}

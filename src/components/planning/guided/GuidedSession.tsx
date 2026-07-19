@@ -9,8 +9,9 @@ import { X, ArrowLeft, ArrowRight, Volume2, VolumeX, Check, Briefcase, Users, Us
 import { usePlanningSession } from '@/hooks/usePlanningSession'
 import type { PlanningHorizon } from '@/hooks/usePlanningSession'
 import { domainSessionToken, DOMAIN_LABELS, type PlanningDomain } from '@/lib/today/domainFilter'
+import { getDueSession, readCadenceConfig, dismissNudgeForToken } from '@/lib/cadence/config'
 import { SESSIONS } from './sessions'
-import { guidedPeriod } from './periods'
+import { resolveGuidedTarget, daysRemainingIn, type GuidedTargetChoice } from './periods'
 import { narrationClip } from './narration'
 import { useNarrationPlayer } from './useNarrationPlayer'
 import { GuidedProvider, type GuidedHost } from './GuidedContext'
@@ -55,25 +56,31 @@ interface Props {
 
 export function GuidedSession({ horizon, domain, host, onClose, onFinished, onChain }: Props) {
   const config = SESSIONS[horizon]
-  const period = useMemo(() => guidedPeriod(horizon), [horizon])
+  // Which period this session plans: the threshold rule by default (late in a
+  // period → the next one), with a header toggle to pin the other candidate.
+  const [targetChoice, setTargetChoice] = useState<GuidedTargetChoice>('auto')
+  const target = useMemo(() => resolveGuidedTarget(horizon, targetChoice), [horizon, targetChoice])
+  const period = target.period
   const { notes, patchNotes, loading } = usePlanningSession(horizon, domainSessionToken(period.token, domain))
 
   // Resume position starts at 0 and is synced from notes.stepIndex exactly
-  // once per horizon, the first time loading flips false. `syncedHorizonRef`
-  // is the guard: after the initial sync for a horizon, later notes changes
-  // (including the ones this component itself writes via patchNotes) must
-  // never override the user's live navigation. Changing horizons resets the
-  // guard so a freshly-mounted-in-place session resyncs to its own position.
+  // once per horizon+period, the first time loading flips false. `syncedKeyRef`
+  // is the guard: after the initial sync, later notes changes (including the
+  // ones this component itself writes via patchNotes) must never override the
+  // user's live navigation. Changing horizons — or flipping the period toggle
+  // — resets the guard so the freshly-targeted session resyncs to its own
+  // persisted position.
   const [index, setIndex] = useState(0)
-  const syncedHorizonRef = useRef<PlanningHorizon | null>(null)
+  const syncedKeyRef = useRef<string | null>(null)
 
   useEffect(() => {
     if (loading) return
-    if (syncedHorizonRef.current === horizon) return
+    const syncKey = `${horizon}|${period.token}`
+    if (syncedKeyRef.current === syncKey) return
     const persisted = typeof notes.stepIndex === 'number' ? notes.stepIndex : 0
     setIndex(Math.min(Math.max(persisted, 0), config.steps.length - 1))
-    syncedHorizonRef.current = horizon
-  }, [loading, horizon, notes.stepIndex, config.steps.length])
+    syncedKeyRef.current = syncKey
+  }, [loading, horizon, period.token, notes.stepIndex, config.steps.length])
 
   // Safety net: if `horizon` changes, `config` swaps to a session with a
   // different (possibly shorter) step list in the same render that the sync
@@ -90,10 +97,21 @@ export function GuidedSession({ horizon, domain, host, onClose, onFinished, onCh
 
   // Shared completion bookkeeping: reset the resume position (the flushed
   // unmount persist carries it to the DB) and stamp the daily first-run flag.
+  // Finishing also answers the rhythm nudge: quiet today's due nudge when it's
+  // this horizon's, else the planned period's token (they byte-match — the
+  // weekly session token IS the nudge's weekToken).
   const completeSession = useCallback(() => {
     patchNotes({ stepIndex: 0 })
-    if (horizon === 'daily') localStorage.setItem('guided.daily.completed', '1')
-  }, [patchNotes, horizon])
+    if (horizon === 'daily') {
+      localStorage.setItem('guided.daily.completed', '1')
+      return
+    }
+    const kindByHorizon: Partial<Record<PlanningHorizon, string>> = {
+      weekly: 'week', monthly: 'month', seasonal: 'season', annual: 'year',
+    }
+    const due = getDueSession(readCadenceConfig(), new Date())
+    dismissNudgeForToken(due && due.kind === kindByHorizon[horizon] ? due.token : period.token)
+  }, [patchNotes, horizon, period.token])
 
   const finish = useCallback(() => {
     completeSession()
@@ -145,6 +163,23 @@ export function GuidedSession({ horizon, domain, host, onClose, onFinished, onCh
           <p className="text-sm text-neutral-500">
             {period.label} · Step {safeIndex + 1} of {config.steps.length}
           </p>
+          {/* Mid-period targeting: say which period is being planned when it
+              isn't the obvious one, and offer the flip (threshold rule —
+              week-boundary spec). Quiet on fresh period-start sessions. */}
+          {target.alt && !loading && (
+            <p className="mt-0.5 text-xs text-neutral-400">
+              {target.mode === 'next'
+                ? `Planning ahead — ${target.alt.label} is nearly done.`
+                : `Midway through — ${daysRemainingIn(period)} day${daysRemainingIn(period) === 1 ? '' : 's'} left.`}{' '}
+              <button
+                type="button"
+                onClick={() => setTargetChoice(target.alt!.target)}
+                className="underline decoration-neutral-300 underline-offset-2 hover:text-primary-700 transition-colors"
+              >
+                {target.mode === 'next' ? `Plan the rest of ${target.alt.label} instead` : `Plan ${target.alt.label} instead`}
+              </button>
+            </p>
+          )}
           {/* Persistence is real (usePlanningSession autosaves + flushes on
               exit, resumes at this step) — say so, so leaving to e.g. connect a
               calendar never feels like a gamble (walkthrough #8). */}

@@ -29,7 +29,7 @@ export const SESSIONS: Record<PlanningHorizon, GuidedSessionConfig> = {
         props: { notesKey: 'lookingBack', placeholder: "It’s July 2027. What actually happened:" },
       },
       {
-        id: 'goal-review', type: 'review', title: "Last year’s goals",
+        id: 'goal-review', type: 'review', title: 'Your goals, so far',
         narration: 'Here are the goals you set before. If one happened, mark it achieved and take the second of credit. If it still matters, carry it into the new year. If it no longer fits, let it go — dropping a goal on purpose is editing, not failing.',
         props: { source: 'goals' },
       },
@@ -167,6 +167,7 @@ export const SESSIONS: Record<PlanningHorizon, GuidedSessionConfig> = {
     horizon: 'weekly',
     title: 'Plan the week',
     estMinutes: [30, 45],
+    chain: { horizon: 'daily', label: 'Plan today now' },
     steps: [
       {
         id: 'welcome', type: 'narration', title: 'The week’s shape',

@@ -36,6 +36,15 @@ export function CalendarStep() {
   const landscapeYear = periodStart.getFullYear()
   const [zoomMonth, setZoomMonth] = useState<number | null>(null)
 
+  // A look-AHEAD never shows the past: mid-period sessions clamp the window to
+  // today (week-boundary spec). The landscape keeps the full year — it maps
+  // terrain, including what already happened.
+  const viewStart = useMemo(() => {
+    if (landscape) return periodStart
+    const today = new Date(); today.setHours(0, 0, 0, 0)
+    return periodStart.getTime() > today.getTime() ? periodStart : today
+  }, [landscape, periodStart])
+
   // fetchEvents REPLACES the app-wide GoogleCalendarProvider cache as a side
   // effect (it's shared with Today's timeline). A wide guided-session range
   // (e.g. the annual session's Jan–Dec scan) would otherwise clobber that
@@ -53,7 +62,7 @@ export function CalendarStep() {
     if (!host.calendarConnected || fetchedRef.current) return
     fetchedRef.current = true
     let cancelled = false
-    void host.fetchEvents(periodStart, periodEnd).then((result) => {
+    void host.fetchEvents(viewStart, periodEnd).then((result) => {
       if (!cancelled) setFetchedEvents(result)
     })
     return () => { cancelled = true }
@@ -63,12 +72,12 @@ export function CalendarStep() {
   const inRange = useMemo(
     () => fetchedEvents
       .map((e) => ({ e, st: eventStart(e) }))
-      .filter((x): x is { e: CalendarEvent; st: Date } => x.st !== null && x.st >= periodStart && x.st <= periodEnd)
+      .filter((x): x is { e: CalendarEvent; st: Date } => x.st !== null && x.st >= viewStart && x.st <= periodEnd)
       .sort((a, b) => a.st.getTime() - b.st.getTime())
       .map((x) => x.e),
-    [fetchedEvents, periodStart, periodEnd],
+    [fetchedEvents, viewStart, periodEnd],
   )
-  const wide = (periodEnd.getTime() - periodStart.getTime()) / DAY_MS > 63
+  const wide = (periodEnd.getTime() - viewStart.getTime()) / DAY_MS > 63
 
   const byMonth = useMemo(() => {
     if (!wide) return []

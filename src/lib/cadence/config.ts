@@ -119,6 +119,23 @@ export function getDueSession(config: CadenceConfig, now: Date): DueSession | nu
   return null
 }
 
+// ── Nudge dismissal ────────────────────────────────────────────────────────
+// One slot, token-scoped: the nudge for a period stays quiet once its token is
+// stored. Written by the banner's ✕ AND by finishing that period's guided
+// session — completing the ritual is the answer to the nudge.
+
+const NUDGE_DISMISS_KEY = 'symphony-rhythm-nudge-dismissed'
+export const NUDGE_DISMISS_EVENT = 'symphony:rhythm-nudge-dismissed'
+
+export function readDismissedNudgeToken(): string | null {
+  try { return localStorage.getItem(NUDGE_DISMISS_KEY) } catch { return null }
+}
+
+export function dismissNudgeForToken(token: string): void {
+  try { localStorage.setItem(NUDGE_DISMISS_KEY, token) } catch { /* ignore */ }
+  try { window.dispatchEvent(new Event(NUDGE_DISMISS_EVENT)) } catch { /* ignore */ }
+}
+
 /** Shared hook: read + update the cadence config, synced across consumers/tabs. */
 export function useCadenceConfig(): {
   config: CadenceConfig

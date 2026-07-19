@@ -6,6 +6,8 @@
  * App.tsx, and various components.
  */
 
+import { readCadenceConfig, weekStartAnchor } from '@/lib/cadence/config'
+
 /**
  * Convert a Date object to a YYYY-MM-DD string (local timezone)
  *
@@ -151,14 +153,12 @@ export function isWeekend(date: Date): boolean {
 }
 
 /**
- * Get the start of the week (Sunday) for a given date
+ * Get the start of the week for a given date, per the cadence config
+ * (Settings → Planning Rhythm; default Sunday). One week convention app-wide —
+ * see the week-boundary spec.
  */
 export function startOfWeek(date: Date): Date {
-  const result = new Date(date)
-  const day = result.getDay()
-  result.setDate(result.getDate() - day)
-  result.setHours(0, 0, 0, 0)
-  return result
+  return weekStartAnchor(date, readCadenceConfig().weekStartsOn)
 }
 
 /**

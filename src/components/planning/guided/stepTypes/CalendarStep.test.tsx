@@ -11,25 +11,35 @@ const step = {
   narration: 'Scan the next four to five weeks for conflicts and trips.',
 }
 
+// The look-ahead clamps its window to today (mid-period sessions never show
+// the past), so event fixtures live in NEXT month relative to the real clock
+// and the harness period is overridden to match.
+const FUT = (() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth() + 1, 1) })()
+const FUT_END = new Date(FUT.getFullYear(), FUT.getMonth() + 1, 0, 23, 59, 59)
+const futPeriod = { periodStart: FUT, periodEnd: FUT_END }
+
 const ev = (title: string, day: number): CalendarEvent => ({
-  id: `e-${day}`, title, startTime: new Date(2026, 6, day, 10), endTime: new Date(2026, 6, day, 11),
+  id: `e-${day}`, title,
+  startTime: new Date(FUT.getFullYear(), FUT.getMonth(), day, 10),
+  endTime: new Date(FUT.getFullYear(), FUT.getMonth(), day, 11),
 } as unknown as CalendarEvent)
 
 describe('CalendarStep', () => {
   it('fetches the period range on mount and lists events by day', async () => {
     const host = makeHost({ calendarConnected: true, events: [ev('Dentist', 14)] })
-    renderStep(<CalendarStep />, { step, host })
+    renderStep(<CalendarStep />, { step, host, ...futPeriod })
     await waitFor(() => expect(host.fetchEvents).toHaveBeenCalledWith(expect.any(Date), expect.any(Date)))
     await waitFor(() => expect(screen.getByText('Dentist')).toBeInTheDocument())
   })
 
   it('renders events that only carry the edge-function snake_case start_time', async () => {
     const snakeCaseEvent = {
-      id: 'e-snake', title: 'Snake Case Checkup', start_time: new Date(2026, 6, 14, 10).toISOString(),
-      end_time: new Date(2026, 6, 14, 11).toISOString(),
+      id: 'e-snake', title: 'Snake Case Checkup',
+      start_time: new Date(FUT.getFullYear(), FUT.getMonth(), 14, 10).toISOString(),
+      end_time: new Date(FUT.getFullYear(), FUT.getMonth(), 14, 11).toISOString(),
     } as unknown as CalendarEvent
     const host = makeHost({ calendarConnected: true, events: [snakeCaseEvent] })
-    renderStep(<CalendarStep />, { step, host })
+    renderStep(<CalendarStep />, { step, host, ...futPeriod })
     await waitFor(() => expect(host.fetchEvents).toHaveBeenCalledWith(expect.any(Date), expect.any(Date)))
     await waitFor(() => expect(screen.getByText('Snake Case Checkup')).toBeInTheDocument())
   })
@@ -40,9 +50,27 @@ describe('CalendarStep', () => {
     // fetchEvents call resolved with, not this shared array.
     const host = makeHost({ calendarConnected: true, events: [ev('Stale Cached Event', 5)] })
     host.fetchEvents = vi.fn(async () => [ev('Fresh Fetched Event', 14)])
-    renderStep(<CalendarStep />, { step, host })
+    renderStep(<CalendarStep />, { step, host, ...futPeriod })
     await waitFor(() => expect(screen.getByText('Fresh Fetched Event')).toBeInTheDocument())
     expect(screen.queryByText('Stale Cached Event')).not.toBeInTheDocument()
+  })
+
+  it('clamps a mid-period look-ahead to today — past events never render', async () => {
+    const past = new Date(); past.setDate(past.getDate() - 3); past.setHours(10, 0, 0, 0)
+    const pastEvent = {
+      id: 'e-past', title: 'Already Happened', startTime: past,
+      endTime: new Date(past.getTime() + 60 * 60 * 1000),
+    } as unknown as CalendarEvent
+    const monthStart = new Date(past.getFullYear(), past.getMonth(), 1)
+    const host = makeHost({ calendarConnected: true, events: [pastEvent] })
+    renderStep(<CalendarStep />, { step, host, periodStart: monthStart, periodEnd: FUT_END })
+    await waitFor(() => expect(host.fetchEvents).toHaveBeenCalled())
+    // Fetch starts at today, not the period's (past) first day…
+    const [fetchStart] = (host.fetchEvents as ReturnType<typeof vi.fn>).mock.calls[0] as [Date, Date]
+    const todayMid = new Date(); todayMid.setHours(0, 0, 0, 0)
+    expect(fetchStart.getTime()).toBe(todayMid.getTime())
+    // …and an already-past event is filtered even if the fetch returns it.
+    expect(screen.queryByText('Already Happened')).not.toBeInTheDocument()
   })
 
   it('disconnected: shows a quiet notice, no fetch', () => {
@@ -61,7 +89,7 @@ describe('CalendarStep', () => {
 
   it('fetches when the connection validates AFTER mount (late flip)', async () => {
     const host = makeHost({ calendarConnected: false, calendarChecking: true })
-    const { rerender, value } = renderStep(<CalendarStep />, { step, host })
+    const { rerender, value } = renderStep(<CalendarStep />, { step, host, ...futPeriod })
     expect(host.fetchEvents).not.toHaveBeenCalled()
     const connected = { ...host, calendarConnected: true, calendarChecking: false,
       fetchEvents: vi.fn(async () => [ev('Dentist', 14)]) }

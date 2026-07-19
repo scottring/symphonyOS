@@ -44,6 +44,9 @@ interface PlanningSessionProps {
   onPushTask: (id: string, target: Date | 'week' | 'month' | 'quarter') => void
   onClose: () => void
   initialDate?: Date
+  /** Reject task drops on days before this date (planning never schedules
+   *  rocks into the past — week-boundary spec). Day-granular; unset = allow. */
+  minDropDate?: Date
   getRoutinesForDate?: (date: Date) => Routine[]
   embedded?: boolean
 }
@@ -73,6 +76,7 @@ export function PlanningSession({
   onPushTask,
   onClose,
   initialDate,
+  minDropDate,
   getRoutinesForDate,
   embedded = false,
 }: PlanningSessionProps) {
@@ -85,6 +89,14 @@ export function PlanningSession({
 
   // Active drag state
   const [activeId, setActiveId] = useState<string | null>(null)
+
+  // Transient refusal notice (a past-day drop) — auto-clears.
+  const [dropNotice, setDropNotice] = useState<string | null>(null)
+  useEffect(() => {
+    if (!dropNotice) return
+    const t = setTimeout(() => setDropNotice(null), 3500)
+    return () => clearTimeout(t)
+  }, [dropNotice])
 
   // Configure sensors for drag detection
   // Use MouseSensor and TouchSensor separately for better scroll container support
@@ -409,6 +421,18 @@ export function PlanningSession({
         const parsed = parseSlotId(dropTarget)
         if (!parsed) return
 
+        // Planning never schedules a rock into the past — a "fresh" plan that
+        // is instantly overdue reads as failure (week-boundary spec).
+        if (minDropDate) {
+          const dropDay = new Date(parsed.year, parsed.month, parsed.day)
+          const minDay = new Date(minDropDate)
+          minDay.setHours(0, 0, 0, 0)
+          if (dropDay.getTime() < minDay.getTime()) {
+            setDropNotice('That day is already behind you — pick a day ahead.')
+            return
+          }
+        }
+
         // Create date in local time (not UTC) to avoid timezone shift
         const scheduledFor = new Date(parsed.year, parsed.month, parsed.day, parsed.hour, parsed.minute, 0, 0)
 
@@ -422,11 +446,11 @@ export function PlanningSession({
         })
       }
     },
-    [onUpdateTask, tasks, onScheduleRoutine, onRescheduleEvent, events]
+    [onUpdateTask, tasks, onScheduleRoutine, onRescheduleEvent, events, minDropDate]
   )
 
   return (
-    <div className={embedded ? 'h-full bg-bg-base flex flex-col' : 'fixed inset-0 z-50 bg-bg-base flex flex-col'}>
+    <div className={embedded ? 'relative h-full bg-bg-base flex flex-col' : 'fixed inset-0 z-50 bg-bg-base flex flex-col'}>
       {/* Header */}
       <PlanningHeader
         dateRange={dateRange}
@@ -438,6 +462,13 @@ export function PlanningSession({
         hideRoutines={hideRoutines}
         onToggleRoutines={() => writeHideRoutines(!hideRoutines)}
       />
+
+      {/* Past-day drop refusal — quiet, transient */}
+      {dropNotice && (
+        <div role="status" className="absolute left-1/2 -translate-x-1/2 top-16 z-20 rounded-lg bg-neutral-800/90 text-white text-sm px-4 py-2 shadow-lg pointer-events-none">
+          {dropNotice}
+        </div>
+      )}
 
       {/* Main content */}
       <div className="flex-1 flex overflow-hidden">

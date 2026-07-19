@@ -36,6 +36,8 @@ export function renderStep(
     horizon = 'monthly' as const,
     domain = 'universal' as const,
     goNext = vi.fn(),
+    periodStart = new Date(2026, 6, 1),
+    periodEnd = new Date(2026, 6, 31, 23, 59, 59),
   }: {
     step: GuidedStepConfig
     host?: GuidedHost
@@ -44,11 +46,13 @@ export function renderStep(
     horizon?: GuidedValue['horizon']
     domain?: GuidedValue['domain']
     goNext?: () => void
+    periodStart?: Date
+    periodEnd?: Date
   },
 ) {
   const value: GuidedValue = {
     horizon, domain, periodToken: '2026-7', periodLabel: 'July 2026',
-    periodStart: new Date(2026, 6, 1), periodEnd: new Date(2026, 6, 31, 23, 59, 59),
+    periodStart, periodEnd,
     notes, patchNotes, host, step, goNext,
   }
   return { ...render(<GuidedProvider value={value}>{ui}</GuidedProvider>), value }

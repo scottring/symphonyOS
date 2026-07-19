@@ -10,6 +10,11 @@ import { useGuided } from '../GuidedContext'
 export function ScheduleGridStep() {
   const { host, periodStart, periodEnd } = useGuided()
   const match = useMemo(() => makeAssigneeFilter([]), [])
+  // Rocks land on days AHEAD: mid-week the grid opens on today (not the
+  // period's — possibly past — first day), and drops before today are refused
+  // (week-boundary spec).
+  const todayStart = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d }, [])
+  const gridStart = periodStart.getTime() > todayStart.getTime() ? periodStart : todayStart
   const priorities = useMemo(
     () => host.tasks.filter((t) => {
       if (t.completed || !match(t.assignedTo, t.assignedToAll)) return false
@@ -39,7 +44,8 @@ export function ScheduleGridStep() {
   return (
     <div className="h-[60vh] min-h-[420px]">
       <StepSchedule
-        weekDate={periodStart}
+        weekDate={gridStart}
+        minDropDate={todayStart}
         priorities={priorities}
         events={host.events}
         routines={host.routines}

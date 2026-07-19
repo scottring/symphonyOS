@@ -25,3 +25,21 @@ export function selectHorizonPool(tasks: Task[], horizon: HorizonId, match: Matc
     !task.completed && task.bucket === def.bucket && match(task.assignedTo, task.assignedToAll),
   )
 }
+
+/** The week's placed rocks: tasks scheduled onto a day inside the week that
+ * starts at `weekStart`. Placing a rock flips bucket week→timed (the
+ * timed-bucket invariant), so it leaves the week pool — without this the /week
+ * page reads as empty the moment a plan is fully placed (week-boundary spec).
+ * Mirrors ScheduleGridStep's placed-rocks filter. */
+export function selectPlacedInWeek(tasks: Task[], weekStart: Date, match: Match): Task[] {
+  const start = new Date(weekStart)
+  start.setHours(0, 0, 0, 0)
+  const end = new Date(start)
+  end.setDate(end.getDate() + 7)
+  return tasks.filter(task => {
+    if (task.completed || task.bucket !== 'timed' || !task.scheduledFor) return false
+    if (!match(task.assignedTo, task.assignedToAll)) return false
+    const d = new Date(task.scheduledFor)
+    return d >= start && d < end
+  })
+}

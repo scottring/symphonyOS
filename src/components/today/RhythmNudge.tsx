@@ -4,16 +4,16 @@
 // noise before, so this is deliberately quiet: it appears ONLY on the configured
 // nudge day, is a single calm line (not a card), and is dismissible for the
 // week. It never blocks — sessions always run on demand from the spine.
+// Finishing the period's guided session also dismisses it (via
+// dismissNudgeForToken + NUDGE_DISMISS_EVENT), so the banner never nags about
+// a session that just happened.
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { CalendarRange, X } from 'lucide-react'
-import type { DueSession } from '@/lib/cadence/config'
-
-const DISMISS_KEY = 'symphony-rhythm-nudge-dismissed'
-
-function readDismissed(): string | null {
-  try { return localStorage.getItem(DISMISS_KEY) } catch { return null }
-}
+import {
+  readDismissedNudgeToken, dismissNudgeForToken, NUDGE_DISMISS_EVENT,
+  type DueSession,
+} from '@/lib/cadence/config'
 
 interface RhythmNudgeProps {
   /** From getDueSession(config, now). Null = nothing due → renders nothing. */
@@ -23,11 +23,23 @@ interface RhythmNudgeProps {
 }
 
 export function RhythmNudge({ due, onPlan }: RhythmNudgeProps) {
-  const [dismissedToken, setDismissedToken] = useState<string | null>(readDismissed)
+  const [dismissedToken, setDismissedToken] = useState<string | null>(readDismissedNudgeToken)
+
+  // A session Finish (possibly in an overlay above this mounted banner) writes
+  // the dismissal — pick it up live instead of waiting for a remount.
+  useEffect(() => {
+    const sync = () => setDismissedToken(readDismissedNudgeToken())
+    window.addEventListener(NUDGE_DISMISS_EVENT, sync)
+    window.addEventListener('storage', sync)
+    return () => {
+      window.removeEventListener(NUDGE_DISMISS_EVENT, sync)
+      window.removeEventListener('storage', sync)
+    }
+  }, [])
 
   const dismiss = useCallback(() => {
     if (!due) return
-    try { localStorage.setItem(DISMISS_KEY, due.token) } catch { /* ignore */ }
+    dismissNudgeForToken(due.token)
     setDismissedToken(due.token)
   }, [due])
 
