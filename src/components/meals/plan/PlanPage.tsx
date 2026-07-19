@@ -6,8 +6,9 @@ import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { useMealPlannerChat } from '@/hooks/useMealPlannerChat'
 import { useGroceryStatus } from '@/hooks/useGroceryStatus'
 import { useMobile } from '@/hooks/useMobile'
-import { sundayOfWeek, formatDateMonthDay, dayLabelFor } from '@/lib/weekHelpers'
+import { sundayOfWeek, formatDateMonthDay, dayLabelFor, dateForDayOfWeek, activeDayRange } from '@/lib/weekHelpers'
 import { WeekGrid } from './WeekGrid'
+import { WeekRangePopover } from './WeekRangePopover'
 import { RecipePickerModal, type LeftoverCandidate } from './RecipePickerModal'
 import { MealChatRail } from '../chat/MealChatRail'
 import { MealChatSheet } from '../chat/MealChatSheet'
@@ -37,7 +38,7 @@ export function PlanPage() {
   const [weekOffset, setWeekOffset] = useState(0)
   const weekStart = useMemo(() => addWeeks(sundayOfWeek(new Date()), weekOffset), [weekOffset])
 
-  const { plan, loading, error, addMeal, removeMeal, moveMeal } = useMealPlan(weekStart)
+  const { plan, loading, error, addMeal, removeMeal, moveMeal, setWeekRange } = useMealPlan(weekStart)
   const { recipes, refresh: refreshRecipes, addManual } = useRecipes()
   const { members: familyMembers } = useFamilyMembers()
   const chat = useMealPlannerChat(weekStart)
@@ -49,6 +50,12 @@ export function PlanPage() {
   const [chatSheetOpen, setChatSheetOpen] = useState(false)
 
   const recipesById = useMemo(() => new Map(recipes.map(r => [r.id, r])), [recipes])
+
+  const activeRange = useMemo(
+    () => activeDayRange(weekStart, plan?.startsOn ?? null, plan?.endsOn ?? null),
+    [weekStart, plan?.startsOn, plan?.endsOn],
+  )
+  const isPartial = activeRange.firstDay > 0 || activeRange.lastDay < 6
 
   /** Leftover candidates for the RecipePickerModal's "Leftovers" tab:
    *  prep-friendly recipe-backed entries that aren't themselves leftovers. */
@@ -112,9 +119,9 @@ export function PlanPage() {
   )
 
   const handleLeftoverTomorrow = useCallback((dayOfWeek: number, entry: MealPlanEntry) => {
-    if (dayOfWeek >= 6) return // Saturday dinner has no "tomorrow" in this week's grid.
+    if (dayOfWeek >= activeRange.lastDay) return // no "tomorrow" inside the active range
     void addMeal({ dayOfWeek: dayOfWeek + 1, slot: 'lunch', leftoverFromId: entry.id })
-  }, [addMeal])
+  }, [addMeal, activeRange.lastDay])
 
   const handleClear = useCallback((entryId: string) => {
     void removeMeal(entryId)
@@ -140,8 +147,17 @@ export function PlanPage() {
             <ChevronLeft className="w-5 h-5" />
           </button>
           <h1 className="font-display text-[1.75rem] text-neutral-800 px-1">
-            Week of <span className="italic text-primary-500">{weekLabel}</span>
+            {isPartial ? (
+              <span className="italic text-primary-500">
+                {formatDateMonthDay(dateForDayOfWeek(weekStart, activeRange.firstDay))}
+                {' – '}
+                {formatDateMonthDay(dateForDayOfWeek(weekStart, activeRange.lastDay))}
+              </span>
+            ) : (
+              <>Week of <span className="italic text-primary-500">{weekLabel}</span></>
+            )}
           </h1>
+          <WeekRangePopover weekStart={weekStart} activeRange={activeRange} onChange={setWeekRange} />
           <button
             onClick={() => setWeekOffset(o => o + 1)}
             aria-label="Next week"
@@ -166,7 +182,7 @@ export function PlanPage() {
         <div className="flex items-start gap-6">
           <WeekGrid
             weekStart={weekStart}
-            activeRange={{ firstDay: 0, lastDay: 6 }}
+            activeRange={activeRange}
             entries={plan?.entries ?? []}
             recipesById={recipesById}
             onPickRecipe={handlePickRecipe}
