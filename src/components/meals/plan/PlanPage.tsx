@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from 'react'
-import { ChevronLeft, ChevronRight, ShoppingBasket, MessageCircle } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ShoppingBasket, MessageCircle, SlidersHorizontal } from 'lucide-react'
 import { useMealPlan } from '@/hooks/useMealPlan'
 import { useRecipes, type ManualRecipeInput } from '@/hooks/useRecipes'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
@@ -10,6 +10,7 @@ import { sundayOfWeek, formatDateMonthDay, dayLabelFor, dateForDayOfWeek, active
 import { WeekGrid } from './WeekGrid'
 import { WeekRangePopover } from './WeekRangePopover'
 import { RecipePickerModal, type LeftoverCandidate } from './RecipePickerModal'
+import { MealPreferencesModal } from './MealPreferencesModal'
 import { MealChatRail } from '../chat/MealChatRail'
 import { MealChatSheet } from '../chat/MealChatSheet'
 import { MealsTabs } from '../MealsTabs'
@@ -48,6 +49,7 @@ export function PlanPage() {
   const [picker, setPicker] = useState<PickerState | null>(null)
   const [groceriesOpen, setGroceriesOpen] = useState(false)
   const [chatSheetOpen, setChatSheetOpen] = useState(false)
+  const [prefsOpen, setPrefsOpen] = useState(false)
 
   const recipesById = useMemo(() => new Map(recipes.map(r => [r.id, r])), [recipes])
 
@@ -166,13 +168,22 @@ export function PlanPage() {
             <ChevronRight className="w-5 h-5" />
           </button>
         </div>
-        <button
-          onClick={() => setGroceriesOpen(true)}
-          className="btn-primary flex items-center gap-2 text-[14px]"
-        >
-          <ShoppingBasket className="w-4 h-4" />
-          Build shopping list
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setPrefsOpen(true)}
+            className="flex items-center gap-2 text-[14px] text-neutral-600 hover:text-neutral-900 px-3 py-2 rounded-2xl hover:bg-neutral-100"
+          >
+            <SlidersHorizontal className="w-4 h-4" />
+            Preferences
+          </button>
+          <button
+            onClick={() => setGroceriesOpen(true)}
+            className="btn-primary flex items-center gap-2 text-[14px]"
+          >
+            <ShoppingBasket className="w-4 h-4" />
+            Build shopping list
+          </button>
+        </div>
       </div>
 
       {loading && <div className="text-[12px] uppercase tracking-widest text-neutral-400">Loading…</div>}
@@ -259,6 +270,8 @@ export function PlanPage() {
         currentItemTexts={[]}
         onSent={() => setGroceriesOpen(false)}
       />
+
+      <MealPreferencesModal isOpen={prefsOpen} onClose={() => setPrefsOpen(false)} />
     </div>
   )
 }

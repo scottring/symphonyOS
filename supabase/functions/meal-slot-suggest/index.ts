@@ -54,10 +54,12 @@ async function loadContext(db: SupabaseClient, weekStart: string): Promise<PlanC
     .from('recipes').select('id, title, tags, prep_minutes').order('title').limit(1000)
   if (recipeErr) throw recipeErr
 
+  // Oldest household note wins — same canonical master-prompt resolver as
+  // meal-planner-chat and the client, so all three read the one shared note.
   const { data: prefRows, error: prefErr } = await db
     .from('notes').select('content')
     .eq('title', 'Household Meal Preferences')
-    .order('created_at', { ascending: false })
+    .order('created_at', { ascending: true })
     .limit(1)
   if (prefErr) throw prefErr
 

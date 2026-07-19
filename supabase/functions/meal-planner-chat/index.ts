@@ -132,7 +132,7 @@ const TOOLS: any[] = [
   },
   {
     name: 'update_preferences',
-    description: 'Rewrite the Household Meal Preferences note. Pass the FULL new content (read the current content from the system prompt, apply the change, send the whole note back).',
+    description: 'Rewrite the Household Meal Preferences master prompt. Use ONLY for STANDING, going-forward changes the user explicitly asks to make permanent ("from now on", "always", "update my preferences") — NEVER for a one-off change to a single week. Pass the FULL new content (read the current content from the system prompt, apply the change, send the whole note back).',
     input_schema: {
       type: 'object',
       properties: { content: { type: 'string' } },
@@ -160,6 +160,9 @@ interface PlanContext {
   entries: Array<{ id: string; day_of_week: number; slot: string; recipe_id: string | null; ad_hoc_title: string | null; leftover_from: string | null }>
   recipes: Array<{ id: string; title: string; tags: string[] | null; prep_minutes: number | null }>
   preferences: string | null
+  /** id of the canonical household preferences note (couple-scoped), so
+   *  update_preferences edits the ONE shared master prompt. Null if none yet. */
+  preferencesNoteId: string | null
 }
 
 async function loadContext(db: SupabaseClient, weekStart: string): Promise<PlanContext> {
@@ -190,10 +193,13 @@ async function loadContext(db: SupabaseClient, weekStart: string): Promise<PlanC
     .from('recipes').select('id, title, tags, prep_minutes').order('title').limit(1000)
   if (recipeErr) throw recipeErr
 
+  // Oldest household note wins — the one canonical master prompt both partners
+  // read and edit (couple-scoped, so household RLS returns it regardless of
+  // which member is signed in). Must match the client + slot-suggest resolver.
   const { data: prefRows, error: prefErr } = await db
-    .from('notes').select('content')
+    .from('notes').select('id, content')
     .eq('title', 'Household Meal Preferences')
-    .order('created_at', { ascending: false })
+    .order('created_at', { ascending: true })
     .limit(1)
   if (prefErr) throw prefErr
 
@@ -204,6 +210,7 @@ async function loadContext(db: SupabaseClient, weekStart: string): Promise<PlanC
     entries,
     recipes: recipes ?? [],
     preferences: prefRows?.[0]?.content ?? null,
+    preferencesNoteId: prefRows?.[0]?.id ?? null,
   }
 }
 
@@ -290,6 +297,12 @@ Breakfast policy: breakfasts are usually repetitive. Offer "the usual" as a fill
 
 Grocery policy: when asked for a shopping list, consolidate ingredients from the week's recipe-backed meals, present the list grouped, flag staples the household likely already has (oil, salt, rice, soy sauce, flour, butter, etc.), and ask which to skip BEFORE calling add_grocery_items. Only call add_grocery_items after the user confirms the final list.
 
+Standing preferences (master prompt) policy — this is important:
+- The Household Meal Preferences note below is the MASTER PROMPT: standing rules that always apply. Treat it as read-only by default.
+- A request about ONE specific week is a one-off — adjust only that week's plan with set_slot/clear_slot/set_week_range. Do NOT call update_preferences for it. Examples that are one-offs, NOT preference changes: "kids are home this Friday, add a family dinner", "we're away Monday", "make this week vegetarian", "add a dinner Friday".
+- Call update_preferences ONLY when the user states a STANDING, going-forward change to how meals should always be planned — signaled by language like "from now on", "always", "never again", "going forward", "update my preferences", "change the master prompt". When unsure whether a change is standing or just this week, ASK ("just this week, or should I make that a standing rule?") rather than editing the master.
+- When you DO update the master, say so plainly in your reply (e.g. "Updated your standing preferences.") so the user knows it will carry into future weeks. The note is shared with the household, so both partners plan from the same master prompt.
+
 Current plan for week of ${weekStart}:
 ${entryLines}
 
@@ -351,6 +364,7 @@ async function runTool(
   name: string,
   input: Record<string, unknown>,
   planCache: { id: string | null },
+  prefsNoteId: string | null,
 ): Promise<string> {
   try {
     switch (name) {
@@ -468,28 +482,26 @@ async function runTool(
       case 'update_preferences': {
         const content = typeof input.content === 'string' ? input.content : ''
         if (!content.trim()) return 'Error: content is required.'
-        const { data: existing, error: findErr } = await db.from('notes')
-          .select('id')
-          .eq('title', 'Household Meal Preferences')
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle()
-        if (findErr) throw findErr
-        if (existing) {
+        // Edit the ONE canonical household note (resolved in loadContext), so
+        // Scott and Iris always change the same master prompt. Scope is left as
+        // it is (couple) — never downgraded.
+        if (prefsNoteId) {
           const { error } = await db.from('notes')
             .update({ content, updated_at: new Date().toISOString() })
-            .eq('id', existing.id)
+            .eq('id', prefsNoteId)
           if (error) throw error
-          return 'Updated the Household Meal Preferences note.'
+          return 'Updated your standing meal preferences.'
         }
+        // None exists yet — create it couple-scoped so the partner sees it too.
         const { error } = await db.from('notes').insert({
           title: 'Household Meal Preferences',
           content,
           type: 'general',
+          scope: 'couple',
           user_id: userId,
         })
         if (error) throw error
-        return 'Created the Household Meal Preferences note.'
+        return 'Created your standing meal preferences (shared with your household).'
       }
       case 'set_week_range': {
         const weekEnd = addDaysIso(weekStart, 6)
@@ -633,7 +645,7 @@ Deno.serve(async (req) => {
               send({ type: 'text', text: block.text })
             } else if (block.type === 'tool_use' && block.name) {
               send({ type: 'tool', name: block.name })
-              const result = await runTool(db, user.id, weekStart, block.name, block.input ?? {}, planCache)
+              const result = await runTool(db, user.id, weekStart, block.name, block.input ?? {}, planCache, ctx.preferencesNoteId)
               toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: result })
             }
           }
