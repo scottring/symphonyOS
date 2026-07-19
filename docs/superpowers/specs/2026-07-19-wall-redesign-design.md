@@ -45,8 +45,11 @@ in §10 but not built.
 
 ### 4.1 Fonts
 
-Existing app fonts (no new fonts): **Instrument Serif** (`font-display`) + **Satoshi** (body).
-Georgia in the comps is a stand-in for Instrument Serif.
+Existing app fonts (no new fonts): the app's display serif (`font-display`, currently
+**Source Serif 4**) + the body sans (currently **Source Sans 3**). Georgia in the comps
+is a stand-in for the display serif. Always reference the `font-display` / default
+body tokens, never a hardcoded family — the wall inherits whatever the app's type
+system settles on.
 
 Serif appears in exactly six places: **weekday/date, clock, weather temperature, dinner
 meal name (italic), family-member names, the quote.** Everything else is Satoshi.
