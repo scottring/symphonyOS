@@ -891,11 +891,11 @@ body {
 }
 
 /* Spine — runs through center of checkbox column
-   px-3(12) + w-12(48) + gap-3(12) + w-5/2(10) = 82px from left edge */
+   px-3(12) + w-16(64) + gap-3(12) + w-5/2(10) = 98px from left edge */
 .timeline-group::before {
   content: '';
   position: absolute;
-  left: 82px;
+  left: 98px;
   top: 0;
   bottom: 0;
   width: 1.5px;
