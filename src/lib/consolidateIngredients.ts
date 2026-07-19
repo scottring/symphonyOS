@@ -176,10 +176,21 @@ export function consolidateIngredients(plan: MealPlan, recipes: Recipe[]): Conso
 
   const byKey = new Map<string, Accumulator>()
 
+  // Count each recipe's ingredients ONCE, even if it's scheduled on several
+  // days (a "weekly batch" breakfast on 5 mornings is one shopping need, not
+  // five). Multiplying per-entry produced absurd lists ("40 eggs"). Ingredients
+  // shared across DIFFERENT recipes still sum — that dedup happens by key below.
+  const seenRecipeIds = new Set<string>()
+  const uniqueRecipes: Recipe[] = []
   for (const entry of plan.entries) {
     if (entry.leftoverFrom) continue
     const recipe = entry.recipe ?? (entry.recipeId ? recipesById.get(entry.recipeId) : undefined)
-    if (!recipe) continue
+    if (!recipe || seenRecipeIds.has(recipe.id)) continue
+    seenRecipeIds.add(recipe.id)
+    uniqueRecipes.push(recipe)
+  }
+
+  for (const recipe of uniqueRecipes) {
     for (const ingredient of recipe.ingredients) {
       const parsed = parseIngredient(ingredient)
       const key = ingredientKey(parsed, ingredient)

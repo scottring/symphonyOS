@@ -47,6 +47,24 @@ describe('consolidateIngredients', () => {
     const result = consolidateIngredients(planAdhoc, [])
     expect(result.length).toBe(0)
   })
+
+  it('counts a recipe ONCE even when scheduled on multiple days (the 40-eggs bug)', () => {
+    const frittata: Recipe = {
+      id: 'batch', userId: 'u1', title: 'Weekly Frittata', ingredients: ['8 eggs', '1 cup whole milk'],
+      instructions: [], tags: [], kidAcceptance: {}, isPrepFriendly: true, timesCooked: 0,
+      createdAt: new Date(), updatedAt: new Date(),
+    }
+    // Same batch recipe on five breakfasts.
+    const fivePlan: MealPlan = {
+      ...plan,
+      entries: [0, 1, 2, 3, 4].map(d => ({
+        id: `b${d}`, mealPlanId: 'p1', dayOfWeek: d, slot: 'breakfast' as const, recipeId: 'batch', recipe: frittata,
+      })),
+    }
+    const result = consolidateIngredients(fivePlan, [frittata])
+    const eggs = result.find(i => /egg/i.test(i.text))
+    expect(eggs?.text).toBe('8 eggs') // once, not 40
+  })
 })
 
 describe('consolidateIngredients — quantity aggregation + prep stripping', () => {

@@ -1,7 +1,9 @@
 import { useState, useMemo, useEffect } from 'react'
+import { Plus } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { CATEGORY_ORDER, type GroceryCategory } from '@/lib/categorizeIngredient'
 import type { ConsolidatedIngredient } from '@/lib/consolidateIngredients'
+import { isStaple } from '@/lib/isStaple'
 import { GrocerySection } from './GrocerySection'
 import { GroceryLineItemV2 } from './GroceryLineItemV2'
 
@@ -58,21 +60,30 @@ export function SendToGroceriesModalV2({
   onSent,
 }: Props) {
   const [items, setItems] = useState<ConsolidatedIngredient[]>([])
+  // Staples the household likely has — shown under "check before buying" and
+  // NOT sent unless the user explicitly adds one.
+  const [staples, setStaples] = useState<ConsolidatedIngredient[]>([])
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (isOpen) {
       const lower = currentItemTexts.map(t => t.toLowerCase())
-      setItems(
-        consolidated.filter(c => {
-          const key = c.text.toLowerCase()
-          return !lower.some(it => it.includes(key) || key.includes(it))
-        })
-      )
+      const notAlreadyListed = consolidated.filter(c => {
+        const key = c.text.toLowerCase()
+        return !lower.some(it => it.includes(key) || key.includes(it))
+      })
+      setItems(notAlreadyListed.filter(c => !isStaple(c)))
+      setStaples(notAlreadyListed.filter(c => isStaple(c)))
       setError(null)
     }
   }, [isOpen, consolidated, currentItemTexts])
+
+  // Move a staple into the to-buy list (user is out of it this week).
+  const addStaple = (item: ConsolidatedIngredient) => {
+    setStaples(prev => prev.filter(p => p !== item))
+    setItems(prev => [...prev, item])
+  }
 
   /**
    * Group items into sections, merging any GroceryCategory values that share
@@ -167,30 +178,49 @@ export function SendToGroceriesModalV2({
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto px-8 py-5">
-          {totalCount === 0 ? (
+          {totalCount === 0 && staples.length === 0 ? (
             <p className="text-center text-neutral-500 py-12 italic font-display">
               All planned ingredients are already on your Groceries list.
             </p>
           ) : (
-            sections.map((section, idx) => (
-              <GrocerySection
-                key={section.label}
-                label={section.label}
-                count={section.items.length}
-                defaultOpen={idx < 2}
-              >
-                {section.items.map((item, i) => (
-                  <GroceryLineItemV2
-                    key={`${section.label}-${item.text}-${i}`}
-                    item={item}
-                    onChange={(text) =>
-                      setItems(prev => prev.map(p => (p === item ? { ...p, text } : p)))
-                    }
-                    onRemove={() => setItems(prev => prev.filter(p => p !== item))}
-                  />
-                ))}
-              </GrocerySection>
-            ))
+            <>
+              {sections.map((section, idx) => (
+                <GrocerySection
+                  key={section.label}
+                  label={section.label}
+                  count={section.items.length}
+                  defaultOpen={idx < 2}
+                >
+                  {section.items.map((item, i) => (
+                    <GroceryLineItemV2
+                      key={`${section.label}-${item.text}-${i}`}
+                      item={item}
+                      onChange={(text) =>
+                        setItems(prev => prev.map(p => (p === item ? { ...p, text } : p)))
+                      }
+                      onRemove={() => setItems(prev => prev.filter(p => p !== item))}
+                    />
+                  ))}
+                </GrocerySection>
+              ))}
+
+              {staples.length > 0 && (
+                <GrocerySection label="STAPLES — CHECK BEFORE BUYING" count={staples.length} defaultOpen={false}>
+                  {staples.map((item, i) => (
+                    <div key={`staple-${item.text}-${i}`} className="group flex items-center gap-3 py-2.5 border-b border-neutral-100 last:border-b-0">
+                      <span className="flex-1 min-w-0 text-[16px] text-neutral-500">{item.text}</span>
+                      <button
+                        onClick={() => addStaple(item)}
+                        className="shrink-0 inline-flex items-center gap-1 text-[13px] text-primary-500 hover:text-primary-600 px-2 py-1 rounded-lg hover:bg-primary-50"
+                        aria-label={`Add ${item.text} to the list`}
+                      >
+                        <Plus className="w-3.5 h-3.5" /> Add
+                      </button>
+                    </div>
+                  ))}
+                </GrocerySection>
+              )}
+            </>
           )}
         </div>
 
