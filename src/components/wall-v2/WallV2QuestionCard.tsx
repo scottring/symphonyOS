@@ -5,6 +5,7 @@
 // discussion. Pulls from useDailyDiscussionPrompt via the shell.
 
 import { MessageCircle, Sparkles } from 'lucide-react';
+import { WALL } from './wallTheme';
 
 interface Props {
   question: string | null;
@@ -19,18 +20,19 @@ export function WallV2QuestionCard({ question, onTap }: Props) {
       type="button"
       onClick={onTap}
       disabled={!tappable}
-      className="group relative w-full text-left bg-gradient-to-br from-violet-50 to-rose-50 dark:from-violet-900/30 dark:to-rose-900/30 border border-violet-200/70 dark:border-violet-700/60 rounded-2xl p-4 overflow-hidden transition-colors hover:from-violet-100 hover:to-rose-100 dark:hover:from-violet-900/50 dark:hover:to-rose-900/50 disabled:cursor-default disabled:hover:from-violet-50 disabled:hover:to-rose-50 dark:disabled:hover:from-violet-900/30 dark:disabled:hover:to-rose-900/30"
+      style={{ touchAction: 'pan-y' }}
+      className={`group relative w-full min-h-[48px] text-left ${WALL.card} px-4 py-3 overflow-hidden transition-colors disabled:cursor-default`}
     >
-      <div className="flex items-center gap-2 text-[0.7rem] font-bold uppercase tracking-[0.22em] text-violet-700 dark:text-violet-300 mb-2">
+      <div className={`flex items-center gap-2 mb-2 ${WALL.label}`}>
         <MessageCircle className="w-4 h-4" />
         Tonight's question
       </div>
       {question ? (
-        <p className="font-display italic text-[1.1rem] leading-snug text-stone-800 dark:text-stone-100">
+        <p className={`font-display italic text-[1.1rem] leading-snug ${WALL.ink}`}>
           &ldquo;{question}&rdquo;
         </p>
       ) : (
-        <p className="text-[0.9rem] text-stone-500 dark:text-stone-400">
+        <p className={`text-[0.9rem] ${WALL.ink}`}>
           No question today.
         </p>
       )}

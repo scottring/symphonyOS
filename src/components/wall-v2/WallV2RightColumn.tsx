@@ -1,35 +1,44 @@
 // src/components/wall-v2/WallV2RightColumn.tsx
 //
-// Stacks the right-column widgets in their fixed order. Weather lives in the
-// left date column, so this rail stays focused on grocery, upcoming events,
-// and the family's "tonight's question" prompt.
+// Right column: dinner hero, tomorrow-morning preview, at-a-glance rollup,
+// tonight's question. Drag-scrolls when content exceeds the column.
+// Phase 2 reserves the slot ABOVE the dinner card for "Symphony Noticed".
 
-import { WallV2GroceryCard } from './WallV2GroceryCard';
-import { WallV2UpcomingCard } from './WallV2UpcomingCard';
-import { WallV2QuestionCard } from './WallV2QuestionCard';
 import { useDragScroll } from '@/hooks/useDragScroll';
-import type {
-  WallV2GroceryData,
-  WallV2UpcomingItem,
-} from './types';
+import { WallV2DinnerCard } from './WallV2DinnerCard';
+import { WallV2TomorrowCard } from './WallV2TomorrowCard';
+import { WallV2GlanceRollupCard } from './WallV2GlanceRollupCard';
+import { WallV2QuestionCard } from './WallV2QuestionCard';
+import type { GlanceRollupRow } from './wallV2Rollups';
 
 interface Props {
-  grocery: WallV2GroceryData;
-  upcoming: WallV2UpcomingItem[];
+  dinner: {
+    mealName: string | null;
+    subtitle?: string | null;
+    dinnerStart: Date | null;
+    photoUrl?: string | null;
+    onTap?: () => void;
+  };
+  tomorrowRows: { id: string; time: string; title: string }[];
+  glanceRows: GlanceRollupRow[];
   question: string | null;
-  onTapGrocery?: () => void;
   onTapQuestion?: () => void;
 }
 
-export function WallV2RightColumn({
-  grocery, upcoming, question, onTapGrocery, onTapQuestion,
-}: Props) {
+export function WallV2RightColumn({ dinner, tomorrowRows, glanceRows, question, onTapQuestion }: Props) {
   const scrollRef = useDragScroll<HTMLDivElement>();
   return (
     <div ref={scrollRef} className="flex flex-col gap-3 h-full min-h-0 overflow-y-auto pr-1 -mr-1">
-      <WallV2GroceryCard data={grocery} onTap={onTapGrocery} />
-      <WallV2UpcomingCard items={upcoming} />
-      <WallV2QuestionCard question={question} onTap={onTapQuestion} />
+      <WallV2DinnerCard
+        mealName={dinner.mealName}
+        subtitle={dinner.subtitle}
+        dinnerStart={dinner.dinnerStart}
+        photoUrl={dinner.photoUrl}
+        onTap={dinner.onTap}
+      />
+      <WallV2TomorrowCard rows={tomorrowRows} />
+      <WallV2GlanceRollupCard rows={glanceRows} />
+      {question && <WallV2QuestionCard question={question} onTap={onTapQuestion} />}
     </div>
   );
 }
