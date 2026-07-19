@@ -6,6 +6,7 @@
 
 import { CalendarDays, Coffee } from 'lucide-react';
 import { TINTS } from './tints';
+import { WALL } from './wallTheme';
 import { WallV2EventCard } from './WallV2EventCard';
 import { WallV2ScheduleBand } from './WallV2ScheduleBand';
 import { useDragScroll } from '@/hooks/useDragScroll';
@@ -29,20 +30,20 @@ export function WallV2Timeline({ band, calendarUnavailable, sections, onTapEvent
   // keep the band visible so its reconnect hint shows.
   const everythingEmpty = bandEmpty && sections.length === 0 && !calendarUnavailable;
   return (
-    <div className="bg-white/70 dark:bg-stone-900/60 border border-stone-200/70 dark:border-stone-700/60 rounded-3xl p-5 flex flex-col gap-4 h-full min-h-0">
-      <div className="text-[0.72rem] font-bold uppercase tracking-[0.22em] text-stone-500 dark:text-stone-400 shrink-0">
+    <div className={`${WALL.card} p-5 flex flex-col gap-4 h-full min-h-0`}>
+      <div className={`${WALL.label} shrink-0`}>
         Today's plan
       </div>
 
       {everythingEmpty ? (
-        <div className="flex flex-col items-center justify-center gap-2 py-10 text-stone-500 dark:text-stone-400">
+        <div className={`flex flex-col items-center justify-center gap-2 py-10 ${WALL.muted}`}>
           <div className="grid place-items-center w-14 h-14 rounded-2xl bg-emerald-50 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-200">
             <Coffee className="w-6 h-6" />
           </div>
-          <div className="font-display text-[1.4rem] text-stone-700 dark:text-stone-200 mt-1">
+          <div className={`text-[1.4rem] mt-1 ${WALL.inkStrong}`}>
             Nothing scheduled
           </div>
-          <div className="text-[0.9rem] text-stone-500 dark:text-stone-400">
+          <div className={`text-[0.9rem] ${WALL.muted}`}>
             Enjoy the calm — or capture something below.
           </div>
         </div>
@@ -66,7 +67,7 @@ export function WallV2Timeline({ band, calendarUnavailable, sections, onTapEvent
         />
 
         {sections.length > 0 && (
-          <div className="text-[0.62rem] font-bold uppercase tracking-[0.18em] text-stone-500 dark:text-stone-400 mt-1">
+          <div className={`${WALL.label} mt-1`}>
             Home rhythm
           </div>
         )}
@@ -85,7 +86,7 @@ export function WallV2Timeline({ band, calendarUnavailable, sections, onTapEvent
                 >
                   <Icon className="w-5 h-5" />
                 </div>
-                <div className="text-[0.62rem] font-bold uppercase tracking-[0.18em] text-stone-500 dark:text-stone-400 mt-1.5">
+                <div className={`${WALL.label} mt-1.5`}>
                   {section.label}
                 </div>
                 {!isLast && (
@@ -117,7 +118,7 @@ export function WallV2Timeline({ band, calendarUnavailable, sections, onTapEvent
         <button
           type="button"
           onClick={onTapFullDay}
-          className="self-center mt-1 shrink-0 inline-flex items-center gap-2 px-4 py-2 text-stone-600 dark:text-stone-300 hover:text-stone-900 dark:hover:text-stone-100 text-[0.9rem] font-bold"
+          className={`self-center mt-1 shrink-0 inline-flex items-center gap-2 px-4 py-2 text-[0.9rem] font-bold ${WALL.muted} hover:text-[#2F291F] dark:hover:text-[#F7F1E4]`}
         >
           <CalendarDays className="w-4 h-4" />
           View full day

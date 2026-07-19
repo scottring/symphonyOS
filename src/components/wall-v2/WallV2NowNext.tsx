@@ -19,6 +19,7 @@ import type { Material } from '@/types/material'
 import { deriveMaterials } from '@/components/surface/hooks/useStagedMaterials'
 import { MaterialChip } from '@/components/surface/MaterialChip'
 import { placeCall } from '@/lib/telephony/placeCall'
+import { WALL } from './wallTheme'
 
 const DEFAULT_DURATION_MS = 60 * 60 * 1000
 const TIMED_SECTIONS: DaySection[] = ['morning', 'afternoon', 'evening']
@@ -68,25 +69,25 @@ export function WallV2NowNext({ today, familyMembers, now, onTapMaterial }: Wall
   return (
     <div className="flex flex-col gap-3">
       {current && (
-        <section className="rounded-3xl bg-gradient-to-br from-primary-700 to-primary-800 text-white p-6 shadow-xl">
-          <div className="text-sm font-semibold uppercase tracking-wider text-white/70">
+        <section className={`${WALL.card} ${WALL.nowAccent} p-6`}>
+          <div className={WALL.label}>
             Happening now{current.startTime ? ` · ${timeToken(current.startTime)}` : ''}
           </div>
           {ownerName(current) && (
-            <div className="mt-1 text-white/80 text-base">{ownerName(current)}</div>
+            <div className={`mt-1 text-base ${WALL.muted}`}>{ownerName(current)}</div>
           )}
-          <h2 className="mt-1 font-display text-3xl leading-tight">{current.title}</h2>
+          <h2 className={`mt-1 text-3xl font-semibold leading-tight ${WALL.inkStrong}`}>{current.title}</h2>
           <MaterialRow item={current} variant="tile" onTap={handleMaterial} />
         </section>
       )}
 
       {next && (
-        <section className="rounded-2xl bg-white dark:bg-stone-900 border border-stone-200/70 dark:border-stone-700/70 p-5">
-          <div className="text-sm font-semibold uppercase tracking-wider text-stone-400">
+        <section className={`${WALL.card} p-5`}>
+          <div className={WALL.label}>
             Next up{next.startTime ? ` · ${timeToken(next.startTime)}` : ''}
           </div>
-          {ownerName(next) && <div className="mt-0.5 text-stone-500 text-sm">{ownerName(next)}</div>}
-          <h3 className="mt-0.5 font-display text-2xl text-stone-800 dark:text-stone-100 leading-tight">{next.title}</h3>
+          {ownerName(next) && <div className={`mt-0.5 text-sm ${WALL.muted}`}>{ownerName(next)}</div>}
+          <h3 className={`mt-0.5 text-2xl font-semibold leading-tight ${WALL.inkStrong}`}>{next.title}</h3>
           <MaterialRow item={next} variant="chip" onTap={handleMaterial} />
         </section>
       )}
