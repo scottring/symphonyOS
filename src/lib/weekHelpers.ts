@@ -33,6 +33,32 @@ export function dateForDayOfWeek(weekStart: Date, dayOfWeek: number): Date {
   return result
 }
 
+export interface ActiveDayRange {
+  firstDay: number
+  lastDay: number
+}
+
+/** Day-of-week bounds (0=Sun..6=Sat) of a plan's active range within its week.
+ *  `startsOn`/`endsOn` are ISO dates (YYYY-MM-DD) or null; null = unbounded on
+ *  that side, so (null, null) is the full week. Out-of-week dates clamp into
+ *  0..6 and an inverted range collapses to a single day, so a malformed row
+ *  can never produce an empty or negative grid. */
+export function activeDayRange(weekStart: Date, startsOn: string | null, endsOn: string | null): ActiveDayRange {
+  const firstDay = startsOn ? dayIndexInWeek(weekStart, startsOn) : 0
+  const lastDay = endsOn ? dayIndexInWeek(weekStart, endsOn) : 6
+  return lastDay < firstDay ? { firstDay, lastDay: firstDay } : { firstDay, lastDay }
+}
+
+function dayIndexInWeek(weekStart: Date, iso: string): number {
+  const [y, m, d] = iso.split('-').map(Number)
+  const date = new Date(y, m - 1, d)
+  const start = new Date(weekStart)
+  start.setHours(0, 0, 0, 0)
+  // Math.round absorbs the one-hour DST drift inside a week.
+  const diff = Math.round((date.getTime() - start.getTime()) / 86400000)
+  return Math.min(6, Math.max(0, diff))
+}
+
 /** Format a Date as YYYY-MM-DD using local time. */
 export function toIsoDate(d: Date): string {
   const y = d.getFullYear()
