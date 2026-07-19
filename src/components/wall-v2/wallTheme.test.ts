@@ -6,6 +6,9 @@ describe('wallTheme', () => {
     for (const token of [WALL.root, WALL.rail, WALL.card, WALL.cardInset, WALL.dinnerCard]) {
       expect(token).toContain('dark:');
     }
+    for (const accent of PERSON_ACCENTS) {
+      expect(accent).toContain('dark:');
+    }
   });
   it('personAccent cycles through the 4 accents', () => {
     expect(personAccent(0)).toBe(PERSON_ACCENTS[0]);

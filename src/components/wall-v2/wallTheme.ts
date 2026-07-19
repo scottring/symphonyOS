@@ -19,10 +19,10 @@ export const WALL = {
 } as const;
 
 export const PERSON_ACCENTS = [
-  'border-l-[#7A8E7E]',
-  'border-l-[#C9A96B]',
-  'border-l-[#D97F5E]',
-  'border-l-[#7C93A8]',
+  'border-l-[#7A8E7E] dark:border-l-[#4E7261]',
+  'border-l-[#C9A96B] dark:border-l-[#D8BC85]',
+  'border-l-[#D97F5E] dark:border-l-[#E29675]',
+  'border-l-[#7C93A8] dark:border-l-[#93A9BC]',
 ] as const satisfies readonly string[];
 
 export function personAccent(index: number): string {
