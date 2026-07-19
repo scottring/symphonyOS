@@ -1,0 +1,140 @@
+<h2>v3 — split the difference</h2>
+<p class="subtitle">v1's clean Nordic bones, v2's warmth only where it earns its keep: serif reserved for display moments (date, clock, dinner, names, quote), one subtle watercolor treeline, calm cream paper. Click to lock or iterate.</p>
+
+<style>
+  .wall3 { position: relative; width: 922px; height: 691px; margin: 0 auto; border-radius: 12px; overflow: hidden; border: 1px solid #D9CFBE; box-shadow: 0 8px 30px rgba(80,65,45,.18); font-family: 'Satoshi', -apple-system, sans-serif; color: #3D362C;
+    background:
+      radial-gradient(ellipse 50% 35% at 92% 2%, rgba(122,142,126,.14), transparent 65%),
+      linear-gradient(170deg, #F8F3E9, #F5EFE2); }
+  .wall3 * { box-sizing: border-box; }
+  .wall3 .treeline { position: absolute; right: 0; top: 0; width: 340px; height: 110px; opacity: .3; pointer-events: none; }
+  .wall3 .rail { position: absolute; left: 16px; top: 16px; width: 200px; height: 550px; background: #F1EADB; border: 1px solid #E1D7C2; border-radius: 16px; padding: 22px 18px; }
+  .wall3 .serif { font-family: Georgia, 'Instrument Serif', serif; }
+  .wall3 .rail .day { font-family: Georgia, serif; font-size: 35px; line-height: 1.05; color: #2E4638; font-style: italic; }
+  .wall3 .rail .shape { font-size: 12.5px; color: #8A7D68; margin-top: 8px; }
+  .wall3 .rail .clock { font-family: Georgia, serif; font-size: 42px; color: #3D362C; margin-top: 16px; letter-spacing: -1px; }
+  .wall3 .rail .wx { margin-top: 14px; padding: 12px; background: #FBF7EE; border: 1px solid #E7DCC6; border-radius: 12px; font-size: 14px; }
+  .wall3 .rail .wx b { font-family: Georgia, serif; font-size: 25px; font-weight: 500; }
+  .wall3 .rail .quote { position: absolute; bottom: 22px; left: 18px; right: 18px; font-family: Georgia, serif; font-size: 12.5px; font-style: italic; color: #8A7D68; line-height: 1.5; text-align: center; }
+  .wall3 .cardw { background: #FDFAF3; border: 1px solid #E5DAC5; border-radius: 16px; box-shadow: 0 1px 4px rgba(90,75,55,.07); }
+  .wall3 .now { position: absolute; left: 230px; top: 16px; width: 424px; height: 64px; padding: 10px 16px; background: #FDFAF3; border: 1px solid #E5DAC5; border-left: 5px solid #2E4638; border-radius: 16px; }
+  .wall3 .now .lbl { font-size: 10px; letter-spacing: .14em; color: #2E4638; font-weight: 700; }
+  .wall3 .now .txt { font-size: 17.5px; font-weight: 650; margin-top: 1px; }
+  .wall3 .now .cd { position: absolute; right: 14px; top: 12px; background: #E5EBE4; color: #2E4638; border-radius: 11px; padding: 7px 13px; font-size: 15px; font-weight: 700; }
+  .wall3 .tlwrap { position: absolute; left: 230px; top: 88px; width: 424px; height: 374px; padding: 14px 16px; }
+  .wall3 .sect { font-size: 10px; letter-spacing: .15em; font-weight: 700; color: #8A7D68; margin: 10px 0 6px; }
+  .wall3 .ev { display: flex; align-items: center; gap: 11px; padding: 9px 11px; border-radius: 12px; background: #FBF7EE; border: 1px solid #EDE3CF; margin-bottom: 6px; }
+  .wall3 .ev .t { width: 60px; font-size: 13px; color: #6E6252; font-weight: 600; }
+  .wall3 .ev .ico { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; font-size: 14px; }
+  .wall3 .ev .name { font-size: 15.5px; font-weight: 600; flex: 1; }
+  .wall3 .ev .who { font-size: 11px; color: #8A7D68; }
+  .wall3 .tasks { position: absolute; left: 230px; top: 470px; width: 424px; height: 96px; padding: 12px 16px; }
+  .wall3 .task { display: flex; gap: 9px; align-items: center; font-size: 14.5px; padding: 3px 0; }
+  .wall3 .task .cb { width: 18px; height: 18px; border: 2px solid #B9AB90; border-radius: 50%; }
+  .wall3 .task .chip { margin-left: auto; font-size: 10px; font-weight: 700; letter-spacing: .06em; padding: 2px 9px; border-radius: 7px; }
+  .wall3 .right { position: absolute; left: 668px; top: 16px; width: 240px; }
+  .wall3 .dinner { position: relative; height: 210px; background: #FCF5E7; border: 1px solid #E9D8B4; border-radius: 16px; overflow: hidden; margin-bottom: 12px; box-shadow: 0 1px 4px rgba(90,75,55,.07); }
+  .wall3 .dinner .photo { height: 94px; background: radial-gradient(circle at 30% 35%, #F2C296, transparent 55%), linear-gradient(135deg, #E8A87C, #C9694C); }
+  .wall3 .dinner .body { padding: 10px 14px; }
+  .wall3 .dinner .lbl { font-size: 9px; letter-spacing: .15em; font-weight: 700; color: #A8743F; }
+  .wall3 .dinner .meal { font-family: Georgia, serif; font-size: 23px; font-style: italic; color: #33291B; line-height: 1.05; margin-top: 2px; }
+  .wall3 .dinner .sides { font-size: 12px; color: #8A7D68; margin-top: 2px; }
+  .wall3 .dinner .prep { margin-top: 7px; display: inline-block; background: #F2E4C4; border-radius: 9px; padding: 4px 11px; font-size: 11.5px; font-weight: 700; color: #7A5A2E; }
+  .wall3 .mini { padding: 12px 14px; margin-bottom: 12px; }
+  .wall3 .mini .lbl { font-size: 9px; letter-spacing: .15em; font-weight: 700; color: #8A7D68; }
+  .wall3 .mini .row { display: flex; gap: 8px; font-size: 13.5px; padding: 3px 0; color: #4A4238; }
+  .wall3 .mini .row .tt { color: #A8743F; font-weight: 700; width: 36px; font-size: 12.5px; }
+  .wall3 .strip { position: absolute; left: 16px; bottom: 16px; right: 16px; height: 106px; display: flex; gap: 10px; }
+  .wall3 .person { flex: 1; background: #FDFAF3; border: 1px solid #E5DAC5; border-radius: 16px; display: flex; align-items: center; gap: 11px; padding: 10px 12px; border-left: 5px solid #7A8E7E; box-shadow: 0 1px 4px rgba(90,75,55,.06); }
+  .wall3 .person:nth-child(2) { border-left-color: #C9A96B; }
+  .wall3 .person:nth-child(3) { border-left-color: #D97F5E; }
+  .wall3 .person:nth-child(4) { border-left-color: #7C93A8; }
+  .wall3 .face { width: 60px; height: 60px; border-radius: 14px; background: radial-gradient(circle at 35% 28%, #F4E5CA, #DCC49A); border: 2px solid #EEE1C7; display: grid; place-items: center; font-family: Georgia, serif; font-size: 23px; color: #6E5A3A; }
+  .wall3 .person .nm { font-family: Georgia, serif; font-size: 17px; color: #2F291F; }
+  .wall3 .person .nx { font-size: 12px; color: #8A7D68; margin-top: 1px; }
+  .wall3 .dockc { width: 118px; background: #F1EADB; border: 1px solid #E1D7C2; border-radius: 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 8px; }
+  .wall3 .dockc div { background: #FDFAF3; border: 1px solid #E5DAC5; border-radius: 11px; display: grid; place-items: center; font-size: 16px; color: #2E4638; }
+</style>
+
+<div class="wall3">
+  <svg class="treeline" viewBox="0 0 380 130" preserveAspectRatio="none">
+    <path d="M0,130 L20,95 L35,110 L55,70 L70,95 L90,55 L105,85 L125,45 L140,80 L160,60 L175,90 L195,50 L210,80 L230,40 L245,75 L265,58 L280,88 L300,48 L315,78 L335,62 L350,92 L365,72 L380,95 L380,130 Z" fill="#7A8E7E" opacity="0.4"/>
+  </svg>
+
+  <div class="rail">
+    <div class="day">Saturday,<br>July 18</div>
+    <div class="shape">HERE'S THE SHAPE OF YOUR DAY</div>
+    <div class="clock">10:04</div>
+    <div class="wx"><b>72°</b> ☁ Partly cloudy<br><span style="color:#8A7D68">↑ 77° &nbsp;↓ 60°</span></div>
+    <div class="quote">"The days are long, but the years are short."<br>— Gretchen Rubin</div>
+  </div>
+
+  <div class="now">
+    <div class="lbl">NOW</div>
+    <div class="txt">Leave for Ella's swim lesson</div>
+    <div class="cd">47 min</div>
+  </div>
+
+  <div class="tlwrap cardw">
+    <div class="sect">THE DAY AHEAD</div>
+    <div class="ev"><div class="t">10:30</div><div class="ico" style="background:#E1EBE2;">🏊</div><div class="name">Ella — Swim Lesson</div><div class="who">45m</div></div>
+    <div class="ev"><div class="t">12:30</div><div class="ico" style="background:#F2E4C4;">🦷</div><div class="name">Noah — Dentist</div><div class="who">1h</div></div>
+    <div class="ev"><div class="t">3:00</div><div class="ico" style="background:#F6E1D2;">⚽</div><div class="name">Noah — Soccer Practice</div><div class="who">1h 15m</div></div>
+    <div class="ev"><div class="t">5:30</div><div class="ico" style="background:#E1EBE2;">🍽</div><div class="name">Family Dinner</div><div class="who">everyone</div></div>
+    <div class="sect">EVENING</div>
+    <div class="ev"><div class="t">7:30</div><div class="ico" style="background:#E7E3EF;">🌙</div><div class="name">Kids' bedtime routine</div><div class="who">routine</div></div>
+  </div>
+
+  <div class="tasks cardw">
+    <div class="sect" style="margin-top:0;">KEEP MOVING</div>
+    <div class="task"><div class="cb"></div>Grocery pickup <span style="color:#8A7D68;font-size:12px;">(order by 11am)</span><span class="chip" style="background:#E1EBE2;color:#2E4638;">HOME</span></div>
+    <div class="task"><div class="cb"></div>Science fair project — materials<span class="chip" style="background:#F6E1D2;color:#A8503C;">NOAH</span></div>
+  </div>
+
+  <div class="right">
+    <div class="dinner">
+      <div class="photo"></div>
+      <div class="body">
+        <div class="lbl">🍽 DINNER PLAN</div>
+        <div class="meal">Grilled Salmon</div>
+        <div class="sides">with couscous & roasted vegetables</div>
+        <div class="prep">Prep window · 4:30 – 5:15</div>
+      </div>
+    </div>
+    <div class="mini cardw">
+      <div class="lbl">☀ TOMORROW MORNING</div>
+      <div class="row"><span class="tt">7:00</span> Breakfast & pack lunches</div>
+      <div class="row"><span class="tt">7:30</span> Walk the dog</div>
+      <div class="row"><span class="tt">8:15</span> Prep for the day</div>
+    </div>
+    <div class="mini cardw">
+      <div class="lbl">AT A GLANCE</div>
+      <div class="row">📅 2 events — next: swim 10:30</div>
+      <div class="row">✓ 4 tasks — 2 due today</div>
+      <div class="row">🏠 Everyone home tonight</div>
+    </div>
+  </div>
+
+  <div class="strip">
+    <div class="person"><div class="face">S</div><div><div class="nm">Scott</div><div class="nx">Soccer run · 3:00</div></div></div>
+    <div class="person"><div class="face">I</div><div><div class="nm">Iris</div><div class="nx">At home · project day</div></div></div>
+    <div class="person"><div class="face">E</div><div><div class="nm">Ella</div><div class="nx">Swim lesson · 10:30</div></div></div>
+    <div class="person"><div class="face">N</div><div><div class="nm">Noah</div><div class="nx">Dentist · 12:30</div></div></div>
+    <div class="dockc"><div>＋</div><div>💬</div><div>📞</div><div>⛭</div></div>
+  </div>
+</div>
+
+<div class="section" style="margin-top: 24px;">
+  <p class="subtitle">Serif now lives only in: the date, the clock, the weather temp, the dinner title, person names, and the quote. Event rows, labels, and tasks are back to clean sans. One treeline wash instead of three corners. Square portrait frames stay (they're the watercolor drop-in target).</p>
+</div>
+
+<div class="options">
+  <div class="option" data-choice="lock" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content"><h3>Lock it — write the spec</h3><p>This is the wall.</p></div>
+  </div>
+  <div class="option" data-choice="tweak" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content"><h3>One more adjustment</h3><p>Tell me in the terminal what to change.</p></div>
+  </div>
+</div>
