@@ -1,5 +1,7 @@
 import { useState, useEffect } from 'react'
-import { useRecipes } from '@/hooks/useRecipes'
+import { Sparkles, Loader2 } from 'lucide-react'
+import { useRecipes, type ManualRecipeInput } from '@/hooks/useRecipes'
+import { useMealSlotSuggestions, type SlotSuggestion } from '@/hooks/useMealSlotSuggestions'
 import { AddRecipeButton } from '../shelf/AddRecipeButton'
 import { RecipeUrlPasteDialog } from '../shelf/RecipeUrlPasteDialog'
 import { RecipeManualEditor } from '../shelf/RecipeManualEditor'
@@ -22,26 +24,76 @@ interface Props {
   initialFamilyMemberId?: string
   familyMembers: FamilyMember[]
   leftoverCandidates?: LeftoverCandidate[]
+  /** Week + day being edited. When both (and slot) are set, the "✨ Ideas" tab
+   *  is available; without them the AI tab is hidden (other callers unaffected). */
+  weekStart?: Date
+  dayOfWeek?: number
   onClose: () => void
   onPick: (recipeId: string, familyMemberId: string | null) => void
   onPickLeftover?: (parentEntryId: string, familyMemberId: string | null) => void
+  /** Apply an AI-invented recipe: save it then fill the slot. */
+  onApplyNewRecipe?: (input: ManualRecipeInput) => void | Promise<void>
 }
 
 export function RecipePickerModal({
   isOpen, slot, initialFamilyMemberId, familyMembers,
   leftoverCandidates = [],
-  onClose, onPick, onPickLeftover,
+  weekStart, dayOfWeek,
+  onClose, onPick, onPickLeftover, onApplyNewRecipe,
 }: Props) {
   const { recipes, loading, addByUrl, addManual } = useRecipes()
   const [q, setQ] = useState('')
   const [pasteOpen, setPasteOpen] = useState(false)
   const [manualOpen, setManualOpen] = useState(false)
   const [forWho, setForWho] = useState<string | null>(initialFamilyMemberId ?? null)
-  const [tab, setTab] = useState<'shelf' | 'leftovers'>('shelf')
+  const [tab, setTab] = useState<'shelf' | 'leftovers' | 'ideas'>('shelf')
+  const [intent, setIntent] = useState('')
+  const [applying, setApplying] = useState(false)
+  const ai = useMealSlotSuggestions()
 
-  useEffect(() => { if (isOpen) { setForWho(initialFamilyMemberId ?? null); setTab('shelf') } }, [isOpen, initialFamilyMemberId])
+  const canSuggest = weekStart != null && dayOfWeek != null && slot != null
+
+  useEffect(() => {
+    if (isOpen) {
+      setForWho(initialFamilyMemberId ?? null)
+      setTab('shelf')
+      setIntent('')
+      ai.reset()
+    }
+  // ai.reset is stable; intentionally not depended on to avoid resetting mid-session.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen, initialFamilyMemberId])
 
   if (!isOpen) return null
+
+  const runSuggest = () => {
+    if (ai.loading || weekStart == null || dayOfWeek == null || slot == null) return
+    void ai.suggest({ weekStart, dayOfWeek, slot, intent })
+  }
+
+  const applySuggestion = async (s: SlotSuggestion) => {
+    if (applying) return
+    if (s.source === 'shelf') {
+      onPick(s.recipeId, forWho)
+      onClose()
+      return
+    }
+    if (!onApplyNewRecipe) return
+    setApplying(true)
+    try {
+      await onApplyNewRecipe({
+        title: s.title,
+        ingredients: s.ingredients,
+        instructions: s.instructions,
+        prepMinutes: s.prepMinutes,
+        tags: s.tags,
+        acceptanceSentence: s.why,
+      })
+      onClose()
+    } finally {
+      setApplying(false)
+    }
+  }
 
   const filtered = q
     ? recipes.filter(r => r.title.toLowerCase().includes(q.toLowerCase()))
@@ -112,7 +164,41 @@ export function RecipePickerModal({
                 }`}
               >Leftovers ({leftoverCandidates.length})</button>
             )}
+            {canSuggest && (
+              <button
+                onClick={() => setTab('ideas')}
+                className={`px-3 py-2 text-[12px] -mb-px border-b-2 inline-flex items-center gap-1 ${
+                  tab === 'ideas'
+                    ? 'border-primary-500 text-primary-700'
+                    : 'border-transparent text-neutral-500 hover:text-neutral-700'
+                }`}
+              ><Sparkles className="w-3.5 h-3.5" /> Ideas</button>
+            )}
           </div>
+          {tab === 'ideas' && (
+            <form
+              onSubmit={(e) => { e.preventDefault(); runSuggest() }}
+              className="flex items-center gap-2"
+            >
+              <input
+                type="text"
+                value={intent}
+                onChange={(e) => setIntent(e.target.value)}
+                placeholder="What are you in the mood for? (optional)"
+                aria-label="Describe what you want"
+                className="flex-1 px-4 py-2 rounded-xl border border-neutral-200 bg-bg-base focus:outline-none focus:border-primary-500"
+                autoFocus
+              />
+              <button
+                type="submit"
+                disabled={ai.loading}
+                className="btn-primary px-4 py-2 text-[13px] inline-flex items-center gap-1.5 disabled:opacity-40 shrink-0"
+              >
+                {ai.loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                Suggest
+              </button>
+            </form>
+          )}
           {tab === 'shelf' && (
             <input type="text" value={q} onChange={(e) => setQ(e.target.value)}
                    placeholder="Search your shelf…"
@@ -121,7 +207,43 @@ export function RecipePickerModal({
           )}
         </div>
         <div className="flex-1 overflow-y-auto p-4">
-          {tab === 'leftovers' ? (
+          {tab === 'ideas' ? (
+            <div>
+              {ai.error && (
+                <div className="py-4 text-center text-accent-500 text-[13px]">{ai.error}</div>
+              )}
+              {ai.loading && (
+                <div className="py-12 text-center text-[12px] uppercase tracking-widest text-neutral-400">
+                  Thinking of ideas…
+                </div>
+              )}
+              {!ai.loading && !ai.error && ai.suggestions.length === 0 && (
+                <div className="py-12 text-center text-neutral-500">
+                  <p className="font-display italic">Ask for a few ideas for this slot — describe a craving or just tap Suggest.</p>
+                </div>
+              )}
+              {!ai.loading && ai.suggestions.map((s, i) => (
+                <button
+                  key={i}
+                  onClick={() => void applySuggestion(s)}
+                  disabled={applying || (s.source === 'new' && !onApplyNewRecipe)}
+                  className="w-full text-left px-5 py-3 rounded-xl hover:bg-neutral-100 transition-colors mb-1 disabled:opacity-50"
+                >
+                  <div className="flex items-center gap-2">
+                    <div className="font-display text-[1.25rem] text-neutral-800">{s.title}</div>
+                    <span className={`text-[9px] uppercase tracking-[0.15em] px-1.5 py-0.5 rounded-full ${
+                      s.source === 'shelf'
+                        ? 'bg-sage-100 text-sage-600'
+                        : 'bg-primary-100 text-primary-600'
+                    }`}>{s.source === 'shelf' ? 'shelf' : 'new'}</span>
+                  </div>
+                  {s.why && (
+                    <div className="font-display italic text-[14px] text-sage-500 mt-0.5">{s.why}</div>
+                  )}
+                </button>
+              ))}
+            </div>
+          ) : tab === 'leftovers' ? (
             <div>
               {leftoverCandidates.length === 0 && (
                 <div className="py-12 text-center text-neutral-500">

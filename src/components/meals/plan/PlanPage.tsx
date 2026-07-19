@@ -1,7 +1,7 @@
 import { useState, useMemo, useCallback } from 'react'
 import { ChevronLeft, ChevronRight, ShoppingBasket, MessageCircle } from 'lucide-react'
 import { useMealPlan } from '@/hooks/useMealPlan'
-import { useRecipes } from '@/hooks/useRecipes'
+import { useRecipes, type ManualRecipeInput } from '@/hooks/useRecipes'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { useMealPlannerChat } from '@/hooks/useMealPlannerChat'
 import { useGroceryStatus } from '@/hooks/useGroceryStatus'
@@ -38,7 +38,7 @@ export function PlanPage() {
   const weekStart = useMemo(() => addWeeks(sundayOfWeek(new Date()), weekOffset), [weekOffset])
 
   const { plan, loading, error, addMeal, removeMeal } = useMealPlan(weekStart)
-  const { recipes, refresh: refreshRecipes } = useRecipes()
+  const { recipes, refresh: refreshRecipes, addManual } = useRecipes()
   const { members: familyMembers } = useFamilyMembers()
   const chat = useMealPlannerChat(weekStart)
   const isMobile = useMobile()
@@ -86,6 +86,17 @@ export function PlanPage() {
     if (!picker) return
     if (picker.replaceEntryId) await removeMeal(picker.replaceEntryId)
     await addMeal({ dayOfWeek: picker.dayOfWeek, slot: picker.slot, leftoverFromId: parentEntryId })
+    setPicker(null)
+  }
+
+  // Apply an AI-invented recipe: save it to the shelf, then fill the slot —
+  // the new-recipe analogue of handlePick (respects "change recipe" replace).
+  const handleApplyAiNew = async (input: ManualRecipeInput) => {
+    if (!picker) return
+    if (picker.replaceEntryId) await removeMeal(picker.replaceEntryId)
+    const recipe = await addManual(input)
+    await addMeal({ dayOfWeek: picker.dayOfWeek, slot: picker.slot, recipeId: recipe.id })
+    await refreshRecipes()
     setPicker(null)
   }
 
@@ -204,9 +215,12 @@ export function PlanPage() {
         slot={picker?.slot}
         familyMembers={familyMembers}
         leftoverCandidates={leftoverCandidates}
+        weekStart={weekStart}
+        dayOfWeek={picker?.dayOfWeek}
         onClose={() => setPicker(null)}
         onPick={handlePick}
         onPickLeftover={handlePickLeftover}
+        onApplyNewRecipe={handleApplyAiNew}
       />
 
       {/* useGroceryStatus already filters `consolidated` against the household's
