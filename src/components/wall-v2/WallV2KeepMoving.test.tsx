@@ -27,4 +27,13 @@ describe('WallV2KeepMoving', () => {
     render(<WallV2KeepMoving tasks={[]} onToggleComplete={() => {}} onTapTask={() => {}} />);
     expect(screen.getByText(/nothing pressing/i)).toBeInTheDocument();
   });
+  it('completed task shows line-through styling', () => {
+    const completedTask: WallV2TimelineEvent = {
+      id: 'task-1', title: 'Completed task', icon: ClipboardList, tint: 'sage', kind: 'task', completed: true,
+    };
+    const { container } = render(<WallV2KeepMoving tasks={[completedTask]} onToggleComplete={() => {}} onTapTask={() => {}} />);
+    const titleButton = screen.getByText('Completed task');
+    expect(titleButton).toHaveClass('line-through');
+    expect(container).toBeInTheDocument();
+  });
 });
