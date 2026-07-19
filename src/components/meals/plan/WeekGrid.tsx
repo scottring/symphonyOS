@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { dayLabelFor, dateForDayOfWeek, isToday as isTodayHelper, formatDateMonthDay } from '@/lib/weekHelpers'
+import { dayLabelFor, dateForDayOfWeek, isToday as isTodayHelper, formatDateMonthDay, type ActiveDayRange } from '@/lib/weekHelpers'
 import { resolveMealTitle } from '@/lib/mealTitle'
 import { SlotCell } from './SlotCell'
 import { DAY_MEAL_SLOTS } from '@/types/meal-planner'
@@ -9,6 +9,9 @@ import type { MealPlanEntry, MealSlot, Recipe } from '@/types/meal-planner'
 export interface WeekGridProps {
   /** The Sunday that starts this week (matches `meal_plans.week_start`). */
   weekStart: Date
+  /** Day-of-week bounds of the plan's active range (0=Sun..6=Sat). Days
+   *  outside render nothing; their entries stay in the DB untouched. */
+  activeRange: ActiveDayRange
   entries: MealPlanEntry[]
   recipesById: Map<string, Recipe>
   onPickRecipe: (dayOfWeek: number, slot: MealSlot) => void
@@ -25,8 +28,12 @@ export interface WeekGridProps {
  *  bubble up to PlanPage, which owns useMealPlan. Realtime updates flow
  *  down as new `entries` props; day_of_week is 0=Sunday..6=Saturday so the
  *  grid renders in DB order with no remapping. */
+function skippedLabel(from: number, to: number): string {
+  return from === to ? dayLabelFor(from) : `${dayLabelFor(from)} – ${dayLabelFor(to)}`
+}
+
 export function WeekGrid({
-  weekStart, entries, recipesById,
+  weekStart, activeRange, entries, recipesById,
   onPickRecipe, onTypeName, onLeftoverFromLastNight,
   onChangeRecipe, onClear, onLeftoverTomorrow, onMoveMeal,
 }: WeekGridProps) {
@@ -42,9 +49,22 @@ export function WeekGrid({
     return m
   }, [entries])
 
+  const days = useMemo(
+    () => Array.from(
+      { length: activeRange.lastDay - activeRange.firstDay + 1 },
+      (_, i) => activeRange.firstDay + i,
+    ),
+    [activeRange.firstDay, activeRange.lastDay],
+  )
+
   return (
     <div className="flex-1 min-w-0 space-y-3">
-      {[0, 1, 2, 3, 4, 5, 6].map(d => {
+      {activeRange.firstDay > 0 && (
+        <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-neutral-400 px-1">
+          {skippedLabel(0, activeRange.firstDay - 1)} · not planned
+        </div>
+      )}
+      {days.map(d => {
         const date = dateForDayOfWeek(weekStart, d)
         const today = isTodayHelper(date)
         const slotMap = entriesByDayBySlot.get(d)
@@ -72,7 +92,7 @@ export function WeekGrid({
                     slot={slot}
                     entry={entry}
                     title={entry ? resolveMealTitle(entry, entriesById, recipesById) : undefined}
-                    canLeftoverTomorrow={slot === 'dinner' && d < 6}
+                    canLeftoverTomorrow={slot === 'dinner' && d < activeRange.lastDay}
                     canLeftoverFromLastNight={!entry && prevDinner != null}
                     previousDinnerTitle={prevDinner ? resolveMealTitle(prevDinner, entriesById, recipesById) : undefined}
                     canMoveUp={up != null}
@@ -92,6 +112,11 @@ export function WeekGrid({
           </div>
         )
       })}
+      {activeRange.lastDay < 6 && (
+        <div className="text-[10px] font-bold uppercase tracking-[0.22em] text-neutral-400 px-1">
+          {skippedLabel(activeRange.lastDay + 1, 6)} · not planned
+        </div>
+      )}
     </div>
   )
 }

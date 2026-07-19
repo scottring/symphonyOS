@@ -31,12 +31,13 @@ const entries: MealPlanEntry[] = [
 
 const recipesById = new Map([[recipe.id, recipe]])
 
-function renderGrid(overrideEntries: MealPlanEntry[] = entries) {
+function renderGrid(overrideEntries: MealPlanEntry[] = entries, activeRange = { firstDay: 0, lastDay: 6 }) {
   return render(
     <WeekGrid
       weekStart={weekStart}
       entries={overrideEntries}
       recipesById={recipesById}
+      activeRange={activeRange}
       onPickRecipe={vi.fn()}
       onTypeName={vi.fn()}
       onLeftoverFromLastNight={vi.fn()}
@@ -97,6 +98,7 @@ describe('WeekGrid', () => {
           weekStart={weekStart}
           entries={entries.filter(e => e.id !== 'e-mon-dinner')}
           recipesById={recipesById}
+          activeRange={{ firstDay: 0, lastDay: 6 }}
           onPickRecipe={vi.fn()}
           onTypeName={vi.fn()}
           onLeftoverFromLastNight={vi.fn()}
@@ -136,5 +138,41 @@ describe('WeekGrid', () => {
     const leftoversOnly = screen.getAllByText('Leftovers')
     expect(leftoversOnly.length).toBe(1)
     expect(screen.queryByText('Leftovers: (unnamed)')).not.toBeInTheDocument()
+  })
+})
+
+describe('WeekGrid partial weeks', () => {
+  it('renders only the active days for a Tue→Sat range', () => {
+    renderGrid(entries, { firstDay: 2, lastDay: 6 })
+    expect(screen.queryByLabelText('Add breakfast for SUN')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Add breakfast for MON')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Add breakfast for TUE')).toBeInTheDocument()
+    expect(screen.getByLabelText('Add breakfast for SAT')).toBeInTheDocument()
+  })
+
+  it('notes the skipped leading days', () => {
+    renderGrid(entries, { firstDay: 2, lastDay: 6 })
+    expect(screen.getByText('SUN – MON · not planned')).toBeInTheDocument()
+  })
+
+  it('notes a single skipped trailing day without a range dash', () => {
+    renderGrid(entries, { firstDay: 0, lastDay: 5 })
+    expect(screen.getByText('SAT · not planned')).toBeInTheDocument()
+  })
+
+  it('hides entries that fall outside the active range', () => {
+    // Monday dinner entry exists but Monday is outside Tue→Sat.
+    renderGrid(entries, { firstDay: 2, lastDay: 6 })
+    expect(screen.queryByText('Sheet-pan chicken')).not.toBeInTheDocument()
+  })
+
+  it('disables "→ lunch tomorrow" on the last ACTIVE day, not just Saturday', async () => {
+    const user = userEvent.setup()
+    const friEntries: MealPlanEntry[] = [
+      { id: 'e-fri-dinner', mealPlanId: 'plan1', dayOfWeek: 5, slot: 'dinner', recipeId: 'r1' },
+    ]
+    renderGrid(friEntries, { firstDay: 0, lastDay: 5 })
+    await user.click(screen.getByLabelText('Dinner actions for FRI'))
+    expect(screen.getByText('→ Lunch tomorrow')).toBeDisabled()
   })
 })

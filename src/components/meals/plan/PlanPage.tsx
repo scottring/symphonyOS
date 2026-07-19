@@ -166,6 +166,7 @@ export function PlanPage() {
         <div className="flex items-start gap-6">
           <WeekGrid
             weekStart={weekStart}
+            activeRange={{ firstDay: 0, lastDay: 6 }}
             entries={plan?.entries ?? []}
             recipesById={recipesById}
             onPickRecipe={handlePickRecipe}
