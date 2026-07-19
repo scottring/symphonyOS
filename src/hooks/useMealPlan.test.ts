@@ -117,6 +117,60 @@ describe('useMealPlan', () => {
     expect(calls.includes('meal_plan_entries')).toBe(true)
   })
 
+  // Mock whose meal_plan_entries table records update({...}).eq('id', x) calls,
+  // while still resolving the load's select().eq().order() with `entries`.
+  function makeMoveMock(planRow: any, entries: any[], updateCalls: any[]) {
+    return (table: string) => {
+      if (table === 'meal_plans') return makeQueryMock([planRow], planRow)
+      const chain: any = {
+        select: () => chain,
+        order: () => chain,
+        eq: () => chain,
+        update: (payload: any) => ({
+          eq: (col: string, val: any) => {
+            updateCalls.push({ payload, col, val })
+            return Promise.resolve({ error: null })
+          },
+        }),
+        then: (resolve: any) => resolve({ data: entries, error: null }),
+      }
+      return chain
+    }
+  }
+
+  it('moveMeal updates the entry to the target cell when it is empty', async () => {
+    const planRow = { id: 'p1', user_id: 'u1', week_start: '2026-04-27', parameter: null, created_at: '2026-04-27T00:00:00Z', updated_at: '2026-04-27T00:00:00Z' }
+    const e1 = { id: 'e1', meal_plan_id: 'p1', day_of_week: 1, slot: 'dinner', recipe_id: 'r1', ad_hoc_title: null, notes: null, leftover_from: null, created_at: '2026-04-27T00:00:00Z' }
+    const updateCalls: any[] = []
+    vi.mocked(__mockFrom as any).mockImplementation(makeMoveMock(planRow, [e1], updateCalls))
+
+    const { result } = renderHook(() => useMealPlan(new Date('2026-04-27')))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    await act(async () => { await result.current.moveMeal('e1', 2, 'lunch') })
+
+    // Exactly one update — the moved entry — since the target cell was empty.
+    expect(updateCalls).toEqual([
+      { payload: { day_of_week: 2, slot: 'lunch' }, col: 'id', val: 'e1' },
+    ])
+  })
+
+  it('moveMeal swaps two entries when the target cell is occupied', async () => {
+    const planRow = { id: 'p1', user_id: 'u1', week_start: '2026-04-27', parameter: null, created_at: '2026-04-27T00:00:00Z', updated_at: '2026-04-27T00:00:00Z' }
+    const e1 = { id: 'e1', meal_plan_id: 'p1', day_of_week: 1, slot: 'dinner', recipe_id: 'r1', ad_hoc_title: null, notes: null, leftover_from: null, created_at: '2026-04-27T00:00:00Z' }
+    const e2 = { id: 'e2', meal_plan_id: 'p1', day_of_week: 2, slot: 'lunch', recipe_id: 'r2', ad_hoc_title: null, notes: null, leftover_from: null, created_at: '2026-04-27T00:00:00Z' }
+    const updateCalls: any[] = []
+    vi.mocked(__mockFrom as any).mockImplementation(makeMoveMock(planRow, [e1, e2], updateCalls))
+
+    const { result } = renderHook(() => useMealPlan(new Date('2026-04-27')))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    await act(async () => { await result.current.moveMeal('e1', 2, 'lunch') })
+
+    // Both entries trade cells.
+    expect(updateCalls).toContainEqual({ payload: { day_of_week: 2, slot: 'lunch' }, col: 'id', val: 'e1' })
+    expect(updateCalls).toContainEqual({ payload: { day_of_week: 1, slot: 'dinner' }, col: 'id', val: 'e2' })
+    expect(updateCalls).toHaveLength(2)
+  })
+
   it('subscribes to a per-instance meal_plan_entries realtime channel and refetches on change', async () => {
     const planRow = { id: 'p1', user_id: 'u1', week_start: '2026-04-27', parameter: null, created_at: '2026-04-27T00:00:00Z', updated_at: '2026-04-27T00:00:00Z' }
     vi.mocked(__mockFrom as any).mockImplementation((table: string) => {

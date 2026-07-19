@@ -1,7 +1,8 @@
-import { useState } from 'react'
-import { Plus } from 'lucide-react'
+import { useCallback, useRef, useState } from 'react'
+import { Plus, ChevronUp, ChevronDown } from 'lucide-react'
 import { dayLabelFor } from '@/lib/weekHelpers'
 import { MEAL_SLOT_LABEL } from '@/types/meal-planner'
+import { useClickOutside } from '@/hooks/useClickOutside'
 import type { MealPlanEntry, MealSlot } from '@/types/meal-planner'
 
 export interface SlotCellProps {
@@ -18,22 +19,30 @@ export interface SlotCellProps {
   canLeftoverFromLastNight: boolean
   /** Title of the previous day's dinner, for the "Leftovers from last night" label. */
   previousDinnerTitle?: string
+  /** Whether the meal can move up/down a cell (false at the ends of the week). */
+  canMoveUp?: boolean
+  canMoveDown?: boolean
   onChangeRecipe: () => void
   onClear: () => void
   onLeftoverTomorrow: () => void
   onPickRecipe: () => void
   onTypeName: (title: string) => void
   onLeftoverFromLastNight: () => void
+  onMoveUp: () => void
+  onMoveDown: () => void
 }
 
 /** One meal slot inside the week grid. Empty slots show a ghost "+"
- *  affordance with a pick/type/leftover menu; filled slots show the
- *  resolved title and a change/clear (+ leftover-tomorrow for dinner) menu. */
+ *  affordance with a pick/type/leftover menu; filled slots show the resolved
+ *  title, up/down move arrows, and a change/clear (+ leftover-tomorrow for
+ *  dinner) menu. Menus dismiss on outside-click / Escape. */
 export function SlotCell({
   dayOfWeek, slot, entry, title,
   canLeftoverTomorrow, canLeftoverFromLastNight, previousDinnerTitle,
+  canMoveUp = false, canMoveDown = false,
   onChangeRecipe, onClear, onLeftoverTomorrow,
   onPickRecipe, onTypeName, onLeftoverFromLastNight,
+  onMoveUp, onMoveDown,
 }: SlotCellProps) {
   const [actionMenuOpen, setActionMenuOpen] = useState(false)
   const [addMenuOpen, setAddMenuOpen] = useState(false)
@@ -45,6 +54,14 @@ export function SlotCell({
 
   const closeAddMenu = () => { setAddMenuOpen(false); setTyping(false); setDraftTitle('') }
 
+  // One ref per cell wraps the trigger + menu; clicking anywhere else —
+  // including another cell's trigger — dismisses whichever menu is open.
+  const menuRef = useRef<HTMLDivElement>(null)
+  const closeMenus = useCallback(() => {
+    setAddMenuOpen(false); setTyping(false); setDraftTitle(''); setActionMenuOpen(false)
+  }, [])
+  useClickOutside(menuRef, closeMenus, addMenuOpen || actionMenuOpen)
+
   const submitTypedName = () => {
     const trimmed = draftTitle.trim()
     if (!trimmed) return
@@ -55,7 +72,7 @@ export function SlotCell({
   // Empty state.
   if (!entry) {
     return (
-      <div className="relative border-b border-dashed border-neutral-200 last:border-b-0 py-2">
+      <div ref={menuRef} className="relative border-b border-dashed border-neutral-200 last:border-b-0 py-2">
         <button
           type="button"
           onClick={() => setAddMenuOpen(o => !o)}
@@ -118,44 +135,62 @@ export function SlotCell({
 
   // Filled state.
   return (
-    <div className="relative grid grid-cols-[80px_1fr_auto] items-start gap-3 py-2 border-b border-neutral-100 last:border-b-0">
+    <div ref={menuRef} className="relative grid grid-cols-[80px_1fr_auto] items-start gap-3 py-2 border-b border-neutral-100 last:border-b-0">
       <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-neutral-400 pt-1">{slotLabel}</div>
       <div className="font-display text-[1rem] leading-tight text-neutral-800">
         {title}
       </div>
-      <div className="relative">
+      <div className="flex items-center gap-0.5">
         <button
-          onClick={() => setActionMenuOpen(o => !o)}
-          aria-label={`${slotLabel} actions for ${dayLabel}`}
-          className="px-2 text-neutral-400 hover:text-neutral-700 text-[14px]"
+          onClick={onMoveUp}
+          disabled={!canMoveUp}
+          aria-label={`Move ${slotLabel} for ${dayLabel} up`}
+          className="p-0.5 text-neutral-300 hover:text-neutral-700 disabled:opacity-30 disabled:hover:text-neutral-300"
         >
-          ⋯
+          <ChevronUp className="w-4 h-4" />
         </button>
-        {actionMenuOpen && (
-          <div className="absolute right-0 top-full mt-1 z-10 min-w-[170px] rounded-xl border border-neutral-200 bg-bg-elevated shadow-card py-1">
-            <button
-              onClick={() => { setActionMenuOpen(false); onChangeRecipe() }}
-              className="w-full text-left px-3 py-1.5 text-[13px] hover:bg-primary-50"
-            >
-              Change recipe
-            </button>
-            <button
-              onClick={() => { setActionMenuOpen(false); onClear() }}
-              className="w-full text-left px-3 py-1.5 text-[13px] hover:bg-accent-50 text-accent-500"
-            >
-              Clear
-            </button>
-            {slot === 'dinner' && (
+        <button
+          onClick={onMoveDown}
+          disabled={!canMoveDown}
+          aria-label={`Move ${slotLabel} for ${dayLabel} down`}
+          className="p-0.5 text-neutral-300 hover:text-neutral-700 disabled:opacity-30 disabled:hover:text-neutral-300"
+        >
+          <ChevronDown className="w-4 h-4" />
+        </button>
+        <div className="relative">
+          <button
+            onClick={() => setActionMenuOpen(o => !o)}
+            aria-label={`${slotLabel} actions for ${dayLabel}`}
+            className="px-2 text-neutral-400 hover:text-neutral-700 text-[14px]"
+          >
+            ⋯
+          </button>
+          {actionMenuOpen && (
+            <div className="absolute right-0 top-full mt-1 z-10 min-w-[170px] rounded-xl border border-neutral-200 bg-bg-elevated shadow-card py-1">
               <button
-                onClick={() => { setActionMenuOpen(false); onLeftoverTomorrow() }}
-                disabled={!canLeftoverTomorrow}
-                className="w-full text-left px-3 py-1.5 text-[13px] hover:bg-primary-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                onClick={() => { setActionMenuOpen(false); onChangeRecipe() }}
+                className="w-full text-left px-3 py-1.5 text-[13px] hover:bg-primary-50"
               >
-                → Lunch tomorrow
+                Change recipe
               </button>
-            )}
-          </div>
-        )}
+              <button
+                onClick={() => { setActionMenuOpen(false); onClear() }}
+                className="w-full text-left px-3 py-1.5 text-[13px] hover:bg-accent-50 text-accent-500"
+              >
+                Clear
+              </button>
+              {slot === 'dinner' && (
+                <button
+                  onClick={() => { setActionMenuOpen(false); onLeftoverTomorrow() }}
+                  disabled={!canLeftoverTomorrow}
+                  className="w-full text-left px-3 py-1.5 text-[13px] hover:bg-primary-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  → Lunch tomorrow
+                </button>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   )

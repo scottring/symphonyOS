@@ -37,7 +37,7 @@ export function PlanPage() {
   const [weekOffset, setWeekOffset] = useState(0)
   const weekStart = useMemo(() => addWeeks(sundayOfWeek(new Date()), weekOffset), [weekOffset])
 
-  const { plan, loading, error, addMeal, removeMeal } = useMealPlan(weekStart)
+  const { plan, loading, error, addMeal, removeMeal, moveMeal } = useMealPlan(weekStart)
   const { recipes, refresh: refreshRecipes, addManual } = useRecipes()
   const { members: familyMembers } = useFamilyMembers()
   const chat = useMealPlannerChat(weekStart)
@@ -120,6 +120,10 @@ export function PlanPage() {
     void removeMeal(entryId)
   }, [removeMeal])
 
+  const handleMoveMeal = useCallback((entryId: string, targetDayOfWeek: number, targetSlot: MealSlot) => {
+    void moveMeal(entryId, targetDayOfWeek, targetSlot)
+  }, [moveMeal])
+
   const weekLabel = formatDateMonthDay(weekStart)
 
   return (
@@ -170,6 +174,7 @@ export function PlanPage() {
             onChangeRecipe={handleChangeRecipe}
             onClear={handleClear}
             onLeftoverTomorrow={handleLeftoverTomorrow}
+            onMoveMeal={handleMoveMeal}
           />
 
           {!isMobile && (

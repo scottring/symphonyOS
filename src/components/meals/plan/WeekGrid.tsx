@@ -3,6 +3,7 @@ import { dayLabelFor, dateForDayOfWeek, isToday as isTodayHelper, formatDateMont
 import { resolveMealTitle } from '@/lib/mealTitle'
 import { SlotCell } from './SlotCell'
 import { DAY_MEAL_SLOTS } from '@/types/meal-planner'
+import { adjacentCell } from '@/lib/mealGridOrder'
 import type { MealPlanEntry, MealSlot, Recipe } from '@/types/meal-planner'
 
 export interface WeekGridProps {
@@ -16,6 +17,8 @@ export interface WeekGridProps {
   onChangeRecipe: (dayOfWeek: number, slot: MealSlot, entry: MealPlanEntry) => void
   onClear: (entryId: string) => void
   onLeftoverTomorrow: (dayOfWeek: number, entry: MealPlanEntry) => void
+  /** Move an entry to a target cell (day + slot); PlanPage handles swap-on-collision. */
+  onMoveMeal: (entryId: string, targetDayOfWeek: number, targetSlot: MealSlot) => void
 }
 
 /** The week as a 7-day x 3-slot grid. Pure presentational — all writes
@@ -25,7 +28,7 @@ export interface WeekGridProps {
 export function WeekGrid({
   weekStart, entries, recipesById,
   onPickRecipe, onTypeName, onLeftoverFromLastNight,
-  onChangeRecipe, onClear, onLeftoverTomorrow,
+  onChangeRecipe, onClear, onLeftoverTomorrow, onMoveMeal,
 }: WeekGridProps) {
   const entriesById = useMemo(() => new Map(entries.map(e => [e.id, e])), [entries])
 
@@ -59,6 +62,8 @@ export function WeekGrid({
             <div>
               {DAY_MEAL_SLOTS.map(slot => {
                 const entry = slotMap?.get(slot)
+                const up = adjacentCell(d, slot, 'up')
+                const down = adjacentCell(d, slot, 'down')
 
                 return (
                   <SlotCell
@@ -70,12 +75,16 @@ export function WeekGrid({
                     canLeftoverTomorrow={slot === 'dinner' && d < 6}
                     canLeftoverFromLastNight={!entry && prevDinner != null}
                     previousDinnerTitle={prevDinner ? resolveMealTitle(prevDinner, entriesById, recipesById) : undefined}
+                    canMoveUp={up != null}
+                    canMoveDown={down != null}
                     onChangeRecipe={() => entry && onChangeRecipe(d, slot, entry)}
                     onClear={() => entry && onClear(entry.id)}
                     onLeftoverTomorrow={() => entry && onLeftoverTomorrow(d, entry)}
                     onPickRecipe={() => onPickRecipe(d, slot)}
                     onTypeName={(t) => onTypeName(d, slot, t)}
                     onLeftoverFromLastNight={() => prevDinner && onLeftoverFromLastNight(d, slot, prevDinner)}
+                    onMoveUp={() => { if (entry && up) onMoveMeal(entry.id, up.dayOfWeek, up.slot) }}
+                    onMoveDown={() => { if (entry && down) onMoveMeal(entry.id, down.dayOfWeek, down.slot) }}
                   />
                 )
               })}

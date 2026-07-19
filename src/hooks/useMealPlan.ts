@@ -24,6 +24,9 @@ interface UseMealPlanResult {
   refresh: () => Promise<void>
   addMeal: (input: AddMealInput) => Promise<void>
   removeMeal: (entryId: string) => Promise<void>
+  /** Move an entry to a different day/slot. If the target cell is occupied,
+   *  the two entries swap places. */
+  moveMeal: (entryId: string, targetDayOfWeek: number, targetSlot: MealSlot) => Promise<void>
 }
 
 // Unique per-mount channel names — same-topic channels conflict in supabase-js.
@@ -112,6 +115,42 @@ export function useMealPlan(weekStart: Date): UseMealPlanResult {
     }
   }, [plan])
 
+  const moveMeal = useCallback(async (entryId: string, targetDayOfWeek: number, targetSlot: MealSlot) => {
+    if (!plan) return
+    const source = plan.entries.find(e => e.id === entryId)
+    if (!source) return
+    if (source.dayOfWeek === targetDayOfWeek && source.slot === targetSlot) return
+    // Swap when the target cell already holds a meal, otherwise a plain move.
+    const target = plan.entries.find(e => e.dayOfWeek === targetDayOfWeek && e.slot === targetSlot)
+
+    const previous = plan.entries
+    setPlan(prev => prev ? {
+      ...prev,
+      entries: prev.entries.map(e => {
+        if (e.id === source.id) return { ...e, dayOfWeek: targetDayOfWeek, slot: targetSlot }
+        if (target && e.id === target.id) return { ...e, dayOfWeek: source.dayOfWeek, slot: source.slot }
+        return e
+      }),
+    } : prev)
+
+    const updates = [
+      supabase.from('meal_plan_entries').update({ day_of_week: targetDayOfWeek, slot: targetSlot }).eq('id', source.id),
+    ]
+    // No unique (plan, day, slot) constraint exists, so the two updates can run
+    // without a temp value even though they briefly share a cell.
+    if (target) {
+      updates.push(
+        supabase.from('meal_plan_entries').update({ day_of_week: source.dayOfWeek, slot: source.slot }).eq('id', target.id),
+      )
+    }
+    const results = await Promise.all(updates)
+    const failed = results.find(r => r.error)
+    if (failed?.error) {
+      setPlan(prev => prev ? { ...prev, entries: previous } : prev)
+      setError(failed.error.message)
+    }
+  }, [plan])
+
   // Refetch on mount and when the week changes.
   useEffect(() => { refresh() }, [refresh])
 
@@ -132,5 +171,5 @@ export function useMealPlan(weekStart: Date): UseMealPlanResult {
     return () => { supabase.removeChannel(channel) }
   }, [user])
 
-  return { plan, loading, error, refresh, addMeal, removeMeal }
+  return { plan, loading, error, refresh, addMeal, removeMeal, moveMeal }
 }
