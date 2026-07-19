@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import { consolidateIngredients, type ConsolidatedIngredient } from '@/lib/consolidateIngredients'
+import { activeDayRange } from '@/lib/weekHelpers'
 import type { MealPlan, Recipe } from '@/types/meal-planner'
 
 interface UseGroceryStatusResult {
@@ -25,7 +26,14 @@ export function useGroceryStatus(plan: MealPlan | null, recipes: Recipe[]): UseG
 
   const consolidated = useMemo(() => {
     if (!plan) return []
-    return consolidateIngredients(plan, recipes)
+    // Hidden days keep their entries in the DB, but they must not feed the
+    // shopping list — filter to the plan's active range first.
+    const { firstDay, lastDay } = activeDayRange(plan.weekStart, plan.startsOn, plan.endsOn)
+    const activePlan = {
+      ...plan,
+      entries: plan.entries.filter(e => e.dayOfWeek >= firstDay && e.dayOfWeek <= lastDay),
+    }
+    return consolidateIngredients(activePlan, recipes)
   }, [plan, recipes])
 
   const refresh = useCallback(async () => {
