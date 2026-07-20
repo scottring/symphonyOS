@@ -81,6 +81,15 @@ Account: `symphonygoals@gmail.com` — reset to true zero (onboarding cleared) 2
 
 **Checklist:** Five Horizons wizard end-to-end, goals page + sharpen, month/year grids drag-to-place, week→today cascade, per-domain sessions.
 
+**Pre-walkthrough known-issue fixes shipped 2026-07-20** (Scott asked to clear known items first; week-boundary/mid-period fixes bfac6f66 confirmed already live):
+- Week rung standing grid: PlanningSession 7-day grid mounted on /week (ScheduleGridStep conventions — opens on today, refuses past drops). NEEDS Scott's visual review; "Placed this week" list kept alongside for now.
+- Monthly wizard: "Projects in motion" moved BEFORE the write step (narration said "the list you're about to write" after it was written).
+- ReviewStep fate label "Carried into the new year" → "Carried forward" (mid-period re-runs).
+- Lineage breadcrumb: consecutive duplicate titles collapsed (no more "← X ← X").
+- Month grid rail: rock with a live copied-down child leaves the rail (was showing same title twice: dated chip + rail rock).
+- BookNextStep: calendar-connected branch now has the same same-day dedup as the task branch (event stacking).
+- Still deliberately open: Season grid (paused for Scott's visual direction).
+
 **Findings:**
 
 ---

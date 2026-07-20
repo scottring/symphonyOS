@@ -13,6 +13,7 @@
 
 import { useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import { PAGE_COLUMN } from '@/components/layout/pageLayout';
+import { PlanningSession } from '@/components/planning/PlanningSession';
 import { MonthCalendarGrid } from '@/components/planning/horizon/MonthCalendarGrid';
 import { YearCalendarGrid } from '@/components/planning/horizon/YearCalendarGrid';
 import { MonthZoomSheet } from '@/components/planning/horizon/MonthZoomSheet';
@@ -201,6 +202,28 @@ export function HorizonView({ horizon }: HorizonViewProps) {
       match,
     ).filter((t) => !carried.has(t.id));
   }, [horizon, domainTasks, match, carryOver]);
+
+  // ── Week as a standing 7-day grid — the wizard's "place the big rocks"
+  // surface living on the page (the week rung's calendar view, matching the
+  // month/year grids). Same conventions as ScheduleGridStep: the grid opens
+  // on today mid-week, refuses past-day drops, and keeps a placed rock
+  // visible where it was dropped (bucket week→timed on scheduling). ──
+  const todayStart = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; }, []);
+  const weekAnchor = useMemo(() => weekStartAnchor(new Date(), readCadenceConfig().weekStartsOn), []);
+  const weekGridStart = weekAnchor.getTime() > todayStart.getTime() ? weekAnchor : todayStart;
+  const weekGridTasks = useMemo(() => {
+    if (horizon !== 'week') return [];
+    const end = new Date(weekAnchor); end.setDate(end.getDate() + 7);
+    return domainTasks.filter((t) => {
+      if (t.completed || !match(t.assignedTo, t.assignedToAll)) return false;
+      if (t.bucket === 'week') return true;
+      if (t.scheduledFor) {
+        const d = new Date(t.scheduledFor);
+        return d >= weekAnchor && d < end;
+      }
+      return false;
+    });
+  }, [horizon, domainTasks, match, weekAnchor]);
 
   // Live counts for the cascade rail (bucketed rungs only — today and year
   // have no bucket of their own).
@@ -717,6 +740,26 @@ export function HorizonView({ horizon }: HorizonViewProps) {
           {isCascadeRung && (
             <div className="mb-8">
               <CascadeRail current={horizon} counts={railCounts} onGo={(h) => navigate(`/${h}`)} />
+            </div>
+          )}
+
+          {/* Week as the standing 7-day grid — place rocks straight from the
+              drawer onto days; placed rocks live on their day. */}
+          {horizon === 'week' && (
+            <div className="mb-8 h-[60vh] min-h-[420px]">
+              <PlanningSession
+                tasks={weekGridTasks}
+                events={domainEvents}
+                routines={allRoutines}
+                familyMembers={familyMembers}
+                eventNotesMap={eventNotesMap}
+                onUpdateTask={updateTask}
+                onPushTask={pushTask}
+                onClose={() => {}}
+                initialDate={weekGridStart}
+                minDropDate={todayStart}
+                embedded
+              />
             </div>
           )}
 

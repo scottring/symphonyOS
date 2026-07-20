@@ -35,8 +35,19 @@ export function BookNextStep() {
     if (!y || !m || !d) return
     const start = new Date(y, m - 1, d, 9, 0, 0, 0)
     if (host.calendarConnected) {
-      const end = new Date(start.getTime() + 45 * 60 * 1000)
-      await host.createEvent({ title, startTime: start, endTime: end })
+      // Same stacking guard as the task path: re-running the session must not
+      // pile duplicate calendar events on one day. Best-effort — host.events
+      // holds whatever range the session fetched.
+      const dup = host.events.some((e) => {
+        if (e.title !== title) return false
+        const raw = e.startTime ?? e.start_time
+        const s = raw ? new Date(raw) : null
+        return !!s && !Number.isNaN(s.getTime()) && s.getFullYear() === y && s.getMonth() === m - 1 && s.getDate() === d
+      })
+      if (!dup) {
+        const end = new Date(start.getTime() + 45 * 60 * 1000)
+        await host.createEvent({ title, startTime: start, endTime: end })
+      }
     } else {
       // Re-running the session must not stack duplicate reminder tasks
       // (observed: 3× "Seasonal planning session" piled on one day). Same

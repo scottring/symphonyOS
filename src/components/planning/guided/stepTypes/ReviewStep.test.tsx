@@ -146,7 +146,7 @@ describe('ReviewStep — goals source', () => {
     fireEvent.click(screen.getByRole('button', { name: /Carry forward/ }))
     // Row remains, now read-only with the fate label; action buttons are gone.
     expect(screen.getByText('Run a 5k')).toBeInTheDocument()
-    expect(screen.getByText('Carried into the new year')).toBeInTheDocument()
+    expect(screen.getByText('Carried forward')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Achieved/ })).toBeNull()
   })
 

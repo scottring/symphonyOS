@@ -62,11 +62,18 @@ export function MonthCalendarGrid({ month, tasks, events, onPlaceTask, onUnsched
     }
   }, [month])
 
-  // Undated rocks = this month's bucket, no scheduled time — the things to place.
-  const rocks = useMemo(
-    () => tasks.filter((t) => !t.completed && t.bucket === 'month' && !t.scheduledFor),
-    [tasks],
-  )
+  // Undated rocks = this month's bucket, no scheduled time — the things to
+  // place. A rock whose copied-down child is still live is effectively placed
+  // (copy-down duplicates by design), so it leaves the rail — otherwise the
+  // same title shows twice: dated chip in a cell AND undated rail rock.
+  const rocks = useMemo(() => {
+    const copiedDown = new Set(
+      tasks.filter((t) => !t.completed && t.sourceId).map((t) => t.sourceId as string),
+    )
+    return tasks.filter(
+      (t) => !t.completed && t.bucket === 'month' && !t.scheduledFor && !copiedDown.has(t.id),
+    )
+  }, [tasks])
 
   const itemsFor = (day: Date) => {
     const dayTasks = tasks.filter((t) => !t.completed && t.scheduledFor && sameDay(new Date(t.scheduledFor), day))

@@ -32,7 +32,9 @@ export function lineageTrail(
     seen.add(cursor)
     const parent = tasksById.get(cursor)
     if (!parent) break
-    trail.push(parent.title)
+    // Copy-down carries the same title down each rung — collapse consecutive
+    // repeats so a chain never renders "← X ← X".
+    if (trail[trail.length - 1] !== parent.title) trail.push(parent.title)
     goalId = goalId ?? parent.goalId
     cursor = parent.sourceId
   }

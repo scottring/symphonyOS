@@ -154,7 +154,9 @@ export function ReviewStep() {
       setGoalVerdicts((prev) => new Map(prev).set(id, verdict))
       void act()
     }
-    const FATE_LABEL = { carried: 'Carried into the new year', achieved: 'Achieved', letgo: 'Let go' } as const
+    // "Carried forward", not "into the new year" — the review runs mid-period
+    // on every re-run, not just in January.
+    const FATE_LABEL = { carried: 'Carried forward', achieved: 'Achieved', letgo: 'Let go' } as const
     return (
       <ul className="space-y-2">
         {open.map((g) => {

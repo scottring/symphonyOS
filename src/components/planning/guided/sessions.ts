@@ -123,13 +123,13 @@ export const SESSIONS: Record<PlanningHorizon, GuidedSessionConfig> = {
         props: { bucket: 'month' },
       },
       {
+        id: 'projects-in-motion', type: 'projects', title: 'Projects in motion',
+        narration: "Your projects in motion, for reference. A month moves a project one concrete chunk at a time — an order placed, a call made, a decision written down. Let these suggest month-sized moves for the list you’re about to write.",
+      },
+      {
         id: 'write-month', type: 'write-list', title: "Write the month’s list",
         narration: "Write the month’s list. Keep it honest — and put at least one thing on it that exists purely because it will be fun. A month with nothing to look forward to is a scheduling failure.",
         props: { bucket: 'month', rows: 'plain' },
-      },
-      {
-        id: 'projects-in-motion', type: 'projects', title: 'Projects in motion',
-        narration: "Your projects in motion, for reference. A month moves a project one concrete chunk at a time — an order placed, a call made, a decision written down. Let these suggest month-sized moves for the list you’re about to write.",
       },
       {
         id: 'month-ahead', type: 'calendar', title: 'The month ahead',
