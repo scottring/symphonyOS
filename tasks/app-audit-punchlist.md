@@ -37,7 +37,12 @@ Account: `symphonygoals@gmail.com` — reset to true zero (onboarding cleared) 2
 
 **Findings:**
 
-_(none yet)_
+### [P1] Only onboarding that exists is meal-planning onboarding (onboarding)
+- Repro: fresh account (onboarding_completed_at null) → log in → redirected to /onboarding
+- Expected: general Symphony first-run (tasks/planning/domains — the whole product)
+- Actual: entire flow is meal-first: Welcome copy "plan the week your family actually eats" + meal preview cards; HouseholdScreen "Who's eating?" (kid mods, portions); GoalsScreen options like "cook once, eat thrice"; RhythmsScreen "Any nights you don't cook?". Sample page is "Family Meal Plan".
+- Diagnosis: v2 flow was built as a meal-first first-run (`2500507e feat(onboarding): meal-first first-run flow`); a later commit (`0bd9bdad`) removed the meal habits/brief/generate *steps* but all copy/framing stayed meal-specific. There is no general onboarding — v2 is the only flow, mounted at /onboarding by AuthGate. Completion works (NowWhatScreen sets onboarding_completed_at), so it's passable, just wrong-product framing. Fix = product/design decision (rewrite screens general-first), not a patch.
+- Status: open
 
 ---
 
