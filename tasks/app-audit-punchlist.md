@@ -23,11 +23,11 @@ Account: `symphonygoals@gmail.com` — reset to true zero (onboarding cleared) 2
 ## Session 1 — First run (onboarding → capture → triage)
 
 **Checklist:**
-- [ ] Log in fresh → onboarding flow appears (not a blank/broken screen)
+- [x] Log in fresh → lands on Today (onboarding removed per S1 finding; verified 2026-07-20)
 - [ ] Every onboarding step: copy, inputs, back/forward, skip paths
 - [ ] Household/family setup during onboarding
 - [ ] Sample plan page (`/onboarding/sample`) if offered
-- [ ] Landing after onboarding — where do you end up, does it make sense empty?
+- [x] Landing after login — Today, "Your day is clear" empty state renders correctly
 - [ ] Empty states: Today, inbox, projects, goals — anything broken/ugly at zero data?
 - [ ] First quick captures (5–10 tasks): speed, focus behavior, enter-to-add
 - [ ] Triage from inbox: schedule (Today/Tomorrow/date), context tag, assign
@@ -43,7 +43,7 @@ Account: `symphonygoals@gmail.com` — reset to true zero (onboarding cleared) 2
 - Actual: entire flow is meal-first: Welcome copy "plan the week your family actually eats" + meal preview cards; HouseholdScreen "Who's eating?" (kid mods, portions); GoalsScreen options like "cook once, eat thrice"; RhythmsScreen "Any nights you don't cook?". Sample page is "Family Meal Plan".
 - Diagnosis: v2 flow was built as a meal-first first-run (`2500507e feat(onboarding): meal-first first-run flow`); a later commit (`0bd9bdad`) removed the meal habits/brief/generate *steps* but all copy/framing stayed meal-specific. There is no general onboarding — v2 is the only flow, mounted at /onboarding by AuthGate. Completion works (NowWhatScreen sets onboarding_completed_at), so it's passable, just wrong-product framing.
 - **Decision (Scott, 2026-07-20): REMOVE the meal onboarding entirely** — it's from an older version of the meal feature (pre chat-first rebuild). Fresh users land straight on Today's empty state. A general onboarding is a separate future design task.
-- Status: fixed (2026-07-20) — meal onboarding removed per map below; fresh users land on Today's empty state. Verify on demo account after deploy, then mark fixed+verified. Removal map (executed):
+- Status: fixed+verified (2026-07-20, prod f7f0275c) — meal onboarding removed; verified on demo account: fresh login lands directly on Today's empty state, no redirect, no console errors (one transient weather refetch timeout). Removal map (executed):
   1. `src/main.tsx` — drop `/onboarding` + `/onboarding/sample` routes (~L155-156) and the `OnboardingFlow, SamplePlanPage` lazy import (~L97).
   2. `src/components/lazy.ts` — drop `OnboardingFlow`, `SamplePlanPage`, `HelpPanel` exports (~L53-62).
   3. `src/components/auth/AuthGate.tsx` — strip the whole onboarding check (state, useEffect, supabase query, `<Navigate to="/onboarding">` at ~L143-147); gate becomes auth-only. Remove now-unused `Navigate` + `supabase` imports.
