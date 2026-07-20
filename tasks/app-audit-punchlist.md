@@ -41,8 +41,21 @@ Account: `symphonygoals@gmail.com` — reset to true zero (onboarding cleared) 2
 - Repro: fresh account (onboarding_completed_at null) → log in → redirected to /onboarding
 - Expected: general Symphony first-run (tasks/planning/domains — the whole product)
 - Actual: entire flow is meal-first: Welcome copy "plan the week your family actually eats" + meal preview cards; HouseholdScreen "Who's eating?" (kid mods, portions); GoalsScreen options like "cook once, eat thrice"; RhythmsScreen "Any nights you don't cook?". Sample page is "Family Meal Plan".
-- Diagnosis: v2 flow was built as a meal-first first-run (`2500507e feat(onboarding): meal-first first-run flow`); a later commit (`0bd9bdad`) removed the meal habits/brief/generate *steps* but all copy/framing stayed meal-specific. There is no general onboarding — v2 is the only flow, mounted at /onboarding by AuthGate. Completion works (NowWhatScreen sets onboarding_completed_at), so it's passable, just wrong-product framing. Fix = product/design decision (rewrite screens general-first), not a patch.
-- Status: open
+- Diagnosis: v2 flow was built as a meal-first first-run (`2500507e feat(onboarding): meal-first first-run flow`); a later commit (`0bd9bdad`) removed the meal habits/brief/generate *steps* but all copy/framing stayed meal-specific. There is no general onboarding — v2 is the only flow, mounted at /onboarding by AuthGate. Completion works (NowWhatScreen sets onboarding_completed_at), so it's passable, just wrong-product framing.
+- **Decision (Scott, 2026-07-20): REMOVE the meal onboarding entirely** — it's from an older version of the meal feature (pre chat-first rebuild). Fresh users land straight on Today's empty state. A general onboarding is a separate future design task.
+- Status: fixing — removal fully mapped, edits not yet started. Removal map:
+  1. `src/main.tsx` — drop `/onboarding` + `/onboarding/sample` routes (~L155-156) and the `OnboardingFlow, SamplePlanPage` lazy import (~L97).
+  2. `src/components/lazy.ts` — drop `OnboardingFlow`, `SamplePlanPage`, `HelpPanel` exports (~L53-62).
+  3. `src/components/auth/AuthGate.tsx` — strip the whole onboarding check (state, useEffect, supabase query, `<Navigate to="/onboarding">` at ~L143-147); gate becomes auth-only. Remove now-unused `Navigate` + `supabase` imports.
+  4. `src/components/auth/AuthGate.test.tsx` — remove supabase/onboarding mock + the "redirects to /onboarding" test; retitle "signed in and onboarded" test.
+  5. `src/shell/ShellLayout.tsx` — remove `HelpPanel` import (L11), `helpOpen`/`helpButtonRef` (L114-115), the "?" button (~L323-332), render block (~L478-483).
+  6. `src/apps/tasks/TasksApp.tsx` — remove `HelpPanel` import, `helpButtonRef`/`helpOpen` state, help fields from the chrome memo, render block (~L72-77); `Suspense`/`useRef`/`useState` imports become unused — clean up.
+  7. `src/contexts/AppShellChromeContext.tsx` — remove `helpOpen`/`onHelpOpenChange`/`helpButtonRef` from the interface.
+  8. `src/components/home/HomeHeader.tsx` — remove "?" button (~L142-149) + help destructure (L43).
+  9. Delete `src/components/onboarding/` (whole dir), `src/contexts/OnboardingContext.tsx`, `src/hooks/useOnboarding.ts`.
+  10. Keep `user_profiles.onboarding_completed_at` column + `src/types/userProfile.ts` field (DB mirror, harmless; demo account's flag is currently null — irrelevant once gate is gone).
+  - Verified no other consumers: HelpPanel used only by ShellLayout/TasksApp/HomeHeader "?" wiring; OnboardingContext/useOnboarding only by v2 screens; no GeneratePlanProvider/OnboardingShell/WHITMAN refs outside `src/components/onboarding/`.
+  - After edits: `npm run build` + `npx vitest run`, push to main (auto-deploys).
 
 ---
 
