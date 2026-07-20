@@ -24,16 +24,18 @@ Account: `symphonygoals@gmail.com` — reset to true zero (onboarding cleared) 2
 
 **Checklist:**
 - [x] Log in fresh → lands on Today (onboarding removed per S1 finding; verified 2026-07-20)
-- [ ] Every onboarding step: copy, inputs, back/forward, skip paths
-- [ ] Household/family setup during onboarding
-- [ ] Sample plan page (`/onboarding/sample`) if offered
+- [x] ~~Every onboarding step~~ — n/a, onboarding removed
+- [x] ~~Household/family setup during onboarding~~ — n/a; family setup covered in S4
+- [x] ~~Sample plan page~~ — n/a, route removed
 - [x] Landing after login — Today, "Your day is clear" empty state renders correctly
-- [ ] Empty states: Today, inbox, projects, goals — anything broken/ugly at zero data?
-- [ ] First quick captures (5–10 tasks): speed, focus behavior, enter-to-add
-- [ ] Triage from inbox: schedule (Today/Tomorrow/date), context tag, assign
-- [ ] Scheduled task appears on Today timeline correctly
-- [ ] Complete + undo a task
-- [ ] Realtime: change on one screen appears on the other
+- [x] Empty states: Today, inbox, projects, goals — all pass (Scott, 2026-07-20)
+- [x] First quick captures — 6 tasks captured, no issues
+- [x] Triage: dates (today + Aug 1), context=family, assignee all set correctly; bucket='timed' invariant holds in DB
+- [x] Scheduled tasks appear on Today (All day section)
+- [x] Complete + undo — works (Scott); DB state clean after undo
+- [x] Realtime Scott→parallel session: captures + triage appeared live, no refresh
+
+**Session 1 complete 2026-07-20 — one finding (fixed+verified). Deferred P3s: fresh-account greeting shows “Good morning, Symphonygoals” (email-derived name; no name prompt exists post-onboarding-removal) and briefly “Good morning, there” before profile load.**
 
 **Findings:**
 
