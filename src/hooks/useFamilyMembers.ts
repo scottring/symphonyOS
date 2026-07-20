@@ -1,13 +1,55 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { FamilyMember } from '@/types/family'
+
+// One in-flight seed attempt shared across ALL hook instances in this tab.
+// A per-instance ref cannot stop N simultaneously-mounted instances from
+// racing each other past the DB empty-check — every instance reads "no rows"
+// before any insert lands (9 duplicate self rows on 2026-07-20, 5 on
+// 2026-06-27). The DB partial unique index `family_members_one_self_row`
+// (one is_full_user row with null auth_user_id per user_id) is the backstop
+// for cross-tab races: a lost race fails the insert and we adopt the
+// winner's row instead.
+let seedInFlight: Promise<FamilyMember[] | null> | null = null
+
+async function seedSelfMemberOnce(): Promise<FamilyMember[] | null> {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return null
+
+  // If this user already has ANY member row, adopt it instead of inserting.
+  const { data: existing } = await supabase
+    .from('family_members')
+    .select('*')
+    .eq('user_id', user.id)
+    .order('display_order', { ascending: true })
+  if (existing && existing.length > 0) return existing
+
+  const userName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Me'
+  const initials = userName.split(/\s+/).map((w: string) => w[0]).join('').substring(0, 2).toUpperCase()
+
+  const { data, error } = await supabase
+    .from('family_members')
+    .insert([{ name: userName, initials, color: 'blue', is_full_user: true, display_order: 0, avatar_url: null, member_type: 'core' as const, role_label: 'parent', user_id: user.id }])
+    .select()
+
+  if (error || !data) {
+    // Insert rejected — most likely the unique index caught a concurrent
+    // seed from another tab. Fetch and adopt whatever won.
+    const { data: after } = await supabase
+      .from('family_members')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('display_order', { ascending: true })
+    return after && after.length > 0 ? after : null
+  }
+  return data
+}
 
 export function useFamilyMembers() {
   const [members, setMembers] = useState<FamilyMember[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
   const [currentUserId, setCurrentUserId] = useState<string | null>(null)
-  const seedingRef = useRef(false)
 
   const fetchMembers = useCallback(async () => {
     try {
@@ -38,66 +80,21 @@ export function useFamilyMembers() {
     fetchMembers()
   }, [fetchMembers])
 
-  // Auto-seed if no members exist (first-time setup)
+  // Auto-seed the user's own member row if none exists (first-time setup).
+  // All concurrently-mounted instances share one attempt via seedInFlight;
+  // the promise resets in finally so a later render can retry after failure.
   useEffect(() => {
-    async function seedIfEmpty() {
-      if (loading || members.length > 0 || seedingRef.current) return
-      seedingRef.current = true
-
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        seedingRef.current = false
-        return
-      }
-
-      // Guard against duplicate seeding. The local `members` check above is not
-      // enough: it can be transiently empty during an in-flight/failed fetch,
-      // and `seedingRef` is per hook-instance, so multiple mounted instances
-      // would each seed a second "self". Re-check the DB directly — if this user
-      // already has ANY member row, adopt it instead of inserting a duplicate.
-      // (This is what produced 5 "<email-prefix>" duplicates on 2026-06-27.)
-      const { data: existing } = await supabase
-        .from('family_members')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('display_order', { ascending: true })
-      if (existing && existing.length > 0) {
-        setMembers(existing)
-        seedingRef.current = false
-        return
-      }
-
-      // Only seed the current user - they'll add family in onboarding
-      const userName = user.user_metadata?.full_name || user.email?.split('@')[0] || 'Me'
-      const initials = userName.split(/\s+/).map((w: string) => w[0]).join('').substring(0, 2).toUpperCase()
-
-      const defaultMembers = [
-        { name: userName, initials, color: 'blue', is_full_user: true, display_order: 0, avatar_url: null, member_type: 'core' as const, role_label: 'parent' },
-      ]
-
-      try {
-        const { data, error } = await supabase
-          .from('family_members')
-          .insert(defaultMembers.map(m => ({ ...m, user_id: user.id })))
-          .select()
-
-        if (!error && data) {
-          setMembers(data)
-        }
-      } catch (err) {
+    if (loading || members.length > 0) return
+    const attempt = (seedInFlight ??= seedSelfMemberOnce().finally(() => {
+      seedInFlight = null
+    }))
+    attempt
+      .then((rows) => {
+        if (rows && rows.length > 0) setMembers(rows)
+      })
+      .catch((err) => {
         console.error('Error seeding family members:', err)
-      } finally {
-        seedingRef.current = false
-      }
-    }
-    // Best-effort seed: the pre-insert auth/existence checks run before the
-    // inner try, so a transient network failure there would otherwise escape as
-    // an unhandled rejection. Catch it, reset the guard so a later render can
-    // retry, and never crash the hook.
-    seedIfEmpty().catch((err) => {
-      console.error('Error seeding family members:', err)
-      seedingRef.current = false
-    })
+      })
   }, [loading, members.length])
 
   const addMember = useCallback(async (member: Omit<FamilyMember, 'id' | 'user_id' | 'created_at'>) => {

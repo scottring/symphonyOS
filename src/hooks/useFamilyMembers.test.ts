@@ -197,6 +197,42 @@ describe('useFamilyMembers', () => {
       }, { timeout: 1000 })
     })
 
+    it('seeds exactly once when many instances mount concurrently', async () => {
+      // Stateful mock DB: an insert becomes visible to subsequent reads, like
+      // the real thing. The old per-instance guard raced past the empty-check
+      // and inserted once per mounted instance (9 duplicates on 2026-07-20).
+      const db: FamilyMember[] = []
+      mockOrder.mockImplementation(() => Promise.resolve({ data: [...db], error: null }))
+      mockInsert.mockImplementation(() => {
+        const row = createMockFamilyMember({ name: 'me', is_full_user: true })
+        db.push(row)
+        return {
+          select: () => ({
+            single: mockSingle,
+            then: (resolve: (val: unknown) => void) =>
+              Promise.resolve({ data: [row], error: null }).then(resolve),
+          }),
+        }
+      })
+
+      const hooks = [
+        renderHook(() => useFamilyMembers()),
+        renderHook(() => useFamilyMembers()),
+        renderHook(() => useFamilyMembers()),
+      ]
+
+      await waitFor(() => {
+        hooks.forEach(h => expect(h.result.current.loading).toBe(false))
+      })
+
+      // All instances adopt the single seeded row…
+      await waitFor(() => {
+        hooks.forEach(h => expect(h.result.current.members).toHaveLength(1))
+      })
+      // …from exactly one insert (this raced to 9 duplicates on 2026-07-20)
+      expect(mockInsert).toHaveBeenCalledTimes(1)
+    })
+
     it('does not seed if members already exist', async () => {
       mockFetchResult = [createMockFamilyMember()]
 

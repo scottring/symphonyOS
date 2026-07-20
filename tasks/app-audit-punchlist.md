@@ -67,6 +67,14 @@ Account: `symphonygoals@gmail.com` — reset to true zero (onboarding cleared) 2
 
 **Findings:**
 
+### [P1] Assign picker shows 9 duplicate "symphonygoals" family members (detail panel)
+- Repro: fresh account first load → open任何 assign-to-family picker
+- Expected: one self member row
+- Actual: 9 identical rows, all created within ~70ms of first login (10:55:54Z)
+- Diagnosis: useFamilyMembers auto-seed race. The 2026-06-27 fix added a DB re-check before insert, but N simultaneously-mounted hook instances all pass the empty-check before any insert lands; per-instance seedingRef can't serialize across instances. NOT demo-only: real users tim.rappold (2 dupes) and meganhryan (3 dupes) had the same corruption.
+- Fix (2026-07-20): (1) data repair — for every affected user kept oldest self row, repointed all 16 FK columns referencing family_members, deleted dupes; (2) DB partial unique index `family_members_one_self_row` (one is_full_user/null-auth_user_id row per user_id) applied to prod + recorded in supabase/migrations/2026-07-20_family_members_one_self_row.sql; (3) module-level shared seed promise in useFamilyMembers + adopt-winner-on-insert-failure; regression test w/ stateful mock DB.
+- Status: fixing — code pushed, verify picker on demo account after deploy
+
 ---
 
 ## Session 3 — Planning
