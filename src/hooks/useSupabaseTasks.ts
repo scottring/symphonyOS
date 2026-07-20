@@ -11,6 +11,24 @@ import { defaultScopeForArea, type Scope } from '@/lib/scope'
 // Monotonic suffix so every hook instance gets its own realtime channel topic.
 let tasksChannelSeq = 0
 
+// Same-tab write fan-out. Every hook instance keeps its own copy of the tasks
+// state, and cross-instance sync (detail panel → Today list, QuickCapture →
+// view) used to ride ONLY on the Supabase realtime round-trip — seconds of lag
+// when healthy, and silently dead when the websocket is (slept laptop,
+// long-lived tab): "rescheduled in the panel but Today never changed".
+// Successful local writes now announce themselves in-process so every mounted
+// instance applies the change immediately; realtime remains the channel for
+// other tabs and devices. Announced tasks are the full local objects (nested
+// subtasks intact), unlike realtime's flat rows.
+type LocalTaskWrite =
+  | { kind: 'insert'; task: Task }
+  | { kind: 'update'; task: Task }
+  | { kind: 'delete'; id: string }
+const localTaskWrites = new EventTarget()
+function announceLocalWrite(detail: LocalTaskWrite): void {
+  localTaskWrites.dispatchEvent(new CustomEvent<LocalTaskWrite>('write', { detail }))
+}
+
 export interface DbTask {
   id: string
   user_id: string
@@ -215,6 +233,64 @@ export function useSupabaseTasks() {
     setLoading(false)
   }, [user])
 
+  // Apply an incoming write (realtime payload or same-tab announcement) to this
+  // instance's state. Insert/update/delete mirror the realtime semantics:
+  // inserts dedupe against optimistic copies, updates match top-level tasks and
+  // nested subtasks, deletes sweep both levels.
+  const applyIncomingInsert = useCallback((newTask: Task) => {
+    setTasks((prev) => {
+      // Realtime is not the only writer: this tab's own addTask has
+      // usually already added the row (optimistically or reconciled).
+      const exists = prev.some(
+        (t) => t.id === newTask.id || t.subtasks?.some((st) => st.id === newTask.id)
+      )
+      if (exists) return prev
+      if (newTask.parentTaskId) {
+        // Append to the parent's nested subtasks. Don't re-run
+        // nestSubtasks on an already-nested list — it would replace
+        // the parent's subtasks with just this one.
+        return prev.map((t) =>
+          t.id === newTask.parentTaskId
+            ? { ...t, subtasks: [...(t.subtasks || []), newTask] }
+            : t
+        )
+      }
+      return [newTask, ...prev]
+    })
+  }, [])
+
+  const applyIncomingUpdate = useCallback((updatedTask: Task) => {
+    setTasks((prev) => {
+      const updated = prev.map((t) => {
+        if (t.id === updatedTask.id) return updatedTask
+        // Also check subtasks
+        if (t.subtasks) {
+          const updatedSubtasks = t.subtasks.map((st) =>
+            st.id === updatedTask.id ? updatedTask : st
+          )
+          if (updatedSubtasks !== t.subtasks) {
+            return { ...t, subtasks: updatedSubtasks }
+          }
+        }
+        return t
+      })
+      return nestSubtasks(updated)
+    })
+  }, [])
+
+  const applyIncomingDelete = useCallback((deletedId: string) => {
+    setTasks((prev) => {
+      const filtered = prev.filter((t) => {
+        if (t.id === deletedId) return false
+        if (t.subtasks) {
+          t.subtasks = t.subtasks.filter((st) => st.id !== deletedId)
+        }
+        return true
+      })
+      return filtered
+    })
+  }, [])
+
   // Fetch on mount / user change, then subscribe to realtime.
   useEffect(() => {
     if (!user) {
@@ -246,66 +322,33 @@ export function useSupabaseTasks() {
           logger.debug('[useSupabaseTasks] Real-time update:', payload)
 
           if (payload.eventType === 'INSERT') {
-            const newTask = dbTaskToTask(payload.new as DbTask)
-            setTasks((prev) => {
-              // Realtime is not the only writer: this tab's own addTask has
-              // usually already added the row (optimistically or reconciled).
-              const exists = prev.some(
-                (t) => t.id === newTask.id || t.subtasks?.some((st) => st.id === newTask.id)
-              )
-              if (exists) return prev
-              if (newTask.parentTaskId) {
-                // Append to the parent's nested subtasks. Don't re-run
-                // nestSubtasks on an already-nested list — it would replace
-                // the parent's subtasks with just this one.
-                return prev.map((t) =>
-                  t.id === newTask.parentTaskId
-                    ? { ...t, subtasks: [...(t.subtasks || []), newTask] }
-                    : t
-                )
-              }
-              return [newTask, ...prev]
-            })
+            applyIncomingInsert(dbTaskToTask(payload.new as DbTask))
           } else if (payload.eventType === 'UPDATE') {
-            const updatedTask = dbTaskToTask(payload.new as DbTask)
-            setTasks((prev) => {
-              const updated = prev.map((t) => {
-                if (t.id === updatedTask.id) return updatedTask
-                // Also check subtasks
-                if (t.subtasks) {
-                  const updatedSubtasks = t.subtasks.map((st) =>
-                    st.id === updatedTask.id ? updatedTask : st
-                  )
-                  if (updatedSubtasks !== t.subtasks) {
-                    return { ...t, subtasks: updatedSubtasks }
-                  }
-                }
-                return t
-              })
-              return nestSubtasks(updated)
-            })
+            applyIncomingUpdate(dbTaskToTask(payload.new as DbTask))
           } else if (payload.eventType === 'DELETE') {
-            const deletedId = (payload.old as { id: string }).id
-            setTasks((prev) => {
-              const filtered = prev.filter((t) => {
-                if (t.id === deletedId) return false
-                if (t.subtasks) {
-                  t.subtasks = t.subtasks.filter((st) => st.id !== deletedId)
-                }
-                return true
-              })
-              return filtered
-            })
+            applyIncomingDelete((payload.old as { id: string }).id)
           }
         }
       )
       .subscribe()
 
+    // Same-tab writes from OTHER hook instances (see localTaskWrites above).
+    // The acting instance re-applies its own announcement too — idempotent, it
+    // matches the optimistic state already set.
+    const onLocalWrite = (e: Event) => {
+      const detail = (e as CustomEvent<LocalTaskWrite>).detail
+      if (detail.kind === 'insert') applyIncomingInsert(detail.task)
+      else if (detail.kind === 'update') applyIncomingUpdate(detail.task)
+      else applyIncomingDelete(detail.id)
+    }
+    localTaskWrites.addEventListener('write', onLocalWrite)
+
     // Cleanup subscription on unmount
     return () => {
       channel.unsubscribe()
+      localTaskWrites.removeEventListener('write', onLocalWrite)
     }
-  }, [user, fetchTasks])
+  }, [user, fetchTasks, applyIncomingInsert, applyIncomingUpdate, applyIncomingDelete])
 
   // Options for creating linked tasks
   interface AddTaskOptions {
@@ -432,6 +475,8 @@ export function useSupabaseTasks() {
         .map((t) => (t.id === tempId ? createdTask : t))
     )
 
+    announceLocalWrite({ kind: 'insert', task: createdTask })
+
     return createdTask.id
   }, [user])
 
@@ -519,6 +564,8 @@ export function useSupabaseTasks() {
       )
     )
 
+    announceLocalWrite({ kind: 'insert', task: createdSubtask })
+
     return createdSubtask.id
   }, [user, tasks])
 
@@ -585,6 +632,8 @@ export function useSupabaseTasks() {
         )
         setError(updateError.message)
         showToast('Failed to update task', 'error', 4000)
+      } else {
+        announceLocalWrite({ kind: 'update', task: { ...task, completed: newCompleted } })
       }
     } else {
       // Toggle parent task
@@ -637,6 +686,20 @@ export function useSupabaseTasks() {
         showToast('Failed to update task', 'error', 4000)
         return
       }
+
+      // Mirror the optimistic state for other instances.
+      announceLocalWrite({
+        kind: 'update',
+        task: {
+          ...task,
+          completed: newCompleted,
+          ...(newCompleted && task.isWaiting ? { isWaiting: false, waitingSince: undefined } : {}),
+          ...(newCompleted && task.needsDiscussion ? { needsDiscussion: false, discussionNote: undefined } : {}),
+          subtasks: newCompleted
+            ? task.subtasks?.map((s) => ({ ...s, completed: true }))
+            : task.subtasks,
+        },
+      })
 
       // If completing and has incomplete subtasks, complete them too
       if (incompleteSubtaskIds.length > 0) {
@@ -704,6 +767,8 @@ export function useSupabaseTasks() {
         )
       }
       setError(updateError.message)
+    } else {
+      announceLocalWrite({ kind: 'update', task: { ...task, ...waitingUpdates } })
     }
   }, [findTaskById, findParentOfSubtask])
 
@@ -749,6 +814,8 @@ export function useSupabaseTasks() {
       }
       setError(deleteError.message)
       showToast('Failed to delete task', 'error', 4000)
+    } else {
+      announceLocalWrite({ kind: 'delete', id })
     }
   }, [findTaskById, findParentOfSubtask])
 
@@ -892,6 +959,9 @@ export function useSupabaseTasks() {
       setError(updateError.message)
     } else if (data && data.length > 0) {
       logger.debug('[updateTask] DB update successful, returned notes:', (data[0] as DbTask).notes)
+      // Fan out to other instances. Announce the merged LOCAL object, not the
+      // returned flat row — a parent's nested subtasks must survive the swap.
+      announceLocalWrite({ kind: 'update', task: { ...task, ...updates } })
     } else {
       console.warn('[updateTask] DB update returned no data!')
     }
@@ -991,6 +1061,10 @@ export function useSupabaseTasks() {
       setError(updateError.message)
       showToast('Failed to update tasks', 'error', 4000)
       throw updateError
+    }
+
+    for (const t of tasksToUpdate) {
+      announceLocalWrite({ kind: 'update', task: { ...t, ...updates } })
     }
   }, [tasks])
 
@@ -1107,6 +1181,8 @@ export function useSupabaseTasks() {
         .filter((t) => t.id !== createdTask.id)
         .map((t) => (t.id === tempId ? createdTask : t))
     )
+
+    announceLocalWrite({ kind: 'insert', task: createdTask })
 
     return createdTask.id
   }, [user])

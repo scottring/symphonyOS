@@ -9,9 +9,9 @@
  * passing it promotes the next one.
  */
 import { Check, ArrowUpRight } from 'lucide-react'
-import type { TimelineItem } from '@/types/timeline'
 import type { Project } from '@/types/project'
 import { formatUpNextStatus, type UpNextSelection } from '@/lib/today/upNext'
+import { RescheduleButton } from './RescheduleButton'
 
 interface UpNextHeroProps {
   selection: UpNextSelection
@@ -77,7 +77,10 @@ export function UpNextHero({ selection, onSelectItem, onToggleTask, projectsMap 
           )}
         </div>
 
-        <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
+        <div className="shrink-0 flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
+          {/* Tasks get the same one-tap reschedule the timeline rows have —
+              triaging out of the hero must not require opening the panel. */}
+          {item.type === 'task' && item.originalTask && <RescheduleButton item={item} />}
           {taskId && onToggleTask ? (
             <button
               type="button"

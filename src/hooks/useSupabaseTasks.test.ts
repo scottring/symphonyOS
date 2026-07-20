@@ -998,4 +998,85 @@ describe('useSupabaseTasks', () => {
       ])
     })
   })
+
+  // Every hook instance keeps its own state; the detail panel and the Today
+  // list are DIFFERENT instances. These tests pin the same-tab write fan-out:
+  // a successful write in one instance must reach every other mounted instance
+  // synchronously — without a Supabase realtime round-trip (which is dead in a
+  // slept/stale tab and was the "reschedule in the panel, Today never changes"
+  // bug).
+  describe('same-tab cross-instance sync', () => {
+    async function renderTwoInstances() {
+      const a = renderHook(() => useSupabaseTasks())
+      const b = renderHook(() => useSupabaseTasks())
+      await waitFor(() => expect(a.result.current.loading).toBe(false))
+      await waitFor(() => expect(b.result.current.loading).toBe(false))
+      return { a, b }
+    }
+
+    it('a reschedule in one instance moves the task in the other instance', async () => {
+      mockSupabaseData.push(createMockDbTask({ id: 'task-1', title: 'Task 1' }))
+      const { a, b } = await renderTwoInstances()
+
+      const tomorrow = new Date()
+      tomorrow.setDate(tomorrow.getDate() + 1)
+      tomorrow.setHours(0, 0, 0, 0)
+      await act(async () => {
+        await a.result.current.updateTask('task-1', {
+          bucket: 'timed',
+          scheduledFor: tomorrow,
+          isAllDay: true,
+        })
+      })
+
+      const seenByB = b.result.current.tasks.find((t) => t.id === 'task-1')
+      expect(seenByB?.scheduledFor?.getTime()).toBe(tomorrow.getTime())
+      expect(seenByB?.bucket).toBe('timed')
+    })
+
+    it('toggleTask completion reaches the other instance', async () => {
+      mockSupabaseData.push(createMockDbTask({ id: 'task-1', completed: false }))
+      const { a, b } = await renderTwoInstances()
+
+      await act(async () => {
+        await a.result.current.toggleTask('task-1')
+      })
+
+      expect(b.result.current.tasks.find((t) => t.id === 'task-1')?.completed).toBe(true)
+    })
+
+    it('deleteTask removes the task from the other instance', async () => {
+      mockSupabaseData.push(createMockDbTask({ id: 'task-1' }))
+      const { a, b } = await renderTwoInstances()
+
+      await act(async () => {
+        await a.result.current.deleteTask('task-1')
+      })
+
+      expect(b.result.current.tasks.find((t) => t.id === 'task-1')).toBeUndefined()
+    })
+
+    it('addTask appears in the other instance', async () => {
+      const { a, b } = await renderTwoInstances()
+
+      await act(async () => {
+        await a.result.current.addTask('Brand new task')
+      })
+
+      expect(b.result.current.tasks.some((t) => t.title === 'Brand new task')).toBe(true)
+    })
+
+    it('an unmounted instance stops listening (no zombie writes)', async () => {
+      mockSupabaseData.push(createMockDbTask({ id: 'task-1', title: 'Task 1' }))
+      const { a, b } = await renderTwoInstances()
+      b.unmount()
+
+      await act(async () => {
+        await a.result.current.updateTask('task-1', { title: 'Renamed' })
+      })
+
+      // The unmounted hook's last state is frozen — no update applied.
+      expect(b.result.current.tasks.find((t) => t.id === 'task-1')?.title).toBe('Task 1')
+    })
+  })
 })

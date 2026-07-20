@@ -303,6 +303,34 @@ describe('TodayView', () => {
       renderView()
       expect(screen.queryByTestId('up-next-hero')).toBeNull()
     })
+
+    it('hero task has a one-tap Reschedule — triaging out of Up Next must not require the panel', async () => {
+      const onPushTask = vi.fn()
+      const heroTime = new Date()
+      heroTime.setMinutes(heroTime.getMinutes() - 30)
+      if (heroTime.getDate() !== new Date().getDate()) {
+        heroTime.setMinutes(heroTime.getMinutes() + 60)
+      }
+      const { user } = renderView(
+        {
+          tasks: [
+            {
+              id: 'hero-task',
+              title: 'Call the pediatrician',
+              completed: false,
+              createdAt: TODAY,
+              updatedAt: TODAY,
+              bucket: 'timed' as const,
+              scheduledFor: heroTime,
+            },
+          ],
+        } as never,
+        { onPushTask },
+      )
+      await user.click(screen.getByRole('button', { name: /reschedule/i }))
+      await user.click(screen.getByRole('menuitem', { name: /tomorrow/i }))
+      expect(onPushTask).toHaveBeenCalledWith('hero-task', expect.any(Date))
+    })
   })
 
   it('renders the Morning section header on mobile in italic serif', () => {

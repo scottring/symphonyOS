@@ -47,7 +47,8 @@ import type { Routine } from '@/types/actionable';
 import { TapEventPanel } from '@/components/surface/TapEventPanel';
 import { TapMealPanel } from '@/components/surface/TapMealPanel';
 import { WhyChain } from '@/components/why/WhyChain';
-import { applyTriageWhen } from '@/lib/triage/applyWhen';
+import { applyTriageWhen, describeTriageWhen } from '@/lib/triage/applyWhen';
+import { formatDateLabel } from '@/lib/dateHelpers';
 import type { Task, TaskLink } from '@/types/task';
 
 /** Find a task by id, searching one level of nested subtasks (group children). */
@@ -193,10 +194,16 @@ function TaskPanelBody({ id }: { id: string }) {
       onNotesChange={(n) => updateTask(task.id, { notes: n })}
       // onSaveNoteToVault intentionally omitted (vault integration removed)
       onToggleComplete={() => toggleTask(task.id)}
-      onSchedule={(date, isAllDay) =>
-        updateTask(task.id, { bucket: 'timed', scheduledFor: date, isAllDay })
-      }
-      onReschedule={(when) =>
+      onSchedule={(date, isAllDay) => {
+        updateTask(task.id, { bucket: 'timed', scheduledFor: date, isAllDay });
+        // Same confirmation the card-level RescheduleButton gives — without it
+        // a reschedule from the panel has no visible acknowledgment at all.
+        const label = isAllDay
+          ? formatDateLabel(date)
+          : `${formatDateLabel(date)}, ${date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
+        showToast(`Moved to ${label}`, 'success');
+      }}
+      onReschedule={(when) => {
         applyTriageWhen(when, task.id, {
           onPushTask: (id, target) => {
             if (target instanceof Date) {
@@ -207,8 +214,9 @@ function TaskPanelBody({ id }: { id: string }) {
             }
           },
           onSetBucket: (id, bucket) => updateTask(id, { bucket, scheduledFor: undefined, isAllDay: undefined }),
-        })
-      }
+        });
+        showToast(describeTriageWhen(when), 'success');
+      }}
       onClearSchedule={() =>
         updateTask(task.id, { bucket: 'inbox', scheduledFor: undefined, isAllDay: undefined })
       }
@@ -235,7 +243,7 @@ function TaskPanelBody({ id }: { id: string }) {
       onRemoveSubtask={(sid) => {
         void removeFromGroup(sid, { updateTask, refetch });
       }}
-      onRescheduleSubtask={(sid, when) =>
+      onRescheduleSubtask={(sid, when) => {
         applyTriageWhen(when, sid, {
           onPushTask: (id, target) => {
             if (target instanceof Date) {
@@ -246,8 +254,9 @@ function TaskPanelBody({ id }: { id: string }) {
             }
           },
           onSetBucket: (id, bucket) => updateTask(id, { bucket, scheduledFor: undefined, isAllDay: undefined }),
-        })
-      }
+        });
+        showToast(describeTriageWhen(when), 'success');
+      }}
       onScheduleSubtask={(sid, date, isAllDay) =>
         updateTask(sid, { bucket: 'timed', scheduledFor: date, isAllDay })
       }
