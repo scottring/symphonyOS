@@ -94,8 +94,6 @@ import { PlaceProvider } from './hooks/usePlace'
 import { Shell } from './shell/Shell'
 import { AuthGate } from './components/auth/AuthGate'
 import { ErrorBoundary } from './components/ErrorBoundary'
-import { OnboardingFlow, SamplePlanPage } from './components/lazy'
-import { LoadingFallback } from './components/layout/LoadingFallback'
 
 // Quick-capture window for the Mac shell (desktop/): a frameless Tauri window
 // loads /capture via the global hotkey. Lazy — browsers never fetch it.
@@ -103,7 +101,7 @@ const CapturePage = lazy(() => import('./desktop/CapturePage').then((m) => ({ de
 
 // P5 cutover (gated). /, /today, /inbox, /task/:id route to the new Shell-mounted
 // TasksApp when the flag is enabled, otherwise to legacy App.tsx. Both paths now
-// share the same auth + onboarding gate (AuthGate): App wraps itself in it, and
+// share the same auth gate (AuthGate): App wraps itself in it, and
 // the Shell mounts here are wrapped via `tasksElement`. This is what unblocks
 // flipping the flag default-ON — previously the Shell rendered ungated and the
 // auth-form e2e specs at `/` regressed (e2e/app.spec.ts). Flip locally for
@@ -152,8 +150,6 @@ createRoot(document.getElementById('root')!).render(
               <Route path="/tasks-new/*" element={<Shell />} />
               <Route path="/morning/*" element={<Shell />} />
               <Route path="/bedtime/*" element={<Shell />} />
-              <Route path="/onboarding" element={<Suspense fallback={<LoadingFallback />}><OnboardingFlow /></Suspense>} />
-              <Route path="/onboarding/sample" element={<Suspense fallback={<LoadingFallback />}><SamplePlanPage /></Suspense>} />
               <Route path="/meals/*" element={<Shell />} />
               <Route path="/home/*" element={<Shell />} />
               <Route path="/settings/*" element={<Shell />} />

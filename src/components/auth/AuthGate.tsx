@@ -1,7 +1,5 @@
-import { useEffect, useRef, useState, Suspense, type ReactNode } from 'react'
-import { Navigate } from 'react-router-dom'
+import { useState, Suspense, type ReactNode } from 'react'
 import { useAuth } from '@/hooks/useAuth'
-import { supabase } from '@/lib/supabase'
 import { AuthForm } from '@/components/lazy'
 import { LoadingFallback } from '@/components/layout/LoadingFallback'
 import type { User } from '@supabase/supabase-js'
@@ -65,10 +63,9 @@ function PasswordResetForm({ onSubmit }: { onSubmit: (password: string) => Promi
 }
 
 /**
- * Auth + onboarding gate. Renders `children` only when the user is signed in,
- * not mid password-recovery, and has completed onboarding. Otherwise renders
- * the loading state, the auth form, the password-reset form, or a redirect to
- * /onboarding as appropriate.
+ * Auth gate. Renders `children` only when the user is signed in and not mid
+ * password-recovery. Otherwise renders the loading state, the auth form, or
+ * the password-reset form as appropriate.
  *
  * Lifted out of App.tsx so the Shell-mounted cutover routes (/, /today, /inbox,
  * /task/:id) get the same gate when `symphony.useNewTasks` is enabled.
@@ -76,51 +73,7 @@ function PasswordResetForm({ onSubmit }: { onSubmit: (password: string) => Promi
 export function AuthGate({ children }: { children: (auth: AuthedContext) => ReactNode }) {
   const { user, loading: authLoading, isPasswordRecovery, updatePassword, signOut } = useAuth()
 
-  const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null)
-  const [onboardingLoading, setOnboardingLoading] = useState(true)
-  const onboardingChecked = useRef(false)
-
-  // Check onboarding status — only on initial load, not on auth token refreshes.
-  useEffect(() => {
-    if (onboardingChecked.current) return // Only check once
-    async function checkOnboarding() {
-      if (!user) {
-        setOnboardingLoading(false)
-        return
-      }
-
-      onboardingChecked.current = true
-
-      try {
-        const { data: profile, error } = await supabase
-          .from('user_profiles')
-          .select('onboarding_completed_at')
-          .eq('user_id', user.id)
-          .maybeSingle()
-
-        if (error) {
-          console.error('Error checking onboarding:', error)
-          // Assume complete on error to not block the app
-          setOnboardingComplete(true)
-        } else if (profile?.onboarding_completed_at) {
-          setOnboardingComplete(true)
-        } else {
-          setOnboardingComplete(false)
-        }
-      } catch (err) {
-        console.error('Error in checkOnboarding:', err)
-        setOnboardingComplete(true) // Fail open
-      } finally {
-        setOnboardingLoading(false)
-      }
-    }
-
-    if (!authLoading) {
-      checkOnboarding()
-    }
-  }, [user, authLoading])
-
-  if (authLoading || onboardingLoading) {
+  if (authLoading) {
     return (
       <div className="min-h-screen bg-bg-base flex items-center justify-center">
         <p className="text-neutral-500">Loading...</p>
@@ -138,12 +91,6 @@ export function AuthGate({ children }: { children: (auth: AuthedContext) => Reac
 
   if (isPasswordRecovery) {
     return <PasswordResetForm onSubmit={updatePassword} />
-  }
-
-  if (onboardingComplete === false) {
-    // Onboarding lives at /onboarding as a top-level route. Redirect any
-    // gated path (e.g. /, /meals/plan) there until the user finishes.
-    return <Navigate to="/onboarding" replace />
   }
 
   return <>{children({ user, signOut })}</>

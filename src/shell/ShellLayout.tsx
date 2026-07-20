@@ -1,5 +1,5 @@
 // src/shell/ShellLayout.tsx
-import { useCallback, useEffect, useMemo, useRef, useState, Suspense, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Sparkles, Sun, CalendarRange, CalendarDays, Inbox as InboxIcon, MoreHorizontal } from 'lucide-react';
 import { Sidebar, type ViewType } from '@/components/layout/Sidebar';
@@ -8,7 +8,6 @@ import { QuickCapture } from '@/components/layout/QuickCapture';
 import { NewVersionBanner } from '@/components/layout/NewVersionBanner';
 import { OmniboxResults } from '@/components/omnibox/OmniboxResults';
 import { DomainSwitcher } from '@/components/domain/DomainSwitcher';
-import { HelpPanel } from '@/components/lazy';
 import { Toast, ConfirmationToast } from '@/components/toast';
 import { ChatPanel } from '@/components/chat/ChatPanel';
 import { NotesProvider } from '@/contexts/NotesContext';
@@ -111,8 +110,6 @@ function ShellLayoutInner({ children }: Props) {
   // Mobile/UI chrome state
   const [moreSheetOpen, setMoreSheetOpen] = useState(false);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
-  const [helpOpen, setHelpOpen] = useState(false);
-  const helpButtonRef = useRef<HTMLButtonElement>(null);
 
   // Global keyboard shortcuts: ⌘K opens the unibox (Quick Add + search + Ask
   // Symphony); ⌘/ is a legacy alias for the same box; ⌘\ toggles the sidebar.
@@ -320,16 +317,6 @@ function ShellLayoutInner({ children }: Props) {
             >
               <Sparkles className="w-4 h-4" />
             </button>
-            <button
-              ref={helpButtonRef}
-              onClick={() => setHelpOpen((o) => !o)}
-              className={`w-9 h-9 rounded-full bg-bg-elevated border border-neutral-200 text-neutral-500 hover:text-primary-500 hover:border-primary-300 transition-all font-display italic text-[16px] grid place-items-center shadow-card ${
-                helpOpen ? 'ring-2 ring-primary-500/30 text-primary-500 border-primary-500' : ''
-              }`}
-              aria-label="Help"
-            >
-              ?
-            </button>
           </div>
         )}
 
@@ -473,13 +460,6 @@ function ShellLayoutInner({ children }: Props) {
           onNavigate={handleViewChange}
           activeView={activeView}
         />
-      )}
-
-      {/* Help panel — floating, anchored to the ? button in the topbar */}
-      {helpOpen && (
-        <Suspense fallback={null}>
-          <HelpPanel open={helpOpen} onClose={() => setHelpOpen(false)} anchorRef={helpButtonRef} />
-        </Suspense>
       )}
 
       {/* Toast — surfaces QuickCapture note-save feedback */}

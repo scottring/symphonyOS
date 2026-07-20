@@ -3,9 +3,6 @@ import React from 'react'
 export interface AppShellChromeContextValue {
   chatOpen: boolean
   onChatOpenChange: (open: boolean) => void
-  helpOpen: boolean
-  onHelpOpenChange: (open: boolean) => void
-  helpButtonRef: React.RefObject<HTMLButtonElement | null>
 }
 
 export const AppShellChromeContext = React.createContext<AppShellChromeContextValue | null>(null)

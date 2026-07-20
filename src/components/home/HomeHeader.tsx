@@ -40,7 +40,7 @@ function formatDayShort(d: Date): string {
 
 export function HomeHeader(props: HomeHeaderProps) {
   const { currentView, viewedDate, onDateChange, weekStart, onWeekChange, monthStart, onMonthChange, onViewChange, onOpenWeeklyPlanning } = props
-  const { chatOpen, onChatOpenChange, helpOpen, onHelpOpenChange, helpButtonRef } = useAppShellChrome()
+  const { chatOpen, onChatOpenChange } = useAppShellChrome()
 
   // Per-view label + chevron handlers
   let label: { short: string; long: string }
@@ -139,14 +139,6 @@ export function HomeHeader(props: HomeHeaderProps) {
         >
           <Sparkles className="w-4 h-4" />
         </button>
-        <button
-          ref={helpButtonRef}
-          onClick={() => onHelpOpenChange(!helpOpen)}
-          className={`w-9 h-9 rounded-full bg-bg-elevated border border-neutral-200 text-neutral-500 hover:text-primary-500 hover:border-primary-300 transition-all font-display italic text-[16px] grid place-items-center shadow-card ${
-            helpOpen ? 'ring-2 ring-primary-500/30 text-primary-500 border-primary-500' : ''
-          }`}
-          aria-label="Help"
-        >?</button>
       </div>
       </div>
 
