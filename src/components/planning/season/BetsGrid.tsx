@@ -20,7 +20,9 @@ export function BetsGrid({ tasks, goalsById, onSelect, onComplete, onDemote, onS
 }) {
   const { picks } = partitionSeason(tasks)
   const won = wonPicks(tasks, now)
-  const openSlots = Math.max(0, PICK_CAP - picks.length)
+  // A won pick spent one of the season's positions — filled = open + won,
+  // slots are what's genuinely left.
+  const openSlots = Math.max(0, PICK_CAP - picks.length - won.length)
   return (
     <div>
       {picks.length === 0 && won.length === 0 && (
@@ -30,6 +32,9 @@ export function BetsGrid({ tasks, goalsById, onSelect, onComplete, onDemote, onS
       )}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         {picks.map((b) => (
+          <BetCard key={b.id} bet={b} tasks={tasks} goalsById={goalsById} onSelect={onSelect} onComplete={onComplete} onDemote={onDemote} now={now} />
+        ))}
+        {won.map((b) => (
           <BetCard key={b.id} bet={b} tasks={tasks} goalsById={goalsById} onSelect={onSelect} onComplete={onComplete} onDemote={onDemote} now={now} />
         ))}
         {Array.from({ length: openSlots }, (_, i) => (
@@ -44,9 +49,6 @@ export function BetsGrid({ tasks, goalsById, onSelect, onComplete, onDemote, onS
               <Plus aria-hidden="true" className="w-3.5 h-3.5" /> Open slot
             </span>
           </button>
-        ))}
-        {won.map((b) => (
-          <BetCard key={b.id} bet={b} tasks={tasks} goalsById={goalsById} onSelect={onSelect} onComplete={onComplete} onDemote={onDemote} now={now} />
         ))}
       </div>
     </div>

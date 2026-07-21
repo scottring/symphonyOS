@@ -53,21 +53,23 @@ export function BetCard({ bet, tasks, goalsById, onSelect, onComplete, onDemote,
             {m.label}
           </span>
         ))}
-        {pulse.starving && !bet.completed && (
-          <span className="ml-auto text-[11px] font-medium text-amber-700">nothing this month</span>
-        )}
         {!bet.completed && (
           <button
             type="button"
             aria-label="Move to bench"
             title="Not this season — move to the bench"
             onClick={(e) => { e.stopPropagation(); onDemote(bet.id) }}
-            className={`${pulse.starving ? '' : 'ml-auto'} shrink-0 inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded text-neutral-300 hover:text-neutral-600 hover:bg-neutral-100 transition-colors`}
+            className="ml-auto shrink-0 inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded text-neutral-300 hover:text-neutral-600 hover:bg-neutral-100 transition-colors"
           >
             <ArrowDown aria-hidden="true" className="w-3 h-3" /> Bench
           </button>
         )}
       </div>
+      {/* The starving warning gets its own line — inline it wraps into a
+          three-line mess inside a half-column card. */}
+      {pulse.starving && !bet.completed && (
+        <p className="mt-1.5 text-[11px] font-medium text-amber-700">nothing on this month's list yet</p>
+      )}
     </div>
   )
 }
