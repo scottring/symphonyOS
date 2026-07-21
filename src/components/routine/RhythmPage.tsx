@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Plus, Search, Sparkles, RefreshCw } from 'lucide-react'
-import { PAGE_COLUMN } from '@/components/layout/pageLayout'
 import type { Routine } from '@/types/actionable'
 import type { Contact } from '@/types/contact'
 import type { FamilyMember } from '@/types/family'
@@ -128,7 +127,9 @@ export function RhythmPage(props: RhythmPageProps) {
 
   return (
     <div className="h-full overflow-auto bg-[var(--color-bg-base)]">
-      <div className={`relative ${PAGE_COLUMN}`}>
+      {/* Full-width canvas (keeps the shared gutter, drops the 940px cap) —
+          the staggered timeline needs the room; approved deviation from PAGE_COLUMN. */}
+      <div className="relative w-full px-6 md:px-10 lg:px-14 py-8">
         {/* Masthead */}
         <div className="flex items-start justify-between gap-4 mb-4 flex-wrap">
           <div>

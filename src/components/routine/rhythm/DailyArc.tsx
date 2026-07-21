@@ -4,7 +4,6 @@ import type { FamilyMember } from '@/types/family'
 import { AssigneeAvatar } from '@/components/family/AssigneeAvatar'
 import { Sparkles } from 'lucide-react'
 import type { RhythmCard } from './rhythmModel'
-import { minutesOf } from './rhythmModel'
 import { formatRange, formatClock } from './format'
 
 export interface DailyArcProps {
@@ -17,6 +16,23 @@ export interface DailyArcProps {
   onOpenRoutine: (r: Routine) => void
   onNameCluster: (card: RhythmCard, name: string) => void
 }
+
+const ARC_START = 6 * 60   // 6:00
+const ARC_END = 21.5 * 60  // 21:30
+
+function pct(minutes: number): number {
+  const clamped = Math.min(Math.max(minutes, ARC_START), ARC_END)
+  return ((clamped - ARC_START) / (ARC_END - ARC_START)) * 100
+}
+
+const RULER_MARKS: { label: string; minutes: number }[] = [
+  { label: '6 am', minutes: 6 * 60 },
+  { label: '9 am', minutes: 9 * 60 },
+  { label: 'noon', minutes: 12 * 60 },
+  { label: '4 pm', minutes: 16 * 60 },
+  { label: '7 pm', minutes: 19 * 60 },
+  { label: '9 pm', minutes: 21 * 60 },
+]
 
 function NameNudge({ card, onNameCluster }: { card: RhythmCard; onNameCluster: DailyArcProps['onNameCluster'] }) {
   const [editing, setEditing] = useState(false)
@@ -60,9 +76,6 @@ export function DailyArc({ cards, anytime, familyMembers, matches, nowMinutes, o
   const cardMatches = (c: RhythmCard) =>
     c.routines.some(matches) || (c.name != null && matches({ name: c.name } as Routine))
 
-  // NOW sits on the center line at its ordinal spot between card times.
-  const nowIndex = cards.filter(c => (minutesOf(c.startTime) ?? Infinity) <= nowMinutes).length
-  const nowPct = cards.length > 0 ? Math.min(97, Math.max(2, (nowIndex / cards.length) * 100)) : 50
 
   const renderCard = (card: RhythmCard) => (
     <div
@@ -119,20 +132,28 @@ export function DailyArc({ cards, anytime, familyMembers, matches, nowMinutes, o
     <section className="mb-10">
       <h2 className="text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-3">Every day</h2>
 
-      {/* Metro-style day line: cards alternate above/below a central dawn→dusk
-          timeline, each anchored to it by a stem + dot at its moment. */}
+      {/* Center timeline with staggered cards: the thick dawn→dusk ruler runs
+          through the middle; cards alternate above/below and each card starts
+          at the horizontal midpoint of the one before it (2-col spans on an
+          N+1 column grid), anchored to the ruler by a stem + dot. */}
       {cards.length > 0 && (
-        <div className="overflow-x-auto pt-5">
+        <div className="overflow-x-auto pt-6 pb-2">
           <div
-            className="grid gap-x-4 grid-rows-[auto_2.75rem_auto]"
-            style={{ gridTemplateColumns: `repeat(${cards.length}, minmax(250px, 1fr))` }}
+            className="grid gap-x-3 grid-rows-[auto_4rem_auto]"
+            style={{ gridTemplateColumns: `repeat(${cards.length + 1}, minmax(150px, 1fr))` }}
           >
-            {/* The day line itself, spanning all columns */}
-            <div className="col-span-full row-start-2 self-center relative h-1.5 rounded-full
-                            bg-gradient-to-r from-amber-200 via-emerald-100 to-stone-300/80">
-              <div className="absolute -top-1.5 -bottom-1.5 w-0.5 bg-orange-600" style={{ left: `${nowPct}%` }} />
+            {/* The day ruler, spanning all columns */}
+            <div className="col-span-full row-start-2 self-center relative h-8 rounded-full border border-[var(--color-border,#eadfcc)]
+                            bg-gradient-to-r from-amber-100 via-emerald-50 to-stone-300/60">
+              {RULER_MARKS.map(m => (
+                <span key={m.label} className="absolute top-1.5 text-[11px] text-neutral-500 -translate-x-1/2"
+                      style={{ left: `${pct(m.minutes)}%` }}>
+                  {m.label}
+                </span>
+              ))}
+              <div className="absolute -top-1.5 -bottom-1.5 w-0.5 bg-orange-600" style={{ left: `${pct(nowMinutes)}%` }} />
               <span className="absolute -top-6 text-[10px] font-bold text-orange-600 -translate-x-1/2"
-                    style={{ left: `${nowPct}%` }}>
+                    style={{ left: `${pct(nowMinutes)}%` }}>
                 NOW
               </span>
             </div>
@@ -141,28 +162,29 @@ export function DailyArc({ cards, anytime, familyMembers, matches, nowMinutes, o
               const above = i % 2 === 0
               return (
                 <Fragment key={card.id}>
-                  {/* Card cell — above or below the line */}
+                  {/* Card cell — spans 2 columns starting at column i+1, so each
+                      card's left edge sits at the midpoint of the previous one */}
                   <div
-                    className={above ? 'self-end row-start-1' : 'self-start row-start-3'}
-                    style={{ gridColumnStart: i + 1 }}
+                    className={above ? 'self-end row-start-1 min-w-0' : 'self-start row-start-3 min-w-0'}
+                    style={{ gridColumn: `${i + 1} / span 2` }}
                   >
                     {renderCard(card)}
                   </div>
-                  {/* Stem + dot anchoring the card to its moment on the line */}
+                  {/* Stem + dot anchoring the card to the ruler */}
                   <div
-                    className={`row-start-2 justify-self-center flex flex-col items-center pointer-events-none
-                                ${above ? 'self-start' : 'self-end justify-end'}`}
-                    style={{ gridColumnStart: i + 1 }}
+                    className={`row-start-2 justify-self-center z-10 flex flex-col items-center pointer-events-none
+                                ${above ? 'self-start' : 'self-end'}`}
+                    style={{ gridColumn: `${i + 1} / span 2` }}
                   >
                     {above ? (
                       <>
-                        <span className="w-px h-3 bg-amber-300" />
+                        <span className="w-px h-4 bg-amber-400" />
                         <span className="w-2.5 h-2.5 rounded-full bg-amber-500 ring-2 ring-white" />
                       </>
                     ) : (
                       <>
                         <span className="w-2.5 h-2.5 rounded-full bg-amber-500 ring-2 ring-white" />
-                        <span className="w-px h-3 bg-amber-300" />
+                        <span className="w-px h-4 bg-amber-400" />
                       </>
                     )}
                   </div>
