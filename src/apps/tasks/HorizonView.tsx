@@ -1092,6 +1092,7 @@ export function HorizonView({ horizon }: HorizonViewProps) {
                 onMakeMove={(id) => updateTask(id, { bucket: 'month' })}
                 onShelf={(id) => updateTask(id, { bucket: 'someday' })}
                 onLetGo={handleLetGo}
+                onRename={(id, title) => updateTask(id, { title })}
               />
             </div>
             );

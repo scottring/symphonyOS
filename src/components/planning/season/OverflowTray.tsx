@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Star, CornerRightDown, Archive, Trash2, Repeat, ChevronRight } from 'lucide-react'
+import { Star, CornerRightDown, Archive, Trash2, Repeat, ChevronRight, Sparkles, Check } from 'lucide-react'
+import { useBenchAudit } from '@/hooks/useBenchAudit'
 import type { Task } from '@/types/task'
 import { PICK_CAP } from '@/lib/planning/betPulse'
 
@@ -8,7 +9,7 @@ import { PICK_CAP } from '@/lib/planning/betPulse'
  *  gesture replaces a current pick. The other exits re-grade or retire.
  *  `collapsible` renders it as a closed drawer (season-spread bottom) —
  *  subordinate by interaction, not just by muting. */
-export function OverflowTray({ items, picks, onPick, onSwap, onMakeMove, onShelf, onLetGo, collapsible = false }: {
+export function OverflowTray({ items, picks, onPick, onSwap, onMakeMove, onShelf, onLetGo, onRename, collapsible = false }: {
   items: readonly Task[]
   /** Current picks, for the at-cap swap picker. */
   picks: readonly Task[]
@@ -18,9 +19,12 @@ export function OverflowTray({ items, picks, onPick, onSwap, onMakeMove, onShelf
   onMakeMove: (id: string) => void
   onShelf: (id: string) => void
   onLetGo: (id: string) => void
+  /** Apply an audit rewrite: replace the item's title (user-confirmed). */
+  onRename?: (id: string, title: string) => void
   collapsible?: boolean
 }) {
   const [swapFor, setSwapFor] = useState<string | null>(null)
+  const { audit, results, loading: auditing, error: auditError } = useBenchAudit()
   const [open, setOpen] = useState(!collapsible)
   if (items.length === 0) return null
   const atCap = picks.length >= PICK_CAP
@@ -45,9 +49,19 @@ export function OverflowTray({ items, picks, onPick, onSwap, onMakeMove, onShelf
         <h3 className="text-sm font-medium text-neutral-500">On the bench ({items.length})</h3>
       )}
       {!open ? null : (<>
-      <p className="text-[12px] text-neutral-400 mt-0.5 mb-3">
-        A season holds 5–8 picks. Pick one up, turn it into a month move, shelf it, or let it go.
-      </p>
+      <div className="flex items-center gap-3 mt-0.5 mb-3">
+        <p className="text-[12px] text-neutral-400">
+          A season holds 5–8 picks. Pick one up, turn it into a month move, shelf it, or let it go.
+        </p>
+        <button type="button"
+          onClick={() => void audit(items.map((t) => ({ id: t.id, title: t.title })))}
+          disabled={auditing}
+          className="shrink-0 inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-md text-primary-700 bg-primary-50 hover:bg-primary-100 disabled:opacity-50 transition-colors">
+          <Sparkles aria-hidden="true" className="w-3 h-3" />
+          {auditing ? 'Auditing…' : 'Audit the bench'}
+        </button>
+      </div>
+      {auditError && <p className="text-[11px] text-amber-700 mb-2">{auditError}</p>}
       <ul className="space-y-1.5">
         {items.map((t) => (
           <li key={t.id} className="rounded-lg bg-neutral-50/80 border border-neutral-100 px-3 py-2">
@@ -72,6 +86,38 @@ export function OverflowTray({ items, picks, onPick, onSwap, onMakeMove, onShelf
                 <Trash2 aria-hidden="true" className="w-3 h-3" /> Let it go
               </button>
             </div>
+            {/* Audit verdict — the season-grain read on this item, with the
+                recommended exit named and any rewrite one tap from applying. */}
+            {(() => {
+              const v = results?.get(t.id)
+              if (!v) return null
+              const CHIP: Record<string, { label: string; cls: string }> = {
+                ready: { label: 'season-ready', cls: 'text-primary-700 bg-primary-50' },
+                rephrase: { label: 'rephrase', cls: 'text-amber-700 bg-amber-50' },
+                month: { label: 'month-sized', cls: 'text-sky-700 bg-sky-50' },
+                goal: { label: 'goal-sized', cls: 'text-violet-700 bg-violet-50' },
+              }
+              const chip = CHIP[v.verdict]
+              return (
+                <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[11px]">
+                  <span className={`px-1.5 py-0.5 rounded font-medium ${chip.cls}`}>{chip.label}</span>
+                  <span className="text-neutral-400">{v.reason}</span>
+                  {v.verdict === 'rephrase' && v.suggestion && onRename && (
+                    <button type="button"
+                      onClick={() => onRename(t.id, v.suggestion as string)}
+                      className="inline-flex items-center gap-1 font-medium text-primary-700 hover:text-primary-800 transition-colors">
+                      <Check aria-hidden="true" className="w-3 h-3" /> Use "{v.suggestion}"
+                    </button>
+                  )}
+                  {v.verdict === 'month' && (
+                    <span className="text-neutral-400 italic">→ Month move is the honest home</span>
+                  )}
+                  {v.verdict === 'goal' && (
+                    <span className="text-neutral-400 italic">→ Shelf it, or make it a goal and pick its first move</span>
+                  )}
+                </div>
+              )
+            })()}
             {/* At the cap, "Pick it" becomes a swap: choose which current pick
                 this one replaces. One gesture, no orphaned ninth pick. */}
             {atCap && swapFor === t.id && (

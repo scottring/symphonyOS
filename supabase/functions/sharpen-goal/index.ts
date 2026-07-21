@@ -65,6 +65,54 @@ function parseResult(text: string): SharpenResult {
   }
 }
 
+// Bench audit: judge each bench item against the season grain and return a
+// per-item verdict the client renders inline. Verdicts:
+//   ready    — a well-constructed season outcome as written
+//   rephrase — right size, wrong shape (activity phrasing) → suggestion
+//   month    — month-sized (fits a sitting or two) → belongs on the month list
+//   goal     — multi-season direction in disguise → shelve or translate
+function buildAuditPrompt(items: { id: string; title: string }[]): string {
+  const list = items.map((i) => `- id "${i.id}": "${i.title}"`).join('\n')
+  return `You are the planning coach for Symphony. The user's SEASON page holds "picks" — outcomes true by the end of a ~13-week season, measured in weekends ("Will drafted and signed"). A MONTH move fits in a sitting or two ("Order the dishwasher"). A GOAL is a multi-season direction ("Financial calm"). Audit each bench item below for season-level construction:
+
+${list}
+
+For each item return a verdict:
+- "ready": a concrete season-sized outcome as written.
+- "rephrase": season-sized but phrased as an activity or vaguely — include "suggestion": a rewrite as one outcome sentence, under 12 words, no "start/continue/work on" phrasing, keeping the user's intent without inventing facts.
+- "month": actually month-sized — doable in a sitting or two.
+- "goal": actually a multi-season direction, too big for one season.
+
+Also give every item a "reason": one short plain clause (under 12 words).
+
+Respond with ONLY a JSON array (no markdown fences, no prose), one object per item, same order:
+[{"id": "...", "verdict": "ready|rephrase|month|goal", "suggestion": "only for rephrase", "reason": "..."}]`
+}
+
+export interface AuditItemResult {
+  id: string
+  verdict: 'ready' | 'rephrase' | 'month' | 'goal'
+  suggestion?: string
+  reason: string
+}
+
+function parseAuditResult(text: string, ids: string[]): AuditItemResult[] {
+  const stripped = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '')
+  const parsed = JSON.parse(stripped) as Partial<AuditItemResult>[]
+  if (!Array.isArray(parsed)) throw new Error('Audit result was not an array')
+  const valid = new Set(ids)
+  const verdicts = new Set(['ready', 'rephrase', 'month', 'goal'])
+  return parsed
+    .filter((r): r is AuditItemResult =>
+      typeof r?.id === 'string' && valid.has(r.id) && typeof r?.verdict === 'string' && verdicts.has(r.verdict))
+    .map((r) => ({
+      id: r.id,
+      verdict: r.verdict,
+      suggestion: typeof r.suggestion === 'string' ? r.suggestion.trim().slice(0, 300) : undefined,
+      reason: typeof r.reason === 'string' ? r.reason.trim().slice(0, 160) : '',
+    }))
+}
+
 // The bet prompt asks for a bare sentence, not JSON — strip any stray quoting
 // or code fences the model adds anyway and use the line as-is.
 function parseBetResult(text: string): SharpenResult {
@@ -79,13 +127,13 @@ function parseBetResult(text: string): SharpenResult {
   return { suggestion: stripped.slice(0, 300), why: '' }
 }
 
-async function callClaude(prompt: string, apiKey: string): Promise<string> {
+async function callClaude(prompt: string, apiKey: string, maxTokens = 400): Promise<string> {
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-api-key': apiKey, 'anthropic-version': '2023-06-01' },
     body: JSON.stringify({
       model: MODEL,
-      max_tokens: 400,
+      max_tokens: maxTokens,
       messages: [{ role: 'user', content: [{ type: 'text', text: prompt }] }],
     }),
   })
@@ -117,12 +165,33 @@ Deno.serve(async (req) => {
   const { data: { user }, error: authErr } = await service.auth.getUser(token)
   if (authErr || !user) return json({ error: 'Invalid token' }, 401)
 
-  let body: { name?: string; title?: string; areaName?: string; context?: string; mode?: 'goal' | 'bet' }
+  let body: {
+    name?: string; title?: string; areaName?: string; context?: string
+    mode?: 'goal' | 'bet' | 'audit'
+    items?: { id?: string; title?: string }[]
+  }
   try {
     body = await req.json()
   } catch {
     return json({ error: 'Invalid JSON body' }, 400)
   }
+
+  // Bench audit: batch verdicts, separate path from the single-title modes.
+  if (body.mode === 'audit') {
+    const items = (body.items ?? [])
+      .filter((i): i is { id: string; title: string } =>
+        typeof i?.id === 'string' && typeof i?.title === 'string' && !!i.title.trim())
+      .slice(0, 40)
+      .map((i) => ({ id: i.id, title: i.title.trim().slice(0, 300) }))
+    if (items.length === 0) return json({ error: 'items required' }, 400)
+    try {
+      const text = await callClaude(buildAuditPrompt(items), apiKey, 3000)
+      return json({ results: parseAuditResult(text, items.map((i) => i.id)) })
+    } catch (e) {
+      return json({ error: e instanceof Error ? e.message : 'Audit failed' }, 502)
+    }
+  }
+
   const isBet = body.mode === 'bet'
   const name = (isBet ? body.title : body.name)?.trim()
   if (!name) return json({ error: `${isBet ? 'title' : 'name'} required` }, 400)
