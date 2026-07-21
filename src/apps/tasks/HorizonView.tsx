@@ -48,6 +48,14 @@ import { useGoalsContext } from '@/contexts/GoalsContext';
 import { periodLabel, periodProgress } from '@/lib/cadence/periods';
 import { lineageLabel, goalRollup, inheritedLineage } from '@/lib/planning/lineage';
 import { SeasonMoveSuggestions } from '@/components/planning/SeasonMoveSuggestions';
+import { BetsGrid } from '@/components/planning/season/BetsGrid';
+import { OverflowTray } from '@/components/planning/season/OverflowTray';
+import { MonthStrip } from '@/components/planning/season/MonthStrip';
+import { FocusLine } from '@/components/planning/season/FocusLine';
+import { usePlanningSession } from '@/hooks/usePlanningSession';
+import { guidedPeriod } from '@/components/planning/guided/periods';
+import { partitionBets } from '@/lib/planning/betPulse';
+import { looksLikeActivity } from '@/lib/planning/outcomeCoach';
 import type { Task } from '@/types/task';
 import type { Goal } from '@/types/goal';
 
@@ -241,6 +249,10 @@ export function HorizonView({ horizon }: HorizonViewProps) {
   // default (this level's own list leads the page); auto-open on a blank
   // slate, where the level above is the invitation.
   const { areas, goals } = useGoalsContext();
+  // Season focus line — persisted in the shared planning_sessions notes row
+  // for this season (key seasonFocus), same row the wizard writes.
+  const seasonToken = useMemo(() => guidedPeriod('seasonal').token, []);
+  const { notes: seasonNotes, patchNotes: patchSeasonNotes } = usePlanningSession('seasonal', seasonToken);
   // Reference rows carry their lineage payload so "Copy down" threads the
   // cascade: a month copy records its season source; a season line created
   // from a goal records the goal itself.
@@ -778,6 +790,30 @@ export function HorizonView({ horizon }: HorizonViewProps) {
             </div>
           )}
 
+          {/* Season — five bets and a shape (spec 2026-07-20). Cards, cap 8
+              with overflow tray, focus line, the season's three months. */}
+          {horizon === 'season' && (
+            <div className="mb-8 space-y-6">
+              <FocusLine
+                value={(seasonNotes.seasonFocus as string) ?? ''}
+                onChange={(v) => patchSeasonNotes({ seasonFocus: v })}
+              />
+              <BetsGrid
+                tasks={domainTasks}
+                goalsById={goalsById}
+                onSelect={handleSelect}
+                onComplete={(id) => toggleTask(id)}
+              />
+              <OverflowTray
+                items={partitionBets(domainTasks).overflow}
+                onMakeMove={(id) => updateTask(id, { bucket: 'month' })}
+                onShelf={(id) => updateTask(id, { bucket: 'someday' })}
+                onLetGo={(id) => { void deleteTask(id); }}
+              />
+              <MonthStrip tasks={domainTasks} onOpenMonth={() => navigate('/month')} />
+            </div>
+          )}
+
           {/* The level above, for reference — folded into one quiet line so
               this level's OWN list leads the page. Month looks at the season
               list; season looks at the year's goals. Read-only: nothing moves,
@@ -908,8 +944,9 @@ export function HorizonView({ horizon }: HorizonViewProps) {
             </section>
           )}
 
-          {/* Projects in motion — the pool grouped by project, loose tasks after. */}
-          {grouped.groups.map(({ project, items }) => (
+          {/* Projects in motion — the pool grouped by project, loose tasks after.
+              Suppressed for season: bets render as cards above, not rows. */}
+          {horizon !== 'season' && grouped.groups.map(({ project, items }) => (
             <section key={project.id} className="mb-6">
               <button
                 type="button"
@@ -927,42 +964,48 @@ export function HorizonView({ horizon }: HorizonViewProps) {
             </section>
           ))}
 
-          {/* The rest of the pool (loose tasks), or the empty invitation. */}
+          {/* The rest of the pool (loose tasks), or the empty invitation.
+              Suppressed for season: bets render as cards above, not rows —
+              but the inline add affordance below still lands new bets. */}
           <section>
-            {(grouped.loose.length > 0 || pool.length === 0) && (
-              <h2 className="font-display text-sm tracking-wide text-neutral-400 uppercase mb-3">
-                {grouped.groups.length > 0 ? `More in ${rungName}` : label} ({grouped.groups.length > 0 ? grouped.loose.length : pool.length})
-              </h2>
-            )}
-            {pool.length === 0 && placedThisWeek.length > 0 ? (
-              // Every rock is placed on a day — that's a planned week, not an
-              // empty one. No invitation needed; the placed section above
-              // carries the page.
-              <p className="text-center py-4 text-sm text-neutral-400">
-                Everything on the {rungName} list is placed on a day.
-              </p>
-            ) : pool.length === 0 ? (
-              <div className="text-center py-10 text-neutral-400">
-                <p className="font-display text-lg text-neutral-600 mb-1">
-                  {period ? `Nothing planned for ${period.split(' ')[0]} yet` : `Nothing in ${label.toLowerCase()}`}
-                </p>
-                <p className="text-sm mb-4">
-                  {planDisabled
-                    ? 'Park timeless ideas here — they surface in seasonal planning.'
-                    : 'Plan it together, pull items down the cascade, or add one below.'}
-                </p>
-                {!planDisabled && (
-                  <button
-                    type="button"
-                    onClick={handlePlan}
-                    className="btn-primary inline-flex items-center gap-2"
-                  >
-                    <CalendarRange className="w-4 h-4" /> Plan the {rungName}
-                  </button>
+            {horizon !== 'season' && (
+              <>
+                {(grouped.loose.length > 0 || pool.length === 0) && (
+                  <h2 className="font-display text-sm tracking-wide text-neutral-400 uppercase mb-3">
+                    {grouped.groups.length > 0 ? `More in ${rungName}` : label} ({grouped.groups.length > 0 ? grouped.loose.length : pool.length})
+                  </h2>
                 )}
-              </div>
-            ) : (
-              <div className="space-y-2">{grouped.loose.map(renderRow)}</div>
+                {pool.length === 0 && placedThisWeek.length > 0 ? (
+                  // Every rock is placed on a day — that's a planned week, not an
+                  // empty one. No invitation needed; the placed section above
+                  // carries the page.
+                  <p className="text-center py-4 text-sm text-neutral-400">
+                    Everything on the {rungName} list is placed on a day.
+                  </p>
+                ) : pool.length === 0 ? (
+                  <div className="text-center py-10 text-neutral-400">
+                    <p className="font-display text-lg text-neutral-600 mb-1">
+                      {period ? `Nothing planned for ${period.split(' ')[0]} yet` : `Nothing in ${label.toLowerCase()}`}
+                    </p>
+                    <p className="text-sm mb-4">
+                      {planDisabled
+                        ? 'Park timeless ideas here — they surface in seasonal planning.'
+                        : 'Plan it together, pull items down the cascade, or add one below.'}
+                    </p>
+                    {!planDisabled && (
+                      <button
+                        type="button"
+                        onClick={handlePlan}
+                        className="btn-primary inline-flex items-center gap-2"
+                      >
+                        <CalendarRange className="w-4 h-4" /> Plan the {rungName}
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-2">{grouped.loose.map(renderRow)}</div>
+                )}
+              </>
             )}
 
             {/* Add directly into this horizon's pool. The placeholder speaks
@@ -992,6 +1035,11 @@ export function HorizonView({ horizon }: HorizonViewProps) {
                   className="flex-1 min-w-0 text-sm bg-transparent placeholder:text-neutral-400 focus:outline-none"
                 />
               </div>
+            )}
+            {horizon === 'season' && looksLikeActivity(draft) && (
+              <p className="text-[11px] text-amber-700 mt-1">
+                Bets read best as outcomes — "Will drafted and signed", not "start working on the will".
+              </p>
             )}
           </section>
         </div>
