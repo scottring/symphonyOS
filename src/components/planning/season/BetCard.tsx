@@ -17,7 +17,7 @@ export function BetCard({ bet, tasks, goalsById, onSelect, onComplete, now }: {
     <div
       role="button" tabIndex={0}
       onClick={() => onSelect(bet.id)}
-      onKeyDown={(e) => { if (e.key === 'Enter') onSelect(bet.id) }}
+      onKeyDown={(e) => { if (e.key === 'Enter' && e.target === e.currentTarget) onSelect(bet.id) }}
       className={`card p-4 text-left transition-colors cursor-pointer hover:bg-neutral-50 ${
         bet.completed ? 'opacity-60' : pulse.starving ? 'border-amber-200 bg-amber-50/40' : ''
       }`}
@@ -32,12 +32,12 @@ export function BetCard({ bet, tasks, goalsById, onSelect, onComplete, now }: {
             bet.completed ? 'bg-primary-500 border-primary-500 text-white' : 'border-neutral-300 text-transparent hover:text-neutral-300'
           }`}
         >
-          <Check className="w-3.5 h-3.5" strokeWidth={3} />
+          <Check aria-hidden="true" className="w-3.5 h-3.5" strokeWidth={3} />
         </button>
       </div>
       {goal ? (
         <p className="mt-1.5 flex items-center gap-1 text-[11px] text-primary-700">
-          <Target className="w-3 h-3" /> {goal.name}
+          <Target aria-hidden="true" className="w-3 h-3" /> {goal.name}
         </p>
       ) : (
         <p className="mt-1.5 text-[11px] text-neutral-400">seasonal</p>

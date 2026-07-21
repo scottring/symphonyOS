@@ -11,7 +11,6 @@ export function MonthStrip({ tasks, onOpenMonth, now = new Date() }: {
     const d = new Date(start.getFullYear(), start.getMonth() + i, 1)
     const isCurrent = d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
     const moves = tasks.filter((t) => {
-      if (t.completed && !t.scheduledFor) return false
       if (t.scheduledFor) {
         const s = new Date(t.scheduledFor)
         return s.getMonth() === d.getMonth() && s.getFullYear() === d.getFullYear()

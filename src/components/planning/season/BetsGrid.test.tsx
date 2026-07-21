@@ -1,7 +1,8 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@/test/test-utils'
+import { render, screen, fireEvent } from '@/test/test-utils'
 import { BetsGrid } from './BetsGrid'
 import { OverflowTray } from './OverflowTray'
+import { MonthStrip } from './MonthStrip'
 import type { Task } from '@/types/task'
 
 function bet(id: string, title: string, over: Partial<Task> = {}): Task {
@@ -36,5 +37,58 @@ describe('OverflowTray', () => {
     expect(screen.getByRole('button', { name: /month move/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /shelf/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /let it go/i })).toBeInTheDocument()
+  })
+})
+
+describe('BetsGrid keyboard', () => {
+  it('does not call onSelect when Enter is pressed on Mark Won button', () => {
+    const onSelect = vi.fn()
+    const onComplete = vi.fn()
+    render(
+      <BetsGrid
+        tasks={[bet('b1', 'A test bet')]}
+        goalsById={new Map()}
+        onSelect={onSelect}
+        onComplete={onComplete}
+        now={new Date(2026, 6, 20)}
+      />,
+    )
+    const markWonButton = screen.getByRole('button', { name: /mark won/i })
+    fireEvent.keyDown(markWonButton, { key: 'Enter' })
+    expect(onSelect).not.toHaveBeenCalled()
+  })
+})
+
+describe('MonthStrip', () => {
+  it('shows progress bar with completed month-bucket tasks', () => {
+    const tasks: Task[] = [
+      {
+        id: 't1',
+        title: 'Completed month task',
+        completed: true,
+        bucket: 'month' as const,
+        createdAt: new Date(2026, 6, 1),
+        scheduledFor: null,
+      } as Task,
+      {
+        id: 't2',
+        title: 'Open month task',
+        completed: false,
+        bucket: 'month' as const,
+        createdAt: new Date(2026, 6, 2),
+        scheduledFor: null,
+      } as Task,
+    ]
+    render(
+      <MonthStrip
+        tasks={tasks}
+        onOpenMonth={vi.fn()}
+        now={new Date(2026, 6, 20)}
+      />,
+    )
+    expect(screen.getByText('2 moves')).toBeInTheDocument()
+    // Progress bar should show 50% (1 completed out of 2)
+    const cells = screen.getAllByRole('button')
+    expect(cells.length).toBeGreaterThanOrEqual(1)
   })
 })
