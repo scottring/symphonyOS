@@ -42,6 +42,17 @@ Respond with ONLY a JSON object (no markdown fences, no prose):
 }`
 }
 
+// Season-bet variant: bets read best as outcomes ("Will drafted and signed"),
+// not activities ("Start working on the will") — see lib/planning/outcomeCoach.
+// Unlike buildPrompt's JSON contract, this asks for a bare sentence: no "why"
+// to show, just the rewrite the coach hint's Sharpen button drops straight
+// into the draft input.
+function buildBetPrompt(title: string): string {
+  return `Rewrite the given season intention as a single outcome sentence: the end-state that will be true by the end of the season, concrete and verifiable, under 12 words, no "start/continue/work on" phrasing. Return only the rewritten sentence.
+
+"${title}"`
+}
+
 function parseResult(text: string): SharpenResult {
   const stripped = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '')
   const parsed = JSON.parse(stripped) as Partial<SharpenResult>
@@ -52,6 +63,20 @@ function parseResult(text: string): SharpenResult {
     suggestion: parsed.suggestion.trim().slice(0, 300),
     why: typeof parsed.why === 'string' ? parsed.why.trim().slice(0, 160) : '',
   }
+}
+
+// The bet prompt asks for a bare sentence, not JSON — strip any stray quoting
+// or code fences the model adds anyway and use the line as-is.
+function parseBetResult(text: string): SharpenResult {
+  const stripped = text
+    .trim()
+    .replace(/^```(?:\w+)?\s*/i, '')
+    .replace(/```\s*$/, '')
+    .trim()
+    .replace(/^["']|["']$/g, '')
+    .trim()
+  if (!stripped) throw new Error('Sharpen result was empty')
+  return { suggestion: stripped.slice(0, 300), why: '' }
 }
 
 async function callClaude(prompt: string, apiKey: string): Promise<string> {
@@ -92,19 +117,22 @@ Deno.serve(async (req) => {
   const { data: { user }, error: authErr } = await service.auth.getUser(token)
   if (authErr || !user) return json({ error: 'Invalid token' }, 401)
 
-  let body: { name?: string; areaName?: string; context?: string }
+  let body: { name?: string; title?: string; areaName?: string; context?: string; mode?: 'goal' | 'bet' }
   try {
     body = await req.json()
   } catch {
     return json({ error: 'Invalid JSON body' }, 400)
   }
-  const name = body.name?.trim()
-  if (!name) return json({ error: 'name required' }, 400)
-  if (name.length > 500) return json({ error: 'name too long' }, 400)
+  const isBet = body.mode === 'bet'
+  const name = (isBet ? body.title : body.name)?.trim()
+  if (!name) return json({ error: `${isBet ? 'title' : 'name'} required` }, 400)
+  if (name.length > 500) return json({ error: `${isBet ? 'title' : 'name'} too long` }, 400)
 
   try {
-    const text = await callClaude(buildPrompt(name, body.areaName, body.context), apiKey)
-    return json(parseResult(text))
+    const text = isBet
+      ? await callClaude(buildBetPrompt(name), apiKey)
+      : await callClaude(buildPrompt(name, body.areaName, body.context), apiKey)
+    return json(isBet ? parseBetResult(text) : parseResult(text))
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : 'Sharpen failed' }, 502)
   }

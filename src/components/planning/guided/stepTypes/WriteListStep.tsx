@@ -9,6 +9,7 @@ import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
 import { funRatio } from '@/lib/planning/coachLines'
 import { looksLikeActivity } from '@/lib/planning/outcomeCoach'
 import { BET_CAP } from '@/lib/planning/betPulse'
+import { useSharpenBet } from '@/hooks/useSharpenBet'
 import { useGuided } from '../GuidedContext'
 import { extractProjectTag } from '../projectTag'
 import { ListSuggestions, type WriteBucket } from '../ListSuggestions'
@@ -43,6 +44,7 @@ export function WriteListStep() {
 
   const inputRef = useRef<HTMLInputElement>(null)
   const [draft, setDraft] = useState('')
+  const { sharpen: sharpenBet, loading: sharpenBetLoading } = useSharpenBet()
   const submit = useCallback(async () => {
     const raw = draft.trim()
     if (!raw || !bucket) return
@@ -84,8 +86,20 @@ export function WriteListStep() {
       </div>
       {/* Bets read best as outcomes, not activities — a quiet hint, never a block. */}
       {step.props?.rows === 'bets' && looksLikeActivity(draft) && (
-        <p className="text-[11px] text-amber-700 mt-1">
+        <p className="text-[11px] text-amber-700 mt-1 inline-flex items-center gap-1.5">
           Bets read best as outcomes — what will be true by season&rsquo;s end?
+          <button
+            type="button"
+            onClick={async () => {
+              const suggestion = await sharpenBet(draft)
+              if (suggestion) setDraft(suggestion)
+            }}
+            disabled={sharpenBetLoading}
+            className="inline-flex items-center gap-1 font-medium text-primary-600 hover:text-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          >
+            <Sparkles className="w-3 h-3" />
+            {sharpenBetLoading ? 'Sharpening…' : 'Sharpen'}
+          </button>
         </p>
       )}
       {/* AI fuel for the blank page: a spread of this-horizon-sized moves drawn

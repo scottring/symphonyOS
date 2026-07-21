@@ -18,8 +18,9 @@ import { MonthCalendarGrid } from '@/components/planning/horizon/MonthCalendarGr
 import { YearCalendarGrid } from '@/components/planning/horizon/YearCalendarGrid';
 import { MonthZoomSheet } from '@/components/planning/horizon/MonthZoomSheet';
 import { useNavigate } from 'react-router-dom';
-import { CalendarRange, Target, Plus, ChevronRight, FolderOpen, Check, Pencil, Archive, Trash2, CornerRightDown } from 'lucide-react';
+import { CalendarRange, Target, Plus, ChevronRight, FolderOpen, Check, Pencil, Archive, Trash2, CornerRightDown, Sparkles } from 'lucide-react';
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
+import { useSharpenBet } from '@/hooks/useSharpenBet';
 import { useGoogleCalendar } from '@/hooks/useGoogleCalendar';
 import { useEventNotes } from '@/hooks/useEventNotes';
 import { useContacts } from '@/hooks/useContacts';
@@ -367,6 +368,7 @@ export function HorizonView({ horizon }: HorizonViewProps) {
 
   // Inline add-a-task draft for the pool section.
   const [draft, setDraft] = useState('');
+  const { sharpen: sharpenBet, loading: sharpenBetLoading } = useSharpenBet();
   const submitDraft = useCallback(async () => {
     const title = draft.trim();
     if (!title) return;
@@ -1076,8 +1078,20 @@ export function HorizonView({ horizon }: HorizonViewProps) {
               </div>
             )}
             {horizon === 'season' && looksLikeActivity(draft) && (
-              <p className="text-[11px] text-amber-700 mt-1">
+              <p className="text-[11px] text-amber-700 mt-1 inline-flex items-center gap-1.5">
                 Bets read best as outcomes — "Will drafted and signed", not "start working on the will".
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const suggestion = await sharpenBet(draft);
+                    if (suggestion) setDraft(suggestion);
+                  }}
+                  disabled={sharpenBetLoading}
+                  className="inline-flex items-center gap-1 font-medium text-primary-600 hover:text-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  <Sparkles className="w-3 h-3" />
+                  {sharpenBetLoading ? 'Sharpening…' : 'Sharpen'}
+                </button>
               </p>
             )}
           </section>
