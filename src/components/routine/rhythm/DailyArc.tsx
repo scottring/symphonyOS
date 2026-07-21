@@ -140,7 +140,7 @@ export function DailyArc({ cards, anytime, familyMembers, matches, nowMinutes, o
         <div className="overflow-x-auto pt-6 pb-2">
           <div
             className="grid gap-x-3 grid-rows-[auto_4rem_auto]"
-            style={{ gridTemplateColumns: `repeat(${cards.length + 1}, minmax(150px, 1fr))` }}
+            style={{ gridTemplateColumns: `repeat(${cards.length + 1}, 165px)` }}
           >
             {/* The day ruler, spanning all columns */}
             <div className="col-span-full row-start-2 self-center relative h-8 rounded-full border border-[var(--color-border,#eadfcc)]
