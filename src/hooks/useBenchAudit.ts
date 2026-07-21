@@ -5,6 +5,8 @@ export interface BenchAuditResult {
   id: string
   verdict: 'ready' | 'rephrase' | 'month' | 'goal'
   suggestion?: string
+  /** For month/goal verdicts: the season-grain rewrite (the upgrade path). */
+  seasonVersion?: string
   reason: string
 }
 

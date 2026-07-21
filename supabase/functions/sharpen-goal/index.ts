@@ -85,14 +85,18 @@ For each item return a verdict:
 
 Also give every item a "reason": one short plain clause (under 12 words).
 
+For "month" and "goal" verdicts, ALSO include "seasonVersion": the item rewritten as a genuine season-sized outcome (one sentence, under 12 words, no "start/continue/work on" phrasing, keeping the user's intent without inventing facts) — the upgrade path in case the user wants to keep it at season level. For "month", scope UP (the fuller outcome the sitting serves); for "goal", scope DOWN (the one-season slice).
+
 Respond with ONLY a JSON array (no markdown fences, no prose), one object per item, same order:
-[{"id": "...", "verdict": "ready|rephrase|month|goal", "suggestion": "only for rephrase", "reason": "..."}]`
+[{"id": "...", "verdict": "ready|rephrase|month|goal", "suggestion": "only for rephrase", "seasonVersion": "only for month/goal", "reason": "..."}]`
 }
 
 export interface AuditItemResult {
   id: string
   verdict: 'ready' | 'rephrase' | 'month' | 'goal'
   suggestion?: string
+  /** For month/goal verdicts: the item rewritten at season grain (the upgrade path). */
+  seasonVersion?: string
   reason: string
 }
 
@@ -109,6 +113,7 @@ function parseAuditResult(text: string, ids: string[]): AuditItemResult[] {
       id: r.id,
       verdict: r.verdict,
       suggestion: typeof r.suggestion === 'string' ? r.suggestion.trim().slice(0, 300) : undefined,
+      seasonVersion: typeof r.seasonVersion === 'string' ? r.seasonVersion.trim().slice(0, 300) : undefined,
       reason: typeof r.reason === 'string' ? r.reason.trim().slice(0, 160) : '',
     }))
 }

@@ -147,6 +147,16 @@ export function OverflowTray({ items, picks, onPick, onSwap, onMakeMove, onShelf
                       <Archive aria-hidden="true" className="w-3 h-3" /> Shelf it
                     </button>
                   )}
+                  {/* The upgrade path — disagree with the demotion and keep it
+                      at season level, with the audit's season-grade wording. */}
+                  {(v.verdict === 'month' || v.verdict === 'goal') && v.seasonVersion && onRename && (
+                    <button type="button"
+                      onClick={() => onRename(t.id, v.seasonVersion as string)}
+                      title="Keep it at season level with this wording"
+                      className="inline-flex items-center gap-1 font-medium text-primary-700 hover:text-primary-800 transition-colors">
+                      <Star aria-hidden="true" className="w-3 h-3" /> Season-size it: "{v.seasonVersion}"
+                    </button>
+                  )}
                 </div>
               )
             })()}
