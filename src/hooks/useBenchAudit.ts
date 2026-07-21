@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 
 export interface BenchAuditResult {
@@ -10,30 +10,83 @@ export interface BenchAuditResult {
   reason: string
 }
 
+type CacheEntry = BenchAuditResult & {
+  /** The exact title the verdict was computed for — a rename invalidates it. */
+  title: string
+}
+
+// Verdicts persist across navigation (and reloads) so the audit never
+// re-bills for unchanged items. A verdict is a pure function of the title,
+// so the title is the cache validity check. Per-device is fine: the audit is
+// a working-session tool, not synced state.
+const CACHE_KEY = 'symphony.benchAudit.v1'
+const CACHE_MAX = 200
+
+function loadCache(): Record<string, CacheEntry> {
+  try {
+    const raw = localStorage.getItem(CACHE_KEY)
+    const parsed = raw ? JSON.parse(raw) as Record<string, CacheEntry> : {}
+    return parsed && typeof parsed === 'object' ? parsed : {}
+  } catch {
+    return {}
+  }
+}
+
+function persistCache(cache: Record<string, CacheEntry>) {
+  try {
+    const entries = Object.entries(cache).slice(-CACHE_MAX)
+    localStorage.setItem(CACHE_KEY, JSON.stringify(Object.fromEntries(entries)))
+  } catch {
+    // Quota/serialization failures degrade to in-memory only.
+  }
+}
+
 /**
- * On-demand bench audit — sends the bench items to the sharpen-goal edge
- * function (mode:'audit') and returns per-item season-grain verdicts. Runs
- * only when the user taps "Audit the bench" (never on render); the caller
- * renders the verdicts inline and every application of a verdict is a
- * separate user tap (AI proposes; only the user's tap writes).
+ * On-demand bench audit with a persistent per-item cache. `audit()` sends
+ * ONLY items without a valid cached verdict (new or renamed); `reauditAll()`
+ * forces a fresh pass. Verdict application stays tap-to-write on the caller.
  */
-export function useBenchAudit() {
+export function useBenchAudit(items: readonly { id: string; title: string }[]) {
+  const [cache, setCache] = useState<Record<string, CacheEntry>>(loadCache)
   const [loading, setLoading] = useState(false)
-  const [results, setResults] = useState<Map<string, BenchAuditResult> | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const audit = useCallback(async (items: { id: string; title: string }[]) => {
-    if (items.length === 0) return
+  /** Valid cached verdicts for the CURRENT items (title must still match). */
+  const results = useMemo(() => {
+    const m = new Map<string, BenchAuditResult>()
+    for (const it of items) {
+      const e = cache[it.id]
+      if (e && e.title === it.title) m.set(it.id, e)
+    }
+    return m.size > 0 ? m : null
+  }, [items, cache])
+
+  const uncached = useMemo(
+    () => items.filter((it) => cache[it.id]?.title !== it.title),
+    [items, cache],
+  )
+
+  const run = useCallback(async (targets: readonly { id: string; title: string }[]) => {
+    if (targets.length === 0) return
     setLoading(true)
     setError(null)
     try {
       const { data, error: fnError } = await supabase.functions.invoke('sharpen-goal', {
-        body: { mode: 'audit', items },
+        body: { mode: 'audit', items: targets },
       })
       if (fnError) throw fnError
       const list = (data as { results?: BenchAuditResult[] } | null)?.results
       if (!Array.isArray(list)) throw new Error('no results')
-      setResults(new Map(list.map((r) => [r.id, r])))
+      const titleById = new Map(targets.map((t) => [t.id, t.title]))
+      setCache((prev) => {
+        const next = { ...prev }
+        for (const r of list) {
+          const title = titleById.get(r.id)
+          if (title) next[r.id] = { ...r, title }
+        }
+        persistCache(next)
+        return next
+      })
     } catch {
       setError("The audit didn't come back — try again in a moment.")
     } finally {
@@ -41,7 +94,10 @@ export function useBenchAudit() {
     }
   }, [])
 
-  const clear = useCallback(() => { setResults(null); setError(null) }, [])
+  /** Audit only what has no valid verdict yet (new or renamed items). */
+  const audit = useCallback(() => run(uncached), [run, uncached])
+  /** Force a fresh pass over everything. */
+  const reauditAll = useCallback(() => run(items), [run, items])
 
-  return { audit, results, loading, error, clear }
+  return { audit, reauditAll, results, uncachedCount: uncached.length, loading, error }
 }

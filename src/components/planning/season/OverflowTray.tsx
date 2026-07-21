@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Star, CornerRightDown, Archive, Trash2, Repeat, ChevronRight, Sparkles, Check } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { Star, CornerRightDown, Archive, Trash2, Repeat, ChevronRight, Sparkles, Check, RotateCw } from 'lucide-react'
 import { useBenchAudit } from '@/hooks/useBenchAudit'
 import type { Task } from '@/types/task'
 import { PICK_CAP } from '@/lib/planning/betPulse'
@@ -36,7 +36,8 @@ export function OverflowTray({ items, picks, onPick, onSwap, onMakeMove, onShelf
   const [goalFlow, setGoalFlow] = useState<{ taskId: string; goalId: string } | null>(null)
   const [moveDraft, setMoveDraft] = useState('')
   const [convertingId, setConvertingId] = useState<string | null>(null)
-  const { audit, results, loading: auditing, error: auditError } = useBenchAudit()
+  const auditItems = useMemo(() => items.map((t) => ({ id: t.id, title: t.title })), [items])
+  const { audit, reauditAll, results, uncachedCount, loading: auditing, error: auditError } = useBenchAudit(auditItems)
   const [open, setOpen] = useState(!collapsible)
   if (items.length === 0) return null
   const atCap = picks.length >= PICK_CAP
@@ -66,12 +67,21 @@ export function OverflowTray({ items, picks, onPick, onSwap, onMakeMove, onShelf
           A season holds 5–8 picks. Pick one up, turn it into a month move, shelf it, or let it go.
         </p>
         <button type="button"
-          onClick={() => void audit(items.map((t) => ({ id: t.id, title: t.title })))}
+          onClick={() => void (uncachedCount > 0 ? audit() : reauditAll())}
           disabled={auditing}
           className="shrink-0 inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-1 rounded-md text-primary-700 bg-primary-50 hover:bg-primary-100 disabled:opacity-50 transition-colors">
           <Sparkles aria-hidden="true" className="w-3 h-3" />
-          {auditing ? 'Auditing…' : 'Audit the bench'}
+          {auditing ? 'Auditing…'
+            : uncachedCount === 0 ? 'Re-audit'
+            : results ? `Audit ${uncachedCount} new` : 'Audit the bench'}
         </button>
+        {results && uncachedCount > 0 && (
+          <button type="button" onClick={() => void reauditAll()} disabled={auditing}
+            aria-label="Re-audit everything" title="Re-audit everything"
+            className="shrink-0 p-1 rounded-md text-neutral-400 hover:text-primary-600 disabled:opacity-50 transition-colors">
+            <RotateCw aria-hidden="true" className="w-3 h-3" />
+          </button>
+        )}
       </div>
       {auditError && <p className="text-[11px] text-amber-700 mb-2">{auditError}</p>}
       <ul className="space-y-1.5">
