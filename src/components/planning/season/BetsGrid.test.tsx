@@ -27,7 +27,7 @@ describe('BetsGrid', () => {
     expect(screen.getByText('A money plan we follow')).toBeInTheDocument()
     expect(screen.queryByText('Benched idea')).not.toBeInTheDocument()
     expect(screen.getByText(/Financial calm/)).toBeInTheDocument()
-    expect(screen.getByText(/nothing this month/i)).toBeInTheDocument()
+    expect(screen.getByText(/nothing on this month's list yet/i)).toBeInTheDocument()
   })
 
   it('still renders a completed pick from this season instead of making it vanish', () => {
