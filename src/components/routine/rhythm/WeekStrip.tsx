@@ -45,7 +45,7 @@ export function WeekStrip({ days, sometime, stepCounts, matches, todayKey, onOpe
   return (
     <section className="mb-10">
       <h2 className="text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-3">Through the week</h2>
-      <div className="grid grid-cols-7 gap-2 overflow-x-auto min-w-0">
+      <div className="grid grid-cols-[repeat(7,minmax(92px,1fr))] gap-2 overflow-x-auto min-w-0">
         {DAY_ORDER.map(day => {
           const items = days[day]
           const isToday = day === todayKey
@@ -53,7 +53,7 @@ export function WeekStrip({ days, sometime, stepCounts, matches, todayKey, onOpe
             <div
               key={day}
               data-testid={`day-${day}`}
-              className={`rounded-xl p-2 min-w-[92px] ${
+              className={`rounded-xl p-2 ${
                 isToday
                   ? 'border-2 border-[var(--color-primary-500,#3d5a44)] bg-emerald-50/40'
                   : 'border border-neutral-100 bg-white'

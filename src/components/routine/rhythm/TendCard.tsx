@@ -29,8 +29,8 @@ function LookalikeRow({ finding, onMerge }: {
             </label>
           ))}
           <button
-            disabled={!survivor}
-            onClick={() => survivor && onMerge(survivor, finding.ids.filter(id => id !== survivor))}
+            disabled={!survivor || !finding.ids.includes(survivor)}
+            onClick={() => survivor && finding.ids.includes(survivor) && onMerge(survivor, finding.ids.filter(id => id !== survivor))}
             className="mt-1 self-start rounded-md bg-emerald-600 px-2.5 py-1 text-xs font-semibold
                        disabled:opacity-40 hover:bg-emerald-500 transition-colors"
           >
@@ -48,9 +48,9 @@ function StampRow({ finding, routines, onStampDomain }: {
   onStampDomain: (id: string, context: 'work' | 'family' | 'personal') => void
 }) {
   const [reviewing, setReviewing] = useState(false)
-  const [index, setIndex] = useState(0)
-  const remaining = finding.ids.slice(index)
-  const current = routines.find(r => r.id === remaining[0])
+  const current = finding.ids
+    .map(id => routines.find(r => r.id === id))
+    .find((r): r is Routine => !!r && r.context == null)
   return (
     <div className="rounded-lg bg-emerald-900/40 px-3 py-2">
       <div className="flex items-center justify-between gap-3">
@@ -68,7 +68,7 @@ function StampRow({ finding, routines, onStampDomain }: {
           <span className="flex gap-1 flex-shrink-0">
             {DOMAINS.map(d => (
               <button key={d}
-                onClick={() => { onStampDomain(current.id, d); setIndex(i => i + 1) }}
+                onClick={() => onStampDomain(current.id, d)}
                 className="rounded-md bg-emerald-700 px-2 py-1 text-xs capitalize hover:bg-emerald-600 transition-colors">
                 {d}
               </button>
@@ -123,10 +123,10 @@ export function TendCard({ findings, routines, onMerge, onStampDomain, onRename,
         </span>
       </div>
       <div className="flex flex-col gap-1.5">
-        {shown.map((f, i) => {
-          if (f.kind === 'lookalike') return <LookalikeRow key={`l${i}`} finding={f} onMerge={onMerge} />
-          if (f.kind === 'missing-domain') return <StampRow key={`m${i}`} finding={f} routines={routines} onStampDomain={onStampDomain} />
-          return <UnfinishedRow key={`u${i}`} finding={f} onRename={onRename} onLetGo={onLetGo} />
+        {shown.map(f => {
+          if (f.kind === 'lookalike') return <LookalikeRow key={'l-' + f.ids.join('.')} finding={f} onMerge={onMerge} />
+          if (f.kind === 'missing-domain') return <StampRow key="missing-domain" finding={f} routines={routines} onStampDomain={onStampDomain} />
+          return <UnfinishedRow key={'u-' + f.id} finding={f} onRename={onRename} onLetGo={onLetGo} />
         })}
       </div>
     </section>

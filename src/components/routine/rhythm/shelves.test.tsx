@@ -1,8 +1,10 @@
 import { describe, it, expect, vi } from 'vitest'
+import { useState } from 'react'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { SometimesShelf } from './SometimesShelf'
 import { SeasonalShelf } from './SeasonalShelf'
 import { TendCard } from './TendCard'
+import type { TendFinding } from './tendHeuristics'
 import type { Routine } from '@/types/actionable'
 
 let seq = 0
@@ -87,19 +89,74 @@ describe('TendCard', () => {
     expect(onMerge).toHaveBeenCalledWith('a', ['b'])
   })
 
-  it('stamping strip advances through missing-domain ids', () => {
-    const onStampDomain = vi.fn()
-    const a = mk('laundry', { id: 'a', context: null })
-    const b = mk('dishes', { id: 'b', context: null })
-    render(
-      <TendCard routines={[a, b]} onMerge={vi.fn()} onStampDomain={onStampDomain} onRename={vi.fn()} onLetGo={vi.fn()}
-        findings={[{ kind: 'missing-domain', ids: ['a', 'b'] }]} />
+  it('identity-keyed rows: resolving one lookalike group does not leak open-picker state into the next', () => {
+    const onMerge = vi.fn()
+    const a = mk('Water plants', { id: 'a' })
+    const b = mk('Water houseplants', { id: 'b' })
+    const c = mk('Feed cat', { id: 'c' })
+    const d = mk('Feed the cat', { id: 'd' })
+    const findingAB: TendFinding = { kind: 'lookalike', ids: ['a', 'b'], names: ['Water plants', 'Water houseplants'] }
+    const findingCD: TendFinding = { kind: 'lookalike', ids: ['c', 'd'], names: ['Feed cat', 'Feed the cat'] }
+
+    const { rerender } = render(
+      <TendCard routines={[a, b, c, d]} onMerge={onMerge} onStampDomain={vi.fn()} onRename={vi.fn()} onLetGo={vi.fn()}
+        findings={[findingAB, findingCD]} />
     )
+
+    // Open the first group's picker and pick a survivor.
+    fireEvent.click(screen.getAllByRole('button', { name: /^merge$/i })[0])
+    fireEvent.click(screen.getByLabelText('Water plants'))
+    expect(screen.getByRole('button', { name: /keep this one/i })).not.toBeDisabled()
+
+    // Simulate resolution of the first finding: findings array recomputes to only the second group.
+    rerender(
+      <TendCard routines={[c, d]} onMerge={onMerge} onStampDomain={vi.fn()} onRename={vi.fn()} onLetGo={vi.fn()}
+        findings={[findingCD]} />
+    )
+
+    // The remaining row is a fresh mount for findingCD's identity — its picker is closed,
+    // not left open with a stale survivor from the resolved group.
+    expect(screen.queryByRole('button', { name: /keep this one/i })).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Water plants')).not.toBeInTheDocument()
+
+    // Opening it fresh shows a disabled confirm until a radio in THIS group is picked.
+    fireEvent.click(screen.getByRole('button', { name: /^merge$/i }))
+    expect(screen.getByRole('button', { name: /keep this one/i })).toBeDisabled()
+  })
+
+  it('stamping strip advances through missing-domain ids as routines update (optimistic-update simulation)', () => {
+    const onStampDomain = vi.fn()
+    const findings: TendFinding[] = [{ kind: 'missing-domain', ids: ['a', 'b'] }]
+
+    function Wrapper() {
+      const [routines, setRoutines] = useState<Routine[]>([
+        mk('laundry', { id: 'a', context: null }),
+        mk('dishes', { id: 'b', context: null }),
+      ])
+      const handleStamp = (id: string, context: 'work' | 'family' | 'personal') => {
+        onStampDomain(id, context)
+        // Mirrors the real optimistic update: routine's context flips in place,
+        // the findings array itself is NOT recomputed/shrunk here.
+        setRoutines(prev => prev.map(r => (r.id === id ? { ...r, context } : r)))
+      }
+      return (
+        <TendCard routines={routines} onMerge={vi.fn()} onStampDomain={handleStamp} onRename={vi.fn()} onLetGo={vi.fn()}
+          findings={findings} />
+      )
+    }
+
+    render(<Wrapper />)
     fireEvent.click(screen.getByRole('button', { name: /review/i }))
     expect(screen.getByText('laundry')).toBeInTheDocument()
+
     fireEvent.click(screen.getByRole('button', { name: /family/i }))
     expect(onStampDomain).toHaveBeenCalledWith('a', 'family')
     expect(screen.getByText('dishes')).toBeInTheDocument()
+    expect(screen.queryByText('laundry')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /family/i }))
+    expect(onStampDomain).toHaveBeenCalledWith('b', 'family')
+    expect(screen.getByText('All stamped.')).toBeInTheDocument()
   })
 
   it('renders nothing when no findings', () => {
