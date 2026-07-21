@@ -143,7 +143,8 @@ export function buildRhythmModel(
     const prev = minutesOf(current[current.length - 1].time_of_day) ?? 0
     const cur = minutesOf(r.time_of_day) ?? 0
     if (cur - prev > CLUSTER_GAP_MIN) flush()
-    current.length === 0 ? (current = [r]) : current.push(r)
+    if (current.length === 0) current = [r]
+    else current.push(r)
   }
   flush()
 
