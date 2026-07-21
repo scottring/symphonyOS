@@ -9,6 +9,47 @@ use tauri_plugin_global_shortcut::ShortcutState;
 
 const APP_URL: &str = "https://app.symphony-os.com";
 
+// WKWebView silently drops target="_blank" clicks and window.open() calls —
+// there is no popup handler in this shell, so external links did nothing.
+// This script (injected on every page load) forwards external http(s) URLs to
+// Rust over the event bridge the page is already permitted to use
+// (capabilities/remote.json → core:event:default); Rust hands them to the
+// system browser via `open`.
+const EXTERNAL_LINKS_JS: &str = r#"
+(function () {
+  if (window.__symphonyExternalLinks) return;
+  window.__symphonyExternalLinks = true;
+  var external = function (raw) {
+    try {
+      var u = new URL(raw, location.href);
+      if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
+      return u.origin === location.origin ? null : u.href;
+    } catch (e) { return null; }
+  };
+  var send = function (url) {
+    if (window.__TAURI__ && window.__TAURI__.event) {
+      window.__TAURI__.event.emit('shell:open-external', url);
+    }
+  };
+  document.addEventListener('click', function (e) {
+    var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+    if (!a) return;
+    var url = external(a.href);
+    if (url && (a.target === '_blank' || e.metaKey || e.ctrlKey)) {
+      e.preventDefault();
+      e.stopPropagation();
+      send(url);
+    }
+  }, true);
+  var originalOpen = window.open ? window.open.bind(window) : null;
+  window.open = function (raw) {
+    var url = raw ? external(String(raw)) : null;
+    if (url) { send(url); return null; }
+    return originalOpen ? originalOpen.apply(null, arguments) : null;
+  };
+})();
+"#;
+
 const NAV_EVENTS: [(&str, &str); 4] = [
     ("nav-today", "today"),
     ("nav-inbox", "inbox"),
@@ -271,7 +312,18 @@ pub fn run() {
                     let _ = win.hide();
                 }
             });
+            // External links forwarded by EXTERNAL_LINKS_JS → system browser.
+            app.listen_any("shell:open-external", move |event| {
+                if let Ok(url) = serde_json::from_str::<String>(event.payload()) {
+                    if url.starts_with("https://") || url.starts_with("http://") {
+                        let _ = std::process::Command::new("open").arg(&url).spawn();
+                    }
+                }
+            });
             Ok(())
+        })
+        .on_page_load(|webview, _payload| {
+            let _ = webview.eval(EXTERNAL_LINKS_JS);
         })
         .on_window_event(|window, event| {
             // Mac convention: the red button closes the window, not the app.
