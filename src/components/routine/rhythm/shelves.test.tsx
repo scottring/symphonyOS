@@ -55,6 +55,21 @@ describe('SeasonalShelf', () => {
     )
     expect(screen.getByText(/Resting/)).toBeInTheDocument()
   })
+
+  it('expand shows per-routine buttons, clicking one calls onOpenRoutine', () => {
+    const onOpenRoutine = vi.fn()
+    const r1 = mk('Walk to school', { id: 'r1', visibility: 'reference', paused_until: '2026-09-01T00:00:00Z' })
+    const r2 = mk('FFG pickup', { id: 'r2', visibility: 'reference', paused_until: '2026-09-01T00:00:00Z' })
+    render(
+      <SeasonalShelf onWakeAll={vi.fn()} onOpenRoutine={onOpenRoutine} routines={[r1, r2]} />
+    )
+    // Click title toggle to expand
+    fireEvent.click(screen.getByRole('button', { name: /waiting for/i }))
+    expect(screen.getByRole('button', { name: /walk to school/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /ffg pickup/i })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /walk to school/i }))
+    expect(onOpenRoutine).toHaveBeenCalledWith(r1)
+  })
 })
 
 describe('TendCard', () => {
@@ -92,5 +107,47 @@ describe('TendCard', () => {
       <TendCard routines={[]} findings={[]} onMerge={vi.fn()} onStampDomain={vi.fn()} onRename={vi.fn()} onLetGo={vi.fn()} />
     )
     expect(container.firstChild).toBeNull()
+  })
+
+  it('unfinished-name: rename on Enter, let-go needs two clicks', () => {
+    const onRename = vi.fn()
+    const onLetGo = vi.fn()
+    const { rerender } = render(
+      <TendCard routines={[]} findings={[{ kind: 'unfinished-name', id: 'a', name: 'Do laundry in the' }]}
+        onMerge={vi.fn()} onStampDomain={vi.fn()} onRename={onRename} onLetGo={onLetGo} />
+    )
+    const input = screen.getByRole('textbox')
+    fireEvent.change(input, { target: { value: 'Do laundry' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(onRename).toHaveBeenCalledWith('a', 'Do laundry')
+
+    // Re-render with same finding to test let-go behavior
+    rerender(
+      <TendCard routines={[]} findings={[{ kind: 'unfinished-name', id: 'a', name: 'Do laundry in the' }]}
+        onMerge={vi.fn()} onStampDomain={vi.fn()} onRename={vi.fn()} onLetGo={onLetGo} />
+    )
+    const letGoButton = screen.getByRole('button', { name: /let go/i })
+    fireEvent.click(letGoButton)
+    expect(onLetGo).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: /sure\? remove/i })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /sure\? remove/i }))
+    expect(onLetGo).toHaveBeenCalledWith('a')
+  })
+
+  it('caps display at 3 findings but shows total in badge', () => {
+    const onMerge = vi.fn()
+    render(
+      <TendCard routines={[]}
+        findings={[
+          { kind: 'unfinished-name', id: 'a', name: 'Do laundry in the' },
+          { kind: 'unfinished-name', id: 'b', name: 'Partial task B' },
+          { kind: 'unfinished-name', id: 'c', name: 'Partial task C' },
+          { kind: 'unfinished-name', id: 'd', name: 'Partial task D' },
+        ]}
+        onMerge={onMerge} onStampDomain={vi.fn()} onRename={vi.fn()} onLetGo={vi.fn()} />
+    )
+    expect(screen.getAllByRole('textbox')).toHaveLength(3)
+    expect(screen.getByText(/4 suggestions/)).toBeInTheDocument()
   })
 })
