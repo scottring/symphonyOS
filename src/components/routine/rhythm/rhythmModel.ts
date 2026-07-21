@@ -1,4 +1,5 @@
 import type { Routine, RecurrencePattern } from '@/types/actionable'
+import type { FamilyMember } from '@/types/family'
 import { groupRoutineSteps } from '@/lib/today/routineCollections'
 
 export type DayKey = 'sun' | 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat'
@@ -12,6 +13,8 @@ export interface RhythmCard {
   endTime: string | null
   routines: Routine[]
   suggestedName?: string
+  /** The collection's own routine — carries card-level assignees (steps often have none). */
+  routine?: Routine
 }
 
 export interface RhythmModel {
@@ -101,6 +104,7 @@ export function buildRhythmModel(
           startTime: routine.time_of_day,
           endTime: routine.time_of_day,
           routines: steps,
+          routine,
         })
       } else if (routine.time_of_day) {
         looseTimedDaily.push(routine)
@@ -152,4 +156,11 @@ export function buildRhythmModel(
     (a, b) => (minutesOf(a.startTime) ?? 24 * 60) - (minutesOf(b.startTime) ?? 24 * 60),
   )
   return model
+}
+
+/** Resolve a routine's assignees against the family roster (multi with legacy fallback). */
+export function resolveMembers(r: Routine, familyMembers: FamilyMember[]): FamilyMember[] {
+  return memberIdsOf(r)
+    .map(id => familyMembers.find(m => m.id === id))
+    .filter((m): m is FamilyMember => Boolean(m))
 }

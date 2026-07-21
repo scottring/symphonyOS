@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Plus, Search, Sparkles, RefreshCw } from 'lucide-react'
 import type { Routine } from '@/types/actionable'
 import type { Contact } from '@/types/contact'
@@ -125,8 +125,42 @@ export function RhythmPage(props: RhythmPageProps) {
   const openRoutine = (r: Routine) =>
     setOpen({ kind: model.stepCounts[r.id] ? 'routine' : 'standalone-step', id: r.id })
 
+  // --- Sticky section nav: pills that jump to each zone; scroll-spy highlight ---
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const zoneRefs = useRef<Record<string, HTMLDivElement | null>>({})
+  const weekCount = DAY_ORDER.reduce((n, d) => n + model.week.days[d].length, 0) + model.week.sometime.length
+  const zones = [
+    { key: 'daily', label: 'Every day', show: model.daily.timed.length + model.daily.anytime.length > 0 },
+    { key: 'week', label: 'This week', show: weekCount > 0 },
+    { key: 'sometimes', label: 'Sometimes', show: model.sometimes.length > 0 },
+    { key: 'seasonal', label: 'Resting', show: model.seasonal.length > 0 },
+    { key: 'tend', label: 'Tend', show: findings.length > 0 },
+  ].filter(z => z.show)
+  const [activeZone, setActiveZone] = useState('daily')
+  const zoneKeys = zones.map(z => z.key).join(',')
+
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const onScroll = () => {
+      const offset = el.scrollTop + 140
+      let current = zoneKeys.split(',')[0] ?? 'daily'
+      for (const key of zoneKeys.split(',')) {
+        const top = zoneRefs.current[key]?.offsetTop ?? Infinity
+        if (top <= offset) current = key
+      }
+      setActiveZone(current)
+    }
+    el.addEventListener('scroll', onScroll, { passive: true })
+    onScroll()
+    return () => el.removeEventListener('scroll', onScroll)
+  }, [zoneKeys])
+
+  const jumpTo = (key: string) => zoneRefs.current[key]?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  const setZoneRef = (key: string) => (node: HTMLDivElement | null) => { zoneRefs.current[key] = node }
+
   return (
-    <div className="h-full overflow-auto bg-[var(--color-bg-base)]">
+    <div ref={scrollRef} className="h-full overflow-auto bg-[var(--color-bg-base)]">
       {/* Full-width canvas (keeps the shared gutter, drops the 940px cap) —
           the staggered timeline needs the room; approved deviation from PAGE_COLUMN. */}
       <div className="relative w-full px-6 md:px-10 lg:px-14 py-8">
@@ -190,6 +224,27 @@ export function RhythmPage(props: RhythmPageProps) {
           </div>
         )}
 
+        {/* Sticky section nav — tab ergonomics without hiding the canvas */}
+        {zones.length >= 2 && (
+          <nav className="sticky top-0 z-20 -mx-6 md:-mx-10 lg:-mx-14 mb-6 px-6 md:px-10 lg:px-14 py-2.5
+                          bg-[var(--color-bg-base)]/95 backdrop-blur-sm border-b border-neutral-200/60
+                          flex items-center gap-1.5 overflow-x-auto">
+            {zones.map(z => (
+              <button
+                key={z.key}
+                onClick={() => jumpTo(z.key)}
+                className={`rounded-full px-3.5 py-1 text-sm whitespace-nowrap transition-colors ${
+                  activeZone === z.key
+                    ? 'bg-[var(--color-primary-500,#3d5a44)] text-white'
+                    : 'text-neutral-500 hover:bg-neutral-100'
+                }`}
+              >
+                {z.label}
+              </button>
+            ))}
+          </nav>
+        )}
+
         {loading && routines.length === 0 && (
           <p className="py-16 text-center text-neutral-400">Loading your week…</p>
         )}
@@ -217,39 +272,50 @@ export function RhythmPage(props: RhythmPageProps) {
           </div>
         )}
 
-        <DailyArc
-          cards={model.daily.timed}
-          anytime={model.daily.anytime}
-          familyMembers={familyMembers}
-          matches={matches}
-          nowMinutes={nowMinutes}
-          onOpenCollection={id => setOpen({ kind: 'routine', id })}
-          onOpenRoutine={openRoutine}
-          onNameCluster={handleNameCluster}
-        />
+        <div ref={setZoneRef('daily')} className="scroll-mt-16">
+          <DailyArc
+            cards={model.daily.timed}
+            anytime={model.daily.anytime}
+            familyMembers={familyMembers}
+            matches={matches}
+            nowMinutes={nowMinutes}
+            onOpenCollection={id => setOpen({ kind: 'routine', id })}
+            onOpenRoutine={openRoutine}
+            onNameCluster={handleNameCluster}
+          />
+        </div>
 
-        <WeekStrip
-          days={model.week.days}
-          sometime={model.week.sometime}
-          stepCounts={model.stepCounts}
-          matches={matches}
-          todayKey={todayKey}
-          onOpenRoutine={openRoutine}
-        />
+        <div ref={setZoneRef('week')} className="scroll-mt-16">
+          <WeekStrip
+            days={model.week.days}
+            sometime={model.week.sometime}
+            stepCounts={model.stepCounts}
+            matches={matches}
+            todayKey={todayKey}
+            onOpenRoutine={openRoutine}
+            familyMembers={familyMembers}
+          />
+        </div>
 
-        <SometimesShelf routines={model.sometimes} matches={matches} onOpenRoutine={openRoutine} />
+        <div ref={setZoneRef('sometimes')} className="scroll-mt-16">
+          <SometimesShelf routines={model.sometimes} matches={matches} onOpenRoutine={openRoutine} />
+        </div>
 
-        <SeasonalShelf routines={model.seasonal} onWakeAll={handleWakeAll} onOpenRoutine={openRoutine} />
+        <div ref={setZoneRef('seasonal')} className="scroll-mt-16">
+          <SeasonalShelf routines={model.seasonal} onWakeAll={handleWakeAll} onOpenRoutine={openRoutine} />
+        </div>
 
-        <TendCard
-          findings={findings}
-          routines={routines}
-          onMerge={handleMerge}
-          onStampDomain={(id, context) => onUpdateRoutine(id, { context })}
-          onRename={(id, name) => onUpdateRoutine(id, { name })}
-          onLetGo={id => onDelete?.(id)}
-          onDismiss={dismissTend}
-        />
+        <div ref={setZoneRef('tend')} className="scroll-mt-16">
+          <TendCard
+            findings={findings}
+            routines={routines}
+            onMerge={handleMerge}
+            onStampDomain={(id, context) => onUpdateRoutine(id, { context })}
+            onRename={(id, name) => onUpdateRoutine(id, { name })}
+            onLetGo={id => onDelete?.(id)}
+            onDismiss={dismissTend}
+          />
+        </div>
       </div>
 
       {/* Panel overlay — routine/step editors, shared across all zones */}

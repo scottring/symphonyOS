@@ -91,6 +91,7 @@ describe('buildRhythmModel bucketing', () => {
     const card = m.daily.timed.find(c => c.id === 'parent')
     expect(card?.kind).toBe('collection')
     expect(card?.routines.map(r => r.id)).toEqual(['s1', 's2'])
+    expect(card?.routine?.id).toBe('parent')
   })
 })
 

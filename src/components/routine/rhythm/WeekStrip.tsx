@@ -1,6 +1,8 @@
 import type { Routine } from '@/types/actionable'
+import type { FamilyMember } from '@/types/family'
+import { AssigneeAvatar } from '@/components/family/AssigneeAvatar'
 import type { DayKey } from './rhythmModel'
-import { DAY_ORDER } from './rhythmModel'
+import { DAY_ORDER, resolveMembers } from './rhythmModel'
 
 export interface WeekStripProps {
   days: Record<DayKey, Routine[]>
@@ -9,6 +11,7 @@ export interface WeekStripProps {
   matches: (r: Routine) => boolean
   todayKey: DayKey
   onOpenRoutine: (r: Routine) => void
+  familyMembers?: FamilyMember[]
 }
 
 const DAY_LABEL: Record<DayKey, string> = {
@@ -17,11 +20,13 @@ const DAY_LABEL: Record<DayKey, string> = {
 
 const FULL_THRESHOLD = 4
 
-function Chip({ r, stepCounts, matches, onOpen }: {
+function Chip({ r, stepCounts, matches, onOpen, familyMembers }: {
   r: Routine; stepCounts: Record<string, number>; matches: (r: Routine) => boolean; onOpen: (r: Routine) => void
+  familyMembers: FamilyMember[]
 }) {
   const steps = stepCounts[r.id]
   const biweekly = r.recurrence_pattern.type === 'weekly' && r.recurrence_pattern.interval === 2
+  const members = resolveMembers(r, familyMembers)
   return (
     <button
       onClick={() => onOpen(r)}
@@ -29,16 +34,25 @@ function Chip({ r, stepCounts, matches, onOpen }: {
                   hover:bg-emerald-100/70 transition-colors ${matches(r) ? '' : 'opacity-30'}`}
     >
       <span className="line-clamp-2">{r.name}</span>
-      {(steps || biweekly) && (
-        <span className="block text-[10px] text-neutral-400">
-          {steps ? `${steps} steps` : ''}{steps && biweekly ? ' · ' : ''}{biweekly ? 'every 2 wks' : ''}
+      {(steps || biweekly || members.length > 0) && (
+        <span className="mt-0.5 flex items-center justify-between gap-1">
+          <span className="text-[10px] text-neutral-400">
+            {steps ? `${steps} steps` : ''}{steps && biweekly ? ' · ' : ''}{biweekly ? 'every 2 wks' : ''}
+          </span>
+          {members.length > 0 && (
+            <span className="flex -space-x-1.5">
+              {members.map(m => (
+                <AssigneeAvatar key={m.id} member={m} size="sm" className="ring-1 ring-white" />
+              ))}
+            </span>
+          )}
         </span>
       )}
     </button>
   )
 }
 
-export function WeekStrip({ days, sometime, stepCounts, matches, todayKey, onOpenRoutine }: WeekStripProps) {
+export function WeekStrip({ days, sometime, stepCounts, matches, todayKey, onOpenRoutine, familyMembers = [] }: WeekStripProps) {
   const total = DAY_ORDER.reduce((n, d) => n + days[d].length, 0)
   if (total === 0 && sometime.length === 0) return null
 
@@ -69,7 +83,7 @@ export function WeekStrip({ days, sometime, stepCounts, matches, todayKey, onOpe
               ) : (
                 <div className="flex flex-col gap-1">
                   {items.map(r => (
-                    <Chip key={`${day}-${r.id}`} r={r} stepCounts={stepCounts} matches={matches} onOpen={onOpenRoutine} />
+                    <Chip key={`${day}-${r.id}`} r={r} stepCounts={stepCounts} matches={matches} onOpen={onOpenRoutine} familyMembers={familyMembers} />
                   ))}
                 </div>
               )}

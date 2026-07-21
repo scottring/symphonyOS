@@ -42,9 +42,9 @@ describe('RhythmPage', () => {
         ]} />
     )
     expect(screen.getByRole('heading', { name: 'Routines' })).toBeInTheDocument()
-    expect(screen.getByText('Every day')).toBeInTheDocument()
-    expect(screen.getByText('Through the week')).toBeInTheDocument()
-    expect(screen.getByText('Sometimes')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Every day' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Through the week' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Sometimes' })).toBeInTheDocument()
     expect(screen.getByText(/Waiting for September/)).toBeInTheDocument()
   })
 

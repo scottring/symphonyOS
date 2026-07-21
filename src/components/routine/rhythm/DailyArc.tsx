@@ -3,7 +3,7 @@ import type { Routine } from '@/types/actionable'
 import type { FamilyMember } from '@/types/family'
 import { AssigneeAvatar } from '@/components/family/AssigneeAvatar'
 import { Sparkles } from 'lucide-react'
-import type { RhythmCard } from './rhythmModel'
+import { resolveMembers, type RhythmCard } from './rhythmModel'
 import { formatRange, formatClock } from './format'
 
 export interface DailyArcProps {
@@ -68,10 +68,7 @@ function NameNudge({ card, onNameCluster }: { card: RhythmCard; onNameCluster: D
 export function DailyArc({ cards, anytime, familyMembers, matches, nowMinutes, onOpenCollection, onOpenRoutine, onNameCluster }: DailyArcProps) {
   if (cards.length === 0 && anytime.length === 0) return null
 
-  const membersOf = (r: Routine): FamilyMember[] => {
-    const ids = r.assigned_to_all?.length ? r.assigned_to_all : r.assigned_to ? [r.assigned_to] : []
-    return ids.map(id => familyMembers.find(m => m.id === id)).filter((m): m is FamilyMember => !!m)
-  }
+  const membersOf = (r: Routine): FamilyMember[] => resolveMembers(r, familyMembers)
 
   const cardMatches = (c: RhythmCard) =>
     c.routines.some(matches) || (c.name != null && matches({ name: c.name } as Routine))
@@ -97,7 +94,16 @@ export function DailyArc({ cards, anytime, familyMembers, matches, nowMinutes, o
             {card.name ?? 'Unnamed cluster'}
           </span>
         )}
-        <span className="text-[11px] text-neutral-400 flex-shrink-0">{formatRange(card.startTime, card.endTime)}</span>
+        <span className="flex items-center gap-1.5 flex-shrink-0">
+          {card.routine && (
+            <span className="flex -space-x-1.5">
+              {membersOf(card.routine).map(m => (
+                <AssigneeAvatar key={m.id} member={m} size="sm" className="ring-1 ring-white" />
+              ))}
+            </span>
+          )}
+          <span className="text-[11px] text-neutral-400">{formatRange(card.startTime, card.endTime)}</span>
+        </span>
       </div>
 
       <ul className="flex flex-col gap-1">
