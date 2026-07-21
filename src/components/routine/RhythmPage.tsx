@@ -51,7 +51,7 @@ export function RhythmPage(props: RhythmPageProps) {
 
   const model = useMemo(() => buildRhythmModel(routines, { memberId }), [routines, memberId])
   const findings = useMemo(() => findTend(routines), [routines])
-  const { collections } = groupRoutineSteps(routines)
+  const { collections } = useMemo(() => groupRoutineSteps(routines), [routines])
 
   // Type-anywhere search
   useEffect(() => {
@@ -60,8 +60,8 @@ export function RhythmPage(props: RhythmPageProps) {
       if (t instanceof HTMLElement && t.closest('input,textarea,[contenteditable="true"]')) return
       if (open) return
       if (e.key === 'Escape') { setQuery(''); return }
-      if (e.key === 'Backspace') { setQuery(q => q.slice(0, -1)); return }
-      if (e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey) setQuery(q => q + e.key)
+      if (e.key === 'Backspace') { e.preventDefault(); setQuery(q => q.slice(0, -1)); return }
+      if (e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); setQuery(q => q + e.key) }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
