@@ -7,7 +7,7 @@
  *
  * WHAT IT DOES: wipes every row belonging to the demo user (tasks, projects,
  * goals, routines, lists, meals, contacts, extra family members) and reseeds
- * the "Alex" household — partner Iris, kids Liam & Mia — with:
+ * the "Alex" household — partner Edith, kids Liam & Mia — with:
  *   • Today: timed tasks across Work/Personal/Family, rich context attached
  *     (notes, links, phone numbers, project + contact chips)
  *   • Inbox: four raw captures for the live triage beat
@@ -102,7 +102,7 @@ async function main() {
   die('wipe extra family')(await db.from('family_members').delete().eq('user_id', DEMO_USER).eq('is_full_user', false))
 
   // ── 2. FAMILY ──────────────────────────────────────────────────────────
-  console.log('· family: Alex, Iris, Liam, Mia')
+  console.log('· family: Alex, Edith, Liam, Mia')
   const selfRows = die('read self member')(await db.from('family_members')
     .select('id').eq('user_id', DEMO_USER).eq('is_full_user', true).limit(1))
   if (!selfRows.length) { console.error('✗ no self family_members row for demo user'); process.exit(1) }
@@ -110,7 +110,7 @@ async function main() {
   die('rename self → Alex')(await db.from('family_members')
     .update({ name: 'Alex', initials: 'A', color: 'blue', display_order: 0 }).eq('id', alexId))
   const fam = die('insert family')(await db.from('family_members').insert([
-    { user_id: DEMO_USER, name: 'Iris', initials: 'I', color: 'purple', is_full_user: false, display_order: 1, member_type: 'core' },
+    { user_id: DEMO_USER, name: 'Edith', initials: 'E', color: 'purple', is_full_user: false, display_order: 1, member_type: 'core' },
     { user_id: DEMO_USER, name: 'Liam', initials: 'L', color: 'green', is_full_user: false, display_order: 2, member_type: 'core' },
     { user_id: DEMO_USER, name: 'Mia', initials: 'M', color: 'orange', is_full_user: false, display_order: 3, member_type: 'core' },
   ]).select('id,name'))
@@ -131,7 +131,7 @@ async function main() {
       phone_number: '(555) 014-8890',
       notes: 'Decision log:\n• Counter depth 25.5" (confirmed w/ Mike 7/12)\n• Keeping the window over the sink\n• Floor: white oak, matte\n\nStill open: paint color, cabinet pulls.',
       links: [
-        { url: 'https://www.benjaminmoore.com/en-us/paint-colors/color/1572/quiet-moments', title: 'Paint option A — Quiet Moments' },
+        { url: 'https://www.benjaminmoore.com/en-us/paint-colors/color/1563/quiet-moments', title: 'Paint option A — Quiet Moments' },
         { url: 'https://www.homedepot.com/b/Appliances-Dishwashers/N-5yc1vZc3po', title: 'Dishwasher shortlist' },
       ],
     },
@@ -208,18 +208,18 @@ async function main() {
       goal_id: goal['A fitness habit that survives busy weeks'],
     }),
     t({
-      title: 'Pick the kitchen paint: Quiet Moments vs. Salt Air', context: 'family', scope: 'compound',
+      title: 'Pick the kitchen paint: Quiet Moments vs. Stonington Gray', context: 'family', scope: 'compound',
       scheduled_for: at(0, 16, 30), estimated_duration: 20,
       project_id: project['Kitchen renovation'],
       notes: 'Swatches are taped by the window. Check them in afternoon light.',
       links: [
-        { url: 'https://www.benjaminmoore.com/en-us/paint-colors/color/1572/quiet-moments', title: 'Quiet Moments 1563' },
-        { url: 'https://www.benjaminmoore.com/en-us/paint-colors/color/1616/stonington-gray', title: 'Salt Air 1616' },
+        { url: 'https://www.benjaminmoore.com/en-us/paint-colors/color/1563/quiet-moments', title: 'Quiet Moments 1563' },
+        { url: 'https://www.benjaminmoore.com/en-us/paint-colors/color/hc-170/stonington-gray', title: 'Stonington Gray HC-170' },
       ],
     }),
     t({
       title: 'Email Ms. Alvarez about the reading-group form', context: 'family', scope: 'compound',
-      scheduled_for: allDay(0), is_all_day: true, contact_id: contact['Ms. Alvarez'], assigned_to: member.Iris,
+      scheduled_for: allDay(0), is_all_day: true, contact_id: contact['Ms. Alvarez'], assigned_to: member.Edith,
     }),
     t({ title: 'Drop the library books', context: 'family', scope: 'compound', scheduled_for: allDay(0), is_all_day: true }),
     // tomorrow — so the demo can flip a day ahead without emptiness
@@ -279,9 +279,10 @@ async function main() {
   ]).select('id,title'))
   const recipe = Object.fromEntries(recipes.map(r => [r.title, r.id]))
   const weekStart = sundayOfThisWeek()
-  const plan = die('meal plan')(await db.from('meal_plans').insert({
-    user_id: DEMO_USER, week_start: weekStart, starts_on: weekStart,
-  }).select('id'))
+  const plan = die('meal plan')(await db.from('meal_plans').upsert(
+    { user_id: DEMO_USER, week_start: weekStart, starts_on: weekStart },
+    { onConflict: 'user_id,week_start' },
+  ).select('id'))
   die('meal entries')(await db.from('meal_plan_entries').insert([
     { meal_plan_id: plan[0].id, day_of_week: 1, slot: 'dinner', recipe_id: recipe['Sheet-pan chicken fajitas'] },
     { meal_plan_id: plan[0].id, day_of_week: 2, slot: 'dinner', ad_hoc_title: 'Leftovers night' },

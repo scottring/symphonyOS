@@ -4,7 +4,7 @@
 two seconds, files it into one calm plan, and hands it back at exactly the right moment —
 with everything you need to act already attached.*
 
-Demo account: `symphonygoals@gmail.com` ("Alex" — partner Iris, kids Liam & Mia).
+Demo account: `symphonygoals@gmail.com` ("Alex" — partner Edith, kids Liam & Mia).
 Full run: **~10 minutes.** Short version at the bottom: **3 minutes.**
 
 ---
@@ -19,7 +19,7 @@ Full run: **~10 minutes.** Short version at the bottom: **3 minutes.**
 2. **Sign in** at `app.symphony-os.com` as `symphonygoals@gmail.com` (your demo password).
    Use a clean Chrome profile or window — no personal tabs visible.
 3. **Assignee filter → Everyone.** On Today, tap the people icon in the header and select
-   Everyone. (Default is "my tasks", which hides Iris's and unassigned items.)
+   Everyone. (Default is "my tasks", which hides Edith's and unassigned items.)
 4. **Fresh AI audit.** If you've demoed on this browser before, clear the cached audit in
    DevTools console so the season-audit beat runs live:
    ```js
@@ -56,7 +56,7 @@ Done. Point at the Inbox count ticking up.
 > **SAY:** "This is the only page you *have* to live on. Symphony assembles it: timed tasks,
 > family routines, and what's next."
 
-**DO — the Up Next hero:** Point at **"Pick the kitchen paint: Quiet Moments vs. Salt Air"**.
+**DO — the Up Next hero:** Point at **"Pick the kitchen paint: Quiet Moments vs. Stonington Gray"**.
 Open it.
 
 > **SAY:** "Here's the whole idea of Symphony in one card. When I planned this on Sunday I
@@ -94,7 +94,7 @@ relaunch appear; everything family vanishes. Flip back to **Family**.
 
 **DO:** Triage three items with the inline icons — two taps each:
 - **"gutters???"** → When: *Next week* · Context: *Family*
-- **"mia swim lessons — tuesdays?"** → Assign: *Iris* → When: *Next week*
+- **"mia swim lessons — tuesdays?"** → Assign: *Edith* → When: *Next week*
 - **"that pizza place Dan mentioned"** → *Someday*
 
 > **SAY:** "Nothing fell on the floor, and it cost me thirty seconds standing in line for
