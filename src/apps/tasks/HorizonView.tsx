@@ -50,6 +50,7 @@ import { useGoalsContext } from '@/contexts/GoalsContext';
 import { periodLabel, periodProgress } from '@/lib/cadence/periods';
 import { lineageLabel, goalRollup, inheritedLineage } from '@/lib/planning/lineage';
 import { SeasonMoveSuggestions } from '@/components/planning/SeasonMoveSuggestions';
+import { ListSuggestions } from '@/components/planning/guided/ListSuggestions';
 import { BetsGrid } from '@/components/planning/season/BetsGrid';
 import { OverflowTray } from '@/components/planning/season/OverflowTray';
 import { MonthStrip } from '@/components/planning/season/MonthStrip';
@@ -1045,6 +1046,17 @@ export function HorizonView({ horizon }: HorizonViewProps) {
                         onKeyDown={(e) => { if (e.key === 'Enter') void submitDraft() }}
                         placeholder="Finishable by season's end…"
                         className="flex-1 min-w-0 text-sm bg-transparent placeholder:text-neutral-400 focus:outline-none"
+                      />
+                    </div>
+                    {/* AI fuel for the blank composer: outcome-shaped proposals
+                        drawn from the active goals. Tap-to-FILL only — the
+                        human edits and confirms (same engine as the wizard). */}
+                    <div className="mt-3">
+                      <ListSuggestions
+                        bucket="quarter"
+                        aboveItems={goals.filter((g) => g.status === 'active' && matchesDomain(g.context, currentDomain)).map((g) => g.name)}
+                        aboveLabel="your year goals"
+                        onPick={(t) => { setDraft(t); composerRef.current?.focus(); }}
                       />
                     </div>
                     {looksLikeActivity(draft) && (
