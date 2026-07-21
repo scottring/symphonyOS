@@ -1,10 +1,13 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { PAGE_COLUMN } from '@/components/layout/pageLayout'
+import { GoalChapters } from './GoalChapters'
 import type { Goal, GoalArea } from '@/types/goal'
+import type { Task } from '@/types/task'
 
 interface GoalViewProps {
   goal: Goal
   area: GoalArea | undefined
+  tasks: readonly Task[]
   onBack: () => void
   onUpdateGoal: (id: string, updates: Partial<Pick<Goal, 'name' | 'notes' | 'status' | 'strategy' | 'domainSlug' | 'layerId'>>) => void
   onDeleteGoal: (id: string) => void
@@ -13,6 +16,7 @@ interface GoalViewProps {
 export function GoalView({
   goal,
   area,
+  tasks,
   onBack,
   onUpdateGoal,
   onDeleteGoal,
@@ -134,6 +138,8 @@ export function GoalView({
                        resize-none transition-all"
           />
         </div>
+
+        <GoalChapters goalId={goal.id} tasks={tasks} />
 
         {/* Danger zone */}
         <div className="mt-12 pt-8 border-t border-neutral-100">

@@ -2,6 +2,7 @@ import { Suspense } from 'react'
 import { Routes, Route, useNavigate, useParams, Navigate } from 'react-router-dom'
 import { GoalsProvider, useGoalsContext } from '@/contexts/GoalsContext'
 import { useDomain } from '@/hooks/useDomain'
+import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
 import { GoalsList, GoalView } from '@/components/lazy'
 import { LoadingFallback } from '@/components/layout/LoadingFallback'
 
@@ -57,6 +58,7 @@ function GoalDetail() {
     areas, goals, getGoalById,
     updateGoal, deleteGoal,
   } = useGoalsContext()
+  const { tasks } = useSupabaseTasks()
 
   const goal = goalId ? getGoalById(goalId) : undefined
 
@@ -70,6 +72,7 @@ function GoalDetail() {
       <GoalView
         goal={goal}
         area={areas.find((a) => a.id === goal.areaId)}
+        tasks={tasks}
         onBack={() => navigate('/goals')}
         onUpdateGoal={updateGoal}
         onDeleteGoal={deleteGoal}
