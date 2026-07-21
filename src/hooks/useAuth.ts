@@ -115,7 +115,19 @@ export function useAuth() {
 
   const signOut = async () => {
     const { error } = await supabase.auth.signOut()
-    return { error }
+    if (error) {
+      // If the server session is already dead (revoked by a password change,
+      // expired while idle), auth-js errors out WITHOUT clearing the local
+      // session — session_not_found maps to AuthSessionMissingError, which
+      // slips past its own 401/403/404 ignore list. Left alone, Sign out
+      // silently does nothing forever. The user asked to leave: drop the
+      // local session ourselves and reload to the login screen.
+      for (const key of Object.keys(localStorage)) {
+        if (key.startsWith('sb-')) localStorage.removeItem(key)
+      }
+      window.location.reload()
+    }
+    return { error: null }
   }
 
   return {

@@ -406,10 +406,16 @@ describe('useAuth', () => {
       expect(signOutResult?.error).toBeNull()
     })
 
-    it('handles sign out error', async () => {
+    it('force-clears the local session and reloads when sign out errors', async () => {
+      // A password change (or long-idle expiry) revokes the server session;
+      // auth-js then errors out of signOut() WITHOUT clearing local storage,
+      // leaving the user stuck signed in. useAuth must clear it manually.
       const mockUser = createMockUser({ email: 'test@example.com' })
       mockSession = createMockSession({ user: mockUser })
-      mockSignOutError = { message: 'Sign out failed' }
+      mockSignOutError = { message: 'Auth session missing!' }
+      localStorage.setItem('sb-testref-auth-token', '{"access_token":"stale"}')
+      localStorage.setItem('unrelated-key', 'keep me')
+      const reloadSpy = vi.spyOn(window.location, 'reload').mockImplementation(() => {})
 
       const { result } = renderHook(() => useAuth())
 
@@ -423,7 +429,36 @@ describe('useAuth', () => {
         signOutResult = await result.current.signOut()
       })
 
-      expect(signOutResult?.error).toEqual({ message: 'Sign out failed' })
+      expect(localStorage.getItem('sb-testref-auth-token')).toBeNull()
+      expect(localStorage.getItem('unrelated-key')).toBe('keep me')
+      expect(reloadSpy).toHaveBeenCalled()
+      expect(signOutResult?.error).toBeNull()
+
+      reloadSpy.mockRestore()
+      localStorage.removeItem('unrelated-key')
+    })
+
+    it('does not touch localStorage or reload on clean sign out', async () => {
+      const mockUser = createMockUser({ email: 'test@example.com' })
+      mockSession = createMockSession({ user: mockUser })
+      localStorage.setItem('sb-testref-auth-token', '{"access_token":"live"}')
+      const reloadSpy = vi.spyOn(window.location, 'reload').mockImplementation(() => {})
+
+      const { result } = renderHook(() => useAuth())
+
+      await waitFor(() => {
+        expect(result.current.user).toEqual(mockUser)
+      })
+
+      await act(async () => {
+        await result.current.signOut()
+      })
+
+      // clean path: auth-js owns storage removal; useAuth must not reload
+      expect(reloadSpy).not.toHaveBeenCalled()
+
+      reloadSpy.mockRestore()
+      localStorage.removeItem('sb-testref-auth-token')
     })
   })
 })
