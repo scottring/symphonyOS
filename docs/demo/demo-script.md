@@ -16,7 +16,7 @@ Full run: **~10 minutes.** Short version at the bottom: **3 minutes.**
    ```bash
    node scripts/seed-demo.mjs
    ```
-2. **Demo in Chrome, not the Mac app** — external links (the paint-swatch beat) don't open
+2. **Chrome or the Mac app both work.** As of the 2026-07-21 build, external links open in
    from the Mac app's webview yet.
 3. **Sign in** at `app.symphony-os.com` as `symphonygoals@gmail.com` (your demo password).
    Use a clean Chrome profile or window — no personal tabs visible.
