@@ -16,18 +16,20 @@ Full run: **~10 minutes.** Short version at the bottom: **3 minutes.**
    ```bash
    node scripts/seed-demo.mjs
    ```
-2. **Sign in** at `app.symphony-os.com` as `symphonygoals@gmail.com` (your demo password).
+2. **Demo in Chrome, not the Mac app** — external links (the paint-swatch beat) don't open
+   from the Mac app's webview yet.
+3. **Sign in** at `app.symphony-os.com` as `symphonygoals@gmail.com` (your demo password).
    Use a clean Chrome profile or window — no personal tabs visible.
-3. **Assignee filter → Everyone.** On Today, tap the people icon in the header and select
+4. **Assignee filter → Everyone.** On Today, tap the people icon in the header and select
    Everyone. (Default is "my tasks", which hides Edith's and unassigned items.)
-4. **Fresh AI audit.** If you've demoed on this browser before, clear the cached audit in
+5. **Fresh AI audit.** If you've demoed on this browser before, clear the cached audit in
    DevTools console so the season-audit beat runs live:
    ```js
    localStorage.removeItem('symphony.benchAudit.v1'); localStorage.removeItem('symphony.benchAudit.slate.v1')
    ```
-5. **Domain switcher on Family.** Top-right of Today. The Work reveal in Act 2 depends on
+6. **Domain switcher on Family.** Top-right of Today. The Work reveal in Act 2 depends on
    starting here.
-6. Glance at Today and This Season — 30 seconds to confirm both look like the screenshots
+7. Glance at Today and This Season — 30 seconds to confirm both look like the screenshots
    you remember. If Today looks thin, you skipped step 1.
 
 **Do NOT demo:** Google Calendar (not connected on this account), iOS photo capture
