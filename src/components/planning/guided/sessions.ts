@@ -97,7 +97,7 @@ export const SESSIONS: Record<PlanningHorizon, GuidedSessionConfig> = {
       {
         id: 'write-season', type: 'write-list', title: "Write the season’s list",
         narration: "Now write this season’s list — concrete, specific things you want to be true by the end of it. Look back at your year goals if it helps, or don’t. This list is allowed to contain things that appear nowhere else.",
-        props: { bucket: 'quarter', rows: 'plain' },
+        props: { bucket: 'quarter', rows: 'bets' },
       },
       {
         id: 'book-next', type: 'book-next', title: 'Anchor the next step',

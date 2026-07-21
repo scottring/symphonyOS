@@ -44,8 +44,9 @@ export interface GuidedStepConfig {
     source?: 'someday' | 'overdue' | 'goals'
     /** review/write-list row style. Default: the TriageWhenMenu (day/week/month
      *  routing + Done). 'fate' = seasonal review verdicts (Carry forward /
-     *  Change / Put aside). 'plain' = list only, no routing (seasonal write). */
-    rows?: 'fate' | 'plain'
+     *  Change / Put aside). 'plain' = list only, no routing (seasonal write).
+     *  'bets' = seasonal write, plain rows + bet cap counter + outcome coach. */
+    rows?: 'fate' | 'plain' | 'bets'
     /** look-above: bucket of the level above ('quarter' for month, …) or 'goals'. */
     aboveBucket?: TaskBucket | 'goals'
     aboveLabel?: string

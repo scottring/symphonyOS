@@ -7,6 +7,8 @@ import { useState, useMemo, useCallback, useRef } from 'react'
 import { Plus, Sparkles } from 'lucide-react'
 import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
 import { funRatio } from '@/lib/planning/coachLines'
+import { looksLikeActivity } from '@/lib/planning/outcomeCoach'
+import { BET_CAP } from '@/lib/planning/betPulse'
 import { useGuided } from '../GuidedContext'
 import { extractProjectTag } from '../projectTag'
 import { ListSuggestions, type WriteBucket } from '../ListSuggestions'
@@ -80,6 +82,12 @@ export function WriteListStep() {
           className="flex-1 min-w-0 text-sm bg-transparent placeholder:text-neutral-400 focus:outline-none"
         />
       </div>
+      {/* Bets read best as outcomes, not activities — a quiet hint, never a block. */}
+      {step.props?.rows === 'bets' && looksLikeActivity(draft) && (
+        <p className="text-[11px] text-amber-700 mt-1">
+          Bets read best as outcomes — what will be true by season&rsquo;s end?
+        </p>
+      )}
       {/* AI fuel for the blank page: a spread of this-horizon-sized moves drawn
           from the level above. Tap-to-FILL only — the human always confirms. */}
       {writeBucket && (
@@ -113,6 +121,13 @@ export function WriteListStep() {
           {pool.length} of ~{softCap}{over ? ' — a list you believe beats a list you admire' : ''}
         </p>
       )}
+      {/* The bets cap, live: 5 is a season worth committing to, 19 is a backlog
+          wearing a season's clothes. Never blocks — just names the shape. */}
+      {step.props?.rows === 'bets' && (
+        <p className={`text-[11px] mb-2 ${pool.length > BET_CAP ? 'text-amber-700 font-medium' : 'text-neutral-400'}`}>
+          {pool.length} of {BET_CAP} — 5 is a season; 19 is a backlog.
+        </p>
+      )}
       {/* The fun audit, live: tally chip + per-row ✨ toggle (Best Laid Plans'
           2:1 rule). Marking is one tap; the coach line reads the same data. */}
       {pool.length > 0 && (
@@ -137,7 +152,8 @@ export function WriteListStep() {
               <div className="flex-1 min-w-0">
                 {/* Season-altitude lists don't route items to days/weeks or complete
                     them here — the list itself is the artifact. Plain rows only. */}
-                {step.props?.rows === 'plain' ? <SeasonListRow task={t} /> : <TaskTriageRow task={t} />}
+                {step.props?.rows === 'bets' || step.props?.rows === 'plain'
+                  ? <SeasonListRow task={t} /> : <TaskTriageRow task={t} />}
               </div>
             </li>
           ))}
