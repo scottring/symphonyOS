@@ -166,6 +166,24 @@ describe('TendCard', () => {
     expect(container.firstChild).toBeNull()
   })
 
+  it('dismiss button reports the finding identity key', () => {
+    const onDismiss = vi.fn()
+    render(
+      <TendCard routines={[]} onMerge={vi.fn()} onStampDomain={vi.fn()} onRename={vi.fn()} onLetGo={vi.fn()} onDismiss={onDismiss}
+        findings={[{ kind: 'lookalike', ids: ['b', 'a'], names: ['B', 'A'] }]} />
+    )
+    fireEvent.click(screen.getByRole('button', { name: /dismiss suggestion/i }))
+    expect(onDismiss).toHaveBeenCalledWith('l:a.b')
+  })
+
+  it('hides dismiss buttons when onDismiss is not provided', () => {
+    render(
+      <TendCard routines={[]} onMerge={vi.fn()} onStampDomain={vi.fn()} onRename={vi.fn()} onLetGo={vi.fn()}
+        findings={[{ kind: 'unfinished-name', id: 'a', name: 'Do the' }]} />
+    )
+    expect(screen.queryByRole('button', { name: /dismiss suggestion/i })).not.toBeInTheDocument()
+  })
+
   it('unfinished-name: rename on Enter, let-go needs two clicks', () => {
     const onRename = vi.fn()
     const onLetGo = vi.fn()

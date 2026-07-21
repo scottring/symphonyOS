@@ -1,6 +1,7 @@
 import { useState } from 'react'
+import { X } from 'lucide-react'
 import type { Routine } from '@/types/actionable'
-import type { TendFinding } from './tendHeuristics'
+import { tendFindingKey, type TendFinding } from './tendHeuristics'
 
 const DOMAINS = ['work', 'family', 'personal'] as const
 
@@ -104,13 +105,15 @@ function UnfinishedRow({ finding, onRename, onLetGo }: {
   )
 }
 
-export function TendCard({ findings, routines, onMerge, onStampDomain, onRename, onLetGo }: {
+export function TendCard({ findings, routines, onMerge, onStampDomain, onRename, onLetGo, onDismiss }: {
   findings: TendFinding[]
   routines: Routine[]
   onMerge: (survivorId: string, loserIds: string[]) => void
   onStampDomain: (id: string, context: 'work' | 'family' | 'personal') => void
   onRename: (id: string, name: string) => void
   onLetGo: (id: string) => void
+  /** Dismiss a suggestion for good (e.g. a lookalike group that shouldn't merge). */
+  onDismiss?: (key: string) => void
 }) {
   if (findings.length === 0) return null
   const shown = findings.slice(0, 3)
@@ -124,9 +127,26 @@ export function TendCard({ findings, routines, onMerge, onStampDomain, onRename,
       </div>
       <div className="flex flex-col gap-1.5">
         {shown.map(f => {
-          if (f.kind === 'lookalike') return <LookalikeRow key={'l-' + f.ids.join('.')} finding={f} onMerge={onMerge} />
-          if (f.kind === 'missing-domain') return <StampRow key="missing-domain" finding={f} routines={routines} onStampDomain={onStampDomain} />
-          return <UnfinishedRow key={'u-' + f.id} finding={f} onRename={onRename} onLetGo={onLetGo} />
+          const key = tendFindingKey(f)
+          const row =
+            f.kind === 'lookalike' ? <LookalikeRow finding={f} onMerge={onMerge} />
+            : f.kind === 'missing-domain' ? <StampRow finding={f} routines={routines} onStampDomain={onStampDomain} />
+            : <UnfinishedRow finding={f} onRename={onRename} onLetGo={onLetGo} />
+          return (
+            <div key={key} className="flex items-start gap-1.5">
+              <div className="min-w-0 flex-1">{row}</div>
+              {onDismiss && (
+                <button
+                  onClick={() => onDismiss(key)}
+                  aria-label="Dismiss suggestion"
+                  title="Dismiss — don't suggest this again"
+                  className="mt-2 rounded-md p-1 text-emerald-300/70 hover:bg-emerald-800/60 hover:text-emerald-100 transition-colors flex-shrink-0"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          )
         })}
       </div>
     </section>

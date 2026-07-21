@@ -96,13 +96,14 @@ export function DailyArc({ cards, anytime, familyMembers, matches, nowMinutes, o
         </span>
       </div>
 
-      {/* Rhythm cards */}
-      <div className="flex flex-col md:flex-row gap-3 items-stretch md:items-start">
+      {/* Rhythm cards — auto-fill grid so cards keep a readable width and wrap
+          into rows instead of squeezing onto one line (names were truncating). */}
+      <div className="grid gap-3 sm:grid-cols-[repeat(auto-fill,minmax(280px,1fr))]">
         {cards.map(card => (
           <div
             key={card.id}
             data-testid={`arc-card-${card.id}`}
-            className={`flex-1 min-w-0 rounded-2xl border bg-white p-4 transition-all
+            className={`min-w-0 rounded-2xl border bg-white p-4 transition-all
                         ${card.kind === 'cluster' ? 'border-dashed border-amber-300' : 'border-neutral-100 shadow-sm'}
                         ${cardMatches(card) ? '' : 'opacity-30'}`}
           >
@@ -110,12 +111,12 @@ export function DailyArc({ cards, anytime, familyMembers, matches, nowMinutes, o
               {card.kind === 'collection' ? (
                 <button
                   onClick={() => onOpenCollection(card.id)}
-                  className="font-display font-semibold text-neutral-800 hover:text-amber-700 transition-colors truncate"
+                  className="font-display font-semibold text-neutral-800 hover:text-amber-700 transition-colors text-left min-w-0 break-words"
                 >
                   {card.name}
                 </button>
               ) : (
-                <span className="font-display font-semibold text-neutral-600 truncate">
+                <span className="font-display font-semibold text-neutral-600 min-w-0 break-words">
                   {card.name ?? 'Unnamed cluster'}
                 </span>
               )}
@@ -130,7 +131,7 @@ export function DailyArc({ cards, anytime, familyMembers, matches, nowMinutes, o
                     className={`w-full flex items-center justify-between gap-2 text-left text-sm rounded-lg px-2 py-1
                                 hover:bg-neutral-50 transition-colors ${matches(r) ? 'text-neutral-700' : 'opacity-30'}`}
                   >
-                    <span className="truncate">{r.name}</span>
+                    <span className="flex-1 min-w-0 break-words">{r.name}</span>
                     <span className="flex items-center gap-1 flex-shrink-0">
                       {r.time_of_day && card.kind !== 'single' && (
                         <span className="text-[10px] text-neutral-400">{formatClock(r.time_of_day)}</span>

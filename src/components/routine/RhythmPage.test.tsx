@@ -105,4 +105,20 @@ describe('RhythmPage', () => {
     fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter' })
     expect(onGroupIntoCollection).toHaveBeenCalledWith('Bedtime', ['a', 'b', 'c'])
   })
+
+  it('dismissing a tend suggestion hides it and persists to localStorage', () => {
+    localStorage.removeItem('rhythm-tend-dismissed')
+    render(
+      <RhythmPage {...noop} onUpdateRoutine={vi.fn()}
+        routines={[
+          mk('Water plants', { id: 'a' }),
+          mk('Water houseplants', { id: 'b' }),
+        ]} />
+    )
+    expect(screen.getByText(/same job\?/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /dismiss suggestion/i }))
+    expect(screen.queryByText(/same job\?/)).not.toBeInTheDocument()
+    expect(JSON.parse(localStorage.getItem('rhythm-tend-dismissed')!)).toEqual(['l:a.b'])
+    localStorage.removeItem('rhythm-tend-dismissed')
+  })
 })

@@ -89,3 +89,10 @@ export function findTend(routines: Routine[]): TendFinding[] {
   }
   return findings
 }
+
+/** Stable identity for a finding — used for React keys and persisted dismissals. */
+export function tendFindingKey(f: TendFinding): string {
+  if (f.kind === 'lookalike') return `l:${[...f.ids].sort().join('.')}`
+  if (f.kind === 'missing-domain') return 'missing-domain'
+  return `u:${f.id}`
+}

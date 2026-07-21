@@ -9,7 +9,7 @@ import { groupRoutineSteps } from '@/lib/today/routineCollections'
 import { TapRoutinePanel } from '@/components/surface/TapRoutinePanel'
 import { TapStepPanel } from '@/components/surface/TapStepPanel'
 import { buildRhythmModel, DAY_ORDER, type RhythmCard } from './rhythm/rhythmModel'
-import { findTend } from './rhythm/tendHeuristics'
+import { findTend, tendFindingKey } from './rhythm/tendHeuristics'
 import { DailyArc } from './rhythm/DailyArc'
 import { WeekStrip } from './rhythm/WeekStrip'
 import { SometimesShelf } from './rhythm/SometimesShelf'
@@ -50,7 +50,26 @@ export function RhythmPage(props: RhythmPageProps) {
   const [open, setOpen] = useState<{ kind: 'routine' | 'standalone-step' | 'step'; id: string } | null>(null)
 
   const model = useMemo(() => buildRhythmModel(routines, { memberId }), [routines, memberId])
-  const findings = useMemo(() => findTend(routines), [routines])
+
+  // Dismissed tend suggestions persist so a rejected grouping stays gone.
+  const [dismissedTend, setDismissedTend] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem('rhythm-tend-dismissed') ?? '[]') as string[]
+    } catch {
+      return []
+    }
+  })
+  const dismissTend = (key: string) => {
+    setDismissedTend(prev => {
+      const next = prev.includes(key) ? prev : [...prev, key]
+      localStorage.setItem('rhythm-tend-dismissed', JSON.stringify(next))
+      return next
+    })
+  }
+  const findings = useMemo(
+    () => findTend(routines).filter(f => !dismissedTend.includes(tendFindingKey(f))),
+    [routines, dismissedTend],
+  )
   const { collections } = useMemo(() => groupRoutineSteps(routines), [routines])
 
   // Type-anywhere search
@@ -228,6 +247,7 @@ export function RhythmPage(props: RhythmPageProps) {
           onStampDomain={(id, context) => onUpdateRoutine(id, { context })}
           onRename={(id, name) => onUpdateRoutine(id, { name })}
           onLetGo={id => onDelete?.(id)}
+          onDismiss={dismissTend}
         />
       </div>
 
