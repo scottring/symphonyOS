@@ -96,13 +96,13 @@ export function useBenchAudit(items: readonly { id: string; title: string }[], p
     [items, cache],
   )
 
-  const run = useCallback(async (targets: readonly { id: string; title: string }[]) => {
+  const run = useCallback(async (targets: readonly { id: string; title: string }[], wantSlate: boolean) => {
     if (targets.length === 0) return
     setLoading(true)
     setError(null)
     try {
       const { data, error: fnError } = await supabase.functions.invoke('sharpen-goal', {
-        body: { mode: 'audit', items: targets, picks },
+        body: { mode: 'audit', items: targets, picks, wantSlate },
       })
       if (fnError) throw fnError
       const payload = data as { results?: BenchAuditResult[]; slate?: AuditSlate | null } | null
@@ -118,7 +118,11 @@ export function useBenchAudit(items: readonly { id: string; title: string }[], p
         persistCache(next)
         return next
       })
-      if (payload?.slate && Array.isArray(payload.slate.ids) && payload.slate.ids.length > 0) {
+      // Only a full-pool run (wantSlate) can produce a slate worth trusting —
+      // a partial (incremental) run judged an incomplete pool, so it must
+      // never overwrite a slate cached for the full pool's fingerprint. A
+      // still-valid slate for the CURRENT fingerprint simply keeps showing.
+      if (wantSlate && payload?.slate && Array.isArray(payload.slate.ids) && payload.slate.ids.length > 0) {
         const entry: SlateEntry = { ids: payload.slate.ids, rationale: payload.slate.rationale ?? '', fingerprint: poolFingerprint }
         setSlateEntry(entry)
         try { localStorage.setItem(SLATE_KEY, JSON.stringify(entry)) } catch { /* in-memory only */ }
@@ -130,10 +134,26 @@ export function useBenchAudit(items: readonly { id: string; title: string }[], p
     }
   }, [picks, poolFingerprint])
 
-  /** Audit only what has no valid verdict yet (new or renamed items). */
-  const audit = useCallback(() => run(uncached), [run, uncached])
-  /** Force a fresh pass over everything. */
-  const reauditAll = useCallback(() => run(items), [run, items])
+  /** Audit only what has no valid verdict yet (new or renamed items). A
+   *  first full run (nothing was cached) earns a slate; a partial run —
+   *  some items already had verdicts — judged an incomplete pool and must
+   *  not produce/cache a slate for the full pool's fingerprint. */
+  const audit = useCallback(() => run(uncached, uncached.length === items.length), [run, uncached, items])
+  /** Force a fresh pass over everything — always earns a slate. */
+  const reauditAll = useCallback(() => run(items, true), [run, items])
 
-  return { audit, reauditAll, results, slate, uncachedCount: uncached.length, loading, error }
+  /** Applying an AI rewrite (rephrase's "Use…" or the goal/month upgrade's
+   *  "Season-size it…") produces text the model itself already judged
+   *  season-ready — write the verdict directly instead of re-billing to
+   *  re-judge it. Plain manual edits skip this and fall through to the
+   *  normal title-mismatch invalidation. */
+  const markReady = useCallback((id: string, title: string) => {
+    setCache((prev) => {
+      const next = { ...prev, [id]: { id, verdict: 'ready' as const, reason: 'audit rewrite applied', title } }
+      persistCache(next)
+      return next
+    })
+  }, [])
+
+  return { audit, reauditAll, markReady, results, slate, uncachedCount: uncached.length, loading, error }
 }

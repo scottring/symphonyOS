@@ -110,6 +110,23 @@ describe('BetsGrid slots', () => {
     fireEvent.click(slots[0])
     expect(onSlotClick).toHaveBeenCalled()
   })
+
+  it('a won pick frees its slot instead of occupying one: 1 open + 1 won leaves 7 open slots', () => {
+    render(
+      <BetsGrid
+        tasks={[
+          picked('b1', 'One open pick'),
+          picked('b2', 'One won pick', { completed: true }),
+        ]}
+        goalsById={new Map()} onSelect={vi.fn()} onComplete={vi.fn()} onDemote={vi.fn()}
+        now={new Date(2026, 6, 20)}
+      />,
+    )
+    const slots = screen.getAllByRole('button', { name: /open slot/i })
+    expect(slots).toHaveLength(7)
+    expect(screen.getByText('Won this season')).toBeInTheDocument()
+    expect(screen.getByText('One won pick')).toBeInTheDocument()
+  })
 })
 
 describe('BetsGrid keyboard', () => {

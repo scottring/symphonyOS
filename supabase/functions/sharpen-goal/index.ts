@@ -71,11 +71,18 @@ function parseResult(text: string): SharpenResult {
 //   rephrase — right size, wrong shape (activity phrasing) → suggestion
 //   month    — month-sized (fits a sitting or two) → belongs on the month list
 //   goal     — multi-season direction in disguise → shelve or translate
-function buildAuditPrompt(items: { id: string; title: string }[], picks: { id: string; title: string }[] = []): string {
+function buildAuditPrompt(items: { id: string; title: string }[], picks: { id: string; title: string }[] = [], wantSlate = true): string {
   const list = items.map((i) => `- id "${i.id}": "${i.title}"`).join('\n')
   const pickList = picks.length > 0
     ? `\n\nTheir CURRENT picks (already chosen for this season):\n` + picks.map((i) => `- id "${i.id}": "${i.title}"`).join('\n')
     : ''
+  const slateParagraph = wantSlate
+    ? `\n\nFINALLY, recommend the season's slate: from ALL items (current picks AND bench together), choose the strongest coherent set of AT MOST 8 for this season. Favor season-ready construction, spread across life areas, and honest capacity — fewer is fine. A current pick may be left out; a bench item may be chosen.`
+    : ''
+  const responseShape = wantSlate
+    ? `{"results": [{"id": "...", "verdict": "ready|rephrase|month|goal", "suggestion": "only for rephrase", "seasonVersion": "only for month/goal", "reason": "..."}],
+ "slate": {"ids": ["up to 8 ids, strongest first"], "rationale": "one sentence on the shape of this slate"}}`
+    : `{"results": [{"id": "...", "verdict": "ready|rephrase|month|goal", "suggestion": "only for rephrase", "seasonVersion": "only for month/goal", "reason": "..."}]}`
   return `You are the planning coach for Symphony. The user's SEASON page holds "picks" — outcomes true by the end of a ~13-week season, measured in weekends ("Will drafted and signed"). A MONTH move fits in a sitting or two ("Order the dishwasher"). A GOAL is a multi-season direction ("Financial calm"). Audit each bench item below for season-level construction:
 
 ${list}${pickList}
@@ -88,13 +95,10 @@ For each item return a verdict:
 
 Also give every item a "reason": one short plain clause (under 12 words).
 
-For "month" and "goal" verdicts, ALSO include "seasonVersion": the item rewritten as a genuine season-sized outcome (one sentence, under 12 words, no "start/continue/work on" phrasing, keeping the user's intent without inventing facts) — the upgrade path in case the user wants to keep it at season level. For "month", scope UP (the fuller outcome the sitting serves); for "goal", scope DOWN (the one-season slice).
-
-FINALLY, recommend the season's slate: from ALL items (current picks AND bench together), choose the strongest coherent set of AT MOST 8 for this season. Favor season-ready construction, spread across life areas, and honest capacity — fewer is fine. A current pick may be left out; a bench item may be chosen.
+For "month" and "goal" verdicts, ALSO include "seasonVersion": the item rewritten as a genuine season-sized outcome (one sentence, under 12 words, no "start/continue/work on" phrasing, keeping the user's intent without inventing facts) — the upgrade path in case the user wants to keep it at season level. For "month", scope UP (the fuller outcome the sitting serves); for "goal", scope DOWN (the one-season slice).${slateParagraph}
 
 Respond with ONLY a JSON object (no markdown fences, no prose):
-{"results": [{"id": "...", "verdict": "ready|rephrase|month|goal", "suggestion": "only for rephrase", "seasonVersion": "only for month/goal", "reason": "..."}],
- "slate": {"ids": ["up to 8 ids, strongest first"], "rationale": "one sentence on the shape of this slate"}}
+${responseShape}
 The results array covers ONLY the bench items, one object each, same order.`
 }
 
@@ -198,6 +202,7 @@ Deno.serve(async (req) => {
     mode?: 'goal' | 'bet' | 'audit'
     items?: { id?: string; title?: string }[]
     picks?: { id?: string; title?: string }[]
+    wantSlate?: boolean
   }
   try {
     body = await req.json()
@@ -218,8 +223,9 @@ Deno.serve(async (req) => {
         typeof i?.id === 'string' && typeof i?.title === 'string' && !!i.title.trim())
       .slice(0, 12)
       .map((i) => ({ id: i.id, title: i.title.trim().slice(0, 300) }))
+    const wantSlate = body.wantSlate === true
     try {
-      const text = await callClaude(buildAuditPrompt(items, picks), apiKey, 4000)
+      const text = await callClaude(buildAuditPrompt(items, picks, wantSlate), apiKey, 8000)
       const { results, slate } = parseAuditResult(text, items.map((i) => i.id), [...items, ...picks].map((i) => i.id))
       return json({ results, slate })
     } catch (e) {

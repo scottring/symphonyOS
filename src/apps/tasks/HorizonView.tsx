@@ -1087,6 +1087,7 @@ export function HorizonView({ horizon }: HorizonViewProps) {
                         onChange={(e) => setDraft(e.target.value)}
                         onKeyDown={(e) => { if (e.key === 'Enter') void submitDraft() }}
                         placeholder="Finishable by season's end…"
+                        aria-label="Add an outcome for this season"
                         className="flex-1 min-w-0 text-sm bg-transparent placeholder:text-neutral-400 focus:outline-none"
                       />
                     </div>
@@ -1136,13 +1137,18 @@ export function HorizonView({ horizon }: HorizonViewProps) {
                 onShelf={(id) => updateTask(id, { bucket: 'someday' })}
                 onLetGo={handleLetGo}
                 onRename={(id, title) => updateTask(id, { title })}
-                onMakeGoal={async (_id, title) => {
+                onMakeGoal={async (id, title) => {
                   // Goal-sized bench item → a real goal. Filed under the first
                   // life area (movable on /goals); context follows the domain.
                   const area = [...areas].sort((a, b) => a.sortOrder - b.sortOrder)[0];
                   if (!area) return null;
                   const created = await addGoal(area.id, title, currentDomain !== 'universal' ? currentDomain : undefined);
-                  return created?.id ?? null;
+                  if (!created) return null;
+                  // Stamp the task↔goal link immediately — the task's fate
+                  // (first move vs. shelved) is still pending, but the link
+                  // must survive regardless of what happens to that prompt.
+                  void updateTask(id, { goalId: created.id });
+                  return created.id;
                 }}
                 onFirstMove={(id, goalId, moveText) => {
                   // The original item BECOMES the goal's first season move —

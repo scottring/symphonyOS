@@ -39,9 +39,12 @@ export function OverflowTray({ items, picks, onPick, onSwap, onMakeMove, onShelf
   const [goalFlow, setGoalFlow] = useState<{ taskId: string; goalId: string } | null>(null)
   const [moveDraft, setMoveDraft] = useState('')
   const [convertingId, setConvertingId] = useState<string | null>(null)
+  // onMakeGoal resolves null when there's nowhere to file the goal (zero life
+  // areas) — surface that under the row instead of a silent no-op button.
+  const [goalError, setGoalError] = useState<{ taskId: string; message: string } | null>(null)
   const auditItems = useMemo(() => items.map((t) => ({ id: t.id, title: t.title })), [items])
   const auditPicks = useMemo(() => picks.map((t) => ({ id: t.id, title: t.title })), [picks])
-  const { audit, reauditAll, results, slate, uncachedCount, loading: auditing, error: auditError } = useBenchAudit(auditItems, auditPicks)
+  const { audit, reauditAll, markReady, results, slate, uncachedCount, loading: auditing, error: auditError } = useBenchAudit(auditItems, auditPicks)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editDraft, setEditDraft] = useState('')
   const titleById = useMemo(() => new Map([...items, ...picks].map((t) => [t.id, t.title])), [items, picks])
@@ -136,6 +139,7 @@ export function OverflowTray({ items, picks, onPick, onSwap, onMakeMove, onShelf
                     if (v && v !== t.title) onRename(t.id, v)
                     setEditingId(null)
                   }}
+                  aria-label="Edit item title"
                   className="flex-1 min-w-0 text-sm text-neutral-700 bg-white border border-primary-200 rounded-md px-2 py-1 focus:outline-none focus:border-primary-400"
                 />
               ) : (
@@ -186,7 +190,7 @@ export function OverflowTray({ items, picks, onPick, onSwap, onMakeMove, onShelf
                   <span className="text-neutral-400">{v.reason}</span>
                   {v.verdict === 'rephrase' && v.suggestion && onRename && (
                     <button type="button"
-                      onClick={() => onRename(t.id, v.suggestion as string)}
+                      onClick={() => { onRename(t.id, v.suggestion as string); markReady(t.id, v.suggestion as string) }}
                       className="inline-flex items-center gap-1 font-medium text-primary-700 hover:text-primary-800 transition-colors">
                       <Check aria-hidden="true" className="w-3 h-3" /> Use "{v.suggestion}"
                     </button>
@@ -202,9 +206,11 @@ export function OverflowTray({ items, picks, onPick, onSwap, onMakeMove, onShelf
                       disabled={convertingId === t.id}
                       onClick={async () => {
                         setConvertingId(t.id)
+                        setGoalError(null)
                         const goalId = await onMakeGoal(t.id, t.title)
                         setConvertingId(null)
                         if (goalId) { setGoalFlow({ taskId: t.id, goalId }); setMoveDraft('') }
+                        else setGoalError({ taskId: t.id, message: "Couldn't create the goal — add a life area on the Goals page first." })
                       }}
                       className="inline-flex items-center gap-1 font-medium text-violet-700 hover:text-violet-800 disabled:opacity-50 transition-colors">
                       <Star aria-hidden="true" className="w-3 h-3" />
@@ -221,7 +227,7 @@ export function OverflowTray({ items, picks, onPick, onSwap, onMakeMove, onShelf
                       at season level, with the audit's season-grade wording. */}
                   {(v.verdict === 'month' || v.verdict === 'goal') && v.seasonVersion && onRename && (
                     <button type="button"
-                      onClick={() => onRename(t.id, v.seasonVersion as string)}
+                      onClick={() => { onRename(t.id, v.seasonVersion as string); markReady(t.id, v.seasonVersion as string) }}
                       title="Keep it at season level with this wording"
                       className="inline-flex items-center gap-1 font-medium text-primary-700 hover:text-primary-800 transition-colors">
                       <Star aria-hidden="true" className="w-3 h-3" /> Season-size it: "{v.seasonVersion}"
@@ -230,6 +236,9 @@ export function OverflowTray({ items, picks, onPick, onSwap, onMakeMove, onShelf
                 </div>
               )
             })()}
+            {goalError?.taskId === t.id && (
+              <p className="mt-1 text-[11px] text-amber-700">{goalError.message}</p>
+            )}
             {/* Goal conversion step 2 — the goal exists; the item becomes its
                 first season-sized move (or shelves, linked, if skipped). */}
             {goalFlow?.taskId === t.id && onFirstMove && onShelfLinked && (
@@ -245,8 +254,12 @@ export function OverflowTray({ items, picks, onPick, onSwap, onMakeMove, onShelf
                       if (e.key === 'Enter' && moveDraft.trim()) {
                         onFirstMove(t.id, goalFlow.goalId, moveDraft.trim()); setGoalFlow(null)
                       }
-                      if (e.key === 'Escape') { onShelfLinked(t.id, goalFlow.goalId); setGoalFlow(null) }
+                      // Escape only closes the prompt — it must never shelf as
+                      // a side effect of dismissing. "Shelf instead" below is
+                      // the only path to onShelfLinked.
+                      if (e.key === 'Escape') setGoalFlow(null)
                     }}
+                    aria-label="First season-sized move"
                     className="flex-1 min-w-0 text-sm bg-white border border-violet-200 rounded-md px-2.5 py-1.5 focus:outline-none focus:border-violet-400"
                   />
                   <button type="button" disabled={!moveDraft.trim()}
