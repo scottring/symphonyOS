@@ -70,6 +70,19 @@ export function RhythmPage(props: RhythmPageProps) {
     [routines, dismissedTend],
   )
   const { collections } = useMemo(() => groupRoutineSteps(routines), [routines])
+  const collectionSteps = useMemo(
+    () => Object.fromEntries(collections.map(c => [c.id, c.steps])),
+    [collections],
+  )
+  // Every-day routines mirrored into the Week Strip: collections as one named
+  // item, cluster/single members individually.
+  const dailyItems = useMemo(
+    () => [
+      ...model.daily.timed.flatMap(c => (c.kind === 'collection' && c.routine ? [c.routine] : c.routines)),
+      ...model.daily.anytime,
+    ],
+    [model],
+  )
 
   // Type-anywhere search
   useEffect(() => {
@@ -294,6 +307,8 @@ export function RhythmPage(props: RhythmPageProps) {
             todayKey={todayKey}
             onOpenRoutine={openRoutine}
             familyMembers={familyMembers}
+            collectionSteps={collectionSteps}
+            dailyItems={dailyItems}
           />
         </div>
 
@@ -331,6 +346,7 @@ export function RhythmPage(props: RhythmPageProps) {
                 onRename={name => onUpdateRoutine(openRoutineItem.id, { name })}
                 onContextChange={context => onUpdateRoutine(openRoutineItem.id, { context: context ?? null })}
                 onVisibilityChange={visibility => onUpdateRoutine(openRoutineItem.id, { visibility })}
+                onRestUntilChange={pausedUntil => onUpdateRoutine(openRoutineItem.id, { paused_until: pausedUntil })}
                 onAssignChange={memberIds => onUpdateRoutine(openRoutineItem.id, { assigned_to_all: memberIds })}
                 onScheduleChange={(pattern, timeOfDay) =>
                   onUpdateRoutine(openRoutineItem.id, { recurrence_pattern: pattern, time_of_day: timeOfDay || null })}

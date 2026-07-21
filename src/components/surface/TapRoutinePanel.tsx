@@ -36,6 +36,8 @@ interface TapRoutinePanelProps {
   onNotesChange: (next: string) => void
   onContextChange: (context: TaskContext | undefined) => void
   onVisibilityChange: (visibility: RoutineVisibility) => void
+  /** Persist a wake date for a resting routine (paused_until; null = rest indefinitely). */
+  onRestUntilChange?: (pausedUntil: string | null) => void
   onAssignChange?: (memberIds: string[]) => void
   /** Persist a recurrence/time-of-day change. time is '' (clear) or 'HH:MM'. */
   onScheduleChange?: (pattern: RecurrencePattern, timeOfDay: string) => void
@@ -118,16 +120,18 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
           )}
         </div>
 
-        {/* Show on Today's timeline — a real on/off switch. Off = "reference":
-            the routine is kept but doesn't appear on Today. */}
+        {/* Active / Resting — off parks the routine on the Resting shelf
+            (visibility "reference"), optionally with an automatic wake date. */}
         <div>
           <div className="flex items-center justify-between gap-3">
-            <span className="text-sm font-medium text-neutral-700">Show on Today's timeline</span>
+            <span className="text-sm font-medium text-neutral-700">
+              {onTimeline ? 'Active' : 'Resting'}
+            </span>
             <button
               type="button"
               role="switch"
               aria-checked={onTimeline}
-              aria-label="Show on Today's timeline"
+              aria-label="Active"
               onClick={() => props.onVisibilityChange(onTimeline ? 'reference' : 'active')}
               className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
                 onTimeline ? 'bg-primary-600' : 'bg-neutral-300'
@@ -140,11 +144,23 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
               />
             </button>
           </div>
-          <p className="text-xs text-neutral-500 mt-1.5">
+          <p className="mt-1 text-xs text-neutral-400">
             {onTimeline
-              ? 'This routine appears on Today at its scheduled time.'
-              : 'Reference: the routine is kept but hidden from Today (turn on to schedule it back).'}
+              ? "This routine appears on Today at its scheduled time."
+              : "Asleep — off Today and the week, parked on the Resting shelf."}
           </p>
+          {!onTimeline && props.onRestUntilChange && (
+            <div className="mt-2 flex items-center gap-2">
+              <label htmlFor="wake-date" className="text-xs text-neutral-500">Wake automatically on</label>
+              <input
+                id="wake-date"
+                type="date"
+                value={routine.paused_until ? routine.paused_until.slice(0, 10) : ''}
+                onChange={e => props.onRestUntilChange!(e.target.value ? new Date(`${e.target.value}T00:00:00`).toISOString() : null)}
+                className="rounded-lg border border-neutral-200 px-2 py-1 text-xs text-neutral-600"
+              />
+            </div>
+          )}
         </div>
 
         {/* Schedule (recurrence + time) — collapsed summary, expands to edit */}

@@ -52,7 +52,7 @@ describe('TapRoutinePanel', () => {
 
   it('renders visibility as a labelled on/off switch (checked when active)', () => {
     render(<TapRoutinePanel routine={routine} onClose={vi.fn()} onNotesChange={vi.fn()} onContextChange={vi.fn()} onVisibilityChange={vi.fn()} />)
-    const sw = screen.getByRole('switch', { name: /show on today's timeline/i })
+    const sw = screen.getByRole('switch', { name: /^active$/i })
     expect(sw).toBeInTheDocument()
     expect(sw).toHaveAttribute('aria-checked', 'true')
     expect(screen.getByText(/appears on Today at its scheduled time/i)).toBeInTheDocument()
@@ -61,7 +61,7 @@ describe('TapRoutinePanel', () => {
   it('toggling the switch off reports a reference visibility change', () => {
     const onVisibilityChange = vi.fn()
     render(<TapRoutinePanel routine={routine} onClose={vi.fn()} onNotesChange={vi.fn()} onContextChange={vi.fn()} onVisibilityChange={onVisibilityChange} />)
-    fireEvent.click(screen.getByRole('switch', { name: /show on today's timeline/i }))
+    fireEvent.click(screen.getByRole('switch', { name: /^active$/i }))
     expect(onVisibilityChange).toHaveBeenCalledWith('reference')
   })
 
