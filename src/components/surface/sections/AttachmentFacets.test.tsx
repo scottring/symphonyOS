@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@/test/test-utils'
-import { AttachmentFacets } from './AttachmentFacets'
+import { AttachmentFacets, facetsToText } from './AttachmentFacets'
 import type { Facet } from '@/types/facets'
 
 const all: Facet[] = [
@@ -62,6 +62,60 @@ describe('AttachmentFacets', () => {
     expect(onAddLink).toHaveBeenCalledWith('https://airbnb.com/trips/x')
     await user.click(screen.getByRole('button', { name: 'Save phone number' }))
     expect(onSetPhone).toHaveBeenCalledWith('+1 207 555 0101')
+  })
+
+  it('offers a copy button on every value chip', async () => {
+    const { user } = render(<AttachmentFacets facets={all} />)
+    const writeText = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue()
+    await user.click(screen.getByRole('button', { name: 'Copy address' }))
+    expect(writeText).toHaveBeenLastCalledWith('4 Beach Ave, Kennebunkport ME')
+    await user.click(screen.getByRole('button', { name: 'Copy phone number' }))
+    expect(writeText).toHaveBeenLastCalledWith('+1 207 555 0101')
+    await user.click(screen.getByRole('button', { name: 'Copy date' }))
+    expect(writeText).toHaveBeenLastCalledWith('Sat, Jul 18, 4:00 PM')
+    await user.click(screen.getByRole('button', { name: 'Copy link' }))
+    expect(writeText).toHaveBeenLastCalledWith('https://airbnb.com/trips/x')
+    await user.click(screen.getByRole('button', { name: 'Copy checklist' }))
+    expect(writeText).toHaveBeenLastCalledWith('Bring towels')
+    await user.click(screen.getByRole('button', { name: 'Copy item' }))
+    expect(writeText).toHaveBeenLastCalledWith('T8 bulb — 18W 4-pin')
+  })
+
+  it('serializes the whole parse as plain text, summary first', () => {
+    expect(facetsToText(all)).toBe(
+      [
+        'Airbnb confirmation',
+        'The house: 4 Beach Ave, Kennebunkport ME',
+        'Door code: 4482#',
+        'Host: +1 207 555 0101',
+        'Check-in: Sat, Jul 18, 4:00 PM',
+        'Trip page: https://airbnb.com/trips/x',
+        'Before you go:',
+        '- Bring towels',
+        'T8 bulb — 18W 4-pin',
+      ].join('\n'),
+    )
+  })
+
+  it('omits labels it does not have when serializing', () => {
+    expect(
+      facetsToText([
+        { type: 'phone', number: '555-0101' },
+        { type: 'checklist', items: ['a', 'b'] },
+      ]),
+    ).toBe(['555-0101', 'Checklist:', '- a', '- b'].join('\n'))
+  })
+
+  it('Copy all copies the serialized parse', async () => {
+    const { user } = render(<AttachmentFacets facets={all} />)
+    const writeText = vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue()
+    await user.click(screen.getByRole('button', { name: 'Copy all' }))
+    expect(writeText).toHaveBeenCalledWith(facetsToText(all))
+  })
+
+  it('hides Copy all when there is only one facet', () => {
+    render(<AttachmentFacets facets={[all[2]]} />)
+    expect(screen.queryByRole('button', { name: 'Copy all' })).not.toBeInTheDocument()
   })
 
   it('renders no promotion buttons without handlers', () => {
