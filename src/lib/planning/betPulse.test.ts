@@ -74,4 +74,13 @@ describe('goalChapters', () => {
     expect(ch[0]).toMatchObject({ label: 'Spring 2026', state: 'won' })
     expect(ch[1]).toMatchObject({ label: 'Summer 2026', state: 'open' })
   })
+
+  it('winter wrap: bets created in Dec and Jan of same season both labeled with season start year', () => {
+    const decBet = task({ bucket: 'quarter', goalId: 'g1', createdAt: new Date(2026, 11, 10) })
+    const janBet = task({ bucket: 'quarter', goalId: 'g1', createdAt: new Date(2027, 0, 15) })
+    const ch = goalChapters('g1', [decBet, janBet])
+    expect(ch).toHaveLength(2)
+    expect(ch[0]).toMatchObject({ label: 'Winter 2026', state: 'open' })
+    expect(ch[1]).toMatchObject({ label: 'Winter 2026', state: 'open' })
+  })
 })

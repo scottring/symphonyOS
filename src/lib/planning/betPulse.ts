@@ -75,7 +75,7 @@ export function goalChapters(goalId: string, tasks: readonly Task[]) {
     .map((bet) => {
       const created = new Date(bet.createdAt)
       return {
-        label: `${SEASON_NAMES[seasonIndex(created)]} ${created.getFullYear()}`,
+        label: `${SEASON_NAMES[seasonIndex(created)]} ${seasonStart(created).getFullYear()}`,
         bet,
         state: (bet.completed ? 'won' : 'open') as 'won' | 'open',
       }
