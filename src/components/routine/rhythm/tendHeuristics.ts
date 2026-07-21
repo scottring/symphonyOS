@@ -23,9 +23,13 @@ function tokens(name: string): string[] {
     .map(t => (t.length > 3 && t.endsWith('s') ? t.slice(0, -1) : t))
 }
 
-/** Two tokens match when equal or one contains the other (plant ~ houseplant). */
+/** Two tokens match when equal or one contains the other (plant ~ houseplant).
+ * Substring containment requires BOTH tokens to be at least 4 chars to avoid false positives (am vs camp).
+ */
 function tokenMatch(a: string, b: string): boolean {
-  return a === b || a.includes(b) || b.includes(a)
+  if (a === b) return true
+  if (a.length < 4 || b.length < 4) return false
+  return a.includes(b) || b.includes(a)
 }
 
 function sharedCount(a: string[], b: string[]): number {

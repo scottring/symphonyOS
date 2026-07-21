@@ -44,6 +44,14 @@ describe('findTend lookalikes', () => {
     const findings = findTend([mk('Walk Jax'), mk('Food shopping'), mk('PT Exercises')])
     expect(findings.filter(f => f.kind === 'lookalike')).toHaveLength(0)
   })
+
+  it('does not match short tokens by substring (am vs camp)', () => {
+    const findings = findTend([
+      mk('School AM Routine', { id: 'a' }),
+      mk('After camp routine', { id: 'b' }),
+    ])
+    expect(findings.filter(f => f.kind === 'lookalike')).toHaveLength(0)
+  })
 })
 
 describe('findTend missing domain', () => {
