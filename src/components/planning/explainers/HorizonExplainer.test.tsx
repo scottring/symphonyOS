@@ -5,7 +5,7 @@ import { HorizonExplainer } from './HorizonExplainer'
 describe('HorizonExplainer', () => {
   it('renders the first scene and advances on Next', () => {
     render(<HorizonExplainer horizon="season" open onClose={vi.fn()} />)
-    expect(screen.getByText(/a bet is an outcome/i)).toBeInTheDocument()
+    expect(screen.getByText(/a pick is an outcome/i)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /next/i }))
     expect(screen.getByText(/5.*8/)).toBeInTheDocument()
   })

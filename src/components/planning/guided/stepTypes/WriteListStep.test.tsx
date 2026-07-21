@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { screen, fireEvent } from '@testing-library/react'
 import { WriteListStep } from './WriteListStep'
 import { renderStep, makeHost } from './testHarness'
-import { BET_CAP } from '@/lib/planning/betPulse'
+import { PICK_CAP } from '@/lib/planning/betPulse'
 import type { Task } from '@/types/task'
 
 const step = {
@@ -56,17 +56,18 @@ describe('WriteListStep', () => {
     expect(screen.queryByRole('button', { name: /Carry forward|Put aside/ })).not.toBeInTheDocument()
   })
 
-  it('bets mode (rows: bets) shows the amber bet-cap counter once over BET_CAP', () => {
+  it('picks mode (rows: bets) shows picked-vs-written and goes amber once the list is over PICK_CAP', () => {
     const betStep = {
       id: 'write-season', type: 'write-list' as const, title: 'Write the season\'s list',
       narration: 'Concrete, specific things.',
       props: { bucket: 'quarter' as const, rows: 'bets' as const },
     }
-    const tasks = Array.from({ length: 9 }, (_, i) => t({ id: `q${i}`, title: `Bet ${i}`, bucket: 'quarter' }))
+    const tasks = Array.from({ length: 9 }, (_, i) =>
+      t({ id: `q${i}`, title: `Bet ${i}`, bucket: 'quarter', pickedAt: i < 3 ? new Date(2026, 6, 1 + i) : undefined }))
     const host = makeHost({ tasks })
     renderStep(<WriteListStep />, { step: betStep, host, horizon: 'seasonal' })
-    expect(screen.getByText(/9 of 8/)).toBeInTheDocument()
-    expect(BET_CAP).toBe(8)
+    expect(screen.getByText(/3 of 8 picked · 9 written/)).toBeInTheDocument()
+    expect(PICK_CAP).toBe(8)
   })
 
   it('shows the soft-cap counter without blocking', () => {

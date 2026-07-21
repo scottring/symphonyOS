@@ -1,14 +1,16 @@
-import { Check, Target } from 'lucide-react'
+import { Check, Target, ArrowDown } from 'lucide-react'
 import type { Task } from '@/types/task'
 import type { Goal } from '@/types/goal'
 import { betPulse } from '@/lib/planning/betPulse'
 
-export function BetCard({ bet, tasks, goalsById, onSelect, onComplete, now }: {
+export function BetCard({ bet, tasks, goalsById, onSelect, onComplete, onDemote, now }: {
   bet: Task
   tasks: readonly Task[]
   goalsById: Map<string, Goal>
   onSelect: (id: string) => void
   onComplete: (id: string) => void
+  /** Un-pick: send this card back to the bench (pickedAt cleared). */
+  onDemote: (id: string) => void
   now?: Date
 }) {
   const pulse = betPulse(bet, tasks, now)
@@ -53,6 +55,17 @@ export function BetCard({ bet, tasks, goalsById, onSelect, onComplete, now }: {
         ))}
         {pulse.starving && !bet.completed && (
           <span className="ml-auto text-[11px] font-medium text-amber-700">nothing this month</span>
+        )}
+        {!bet.completed && (
+          <button
+            type="button"
+            aria-label="Move to bench"
+            title="Not this season — move to the bench"
+            onClick={(e) => { e.stopPropagation(); onDemote(bet.id) }}
+            className={`${pulse.starving ? '' : 'ml-auto'} shrink-0 inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded text-neutral-300 hover:text-neutral-600 hover:bg-neutral-100 transition-colors`}
+          >
+            <ArrowDown aria-hidden="true" className="w-3 h-3" /> Bench
+          </button>
         )}
       </div>
     </div>

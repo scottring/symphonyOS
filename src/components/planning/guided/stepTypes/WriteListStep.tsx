@@ -4,11 +4,11 @@
 // bucket in options (host.createTaskInBucket) — never create-then-setBucket.
 // The soft cap is a nudge, never a wall.
 import { useState, useMemo, useCallback, useRef } from 'react'
-import { Plus, Sparkles } from 'lucide-react'
+import { Plus, Sparkles, Star } from 'lucide-react'
 import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
 import { funRatio } from '@/lib/planning/coachLines'
 import { looksLikeActivity } from '@/lib/planning/outcomeCoach'
-import { BET_CAP } from '@/lib/planning/betPulse'
+import { PICK_CAP } from '@/lib/planning/betPulse'
 import { useSharpenBet } from '@/hooks/useSharpenBet'
 import { useGuided } from '../GuidedContext'
 import { extractProjectTag } from '../projectTag'
@@ -87,7 +87,7 @@ export function WriteListStep() {
       {/* Bets read best as outcomes, not activities — a quiet hint, never a block. */}
       {step.props?.rows === 'bets' && looksLikeActivity(draft) && (
         <p className="text-[11px] text-amber-700 mt-1 inline-flex items-center gap-1.5">
-          Bets read best as outcomes — what will be true by season&rsquo;s end?
+          Picks read best as outcomes — what will be true by season&rsquo;s end?
           <button
             type="button"
             onClick={async () => {
@@ -135,11 +135,11 @@ export function WriteListStep() {
           {pool.length} of ~{softCap}{over ? ' — a list you believe beats a list you admire' : ''}
         </p>
       )}
-      {/* The bets cap, live: 5 is a season worth committing to, 19 is a backlog
-          wearing a season's clothes. Never blocks — just names the shape. */}
+      {/* The picks cap, live: writing is unlimited (the bench absorbs it), but
+          only PICK_CAP get picked. Never blocks — just names the shape. */}
       {step.props?.rows === 'bets' && (
-        <p className={`text-[11px] mb-2 ${pool.length > BET_CAP ? 'text-amber-700 font-medium' : 'text-neutral-400'}`}>
-          {pool.length} of {BET_CAP} — 5 is a season; 19 is a backlog.
+        <p className={`text-[11px] mb-2 ${pool.length > PICK_CAP ? 'text-amber-700 font-medium' : 'text-neutral-400'}`}>
+          {pool.filter((t) => t.pickedAt).length} of {PICK_CAP} picked · {pool.length} written — 5 is a season; 19 is a backlog.
         </p>
       )}
       {/* The fun audit, live: tally chip + per-row ✨ toggle (Best Laid Plans'
@@ -154,6 +154,17 @@ export function WriteListStep() {
         <ul className="space-y-2">
           {pool.map((t) => (
             <li key={t.id} className="flex items-start gap-1.5">
+              {step.props?.rows === 'bets' && (
+                <button type="button"
+                  onClick={() => host.onUpdateTask(t.id, { pickedAt: t.pickedAt ? undefined : new Date() })}
+                  aria-label={t.pickedAt ? 'Move to bench' : 'Pick for the season'}
+                  aria-pressed={t.pickedAt != null}
+                  title={t.pickedAt ? 'Picked — tap to bench' : 'Pick it for the season'}
+                  className={`shrink-0 mt-1.5 p-1 rounded-md transition-colors ${
+                    t.pickedAt ? 'text-primary-600 bg-primary-50' : 'text-neutral-300 hover:text-primary-600 hover:bg-primary-50'}`}>
+                  <Star className="w-3.5 h-3.5" />
+                </button>
+              )}
               <button type="button"
                 onClick={() => host.onUpdateTask(t.id, { isFun: !t.isFun })}
                 aria-label={t.isFun ? 'Unmark as fun' : 'Mark as fun'}

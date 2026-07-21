@@ -47,6 +47,7 @@ export interface Task {
   deferredUntil?: Date // Legacy — kept for backwards compat, prefer bucket
   deferCount?: number // Times this task has been deferred
   weekDeferredAt?: Date // Set when an item already in 'week' bucket is bumped to next week — sinks it to the bottom of the This Week popover
+  pickedAt?: Date // Season picks: set when the user explicitly picks this quarter item for the season (null/undefined = on the bench)
   captureMeta?: TaskCaptureMeta // Photo-first capture state (AI enrichment + suggested merge destination)
   isAllDay?: boolean // True = all day task, false/undefined = specific time
   isSomeday?: boolean // Legacy — replaced by bucket system

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { partitionBets, betPulse, servingCount, goalChapters, wonBets, BET_CAP } from './betPulse'
+import { partitionSeason, betPulse, servingCount, goalChapters, wonPicks, PICK_CAP } from './betPulse'
 import type { Task } from '@/types/task'
 
 let n = 0
@@ -7,103 +7,103 @@ function task(over: Partial<Task>): Task {
   n += 1
   return {
     id: `t${n}`, title: `task ${n}`, completed: false,
-    createdAt: new Date(2026, 6, 1 + n), // July, ordered
+    createdAt: new Date(2026, 6, 1 + (n % 20)), // July, ordered
     ...over,
   } as Task
 }
 
 const NOW = new Date(2026, 6, 20) // Jul 20 — summer (Jun/Jul/Aug), current month = Jul
 
-describe('partitionBets', () => {
-  it('splits open quarter tasks: first 8 by createdAt are bets, rest overflow', () => {
-    const bets = Array.from({ length: 10 }, () => task({ bucket: 'quarter' }))
-    const noise = [task({ bucket: 'month' }), task({ bucket: 'quarter', completed: true })]
-    const { bets: b, overflow } = partitionBets([...bets, ...noise])
-    expect(b).toHaveLength(BET_CAP)
-    expect(overflow).toHaveLength(2)
-    expect(b[0].id).toBe(bets[0].id)
-    expect(overflow[0].id).toBe(bets[8].id)
+describe('partitionSeason', () => {
+  it('splits open quarter tasks by explicit choice: picked → picks (by pickedAt), unpicked → bench (by createdAt)', () => {
+    const p1 = task({ bucket: 'quarter', pickedAt: new Date(2026, 6, 10) })
+    const p2 = task({ bucket: 'quarter', pickedAt: new Date(2026, 6, 5) })
+    const b1 = task({ bucket: 'quarter' })
+    const noise = [task({ bucket: 'month' }), task({ bucket: 'quarter', completed: true, pickedAt: new Date() })]
+    const { picks, bench } = partitionSeason([p1, p2, b1, ...noise])
+    expect(picks.map((t) => t.id)).toEqual([p2.id, p1.id]) // pickedAt order
+    expect(bench.map((t) => t.id)).toEqual([b1.id])
+  })
+
+  it('has no implicit cap — picking is explicit; the cap is enforced by the swap UI', () => {
+    const many = Array.from({ length: 10 }, (_, i) => task({ bucket: 'quarter', pickedAt: new Date(2026, 6, 1 + i) }))
+    expect(partitionSeason(many).picks).toHaveLength(10)
+    expect(PICK_CAP).toBe(8)
+  })
+})
+
+describe('wonPicks', () => {
+  it('keeps completed picks from the current season visible; bench completions and past seasons drop out', () => {
+    const wonNow = task({ bucket: 'quarter', completed: true, pickedAt: new Date(2026, 6, 2) })
+    const wonPastSeason = task({ bucket: 'quarter', completed: true, pickedAt: new Date(2026, 2, 2) })
+    const benchDone = task({ bucket: 'quarter', completed: true })
+    const got = wonPicks([wonNow, wonPastSeason, benchDone], NOW)
+    expect(got.map((t) => t.id)).toEqual([wonNow.id])
+  })
+
+  it('skips malformed pickedAt rather than crashing seasonStart', () => {
+    const bad = task({ bucket: 'quarter', completed: true, pickedAt: new Date('nonsense') })
+    expect(wonPicks([bad], NOW)).toEqual([])
   })
 })
 
 describe('betPulse', () => {
   it('marks a month with a threaded scheduled move; current month bucket=month counts too', () => {
-    const bet = task({ bucket: 'quarter' })
+    const bet = task({ bucket: 'quarter', pickedAt: new Date() })
     const julyMove = task({ bucket: 'timed', scheduledFor: new Date(2026, 6, 25), sourceId: bet.id })
     const monthMove = task({ bucket: 'month', sourceId: bet.id, completed: true })
     const p = betPulse(bet, [bet, julyMove, monthMove], NOW)
     expect(p.months.map((m) => m.label)).toEqual(['Jun', 'Jul', 'Aug'])
     expect(p.months[1].hasMoves).toBe(true)
-    expect(p.months[1].hasDone).toBe(true) // completed month-bucket move
+    expect(p.months[1].hasDone).toBe(true)
     expect(p.months[0].hasMoves).toBe(false)
     expect(p.starving).toBe(false)
   })
 
   it('threads via shared goalId as well as sourceId', () => {
-    const bet = task({ bucket: 'quarter', goalId: 'g1' })
+    const bet = task({ bucket: 'quarter', goalId: 'g1', pickedAt: new Date() })
     const move = task({ bucket: 'timed', scheduledFor: new Date(2026, 7, 3), goalId: 'g1' })
     const p = betPulse(bet, [bet, move], NOW)
     expect(p.months[2].hasMoves).toBe(true)
   })
 
-  it('starving = open bet with no moves in the current month', () => {
-    const bet = task({ bucket: 'quarter' })
+  it('starving = open pick with no moves in the current month', () => {
+    const bet = task({ bucket: 'quarter', pickedAt: new Date() })
     const p = betPulse(bet, [bet], NOW)
     expect(p.starving).toBe(true)
-    const won = task({ bucket: 'quarter', completed: true })
+    const won = task({ bucket: 'quarter', completed: true, pickedAt: new Date() })
     expect(betPulse(won, [won], NOW).starving).toBe(false)
   })
 })
 
 describe('servingCount', () => {
-  it('counts open bets with at least one current-month move', () => {
-    const fed = task({ bucket: 'quarter' })
-    const starved = task({ bucket: 'quarter' })
+  it('counts open PICKS with at least one current-month move; the bench never counts', () => {
+    const fed = task({ bucket: 'quarter', pickedAt: new Date(2026, 6, 2) })
+    const starved = task({ bucket: 'quarter', pickedAt: new Date(2026, 6, 3) })
+    const benched = task({ bucket: 'quarter' })
     const move = task({ bucket: 'month', sourceId: fed.id })
-    expect(servingCount([fed, starved, move], NOW)).toEqual({ serving: 1, total: 2 })
-  })
-})
-
-describe('wonBets', () => {
-  it('includes a completed quarter task created this season', () => {
-    const won = task({ bucket: 'quarter', completed: true, createdAt: new Date(2026, 6, 5) })
-    expect(wonBets([won], NOW)).toEqual([won])
-  })
-
-  it('excludes a completed quarter task created in a past season', () => {
-    const wonLastSeason = task({ bucket: 'quarter', completed: true, createdAt: new Date(2026, 3, 5) }) // Spring
-    expect(wonBets([wonLastSeason], NOW)).toEqual([])
-  })
-
-  it('excludes open (incomplete) quarter tasks', () => {
-    const open = task({ bucket: 'quarter', completed: false, createdAt: new Date(2026, 6, 5) })
-    expect(wonBets([open], NOW)).toEqual([])
-  })
-
-  it('excludes rows with an unparsable createdAt instead of throwing', () => {
-    const bad = task({ bucket: 'quarter', completed: true, createdAt: 'not-a-date' as unknown as Date })
-    expect(() => wonBets([bad], NOW)).not.toThrow()
-    expect(wonBets([bad], NOW)).toEqual([])
+    expect(servingCount([fed, starved, benched, move], NOW)).toEqual({ serving: 1, total: 2 })
   })
 })
 
 describe('goalChapters', () => {
-  it('groups goal-threaded bets by the season they were created in', () => {
-    const spring = task({ bucket: 'quarter', goalId: 'g1', createdAt: new Date(2026, 3, 5), completed: true })
-    const summer = task({ bucket: 'quarter', goalId: 'g1', createdAt: new Date(2026, 6, 5) })
-    const other = task({ bucket: 'quarter', goalId: 'g2' })
-    const ch = goalChapters('g1', [spring, summer, other])
+  it('groups goal-threaded PICKS by the season they were picked in; bench items make no chapter', () => {
+    const spring = task({ bucket: 'quarter', goalId: 'g1', pickedAt: new Date(2026, 3, 5), completed: true })
+    const summer = task({ bucket: 'quarter', goalId: 'g1', pickedAt: new Date(2026, 6, 5) })
+    const benched = task({ bucket: 'quarter', goalId: 'g1' })
+    const other = task({ bucket: 'quarter', goalId: 'g2', pickedAt: new Date() })
+    const ch = goalChapters('g1', [spring, summer, benched, other])
     expect(ch).toHaveLength(2)
     expect(ch[0]).toMatchObject({ label: 'Spring 2026', state: 'won' })
     expect(ch[1]).toMatchObject({ label: 'Summer 2026', state: 'open' })
   })
 
-  it('winter wrap: bets created in Dec and Jan of same season both labeled with season start year', () => {
-    const decBet = task({ bucket: 'quarter', goalId: 'g1', createdAt: new Date(2026, 11, 10) })
-    const janBet = task({ bucket: 'quarter', goalId: 'g1', createdAt: new Date(2027, 0, 15) })
-    const ch = goalChapters('g1', [decBet, janBet])
+  it('anchors the chapter year on season start across the winter wrap', () => {
+    const dec = task({ bucket: 'quarter', goalId: 'g1', pickedAt: new Date(2026, 11, 10) })
+    const jan = task({ bucket: 'quarter', goalId: 'g1', pickedAt: new Date(2027, 0, 15) })
+    const ch = goalChapters('g1', [dec, jan])
     expect(ch).toHaveLength(2)
-    expect(ch[0]).toMatchObject({ label: 'Winter 2026', state: 'open' })
-    expect(ch[1]).toMatchObject({ label: 'Winter 2026', state: 'open' })
+    expect(ch[0].label).toBe('Winter 2026')
+    expect(ch[1].label).toBe('Winter 2026')
   })
 })

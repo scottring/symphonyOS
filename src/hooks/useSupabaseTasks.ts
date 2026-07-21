@@ -66,6 +66,7 @@ export interface DbTask {
   needs_discussion: boolean | null
   discussion_note: string | null
   week_deferred_at: string | null
+  picked_at: string | null
   capture_meta: { status?: string; storage_path?: string; suggested_task_id?: string } | null
   source_id: string | null
   goal_id: string | null
@@ -135,6 +136,7 @@ export function dbTaskToTask(dbTask: DbTask): Task {
     needsDiscussion: dbTask.needs_discussion ?? undefined,
     discussionNote: dbTask.discussion_note ?? undefined,
     weekDeferredAt: dbTask.week_deferred_at ? new Date(dbTask.week_deferred_at) : undefined,
+    pickedAt: dbTask.picked_at ? new Date(dbTask.picked_at) : undefined,
     sourceId: dbTask.source_id ?? undefined,
     goalId: dbTask.goal_id ?? undefined,
     isFun: dbTask.is_fun ?? undefined,
@@ -372,6 +374,9 @@ export function useSupabaseTasks() {
     bucket?: TaskBucket
     /** Cascade lineage: the task this one is copied down from. */
     sourceId?: string
+    /** Season pick: set when the created quarter item is immediately chosen as
+     *  one of the season's picks (rides the INSERT — same race rationale as bucket). */
+    pickedAt?: Date
     /** Cascade lineage: the annual goal this task serves (inherited by copies). */
     goalId?: string
     /** Fun-audit mark. */
@@ -423,6 +428,7 @@ export function useSupabaseTasks() {
       sourceId: options?.sourceId,
       goalId: options?.goalId,
       isFun: options?.isFun,
+      pickedAt: options?.pickedAt,
     }
     setTasks((prev) => [optimisticTask, ...prev])
 
@@ -452,6 +458,7 @@ export function useSupabaseTasks() {
         source_id: options?.sourceId ?? null,
         goal_id: options?.goalId ?? null,
         is_fun: options?.isFun ?? false,
+        picked_at: options?.pickedAt?.toISOString() ?? null,
       })
       .select()
       .single()
@@ -928,6 +935,7 @@ export function useSupabaseTasks() {
     if ('goalId' in updates) dbUpdates.goal_id = updates.goalId ?? null
     if ('isFun' in updates) dbUpdates.is_fun = updates.isFun ?? false
     if ('weekDeferredAt' in updates) dbUpdates.week_deferred_at = updates.weekDeferredAt?.toISOString() ?? null
+    if ('pickedAt' in updates) dbUpdates.picked_at = updates.pickedAt?.toISOString() ?? null
 
     logger.debug('[updateTask] Sending to DB:', { id, dbUpdates })
     const { data, error: updateError, status, count } = await supabase
@@ -1043,6 +1051,7 @@ export function useSupabaseTasks() {
     if ('goalId' in updates) dbUpdates.goal_id = updates.goalId ?? null
     if ('isFun' in updates) dbUpdates.is_fun = updates.isFun ?? false
     if ('weekDeferredAt' in updates) dbUpdates.week_deferred_at = updates.weekDeferredAt?.toISOString() ?? null
+    if ('pickedAt' in updates) dbUpdates.picked_at = updates.pickedAt?.toISOString() ?? null
 
     logger.debug('[updateTasksBulk] Sending to DB:', { taskIds, dbUpdates })
 

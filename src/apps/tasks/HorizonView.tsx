@@ -58,7 +58,7 @@ import { HorizonExplainer } from '@/components/planning/explainers/HorizonExplai
 import { EXPLAINER_SCENES } from '@/components/planning/explainers/scenes';
 import { usePlanningSession } from '@/hooks/usePlanningSession';
 import { guidedPeriod } from '@/components/planning/guided/periods';
-import { partitionBets, servingCount } from '@/lib/planning/betPulse';
+import { partitionSeason, servingCount, PICK_CAP } from '@/lib/planning/betPulse';
 import { looksLikeActivity } from '@/lib/planning/outcomeCoach';
 import type { Task } from '@/types/task';
 import type { Goal } from '@/types/goal';
@@ -354,6 +354,11 @@ export function HorizonView({ horizon }: HorizonViewProps) {
     [events, currentDomain, eventContextOverrides, getDomainForCalendar, eventNotesMap],
   );
 
+  // Fresh domain tasks for the add callback's auto-pick count (a plain dep
+  // would rebuild the callback on every task change for a rarely-used read).
+  const tasksRefForAdd = useRef<readonly Task[]>([]);
+  useEffect(() => { tasksRefForAdd.current = domainTasks; }, [domainTasks]);
+
   // Create INTO this horizon's bucket — not dated-today. A task added on the
   // This Month page belongs in the month pool, or it vanishes from the page
   // the moment it's created.
@@ -362,15 +367,24 @@ export function HorizonView({ horizon }: HorizonViewProps) {
     async (title: string, lineage?: { sourceId?: string; goalId?: string }) => {
       // Bucket rides the INSERT — a follow-up setBucket can race tasksRef
       // (temp→real id swap not yet rendered) and be silently dropped.
+      // Season adds auto-pick while there's room (picking is explicit, but a
+      // fresh outcome typed on the season page IS a choice); at the cap the
+      // new item lands on the bench for a deliberate swap. Rides the INSERT
+      // (same temp-id race rationale as bucket).
+      const autoPick =
+        horizon === 'season' && partitionSeason(tasksRefForAdd.current).picks.length < PICK_CAP
+          ? new Date()
+          : undefined;
       await addTask(title, undefined, undefined, undefined, {
         assignedTo: getCurrentUserMember()?.id,
         context: currentDomain !== 'universal' ? currentDomain : undefined,
         bucket: horizonBucket ?? undefined,
         sourceId: lineage?.sourceId,
         goalId: lineage?.goalId,
+        pickedAt: autoPick,
       });
     },
-    [addTask, getCurrentUserMember, currentDomain, horizonBucket],
+    [addTask, getCurrentUserMember, currentDomain, horizonBucket, horizon],
   );
 
   // Inline add-a-task draft for the pool section.
@@ -843,7 +857,7 @@ export function HorizonView({ horizon }: HorizonViewProps) {
           {horizon === 'month' && (
             <p className="mb-3 text-[12px] text-neutral-400">
               Moves — concrete chunks that fit in a sitting; 10–15 is a good month.
-              {(() => { const s = servingCount(domainTasks); return s.total > 0 ? ` Serving ${s.serving} of ${s.total} bets.` : ''; })()}
+              {(() => { const s = servingCount(domainTasks); return s.total > 0 ? ` Serving ${s.serving} of ${s.total} picks.` : ''; })()}
             </p>
           )}
 
@@ -862,29 +876,45 @@ export function HorizonView({ horizon }: HorizonViewProps) {
             </div>
           )}
 
-          {/* Season — five bets and a shape (spec 2026-07-20). Cards, cap 8
-              with overflow tray, focus line, the season's three months. */}
-          {horizon === 'season' && (
+          {/* Season — picks and a shape (spec 2026-07-20, revised 2026-07-21:
+              picking is EXPLICIT). Focus line, the chosen picks as cards, the
+              bench below a hard divider, the season's three months. */}
+          {horizon === 'season' && (() => {
+            const { picks, bench } = partitionSeason(domainTasks);
+            return (
             <div className="mb-8 space-y-6">
               <FocusLine
                 value={(seasonNotes.seasonFocus as string) ?? ''}
                 onChange={(v) => patchSeasonNotes({ seasonFocus: v })}
               />
-              <BetsGrid
-                tasks={domainTasks}
-                goalsById={goalsById}
-                onSelect={handleSelect}
-                onComplete={(id) => toggleTask(id)}
-              />
+              <section>
+                <h2 className="font-display text-sm tracking-wide text-neutral-400 uppercase mb-3">
+                  The season's picks · {picks.length} of {PICK_CAP}
+                </h2>
+                <BetsGrid
+                  tasks={domainTasks}
+                  goalsById={goalsById}
+                  onSelect={handleSelect}
+                  onComplete={(id) => toggleTask(id)}
+                  onDemote={(id) => updateTask(id, { pickedAt: undefined })}
+                />
+              </section>
               <OverflowTray
-                items={partitionBets(domainTasks).overflow}
+                items={bench}
+                picks={picks}
+                onPick={(id) => updateTask(id, { pickedAt: new Date() })}
+                onSwap={(benchId, replacedPickId) => {
+                  void updateTask(replacedPickId, { pickedAt: undefined });
+                  void updateTask(benchId, { pickedAt: new Date() });
+                }}
                 onMakeMove={(id) => updateTask(id, { bucket: 'month' })}
                 onShelf={(id) => updateTask(id, { bucket: 'someday' })}
                 onLetGo={handleLetGo}
               />
               <MonthStrip tasks={domainTasks} onOpenMonth={() => navigate('/month')} />
             </div>
-          )}
+            );
+          })()}
 
           {/* The level above, for reference — folded into one quiet line so
               this level's OWN list leads the page. Month looks at the season
@@ -1110,7 +1140,7 @@ export function HorizonView({ horizon }: HorizonViewProps) {
             )}
             {horizon === 'season' && looksLikeActivity(draft) && (
               <p className="text-[11px] text-amber-700 mt-1 inline-flex items-center gap-1.5">
-                Bets read best as outcomes — "Will drafted and signed", not "start working on the will".
+                Picks read best as outcomes — "Will drafted and signed", not "start working on the will".
                 <button
                   type="button"
                   onClick={async () => {

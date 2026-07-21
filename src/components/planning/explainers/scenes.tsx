@@ -90,7 +90,7 @@ function ShelvedGoal() {
 // dot shape communicates "there's a ceiling"; the words say whose ceiling).
 // Only vignette carrying digits, deliberately, so the count reads as a
 // shape, not a rule.
-function CapCounter({ caption = '5–8 bets a season' }: { caption?: string }) {
+function CapCounter({ caption = '5–8 picks a season' }: { caption?: string }) {
   return (
     <div className="flex flex-col items-center gap-2 ex-rise">
       <div className="flex items-center gap-1">
@@ -224,13 +224,13 @@ export const EXPLAINER_SCENES: Record<HorizonId, Scene[]> = {
       vignette: <div className="ex-rise"><MiniGoal /></div>,
     },
     {
-      headline: 'Seasons take bets on goals.',
+      headline: 'Seasons pick which goals get a push.',
       body: 'Every season, you pick which goals get a real push.',
       vignette: <GoalToBet />,
     },
     {
       headline: 'One goal, threading down to a single day.',
-      body: 'Goal → season bet → month move → a slot on a Tuesday.',
+      body: 'Goal → season pick → month move → a slot on a Tuesday.',
       vignette: <CascadeDrop />,
     },
     {
@@ -241,34 +241,34 @@ export const EXPLAINER_SCENES: Record<HorizonId, Scene[]> = {
   ],
   season: [
     {
-      headline: "A bet is an outcome true by season's end.",
+      headline: "A pick is an outcome true by season's end.",
       body: "Measured in weekends — 'Will drafted and signed', not 'start working on the will'.",
       vignette: <div className="ex-rise"><MiniBet /></div>,
     },
     {
       headline: 'Five to eight. Never more.',
-      body: "19 bets isn't a season, it's a backlog. Extras become month moves, or wait on the shelf.",
+      body: "19 picks isn't a season, it's a backlog. Extras wait on the bench, become month moves, or shelve.",
       vignette: <CapCounter />,
     },
     {
-      headline: 'Bets feed months as moves.',
-      body: 'Copy a bet down and it becomes concrete chunks on the month list — the bet stays here.',
+      headline: 'Picks feed months as moves.',
+      body: 'Copy a pick down and it becomes concrete chunks on the month list — the pick stays here.',
       vignette: <BetFeedsMove />,
     },
     {
-      headline: 'A starving bet tells you.',
-      body: "A bet with nothing on this month's list shows an amber warning — that's the season doing its job.",
+      headline: 'A starving pick tells you.',
+      body: "A pick with nothing on this month's list shows an amber warning — that's the season doing its job.",
       vignette: <StarvingBet />,
     },
     {
       headline: 'Win it, carry it, or let it go.',
-      body: "Every outcome is honorable. That's why they're called bets.",
+      body: 'Every outcome is honorable — a pick can go back to the bench without shame.',
       vignette: <BetOutcomes />,
     },
   ],
   month: [
     {
-      headline: 'Moves, not bets.',
+      headline: 'Moves, not picks.',
       body: 'A move fits in a sitting or two — an order placed, a call made.',
       vignette: <div className="ex-rise"><MiniMove /></div>,
     },
@@ -318,7 +318,7 @@ export const EXPLAINER_SCENES: Record<HorizonId, Scene[]> = {
     },
     {
       headline: 'Every item on today can explain itself.',
-      body: 'Follow the thread back: day → move → bet → goal.',
+      body: 'Follow the thread back: day → move → pick → goal.',
       vignette: <CascadeDrop />,
     },
   ],
