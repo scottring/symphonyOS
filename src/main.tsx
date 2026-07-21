@@ -137,24 +137,24 @@ createRoot(document.getElementById('root')!).render(
             <Routes>
               {/* /, /today, /inbox, /task/:id are served by the Shell via the
                   /* catch-all below (explicit routes here win by specificity). */}
-              <Route path="/goals/*" element={<Shell />} />
-              <Route path="/projects/*" element={<Shell />} />
-              <Route path="/routines/*" element={<Shell />} />
-              <Route path="/meds/*" element={<Shell />} />
-              <Route path="/contacts/*" element={<Shell />} />
-              <Route path="/family/*" element={<Shell />} />
-              <Route path="/agent/*" element={<Shell />} />
-              <Route path="/wall/*" element={<Shell />} />
+              <Route path="/goals/*" element={cutoverShell} />
+              <Route path="/projects/*" element={cutoverShell} />
+              <Route path="/routines/*" element={cutoverShell} />
+              <Route path="/meds/*" element={cutoverShell} />
+              <Route path="/contacts/*" element={cutoverShell} />
+              <Route path="/family/*" element={cutoverShell} />
+              <Route path="/agent/*" element={cutoverShell} />
+              <Route path="/wall/*" element={<Shell />} /> {/* wall kiosk: own auth, stays ungated */}
               <Route path="/wall-v2/*" element={<Shell />} />
-              <Route path="/jobs/*" element={<Shell />} />
-              <Route path="/tasks-new/*" element={<Shell />} />
-              <Route path="/morning/*" element={<Shell />} />
-              <Route path="/bedtime/*" element={<Shell />} />
-              <Route path="/meals/*" element={<Shell />} />
-              <Route path="/home/*" element={<Shell />} />
-              <Route path="/settings/*" element={<Shell />} />
-              <Route path="/history/*" element={<Shell />} />
-              <Route path="/lists/*" element={<Shell />} />
+              <Route path="/jobs/*" element={cutoverShell} />
+              <Route path="/tasks-new/*" element={cutoverShell} />
+              <Route path="/morning/*" element={cutoverShell} />
+              <Route path="/bedtime/*" element={cutoverShell} />
+              <Route path="/meals/*" element={cutoverShell} />
+              <Route path="/home/*" element={cutoverShell} />
+              <Route path="/settings/*" element={cutoverShell} />
+              <Route path="/history/*" element={cutoverShell} />
+              <Route path="/lists/*" element={cutoverShell} />
               <Route path="/capture" element={<Suspense fallback={null}><CapturePage /></Suspense>} />
               <Route path="/join/:token" element={<JoinHousehold />} />
               <Route path="/calendar-callback" element={<CalendarCallback />} />
