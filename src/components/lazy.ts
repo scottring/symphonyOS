@@ -11,9 +11,9 @@ export const ProjectView = lazy(() =>
   import('./project/ProjectViewRedesign').then(m => ({ default: m.ProjectViewRedesign }))
 )
 
-// Routine views - Switch to RoutinesListRedesign to test new layout
+// Routine views — the Rhythm page (time-rendered week)
 export const RoutinesList = lazy(() =>
-  import('./routine/RoutinesListRedesign').then(m => ({ default: m.RoutinesListRedesign }))
+  import('./routine/RhythmPage').then(m => ({ default: m.RhythmPage }))
 )
 export const RoutineForm = lazy(() =>
   import('./routine/RoutineForm').then(m => ({ default: m.RoutineForm }))
