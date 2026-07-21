@@ -253,7 +253,7 @@ export function HorizonView({ horizon }: HorizonViewProps) {
   // the season list; season looks at the year's goals. Read-only, folded by
   // default (this level's own list leads the page); auto-open on a blank
   // slate, where the level above is the invitation.
-  const { areas, goals } = useGoalsContext();
+  const { areas, goals, addGoal } = useGoalsContext();
   // Season focus line — persisted in the per-domain planning_sessions notes
   // row for this season (key seasonFocus), the SAME row the wizard writes
   // (GuidedSession keys off domainSessionToken(period.token, domain), not the
@@ -1093,6 +1093,23 @@ export function HorizonView({ horizon }: HorizonViewProps) {
                 onShelf={(id) => updateTask(id, { bucket: 'someday' })}
                 onLetGo={handleLetGo}
                 onRename={(id, title) => updateTask(id, { title })}
+                onMakeGoal={async (_id, title) => {
+                  // Goal-sized bench item → a real goal. Filed under the first
+                  // life area (movable on /goals); context follows the domain.
+                  const area = [...areas].sort((a, b) => a.sortOrder - b.sortOrder)[0];
+                  if (!area) return null;
+                  const created = await addGoal(area.id, title, currentDomain !== 'universal' ? currentDomain : undefined);
+                  return created?.id ?? null;
+                }}
+                onFirstMove={(id, goalId, moveText) => {
+                  // The original item BECOMES the goal's first season move —
+                  // picked if a slot is open, benched otherwise.
+                  const room = partitionSeason(domainTasks).picks.length < PICK_CAP;
+                  void updateTask(id, { title: moveText, goalId, pickedAt: room ? new Date() : undefined });
+                }}
+                onShelfLinked={(id, goalId) => {
+                  void updateTask(id, { bucket: 'someday', goalId, pickedAt: undefined });
+                }}
               />
             </div>
             );
