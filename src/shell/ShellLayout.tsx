@@ -239,6 +239,7 @@ function ShellLayoutInner({ children }: Props) {
           collapsed={sidebarCollapsed}
           onToggle={() => setSidebarCollapsed((c) => !c)}
           userEmail={user?.email ?? undefined}
+          userName={typeof user?.user_metadata?.name === 'string' ? user.user_metadata.name : undefined}
           onSignOut={signOut}
           activeView={activeView}
           onViewChange={handleViewChange}
