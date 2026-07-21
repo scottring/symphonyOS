@@ -18,12 +18,12 @@ Routines are the shape of the family's time, not records. The page becomes
 **Rhythm** — a picture of the default week that you sculpt. It answers "how does
 our family run?" instead of "what routines exist?"
 
-Route stays `/routines`. Masthead: **Rhythm**, subtitle "How your family runs —
+Route stays `/routines`. Masthead title stays **Routines** (the rhythm concept lives in the layout, not the page name); subtitle "How your family runs —
 {weekday, date}". The list view is fully replaced; search covers find-one-thing.
 
 ## Layout (top to bottom)
 
-1. **Masthead** — title/subtitle; type-anywhere search affordance; `+ New` and
+1. **Masthead** — "Routines" title + subtitle; type-anywhere search affordance; `+ New` and
    `Build with AI` (existing handlers).
 2. **People pills** — Everyone (default) + one pill per family member.
    Filters every zone by assignee.

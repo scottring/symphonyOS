@@ -1562,7 +1562,7 @@ git commit -m "feat(rhythm): Sometimes/Seasonal shelves and Worth-tending card"
 - Produces: `export function RhythmPage(props: RhythmPageProps)` where `RhythmPageProps` is the **same prop contract as `RoutinesListProps`** in the old `RoutinesListRedesign.tsx` (copy the interface verbatim — `routines`, `loading`, `contacts`, `familyMembers`, `onCreateRoutine`, `onUpdateRoutine`, `onAddStep`, `onAddSteps`, `onReorderSteps`, `onPromoteStep`, `onDeleteStep`, `onDelete`, `onCreateCollection`, `onGroupIntoCollection`, `onBuildWithAI`). `RoutinesApp` needs **zero changes**.
 
 Assembly behavior:
-- **Masthead:** `font-display` title "Rhythm", subtitle `How your family runs — {weekday}, {month} {day}`; keep `Build with AI` + `New routine` buttons (drop `New step` and `Select` — cluster naming replaces grouping; a loose routine is created via New routine without steps).
+- **Masthead:** `font-display` title "Routines", subtitle `How your family runs — {weekday}, {month} {day}`; keep `Build with AI` + `New routine` buttons (drop `New step` and `Select` — cluster naming replaces grouping; a loose routine is created via New routine without steps).
 - **People pills:** `Everyone` + one pill per `familyMembers` (sorted by `display_order`). State `memberId: string | null`. Passed to `buildRhythmModel`.
 - **Search:** state `query`; global `keydown` listener active only when no `input`/`textarea`/`[contenteditable]` has focus and no panel is open; printable keys append, Backspace deletes, Escape clears. Masthead shows a search input bound to the same state (`Search` icon). `matches(r) = query === '' || r.name.toLowerCase().includes(q) || (stepNames of r's collection include q)`.
 - **Zones:** `DailyArc` (with `nowMinutes` from `new Date()`), `WeekStrip` (`todayKey` from `new Date().getDay()` → `DAY_ORDER[i]`), `SometimesShelf`, `SeasonalShelf`, `TendCard` (from `findTend(routines)`).
@@ -1573,7 +1573,7 @@ Assembly behavior:
   - Merge → for each loser: `onDelete(loserId)` (survivor untouched)
   - Stamp → `onUpdateRoutine(id, { context })`
   - Rename → `onUpdateRoutine(id, { name })`; Let go → `onDelete(id)`
-- **Empty state:** keep the old empty-state card (amber icon block) but with `RefreshCw` lucide icon and copy "No rhythms yet — capture your first routine and Symphony will start painting your week." CTA calls `onCreateCollection('New routine')` then opens the panel (same as old code).
+- **Empty state:** keep the old empty-state card (amber icon block) but with `RefreshCw` lucide icon and copy "No routines yet — capture your first routine and Symphony will start painting your week." CTA calls `onCreateCollection('New routine')` then opens the panel (same as old code).
 - **Loading:** `loading && routines.length === 0` → centered "Loading your week…".
 
 - [ ] **Step 1: Write the failing tests** — `src/components/routine/RhythmPage.test.tsx`:
@@ -1610,7 +1610,7 @@ describe('RhythmPage', () => {
           mk('Walk to school', { visibility: 'reference', paused_until: '2026-09-01T00:00:00Z' }),
         ]} />
     )
-    expect(screen.getByText('Rhythm')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Routines' })).toBeInTheDocument()
     expect(screen.getByText('Every day')).toBeInTheDocument()
     expect(screen.getByText('Through the week')).toBeInTheDocument()
     expect(screen.getByText('Sometimes')).toBeInTheDocument()
@@ -1802,7 +1802,7 @@ export function RhythmPage(props: RhythmPageProps) {
         {/* Masthead */}
         <div className="flex items-start justify-between gap-4 mb-4 flex-wrap">
           <div>
-            <h1 className="font-display text-3xl font-semibold tracking-tight text-neutral-800">Rhythm</h1>
+            <h1 className="font-display text-3xl font-semibold tracking-tight text-neutral-800">Routines</h1>
             <p className="mt-1 text-sm text-neutral-500">How your family runs — {subtitle}</p>
           </div>
           <div className="flex items-center gap-2">
@@ -1867,7 +1867,7 @@ export function RhythmPage(props: RhythmPageProps) {
             <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-2xl bg-amber-100">
               <RefreshCw className="h-10 w-10 text-amber-600" />
             </div>
-            <h2 className="font-display mb-2 text-xl font-semibold text-neutral-700">No rhythms yet</h2>
+            <h2 className="font-display mb-2 text-xl font-semibold text-neutral-700">No routines yet</h2>
             <p className="mx-auto mb-6 max-w-sm text-neutral-500">
               Capture your first routine and Symphony will start painting your week.
             </p>
