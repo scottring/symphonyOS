@@ -1111,6 +1111,17 @@ export function HorizonView({ horizon }: HorizonViewProps) {
                 onShelfLinked={(id, goalId) => {
                   void updateTask(id, { bucket: 'someday', goalId, pickedAt: undefined });
                 }}
+                onApplySlate={(ids) => {
+                  // The recommended slate becomes the picks: staggered pickedAt
+                  // preserves the recommendation's order; current picks not in
+                  // the slate return to the bench.
+                  const chosen = new Set(ids);
+                  const base = Date.now();
+                  ids.forEach((id, i) => { void updateTask(id, { pickedAt: new Date(base + i) }); });
+                  for (const p of picks) {
+                    if (!chosen.has(p.id)) void updateTask(p.id, { pickedAt: undefined });
+                  }
+                }}
               />
             </div>
             );

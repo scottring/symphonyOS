@@ -71,11 +71,14 @@ function parseResult(text: string): SharpenResult {
 //   rephrase — right size, wrong shape (activity phrasing) → suggestion
 //   month    — month-sized (fits a sitting or two) → belongs on the month list
 //   goal     — multi-season direction in disguise → shelve or translate
-function buildAuditPrompt(items: { id: string; title: string }[]): string {
+function buildAuditPrompt(items: { id: string; title: string }[], picks: { id: string; title: string }[] = []): string {
   const list = items.map((i) => `- id "${i.id}": "${i.title}"`).join('\n')
+  const pickList = picks.length > 0
+    ? `\n\nTheir CURRENT picks (already chosen for this season):\n` + picks.map((i) => `- id "${i.id}": "${i.title}"`).join('\n')
+    : ''
   return `You are the planning coach for Symphony. The user's SEASON page holds "picks" — outcomes true by the end of a ~13-week season, measured in weekends ("Will drafted and signed"). A MONTH move fits in a sitting or two ("Order the dishwasher"). A GOAL is a multi-season direction ("Financial calm"). Audit each bench item below for season-level construction:
 
-${list}
+${list}${pickList}
 
 For each item return a verdict:
 - "ready": a concrete season-sized outcome as written.
@@ -87,8 +90,12 @@ Also give every item a "reason": one short plain clause (under 12 words).
 
 For "month" and "goal" verdicts, ALSO include "seasonVersion": the item rewritten as a genuine season-sized outcome (one sentence, under 12 words, no "start/continue/work on" phrasing, keeping the user's intent without inventing facts) — the upgrade path in case the user wants to keep it at season level. For "month", scope UP (the fuller outcome the sitting serves); for "goal", scope DOWN (the one-season slice).
 
-Respond with ONLY a JSON array (no markdown fences, no prose), one object per item, same order:
-[{"id": "...", "verdict": "ready|rephrase|month|goal", "suggestion": "only for rephrase", "seasonVersion": "only for month/goal", "reason": "..."}]`
+FINALLY, recommend the season's slate: from ALL items (current picks AND bench together), choose the strongest coherent set of AT MOST 8 for this season. Favor season-ready construction, spread across life areas, and honest capacity — fewer is fine. A current pick may be left out; a bench item may be chosen.
+
+Respond with ONLY a JSON object (no markdown fences, no prose):
+{"results": [{"id": "...", "verdict": "ready|rephrase|month|goal", "suggestion": "only for rephrase", "seasonVersion": "only for month/goal", "reason": "..."}],
+ "slate": {"ids": ["up to 8 ids, strongest first"], "rationale": "one sentence on the shape of this slate"}}
+The results array covers ONLY the bench items, one object each, same order.`
 }
 
 export interface AuditItemResult {
@@ -100,13 +107,28 @@ export interface AuditItemResult {
   reason: string
 }
 
-function parseAuditResult(text: string, ids: string[]): AuditItemResult[] {
+export interface AuditSlate {
+  ids: string[]
+  rationale: string
+}
+
+function parseAuditResult(text: string, ids: string[], allIds: string[]): { results: AuditItemResult[]; slate: AuditSlate | null } {
   const stripped = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '')
-  const parsed = JSON.parse(stripped) as Partial<AuditItemResult>[]
-  if (!Array.isArray(parsed)) throw new Error('Audit result was not an array')
+  const raw = JSON.parse(stripped) as { results?: Partial<AuditItemResult>[]; slate?: { ids?: unknown; rationale?: unknown } } | Partial<AuditItemResult>[]
+  // Back-compat: a bare array is results-only (older prompt shape).
+  const parsed = Array.isArray(raw) ? raw : raw.results
+  if (!Array.isArray(parsed)) throw new Error('Audit result missing results array')
+  const allValid = new Set(allIds)
+  let slate: AuditSlate | null = null
+  if (!Array.isArray(raw) && raw.slate && Array.isArray(raw.slate.ids)) {
+    const slateIds = raw.slate.ids.filter((i): i is string => typeof i === 'string' && allValid.has(i)).slice(0, 8)
+    if (slateIds.length > 0) {
+      slate = { ids: slateIds, rationale: typeof raw.slate.rationale === 'string' ? raw.slate.rationale.trim().slice(0, 240) : '' }
+    }
+  }
   const valid = new Set(ids)
   const verdicts = new Set(['ready', 'rephrase', 'month', 'goal'])
-  return parsed
+  const results = parsed
     .filter((r): r is AuditItemResult =>
       typeof r?.id === 'string' && valid.has(r.id) && typeof r?.verdict === 'string' && verdicts.has(r.verdict))
     .map((r) => ({
@@ -116,6 +138,7 @@ function parseAuditResult(text: string, ids: string[]): AuditItemResult[] {
       seasonVersion: typeof r.seasonVersion === 'string' ? r.seasonVersion.trim().slice(0, 300) : undefined,
       reason: typeof r.reason === 'string' ? r.reason.trim().slice(0, 160) : '',
     }))
+  return { results, slate }
 }
 
 // The bet prompt asks for a bare sentence, not JSON — strip any stray quoting
@@ -174,6 +197,7 @@ Deno.serve(async (req) => {
     name?: string; title?: string; areaName?: string; context?: string
     mode?: 'goal' | 'bet' | 'audit'
     items?: { id?: string; title?: string }[]
+    picks?: { id?: string; title?: string }[]
   }
   try {
     body = await req.json()
@@ -189,9 +213,15 @@ Deno.serve(async (req) => {
       .slice(0, 40)
       .map((i) => ({ id: i.id, title: i.title.trim().slice(0, 300) }))
     if (items.length === 0) return json({ error: 'items required' }, 400)
+    const picks = (body.picks ?? [])
+      .filter((i): i is { id: string; title: string } =>
+        typeof i?.id === 'string' && typeof i?.title === 'string' && !!i.title.trim())
+      .slice(0, 12)
+      .map((i) => ({ id: i.id, title: i.title.trim().slice(0, 300) }))
     try {
-      const text = await callClaude(buildAuditPrompt(items), apiKey, 3000)
-      return json({ results: parseAuditResult(text, items.map((i) => i.id)) })
+      const text = await callClaude(buildAuditPrompt(items, picks), apiKey, 4000)
+      const { results, slate } = parseAuditResult(text, items.map((i) => i.id), [...items, ...picks].map((i) => i.id))
+      return json({ results, slate })
     } catch (e) {
       return json({ error: e instanceof Error ? e.message : 'Audit failed' }, 502)
     }

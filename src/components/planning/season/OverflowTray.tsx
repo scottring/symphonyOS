@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
-import { Star, CornerRightDown, Archive, Trash2, Repeat, ChevronRight, Sparkles, Check, RotateCw } from 'lucide-react'
+import { Star, CornerRightDown, Archive, Trash2, Repeat, ChevronRight, Sparkles, Check, RotateCw, Pencil } from 'lucide-react'
+import { SeasonMoveSuggestions } from '@/components/planning/SeasonMoveSuggestions'
 import { useBenchAudit } from '@/hooks/useBenchAudit'
 import type { Task } from '@/types/task'
 import { PICK_CAP } from '@/lib/planning/betPulse'
@@ -9,7 +10,7 @@ import { PICK_CAP } from '@/lib/planning/betPulse'
  *  gesture replaces a current pick. The other exits re-grade or retire.
  *  `collapsible` renders it as a closed drawer (season-spread bottom) —
  *  subordinate by interaction, not just by muting. */
-export function OverflowTray({ items, picks, onPick, onSwap, onMakeMove, onShelf, onLetGo, onRename, onMakeGoal, onFirstMove, onShelfLinked, collapsible = false }: {
+export function OverflowTray({ items, picks, onPick, onSwap, onMakeMove, onShelf, onLetGo, onRename, onMakeGoal, onFirstMove, onShelfLinked, onApplySlate, collapsible = false }: {
   items: readonly Task[]
   /** Current picks, for the at-cap swap picker. */
   picks: readonly Task[]
@@ -28,6 +29,8 @@ export function OverflowTray({ items, picks, onPick, onSwap, onMakeMove, onShelf
   onFirstMove?: (id: string, goalId: string, moveText: string) => void
   /** Skip the first move: shelf the item with the goal link stamped. */
   onShelfLinked?: (id: string, goalId: string) => void
+  /** Apply the audit's recommended slate: these ids become the picks. */
+  onApplySlate?: (ids: string[]) => void
   collapsible?: boolean
 }) {
   const [swapFor, setSwapFor] = useState<string | null>(null)
@@ -37,7 +40,11 @@ export function OverflowTray({ items, picks, onPick, onSwap, onMakeMove, onShelf
   const [moveDraft, setMoveDraft] = useState('')
   const [convertingId, setConvertingId] = useState<string | null>(null)
   const auditItems = useMemo(() => items.map((t) => ({ id: t.id, title: t.title })), [items])
-  const { audit, reauditAll, results, uncachedCount, loading: auditing, error: auditError } = useBenchAudit(auditItems)
+  const auditPicks = useMemo(() => picks.map((t) => ({ id: t.id, title: t.title })), [picks])
+  const { audit, reauditAll, results, slate, uncachedCount, loading: auditing, error: auditError } = useBenchAudit(auditItems, auditPicks)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editDraft, setEditDraft] = useState('')
+  const titleById = useMemo(() => new Map([...items, ...picks].map((t) => [t.id, t.title])), [items, picks])
   const [open, setOpen] = useState(!collapsible)
   if (items.length === 0) return null
   const atCap = picks.length >= PICK_CAP
@@ -84,11 +91,64 @@ export function OverflowTray({ items, picks, onPick, onSwap, onMakeMove, onShelf
         )}
       </div>
       {auditError && <p className="text-[11px] text-amber-700 mb-2">{auditError}</p>}
+      {/* The audit's season-system read: its recommended slate across picks AND
+          bench. One tap applies it (recommended become the picks, the rest
+          bench); every id resolves to a live item or the button hides. */}
+      {slate && (
+        <div className="mb-3 rounded-xl border border-primary-100 bg-primary-50/30 px-4 py-3">
+          <p className="text-[11px] font-medium tracking-wide uppercase text-primary-700 mb-1">Recommended slate ({slate.ids.length})</p>
+          {slate.rationale && <p className="text-[12px] text-neutral-500 mb-2">{slate.rationale}</p>}
+          <ol className="space-y-0.5 mb-2">
+            {slate.ids.map((id, i) => (
+              <li key={id} className="text-[12.5px] text-neutral-700">
+                <span className="text-neutral-400 mr-1.5">{i + 1}.</span>
+                {titleById.get(id) ?? '(no longer here)'}
+                {picks.some((pk) => pk.id === id) && <span className="ml-1.5 text-[10px] text-primary-600">already picked</span>}
+              </li>
+            ))}
+          </ol>
+          {onApplySlate && (
+            <button type="button"
+              onClick={() => onApplySlate(slate.ids.filter((id) => titleById.has(id)))}
+              className="inline-flex items-center gap-1.5 text-[11px] font-semibold px-2.5 py-1.5 rounded-md text-white bg-primary-600 hover:bg-primary-700 transition-colors">
+              <Star aria-hidden="true" className="w-3 h-3" /> Use this slate
+            </button>
+          )}
+        </div>
+      )}
       <ul className="space-y-1.5">
         {items.map((t) => (
           <li key={t.id} className="rounded-lg bg-neutral-50/80 border border-neutral-100 px-3 py-2">
             <div className="flex items-center gap-2">
-              <span className="flex-1 min-w-0 text-sm text-neutral-600 truncate">{t.title}</span>
+              {editingId === t.id && onRename ? (
+                <input type="text" autoFocus value={editDraft}
+                  onChange={(e) => setEditDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      const v = editDraft.trim()
+                      if (v && v !== t.title) onRename(t.id, v)
+                      setEditingId(null)
+                    }
+                    if (e.key === 'Escape') setEditingId(null)
+                  }}
+                  onBlur={() => {
+                    const v = editDraft.trim()
+                    if (v && v !== t.title) onRename(t.id, v)
+                    setEditingId(null)
+                  }}
+                  className="flex-1 min-w-0 text-sm text-neutral-700 bg-white border border-primary-200 rounded-md px-2 py-1 focus:outline-none focus:border-primary-400"
+                />
+              ) : (
+                <span className="flex-1 min-w-0 text-sm text-neutral-600 truncate">{t.title}</span>
+              )}
+              {onRename && editingId !== t.id && (
+                <button type="button"
+                  onClick={() => { setEditingId(t.id); setEditDraft(t.title) }}
+                  aria-label="Edit title" title="Edit title"
+                  className="shrink-0 p-1 rounded-md text-neutral-300 hover:text-neutral-600 hover:bg-neutral-100 transition-colors">
+                  <Pencil aria-hidden="true" className="w-3 h-3" />
+                </button>
+              )}
               <button type="button"
                 onClick={() => (atCap ? setSwapFor(swapFor === t.id ? null : t.id) : onPick(t.id))}
                 aria-expanded={atCap ? swapFor === t.id : undefined}
@@ -200,6 +260,7 @@ export function OverflowTray({ items, picks, onPick, onSwap, onMakeMove, onShelf
                     Shelf instead
                   </button>
                 </div>
+                <SeasonMoveSuggestions goalName={t.title} onPick={setMoveDraft} />
               </div>
             )}
             {/* At the cap, "Pick it" becomes a swap: choose which current pick

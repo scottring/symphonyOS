@@ -15,6 +15,29 @@ type CacheEntry = BenchAuditResult & {
   title: string
 }
 
+export interface AuditSlate {
+  ids: string[]
+  rationale: string
+}
+
+type SlateEntry = AuditSlate & {
+  /** Fingerprint of the full season pool the slate was computed over. */
+  fingerprint: string
+}
+
+function fingerprintOf(items: readonly { id: string; title: string }[]): string {
+  return items.map((i) => `${i.id}:${i.title}`).sort().join('|')
+}
+
+const SLATE_KEY = 'symphony.benchAudit.slate.v1'
+
+function loadSlate(): SlateEntry | null {
+  try {
+    const raw = localStorage.getItem(SLATE_KEY)
+    return raw ? JSON.parse(raw) as SlateEntry : null
+  } catch { return null }
+}
+
 // Verdicts persist across navigation (and reloads) so the audit never
 // re-bills for unchanged items. A verdict is a pure function of the title,
 // so the title is the cache validity check. Per-device is fine: the audit is
@@ -46,10 +69,17 @@ function persistCache(cache: Record<string, CacheEntry>) {
  * ONLY items without a valid cached verdict (new or renamed); `reauditAll()`
  * forces a fresh pass. Verdict application stays tap-to-write on the caller.
  */
-export function useBenchAudit(items: readonly { id: string; title: string }[]) {
+export function useBenchAudit(items: readonly { id: string; title: string }[], picks: readonly { id: string; title: string }[] = []) {
   const [cache, setCache] = useState<Record<string, CacheEntry>>(loadCache)
+  const [slateEntry, setSlateEntry] = useState<SlateEntry | null>(loadSlate)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const poolFingerprint = useMemo(() => fingerprintOf([...items, ...picks]), [items, picks])
+  /** The slate is only valid for the exact pool it was computed over. */
+  const slate = useMemo(
+    () => (slateEntry && slateEntry.fingerprint === poolFingerprint ? { ids: slateEntry.ids, rationale: slateEntry.rationale } : null),
+    [slateEntry, poolFingerprint],
+  )
 
   /** Valid cached verdicts for the CURRENT items (title must still match). */
   const results = useMemo(() => {
@@ -72,10 +102,11 @@ export function useBenchAudit(items: readonly { id: string; title: string }[]) {
     setError(null)
     try {
       const { data, error: fnError } = await supabase.functions.invoke('sharpen-goal', {
-        body: { mode: 'audit', items: targets },
+        body: { mode: 'audit', items: targets, picks },
       })
       if (fnError) throw fnError
-      const list = (data as { results?: BenchAuditResult[] } | null)?.results
+      const payload = data as { results?: BenchAuditResult[]; slate?: AuditSlate | null } | null
+      const list = payload?.results
       if (!Array.isArray(list)) throw new Error('no results')
       const titleById = new Map(targets.map((t) => [t.id, t.title]))
       setCache((prev) => {
@@ -87,17 +118,22 @@ export function useBenchAudit(items: readonly { id: string; title: string }[]) {
         persistCache(next)
         return next
       })
+      if (payload?.slate && Array.isArray(payload.slate.ids) && payload.slate.ids.length > 0) {
+        const entry: SlateEntry = { ids: payload.slate.ids, rationale: payload.slate.rationale ?? '', fingerprint: poolFingerprint }
+        setSlateEntry(entry)
+        try { localStorage.setItem(SLATE_KEY, JSON.stringify(entry)) } catch { /* in-memory only */ }
+      }
     } catch {
       setError("The audit didn't come back — try again in a moment.")
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [picks, poolFingerprint])
 
   /** Audit only what has no valid verdict yet (new or renamed items). */
   const audit = useCallback(() => run(uncached), [run, uncached])
   /** Force a fresh pass over everything. */
   const reauditAll = useCallback(() => run(items), [run, items])
 
-  return { audit, reauditAll, results, uncachedCount: uncached.length, loading, error }
+  return { audit, reauditAll, results, slate, uncachedCount: uncached.length, loading, error }
 }
