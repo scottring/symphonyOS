@@ -1056,6 +1056,7 @@ export function HorizonView({ horizon }: HorizonViewProps) {
                         bucket="quarter"
                         aboveItems={goals.filter((g) => g.status === 'active' && matchesDomain(g.context, currentDomain)).map((g) => g.name)}
                         aboveLabel="your year goals"
+                        existingItems={domainTasks.filter((t) => t.bucket === 'quarter').map((t) => t.title)}
                         onPick={(t) => { setDraft(t); composerRef.current?.focus(); }}
                       />
                     </div>

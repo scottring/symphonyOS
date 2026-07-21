@@ -47,12 +47,15 @@ const CONFIG: Record<WriteBucket, {
   },
 }
 
-export function ListSuggestions({ bucket, aboveItems, aboveLabel, onPick }: {
+export function ListSuggestions({ bucket, aboveItems, aboveLabel, existingItems = [], onPick }: {
   bucket: WriteBucket
   /** Titles of the level-above list — the fuel for the suggestions. */
   aboveItems: string[]
   /** Human label for the level above, e.g. "your season list". */
   aboveLabel: string
+  /** Titles already on THIS level (list, picks, bench) — suggestions must not
+   *  duplicate or near-duplicate these. */
+  existingItems?: string[]
   /** Fills the write input; the human edits and confirms. Never auto-adds. */
   onPick: (text: string) => void
 }) {
@@ -68,6 +71,10 @@ export function ListSuggestions({ bucket, aboveItems, aboveLabel, onPick }: {
         content:
           `I'm writing my ${cfg.periodLabel} list. For reference, here is ${aboveLabel}:\n` +
           aboveItems.map((t) => `- ${t}`).join('\n') + '\n\n' +
+          (existingItems.length > 0
+            ? `Already on my ${cfg.listName} list (do NOT suggest duplicates or near-duplicates of these):\n` +
+              existingItems.map((t) => `- ${t}`).join('\n') + '\n\n'
+            : '') +
           `Suggest 3 candidate ${cfg.sizeLabel} items for ${cfg.periodLabel} that move these forward: ` +
           `each ${cfg.rule}, specific, under 12 words. Draw from the list above but translate to the ` +
           `right grain — don't just copy a line verbatim. Return ONLY a JSON array of strings — no prose.`,
@@ -76,7 +83,7 @@ export function ListSuggestions({ bucket, aboveItems, aboveLabel, onPick }: {
         sessionContext: {
           horizon: cfg.horizon, periodLabel: cfg.periodLabel,
           stepId: 'write-list', stepTitle: `Write the ${cfg.listName}’s list`,
-          bucket, aboveTitles: aboveItems,
+          bucket, aboveTitles: aboveItems, listTitles: existingItems,
         },
         onDone: (reply) => {
           const parsed = parseSuggestions(reply).slice(0, 3)
@@ -87,7 +94,7 @@ export function ListSuggestions({ bucket, aboveItems, aboveLabel, onPick }: {
         onError: () => setState('error'),
       },
     )
-  }, [bucket, aboveItems, aboveLabel, cfg])
+  }, [bucket, aboveItems, aboveLabel, existingItems, cfg])
 
   // Nothing above to draw from → no helper (the blank page has no fuel yet).
   if (aboveItems.length === 0) return null

@@ -109,6 +109,7 @@ export function WriteListStep() {
           bucket={writeBucket}
           aboveItems={above.items}
           aboveLabel={above.label}
+          existingItems={pool.map((t) => t.title)}
           onPick={(t) => { setDraft(t); inputRef.current?.focus() }}
         />
       )}
