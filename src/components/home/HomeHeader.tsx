@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { ChevronLeft, ChevronRight, Sparkles, CalendarCheck } from 'lucide-react'
 import type { HomeViewType } from '@/types/homeView'
 import { HomeViewSwitcher } from '@/components/home/HomeViewSwitcher'
@@ -5,6 +6,7 @@ import { DomainSwitcher } from '@/components/domain/DomainSwitcher'
 import { DayNavCluster } from '@/components/schedule/DayNavCluster'
 import { mondayOfWeek } from '@/lib/workweekHelpers'
 import { useAppShellChrome } from '@/contexts/AppShellChromeContext'
+import { HorizonExplainer } from '@/components/planning/explainers/HorizonExplainer'
 
 interface HomeHeaderProps {
   currentView: HomeViewType
@@ -41,6 +43,10 @@ function formatDayShort(d: Date): string {
 export function HomeHeader(props: HomeHeaderProps) {
   const { currentView, viewedDate, onDateChange, weekStart, onWeekChange, monthStart, onMonthChange, onViewChange, onOpenWeeklyPlanning } = props
   const { chatOpen, onChatOpenChange } = useAppShellChrome()
+  // "What is this level?" — today's explainer. Link only, no first-visit
+  // auto-open: Today is the app's default view, so a modal on first launch
+  // would fight the empty state. Reachable via the link at any time.
+  const [explainerOpen, setExplainerOpen] = useState(false)
 
   // Per-view label + chevron handlers
   let label: { short: string; long: string }
@@ -129,6 +135,15 @@ export function HomeHeader(props: HomeHeaderProps) {
             <span>Plan the week</span>
           </button>
         )}
+        {currentView === 'today' && (
+          <button
+            type="button"
+            onClick={() => setExplainerOpen(true)}
+            className="text-[12px] text-neutral-400 hover:text-primary-700 transition-colors px-1"
+          >
+            What is this level?
+          </button>
+        )}
         <button
           onClick={() => onChatOpenChange(!chatOpen)}
           className={`w-9 h-9 rounded-full bg-bg-elevated border border-neutral-200 text-neutral-500 hover:text-primary-500 hover:border-primary-300 transition-all grid place-items-center shadow-card ${
@@ -144,6 +159,7 @@ export function HomeHeader(props: HomeHeaderProps) {
 
       {/* Hairline rule anchors the masthead and separates it from the content below */}
       <div className="hidden md:block mt-4 h-px bg-gradient-to-r from-neutral-200 to-transparent" />
+      <HorizonExplainer horizon="today" open={explainerOpen} onClose={() => setExplainerOpen(false)} />
     </header>
   )
 }

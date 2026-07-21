@@ -1,0 +1,15 @@
+/* Scene entry animation. Elements inside a vignette can use the staggered
+   .ex-drop / .ex-rise classes; scene container fades. */
+.explainer-scene { animation: ex-fade 400ms ease both; }
+.explainer-vignette .ex-drop { animation: ex-drop 600ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+.explainer-vignette .ex-rise { animation: ex-rise 500ms ease both; }
+.explainer-vignette [data-ex-delay='1'] { animation-delay: 200ms; }
+.explainer-vignette [data-ex-delay='2'] { animation-delay: 400ms; }
+.explainer-vignette [data-ex-delay='3'] { animation-delay: 600ms; }
+.explainer-vignette [data-ex-delay='4'] { animation-delay: 800ms; }
+@keyframes ex-fade { from { opacity: 0 } to { opacity: 1 } }
+@keyframes ex-drop { from { opacity: 0; transform: translateY(-16px) } to { opacity: 1; transform: translateY(0) } }
+@keyframes ex-rise { from { opacity: 0; transform: translateY(12px) } to { opacity: 1; transform: translateY(0) } }
+@media (prefers-reduced-motion: reduce) {
+  .explainer-scene, .explainer-vignette .ex-drop, .explainer-vignette .ex-rise { animation: none; }
+}

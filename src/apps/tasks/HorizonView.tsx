@@ -52,6 +52,7 @@ import { BetsGrid } from '@/components/planning/season/BetsGrid';
 import { OverflowTray } from '@/components/planning/season/OverflowTray';
 import { MonthStrip } from '@/components/planning/season/MonthStrip';
 import { FocusLine } from '@/components/planning/season/FocusLine';
+import { HorizonExplainer } from '@/components/planning/explainers/HorizonExplainer';
 import { usePlanningSession } from '@/hooks/usePlanningSession';
 import { guidedPeriod } from '@/components/planning/guided/periods';
 import { partitionBets, servingCount } from '@/lib/planning/betPulse';
@@ -279,6 +280,17 @@ export function HorizonView({ horizon }: HorizonViewProps) {
     [poolTitles, poolSourceIds, poolGoalIds],
   );
   const [refOpen, setRefOpen] = useState(false);
+  // "What is this level?" explainer — opens on demand via the link, and once
+  // automatically the first time a rung is visited (localStorage-gated so it
+  // never nags on return visits).
+  const [explainerOpen, setExplainerOpen] = useState(false);
+  useEffect(() => {
+    const key = `symphony.explainerSeen.${horizon}`;
+    if (!localStorage.getItem(key)) {
+      localStorage.setItem(key, '1');
+      setExplainerOpen(true);
+    }
+  }, [horizon]);
   // Year landscape: which month (0–11) is zoomed into, or null. The year grid
   // stays mounted underneath, so closing returns you to the landscape.
   const [zoomMonth, setZoomMonth] = useState<number | null>(null);
@@ -592,13 +604,17 @@ export function HorizonView({ horizon }: HorizonViewProps) {
                 </div>
               )}
             </div>
-            <div className="shrink-0 flex items-center gap-2">
+            <div className="shrink-0 flex flex-col items-end gap-1.5">
               <button
                 type="button"
                 onClick={() => navigate('/today?plan=year')}
                 className="inline-flex items-center gap-2 text-sm font-medium px-3 py-2 rounded-lg transition-colors text-primary-700 bg-primary-50 hover:bg-primary-100"
               >
                 <CalendarRange className="w-4 h-4" /> Plan the year
+              </button>
+              <button type="button" onClick={() => setExplainerOpen(true)}
+                className="text-[12px] text-neutral-400 hover:text-primary-700 transition-colors">
+                What is this level?
               </button>
             </div>
           </header>
@@ -687,6 +703,7 @@ export function HorizonView({ horizon }: HorizonViewProps) {
             </>
           )}
         </div>
+        <HorizonExplainer horizon="year" open={explainerOpen} onClose={() => setExplainerOpen(false)} />
       </div>
     );
   }
@@ -735,17 +752,23 @@ export function HorizonView({ horizon }: HorizonViewProps) {
                 </p>
               )}
             </div>
-            {!planDisabled && (
-              <button
-                type="button"
-                onClick={handlePlan}
-                title={`Plan the ${rungName}`}
-                className="shrink-0 inline-flex items-center gap-2 text-sm font-medium px-3 py-2 rounded-lg transition-colors text-primary-700 bg-primary-50 hover:bg-primary-100"
-              >
-                <CalendarRange className="w-4 h-4" />
-                Plan the {rungName}
+            <div className="shrink-0 flex flex-col items-end gap-1.5">
+              {!planDisabled && (
+                <button
+                  type="button"
+                  onClick={handlePlan}
+                  title={`Plan the ${rungName}`}
+                  className="inline-flex items-center gap-2 text-sm font-medium px-3 py-2 rounded-lg transition-colors text-primary-700 bg-primary-50 hover:bg-primary-100"
+                >
+                  <CalendarRange className="w-4 h-4" />
+                  Plan the {rungName}
+                </button>
+              )}
+              <button type="button" onClick={() => setExplainerOpen(true)}
+                className="text-[12px] text-neutral-400 hover:text-primary-700 transition-colors">
+                What is this level?
               </button>
-            )}
+            </div>
           </header>
 
           {/* The cascade rail — where this rung sits in the year → today flow. */}
@@ -1051,6 +1074,7 @@ export function HorizonView({ horizon }: HorizonViewProps) {
             )}
           </section>
         </div>
+        <HorizonExplainer horizon={horizon} open={explainerOpen} onClose={() => setExplainerOpen(false)} />
       </div>
     </ScheduleActionsProvider>
   );
