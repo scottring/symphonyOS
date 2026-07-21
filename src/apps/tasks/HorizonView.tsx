@@ -54,7 +54,7 @@ import { MonthStrip } from '@/components/planning/season/MonthStrip';
 import { FocusLine } from '@/components/planning/season/FocusLine';
 import { usePlanningSession } from '@/hooks/usePlanningSession';
 import { guidedPeriod } from '@/components/planning/guided/periods';
-import { partitionBets } from '@/lib/planning/betPulse';
+import { partitionBets, servingCount } from '@/lib/planning/betPulse';
 import { looksLikeActivity } from '@/lib/planning/outcomeCoach';
 import type { Task } from '@/types/task';
 import type { Goal } from '@/types/goal';
@@ -773,6 +773,14 @@ export function HorizonView({ horizon }: HorizonViewProps) {
                 embedded
               />
             </div>
+          )}
+
+          {/* Month identity line — framing for moves (concrete chunks) */}
+          {horizon === 'month' && (
+            <p className="mb-3 text-[12px] text-neutral-400">
+              Moves — concrete chunks that fit in a sitting; 10–15 is a good month.
+              {(() => { const s = servingCount(domainTasks); return s.total > 0 ? ` Serving ${s.serving} of ${s.total} bets.` : ''; })()}
+            </p>
           )}
 
           {/* Month as a real calendar grid — the month's big rocks placed on
