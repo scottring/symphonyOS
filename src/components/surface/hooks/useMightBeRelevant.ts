@@ -9,6 +9,8 @@ export interface MightBeRelevantData {
 const STOPWORDS = new Set([
   'the', 'a', 'an', 'and', 'or', 'but', 'to', 'of', 'in', 'on', 'at', 'for', 'with',
   'about', 'call', 'email', 'text', 'send', 'get', 'go', 'do', 'is', 'are',
+  // Family-app noise: these words appear in half the tasks and prove nothing.
+  'make', 'plan', 'new', 'set', 'buy', 'find', 'family', 'kids', 'together',
 ])
 
 function tokenize(s: string | undefined): Set<string> {
@@ -27,6 +29,11 @@ function intersect<T>(a: Set<T>, b: Set<T>): T[] {
   return out
 }
 
+// Relevance = a REAL shared thread, strongest first: the same goal's cascade,
+// the same project, the same contact, or overlapping content words. "Assigned
+// to the same person" is deliberately NOT a signal — in a household of four it
+// matches everything (couch cushions surfaced on "Wills signed"), and a wrong
+// suggestion costs more trust than an empty section. No matches → no section.
 export function useMightBeRelevant(target: Task, data: MightBeRelevantData): MightBeRelevantItem[] {
   return useMemo(() => {
     const out: MightBeRelevantItem[] = []
@@ -34,7 +41,31 @@ export function useMightBeRelevant(target: Task, data: MightBeRelevantData): Mig
 
     const targetTokens = new Set([...tokenize(target.title), ...tokenize(target.notes)])
 
-    // 1) same contact — both are explicitly about the same person; the cleanest signal.
+    // 1) same goal thread — the cascade explicitly links them (goalId stamp or
+    //    a copy-down lineage in either direction).
+    for (const t of data.allTasks) {
+      if (seen.has(t.id)) continue
+      const sharedGoal = !!target.goalId && t.goalId === target.goalId
+      const lineage = t.sourceId === target.id || target.sourceId === t.id
+      if (sharedGoal || lineage) {
+        out.push({ id: t.id, kind: 'task', title: t.title, completed: t.completed, reason: lineage ? 'same thread' : 'same goal' })
+        seen.add(t.id)
+      }
+    }
+
+    // 2) same project — they belong to the same body of work.
+    if (target.projectId) {
+      for (const t of data.allTasks) {
+        if (seen.has(t.id)) continue
+        if (t.projectId === target.projectId) {
+          out.push({ id: t.id, kind: 'task', title: t.title, completed: t.completed, reason: 'same project' })
+          seen.add(t.id)
+        }
+      }
+    }
+
+    // 3) same contact — both are explicitly ABOUT the same person (contactId,
+    //    not assignee: "who it's about" carries meaning; "who does it" doesn't).
     if (target.contactId) {
       for (const t of data.allTasks) {
         if (seen.has(t.id)) continue
@@ -45,35 +76,25 @@ export function useMightBeRelevant(target: Task, data: MightBeRelevantData): Mig
       }
     }
 
-    // 2) keyword overlap in title or notes — likely about the same thing. Ranked
-    //    above same-assignee because content match is a far better relatedness
-    //    signal than "happens to be assigned to the same person" (Scott's
-    //    complaint was that the list surfaced unrelated tasks).
+    // 4) keyword overlap in title or notes — likely about the same thing.
+    //    Ranked by overlap size so two shared words beat one.
     if (targetTokens.size > 0) {
+      const keyword: Array<MightBeRelevantItem & { overlapCount: number }> = []
       for (const t of data.allTasks) {
         if (seen.has(t.id)) continue
         const candidateTokens = new Set([...tokenize(t.title), ...tokenize(t.notes)])
         const overlap = intersect(targetTokens, candidateTokens)
         if (overlap.length > 0) {
-          out.push({
+          keyword.push({
             id: t.id, kind: 'task', title: t.title, completed: t.completed,
             reason: `matches "${overlap[0]}"`,
+            overlapCount: overlap.length,
           })
           seen.add(t.id)
         }
       }
-    }
-
-    // 3) same assignee / for-person — weakest signal (everything assigned to one
-    //    person matches), so it's last AND limited to OPEN tasks to avoid noise.
-    if (target.assignedTo) {
-      for (const t of data.allTasks) {
-        if (seen.has(t.id)) continue
-        if (t.assignedTo === target.assignedTo && !t.completed) {
-          out.push({ id: t.id, kind: 'task', title: t.title, completed: false, reason: 'same person' })
-          seen.add(t.id)
-        }
-      }
+      keyword.sort((a, b) => b.overlapCount - a.overlapCount)
+      out.push(...keyword.map(({ overlapCount: _oc, ...item }) => item))
     }
 
     // Float open items above completed ones (stable within each group).
