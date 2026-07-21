@@ -268,6 +268,20 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
         </div>
       )}
 
+      {/* Explicit save affordance — edits persist as you make them, but a
+          panel with no button reads as "did that stick?" */}
+      <div className="mt-4 flex items-center justify-between gap-3">
+        <span className="text-xs text-neutral-400">Changes save as you edit</span>
+        <button
+          type="button"
+          onClick={props.onClose}
+          className="rounded-xl bg-[var(--color-primary-500,#3d5a44)] px-4 py-2 text-sm font-medium text-white
+                     hover:opacity-90 transition-opacity"
+        >
+          Save & close
+        </button>
+      </div>
+
       <PanelFooter
         createdAt={new Date(routine.created_at)}
         updatedAt={new Date(routine.updated_at)}

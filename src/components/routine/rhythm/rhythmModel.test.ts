@@ -58,6 +58,15 @@ describe('buildRhythmModel bucketing', () => {
     expect(m.week.sometime.map(r => r.id)).toEqual(['w'])
   })
 
+  it('derives the day column from start_date when weekly days are empty', () => {
+    // 2026-07-25 is a Saturday — the real "library every 2 weeks" shape.
+    const m = buildRhythmModel([
+      mk({ id: 'lib', recurrence_pattern: { type: 'weekly', days: [], interval: 2, start_date: '2026-07-25' } }),
+    ])
+    expect(m.week.days.sat.map(r => r.id)).toEqual(['lib'])
+    expect(m.week.sometime).toHaveLength(0)
+  })
+
   it('puts monthly/yearly/specific_days into sometimes', () => {
     const m = buildRhythmModel([
       mk({ id: 'mo', recurrence_pattern: { type: 'monthly', day_of_month: 1 } }),

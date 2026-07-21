@@ -114,8 +114,16 @@ export function buildRhythmModel(
     } else if (zone === 'week') {
       const days = (routine.recurrence_pattern.days ?? []) as DayKey[]
       const valid = days.filter(d => DAY_ORDER.includes(d))
-      if (valid.length === 0) model.week.sometime.push(routine)
-      else for (const d of valid) model.week.days[d].push(routine)
+      if (valid.length > 0) {
+        for (const d of valid) model.week.days[d].push(routine)
+      } else {
+        // No days listed — derive the weekday from start_date when present
+        // (biweekly patterns often carry only interval + start_date).
+        const sd = routine.recurrence_pattern.start_date
+        const derived = sd ? DAY_ORDER[new Date(`${sd}T00:00:00`).getDay()] : undefined
+        if (derived) model.week.days[derived].push(routine)
+        else model.week.sometime.push(routine)
+      }
     } else {
       model.sometimes.push(routine)
     }
