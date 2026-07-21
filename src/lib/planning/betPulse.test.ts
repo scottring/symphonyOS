@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { partitionBets, betPulse, servingCount, goalChapters, BET_CAP } from './betPulse'
+import { partitionBets, betPulse, servingCount, goalChapters, wonBets, BET_CAP } from './betPulse'
 import type { Task } from '@/types/task'
 
 let n = 0
@@ -61,6 +61,29 @@ describe('servingCount', () => {
     const starved = task({ bucket: 'quarter' })
     const move = task({ bucket: 'month', sourceId: fed.id })
     expect(servingCount([fed, starved, move], NOW)).toEqual({ serving: 1, total: 2 })
+  })
+})
+
+describe('wonBets', () => {
+  it('includes a completed quarter task created this season', () => {
+    const won = task({ bucket: 'quarter', completed: true, createdAt: new Date(2026, 6, 5) })
+    expect(wonBets([won], NOW)).toEqual([won])
+  })
+
+  it('excludes a completed quarter task created in a past season', () => {
+    const wonLastSeason = task({ bucket: 'quarter', completed: true, createdAt: new Date(2026, 3, 5) }) // Spring
+    expect(wonBets([wonLastSeason], NOW)).toEqual([])
+  })
+
+  it('excludes open (incomplete) quarter tasks', () => {
+    const open = task({ bucket: 'quarter', completed: false, createdAt: new Date(2026, 6, 5) })
+    expect(wonBets([open], NOW)).toEqual([])
+  })
+
+  it('excludes rows with an unparsable createdAt instead of throwing', () => {
+    const bad = task({ bucket: 'quarter', completed: true, createdAt: 'not-a-date' as unknown as Date })
+    expect(() => wonBets([bad], NOW)).not.toThrow()
+    expect(wonBets([bad], NOW)).toEqual([])
   })
 })
 

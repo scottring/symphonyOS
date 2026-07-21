@@ -35,13 +35,14 @@ import { useCalendarDomainMappings } from '@/hooks/useCalendarDomainMappings';
 import { useListsContext } from '@/contexts/ListsContext';
 import { ScheduleActionsProvider, type ScheduleActionsValue } from '@/contexts/ScheduleActionsContext';
 import { useUndo } from '@/hooks/useUndo';
+import { UndoToast } from '@/components/undo/UndoToast';
 import { useSelection } from '@/shell/providers/SelectionProvider';
 import { DenseInboxRow } from '@/components/schedule/DenseInboxRow';
 import { TriageWhenMenu, type TriageWhen } from '@/components/schedule/TriageWhenMenu';
 import { selectOverdue } from '@/lib/today/taskPools';
 import { selectHorizonPool, selectPlacedInWeek, HORIZONS, type HorizonId } from '@/lib/today/horizons';
 import { readCadenceConfig, weekStartAnchor } from '@/lib/cadence/config';
-import { matchesDomain, filterEventsForDomain } from '@/lib/today/domainFilter';
+import { matchesDomain, filterEventsForDomain, domainSessionToken } from '@/lib/today/domainFilter';
 import { makeAssigneeFilter } from '@/lib/today/assigneeFilter';
 import { useConvertTaskToProject } from '@/hooks/useConvertTaskToProject';
 import { applyTriageWhen } from '@/lib/triage/applyWhen';
@@ -252,10 +253,16 @@ export function HorizonView({ horizon }: HorizonViewProps) {
   // default (this level's own list leads the page); auto-open on a blank
   // slate, where the level above is the invitation.
   const { areas, goals } = useGoalsContext();
-  // Season focus line — persisted in the shared planning_sessions notes row
-  // for this season (key seasonFocus), same row the wizard writes.
+  // Season focus line — persisted in the per-domain planning_sessions notes
+  // row for this season (key seasonFocus), the SAME row the wizard writes
+  // (GuidedSession keys off domainSessionToken(period.token, domain), not the
+  // bare token) — otherwise the focus line reads/writes a different row than
+  // the domain the wizard actually ran in, and the line silently reverts.
   const seasonToken = useMemo(() => guidedPeriod('seasonal').token, []);
-  const { notes: seasonNotes, patchNotes: patchSeasonNotes } = usePlanningSession('seasonal', seasonToken);
+  const { notes: seasonNotes, patchNotes: patchSeasonNotes } = usePlanningSession(
+    'seasonal',
+    domainSessionToken(seasonToken, currentDomain),
+  );
   // Reference rows carry their lineage payload so "Copy down" threads the
   // cascade: a month copy records its season source; a season line created
   // from a goal records the goal itself.
@@ -409,6 +416,30 @@ export function HorizonView({ horizon }: HorizonViewProps) {
 
   // Expand a task into a new project (subtasks absorbed, parent task deleted).
   const handleConvertTaskToProject = useConvertTaskToProject(tasks, { addProject, updateTask, deleteTask });
+
+  // Overflow tray "Let it go" — a delete, but not a silent one. Mirrors the
+  // standard undo pattern (useUndo.pushAction + UndoToast, same as the rest
+  // of this page's schedule actions): capture the task's fields before the
+  // delete lands, then undo recreates it from that snapshot. deleteTask
+  // itself has no undo primitive (unlike toggleTask, which reverts via an
+  // explicit updateTask), so recreation is the only way back.
+  const handleLetGo = useCallback((id: string) => {
+    const task = tasks.find((t) => t.id === id);
+    void deleteTask(id);
+    if (!task) return;
+    undo.pushAction(`Deleted "${task.title}"`, () => {
+      void addTask(task.title, task.contactId, task.projectId, task.scheduledFor, {
+        bucket: task.bucket,
+        context: task.context ?? undefined,
+        assignedTo: task.assignedTo ?? null,
+        assignedToAll: task.assignedToAll,
+        goalId: task.goalId,
+        sourceId: task.sourceId,
+        phoneNumber: task.phoneNumber,
+        isFun: task.isFun,
+      });
+    });
+  }, [tasks, deleteTask, addTask, undo.pushAction]);
 
   const scheduleActionsValue = useMemo<ScheduleActionsValue>(
     () => ({
@@ -849,7 +880,7 @@ export function HorizonView({ horizon }: HorizonViewProps) {
                 items={partitionBets(domainTasks).overflow}
                 onMakeMove={(id) => updateTask(id, { bucket: 'month' })}
                 onShelf={(id) => updateTask(id, { bucket: 'someday' })}
-                onLetGo={(id) => { void deleteTask(id); }}
+                onLetGo={handleLetGo}
               />
               <MonthStrip tasks={domainTasks} onOpenMonth={() => navigate('/month')} />
             </div>
@@ -1097,6 +1128,7 @@ export function HorizonView({ horizon }: HorizonViewProps) {
           </section>
         </div>
         <HorizonExplainer horizon={horizon} open={explainerOpen} onClose={() => setExplainerOpen(false)} />
+        <UndoToast action={undo.currentAction} onUndo={undo.executeUndo} onDismiss={undo.dismiss} />
       </div>
     </ScheduleActionsProvider>
   );

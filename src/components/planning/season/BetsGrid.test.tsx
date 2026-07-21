@@ -25,6 +25,19 @@ describe('BetsGrid', () => {
     expect(screen.getByText(/Financial calm/)).toBeInTheDocument()
     expect(screen.getByText(/nothing this month/i)).toBeInTheDocument()
   })
+
+  it('still renders a completed bet from this season instead of making it vanish', () => {
+    render(
+      <BetsGrid
+        tasks={[bet('b1', 'A won bet this season', { completed: true })]}
+        goalsById={new Map()}
+        onSelect={vi.fn()}
+        onComplete={vi.fn()}
+        now={new Date(2026, 6, 20)}
+      />,
+    )
+    expect(screen.getByText('A won bet this season')).toBeInTheDocument()
+  })
 })
 
 describe('OverflowTray', () => {

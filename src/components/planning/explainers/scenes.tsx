@@ -85,10 +85,12 @@ function ShelvedGoal() {
   )
 }
 
-// A dot cap counter — "five to eight, never more" (season scene 2). Only
-// vignette carrying digits, deliberately, so the count reads as a shape, not
-// a rule.
-function CapCounter() {
+// A dot cap counter — "five to eight, never more" (season scene 2), reused
+// by the month script's own cap beat with a month-appropriate caption (the
+// dot shape communicates "there's a ceiling"; the words say whose ceiling).
+// Only vignette carrying digits, deliberately, so the count reads as a
+// shape, not a rule.
+function CapCounter({ caption = '5–8 bets a season' }: { caption?: string }) {
   return (
     <div className="flex flex-col items-center gap-2 ex-rise">
       <div className="flex items-center gap-1">
@@ -96,7 +98,7 @@ function CapCounter() {
           <span key={i} className={`w-2.5 h-2.5 rounded-full ${i < 5 ? 'bg-primary-500' : 'bg-primary-200'}`} />
         ))}
       </div>
-      <span className="text-xs font-semibold text-neutral-500">5–8 bets a season</span>
+      <span className="text-xs font-semibold text-neutral-500">{caption}</span>
     </div>
   )
 }
@@ -283,7 +285,7 @@ export const EXPLAINER_SCENES: Record<HorizonId, Scene[]> = {
     {
       headline: '10–15 is a good month.',
       body: "A shorter list you believe beats a long one you ignore.",
-      vignette: <CapCounter />,
+      vignette: <CapCounter caption="10–15 moves a month" />,
     },
   ],
   week: [

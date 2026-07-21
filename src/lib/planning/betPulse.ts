@@ -17,6 +17,21 @@ export function partitionBets(tasks: readonly Task[]): { bets: Task[]; overflow:
   return { bets: open.slice(0, BET_CAP), overflow: open.slice(BET_CAP) }
 }
 
+/** Completed bets from the CURRENT season only — a bet doesn't vanish from
+ *  /season the moment it's won, it stays visible (with won styling) through
+ *  the season it was won in. Scoped by createdAt's season, not completion
+ *  date (bets don't carry a completedAt); a NaN createdAt (malformed row)
+ *  is excluded rather than crashing the season-start comparison. */
+export function wonBets(tasks: readonly Task[], now: Date = new Date()): Task[] {
+  const currentSeason = seasonStart(now).getTime()
+  return tasks.filter((t) => {
+    if (!t.completed || t.bucket !== 'quarter') return false
+    const created = new Date(t.createdAt)
+    if (Number.isNaN(created.getTime())) return false
+    return seasonStart(created).getTime() === currentSeason
+  })
+}
+
 /** A task "threads to" a bet when it is its copy-down child (sourceId) or
  *  serves the same goal (goalId) — the same lineage stamps copy-down writes. */
 export function threadsToBet(bet: Task, t: Task): boolean {

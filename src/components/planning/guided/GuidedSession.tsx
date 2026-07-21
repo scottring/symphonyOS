@@ -20,6 +20,22 @@ import { GuideChat } from './GuideChat'
 import { GuidedScene } from './GuidedScene'
 import { placeAt } from './altitude'
 import type { StepType } from './types'
+import { HorizonExplainer } from '@/components/planning/explainers/HorizonExplainer'
+import { EXPLAINER_SCENES } from '@/components/planning/explainers/scenes'
+import type { HorizonId } from '@/lib/today/horizons'
+
+// Entry point (c) of the explainer spec: the wizard's own "What is this
+// level?" link, shown only on the welcome (first, narration) step — the
+// same script HorizonView's rung page opens, so the two entry points teach
+// identically. This session's `horizon` (daily/weekly/monthly/…) maps onto
+// the rung's HorizonId (today/week/month/…) that keys EXPLAINER_SCENES.
+const EXPLAINER_HORIZON: Record<PlanningHorizon, HorizonId> = {
+  annual: 'year',
+  seasonal: 'season',
+  monthly: 'month',
+  weekly: 'week',
+  daily: 'today',
+}
 
 const REGISTRY: Partial<Record<StepType, ComponentType>> = {}
 export function registerStepType(type: StepType, component: ComponentType) {
@@ -60,6 +76,11 @@ export function GuidedSession({ horizon, domain, host, onClose, onFinished, onCh
   // period → the next one), with a header toggle to pin the other candidate.
   const [targetChoice, setTargetChoice] = useState<GuidedTargetChoice>('auto')
   const target = useMemo(() => resolveGuidedTarget(horizon, targetChoice), [horizon, targetChoice])
+  // "What is this level?" explainer — on-demand only (no auto-open, no
+  // localStorage; HorizonView's rung page already owns the first-visit nudge).
+  const [explainerOpen, setExplainerOpen] = useState(false)
+  const explainerHorizon = EXPLAINER_HORIZON[horizon]
+  const hasExplainer = (EXPLAINER_SCENES[explainerHorizon]?.length ?? 0) > 0
   const period = target.period
   const { notes, patchNotes, loading } = usePlanningSession(horizon, domainSessionToken(period.token, domain))
 
@@ -244,6 +265,13 @@ export function GuidedSession({ horizon, domain, host, onClose, onFinished, onCh
                 </div>
                 <h2 className="font-display text-4xl md:text-[44px] leading-[1.06] tracking-tight text-neutral-800 mb-4">{step.title}</h2>
                 <p className="text-lg leading-relaxed text-neutral-600 max-w-[58ch]">{narrationText}</p>
+                {/* Entry point (c): visible only on the welcome step. */}
+                {safeIndex === 0 && step.type === 'narration' && hasExplainer && (
+                  <button type="button" onClick={() => setExplainerOpen(true)}
+                    className="mt-2 text-[12px] text-neutral-400 hover:text-primary-700 transition-colors">
+                    What is this level?
+                  </button>
+                )}
               </div>
               <GuidedProvider value={{
                 horizon, domain, periodToken: period.token, periodLabel: period.label,
@@ -295,6 +323,7 @@ export function GuidedSession({ horizon, domain, host, onClose, onFinished, onCh
           )}
         </div>
       </footer>
+      <HorizonExplainer horizon={explainerHorizon} open={explainerOpen} onClose={() => setExplainerOpen(false)} />
     </div>
   )
 }
