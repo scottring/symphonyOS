@@ -85,7 +85,8 @@ export function servingCount(tasks: readonly Task[], now: Date = new Date()): { 
 
 export function goalChapters(goalId: string, tasks: readonly Task[]) {
   return tasks
-    .filter((t) => t.bucket === 'quarter' && t.goalId === goalId)
+    // The NaN skip guards seasonStart, which never terminates on Invalid Date.
+    .filter((t) => t.bucket === 'quarter' && t.goalId === goalId && !Number.isNaN(new Date(t.createdAt).getTime()))
     .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
     .map((bet) => {
       const created = new Date(bet.createdAt)

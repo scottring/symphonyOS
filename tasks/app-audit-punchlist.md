@@ -90,6 +90,8 @@ Account: `symphonygoals@gmail.com` — reset to true zero (onboarding cleared) 2
 - BookNextStep: calendar-connected branch now has the same same-day dedup as the task branch (event stacking).
 - Still deliberately open: Season grid (paused for Scott's visual direction).
 
+**Season bets + horizon explainers SHIPPED 2026-07-20** (spec + plan in docs/superpowers/): season page = focus line + bet cards (goal chips, per-month pulse, starving warning, won cards) + overflow tray (make-move/shelf/let-go w/ undo) + month strip; wizard write step = bets writer w/ cap counter + coach; month identity line + serving count; goal Chapters strip; animated explainers on all five horizons (first-visit auto-open, wizard welcome link); AI Sharpen for bet phrasing. PENDING Scott's visual gate: /season with his real 19-item list + one explainer run-through. Deferred (rolled follow-up): a11y pass (dialog labelledby/focus, BetCard Space key), MonthStrip any-bucket counting nuance, undo snapshot-lossiness on tray delete.
+
 **Findings:**
 
 ---
