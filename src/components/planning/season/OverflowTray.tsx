@@ -1,12 +1,14 @@
 import { useState } from 'react'
-import { Star, CornerRightDown, Archive, Trash2, Repeat } from 'lucide-react'
+import { Star, CornerRightDown, Archive, Trash2, Repeat, ChevronRight } from 'lucide-react'
 import type { Task } from '@/types/task'
 import { PICK_CAP } from '@/lib/planning/betPulse'
 
 /** The bench: open quarter items that aren't picks. Every row can be promoted
  *  ("Pick it") — at the cap, promoting expands an inline swap picker so one
- *  gesture replaces a current pick. The other exits re-grade or retire. */
-export function OverflowTray({ items, picks, onPick, onSwap, onMakeMove, onShelf, onLetGo }: {
+ *  gesture replaces a current pick. The other exits re-grade or retire.
+ *  `collapsible` renders it as a closed drawer (season-spread bottom) —
+ *  subordinate by interaction, not just by muting. */
+export function OverflowTray({ items, picks, onPick, onSwap, onMakeMove, onShelf, onLetGo, collapsible = false }: {
   items: readonly Task[]
   /** Current picks, for the at-cap swap picker. */
   picks: readonly Task[]
@@ -16,13 +18,33 @@ export function OverflowTray({ items, picks, onPick, onSwap, onMakeMove, onShelf
   onMakeMove: (id: string) => void
   onShelf: (id: string) => void
   onLetGo: (id: string) => void
+  collapsible?: boolean
 }) {
   const [swapFor, setSwapFor] = useState<string | null>(null)
+  const [open, setOpen] = useState(!collapsible)
   if (items.length === 0) return null
   const atCap = picks.length >= PICK_CAP
   return (
-    <section className="mt-8 pt-6 border-t border-neutral-200/70">
-      <h3 className="text-sm font-medium text-neutral-500">On the bench ({items.length})</h3>
+    <section className="mt-10 pt-4 border-t border-neutral-200/70">
+      {collapsible ? (
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          aria-expanded={open}
+          className="w-full flex items-center gap-2 py-1 text-left group"
+        >
+          <ChevronRight aria-hidden="true" className={`w-4 h-4 text-neutral-400 shrink-0 transition-transform ${open ? 'rotate-90' : ''}`} />
+          <span className="text-sm font-medium text-neutral-500 group-hover:text-neutral-700 transition-colors">
+            On the bench ({items.length})
+          </span>
+          {!open && (
+            <span className="text-[12px] text-neutral-400">— waiting for a slot, a month, or a decision</span>
+          )}
+        </button>
+      ) : (
+        <h3 className="text-sm font-medium text-neutral-500">On the bench ({items.length})</h3>
+      )}
+      {!open ? null : (<>
       <p className="text-[12px] text-neutral-400 mt-0.5 mb-3">
         A season holds 5–8 picks. Pick one up, turn it into a month move, shelf it, or let it go.
       </p>
@@ -73,6 +95,7 @@ export function OverflowTray({ items, picks, onPick, onSwap, onMakeMove, onShelf
           </li>
         ))}
       </ul>
+      </>)}
     </section>
   )
 }

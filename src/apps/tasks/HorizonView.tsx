@@ -389,6 +389,7 @@ export function HorizonView({ horizon }: HorizonViewProps) {
 
   // Inline add-a-task draft for the pool section.
   const [draft, setDraft] = useState('');
+  const composerRef = useRef<HTMLInputElement>(null);
   const { sharpen: sharpenBet, loading: sharpenBetLoading } = useSharpenBet();
   const submitDraft = useCallback(async () => {
     const title = draft.trim();
@@ -770,6 +771,111 @@ export function HorizonView({ horizon }: HorizonViewProps) {
   const rungName = label.replace(/^This /, '').toLowerCase();
   const isCascadeRung = horizon !== 'someday';
 
+  // The level above, for reference — folded into one quiet line. Rendered
+  // below the grid on Month; inside the right rail on Season (the season
+  // spread places sources beside the composer, not under the picks).
+  const referenceFold = referenceItems.length > 0 ? (
+            <section className="mb-8">
+              <button
+                type="button"
+                onClick={() => setRefOpen((v) => !v)}
+                aria-expanded={refOpen}
+                className="w-full flex items-center gap-2 rounded-xl border border-primary-100 bg-primary-50/30 px-4 py-3 text-left hover:bg-primary-50/60 transition-colors"
+              >
+                <Target className="w-4 h-4 text-primary-500 shrink-0" />
+                <span className="flex-1 min-w-0 text-sm text-neutral-700">
+                  <span className="font-medium">{referenceLabel}</span>
+                  <span className="text-neutral-400"> — {referenceItems.length} for reference</span>
+                </span>
+                <ChevronRight className={`w-4 h-4 text-neutral-400 shrink-0 transition-transform ${refOpen ? 'rotate-90' : ''}`} />
+              </button>
+              {refOpen && (
+                <ul className="mt-3 space-y-1 rounded-xl border border-neutral-100 bg-white px-4 py-3">
+                  {referenceItems.map((it) => {
+                    {/* Goals don't copy verbatim — a year-sized sentence must be
+                        translated into a season-sized move first (the inline
+                        prompt). Season→month task copies stay one-tap: the
+                        grains are adjacent. */}
+                    if (translatingRefId === it.id) {
+                      return (
+                        <li key={it.id} className="rounded-lg bg-primary-50/60 border border-primary-200 px-3 py-2 my-1">
+                          <p className="text-xs text-primary-800 mb-1.5">
+                            What's the first <span className="font-semibold">season-sized</span> move on “{it.title}”? An outcome you can finish this season.
+                          </p>
+                          <div className="flex items-center gap-2">
+                            <input type="text" autoFocus value={refDraft}
+                              placeholder="An outcome finishable this season — the goal stays on the shelf…"
+                              onChange={(e) => setRefDraft(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' && refDraft.trim()) {
+                                  void onCreateTaskFromValue(refDraft.trim(), it.lineage);
+                                  setTranslatingRefId(null);
+                                }
+                                if (e.key === 'Escape') setTranslatingRefId(null);
+                              }}
+                              className="flex-1 min-w-0 text-sm bg-white border border-primary-200 rounded-md px-2.5 py-1.5 focus:outline-none focus:border-primary-400"
+                            />
+                            <button type="button" disabled={!refDraft.trim()}
+                              onClick={() => { void onCreateTaskFromValue(refDraft.trim(), it.lineage); setTranslatingRefId(null); }}
+                              className="shrink-0 text-xs font-semibold px-2.5 py-1.5 rounded-md text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-40 transition-colors">
+                              Add to season
+                            </button>
+                            <button type="button" onClick={() => setTranslatingRefId(null)} aria-label="Cancel"
+                              className="shrink-0 text-xs px-1.5 py-1.5 text-neutral-400 hover:text-neutral-600">✕</button>
+                          </div>
+                          <SeasonMoveSuggestions goalName={it.title} onPick={setRefDraft} />
+                        </li>
+                      );
+                    }
+                    return (
+                    <li key={it.id} className="flex items-center gap-3 py-1">
+                      {it.goalId ? (
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/goals/${it.goalId}`)}
+                          className="flex-1 min-w-0 text-left text-sm text-neutral-800 truncate hover:text-primary-700 transition-colors"
+                        >
+                          {it.title}
+                        </button>
+                      ) : (
+                        <span className="flex-1 min-w-0 text-sm text-neutral-800 truncate">{it.title}</span>
+                      )}
+                      {isOnThisList(it) ? (
+                        <span className="shrink-0 inline-flex items-center gap-1 text-xs text-primary-700">
+                          <Check className="w-3 h-3" strokeWidth={3} /> on this list
+                        </span>
+                      ) : it.goalId ? (
+                        <button
+                          type="button"
+                          onClick={() => { setTranslatingRefId(it.id); setRefDraft(''); }}
+                          title="Start this goal this season — translate it into a season-sized move"
+                          className="shrink-0 inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-md text-primary-700 bg-primary-50 hover:bg-primary-100 transition-colors"
+                        >
+                          <Plus className="w-3 h-3" /> Start this season
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => void onCreateTaskFromValue(it.title, it.lineage)}
+                          title="Copy onto this list (stays on the list above too)"
+                          className="shrink-0 inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-md text-primary-700 bg-primary-50 hover:bg-primary-100 transition-colors"
+                        >
+                          <Plus className="w-3 h-3" /> Copy down
+                        </button>
+                      )}
+                    </li>
+                    );
+                  })}
+                  {horizon === 'season' && (
+                    <li className="pt-1.5 mt-1 border-t border-neutral-100 text-[11px] text-neutral-400 italic">
+                      Goals you don't start stay on the shelf — every seasonal session offers them again.
+                    </li>
+                  )}
+                </ul>
+              )}
+            </section>
+  ) : null;
+
   return (
     <ScheduleActionsProvider value={scheduleActionsValue}>
       <div className="h-full overflow-y-auto">
@@ -879,27 +985,91 @@ export function HorizonView({ horizon }: HorizonViewProps) {
           {/* Season — picks and a shape (spec 2026-07-20, revised 2026-07-21:
               picking is EXPLICIT). Focus line, the chosen picks as cards, the
               bench below a hard divider, the season's three months. */}
+          {/* Season — the season spread (design pass 2026-07-21). One dominant
+              panel (the picks, with the cap rendered as ARCHITECTURE: eight
+              positions, open slots visible), a quiet right rail (the three
+              months, the goals to draw from, the composer), and the bench as
+              a collapsed drawer at the very bottom. */}
           {horizon === 'season' && (() => {
             const { picks, bench } = partitionSeason(domainTasks);
             return (
-            <div className="mb-8 space-y-6">
-              <FocusLine
-                value={(seasonNotes.seasonFocus as string) ?? ''}
-                onChange={(v) => patchSeasonNotes({ seasonFocus: v })}
-              />
-              <section>
-                <h2 className="font-display text-sm tracking-wide text-neutral-400 uppercase mb-3">
-                  The season's picks · {picks.length} of {PICK_CAP}
-                </h2>
-                <BetsGrid
-                  tasks={domainTasks}
-                  goalsById={goalsById}
-                  onSelect={handleSelect}
-                  onComplete={(id) => toggleTask(id)}
-                  onDemote={(id) => updateTask(id, { pickedAt: undefined })}
+            <div className="mb-8">
+              {/* Epigraph — the focus line closes the masthead. */}
+              <div className="mb-10">
+                <FocusLine
+                  value={(seasonNotes.seasonFocus as string) ?? ''}
+                  onChange={(v) => patchSeasonNotes({ seasonFocus: v })}
                 />
-              </section>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+                {/* The picks — the page's one dominant read. */}
+                <section className="lg:col-span-7">
+                  <h2 className="font-display text-sm tracking-wide text-neutral-400 uppercase mb-4">
+                    The season's picks
+                  </h2>
+                  <BetsGrid
+                    tasks={domainTasks}
+                    goalsById={goalsById}
+                    onSelect={handleSelect}
+                    onComplete={(id) => toggleTask(id)}
+                    onDemote={(id) => updateTask(id, { pickedAt: undefined })}
+                    onSlotClick={() => composerRef.current?.focus()}
+                  />
+                </section>
+
+                {/* The rail — supporting cast in reading order: the season's
+                    shape, the sources, the way in. */}
+                <aside className="lg:col-span-5 space-y-8 lg:border-l lg:border-neutral-200/70 lg:pl-10">
+                  <div>
+                    <h3 className="font-display text-sm tracking-wide text-neutral-400 uppercase mb-3">The three months</h3>
+                    <MonthStrip tasks={domainTasks} onOpenMonth={() => navigate('/month')} orientation="column" />
+                  </div>
+                  {referenceFold && <div>{referenceFold}</div>}
+                  <div>
+                    <h3 className="font-display text-sm tracking-wide text-neutral-400 uppercase mb-3">Add an outcome</h3>
+                    <div className="flex items-center gap-2 px-2 py-1.5 rounded-xl border border-neutral-200 bg-white focus-within:border-primary-400 transition-colors">
+                      <button
+                        type="button"
+                        onClick={() => void submitDraft()}
+                        aria-label="Add outcome"
+                        className="shrink-0 w-6 h-6 rounded-full bg-primary-600 text-white grid place-items-center hover:bg-primary-700 transition-colors"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </button>
+                      <input
+                        ref={composerRef}
+                        type="text"
+                        value={draft}
+                        onChange={(e) => setDraft(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') void submitDraft() }}
+                        placeholder="Finishable by season's end…"
+                        className="flex-1 min-w-0 text-sm bg-transparent placeholder:text-neutral-400 focus:outline-none"
+                      />
+                    </div>
+                    {looksLikeActivity(draft) && (
+                      <p className="text-[11px] text-amber-700 mt-1.5 inline-flex items-center gap-1.5">
+                        Picks read best as outcomes — "Will drafted and signed".
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const suggestion = await sharpenBet(draft);
+                            if (suggestion) setDraft(suggestion);
+                          }}
+                          disabled={sharpenBetLoading}
+                          className="inline-flex items-center gap-1 font-medium text-primary-600 hover:text-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        >
+                          <Sparkles className="w-3 h-3" />
+                          {sharpenBetLoading ? 'Sharpening…' : 'Sharpen'}
+                        </button>
+                      </p>
+                    )}
+                  </div>
+                </aside>
+              </div>
+
               <OverflowTray
+                collapsible
                 items={bench}
                 picks={picks}
                 onPick={(id) => updateTask(id, { pickedAt: new Date() })}
@@ -911,7 +1081,6 @@ export function HorizonView({ horizon }: HorizonViewProps) {
                 onShelf={(id) => updateTask(id, { bucket: 'someday' })}
                 onLetGo={handleLetGo}
               />
-              <MonthStrip tasks={domainTasks} onOpenMonth={() => navigate('/month')} />
             </div>
             );
           })()}
@@ -922,107 +1091,7 @@ export function HorizonView({ horizon }: HorizonViewProps) {
               nothing has to line up. "Copy down" duplicates a line onto this
               list (the original stays where it lives, so the upper list is
               intact for its own review); lines already here show a check. */}
-          {(horizon === 'month' || horizon === 'season') && referenceItems.length > 0 && (
-            <section className="mb-8">
-              <button
-                type="button"
-                onClick={() => setRefOpen((v) => !v)}
-                aria-expanded={refOpen}
-                className="w-full flex items-center gap-2 rounded-xl border border-primary-100 bg-primary-50/30 px-4 py-3 text-left hover:bg-primary-50/60 transition-colors"
-              >
-                <Target className="w-4 h-4 text-primary-500 shrink-0" />
-                <span className="flex-1 min-w-0 text-sm text-neutral-700">
-                  <span className="font-medium">{referenceLabel}</span>
-                  <span className="text-neutral-400"> — {referenceItems.length} for reference</span>
-                </span>
-                <ChevronRight className={`w-4 h-4 text-neutral-400 shrink-0 transition-transform ${refOpen ? 'rotate-90' : ''}`} />
-              </button>
-              {refOpen && (
-                <ul className="mt-3 space-y-1 rounded-xl border border-neutral-100 bg-white px-4 py-3">
-                  {referenceItems.map((it) => {
-                    {/* Goals don't copy verbatim — a year-sized sentence must be
-                        translated into a season-sized move first (the inline
-                        prompt). Season→month task copies stay one-tap: the
-                        grains are adjacent. */}
-                    if (translatingRefId === it.id) {
-                      return (
-                        <li key={it.id} className="rounded-lg bg-primary-50/60 border border-primary-200 px-3 py-2 my-1">
-                          <p className="text-xs text-primary-800 mb-1.5">
-                            What's the first <span className="font-semibold">season-sized</span> move on “{it.title}”? An outcome you can finish this season.
-                          </p>
-                          <div className="flex items-center gap-2">
-                            <input type="text" autoFocus value={refDraft}
-                              placeholder="An outcome finishable this season — the goal stays on the shelf…"
-                              onChange={(e) => setRefDraft(e.target.value)}
-                              onKeyDown={(e) => {
-                                if (e.key === 'Enter' && refDraft.trim()) {
-                                  void onCreateTaskFromValue(refDraft.trim(), it.lineage);
-                                  setTranslatingRefId(null);
-                                }
-                                if (e.key === 'Escape') setTranslatingRefId(null);
-                              }}
-                              className="flex-1 min-w-0 text-sm bg-white border border-primary-200 rounded-md px-2.5 py-1.5 focus:outline-none focus:border-primary-400"
-                            />
-                            <button type="button" disabled={!refDraft.trim()}
-                              onClick={() => { void onCreateTaskFromValue(refDraft.trim(), it.lineage); setTranslatingRefId(null); }}
-                              className="shrink-0 text-xs font-semibold px-2.5 py-1.5 rounded-md text-white bg-primary-600 hover:bg-primary-700 disabled:opacity-40 transition-colors">
-                              Add to season
-                            </button>
-                            <button type="button" onClick={() => setTranslatingRefId(null)} aria-label="Cancel"
-                              className="shrink-0 text-xs px-1.5 py-1.5 text-neutral-400 hover:text-neutral-600">✕</button>
-                          </div>
-                          <SeasonMoveSuggestions goalName={it.title} onPick={setRefDraft} />
-                        </li>
-                      );
-                    }
-                    return (
-                    <li key={it.id} className="flex items-center gap-3 py-1">
-                      {it.goalId ? (
-                        <button
-                          type="button"
-                          onClick={() => navigate(`/goals/${it.goalId}`)}
-                          className="flex-1 min-w-0 text-left text-sm text-neutral-800 truncate hover:text-primary-700 transition-colors"
-                        >
-                          {it.title}
-                        </button>
-                      ) : (
-                        <span className="flex-1 min-w-0 text-sm text-neutral-800 truncate">{it.title}</span>
-                      )}
-                      {isOnThisList(it) ? (
-                        <span className="shrink-0 inline-flex items-center gap-1 text-xs text-primary-700">
-                          <Check className="w-3 h-3" strokeWidth={3} /> on this list
-                        </span>
-                      ) : it.goalId ? (
-                        <button
-                          type="button"
-                          onClick={() => { setTranslatingRefId(it.id); setRefDraft(''); }}
-                          title="Start this goal this season — translate it into a season-sized move"
-                          className="shrink-0 inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-md text-primary-700 bg-primary-50 hover:bg-primary-100 transition-colors"
-                        >
-                          <Plus className="w-3 h-3" /> Start this season
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => void onCreateTaskFromValue(it.title, it.lineage)}
-                          title="Copy onto this list (stays on the list above too)"
-                          className="shrink-0 inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-md text-primary-700 bg-primary-50 hover:bg-primary-100 transition-colors"
-                        >
-                          <Plus className="w-3 h-3" /> Copy down
-                        </button>
-                      )}
-                    </li>
-                    );
-                  })}
-                  {horizon === 'season' && (
-                    <li className="pt-1.5 mt-1 border-t border-neutral-100 text-[11px] text-neutral-400 italic">
-                      Goals you don't start stay on the shelf — every seasonal session offers them again.
-                    </li>
-                  )}
-                </ul>
-              )}
-            </section>
-          )}
+          {horizon === 'month' && referenceFold}
 
           {/* Carry-over — calm "carried over" framing (week only). */}
           {carryOver.length > 0 && (
@@ -1113,7 +1182,7 @@ export function HorizonView({ horizon }: HorizonViewProps) {
             {/* Add directly into this horizon's pool. The placeholder speaks
                 the level's grain (outcome / chunk / task) — the input is where
                 the grain gauge either holds or leaks. */}
-            {horizonBucket && (
+            {horizonBucket && horizon !== 'season' && (
               <div className="mt-3 flex items-center gap-2 px-2 py-1.5 rounded-xl border border-neutral-200 bg-white focus-within:border-primary-400 transition-colors">
                 <button
                   type="button"
@@ -1137,23 +1206,6 @@ export function HorizonView({ horizon }: HorizonViewProps) {
                   className="flex-1 min-w-0 text-sm bg-transparent placeholder:text-neutral-400 focus:outline-none"
                 />
               </div>
-            )}
-            {horizon === 'season' && looksLikeActivity(draft) && (
-              <p className="text-[11px] text-amber-700 mt-1 inline-flex items-center gap-1.5">
-                Picks read best as outcomes — "Will drafted and signed", not "start working on the will".
-                <button
-                  type="button"
-                  onClick={async () => {
-                    const suggestion = await sharpenBet(draft);
-                    if (suggestion) setDraft(suggestion);
-                  }}
-                  disabled={sharpenBetLoading}
-                  className="inline-flex items-center gap-1 font-medium text-primary-600 hover:text-primary-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  <Sparkles className="w-3 h-3" />
-                  {sharpenBetLoading ? 'Sharpening…' : 'Sharpen'}
-                </button>
-              </p>
             )}
           </section>
         </div>

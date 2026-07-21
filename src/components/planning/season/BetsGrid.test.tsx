@@ -94,6 +94,24 @@ describe('OverflowTray (the bench)', () => {
   })
 })
 
+describe('BetsGrid slots', () => {
+  it('renders the cap as architecture: open slots fill the remaining positions', () => {
+    const onSlotClick = vi.fn()
+    render(
+      <BetsGrid
+        tasks={[picked('b1', 'One pick')]}
+        goalsById={new Map()} onSelect={vi.fn()} onComplete={vi.fn()} onDemote={vi.fn()}
+        onSlotClick={onSlotClick}
+        now={new Date(2026, 6, 20)}
+      />,
+    )
+    const slots = screen.getAllByRole('button', { name: /open slot/i })
+    expect(slots).toHaveLength(7)
+    fireEvent.click(slots[0])
+    expect(onSlotClick).toHaveBeenCalled()
+  })
+})
+
 describe('BetsGrid keyboard', () => {
   it('does not call onSelect when Enter is pressed on Mark Won button', () => {
     const onSelect = vi.fn()

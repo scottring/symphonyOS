@@ -1,38 +1,54 @@
 import type { Task } from '@/types/task'
 import type { Goal } from '@/types/goal'
+import { Plus } from 'lucide-react'
 import { BetCard } from './BetCard'
-import { partitionSeason, wonPicks } from '@/lib/planning/betPulse'
+import { partitionSeason, wonPicks, PICK_CAP } from '@/lib/planning/betPulse'
 
-/** The season's picks — explicitly chosen quarter items, cards. Won picks
- *  stay visible (won styling) after the open cards through their season. */
-export function BetsGrid({ tasks, goalsById, onSelect, onComplete, onDemote, now }: {
+/** The season's picks rendered as ARCHITECTURE: always PICK_CAP positions —
+ *  filled cards first, then quiet dashed open slots. The cap isn't a counter,
+ *  it's the visible shape of the season. Won picks follow the open positions
+ *  (they stay visible through their season, won styling). */
+export function BetsGrid({ tasks, goalsById, onSelect, onComplete, onDemote, onSlotClick, now }: {
   tasks: readonly Task[]
   goalsById: Map<string, Goal>
   onSelect: (id: string) => void
   onComplete: (id: string) => void
   onDemote: (id: string) => void
+  /** Tap an open slot → route attention to the composer (or the bench). */
+  onSlotClick?: () => void
   now?: Date
 }) {
   const { picks } = partitionSeason(tasks)
   const won = wonPicks(tasks, now)
-  if (picks.length === 0 && won.length === 0) {
-    return (
-      <p className="text-sm text-neutral-400 italic">
-        No picks yet. A pick is an outcome true by season's end — choose up to 8 from the bench below, start one from your goals, or write one.
-      </p>
-    )
-  }
+  const openSlots = Math.max(0, PICK_CAP - picks.length)
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-      {picks.map((b) => (
-        <BetCard key={b.id} bet={b} tasks={tasks} goalsById={goalsById} onSelect={onSelect} onComplete={onComplete} onDemote={onDemote} now={now} />
-      ))}
-      {/* Completing a pick must not make it vanish from the page — a won pick
-          stays visible (BetCard's own completed styling) through the season
-          it was picked in, rendered after the open cards. */}
-      {won.map((b) => (
-        <BetCard key={b.id} bet={b} tasks={tasks} goalsById={goalsById} onSelect={onSelect} onComplete={onComplete} onDemote={onDemote} now={now} />
-      ))}
+    <div>
+      {picks.length === 0 && won.length === 0 && (
+        <p className="text-sm text-neutral-400 italic mb-3">
+          No picks yet. A pick is an outcome true by season's end — fill a slot from the bench, your goals, or the composer.
+        </p>
+      )}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+        {picks.map((b) => (
+          <BetCard key={b.id} bet={b} tasks={tasks} goalsById={goalsById} onSelect={onSelect} onComplete={onComplete} onDemote={onDemote} now={now} />
+        ))}
+        {Array.from({ length: openSlots }, (_, i) => (
+          <button
+            key={`slot-${i}`}
+            type="button"
+            onClick={onSlotClick}
+            aria-label="Open slot — add a pick"
+            className="min-h-[104px] rounded-xl border-2 border-dashed border-neutral-200/80 grid place-items-center text-neutral-300 hover:border-primary-200 hover:text-primary-400 hover:bg-primary-50/20 transition-colors"
+          >
+            <span className="inline-flex items-center gap-1.5 text-[12px]">
+              <Plus aria-hidden="true" className="w-3.5 h-3.5" /> Open slot
+            </span>
+          </button>
+        ))}
+        {won.map((b) => (
+          <BetCard key={b.id} bet={b} tasks={tasks} goalsById={goalsById} onSelect={onSelect} onComplete={onComplete} onDemote={onDemote} now={now} />
+        ))}
+      </div>
     </div>
   )
 }
