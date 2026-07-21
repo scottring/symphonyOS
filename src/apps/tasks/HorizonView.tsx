@@ -53,6 +53,7 @@ import { OverflowTray } from '@/components/planning/season/OverflowTray';
 import { MonthStrip } from '@/components/planning/season/MonthStrip';
 import { FocusLine } from '@/components/planning/season/FocusLine';
 import { HorizonExplainer } from '@/components/planning/explainers/HorizonExplainer';
+import { EXPLAINER_SCENES } from '@/components/planning/explainers/scenes';
 import { usePlanningSession } from '@/hooks/usePlanningSession';
 import { guidedPeriod } from '@/components/planning/guided/periods';
 import { partitionBets, servingCount } from '@/lib/planning/betPulse';
@@ -284,7 +285,10 @@ export function HorizonView({ horizon }: HorizonViewProps) {
   // automatically the first time a rung is visited (localStorage-gated so it
   // never nags on return visits).
   const [explainerOpen, setExplainerOpen] = useState(false);
+  const hasExplainer = (EXPLAINER_SCENES[horizon]?.length ?? 0) > 0;
   useEffect(() => {
+    // No script for this rung (someday) → no link, no auto-open.
+    if ((EXPLAINER_SCENES[horizon]?.length ?? 0) === 0) return;
     const key = `symphony.explainerSeen.${horizon}`;
     if (!localStorage.getItem(key)) {
       localStorage.setItem(key, '1');
@@ -612,10 +616,12 @@ export function HorizonView({ horizon }: HorizonViewProps) {
               >
                 <CalendarRange className="w-4 h-4" /> Plan the year
               </button>
-              <button type="button" onClick={() => setExplainerOpen(true)}
-                className="text-[12px] text-neutral-400 hover:text-primary-700 transition-colors">
-                What is this level?
-              </button>
+              {hasExplainer && (
+                <button type="button" onClick={() => setExplainerOpen(true)}
+                  className="text-[12px] text-neutral-400 hover:text-primary-700 transition-colors">
+                  What is this level?
+                </button>
+              )}
             </div>
           </header>
 
@@ -764,10 +770,12 @@ export function HorizonView({ horizon }: HorizonViewProps) {
                   Plan the {rungName}
                 </button>
               )}
-              <button type="button" onClick={() => setExplainerOpen(true)}
-                className="text-[12px] text-neutral-400 hover:text-primary-700 transition-colors">
-                What is this level?
-              </button>
+              {hasExplainer && (
+                <button type="button" onClick={() => setExplainerOpen(true)}
+                  className="text-[12px] text-neutral-400 hover:text-primary-700 transition-colors">
+                  What is this level?
+                </button>
+              )}
             </div>
           </header>
 
