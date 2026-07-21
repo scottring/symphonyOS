@@ -19,7 +19,12 @@ export interface RhythmCard {
 
 export interface RhythmModel {
   daily: { timed: RhythmCard[]; anytime: Routine[] }
-  week: { days: Record<DayKey, Routine[]>; sometime: Routine[] }
+  week: {
+    days: Record<DayKey, Routine[]>
+    sometime: Routine[]
+    /** Resting (asleep) weekly routines, ghosted into their day columns. */
+    restingDays: Record<DayKey, Routine[]>
+  }
   sometimes: Routine[]
   seasonal: Routine[]
   stepCounts: Record<string, number>
@@ -47,6 +52,17 @@ function zoneOf(p: RecurrencePattern): 'daily' | 'week' | 'sometimes' {
     return 'week'
   }
   return 'sometimes'
+}
+
+/** Day columns a weekly routine occupies: listed days, else the weekday
+ * derived from start_date (biweekly patterns often carry only interval+start). */
+function weekDaysFor(routine: Routine): DayKey[] {
+  const days = (routine.recurrence_pattern.days ?? []) as DayKey[]
+  const valid = days.filter(d => DAY_ORDER.includes(d))
+  if (valid.length > 0) return valid
+  const sd = routine.recurrence_pattern.start_date
+  const derived = sd ? DAY_ORDER[new Date(`${sd}T00:00:00`).getDay()] : undefined
+  return derived ? [derived] : []
 }
 
 function suggestName(startMinutes: number): string {
@@ -81,7 +97,7 @@ export function buildRhythmModel(
 
   const model: RhythmModel = {
     daily: { timed: [], anytime: [] },
-    week: { days: emptyDays(), sometime: [] },
+    week: { days: emptyDays(), sometime: [], restingDays: emptyDays() },
     sometimes: [],
     seasonal: [],
     stepCounts,
@@ -92,6 +108,10 @@ export function buildRhythmModel(
   for (const { routine, steps } of topLevel) {
     if (routine.visibility === 'reference') {
       model.seasonal.push(routine)
+      // Weekly sleepers also ghost into their day column for one-tap wake.
+      if (zoneOf(routine.recurrence_pattern) === 'week') {
+        for (const d of weekDaysFor(routine)) model.week.restingDays[d].push(routine)
+      }
       continue
     }
     const zone = zoneOf(routine.recurrence_pattern)
@@ -112,18 +132,9 @@ export function buildRhythmModel(
         model.daily.anytime.push(routine)
       }
     } else if (zone === 'week') {
-      const days = (routine.recurrence_pattern.days ?? []) as DayKey[]
-      const valid = days.filter(d => DAY_ORDER.includes(d))
-      if (valid.length > 0) {
-        for (const d of valid) model.week.days[d].push(routine)
-      } else {
-        // No days listed — derive the weekday from start_date when present
-        // (biweekly patterns often carry only interval + start_date).
-        const sd = routine.recurrence_pattern.start_date
-        const derived = sd ? DAY_ORDER[new Date(`${sd}T00:00:00`).getDay()] : undefined
-        if (derived) model.week.days[derived].push(routine)
-        else model.week.sometime.push(routine)
-      }
+      const wd = weekDaysFor(routine)
+      if (wd.length > 0) for (const d of wd) model.week.days[d].push(routine)
+      else model.week.sometime.push(routine)
     } else {
       model.sometimes.push(routine)
     }

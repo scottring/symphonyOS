@@ -37,6 +37,16 @@ describe('WeekStrip', () => {
     expect(onOpenRoutine).toHaveBeenCalledWith(lib)
   })
 
+  it('ghosts resting routines with a one-tap wake flick', () => {
+    const onWake = vi.fn()
+    const sleeping = mk({ name: 'Walk kids to school', visibility: 'reference' })
+    render(<WeekStrip {...base} days={empty} restingDays={{ ...empty, mon: [sleeping] }} onWake={onWake} />)
+    expect(screen.getByText('Walk kids to school')).toBeInTheDocument()
+    expect(screen.getByText('asleep')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /wake walk kids to school/i }))
+    expect(onWake).toHaveBeenCalledWith(sleeping)
+  })
+
   it('renders the sometime-this-week pocket', () => {
     render(<WeekStrip {...base} days={empty} sometime={[mk({ name: 'Clara nails', recurrence_pattern: { type: 'weekly' } })]} />)
     expect(screen.getByText(/sometime this week/i)).toBeInTheDocument()

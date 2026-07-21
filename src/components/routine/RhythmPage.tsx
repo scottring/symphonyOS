@@ -309,6 +309,8 @@ export function RhythmPage(props: RhythmPageProps) {
             familyMembers={familyMembers}
             collectionSteps={collectionSteps}
             dailyItems={dailyItems}
+            restingDays={model.week.restingDays}
+            onWake={r => onUpdateRoutine(r.id, { visibility: 'active', paused_until: null })}
           />
         </div>
 

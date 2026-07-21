@@ -58,6 +58,15 @@ describe('buildRhythmModel bucketing', () => {
     expect(m.week.sometime.map(r => r.id)).toEqual(['w'])
   })
 
+  it('ghosts resting weekly routines into restingDays and keeps them in seasonal', () => {
+    const m = buildRhythmModel([
+      mk({ id: 'p', visibility: 'reference', recurrence_pattern: { type: 'weekly', days: ['mon'] } }),
+    ])
+    expect(m.seasonal.map(r => r.id)).toEqual(['p'])
+    expect(m.week.restingDays.mon.map(r => r.id)).toEqual(['p'])
+    expect(m.week.days.mon).toHaveLength(0)
+  })
+
   it('derives the day column from start_date when weekly days are empty', () => {
     // 2026-07-25 is a Saturday — the real "library every 2 weeks" shape.
     const m = buildRhythmModel([
