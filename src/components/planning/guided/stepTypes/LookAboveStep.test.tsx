@@ -13,7 +13,7 @@ const t = (over: Record<string, unknown>) => ({
 
 describe('LookAboveStep', () => {
   it('reference mode: copy-down duplicates into this horizon\'s bucket', async () => {
-    const host = makeHost({ tasks: [t({ id: 'q1', title: 'Renovate kitchen', bucket: 'quarter' })] })
+    const host = makeHost({ tasks: [t({ id: 'q1', title: 'Renovate kitchen', bucket: 'quarter', pickedAt: new Date() })] })
     renderStep(<LookAboveStep />, {
       step: { id: 'look-at-season', type: 'look-above', title: 'Your season list',
         narration: 'Read it; copy down what this month should carry.',
@@ -27,7 +27,7 @@ describe('LookAboveStep', () => {
 
   it('reference mode: an item already on this list shows a check, no button', () => {
     const host = makeHost({ tasks: [
-      t({ id: 'q1', title: 'Renovate kitchen', bucket: 'quarter' }),
+      t({ id: 'q1', title: 'Renovate kitchen', bucket: 'quarter', pickedAt: new Date() }),
       t({ id: 'm1', title: 'Renovate kitchen', bucket: 'month' }),
     ] })
     renderStep(<LookAboveStep />, {
@@ -37,6 +37,22 @@ describe('LookAboveStep', () => {
     })
     expect(screen.getByText(/on this list/)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /Copy down/ })).toBeNull()
+  })
+
+  it('reference mode: unpicked season items collapse behind the bench disclosure', () => {
+    const host = makeHost({ tasks: [
+      t({ id: 'q1', title: 'Picked outcome', bucket: 'quarter', pickedAt: new Date() }),
+      t({ id: 'q2', title: 'Benched idea', bucket: 'quarter' }),
+    ] })
+    renderStep(<LookAboveStep />, {
+      step: { id: 'look-at-season', type: 'look-above', title: 'Your season list',
+        narration: 'Read it.', props: { aboveBucket: 'quarter' } },
+      host, horizon: 'monthly',
+    })
+    expect(screen.getByText('Picked outcome')).toBeInTheDocument()
+    expect(screen.queryByText('Benched idea')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: /Also on the bench \(1\)/ }))
+    expect(screen.getByText('Benched idea')).toBeInTheDocument()
   })
 
   it('goals mode: renders active goals grouped by area, read-only', () => {

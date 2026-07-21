@@ -6,7 +6,7 @@
 // area with no actions at all. Pick mode (daily) MOVES week items into today
 // — that's ordinary bucket flow, not linkage.
 import { useMemo, useState } from 'react'
-import { Target, Check, Plus } from 'lucide-react'
+import { Target, Check, Plus, ChevronRight } from 'lucide-react'
 import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
 import { inheritedLineage } from '@/lib/planning/lineage'
 import { SeasonMoveSuggestions } from '@/components/planning/SeasonMoveSuggestions'
@@ -46,6 +46,19 @@ export function LookAboveStep() {
       : abovePool),
     [pick, host.tasks, above, match, pickedIds, abovePool],
   )
+  // The season reference is the CHOSEN season: picks lead; the bench (items
+  // the user deliberately didn't pick) collapses below — reachable for the
+  // rare grab, but never dressed as part of the plan.
+  const isSeasonRef = above === 'quarter'
+  const mainPool = useMemo(
+    () => (isSeasonRef ? abovePool.filter((t) => !!t.pickedAt) : abovePool),
+    [isSeasonRef, abovePool],
+  )
+  const benchPool = useMemo(
+    () => (isSeasonRef ? abovePool.filter((t) => !t.pickedAt) : []),
+    [isSeasonRef, abovePool],
+  )
+  const [benchOpen, setBenchOpen] = useState(false)
   const ownTitles = useMemo(
     () => new Set(host.tasks.filter((t) => !t.completed && ownBucket && t.bucket === ownBucket).map((t) => t.title)),
     [host.tasks, ownBucket],
@@ -164,10 +177,38 @@ export function LookAboveStep() {
   }
 
   if (host.tasksLoading) return <p className="text-sm text-neutral-400">Gathering the list above…</p>
-  const pool = pick ? pickPool : abovePool
-  if (pool.length === 0) return <p className="text-sm text-neutral-400">Nothing on that list yet.</p>
+  const pool = pick ? pickPool : mainPool
+  if (pool.length === 0 && benchPool.length === 0) return <p className="text-sm text-neutral-400">Nothing on that list yet.</p>
+
+  const copyRow = (t: (typeof pool)[number]) => {
+    const alreadyHere = ownTitles.has(t.title)
+    return (
+      <li key={t.id} className="flex items-center gap-3 rounded-lg bg-neutral-50/70 px-3 py-1.5">
+        <span className="flex-1 min-w-0 text-sm text-neutral-700 truncate">
+          {t.title}
+          {projectName(t.projectId) && <span className="text-xs text-neutral-400"> · {projectName(t.projectId)}</span>}
+        </span>
+        {alreadyHere ? (
+          <span className="shrink-0 inline-flex items-center gap-1 text-xs text-primary-700">
+            <Check className="w-3 h-3" strokeWidth={3} /> on this list
+          </span>
+        ) : ownBucket ? (
+          <button type="button"
+            onClick={() => void host.createTaskInBucket(t.title, ownBucket, { projectId: t.projectId, ...inheritedLineage(t) })}
+            title="Copy onto this list (stays on the list above too)"
+            className="shrink-0 inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-md text-primary-700 bg-primary-50 hover:bg-primary-100 transition-colors">
+            <Plus className="w-3 h-3" /> Copy down
+          </button>
+        ) : null}
+      </li>
+    )
+  }
 
   return (
+    <>
+    {pool.length === 0 && (
+      <p className="text-sm text-neutral-400">No picks this season yet — the bench below is unchosen.</p>
+    )}
     <ul className="space-y-1">
       {pool.map((t) => {
         if (pick) {
@@ -188,28 +229,19 @@ export function LookAboveStep() {
             </li>
           )
         }
-        const alreadyHere = ownTitles.has(t.title)
-        return (
-          <li key={t.id} className="flex items-center gap-3 rounded-lg bg-neutral-50/70 px-3 py-1.5">
-            <span className="flex-1 min-w-0 text-sm text-neutral-700 truncate">
-              {t.title}
-              {projectName(t.projectId) && <span className="text-xs text-neutral-400"> · {projectName(t.projectId)}</span>}
-            </span>
-            {alreadyHere ? (
-              <span className="shrink-0 inline-flex items-center gap-1 text-xs text-primary-700">
-                <Check className="w-3 h-3" strokeWidth={3} /> on this list
-              </span>
-            ) : ownBucket ? (
-              <button type="button"
-                onClick={() => void host.createTaskInBucket(t.title, ownBucket, { projectId: t.projectId, ...inheritedLineage(t) })}
-                title="Copy onto this list (stays on the list above too)"
-                className="shrink-0 inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-md text-primary-700 bg-primary-50 hover:bg-primary-100 transition-colors">
-                <Plus className="w-3 h-3" /> Copy down
-              </button>
-            ) : null}
-          </li>
-        )
+        return copyRow(t)
       })}
     </ul>
+    {!pick && benchPool.length > 0 && (
+      <div className="mt-2">
+        <button type="button" onClick={() => setBenchOpen((v) => !v)} aria-expanded={benchOpen}
+          className="inline-flex items-center gap-1 text-[11px] text-neutral-400 hover:text-neutral-600 transition-colors">
+          <ChevronRight className={`w-3 h-3 transition-transform ${benchOpen ? 'rotate-90' : ''}`} />
+          Also on the bench ({benchPool.length}) — not picked this season
+        </button>
+        {benchOpen && <ul className="space-y-1 mt-1.5 opacity-75">{benchPool.map(copyRow)}</ul>}
+      </div>
+    )}
+    </>
   )
 }

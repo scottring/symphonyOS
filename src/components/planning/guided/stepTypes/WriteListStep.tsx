@@ -37,7 +37,8 @@ export function WriteListStep() {
     const aboveBucket = writeBucket === 'month' ? 'quarter' : writeBucket === 'week' ? 'month' : null
     if (!aboveBucket) return { items: [] as string[], label: '' }
     const items = host.tasks
-      .filter((t) => !t.completed && t.bucket === aboveBucket && match(t.assignedTo, t.assignedToAll))
+      // The season-above is the CHOSEN season: picks only fuel the month.
+      .filter((t) => !t.completed && t.bucket === aboveBucket && match(t.assignedTo, t.assignedToAll) && (aboveBucket !== 'quarter' || !!t.pickedAt))
       .map((t) => t.title)
     return { items, label: aboveBucket === 'quarter' ? 'your season list' : 'your month list' }
   }, [writeBucket, host.goals, host.tasks, match])

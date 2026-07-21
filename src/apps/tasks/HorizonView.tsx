@@ -269,7 +269,11 @@ export function HorizonView({ horizon }: HorizonViewProps) {
   // from a goal records the goal itself.
   const referenceItems = useMemo<Array<{ id: string; title: string; goalId?: string; lineage?: { sourceId?: string; goalId?: string } }>>(() => {
     if (horizon === 'month') {
-      return selectHorizonPool(domainTasks, 'season', match).map((t) => ({ id: t.id, title: t.title, lineage: inheritedLineage(t) }));
+      // The month draws from the CHOSEN season — picks only. The bench (items
+      // deliberately not picked) collapses separately below.
+      return selectHorizonPool(domainTasks, 'season', match)
+        .filter((t) => !!t.pickedAt)
+        .map((t) => ({ id: t.id, title: t.title, lineage: inheritedLineage(t) }));
     }
     if (horizon === 'season') {
       return goals
@@ -278,7 +282,7 @@ export function HorizonView({ horizon }: HorizonViewProps) {
     }
     return [];
   }, [horizon, domainTasks, match, goals, currentDomain]);
-  const referenceLabel = horizon === 'month' ? `Your ${periodLabel('season')?.split(' ')[0]} list` : `Your ${new Date().getFullYear()} goals`;
+  const referenceLabel = horizon === 'month' ? `Your ${periodLabel('season')?.split(' ')[0]} picks` : `Your ${new Date().getFullYear()} goals`;
   // "on this list" reads the lineage thread first (a copy renamed later still
   // counts); title equality is the pre-lineage fallback.
   const poolTitles = useMemo(() => new Set(pool.map((t) => t.title)), [pool]);
@@ -290,6 +294,14 @@ export function HorizonView({ horizon }: HorizonViewProps) {
     [poolTitles, poolSourceIds, poolGoalIds],
   );
   const [refOpen, setRefOpen] = useState(false);
+  const [refBenchOpen, setRefBenchOpen] = useState(false);
+  // Month-only: the season's unchosen items, offered quietly for the rare grab.
+  const referenceBenchItems = useMemo(() => {
+    if (horizon !== 'month') return [] as Array<{ id: string; title: string; lineage?: { sourceId?: string; goalId?: string } }>;
+    return selectHorizonPool(domainTasks, 'season', match)
+      .filter((t) => !t.pickedAt)
+      .map((t) => ({ id: t.id, title: t.title, lineage: inheritedLineage(t) }));
+  }, [horizon, domainTasks, match]);
   // "What is this level?" explainer — opens on demand via the link, and once
   // automatically the first time a rung is visited (localStorage-gated so it
   // never nags on return visits).
@@ -775,7 +787,7 @@ export function HorizonView({ horizon }: HorizonViewProps) {
   // The level above, for reference — folded into one quiet line. Rendered
   // below the grid on Month; inside the right rail on Season (the season
   // spread places sources beside the composer, not under the picks).
-  const referenceFold = referenceItems.length > 0 ? (
+  const referenceFold = (referenceItems.length > 0 || referenceBenchItems.length > 0) ? (
             <section className="mb-8">
               <button
                 type="button"
@@ -867,6 +879,36 @@ export function HorizonView({ horizon }: HorizonViewProps) {
                     </li>
                     );
                   })}
+                  {horizon === 'month' && referenceBenchItems.length > 0 && (
+                    <li className="pt-1.5 mt-1 border-t border-neutral-100">
+                      <button type="button" onClick={() => setRefBenchOpen((v) => !v)} aria-expanded={refBenchOpen}
+                        className="inline-flex items-center gap-1 text-[11px] text-neutral-400 hover:text-neutral-600 transition-colors">
+                        <ChevronRight className={`w-3 h-3 transition-transform ${refBenchOpen ? 'rotate-90' : ''}`} />
+                        Also on the bench ({referenceBenchItems.length}) — not picked this season
+                      </button>
+                      {refBenchOpen && (
+                        <ul className="mt-1.5 space-y-1 opacity-75">
+                          {referenceBenchItems.map((it) => (
+                            <li key={it.id} className="flex items-center gap-3 py-0.5">
+                              <span className="flex-1 min-w-0 text-sm text-neutral-700 truncate">{it.title}</span>
+                              {isOnThisList(it) ? (
+                                <span className="shrink-0 inline-flex items-center gap-1 text-xs text-primary-700">
+                                  <Check className="w-3 h-3" strokeWidth={3} /> on this list
+                                </span>
+                              ) : (
+                                <button type="button"
+                                  onClick={() => void onCreateTaskFromValue(it.title, it.lineage)}
+                                  title="Copy onto this list (stays on the bench too)"
+                                  className="shrink-0 inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-md text-primary-700 bg-primary-50 hover:bg-primary-100 transition-colors">
+                                  <Plus className="w-3 h-3" /> Copy down
+                                </button>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </li>
+                  )}
                   {horizon === 'season' && (
                     <li className="pt-1.5 mt-1 border-t border-neutral-100 text-[11px] text-neutral-400 italic">
                       Goals you don't start stay on the shelf — every seasonal session offers them again.
