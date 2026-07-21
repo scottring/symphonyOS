@@ -31,10 +31,20 @@ const EXTERNAL_LINKS_JS: &str = r#"
       window.__TAURI__.event.emit('shell:open-external', url);
     }
   };
+  var SYSTEM_SCHEMES = ['tel:', 'mailto:', 'sms:', 'facetime:'];
   document.addEventListener('click', function (e) {
     var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
     if (!a) return;
-    var url = external(a.href);
+    var href = a.href || '';
+    var scheme = SYSTEM_SCHEMES.find(function (s) { return href.toLowerCase().indexOf(s) === 0; });
+    if (scheme) {
+      // WKWebView ignores tel:/mailto:/… navigations — hand them to macOS.
+      e.preventDefault();
+      e.stopPropagation();
+      send(href);
+      return;
+    }
+    var url = external(href);
     if (url && (a.target === '_blank' || e.metaKey || e.ctrlKey)) {
       e.preventDefault();
       e.stopPropagation();
@@ -315,7 +325,8 @@ pub fn run() {
             // External links forwarded by EXTERNAL_LINKS_JS → system browser.
             app.listen_any("shell:open-external", move |event| {
                 if let Ok(url) = serde_json::from_str::<String>(event.payload()) {
-                    if url.starts_with("https://") || url.starts_with("http://") {
+                    let allowed = ["https://", "http://", "tel:", "mailto:", "sms:", "facetime:"];
+                    if allowed.iter().any(|p| url.starts_with(p)) {
                         let _ = std::process::Command::new("open").arg(&url).spawn();
                     }
                 }

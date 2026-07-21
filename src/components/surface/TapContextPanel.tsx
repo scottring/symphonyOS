@@ -130,7 +130,7 @@ export function TapContextPanel(props: TapContextPanelProps) {
       {props.whyChain && <div>{props.whyChain}</div>}
       <PanelActions
         completed={task.completed}
-        phoneNumber={task.phoneNumber || linked.contact?.phone}
+        phoneNumber={task.phoneNumber || linked.contact?.phone || linked.project?.phoneNumber}
         location={task.location}
         onShowDirections={() => setShowDirections((v) => !v)}
         scheduledFor={task.scheduledFor || undefined}

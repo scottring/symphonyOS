@@ -67,6 +67,18 @@ describe('TapContextPanel', () => {
     expect(screen.getByText('Liam — Health')).toBeInTheDocument()
   })
 
+  it('falls back to the project phone number when task and contact have none', () => {
+    const project = createMockProject({ id: 'p1', name: 'Kitchen renovation', phoneNumber: '555-8890' })
+    const task = createMockTask({ projectId: 'p1' })
+    render(<TapContextPanel
+      task={task}
+      contacts={[]} projects={[project]} events={[]} familyMembers={[]} siblingTaskCandidates={[]} allTasks={[task]}
+      {...baseHandlers}
+    />)
+    const tel = document.querySelector('a[href="tel:555-8890"]')
+    expect(tel).not.toBeNull()
+  })
+
   it('renders Might be relevant items', () => {
     const target = createMockTask({ id: 't1', contactId: 'c1', title: 'Call Dr. Smith' })
     const sib = createMockTask({ id: 't2', contactId: 'c1', title: 'Last call to Dr. Smith' })
