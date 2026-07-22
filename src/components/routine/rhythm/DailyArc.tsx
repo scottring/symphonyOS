@@ -1,10 +1,11 @@
-import { Fragment, useState } from 'react'
+import { useState } from 'react'
 import type { Routine } from '@/types/actionable'
 import type { FamilyMember } from '@/types/family'
 import { AssigneeAvatar } from '@/components/family/AssigneeAvatar'
-import { Sparkles } from 'lucide-react'
-import { resolveMembers, type RhythmCard } from './rhythmModel'
+import { Pencil, Sparkles } from 'lucide-react'
+import { minutesOf, resolveMembers, type RhythmCard } from './rhythmModel'
 import { formatRange, formatClock } from './format'
+import { QuickAddInput } from './QuickAddInput'
 
 export interface DailyArcProps {
   cards: RhythmCard[]
@@ -15,6 +16,8 @@ export interface DailyArcProps {
   onOpenCollection: (id: string) => void
   onOpenRoutine: (r: Routine) => void
   onNameCluster: (card: RhythmCard, name: string) => void
+  /** Create a new every-day routine inline from the arc. */
+  onQuickAddDaily?: (name: string) => void
 }
 
 const ARC_START = 6 * 60   // 6:00
@@ -34,52 +37,29 @@ const RULER_MARKS: { label: string; minutes: number }[] = [
   { label: '9 pm', minutes: 21 * 60 },
 ]
 
-function NameNudge({ card, onNameCluster }: { card: RhythmCard; onNameCluster: DailyArcProps['onNameCluster'] }) {
+function ArcCard({ card, familyMembers, matches, onOpenCollection, onOpenRoutine, onNameCluster }: {
+  card: RhythmCard
+  familyMembers: FamilyMember[]
+  matches: (r: Routine) => boolean
+  onOpenCollection: (id: string) => void
+  onOpenRoutine: (r: Routine) => void
+  onNameCluster: DailyArcProps['onNameCluster']
+}) {
+  // Cluster naming: the title and the sparkles nudge open the same input.
   const [editing, setEditing] = useState(false)
-  const [name, setName] = useState(card.suggestedName ?? '')
-  if (!editing) {
-    return (
-      <button
-        onClick={() => setEditing(true)}
-        className="mt-2 w-full text-left flex items-center gap-1.5 rounded-lg bg-amber-50 px-2.5 py-1.5
-                   text-xs text-amber-700 hover:bg-amber-100 transition-colors"
-      >
-        <Sparkles className="w-3.5 h-3.5" />
-        These travel together — name this rhythm?
-      </button>
-    )
-  }
-  return (
-    <input
-      autoFocus
-      value={name}
-      onChange={e => setName(e.target.value)}
-      onKeyDown={e => {
-        if (e.key === 'Enter' && name.trim()) onNameCluster(card, name.trim())
-        if (e.key === 'Escape') setEditing(false)
-      }}
-      className="mt-2 w-full rounded-lg border border-amber-300 px-2.5 py-1.5 text-sm focus:outline-none
-                 focus:ring-2 focus:ring-amber-400"
-      placeholder="Name this rhythm"
-    />
-  )
-}
-
-export function DailyArc({ cards, anytime, familyMembers, matches, nowMinutes, onOpenCollection, onOpenRoutine, onNameCluster }: DailyArcProps) {
-  if (cards.length === 0 && anytime.length === 0) return null
+  const [name, setName] = useState('')
+  const startEditing = () => { setName(card.name ?? card.suggestedName ?? ''); setEditing(true) }
 
   const membersOf = (r: Routine): FamilyMember[] => resolveMembers(r, familyMembers)
+  const cardMatches =
+    card.routines.some(matches) || (card.name != null && matches({ name: card.name } as Routine))
 
-  const cardMatches = (c: RhythmCard) =>
-    c.routines.some(matches) || (c.name != null && matches({ name: c.name } as Routine))
-
-
-  const renderCard = (card: RhythmCard) => (
+  return (
     <div
       data-testid={`arc-card-${card.id}`}
       className={`min-w-0 rounded-2xl border bg-white p-4 transition-all
                   ${card.kind === 'cluster' ? 'border-dashed border-amber-300' : 'border-neutral-100 shadow-sm'}
-                  ${cardMatches(card) ? '' : 'opacity-30'}`}
+                  ${cardMatches ? '' : 'opacity-30'}`}
     >
       <div className="flex items-baseline justify-between gap-2 mb-2">
         {card.kind === 'collection' ? (
@@ -88,6 +68,29 @@ export function DailyArc({ cards, anytime, familyMembers, matches, nowMinutes, o
             className="font-display font-semibold text-neutral-800 hover:text-amber-700 transition-colors text-left min-w-0 break-words"
           >
             {card.name}
+          </button>
+        ) : card.kind === 'cluster' && editing ? (
+          <input
+            autoFocus
+            value={name}
+            onChange={e => setName(e.target.value)}
+            onKeyDown={e => {
+              if (e.key === 'Enter' && name.trim()) onNameCluster(card, name.trim())
+              if (e.key === 'Escape') setEditing(false)
+            }}
+            className="min-w-0 flex-1 rounded-lg border border-amber-300 px-2 py-1 text-sm focus:outline-none
+                       focus:ring-2 focus:ring-amber-400"
+            placeholder="Name this rhythm"
+          />
+        ) : card.kind === 'cluster' ? (
+          <button
+            onClick={startEditing}
+            title="Rename this rhythm"
+            className="group font-display font-semibold text-neutral-600 hover:text-amber-700 transition-colors
+                       text-left min-w-0 break-words inline-flex items-baseline gap-1.5"
+          >
+            {card.name ?? 'Unnamed cluster'}
+            <Pencil className="w-3 h-3 flex-shrink-0 self-center text-neutral-300 group-hover:text-amber-600 transition-colors" />
           </button>
         ) : (
           <span className="font-display font-semibold text-neutral-600 min-w-0 break-words">
@@ -130,9 +133,22 @@ export function DailyArc({ cards, anytime, familyMembers, matches, nowMinutes, o
         ))}
       </ul>
 
-      {card.suggestedName && <NameNudge card={card} onNameCluster={onNameCluster} />}
+      {card.suggestedName && !editing && (
+        <button
+          onClick={startEditing}
+          className="mt-2 w-full text-left flex items-center gap-1.5 rounded-lg bg-amber-50 px-2.5 py-1.5
+                     text-xs text-amber-700 hover:bg-amber-100 transition-colors"
+        >
+          <Sparkles className="w-3.5 h-3.5" />
+          These travel together — name this rhythm?
+        </button>
+      )}
     </div>
   )
+}
+
+export function DailyArc({ cards, anytime, familyMembers, matches, nowMinutes, onOpenCollection, onOpenRoutine, onNameCluster, onQuickAddDaily }: DailyArcProps) {
+  if (cards.length === 0 && anytime.length === 0) return null
 
   return (
     <section className="mb-10">
@@ -162,25 +178,18 @@ export function DailyArc({ cards, anytime, familyMembers, matches, nowMinutes, o
                     style={{ left: `${pct(nowMinutes)}%` }}>
                 NOW
               </span>
-            </div>
-
-            {cards.map((card, i) => {
-              const above = i % 2 === 0
-              return (
-                <Fragment key={card.id}>
-                  {/* Card cell — spans 2 columns starting at column i+1, so each
-                      card's left edge sits at the midpoint of the previous one */}
+              {/* Stems + dots anchored at each card's true start time — the
+                  pointer may sit off-center from its card, and that's fine. */}
+              {cards.map((card, i) => {
+                const start = minutesOf(card.startTime)
+                if (start == null) return null
+                const above = i % 2 === 0
+                return (
                   <div
-                    className={above ? 'self-end row-start-1 min-w-0' : 'self-start row-start-3 min-w-0'}
-                    style={{ gridColumn: `${i + 1} / span 2` }}
-                  >
-                    {renderCard(card)}
-                  </div>
-                  {/* Stem + dot anchoring the card to the ruler */}
-                  <div
-                    className={`row-start-2 justify-self-center z-10 flex flex-col items-center pointer-events-none
-                                ${above ? 'self-start' : 'self-end'}`}
-                    style={{ gridColumn: `${i + 1} / span 2` }}
+                    key={card.id}
+                    className={`absolute flex flex-col items-center pointer-events-none -translate-x-1/2
+                                ${above ? '-top-4' : '-bottom-4'}`}
+                    style={{ left: `${pct(start)}%` }}
                   >
                     {above ? (
                       <>
@@ -194,15 +203,34 @@ export function DailyArc({ cards, anytime, familyMembers, matches, nowMinutes, o
                       </>
                     )}
                   </div>
-                </Fragment>
-              )
-            })}
+                )
+              })}
+            </div>
+
+            {/* Card cells — each spans 2 columns starting at column i+1, so a
+                card's left edge sits at the midpoint of the previous one */}
+            {cards.map((card, i) => (
+              <div
+                key={card.id}
+                className={i % 2 === 0 ? 'self-end row-start-1 min-w-0' : 'self-start row-start-3 min-w-0'}
+                style={{ gridColumn: `${i + 1} / span 2` }}
+              >
+                <ArcCard
+                  card={card}
+                  familyMembers={familyMembers}
+                  matches={matches}
+                  onOpenCollection={onOpenCollection}
+                  onOpenRoutine={onOpenRoutine}
+                  onNameCluster={onNameCluster}
+                />
+              </div>
+            ))}
           </div>
         </div>
       )}
 
-      {/* Anytime row */}
-      {anytime.length > 0 && (
+      {/* Anytime row — plus an inline add for new every-day routines */}
+      {(anytime.length > 0 || onQuickAddDaily) && (
         <div className="flex items-center gap-2 flex-wrap mt-4">
           <span className="text-xs italic text-neutral-400">anytime today —</span>
           {anytime.map(r => (
@@ -215,6 +243,14 @@ export function DailyArc({ cards, anytime, familyMembers, matches, nowMinutes, o
               {r.name}
             </button>
           ))}
+          {onQuickAddDaily && (
+            <QuickAddInput
+              label="Add an every-day routine"
+              placeholder="New every-day routine"
+              onSubmit={onQuickAddDaily}
+              variant="pill"
+            />
+          )}
         </div>
       )}
     </section>

@@ -7,6 +7,7 @@ import {
   useLocation,
   Navigate,
 } from 'react-router-dom'
+import type { RecurrencePattern } from '@/types/actionable'
 import { useRoutines } from '@/hooks/useRoutines'
 import { useContacts } from '@/hooks/useContacts'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
@@ -86,11 +87,24 @@ function RoutinesIndex() {
     return addRoutine({ name, context: currentDomain !== 'universal' ? currentDomain : undefined })
   }, [addRoutine, currentDomain])
 
-  const handleGroupIntoCollection = useCallback(async (name: string, ids: string[]) => {
-    const parent = await addRoutine({ name, context: currentDomain !== 'universal' ? currentDomain : undefined })
+  const handleGroupIntoCollection = useCallback(async (
+    name: string,
+    ids: string[],
+    opts?: { time_of_day?: string; recurrence_pattern?: RecurrencePattern },
+  ) => {
+    const parent = await addRoutine({
+      name,
+      context: currentDomain !== 'universal' ? currentDomain : undefined,
+      time_of_day: opts?.time_of_day,
+      recurrence_pattern: opts?.recurrence_pattern,
+    })
     if (!parent) return
     await Promise.all(ids.map((id, i) => updateRoutine(id, { parent_routine_id: parent.id, step_order: i })))
-  }, [addRoutine, updateRoutine])
+  }, [addRoutine, updateRoutine, currentDomain])
+
+  const handleQuickCreate = useCallback(async (input: { name: string; recurrence_pattern: RecurrencePattern; time_of_day?: string }) => {
+    await addRoutine({ ...input, context: currentDomain !== 'universal' ? currentDomain : undefined })
+  }, [addRoutine, currentDomain])
 
   return (
     <Suspense fallback={<LoadingFallback />}>
@@ -109,6 +123,7 @@ function RoutinesIndex() {
         onDelete={deleteRoutine}
         onCreateCollection={handleCreateCollection}
         onGroupIntoCollection={handleGroupIntoCollection}
+        onQuickCreate={handleQuickCreate}
         onBuildWithAI={() => setBuilderOpen(true)}
       />
       {builderOpen && (

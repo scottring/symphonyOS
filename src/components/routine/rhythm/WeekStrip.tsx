@@ -5,6 +5,7 @@ import type { FamilyMember } from '@/types/family'
 import { AssigneeAvatar } from '@/components/family/AssigneeAvatar'
 import type { DayKey } from './rhythmModel'
 import { DAY_ORDER, resolveMembers } from './rhythmModel'
+import { QuickAddInput } from './QuickAddInput'
 
 export interface WeekStripProps {
   days: Record<DayKey, Routine[]>
@@ -22,6 +23,10 @@ export interface WeekStripProps {
   restingDays?: Record<DayKey, Routine[]>
   /** Flick a sleeping routine back to active. */
   onWake?: (r: Routine) => void
+  /** Create a new weekly routine inline on a specific day column. */
+  onQuickAdd?: (name: string, day: DayKey) => void
+  /** Add a step to a collection inline from its expanded chip. */
+  onAddStep?: (collectionId: string, name: string) => void
 }
 
 const DAY_LABEL: Record<DayKey, string> = {
@@ -38,9 +43,9 @@ function occursOn(r: Routine, day: DayKey): boolean {
   return false
 }
 
-function Chip({ r, stepCounts, matches, onOpen, familyMembers, steps }: {
+function Chip({ r, stepCounts, matches, onOpen, familyMembers, steps, onAddStep }: {
   r: Routine; stepCounts: Record<string, number>; matches: (r: Routine) => boolean; onOpen: (r: Routine) => void
-  familyMembers: FamilyMember[]; steps: Routine[]
+  familyMembers: FamilyMember[]; steps: Routine[]; onAddStep?: (collectionId: string, name: string) => void
 }) {
   const [expanded, setExpanded] = useState(false)
   const stepCount = stepCounts[r.id]
@@ -80,44 +85,68 @@ function Chip({ r, stepCounts, matches, onOpen, familyMembers, steps }: {
         </span>
       )}
       {expanded && (
-        <ul className="mt-1.5 border-l-2 border-emerald-200 pl-2 flex flex-col gap-0.5">
+        <div className="mt-1.5 border-l-2 border-emerald-200 pl-2 flex flex-col gap-0.5">
           {steps.map(s => (
-            <li key={s.id} className="text-[10px] leading-snug text-neutral-500">{s.name}</li>
+            <div key={s.id} className="text-[10px] leading-snug text-neutral-500">{s.name}</div>
           ))}
-        </ul>
+          {onAddStep && (
+            <QuickAddInput
+              label={`Add step to ${r.name}`}
+              placeholder="New step"
+              onSubmit={name => onAddStep(r.id, name)}
+            />
+          )}
+        </div>
       )}
     </div>
   )
 }
 
-export function WeekStrip({ days, sometime, stepCounts, matches, todayKey, onOpenRoutine, familyMembers = [], collectionSteps = {}, dailyItems = [], restingDays, onWake }: WeekStripProps) {
+export function WeekStrip({ days, sometime, stepCounts, matches, todayKey, onOpenRoutine, familyMembers = [], collectionSteps = {}, dailyItems = [], restingDays, onWake, onQuickAdd, onAddStep }: WeekStripProps) {
   // Every-day items are visible by default; the preference persists per browser.
   const [showDaily, setShowDaily] = useState(() => localStorage.getItem('rhythm-week-show-daily') !== '0')
   const toggleDaily = () => setShowDaily(v => {
     localStorage.setItem('rhythm-week-show-daily', v ? '0' : '1')
     return !v
   })
+  // Same deal for ghosted resting (asleep) routines.
+  const [showResting, setShowResting] = useState(() => localStorage.getItem('rhythm-week-show-resting') !== '0')
+  const toggleResting = () => setShowResting(v => {
+    localStorage.setItem('rhythm-week-show-resting', v ? '0' : '1')
+    return !v
+  })
+  const restingCount = DAY_ORDER.reduce((n, d) => n + (restingDays?.[d].length ?? 0), 0)
 
   const total = DAY_ORDER.reduce((n, d) => n + days[d].length + (restingDays?.[d].length ?? 0), 0)
-  if (total === 0 && sometime.length === 0 && dailyItems.length === 0) return null
+  if (total === 0 && sometime.length === 0 && dailyItems.length === 0 && !onQuickAdd) return null
 
   return (
     <section className="mb-10">
       <div className="mb-3 flex items-baseline justify-between gap-3">
         <h2 className="text-xs font-semibold uppercase tracking-wider text-neutral-400">Through the week</h2>
-        {dailyItems.length > 0 && (
-          <button
-            onClick={toggleDaily}
-            className="text-xs text-neutral-400 hover:text-neutral-600 transition-colors"
-          >
-            {showDaily ? 'Hide every-day items' : 'Show every-day items'}
-          </button>
-        )}
+        <div className="flex items-center gap-3">
+          {restingCount > 0 && (
+            <button
+              onClick={toggleResting}
+              className="text-xs text-neutral-400 hover:text-neutral-600 transition-colors"
+            >
+              {showResting ? 'Hide resting items' : `Show resting items (${restingCount})`}
+            </button>
+          )}
+          {dailyItems.length > 0 && (
+            <button
+              onClick={toggleDaily}
+              className="text-xs text-neutral-400 hover:text-neutral-600 transition-colors"
+            >
+              {showDaily ? 'Hide every-day items' : 'Show every-day items'}
+            </button>
+          )}
+        </div>
       </div>
       <div className="grid grid-cols-[repeat(7,minmax(92px,1fr))] gap-2 overflow-x-auto min-w-0">
         {DAY_ORDER.map(day => {
           const items = days[day]
-          const resting = restingDays?.[day] ?? []
+          const resting = showResting ? (restingDays?.[day] ?? []) : []
           const daily = showDaily ? dailyItems.filter(r => occursOn(r, day)) : []
           const isToday = day === todayKey
           return (
@@ -142,7 +171,7 @@ export function WeekStrip({ days, sometime, stepCounts, matches, todayKey, onOpe
                   {items.map(r => (
                     <Chip key={`${day}-${r.id}`} r={r} stepCounts={stepCounts} matches={matches}
                           onOpen={onOpenRoutine} familyMembers={familyMembers}
-                          steps={collectionSteps[r.id] ?? []} />
+                          steps={collectionSteps[r.id] ?? []} onAddStep={onAddStep} />
                   ))}
                 </div>
               )}
@@ -190,6 +219,15 @@ export function WeekStrip({ days, sometime, stepCounts, matches, todayKey, onOpe
                       </button>
                     ))}
                   </div>
+                </div>
+              )}
+              {onQuickAdd && (
+                <div className="mt-1">
+                  <QuickAddInput
+                    label={`Add a routine on ${DAY_LABEL[day]}`}
+                    placeholder={`New on ${DAY_LABEL[day]}`}
+                    onSubmit={name => onQuickAdd(name, day)}
+                  />
                 </div>
               )}
             </div>

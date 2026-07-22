@@ -103,7 +103,9 @@ describe('RhythmPage', () => {
     )
     fireEvent.click(screen.getByRole('button', { name: /name this rhythm/i }))
     fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter' })
-    expect(onGroupIntoCollection).toHaveBeenCalledWith('Bedtime', ['a', 'b', 'c'])
+    // The cluster's start time + daily recurrence keep the new collection in place on the arc.
+    expect(onGroupIntoCollection).toHaveBeenCalledWith('Bedtime', ['a', 'b', 'c'],
+      { time_of_day: '19:01', recurrence_pattern: { type: 'daily' } })
   })
 
   it('dismissing a tend suggestion hides it and persists to localStorage', () => {

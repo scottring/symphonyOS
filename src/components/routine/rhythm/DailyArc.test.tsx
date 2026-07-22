@@ -52,6 +52,32 @@ describe('DailyArc', () => {
     expect(onNameCluster).toHaveBeenCalledWith(card, 'Bedtime')
   })
 
+  it('renames a cluster by clicking its title', () => {
+    const onNameCluster = vi.fn()
+    const card: RhythmCard = {
+      kind: 'cluster', id: 'cluster-1', name: null,
+      startTime: '06:30:00', endTime: '07:00:00', suggestedName: 'Morning',
+      routines: [mk({}), mk({})],
+    }
+    render(<DailyArc {...base} onNameCluster={onNameCluster} cards={[card]} anytime={[]} />)
+    fireEvent.click(screen.getByRole('button', { name: /unnamed cluster/i }))
+    const input = screen.getByPlaceholderText('Name this rhythm')
+    expect((input as HTMLInputElement).value).toBe('Morning')
+    fireEvent.change(input, { target: { value: 'Morning chores' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(onNameCluster).toHaveBeenCalledWith(card, 'Morning chores')
+  })
+
+  it('quick-adds an every-day routine from the anytime row', () => {
+    const onQuickAddDaily = vi.fn()
+    render(<DailyArc {...base} onQuickAddDaily={onQuickAddDaily} cards={[]} anytime={[mk({ name: 'PT Exercises' })]} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Add an every-day routine' }))
+    const input = screen.getByPlaceholderText('New every-day routine')
+    fireEvent.change(input, { target: { value: 'Water plants' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(onQuickAddDaily).toHaveBeenCalledWith('Water plants')
+  })
+
   it('renders anytime pills and opens the routine on click', () => {
     const onOpenRoutine = vi.fn()
     const pt = mk({ name: 'PT Exercises' })

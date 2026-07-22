@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Plus, Search, Sparkles, RefreshCw } from 'lucide-react'
-import type { Routine } from '@/types/actionable'
+import type { RecurrencePattern, Routine } from '@/types/actionable'
 import type { Contact } from '@/types/contact'
 import type { FamilyMember } from '@/types/family'
 import type { UpdateRoutineInput } from '@/hooks/useRoutines'
@@ -33,7 +33,13 @@ interface RhythmPageProps {
   /** Delete a top-level routine (RoutinesApp already passes this — it was silently dropped before). */
   onDelete?: (id: string) => void
   onCreateCollection?: (name: string) => Promise<Routine | null> | void
-  onGroupIntoCollection?: (name: string, routineIds: string[]) => void
+  onGroupIntoCollection?: (
+    name: string,
+    routineIds: string[],
+    opts?: { time_of_day?: string; recurrence_pattern?: RecurrencePattern },
+  ) => void
+  /** Inline quick-create from the timeline views (day columns, anytime row). */
+  onQuickCreate?: (input: { name: string; recurrence_pattern: RecurrencePattern; time_of_day?: string }) => void
   /** Open the AI routine builder (paste text / drop a PDF → proposed routine). */
   onBuildWithAI?: () => void
 }
@@ -41,7 +47,7 @@ interface RhythmPageProps {
 export function RhythmPage(props: RhythmPageProps) {
   const {
     routines, loading = false, familyMembers = [],
-    onUpdateRoutine, onDelete, onGroupIntoCollection, onBuildWithAI, onCreateCollection,
+    onUpdateRoutine, onDelete, onGroupIntoCollection, onBuildWithAI, onCreateCollection, onQuickCreate,
   } = props
 
   const [memberId, setMemberId] = useState<string | null>(null)
@@ -112,7 +118,12 @@ export function RhythmPage(props: RhythmPageProps) {
   const subtitle = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
 
   const handleNameCluster = (card: RhythmCard, name: string) => {
-    onGroupIntoCollection?.(name, card.routines.map(r => r.id))
+    // Stamp the cluster's start time + daily recurrence on the new collection
+    // so it stays in place on the arc instead of landing untimed at the end.
+    onGroupIntoCollection?.(name, card.routines.map(r => r.id), {
+      time_of_day: card.startTime?.slice(0, 5) ?? undefined,
+      recurrence_pattern: { type: 'daily' },
+    })
   }
   const handleWakeAll = () => {
     for (const r of model.seasonal) onUpdateRoutine(r.id, { visibility: 'active', paused_until: null })
@@ -295,6 +306,9 @@ export function RhythmPage(props: RhythmPageProps) {
             onOpenCollection={id => setOpen({ kind: 'routine', id })}
             onOpenRoutine={openRoutine}
             onNameCluster={handleNameCluster}
+            onQuickAddDaily={onQuickCreate
+              ? name => onQuickCreate({ name, recurrence_pattern: { type: 'daily' } })
+              : undefined}
           />
         </div>
 
@@ -311,6 +325,10 @@ export function RhythmPage(props: RhythmPageProps) {
             dailyItems={dailyItems}
             restingDays={model.week.restingDays}
             onWake={r => onUpdateRoutine(r.id, { visibility: 'active', paused_until: null })}
+            onQuickAdd={onQuickCreate
+              ? (name, day) => onQuickCreate({ name, recurrence_pattern: { type: 'weekly', days: [day] } })
+              : undefined}
+            onAddStep={props.onAddStep}
           />
         </div>
 
