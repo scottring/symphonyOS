@@ -5,8 +5,8 @@
 // src/lib/cadence/config.ts orderedWeekDays/orderedDayKeys — the single
 // source of ordering for the app.
 
-import { describe, it, expect } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { describe, it, expect, vi } from 'vitest'
+import { render, screen, fireEvent } from '@testing-library/react'
 import { MonthCalendarGrid } from './MonthCalendarGrid'
 import type { Task } from '@/types/task'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
@@ -38,5 +38,48 @@ describe('MonthCalendarGrid week-start ordering', () => {
     expect(headers[0]).toHaveTextContent('Mon')
     // First cell of the grid is Mon Jun 29 2026.
     expect(firstCellDay(container)).toBe('29')
+  })
+})
+
+describe('MonthCalendarGrid seam — Open week chip', () => {
+  it('shows "Open week →" on hover and calls onOpenWeek with the row\'s local-date week start', () => {
+    const onOpenWeek = vi.fn()
+    // July 2026, Monday-first: gridStart is Mon Jun 29; row 2 (Jul 13–19)
+    // contains Wed Jul 15 — hovering it should open the week starting Mon Jul 13.
+    render(
+      <MonthCalendarGrid
+        month={new Date(2026, 6, 1)}
+        tasks={tasks}
+        events={events}
+        weekStartsOn={1}
+        onOpenWeek={onOpenWeek}
+      />
+    )
+
+    expect(screen.queryByText('Open week →')).not.toBeInTheDocument()
+
+    const dayCell = screen.getByText('15').closest('div')
+    expect(dayCell).not.toBeNull()
+    fireEvent.mouseEnter(dayCell!)
+
+    const chip = screen.getByText('Open week →')
+    expect(chip).toBeInTheDocument()
+
+    fireEvent.click(chip)
+    expect(onOpenWeek).toHaveBeenCalledTimes(1)
+    const weekStart: Date = onOpenWeek.mock.calls[0][0]
+    expect(weekStart.getFullYear()).toBe(2026)
+    expect(weekStart.getMonth()).toBe(6) // July (0-indexed)
+    expect(weekStart.getDate()).toBe(13) // Monday of that row
+  })
+
+  it('renders no chip without onOpenWeek', () => {
+    const { container } = render(
+      <MonthCalendarGrid month={new Date(2026, 6, 1)} tasks={tasks} events={events} weekStartsOn={1} />
+    )
+    const dayCell = screen.getByText('15').closest('div')
+    fireEvent.mouseEnter(dayCell!)
+    expect(screen.queryByText('Open week →')).not.toBeInTheDocument()
+    expect(container).toBeTruthy()
   })
 })

@@ -6,13 +6,40 @@
 // Extracted verbatim from the former HorizonView.tsx common return branch
 // (mechanical split — no behavior change; horizon fixed to 'week').
 
+import { useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { PAGE_COLUMN } from '@/components/layout/pageLayout';
 import { PlanningSession } from '@/components/planning/PlanningSession';
 import { CalendarRange, Plus, ChevronRight, FolderOpen } from 'lucide-react';
 import { ScheduleActionsProvider } from '@/contexts/ScheduleActionsContext';
 import { UndoToast } from '@/components/undo/UndoToast';
 import { HorizonExplainer } from '@/components/planning/explainers/HorizonExplainer';
+import { readCadenceConfig, weekStartAnchor } from '@/lib/cadence/config';
 import { CascadeRail, useHorizonPageData } from './shared';
+
+// `?start=YYYY-MM-DD` parsed from LOCAL date parts — never Date.parse/UTC,
+// which would shift the anchor a day in negative-UTC-offset timezones.
+// Rejects malformed strings and impossible calendar dates (e.g. 2026-02-30).
+function parseLocalYmd(value: string | null): Date | null {
+  if (!value) return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
+  if (!m) return null;
+  const year = Number(m[1]);
+  const month = Number(m[2]) - 1;
+  const day = Number(m[3]);
+  const date = new Date(year, month, day);
+  if (date.getFullYear() !== year || date.getMonth() !== month || date.getDate() !== day) return null;
+  return date;
+}
+
+// LOCAL date parts, never toISOString() — UTC would shift the date near
+// midnight in negative-UTC-offset timezones.
+function localYmd(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
 
 export function WeekPage() {
   const horizon = 'week' as const;
@@ -26,6 +53,21 @@ export function WeekPage() {
     scheduleActionsValue, undo,
   } = useHorizonPageData(horizon);
 
+  // Month→Week seam: `?start=` anchors this page on a specific week — the
+  // grid's initial date, the header's range label, and (via minDropDate,
+  // unchanged below) which days accept a drop. The pool/carry-over sections
+  // stay bucket-based (this week only) — see report for why that's fine.
+  const [searchParams] = useSearchParams();
+  const startAnchor = parseLocalYmd(searchParams.get('start'));
+  const anchoredWeekStart = useMemo(() => {
+    if (!startAnchor) return null;
+    return weekStartAnchor(startAnchor, readCadenceConfig().weekStartsOn);
+  }, [startAnchor]);
+  const gridInitialDate = anchoredWeekStart ?? weekGridStart;
+  const displayPeriod = anchoredWeekStart
+    ? `Week of ${anchoredWeekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+    : (period ?? label);
+
   return (
     <ScheduleActionsProvider value={scheduleActionsValue}>
       <div className="h-full overflow-y-auto">
@@ -34,9 +76,9 @@ export function WeekPage() {
             <div>
               <p className="text-[11px] uppercase tracking-wider text-neutral-400">{label}</p>
               <h1 className="font-display text-3xl font-semibold text-neutral-800 mt-0.5">
-                {period ?? label}
+                {displayPeriod}
               </h1>
-              {progress ? (
+              {progress && !anchoredWeekStart ? (
                 <div className="mt-2 flex items-center gap-2 text-xs text-neutral-400">
                   <span>Day {progress.day} of {progress.total}</span>
                   <span className="h-1 w-24 rounded-full bg-neutral-200 overflow-hidden inline-block">
@@ -101,8 +143,9 @@ export function WeekPage() {
               onUpdateTask={updateTask}
               onPushTask={pushTask}
               onClose={() => {}}
-              initialDate={weekGridStart}
+              initialDate={gridInitialDate}
               minDropDate={todayStart}
+              onOpenDay={(d) => navigate(`/today?date=${localYmd(d)}`)}
               embedded
             />
           </div>

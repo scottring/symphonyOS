@@ -7,6 +7,10 @@
 
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@/test/test-utils'
+import { render as rtlRender } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
+import { PlaceProvider } from '@/hooks/usePlace'
+import { DomainProvider } from '@/hooks/useDomain'
 
 // ── Context/selection hooks that throw without a real provider: mock them
 // directly (same pattern as src/components/omnibox/OmniboxResults.test.tsx). ──
@@ -95,5 +99,20 @@ describe('horizon pages (smoke)', () => {
   it('SomedayPage renders the timeless-pool empty state', () => {
     render(<SomedayPage />)
     expect(screen.getByText(/Timeless — review during seasonal planning\./i)).toBeInTheDocument()
+  })
+
+  it('WeekPage anchors on `?start=` — header shows that week, not the current one', () => {
+    // A MemoryRouter (not the shared test-utils BrowserRouter) so the initial
+    // location — and therefore useSearchParams() — is deterministic.
+    rtlRender(
+      <MemoryRouter initialEntries={['/week?start=2026-07-05']}>
+        <PlaceProvider>
+          <DomainProvider>
+            <WeekPage />
+          </DomainProvider>
+        </PlaceProvider>
+      </MemoryRouter>
+    )
+    expect(screen.getByText('Week of Jul 5')).toBeInTheDocument()
   })
 })

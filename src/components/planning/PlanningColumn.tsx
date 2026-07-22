@@ -55,6 +55,9 @@ interface PlanningColumnProps {
   timeLabels: TimeLabel[]
   slotHeight: number
   dayStartHour: number
+  /** Week→Today seam: when present, the day header renders a small "→ day"
+   *  button that jumps to this date on the Today rung. */
+  onOpenDay?: (date: Date) => void
 }
 
 export function PlanningColumn({
@@ -67,6 +70,7 @@ export function PlanningColumn({
   timeLabels,
   slotHeight,
   dayStartHour,
+  onOpenDay,
 }: PlanningColumnProps) {
   // Helper to find family member by ID
   const getMember = useCallback((id: string | null | undefined) => {
@@ -209,20 +213,33 @@ export function PlanningColumn({
     >
       {/* Day header */}
       <div
-        className={`h-12 px-3 flex flex-col justify-center border-b border-neutral-200 sticky top-0 z-10 ${
+        className={`h-12 px-3 flex items-center justify-between gap-2 border-b border-neutral-200 sticky top-0 z-10 ${
           isToday ? 'bg-primary-50' : 'bg-neutral-50'
         }`}
       >
-        <span className="text-sm font-medium text-neutral-700">
-          {date.toLocaleDateString('en-US', { weekday: 'short' })}
-        </span>
-        <span
-          className={`text-xs ${
-            isToday ? 'text-primary-600 font-semibold' : 'text-neutral-500'
-          }`}
-        >
-          {date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-        </span>
+        <div className="flex flex-col justify-center min-w-0">
+          <span className="text-sm font-medium text-neutral-700">
+            {date.toLocaleDateString('en-US', { weekday: 'short' })}
+          </span>
+          <span
+            className={`text-xs ${
+              isToday ? 'text-primary-600 font-semibold' : 'text-neutral-500'
+            }`}
+          >
+            {date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+          </span>
+        </div>
+        {onOpenDay && (
+          <button
+            type="button"
+            onClick={() => onOpenDay(date)}
+            aria-label={`Open ${date.toLocaleDateString('en-US', { weekday: 'short' })} on Today`}
+            title="Open this day on Today"
+            className="shrink-0 text-[11px] font-medium text-neutral-400 hover:text-primary-700 transition-colors"
+          >
+            → day
+          </button>
+        )}
       </div>
 
       {/* Time slots (drop targets) */}

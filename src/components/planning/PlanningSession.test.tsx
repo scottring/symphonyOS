@@ -341,6 +341,45 @@ describe('PlanningSession', () => {
     expect(wa.style.left).not.toBe(wb.style.left)
   })
 
+  it('renders a "→ day" button per day header when onOpenDay is given, none without it', () => {
+    const onOpenDay = vi.fn()
+    const { rerender } = render(
+      <PlanningSession
+        tasks={[]}
+        events={[]}
+        routines={[]}
+        onUpdateTask={vi.fn()}
+        onPushTask={vi.fn()}
+        onClose={vi.fn()}
+        onOpenDay={onOpenDay}
+      />
+    )
+
+    // Default range is a single day — grow it to 7 via the header's "Add day"
+    // control (max 7, same as the week-planning grid).
+    const addDay = screen.getByRole('button', { name: /add day/i })
+    for (let i = 0; i < 6; i++) fireEvent.click(addDay)
+
+    const openDayButtons = screen.getAllByRole('button', { name: /open .* on today/i })
+    expect(openDayButtons).toHaveLength(7)
+
+    fireEvent.click(openDayButtons[0])
+    expect(onOpenDay).toHaveBeenCalledTimes(1)
+    expect(onOpenDay.mock.calls[0][0]).toBeInstanceOf(Date)
+
+    rerender(
+      <PlanningSession
+        tasks={[]}
+        events={[]}
+        routines={[]}
+        onUpdateTask={vi.fn()}
+        onPushTask={vi.fn()}
+        onClose={vi.fn()}
+      />
+    )
+    expect(screen.queryAllByRole('button', { name: /open .* on today/i })).toHaveLength(0)
+  })
+
   it('collapses heavy overlap (beyond the lane cap) into a "+N" chip', () => {
     const today = new Date()
     today.setHours(9, 0, 0, 0)

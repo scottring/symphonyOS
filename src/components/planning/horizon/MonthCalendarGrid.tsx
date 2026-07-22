@@ -30,6 +30,10 @@ interface MonthCalendarGridProps {
   /** Which day the week starts on. Defaults to the cadence config so nothing
    *  needs to thread it through unless a caller wants to override (tests). */
   weekStartsOn?: WeekStart
+  /** Month→Week seam: when present, hovering any cell in a grid row washes
+   *  the whole row and offers a floating "Open week →" chip that jumps to
+   *  the Week page anchored on that row's first day. */
+  onOpenWeek?: (weekStart: Date) => void
 }
 
 const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -45,9 +49,13 @@ function eventStart(e: CalendarEvent): Date | null {
   return Number.isNaN(d.getTime()) ? null : d
 }
 
-export function MonthCalendarGrid({ month, tasks, events, onPlaceTask, onUnscheduleTask, onSelectTask, readOnly = false, weekStartsOn = readCadenceConfig().weekStartsOn }: MonthCalendarGridProps) {
+export function MonthCalendarGrid({ month, tasks, events, onPlaceTask, onUnscheduleTask, onSelectTask, readOnly = false, weekStartsOn = readCadenceConfig().weekStartsOn, onOpenWeek }: MonthCalendarGridProps) {
   const [dragOverKey, setDragOverKey] = useState<string | null>(null)
   const [railOver, setRailOver] = useState(false)
+  // Which grid row (0-5) the pointer is over — a full row wash + the "Open
+  // week →" chip. Row membership is cellIndex / 7, same math as the 42-cell
+  // grid build below.
+  const [hoverRow, setHoverRow] = useState<number | null>(null)
 
   const weekdayLabels = useMemo(
     () => orderedWeekDays(weekStartsOn).map((d) => WEEKDAY_LABELS[d]),
@@ -150,9 +158,14 @@ export function MonthCalendarGrid({ month, tasks, events, onPlaceTask, onUnsched
             const inMonth = day.getMonth() === monthIndex
             const { dayTasks, dayEvents } = itemsFor(day)
             const dragging = dragOverKey === key
+            const row = Math.floor(i / 7)
+            const isLastColumn = i % 7 === 6
+            const rowHovered = onOpenWeek != null && hoverRow === row
             return (
               <div
                 key={key}
+                onMouseEnter={onOpenWeek ? () => setHoverRow(row) : undefined}
+                onMouseLeave={onOpenWeek ? () => setHoverRow((r) => (r === row ? null : r)) : undefined}
                 onDragOver={readOnly ? undefined : (e) => { e.preventDefault(); setDragOverKey(key) }}
                 onDragLeave={readOnly ? undefined : () => setDragOverKey((k) => (k === key ? null : k))}
                 onDrop={readOnly ? undefined : (e) => {
@@ -170,9 +183,11 @@ export function MonthCalendarGrid({ month, tasks, events, onPlaceTask, onUnsched
                   }
                   onPlaceTask?.(id, target)
                 }}
-                className={`min-h-[92px] border-b border-r border-neutral-100 p-1.5 flex flex-col gap-1 ${
+                className={`relative min-h-[92px] border-b border-r border-neutral-100 p-1.5 flex flex-col gap-1 ${
                   i % 7 === 0 ? 'border-l' : ''
-                } ${inMonth ? 'bg-white' : 'bg-neutral-50/50'} ${dragging ? 'ring-2 ring-inset ring-primary-400 bg-primary-50/40' : ''}`}
+                } ${inMonth ? 'bg-white' : 'bg-neutral-50/50'} ${dragging ? 'ring-2 ring-inset ring-primary-400 bg-primary-50/40' : ''} ${
+                  rowHovered ? 'bg-amber-50' : ''
+                }`}
               >
                 <span className={`text-xs font-medium self-end ${
                   isToday(day) ? 'w-5 h-5 grid place-items-center rounded-full bg-primary-600 text-white' : inMonth ? 'text-neutral-500' : 'text-neutral-300'
@@ -197,6 +212,20 @@ export function MonthCalendarGrid({ month, tasks, events, onPlaceTask, onUnsched
                     onClick={() => onSelectTask?.(t.id)}
                   />
                 ))}
+                {/* Floating "Open week →" chip — shown at the hovered row's
+                    right edge (the last column's cell hosts it). */}
+                {rowHovered && isLastColumn && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onOpenWeek?.(cells[row * 7])
+                    }}
+                    className="absolute right-1.5 top-1.5 z-10 inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-md bg-amber-100 text-amber-800 border border-amber-200 shadow-sm hover:bg-amber-200 transition-colors"
+                  >
+                    Open week →
+                  </button>
+                )}
               </div>
             )
           })}

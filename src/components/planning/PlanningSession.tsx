@@ -49,6 +49,9 @@ interface PlanningSessionProps {
   minDropDate?: Date
   getRoutinesForDate?: (date: Date) => Routine[]
   embedded?: boolean
+  /** Week→Today seam: when present, each day header renders a small "→ day"
+   *  button that jumps straight to that date on the Today rung. */
+  onOpenDay?: (date: Date) => void
 }
 
 // Time slot duration in minutes
@@ -79,6 +82,7 @@ export function PlanningSession({
   minDropDate,
   getRoutinesForDate,
   embedded = false,
+  onOpenDay,
 }: PlanningSessionProps) {
   // Date range state - start with the initial date if provided
   const [dateRange, setDateRange] = useState<Date[]>(() => {
@@ -505,6 +509,7 @@ export function PlanningSession({
             dayStartHour={DAY_START_HOUR}
             dayEndHour={DAY_END_HOUR}
             slotDuration={SLOT_DURATION}
+            onOpenDay={onOpenDay}
           />
 
           {/* Drag overlay */}

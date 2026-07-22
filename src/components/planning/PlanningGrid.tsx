@@ -16,6 +16,7 @@ interface PlanningGridProps {
   dayStartHour: number
   dayEndHour: number
   slotDuration: number
+  onOpenDay?: (date: Date) => void
 }
 
 export function PlanningGrid({
@@ -28,6 +29,7 @@ export function PlanningGrid({
   dayStartHour,
   dayEndHour,
   slotDuration,
+  onOpenDay,
 }: PlanningGridProps) {
   // Generate time labels
   const timeLabels = useMemo(() => {
@@ -95,6 +97,7 @@ export function PlanningGrid({
               timeLabels={timeLabels}
               slotHeight={slotHeight}
               dayStartHour={dayStartHour}
+              onOpenDay={onOpenDay}
             />
           )
         })}

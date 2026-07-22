@@ -17,6 +17,16 @@ import { servingCount } from '@/lib/planning/betPulse';
 import { readCadenceConfig } from '@/lib/cadence/config';
 import { CascadeRail, useHorizonPageData } from './shared';
 
+// LOCAL date parts, never toISOString() — UTC would shift the date near
+// midnight in negative-UTC-offset timezones (the week-row's Sunday could
+// read back as Saturday for anyone west of Greenwich).
+function localYmd(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
 export function MonthPage() {
   const horizon = 'month' as const;
   const {
@@ -108,6 +118,7 @@ export function MonthPage() {
               onPlaceTask={(id, day) => updateTask(id, { bucket: 'timed', scheduledFor: day })}
               onUnscheduleTask={(id) => updateTask(id, { bucket: 'month', scheduledFor: undefined })}
               onSelectTask={handleSelect}
+              onOpenWeek={(d) => navigate(`/week?start=${localYmd(d)}`)}
             />
           </div>
 
