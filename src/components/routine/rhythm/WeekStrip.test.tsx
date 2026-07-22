@@ -106,3 +106,26 @@ describe('WeekStrip', () => {
     expect(screen.getByTestId('day-wed')).toBeInTheDocument()
   })
 })
+
+describe('pulse view and day focus', () => {
+  it('toggles pulse view: chips collapse to slim bars and the preference persists', () => {
+    localStorage.removeItem('rhythm-week-density')
+    const lib = mk({ id: 'lib', name: 'Library trip', recurrence_pattern: { type: 'weekly', days: ['thu'] } })
+    render(<WeekStrip {...base} days={{ ...empty, thu: [lib] }} stepCounts={{ lib: 3 }} />)
+    expect(screen.getByText('3 steps')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /pulse view/i }))
+    expect(screen.queryByText('3 steps')).not.toBeInTheDocument()
+    expect(screen.getByText('Library trip')).toBeInTheDocument()
+    expect(localStorage.getItem('rhythm-week-density')).toBe('pulse')
+    fireEvent.click(screen.getByRole('button', { name: /normal view/i }))
+    expect(screen.getByText('3 steps')).toBeInTheDocument()
+  })
+
+  it('clicking a day header selects it; the selected day is highlighted', () => {
+    const onSelectDay = vi.fn()
+    render(<WeekStrip {...base} days={empty} onDropIntent={vi.fn()} selectedDay="wed" onSelectDay={onSelectDay} />)
+    expect(screen.getByTestId('day-wed').className).toContain('border-amber-500')
+    fireEvent.click(screen.getByRole('button', { name: /^THU/ }))
+    expect(onSelectDay).toHaveBeenCalledWith('thu')
+  })
+})

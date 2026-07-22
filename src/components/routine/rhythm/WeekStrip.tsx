@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronDown } from 'lucide-react'
+import { BarChart3, ChevronDown, LayoutList } from 'lucide-react'
 import type { Routine } from '@/types/actionable'
 import type { FamilyMember } from '@/types/family'
 import { AssigneeAvatar } from '@/components/family/AssigneeAvatar'
@@ -20,6 +20,9 @@ export interface WeekStripProps {
   collectionSteps?: Record<string, Routine[]>
   /** Drag-and-drop: chips become draggable and day columns accept drops. */
   onDropIntent?: (intent: DropIntent) => void
+  /** Day focus: clicking a day's header selects it (the arc shows that day). */
+  selectedDay?: DayKey | null
+  onSelectDay?: (day: DayKey) => void
 }
 
 const DAY_LABEL: Record<DayKey, string> = {
@@ -82,14 +85,30 @@ function Chip({ r, stepCounts, matches, onOpen, familyMembers, steps, day, onDro
   )
 }
 
-export function WeekStrip({ days, sometime, stepCounts, matches, todayKey, onOpenRoutine, familyMembers = [], collectionSteps = {}, onDropIntent }: WeekStripProps) {
+export function WeekStrip({ days, sometime, stepCounts, matches, todayKey, onOpenRoutine, familyMembers = [], collectionSteps = {}, onDropIntent, selectedDay = null, onSelectDay }: WeekStripProps) {
   const [dropDay, setDropDay] = useState<DayKey | null>(null)
+  // Pulse view: every chip renders as one slim uniform bar, so each column's
+  // height reads as that day's load (one unit per routine; steps don't count).
+  const [pulse, setPulse] = useState(() => localStorage.getItem('rhythm-week-density') === 'pulse')
+  const togglePulse = () => setPulse(v => {
+    localStorage.setItem('rhythm-week-density', v ? 'normal' : 'pulse')
+    return !v
+  })
   const total = DAY_ORDER.reduce((n, d) => n + days[d].length, 0)
   if (total === 0 && sometime.length === 0 && !onDropIntent) return null
 
   return (
     <section className="mb-10">
-      <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-neutral-400">Through the week</h2>
+      <div className="mb-3 flex items-baseline justify-between gap-3">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-neutral-400">Through the week</h2>
+        <button
+          onClick={togglePulse}
+          className="inline-flex items-center gap-1 text-xs text-neutral-400 hover:text-neutral-600 transition-colors"
+        >
+          {pulse ? <LayoutList className="w-3.5 h-3.5" /> : <BarChart3 className="w-3.5 h-3.5" />}
+          {pulse ? 'Normal view' : 'Pulse view'}
+        </button>
+      </div>
       <div className="grid grid-cols-[repeat(7,minmax(92px,1fr))] gap-2 overflow-x-auto min-w-0">
         {DAY_ORDER.map(day => {
           const items = days[day]
@@ -115,18 +134,50 @@ export function WeekStrip({ days, sometime, stepCounts, matches, todayKey, onOpe
               className={`rounded-xl p-2 ${
                 dropDay === day
                   ? 'border-2 border-dashed border-amber-400 bg-amber-50/40'
-                  : isToday
-                    ? 'border-2 border-[var(--color-primary-500,#3d5a44)] bg-emerald-50/40'
-                    : 'border border-neutral-100 bg-white'
+                  : selectedDay === day
+                    ? 'border-2 border-amber-500 bg-amber-50/40'
+                    : isToday
+                      ? 'border-2 border-[var(--color-primary-500,#3d5a44)] bg-emerald-50/40'
+                      : 'border border-neutral-100 bg-white'
               }`}
             >
-              <div className={`text-[10px] font-bold mb-1.5 ${isToday ? 'text-emerald-800' : 'text-neutral-400'}`}>
-                {DAY_LABEL[day]}
-                {isToday && ' · today'}
-                {items.length >= FULL_THRESHOLD && <span className="text-orange-600"> · full</span>}
-              </div>
+              {onSelectDay ? (
+                <button
+                  onClick={() => onSelectDay(day)}
+                  title={selectedDay === day ? 'Back to every day' : `Show ${DAY_LABEL[day]} on the timeline`}
+                  className={`mb-1.5 block w-full text-left text-[10px] font-bold transition-colors ${
+                    selectedDay === day ? 'text-amber-700' : isToday ? 'text-emerald-800' : 'text-neutral-400 hover:text-neutral-600'
+                  }`}
+                >
+                  {DAY_LABEL[day]}
+                  {isToday && ' · today'}
+                  {items.length >= FULL_THRESHOLD && <span className="text-orange-600"> · full</span>}
+                </button>
+              ) : (
+                <div className={`text-[10px] font-bold mb-1.5 ${isToday ? 'text-emerald-800' : 'text-neutral-400'}`}>
+                  {DAY_LABEL[day]}
+                  {isToday && ' · today'}
+                  {items.length >= FULL_THRESHOLD && <span className="text-orange-600"> · full</span>}
+                </div>
+              )}
               {items.length === 0 ? (
                 <div className="text-[11px] italic text-neutral-300">quiet</div>
+              ) : pulse ? (
+                <div className="flex flex-col gap-0.5">
+                  {items.map(r => (
+                    <button
+                      key={`${day}-${r.id}`}
+                      onClick={() => onOpenRoutine(r)}
+                      draggable={!!onDropIntent}
+                      onDragStart={onDropIntent ? (e => setDragPayload(e, { kind: 'routine', id: r.id, fromDay: day })) : undefined}
+                      className={`block w-full truncate rounded bg-emerald-300/60 px-1.5 py-0.5 text-left text-[9px]
+                                  leading-tight text-neutral-700 hover:bg-emerald-300 transition-colors
+                                  ${matches(r) ? '' : 'opacity-30'} ${onDropIntent ? 'cursor-grab' : ''}`}
+                    >
+                      {r.name}
+                    </button>
+                  ))}
+                </div>
               ) : (
                 <div className="flex flex-col gap-1">
                   {items.map(r => (

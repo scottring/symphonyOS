@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { DailyArc } from './DailyArc'
+import { arcColumns } from './dragTypes'
 import type { RhythmCard } from './rhythmModel'
 import type { Routine } from '@/types/actionable'
 
@@ -182,5 +183,68 @@ describe('DailyArc', () => {
     render(<DailyArc {...base} {...dragProps} cards={[]} anytime={[pt]} />)
     fireEvent.dragStart(screen.getByText('PT Exercises').closest('[draggable="true"]')!, { dataTransfer: dt })
     expect(JSON.parse(dt.getData('text/rhythm-payload'))).toEqual({ kind: 'routine', id: 'pt' })
+  })
+})
+
+describe('arcColumns', () => {
+  const c = (id: string, startTime: string | null): RhythmCard =>
+    ({ kind: 'single', id, name: id, startTime, endTime: startTime, routines: [] })
+
+  it('places cards proportionally to their start time', () => {
+    const cols = arcColumns([c('morning', '06:30:00'), c('noonish', '13:45:00'), c('evening', '21:00:00')])
+    expect(cols[0]).toBe(1)      // 6:30 → far left
+    expect(cols[1]).toBe(7)      // ~midday → middle band
+    expect(cols[2]).toBe(13)     // 21:00 → far right (16 - 4 + 1 = max 13)
+  })
+
+  it('pushes same-row collisions right and clamps to the grid', () => {
+    // cards 0 and 2 share the top row; identical times must not overlap
+    const cols = arcColumns([c('a', '07:00:00'), c('b', '07:05:00'), c('c', '07:10:00')])
+    expect(cols[2]).toBeGreaterThanOrEqual(cols[0] + 4)
+    const clamped = arcColumns([c('x', '21:30:00'), c('y', '21:30:00'), c('z', '21:30:00')])
+    expect(Math.max(...clamped)).toBeLessThanOrEqual(13)
+  })
+})
+
+describe('routine-on-routine grouping', () => {
+  const dragProps = { onDropIntent: vi.fn(), foldTargets: [], onNameGroup: vi.fn(), onFoldInto: vi.fn() }
+
+  it('dropping onto a single block emits add-steps targeting that routine', () => {
+    const onDropIntent = vi.fn()
+    const dt = mkDT()
+    dt.setData('text/rhythm-payload', JSON.stringify({ kind: 'routine', id: 'feed' }))
+    dt.setData('text/rhythm-kind-routine', '1')
+    const card: RhythmCard = {
+      kind: 'single', id: 'walk', name: 'Walk Jax', startTime: '06:30:00', endTime: '06:30:00',
+      routines: [mk({ id: 'walk', name: 'Walk Jax', time_of_day: '06:30:00' })],
+    }
+    render(<DailyArc {...base} {...dragProps} onDropIntent={onDropIntent} cards={[card]} anytime={[]} />)
+    fireEvent.drop(screen.getByTestId('arc-card-walk'), { dataTransfer: dt })
+    expect(onDropIntent).toHaveBeenCalledWith({ type: 'add-steps', collectionId: 'walk', ids: ['feed'] })
+  })
+
+  it('dropping onto a cluster pill emits add-steps targeting that pill', () => {
+    const onDropIntent = vi.fn()
+    const dt = mkDT()
+    dt.setData('text/rhythm-payload', JSON.stringify({ kind: 'routine', id: 'hamper' }))
+    dt.setData('text/rhythm-kind-routine', '1')
+    const card: RhythmCard = {
+      kind: 'cluster', id: 'c1', name: null, startTime: '19:00:00', endTime: '19:06:00',
+      suggestedName: 'Bedtime',
+      routines: [mk({ id: 'kitchen', name: 'Clean kitchen', time_of_day: '19:00:00' }), mk({ id: 'dog', name: 'Feed dog' })],
+    }
+    render(<DailyArc {...base} {...dragProps} onDropIntent={onDropIntent} cards={[card]} anytime={[]} />)
+    fireEvent.drop(screen.getByText('Clean kitchen').closest('button')!, { dataTransfer: dt })
+    expect(onDropIntent).toHaveBeenCalledWith({ type: 'add-steps', collectionId: 'kitchen', ids: ['hamper'] })
+  })
+
+  it('uses a focused heading when provided', () => {
+    const card: RhythmCard = {
+      kind: 'single', id: 'walk', name: 'Walk Jax', startTime: '06:30:00', endTime: '06:30:00',
+      routines: [mk({ id: 'walk', name: 'Walk Jax' })],
+    }
+    render(<DailyArc {...base} heading="Wednesday — the whole day" cards={[card]} anytime={[]} />)
+    expect(screen.getByText('Wednesday — the whole day')).toBeInTheDocument()
+    expect(screen.queryByText('Every day')).not.toBeInTheDocument()
   })
 })

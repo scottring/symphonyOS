@@ -5,7 +5,7 @@ import { AssigneeAvatar } from '@/components/family/AssigneeAvatar'
 import { GripVertical } from 'lucide-react'
 import { minutesOf, resolveMembers, type RhythmCard } from './rhythmModel'
 import { formatRange, formatClock } from './format'
-import { ARC_START, ARC_END, setDragPayload, readDragPayload, acceptsDrag, timeFromAxisX, type DragPayload } from './dragTypes'
+import { ARC_START, ARC_END, ARC_COLS, CARD_SPAN, arcColumns, setDragPayload, readDragPayload, acceptsDrag, timeFromAxisX, type DragPayload } from './dragTypes'
 import { resolveDrop, type DropIntent } from './dropRules'
 import { GroupNamePopover } from './GroupNamePopover'
 
@@ -15,6 +15,9 @@ export interface DailyArcProps {
   familyMembers: FamilyMember[]
   matches: (r: Routine) => boolean
   nowMinutes: number
+  /** Section heading — "Every day" normally, the weekday name when a
+   *  Through-the-week day is focused. */
+  heading?: string
   onOpenCollection: (id: string) => void
   onOpenRoutine: (r: Routine) => void
   /** Drag-and-drop: when present, pills/headers become draggable and the
@@ -40,6 +43,7 @@ const RULER_MARKS: { label: string; minutes: number }[] = [
   { label: '9 pm', minutes: 21 * 60 },
 ]
 
+
 /** Payload for a pill inside a card: collection steps travel as steps,
  *  cluster members and singles travel as loose routines. */
 function pillPayload(card: RhythmCard, r: Routine): DragPayload {
@@ -64,6 +68,7 @@ function ArcCard({ card, familyMembers, matches, onOpenCollection, onOpenRoutine
   onFoldInto?: (targetId: string, ids: string[]) => void
 }) {
   const [dropHover, setDropHover] = useState(false)
+  const [pillHover, setPillHover] = useState<string | null>(null)
   const [naming, setNaming] = useState(false)
   const draggable = !!onDropIntent
   const canName = card.kind === 'cluster' && !!onNameGroup && !!onFoldInto
@@ -72,8 +77,13 @@ function ArcCard({ card, familyMembers, matches, onOpenCollection, onOpenRoutine
   const cardMatches =
     card.routines.some(matches) || (card.name != null && matches({ name: card.name } as Routine))
 
-  const isDropTarget = card.kind === 'collection' && !!onDropIntent
-  const dropHandlers = isDropTarget ? {
+  // Collection blocks fold drops in as steps; single blocks accept drops too —
+  // dropping A onto B makes A a step OF B, turning B into a group.
+  const blockTarget =
+    card.kind === 'collection' ? { kind: 'collection-block' as const, collectionId: card.id }
+    : card.kind === 'single' ? { kind: 'routine-target' as const, routineId: card.routines[0].id }
+    : null
+  const dropHandlers = blockTarget && onDropIntent ? {
     onDragOver: (e: React.DragEvent) => {
       if (!acceptsDrag(e, ['step', 'routine', 'group'])) return
       e.preventDefault()
@@ -85,10 +95,33 @@ function ArcCard({ card, familyMembers, matches, onOpenCollection, onOpenRoutine
       setDropHover(false)
       const payload = readDragPayload(e)
       if (!payload) return
-      const intent = resolveDrop(payload, { kind: 'collection-block', collectionId: card.id })
+      const intent = resolveDrop(payload, blockTarget)
       if (intent) onDropIntent!(intent)
     },
   } : {}
+
+  // Cluster pills are drop targets individually: dropping onto a pill makes
+  // the dragged item a step of THAT routine (collection steps are not
+  // targets — no nested collections).
+  const pillDropHandlers = (r: Routine) =>
+    card.kind === 'cluster' && onDropIntent ? {
+      onDragOver: (e: React.DragEvent) => {
+        if (!acceptsDrag(e, ['step', 'routine', 'group'])) return
+        e.preventDefault()
+        e.stopPropagation()
+        setPillHover(r.id)
+      },
+      onDragLeave: () => setPillHover(null),
+      onDrop: (e: React.DragEvent) => {
+        e.preventDefault()
+        e.stopPropagation()
+        setPillHover(null)
+        const payload = readDragPayload(e)
+        if (!payload) return
+        const intent = resolveDrop(payload, { kind: 'routine-target', routineId: r.id })
+        if (intent) onDropIntent!(intent)
+      },
+    } : {}
 
   return (
     <div
@@ -156,9 +189,11 @@ function ArcCard({ card, familyMembers, matches, onOpenCollection, onOpenRoutine
               onClick={() => onOpenRoutine(r)}
               draggable={draggable}
               onDragStart={draggable ? (e => setDragPayload(e, pillPayload(card, r))) : undefined}
+              {...pillDropHandlers(r)}
               className={`w-full flex items-center justify-between gap-2 text-left text-sm rounded-lg px-2 py-1
                           hover:bg-neutral-50 transition-colors ${matches(r) ? 'text-neutral-700' : 'opacity-30'}
-                          ${draggable ? 'cursor-grab' : ''}`}
+                          ${draggable ? 'cursor-grab' : ''}
+                          ${pillHover === r.id ? 'ring-2 ring-amber-400 bg-amber-50' : ''}`}
             >
               <span className="flex items-center gap-1 flex-1 min-w-0">
                 {draggable && <GripVertical className="w-3 h-3 flex-shrink-0 text-neutral-300" />}
@@ -179,7 +214,7 @@ function ArcCard({ card, familyMembers, matches, onOpenCollection, onOpenRoutine
         ))}
         {dropHover && (
           <li className="rounded-lg border border-dashed border-amber-400 bg-amber-50 px-2 py-1 text-xs text-amber-700">
-            drop to add as step
+            {card.kind === 'collection' ? 'drop to add as step' : `drop to group with ${card.routines[0].name}`}
           </li>
         )}
       </ul>
@@ -187,9 +222,11 @@ function ArcCard({ card, familyMembers, matches, onOpenCollection, onOpenRoutine
   )
 }
 
-export function DailyArc({ cards, anytime, familyMembers, matches, nowMinutes, onOpenCollection, onOpenRoutine, onDropIntent, foldTargets, onNameGroup, onFoldInto }: DailyArcProps) {
+export function DailyArc({ cards, anytime, familyMembers, matches, nowMinutes, heading, onOpenCollection, onOpenRoutine, onDropIntent, foldTargets, onNameGroup, onFoldInto }: DailyArcProps) {
   const [caret, setCaret] = useState<{ leftPct: number; time: string } | null>(null)
   if (cards.length === 0 && anytime.length === 0) return null
+
+  const columns = arcColumns(cards)
 
   const axisHandlers = onDropIntent ? {
     onDragOver: (e: React.DragEvent) => {
@@ -216,19 +253,19 @@ export function DailyArc({ cards, anytime, familyMembers, matches, nowMinutes, o
 
   return (
     <section className="mb-10">
-      <h2 className="text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-3">Every day</h2>
+      <h2 className="text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-3">{heading ?? 'Every day'}</h2>
 
-      {/* Center timeline with staggered cards: the thick dawn→dusk ruler runs
-          through the middle; cards alternate above/below and each card starts
-          at the horizontal midpoint of the one before it (2-col spans on an
-          N+1 column grid). Stems/dots anchor at each card's true start time.
-          With drag enabled, the ruler doubles as a drop target: hover shows a
-          caret + time; dropping retimes/promotes at that time. */}
+      {/* Center timeline with cards anchored near their true start times: the
+          thick dawn→dusk ruler always stretches the full page width; cards
+          alternate above/below and land in the column band nearest their time
+          (arcColumns), so each card sits beside its dot. With drag enabled the
+          ruler doubles as a drop target: hover shows a caret + time; dropping
+          retimes/promotes at that time. */}
       {cards.length > 0 && (
         <div className="overflow-x-auto pt-6 pb-2">
           <div
-            className="grid gap-x-3 grid-rows-[auto_4rem_auto]"
-            style={{ gridTemplateColumns: `repeat(${cards.length + 1}, 165px)` }}
+            className="grid w-full min-w-[880px] gap-x-3 grid-rows-[auto_4rem_auto]"
+            style={{ gridTemplateColumns: `repeat(${ARC_COLS}, minmax(0, 1fr))` }}
           >
             {/* The day ruler, spanning all columns */}
             <div
@@ -285,13 +322,13 @@ export function DailyArc({ cards, anytime, familyMembers, matches, nowMinutes, o
               })}
             </div>
 
-            {/* Card cells — each spans 2 columns starting at column i+1, so a
-                card's left edge sits at the midpoint of the previous one */}
+            {/* Card cells — placed in the column band nearest their start time
+                so each card stays visually attached to its dot on the ruler */}
             {cards.map((card, i) => (
               <div
                 key={card.id}
                 className={i % 2 === 0 ? 'self-end row-start-1 min-w-0' : 'self-start row-start-3 min-w-0'}
-                style={{ gridColumn: `${i + 1} / span 2` }}
+                style={{ gridColumn: `${columns[i]} / span ${CARD_SPAN}` }}
               >
                 <ArcCard
                   card={card}

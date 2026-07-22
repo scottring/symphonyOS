@@ -73,13 +73,14 @@ function suggestName(startMinutes: number): string {
 
 export function buildRhythmModel(
   routines: Routine[],
-  opts: { memberId?: string | null } = {},
+  opts: { memberId?: string | null; focusDay?: DayKey | null } = {},
 ): RhythmModel {
   const { collections, standalone } = groupRoutineSteps(routines)
   const stepCounts: Record<string, number> = {}
   for (const c of collections) stepCounts[c.id] = c.steps.length
 
   const memberId = opts.memberId ?? null
+  const focusDay = opts.focusDay ?? null
   const keep = (r: Routine, steps: Routine[] = []): boolean => {
     if (!memberId) return true
     return [r, ...steps].some(x => memberIdsOf(x).includes(memberId))
@@ -129,6 +130,25 @@ export function buildRhythmModel(
       const wd = weekDaysFor(routine)
       if (wd.length > 0) for (const d of wd) model.week.days[d].push(routine)
       else model.week.sometime.push(routine)
+      // Focused day: that day's weekly routines ALSO join the arc, placed at
+      // their times, so the arc becomes the full picture of the chosen day.
+      if (focusDay && wd.includes(focusDay)) {
+        if (steps.length > 0) {
+          model.daily.timed.push({
+            kind: 'collection',
+            id: routine.id,
+            name: routine.name,
+            startTime: routine.time_of_day,
+            endTime: routine.time_of_day,
+            routines: steps,
+            routine,
+          })
+        } else if (routine.time_of_day) {
+          looseTimedDaily.push(routine)
+        } else {
+          model.daily.anytime.push(routine)
+        }
+      }
     } else {
       model.sometimes.push(routine)
     }

@@ -212,3 +212,25 @@ describe('RhythmPage', () => {
     localStorage.removeItem('rhythm-tend-dismissed')
   })
 })
+
+describe('day focus', () => {
+  it("clicking a week day shows that day's weekly routines on the arc", () => {
+    render(
+      <RhythmPage {...noop} onUpdateRoutine={vi.fn()}
+        routines={[
+          mk('Walk Jax', { id: 'walk', time_of_day: '06:30:00' }),
+          mk('Kids Bedtime', { id: 'bed', recurrence_pattern: { type: 'weekly', days: ['wed'] }, time_of_day: '19:15:00' }),
+        ]} />
+    )
+    // before focusing, the weekly routine appears only as a week chip
+    expect(screen.getByRole('heading', { name: 'Every day' })).toBeInTheDocument()
+    expect(screen.getAllByText('Kids Bedtime')).toHaveLength(1)
+
+    fireEvent.click(screen.getByRole('button', { name: /^WED/ }))
+    expect(screen.getByRole('heading', { name: /wednesday — the whole day/i })).toBeInTheDocument()
+    expect(screen.getAllByText('Kids Bedtime').length).toBeGreaterThan(1)
+
+    fireEvent.click(screen.getByRole('button', { name: /^WED/ }))
+    expect(screen.getByRole('heading', { name: 'Every day' })).toBeInTheDocument()
+  })
+})

@@ -56,3 +56,20 @@ describe('week-day target', () => {
       .toEqual({ type: 'weekly-on', ids: ['a', 'b'], day: 'thu' })
   })
 })
+
+describe('routine-target (drop A onto B → A becomes a step of B)', () => {
+  const target = { kind: 'routine-target', routineId: 'walk' } as const
+  it('folds steps, routines, and groups in as steps of the target', () => {
+    expect(resolveDrop({ kind: 'routine', id: 'feed' }, target))
+      .toEqual({ type: 'add-steps', collectionId: 'walk', ids: ['feed'] })
+    expect(resolveDrop({ kind: 'step', id: 's1' }, target))
+      .toEqual({ type: 'add-steps', collectionId: 'walk', ids: ['s1'] })
+    expect(resolveDrop({ kind: 'group', ids: ['a', 'b'] }, target))
+      .toEqual({ type: 'add-steps', collectionId: 'walk', ids: ['a', 'b'] })
+  })
+  it('rejects collections and self-drops', () => {
+    expect(resolveDrop({ kind: 'collection', id: 'camp' }, target)).toBeNull()
+    expect(resolveDrop({ kind: 'routine', id: 'walk' }, target)).toBeNull()
+    expect(resolveDrop({ kind: 'group', ids: ['x', 'walk'] }, target)).toBeNull()
+  })
+})

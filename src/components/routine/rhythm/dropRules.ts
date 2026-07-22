@@ -3,6 +3,9 @@ import type { DragPayload } from './dragTypes'
 
 export type DropTarget =
   | { kind: 'collection-block'; collectionId: string }
+  /** A loose top-level routine (single block or cluster pill) — dropping on
+   *  it makes the dragged item a step OF it, turning it into a group. */
+  | { kind: 'routine-target'; routineId: string }
   | { kind: 'axis'; time: string }
   | { kind: 'week-day'; day: DayKey }
 
@@ -18,11 +21,13 @@ export type DropIntent =
  *  additionally skips steps dropped onto their own parent. */
 export function resolveDrop(payload: DragPayload, target: DropTarget): DropIntent | null {
   switch (target.kind) {
-    case 'collection-block': {
+    case 'collection-block':
+    case 'routine-target': {
       if (payload.kind === 'collection') return null
+      const collectionId = target.kind === 'collection-block' ? target.collectionId : target.routineId
       const ids = payload.kind === 'group' ? payload.ids : [payload.id]
-      if (ids.includes(target.collectionId)) return null
-      return { type: 'add-steps', collectionId: target.collectionId, ids }
+      if (ids.includes(collectionId)) return null
+      return { type: 'add-steps', collectionId, ids }
     }
     case 'axis': {
       if (payload.kind === 'step') return { type: 'stand-alone-at', id: payload.id, time: target.time }

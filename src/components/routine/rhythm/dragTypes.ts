@@ -1,7 +1,31 @@
-import type { DayKey } from './rhythmModel'
+import { minutesOf, type DayKey, type RhythmCard } from './rhythmModel'
 
 export const ARC_START = 6 * 60   // 6:00
 export const ARC_END = 21.5 * 60  // 21:30
+
+// The arc grid always stretches the full page width; cards land in the
+// column band nearest their true start time so each card sits by its dot.
+export const ARC_COLS = 16
+export const CARD_SPAN = 4
+
+/** Column start (1-based) per card: proportional to start time, pushed right
+ *  on same-row collisions (cards alternate above/below), clamped to fit. */
+export function arcColumns(cards: RhythmCard[], cols = ARC_COLS, span = CARD_SPAN): number[] {
+  let lastAbove = -Infinity
+  let lastBelow = -Infinity
+  return cards.map((card, i) => {
+    const above = i % 2 === 0
+    const start = minutesOf(card.startTime) ?? ARC_START
+    const frac = Math.min(Math.max((start - ARC_START) / (ARC_END - ARC_START), 0), 1)
+    let col = 1 + Math.round(frac * (cols - span))
+    const prev = above ? lastAbove : lastBelow
+    col = Math.max(col, prev + span)
+    col = Math.min(col, cols - span + 1)
+    if (above) lastAbove = col
+    else lastBelow = col
+    return col
+  })
+}
 
 export type DragPayload =
   | { kind: 'step'; id: string }

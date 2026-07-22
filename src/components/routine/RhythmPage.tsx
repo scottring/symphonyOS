@@ -7,7 +7,12 @@ import type { UpdateRoutineInput } from '@/hooks/useRoutines'
 import { groupRoutineSteps } from '@/lib/today/routineCollections'
 import { TapRoutinePanel } from '@/components/surface/TapRoutinePanel'
 import { TapStepPanel } from '@/components/surface/TapStepPanel'
-import { buildRhythmModel, DAY_ORDER, minutesOf, type RhythmCard } from './rhythm/rhythmModel'
+import { buildRhythmModel, DAY_ORDER, minutesOf, type DayKey, type RhythmCard } from './rhythm/rhythmModel'
+
+const DAY_FULL: Record<DayKey, string> = {
+  sun: 'Sunday', mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday',
+  thu: 'Thursday', fri: 'Friday', sat: 'Saturday',
+}
 import { findTend, tendFindingKey } from './rhythm/tendHeuristics'
 import { DailyArc } from './rhythm/DailyArc'
 import { WeekStrip } from './rhythm/WeekStrip'
@@ -52,11 +57,13 @@ export function RhythmPage(props: RhythmPageProps) {
   } = props
 
   const [memberId, setMemberId] = useState<string | null>(null)
+  // A focused Through-the-week day: the arc shows that day's full picture.
+  const [focusDay, setFocusDay] = useState<DayKey | null>(null)
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState<{ kind: 'routine' | 'standalone-step' | 'step'; id: string } | null>(null)
   const [tendOpen, setTendOpen] = useState(false)
 
-  const model = useMemo(() => buildRhythmModel(routines, { memberId }), [routines, memberId])
+  const model = useMemo(() => buildRhythmModel(routines, { memberId, focusDay }), [routines, memberId, focusDay])
 
   // Dismissed tend suggestions persist so a rejected grouping stays gone.
   const [dismissedTend, setDismissedTend] = useState<string[]>(() => {
@@ -325,6 +332,7 @@ export function RhythmPage(props: RhythmPageProps) {
             familyMembers={familyMembers}
             matches={matches}
             nowMinutes={nowMinutes}
+            heading={focusDay ? `${DAY_FULL[focusDay]} — the whole day` : undefined}
             onOpenCollection={id => setOpen({ kind: 'routine', id })}
             onOpenRoutine={openRoutine}
             onDropIntent={executeDropIntent}
@@ -345,6 +353,8 @@ export function RhythmPage(props: RhythmPageProps) {
             familyMembers={familyMembers}
             collectionSteps={collectionSteps}
             onDropIntent={executeDropIntent}
+            selectedDay={focusDay}
+            onSelectDay={day => setFocusDay(cur => (cur === day ? null : day))}
           />
         </div>
 

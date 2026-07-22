@@ -190,3 +190,26 @@ describe('buildRhythmModel person filter', () => {
     expect(iris.daily.timed).toHaveLength(0)
   })
 })
+
+describe('buildRhythmModel focus day', () => {
+  it("adds the focused day's weekly routines to the arc, at their times", () => {
+    const bedtime = mk({ id: 'bed', name: 'Kids Bedtime', recurrence_pattern: { type: 'weekly', days: ['wed', 'fri'] }, time_of_day: '19:15:00' })
+    const errand = mk({ id: 'err', name: 'Recycling out', recurrence_pattern: { type: 'weekly', days: ['wed'] } })
+    const daily = mk({ id: 'walk', name: 'Walk Jax', time_of_day: '06:30:00' })
+
+    const plain = buildRhythmModel([bedtime, errand, daily])
+    expect(plain.daily.timed.flatMap(c => c.routines.map(r => r.id))).toEqual(['walk'])
+    expect(plain.daily.anytime).toEqual([])
+
+    const wed = buildRhythmModel([bedtime, errand, daily], { focusDay: 'wed' })
+    expect(wed.daily.timed.flatMap(c => c.routines.map(r => r.id))).toEqual(expect.arrayContaining(['walk', 'bed']))
+    expect(wed.daily.anytime.map(r => r.id)).toEqual(['err'])
+    // still present in the week columns — focus augments the arc, not the strip
+    expect(wed.week.days.wed.map(r => r.id)).toEqual(expect.arrayContaining(['bed', 'err']))
+
+    const fri = buildRhythmModel([bedtime, errand, daily], { focusDay: 'fri' })
+    expect(fri.daily.anytime).toEqual([])
+    expect(fri.daily.timed.flatMap(c => c.routines.map(r => r.id))).toEqual(expect.arrayContaining(['walk', 'bed']))
+    expect(fri.daily.timed.flatMap(c => c.routines.map(r => r.id))).not.toContain('err')
+  })
+})
