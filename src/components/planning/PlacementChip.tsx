@@ -60,13 +60,22 @@ export function PlacementChip({
       `}
     >
       {draggable && <GripVertical className="w-3 h-3 text-neutral-300 shrink-0" />}
-      <button
-        type="button"
-        onClick={onClick}
-        className="flex-1 min-w-0 text-left line-clamp-2 truncate text-neutral-700"
-      >
-        {name}
-      </button>
+      {onClick ? (
+        <button
+          type="button"
+          onClick={onClick}
+          className="flex-1 min-w-0 text-left line-clamp-2 truncate text-neutral-700"
+        >
+          {name}
+        </button>
+      ) : (
+        // No onClick (e.g. calendar events, which aren't selectable from the
+        // month grid) — a plain div, not a button, so it isn't a focusable,
+        // seemingly-clickable no-op tab stop.
+        <div className="flex-1 min-w-0 text-left line-clamp-2 truncate text-neutral-700">
+          {name}
+        </div>
+      )}
       {members && members.length > 0 && (
         <span className="flex -space-x-1.5 shrink-0">
           {members.map((m) => (

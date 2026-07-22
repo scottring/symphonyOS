@@ -110,8 +110,16 @@ export interface ReferenceItem {
 
 /** Everything a horizon page needs to render — identical wiring for every
  * horizon, differing only by the `horizon` passed in and the data it turns
- * up. See file header for why this lives as one hook. */
-export function useHorizonPageData(horizon: HorizonId) {
+ * up. See file header for why this lives as one hook.
+ *
+ * `anchorDate` (week only): when the Week page is anchored on a specific
+ * week via `?start=`, the caller passes that week's start date so the grid
+ * task filter window follows the anchored week instead of the current one —
+ * otherwise `/week?start=<a past/future week>` always computes against
+ * *this* week and the grid renders empty for any week that isn't current.
+ * Pool/carry-over/placed stay bucket-based (current week only) by design —
+ * see WeekPage.tsx for the seam comment. */
+export function useHorizonPageData(horizon: HorizonId, anchorDate?: Date) {
   const navigate = useNavigate();
   const def = HORIZONS.find((h) => h.id === horizon);
 
@@ -186,7 +194,12 @@ export function useHorizonPageData(horizon: HorizonId) {
   // on today mid-week, refuses past-day drops, and keeps a placed rock
   // visible where it was dropped (bucket week→timed on scheduling). ──
   const todayStart = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; }, []);
-  const weekAnchor = useMemo(() => weekStartAnchor(new Date(), readCadenceConfig().weekStartsOn), []);
+  // Anchored to `anchorDate` when the page is viewing a specific week
+  // (`?start=`); otherwise the current week, as before.
+  const weekAnchor = useMemo(
+    () => weekStartAnchor(anchorDate ?? new Date(), readCadenceConfig().weekStartsOn),
+    [anchorDate],
+  );
   const weekGridStart = weekAnchor.getTime() > todayStart.getTime() ? weekAnchor : todayStart;
   const weekGridTasks = useMemo(() => {
     if (horizon !== 'week') return [];
@@ -576,6 +589,7 @@ export function useHorizonPageData(horizon: HorizonId) {
           familyMembers={familyMembers}
           quickActions={[]}
           onQuickAction={() => {}}
+          draggable
           triageMenu={
             horizon === 'season' || horizon === 'month' ? parkingMenu : (
               <TriageWhenMenu

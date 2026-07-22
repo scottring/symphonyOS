@@ -72,6 +72,17 @@ describe('PlacementChip', () => {
     expect(onClick).toHaveBeenCalled()
   })
 
+  it('renders the name as a button (focusable) when onClick is provided', () => {
+    render(<PlacementChip id="t1" name="Buy groceries" onClick={vi.fn()} />)
+    expect(screen.getByRole('button', { name: 'Buy groceries' })).toBeInTheDocument()
+  })
+
+  it('renders the name as a non-focusable div when onClick is absent (e.g. events)', () => {
+    render(<PlacementChip id="e1" name="Dentist" kind="event" />)
+    expect(screen.queryByRole('button', { name: 'Dentist' })).not.toBeInTheDocument()
+    expect(screen.getByText('Dentist')).toBeInTheDocument()
+  })
+
   it('defaults the title tooltip to name', () => {
     const { container } = render(<PlacementChip id="t1" name="Buy groceries" />)
     const el = container.firstElementChild as HTMLElement

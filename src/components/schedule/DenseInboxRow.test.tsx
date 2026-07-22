@@ -131,8 +131,8 @@ describe('DenseInboxRow', () => {
     expect(onToggleSelection).toHaveBeenCalled()
   })
 
-  it('sets text/task-id on dragStart from the grip handle', () => {
-    const { getByTestId } = render(<DenseInboxRow {...baseProps} quickActions={INBOX_ACTIONS} />)
+  it('sets text/task-id on dragStart from the grip handle when draggable', () => {
+    const { getByTestId } = render(<DenseInboxRow {...baseProps} quickActions={INBOX_ACTIONS} draggable />)
     const grip = getByTestId('drag-handle')
     const dataTransfer = makeDataTransfer()
     fireEvent.dragStart(grip, { dataTransfer })
@@ -140,12 +140,22 @@ describe('DenseInboxRow', () => {
   })
 
   it('does not set text/task-id when dragStart fires on the completion checkbox', () => {
-    render(<DenseInboxRow {...baseProps} quickActions={INBOX_ACTIONS} />)
+    render(<DenseInboxRow {...baseProps} quickActions={INBOX_ACTIONS} draggable />)
     // The completion control isn't draggable — dragStart on it must not
     // populate the payload (only the grip handle may).
     const checkbox = screen.getByRole('button', { name: /mark complete/i })
     const dataTransfer = makeDataTransfer()
     fireEvent.dragStart(checkbox, { dataTransfer })
     expect(dataTransfer.getData('text/task-id')).toBe('')
+  })
+
+  it('does not render a grip handle by default (no drop target on inbox/staging/member surfaces)', () => {
+    const { queryByTestId } = render(<DenseInboxRow {...baseProps} quickActions={INBOX_ACTIONS} />)
+    expect(queryByTestId('drag-handle')).not.toBeInTheDocument()
+  })
+
+  it('renders a grip handle when draggable is set', () => {
+    const { getByTestId } = render(<DenseInboxRow {...baseProps} quickActions={INBOX_ACTIONS} draggable />)
+    expect(getByTestId('drag-handle')).toBeInTheDocument()
   })
 })

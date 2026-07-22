@@ -67,6 +67,12 @@ interface DenseInboxRowProps {
   /** When provided, shows a persistent star toggle (the "Focus" affordance used
    *  by the This Week dropdown). Filled amber when active. */
   focusToggle?: { active: boolean; onToggle: () => void }
+  /** Shows the grip handle and makes the row draggable (sets `text/task-id`
+   *  on dragStart). Default false — most surfaces rendering this row
+   *  (InboxView, StagingFloat, MemberView) have no drop target to drag onto;
+   *  only the horizons pool renderer (a grid with day/rail drop targets)
+   *  opts in. */
+  draggable?: boolean
 }
 
 const CONTEXT_OPTIONS: Array<{ value: TaskContext | null; label: string }> = [
@@ -98,6 +104,7 @@ export const DenseInboxRow = memo(function DenseInboxRow({
   triageMenu,
   focusToggle,
   lineage,
+  draggable = false,
 }: DenseInboxRowProps) {
   const [contextOpen, setContextOpen] = useState(false)
 
@@ -120,8 +127,10 @@ export const DenseInboxRow = memo(function DenseInboxRow({
     >
       {/* Grip handle — the ONLY draggable surface on the row. Drag must not
           hijack clicks on the checkbox/title/popovers/quick actions, so the
-          draggable + dragStart attributes live here, not on the row div. */}
-      {task.id && (
+          draggable + dragStart attributes live here, not on the row div.
+          Gated behind `draggable` — surfaces with no drop target (inbox,
+          staging, member view) must not show a grip that goes nowhere. */}
+      {draggable && task.id && (
         <span
           data-testid="drag-handle"
           draggable

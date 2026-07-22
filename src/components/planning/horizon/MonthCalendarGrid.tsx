@@ -213,7 +213,10 @@ export function MonthCalendarGrid({ month, tasks, events, onPlaceTask, onUnsched
                   />
                 ))}
                 {/* Floating "Open week →" chip — shown at the hovered row's
-                    right edge (the last column's cell hosts it). */}
+                    right edge (the last column's cell hosts it). Floated
+                    above the cell's top edge (-top-2.5) rather than inside
+                    it, so it doesn't sit on top of the day number, which is
+                    also anchored top-right of the cell. */}
                 {rowHovered && isLastColumn && (
                   <button
                     type="button"
@@ -221,7 +224,7 @@ export function MonthCalendarGrid({ month, tasks, events, onPlaceTask, onUnsched
                       e.stopPropagation()
                       onOpenWeek?.(cells[row * 7])
                     }}
-                    className="absolute right-1.5 top-1.5 z-10 inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-md bg-amber-100 text-amber-800 border border-amber-200 shadow-sm hover:bg-amber-200 transition-colors"
+                    className="absolute -top-2.5 right-1.5 z-10 inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-md bg-amber-100 text-amber-800 border border-amber-200 shadow-sm hover:bg-amber-200 transition-colors"
                   >
                     Open week →
                   </button>

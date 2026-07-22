@@ -43,6 +43,20 @@ function localYmd(d: Date): string {
 
 export function WeekPage() {
   const horizon = 'week' as const;
+
+  // Month→Week seam: `?start=` anchors this page on a specific week — the
+  // grid's initial date, the header's range label, which days accept a drop
+  // (via minDropDate, unchanged below), and — via `anchorDate` below — which
+  // week's tasks the grid filters to. Parsed before the data hook so it can
+  // thread straight through. The pool/carry-over sections stay bucket-based
+  // (this week only) — see report for why that's fine.
+  const [searchParams] = useSearchParams();
+  const startAnchor = parseLocalYmd(searchParams.get('start'));
+  const anchoredWeekStart = useMemo(() => {
+    if (!startAnchor) return null;
+    return weekStartAnchor(startAnchor, readCadenceConfig().weekStartsOn);
+  }, [startAnchor]);
+
   const {
     navigate, allRoutines, familyMembers, eventNotesMap, updateTask, pushTask,
     domainEvents, weekGridTasks, weekGridStart, todayStart, railCounts,
@@ -51,18 +65,8 @@ export function WeekPage() {
     explainerOpen, setExplainerOpen, label, grouped, renderRow,
     horizonBucket, draft, setDraft, submitDraft,
     scheduleActionsValue, undo,
-  } = useHorizonPageData(horizon);
+  } = useHorizonPageData(horizon, anchoredWeekStart ?? undefined);
 
-  // Month→Week seam: `?start=` anchors this page on a specific week — the
-  // grid's initial date, the header's range label, and (via minDropDate,
-  // unchanged below) which days accept a drop. The pool/carry-over sections
-  // stay bucket-based (this week only) — see report for why that's fine.
-  const [searchParams] = useSearchParams();
-  const startAnchor = parseLocalYmd(searchParams.get('start'));
-  const anchoredWeekStart = useMemo(() => {
-    if (!startAnchor) return null;
-    return weekStartAnchor(startAnchor, readCadenceConfig().weekStartsOn);
-  }, [startAnchor]);
   const gridInitialDate = anchoredWeekStart ?? weekGridStart;
   const displayPeriod = anchoredWeekStart
     ? `Week of ${anchoredWeekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
@@ -111,6 +115,7 @@ export function WeekPage() {
               drawer onto days; placed rocks live on their day. */}
           <div className="mb-8 h-[60vh] min-h-[420px]">
             <PlanningSession
+              key={localYmd(gridInitialDate)}
               tasks={weekGridTasks}
               events={domainEvents}
               routines={allRoutines}
