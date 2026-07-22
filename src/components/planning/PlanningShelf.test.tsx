@@ -55,6 +55,14 @@ describe('PlanningShelf', () => {
     expect(props.onSetBucket).toHaveBeenCalledWith('c1', 'month')
   })
 
+  it('clicking outside the ⋯ menu closes it', () => {
+    renderShelf()
+    fireEvent.click(screen.getAllByLabelText('Task actions')[0]) // c1's ⋯
+    expect(screen.getByRole('menuitem', { name: 'Open' })).toBeInTheDocument()
+    fireEvent.mouseDown(document.body)
+    expect(screen.queryByRole('menuitem', { name: 'Open' })).not.toBeInTheDocument()
+  })
+
   it('starts a sweep from the Tend button', () => {
     const props = renderShelf()
     fireEvent.click(screen.getByRole('button', { name: /tend/i }))

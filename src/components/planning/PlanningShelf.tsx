@@ -6,7 +6,7 @@
 // 'unscheduled-drawer' droppable so dragging a placed block back up here
 // unschedules it. Pressing Tend swaps pills for proposal cards (review mode).
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useDraggable, useDroppable } from '@dnd-kit/core'
 import {
   Sparkles, Plus, MoreHorizontal, X, GitMerge, Archive,
@@ -49,10 +49,30 @@ function ShelfPill({ task, carried, projectName, onOpenTask, onSetBucket, onDele
 }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: task.id })
   const [menuOpen, setMenuOpen] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!menuOpen) return
+    function handleClickOutside(event: MouseEvent) {
+      if (!containerRef.current?.contains(event.target as Node)) setMenuOpen(false)
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [menuOpen])
+
+  useEffect(() => {
+    if (!menuOpen) return
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === 'Escape') setMenuOpen(false)
+    }
+    document.addEventListener('keydown', handleEscape)
+    return () => document.removeEventListener('keydown', handleEscape)
+  }, [menuOpen])
+
   const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: 100 } : undefined
   return (
     <div
-      ref={setNodeRef}
+      ref={(node) => { setNodeRef(node); containerRef.current = node }}
       style={style}
       className={`group relative inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm touch-none cursor-grab active:cursor-grabbing transition-shadow hover:shadow-sm ${
         isDragging ? 'opacity-40' : ''
@@ -71,6 +91,8 @@ function ShelfPill({ task, carried, projectName, onOpenTask, onSetBucket, onDele
         <button
           type="button"
           aria-label="Task actions"
+          aria-haspopup="menu"
+          aria-expanded={menuOpen}
           onClick={() => setMenuOpen((v) => !v)}
           className="p-0.5 rounded text-neutral-400 hover:text-neutral-700"
         >
@@ -242,6 +264,7 @@ export function PlanningShelf(props: PlanningShelfProps) {
             <input type="text" value={draft} onChange={(e) => onDraftChange(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') onSubmitDraft() }}
               onPointerDown={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
               placeholder="Add to this week…"
               className="w-36 bg-transparent text-sm placeholder:text-neutral-400 focus:outline-none" />
           </span>
