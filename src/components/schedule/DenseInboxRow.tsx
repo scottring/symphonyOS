@@ -1,5 +1,5 @@
 import { memo, useState, useCallback } from 'react'
-import { Trash2, Check, Tag, Star } from 'lucide-react'
+import { Trash2, Check, Tag, Star, GripVertical } from 'lucide-react'
 import { ConceptIcon } from '@/lib/conceptIcons'
 import type { Task, TaskContext } from '@/types/task'
 import type { Project } from '@/types/project'
@@ -111,13 +111,21 @@ export const DenseInboxRow = memo(function DenseInboxRow({
     <div
       data-row
       data-task-id={task.id}
+      draggable={!!task.id}
+      onDragStart={task.id ? (e) => e.dataTransfer.setData('text/task-id', task.id) : undefined}
       className={`
-        group flex items-start gap-2 rounded-xl border
+        group flex items-start gap-2 rounded-lg border
         px-3 py-2 shadow-sm transition-all duration-200
         ${isSelected ? 'bg-primary-50/50 border-primary-300' : 'bg-white border-neutral-100'}
-        ${isLeaving ? 'opacity-0 translate-x-2 max-h-0 py-0 my-0 overflow-hidden border-transparent' : 'hover:shadow-md'}
+        ${isLeaving ? 'opacity-0 translate-x-2 max-h-0 py-0 my-0 overflow-hidden border-transparent' : 'hover:shadow-md hover:border-amber-300'}
       `}
     >
+      {/* Grip glyph — signals the row is draggable (onto Month/Week grid
+          cells, matching the rhythm-language PlacementChip). */}
+      {task.id && (
+        <GripVertical className="w-3 h-3 text-neutral-300 shrink-0 mt-1 cursor-grab" aria-hidden />
+      )}
+
       {/* Leading control: selection checkbox in bulk mode, else completion. */}
       <div className="shrink-0 mt-0.5" onClick={(e) => e.stopPropagation()}>
         {selectionMode ? (

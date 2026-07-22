@@ -11,6 +11,7 @@ import { GripVertical } from 'lucide-react'
 import type { Task } from '@/types/task'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import { readCadenceConfig, orderedWeekDays, type WeekStart } from '@/lib/cadence/config'
+import { PlacementChip } from '@/components/planning/PlacementChip'
 
 interface MonthCalendarGridProps {
   /** Any date within the month to render. */
@@ -177,22 +178,22 @@ export function MonthCalendarGrid({ month, tasks, events, onPlaceTask, onUnsched
                   isToday(day) ? 'w-5 h-5 grid place-items-center rounded-full bg-primary-600 text-white' : inMonth ? 'text-neutral-500' : 'text-neutral-300'
                 }`}>{day.getDate()}</span>
                 {dayEvents.map((e) => (
-                  <span key={e.id ?? `${e.title}-${key}`} className="text-[11px] leading-tight px-1 py-0.5 rounded bg-amber-50 text-amber-800 truncate" title={e.title}>
-                    {e.title}
-                  </span>
+                  <PlacementChip
+                    key={e.id ?? `${e.title}-${key}`}
+                    id={e.id ?? `${e.title}-${key}`}
+                    name={e.title}
+                    kind="event"
+                  />
                 ))}
                 {dayTasks.map((t) => (
-                  <button
+                  <PlacementChip
                     key={t.id}
-                    type="button"
+                    id={t.id}
+                    name={t.title}
+                    kind="task"
                     draggable={!readOnly}
-                    onDragStart={readOnly ? undefined : (e) => e.dataTransfer.setData('text/task-id', t.id)}
                     onClick={() => onSelectTask?.(t.id)}
-                    className={`text-left text-[11px] leading-tight px-1 py-0.5 rounded bg-primary-50 text-primary-800 truncate hover:bg-primary-100 transition-colors ${readOnly ? '' : 'cursor-grab active:cursor-grabbing'}`}
-                    title={t.title}
-                  >
-                    {t.title}
-                  </button>
+                  />
                 ))}
               </div>
             )
