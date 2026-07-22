@@ -213,7 +213,6 @@ export function RhythmPage(props: RhythmPageProps) {
               return r ? { ...r, steps: [] as Routine[] } : undefined
             })())
       : undefined
-  const openWithSteps = open?.kind === 'routine'
   const openStep = open?.kind === 'step' ? cs.flatMap(c => c.steps).find(s => s.id === open.id) : undefined
   const parentOfOpenStep = openStep ? cs.find(c => c.steps.some(s => s.id === openStep.id)) : undefined
 
@@ -398,13 +397,11 @@ export function RhythmPage(props: RhythmPageProps) {
                 onNotesChange={description => onUpdateRoutine(openRoutineItem.id, { description })}
                 onDelete={onDelete ? () => { onDelete(openRoutineItem.id); setOpen(null) } : undefined}
                 onAddSteps={props.onAddSteps ? steps => props.onAddSteps!(openRoutineItem.id, steps) : undefined}
-                {...(openWithSteps ? {
-                  steps: openRoutineItem.steps,
-                  onSelectStep: (s: Routine) => setOpen({ kind: 'step', id: s.id }),
-                  onAddStep: (name: string) => props.onAddStep(openRoutineItem.id, name),
-                  onReorderSteps: props.onReorderSteps,
-                } : {})}
-                {...(!openWithSteps && onAddToCollection ? {
+                steps={openRoutineItem.steps}
+                onSelectStep={(s: Routine) => setOpen({ kind: 'step', id: s.id })}
+                onAddStep={(name: string) => props.onAddStep(openRoutineItem.id, name)}
+                onReorderSteps={props.onReorderSteps}
+                {...(openRoutineItem.steps.length === 0 && onAddToCollection ? {
                   moveTargets: foldTargets.filter(t => t.id !== openRoutineItem.id),
                   onMoveInto: (targetId: string) => {
                     onAddToCollection(targetId, [openRoutineItem.id])

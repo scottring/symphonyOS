@@ -234,3 +234,23 @@ describe('day focus', () => {
     expect(screen.getByRole('heading', { name: 'Every day' })).toBeInTheDocument()
   })
 })
+
+describe('first step on a step-less routine', () => {
+  it('shows the add-step input on a step-less routine panel and adds through it', () => {
+    const onAddStep = vi.fn()
+    render(
+      <RhythmPage {...noop} onUpdateRoutine={vi.fn()} onAddStep={onAddStep} onAddToCollection={vi.fn()}
+        routines={[
+          mk('Kids shower routine', { id: 'shower', recurrence_pattern: { type: 'weekly', days: ['tue'] }, time_of_day: '19:00:00' }),
+          mk('Walk Jax', { id: 'walk', time_of_day: '06:30:00' }),
+        ]} />
+    )
+    fireEvent.click(screen.getByText('Kids shower routine'))
+    const input = screen.getByLabelText('Add a step')
+    fireEvent.change(input, { target: { value: 'Rinse and brush hair' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(onAddStep).toHaveBeenCalledWith('shower', 'Rinse and brush hair')
+    // step-less routines still offer "Make this a step of" alongside
+    expect(screen.getByLabelText(/make this a step of/i)).toBeInTheDocument()
+  })
+})
