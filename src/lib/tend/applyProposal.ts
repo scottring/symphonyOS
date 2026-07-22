@@ -8,7 +8,7 @@ import type { TendProposal } from './types'
 
 export interface TendActions {
   setBucket: (id: string, bucket: TaskBucket, scheduledFor?: Date, isAllDay?: boolean) => void
-  /** WeekPage passes its undo-wrapped delete so merges surface in UndoToast. */
+  /** Merge case deletes each dropId via this function; callers wanting single atomic undo handle merge themselves (as WeekPage does). */
   deleteTask: (id: string) => void
 }
 
