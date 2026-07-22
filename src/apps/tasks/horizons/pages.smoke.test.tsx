@@ -128,6 +128,14 @@ describe('horizon pages (smoke)', () => {
     expect(screen.getByText(/0 placed, 0 to place/)).toBeInTheDocument()
   })
 
+  it('WeekPage renders one surface — no duplicate list sections', () => {
+    render(<WeekPage />)
+    expect(screen.queryByText(/^Carried over/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/^Placed this week/)).not.toBeInTheDocument()
+    // The shelf is the only pool surface:
+    expect(screen.getByRole('button', { name: /tend/i })).toBeInTheDocument()
+  })
+
   it('MonthPage renders the calendar grid weekday header', () => {
     render(<MonthPage />)
     expect(screen.getByText('Sun')).toBeInTheDocument()

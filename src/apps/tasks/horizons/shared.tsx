@@ -780,7 +780,7 @@ export function useHorizonPageData(horizon: HorizonId, anchorDate?: Date) {
     domainTasks,
     showCarryOver, carryOver, pool,
     placedThisWeek,
-    todayStart, weekGridStart, weekGridTasks,
+    todayStart, weekGridStart, weekGridTasks, weekAnchor,
     railCounts,
     areas, goals, addGoal,
     seasonNotes, patchSeasonNotes,
@@ -799,6 +799,10 @@ export function useHorizonPageData(horizon: HorizonId, anchorDate?: Date) {
     grouped,
     handleCreateProjectForTask, handleConvertTaskToProject,
     handleLetGo,
+    // The undo-wrapped delete (capture-then-recreate on undo) exported under
+    // the name Tend/PlanningShelf expect — same function as handleLetGo,
+    // just not renamed at its definition site (SeasonPage still uses that name).
+    deleteTaskWithUndo: handleLetGo,
     scheduleActionsValue,
     applyWhen,
     tasksById, goalsById,
