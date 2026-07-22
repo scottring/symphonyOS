@@ -10,6 +10,7 @@ import { useMemo, useState } from 'react'
 import { GripVertical } from 'lucide-react'
 import type { Task } from '@/types/task'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
+import { readCadenceConfig, orderedWeekDays, type WeekStart } from '@/lib/cadence/config'
 
 interface MonthCalendarGridProps {
   /** Any date within the month to render. */
@@ -25,9 +26,12 @@ interface MonthCalendarGridProps {
    *  grid is a zoom-in reference (e.g. the annual session's month peek), where
    *  the "look, don't link" model forbids scheduling from this surface. */
   readOnly?: boolean
+  /** Which day the week starts on. Defaults to the cadence config so nothing
+   *  needs to thread it through unless a caller wants to override (tests). */
+  weekStartsOn?: WeekStart
 }
 
-const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+const WEEKDAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
 function sameDay(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
@@ -40,15 +44,21 @@ function eventStart(e: CalendarEvent): Date | null {
   return Number.isNaN(d.getTime()) ? null : d
 }
 
-export function MonthCalendarGrid({ month, tasks, events, onPlaceTask, onUnscheduleTask, onSelectTask, readOnly = false }: MonthCalendarGridProps) {
+export function MonthCalendarGrid({ month, tasks, events, onPlaceTask, onUnscheduleTask, onSelectTask, readOnly = false, weekStartsOn = readCadenceConfig().weekStartsOn }: MonthCalendarGridProps) {
   const [dragOverKey, setDragOverKey] = useState<string | null>(null)
   const [railOver, setRailOver] = useState(false)
 
-  // 6-week grid starting on the Sunday of the week containing the 1st.
+  const weekdayLabels = useMemo(
+    () => orderedWeekDays(weekStartsOn).map((d) => WEEKDAY_LABELS[d]),
+    [weekStartsOn],
+  )
+
+  // 6-week grid starting on the configured week-start day on/before the 1st.
   const { cells, monthIndex, monthLabel } = useMemo(() => {
     const first = new Date(month.getFullYear(), month.getMonth(), 1)
+    const offset = (first.getDay() - weekStartsOn + 7) % 7
     const gridStart = new Date(first)
-    gridStart.setDate(1 - first.getDay())
+    gridStart.setDate(1 - offset)
     const days: Date[] = []
     for (let i = 0; i < 42; i++) {
       const d = new Date(gridStart)
@@ -60,7 +70,7 @@ export function MonthCalendarGrid({ month, tasks, events, onPlaceTask, onUnsched
       monthIndex: month.getMonth(),
       monthLabel: month.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
     }
-  }, [month])
+  }, [month, weekStartsOn])
 
   // Undated rocks = this month's bucket, no scheduled time — the things to
   // place. A rock whose copied-down child is still live is effectively placed
@@ -129,8 +139,8 @@ export function MonthCalendarGrid({ month, tasks, events, onPlaceTask, onUnsched
           <h2 className="font-display text-lg text-neutral-800">{monthLabel}</h2>
         </div>
         <div className="grid grid-cols-7 border-b border-neutral-100">
-          {WEEKDAYS.map((w) => (
-            <div key={w} className="px-2 py-1.5 text-[11px] font-medium uppercase tracking-wide text-neutral-400 text-center">{w}</div>
+          {weekdayLabels.map((w, i) => (
+            <div key={`${w}-${i}`} className="px-2 py-1.5 text-[11px] font-medium uppercase tracking-wide text-neutral-400 text-center">{w}</div>
           ))}
         </div>
         <div className="grid grid-cols-7">

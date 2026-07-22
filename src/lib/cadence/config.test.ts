@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { weekStartAnchor, weekToken, getDueSession, DEFAULT_CADENCE } from './config'
+import { weekStartAnchor, weekToken, getDueSession, DEFAULT_CADENCE, orderedWeekDays, orderedDayKeys } from './config'
 
 describe('cadence config', () => {
   describe('weekStartAnchor', () => {
@@ -77,6 +77,14 @@ describe('cadence config', () => {
       const secondSat = new Date(2026, 5, 13) // Sat Jun 13 (> 7th)
       // Not the weekly day (Sunday default) either → nothing due.
       expect(getDueSession(DEFAULT_CADENCE, secondSat)).toBeNull()
+    })
+  })
+
+  describe('orderedWeekDays / orderedDayKeys', () => {
+    it('orders week days from the configured start', () => {
+      expect(orderedWeekDays(0)).toEqual([0, 1, 2, 3, 4, 5, 6])
+      expect(orderedWeekDays(1)).toEqual([1, 2, 3, 4, 5, 6, 0])
+      expect(orderedDayKeys(1)).toEqual(['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'])
     })
   })
 })

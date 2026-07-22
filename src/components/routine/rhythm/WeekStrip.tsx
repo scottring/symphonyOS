@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { BarChart3, ChevronDown, LayoutList } from 'lucide-react'
 import type { Routine } from '@/types/actionable'
 import type { FamilyMember } from '@/types/family'
@@ -7,6 +7,7 @@ import type { DayKey } from './rhythmModel'
 import { DAY_ORDER, resolveMembers } from './rhythmModel'
 import { setDragPayload, acceptsDrag, readDragPayload } from './dragTypes'
 import { resolveDrop, type DropIntent } from './dropRules'
+import { orderedDayKeys, type WeekStart } from '@/lib/cadence/config'
 
 export interface WeekStripProps {
   days: Record<DayKey, Routine[]>
@@ -23,6 +24,9 @@ export interface WeekStripProps {
   /** Day focus: clicking a day's header selects it (the arc shows that day). */
   selectedDay?: DayKey | null
   onSelectDay?: (day: DayKey) => void
+  /** Which day the week starts on (display order only — DAY_ORDER stays the
+   *  model/storage order). Defaults to Sunday. */
+  weekStartsOn?: WeekStart
 }
 
 const DAY_LABEL: Record<DayKey, string> = {
@@ -85,7 +89,7 @@ function Chip({ r, stepCounts, matches, onOpen, familyMembers, steps, day, onDro
   )
 }
 
-export function WeekStrip({ days, sometime, stepCounts, matches, todayKey, onOpenRoutine, familyMembers = [], collectionSteps = {}, onDropIntent, selectedDay = null, onSelectDay }: WeekStripProps) {
+export function WeekStrip({ days, sometime, stepCounts, matches, todayKey, onOpenRoutine, familyMembers = [], collectionSteps = {}, onDropIntent, selectedDay = null, onSelectDay, weekStartsOn = 0 }: WeekStripProps) {
   const [dropDay, setDropDay] = useState<DayKey | null>(null)
   // Pulse view: every chip renders as one slim uniform bar, so each column's
   // height reads as that day's load (one unit per routine; steps don't count).
@@ -94,6 +98,7 @@ export function WeekStrip({ days, sometime, stepCounts, matches, todayKey, onOpe
     localStorage.setItem('rhythm-week-density', v ? 'normal' : 'pulse')
     return !v
   })
+  const orderedDays = useMemo(() => orderedDayKeys(weekStartsOn), [weekStartsOn])
   const total = DAY_ORDER.reduce((n, d) => n + days[d].length, 0)
   if (total === 0 && sometime.length === 0 && !onDropIntent) return null
 
@@ -110,7 +115,7 @@ export function WeekStrip({ days, sometime, stepCounts, matches, todayKey, onOpe
         </button>
       </div>
       <div className={`grid grid-cols-[repeat(7,minmax(92px,1fr))] gap-2 overflow-x-auto min-w-0 ${pulse ? 'items-end' : ''}`}>
-        {DAY_ORDER.map(day => {
+        {orderedDays.map(day => {
           const items = days[day]
           const isToday = day === todayKey
           const dropHandlers = onDropIntent ? {

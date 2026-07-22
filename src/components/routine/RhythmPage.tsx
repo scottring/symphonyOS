@@ -8,6 +8,7 @@ import { groupRoutineSteps } from '@/lib/today/routineCollections'
 import { TapRoutinePanel } from '@/components/surface/TapRoutinePanel'
 import { TapStepPanel } from '@/components/surface/TapStepPanel'
 import { buildRhythmModel, DAY_ORDER, minutesOf, type DayKey, type RhythmCard } from './rhythm/rhythmModel'
+import { readCadenceConfig } from '@/lib/cadence/config'
 
 const DAY_FULL: Record<DayKey, string> = {
   sun: 'Sunday', mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday',
@@ -354,6 +355,7 @@ export function RhythmPage(props: RhythmPageProps) {
             onDropIntent={executeDropIntent}
             selectedDay={focusDay}
             onSelectDay={day => setFocusDay(cur => (cur === day ? null : day))}
+            weekStartsOn={readCadenceConfig().weekStartsOn}
           />
         </div>
 

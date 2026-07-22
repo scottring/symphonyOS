@@ -14,6 +14,7 @@ import { ScheduleActionsProvider } from '@/contexts/ScheduleActionsContext';
 import { UndoToast } from '@/components/undo/UndoToast';
 import { HorizonExplainer } from '@/components/planning/explainers/HorizonExplainer';
 import { servingCount } from '@/lib/planning/betPulse';
+import { readCadenceConfig } from '@/lib/cadence/config';
 import { CascadeRail, useHorizonPageData } from './shared';
 
 export function MonthPage() {
@@ -103,6 +104,7 @@ export function MonthPage() {
               month={viewedDate}
               tasks={domainTasks}
               events={domainEvents}
+              weekStartsOn={readCadenceConfig().weekStartsOn}
               onPlaceTask={(id, day) => updateTask(id, { bucket: 'timed', scheduledFor: day })}
               onUnscheduleTask={(id) => updateTask(id, { bucket: 'month', scheduledFor: undefined })}
               onSelectTask={handleSelect}

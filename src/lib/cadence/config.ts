@@ -65,6 +65,20 @@ export function weekToken(now: Date, weekStartsOn: WeekStart): string {
   return `${a.getFullYear()}-${a.getMonth() + 1}-${a.getDate()}`
 }
 
+/** JS day numbers (0-6) in display order for the configured week start. Single
+ *  source of ordering — nothing in the app may hardcode a week-start day. */
+export function orderedWeekDays(weekStartsOn: WeekStart): number[] {
+  return Array.from({ length: 7 }, (_, i) => ((weekStartsOn + i) % 7))
+}
+
+const DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const
+export type OrderedDayKey = typeof DAY_KEYS[number]
+
+/** Day-name keys in display order for the configured week start. */
+export function orderedDayKeys(weekStartsOn: WeekStart): OrderedDayKey[] {
+  return orderedWeekDays(weekStartsOn).map(d => DAY_KEYS[d])
+}
+
 export type SessionHorizon = 'week' | 'month' | 'season' | 'year'
 
 export interface DueSession {

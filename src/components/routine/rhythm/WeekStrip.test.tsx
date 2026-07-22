@@ -143,4 +143,20 @@ describe('pulse view and day focus', () => {
     fireEvent.click(screen.getByRole('button', { name: /^THU/ }))
     expect(onSelectDay).toHaveBeenCalledWith('thu')
   })
+
+  it('follows weekStartsOn for column order (Monday-first)', () => {
+    render(<WeekStrip {...base} days={{ ...empty, sat: [mk({})] }} weekStartsOn={1} onDropIntent={vi.fn()} />)
+    const mon = screen.getByTestId('day-mon')
+    const sun = screen.getByTestId('day-sun')
+    expect(mon.compareDocumentPosition(sun) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('follows weekStartsOn for column order in pulse view too', () => {
+    localStorage.setItem('rhythm-week-density', 'pulse')
+    render(<WeekStrip {...base} days={{ ...empty, sat: [mk({})] }} weekStartsOn={1} />)
+    const mon = screen.getByTestId('day-mon')
+    const sun = screen.getByTestId('day-sun')
+    expect(mon.compareDocumentPosition(sun) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    localStorage.removeItem('rhythm-week-density')
+  })
 })
