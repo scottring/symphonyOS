@@ -3,6 +3,7 @@ import type { FamilyMember } from '@/types/family'
 import { AssigneeAvatar } from '@/components/family/AssigneeAvatar'
 import { minutesOf, resolveMembers, type RhythmCard } from './rhythmModel'
 import { formatRange, formatClock } from './format'
+import { ARC_START, ARC_END } from './dragTypes'
 
 export interface DailyArcProps {
   cards: RhythmCard[]
@@ -13,9 +14,6 @@ export interface DailyArcProps {
   onOpenCollection: (id: string) => void
   onOpenRoutine: (r: Routine) => void
 }
-
-const ARC_START = 6 * 60   // 6:00
-const ARC_END = 21.5 * 60  // 21:30
 
 function pct(minutes: number): number {
   const clamped = Math.min(Math.max(minutes, ARC_START), ARC_END)
