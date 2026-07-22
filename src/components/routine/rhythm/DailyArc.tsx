@@ -237,13 +237,13 @@ export function DailyArc({ cards, anytime, familyMembers, matches, nowMinutes, o
                          bg-gradient-to-r from-amber-100 via-emerald-50 to-stone-300/60"
             >
               {RULER_MARKS.map(m => (
-                <span key={m.label} className="absolute top-1.5 text-[11px] text-neutral-500 -translate-x-1/2"
+                <span key={m.label} className="absolute top-1.5 text-[11px] text-neutral-500 -translate-x-1/2 pointer-events-none"
                       style={{ left: `${pct(m.minutes)}%` }}>
                   {m.label}
                 </span>
               ))}
-              <div className="absolute -top-1.5 -bottom-1.5 w-0.5 bg-orange-600" style={{ left: `${pct(nowMinutes)}%` }} />
-              <span className="absolute -top-6 text-[10px] font-bold text-orange-600 -translate-x-1/2"
+              <div className="absolute -top-1.5 -bottom-1.5 w-0.5 bg-orange-600 pointer-events-none" style={{ left: `${pct(nowMinutes)}%` }} />
+              <span className="absolute -top-6 text-[10px] font-bold text-orange-600 -translate-x-1/2 pointer-events-none"
                     style={{ left: `${pct(nowMinutes)}%` }}>
                 NOW
               </span>

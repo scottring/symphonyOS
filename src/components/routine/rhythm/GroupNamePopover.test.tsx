@@ -56,4 +56,38 @@ describe('GroupNamePopover', () => {
     expect(screen.queryByRole('button', { name: 'Hamper' })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Kids Bedtime Routine' })).toBeInTheDocument()
   })
+
+  it('does not let a text-selection drag inside the input bubble to an ancestor drag handler', () => {
+    const wrapperDragStart = vi.fn()
+    render(
+      <div onDragStart={wrapperDragStart}>
+        <GroupNamePopover {...base} />
+      </div>
+    )
+    const input = screen.getByPlaceholderText('Name this rhythm')
+    fireEvent.dragStart(input)
+    expect(wrapperDragStart).not.toHaveBeenCalled()
+  })
+
+  it('closes on an outside mousedown', () => {
+    const onClose = vi.fn()
+    render(<GroupNamePopover {...base} onClose={onClose} />)
+    fireEvent.mouseDown(document.body)
+    expect(onClose).toHaveBeenCalled()
+  })
+
+  it('does not close on a mousedown inside the popover', () => {
+    const onClose = vi.fn()
+    render(<GroupNamePopover {...base} onClose={onClose} />)
+    fireEvent.mouseDown(screen.getByPlaceholderText('Name this rhythm'))
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
+  it('still folds via a suggestion button click (regression guard for outside-click close)', () => {
+    const onFoldInto = vi.fn()
+    render(<GroupNamePopover {...base} onFoldInto={onFoldInto}
+      foldTargets={[{ id: 'bed', name: 'Kids Bedtime Routine' }]} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Kids Bedtime Routine' }))
+    expect(onFoldInto).toHaveBeenCalledWith('bed', ['a', 'b'])
+  })
 })

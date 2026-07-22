@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { RhythmCard } from './rhythmModel'
 
 /** Inline popover under an auto-group title: name it into a rhythm, or fold
@@ -11,6 +11,7 @@ export function GroupNamePopover({ card, foldTargets, onName, onFoldInto, onClos
   onClose: () => void
 }) {
   const [name, setName] = useState('')
+  const rootRef = useRef<HTMLDivElement>(null)
   const memberIds = card.routines.map(r => r.id)
   const targets = foldTargets.filter(t => !memberIds.includes(t.id))
   const typed = name.trim().toLowerCase()
@@ -24,10 +25,21 @@ export function GroupNamePopover({ card, foldTargets, onName, onFoldInto, onClos
     onClose()
   }
 
+  useEffect(() => {
+    const handleMouseDown = (e: MouseEvent) => {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) onClose()
+    }
+    document.addEventListener('mousedown', handleMouseDown)
+    return () => document.removeEventListener('mousedown', handleMouseDown)
+  }, [onClose])
+
   return (
     <div
+      ref={rootRef}
       className="absolute left-0 top-full z-30 mt-1 w-56 rounded-xl border border-neutral-200 bg-white p-2.5 shadow-lg"
       onClick={e => e.stopPropagation()}
+      draggable
+      onDragStart={e => { e.preventDefault(); e.stopPropagation() }}
     >
       <input
         autoFocus

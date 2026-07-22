@@ -176,6 +176,25 @@ describe('RhythmPage', () => {
     expect(onAddToCollection).toHaveBeenCalledWith('bed', ['a'])
   })
 
+  it('executes a stand-alone-at drop: promote then retime daily', () => {
+    const onPromoteStep = vi.fn()
+    const onUpdateRoutine = vi.fn()
+    render(
+      <RhythmPage {...noop} onPromoteStep={onPromoteStep} onUpdateRoutine={onUpdateRoutine}
+        routines={[
+          mk('Walk Jax', { id: 'walk', time_of_day: '06:30:00' }),
+          mk('Camp Mornings', { id: 'camp', time_of_day: '07:00:00' }),
+          mk('Pack bags', { id: 'pack', parent_routine_id: 'camp' }),
+        ]} />
+    )
+    const dt = mkDT()
+    dt.setData('text/rhythm-payload', JSON.stringify({ kind: 'step', id: 'pack' }))
+    dt.setData('text/rhythm-kind-step', '1')
+    fireEvent.drop(screen.getByTestId('arc-axis'), { dataTransfer: dt })
+    expect(onPromoteStep).toHaveBeenCalledWith('pack')
+    expect(onUpdateRoutine).toHaveBeenCalledWith('pack', { time_of_day: '06:00', recurrence_pattern: { type: 'daily' } })
+  })
+
   it('dismissing a tend suggestion hides it and persists to localStorage', () => {
     localStorage.removeItem('rhythm-tend-dismissed')
     render(
