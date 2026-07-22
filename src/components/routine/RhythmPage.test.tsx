@@ -108,6 +108,23 @@ describe('RhythmPage', () => {
       { time_of_day: '19:01', recurrence_pattern: { type: 'daily' } })
   })
 
+  it('folding a cluster into an existing routine calls onAddToCollection', () => {
+    const onAddToCollection = vi.fn()
+    render(
+      <RhythmPage {...noop} onUpdateRoutine={vi.fn()} onAddToCollection={onAddToCollection}
+        routines={[
+          mk('Hamper', { id: 'a', time_of_day: '19:01:00' }),
+          mk('Pajamas', { id: 'b', time_of_day: '19:02:00' }),
+          mk('Reading', { id: 'c', time_of_day: '19:06:00' }),
+          mk('Kids Bedtime Routine', { id: 'bed', recurrence_pattern: { type: 'weekly', days: ['sun', 'tue'] }, time_of_day: '19:15:00' }),
+        ]} />
+    )
+    fireEvent.click(screen.getByRole('button', { name: /name this rhythm/i }))
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Kids Bedtime Routine' } })
+    fireEvent.click(screen.getAllByRole('button', { name: 'Kids Bedtime Routine' })[0])
+    expect(onAddToCollection).toHaveBeenCalledWith('bed', ['a', 'b', 'c'])
+  })
+
   it('dismissing a tend suggestion hides it and persists to localStorage', () => {
     localStorage.removeItem('rhythm-tend-dismissed')
     render(

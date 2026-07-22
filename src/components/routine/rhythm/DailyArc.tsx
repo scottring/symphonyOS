@@ -18,6 +18,9 @@ export interface DailyArcProps {
   onNameCluster: (card: RhythmCard, name: string) => void
   /** Create a new every-day routine inline from the arc. */
   onQuickAddDaily?: (name: string) => void
+  /** Existing routines a cluster can be folded into (instead of creating a new one). */
+  foldTargets?: { id: string; name: string }[]
+  onFoldInto?: (card: RhythmCard, targetId: string) => void
 }
 
 const ARC_START = 6 * 60   // 6:00
@@ -37,18 +40,35 @@ const RULER_MARKS: { label: string; minutes: number }[] = [
   { label: '9 pm', minutes: 21 * 60 },
 ]
 
-function ArcCard({ card, familyMembers, matches, onOpenCollection, onOpenRoutine, onNameCluster }: {
+function ArcCard({ card, familyMembers, matches, onOpenCollection, onOpenRoutine, onNameCluster, foldTargets, onFoldInto }: {
   card: RhythmCard
   familyMembers: FamilyMember[]
   matches: (r: Routine) => boolean
   onOpenCollection: (id: string) => void
   onOpenRoutine: (r: Routine) => void
   onNameCluster: DailyArcProps['onNameCluster']
+  foldTargets?: { id: string; name: string }[]
+  onFoldInto?: DailyArcProps['onFoldInto']
 }) {
   // Cluster naming: the title and the sparkles nudge open the same input.
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState('')
   const startEditing = () => { setName(card.name ?? card.suggestedName ?? ''); setEditing(true) }
+
+  // Existing routines this cluster could fold into — a cluster member can't
+  // become its own parent, so members are excluded.
+  const targets = (foldTargets ?? []).filter(t => !card.routines.some(r => r.id === t.id))
+  const typed = name.trim().toLowerCase()
+  const suggestions = onFoldInto
+    ? targets.filter(t => !typed || t.name.toLowerCase().includes(typed)).slice(0, 4)
+    : []
+
+  const submit = () => {
+    if (!name.trim()) return
+    const exact = targets.find(t => t.name.toLowerCase() === typed)
+    if (exact && onFoldInto) onFoldInto(card, exact.id)
+    else onNameCluster(card, name.trim())
+  }
 
   const membersOf = (r: Routine): FamilyMember[] => resolveMembers(r, familyMembers)
   const cardMatches =
@@ -75,7 +95,7 @@ function ArcCard({ card, familyMembers, matches, onOpenCollection, onOpenRoutine
             value={name}
             onChange={e => setName(e.target.value)}
             onKeyDown={e => {
-              if (e.key === 'Enter' && name.trim()) onNameCluster(card, name.trim())
+              if (e.key === 'Enter') submit()
               if (e.key === 'Escape') setEditing(false)
             }}
             className="min-w-0 flex-1 rounded-lg border border-amber-300 px-2 py-1 text-sm focus:outline-none
@@ -108,6 +128,24 @@ function ArcCard({ card, familyMembers, matches, onOpenCollection, onOpenRoutine
           <span className="text-[11px] text-neutral-400">{formatRange(card.startTime, card.endTime)}</span>
         </span>
       </div>
+
+      {/* While naming, offer existing routines to fold these into instead —
+          picking one adds the members as its steps, no duplicate created. */}
+      {editing && suggestions.length > 0 && (
+        <div className="mb-2 flex flex-col gap-1">
+          <span className="text-[10px] uppercase tracking-wide text-neutral-400">or add these into</span>
+          {suggestions.map(t => (
+            <button
+              key={t.id}
+              onClick={() => onFoldInto!(card, t.id)}
+              className="text-left text-xs rounded-lg bg-emerald-50 px-2 py-1 text-emerald-900
+                         hover:bg-emerald-100 transition-colors"
+            >
+              {t.name}
+            </button>
+          ))}
+        </div>
+      )}
 
       <ul className="flex flex-col gap-1">
         {card.routines.map(r => (
@@ -147,7 +185,7 @@ function ArcCard({ card, familyMembers, matches, onOpenCollection, onOpenRoutine
   )
 }
 
-export function DailyArc({ cards, anytime, familyMembers, matches, nowMinutes, onOpenCollection, onOpenRoutine, onNameCluster, onQuickAddDaily }: DailyArcProps) {
+export function DailyArc({ cards, anytime, familyMembers, matches, nowMinutes, onOpenCollection, onOpenRoutine, onNameCluster, onQuickAddDaily, foldTargets, onFoldInto }: DailyArcProps) {
   if (cards.length === 0 && anytime.length === 0) return null
 
   return (
@@ -222,6 +260,8 @@ export function DailyArc({ cards, anytime, familyMembers, matches, nowMinutes, o
                   onOpenCollection={onOpenCollection}
                   onOpenRoutine={onOpenRoutine}
                   onNameCluster={onNameCluster}
+                  foldTargets={foldTargets}
+                  onFoldInto={onFoldInto}
                 />
               </div>
             ))}

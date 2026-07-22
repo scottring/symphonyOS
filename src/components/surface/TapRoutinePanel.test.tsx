@@ -167,4 +167,13 @@ describe('TapRoutinePanel', () => {
     render(<TapRoutinePanel routine={routine} onClose={vi.fn()} onNotesChange={vi.fn()} onContextChange={vi.fn()} onVisibilityChange={vi.fn()} />)
     expect(screen.queryByLabelText(/add a step/i)).not.toBeInTheDocument()
   })
+
+  it('moves the routine into a chosen collection via "Make this a step of"', () => {
+    const onMoveInto = vi.fn()
+    render(<TapRoutinePanel routine={routine} onClose={vi.fn()} onNotesChange={vi.fn()} onContextChange={vi.fn()}
+      onVisibilityChange={vi.fn()} onMoveInto={onMoveInto}
+      moveTargets={[{ id: 'bed', name: 'Kids Bedtime Routine' }]} />)
+    fireEvent.change(screen.getByLabelText(/make this a step of/i), { target: { value: 'bed' } })
+    expect(onMoveInto).toHaveBeenCalledWith('bed')
+  })
 })

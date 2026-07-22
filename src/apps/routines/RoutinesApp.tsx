@@ -113,6 +113,15 @@ function RoutinesIndex() {
     await addRoutine({ ...input, context: currentDomain !== 'universal' ? currentDomain : undefined })
   }, [addRoutine, currentDomain])
 
+  // Fold existing routines into an existing routine as steps, appended after
+  // any steps it already has.
+  const handleAddToCollection = useCallback(async (collectionId: string, ids: string[]) => {
+    const { collections } = groupRoutineSteps(routines)
+    const existing = collections.find(c => c.id === collectionId)?.steps ?? []
+    const base = nextStepOrder(existing)
+    await Promise.all(ids.map((id, i) => updateRoutine(id, { parent_routine_id: collectionId, step_order: base + i })))
+  }, [routines, updateRoutine])
+
   return (
     <Suspense fallback={<LoadingFallback />}>
       <RoutinesList
@@ -131,6 +140,7 @@ function RoutinesIndex() {
         onCreateCollection={handleCreateCollection}
         onGroupIntoCollection={handleGroupIntoCollection}
         onQuickCreate={handleQuickCreate}
+        onAddToCollection={handleAddToCollection}
         onBuildWithAI={() => setBuilderOpen(true)}
       />
       {builderOpen && (

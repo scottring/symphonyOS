@@ -40,6 +40,8 @@ interface RhythmPageProps {
   ) => void
   /** Inline quick-create from the timeline views (day columns, anytime row). */
   onQuickCreate?: (input: { name: string; recurrence_pattern: RecurrencePattern; time_of_day?: string }) => void
+  /** Fold existing routines into an existing routine as its steps. */
+  onAddToCollection?: (collectionId: string, routineIds: string[]) => void
   /** Open the AI routine builder (paste text / drop a PDF → proposed routine). */
   onBuildWithAI?: () => void
 }
@@ -48,6 +50,7 @@ export function RhythmPage(props: RhythmPageProps) {
   const {
     routines, loading = false, familyMembers = [],
     onUpdateRoutine, onDelete, onGroupIntoCollection, onBuildWithAI, onCreateCollection, onQuickCreate,
+    onAddToCollection,
   } = props
 
   const [memberId, setMemberId] = useState<string | null>(null)
@@ -125,6 +128,16 @@ export function RhythmPage(props: RhythmPageProps) {
       recurrence_pattern: { type: 'daily' },
     })
   }
+  // Any active top-level routine can absorb others as steps (an empty shell
+  // like a step-less collection counts — folding in gives it its steps).
+  const foldTargets = useMemo(
+    () => routines
+      .filter(r => !r.parent_routine_id && r.visibility === 'active')
+      .map(r => ({ id: r.id, name: r.name })),
+    [routines],
+  )
+  const handleFoldInto = (card: RhythmCard, targetId: string) =>
+    onAddToCollection?.(targetId, card.routines.map(r => r.id))
   const handleWakeAll = () => {
     for (const r of model.seasonal) onUpdateRoutine(r.id, { visibility: 'active', paused_until: null })
   }
@@ -309,6 +322,8 @@ export function RhythmPage(props: RhythmPageProps) {
             onQuickAddDaily={onQuickCreate
               ? name => onQuickCreate({ name, recurrence_pattern: { type: 'daily' } })
               : undefined}
+            foldTargets={foldTargets}
+            onFoldInto={onAddToCollection ? handleFoldInto : undefined}
           />
         </div>
 
@@ -378,6 +393,13 @@ export function RhythmPage(props: RhythmPageProps) {
                   onSelectStep: (s: Routine) => setOpen({ kind: 'step', id: s.id }),
                   onAddStep: (name: string) => props.onAddStep(openRoutineItem.id, name),
                   onReorderSteps: props.onReorderSteps,
+                } : {})}
+                {...(!openWithSteps && onAddToCollection ? {
+                  moveTargets: foldTargets.filter(t => t.id !== openRoutineItem.id),
+                  onMoveInto: (targetId: string) => {
+                    onAddToCollection(targetId, [openRoutineItem.id])
+                    setOpen({ kind: 'routine', id: targetId })
+                  },
                 } : {})}
               />
             )}

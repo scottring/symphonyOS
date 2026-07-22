@@ -55,6 +55,9 @@ interface TapRoutinePanelProps {
   onReorderSteps?: (writes: { id: string; step_order: number }[]) => void
   /** Refetch after the planning assistant writes (enables the Help-me-plan action). */
   onAssistMutate?: () => void
+  /** Existing routines this one can be tucked into as a step (standalone routines only). */
+  moveTargets?: { id: string; name: string }[]
+  onMoveInto?: (targetId: string) => void
 }
 
 export function TapRoutinePanel(props: TapRoutinePanelProps) {
@@ -259,6 +262,27 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
             } : undefined}
           />
         </section>
+      )}
+
+      {/* Fold this routine into an existing one as a step — the interface
+          for "these belong together" without creating anything new. */}
+      {props.onMoveInto && props.moveTargets && props.moveTargets.length > 0 && (
+        <div className="px-1 pb-3 flex items-center gap-2">
+          <label htmlFor="move-into" className="text-xs text-neutral-500 whitespace-nowrap">
+            Make this a step of
+          </label>
+          <select
+            id="move-into"
+            value=""
+            onChange={e => { if (e.target.value) props.onMoveInto!(e.target.value) }}
+            className="min-w-0 flex-1 rounded-lg border border-neutral-200 bg-white px-2 py-1.5 text-sm text-neutral-700"
+          >
+            <option value="">Choose a routine…</option>
+            {props.moveTargets.map(t => (
+              <option key={t.id} value={t.id}>{t.name}</option>
+            ))}
+          </select>
+        </div>
       )}
 
       {props.onDelete && (

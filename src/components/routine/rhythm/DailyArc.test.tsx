@@ -52,6 +52,40 @@ describe('DailyArc', () => {
     expect(onNameCluster).toHaveBeenCalledWith(card, 'Bedtime')
   })
 
+  it('folds a cluster into an existing routine via suggestion click', () => {
+    const onFoldInto = vi.fn()
+    const onNameCluster = vi.fn()
+    const card: RhythmCard = {
+      kind: 'cluster', id: 'cluster-1', name: null,
+      startTime: '19:00:00', endTime: '19:10:00', suggestedName: 'Bedtime',
+      routines: [mk({ id: 'a' }), mk({ id: 'b' })],
+    }
+    render(<DailyArc {...base} onNameCluster={onNameCluster} onFoldInto={onFoldInto}
+      foldTargets={[{ id: 'bed', name: 'Kids Bedtime Routine' }]} cards={[card]} anytime={[]} />)
+    fireEvent.click(screen.getByRole('button', { name: /name this rhythm/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'Kids Bedtime Routine' }))
+    expect(onFoldInto).toHaveBeenCalledWith(card, 'bed')
+    expect(onNameCluster).not.toHaveBeenCalled()
+  })
+
+  it('folds instead of creating when the typed name matches an existing routine', () => {
+    const onFoldInto = vi.fn()
+    const onNameCluster = vi.fn()
+    const card: RhythmCard = {
+      kind: 'cluster', id: 'cluster-1', name: null,
+      startTime: '19:00:00', endTime: '19:10:00', suggestedName: 'Bedtime',
+      routines: [mk({ id: 'a' }), mk({ id: 'b' })],
+    }
+    render(<DailyArc {...base} onNameCluster={onNameCluster} onFoldInto={onFoldInto}
+      foldTargets={[{ id: 'bed', name: 'Kids Bedtime Routine' }]} cards={[card]} anytime={[]} />)
+    fireEvent.click(screen.getByRole('button', { name: /name this rhythm/i }))
+    const input = screen.getByPlaceholderText('Name this rhythm')
+    fireEvent.change(input, { target: { value: 'kids bedtime routine' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(onFoldInto).toHaveBeenCalledWith(card, 'bed')
+    expect(onNameCluster).not.toHaveBeenCalled()
+  })
+
   it('renames a cluster by clicking its title', () => {
     const onNameCluster = vi.fn()
     const card: RhythmCard = {
