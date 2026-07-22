@@ -82,20 +82,13 @@ export function PlanningSession({
   minDropDate,
   getRoutinesForDate,
   embedded = false,
-  initialDays = 1,
-  showDone = true,
   onOpenDay,
 }: PlanningSessionProps) {
-  // Date range state - start with the initial date(s) if provided
+  // Date range state - start with the initial date if provided
   const [dateRange, setDateRange] = useState<Date[]>(() => {
     const startDate = initialDate ? new Date(initialDate) : new Date()
     startDate.setHours(0, 0, 0, 0)
-    const count = Math.min(Math.max(Math.floor(initialDays), 1), 7)
-    return Array.from({ length: count }, (_, i) => {
-      const d = new Date(startDate)
-      d.setDate(startDate.getDate() + i)
-      return d
-    })
+    return [startDate]
   })
 
   // Active drag state
@@ -470,7 +463,6 @@ export function PlanningSession({
         onRemoveDay={handleRemoveDay}
         onDateChange={handleDateChange}
         showClose={!embedded}
-        showDone={showDone}
         hideRoutines={hideRoutines}
         onToggleRoutines={() => writeHideRoutines(!hideRoutines)}
       />
