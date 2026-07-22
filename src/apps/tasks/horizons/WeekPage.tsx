@@ -58,7 +58,7 @@ export function WeekPage() {
   }, [startAnchor]);
 
   const {
-    navigate, allRoutines, familyMembers, eventNotesMap, updateTask, pushTask,
+    navigate, familyMembers, eventNotesMap, updateTask, pushTask,
     domainEvents, weekGridTasks, weekGridStart, todayStart, railCounts,
     period, placedThisWeek, carryOver, pool,
     planDisabled, handlePlan, rungName, isCascadeRung, hasExplainer,
@@ -118,7 +118,7 @@ export function WeekPage() {
               key={localYmd(gridInitialDate)}
               tasks={weekGridTasks}
               events={domainEvents}
-              routines={allRoutines}
+              routines={[]}
               familyMembers={familyMembers}
               eventNotesMap={eventNotesMap}
               onUpdateTask={updateTask}
