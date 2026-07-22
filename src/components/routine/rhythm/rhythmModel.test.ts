@@ -125,7 +125,7 @@ describe('buildRhythmModel clustering', () => {
     expect(m.daily.timed[1]).toMatchObject({ kind: 'single' })
   })
 
-  it('suggests a name only for clusters of 3+', () => {
+  it('suggests a daypart name for every cluster', () => {
     const m = buildRhythmModel([
       mk({ time_of_day: '19:00:00' }),
       mk({ time_of_day: '19:05:00' }),
@@ -136,7 +136,7 @@ describe('buildRhythmModel clustering', () => {
       mk({ time_of_day: '06:00:00' }),
       mk({ time_of_day: '06:10:00' }),
     ])
-    expect(m2.daily.timed[0].suggestedName).toBeUndefined()
+    expect(m2.daily.timed[0].suggestedName).toBe('Morning')
   })
 
   it('never merges a collection into a cluster', () => {

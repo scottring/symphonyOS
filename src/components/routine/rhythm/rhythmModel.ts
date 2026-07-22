@@ -155,7 +155,7 @@ export function buildRhythmModel(
       endTime: end,
       routines: current,
     }
-    if (card.kind === 'cluster' && current.length >= 3) {
+    if (card.kind === 'cluster') {
       card.suggestedName = suggestName(minutesOf(start) ?? 0)
     }
     model.daily.timed.push(card)
