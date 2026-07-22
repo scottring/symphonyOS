@@ -163,6 +163,19 @@ describe('DailyArc', () => {
     expect(onNameGroup).toHaveBeenCalledWith(card, 'Evening reset')
   })
 
+  it('clicking the group title a second time closes the popover', () => {
+    const card: RhythmCard = {
+      kind: 'cluster', id: 'c1', name: null, startTime: '19:00:00', endTime: '19:06:00',
+      suggestedName: 'Bedtime', routines: [mk({ id: 'a' }), mk({ id: 'b' })],
+    }
+    render(<DailyArc {...base} {...dragProps} cards={[card]} anytime={[]} />)
+    const title = screen.getByRole('button', { name: /bedtime/i })
+    fireEvent.mouseDown(title); fireEvent.click(title)
+    expect(screen.getByPlaceholderText('Name this rhythm')).toBeInTheDocument()
+    fireEvent.mouseDown(title); fireEvent.click(title)
+    expect(screen.queryByPlaceholderText('Name this rhythm')).not.toBeInTheDocument()
+  })
+
   it('anytime pills are draggable with a routine payload', () => {
     const dt = mkDT()
     const pt = mk({ id: 'pt', name: 'PT Exercises' })

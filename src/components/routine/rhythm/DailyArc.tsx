@@ -116,6 +116,7 @@ function ArcCard({ card, familyMembers, matches, onOpenCollection, onOpenRoutine
           ) : canName ? (
             <button
               onClick={() => setNaming(v => !v)}
+              onMouseDown={e => e.stopPropagation()}
               title="Name this rhythm"
               className="font-display font-semibold text-neutral-600 hover:text-amber-700 transition-colors text-left min-w-0 break-words"
             >
