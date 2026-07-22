@@ -1514,7 +1514,9 @@ git add src/components/planning/PlanningSession.tsx src/components/planning/Plan
 git commit -m "feat(planning): PlanningSession shelf mode + initialDays"
 ```
 
----### Task 8: WeekPage restructure + shared.tsx exports + smoke tests
+---
+
+### Task 8: WeekPage restructure + shared.tsx exports + smoke tests
 
 **Files:**
 - Modify: `src/apps/tasks/horizons/shared.tsx` (return additions only)
