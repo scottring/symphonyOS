@@ -67,9 +67,7 @@ export function SeasonPage() {
                 </div>
               ) : (
                 <p className="text-sm text-neutral-500 mt-1">
-                  {horizon === 'someday'
-                    ? 'Timeless — review during seasonal planning.'
-                    : total === 0 ? 'Nothing here yet' : `${pool.length} open`}
+                  {total === 0 ? 'Nothing here yet' : `${pool.length} open`}
                 </p>
               )}
             </div>

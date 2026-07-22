@@ -46,7 +46,7 @@ export function WeekPage() {
   const {
     navigate, allRoutines, familyMembers, eventNotesMap, updateTask, pushTask,
     domainEvents, weekGridTasks, weekGridStart, todayStart, railCounts,
-    period, progress, total, placedThisWeek, carryOver, pool,
+    period, placedThisWeek, carryOver, pool,
     planDisabled, handlePlan, rungName, isCascadeRung, hasExplainer,
     explainerOpen, setExplainerOpen, label, grouped, renderRow,
     horizonBucket, draft, setDraft, submitDraft,
@@ -72,38 +72,14 @@ export function WeekPage() {
     <ScheduleActionsProvider value={scheduleActionsValue}>
       <div className="h-full overflow-y-auto">
         <div className={PAGE_COLUMN}>
-          <header className="mb-4 flex items-start justify-between gap-4">
+          <header className="mb-4 flex items-start justify-between gap-4 flex-wrap">
             <div>
-              <p className="text-[11px] uppercase tracking-wider text-neutral-400">{label}</p>
-              <h1 className="font-display text-3xl font-semibold text-neutral-800 mt-0.5">
-                {displayPeriod}
-              </h1>
-              {progress && !anchoredWeekStart ? (
-                <div className="mt-2 flex items-center gap-2 text-xs text-neutral-400">
-                  <span>Day {progress.day} of {progress.total}</span>
-                  <span className="h-1 w-24 rounded-full bg-neutral-200 overflow-hidden inline-block">
-                    <span
-                      className="block h-full bg-primary-400"
-                      style={{ width: `${Math.round((progress.day / progress.total) * 100)}%` }}
-                    />
-                  </span>
-                  {(total > 0 || placedThisWeek.length > 0) && (
-                    <span>
-                      · {pool.length} open
-                      {placedThisWeek.length > 0 ? ` · ${placedThisWeek.length} placed` : ''}
-                      {carryOver.length > 0 ? ` · ${carryOver.length} carried over` : ''}
-                    </span>
-                  )}
-                </div>
-              ) : (
-                <p className="text-sm text-neutral-500 mt-1">
-                  {horizon === 'someday'
-                    ? 'Timeless — review during seasonal planning.'
-                    : total === 0 ? 'Nothing here yet' : `${pool.length} open`}
-                </p>
-              )}
+              <h1 className="font-display text-3xl font-semibold tracking-tight text-neutral-800">{label}</h1>
+              <p className="mt-1 text-sm text-neutral-500">
+                {displayPeriod} · {placedThisWeek.length} placed, {pool.length} to place
+              </p>
             </div>
-            <div className="shrink-0 flex flex-col items-end gap-1.5">
+            <div className="shrink-0 flex items-center gap-2">
               {!planDisabled && (
                 <button
                   type="button"

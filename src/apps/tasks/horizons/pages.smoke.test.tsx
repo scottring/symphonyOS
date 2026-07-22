@@ -78,10 +78,22 @@ describe('horizon pages (smoke)', () => {
     expect(screen.getByTitle('Plan the week')).toBeInTheDocument()
   })
 
+  it('WeekPage masthead shows the rhythm h1 and placed/pool subtitle', () => {
+    render(<WeekPage />)
+    expect(screen.getByRole('heading', { level: 1, name: 'This Week' })).toBeInTheDocument()
+    expect(screen.getByText(/0 placed, 0 to place/)).toBeInTheDocument()
+  })
+
   it('MonthPage renders the calendar grid weekday header', () => {
     render(<MonthPage />)
     expect(screen.getByText('Sun')).toBeInTheDocument()
     expect(screen.getByText('Mon')).toBeInTheDocument()
+  })
+
+  it('MonthPage masthead shows the rhythm h1 and placed/pool subtitle', () => {
+    render(<MonthPage />)
+    expect(screen.getByRole('heading', { level: 1, name: 'This Month' })).toBeInTheDocument()
+    expect(screen.getByText(/0 placed, 0 to place/)).toBeInTheDocument()
   })
 
   it("SeasonPage renders the season's picks panel", () => {
@@ -113,6 +125,6 @@ describe('horizon pages (smoke)', () => {
         </PlaceProvider>
       </MemoryRouter>
     )
-    expect(screen.getByText('Week of Jul 5')).toBeInTheDocument()
+    expect(screen.getByText(/Week of Jul 5/)).toBeInTheDocument()
   })
 })
