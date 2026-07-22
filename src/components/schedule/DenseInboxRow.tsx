@@ -111,8 +111,6 @@ export const DenseInboxRow = memo(function DenseInboxRow({
     <div
       data-row
       data-task-id={task.id}
-      draggable={!!task.id}
-      onDragStart={task.id ? (e) => e.dataTransfer.setData('text/task-id', task.id) : undefined}
       className={`
         group flex items-start gap-2 rounded-lg border
         px-3 py-2 shadow-sm transition-all duration-200
@@ -120,10 +118,19 @@ export const DenseInboxRow = memo(function DenseInboxRow({
         ${isLeaving ? 'opacity-0 translate-x-2 max-h-0 py-0 my-0 overflow-hidden border-transparent' : 'hover:shadow-md hover:border-amber-300'}
       `}
     >
-      {/* Grip glyph — signals the row is draggable (onto Month/Week grid
-          cells, matching the rhythm-language PlacementChip). */}
+      {/* Grip handle — the ONLY draggable surface on the row. Drag must not
+          hijack clicks on the checkbox/title/popovers/quick actions, so the
+          draggable + dragStart attributes live here, not on the row div. */}
       {task.id && (
-        <GripVertical className="w-3 h-3 text-neutral-300 shrink-0 mt-1 cursor-grab" aria-hidden />
+        <span
+          data-testid="drag-handle"
+          draggable
+          onDragStart={(e) => e.dataTransfer.setData('text/task-id', task.id)}
+          className="shrink-0 mt-1 cursor-grab"
+          aria-hidden
+        >
+          <GripVertical className="w-3 h-3 text-neutral-300" />
+        </span>
       )}
 
       {/* Leading control: selection checkbox in bulk mode, else completion. */}

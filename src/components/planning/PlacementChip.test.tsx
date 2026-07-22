@@ -71,4 +71,16 @@ describe('PlacementChip', () => {
     fireEvent.click(screen.getByText('Buy groceries'))
     expect(onClick).toHaveBeenCalled()
   })
+
+  it('defaults the title tooltip to name', () => {
+    const { container } = render(<PlacementChip id="t1" name="Buy groceries" />)
+    const el = container.firstElementChild as HTMLElement
+    expect(el).toHaveAttribute('title', 'Buy groceries')
+  })
+
+  it('uses an explicit title over name when provided', () => {
+    const { container } = render(<PlacementChip id="t1" name="Buy groceries" title="Buy groceries (Trader Joe's)" />)
+    const el = container.firstElementChild as HTMLElement
+    expect(el).toHaveAttribute('title', "Buy groceries (Trader Joe's)")
+  })
 })

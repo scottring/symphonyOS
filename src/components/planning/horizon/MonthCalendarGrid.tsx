@@ -182,6 +182,7 @@ export function MonthCalendarGrid({ month, tasks, events, onPlaceTask, onUnsched
                     key={e.id ?? `${e.title}-${key}`}
                     id={e.id ?? `${e.title}-${key}`}
                     name={e.title}
+                    title={e.title}
                     kind="event"
                   />
                 ))}
@@ -190,6 +191,7 @@ export function MonthCalendarGrid({ month, tasks, events, onPlaceTask, onUnsched
                     key={t.id}
                     id={t.id}
                     name={t.title}
+                    title={t.title}
                     kind="task"
                     draggable={!readOnly}
                     onClick={() => onSelectTask?.(t.id)}

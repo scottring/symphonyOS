@@ -15,6 +15,17 @@ const WEEK_ACTIONS: QuickAction[] = [
   { kind: 'today' }, { kind: 'next-week' }, { kind: 'someday' }, { kind: 'delete' }
 ]
 
+// Minimal DataTransfer mock — jsdom's DataTransfer doesn't implement setData/getData.
+function makeDataTransfer() {
+  return {
+    data: {} as Record<string, string>,
+    setData(k: string, v: string) { this.data[k] = v },
+    getData(k: string) { return this.data[k] ?? '' },
+    get types() { return Object.keys(this.data) },
+    effectAllowed: 'none',
+  }
+}
+
 describe('DenseInboxRow', () => {
   const baseProps = {
     task: createMockTask({ id: 't1', title: 'Test row' }),
@@ -118,5 +129,23 @@ describe('DenseInboxRow', () => {
     expect(checkbox).toHaveAttribute('aria-checked', 'false')
     fireEvent.click(checkbox)
     expect(onToggleSelection).toHaveBeenCalled()
+  })
+
+  it('sets text/task-id on dragStart from the grip handle', () => {
+    const { getByTestId } = render(<DenseInboxRow {...baseProps} quickActions={INBOX_ACTIONS} />)
+    const grip = getByTestId('drag-handle')
+    const dataTransfer = makeDataTransfer()
+    fireEvent.dragStart(grip, { dataTransfer })
+    expect(dataTransfer.getData('text/task-id')).toBe('t1')
+  })
+
+  it('does not set text/task-id when dragStart fires on the completion checkbox', () => {
+    render(<DenseInboxRow {...baseProps} quickActions={INBOX_ACTIONS} />)
+    // The completion control isn't draggable — dragStart on it must not
+    // populate the payload (only the grip handle may).
+    const checkbox = screen.getByRole('button', { name: /mark complete/i })
+    const dataTransfer = makeDataTransfer()
+    fireEvent.dragStart(checkbox, { dataTransfer })
+    expect(dataTransfer.getData('text/task-id')).toBe('')
   })
 })

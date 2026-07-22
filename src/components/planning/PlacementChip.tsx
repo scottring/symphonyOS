@@ -25,6 +25,9 @@ export interface PlacementChipProps {
   draggable?: boolean // sets dataTransfer 'text/task-id' = id on dragStart
   onClick?: () => void
   className?: string
+  /** Tooltip on the root element. Defaults to `name` so hover-title text
+   *  (e.g. full task/event title on a truncated chip) isn't lost. */
+  title?: string
 }
 
 export function PlacementChip({
@@ -36,6 +39,7 @@ export function PlacementChip({
   draggable = false,
   onClick,
   className = '',
+  title,
 }: PlacementChipProps) {
   const isEvent = kind === 'event'
 
@@ -47,6 +51,7 @@ export function PlacementChip({
           ? (e) => e.dataTransfer.setData('text/task-id', id)
           : undefined
       }
+      title={title ?? name}
       className={`
         flex items-center gap-1 rounded-lg border px-2 py-1 text-xs shadow-sm transition-colors
         ${isEvent ? 'bg-[#f4effc] border-[#e2d8f2]' : 'bg-white border-neutral-100'}
