@@ -37,14 +37,14 @@ describe('WeekStrip', () => {
     expect(onOpenRoutine).toHaveBeenCalledWith(lib)
   })
 
-  it('ghosts resting routines with a one-tap wake flick', () => {
-    const onWake = vi.fn()
-    const sleeping = mk({ name: 'Walk kids to school', visibility: 'reference' })
-    render(<WeekStrip {...base} days={empty} restingDays={{ ...empty, mon: [sleeping] }} onWake={onWake} />)
-    expect(screen.getByText('Walk kids to school')).toBeInTheDocument()
-    expect(screen.getByText('asleep')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: /wake walk kids to school/i }))
-    expect(onWake).toHaveBeenCalledWith(sleeping)
+  it('expands a collection chip to show its steps read-only', () => {
+    const bedtime = mk({ id: 'bed', name: 'Kids Bedtime Routine' })
+    const steps = [mk({ name: 'Brush teeth', parent_routine_id: 'bed' })]
+    render(<WeekStrip {...base} days={{ ...empty, thu: [bedtime] }} stepCounts={{ bed: 1 }}
+                      collectionSteps={{ bed: steps }} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Show steps' }))
+    expect(screen.getByText('Brush teeth')).toBeInTheDocument()
+    expect(screen.queryByLabelText(/add step/i)).not.toBeInTheDocument()
   })
 
   it('renders the sometime-this-week pocket', () => {
@@ -53,38 +53,11 @@ describe('WeekStrip', () => {
     expect(screen.getByText('Clara nails')).toBeInTheDocument()
   })
 
-  it('hides resting items behind the header toggle', () => {
-    localStorage.removeItem('rhythm-week-show-resting')
-    const sleeping = mk({ name: 'Walk kids to school', visibility: 'reference' })
-    render(<WeekStrip {...base} days={empty} restingDays={{ ...empty, mon: [sleeping] }} onWake={vi.fn()} />)
-    expect(screen.getByText('Walk kids to school')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Hide resting items' }))
-    expect(screen.queryByText('Walk kids to school')).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: /show resting items \(1\)/i }))
-    expect(screen.getByText('Walk kids to school')).toBeInTheDocument()
-  })
-
-  it('quick-adds a routine on a specific day column', () => {
-    const onQuickAdd = vi.fn()
-    render(<WeekStrip {...base} days={empty} onQuickAdd={onQuickAdd} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Add a routine on TUE' }))
-    const input = screen.getByPlaceholderText('New on TUE')
-    fireEvent.change(input, { target: { value: 'Soccer practice' } })
-    fireEvent.keyDown(input, { key: 'Enter' })
-    expect(onQuickAdd).toHaveBeenCalledWith('Soccer practice', 'tue')
-  })
-
-  it('adds a step inline from an expanded collection chip', () => {
-    const onAddStep = vi.fn()
-    const bedtime = mk({ id: 'bed', name: 'Kids Bedtime Routine' })
-    const steps = [mk({ name: 'Brush teeth', parent_routine_id: 'bed' })]
-    render(<WeekStrip {...base} days={{ ...empty, thu: [bedtime] }} stepCounts={{ bed: 1 }}
-                      collectionSteps={{ bed: steps }} onAddStep={onAddStep} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Show steps' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Add step to Kids Bedtime Routine' }))
-    const input = screen.getByPlaceholderText('New step')
-    fireEvent.change(input, { target: { value: 'Read a book' } })
-    fireEvent.keyDown(input, { key: 'Enter' })
-    expect(onAddStep).toHaveBeenCalledWith('bed', 'Read a book')
+  it('has no toggles, mirrors, ghosts, or quick-adds', () => {
+    render(<WeekStrip {...base} days={{ ...empty, sat: [mk({})] }} />)
+    expect(screen.queryByText(/every-day items/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/resting items/i)).not.toBeInTheDocument()
+    expect(screen.queryByText('asleep')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/add a routine on/i)).not.toBeInTheDocument()
   })
 })
