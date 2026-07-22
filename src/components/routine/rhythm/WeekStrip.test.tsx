@@ -19,6 +19,18 @@ function mk(over: Partial<Routine>): Routine {
 const empty: Record<DayKey, Routine[]> = { sun: [], mon: [], tue: [], wed: [], thu: [], fri: [], sat: [] }
 const base = { stepCounts: {}, matches: () => true, todayKey: 'mon' as DayKey, onOpenRoutine: vi.fn(), sometime: [] }
 
+function mkDT() {
+  const data: Record<string, string> = {}
+  return {
+    data,
+    setData(k: string, v: string) { data[k] = v },
+    getData(k: string) { return data[k] ?? '' },
+    get types() { return Object.keys(data) },
+    effectAllowed: 'none',
+    dropEffect: 'none',
+  }
+}
+
 describe('WeekStrip', () => {
   it('marks quiet days, full days, and today', () => {
     const sat = [mk({}), mk({}), mk({}), mk({})]
@@ -59,5 +71,38 @@ describe('WeekStrip', () => {
     expect(screen.queryByText(/resting items/i)).not.toBeInTheDocument()
     expect(screen.queryByText('asleep')).not.toBeInTheDocument()
     expect(screen.queryByLabelText(/add a routine on/i)).not.toBeInTheDocument()
+  })
+
+  it('sets a routine payload with fromDay when dragging a chip', () => {
+    const dt = mkDT()
+    const lib = mk({ id: 'lib', name: 'Library trip', recurrence_pattern: { type: 'weekly', days: ['thu'] } })
+    render(<WeekStrip {...base} onDropIntent={vi.fn()} days={{ ...empty, thu: [lib] }} />)
+    fireEvent.dragStart(screen.getByText('Library trip').closest('[draggable="true"]')!, { dataTransfer: dt })
+    expect(JSON.parse(dt.getData('text/rhythm-payload'))).toEqual({ kind: 'routine', id: 'lib', fromDay: 'thu' })
+  })
+
+  it('dropping a chip on another day emits move-day', () => {
+    const onDropIntent = vi.fn()
+    const dt = mkDT()
+    dt.setData('text/rhythm-payload', JSON.stringify({ kind: 'routine', id: 'lib', fromDay: 'thu' }))
+    dt.setData('text/rhythm-kind-routine', '1')
+    render(<WeekStrip {...base} onDropIntent={onDropIntent} days={empty} />)
+    fireEvent.drop(screen.getByTestId('day-mon'), { dataTransfer: dt })
+    expect(onDropIntent).toHaveBeenCalledWith({ type: 'move-day', id: 'lib', fromDay: 'thu', toDay: 'mon' })
+  })
+
+  it('dropping a dayless payload on a day emits weekly-on', () => {
+    const onDropIntent = vi.fn()
+    const dt = mkDT()
+    dt.setData('text/rhythm-payload', JSON.stringify({ kind: 'step', id: 's1' }))
+    dt.setData('text/rhythm-kind-step', '1')
+    render(<WeekStrip {...base} onDropIntent={onDropIntent} days={empty} />)
+    fireEvent.drop(screen.getByTestId('day-sat'), { dataTransfer: dt })
+    expect(onDropIntent).toHaveBeenCalledWith({ type: 'weekly-on', ids: ['s1'], day: 'sat' })
+  })
+
+  it('renders the empty band when drops are enabled', () => {
+    render(<WeekStrip {...base} onDropIntent={vi.fn()} days={empty} />)
+    expect(screen.getByTestId('day-wed')).toBeInTheDocument()
   })
 })

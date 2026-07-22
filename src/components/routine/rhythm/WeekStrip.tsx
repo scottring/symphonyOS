@@ -5,6 +5,8 @@ import type { FamilyMember } from '@/types/family'
 import { AssigneeAvatar } from '@/components/family/AssigneeAvatar'
 import type { DayKey } from './rhythmModel'
 import { DAY_ORDER, resolveMembers } from './rhythmModel'
+import { setDragPayload, acceptsDrag, readDragPayload } from './dragTypes'
+import { resolveDrop, type DropIntent } from './dropRules'
 
 export interface WeekStripProps {
   days: Record<DayKey, Routine[]>
@@ -16,6 +18,8 @@ export interface WeekStripProps {
   familyMembers?: FamilyMember[]
   /** Steps per collection id — enables the expand chevron on collection chips. */
   collectionSteps?: Record<string, Routine[]>
+  /** Drag-and-drop: chips become draggable and day columns accept drops. */
+  onDropIntent?: (intent: DropIntent) => void
 }
 
 const DAY_LABEL: Record<DayKey, string> = {
@@ -24,9 +28,9 @@ const DAY_LABEL: Record<DayKey, string> = {
 
 const FULL_THRESHOLD = 4
 
-function Chip({ r, stepCounts, matches, onOpen, familyMembers, steps }: {
+function Chip({ r, stepCounts, matches, onOpen, familyMembers, steps, day, onDropIntent }: {
   r: Routine; stepCounts: Record<string, number>; matches: (r: Routine) => boolean; onOpen: (r: Routine) => void
-  familyMembers: FamilyMember[]; steps: Routine[]
+  familyMembers: FamilyMember[]; steps: Routine[]; day?: DayKey; onDropIntent?: (intent: DropIntent) => void
 }) {
   const [expanded, setExpanded] = useState(false)
   const stepCount = stepCounts[r.id]
@@ -34,8 +38,10 @@ function Chip({ r, stepCounts, matches, onOpen, familyMembers, steps }: {
   const members = resolveMembers(r, familyMembers)
   return (
     <div
+      draggable={!!onDropIntent}
+      onDragStart={onDropIntent && day ? (e => setDragPayload(e, { kind: 'routine', id: r.id, fromDay: day })) : undefined}
       className={`w-full rounded-lg bg-emerald-50/60 px-2 py-1.5 text-xs text-neutral-700
-                  transition-colors ${matches(r) ? '' : 'opacity-30'}`}
+                  transition-colors ${matches(r) ? '' : 'opacity-30'} ${onDropIntent ? 'cursor-grab' : ''}`}
     >
       <div className="flex items-start gap-1">
         <button onClick={() => onOpen(r)} className="flex-1 min-w-0 text-left hover:text-emerald-900">
@@ -76,9 +82,10 @@ function Chip({ r, stepCounts, matches, onOpen, familyMembers, steps }: {
   )
 }
 
-export function WeekStrip({ days, sometime, stepCounts, matches, todayKey, onOpenRoutine, familyMembers = [], collectionSteps = {} }: WeekStripProps) {
+export function WeekStrip({ days, sometime, stepCounts, matches, todayKey, onOpenRoutine, familyMembers = [], collectionSteps = {}, onDropIntent }: WeekStripProps) {
+  const [dropDay, setDropDay] = useState<DayKey | null>(null)
   const total = DAY_ORDER.reduce((n, d) => n + days[d].length, 0)
-  if (total === 0 && sometime.length === 0) return null
+  if (total === 0 && sometime.length === 0 && !onDropIntent) return null
 
   return (
     <section className="mb-10">
@@ -91,10 +98,26 @@ export function WeekStrip({ days, sometime, stepCounts, matches, todayKey, onOpe
             <div
               key={day}
               data-testid={`day-${day}`}
+              onDragOver={onDropIntent ? (e => {
+                if (!acceptsDrag(e, ['step', 'routine', 'collection', 'group'])) return
+                e.preventDefault()
+                setDropDay(day)
+              }) : undefined}
+              onDragLeave={onDropIntent ? (() => setDropDay(null)) : undefined}
+              onDrop={onDropIntent ? (e => {
+                e.preventDefault()
+                setDropDay(null)
+                const payload = readDragPayload(e)
+                if (!payload) return
+                const intent = resolveDrop(payload, { kind: 'week-day', day })
+                if (intent) onDropIntent(intent)
+              }) : undefined}
               className={`rounded-xl p-2 ${
-                isToday
-                  ? 'border-2 border-[var(--color-primary-500,#3d5a44)] bg-emerald-50/40'
-                  : 'border border-neutral-100 bg-white'
+                dropDay === day
+                  ? 'border-2 border-dashed border-amber-400 bg-amber-50/40'
+                  : isToday
+                    ? 'border-2 border-[var(--color-primary-500,#3d5a44)] bg-emerald-50/40'
+                    : 'border border-neutral-100 bg-white'
               }`}
             >
               <div className={`text-[10px] font-bold mb-1.5 ${isToday ? 'text-emerald-800' : 'text-neutral-400'}`}>
@@ -109,7 +132,7 @@ export function WeekStrip({ days, sometime, stepCounts, matches, todayKey, onOpe
                   {items.map(r => (
                     <Chip key={`${day}-${r.id}`} r={r} stepCounts={stepCounts} matches={matches}
                           onOpen={onOpenRoutine} familyMembers={familyMembers}
-                          steps={collectionSteps[r.id] ?? []} />
+                          steps={collectionSteps[r.id] ?? []} day={day} onDropIntent={onDropIntent} />
                   ))}
                 </div>
               )}
