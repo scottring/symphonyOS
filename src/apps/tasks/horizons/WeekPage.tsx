@@ -111,7 +111,7 @@ export function WeekPage() {
 
   const shelf = useMemo(() => ({
     carryOverIds, projectsMap, tasksById,
-    onOpenTask: scheduleActionsValue.onOpenTask,
+    onOpenTask: (id: string) => scheduleActionsValue.onOpenTask?.(id),
     onSetBucket: (id: string, bucket: 'month' | 'someday') => setBucket(id, bucket),
     onDeleteTask: deleteTaskWithUndo,
     onPushTask: pushTask,
