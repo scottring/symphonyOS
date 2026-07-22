@@ -271,7 +271,7 @@ export function DailyArc({ cards, anytime, familyMembers, matches, nowMinutes, h
             <div
               data-testid="arc-axis"
               {...axisHandlers}
-              className="col-span-full row-start-2 self-center relative h-8 rounded-full border border-[var(--color-border,#eadfcc)]
+              className="col-span-full row-start-2 self-center relative z-10 h-8 rounded-full border border-[var(--color-border,#eadfcc)]
                          bg-gradient-to-r from-amber-100 via-emerald-50 to-stone-300/60"
             >
               {RULER_MARKS.map(m => (

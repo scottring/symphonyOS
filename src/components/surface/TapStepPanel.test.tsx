@@ -121,3 +121,25 @@ describe('TapStepPanel delete', () => {
     expect(onDelete).toHaveBeenCalled()
   })
 })
+
+describe('TapStepPanel step time', () => {
+  it('sets an individual time for the step', () => {
+    const onTimeChange = vi.fn()
+    setup({ onTimeChange })
+    fireEvent.change(screen.getByLabelText('At'), { target: { value: '07:50' } })
+    expect(onTimeChange).toHaveBeenCalledWith('07:50')
+  })
+
+  it('clearing the time reports null (back to routine flow)', () => {
+    const onTimeChange = vi.fn()
+    setup({ onTimeChange, step: { ...step, time_of_day: '07:50:00' } })
+    expect(screen.getByText(/its own time/i)).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('At'), { target: { value: '' } })
+    expect(onTimeChange).toHaveBeenCalledWith(null)
+  })
+
+  it('hides the time editor when onTimeChange is absent', () => {
+    setup()
+    expect(screen.queryByLabelText('At')).not.toBeInTheDocument()
+  })
+})

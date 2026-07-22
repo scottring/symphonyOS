@@ -16,6 +16,9 @@ interface TapStepPanelProps {
   onNotesChange: (next: string) => void
   onPromote: () => void
   onScheduleChange?: (pattern: RecurrencePattern) => void
+  /** Give this step its own time within the routine ('' clears it back to
+   *  the routine's flow). Rendered only when provided. */
+  onTimeChange?: (timeOfDay: string | null) => void
   /** Delete the step routine entirely (swap-out). Rendered only when provided. */
   onDelete?: () => void
 }
@@ -36,6 +39,26 @@ export function TapStepPanel(props: TapStepPanelProps) {
       <p className="text-xs text-neutral-500 mb-4">
         Context and people are <span className="font-medium">inherited from {parentName}</span>.
       </p>
+
+      {props.onTimeChange && (
+        <section className="pb-4 mb-4 border-b border-neutral-200">
+          <div className="flex items-center justify-between gap-3">
+            <label htmlFor="step-time" className="text-sm font-medium text-neutral-700">At</label>
+            <input
+              id="step-time"
+              type="time"
+              value={(step.time_of_day ?? '').slice(0, 5)}
+              onChange={e => props.onTimeChange!(e.target.value || null)}
+              className="rounded-lg border border-neutral-200 px-2 py-1 text-sm text-neutral-700"
+            />
+          </div>
+          <p className="mt-1 text-xs text-neutral-400">
+            {step.time_of_day
+              ? 'This step has its own time — it shows on the timeline and inside the routine.'
+              : `No set time — flows in ${parentName}'s order.`}
+          </p>
+        </section>
+      )}
 
       <section className="pb-4 mb-4 border-b border-neutral-200">
         <h3 className="text-sm font-medium text-neutral-700 mb-2">Dose times</h3>

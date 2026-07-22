@@ -109,75 +109,110 @@ export function WeekStrip({ days, sometime, stepCounts, matches, todayKey, onOpe
           {pulse ? 'Normal view' : 'Pulse view'}
         </button>
       </div>
-      <div className="grid grid-cols-[repeat(7,minmax(92px,1fr))] gap-2 overflow-x-auto min-w-0">
+      <div className={`grid grid-cols-[repeat(7,minmax(92px,1fr))] gap-2 overflow-x-auto min-w-0 ${pulse ? 'items-end' : ''}`}>
         {DAY_ORDER.map(day => {
           const items = days[day]
           const isToday = day === todayKey
+          const dropHandlers = onDropIntent ? {
+            onDragOver: (e: React.DragEvent) => {
+              if (!acceptsDrag(e, ['step', 'routine', 'collection', 'group'])) return
+              e.preventDefault()
+              setDropDay(day)
+            },
+            onDragLeave: () => setDropDay(null),
+            onDrop: (e: React.DragEvent) => {
+              e.preventDefault()
+              setDropDay(null)
+              const payload = readDragPayload(e)
+              if (!payload) return
+              const intent = resolveDrop(payload, { kind: 'week-day', day })
+              if (intent) onDropIntent(intent)
+            },
+          } : {}
+          const borderClass =
+            dropDay === day
+              ? 'border-2 border-dashed border-amber-400 bg-amber-50/40'
+              : selectedDay === day
+                ? 'border-2 border-amber-500 bg-amber-50/40'
+                : isToday
+                  ? 'border-2 border-[var(--color-primary-500,#3d5a44)] bg-emerald-50/40'
+                  : 'border border-neutral-100 bg-white'
+          const dayLabel = (
+            <>
+              {DAY_LABEL[day]}
+              {isToday && ' · today'}
+              {items.length >= FULL_THRESHOLD && <span className="text-orange-600"> · full</span>}
+            </>
+          )
+          const labelColor =
+            selectedDay === day ? 'text-amber-700' : isToday ? 'text-emerald-800' : 'text-neutral-400 hover:text-neutral-600'
+
+          // Pulse view: a true histogram — bars grow up from a shared bottom
+          // baseline, one uniform unit per routine, day labels as the x-axis.
+          if (pulse) {
+            return (
+              <div
+                key={day}
+                data-testid={`day-${day}`}
+                {...dropHandlers}
+                className={`flex flex-col justify-end rounded-xl p-2 ${borderClass}`}
+              >
+                {items.length > 0 && (
+                  <span className="mb-1 text-center text-[10px] font-bold text-neutral-400">{items.length}</span>
+                )}
+                <div className="flex flex-col gap-0.5">
+                  {items.map(r => (
+                    <button
+                      key={`${day}-${r.id}`}
+                      title={r.name}
+                      aria-label={r.name}
+                      onClick={() => onOpenRoutine(r)}
+                      draggable={!!onDropIntent}
+                      onDragStart={onDropIntent ? (e => setDragPayload(e, { kind: 'routine', id: r.id, fromDay: day })) : undefined}
+                      className={`h-2.5 w-full rounded-sm bg-emerald-400/70 hover:bg-emerald-500 transition-colors
+                                  ${matches(r) ? '' : 'opacity-30'} ${onDropIntent ? 'cursor-grab' : ''}`}
+                    />
+                  ))}
+                </div>
+                {onSelectDay ? (
+                  <button
+                    onClick={() => onSelectDay(day)}
+                    title={selectedDay === day ? 'Back to every day' : `Show ${DAY_LABEL[day]} on the timeline`}
+                    className={`mt-1.5 block w-full text-center text-[10px] font-bold transition-colors ${labelColor}`}
+                  >
+                    {dayLabel}
+                  </button>
+                ) : (
+                  <div className={`mt-1.5 text-center text-[10px] font-bold ${isToday ? 'text-emerald-800' : 'text-neutral-400'}`}>
+                    {dayLabel}
+                  </div>
+                )}
+              </div>
+            )
+          }
+
           return (
             <div
               key={day}
               data-testid={`day-${day}`}
-              onDragOver={onDropIntent ? (e => {
-                if (!acceptsDrag(e, ['step', 'routine', 'collection', 'group'])) return
-                e.preventDefault()
-                setDropDay(day)
-              }) : undefined}
-              onDragLeave={onDropIntent ? (() => setDropDay(null)) : undefined}
-              onDrop={onDropIntent ? (e => {
-                e.preventDefault()
-                setDropDay(null)
-                const payload = readDragPayload(e)
-                if (!payload) return
-                const intent = resolveDrop(payload, { kind: 'week-day', day })
-                if (intent) onDropIntent(intent)
-              }) : undefined}
-              className={`rounded-xl p-2 ${
-                dropDay === day
-                  ? 'border-2 border-dashed border-amber-400 bg-amber-50/40'
-                  : selectedDay === day
-                    ? 'border-2 border-amber-500 bg-amber-50/40'
-                    : isToday
-                      ? 'border-2 border-[var(--color-primary-500,#3d5a44)] bg-emerald-50/40'
-                      : 'border border-neutral-100 bg-white'
-              }`}
+              {...dropHandlers}
+              className={`rounded-xl p-2 ${borderClass}`}
             >
               {onSelectDay ? (
                 <button
                   onClick={() => onSelectDay(day)}
                   title={selectedDay === day ? 'Back to every day' : `Show ${DAY_LABEL[day]} on the timeline`}
-                  className={`mb-1.5 block w-full text-left text-[10px] font-bold transition-colors ${
-                    selectedDay === day ? 'text-amber-700' : isToday ? 'text-emerald-800' : 'text-neutral-400 hover:text-neutral-600'
-                  }`}
+                  className={`mb-1.5 block w-full text-left text-[10px] font-bold transition-colors ${labelColor}`}
                 >
-                  {DAY_LABEL[day]}
-                  {isToday && ' · today'}
-                  {items.length >= FULL_THRESHOLD && <span className="text-orange-600"> · full</span>}
+                  {dayLabel}
                 </button>
               ) : (
                 <div className={`text-[10px] font-bold mb-1.5 ${isToday ? 'text-emerald-800' : 'text-neutral-400'}`}>
-                  {DAY_LABEL[day]}
-                  {isToday && ' · today'}
-                  {items.length >= FULL_THRESHOLD && <span className="text-orange-600"> · full</span>}
+                  {dayLabel}
                 </div>
               )}
               {items.length === 0 ? (
                 <div className="text-[11px] italic text-neutral-300">quiet</div>
-              ) : pulse ? (
-                <div className="flex flex-col gap-0.5">
-                  {items.map(r => (
-                    <button
-                      key={`${day}-${r.id}`}
-                      onClick={() => onOpenRoutine(r)}
-                      draggable={!!onDropIntent}
-                      onDragStart={onDropIntent ? (e => setDragPayload(e, { kind: 'routine', id: r.id, fromDay: day })) : undefined}
-                      className={`block w-full truncate rounded bg-emerald-300/60 px-1.5 py-0.5 text-left text-[9px]
-                                  leading-tight text-neutral-700 hover:bg-emerald-300 transition-colors
-                                  ${matches(r) ? '' : 'opacity-30'} ${onDropIntent ? 'cursor-grab' : ''}`}
-                    >
-                      {r.name}
-                    </button>
-                  ))}
-                </div>
               ) : (
                 <div className="flex flex-col gap-1">
                   {items.map(r => (

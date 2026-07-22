@@ -421,6 +421,7 @@ export function RhythmPage(props: RhythmPageProps) {
                 onClose={() => setOpen({ kind: 'routine', id: parentOfOpenStep.id })}
                 onRename={name => onUpdateRoutine(openStep.id, { name })}
                 onDosesChange={times => onUpdateRoutine(openStep.id, { times_per_day: times })}
+                onTimeChange={timeOfDay => onUpdateRoutine(openStep.id, { time_of_day: timeOfDay })}
                 onNotesChange={description => onUpdateRoutine(openStep.id, { description })}
                 onScheduleChange={pattern => onUpdateRoutine(openStep.id, { recurrence_pattern: pattern })}
                 onPromote={() => { props.onPromoteStep(openStep.id); setOpen({ kind: 'routine', id: parentOfOpenStep.id }) }}
