@@ -41,10 +41,17 @@ function RoutinesIndex() {
   const { members: familyMembers } = useFamilyMembers()
   const [builderOpen, setBuilderOpen] = useState(false)
 
-  const filtered =
-    currentDomain === 'universal'
-      ? routines
-      : routines.filter((r) => r.context === currentDomain)
+  // Steps travel with their parent through the domain lens — an unstamped
+  // step must not strip a matching collection down to a bare routine.
+  const filtered = useMemo(() => {
+    if (currentDomain === 'universal') return routines
+    const byId = new Map(routines.map((r) => [r.id, r]))
+    return routines.filter((r) => {
+      if (r.context === currentDomain) return true
+      const parent = r.parent_routine_id ? byId.get(r.parent_routine_id) : undefined
+      return parent?.context === currentDomain
+    })
+  }, [routines, currentDomain])
 
   const handleAddStep = useCallback(async (collectionId: string, name: string) => {
     const { collections } = groupRoutineSteps(routines)
