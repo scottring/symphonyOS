@@ -405,4 +405,48 @@ describe('PlanningSession', () => {
     expect(renderedCards.length).toBe(3)
     expect(screen.getByRole('button', { name: /3 more overlapping items/i })).toBeInTheDocument()
   })
+
+  it('renders the shelf above the grid instead of the drawer when shelf prop is set', () => {
+    render(
+      <PlanningSession
+        tasks={[]}
+        events={[]}
+        routines={[]}
+        onUpdateTask={vi.fn()}
+        onPushTask={vi.fn()}
+        onClose={vi.fn()}
+        initialDays={7}
+        shelf={{
+          carryOverIds: new Set<string>(),
+          projectsMap: new Map(),
+          tasksById: new Map(),
+          onOpenTask: vi.fn(), onSetBucket: vi.fn(), onDeleteTask: vi.fn(), onPushTask: vi.fn(),
+          draft: '', onDraftChange: vi.fn(), onSubmitDraft: vi.fn(),
+          tend: { status: 'idle', aiLoading: false, aiError: null, proposals: [], start: vi.fn(), remove: vi.fn(), done: vi.fn() },
+          onApplyProposal: vi.fn(),
+        }}
+      />
+    )
+    expect(screen.queryByText('Unscheduled')).not.toBeInTheDocument() // drawer gone
+    expect(screen.getByRole('button', { name: /tend/i })).toBeInTheDocument() // shelf present
+  })
+
+  it('initialDays seeds a multi-day range', () => {
+    const onOpenDay = vi.fn()
+    render(
+      <PlanningSession
+        tasks={[]}
+        events={[]}
+        routines={[]}
+        onUpdateTask={vi.fn()}
+        onPushTask={vi.fn()}
+        onClose={vi.fn()}
+        initialDate={new Date(2026, 6, 19)}
+        initialDays={7}
+        onOpenDay={onOpenDay}
+      />
+    )
+    // Reuse the "→ day" header-button query pattern: one per day column.
+    expect(screen.getAllByRole('button', { name: /open .* on today/i })).toHaveLength(7)
+  })
 })

@@ -22,6 +22,7 @@ import type { FamilyMember } from '@/types/family'
 import { PlanningHeader } from './PlanningHeader'
 import { PlanningGrid } from './PlanningGrid'
 import { PlanningTaskDrawer } from './PlanningTaskDrawer'
+import { PlanningShelf, type PlanningShelfProps } from './PlanningShelf'
 import { PlanningTaskCard } from './PlanningTaskCard'
 import { PlanningRoutineDragCard, ROUTINE_DRAG_PREFIX } from './PlanningRoutineDragCard'
 import { PlanningEventBlock, PLACED_EVENT_DRAG_PREFIX } from './PlanningEventBlock'
@@ -44,6 +45,8 @@ interface PlanningSessionProps {
   onPushTask: (id: string, target: Date | 'week' | 'month' | 'quarter') => void
   onClose: () => void
   initialDate?: Date
+  /** Days the range starts with (default 1; clamped to 7). WeekPage passes 7. */
+  initialDays?: number
   /** Reject task drops on days before this date (planning never schedules
    *  rocks into the past — week-boundary spec). Day-granular; unset = allow. */
   minDropDate?: Date
@@ -52,6 +55,9 @@ interface PlanningSessionProps {
   /** Week→Today seam: when present, each day header renders a small "→ day"
    *  button that jumps straight to that date on the Today rung. */
   onOpenDay?: (date: Date) => void
+  /** Shelf mode: render the pool as a full-width lane above the grid instead
+   *  of the side drawer. The session supplies tasks + backlog toggle. */
+  shelf?: Omit<PlanningShelfProps, 'tasks' | 'hiddenCount' | 'showingAll' | 'onToggleShowAll'>
 }
 
 // Time slot duration in minutes
@@ -79,16 +85,23 @@ export function PlanningSession({
   onPushTask,
   onClose,
   initialDate,
+  initialDays,
   minDropDate,
   getRoutinesForDate,
   embedded = false,
   onOpenDay,
+  shelf,
 }: PlanningSessionProps) {
   // Date range state - start with the initial date if provided
   const [dateRange, setDateRange] = useState<Date[]>(() => {
     const startDate = initialDate ? new Date(initialDate) : new Date()
     startDate.setHours(0, 0, 0, 0)
-    return [startDate]
+    const count = Math.min(Math.max(initialDays ?? 1, 1), 7)
+    return Array.from({ length: count }, (_, i) => {
+      const d = new Date(startDate)
+      d.setDate(d.getDate() + i)
+      return d
+    })
   })
 
   // Active drag state
@@ -475,7 +488,7 @@ export function PlanningSession({
       )}
 
       {/* Main content */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className={`flex-1 ${shelf ? 'flex flex-col gap-3 overflow-hidden p-3 pt-0' : 'flex overflow-hidden'}`}>
         <DndContext
           sensors={sensors}
           collisionDetection={pointerWithin}
@@ -488,29 +501,57 @@ export function PlanningSession({
           onDragOver={handleDragOver}
           onDragEnd={handleDragEnd}
         >
-          {/* Task drawer (sidebar) */}
-          <PlanningTaskDrawer
-            tasks={unscheduledTasks}
-            routines={draggableRoutines}
-            onPushTask={onPushTask}
-            hiddenCount={showAllUnscheduled ? 0 : backlogCount}
-            showingAll={showAllUnscheduled}
-            onToggleShowAll={backlogCount > 0 || showAllUnscheduled ? () => setShowAllUnscheduled((v) => !v) : undefined}
-          />
+          {shelf ? (
+            /* Full-width pool lane above the grid — shelf mode replaces the drawer */
+            <PlanningShelf
+              {...shelf}
+              tasks={unscheduledTasks}
+              hiddenCount={showAllUnscheduled ? 0 : backlogCount}
+              showingAll={showAllUnscheduled}
+              onToggleShowAll={backlogCount > 0 || showAllUnscheduled ? () => setShowAllUnscheduled((v) => !v) : undefined}
+            />
+          ) : (
+            /* Task drawer (sidebar) */
+            <PlanningTaskDrawer
+              tasks={unscheduledTasks}
+              routines={draggableRoutines}
+              onPushTask={onPushTask}
+              hiddenCount={showAllUnscheduled ? 0 : backlogCount}
+              showingAll={showAllUnscheduled}
+              onToggleShowAll={backlogCount > 0 || showAllUnscheduled ? () => setShowAllUnscheduled((v) => !v) : undefined}
+            />
+          )}
 
           {/* Planning grid */}
-          <PlanningGrid
-            dateRange={dateRange}
-            scheduledTasksByDate={scheduledTasksByDate}
-            eventsByDate={eventsByDate}
-            routinesByDate={routinesByDate}
-            familyMembers={familyMembers}
-            eventNotesMap={eventNotesMap}
-            dayStartHour={DAY_START_HOUR}
-            dayEndHour={DAY_END_HOUR}
-            slotDuration={SLOT_DURATION}
-            onOpenDay={onOpenDay}
-          />
+          {shelf ? (
+            <div className="flex-1 min-h-0 flex">
+              <PlanningGrid
+                dateRange={dateRange}
+                scheduledTasksByDate={scheduledTasksByDate}
+                eventsByDate={eventsByDate}
+                routinesByDate={routinesByDate}
+                familyMembers={familyMembers}
+                eventNotesMap={eventNotesMap}
+                dayStartHour={DAY_START_HOUR}
+                dayEndHour={DAY_END_HOUR}
+                slotDuration={SLOT_DURATION}
+                onOpenDay={onOpenDay}
+              />
+            </div>
+          ) : (
+            <PlanningGrid
+              dateRange={dateRange}
+              scheduledTasksByDate={scheduledTasksByDate}
+              eventsByDate={eventsByDate}
+              routinesByDate={routinesByDate}
+              familyMembers={familyMembers}
+              eventNotesMap={eventNotesMap}
+              dayStartHour={DAY_START_HOUR}
+              dayEndHour={DAY_END_HOUR}
+              slotDuration={SLOT_DURATION}
+              onOpenDay={onOpenDay}
+            />
+          )}
 
           {/* Drag overlay */}
           <DragOverlay dropAnimation={null}>
