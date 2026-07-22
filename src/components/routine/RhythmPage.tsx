@@ -8,11 +8,11 @@ import { groupRoutineSteps } from '@/lib/today/routineCollections'
 import { TapRoutinePanel } from '@/components/surface/TapRoutinePanel'
 import { TapStepPanel } from '@/components/surface/TapStepPanel'
 import { buildRhythmModel, DAY_ORDER, type RhythmCard } from './rhythm/rhythmModel'
-import { findTend, tendFindingKey } from './rhythm/tendHeuristics'
+import { findTend, tendFindingKey, groupSuggestionKey } from './rhythm/tendHeuristics'
 import { DailyArc } from './rhythm/DailyArc'
 import { WeekStrip } from './rhythm/WeekStrip'
 import { SometimesShelf } from './rhythm/SometimesShelf'
-import { TendDrawer, groupSuggestionKey } from './rhythm/TendDrawer'
+import { TendDrawer } from './rhythm/TendDrawer'
 
 interface RhythmPageProps {
   routines: Routine[]

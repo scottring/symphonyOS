@@ -1,8 +1,10 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
-import { TendDrawer, groupSuggestionKey } from './TendDrawer'
+import { TendDrawer } from './TendDrawer'
+import { groupSuggestionKey } from './tendHeuristics'
 import type { RhythmCard } from './rhythmModel'
 import type { Routine } from '@/types/actionable'
+import type { FamilyMember } from '@/types/family'
 
 let seq = 0
 function mk(over: Partial<Routine>): Routine {
@@ -107,6 +109,15 @@ describe('TendDrawer', () => {
     expect(onFoldInto).toHaveBeenCalledWith('bed', ['walk'])
     // the routine itself must not be offered as its own target
     expect(screen.queryByRole('option', { name: 'Walk Jax' })).not.toBeInTheDocument()
+  })
+
+  it('renders assignee avatars on a loose item', () => {
+    const walk = mk({ id: 'walk', name: 'Walk Jax', assigned_to_all: ['iris'] })
+    const familyMembers = [
+      { id: 'iris', name: 'Iris', initials: 'IR', color: 'purple' } as unknown as FamilyMember,
+    ]
+    render(<TendDrawer {...base} looseItems={[walk]} familyMembers={familyMembers} />)
+    expect(screen.getByText('IR')).toBeInTheDocument()
   })
 
   it('renders the sleeping section with wake-all', () => {

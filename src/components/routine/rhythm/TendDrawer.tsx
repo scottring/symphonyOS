@@ -3,15 +3,13 @@ import { X } from 'lucide-react'
 import type { Routine } from '@/types/actionable'
 import type { FamilyMember } from '@/types/family'
 import type { RhythmCard } from './rhythmModel'
+import { resolveMembers } from './rhythmModel'
 import type { TendFinding } from './tendHeuristics'
+import { groupSuggestionKey } from './tendHeuristics'
 import { formatRange } from './format'
 import { TendCard } from './TendCard'
 import { SeasonalShelf } from './SeasonalShelf'
-
-/** Dismissal key for a name-this-group suggestion (order-independent). */
-export function groupSuggestionKey(card: RhythmCard): string {
-  return `g:${card.routines.map(r => r.id).sort().join('.')}`
-}
+import { AssigneeAvatar } from '@/components/family/AssigneeAvatar'
 
 export interface TendDrawerProps {
   open: boolean
@@ -107,18 +105,27 @@ function scheduleSummary(r: Routine): string {
   return `${p.type}${time}`
 }
 
-function LooseRow({ r, foldTargets, onFoldInto, onOpenRoutine }: {
+function LooseRow({ r, foldTargets, familyMembers, onFoldInto, onOpenRoutine }: {
   r: Routine
   foldTargets: { id: string; name: string }[]
+  familyMembers: FamilyMember[]
   onFoldInto: TendDrawerProps['onFoldInto']
   onOpenRoutine: TendDrawerProps['onOpenRoutine']
 }) {
   const targets = foldTargets.filter(t => t.id !== r.id)
+  const members = resolveMembers(r, familyMembers)
   return (
     <div className="flex items-center gap-2 rounded-lg bg-white border border-neutral-200 px-2.5 py-2">
       <button onClick={() => onOpenRoutine(r)} className="flex-1 min-w-0 text-left">
         <span className="block text-sm text-neutral-700 truncate">{r.name}</span>
         <span className="block text-[10px] text-neutral-400">{scheduleSummary(r)}</span>
+        {members.length > 0 && (
+          <span className="flex -space-x-1.5 flex-shrink-0">
+            {members.map(m => (
+              <AssigneeAvatar key={m.id} member={m} size="sm" className="ring-1 ring-white" />
+            ))}
+          </span>
+        )}
       </button>
       {targets.length > 0 && (
         <select
@@ -138,7 +145,7 @@ function LooseRow({ r, foldTargets, onFoldInto, onOpenRoutine }: {
 }
 
 export function TendDrawer(props: TendDrawerProps) {
-  const { open, onClose, clusters, findings, routines, looseItems, sleepers, foldTargets } = props
+  const { open, onClose, clusters, findings, routines, looseItems, sleepers, foldTargets, familyMembers } = props
   if (!open) return null
 
   const empty = clusters.length === 0 && findings.length === 0 && looseItems.length === 0 && sleepers.length === 0
@@ -190,7 +197,7 @@ export function TendDrawer(props: TendDrawerProps) {
             <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-neutral-400">On their own</h3>
             <div className="flex flex-col gap-1.5">
               {looseItems.map(r => (
-                <LooseRow key={r.id} r={r} foldTargets={foldTargets}
+                <LooseRow key={r.id} r={r} foldTargets={foldTargets} familyMembers={familyMembers}
                   onFoldInto={props.onFoldInto} onOpenRoutine={props.onOpenRoutine} />
               ))}
             </div>

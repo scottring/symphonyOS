@@ -22,8 +22,6 @@ export interface RhythmModel {
   week: {
     days: Record<DayKey, Routine[]>
     sometime: Routine[]
-    /** Resting (asleep) weekly routines, ghosted into their day columns. */
-    restingDays: Record<DayKey, Routine[]>
   }
   sometimes: Routine[]
   seasonal: Routine[]
@@ -97,7 +95,7 @@ export function buildRhythmModel(
 
   const model: RhythmModel = {
     daily: { timed: [], anytime: [] },
-    week: { days: emptyDays(), sometime: [], restingDays: emptyDays() },
+    week: { days: emptyDays(), sometime: [] },
     sometimes: [],
     seasonal: [],
     stepCounts,
@@ -108,10 +106,6 @@ export function buildRhythmModel(
   for (const { routine, steps } of topLevel) {
     if (routine.visibility === 'reference') {
       model.seasonal.push(routine)
-      // Weekly sleepers also ghost into their day column for one-tap wake.
-      if (zoneOf(routine.recurrence_pattern) === 'week') {
-        for (const d of weekDaysFor(routine)) model.week.restingDays[d].push(routine)
-      }
       continue
     }
     const zone = zoneOf(routine.recurrence_pattern)

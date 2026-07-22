@@ -1,4 +1,5 @@
 import type { Routine } from '@/types/actionable'
+import type { RhythmCard } from './rhythmModel'
 
 export type TendFinding =
   | { kind: 'lookalike'; ids: string[]; names: string[] }
@@ -95,4 +96,9 @@ export function tendFindingKey(f: TendFinding): string {
   if (f.kind === 'lookalike') return `l:${[...f.ids].sort().join('.')}`
   if (f.kind === 'missing-domain') return 'missing-domain'
   return `u:${f.id}`
+}
+
+/** Dismissal key for a name-this-group suggestion (order-independent). */
+export function groupSuggestionKey(card: RhythmCard): string {
+  return `g:${card.routines.map(r => r.id).sort().join('.')}`
 }

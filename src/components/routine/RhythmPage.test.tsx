@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, within } from '@testing-library/react'
 import { RhythmPage } from './RhythmPage'
 import type { Routine } from '@/types/actionable'
 
@@ -140,8 +140,9 @@ describe('RhythmPage', () => {
           mk('Pajamas', { id: 'b', time_of_day: '19:02:00' }),
         ]} />
     )
-    // one cluster, no findings → badge shows 1
-    expect(screen.getByRole('button', { name: /tend/i })).toHaveTextContent('1')
+    // one cluster, no findings → badge shows exactly 1 (not e.g. "11")
+    const badge = within(screen.getByRole('button', { name: /tend/i })).getByText('1')
+    expect(badge.textContent).toBe('1')
   })
 
   it('dismissing a tend suggestion hides it and persists to localStorage', () => {
