@@ -43,4 +43,36 @@ describe('parseTendProposals', () => {
     expect(parseTendProposals(null, IDS)).toEqual([])
     expect(parseTendProposals({ proposals: 'nope' }, IDS)).toEqual([])
   })
+
+  describe('dateWindow', () => {
+    const WINDOW = { minYmd: '2026-07-20', maxYmd: '2026-07-26' }
+
+    it('accepts a place proposal whose date is inside the window', () => {
+      const out = parseTendProposals({ proposals: [
+        { kind: 'place', taskIds: ['t1'], date: '2026-07-23', why: '' },
+      ] }, IDS, WINDOW)
+      expect(out).toHaveLength(1)
+    })
+
+    it('drops a place proposal whose date is before the window minimum', () => {
+      const out = parseTendProposals({ proposals: [
+        { kind: 'place', taskIds: ['t1'], date: '2026-07-19', why: '' },
+      ] }, IDS, WINDOW)
+      expect(out).toHaveLength(0)
+    })
+
+    it('drops a place proposal whose date is after the window maximum', () => {
+      const out = parseTendProposals({ proposals: [
+        { kind: 'place', taskIds: ['t1'], date: '2026-07-27', why: '' },
+      ] }, IDS, WINDOW)
+      expect(out).toHaveLength(0)
+    })
+
+    it('with no window provided, keeps the old unbounded behavior', () => {
+      const out = parseTendProposals({ proposals: [
+        { kind: 'place', taskIds: ['t1'], date: '2099-01-01', why: '' },
+      ] }, IDS)
+      expect(out).toHaveLength(1)
+    })
+  })
 })

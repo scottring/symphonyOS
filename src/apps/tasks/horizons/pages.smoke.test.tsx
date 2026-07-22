@@ -218,6 +218,22 @@ describe('horizon pages (smoke)', () => {
     expect(screen.queryByText('Anchored week task')).not.toBeInTheDocument()
   })
 
+  it('a prior-week carried-over task (bucket timed, overdue, not anchored) renders on the shelf, not nowhere', () => {
+    const lastWeek = new Date(now)
+    lastWeek.setDate(lastWeek.getDate() - 8)
+    lastWeek.setHours(9, 0, 0, 0)
+    mockTasks.push(createMockTask({
+      id: 'carried-task',
+      title: 'Carried over from last week',
+      bucket: 'timed',
+      scheduledFor: lastWeek,
+      completed: false,
+    }) satisfies Task)
+
+    render(<WeekPage />)
+    expect(screen.getAllByText('Carried over from last week')).toHaveLength(1)
+  })
+
   it('navigating from `?start=` back to `/week` resets the header AND the grid to the current week', () => {
     mockTasks.push(
       createMockTask({ id: 'anchor-task', title: 'Anchored week task', scheduledFor: anchorTaskDate }) satisfies Task,

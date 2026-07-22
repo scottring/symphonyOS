@@ -61,6 +61,16 @@ describe('useTendWeek', () => {
     expect(result.current.proposals.filter((p) => p.kind === 'merge')).toHaveLength(1)
   })
 
+  it('start() with an empty pool and no carry-over settles immediately without invoking the edge fn', () => {
+    const { result } = renderHook(() => useTendWeek({ ...ARGS, pool: [], carryOver: [] }))
+    act(() => result.current.start())
+    expect(result.current.status).toBe('reviewing')
+    expect(result.current.aiLoading).toBe(false)
+    expect(result.current.proposals).toEqual([])
+    expect(result.current.aiError).toBeNull()
+    expect(invoke).not.toHaveBeenCalled()
+  })
+
   it('remove() deletes one proposal; done() resets to idle', async () => {
     invoke.mockResolvedValue({ data: { proposals: [] }, error: null })
     const pool = [task('a', 'Same title'), task('b', 'Same title')]

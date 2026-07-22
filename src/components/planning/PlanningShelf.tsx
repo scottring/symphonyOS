@@ -77,6 +77,7 @@ function ShelfPill({ task, carried, projectName, onOpenTask, onSetBucket, onDele
       className={`group relative inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm touch-none cursor-grab active:cursor-grabbing transition-shadow hover:shadow-sm ${
         isDragging ? 'opacity-40' : ''
       } ${carried ? 'bg-amber-50 border-amber-200' : 'bg-white border-neutral-200'}`}
+      onClick={() => onOpenTask(task.id)}
       {...attributes}
       {...listeners}
     >
@@ -86,6 +87,7 @@ function ShelfPill({ task, carried, projectName, onOpenTask, onSetBucket, onDele
         className="flex items-center opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
         onPointerDown={(e) => e.stopPropagation()}
         onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
       >
         <PushDropdown size="sm" onPush={(date) => onPushTask(task.id, date)} />
         <button
@@ -101,7 +103,8 @@ function ShelfPill({ task, carried, projectName, onOpenTask, onSetBucket, onDele
       </span>
       {menuOpen && (
         <div role="menu" className="absolute top-full left-0 mt-1 z-30 w-36 rounded-lg border border-neutral-200 bg-white shadow-lg py-1 text-sm"
-          onPointerDown={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}>
+          onPointerDown={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}
+          onClick={(e) => e.stopPropagation()}>
           <button role="menuitem" type="button" className="w-full text-left px-3 py-1.5 hover:bg-neutral-50"
             onClick={() => { setMenuOpen(false); onOpenTask(task.id) }}>Open</button>
           <button role="menuitem" type="button" className="w-full text-left px-3 py-1.5 hover:bg-neutral-50"

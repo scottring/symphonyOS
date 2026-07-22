@@ -18,7 +18,11 @@ function why(v: unknown): string {
   return typeof v === 'string' ? v.trim().slice(0, MAX_WHY) : ''
 }
 
-export function parseTendProposals(data: unknown, validIds: Set<string>): TendProposal[] {
+export function parseTendProposals(
+  data: unknown,
+  validIds: Set<string>,
+  dateWindow?: { minYmd: string; maxYmd: string },
+): TendProposal[] {
   const raw = (data as { proposals?: unknown })?.proposals
   if (!Array.isArray(raw)) return []
   const out: TendProposal[] = []
@@ -56,6 +60,8 @@ export function parseTendProposals(data: unknown, validIds: Set<string>): TendPr
         if (!date || !DATE_RE.test(date)) continue
         const time = str(e.time)
         if (time && !TIME_RE.test(time)) continue
+        // YYYY-MM-DD compares correctly lexicographically — no Date parsing needed.
+        if (dateWindow && (date < dateWindow.minYmd || date > dateWindow.maxYmd)) continue
         out.push({ kind: 'place', id, taskIds, date, ...(time ? { time } : {}), why: why(e.why) })
         break
       }

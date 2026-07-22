@@ -31,6 +31,15 @@ export interface TendState {
   done: () => void
 }
 
+// LOCAL date parts, never toISOString() — UTC would shift the date near
+// midnight in negative-UTC-offset timezones.
+function localYmd(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
 /** Task ids a proposal touches, keyed for overlap-dedup between prepass and AI. */
 function touchedIds(p: TendProposal): string[] {
   switch (p.kind) {
@@ -62,6 +71,16 @@ export function useTendWeek(args: UseTendWeekArgs): TendState {
     const byId = new Map<string, Task>()
     for (const t of [...pool, ...carryOver]) if (!t.completed) byId.set(t.id, t)
     const tasks = [...byId.values()]
+
+    // Nothing open to tend — the sweep is still useful (prepass already ran,
+    // synchronously, above) but there's no point invoking the edge fn over an
+    // empty list. Settle immediately so the UI reads "Nothing to tend" rather
+    // than sitting in a loading state that never resolves into a failure look.
+    if (tasks.length === 0) {
+      setAiLoading(false)
+      return
+    }
+
     const now = Date.now()
     const body = {
       tasks: tasks.map((t) => ({
@@ -85,7 +104,14 @@ export function useTendWeek(args: UseTendWeekArgs): TendState {
         return
       }
       const validIds = new Set(tasks.map((t) => t.id))
-      const ai = parseTendProposals(data, validIds)
+      // AI place proposals must land inside today..weekEnd (weekStart + 6 days) —
+      // never in the past, never past the week it's tending. LOCAL date parts
+      // only (never Date.parse/toISOString, which shift near midnight in
+      // negative-UTC-offset timezones).
+      const [wy, wm, wd] = weekStartYmd.split('-').map(Number)
+      const weekEnd = new Date(wy, wm - 1, wd + 6)
+      const maxYmd = localYmd(weekEnd)
+      const ai = parseTendProposals(data, validIds, { minYmd: todayYmd, maxYmd })
       setProposals((current) => {
         const covered = new Set(current.flatMap((p) => touchedIds(p).map((id) => `${p.kind}:${id}`)))
         const fresh = ai.filter((p) => !touchedIds(p).some((id) => covered.has(`${p.kind}:${id}`)))

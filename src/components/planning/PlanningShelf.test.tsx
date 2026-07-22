@@ -48,6 +48,17 @@ describe('PlanningShelf', () => {
     expect(screen.getAllByTestId('shelf-pill-title')).toHaveLength(SHELF_COLLAPSED_COUNT + 3)
   })
 
+  it('clicking the pill title opens the task; clicking the ⋯ button does not', () => {
+    const props = renderShelf()
+    const onOpenTask = vi.mocked(props.onOpenTask)
+    fireEvent.click(screen.getAllByTestId('shelf-pill-title')[0]) // c1's title
+    expect(onOpenTask).toHaveBeenCalledWith('c1')
+
+    onOpenTask.mockClear()
+    fireEvent.click(screen.getAllByLabelText('Task actions')[0]) // c1's ⋯
+    expect(onOpenTask).not.toHaveBeenCalled()
+  })
+
   it('pill menu routes To month / Put aside / Delete / Open to the right callbacks', () => {
     const props = renderShelf()
     fireEvent.click(screen.getAllByLabelText('Task actions')[0]) // c1's ⋯

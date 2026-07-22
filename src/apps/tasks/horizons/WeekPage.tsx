@@ -67,6 +67,7 @@ export function WeekPage() {
     draft, setDraft, submitDraft,
     scheduleActionsValue, undo,
     setBucket, deleteTaskWithUndo, projectsMap, tasksById, weekAnchor,
+    addTask, deleteTask,
   } = useHorizonPageData(horizon, anchoredWeekStart ?? undefined);
 
   const gridStart = anchoredWeekStart ?? weekAnchor;
@@ -75,6 +76,24 @@ export function WeekPage() {
     : (period ?? label);
 
   const carryOverIds = useMemo(() => new Set(carryOver.map((t) => t.id)), [carryOver]);
+
+  // Union of this week's grid tasks + carried-over (prior-week overdue) tasks,
+  // deduped by id. weekGridTasks alone excludes a task scheduled BEFORE the
+  // anchored week (bucket 'timed', overdue) — it lives in carryOver instead —
+  // so without this union it's invisible: not on the grid (wrong week) and not
+  // on the shelf (not passed to PlanningSession at all). PlanningSession's own
+  // unscheduled-pool derivation already routes any past-scheduled task outside
+  // the grid's date range into the shelf (see allUnscheduledTasks in
+  // PlanningSession.tsx), so simply including it in `tasks` is sufficient —
+  // shared.tsx's weekGridTasks itself must NOT be widened (it also feeds the
+  // "placed this week" count and other horizons' pool math).
+  const sessionTasks = useMemo(() => {
+    const byId = new Map<string, Task>();
+    for (const t of weekGridTasks) byId.set(t.id, t);
+    for (const t of carryOver) byId.set(t.id, t);
+    return [...byId.values()];
+  }, [weekGridTasks, carryOver]);
+
   const busy = useMemo(() => domainEvents
     .map((e) => ({
       title: e.title ?? 'busy',
@@ -91,23 +110,50 @@ export function WeekPage() {
     projectNameFor: (t) => (t.projectId ? projectsMap.get(t.projectId)?.name : undefined),
   });
 
-  // Every apply is undoable (spec). Merges undo through deleteTaskWithUndo's
-  // own pushAction; bucket-moving kinds capture prior bucket/scheduledFor here
-  // and restore them via one setBucket call each.
+  // Every apply is undoable (spec). Bucket-moving kinds capture prior
+  // bucket/scheduledFor here and restore them via one setBucket call each.
+  //
+  // Merge is handled entirely here, NOT via applyProposal + deleteTaskWithUndo:
+  // deleteTaskWithUndo (handleLetGo) pushes its OWN undo action into the
+  // single-slot undo store on every call, so dropping N≥2 duplicates would
+  // push N undo actions and only the last (most recent) survives — the rest
+  // are silently unrecoverable. Instead: snapshot every dropped task from
+  // tasksById before deleting, delete each via the RAW deleteTask (no
+  // per-call undo), then push exactly ONE undo action that recreates every
+  // snapshot. Restore fields mirror handleLetGo's recreate-body exactly.
   const handleApplyProposal = useCallback((p: TendProposal) => {
-    if (p.kind !== 'merge') {
-      const ids = p.kind === 'place' ? p.taskIds : [p.taskId];
-      const prior = ids
+    if (p.kind === 'merge') {
+      const dropTasks = p.dropIds
         .map((id) => tasksById.get(id))
-        .filter((t): t is Task => !!t)
-        .map((t) => ({ id: t.id, bucket: t.bucket ?? 'week', scheduledFor: t.scheduledFor, isAllDay: t.isAllDay }));
-      const label = p.kind === 'put_aside' ? 'Put aside' : p.kind === 'regrade' ? `Moved to ${p.to}` : 'Placed';
-      undo.pushAction(`${label} · Tend`, () => {
-        for (const t of prior) setBucket(t.id, t.bucket, t.scheduledFor ? new Date(t.scheduledFor) : undefined, t.isAllDay);
+        .filter((t): t is Task => !!t);
+      undo.pushAction('Merged duplicates', () => {
+        for (const t of dropTasks) {
+          void addTask(t.title, t.contactId, t.projectId, t.scheduledFor, {
+            bucket: t.bucket,
+            context: t.context ?? undefined,
+            assignedTo: t.assignedTo ?? null,
+            assignedToAll: t.assignedToAll,
+            goalId: t.goalId,
+            sourceId: t.sourceId,
+            phoneNumber: t.phoneNumber,
+            isFun: t.isFun,
+          });
+        }
       });
+      for (const t of dropTasks) deleteTask(t.id);
+      return;
     }
+    const ids = p.kind === 'place' ? p.taskIds : [p.taskId];
+    const prior = ids
+      .map((id) => tasksById.get(id))
+      .filter((t): t is Task => !!t)
+      .map((t) => ({ id: t.id, bucket: t.bucket ?? 'week', scheduledFor: t.scheduledFor, isAllDay: t.isAllDay }));
+    const label = p.kind === 'put_aside' ? 'Put aside' : p.kind === 'regrade' ? `Moved to ${p.to}` : 'Placed';
+    undo.pushAction(`${label} · Tend`, () => {
+      for (const t of prior) setBucket(t.id, t.bucket, t.scheduledFor ? new Date(t.scheduledFor) : undefined, t.isAllDay);
+    });
     applyProposal(p, { setBucket, deleteTask: deleteTaskWithUndo });
-  }, [setBucket, deleteTaskWithUndo, tasksById, undo]);
+  }, [setBucket, deleteTaskWithUndo, deleteTask, addTask, tasksById, undo]);
 
   const shelf = useMemo(() => ({
     carryOverIds, projectsMap, tasksById,
@@ -156,7 +202,7 @@ export function WeekPage() {
         <div className="flex-1 min-h-0">
           <PlanningSession
             key={localYmd(gridStart)}
-            tasks={weekGridTasks}
+            tasks={sessionTasks}
             events={domainEvents}
             routines={[]}
             familyMembers={familyMembers}
