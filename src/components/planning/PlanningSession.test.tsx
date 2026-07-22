@@ -406,3 +406,54 @@ describe('PlanningSession', () => {
     expect(screen.getByRole('button', { name: /3 more overlapping items/i })).toBeInTheDocument()
   })
 })
+
+describe('standing week-page embed', () => {
+  it('initialDays opens the full range at once', () => {
+    const onOpenDay = vi.fn()
+    render(
+      <PlanningSession
+        tasks={[]}
+        events={[]}
+        routines={[]}
+        onUpdateTask={vi.fn()}
+        onPushTask={vi.fn()}
+        onClose={vi.fn()}
+        initialDate={new Date(2026, 6, 19)}
+        initialDays={7}
+        onOpenDay={onOpenDay}
+        embedded
+      />
+    )
+    expect(screen.getAllByRole('button', { name: /open .* on today/i })).toHaveLength(7)
+  })
+
+  it('showDone={false} hides the dead Done button', () => {
+    render(
+      <PlanningSession
+        tasks={[]}
+        events={[]}
+        routines={[]}
+        onUpdateTask={vi.fn()}
+        onPushTask={vi.fn()}
+        onClose={vi.fn()}
+        showDone={false}
+        embedded
+      />
+    )
+    expect(screen.queryByRole('button', { name: 'Done' })).not.toBeInTheDocument()
+  })
+
+  it('Done stays by default (wizard/overlay hosts)', () => {
+    render(
+      <PlanningSession
+        tasks={[]}
+        events={[]}
+        routines={[]}
+        onUpdateTask={vi.fn()}
+        onPushTask={vi.fn()}
+        onClose={vi.fn()}
+      />
+    )
+    expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument()
+  })
+})

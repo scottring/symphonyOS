@@ -8,6 +8,7 @@ interface PlanningHeaderProps {
   onRemoveDay: () => void
   onDateChange: (startDate: Date) => void
   showClose?: boolean
+  showDone?: boolean
   hideRoutines?: boolean
   onToggleRoutines?: () => void
 }
@@ -19,6 +20,7 @@ export function PlanningHeader({
   onRemoveDay,
   onDateChange,
   showClose = true,
+  showDone = true,
   hideRoutines = false,
   onToggleRoutines,
 }: PlanningHeaderProps) {
@@ -160,12 +162,14 @@ export function PlanningHeader({
               {hideRoutines ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
           )}
-          <button
-            onClick={onClose}
-            className="btn-primary px-6 py-2"
-          >
-            Done
-          </button>
+          {showDone && (
+            <button
+              onClick={onClose}
+              className="btn-primary px-6 py-2"
+            >
+              Done
+            </button>
+          )}
         </div>
       </div>
     </div>

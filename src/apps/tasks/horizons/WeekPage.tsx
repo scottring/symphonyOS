@@ -125,6 +125,8 @@ export function WeekPage() {
               onPushTask={pushTask}
               onClose={() => {}}
               initialDate={gridInitialDate}
+              initialDays={7}
+              showDone={false}
               minDropDate={todayStart}
               onOpenDay={(d) => navigate(`/today?date=${localYmd(d)}`)}
               embedded
