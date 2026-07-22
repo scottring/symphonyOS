@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { Plus, Search, Sparkles, RefreshCw } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Plus, Search, Sparkles, RefreshCw, Wrench } from 'lucide-react'
 import type { RecurrencePattern, Routine } from '@/types/actionable'
 import type { Contact } from '@/types/contact'
 import type { FamilyMember } from '@/types/family'
@@ -12,8 +12,7 @@ import { findTend, tendFindingKey } from './rhythm/tendHeuristics'
 import { DailyArc } from './rhythm/DailyArc'
 import { WeekStrip } from './rhythm/WeekStrip'
 import { SometimesShelf } from './rhythm/SometimesShelf'
-import { SeasonalShelf } from './rhythm/SeasonalShelf'
-import { TendCard } from './rhythm/TendCard'
+import { TendDrawer, groupSuggestionKey } from './rhythm/TendDrawer'
 
 interface RhythmPageProps {
   routines: Routine[]
@@ -38,8 +37,6 @@ interface RhythmPageProps {
     routineIds: string[],
     opts?: { time_of_day?: string; recurrence_pattern?: RecurrencePattern },
   ) => void
-  /** Inline quick-create from the timeline views (day columns, anytime row). */
-  onQuickCreate?: (input: { name: string; recurrence_pattern: RecurrencePattern; time_of_day?: string }) => void
   /** Fold existing routines into an existing routine as its steps. */
   onAddToCollection?: (collectionId: string, routineIds: string[]) => void
   /** Open the AI routine builder (paste text / drop a PDF → proposed routine). */
@@ -49,13 +46,14 @@ interface RhythmPageProps {
 export function RhythmPage(props: RhythmPageProps) {
   const {
     routines, loading = false, familyMembers = [],
-    onUpdateRoutine, onDelete, onGroupIntoCollection, onBuildWithAI, onCreateCollection, onQuickCreate,
+    onUpdateRoutine, onDelete, onGroupIntoCollection, onBuildWithAI, onCreateCollection,
     onAddToCollection,
   } = props
 
   const [memberId, setMemberId] = useState<string | null>(null)
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState<{ kind: 'routine' | 'standalone-step' | 'step'; id: string } | null>(null)
+  const [tendOpen, setTendOpen] = useState(false)
 
   const model = useMemo(() => buildRhythmModel(routines, { memberId }), [routines, memberId])
 
@@ -78,19 +76,20 @@ export function RhythmPage(props: RhythmPageProps) {
     () => findTend(routines).filter(f => !dismissedTend.includes(tendFindingKey(f))),
     [routines, dismissedTend],
   )
+  // Arc clusters whose name-this-group suggestion hasn't been dismissed.
+  const activeClusters = useMemo(
+    () => model.daily.timed.filter(c => c.kind === 'cluster' && !dismissedTend.includes(groupSuggestionKey(c))),
+    [model, dismissedTend],
+  )
+  const tendCount = findings.length + activeClusters.length
+  const looseItems = useMemo(
+    () => routines.filter(r => !r.parent_routine_id && r.visibility === 'active' && !model.stepCounts[r.id]),
+    [routines, model],
+  )
   const { collections } = useMemo(() => groupRoutineSteps(routines), [routines])
   const collectionSteps = useMemo(
     () => Object.fromEntries(collections.map(c => [c.id, c.steps])),
     [collections],
-  )
-  // Every-day routines mirrored into the Week Strip: collections as one named
-  // item, cluster/single members individually.
-  const dailyItems = useMemo(
-    () => [
-      ...model.daily.timed.flatMap(c => (c.kind === 'collection' && c.routine ? [c.routine] : c.routines)),
-      ...model.daily.anytime,
-    ],
-    [model],
   )
 
   // Type-anywhere search
@@ -98,14 +97,14 @@ export function RhythmPage(props: RhythmPageProps) {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target
       if (t instanceof HTMLElement && t.closest('input,textarea,[contenteditable="true"]')) return
-      if (open) return
+      if (open || tendOpen) return
       if (e.key === 'Escape') { setQuery(''); return }
       if (e.key === 'Backspace') { e.preventDefault(); setQuery(q => q.slice(0, -1)); return }
       if (e.key.length === 1 && !e.metaKey && !e.ctrlKey && !e.altKey) { e.preventDefault(); setQuery(q => q + e.key) }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [open])
+  }, [open, tendOpen])
 
   const q = query.trim().toLowerCase()
   const matches = (r: Routine): boolean => {
@@ -136,8 +135,6 @@ export function RhythmPage(props: RhythmPageProps) {
       .map(r => ({ id: r.id, name: r.name })),
     [routines],
   )
-  const handleFoldInto = (card: RhythmCard, targetId: string) =>
-    onAddToCollection?.(targetId, card.routines.map(r => r.id))
   const handleWakeAll = () => {
     for (const r of model.seasonal) onUpdateRoutine(r.id, { visibility: 'active', paused_until: null })
   }
@@ -162,42 +159,8 @@ export function RhythmPage(props: RhythmPageProps) {
   const openRoutine = (r: Routine) =>
     setOpen({ kind: model.stepCounts[r.id] ? 'routine' : 'standalone-step', id: r.id })
 
-  // --- Sticky section nav: pills that jump to each zone; scroll-spy highlight ---
-  const scrollRef = useRef<HTMLDivElement>(null)
-  const zoneRefs = useRef<Record<string, HTMLDivElement | null>>({})
-  const weekCount = DAY_ORDER.reduce((n, d) => n + model.week.days[d].length, 0) + model.week.sometime.length
-  const zones = [
-    { key: 'daily', label: 'Every day', show: model.daily.timed.length + model.daily.anytime.length > 0 },
-    { key: 'week', label: 'This week', show: weekCount > 0 },
-    { key: 'sometimes', label: 'Sometimes', show: model.sometimes.length > 0 },
-    { key: 'seasonal', label: 'Resting', show: model.seasonal.length > 0 },
-    { key: 'tend', label: 'Tend', show: findings.length > 0 },
-  ].filter(z => z.show)
-  const [activeZone, setActiveZone] = useState('daily')
-  const zoneKeys = zones.map(z => z.key).join(',')
-
-  useEffect(() => {
-    const el = scrollRef.current
-    if (!el) return
-    const onScroll = () => {
-      const offset = el.scrollTop + 140
-      let current = zoneKeys.split(',')[0] ?? 'daily'
-      for (const key of zoneKeys.split(',')) {
-        const top = zoneRefs.current[key]?.offsetTop ?? Infinity
-        if (top <= offset) current = key
-      }
-      setActiveZone(current)
-    }
-    el.addEventListener('scroll', onScroll, { passive: true })
-    onScroll()
-    return () => el.removeEventListener('scroll', onScroll)
-  }, [zoneKeys])
-
-  const jumpTo = (key: string) => zoneRefs.current[key]?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  const setZoneRef = (key: string) => (node: HTMLDivElement | null) => { zoneRefs.current[key] = node }
-
   return (
-    <div ref={scrollRef} className="h-full overflow-auto bg-[var(--color-bg-base)]">
+    <div className="h-full overflow-auto bg-[var(--color-bg-base)]">
       {/* Full-width canvas (keeps the shared gutter, drops the 940px cap) —
           the staggered timeline needs the room; approved deviation from PAGE_COLUMN. */}
       <div className="relative w-full px-6 md:px-10 lg:px-14 py-8">
@@ -226,6 +189,19 @@ export function RhythmPage(props: RhythmPageProps) {
                 Build with AI
               </button>
             )}
+            <button
+              onClick={() => setTendOpen(true)}
+              className="relative flex items-center gap-2 rounded-xl border border-neutral-200 bg-white px-4 py-2.5
+                         font-medium text-neutral-700 shadow-sm hover:border-emerald-400 transition-colors"
+            >
+              <Wrench className="w-4 h-4 text-emerald-700" />
+              Tend
+              {tendCount > 0 && (
+                <span className="ml-0.5 rounded-full bg-emerald-700 px-1.5 py-0.5 text-[10px] font-bold text-white">
+                  {tendCount}
+                </span>
+              )}
+            </button>
             <button
               onClick={async () => {
                 if (!onCreateCollection) return
@@ -261,27 +237,6 @@ export function RhythmPage(props: RhythmPageProps) {
           </div>
         )}
 
-        {/* Sticky section nav — tab ergonomics without hiding the canvas */}
-        {zones.length >= 2 && (
-          <nav className="sticky top-0 z-20 -mx-6 md:-mx-10 lg:-mx-14 mb-6 px-6 md:px-10 lg:px-14 py-2.5
-                          bg-[var(--color-bg-base)]/95 backdrop-blur-sm border-b border-neutral-200/60
-                          flex items-center gap-1.5 overflow-x-auto">
-            {zones.map(z => (
-              <button
-                key={z.key}
-                onClick={() => jumpTo(z.key)}
-                className={`rounded-full px-3.5 py-1 text-sm whitespace-nowrap transition-colors ${
-                  activeZone === z.key
-                    ? 'bg-[var(--color-primary-500,#3d5a44)] text-white'
-                    : 'text-neutral-500 hover:bg-neutral-100'
-                }`}
-              >
-                {z.label}
-              </button>
-            ))}
-          </nav>
-        )}
-
         {loading && routines.length === 0 && (
           <p className="py-16 text-center text-neutral-400">Loading your week…</p>
         )}
@@ -309,7 +264,7 @@ export function RhythmPage(props: RhythmPageProps) {
           </div>
         )}
 
-        <div ref={setZoneRef('daily')} className="scroll-mt-16">
+        <div>
           <DailyArc
             cards={model.daily.timed}
             anytime={model.daily.anytime}
@@ -318,16 +273,10 @@ export function RhythmPage(props: RhythmPageProps) {
             nowMinutes={nowMinutes}
             onOpenCollection={id => setOpen({ kind: 'routine', id })}
             onOpenRoutine={openRoutine}
-            onNameCluster={handleNameCluster}
-            onQuickAddDaily={onQuickCreate
-              ? name => onQuickCreate({ name, recurrence_pattern: { type: 'daily' } })
-              : undefined}
-            foldTargets={foldTargets}
-            onFoldInto={onAddToCollection ? handleFoldInto : undefined}
           />
         </div>
 
-        <div ref={setZoneRef('week')} className="scroll-mt-16">
+        <div>
           <WeekStrip
             days={model.week.days}
             sometime={model.week.sometime}
@@ -337,36 +286,34 @@ export function RhythmPage(props: RhythmPageProps) {
             onOpenRoutine={openRoutine}
             familyMembers={familyMembers}
             collectionSteps={collectionSteps}
-            dailyItems={dailyItems}
-            restingDays={model.week.restingDays}
-            onWake={r => onUpdateRoutine(r.id, { visibility: 'active', paused_until: null })}
-            onQuickAdd={onQuickCreate
-              ? (name, day) => onQuickCreate({ name, recurrence_pattern: { type: 'weekly', days: [day] } })
-              : undefined}
-            onAddStep={props.onAddStep}
           />
         </div>
 
-        <div ref={setZoneRef('sometimes')} className="scroll-mt-16">
+        <div>
           <SometimesShelf routines={model.sometimes} matches={matches} onOpenRoutine={openRoutine} />
         </div>
-
-        <div ref={setZoneRef('seasonal')} className="scroll-mt-16">
-          <SeasonalShelf routines={model.seasonal} onWakeAll={handleWakeAll} onOpenRoutine={openRoutine} />
-        </div>
-
-        <div ref={setZoneRef('tend')} className="scroll-mt-16">
-          <TendCard
-            findings={findings}
-            routines={routines}
-            onMerge={handleMerge}
-            onStampDomain={(id, context) => onUpdateRoutine(id, { context })}
-            onRename={(id, name) => onUpdateRoutine(id, { name })}
-            onLetGo={id => onDelete?.(id)}
-            onDismiss={dismissTend}
-          />
-        </div>
       </div>
+
+      <TendDrawer
+        open={tendOpen}
+        onClose={() => setTendOpen(false)}
+        clusters={activeClusters}
+        findings={findings}
+        routines={routines}
+        looseItems={looseItems}
+        sleepers={model.seasonal}
+        foldTargets={foldTargets}
+        familyMembers={familyMembers}
+        onNameGroup={handleNameCluster}
+        onFoldInto={(targetId, ids) => onAddToCollection?.(targetId, ids)}
+        onDismiss={dismissTend}
+        onMerge={handleMerge}
+        onStampDomain={(id, context) => onUpdateRoutine(id, { context })}
+        onRename={(id, name) => onUpdateRoutine(id, { name })}
+        onLetGo={id => onDelete?.(id)}
+        onWakeAll={handleWakeAll}
+        onOpenRoutine={r => { setTendOpen(false); openRoutine(r) }}
+      />
 
       {/* Panel overlay — routine/step editors, shared across all zones */}
       {(openRoutineItem || openStep) && (

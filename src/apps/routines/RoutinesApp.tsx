@@ -109,10 +109,6 @@ function RoutinesIndex() {
     await Promise.all(ids.map((id, i) => updateRoutine(id, { parent_routine_id: parent.id, step_order: i })))
   }, [addRoutine, updateRoutine, currentDomain])
 
-  const handleQuickCreate = useCallback(async (input: { name: string; recurrence_pattern: RecurrencePattern; time_of_day?: string }) => {
-    await addRoutine({ ...input, context: currentDomain !== 'universal' ? currentDomain : undefined })
-  }, [addRoutine, currentDomain])
-
   // Fold existing routines into an existing routine as steps, appended after
   // any steps it already has.
   const handleAddToCollection = useCallback(async (collectionId: string, ids: string[]) => {
@@ -139,7 +135,6 @@ function RoutinesIndex() {
         onDelete={deleteRoutine}
         onCreateCollection={handleCreateCollection}
         onGroupIntoCollection={handleGroupIntoCollection}
-        onQuickCreate={handleQuickCreate}
         onAddToCollection={handleAddToCollection}
         onBuildWithAI={() => setBuilderOpen(true)}
       />

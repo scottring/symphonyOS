@@ -45,6 +45,8 @@ describe('RhythmPage', () => {
     expect(screen.getByRole('heading', { name: 'Every day' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Through the week' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Sometimes' })).toBeInTheDocument()
+    // Resting routines now live in the Tend drawer, not the page body.
+    fireEvent.click(screen.getByRole('button', { name: /tend/i }))
     expect(screen.getByText(/Waiting for September/)).toBeInTheDocument()
   })
 
@@ -72,6 +74,8 @@ describe('RhythmPage', () => {
           mk('B', { id: 'b', visibility: 'reference' }),
         ]} />
     )
+    // Resting routines + wake-all now live in the Tend drawer.
+    fireEvent.click(screen.getByRole('button', { name: /tend/i }))
     fireEvent.click(screen.getByRole('button', { name: /wake all/i }))
     expect(onUpdateRoutine).toHaveBeenCalledWith('a', { visibility: 'active', paused_until: null })
     expect(onUpdateRoutine).toHaveBeenCalledWith('b', { visibility: 'active', paused_until: null })
@@ -91,7 +95,7 @@ describe('RhythmPage', () => {
     expect(screen.getByTestId('arc-card-run')).toBeInTheDocument()
   })
 
-  it('naming a cluster calls onGroupIntoCollection with member ids', () => {
+  it('naming a group in the Tend drawer calls onGroupIntoCollection with time opts', () => {
     const onGroupIntoCollection = vi.fn()
     render(
       <RhythmPage {...noop} onUpdateRoutine={vi.fn()} onGroupIntoCollection={onGroupIntoCollection}
@@ -101,28 +105,43 @@ describe('RhythmPage', () => {
           mk('Reading', { id: 'c', time_of_day: '19:06:00' }),
         ]} />
     )
-    fireEvent.click(screen.getByRole('button', { name: /name this rhythm/i }))
-    fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter' })
-    // The cluster's start time + daily recurrence keep the new collection in place on the arc.
+    fireEvent.click(screen.getByRole('button', { name: /tend/i }))
+    const input = screen.getByPlaceholderText('Name this rhythm')
+    fireEvent.change(input, { target: { value: 'Bedtime' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
     expect(onGroupIntoCollection).toHaveBeenCalledWith('Bedtime', ['a', 'b', 'c'],
       { time_of_day: '19:01', recurrence_pattern: { type: 'daily' } })
   })
 
-  it('folding a cluster into an existing routine calls onAddToCollection', () => {
+  it('folding a group into an existing routine via the drawer calls onAddToCollection', () => {
     const onAddToCollection = vi.fn()
     render(
       <RhythmPage {...noop} onUpdateRoutine={vi.fn()} onAddToCollection={onAddToCollection}
         routines={[
           mk('Hamper', { id: 'a', time_of_day: '19:01:00' }),
           mk('Pajamas', { id: 'b', time_of_day: '19:02:00' }),
-          mk('Reading', { id: 'c', time_of_day: '19:06:00' }),
           mk('Kids Bedtime Routine', { id: 'bed', recurrence_pattern: { type: 'weekly', days: ['sun', 'tue'] }, time_of_day: '19:15:00' }),
         ]} />
     )
-    fireEvent.click(screen.getByRole('button', { name: /name this rhythm/i }))
-    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Kids Bedtime Routine' } })
-    fireEvent.click(screen.getAllByRole('button', { name: 'Kids Bedtime Routine' })[0])
-    expect(onAddToCollection).toHaveBeenCalledWith('bed', ['a', 'b', 'c'])
+    fireEvent.click(screen.getByRole('button', { name: /tend/i }))
+    fireEvent.change(screen.getByPlaceholderText('Name this rhythm'), { target: { value: 'Kids Bedtime' } })
+    // "Kids Bedtime Routine" also renders as a WeekStrip chip (it's scheduled
+    // sun+tue) — disambiguate to the drawer's fold suggestion button.
+    const foldButtons = screen.getAllByRole('button', { name: 'Kids Bedtime Routine' })
+    fireEvent.click(foldButtons.find(b => b.className.includes('bg-emerald-50'))!)
+    expect(onAddToCollection).toHaveBeenCalledWith('bed', ['a', 'b'])
+  })
+
+  it('shows a Tend badge counting findings plus nameable groups', () => {
+    render(
+      <RhythmPage {...noop} onUpdateRoutine={vi.fn()}
+        routines={[
+          mk('Hamper', { id: 'a', time_of_day: '19:01:00' }),
+          mk('Pajamas', { id: 'b', time_of_day: '19:02:00' }),
+        ]} />
+    )
+    // one cluster, no findings → badge shows 1
+    expect(screen.getByRole('button', { name: /tend/i })).toHaveTextContent('1')
   })
 
   it('dismissing a tend suggestion hides it and persists to localStorage', () => {
@@ -134,6 +153,7 @@ describe('RhythmPage', () => {
           mk('Water houseplants', { id: 'b' }),
         ]} />
     )
+    fireEvent.click(screen.getByRole('button', { name: /tend/i }))
     expect(screen.getByText(/same job\?/)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: /dismiss suggestion/i }))
     expect(screen.queryByText(/same job\?/)).not.toBeInTheDocument()
