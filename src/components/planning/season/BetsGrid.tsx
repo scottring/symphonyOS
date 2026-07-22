@@ -16,7 +16,7 @@ export function BetsGrid({ tasks, goalsById, onSelect, onComplete, onDemote, onS
   onSelect: (id: string) => void
   onComplete: (id: string) => void
   onDemote: (id: string) => void
-  /** Tap an open slot → route attention to the composer (or the bench). */
+  /** Tap an open slot → route attention to the composer (or the shelf). */
   onSlotClick?: () => void
   now?: Date
 }) {
@@ -27,7 +27,7 @@ export function BetsGrid({ tasks, goalsById, onSelect, onComplete, onDemote, onS
     <div>
       {picks.length === 0 && won.length === 0 && (
         <p className="text-sm text-neutral-400 italic mb-3">
-          No picks yet. A pick is an outcome true by season's end — fill a slot from the bench, your goals, or the composer.
+          No picks yet. A pick is an outcome true by season's end — fill a slot from the shelf, your goals, or the composer.
         </p>
       )}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

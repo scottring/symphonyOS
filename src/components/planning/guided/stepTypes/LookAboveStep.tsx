@@ -207,7 +207,7 @@ export function LookAboveStep() {
   return (
     <>
     {pool.length === 0 && (
-      <p className="text-sm text-neutral-400">No picks this season yet — the bench below is unchosen.</p>
+      <p className="text-sm text-neutral-400">No picks this season yet — the shelf below is unchosen.</p>
     )}
     <ul className="space-y-1">
       {pool.map((t) => {
@@ -237,7 +237,7 @@ export function LookAboveStep() {
         <button type="button" onClick={() => setBenchOpen((v) => !v)} aria-expanded={benchOpen}
           className="inline-flex items-center gap-1 text-[11px] text-neutral-400 hover:text-neutral-600 transition-colors">
           <ChevronRight className={`w-3 h-3 transition-transform ${benchOpen ? 'rotate-90' : ''}`} />
-          Also on the bench ({benchPool.length}) — not picked this season
+          Also on the shelf ({benchPool.length}) — not picked this season
         </button>
         {benchOpen && <ul className="space-y-1 mt-1.5 opacity-75">{benchPool.map(copyRow)}</ul>}
       </div>

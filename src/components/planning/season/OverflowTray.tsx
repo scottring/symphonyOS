@@ -5,7 +5,7 @@ import { useBenchAudit } from '@/hooks/useBenchAudit'
 import type { Task } from '@/types/task'
 import { PICK_CAP } from '@/lib/planning/betPulse'
 
-/** The bench: open quarter items that aren't picks. Every row can be promoted
+/** The shelf: open quarter items that aren't picks. Every row can be promoted
  *  ("Pick it") — at the cap, promoting expands an inline swap picker so one
  *  gesture replaces a current pick. The other exits re-grade or retire.
  *  `collapsible` renders it as a closed drawer (season-spread bottom) —
@@ -62,14 +62,14 @@ export function OverflowTray({ items, picks, onPick, onSwap, onMakeMove, onShelf
         >
           <ChevronRight aria-hidden="true" className={`w-4 h-4 text-neutral-400 shrink-0 transition-transform ${open ? 'rotate-90' : ''}`} />
           <span className="text-sm font-medium text-neutral-500 group-hover:text-neutral-700 transition-colors">
-            On the bench ({items.length})
+            On the shelf ({items.length})
           </span>
           {!open && (
             <span className="text-[12px] text-neutral-400">— waiting for a slot, a month, or a decision</span>
           )}
         </button>
       ) : (
-        <h3 className="text-sm font-medium text-neutral-500">On the bench ({items.length})</h3>
+        <h3 className="text-sm font-medium text-neutral-500">On the shelf ({items.length})</h3>
       )}
       {!open ? null : (<>
       <div className="flex items-center gap-3 mt-0.5 mb-3">
@@ -83,7 +83,7 @@ export function OverflowTray({ items, picks, onPick, onSwap, onMakeMove, onShelf
           <Sparkles aria-hidden="true" className="w-3 h-3" />
           {auditing ? 'Auditing…'
             : uncachedCount === 0 ? 'Re-audit'
-            : results ? `Audit ${uncachedCount} new` : 'Audit the bench'}
+            : results ? `Audit ${uncachedCount} new` : 'Audit the shelf'}
         </button>
         {results && uncachedCount > 0 && (
           <button type="button" onClick={() => void reauditAll()} disabled={auditing}
@@ -95,8 +95,8 @@ export function OverflowTray({ items, picks, onPick, onSwap, onMakeMove, onShelf
       </div>
       {auditError && <p className="text-[11px] text-amber-700 mb-2">{auditError}</p>}
       {/* The audit's season-system read: its recommended slate across picks AND
-          bench. One tap applies it (recommended become the picks, the rest
-          bench); every id resolves to a live item or the button hides. */}
+          shelf. One tap applies it (recommended become the picks, the rest
+          shelved); every id resolves to a live item or the button hides. */}
       {slate && (
         <div className="mb-3 rounded-xl border border-primary-100 bg-primary-50/30 px-4 py-3">
           <p className="text-[11px] font-medium tracking-wide uppercase text-primary-700 mb-1">Recommended slate ({slate.ids.length})</p>
@@ -165,7 +165,7 @@ export function OverflowTray({ items, picks, onPick, onSwap, onMakeMove, onShelf
               </button>
               <button type="button" onClick={() => onShelf(t.id)}
                 className="shrink-0 inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-md text-neutral-500 hover:bg-neutral-100 transition-colors">
-                <Archive aria-hidden="true" className="w-3 h-3" /> Shelf
+                <Archive aria-hidden="true" className="w-3 h-3" /> Put aside
               </button>
               <button type="button" onClick={() => onLetGo(t.id)}
                 className="shrink-0 inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-md text-neutral-400 hover:text-danger-600 hover:bg-danger-50 transition-colors">
@@ -220,7 +220,7 @@ export function OverflowTray({ items, picks, onPick, onSwap, onMakeMove, onShelf
                   {v.verdict === 'goal' && (
                     <button type="button" onClick={() => onShelf(t.id)}
                       className="inline-flex items-center gap-1 font-medium text-neutral-500 hover:text-neutral-700 transition-colors">
-                      <Archive aria-hidden="true" className="w-3 h-3" /> Shelf it
+                      <Archive aria-hidden="true" className="w-3 h-3" /> Put it aside
                     </button>
                   )}
                   {/* The upgrade path — disagree with the demotion and keep it

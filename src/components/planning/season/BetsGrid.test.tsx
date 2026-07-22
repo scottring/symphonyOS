@@ -44,7 +44,7 @@ describe('BetsGrid', () => {
     expect(screen.getByText('A won pick this season')).toBeInTheDocument()
   })
 
-  it('demote: the Bench action un-picks without selecting or completing', () => {
+  it('demote: the Shelf action un-picks without selecting or completing', () => {
     const onSelect = vi.fn(); const onComplete = vi.fn(); const onDemote = vi.fn()
     render(
       <BetsGrid
@@ -53,14 +53,14 @@ describe('BetsGrid', () => {
         now={new Date(2026, 6, 20)}
       />,
     )
-    fireEvent.click(screen.getByRole('button', { name: /move to bench/i }))
+    fireEvent.click(screen.getByRole('button', { name: /move to shelf/i }))
     expect(onDemote).toHaveBeenCalledWith('b1')
     expect(onSelect).not.toHaveBeenCalled()
     expect(onComplete).not.toHaveBeenCalled()
   })
 })
 
-describe('OverflowTray (the bench)', () => {
+describe('OverflowTray (the shelf)', () => {
   it('renders Pick it plus the three exits; under the cap Pick it promotes directly', () => {
     const onPick = vi.fn()
     render(
@@ -73,7 +73,7 @@ describe('OverflowTray (the bench)', () => {
     fireEvent.click(screen.getByRole('button', { name: /pick it/i }))
     expect(onPick).toHaveBeenCalledWith('b9')
     expect(screen.getByRole('button', { name: /month move/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /shelf/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /put aside/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /let it go/i })).toBeInTheDocument()
   })
 

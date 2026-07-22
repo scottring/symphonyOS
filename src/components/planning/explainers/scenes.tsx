@@ -247,7 +247,7 @@ export const EXPLAINER_SCENES: Record<HorizonId, Scene[]> = {
     },
     {
       headline: 'Five to eight. Never more.',
-      body: "19 picks isn't a season, it's a backlog. Extras wait on the bench, become month moves, or shelve.",
+      body: "19 picks isn't a season, it's a backlog. Extras wait on the shelf, become month moves, or let go.",
       vignette: <CapCounter />,
     },
     {
@@ -262,7 +262,7 @@ export const EXPLAINER_SCENES: Record<HorizonId, Scene[]> = {
     },
     {
       headline: 'Win it, carry it, or let it go.',
-      body: 'Every outcome is honorable — a pick can go back to the bench without shame.',
+      body: 'Every outcome is honorable — a pick can go back to the shelf without shame.',
       vignette: <BetOutcomes />,
     },
   ],

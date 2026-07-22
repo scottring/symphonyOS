@@ -898,7 +898,7 @@ export function HorizonView({ horizon }: HorizonViewProps) {
                               ) : (
                                 <button type="button"
                                   onClick={() => void onCreateTaskFromValue(it.title, it.lineage)}
-                                  title="Copy onto this list (stays on the bench too)"
+                                  title="Copy onto this list (stays on the shelf too)"
                                   className="shrink-0 inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-md text-primary-700 bg-primary-50 hover:bg-primary-100 transition-colors">
                                   <Plus className="w-3 h-3" /> Copy down
                                 </button>

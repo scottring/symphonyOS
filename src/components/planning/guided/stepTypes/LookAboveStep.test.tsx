@@ -39,7 +39,7 @@ describe('LookAboveStep', () => {
     expect(screen.queryByRole('button', { name: /Copy down/ })).toBeNull()
   })
 
-  it('reference mode: unpicked season items collapse behind the bench disclosure', () => {
+  it('reference mode: unpicked season items collapse behind the shelf disclosure', () => {
     const host = makeHost({ tasks: [
       t({ id: 'q1', title: 'Picked outcome', bucket: 'quarter', pickedAt: new Date() }),
       t({ id: 'q2', title: 'Benched idea', bucket: 'quarter' }),
@@ -51,7 +51,7 @@ describe('LookAboveStep', () => {
     })
     expect(screen.getByText('Picked outcome')).toBeInTheDocument()
     expect(screen.queryByText('Benched idea')).toBeNull()
-    fireEvent.click(screen.getByRole('button', { name: /Also on the bench \(1\)/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Also on the shelf \(1\)/ }))
     expect(screen.getByText('Benched idea')).toBeInTheDocument()
   })
 

@@ -9,7 +9,7 @@ export function BetCard({ bet, tasks, goalsById, onSelect, onComplete, onDemote,
   goalsById: Map<string, Goal>
   onSelect: (id: string) => void
   onComplete: (id: string) => void
-  /** Un-pick: send this card back to the bench (pickedAt cleared). */
+  /** Un-pick: send this card back to the shelf (pickedAt cleared). */
   onDemote: (id: string) => void
   now?: Date
 }) {
@@ -56,12 +56,12 @@ export function BetCard({ bet, tasks, goalsById, onSelect, onComplete, onDemote,
         {!bet.completed && (
           <button
             type="button"
-            aria-label="Move to bench"
-            title="Not this season — move to the bench"
+            aria-label="Move to shelf"
+            title="Not this season — move to the shelf"
             onClick={(e) => { e.stopPropagation(); onDemote(bet.id) }}
             className="ml-auto shrink-0 inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded text-neutral-300 hover:text-neutral-600 hover:bg-neutral-100 transition-colors"
           >
-            <ArrowDown aria-hidden="true" className="w-3 h-3" /> Bench
+            <ArrowDown aria-hidden="true" className="w-3 h-3" /> Shelf
           </button>
         )}
       </div>

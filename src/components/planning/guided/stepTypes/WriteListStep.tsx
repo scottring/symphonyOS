@@ -159,9 +159,9 @@ export function WriteListStep() {
               {step.props?.rows === 'bets' && (
                 <button type="button"
                   onClick={() => host.onUpdateTask(t.id, { pickedAt: t.pickedAt ? undefined : new Date() })}
-                  aria-label={t.pickedAt ? 'Move to bench' : 'Pick for the season'}
+                  aria-label={t.pickedAt ? 'Move to shelf' : 'Pick for the season'}
                   aria-pressed={t.pickedAt != null}
-                  title={t.pickedAt ? 'Picked — tap to bench' : 'Pick it for the season'}
+                  title={t.pickedAt ? 'Picked — tap to shelve' : 'Pick it for the season'}
                   className={`shrink-0 mt-1.5 p-1 rounded-md transition-colors ${
                     t.pickedAt ? 'text-primary-600 bg-primary-50' : 'text-neutral-300 hover:text-primary-600 hover:bg-primary-50'}`}>
                   <Star className="w-3.5 h-3.5" />
