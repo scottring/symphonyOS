@@ -29,6 +29,10 @@ function mk(name: string, over: Partial<Routine> = {}): Routine {
 
 const noop = { onCreateRoutine: vi.fn(), onAddStep: vi.fn(), onReorderSteps: vi.fn(), onPromoteStep: vi.fn() }
 
+function mkDT(): DataTransfer {
+  return new DataTransfer()
+}
+
 describe('RhythmPage', () => {
   it('renders all zones from a mixed routine set', () => {
     render(
@@ -95,7 +99,7 @@ describe('RhythmPage', () => {
     expect(screen.getByTestId('arc-card-run')).toBeInTheDocument()
   })
 
-  it('naming a group in the Tend drawer calls onGroupIntoCollection with time opts', () => {
+  it('naming a group via the canvas popover calls onGroupIntoCollection with time opts', () => {
     const onGroupIntoCollection = vi.fn()
     render(
       <RhythmPage {...noop} onUpdateRoutine={vi.fn()} onGroupIntoCollection={onGroupIntoCollection}
@@ -105,44 +109,71 @@ describe('RhythmPage', () => {
           mk('Reading', { id: 'c', time_of_day: '19:06:00' }),
         ]} />
     )
-    fireEvent.click(screen.getByRole('button', { name: /tend/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'Bedtime' }))
     const input = screen.getByPlaceholderText('Name this rhythm')
-    fireEvent.change(input, { target: { value: 'Bedtime' } })
+    fireEvent.change(input, { target: { value: 'Wind-down' } })
     fireEvent.keyDown(input, { key: 'Enter' })
-    expect(onGroupIntoCollection).toHaveBeenCalledWith('Bedtime', ['a', 'b', 'c'],
+    expect(onGroupIntoCollection).toHaveBeenCalledWith('Wind-down', ['a', 'b', 'c'],
       { time_of_day: '19:01', recurrence_pattern: { type: 'daily' } })
   })
 
-  it('folding a group into an existing routine via the drawer calls onAddToCollection', () => {
+  it('folding a group into an existing routine via the canvas popover calls onAddToCollection', () => {
     const onAddToCollection = vi.fn()
     render(
       <RhythmPage {...noop} onUpdateRoutine={vi.fn()} onAddToCollection={onAddToCollection}
         routines={[
           mk('Hamper', { id: 'a', time_of_day: '19:01:00' }),
           mk('Pajamas', { id: 'b', time_of_day: '19:02:00' }),
-          mk('Kids Bedtime Routine', { id: 'bed', recurrence_pattern: { type: 'weekly', days: ['sun', 'tue'] }, time_of_day: '19:15:00' }),
+          mk('Reading', { id: 'c', time_of_day: '19:06:00' }),
+          mk('Kids Bedtime Routine', { id: 'bed', recurrence_pattern: { type: 'weekly', days: ['sun'] } }),
         ]} />
     )
-    fireEvent.click(screen.getByRole('button', { name: /tend/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'Bedtime' }))
     fireEvent.change(screen.getByPlaceholderText('Name this rhythm'), { target: { value: 'Kids Bedtime' } })
-    // "Kids Bedtime Routine" also renders as a WeekStrip chip (it's scheduled
-    // sun+tue) — disambiguate to the drawer's fold suggestion button.
+    // "Kids Bedtime Routine" also renders as a WeekStrip chip (untimed, Sunday
+    // only) — disambiguate to the popover's fold suggestion button.
     const foldButtons = screen.getAllByRole('button', { name: 'Kids Bedtime Routine' })
     fireEvent.click(foldButtons.find(b => b.className.includes('bg-emerald-50'))!)
-    expect(onAddToCollection).toHaveBeenCalledWith('bed', ['a', 'b'])
+    expect(onAddToCollection).toHaveBeenCalledWith('bed', ['a', 'b', 'c'])
   })
 
-  it('shows a Tend badge counting findings plus nameable groups', () => {
-    render(
+  it('shows a Tend badge counting findings only (not nameable groups)', () => {
+    const { rerender } = render(
+      <RhythmPage {...noop} onUpdateRoutine={vi.fn()}
+        routines={[
+          mk('Water plants', { id: 'x', context: null }),
+        ]} />
+    )
+    // one missing-domain finding → badge shows exactly 1
+    const badge = within(screen.getByRole('button', { name: /tend/i })).getByText('1')
+    expect(badge.textContent).toBe('1')
+
+    // a nameable cluster with no findings should NOT show a badge
+    rerender(
       <RhythmPage {...noop} onUpdateRoutine={vi.fn()}
         routines={[
           mk('Hamper', { id: 'a', time_of_day: '19:01:00' }),
           mk('Pajamas', { id: 'b', time_of_day: '19:02:00' }),
         ]} />
     )
-    // one cluster, no findings → badge shows exactly 1 (not e.g. "11")
-    const badge = within(screen.getByRole('button', { name: /tend/i })).getByText('1')
-    expect(badge.textContent).toBe('1')
+    expect(within(screen.getByRole('button', { name: /tend/i })).queryByText(/^\d+$/)).not.toBeInTheDocument()
+  })
+
+  it('executes an add-steps drop end to end', () => {
+    const onAddToCollection = vi.fn()
+    render(
+      <RhythmPage {...noop} onUpdateRoutine={vi.fn()} onAddToCollection={onAddToCollection}
+        routines={[
+          mk('Hamper', { id: 'a', time_of_day: '19:01:00' }),
+          mk('Kids Bedtime', { id: 'bed', time_of_day: '19:15:00' }),
+          mk('Read', { id: 'read', time_of_day: null, parent_routine_id: 'bed' }),
+        ]} />
+    )
+    const dt = mkDT()
+    dt.setData('text/rhythm-payload', JSON.stringify({ kind: 'routine', id: 'a' }))
+    dt.setData('text/rhythm-kind-routine', '1')
+    fireEvent.drop(screen.getByTestId('arc-card-bed'), { dataTransfer: dt })
+    expect(onAddToCollection).toHaveBeenCalledWith('bed', ['a'])
   })
 
   it('dismissing a tend suggestion hides it and persists to localStorage', () => {

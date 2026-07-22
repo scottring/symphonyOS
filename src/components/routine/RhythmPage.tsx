@@ -7,12 +7,13 @@ import type { UpdateRoutineInput } from '@/hooks/useRoutines'
 import { groupRoutineSteps } from '@/lib/today/routineCollections'
 import { TapRoutinePanel } from '@/components/surface/TapRoutinePanel'
 import { TapStepPanel } from '@/components/surface/TapStepPanel'
-import { buildRhythmModel, DAY_ORDER, type RhythmCard } from './rhythm/rhythmModel'
-import { findTend, tendFindingKey, groupSuggestionKey } from './rhythm/tendHeuristics'
+import { buildRhythmModel, DAY_ORDER, minutesOf, type RhythmCard } from './rhythm/rhythmModel'
+import { findTend, tendFindingKey } from './rhythm/tendHeuristics'
 import { DailyArc } from './rhythm/DailyArc'
 import { WeekStrip } from './rhythm/WeekStrip'
 import { SometimesShelf } from './rhythm/SometimesShelf'
 import { TendDrawer } from './rhythm/TendDrawer'
+import type { DropIntent } from './rhythm/dropRules'
 
 interface RhythmPageProps {
   routines: Routine[]
@@ -76,16 +77,7 @@ export function RhythmPage(props: RhythmPageProps) {
     () => findTend(routines).filter(f => !dismissedTend.includes(tendFindingKey(f))),
     [routines, dismissedTend],
   )
-  // Arc clusters whose name-this-group suggestion hasn't been dismissed.
-  const activeClusters = useMemo(
-    () => model.daily.timed.filter(c => c.kind === 'cluster' && !dismissedTend.includes(groupSuggestionKey(c))),
-    [model, dismissedTend],
-  )
-  const tendCount = findings.length + activeClusters.length
-  const looseItems = useMemo(
-    () => routines.filter(r => !r.parent_routine_id && r.visibility === 'active' && !model.stepCounts[r.id]),
-    [routines, model],
-  )
+  const tendCount = findings.length
   const { collections } = useMemo(() => groupRoutineSteps(routines), [routines])
   const collectionSteps = useMemo(
     () => Object.fromEntries(collections.map(c => [c.id, c.steps])),
@@ -126,6 +118,68 @@ export function RhythmPage(props: RhythmPageProps) {
       time_of_day: card.startTime?.slice(0, 5) ?? undefined,
       recurrence_pattern: { type: 'daily' },
     })
+  }
+  const routineById = useMemo(() => new Map(routines.map(r => [r.id, r])), [routines])
+  const isDailyZone = (r: Routine) => {
+    const p = r.recurrence_pattern
+    return p.type === 'daily' || (p.type === 'weekly' && (p.days?.length ?? 0) >= 5)
+  }
+  const fmtMinutes = (n: number) => {
+    const clamped = Math.min(Math.max(n, 0), 24 * 60 - 5)
+    return `${String(Math.floor(clamped / 60)).padStart(2, '0')}:${String(clamped % 60).padStart(2, '0')}`
+  }
+  const executeDropIntent = (intent: DropIntent) => {
+    switch (intent.type) {
+      case 'add-steps': {
+        const ids = intent.ids.filter(id => routineById.get(id)?.parent_routine_id !== intent.collectionId)
+        if (ids.length > 0) onAddToCollection?.(intent.collectionId, ids)
+        return
+      }
+      case 'stand-alone-at':
+        props.onPromoteStep(intent.id)
+        onUpdateRoutine(intent.id, { time_of_day: intent.time, recurrence_pattern: { type: 'daily' } })
+        return
+      case 'retime': {
+        const r = routineById.get(intent.id)
+        if (!r) return
+        onUpdateRoutine(intent.id, isDailyZone(r)
+          ? { time_of_day: intent.time }
+          : { time_of_day: intent.time, recurrence_pattern: { type: 'daily' } })
+        return
+      }
+      case 'shift-group': {
+        const members = intent.ids
+          .map(id => routineById.get(id))
+          .filter((r): r is Routine => !!r && minutesOf(r.time_of_day) != null)
+        if (members.length === 0) return
+        const earliest = Math.min(...members.map(m => minutesOf(m.time_of_day)!))
+        const delta = (minutesOf(intent.time) ?? earliest) - earliest
+        for (const m of members) {
+          onUpdateRoutine(m.id, { time_of_day: fmtMinutes(minutesOf(m.time_of_day)! + delta) })
+        }
+        return
+      }
+      case 'weekly-on': {
+        for (const id of intent.ids) {
+          if (routineById.get(id)?.parent_routine_id) props.onPromoteStep(id)
+          onUpdateRoutine(id, { recurrence_pattern: { type: 'weekly', days: [intent.day] } })
+        }
+        return
+      }
+      case 'move-day': {
+        const r = routineById.get(intent.id)
+        if (!r) return
+        const p = r.recurrence_pattern
+        if (!p.days || p.days.length === 0) {
+          onUpdateRoutine(intent.id, { recurrence_pattern: { type: 'weekly', days: [intent.toDay] } })
+          return
+        }
+        const set = new Set(p.days.filter(d => d !== intent.fromDay))
+        set.add(intent.toDay)
+        onUpdateRoutine(intent.id, { recurrence_pattern: { ...p, days: DAY_ORDER.filter(d => set.has(d)) } })
+        return
+      }
+    }
   }
   // Any active top-level routine can absorb others as steps (an empty shell
   // like a step-less collection counts — folding in gives it its steps).
@@ -273,6 +327,10 @@ export function RhythmPage(props: RhythmPageProps) {
             nowMinutes={nowMinutes}
             onOpenCollection={id => setOpen({ kind: 'routine', id })}
             onOpenRoutine={openRoutine}
+            onDropIntent={executeDropIntent}
+            foldTargets={foldTargets}
+            onNameGroup={handleNameCluster}
+            onFoldInto={(targetId, ids) => onAddToCollection?.(targetId, ids)}
           />
         </div>
 
@@ -286,6 +344,7 @@ export function RhythmPage(props: RhythmPageProps) {
             onOpenRoutine={openRoutine}
             familyMembers={familyMembers}
             collectionSteps={collectionSteps}
+            onDropIntent={executeDropIntent}
           />
         </div>
 
@@ -297,15 +356,9 @@ export function RhythmPage(props: RhythmPageProps) {
       <TendDrawer
         open={tendOpen}
         onClose={() => setTendOpen(false)}
-        clusters={activeClusters}
         findings={findings}
         routines={routines}
-        looseItems={looseItems}
         sleepers={model.seasonal}
-        foldTargets={foldTargets}
-        familyMembers={familyMembers}
-        onNameGroup={handleNameCluster}
-        onFoldInto={(targetId, ids) => onAddToCollection?.(targetId, ids)}
         onDismiss={dismissTend}
         onMerge={handleMerge}
         onStampDomain={(id, context) => onUpdateRoutine(id, { context })}
