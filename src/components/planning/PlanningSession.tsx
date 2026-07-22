@@ -52,6 +52,11 @@ interface PlanningSessionProps {
   /** Week→Today seam: when present, each day header renders a small "→ day"
    *  button that jumps straight to that date on the Today rung. */
   onOpenDay?: (date: Date) => void
+  /** How many consecutive days to open with (1–7). The standing Week page
+   *  passes 7; the wizard keeps the focused single-day default. */
+  initialDays?: number
+  /** Hide the Done button when the host page has no close semantics. */
+  showDone?: boolean
 }
 
 // Time slot duration in minutes
