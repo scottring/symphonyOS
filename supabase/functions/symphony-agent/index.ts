@@ -23,12 +23,13 @@ const MAX_TURNS = 14
 const SYSTEM_PROMPT = `You are the assistant inside Symphony, Scott's task, project, and routine manager. You help manage tasks, projects, and contacts using the tools available to you.
 
 Rules:
-- You operate ONLY within Symphony. You have no access to files, email, the vault, or the web. If asked to do something outside Symphony, say so plainly and stop.
+- You operate within Symphony. You have no access to email or the web, and you cannot edit the vault. But you CAN search Scott's knowledge base — his notes synced from his vault (people, projects, job search, meetings, daily logs, research, context) — with symphony_search_notes. If asked to do something none of your tools cover, say so plainly and stop.
 - No em dashes. No AI cliches. No sycophancy. Be direct and action-oriented.
 - Just do it; don't narrate what you are about to do. After acting, confirm briefly.
 
 Grounding and verification (important):
 - Only state facts you have actually read from a tool result. Never assert a prior value, schedule, date, or history you have not looked up. If you are not sure, look it up or say you don't know. Do not invent.
+- Scott has a large knowledge base of notes synced from his vault. When he asks what he knows about a topic, wants background or prep on something (an interview, a person, a project, a decision), or asks you to gather relevant material, call symphony_search_notes BEFORE concluding there is nothing. Do not say "nothing exists" or "I have no information on X" about any topic without searching notes first. When you use a note, name its title so he can find it.
 - The user's data spans tasks, routines, projects, contacts, lists, notes, and calendar events. Before acting on "X", check the right entity type: a recurring item like "Feed Jax dinner" is a routine (symphony_list_routines), not a task. Look it up before assuming it doesn't exist.
 - A dated occasion someone ATTENDS (a show, appointment, party, pickup, reservation) belongs on the real calendar: use symphony_create_calendar_event, never symphony_create_task, for it. Tasks are to-dos someone DOES. Family occasions go on the family calendar (domain "family").
 - After ANY write (create / update / complete / delete / add / check), VERIFY before you claim success: read the affected item back with the matching list_/get_ tool and confirm the fields you intended actually changed. If the change did not take or a value looks wrong, say so and retry or ask. Never report a change you have not verified.
@@ -373,6 +374,19 @@ const TOOLS = [
     },
   },
   {
+    name: 'symphony_search_notes',
+    description:
+      "Semantic search over Scott's knowledge base (notes synced from his vault: people, projects, job search, meetings, daily logs, research, background). Use this whenever he asks what he knows about a topic, wants background or prep on something, or asks you to gather relevant material. Returns the most relevant notes with a content snippet and their vault path. Pass a natural-language query describing the topic, not just a keyword.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Natural-language description of what to find, e.g. "background and prep for the NYSRA executive director interview"' },
+        limit: { type: 'number', description: 'Max notes to return (default 6, max 12)' },
+      },
+      required: ['query'],
+    },
+  },
+  {
     name: 'symphony_list_events',
     description:
       'Search calendar events. Read-only. No arguments = today. Pass start_date/end_date to cover a range (a week, a whole month). Pass query to find an event by name — for "when is X?" call with just query and it searches a year in each direction. Multi-day events that overlap the range are included.',
@@ -490,6 +504,26 @@ function dedupeMembersByName<T extends { name: string }>(rows: T[]): T[] {
     out.push(r)
   }
   return out
+}
+
+// Embed a query with the SAME model vault-sync used for notes
+// (text-embedding-3-small, 1536-dim) so cosine search is meaningful.
+async function embedQuery(text: string): Promise<number[] | null> {
+  const openAiKey = Deno.env.get('OPENAI_API_KEY')
+  if (!openAiKey) return null
+  try {
+    const res = await fetch('https://api.openai.com/v1/embeddings', {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${openAiKey}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'text-embedding-3-small', input: text.slice(0, 8000) }),
+    })
+    if (!res.ok) { console.error('embedQuery error:', await res.text()); return null }
+    const json = await res.json()
+    return json.data?.[0]?.embedding ?? null
+  } catch (err) {
+    console.error('embedQuery failed:', err)
+    return null
+  }
 }
 
 // ── Tool executor (RLS-scoped via userSupabase) ────────────────────
@@ -811,6 +845,46 @@ async function runTool(
           .select('id, title, type, context, created_at').single()
         if (error) throw error
         return JSON.stringify(data, null, 2)
+      }
+      case 'symphony_search_notes': {
+        const query = typeof input.query === 'string' ? input.query.trim() : ''
+        if (!query) return 'Error: query is required'
+        const limit = Math.min(typeof input.limit === 'number' ? input.limit : 6, 12)
+        const embedding = await embedQuery(query)
+
+        type NoteHit = { id: string; title: string | null; content: string | null; vault_path: string | null; context: string | null; similarity?: number }
+        let hits: NoteHit[] = []
+        if (embedding) {
+          // Semantic search via the existing pgvector RPC (auth.uid()-scoped).
+          const { data, error } = await db.rpc('search_notes_semantic', {
+            query_embedding: embedding,
+            match_threshold: 0.3,
+            match_count: limit,
+          })
+          if (error) throw error
+          hits = (data as NoteHit[]) ?? []
+        }
+        // Fallback: no embedding (missing key) or nothing cleared the threshold —
+        // keyword search so the assistant still finds obviously-relevant notes.
+        if (hits.length === 0) {
+          const { data, error } = await db.from('notes')
+            .select('id, title, content, vault_path, context')
+            .or(`title.ilike.%${query}%,content.ilike.%${query}%`)
+            .limit(limit)
+          if (error) throw error
+          hits = (data as NoteHit[]) ?? []
+        }
+        if (hits.length === 0) return `No notes found for "${query}".`
+
+        // Snippet the content — never dump full notes into the context window.
+        const results = hits.map((n) => ({
+          title: n.title || (n.vault_path ? n.vault_path.split('/').pop() : 'Untitled'),
+          vault_path: n.vault_path,
+          context: n.context,
+          similarity: typeof n.similarity === 'number' ? Number(n.similarity.toFixed(3)) : undefined,
+          snippet: (n.content || '').replace(/\s+/g, ' ').slice(0, 500),
+        }))
+        return `${results.length} notes for "${query}":\n${JSON.stringify(results, null, 2)}`
       }
       case 'symphony_list_events': {
         const shiftDate = (iso: string, days: number) => {
