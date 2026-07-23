@@ -1,4 +1,5 @@
 import { useMemo, useCallback, useState } from 'react'
+import { useDraggable, useDroppable } from '@dnd-kit/core'
 import type { Task } from '@/types/task'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { EventNote } from '@/hooks/useEventNotes'
@@ -12,6 +13,15 @@ import { layoutLanes, type Lane } from './overlapLanes'
 
 // Max side-by-side lanes before overlapping items collapse into a "+N" chip.
 const MAX_LANES = 4
+
+// Fixed height (px) of the all-day lane in every column — and the matching
+// spacer in the time-label column. Must stay FIXED regardless of chip count:
+// columns are independent flex children, so a variable-height lane would
+// desynchronize hour rows across days.
+export const ALL_DAY_LANE_HEIGHT = 44
+
+// Up to this many chips render before the rest collapse into a "+N" count.
+const MAX_ALL_DAY_CHIPS = 2
 
 // "8:00 AM" style label from minutes-since-day-start.
 function minutesToLabel(minutesFromStart: number, dayStartHour: number): string {
@@ -50,6 +60,9 @@ interface PlanningColumnProps {
   tasks: Task[]
   events: CalendarEvent[]
   routines: Routine[]
+  /** Incomplete, isAllDay tasks scheduled on this exact day — rendered as
+   *  fixed-height chips in the all-day lane, never in the hour grid below. */
+  allDayTasks?: Task[]
   familyMembers: FamilyMember[]
   eventNotesMap?: Map<string, EventNote>
   timeLabels: TimeLabel[]
@@ -65,6 +78,7 @@ export function PlanningColumn({
   tasks,
   events,
   routines,
+  allDayTasks = [],
   familyMembers,
   eventNotesMap,
   timeLabels,
@@ -242,6 +256,13 @@ export function PlanningColumn({
         )}
       </div>
 
+      {/* All-day lane — fixed height in every column, regardless of chip count. */}
+      <AllDayLaneCell
+        dateKey={dateKey}
+        tasks={allDayTasks}
+        onChipClick={(taskId) => setRaisedId(taskId)}
+      />
+
       {/* Time slots (drop targets) */}
       <div className="relative">
         {/* Background slots - these are the drop targets */}
@@ -342,6 +363,78 @@ export function PlanningColumn({
         })}
       </div>
     </div>
+  )
+}
+
+interface AllDayLaneCellProps {
+  dateKey: string
+  tasks: Task[]
+  onChipClick: (taskId: string) => void
+}
+
+// The all-day lane cell for one column. Its own component so the droppable
+// hook stays unconditional (every column always registers a lane, even with
+// zero tasks) — keeping hook usage clean rather than conditionally calling
+// useDroppable inside PlanningColumn's body.
+function AllDayLaneCell({ dateKey, tasks, onChipClick }: AllDayLaneCellProps) {
+  const { isOver, setNodeRef } = useDroppable({ id: `allday-${dateKey}` })
+  const visible = tasks.slice(0, MAX_ALL_DAY_CHIPS)
+  const overflow = tasks.length - visible.length
+
+  return (
+    <div
+      ref={setNodeRef}
+      data-testid="allday-lane"
+      style={{ height: ALL_DAY_LANE_HEIGHT }}
+      className={`px-1.5 py-1 flex items-center gap-1 border-b border-neutral-200 transition-colors overflow-hidden ${
+        isOver ? 'bg-primary-100' : 'bg-neutral-50/60'
+      }`}
+    >
+      {visible.map((task) => (
+        <AllDayChip key={task.id} task={task} onClick={() => onChipClick(task.id)} />
+      ))}
+      {overflow > 0 && (
+        <span className="shrink-0 text-[10px] font-semibold text-neutral-500 bg-neutral-200 rounded-full px-1.5 py-0.5">
+          +{overflow}
+        </span>
+      )}
+    </div>
+  )
+}
+
+interface AllDayChipProps {
+  task: Task
+  onClick: () => void
+}
+
+// Compact, truncating, draggable chip for a lane task. Bare `task.id` as the
+// draggable id — the existing slot/drawer/allday drop branches in
+// PlanningSession.handleDragEnd all key off the bare task id already, so lane
+// chips work with those branches with no new drop-handling code.
+function AllDayChip({ task, onClick }: AllDayChipProps) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: task.id })
+
+  const style = transform
+    ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: 100 }
+    : undefined
+
+  if (isDragging) {
+    return <div ref={setNodeRef} className="h-5 min-w-[32px] flex-1 rounded bg-primary-100 border border-dashed border-primary-300 opacity-50" />
+  }
+
+  return (
+    <button
+      ref={setNodeRef}
+      type="button"
+      style={style}
+      {...attributes}
+      {...listeners}
+      onClick={onClick}
+      title={task.title}
+      className="min-w-0 flex-1 h-5 px-1.5 rounded bg-primary-50 border border-primary-200 text-[10px] font-medium text-primary-700 truncate text-left cursor-grab active:cursor-grabbing touch-none"
+    >
+      {task.title}
+    </button>
   )
 }
 

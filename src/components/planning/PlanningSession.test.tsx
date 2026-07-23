@@ -431,6 +431,64 @@ describe('PlanningSession', () => {
     expect(screen.getByRole('button', { name: /tend/i })).toBeInTheDocument() // shelf present
   })
 
+  it('renders an in-range all-day task in the lane, not the pool', () => {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    const allDayTask = createMockTask({
+      title: 'Passport renewal',
+      isAllDay: true,
+      scheduledFor: today,
+    })
+
+    render(
+      <PlanningSession
+        tasks={[allDayTask]}
+        events={[]}
+        routines={[]}
+        onUpdateTask={vi.fn()}
+        onPushTask={vi.fn()}
+        onClose={vi.fn()}
+        initialDate={today}
+      />
+    )
+
+    const lane = screen.getByTestId('allday-lane')
+    expect(lane).toHaveTextContent('Passport renewal')
+    // Not in the drawer/pool — the drawer shows its "all scheduled" empty state.
+    expect(screen.getByText('All tasks scheduled')).toBeInTheDocument()
+  })
+
+  it('does not render the all-day lane chip for out-of-range all-day tasks (they stay in the pool)', () => {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const farFuture = new Date(today)
+    farFuture.setDate(farFuture.getDate() + 30)
+
+    const allDayTask = createMockTask({
+      title: 'Future all-day task',
+      isAllDay: true,
+      scheduledFor: farFuture,
+    })
+
+    render(
+      <PlanningSession
+        tasks={[allDayTask]}
+        events={[]}
+        routines={[]}
+        onUpdateTask={vi.fn()}
+        onPushTask={vi.fn()}
+        onClose={vi.fn()}
+        initialDate={today}
+      />
+    )
+
+    // Out-of-range all-day task still shows in the drawer pool, not the lane.
+    const lane = screen.getByTestId('allday-lane')
+    expect(lane).not.toHaveTextContent('Future all-day task')
+    expect(screen.getByText('Future all-day task')).toBeInTheDocument()
+  })
+
   it('initialDays seeds a multi-day range', () => {
     const onOpenDay = vi.fn()
     render(

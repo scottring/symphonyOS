@@ -4,13 +4,16 @@ import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { EventNote } from '@/hooks/useEventNotes'
 import type { Routine } from '@/types/actionable'
 import type { FamilyMember } from '@/types/family'
-import { PlanningColumn } from './PlanningColumn'
+import { PlanningColumn, ALL_DAY_LANE_HEIGHT } from './PlanningColumn'
 
 interface PlanningGridProps {
   dateRange: Date[]
   scheduledTasksByDate: Map<string, Task[]>
   eventsByDate: Map<string, CalendarEvent[]>
   routinesByDate: Map<string, Routine[]>
+  /** Incomplete, isAllDay tasks scheduled on each day — rendered in the fixed
+   *  all-day lane, not the hour grid. */
+  allDayTasksByDate?: Map<string, Task[]>
   familyMembers: FamilyMember[]
   eventNotesMap?: Map<string, EventNote>
   dayStartHour: number
@@ -24,6 +27,7 @@ export function PlanningGrid({
   scheduledTasksByDate,
   eventsByDate,
   routinesByDate,
+  allDayTasksByDate,
   familyMembers,
   eventNotesMap,
   dayStartHour,
@@ -60,6 +64,17 @@ export function PlanningGrid({
           {/* Header spacer */}
           <div className="h-12 border-b border-neutral-200" />
 
+          {/* All-day label spacer — matches ALL_DAY_LANE_HEIGHT in every
+              column so hour rows below stay aligned across the grid. */}
+          <div
+            style={{ height: ALL_DAY_LANE_HEIGHT }}
+            className="px-2 flex items-center border-b border-neutral-200"
+          >
+            <span className="text-[10px] uppercase tracking-wide text-neutral-400 font-medium">
+              All day
+            </span>
+          </div>
+
           {/* Time labels */}
           <div>
             {timeLabels.map(({ hour, minute, label }) => (
@@ -84,6 +99,7 @@ export function PlanningGrid({
           const tasks = scheduledTasksByDate.get(dateKey) || []
           const events = eventsByDate.get(dateKey) || []
           const routines = routinesByDate.get(dateKey) || []
+          const allDayTasks = allDayTasksByDate?.get(dateKey) || []
 
           return (
             <PlanningColumn
@@ -92,6 +108,7 @@ export function PlanningGrid({
               tasks={tasks}
               events={events}
               routines={routines}
+              allDayTasks={allDayTasks}
               familyMembers={familyMembers}
               eventNotesMap={eventNotesMap}
               timeLabels={timeLabels}

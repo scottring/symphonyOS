@@ -157,8 +157,16 @@ export function PlanningSession({
         if (deferDate > today) return false
       }
 
-      // Include all-day tasks (so they can be time-blocked)
-      if (task.isAllDay) return true
+      // All-day tasks: a date inside the visible grid range means it renders
+      // in that day's all-day lane, not the unscheduled pool. Without a date,
+      // or with a date outside the range, it stays in the pool as before
+      // (so it can be time-blocked or dragged onto the visible range).
+      if (task.isAllDay) {
+        if (!task.scheduledFor) return true
+        const allDayDate = new Date(task.scheduledFor)
+        if (rangeStart && rangeEnd && allDayDate >= rangeStart && allDayDate <= rangeEnd) return false
+        return true
+      }
 
       if (!task.scheduledFor) return true
       const taskDate = new Date(task.scheduledFor)
@@ -212,6 +220,31 @@ export function PlanningSession({
         // Filter out all-day tasks (they show in unscheduled drawer)
         if (task.isAllDay) return false
 
+        const taskDate = new Date(task.scheduledFor)
+        return taskDate >= startOfDay && taskDate <= endOfDay
+      })
+
+      map.set(dateKey, tasksForDay)
+    }
+
+    return map
+  }, [tasks, dateRange])
+
+  // All-day tasks scheduled onto a visible day — rendered in that day's fixed
+  // all-day lane (PlanningColumn), never in the hour grid.
+  const allDayTasksByDate = useMemo(() => {
+    const map = new Map<string, Task[]>()
+
+    for (const date of dateRange) {
+      const dateKey = formatDateKey(date)
+      const startOfDay = new Date(date)
+      startOfDay.setHours(0, 0, 0, 0)
+      const endOfDay = new Date(date)
+      endOfDay.setHours(23, 59, 59, 999)
+
+      const tasksForDay = tasks.filter((task) => {
+        if (task.completed) return false
+        if (!task.isAllDay || !task.scheduledFor) return false
         const taskDate = new Date(task.scheduledFor)
         return taskDate >= startOfDay && taskDate <= endOfDay
       })
@@ -420,6 +453,25 @@ export function PlanningSession({
         return
       }
 
+      // All-day lane drop (id `allday-YYYY-MM-DD`): pins the dragged task as an
+      // all-day item on that date. Bare task ids only reach here — routine/
+      // event/resize-prefixed ids all return via their branches above.
+      if (dropTarget.startsWith('allday-')) {
+        const m = /^allday-(\d{4})-(\d{2})-(\d{2})$/.exec(dropTarget)
+        if (!m) return
+        const day = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]))
+        if (minDropDate) {
+          const minDay = new Date(minDropDate)
+          minDay.setHours(0, 0, 0, 0)
+          if (day.getTime() < minDay.getTime()) {
+            setDropNotice('That day is already behind you — pick a day ahead.')
+            return
+          }
+        }
+        onUpdateTask(activeId, { bucket: 'timed', scheduledFor: day, isAllDay: true })
+        return
+      }
+
       // Handle dropping on unscheduled drawer
       if (dropTarget === 'unscheduled-drawer') {
         // Clear the time AND drop out of the 'timed' bucket — a task with no
@@ -530,6 +582,7 @@ export function PlanningSession({
                 scheduledTasksByDate={scheduledTasksByDate}
                 eventsByDate={eventsByDate}
                 routinesByDate={routinesByDate}
+                allDayTasksByDate={allDayTasksByDate}
                 familyMembers={familyMembers}
                 eventNotesMap={eventNotesMap}
                 dayStartHour={DAY_START_HOUR}
@@ -544,6 +597,7 @@ export function PlanningSession({
               scheduledTasksByDate={scheduledTasksByDate}
               eventsByDate={eventsByDate}
               routinesByDate={routinesByDate}
+              allDayTasksByDate={allDayTasksByDate}
               familyMembers={familyMembers}
               eventNotesMap={eventNotesMap}
               dayStartHour={DAY_START_HOUR}
