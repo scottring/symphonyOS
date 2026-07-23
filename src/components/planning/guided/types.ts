@@ -20,6 +20,7 @@ export type StepType =
   | 'schedule-grid'  // weekly: the existing StepSchedule grid
   | 'domains-goals'  // annual: goal statements per life domain
   | 'book-next'      // create next session's calendar item
+  | 'wins'           // monthly opener: completed moves, read-only celebration
 
 export interface GuidedStepConfig {
   /** Unique within the session; keys the narration manifest as `<horizon>.<id>`. */
