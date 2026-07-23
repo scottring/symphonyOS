@@ -22,6 +22,7 @@ export function makeHost(overrides: Partial<GuidedHost> = {}): GuidedHost {
     updateGoalStatus: vi.fn(async () => {}),
     carryGoal: vi.fn(async () => {}),
     routines: [], draggableRoutines: [], onScheduleRoutine: vi.fn(), getRoutinesForDate: () => [],
+    upkeepItems: [], upkeepLoading: false, ensureUpkeepList: vi.fn(async () => {}),
     ...overrides,
   }
 }

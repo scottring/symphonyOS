@@ -12,6 +12,7 @@ import { useGoogleCalendar } from '@/hooks/useGoogleCalendar'
 import { useGoalsContext } from '@/contexts/GoalsContext'
 import { useProjects } from '@/hooks/useProjects'
 import { useRoutines } from '@/hooks/useRoutines'
+import { useUpkeepList } from '@/hooks/useUpkeepList'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { useDomain } from '@/hooks/useDomain'
 import { useCalendarDomainMappings } from '@/hooks/useCalendarDomainMappings'
@@ -35,6 +36,7 @@ export function GuidedSessionContainer({ horizon, onClose, onFinished, onChain, 
   const { areas, goals, addGoal, addArea, updateGoal } = useGoalsContext()
   const { projects, projectsMap } = useProjects()
   const { routines: allRoutines, getRoutinesForDate } = useRoutines()
+  const { upkeepItems, upkeepLoading, ensureUpkeepList } = useUpkeepList()
   const { getCurrentUserMember } = useFamilyMembers()
   const { currentDomain } = useDomain()
   const { getDomainForCalendar } = useCalendarDomainMappings()
@@ -128,7 +130,8 @@ export function GuidedSessionContainer({ horizon, onClose, onFinished, onChain, 
     draggableRoutines: domainRoutines.filter((r) => r.visibility === 'active' && !isEverydayRoutine(r.recurrence_pattern) && !r.time_of_day),
     onScheduleRoutine,
     getRoutinesForDate: domainGetRoutinesForDate,
-  }), [domainTasks, tasksLoading, domainEvents, isConnected, calendarChecking, domainFetchEvents, createEvent, pushTaskStamped, setBucketStamped, toggleTask, updateTask, createTaskInBucket, createDatedTask, domainProjects, projectsMap, domainGoals, areas, addGoal, addArea, updateGoal, domainRoutines, onScheduleRoutine, domainGetRoutinesForDate, currentDomain])
+    upkeepItems, upkeepLoading, ensureUpkeepList,
+  }), [domainTasks, tasksLoading, domainEvents, isConnected, calendarChecking, domainFetchEvents, createEvent, pushTaskStamped, setBucketStamped, toggleTask, updateTask, createTaskInBucket, createDatedTask, domainProjects, projectsMap, domainGoals, areas, addGoal, addArea, updateGoal, domainRoutines, onScheduleRoutine, domainGetRoutinesForDate, currentDomain, upkeepItems, upkeepLoading, ensureUpkeepList])
 
   return <GuidedSession horizon={horizon} domain={currentDomain} host={host} onClose={onClose} onFinished={onFinished} onChain={onChain} />
 }

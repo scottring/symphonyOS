@@ -57,6 +57,11 @@ export interface GuidedHost {
   draggableRoutines: Routine[]
   onScheduleRoutine: (routineId: string, date: Date, time: string) => void
   getRoutinesForDate: (date: Date) => Routine[]
+  // Monthly maintenance sweep (Best Laid Plans): the "Monthly upkeep"
+  // template list — open items + one idempotent find-or-create-with-seeds.
+  upkeepItems: { id: string; text: string }[]
+  upkeepLoading: boolean
+  ensureUpkeepList: () => Promise<void>
 }
 
 export interface GuidedValue extends GuidedStepRenderContext {
