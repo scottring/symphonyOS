@@ -8,10 +8,13 @@
 //
 // `dragMode: 'native'` swaps dnd-kit wiring for plain HTML5 drag (the
 // PlacementChip/MonthCalendarGrid 'text/task-id' convention) so this can
-// render on pages with no DndContext (e.g. the month page). dnd-kit hooks
-// (useDraggable/useDroppable) throw outside a DndContext, so they only ever
-// live in components that are mounted exclusively in dndkit mode
-// (ShelfPill, DndShelfFrame) — PlanningShelf itself calls no dnd-kit hooks.
+// render on pages with no DndContext (e.g. the month page). Outside a
+// DndContext, dnd-kit's useDraggable/useDroppable don't throw — they silently
+// no-op, so pills would render but never actually drag or drop. Native mode
+// exists because MonthCalendarGrid speaks plain HTML5 dataTransfer, which
+// dnd-kit's pointer-sensor protocol can't feed into; ShelfPill and
+// DndShelfFrame (the dnd-kit hook callers) are therefore mounted exclusively
+// in dndkit mode — PlanningShelf itself calls no dnd-kit hooks.
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useDraggable, useDroppable } from '@dnd-kit/core'
@@ -54,6 +57,9 @@ export interface PlanningShelfProps {
   /** The add-pill's placeholder — speaks the host page's grain (week vs
    *  month). Defaults to the week page's copy. */
   draftPlaceholder?: string
+  /** The reviewing-mode header's lead-in — speaks the host page's grain
+   *  (week vs month). Defaults to the week page's copy. */
+  tendingLabel?: string
 }
 
 const DEFAULT_MOVE_DOWN = { label: 'To month', bucket: 'month' as const }
@@ -216,8 +222,9 @@ function frameClassName(isOver: boolean) {
   }`
 }
 
-// dnd-kit's useDroppable throws outside a DndContext, so it lives only in
-// this child — mounted exclusively when dragMode === 'dndkit'.
+// Outside a DndContext, dnd-kit's useDroppable doesn't throw — it silently
+// no-ops (never reports isOver, never registers a drop target), so this
+// lives only in this child, mounted exclusively when dragMode === 'dndkit'.
 function DndShelfFrame({ children }: { children: (isOver: boolean) => ReactNode }) {
   const { isOver, setNodeRef } = useDroppable({ id: 'unscheduled-drawer' })
   return (
@@ -237,7 +244,13 @@ function NativeShelfFrame({ onNativeUnschedule, children }: {
       data-testid="shelf-lane"
       className={frameClassName(isOver)}
       onDragOver={(e) => { e.preventDefault(); setIsOver(true) }}
-      onDragLeave={() => setIsOver(false)}
+      onDragLeave={(e) => {
+        // dragleave fires on every child-boundary crossing too, not just when
+        // leaving the frame itself — only clear isOver once the pointer has
+        // actually left the frame's subtree, or hovering over a child pill
+        // flickers the highlight off and back on.
+        if (!e.currentTarget.contains(e.relatedTarget as Node)) setIsOver(false)
+      }}
       onDrop={(e) => {
         e.preventDefault()
         setIsOver(false)
@@ -255,7 +268,7 @@ export function PlanningShelf(props: PlanningShelfProps) {
     tasks, carryOverIds, projectsMap, tasksById, onOpenTask, onSetBucket, onDeleteTask, onPushTask,
     draft, onDraftChange, onSubmitDraft, hiddenCount = 0, showingAll = false, onToggleShowAll,
     tend, onApplyProposal, dragMode = 'dndkit', onNativeUnschedule, moveDown = DEFAULT_MOVE_DOWN,
-    draftPlaceholder = 'Add to this week…',
+    draftPlaceholder = 'Add to this week…', tendingLabel = 'Tending this week',
   } = props
   const [expanded, setExpanded] = useState(false)
 
@@ -287,7 +300,7 @@ export function PlanningShelf(props: PlanningShelfProps) {
       <div className="flex items-center justify-between mb-2">
         <h2 className="text-xs font-semibold tracking-wide uppercase text-neutral-400">
           {reviewing
-            ? `Tending this week · ${tend.proposals.length} suggestion${tend.proposals.length === 1 ? '' : 's'}`
+            ? `${tendingLabel} · ${tend.proposals.length} suggestion${tend.proposals.length === 1 ? '' : 's'}`
             : `To place (${ordered.length})${carriedCount > 0 ? ` · ${carriedCount} carried over` : ''}`}
         </h2>
         {reviewing ? (

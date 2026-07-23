@@ -32,11 +32,16 @@ vi.mock('@/contexts/GoalsContext', () => ({
 // it) — most tests leave it empty; the anchored-week tests below populate it
 // per-case and a top-level beforeEach resets it so nothing bleeds between
 // tests. ──
-const { mockTasks } = vi.hoisted(() => ({ mockTasks: [] as unknown[] }))
+// `mockUpdateTask` is hoisted (not a fresh `vi.fn()` per hook call) so tests
+// can assert on calls made through it — e.g. MonthPage's onPlaceTask wiring.
+const { mockTasks, mockUpdateTask } = vi.hoisted(() => ({
+  mockTasks: [] as unknown[],
+  mockUpdateTask: vi.fn(),
+}))
 vi.mock('@/hooks/useSupabaseTasks', () => ({
   useSupabaseTasks: () => ({
     tasks: mockTasks, addTask: vi.fn(), toggleTask: vi.fn(), toggleWaiting: vi.fn(),
-    deleteTask: vi.fn(), updateTask: vi.fn(), updateTasksBulk: vi.fn(),
+    deleteTask: vi.fn(), updateTask: mockUpdateTask, updateTasksBulk: vi.fn(),
     pushTask: vi.fn(), setBucket: vi.fn(),
   }),
 }))
@@ -111,8 +116,17 @@ anchorTaskDate.setHours(10, 0, 0, 0)
 const currentWeekTaskDate = new Date(now)
 currentWeekTaskDate.setHours(10, 0, 0, 0)
 
+// Finds the calendar grid cell for "today" — the one cell whose day-number
+// span carries the isToday styling (`bg-primary-600`) — and returns its
+// parent cell div, the element the grid's onDrop handler is bound to.
+function todayGridCell(container: HTMLElement): HTMLElement {
+  const span = Array.from(container.querySelectorAll('span')).find((s) => s.className.includes('bg-primary-600'))
+  if (!span?.parentElement) throw new Error('today grid cell not found')
+  return span.parentElement
+}
+
 describe('horizon pages (smoke)', () => {
-  beforeEach(() => { mockTasks.length = 0 })
+  beforeEach(() => { mockTasks.length = 0; mockUpdateTask.mockClear() })
 
   it('WeekPage renders the week scaffold with an empty pool', () => {
     render(<WeekPage />)
@@ -164,6 +178,42 @@ describe('horizon pages (smoke)', () => {
     }) satisfies Task)
     render(<MonthPage />)
     expect(screen.getAllByText('Order flowers for the reception')).toHaveLength(1)
+  })
+
+  it('dropping a fresh rock (no prior time) onto a grid day marks it all-day', () => {
+    mockTasks.push(createMockTask({
+      id: 'rock-task',
+      title: 'Fresh rock',
+      bucket: 'month',
+      scheduledFor: undefined,
+    }) satisfies Task)
+    const { container } = render(<MonthPage />)
+    const cell = todayGridCell(container)
+    fireEvent.drop(cell, { dataTransfer: { getData: () => 'rock-task' } })
+    expect(mockUpdateTask).toHaveBeenCalledWith('rock-task', expect.objectContaining({
+      bucket: 'timed',
+      isAllDay: true,
+    }))
+  })
+
+  it('re-dragging an already-timed item between cells preserves its clock time (not all-day)', () => {
+    const timedDate = new Date(now)
+    timedDate.setDate(timedDate.getDate() - 3)
+    timedDate.setHours(14, 30, 0, 0)
+    mockTasks.push(createMockTask({
+      id: 'timed-task',
+      title: 'Timed item',
+      bucket: 'timed',
+      scheduledFor: timedDate,
+    }) satisfies Task)
+    const { container } = render(<MonthPage />)
+    const cell = todayGridCell(container)
+    fireEvent.drop(cell, { dataTransfer: { getData: () => 'timed-task' } })
+    const call = mockUpdateTask.mock.calls.find(([id]) => id === 'timed-task')
+    expect(call).toBeDefined()
+    expect(call![1]).toMatchObject({ bucket: 'timed', isAllDay: false })
+    expect((call![1].scheduledFor as Date).getHours()).toBe(14)
+    expect((call![1].scheduledFor as Date).getMinutes()).toBe(30)
   })
 
   it("SeasonPage renders the season's picks panel", () => {

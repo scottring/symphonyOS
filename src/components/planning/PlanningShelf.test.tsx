@@ -103,6 +103,14 @@ describe('PlanningShelf', () => {
     expect(screen.getByText(/nothing to tend/i)).toBeInTheDocument()
   })
 
+  it('reviewing mode header defaults to "Tending this week" but honors a custom tendingLabel', () => {
+    renderShelf({ tend: { ...idleTend, status: 'reviewing', proposals: [] } })
+    expect(screen.getByText(/^Tending this week/)).toBeInTheDocument()
+
+    renderShelf({ tend: { ...idleTend, status: 'reviewing', proposals: [] }, tendingLabel: 'Tending this month' })
+    expect(screen.getByText(/^Tending this month/)).toBeInTheDocument()
+  })
+
   it('native mode pills are HTML-draggable, set text/task-id, and render without a DndContext', () => {
     // NOTE: render WITHOUT the <DndContext> wrapper — that absence IS the test.
     const props = baseProps({ dragMode: 'native', onNativeUnschedule: vi.fn() })

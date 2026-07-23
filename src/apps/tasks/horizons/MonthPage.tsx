@@ -33,6 +33,12 @@ function localYmd(d: Date): string {
   return `${y}-${m}-${day}`;
 }
 
+// Stable empty set for `carryOverIds` — the month grain has no carry-over
+// concept (that's week-only), but a fresh `new Set()` literal on every render
+// would give PlanningShelf's `ordered` useMemo a new dependency identity each
+// time, defeating its memoization. Module-level so the reference never changes.
+const NO_CARRY_OVER = new Set<string>();
+
 export function MonthPage() {
   const horizon = 'month' as const;
   const {
@@ -180,7 +186,7 @@ export function MonthPage() {
             <PlanningShelf
               dragMode="native"
               tasks={pool}
-              carryOverIds={new Set()}
+              carryOverIds={NO_CARRY_OVER}
               projectsMap={projectsMap}
               tasksById={tasksById}
               onOpenTask={(id) => scheduleActionsValue.onOpenTask?.(id)}
@@ -193,6 +199,7 @@ export function MonthPage() {
               onDraftChange={setDraft}
               onSubmitDraft={() => void submitDraft()}
               draftPlaceholder="Add a chunk to this month — an order placed, a call made…"
+              tendingLabel="Tending this month"
               tend={tend}
               onApplyProposal={handleApplyProposal}
             />
@@ -209,7 +216,17 @@ export function MonthPage() {
               events={domainEvents}
               weekStartsOn={readCadenceConfig().weekStartsOn}
               hideRail
-              onPlaceTask={(id, day) => updateTask(id, { bucket: 'timed', scheduledFor: day })}
+              // isAllDay heuristic: MonthCalendarGrid builds `day` at
+              // midnight for a fresh rock (no prior scheduledFor) but copies
+              // over the dragged item's existing clock time when re-dragging
+              // an already-timed item between cells. So midnight here means
+              // "never had a time" → all-day; a preserved non-midnight time
+              // means it stays a timed item.
+              onPlaceTask={(id, day) => updateTask(id, {
+                bucket: 'timed',
+                scheduledFor: day,
+                isAllDay: day.getHours() === 0 && day.getMinutes() === 0,
+              })}
               onUnscheduleTask={(id) => updateTask(id, { bucket: 'month', scheduledFor: undefined })}
               onSelectTask={(id) => scheduleActionsValue.onOpenTask?.(id)}
               onOpenWeek={(d) => navigate(`/week?start=${localYmd(d)}`)}
