@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
-import { streamSymphonyAgent, type AgentApiMessage, type AssistantTaskContext } from '@/lib/agentStream'
+import { streamSymphonyAgent, type AgentApiMessage, type AssistantTaskContext, type AgentSourceNote } from '@/lib/agentStream'
 import type { ChatMessage, ChatSession } from '@/types/chat'
 import type { ChatAttachment } from '@/components/chat/ChatAttachment'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
@@ -38,12 +38,17 @@ export interface UseSymphonyAssistantOptions {
   persistEntityId?: string
 }
 
-type StoredMessage = { role: 'user' | 'assistant'; content: string; timestamp?: string }
+type StoredMessage = { role: 'user' | 'assistant'; content: string; timestamp?: string; sources?: AgentSourceNote[] }
 
 function serializeMessages(msgs: ChatMessage[]): StoredMessage[] {
   return msgs
     .filter((m) => m.content.trim().length > 0)
-    .map((m) => ({ role: m.role, content: m.content, timestamp: m.timestamp.toISOString() }))
+    .map((m) => ({
+      role: m.role,
+      content: m.content,
+      timestamp: m.timestamp.toISOString(),
+      ...(m.sources && m.sources.length > 0 ? { sources: m.sources } : {}),
+    }))
 }
 
 function hydrateMessages(raw: unknown, sessionId: string): ChatMessage[] {
@@ -53,6 +58,7 @@ function hydrateMessages(raw: unknown, sessionId: string): ChatMessage[] {
     role: m.role,
     content: m.content ?? '',
     timestamp: m.timestamp ? new Date(m.timestamp) : new Date(),
+    ...(Array.isArray(m.sources) && m.sources.length > 0 ? { sources: m.sources } : {}),
   }))
 }
 
@@ -194,6 +200,7 @@ export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
     // Track the assistant's reply locally too, so persistence doesn't depend
     // on reading back async state.
     let assistantText = ''
+    let assistantSources: AgentSourceNote[] | undefined
     const appendText = (chunk: string) => {
       assistantText += chunk
       setMessages((prev) => prev.map((m) =>
@@ -220,12 +227,18 @@ export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
           if (WRITE_TOOLS.has(name)) didWrite = true
           setToolActivity((prev) => [...prev, name])
         },
-        onDone: (reply) => {
+        onDone: (reply, _sessionId, sources) => {
           // Fall back to the authoritative final reply if no text streamed.
           if (assistantText.length === 0) assistantText = reply
+          if (sources && sources.length > 0) assistantSources = sources
           setMessages((prev) => prev.map((m) =>
-            m.id === assistantId && m.content.length === 0
-              ? { ...m, content: reply } : m))
+            m.id === assistantId
+              ? {
+                  ...m,
+                  content: m.content.length === 0 ? reply : m.content,
+                  sources: sources && sources.length > 0 ? sources : m.sources,
+                }
+              : m))
         },
         onError: (message) => {
           streamError = message
@@ -259,7 +272,7 @@ export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
     void persistTurn([
       ...messages,
       userMsg,
-      { id: assistantId, role: 'assistant', content: assistantText, timestamp: new Date() },
+      { id: assistantId, role: 'assistant', content: assistantText, sources: assistantSources, timestamp: new Date() },
     ])
   }, [loading, messages, onMutate, taskContext, getCurrentUserMember, persistTurn])
 

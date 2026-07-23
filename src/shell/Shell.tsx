@@ -1,7 +1,8 @@
 // src/shell/Shell.tsx
-import { useEffect, useRef, type ComponentType, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ComponentType, type ReactNode } from 'react';
 import { useLocation } from 'react-router-dom';
 import { PanelRightOpen } from 'lucide-react';
+import { NoteViewer } from '@/components/chat/NoteViewer';
 import { SelectionProvider } from './providers/SelectionProvider';
 import { MealEventsProvider } from './providers/MealEventsProvider';
 import { AssistantLaunchProvider, useAssistantLaunchRequests } from '@/contexts/AssistantLaunchContext';
@@ -60,6 +61,7 @@ function ShellAssistantHost() {
   const isMobile = useMobile();
   const { hidden, setHidden } = useScratchpadHidden();
   const assistant = useSymphonyAssistant({ persistKey: 'symphony_rail' });
+  const [activeNoteId, setActiveNoteId] = useState<string | null>(null);
 
   const isToday = TODAY_PATHS.has(pathname);
 
@@ -94,28 +96,34 @@ function ShellAssistantHost() {
   }
 
   return (
-    <aside
-      className="fixed top-0 bottom-0 right-0 w-[420px] z-10"
-      aria-label="Symphony AI"
-    >
-      <ChatPanel
-        messages={assistant.messages}
-        loading={assistant.loading}
-        error={assistant.error}
-        entityContext={null}
-        mode="chat"
-        onSend={assistant.sendMessage}
-        onClear={assistant.resetSession}
-        onClose={() => setHidden(true)}
-        onNewChat={assistant.resetSession}
-        toolActivity={assistant.toolActivity}
-        sessions={assistant.sessions}
-        sessionsLoading={assistant.sessionsLoading}
-        onLoadSession={assistant.loadSession}
-        onDeleteSession={assistant.deleteSession}
-        activeSessionId={assistant.activeSessionId}
-      />
-    </aside>
+    <>
+      <aside
+        className="fixed top-0 bottom-0 right-0 w-[420px] z-10"
+        aria-label="Symphony AI"
+      >
+        <ChatPanel
+          messages={assistant.messages}
+          loading={assistant.loading}
+          error={assistant.error}
+          entityContext={null}
+          mode="chat"
+          onSend={assistant.sendMessage}
+          onClear={assistant.resetSession}
+          onClose={() => setHidden(true)}
+          onNewChat={assistant.resetSession}
+          onSourceClick={setActiveNoteId}
+          toolActivity={assistant.toolActivity}
+          sessions={assistant.sessions}
+          sessionsLoading={assistant.sessionsLoading}
+          onLoadSession={assistant.loadSession}
+          onDeleteSession={assistant.deleteSession}
+          activeSessionId={assistant.activeSessionId}
+        />
+      </aside>
+      {activeNoteId && (
+        <NoteViewer key={activeNoteId} noteId={activeNoteId} onClose={() => setActiveNoteId(null)} />
+      )}
+    </>
   );
 }
 

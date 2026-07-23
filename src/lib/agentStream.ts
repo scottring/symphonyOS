@@ -1,10 +1,12 @@
 import { supabase } from '@/lib/supabase'
 
+export interface AgentSourceNote { id: string; title: string; vaultPath?: string }
+
 export type AgentStreamEvent =
   | { type: 'session'; sessionId: string }
   | { type: 'text'; text: string }
   | { type: 'tool'; name: string }
-  | { type: 'done'; reply: string; sessionId: string | null }
+  | { type: 'done'; reply: string; sessionId: string | null; sources?: AgentSourceNote[] }
   | { type: 'error'; message: string }
 
 /**
@@ -71,7 +73,7 @@ export interface StreamHandlers {
   onText?: (text: string) => void
   onTool?: (name: string) => void
   onSession?: (sessionId: string) => void
-  onDone?: (reply: string, sessionId: string | null) => void
+  onDone?: (reply: string, sessionId: string | null, sources?: AgentSourceNote[]) => void
   onError?: (message: string) => void
   attachment?: AttachmentMeta
   /** The caller's own family-member id, so the agent can assign personal
@@ -147,7 +149,7 @@ export async function streamSymphonyAgent(
       if (ev.type === 'text') handlers.onText?.(ev.text)
       else if (ev.type === 'tool') handlers.onTool?.(ev.name)
       else if (ev.type === 'session') handlers.onSession?.(ev.sessionId)
-      else if (ev.type === 'done') handlers.onDone?.(ev.reply, ev.sessionId)
+      else if (ev.type === 'done') handlers.onDone?.(ev.reply, ev.sessionId, ev.sources)
       else if (ev.type === 'error') handlers.onError?.(ev.message)
     }
   }

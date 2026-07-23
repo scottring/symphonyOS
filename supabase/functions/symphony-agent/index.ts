@@ -29,7 +29,7 @@ Rules:
 
 Grounding and verification (important):
 - Only state facts you have actually read from a tool result. Never assert a prior value, schedule, date, or history you have not looked up. If you are not sure, look it up or say you don't know. Do not invent.
-- Scott has a large knowledge base of notes synced from his vault. When he asks what he knows about a topic, wants background or prep on something (an interview, a person, a project, a decision), or asks you to gather relevant material, call symphony_search_notes BEFORE concluding there is nothing. Do not say "nothing exists" or "I have no information on X" about any topic without searching notes first. When you use a note, name its title so he can find it.
+- Scott has a large knowledge base of notes synced from his vault. When he asks what he knows about a topic, wants background or prep on something (an interview, a person, a project, a decision), or asks you to gather relevant material, call symphony_search_notes BEFORE concluding there is nothing. Do not say "nothing exists" or "I have no information on X" about any topic without searching notes first. When you use a note, name its title so he can find it. The notes you find are shown to the user as clickable chips they can open in-app, so you do not need to print file paths, ".md" filenames, or links.
 - The user's data spans tasks, routines, projects, contacts, lists, notes, and calendar events. Before acting on "X", check the right entity type: a recurring item like "Feed Jax dinner" is a routine (symphony_list_routines), not a task. Look it up before assuming it doesn't exist.
 - A dated occasion someone ATTENDS (a show, appointment, party, pickup, reservation) belongs on the real calendar: use symphony_create_calendar_event, never symphony_create_task, for it. Tasks are to-dos someone DOES. Family occasions go on the family calendar (domain "family").
 - After ANY write (create / update / complete / delete / add / check), VERIFY before you claim success: read the affected item back with the matching list_/get_ tool and confirm the fields you intended actually changed. If the change did not take or a value looks wrong, say so and retry or ask. Never report a change you have not verified.
@@ -535,6 +535,9 @@ async function runTool(
   attachment: AttachmentMeta | null,
   currentMemberId: string | null,
   authHeader: string,
+  // Structured side-channel: search_notes pushes the notes it found here so the
+  // handler can surface them to the client as clickable source chips.
+  sourceSink: Array<{ id: string; title: string; vaultPath?: string }>,
 ): Promise<string> {
   const now = () => new Date().toISOString()
   try {
@@ -876,6 +879,15 @@ async function runTool(
         }
         if (hits.length === 0) return `No notes found for "${query}".`
 
+        // Surface each hit to the client as a clickable chip (opens in-app).
+        for (const n of hits) {
+          sourceSink.push({
+            id: n.id,
+            title: n.title || (n.vault_path ? n.vault_path.split('/').pop()! : 'Untitled'),
+            vaultPath: n.vault_path ?? undefined,
+          })
+        }
+
         // Snippet the content — never dump full notes into the context window.
         const results = hits.map((n) => ({
           title: n.title || (n.vault_path ? n.vault_path.split('/').pop() : 'Untitled'),
@@ -1094,6 +1106,8 @@ Deno.serve(async (req) => {
       const enc = new TextEncoder()
       const send = (ev: Record<string, unknown>) => controller.enqueue(enc.encode(`data: ${JSON.stringify(ev)}\n\n`))
       let finalText = ''
+      // Notes surfaced by search_notes across the turn → clickable source chips.
+      const sourceNotes: Array<{ id: string; title: string; vaultPath?: string }> = []
       try {
         for (let turn = 0; turn < MAX_TURNS; turn++) {
           const { content, stop_reason } = await callAnthropic(apiKey, convo)
@@ -1104,7 +1118,7 @@ Deno.serve(async (req) => {
               send({ type: 'text', text: block.text })
             } else if (block.type === 'tool_use' && block.name) {
               send({ type: 'tool', name: block.name })
-              const result = await runTool(db, user.id, block.name, block.input ?? {}, attachment, currentMemberId, authHeader)
+              const result = await runTool(db, user.id, block.name, block.input ?? {}, attachment, currentMemberId, authHeader, sourceNotes)
               toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: result })
             }
           }
@@ -1115,7 +1129,9 @@ Deno.serve(async (req) => {
           }
           break
         }
-        send({ type: 'done', reply: finalText, sessionId: null })
+        const seen = new Set<string>()
+        const sources = sourceNotes.filter((s) => (seen.has(s.id) ? false : (seen.add(s.id), true)))
+        send({ type: 'done', reply: finalText, sessionId: null, sources })
       } catch (err) {
         send({ type: 'error', message: err instanceof Error ? err.message : 'Agent failed' })
       } finally {

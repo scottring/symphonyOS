@@ -106,6 +106,22 @@ describe('useSymphonyAssistant', () => {
     expect(captured.map(m => m.content)).toEqual(['first', 'ok', 'second'])
   })
 
+  it('attaches note sources from onDone to the assistant message', async () => {
+    vi.mocked(streamSymphonyAgent).mockImplementation(async (_messages, h) => {
+      h.onText?.('Here is your prep.')
+      h.onDone?.('Here is your prep.', null, [
+        { id: 'n1', title: 'NYSRA Panel One-Pager', vaultPath: 'job-search/nysra-panel-onepager.md' },
+        { id: 'n2', title: 'NYSRA Interview Prep' },
+      ])
+    })
+    const { result } = renderHook(() => useSymphonyAssistant())
+    await act(async () => { await result.current.sendMessage('prep for nysra') })
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    const assistantMsg = result.current.messages[1]
+    expect(assistantMsg.sources?.map(s => s.id)).toEqual(['n1', 'n2'])
+    expect(assistantMsg.sources?.[0].title).toBe('NYSRA Panel One-Pager')
+  })
+
   it('records tool activity from onTool', async () => {
     vi.mocked(streamSymphonyAgent).mockImplementation(async (_messages, h) => {
       h.onTool?.('symphony_create_task')
