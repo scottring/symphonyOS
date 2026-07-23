@@ -26,7 +26,7 @@ interface TendTask {
 }
 interface BusySlot { title: string; start: string; end: string }
 
-function buildPrompt(tasks: TendTask[], weekStart: string, today: string, busy: BusySlot[]): string {
+function buildPrompt(tasks: TendTask[], weekStart: string, today: string, busy: BusySlot[], grain: 'week' | 'month' = 'week', monthEnd?: string): string {
   const taskLines = tasks
     .map((t) => {
       const bits = [
@@ -42,24 +42,31 @@ function buildPrompt(tasks: TendTask[], weekStart: string, today: string, busy: 
     .join('\n')
   const busyLines = busy.length
     ? busy.map((b) => `- ${b.start} → ${b.end}: ${b.title}`).join('\n')
-    : '(no calendar events this week)'
+    : grain === 'month' ? '(no calendar events this month)' : '(no calendar events this week)'
 
-  return `You are the list gardener for Symphony, a personal planning app. The user's week list (week starting ${weekStart}; today is ${today}) has grown unwieldy. Here are the unplaced tasks:
+  const greeting = grain === 'month' ? `The user's month list (today is ${today}, month ends ${monthEnd}) has grown unwieldy` : `The user's week list (week starting ${weekStart}; today is ${today}) has grown unwieldy`
+
+  const rulesText = grain === 'month'
+    ? `- "regrade": wrong-sized for a month — {"kind":"regrade","taskId":"...","to":"week"|"season"|"someday","why":"..."} — "week" when it's small enough to just do this week, "season" when it's bigger than a month.
+- "place": a concrete DAY suggestion this month. {"kind":"place","taskIds":["..."],"date":"YYYY-MM-DD","why":"..."} — no clock time; month placement is day-granular. "date" must be between ${today} and ${monthEnd}, never before ${today}.`
+    : `- "regrade": wrong-sized for a week — a month-scale chunk or a timeless idea. {"kind":"regrade","taskId":"...","to":"month"|"someday","why":"..."}
+- "place": a concrete day/time suggestion this week. {"kind":"place","taskIds":["..."],"date":"YYYY-MM-DD","time":"HH:MM","why":"..."} — you may pair naturally-batched tasks (errands, outdoor work) in one proposal.`
+
+  return `You are the list gardener for Symphony, a personal planning app. ${greeting}. Here are the unplaced tasks:
 
 ${taskLines}
 
-Already-busy times this week:
+Already-busy times this ${grain === 'month' ? 'month' : 'week'}:
 ${busyLines}
 
 Propose a SHORT list of tending actions. Kinds:
 - "merge": two+ entries are the same real-world task. {"kind":"merge","keepId":"...","dropIds":["..."],"why":"..."} — keep the older/richer one.
 - "put_aside": the timing is wrong, not the idea — it has sat untouched and isn't urgent. {"kind":"put_aside","taskId":"...","why":"..."}
-- "regrade": wrong-sized for a week — a month-scale chunk or a timeless idea. {"kind":"regrade","taskId":"...","to":"month"|"someday","why":"..."}
-- "place": a concrete day/time suggestion this week. {"kind":"place","taskIds":["..."],"date":"YYYY-MM-DD","time":"HH:MM","why":"..."} — you may pair naturally-batched tasks (errands, outdoor work) in one proposal.
+${rulesText}
 
 Rules:
 - Use ONLY the task ids listed above. Never invent ids.
-- "date" must be between ${today} and 6 days after ${weekStart}, never before ${today}.
+${grain === 'month' ? `- "date" must be between ${today} and ${monthEnd}, never before ${today}.` : `- "date" must be between ${today} and 6 days after ${weekStart}, never before ${today}.`}
 - Avoid the busy times listed. Prefer mornings for focused work, weekends for house/outdoor work.
 - Be conservative: at most 8 proposals, only ones you'd defend. An empty list is a fine answer.
 - "why" is ONE short sentence, plain language, addressed to the user.
@@ -106,12 +113,16 @@ Deno.serve(async (req) => {
   const { data: { user }, error: authErr } = await service.auth.getUser(token)
   if (authErr || !user) return json({ error: 'Invalid token' }, 401)
 
-  let body: { tasks?: unknown; weekStart?: unknown; today?: unknown; busy?: unknown }
+  let body: { tasks?: unknown; weekStart?: unknown; today?: unknown; busy?: unknown; grain?: unknown; monthEnd?: unknown }
   try {
     body = await req.json()
   } catch {
     return json({ error: 'Invalid JSON body' }, 400)
   }
+
+  const grain = body.grain === 'month' ? 'month' : 'week'
+  const monthEnd = typeof body.monthEnd === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.monthEnd) ? body.monthEnd : null
+  if (grain === 'month' && !monthEnd) return json({ error: 'monthEnd required for month grain' }, 400)
 
   const tasks = (Array.isArray(body.tasks) ? body.tasks : [])
     .filter((t): t is TendTask =>
@@ -136,7 +147,7 @@ Deno.serve(async (req) => {
   if (tasks.length === 0 || !weekStart || !today) return json({ error: 'tasks, weekStart, today required' }, 400)
 
   try {
-    const text = await callClaude(buildPrompt(tasks, weekStart, today, busy), apiKey)
+    const text = await callClaude(buildPrompt(tasks, weekStart, today, busy, grain, monthEnd || undefined), apiKey)
     const stripped = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '')
     const parsed = JSON.parse(stripped) as { proposals?: unknown }
     const proposals = Array.isArray(parsed.proposals) ? parsed.proposals.slice(0, 12) : []
