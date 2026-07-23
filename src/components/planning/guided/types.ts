@@ -56,6 +56,9 @@ export interface GuidedStepConfig {
     pick?: boolean
     /** write-list: soft item-count nudge (never blocks). */
     softCap?: number
+    /** write-list (monthly): render Hart-Unger's fun-composition recipe chips
+     *  above the fun tally. Static recipe, no per-chip classification. */
+    funComposition?: boolean
     /** book-next: which horizon's session to schedule. */
     bookHorizon?: PlanningHorizon
     bookTitle?: string

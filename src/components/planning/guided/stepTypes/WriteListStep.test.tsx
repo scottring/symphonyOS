@@ -77,4 +77,28 @@ describe('WriteListStep', () => {
     expect(screen.getByText(/16 of ~15/)).toBeInTheDocument()
     expect(screen.getByPlaceholderText(/Add a task to this week|Add a chunk to this month|Add an outcome for this season/)).toBeEnabled()
   })
+
+  it('renders the fun-composition recipe chips when funComposition is set', () => {
+    const monthStep = {
+      id: 'write-month', type: 'write-list' as const, title: 'Write the month\'s list',
+      narration: 'Concrete, specific things.',
+      props: { bucket: 'month' as const, funComposition: true },
+    }
+    const host = makeHost()
+    renderStep(<WriteListStep />, { step: monthStep, host, horizon: 'monthly' })
+    expect(screen.getByText('One big experience')).toBeInTheDocument()
+    expect(screen.getByText('A few social things')).toBeInTheDocument()
+    expect(screen.getByText('A themed quest — optional')).toBeInTheDocument()
+  })
+
+  it('omits the recipe chips without funComposition', () => {
+    const monthStep = {
+      id: 'write-month', type: 'write-list' as const, title: 'Write the month\'s list',
+      narration: 'Concrete, specific things.',
+      props: { bucket: 'month' as const },
+    }
+    const host = makeHost()
+    renderStep(<WriteListStep />, { step: monthStep, host, horizon: 'monthly' })
+    expect(screen.queryByText('One big experience')).not.toBeInTheDocument()
+  })
 })

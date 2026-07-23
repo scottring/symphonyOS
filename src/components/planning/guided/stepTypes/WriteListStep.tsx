@@ -144,6 +144,19 @@ export function WriteListStep() {
           {pool.filter((t) => t.pickedAt).length} of {PICK_CAP} picked · {pool.length} written — 5 is a season; 19 is a backlog.
         </p>
       )}
+      {/* Hart-Unger's fun recipe (Best Laid Plans): name the composition so
+          "fun" means a shape, not a vibe. Static hint — no classification. */}
+      {step.props?.funComposition && (
+        <div className="flex flex-wrap gap-1.5">
+          {['One big experience', 'A few social things', 'A themed quest — optional'].map((label) => (
+            <span key={label}
+              className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50/60 px-2.5 py-1 text-[11px] text-amber-700">
+              <Sparkles className="w-3 h-3" />
+              {label}
+            </span>
+          ))}
+        </div>
+      )}
       {/* The fun audit, live: tally chip + per-row ✨ toggle (Best Laid Plans'
           2:1 rule). Marking is one tap; the coach line reads the same data. */}
       {pool.length > 0 && (
