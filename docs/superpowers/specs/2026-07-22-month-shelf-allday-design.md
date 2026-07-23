@@ -68,7 +68,13 @@ duplication is the project-grouped + loose pool rendered as heavy
 - **Deleted:** the dead Carried over / Placed this week JSX, project sections,
   loose list, bottom add-input. Every month task renders exactly once: on a
   grid day or on the shelf.
-- MonthCalendarGrid itself: behaviorally untouched.
+- MonthCalendarGrid: gains `hideRail?: boolean` (default false). The grid has
+  its OWN built-in rocks rail today (the dashed drag-source strip) — with the
+  shelf in place that rail is redundant, so MonthPage passes `hideRail` to
+  hide it while keeping cell drag/drop fully live (unlike `readOnly`, which
+  kills both). The shelf's native drop target takes over the rail's
+  unschedule role. Cell drop logic otherwise untouched; other callers
+  unaffected.
 
 ### Tend on month
 
