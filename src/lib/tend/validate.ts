@@ -18,11 +18,17 @@ function why(v: unknown): string {
   return typeof v === 'string' ? v.trim().slice(0, MAX_WHY) : ''
 }
 
+export interface ParseTendOptions {
+  dateWindow?: { minYmd: string; maxYmd: string }
+  allowedRegrades?: ReadonlySet<'week' | 'month' | 'season' | 'someday'>
+}
+
 export function parseTendProposals(
   data: unknown,
   validIds: Set<string>,
-  dateWindow?: { minYmd: string; maxYmd: string },
+  opts: ParseTendOptions = {},
 ): TendProposal[] {
+  const { dateWindow, allowedRegrades } = opts
   const raw = (data as { proposals?: unknown })?.proposals
   if (!Array.isArray(raw)) return []
   const out: TendProposal[] = []
@@ -49,7 +55,8 @@ export function parseTendProposals(
       case 'regrade': {
         const taskId = str(e.taskId)
         if (!taskId || !validIds.has(taskId)) continue
-        if (e.to !== 'month' && e.to !== 'someday') continue
+        if (e.to !== 'week' && e.to !== 'month' && e.to !== 'season' && e.to !== 'someday') continue
+        if (allowedRegrades && !allowedRegrades.has(e.to)) continue
         out.push({ kind: 'regrade', id, taskId, to: e.to, why: why(e.why) })
         break
       }

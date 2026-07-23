@@ -111,7 +111,7 @@ export function useTendWeek(args: UseTendWeekArgs): TendState {
       const [wy, wm, wd] = weekStartYmd.split('-').map(Number)
       const weekEnd = new Date(wy, wm - 1, wd + 6)
       const maxYmd = localYmd(weekEnd)
-      const ai = parseTendProposals(data, validIds, { minYmd: todayYmd, maxYmd })
+      const ai = parseTendProposals(data, validIds, { dateWindow: { minYmd: todayYmd, maxYmd } })
       setProposals((current) => {
         const covered = new Set(current.flatMap((p) => touchedIds(p).map((id) => `${p.kind}:${id}`)))
         const fresh = ai.filter((p) => !touchedIds(p).some((id) => covered.has(`${p.kind}:${id}`)))

@@ -38,10 +38,15 @@ describe('applyProposal', () => {
     expect(when).toEqual(new Date(2026, 6, 25, 10, 30, 0, 0)) // local parts, no UTC shift
   })
 
-  it('place defaults to 09:00 when no time given', () => {
+  it('place without time is an all-day placement at local midnight', () => {
     const a = actions()
     applyProposal({ kind: 'place', id: 'pl', taskIds: ['t1'], date: '2026-07-25', why: '' }, a)
-    const [, , when] = (a.setBucket as ReturnType<typeof vi.fn>).mock.calls[0]
-    expect(when).toEqual(new Date(2026, 6, 25, 9, 0, 0, 0))
+    expect(a.setBucket).toHaveBeenCalledWith('t1', 'timed', new Date(2026, 6, 25, 0, 0, 0, 0), true)
+  })
+
+  it('regrade to season lands in the quarter bucket', () => {
+    const a = actions()
+    applyProposal({ kind: 'regrade', id: 'r', taskId: 't1', to: 'season', why: '' }, a)
+    expect(a.setBucket).toHaveBeenCalledWith('t1', 'quarter')
   })
 })

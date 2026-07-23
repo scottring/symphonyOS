@@ -21,7 +21,7 @@ export interface TendRegrade {
   kind: 'regrade'
   id: string
   taskId: string
-  to: 'month' | 'someday'
+  to: 'week' | 'month' | 'season' | 'someday'
   why: string
 }
 

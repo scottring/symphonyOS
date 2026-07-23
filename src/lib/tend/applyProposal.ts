@@ -2,6 +2,7 @@
 // Turns an accepted proposal into writes. One write per task, through
 // setBucket — bucket:'timed' + scheduledFor land in a single call so the
 // timed-bucket invariant can't be violated by a race.
+// For place without time: all-day placements land at local midnight with isAllDay=true.
 
 import type { TaskBucket } from '@/types/task'
 import type { TendProposal } from './types'
@@ -21,14 +22,20 @@ export function applyProposal(p: TendProposal, actions: TendActions): void {
       actions.setBucket(p.taskId, 'someday')
       return
     case 'regrade':
-      actions.setBucket(p.taskId, p.to)
+      actions.setBucket(p.taskId, p.to === 'season' ? 'quarter' : p.to)
       return
     case 'place': {
       // Local date parts — never Date.parse (UTC shift).
       const [y, m, d] = p.date.split('-').map(Number)
-      const [hh, mm] = (p.time ?? '09:00').split(':').map(Number)
-      const when = new Date(y, m - 1, d, hh, mm, 0, 0)
-      for (const id of p.taskIds) actions.setBucket(id, 'timed', when, false)
+      if (p.time) {
+        const [hh, mm] = p.time.split(':').map(Number)
+        const when = new Date(y, m - 1, d, hh, mm, 0, 0)
+        for (const id of p.taskIds) actions.setBucket(id, 'timed', when, false)
+      } else {
+        // No time = an all-day placement (the grid's All-day lane convention).
+        const when = new Date(y, m - 1, d, 0, 0, 0, 0)
+        for (const id of p.taskIds) actions.setBucket(id, 'timed', when, true)
+      }
       return
     }
   }
