@@ -83,3 +83,53 @@ describe('MonthCalendarGrid seam — Open week chip', () => {
     expect(container).toBeTruthy()
   })
 })
+
+describe('MonthCalendarGrid hideRail', () => {
+  it('hides the rail text when hideRail=true but still calls onPlaceTask on cell drop', () => {
+    const onPlaceTask = vi.fn()
+    const taskWithSchedule: Task = {
+      id: 'task-1',
+      title: 'Test Task',
+      completed: false,
+      bucket: 'timed',
+      scheduledFor: new Date(2026, 6, 10),
+      sourceId: null,
+      context: null,
+      created_at: new Date(),
+      updated_at: new Date(),
+    }
+
+    render(
+      <MonthCalendarGrid
+        month={new Date(2026, 6, 1)}
+        tasks={[taskWithSchedule]}
+        events={events}
+        onPlaceTask={onPlaceTask}
+        hideRail={true}
+      />
+    )
+
+    // Rail text should not be present
+    expect(screen.queryByText(/Drag onto a day to schedule/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Drag a scheduled item here to unschedule/)).not.toBeInTheDocument()
+
+    // But cell drop should still work: drag task-1 onto day 15
+    const dayCell = screen.getByText('15').closest('div')
+    expect(dayCell).not.toBeNull()
+
+    fireEvent.dragOver(dayCell!, {
+      dataTransfer: { getData: () => 'task-1' },
+      preventDefault: vi.fn(),
+    })
+
+    fireEvent.drop(dayCell!, {
+      dataTransfer: { getData: (format: string) => format === 'text/task-id' ? 'task-1' : '' },
+      preventDefault: vi.fn(),
+    })
+
+    expect(onPlaceTask).toHaveBeenCalledTimes(1)
+    const [taskId, targetDate] = onPlaceTask.mock.calls[0]
+    expect(taskId).toBe('task-1')
+    expect(targetDate.getDate()).toBe(15)
+  })
+})

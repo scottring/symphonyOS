@@ -27,6 +27,10 @@ interface MonthCalendarGridProps {
    *  grid is a zoom-in reference (e.g. the annual session's month peek), where
    *  the "look, don't link" model forbids scheduling from this surface. */
   readOnly?: boolean
+  /** Hide the rocks rail while preserving cell drop/drag behavior. Used when
+   *  an external shelf (e.g., a sidebar) takes the rail's role. Drag/drop on
+   *  cells continues to work; readOnly semantics unchanged. */
+  hideRail?: boolean
   /** Which day the week starts on. Defaults to the cadence config so nothing
    *  needs to thread it through unless a caller wants to override (tests). */
   weekStartsOn?: WeekStart
@@ -49,7 +53,7 @@ function eventStart(e: CalendarEvent): Date | null {
   return Number.isNaN(d.getTime()) ? null : d
 }
 
-export function MonthCalendarGrid({ month, tasks, events, onPlaceTask, onUnscheduleTask, onSelectTask, readOnly = false, weekStartsOn = readCadenceConfig().weekStartsOn, onOpenWeek }: MonthCalendarGridProps) {
+export function MonthCalendarGrid({ month, tasks, events, onPlaceTask, onUnscheduleTask, onSelectTask, readOnly = false, hideRail = false, weekStartsOn = readCadenceConfig().weekStartsOn, onOpenWeek }: MonthCalendarGridProps) {
   const [dragOverKey, setDragOverKey] = useState<string | null>(null)
   const [railOver, setRailOver] = useState(false)
   // Which grid row (0-5) the pointer is over — a full row wash + the "Open
@@ -106,8 +110,9 @@ export function MonthCalendarGrid({ month, tasks, events, onPlaceTask, onUnsched
     <div className="space-y-4">
       {/* Rocks rail — drag onto a day to schedule; drag a scheduled item back
           here to unschedule it. Always present so it's a drop target even when
-          empty. Hidden in read-only (look-only) mode. */}
-      {!readOnly && (
+          empty. Hidden in read-only (look-only) mode, or when hideRail is true
+          (external shelf takes the rail's role). */}
+      {!readOnly && !hideRail && (
         <div
           onDragOver={(e) => { e.preventDefault(); setRailOver(true) }}
           onDragLeave={() => setRailOver(false)}
