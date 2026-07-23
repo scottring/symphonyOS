@@ -15,8 +15,8 @@ const idleTend: TendState = {
   start: vi.fn(), remove: vi.fn(), done: vi.fn(),
 }
 
-function renderShelf(overrides: Partial<PlanningShelfProps> = {}) {
-  const props: PlanningShelfProps = {
+function baseProps(overrides: Partial<PlanningShelfProps> = {}): PlanningShelfProps {
+  return {
     tasks: [task('c1', 'Ask for YNAB refund'), task('p1', 'Weed the backyard', 'proj'), task('l1', 'Make a chore plan')],
     carryOverIds: new Set(['c1']),
     projectsMap: new Map([['proj', { id: 'proj', name: 'Backyards' }]]),
@@ -26,6 +26,10 @@ function renderShelf(overrides: Partial<PlanningShelfProps> = {}) {
     tend: idleTend, onApplyProposal: vi.fn(),
     ...overrides,
   }
+}
+
+function renderShelf(overrides: Partial<PlanningShelfProps> = {}) {
+  const props = baseProps(overrides)
   render(<DndContext><PlanningShelf {...props} /></DndContext>)
   return props
 }
@@ -97,5 +101,32 @@ describe('PlanningShelf', () => {
   it('reviewing mode with no proposals and AI settled shows the healthy message', () => {
     renderShelf({ tend: { ...idleTend, status: 'reviewing', proposals: [] } })
     expect(screen.getByText(/nothing to tend/i)).toBeInTheDocument()
+  })
+
+  it('native mode pills are HTML-draggable, set text/task-id, and render without a DndContext', () => {
+    // NOTE: render WITHOUT the <DndContext> wrapper — that absence IS the test.
+    const props = baseProps({ dragMode: 'native', onNativeUnschedule: vi.fn() })
+    render(<PlanningShelf {...props} />)
+    const pill = screen.getAllByTestId('shelf-pill-title')[0].closest('.group') as HTMLElement
+    expect(pill).toHaveAttribute('draggable', 'true')
+    const setData = vi.fn()
+    fireEvent.dragStart(pill, { dataTransfer: { setData } })
+    expect(setData).toHaveBeenCalledWith('text/task-id', props.tasks[0].id)
+  })
+
+  it('native mode shelf drop calls onNativeUnschedule with the dragged id', () => {
+    const onNativeUnschedule = vi.fn()
+    render(<PlanningShelf {...baseProps({ dragMode: 'native', onNativeUnschedule })} />)
+    const lane = screen.getByTestId('shelf-lane')
+    fireEvent.drop(lane, { dataTransfer: { getData: () => 'c1' } })
+    expect(onNativeUnschedule).toHaveBeenCalledWith('c1')
+  })
+
+  it('moveDown customizes the demote menu item', () => {
+    const props = baseProps({ moveDown: { label: 'To week', bucket: 'week' } })
+    render(<DndContext><PlanningShelf {...props} /></DndContext>)
+    fireEvent.click(screen.getAllByLabelText('Task actions')[0])
+    fireEvent.click(screen.getByRole('menuitem', { name: 'To week' }))
+    expect(props.onSetBucket).toHaveBeenCalledWith(props.tasks[0].id, 'week')
   })
 })
