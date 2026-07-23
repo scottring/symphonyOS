@@ -94,4 +94,28 @@ describe('PlacementChip', () => {
     const el = container.firstElementChild as HTMLElement
     expect(el).toHaveAttribute('title', "Buy groceries (Trader Joe's)")
   })
+
+  it('defaults to clamped/truncated title text (wrap unset)', () => {
+    render(<PlacementChip id="t1" name="Buy groceries" onClick={vi.fn()} />)
+    const title = screen.getByText('Buy groceries')
+    expect(title.className).toMatch(/line-clamp-2/)
+    expect(title.className).toMatch(/truncate/)
+    expect(title.className).not.toMatch(/break-words/)
+  })
+
+  it('wrap=true drops line-clamp/truncate in favor of break-words, for a clickable chip', () => {
+    render(<PlacementChip id="t1" name="Buy groceries" onClick={vi.fn()} wrap />)
+    const title = screen.getByText('Buy groceries')
+    expect(title.className).toMatch(/break-words/)
+    expect(title.className).not.toMatch(/line-clamp-2/)
+    expect(title.className).not.toMatch(/truncate/)
+  })
+
+  it('wrap=true drops line-clamp/truncate for a non-clickable (event) chip too', () => {
+    render(<PlacementChip id="e1" name="Dentist" kind="event" wrap />)
+    const title = screen.getByText('Dentist')
+    expect(title.className).toMatch(/break-words/)
+    expect(title.className).not.toMatch(/line-clamp-2/)
+    expect(title.className).not.toMatch(/truncate/)
+  })
 })

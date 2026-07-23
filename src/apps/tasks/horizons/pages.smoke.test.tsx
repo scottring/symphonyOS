@@ -156,10 +156,17 @@ describe('horizon pages (smoke)', () => {
     expect(screen.getByText('Mon')).toBeInTheDocument()
   })
 
-  it('MonthPage masthead shows the rhythm h1 and placed/pool subtitle', () => {
+  it('MonthPage masthead shows the rhythm h1 and the calendar/motion/done subtitle', () => {
     render(<MonthPage />)
     expect(screen.getByRole('heading', { level: 1, name: 'This Month' })).toBeInTheDocument()
-    expect(screen.getByText(/0 placed, 0 to place/)).toBeInTheDocument()
+    expect(screen.getByText(/0 on the calendar · 0 in motion · 0 done/)).toBeInTheDocument()
+  })
+
+  it("MonthPage shelf header reframes as the month's own list, not a placement queue", () => {
+    render(<MonthPage />)
+    const monthName = new Date().toLocaleDateString('en-US', { month: 'long' })
+    expect(screen.getByText(`${monthName}'s moves (0)`)).toBeInTheDocument()
+    expect(screen.queryByText(/^To place/)).not.toBeInTheDocument()
   })
 
   it('MonthPage renders one surface — shelf, no list sections', () => {

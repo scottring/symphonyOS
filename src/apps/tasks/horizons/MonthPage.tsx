@@ -68,6 +68,24 @@ export function MonthPage() {
     }).length;
   }, [domainTasks, match, viewedDate]);
 
+  // Done-this-month count for the masthead subtitle's "celebrate wins" step
+  // (Best Laid Plans reframe) — completed tasks that belong to the month:
+  // still-undated bucket='month' items (finished before ever hitting a day),
+  // or scheduled inside the viewed month. Same domain match() as the placed
+  // count, same LOCAL date-part math as the rest of this page.
+  const monthDoneCount = useMemo(() => {
+    const start = new Date(viewedDate.getFullYear(), viewedDate.getMonth(), 1);
+    const end = new Date(viewedDate.getFullYear(), viewedDate.getMonth() + 1, 1);
+    return domainTasks.filter((t) => {
+      if (!t.completed) return false;
+      if (!match(t.assignedTo, t.assignedToAll)) return false;
+      if (t.bucket === 'month') return true;
+      if (!t.scheduledFor) return false;
+      const d = new Date(t.scheduledFor);
+      return d >= start && d < end;
+    }).length;
+  }, [domainTasks, match, viewedDate]);
+
   // Month-grain Tend window — the first and last day of the viewed month,
   // computed from LOCAL date parts (never Date.parse), same convention as
   // the rest of this page's date math.
@@ -144,6 +162,12 @@ export function MonthPage() {
     applyProposal(p, { setBucket, deleteTask: deleteTaskWithUndo });
   }, [setBucket, deleteTaskWithUndo, deleteTask, addTask, tasksById, undo]);
 
+  // "<Month>'s moves" — the shelf reframed as the month's own curated list
+  // (Best Laid Plans reframe), not a placement queue. Straight apostrophe:
+  // matches the codebase's dominant UI-string convention (see e.g. YearPage's
+  // "doesn't have goals yet", shared.tsx's "don't start stay").
+  const shelfPoolLabel = `${viewedDate.toLocaleDateString('en-US', { month: 'long' })}'s moves`;
+
   return (
     <ScheduleActionsProvider value={scheduleActionsValue}>
       <div className="h-full overflow-y-auto">
@@ -152,7 +176,7 @@ export function MonthPage() {
             <div>
               <h1 className="font-display text-3xl font-semibold tracking-tight text-neutral-800">{label}</h1>
               <p className="mt-1 text-sm text-neutral-500">
-                {period ?? label} · {monthPlacedCount} placed, {pool.length} to place
+                {period ?? label} · {monthPlacedCount} on the calendar · {pool.length} in motion · {monthDoneCount} done
               </p>
             </div>
             <div className="shrink-0 flex flex-col items-end gap-1.5">
@@ -179,14 +203,19 @@ export function MonthPage() {
             Moves — concrete chunks that fit in a sitting; 10–15 is a good month.
             {(() => { const s = servingCount(domainTasks); return s.total > 0 ? ` Serving ${s.serving} of ${s.total} picks.` : ''; })()}
           </p>
+        </div>
 
-          {/* One surface: shelf above, month grid below. A task is on a day
-              or on the shelf — never both, never listed again elsewhere. */}
+        {/* Full width below the masthead (mirrors WeekPage): shelf above the
+            calendar grid, reference fold below. A task lives on a day or on
+            the shelf — never both, never listed again elsewhere on the page. */}
+        <div className="px-3 pb-8">
+          {/* One surface: shelf above, month grid below. */}
           <div className="mb-6">
             <PlanningShelf
               dragMode="native"
               tasks={pool}
               carryOverIds={NO_CARRY_OVER}
+              poolLabel={shelfPoolLabel}
               projectsMap={projectsMap}
               tasksById={tasksById}
               onOpenTask={(id) => scheduleActionsValue.onOpenTask?.(id)}

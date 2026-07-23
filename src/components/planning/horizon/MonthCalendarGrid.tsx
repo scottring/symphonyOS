@@ -204,6 +204,7 @@ export function MonthCalendarGrid({ month, tasks, events, onPlaceTask, onUnsched
                     name={e.title}
                     title={e.title}
                     kind="event"
+                    wrap
                   />
                 ))}
                 {dayTasks.map((t) => (
@@ -215,6 +216,7 @@ export function MonthCalendarGrid({ month, tasks, events, onPlaceTask, onUnsched
                     kind="task"
                     draggable={!readOnly}
                     onClick={() => onSelectTask?.(t.id)}
+                    wrap
                   />
                 ))}
                 {/* Floating "Open week →" chip — shown at the hovered row's

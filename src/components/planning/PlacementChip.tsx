@@ -28,6 +28,10 @@ export interface PlacementChipProps {
   /** Tooltip on the root element. Defaults to `name` so hover-title text
    *  (e.g. full task/event title on a truncated chip) isn't lost. */
   title?: string
+  /** When true, the title wraps (`break-words`) instead of clamping to two
+   *  lines and truncating. Display-only — doesn't affect drag/click/data.
+   *  Default false keeps every other call site's clamped-chip look. */
+  wrap?: boolean
 }
 
 export function PlacementChip({
@@ -40,8 +44,12 @@ export function PlacementChip({
   onClick,
   className = '',
   title,
+  wrap = false,
 }: PlacementChipProps) {
   const isEvent = kind === 'event'
+  const titleClassName = wrap
+    ? 'flex-1 min-w-0 text-left break-words text-neutral-700'
+    : 'flex-1 min-w-0 text-left line-clamp-2 truncate text-neutral-700'
 
   return (
     <div
@@ -64,7 +72,7 @@ export function PlacementChip({
         <button
           type="button"
           onClick={onClick}
-          className="flex-1 min-w-0 text-left line-clamp-2 truncate text-neutral-700"
+          className={titleClassName}
         >
           {name}
         </button>
@@ -72,7 +80,7 @@ export function PlacementChip({
         // No onClick (e.g. calendar events, which aren't selectable from the
         // month grid) — a plain div, not a button, so it isn't a focusable,
         // seemingly-clickable no-op tab stop.
-        <div className="flex-1 min-w-0 text-left line-clamp-2 truncate text-neutral-700">
+        <div className={titleClassName}>
           {name}
         </div>
       )}

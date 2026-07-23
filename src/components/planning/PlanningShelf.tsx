@@ -60,6 +60,10 @@ export interface PlanningShelfProps {
   /** The reviewing-mode header's lead-in — speaks the host page's grain
    *  (week vs month). Defaults to the week page's copy. */
   tendingLabel?: string
+  /** The non-reviewing header's lead-in, before the `(n)` count. Month
+   *  reframes this as its own curated list (e.g. "July's moves") rather than
+   *  a placement queue; week keeps the default. */
+  poolLabel?: string
 }
 
 const DEFAULT_MOVE_DOWN = { label: 'To month', bucket: 'month' as const }
@@ -269,6 +273,7 @@ export function PlanningShelf(props: PlanningShelfProps) {
     draft, onDraftChange, onSubmitDraft, hiddenCount = 0, showingAll = false, onToggleShowAll,
     tend, onApplyProposal, dragMode = 'dndkit', onNativeUnschedule, moveDown = DEFAULT_MOVE_DOWN,
     draftPlaceholder = 'Add to this week…', tendingLabel = 'Tending this week',
+    poolLabel = 'To place',
   } = props
   const [expanded, setExpanded] = useState(false)
 
@@ -301,7 +306,7 @@ export function PlanningShelf(props: PlanningShelfProps) {
         <h2 className="text-xs font-semibold tracking-wide uppercase text-neutral-400">
           {reviewing
             ? `${tendingLabel} · ${tend.proposals.length} suggestion${tend.proposals.length === 1 ? '' : 's'}`
-            : `To place (${ordered.length})${carriedCount > 0 ? ` · ${carriedCount} carried over` : ''}`}
+            : `${poolLabel} (${ordered.length})${carriedCount > 0 ? ` · ${carriedCount} carried over` : ''}`}
         </h2>
         {reviewing ? (
           <button type="button" onClick={tend.done}

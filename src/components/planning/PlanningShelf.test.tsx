@@ -130,6 +130,17 @@ describe('PlanningShelf', () => {
     expect(onNativeUnschedule).toHaveBeenCalledWith('c1')
   })
 
+  it('defaults the non-reviewing header to "To place (n)"', () => {
+    renderShelf({ carryOverIds: new Set() })
+    expect(screen.getByText('To place (3)')).toBeInTheDocument()
+  })
+
+  it('honors a custom poolLabel in the non-reviewing header', () => {
+    renderShelf({ carryOverIds: new Set(), poolLabel: "July's moves" })
+    expect(screen.getByText("July's moves (3)")).toBeInTheDocument()
+    expect(screen.queryByText(/^To place/)).not.toBeInTheDocument()
+  })
+
   it('moveDown customizes the demote menu item', () => {
     const props = baseProps({ moveDown: { label: 'To week', bucket: 'week' } })
     render(<DndContext><PlanningShelf {...props} /></DndContext>)
