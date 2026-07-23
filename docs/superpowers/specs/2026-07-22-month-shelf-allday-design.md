@@ -98,6 +98,28 @@ duplication is the project-grouped + loose pool rendered as heavy
   place-date window for month grain is `[today, end of current month]`.
 - Prepass (dupes/stale) reused as-is — horizon-agnostic already.
 
+## Addendum 2026-07-23: Best Laid Plans reframe (approved)
+
+After reviewing how Hart-Unger's *Best Laid Plans* treats the month (list
+curated against a calendar landscape; day-slotting only for date-certain
+items; pull-down = migration at weekly planning), the month page drops the
+"placement queue" framing:
+
+1. **Full width.** Masthead + identity line keep `PAGE_COLUMN`; shelf +
+   calendar + reference fold take the full viewport width (mirrors /week).
+2. **Cell chips wrap, never truncate.** `PlacementChip` gains `wrap?: boolean`
+   (default false — other call sites unchanged); MonthCalendarGrid passes it
+   for task and event chips. Month rows may grow vertically.
+3. **Shelf reframed as the month list.** `PlanningShelf` gains
+   `poolLabel?: string` (default `'To place'`); MonthPage passes
+   `"<Month>'s moves"` (e.g. "July's moves") derived from `viewedDate`.
+4. **Masthead subtitle** becomes `"{placed} on the calendar · {pool} in
+   motion · {done} done"` where done = completed tasks belonging to the
+   month (bucket month, or scheduledFor inside it) — the "celebrate wins"
+   step. The "placed / to place" pressure framing is gone.
+5. Unchanged: day-drops (date-certain items), Tend, ⋯ To week migration,
+   reference fold, /week page.
+
 ## What this touches
 
 - `src/components/planning/PlanningGrid.tsx` (+ column/header pieces as
