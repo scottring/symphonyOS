@@ -403,7 +403,7 @@ export function PlanningShelf(props: PlanningShelfProps) {
               onPointerDown={(e) => e.stopPropagation()}
               onMouseDown={(e) => e.stopPropagation()}
               placeholder={draftPlaceholder}
-              className="w-36 bg-transparent text-sm placeholder:text-neutral-400 focus:outline-none" />
+              className="w-64 bg-transparent text-sm placeholder:text-neutral-400 focus:outline-none" />
           </span>
           {ordered.length === 0 && (
             <span className="text-sm text-neutral-400 py-1">
