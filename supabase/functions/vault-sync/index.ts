@@ -168,7 +168,10 @@ Deno.serve(async (req) => {
         })
       }
 
-      return await handleBackfill(supabase, githubPat, openAiKey, vaultUserId)
+      // Optional path prefix to process a subset (e.g. 'job-search/') so a large
+      // vault can be backfilled in chunks that each fit the worker compute limit.
+      const prefix = url.searchParams.get('prefix') ?? undefined
+      return await handleBackfill(supabase, githubPat, openAiKey, vaultUserId, prefix)
     }
 
     // Normal webhook flow
@@ -214,6 +217,7 @@ Deno.serve(async (req) => {
     }
 
     const filesToSync = [...added, ...modified]
+    const attempted = filesToSync.length
     const results = { synced: 0, removed: 0, errors: [] as string[] }
 
     // Remove deleted files
@@ -242,6 +246,20 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Surface systemic failures. A webhook that always returns 200 hid an
+    // expired GITHUB_PAT for a month (every file 401'd, synced stayed 0, yet
+    // the delivery showed green). If we attempted files but synced none, that's
+    // a real breakage — return 500 so it shows as a failed delivery, not a
+    // silent no-op. Partial failures still return 200 with errors in the body.
+    if (results.errors.length > 0) {
+      console.error('vault-sync errors:', JSON.stringify(results.errors))
+    }
+    if (attempted > 0 && results.synced === 0) {
+      return new Response(JSON.stringify({ ...results, systemic_failure: true }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
     return new Response(JSON.stringify(results), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
@@ -449,6 +467,7 @@ async function handleBackfill(
   githubPat: string,
   openAiKey: string | undefined,
   userId: string,
+  prefix?: string,
 ) {
   const repoFullName = 'scottring/scotts-world'
 
@@ -478,7 +497,8 @@ async function handleBackfill(
       !f.path.startsWith('.') &&
       !f.path.startsWith('scripts/') &&
       !f.path.startsWith('assets/') &&
-      !f.path.startsWith('private/')
+      !f.path.startsWith('private/') &&
+      (!prefix || f.path.startsWith(prefix))
     )
     .map((f: { path: string }) => f.path)
 
