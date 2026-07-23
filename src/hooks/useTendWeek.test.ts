@@ -82,4 +82,20 @@ describe('useTendWeek', () => {
     act(() => result.current.done())
     expect(result.current.status).toBe('idle')
   })
+
+  it('month grain sends grain+monthEnd and filters regrades to week/season/someday', async () => {
+    invoke.mockResolvedValue({ data: { proposals: [
+      { kind: 'regrade', taskId: 'a', to: 'month', why: '' },   // not allowed at month grain
+      { kind: 'regrade', taskId: 'b', to: 'week', why: '' },
+    ] }, error: null })
+    const pool = [task('a', 'Alpha'), task('b', 'Beta')]
+    const { result } = renderHook(() => useTendWeek({ ...ARGS, pool, carryOver: [], grain: 'month', monthEndYmd: '2026-07-31' }))
+    act(() => result.current.start())
+    await waitFor(() => expect(result.current.aiLoading).toBe(false))
+    expect(invoke.mock.calls[0][1].body.grain).toBe('month')
+    expect(invoke.mock.calls[0][1].body.monthEnd).toBe('2026-07-31')
+    const regrades = result.current.proposals.filter((p) => p.kind === 'regrade')
+    expect(regrades).toHaveLength(1)
+    expect((regrades[0] as { to: string }).to).toBe('week')
+  })
 })

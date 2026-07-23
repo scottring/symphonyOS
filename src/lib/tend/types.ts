@@ -31,7 +31,7 @@ export interface TendPlace {
   taskIds: string[]
   /** Local calendar date, YYYY-MM-DD. */
   date: string
-  /** HH:MM 24h; defaults to 09:00 when absent. */
+  /** HH:MM 24h; absence means an all-day placement. */
   time?: string
   why: string
 }

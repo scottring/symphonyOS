@@ -19,6 +19,8 @@ export interface UseTendWeekArgs {
   todayYmd: string
   busy: { title: string; start: string; end: string }[]
   projectNameFor: (task: Task) => string | undefined
+  grain?: 'week' | 'month'
+  monthEndYmd?: string
 }
 
 export interface TendState {
@@ -58,7 +60,7 @@ export function useTendWeek(args: UseTendWeekArgs): TendState {
   // A sweep started then finished before the fn resolves must not resurrect cards.
   const sweepSeq = useRef(0)
 
-  const { pool, carryOver, weekStartYmd, todayYmd, busy, projectNameFor } = args
+  const { pool, carryOver, weekStartYmd, todayYmd, busy, projectNameFor, grain = 'week', monthEndYmd } = args
 
   const start = useCallback(() => {
     const seq = ++sweepSeq.current
@@ -82,7 +84,7 @@ export function useTendWeek(args: UseTendWeekArgs): TendState {
     }
 
     const now = Date.now()
-    const body = {
+    const body: Record<string, unknown> = {
       tasks: tasks.map((t) => ({
         id: t.id,
         title: t.title,
@@ -94,6 +96,10 @@ export function useTendWeek(args: UseTendWeekArgs): TendState {
       weekStart: weekStartYmd,
       today: todayYmd,
       busy,
+      grain,
+    }
+    if (grain === 'month' && monthEndYmd) {
+      body.monthEnd = monthEndYmd
     }
 
     void supabase.functions.invoke('tend-week', { body }).then(({ data, error }) => {
@@ -104,21 +110,31 @@ export function useTendWeek(args: UseTendWeekArgs): TendState {
         return
       }
       const validIds = new Set(tasks.map((t) => t.id))
-      // AI place proposals must land inside today..weekEnd (weekStart + 6 days) —
-      // never in the past, never past the week it's tending. LOCAL date parts
-      // only (never Date.parse/toISOString, which shift near midnight in
+      // AI place proposals and regrade filtering depend on grain. LOCAL date
+      // parts only (never Date.parse/toISOString, which shift near midnight in
       // negative-UTC-offset timezones).
-      const [wy, wm, wd] = weekStartYmd.split('-').map(Number)
-      const weekEnd = new Date(wy, wm - 1, wd + 6)
-      const maxYmd = localYmd(weekEnd)
-      const ai = parseTendProposals(data, validIds, { dateWindow: { minYmd: todayYmd, maxYmd } })
+      let dateWindowMax: string
+      let allowedRegrades: Set<'week' | 'month' | 'season' | 'someday'>
+      if (grain === 'month' && monthEndYmd) {
+        dateWindowMax = monthEndYmd
+        allowedRegrades = new Set(['week', 'season', 'someday'])
+      } else {
+        const [wy, wm, wd] = weekStartYmd.split('-').map(Number)
+        const weekEnd = new Date(wy, wm - 1, wd + 6)
+        dateWindowMax = localYmd(weekEnd)
+        allowedRegrades = new Set(['month', 'someday'])
+      }
+      const ai = parseTendProposals(data, validIds, {
+        dateWindow: { minYmd: todayYmd, maxYmd: dateWindowMax },
+        allowedRegrades,
+      })
       setProposals((current) => {
         const covered = new Set(current.flatMap((p) => touchedIds(p).map((id) => `${p.kind}:${id}`)))
         const fresh = ai.filter((p) => !touchedIds(p).some((id) => covered.has(`${p.kind}:${id}`)))
         return [...current, ...fresh]
       })
     })
-  }, [pool, carryOver, weekStartYmd, todayYmd, busy, projectNameFor])
+  }, [pool, carryOver, weekStartYmd, todayYmd, busy, projectNameFor, grain, monthEndYmd])
 
   const remove = useCallback((proposalId: string) => {
     setProposals((current) => current.filter((p) => p.id !== proposalId))
