@@ -132,8 +132,8 @@ export const SESSIONS: Record<PlanningHorizon, GuidedSessionConfig> = {
         props: { aboveBucket: 'quarter', aboveLabel: 'Your season picks' },
       },
       {
-        id: 'month-ahead', type: 'calendar', title: "What's already claimed",
-        narration: 'Before you write anything, scan the month\'s calendar and ask one question: what is already claimed? Trips, deadlines, the weeks that are spoken for. The open space that remains is what you are actually planning.',
+        id: 'month-ahead', type: 'calendar', title: "What’s already claimed",
+        narration: 'Before you write anything, scan the month’s calendar and ask one question: what is already claimed? Trips, deadlines, the weeks that are spoken for. The open space that remains is what you are actually planning.',
       },
       {
         id: 'look-within', type: 'reflect', title: 'Look within',
@@ -152,20 +152,20 @@ export const SESSIONS: Record<PlanningHorizon, GuidedSessionConfig> = {
       },
       {
         id: 'projects-in-motion', type: 'projects', title: 'Projects in motion',
-        narration: "Your projects in motion, for reference. A month moves a project one concrete chunk at a time — an order placed, a call made, a decision written down. Let these suggest month-sized moves for the list you're about to write.",
+        narration: "Your projects in motion, for reference. A month moves a project one concrete chunk at a time — an order placed, a call made, a decision written down. Let these suggest month-sized moves for the list you’re about to write.",
       },
       {
-        id: 'write-month', type: 'write-list', title: "Write the month's list",
-        narration: "Write the month's list. Keep it honest — and build the fun on purpose: one big experience, a few social things, maybe a themed quest. A month with nothing to look forward to is a scheduling failure.",
+        id: 'write-month', type: 'write-list', title: "Write the month’s list",
+        narration: "Write the month’s list. Keep it honest — and build the fun on purpose: one big experience, a few social things, maybe a themed quest. A month with nothing to look forward to is a scheduling failure.",
         props: { bucket: 'month', rows: 'plain', funComposition: true },
       },
       {
         id: 'maintenance', type: 'maintenance', title: 'The upkeep sweep',
-        narration: 'Last sweep: the quiet upkeep that keeps the month from ambushing you — the budget, the paperwork, the pile you have been ignoring. Pull this month\'s picks onto the list. Small, boring, load-bearing.',
+        narration: 'Last sweep: the quiet upkeep that keeps the month from ambushing you — the budget, the paperwork, the pile you have been ignoring. Pull this month’s picks onto the list. Small, boring, load-bearing.',
       },
       {
         id: 'book-next', type: 'book-next', title: 'Anchor the next step',
-        narration: "Book next month's session before you close. First weekend of the month works well.",
+        narration: "Book next month’s session before you close. First weekend of the month works well.",
         props: { bookHorizon: 'monthly', bookTitle: 'Monthly planning session' },
       },
     ],
