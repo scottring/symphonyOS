@@ -625,6 +625,7 @@ export function PlanningSession({
           onDragStart={handleDragStart}
           onDragOver={handleDragOver}
           onDragEnd={handleDragEnd}
+          onDragCancel={() => setActiveId(null)}
         >
           {shelf ? (
             /* Full-width pool lane above the grid — shelf mode replaces the drawer */
@@ -662,7 +663,7 @@ export function PlanningSession({
                 dayEndHour={DAY_END_HOUR}
                 slotDuration={SLOT_DURATION}
                 onOpenDay={onOpenDay}
-                onSlotClick={handleSlotClick}
+                onSlotClick={onCreateTaskAt ? handleSlotClick : undefined}
               />
             </div>
           ) : (
@@ -678,7 +679,7 @@ export function PlanningSession({
               dayEndHour={DAY_END_HOUR}
               slotDuration={SLOT_DURATION}
               onOpenDay={onOpenDay}
-              onSlotClick={handleSlotClick}
+              onSlotClick={onCreateTaskAt ? handleSlotClick : undefined}
             />
           )}
 
