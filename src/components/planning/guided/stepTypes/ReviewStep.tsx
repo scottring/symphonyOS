@@ -13,9 +13,50 @@ import { selectOverdue } from '@/lib/today/taskPools'
 import type { Task } from '@/types/task'
 import { useGuided } from '../GuidedContext'
 
-export function TaskTriageRow({ task }: { task: Task }) {
+export function TaskTriageRow({ task, onCelebrated }: { task: Task; onCelebrated?: (id: string) => void }) {
   const { host } = useGuided()
   const project = task.projectId ? host.projectsMap.get(task.projectId) : undefined
+  // Completing is one click; the note is an optional field that appears on the
+  // now-done row. Pre-fill with any existing notes so the field never silently
+  // clobbers what was already there. onCelebrated keeps the row on screen after
+  // completion (the pool otherwise drops completed items mid-step).
+  const [done, setDone] = useState(false)
+  const [note, setNote] = useState(task.notes ?? '')
+
+  const complete = () => {
+    setDone(true)
+    onCelebrated?.(task.id)
+    host.onCompleteTask(task.id)
+  }
+  const saveNote = () => {
+    const next = note.trim()
+    if (next !== (task.notes ?? '')) host.onUpdateTask(task.id, { notes: next || undefined })
+  }
+
+  if (done) {
+    return (
+      <li className="flex flex-col gap-1.5 rounded-xl border border-primary-100 bg-primary-50/40 px-3 py-2">
+        <div className="flex items-start gap-2">
+          <Check className="w-3.5 h-3.5 text-primary-600 shrink-0 mt-0.5" strokeWidth={3} />
+          <span className="flex-1 min-w-[10rem] text-sm text-neutral-500 line-through leading-snug">
+            {task.title}
+            {project && <span className="text-xs text-neutral-400 whitespace-nowrap"> · {project.name}</span>}
+          </span>
+          <span className="text-xs font-medium text-primary-700 shrink-0">Done</span>
+        </div>
+        <input
+          type="text" value={note} autoFocus
+          aria-label="Add a note"
+          placeholder="Add a note (optional)…"
+          onChange={(e) => setNote(e.target.value)}
+          onBlur={saveNote}
+          onKeyDown={(e) => { if (e.key === 'Enter') { saveNote(); e.currentTarget.blur() } }}
+          className="ml-5 text-sm text-neutral-700 bg-transparent border-b border-primary-200 focus:border-primary-400 focus:outline-none placeholder:text-neutral-400"
+        />
+      </li>
+    )
+  }
+
   return (
     <li className="flex items-start gap-2 rounded-xl border border-neutral-100 bg-white px-3 py-2">
       <span className="flex-1 min-w-[10rem] text-sm text-neutral-800 leading-snug">
@@ -25,7 +66,7 @@ export function TaskTriageRow({ task }: { task: Task }) {
       <TriageWhenMenu
         onPick={(when) => applyTriageWhen(when, task.id, { onPushTask: host.onPushTask, onSetBucket: host.onSetBucket })}
         onPickDate={(date) => host.onPushTask(task.id, date)}
-        onComplete={() => host.onCompleteTask(task.id)}
+        onComplete={complete}
       />
     </li>
   )
@@ -240,5 +281,12 @@ export function ReviewStep() {
       </ul>
     )
   }
-  return <ul className="space-y-2">{pool.map((t) => <TaskTriageRow key={t.id} task={t} />)}</ul>
+  return (
+    <ul className="space-y-2">
+      {pool.map((t) => (
+        <TaskTriageRow key={t.id} task={t}
+          onCelebrated={(id) => setCelebratedIds((prev) => new Set(prev).add(id))} />
+      ))}
+    </ul>
+  )
 }

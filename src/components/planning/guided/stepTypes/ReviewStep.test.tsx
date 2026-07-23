@@ -29,6 +29,33 @@ describe('ReviewStep — bucket source', () => {
     expect(host.onCompleteTask).toHaveBeenCalledWith('a')
   })
 
+  it('reveals an optional note field on the row after it is completed, and stays visible', () => {
+    const host = makeHost({ tasks: [task({ id: 'a', title: 'Order dishwasher', bucket: 'month' })] })
+    renderStep(<ReviewStep />, { step: bucketStep, host })
+    fireEvent.click(screen.getByRole('button', { name: 'Mark done' }))
+    // Row remains (marked done) instead of vanishing, with a note field.
+    expect(screen.getByText('Order dishwasher')).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Add a note' })).toBeInTheDocument()
+  })
+
+  it('saves a completion note to the task notes field', () => {
+    const host = makeHost({ tasks: [task({ id: 'a', title: 'Order dishwasher', bucket: 'month' })] })
+    renderStep(<ReviewStep />, { step: bucketStep, host })
+    fireEvent.click(screen.getByRole('button', { name: 'Mark done' }))
+    const noteInput = screen.getByRole('textbox', { name: 'Add a note' })
+    fireEvent.change(noteInput, { target: { value: 'Picked the Bosch 800 series' } })
+    fireEvent.blur(noteInput)
+    expect(host.onUpdateTask).toHaveBeenCalledWith('a', { notes: 'Picked the Bosch 800 series' })
+  })
+
+  it('does not write notes when the field is left empty', () => {
+    const host = makeHost({ tasks: [task({ id: 'a', title: 'Order dishwasher', bucket: 'month' })] })
+    renderStep(<ReviewStep />, { step: bucketStep, host })
+    fireEvent.click(screen.getByRole('button', { name: 'Mark done' }))
+    fireEvent.blur(screen.getByRole('textbox', { name: 'Add a note' }))
+    expect(host.onUpdateTask).not.toHaveBeenCalled()
+  })
+
   it('shows the empty state when the bucket is clear', () => {
     renderStep(<ReviewStep />, { step: bucketStep })
     expect(screen.getByText(/Nothing left open/)).toBeInTheDocument()
