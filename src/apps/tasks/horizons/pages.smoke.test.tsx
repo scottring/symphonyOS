@@ -148,6 +148,24 @@ describe('horizon pages (smoke)', () => {
     expect(screen.getByText(/0 placed, 0 to place/)).toBeInTheDocument()
   })
 
+  it('MonthPage renders one surface — shelf, no list sections', () => {
+    render(<MonthPage />)
+    expect(screen.queryByText(/^Carried over/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/^Placed this week/)).not.toBeInTheDocument()
+    // The shelf is the only pool surface:
+    expect(screen.getByRole('button', { name: /tend/i })).toBeInTheDocument()
+  })
+
+  it('a bucket-month task renders exactly once — shelf pill, not also in a rail/list', () => {
+    mockTasks.push(createMockTask({
+      id: 'month-task',
+      title: 'Order flowers for the reception',
+      bucket: 'month',
+    }) satisfies Task)
+    render(<MonthPage />)
+    expect(screen.getAllByText('Order flowers for the reception')).toHaveLength(1)
+  })
+
   it("SeasonPage renders the season's picks panel", () => {
     render(<SeasonPage />)
     expect(screen.getByText("The season's picks")).toBeInTheDocument()

@@ -51,6 +51,9 @@ export interface PlanningShelfProps {
   /** Config for the ⋯ menu's demote item. Month page passes
    *  { label: 'To week', bucket: 'week' }. */
   moveDown?: { label: string; bucket: 'week' | 'month' }
+  /** The add-pill's placeholder — speaks the host page's grain (week vs
+   *  month). Defaults to the week page's copy. */
+  draftPlaceholder?: string
 }
 
 const DEFAULT_MOVE_DOWN = { label: 'To month', bucket: 'month' as const }
@@ -252,6 +255,7 @@ export function PlanningShelf(props: PlanningShelfProps) {
     tasks, carryOverIds, projectsMap, tasksById, onOpenTask, onSetBucket, onDeleteTask, onPushTask,
     draft, onDraftChange, onSubmitDraft, hiddenCount = 0, showingAll = false, onToggleShowAll,
     tend, onApplyProposal, dragMode = 'dndkit', onNativeUnschedule, moveDown = DEFAULT_MOVE_DOWN,
+    draftPlaceholder = 'Add to this week…',
   } = props
   const [expanded, setExpanded] = useState(false)
 
@@ -380,7 +384,7 @@ export function PlanningShelf(props: PlanningShelfProps) {
               onKeyDown={(e) => { if (e.key === 'Enter') onSubmitDraft() }}
               onPointerDown={(e) => e.stopPropagation()}
               onMouseDown={(e) => e.stopPropagation()}
-              placeholder="Add to this week…"
+              placeholder={draftPlaceholder}
               className="w-36 bg-transparent text-sm placeholder:text-neutral-400 focus:outline-none" />
           </span>
           {ordered.length === 0 && (

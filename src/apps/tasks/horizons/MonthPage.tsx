@@ -1,21 +1,26 @@
 // src/apps/tasks/horizons/MonthPage.tsx
 //
-// Month: a real calendar grid (big rocks placed on actual days) plus the
-// month's own pool, grouped by project, with the season's picks folded in for
-// reference.
-//
-// Extracted verbatim from the former HorizonView.tsx common return branch
-// (mechanical split — no behavior change; horizon fixed to 'month').
+// Month: ONE surface — the shelf (unplaced pool, Tend-able) above a real
+// calendar grid (big rocks placed on actual days), with the season's picks
+// folded in for reference below. A task lives on a day or on the shelf,
+// never both, never listed again elsewhere on the page (no carried-over
+// section, no project-grouped lists — those all collapsed into the shelf,
+// mirroring WeekPage's one-surface shape).
 
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { PAGE_COLUMN } from '@/components/layout/pageLayout';
 import { MonthCalendarGrid } from '@/components/planning/horizon/MonthCalendarGrid';
-import { CalendarRange, Plus, ChevronRight, FolderOpen } from 'lucide-react';
+import { PlanningShelf } from '@/components/planning/PlanningShelf';
+import { CalendarRange } from 'lucide-react';
 import { ScheduleActionsProvider } from '@/contexts/ScheduleActionsContext';
 import { UndoToast } from '@/components/undo/UndoToast';
 import { HorizonExplainer } from '@/components/planning/explainers/HorizonExplainer';
 import { servingCount } from '@/lib/planning/betPulse';
 import { readCadenceConfig } from '@/lib/cadence/config';
+import { useTendWeek } from '@/hooks/useTendWeek';
+import { applyProposal } from '@/lib/tend/applyProposal';
+import type { TendProposal } from '@/lib/tend/types';
+import type { Task } from '@/types/task';
 import { CascadeRail, useHorizonPageData } from './shared';
 
 // LOCAL date parts, never toISOString() — UTC would shift the date near
@@ -31,12 +36,14 @@ function localYmd(d: Date): string {
 export function MonthPage() {
   const horizon = 'month' as const;
   const {
-    navigate, updateTask, handleSelect, domainTasks, domainEvents, viewedDate,
-    railCounts, period, placedThisWeek, carryOver, pool, match,
-    planDisabled, handlePlan, rungName, isCascadeRung, hasExplainer,
-    explainerOpen, setExplainerOpen, label, grouped, renderRow,
-    horizonBucket, draft, setDraft, submitDraft,
+    navigate, updateTask, domainTasks, domainEvents, viewedDate,
+    railCounts, period, pool, match,
+    planDisabled, handlePlan, rungName, hasExplainer,
+    explainerOpen, setExplainerOpen, label,
+    draft, setDraft, submitDraft,
     scheduleActionsValue, undo, referenceFold,
+    setBucket, deleteTaskWithUndo, projectsMap, tasksById,
+    addTask, deleteTask, pushTask, todayStart,
   } = useHorizonPageData(horizon);
 
   // Placed-this-month count for the masthead subtitle — no existing selector
@@ -55,44 +62,111 @@ export function MonthPage() {
     }).length;
   }, [domainTasks, match, viewedDate]);
 
+  // Month-grain Tend window — the first and last day of the viewed month,
+  // computed from LOCAL date parts (never Date.parse), same convention as
+  // the rest of this page's date math.
+  const monthStartYmd = useMemo(
+    () => localYmd(new Date(viewedDate.getFullYear(), viewedDate.getMonth(), 1)),
+    [viewedDate],
+  );
+  const monthEndYmd = useMemo(
+    () => localYmd(new Date(viewedDate.getFullYear(), viewedDate.getMonth() + 1, 0)),
+    [viewedDate],
+  );
+
+  const busy = useMemo(() => domainEvents
+    .map((e) => ({
+      title: e.title ?? 'busy',
+      start: e.start_time ?? e.startTime ?? '',
+      end: e.end_time ?? e.endTime ?? '',
+    }))
+    .filter((b) => b.start && b.end), [domainEvents]);
+
+  // `weekStartYmd` stays required by the args type but is unused at month
+  // grain — the tend window uses `monthEndYmd` instead; the first of the
+  // viewed month is passed to satisfy the type.
+  const tend = useTendWeek({
+    pool, carryOver: [], grain: 'month', monthEndYmd,
+    weekStartYmd: monthStartYmd,
+    todayYmd: localYmd(todayStart),
+    busy,
+    projectNameFor: (t) => (t.projectId ? projectsMap.get(t.projectId)?.name : undefined),
+  });
+
+  // Every apply is undoable (spec). Bucket-moving kinds capture prior
+  // bucket/scheduledFor here and restore them via one setBucket call each.
+  //
+  // Merge is handled entirely here, NOT via applyProposal + deleteTaskWithUndo:
+  // deleteTaskWithUndo (handleLetGo) pushes its OWN undo action into the
+  // single-slot undo store on every call, so dropping N≥2 duplicates would
+  // push N undo actions and only the last (most recent) survives — the rest
+  // are silently unrecoverable. Instead: snapshot every dropped task from
+  // tasksById before deleting, delete each via the RAW deleteTask (no
+  // per-call undo), then push exactly ONE undo action that recreates every
+  // snapshot. Restore fields mirror handleLetGo's recreate-body exactly.
+  const handleApplyProposal = useCallback((p: TendProposal) => {
+    if (p.kind === 'merge') {
+      const dropTasks = p.dropIds
+        .map((id) => tasksById.get(id))
+        .filter((t): t is Task => !!t);
+      undo.pushAction('Merged duplicates', () => {
+        for (const t of dropTasks) {
+          void addTask(t.title, t.contactId, t.projectId, t.scheduledFor, {
+            bucket: t.bucket,
+            context: t.context ?? undefined,
+            assignedTo: t.assignedTo ?? null,
+            assignedToAll: t.assignedToAll,
+            goalId: t.goalId,
+            sourceId: t.sourceId,
+            phoneNumber: t.phoneNumber,
+            isFun: t.isFun,
+          });
+        }
+      });
+      for (const t of dropTasks) deleteTask(t.id);
+      return;
+    }
+    const ids = p.kind === 'place' ? p.taskIds : [p.taskId];
+    const prior = ids
+      .map((id) => tasksById.get(id))
+      .filter((t): t is Task => !!t)
+      .map((t) => ({ id: t.id, bucket: t.bucket ?? 'month', scheduledFor: t.scheduledFor, isAllDay: t.isAllDay }));
+    const proposalLabel = p.kind === 'put_aside' ? 'Put aside' : p.kind === 'regrade' ? `Moved to ${p.to}` : 'Placed';
+    undo.pushAction(`${proposalLabel} · Tend`, () => {
+      for (const t of prior) setBucket(t.id, t.bucket, t.scheduledFor ? new Date(t.scheduledFor) : undefined, t.isAllDay);
+    });
+    applyProposal(p, { setBucket, deleteTask: deleteTaskWithUndo });
+  }, [setBucket, deleteTaskWithUndo, deleteTask, addTask, tasksById, undo]);
+
   return (
     <ScheduleActionsProvider value={scheduleActionsValue}>
       <div className="h-full overflow-y-auto">
         <div className={PAGE_COLUMN}>
-          <header className="mb-4 flex items-start justify-between gap-4 flex-wrap">
+          <header className="mb-3 flex items-start justify-between gap-4 flex-wrap">
             <div>
               <h1 className="font-display text-3xl font-semibold tracking-tight text-neutral-800">{label}</h1>
               <p className="mt-1 text-sm text-neutral-500">
                 {period ?? label} · {monthPlacedCount} placed, {pool.length} to place
               </p>
             </div>
-            <div className="shrink-0 flex items-center gap-2">
-              {!planDisabled && (
-                <button
-                  type="button"
-                  onClick={handlePlan}
-                  title={`Plan the ${rungName}`}
-                  className="inline-flex items-center gap-2 text-sm font-medium px-3 py-2 rounded-lg transition-colors text-primary-700 bg-primary-50 hover:bg-primary-100"
-                >
-                  <CalendarRange className="w-4 h-4" />
-                  Plan the {rungName}
-                </button>
-              )}
-              {hasExplainer && (
-                <button type="button" onClick={() => setExplainerOpen(true)}
-                  className="text-[12px] text-neutral-400 hover:text-primary-700 transition-colors">
-                  What is this level?
-                </button>
-              )}
+            <div className="shrink-0 flex flex-col items-end gap-1.5">
+              <CascadeRail current={horizon} counts={railCounts} onGo={(h) => navigate(`/${h}`)} />
+              <div className="flex items-center gap-3">
+                {!planDisabled && (
+                  <button type="button" onClick={handlePlan} title={`Plan the ${rungName}`}
+                    className="inline-flex items-center gap-1.5 text-xs font-medium text-primary-700 hover:text-primary-800 transition-colors">
+                    <CalendarRange className="w-3.5 h-3.5" /> Plan the {rungName}
+                  </button>
+                )}
+                {hasExplainer && (
+                  <button type="button" onClick={() => setExplainerOpen(true)}
+                    className="text-[12px] text-neutral-400 hover:text-primary-700 transition-colors">
+                    What is this level?
+                  </button>
+                )}
+              </div>
             </div>
           </header>
-
-          {/* The cascade rail — where this rung sits in the year → today flow. */}
-          {isCascadeRung && (
-            <div className="mb-8">
-              <CascadeRail current={horizon} counts={railCounts} onGo={(h) => navigate(`/${h}`)} />
-            </div>
-          )}
 
           {/* Month identity line — framing for moves (concrete chunks) */}
           <p className="mb-3 text-[12px] text-neutral-400">
@@ -100,17 +174,44 @@ export function MonthPage() {
             {(() => { const s = servingCount(domainTasks); return s.total > 0 ? ` Serving ${s.serving} of ${s.total} picks.` : ''; })()}
           </p>
 
+          {/* One surface: shelf above, month grid below. A task is on a day
+              or on the shelf — never both, never listed again elsewhere. */}
+          <div className="mb-6">
+            <PlanningShelf
+              dragMode="native"
+              tasks={pool}
+              carryOverIds={new Set()}
+              projectsMap={projectsMap}
+              tasksById={tasksById}
+              onOpenTask={(id) => scheduleActionsValue.onOpenTask?.(id)}
+              onSetBucket={(id, bucket) => setBucket(id, bucket)}
+              onDeleteTask={deleteTaskWithUndo}
+              onPushTask={pushTask}
+              onNativeUnschedule={(id) => updateTask(id, { bucket: 'month', scheduledFor: undefined })}
+              moveDown={{ label: 'To week', bucket: 'week' }}
+              draft={draft}
+              onDraftChange={setDraft}
+              onSubmitDraft={() => void submitDraft()}
+              draftPlaceholder="Add a chunk to this month — an order placed, a call made…"
+              tend={tend}
+              onApplyProposal={handleApplyProposal}
+            />
+          </div>
+
           {/* Month as a real calendar grid — the month's big rocks placed on
-              actual days (the first of the per-horizon calendar views). */}
+              actual days (the first of the per-horizon calendar views). The
+              shelf above takes the rail's role (hideRail), so a rock is
+              never rendered twice. */}
           <div className="mb-8">
             <MonthCalendarGrid
               month={viewedDate}
               tasks={domainTasks}
               events={domainEvents}
               weekStartsOn={readCadenceConfig().weekStartsOn}
+              hideRail
               onPlaceTask={(id, day) => updateTask(id, { bucket: 'timed', scheduledFor: day })}
               onUnscheduleTask={(id) => updateTask(id, { bucket: 'month', scheduledFor: undefined })}
-              onSelectTask={handleSelect}
+              onSelectTask={(id) => scheduleActionsValue.onOpenTask?.(id)}
               onOpenWeek={(d) => navigate(`/week?start=${localYmd(d)}`)}
             />
           </div>
@@ -122,115 +223,6 @@ export function MonthPage() {
               list (the original stays where it lives, so the upper list is
               intact for its own review); lines already here show a check. */}
           {referenceFold}
-
-          {/* Carry-over — calm "carried over" framing (week only). */}
-          {carryOver.length > 0 && (
-            <section className="mb-6">
-              <h2 className="font-display text-sm tracking-wide text-neutral-400 uppercase mb-3">
-                Carried over ({carryOver.length})
-              </h2>
-              <div className="space-y-2">{carryOver.map(renderRow)}</div>
-            </section>
-          )}
-
-          {/* Placed this week — rocks already on a day (bucket 'timed' inside
-              the week). Scheduling drains the week pool, so without this a
-              fully-placed plan reads as an empty week (week-boundary spec). */}
-          {placedThisWeek.length > 0 && (
-            <section className="mb-6">
-              <h2 className="font-display text-sm tracking-wide text-neutral-400 uppercase mb-3">
-                Placed this week ({placedThisWeek.length})
-              </h2>
-              <div className="space-y-2">{placedThisWeek.map(renderRow)}</div>
-            </section>
-          )}
-
-          {/* Projects in motion — the pool grouped by project, loose tasks after. */}
-          {grouped.groups.map(({ project, items }) => (
-            <section key={project.id} className="mb-6">
-              <button
-                type="button"
-                onClick={() => navigate(`/projects/${project.id}`)}
-                className="group flex items-center gap-2 mb-3"
-              >
-                <FolderOpen className="w-3.5 h-3.5 text-neutral-400" />
-                <h2 className="font-display text-sm tracking-wide text-neutral-500 uppercase group-hover:text-primary-700 transition-colors">
-                  {project.name}
-                </h2>
-                <span className="text-xs text-neutral-400">({items.length})</span>
-                <ChevronRight className="w-3.5 h-3.5 text-neutral-300 group-hover:text-primary-500 transition-colors" />
-              </button>
-              <div className="space-y-2">{items.map(renderRow)}</div>
-            </section>
-          ))}
-
-          {/* The rest of the pool (loose tasks), or the empty invitation. */}
-          <section>
-            {(grouped.loose.length > 0 || pool.length === 0) && (
-              <h2 className="font-display text-sm tracking-wide text-neutral-400 uppercase mb-3">
-                {grouped.groups.length > 0 ? `More in ${rungName}` : label} ({grouped.groups.length > 0 ? grouped.loose.length : pool.length})
-              </h2>
-            )}
-            {pool.length === 0 && placedThisWeek.length > 0 ? (
-              // Every rock is placed on a day — that's a planned week, not an
-              // empty one. No invitation needed; the placed section above
-              // carries the page.
-              <p className="text-center py-4 text-sm text-neutral-400">
-                Everything on the {rungName} list is placed on a day.
-              </p>
-            ) : pool.length === 0 ? (
-              <div className="text-center py-10 text-neutral-400">
-                <p className="font-display text-lg text-neutral-600 mb-1">
-                  {period ? `Nothing planned for ${period.split(' ')[0]} yet` : `Nothing in ${label.toLowerCase()}`}
-                </p>
-                <p className="text-sm mb-4">
-                  {planDisabled
-                    ? 'Park timeless ideas here — they surface in seasonal planning.'
-                    : 'Plan it together, pull items down the cascade, or add one below.'}
-                </p>
-                {!planDisabled && (
-                  <button
-                    type="button"
-                    onClick={handlePlan}
-                    className="btn-primary inline-flex items-center gap-2"
-                  >
-                    <CalendarRange className="w-4 h-4" /> Plan the {rungName}
-                  </button>
-                )}
-              </div>
-            ) : (
-              <div className="space-y-2">{grouped.loose.map(renderRow)}</div>
-            )}
-
-            {/* Add directly into this horizon's pool. The placeholder speaks
-                the level's grain (outcome / chunk / task) — the input is where
-                the grain gauge either holds or leaks. */}
-            {horizonBucket && (
-              <div className="mt-3 flex items-center gap-2 px-2 py-1.5 rounded-xl border border-neutral-200 bg-white focus-within:border-primary-400 transition-colors">
-                <button
-                  type="button"
-                  onClick={() => void submitDraft()}
-                  aria-label="Add task"
-                  className="shrink-0 w-6 h-6 rounded-full bg-primary-600 text-white grid place-items-center hover:bg-primary-700 transition-colors"
-                >
-                  <Plus className="w-4 h-4" />
-                </button>
-                <input
-                  type="text"
-                  value={draft}
-                  onChange={(e) => setDraft(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter') void submitDraft() }}
-                  placeholder={
-                    horizonBucket === 'quarter' ? 'Add an outcome for this season — finishable by its end…'
-                    : horizonBucket === 'month' ? 'Add a chunk to this month — an order placed, a call made…'
-                    : horizonBucket === 'someday' ? 'Park an idea on Someday — no timeline attached…'
-                    : `Add a task to ${label.toLowerCase()}…`
-                  }
-                  className="flex-1 min-w-0 text-sm bg-transparent placeholder:text-neutral-400 focus:outline-none"
-                />
-              </div>
-            )}
-          </section>
         </div>
         <HorizonExplainer horizon={horizon} open={explainerOpen} onClose={() => setExplainerOpen(false)} />
         <UndoToast action={undo.currentAction} onUndo={undo.executeUndo} onDismiss={undo.dismiss} />
