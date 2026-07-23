@@ -5,7 +5,7 @@
 // (daily look-back), or 'goals' (annual goal review). Task rows reuse the
 // canonical TriageWhenMenu; goal rows get Carry forward / Achieved / Let go.
 import { useMemo, useState } from 'react'
-import { Check, Archive, Sparkles, ArrowRight, Pencil } from 'lucide-react'
+import { Check, Archive, Sparkles, ArrowRight, Pencil, Undo2 } from 'lucide-react'
 import { TriageWhenMenu } from '@/components/schedule/TriageWhenMenu'
 import { applyTriageWhen } from '@/lib/triage/applyWhen'
 import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
@@ -265,9 +265,18 @@ export function ReviewStep() {
             <li key={t.id} className="flex items-start gap-2 rounded-xl border border-neutral-100 bg-white px-3 py-2">
               <span className="flex-1 min-w-[10rem] text-sm text-neutral-800 leading-snug">{t.title}</span>
               {moved ? (
-                <span className="shrink-0 inline-flex items-center gap-1 text-xs text-primary-700">
-                  <Check className="w-3 h-3" strokeWidth={3} /> in this season
-                </span>
+                <button type="button"
+                  onClick={() => {
+                    setMovedIds((prev) => { const next = new Set(prev); next.delete(t.id); return next })
+                    host.onSetBucket(t.id, 'someday')
+                  }}
+                  title="Move back to someday"
+                  className="group shrink-0 inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md text-primary-700 hover:text-neutral-500 hover:bg-neutral-100 transition-colors">
+                  <Check className="w-3 h-3 group-hover:hidden" strokeWidth={3} />
+                  <Undo2 className="w-3 h-3 hidden group-hover:inline" />
+                  <span className="group-hover:hidden">in this season</span>
+                  <span className="hidden group-hover:inline">Move back to someday</span>
+                </button>
               ) : (
                 <button type="button"
                   onClick={() => { setMovedIds((prev) => new Set(prev).add(t.id)); host.onSetBucket(t.id, 'quarter') }}
