@@ -115,25 +115,25 @@ export const SESSIONS: Record<PlanningHorizon, GuidedSessionConfig> = {
     steps: [
       {
         id: 'welcome', type: 'narration', title: 'A clean slate',
-        narration: 'This is your monthly planning session — a clean slate, twelve times a year. Twenty minutes to close last month, look at the season, and write a short list for the next four weeks.',
+        narration: 'This is your monthly planning session — a clean slate, twelve times a year. One arc, about twenty minutes: celebrate what happened, migrate what is unfinished, scan what is already claimed, check in with yourself, then write the month — its moves, its fun, and the upkeep that keeps life running.',
       },
       {
-        id: 'month-review', type: 'review', title: "Last month’s list",
-        narration: "Here is what is still open from the month’s list. Mark off what actually happened — more got done than you think. Carry forward what still matters. Let go of what doesn’t; a shorter list you believe is worth more than a long one you ignore.",
+        id: 'wins', type: 'wins', title: 'Start with the wins',
+        narration: 'Start with what actually happened. These are the moves you closed this month — read them slowly and take the credit. Most months hold more than you remember, and the review works better when it starts from evidence instead of guilt.',
+      },
+      {
+        id: 'month-review', type: 'review', title: 'Migrate or release',
+        narration: 'Now the honest half. Here is what is still open from the month. For each item, migrate it or release it: carry it forward only if you would write it again today, park it on Someday if the timing is wrong, or let it go. A shorter list you believe is worth more than a long one you ignore.',
         props: { bucket: 'month' },
       },
       {
-        id: 'projects-in-motion', type: 'projects', title: 'Projects in motion',
-        narration: "Your projects in motion, for reference. A month moves a project one concrete chunk at a time — an order placed, a call made, a decision written down. Let these suggest month-sized moves for the list you’re about to write.",
+        id: 'look-at-season', type: 'look-above', title: 'Check the season',
+        narration: 'Step up to the season for a moment. These are your picks — notice which ones are moving and which have a month-sized next step waiting. Copy a line down if this is its month; the original stays on the season list.',
+        props: { aboveBucket: 'quarter', aboveLabel: 'Your season picks' },
       },
       {
-        id: 'write-month', type: 'write-list', title: "Write the month’s list",
-        narration: "Write the month’s list. Keep it honest — and put at least one thing on it that exists purely because it will be fun. A month with nothing to look forward to is a scheduling failure.",
-        props: { bucket: 'month', rows: 'plain' },
-      },
-      {
-        id: 'month-ahead', type: 'calendar', title: 'The month ahead',
-        narration: 'Scan the next four to five weeks. The calendar is fairly solid at this range — look for conflicts, trips, and the weeks that are already full, and plan around them instead of colliding with them.',
+        id: 'month-ahead', type: 'calendar', title: "What's already claimed",
+        narration: 'Before you write anything, scan the month\'s calendar and ask one question: what is already claimed? Trips, deadlines, the weeks that are spoken for. The open space that remains is what you are actually planning.',
       },
       {
         id: 'look-within', type: 'reflect', title: 'Look within',
@@ -151,13 +151,21 @@ export const SESSIONS: Record<PlanningHorizon, GuidedSessionConfig> = {
         },
       },
       {
-        id: 'look-at-season', type: 'look-above', title: 'Your season list',
-        narration: "This is your season list, for reference. Watch how the big items naturally suggest month-sized moves — renovate the kitchen becomes order the dishwasher. Copy a line down if you want it in front of you this month; the original stays on the season list.",
-        props: { aboveBucket: 'quarter', aboveLabel: 'Your season list' },
+        id: 'projects-in-motion', type: 'projects', title: 'Projects in motion',
+        narration: "Your projects in motion, for reference. A month moves a project one concrete chunk at a time — an order placed, a call made, a decision written down. Let these suggest month-sized moves for the list you're about to write.",
+      },
+      {
+        id: 'write-month', type: 'write-list', title: "Write the month's list",
+        narration: "Write the month's list. Keep it honest — and build the fun on purpose: one big experience, a few social things, maybe a themed quest. A month with nothing to look forward to is a scheduling failure.",
+        props: { bucket: 'month', rows: 'plain', funComposition: true },
+      },
+      {
+        id: 'maintenance', type: 'maintenance', title: 'The upkeep sweep',
+        narration: 'Last sweep: the quiet upkeep that keeps the month from ambushing you — the budget, the paperwork, the pile you have been ignoring. Pull this month\'s picks onto the list. Small, boring, load-bearing.',
       },
       {
         id: 'book-next', type: 'book-next', title: 'Anchor the next step',
-        narration: "Book next month’s session before you close. First weekend of the month works well.",
+        narration: "Book next month's session before you close. First weekend of the month works well.",
         props: { bookHorizon: 'monthly', bookTitle: 'Monthly planning session' },
       },
     ],

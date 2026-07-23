@@ -6,6 +6,7 @@ import type { StepType } from './types'
 const KNOWN_TYPES: StepType[] = [
   'narration', 'reflect', 'review', 'look-above', 'projects', 'calendar',
   'write-list', 'inbox', 'schedule-grid', 'domains-goals', 'book-next',
+  'wins', 'maintenance',
 ]
 
 describe('guided session configs', () => {
@@ -39,5 +40,14 @@ describe('guided session configs', () => {
 
   it('daily is light: at most 4 steps', () => {
     expect(SESSIONS.daily.steps.length).toBeLessThanOrEqual(4)
+  })
+
+  it('monthly follows the Best Laid Plans arc', () => {
+    expect(SESSIONS.monthly.steps.map((s) => s.id)).toEqual([
+      'welcome', 'wins', 'month-review', 'look-at-season', 'month-ahead',
+      'look-within', 'projects-in-motion', 'write-month', 'maintenance', 'book-next',
+    ])
+    const write = SESSIONS.monthly.steps.find((s) => s.id === 'write-month')
+    expect(write?.props?.funComposition).toBe(true)
   })
 })
