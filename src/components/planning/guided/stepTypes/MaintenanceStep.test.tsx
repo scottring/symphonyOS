@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect } from 'vitest'
 import { screen, fireEvent, waitFor } from '@testing-library/react'
 import { MaintenanceStep } from './MaintenanceStep'
 import { renderStep, makeHost } from './testHarness'
