@@ -13,6 +13,7 @@ import { ScheduleGridStep } from './ScheduleGridStep'
 import { DomainsGoalsStep } from './DomainsGoalsStep'
 import { BookNextStep } from './BookNextStep'
 import { WinsStep } from './WinsStep'
+import { MaintenanceStep } from './MaintenanceStep'
 
 registerStepType('narration', NarrationStep)
 registerStepType('reflect', ReflectStep)
@@ -26,3 +27,4 @@ registerStepType('schedule-grid', ScheduleGridStep)
 registerStepType('domains-goals', DomainsGoalsStep)
 registerStepType('book-next', BookNextStep)
 registerStepType('wins', WinsStep)
+registerStepType('maintenance', MaintenanceStep)
