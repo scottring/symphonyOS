@@ -83,6 +83,16 @@ describe('useUpkeepList', () => {
     expect(result.current.upkeepItems.length).toBe(UPKEEP_SEED_ITEMS.length)
   })
 
+  it('ensureUpkeepList adopts a list that appeared since load instead of inserting', async () => {
+    const { result } = renderHook(() => useUpkeepList())
+    await waitFor(() => expect(result.current.upkeepLoading).toBe(false))
+    listRows = [{ id: 'list-2', title: 'Monthly upkeep' }]
+    itemRows = [{ id: 'i9', text: 'Reconcile budget (YNAB)', completed: false }]
+    await act(() => result.current.ensureUpkeepList())
+    expect(inserted.length).toBe(0)
+    expect(result.current.upkeepItems.some((i) => i.text === 'Reconcile budget (YNAB)')).toBe(true)
+  })
+
   it('ensureUpkeepList is a no-op when the list exists', async () => {
     listRows = [{ id: 'list-1', title: 'monthly UPKEEP' }] // case-insensitive match
     const { result } = renderHook(() => useUpkeepList())

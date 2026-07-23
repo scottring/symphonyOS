@@ -64,6 +64,27 @@ export function useUpkeepList(): {
     if (!user || listId || loading || ensuring.current) return
     ensuring.current = true
     try {
+      // Find-or-create: re-check right before inserting so an errored initial
+      // load or a second tab mid-session can't produce a duplicate template.
+      const { data: existing, error: findError } = await supabase
+        .from('lists')
+        .select('id')
+        .eq('user_id', user.id)
+        .ilike('title', UPKEEP_LIST_TITLE)
+        .limit(1)
+      if (findError) return
+      const found = existing?.[0]
+      if (found) {
+        setListId(found.id)
+        const { data: rows } = await supabase
+          .from('list_items')
+          .select('id, text, completed')
+          .eq('list_id', found.id)
+          .eq('completed', false)
+          .order('sort_order', { ascending: true })
+        setItems((rows ?? []).map((r) => ({ id: r.id, text: r.text })))
+        return
+      }
       const { data: created, error } = await supabase
         .from('lists')
         .insert({
