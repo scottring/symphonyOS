@@ -71,6 +71,10 @@ interface PlanningColumnProps {
   /** Week→Today seam: when present, the day header renders a small "→ day"
    *  button that jumps to this date on the Today rung. */
   onOpenDay?: (date: Date) => void
+  /** Click-to-create (week-grid-click spec): fires when an empty hour slot is
+   *  clicked, with the slot's date/time and the clicked DOM node (used to
+   *  anchor the quick-create popover). Undefined = slots are not clickable. */
+  onSlotClick?: (dateKey: string, hour: number, minute: number, anchorEl: HTMLElement) => void
 }
 
 export function PlanningColumn({
@@ -85,6 +89,7 @@ export function PlanningColumn({
   slotHeight,
   dayStartHour,
   onOpenDay,
+  onSlotClick,
 }: PlanningColumnProps) {
   // Helper to find family member by ID
   const getMember = useCallback((id: string | null | undefined) => {
@@ -273,6 +278,7 @@ export function PlanningColumn({
             hour={hour}
             minute={minute}
             height={slotHeight}
+            onSlotClick={onSlotClick ? (e) => onSlotClick(dateKey, hour, minute, e.currentTarget) : undefined}
           />
         ))}
 

@@ -20,6 +20,9 @@ interface PlanningGridProps {
   dayEndHour: number
   slotDuration: number
   onOpenDay?: (date: Date) => void
+  /** Click-to-create (week-grid-click spec): threaded down to every column's
+   *  time slots. Undefined = slots are not clickable. */
+  onSlotClick?: (dateKey: string, hour: number, minute: number, anchorEl: HTMLElement) => void
 }
 
 export function PlanningGrid({
@@ -34,6 +37,7 @@ export function PlanningGrid({
   dayEndHour,
   slotDuration,
   onOpenDay,
+  onSlotClick,
 }: PlanningGridProps) {
   // Generate time labels
   const timeLabels = useMemo(() => {
@@ -115,6 +119,7 @@ export function PlanningGrid({
               slotHeight={slotHeight}
               dayStartHour={dayStartHour}
               onOpenDay={onOpenDay}
+              onSlotClick={onSlotClick}
             />
           )
         })}

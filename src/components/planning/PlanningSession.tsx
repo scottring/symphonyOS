@@ -28,6 +28,7 @@ import { PlanningRoutineDragCard, ROUTINE_DRAG_PREFIX } from './PlanningRoutineD
 import { PlanningEventBlock, PLACED_EVENT_DRAG_PREFIX } from './PlanningEventBlock'
 import { PlanningRoutineBlock, PLACED_ROUTINE_DRAG_PREFIX } from './PlanningRoutineBlock'
 import { computeEventReschedule } from './planningReschedule'
+import { PlanningSlotQuickCreate } from './PlanningSlotQuickCreate'
 
 interface PlanningSessionProps {
   tasks: Task[]
@@ -43,6 +44,10 @@ interface PlanningSessionProps {
   eventNotesMap?: Map<string, EventNote>
   onUpdateTask: (id: string, updates: Partial<Task>) => void
   onPushTask: (id: string, target: Date | 'week' | 'month' | 'quarter') => void
+  /** Click-to-create (week-grid-click spec): create a task at the clicked
+   *  empty slot's local date/time. Undefined = slots are not clickable (no-op),
+   *  keeping other mount sites (e.g. the wizard drawer) unaffected until wired. */
+  onCreateTaskAt?: (title: string, scheduledFor: Date) => void | Promise<void>
   onClose: () => void
   initialDate?: Date
   /** Days the range starts with (default 1; clamped to 7). WeekPage passes 7. */
@@ -83,6 +88,7 @@ export function PlanningSession({
   eventNotesMap,
   onUpdateTask,
   onPushTask,
+  onCreateTaskAt,
   onClose,
   initialDate,
   initialDays,
@@ -107,13 +113,71 @@ export function PlanningSession({
   // Active drag state
   const [activeId, setActiveId] = useState<string | null>(null)
 
-  // Transient refusal notice (a past-day drop) — auto-clears.
+  // Transient refusal notice (a past-day drop, or a past-day slot click) —
+  // auto-clears.
   const [dropNotice, setDropNotice] = useState<string | null>(null)
   useEffect(() => {
     if (!dropNotice) return
     const t = setTimeout(() => setDropNotice(null), 3500)
     return () => clearTimeout(t)
   }, [dropNotice])
+
+  // Click-to-create popover state (week-grid-click spec): which slot was
+  // clicked, and the DOM node to anchor the popover against.
+  const [quickCreate, setQuickCreate] = useState<{
+    dateKey: string
+    hour: number
+    minute: number
+    anchorEl: HTMLElement
+  } | null>(null)
+
+  // Fires on click of an empty hour slot. Suppressed while a dnd-kit drag is
+  // active (activeId != null) — the 5px MouseSensor activation constraint
+  // already keeps genuine clicks from starting drags, but a click that lands
+  // right as a drag ends should still not open the popover. No-op entirely
+  // when the mount site hasn't wired onCreateTaskAt (e.g. the wizard drawer).
+  const handleSlotClick = useCallback(
+    (dateKey: string, hour: number, minute: number, anchorEl: HTMLElement) => {
+      if (activeId) return
+      if (!onCreateTaskAt) return
+
+      const parsed = parseDateKey(dateKey)
+      if (!parsed) return
+
+      // Same past-day refusal as the drag-drop slot branch — planning never
+      // schedules a rock into the past.
+      if (minDropDate) {
+        const clickedDay = new Date(parsed.year, parsed.month, parsed.day)
+        const minDay = new Date(minDropDate)
+        minDay.setHours(0, 0, 0, 0)
+        if (clickedDay.getTime() < minDay.getTime()) {
+          setDropNotice('That day is already behind you — pick a day ahead.')
+          return
+        }
+      }
+
+      setQuickCreate({ dateKey, hour, minute, anchorEl })
+    },
+    [activeId, onCreateTaskAt, minDropDate]
+  )
+
+  // Submits the quick-create popover: builds the same LOCAL-date scheduledFor
+  // as the slot drag-drop branch (new Date(y, m, d, hour, minute)), then
+  // hands off to the caller-supplied onCreateTaskAt (one atomic addTask).
+  const handleQuickCreateSubmit = useCallback(
+    (title: string) => {
+      if (!quickCreate || !onCreateTaskAt) {
+        setQuickCreate(null)
+        return
+      }
+      const parsed = parseDateKey(quickCreate.dateKey)
+      setQuickCreate(null)
+      if (!parsed) return
+      const scheduledFor = new Date(parsed.year, parsed.month, parsed.day, quickCreate.hour, quickCreate.minute, 0, 0)
+      void onCreateTaskAt(title, scheduledFor)
+    },
+    [quickCreate, onCreateTaskAt]
+  )
 
   // Configure sensors for drag detection
   // Use MouseSensor and TouchSensor separately for better scroll container support
@@ -539,6 +603,15 @@ export function PlanningSession({
         </div>
       )}
 
+      {/* Click-to-create popover — anchored to the clicked empty slot */}
+      {quickCreate && (
+        <PlanningSlotQuickCreate
+          anchorEl={quickCreate.anchorEl}
+          onSubmit={handleQuickCreateSubmit}
+          onCancel={() => setQuickCreate(null)}
+        />
+      )}
+
       {/* Main content */}
       <div className={`flex-1 ${shelf ? 'flex flex-col gap-3 overflow-hidden p-3 pt-0' : 'flex overflow-hidden'}`}>
         <DndContext
@@ -589,6 +662,7 @@ export function PlanningSession({
                 dayEndHour={DAY_END_HOUR}
                 slotDuration={SLOT_DURATION}
                 onOpenDay={onOpenDay}
+                onSlotClick={handleSlotClick}
               />
             </div>
           ) : (
@@ -604,6 +678,7 @@ export function PlanningSession({
               dayEndHour={DAY_END_HOUR}
               slotDuration={SLOT_DURATION}
               onOpenDay={onOpenDay}
+              onSlotClick={handleSlotClick}
             />
           )}
 
@@ -634,6 +709,19 @@ function formatDateKey(date: Date): string {
   const month = String(date.getMonth() + 1).padStart(2, '0')
   const day = String(date.getDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
+}
+
+// Helper to parse a dateKey (YYYY-MM-DD) into local date components — used
+// by the click-to-create popover, which receives dateKey/hour/minute
+// separately rather than a single slot id.
+function parseDateKey(dateKey: string): { year: number; month: number; day: number } | null {
+  const match = dateKey.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!match) return null
+  return {
+    year: parseInt(match[1], 10),
+    month: parseInt(match[2], 10) - 1,
+    day: parseInt(match[3], 10),
+  }
 }
 
 // Helper to parse slot ID into date components

@@ -67,7 +67,7 @@ export function WeekPage() {
     draft, setDraft, submitDraft,
     scheduleActionsValue, undo,
     setBucket, deleteTaskWithUndo, projectsMap, tasksById, weekAnchor,
-    addTask, deleteTask,
+    addTask, deleteTask, getCurrentUserMember, currentDomain,
   } = useHorizonPageData(horizon, anchoredWeekStart ?? undefined);
 
   const gridStart = anchoredWeekStart ?? weekAnchor;
@@ -155,6 +155,18 @@ export function WeekPage() {
     applyProposal(p, { setBucket, deleteTask: deleteTaskWithUndo });
   }, [setBucket, deleteTaskWithUndo, deleteTask, addTask, tasksById, undo]);
 
+  // Click-to-create on an empty grid slot (week-grid-click spec): one atomic
+  // addTask with scheduledFor riding the INSERT — bucket:'timed' is derived
+  // from it (useSupabaseTasks.ts), so this never needs a follow-up setBucket.
+  // Mirrors onCreateTaskFromValue's option stamping in shared.tsx.
+  const onCreateTaskAt = useCallback((title: string, scheduledFor: Date) => {
+    void addTask(title, undefined, undefined, scheduledFor, {
+      isAllDay: false,
+      assignedTo: getCurrentUserMember()?.id,
+      context: currentDomain !== 'universal' ? currentDomain : undefined,
+    });
+  }, [addTask, getCurrentUserMember, currentDomain]);
+
   const shelf = useMemo(() => ({
     carryOverIds, projectsMap, tasksById,
     onOpenTask: (id: string) => scheduleActionsValue.onOpenTask?.(id),
@@ -209,6 +221,7 @@ export function WeekPage() {
             eventNotesMap={eventNotesMap}
             onUpdateTask={updateTask}
             onPushTask={pushTask}
+            onCreateTaskAt={onCreateTaskAt}
             onClose={() => {}}
             initialDate={gridStart}
             initialDays={7}

@@ -5,6 +5,10 @@ interface PlanningTimeSlotProps {
   hour: number
   minute: number
   height: number
+  /** Fires on click of the empty slot div — click-to-create (week-grid-click
+   *  spec). Placed cards are absolutely-positioned siblings, not children, of
+   *  this div, so there's no bubbling conflict with card clicks. */
+  onSlotClick?: (e: React.MouseEvent<HTMLDivElement>) => void
 }
 
 export function PlanningTimeSlot({
@@ -12,6 +16,7 @@ export function PlanningTimeSlot({
   hour,
   minute,
   height,
+  onSlotClick,
 }: PlanningTimeSlotProps) {
   const slotId = `slot-${dateKey}-${hour}-${minute}`
 
@@ -26,7 +31,8 @@ export function PlanningTimeSlot({
     <div
       ref={setNodeRef}
       data-droppable-id={slotId}
-      className={`transition-colors box-border ${
+      onClick={onSlotClick}
+      className={`transition-colors box-border ${onSlotClick ? 'cursor-pointer hover:bg-primary-50/60' : ''} ${
         isOver
           ? 'bg-primary-100 border-2 border-primary-400 border-dashed'
           : isHourStart

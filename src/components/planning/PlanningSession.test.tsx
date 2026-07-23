@@ -507,4 +507,149 @@ describe('PlanningSession', () => {
     // Reuse the "→ day" header-button query pattern: one per day column.
     expect(screen.getAllByRole('button', { name: /open .* on today/i })).toHaveLength(7)
   })
+
+  describe('click-to-create on an empty slot', () => {
+    // Fixed local date, decoupled from "today" so minDropDate math is stable.
+    const day = new Date(2026, 6, 20)
+    const dateKey = formatDateKey(day)
+    const slotSelector = `[data-droppable-id="slot-${dateKey}-10-30"]`
+
+    it('opens the quick-create input when clicking an empty slot', () => {
+      const { container } = render(
+        <PlanningSession
+          tasks={[]}
+          events={[]}
+          routines={[]}
+          onUpdateTask={vi.fn()}
+          onPushTask={vi.fn()}
+          onClose={vi.fn()}
+          initialDate={day}
+          onCreateTaskAt={vi.fn()}
+        />
+      )
+
+      expect(screen.queryByRole('dialog', { name: /create task/i })).not.toBeInTheDocument()
+
+      const slot = container.querySelector(slotSelector)
+      expect(slot).not.toBeNull()
+      fireEvent.click(slot!)
+
+      expect(screen.getByRole('dialog', { name: /create task/i })).toBeInTheDocument()
+    })
+
+    it('typing a title and pressing Enter creates a task at the exact slot time and closes the popover', () => {
+      const onCreateTaskAt = vi.fn()
+      const { container } = render(
+        <PlanningSession
+          tasks={[]}
+          events={[]}
+          routines={[]}
+          onUpdateTask={vi.fn()}
+          onPushTask={vi.fn()}
+          onClose={vi.fn()}
+          initialDate={day}
+          onCreateTaskAt={onCreateTaskAt}
+        />
+      )
+
+      const slot = container.querySelector(slotSelector)
+      fireEvent.click(slot!)
+
+      const input = screen.getByRole('textbox')
+      fireEvent.change(input, { target: { value: 'Dentist appointment' } })
+      fireEvent.keyDown(input, { key: 'Enter' })
+
+      expect(onCreateTaskAt).toHaveBeenCalledTimes(1)
+      const [title, scheduledFor] = onCreateTaskAt.mock.calls[0]
+      expect(title).toBe('Dentist appointment')
+      expect(scheduledFor).toEqual(new Date(2026, 6, 20, 10, 30, 0, 0))
+
+      expect(screen.queryByRole('dialog', { name: /create task/i })).not.toBeInTheDocument()
+    })
+
+    it('Escape closes the popover without creating a task', () => {
+      const onCreateTaskAt = vi.fn()
+      const { container } = render(
+        <PlanningSession
+          tasks={[]}
+          events={[]}
+          routines={[]}
+          onUpdateTask={vi.fn()}
+          onPushTask={vi.fn()}
+          onClose={vi.fn()}
+          initialDate={day}
+          onCreateTaskAt={onCreateTaskAt}
+        />
+      )
+
+      const slot = container.querySelector(slotSelector)
+      fireEvent.click(slot!)
+
+      const input = screen.getByRole('textbox')
+      fireEvent.change(input, { target: { value: 'Should not save' } })
+      fireEvent.keyDown(input, { key: 'Escape' })
+
+      expect(onCreateTaskAt).not.toHaveBeenCalled()
+      expect(screen.queryByRole('dialog', { name: /create task/i })).not.toBeInTheDocument()
+    })
+
+    it('clicking a slot on a day before minDropDate shows the refusal notice and does not open the popover', () => {
+      const onCreateTaskAt = vi.fn()
+      const yesterday = new Date(day)
+      yesterday.setDate(yesterday.getDate() - 1)
+      const yesterdayKey = formatDateKey(yesterday)
+
+      const { container } = render(
+        <PlanningSession
+          tasks={[]}
+          events={[]}
+          routines={[]}
+          onUpdateTask={vi.fn()}
+          onPushTask={vi.fn()}
+          onClose={vi.fn()}
+          initialDate={yesterday}
+          initialDays={2}
+          minDropDate={day}
+          onCreateTaskAt={onCreateTaskAt}
+        />
+      )
+
+      const slot = container.querySelector(`[data-droppable-id="slot-${yesterdayKey}-10-30"]`)
+      expect(slot).not.toBeNull()
+      fireEvent.click(slot!)
+
+      expect(screen.getByText(/already behind you/i)).toBeInTheDocument()
+      expect(screen.queryByRole('dialog', { name: /create task/i })).not.toBeInTheDocument()
+      expect(onCreateTaskAt).not.toHaveBeenCalled()
+    })
+
+    it('does nothing when onCreateTaskAt is not provided', () => {
+      const { container } = render(
+        <PlanningSession
+          tasks={[]}
+          events={[]}
+          routines={[]}
+          onUpdateTask={vi.fn()}
+          onPushTask={vi.fn()}
+          onClose={vi.fn()}
+          initialDate={day}
+        />
+      )
+
+      const slot = container.querySelector(slotSelector)
+      expect(slot).not.toBeNull()
+      fireEvent.click(slot!)
+
+      expect(screen.queryByRole('dialog', { name: /create task/i })).not.toBeInTheDocument()
+    })
+  })
 })
+
+// Helper to format date as YYYY-MM-DD, matching PlanningSession's internal
+// dateKey format used for slot droppable ids.
+function formatDateKey(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
