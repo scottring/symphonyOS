@@ -11,7 +11,7 @@
 import type { Task } from '@/types/task'
 import { SEASON_NAMES, seasonIndex, seasonStart } from '@/lib/cadence/periods'
 
-export const PICK_CAP = 8
+export const PICK_CAP = 10
 
 /** Open-quarter partition: picks (chosen, by when they were picked) and the
  *  bench (unchosen, oldest first — the order they piled up). */

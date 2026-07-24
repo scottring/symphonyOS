@@ -14,7 +14,7 @@ import { useProjects } from '@/hooks/useProjects'
 import { useRoutines } from '@/hooks/useRoutines'
 import { useUpkeepList } from '@/hooks/useUpkeepList'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
-import { useDomain } from '@/hooks/useDomain'
+import { useDomain, type Domain } from '@/hooks/useDomain'
 import { useCalendarDomainMappings } from '@/hooks/useCalendarDomainMappings'
 import { isEverydayRoutine } from '@/lib/routineUtils'
 import { filterTasksForPlanning, filterEventsForDomain, filterRoutinesForDomain } from '@/lib/today/domainFilter'
@@ -28,6 +28,25 @@ interface Props {
   onChain?: (next: PlanningHorizon) => void
   /** Reuse the host page's routine-scheduling handler (drag onto the grid). */
   onScheduleRoutine: (routineId: string, date: Date, time: string) => void
+}
+
+/** Pure opts-mapping for createTaskInBucket → addTask's AddTaskOptions. Extracted
+ *  so the forwarding (bucket, projectId, sourceId, goalId, pickedAt, and the
+ *  session-domain context stamp) is unit-testable without mounting the container.
+ *  assignedTo is NOT here — it's an app-hook read merged at the call site. */
+export function buildAddTaskOptions(
+  bucket: TaskBucket,
+  opts: { projectId?: string; sourceId?: string; goalId?: string; pickedAt?: Date } | undefined,
+  currentDomain: Domain,
+) {
+  return {
+    bucket,
+    projectId: opts?.projectId,
+    sourceId: opts?.sourceId,
+    goalId: opts?.goalId,
+    pickedAt: opts?.pickedAt,
+    context: currentDomain !== 'universal' ? currentDomain : undefined,
+  }
 }
 
 export function GuidedSessionContainer({ horizon, onClose, onFinished, onChain, onScheduleRoutine }: Props) {
@@ -93,14 +112,14 @@ export function GuidedSessionContainer({ horizon, onClose, onFinished, onChain, 
   const createTaskInBucket = useCallback(async (
     title: string,
     bucket: TaskBucket,
-    opts?: { projectId?: string; sourceId?: string; goalId?: string },
+    opts?: { projectId?: string; sourceId?: string; goalId?: string; pickedAt?: Date },
   ) => {
+    // projectId rides positionally (addTask reads it there); the rest — bucket,
+    // sourceId, goalId, pickedAt, context — ride in AddTaskOptions. assignedTo
+    // is merged here (not part of the pure mapping) so the creator owns the item.
     await addTask(title, undefined, opts?.projectId, undefined, {
+      ...buildAddTaskOptions(bucket, opts, currentDomain),
       assignedTo: getCurrentUserMember()?.id,
-      context: currentDomain !== 'universal' ? currentDomain : undefined,
-      bucket,
-      sourceId: opts?.sourceId,
-      goalId: opts?.goalId,
     })
   }, [addTask, getCurrentUserMember, currentDomain])
 

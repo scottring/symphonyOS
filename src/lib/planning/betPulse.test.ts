@@ -28,7 +28,7 @@ describe('partitionSeason', () => {
   it('has no implicit cap — picking is explicit; the cap is enforced by the swap UI', () => {
     const many = Array.from({ length: 10 }, (_, i) => task({ bucket: 'quarter', pickedAt: new Date(2026, 6, 1 + i) }))
     expect(partitionSeason(many).picks).toHaveLength(10)
-    expect(PICK_CAP).toBe(8)
+    expect(PICK_CAP).toBe(10)
   })
 })
 
