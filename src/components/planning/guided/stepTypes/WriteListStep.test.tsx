@@ -66,8 +66,8 @@ describe('WriteListStep', () => {
       t({ id: `q${i}`, title: `Bet ${i}`, bucket: 'quarter', pickedAt: i < 3 ? new Date(2026, 6, 1 + i) : undefined }))
     const host = makeHost({ tasks })
     renderStep(<WriteListStep />, { step: betStep, host, horizon: 'seasonal' })
-    expect(screen.getByText(/3 of 8 picked · 9 written/)).toBeInTheDocument()
-    expect(PICK_CAP).toBe(8)
+    expect(screen.getByText(/3 of 10 picked · 9 written/)).toBeInTheDocument()
+    expect(PICK_CAP).toBe(10)
   })
 
   it('shows the soft-cap counter without blocking', () => {
