@@ -6,7 +6,7 @@ import type { StepType } from './types'
 const KNOWN_TYPES: StepType[] = [
   'narration', 'reflect', 'review', 'look-above', 'projects', 'calendar',
   'write-list', 'inbox', 'schedule-grid', 'domains-goals', 'book-next',
-  'wins', 'maintenance',
+  'wins', 'maintenance', 'pick-by-goal',
 ]
 
 describe('guided session configs', () => {

@@ -71,18 +71,18 @@ export const SESSIONS: Record<PlanningHorizon, GuidedSessionConfig> = {
         narration: "This is your seasonal planning session — about half an hour to close out the season that is ending and shape the one ahead. Seasons are the honest unit of life: school terms, summers, the stretch before the holidays. Let’s look at what happened, and then decide what this next one is for.",
       },
       {
-        id: 'season-review', type: 'review', title: "Last season’s list",
+        id: 'season-review', type: 'review', title: "Carry, win, or release last season’s picks",
         narration: "Here is everything still open from this season’s list. Celebrate what got done. For each item that didn’t: carry it into the new season if it still matters, park it on Someday if the timing is wrong, or let it go. If you carry something, take one second to notice what stopped it last time.",
         props: { bucket: 'quarter', rows: 'fate' },
       },
       {
-        id: 'look-at-year', type: 'look-above', title: 'Your goals for the year',
-        narration: "These are the goals you set for the year — read them slowly, but don’t move anything. You are just asking one question: which of these fit this season’s energy and timing? The season list you write next is its own list; it doesn’t have to line up with anything.",
-        props: { aboveBucket: 'goals', aboveLabel: 'Your goals for the year' },
+        id: 'pick-by-goal', type: 'pick-by-goal', title: 'Choose this season, goal by goal',
+        narration: "Now choose the season, goal by goal. Under each of your year goals, add the one or two picks that would actually move it over the next three months. Not everything you could do — the few that matter. A goal with no pick is a goal you are choosing to rest this season, and that is allowed.",
       },
       {
-        id: 'projects-in-motion', type: 'projects', title: 'Projects in motion',
-        narration: "These are the projects you have in motion, with what’s still open in each. A season is mostly its projects — as you write this season’s list, ask which of these deserve a real push over the next three months, and which can idle without guilt.",
+        id: 'standalone-picks', type: 'pick-by-goal', title: "Anything that doesn’t serve a goal",
+        narration: "Last, the picks that don’t ladder up to any goal — the season’s must-dos, the household load, the thing you simply want. They belong on the list too. Add anything this season needs that none of your goals covers.",
+        props: { standalone: true },
       },
       {
         id: 'season-ahead', type: 'calendar', title: 'The season ahead',
@@ -93,11 +93,6 @@ export const SESSIONS: Record<PlanningHorizon, GuidedSessionConfig> = {
         id: 'look-within', type: 'reflect', title: 'Look within',
         narration: 'Before you write anything: how are you, actually? Energy, health, mood. A season planned for the person you wish you were will fall apart in a week. Plan for the person you are right now.',
         props: { notesKey: 'energy', placeholder: 'Energy, health, and mood going into this season…' },
-      },
-      {
-        id: 'write-season', type: 'write-list', title: "Write the season’s list",
-        narration: "Now write this season’s list — concrete, specific things you want to be true by the end of it. Look back at your year goals if it helps, or don’t. This list is allowed to contain things that appear nowhere else.",
-        props: { bucket: 'quarter', rows: 'bets' },
       },
       {
         id: 'book-next', type: 'book-next', title: 'Anchor the next step',
