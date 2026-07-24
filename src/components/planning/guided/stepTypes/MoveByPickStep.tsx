@@ -24,6 +24,8 @@ export function MoveByPickStep() {
   const [asides, setAsides] = useState<Aside[]>([])
   const [lastAside, setLastAside] = useState<string | null>(null)
   const [shelfMenu, setShelfMenu] = useState<string | null>(null)
+  // Which pick's "file an existing item" menu is open (only one at a time).
+  const [attachPick, setAttachPick] = useState<string | null>(null)
 
   const tasksById = useMemo(() => new Map(host.tasks.map((t) => [t.id, t])), [host.tasks])
   const goalName = useMemo(() => new Map(host.goals.map((g) => [g.id, g.name])), [host.goals])
@@ -109,11 +111,43 @@ export function MoveByPickStep() {
               <InlineAdd autoFocus placeholder="What would move this pick this month?"
                 onAdd={(v) => void addMove(p, v)} />
             ) : (
-              <button type="button" aria-label={`Add a move for "${p.title}"`}
-                onClick={() => setOpenPick(p.id)}
-                className="mt-2 inline-flex items-center gap-1 text-xs text-primary-700 border border-dashed border-primary-200 rounded-md px-2 py-1 hover:bg-primary-50">
-                <Plus className="w-3 h-3" /> Add a move for this month
-              </button>
+              <div className="mt-2 flex items-center gap-2 flex-wrap">
+                <button type="button" aria-label={`Add a move for "${p.title}"`}
+                  onClick={() => setOpenPick(p.id)}
+                  className="inline-flex items-center gap-1 text-xs text-primary-700 border border-dashed border-primary-200 rounded-md px-2 py-1 hover:bg-primary-50">
+                  <Plus className="w-3 h-3" /> Add a move for this month
+                </button>
+                {/* The reciprocal of the shelf's "File under": most months the
+                    move is already written down somewhere, and making you
+                    retype it (or scroll to the shelf) is the wrong ask. */}
+                {shelf.length > 0 && (
+                  <div className="relative">
+                    <button type="button" aria-label={`File an existing item under "${p.title}"`}
+                      onClick={() => setAttachPick((x) => (x === p.id ? null : p.id))}
+                      className="inline-flex items-center gap-1 text-xs text-neutral-500 border border-dashed border-neutral-200 rounded-md px-2 py-1 hover:bg-neutral-50">
+                      File an existing item <ChevronDown className="w-3 h-3" />
+                    </button>
+                    {attachPick === p.id && (
+                      <>
+                        <button aria-hidden tabIndex={-1} onClick={() => setAttachPick(null)}
+                          className="fixed inset-0 z-40 cursor-default" />
+                        <div className="absolute left-0 top-full z-50 mt-1 min-w-[260px] max-h-64 overflow-auto rounded-xl border border-neutral-200 bg-white p-1.5 shadow-lg">
+                          <p className="px-2.5 py-1 text-[11px] font-medium uppercase tracking-wide text-neutral-400">
+                            On the month list, serving no pick
+                          </p>
+                          {shelf.map((item) => (
+                            <button key={item.id} type="button"
+                              onClick={() => { thread(item.id, p); setAttachPick(null) }}
+                              className="w-full rounded-lg px-2.5 py-1.5 text-left text-sm text-neutral-700 hover:bg-neutral-50">
+                              {item.title}
+                            </button>
+                          ))}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
             )}
             {/* AI fuel scoped to THIS pick: the pick is the above-list, its
                 existing moves ride in as do-not-duplicate. Tapping a chip is

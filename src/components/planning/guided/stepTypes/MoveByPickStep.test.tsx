@@ -156,6 +156,32 @@ describe('MoveByPickStep', () => {
     ))
   })
 
+  it('files an EXISTING month item under a pick from the pick itself', () => {
+    const onUpdateTask = vi.fn()
+    const host = makeHost({
+      goals: [goal({ id: 'g1', name: 'Every room' })],
+      tasks: [
+        pick({ id: 'p1', title: 'Porch and backyard', goalId: 'g1' }),
+        t({ id: 'm1', title: 'Buy a bench', bucket: 'month' }),
+        t({ id: 'm2', title: 'Weed the backyard', bucket: 'month', sourceId: 'p1', goalId: 'g1' }),
+      ],
+      onUpdateTask,
+    })
+    renderStep(<MoveByPickStep />, { step, host, horizon: 'monthly' })
+    fireEvent.click(screen.getByRole('button', { name: 'File an existing item under "Porch and backyard"' }))
+    // Only unfiled items are offered — what's already under a pick isn't.
+    expect(screen.getByRole('button', { name: 'Buy a bench' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Weed the backyard' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Buy a bench' }))
+    expect(onUpdateTask).toHaveBeenCalledWith('m1', { sourceId: 'p1', goalId: 'g1' })
+  })
+
+  it('offers nothing to file when the shelf is empty', () => {
+    const host = makeHost({ tasks: [pick({ id: 'p1', title: 'Porch and backyard', goalId: 'g1' })] })
+    renderStep(<MoveByPickStep />, { step, host, horizon: 'monthly' })
+    expect(screen.queryByRole('button', { name: /file an existing item/i })).not.toBeInTheDocument()
+  })
+
   it('tells you to go pick a season when there are no picks', () => {
     const host = makeHost({ tasks: [t({ id: 'm1', title: 'Buy a bench', bucket: 'month' })] })
     renderStep(<MoveByPickStep />, { step, host, horizon: 'monthly' })
