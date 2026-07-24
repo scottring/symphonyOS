@@ -10,9 +10,10 @@
 import { PAGE_COLUMN } from '@/components/layout/pageLayout';
 import { YearCalendarGrid } from '@/components/planning/horizon/YearCalendarGrid';
 import { MonthZoomSheet } from '@/components/planning/horizon/MonthZoomSheet';
-import { CalendarRange, Target, ChevronRight } from 'lucide-react';
+import { CalendarRange, Target, ChevronRight, Sparkles } from 'lucide-react';
 import { HorizonExplainer } from '@/components/planning/explainers/HorizonExplainer';
 import { goalRollup } from '@/lib/planning/lineage';
+import { partitionSeason } from '@/lib/planning/betPulse';
 import type { Task } from '@/types/task';
 import type { Goal } from '@/types/goal';
 import { CascadeRail, useHorizonPageData } from './shared';
@@ -20,8 +21,14 @@ import { CascadeRail, useHorizonPageData } from './shared';
 // A year goal on the Year rung, with its cascade roll-up: every task anywhere
 // that carries this goal's id (goal_id thread, stamped on promotion and
 // inherited by copies). No moves yet = a quiet invitation, not a zero.
-function YearGoalRow({ goal, tasks, onOpen }: { goal: Goal; tasks: Task[]; onOpen: () => void }) {
+//
+// `seasonPicks` is THIS domain's picks that thread to this goal (computed by
+// the parent from domainTasks) — the read side of the season↔year thread. One
+// or more = the goal is being worked this season; zero = a quiet "0 moves this
+// season" flag (muted, an invitation to pick, not an alarm).
+function YearGoalRow({ goal, tasks, seasonPicks, onOpen }: { goal: Goal; tasks: Task[]; seasonPicks: Task[]; onOpen: () => void }) {
   const { total, done } = goalRollup(goal.id, tasks);
+  const pickCount = seasonPicks.length;
   return (
     <button
       type="button"
@@ -41,6 +48,14 @@ function YearGoalRow({ goal, tasks, onOpen }: { goal: Goal; tasks: Task[]; onOpe
         ) : (
           <span className="block mt-0.5 text-[11px] text-neutral-300">no moves threaded yet — promote it in a seasonal session</span>
         )}
+        {pickCount > 0 ? (
+          <span className="mt-1 flex items-center gap-1.5 text-[11px] text-primary-600">
+            <Sparkles aria-hidden="true" className="w-3 h-3 text-primary-400" />
+            {pickCount} pick{pickCount === 1 ? '' : 's'} this season
+          </span>
+        ) : (
+          <span className="mt-1 block text-[11px] text-neutral-300">0 moves this season</span>
+        )}
       </span>
       <ChevronRight className="w-4 h-4 text-neutral-300 shrink-0" />
     </button>
@@ -55,6 +70,13 @@ export function YearPage() {
   } = useHorizonPageData('year');
 
   const activeGoals = goals.filter((g) => g.status === 'active');
+  // This domain's season picks, indexed by the goal they thread to — the read
+  // side of the year↔season thread. domainTasks (already domain-scoped) keeps a
+  // work goal's picks off the Family year page. goalRollup above still reads the
+  // full `tasks` thread (unchanged); this coverage read is deliberately
+  // domain-local.
+  const seasonPicks = partitionSeason(domainTasks).picks;
+  const picksForGoal = (goalId: string) => seasonPicks.filter((p) => p.goalId === goalId);
   const goalsByArea = areas
     .map((area) => ({ area, items: activeGoals.filter((g) => g.areaId === area.id) }))
     .filter(({ items }) => items.length > 0);
@@ -155,7 +177,7 @@ export function YearPage() {
                 <h2 className="font-display text-sm tracking-wide text-neutral-400 uppercase mb-3">{area.name}</h2>
                 <div className="space-y-2">
                   {items.map((g) => (
-                    <YearGoalRow key={g.id} goal={g} tasks={tasks} onOpen={() => navigate(`/goals/${g.id}`)} />
+                    <YearGoalRow key={g.id} goal={g} tasks={tasks} seasonPicks={picksForGoal(g.id)} onOpen={() => navigate(`/goals/${g.id}`)} />
                   ))}
                 </div>
               </section>
@@ -165,7 +187,7 @@ export function YearPage() {
                 <h2 className="font-display text-sm tracking-wide text-neutral-400 uppercase mb-3">Goals</h2>
                 <div className="space-y-2">
                   {orphanGoals.map((g) => (
-                    <YearGoalRow key={g.id} goal={g} tasks={tasks} onOpen={() => navigate(`/goals/${g.id}`)} />
+                    <YearGoalRow key={g.id} goal={g} tasks={tasks} seasonPicks={picksForGoal(g.id)} onOpen={() => navigate(`/goals/${g.id}`)} />
                   ))}
                 </div>
               </section>
