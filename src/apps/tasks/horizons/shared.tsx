@@ -727,7 +727,7 @@ export function useHorizonPageData(horizon: HorizonId, anchorDate?: Date) {
                       <button type="button" onClick={() => setRefBenchOpen((v) => !v)} aria-expanded={refBenchOpen}
                         className="inline-flex items-center gap-1 text-[11px] text-neutral-400 hover:text-neutral-600 transition-colors">
                         <ChevronRight className={`w-3 h-3 transition-transform ${refBenchOpen ? 'rotate-90' : ''}`} />
-                        Also on the bench ({referenceBenchItems.length}) — not picked this season
+                        Also on the shelf ({referenceBenchItems.length}) — not picked this season
                       </button>
                       {refBenchOpen && (
                         <ul className="mt-1.5 space-y-1 opacity-75">

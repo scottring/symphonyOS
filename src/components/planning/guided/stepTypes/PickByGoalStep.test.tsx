@@ -77,6 +77,22 @@ describe('PickByGoalStep', () => {
     expect(onUpdateTask).toHaveBeenCalledWith('t1', { pickedAt: null })
   })
 
+  it('shows your unpicked items on the shelf and files one under a goal as a pick', () => {
+    const onUpdateTask = vi.fn()
+    const host = makeHost({
+      goals: [goal({ id: 'g1', name: 'Every room set up' })],
+      tasks: [t({ id: 's1', title: 'Fix up the living room', bucket: 'quarter' })], // unpicked → on the shelf
+      onUpdateTask,
+    })
+    renderStep(<PickByGoalStep />, { step, host, horizon: 'seasonal' })
+    // The existing item shows on the shelf (not retyped).
+    expect(screen.getByText('Fix up the living room')).toBeInTheDocument()
+    // File it under a goal → picks it (pickedAt) and threads it (goalId) in one tap.
+    fireEvent.click(screen.getByRole('button', { name: 'File "Fix up the living room" under a goal' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Every room set up' }))
+    expect(onUpdateTask).toHaveBeenCalledWith('s1', expect.objectContaining({ goalId: 'g1', pickedAt: expect.any(Date) }))
+  })
+
   it('dropping a pick on another goal re-parents it (goalId update)', () => {
     const onUpdateTask = vi.fn()
     const host = makeHost({

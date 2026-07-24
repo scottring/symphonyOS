@@ -7,7 +7,7 @@
 // set-aside, coherence hint, and AI-suggest come in later tasks. See spec
 // 2026-07-24.
 import { useMemo, useState } from 'react'
-import { Plus, Check, X, RotateCcw } from 'lucide-react'
+import { Plus, Check, X, RotateCcw, ChevronDown } from 'lucide-react'
 import { partitionSeason, PICK_CAP } from '@/lib/planning/betPulse'
 import { goalsInFocusNudge, coherenceHint } from '@/lib/planning/pickCoherence'
 import type { Task } from '@/types/task'
@@ -25,6 +25,8 @@ export function PickByGoalStep() {
   // one also gets an inline Undo.
   const [setAsideIds, setSetAsideIds] = useState<string[]>([])
   const [lastSetAside, setLastSetAside] = useState<string | null>(null)
+  // Which shelf item's "File under" menu is open (only one at a time).
+  const [shelfMenu, setShelfMenu] = useState<string | null>(null)
 
   const tasksById = useMemo(() => new Map(host.tasks.map((t) => [t.id, t])), [host.tasks])
 
@@ -40,7 +42,14 @@ export function PickByGoalStep() {
     setLastSetAside((last) => (last === id ? null : last))
   }
 
-  const picks = useMemo(() => partitionSeason(host.tasks).picks, [host.tasks])
+  const season = useMemo(() => partitionSeason(host.tasks), [host.tasks])
+  const picks = season.picks
+  // The shelf: open quarter items you wrote down but haven't chosen yet.
+  // Excludes items demoted this session — those live in the set-aside tray.
+  const shelf = useMemo(
+    () => season.bench.filter((b) => !setAsideIds.includes(b.id)),
+    [season.bench, setAsideIds],
+  )
   const picksByGoal = useMemo(() => {
     const m = new Map<string, Task[]>()
     for (const p of picks) {
@@ -90,7 +99,14 @@ export function PickByGoalStep() {
               e.preventDefault()
               setDragOverGoal(null)
               const id = e.dataTransfer.getData('text/plain')
-              if (id) host.onUpdateTask(id, { goalId: goal.id })
+              if (!id) return
+              // Dragging a shelf item onto a goal picks AND threads it in one
+              // motion; dragging an existing pick just re-parents it.
+              const dragged = tasksById.get(id)
+              host.onUpdateTask(id, {
+                goalId: goal.id,
+                ...(dragged && !dragged.pickedAt ? { pickedAt: new Date() } : {}),
+              })
             }}
             className={`rounded-2xl border bg-white/70 p-3 ${dragOverGoal === goal.id ? 'border-primary-300 ring-2 ring-primary-300' : 'border-neutral-100'}`}>
             <div className="flex items-center justify-between gap-2">
@@ -178,6 +194,52 @@ export function PickByGoalStep() {
                 </li>
               )
             })}
+          </ul>
+        </div>
+      )}
+      {shelf.length > 0 && (
+        <div className="rounded-2xl border border-neutral-100 bg-white/70 p-3">
+          <h3 className="text-sm font-display text-neutral-800">On the shelf ({shelf.length})</h3>
+          <p className="mt-0.5 mb-2 text-xs text-neutral-400">
+            Things you wrote down but haven&rsquo;t chosen yet. File one under a goal to make it a pick — or drag it onto a goal above.
+          </p>
+          <ul className="space-y-1">
+            {shelf.map((item) => (
+              <li key={item.id} draggable
+                onDragStart={(e) => e.dataTransfer.setData('text/plain', item.id)}
+                className="relative flex items-center justify-between gap-2 rounded-lg border border-neutral-100 bg-white px-2.5 py-1.5 text-xs cursor-grab active:cursor-grabbing">
+                <span className="truncate text-neutral-700">{item.title}</span>
+                <div className="relative shrink-0">
+                  <button type="button" aria-label={`File "${item.title}" under a goal`}
+                    onClick={() => setShelfMenu((m) => (m === item.id ? null : item.id))}
+                    className="inline-flex items-center gap-1 rounded-md border border-dashed border-primary-200 px-2 py-0.5 text-primary-700 hover:bg-primary-50">
+                    File under <ChevronDown className="w-3 h-3" />
+                  </button>
+                  {shelfMenu === item.id && (
+                    <>
+                      <button aria-hidden tabIndex={-1} onClick={() => setShelfMenu(null)}
+                        className="fixed inset-0 z-40 cursor-default" />
+                      <div className="absolute right-0 top-full z-50 mt-1 min-w-[220px] max-h-64 overflow-auto rounded-xl border border-neutral-200 bg-white p-1.5 shadow-lg">
+                        <p className="px-2.5 py-1 text-[11px] font-medium uppercase tracking-wide text-neutral-400">Pick under</p>
+                        {activeGoals.map((g) => (
+                          <button key={g.id} type="button"
+                            onClick={() => { host.onUpdateTask(item.id, { pickedAt: new Date(), goalId: g.id }); setShelfMenu(null) }}
+                            className="w-full rounded-lg px-2.5 py-1.5 text-left text-sm text-neutral-700 hover:bg-neutral-50">
+                            {g.name}
+                          </button>
+                        ))}
+                        <div className="my-1 border-t border-neutral-100" />
+                        <button type="button"
+                          onClick={() => { host.onUpdateTask(item.id, { pickedAt: new Date(), goalId: undefined }); setShelfMenu(null) }}
+                          className="w-full rounded-lg px-2.5 py-1.5 text-left text-sm text-neutral-500 hover:bg-neutral-50">
+                          No goal (standalone)
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </li>
+            ))}
           </ul>
         </div>
       )}
