@@ -2,7 +2,31 @@
 
 **Date:** 2026-07-24
 **Status:** design — awaiting mockup approval before build
-**Scope:** the *seasonal* guided session only. Month/Week/Day wizards are later phases.
+**Scope:** the **Year→Season seam, end-to-end** — the seasonal guided session
+(write side) **and** the `/season` and `/year` horizon pages (read side). Later
+seams (Season→Month, Month→Week, Week→Day) are later phases, each covering both
+its wizard and its page.
+
+## The systemwide frame: one model, two surfaces
+
+The thread (`goal_id` / `source_id`) is written and read in two places that must
+tell the **same** story:
+
+- **Wizards — the write side.** You *create* the thread: pick under goal, move
+  under pick, placement under move.
+- **Pages — the read side.** The rest of the time you *see and navigate* the
+  thread on the standing horizon pages.
+
+If the wizard threads a pick under a goal but `/season` still renders a flat 8-slot
+grid, the thread is invisible the moment you leave the wizard. So every phase ships
+**wizard + page together**, both sitting on the **same pure helpers** —
+`lineageLabel`, `goalRollup`, `goalsWithoutMoves`, `betPulse`/`threadsToBet`. Two
+invariants across every page:
+
+1. **Every item shows a one-glance thread breadcrumb** (`← Pick ← Goal`).
+2. **Every page shows coverage/gaps** — which parents have nothing under them
+   (untouched goals, picks with no move this month). The gap read is what makes the
+   flow *obvious* instead of implied.
 
 ---
 
@@ -119,18 +143,51 @@ Last season's open picks get an explicit fate, extending the existing `fate` row
 - **Release** — to `someday` (or archive). Enforces the prune Hart-Unger treats as
   the point of the ritual.
 
+## Horizon pages — read side (Phase 1: `/season` + `/year`)
+
+Both pages render inside `HorizonView`. Today they show the level above as a side
+reference panel (`referenceLabel`) with picks in a flat `BetsGrid`. Phase 1 makes
+the thread the organizing structure.
+
+**`/season`:**
+- `BetCard` shows its **`← Goal`** breadcrumb (data already passed via `goalsById`;
+  surface it). Picks group/annotate under their goal rather than reading as a bare
+  8-slot grid.
+- A **coverage row** — "goals not yet picked this season" — from `goalsWithoutMoves`
+  (bucket `quarter`), so untouched goals are visible on the page, not just in the
+  wizard. Each is a one-tap "pick this season" that opens the anchored add.
+- Bench unchanged, below.
+
+**`/year`:**
+- Goals as the spine; under each goal, its **season picks** (coverage) with the
+  existing `goalRollup` progress. Untouched goals carry a quiet "0 moves this season"
+  flag — the live version of the cascade map's red rows.
+
+Both reads are **domain-filtered** like the rest of the page (follows the app's
+domain switcher, as `HorizonView` already does for its pools).
+
 ## Files touched
 
+**Write side (wizard):**
 - `src/components/planning/guided/sessions.ts` — seasonal arc.
 - `src/components/planning/guided/stepTypes/PickByGoalStep.tsx` — **new**.
 - `src/components/planning/guided/stepTypes/ReviewStep.tsx` — carry-into-season fate.
 - `src/components/planning/guided/GuidedContext.tsx` + host — methods:
   `createAnchoredPick(goalId, title)`, `carryPick(id)`, `releasePick(id)`.
+
+**Read side (pages):**
+- `src/apps/tasks/HorizonView.tsx` — season/year blocks: breadcrumb + coverage row.
+- `src/components/planning/season/BetCard.tsx` — surface the `← Goal` breadcrumb.
+- `src/components/planning/season/BetsGrid.tsx` — goal grouping/annotation.
+- Year block: goal-spine coverage read (component TBD — likely extend the existing
+  year rendering in `HorizonView` / `YearCalendarGrid` companion list).
+
+**Shared:**
 - `src/lib/planning/betPulse.ts` — `PICK_CAP` 8 → 10.
 - `src/lib/planning/coachLines.ts` — coherence nudge + goals-in-focus nudge.
-- Domain filtering: reuse `filterGoalsForDomain` (or the canonical helper) — verify
-  a goals helper exists; add one if not.
-- Tests alongside each.
+- Domain filtering: reuse the canonical `filter*ForDomain` helpers — verify a
+  **goals** helper exists; add `filterGoalsForDomain` (same shape) if not.
+- Tests alongside each (write side, read side, helpers).
 
 ## Data flow
 
@@ -169,16 +226,17 @@ No new columns; `partitionSeason` already keys picks off `picked_at`, and
 
 The `pick-by-goal` step is really **"write-anchored-to-parent."** Every seam reuses
 it, pointed at a different parent level, so proving Phase 1 de-risks all of them.
+**Each phase ships both surfaces — the wizard (write) and the page (read).**
 Vocabulary → bucket mapping: **Goal** (goals table) → **Pick** (`quarter` +
 `picked_at`) → **Move** (`month`) → **Placement** (`week` → `timed`).
 
-| Seam | Wizard | Interactive step | Thread written | Phase |
-|------|--------|------------------|----------------|-------|
-| — (top) | Year | produce clean, domain-tagged Goals; someday feeds picks | goals (anchor) | exists; light touch |
-| Year→Season | Season | Pick inside a Goal | `quarter` + `goal_id` + `picked_at` | **1 (this spec)** |
-| Season→Month | Month | Move under a Pick (copy-down) | `month` + `source_id`→pick + inherited `goal_id` | 2 |
-| Month→Week | Week | Placements drawn from Moves, placed on days | `week`→`timed` + `source_id`→move + `goal_id`; **capacity gate here** | 3 |
-| Week→Day | Day | today's placements from the week, matched to energy | `timed` + `source_id` + `goal_id` | 4 |
+| Seam | Wizard step (write) | Page (read) | Thread written | Phase |
+|------|---------------------|-------------|----------------|-------|
+| — (top) | Year: domain-tagged Goals; someday feeds picks | `/year`: goal spine + pick coverage | goals (anchor) | **1 (light)** |
+| Year→Season | Pick inside a Goal | `/season`: picks under goals + gap row | `quarter` + `goal_id` + `picked_at` | **1** |
+| Season→Month | Move under a Pick (copy-down) | `/month`: moves under picks + starving read | `month` + `source_id`→pick + inherited `goal_id` | 2 |
+| Month→Week | Placements from Moves, placed on days | `/week`: placements under moves + grid | `week`→`timed` + `source_id`→move + `goal_id`; **capacity gate** | 3 |
+| Week→Day | today's placements, matched to energy | `/today`: breadcrumb up to goal | `timed` + `source_id` + `goal_id` | 4 |
 
 Enablers already in place: `lineage.inheritedLineage()` carries `goal_id` down every
 rung (roll-up stays a flat filter); `look-within` (energy) exists at each level;
