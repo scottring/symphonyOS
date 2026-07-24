@@ -95,6 +95,20 @@ describe('GoalsList goal domain tag', () => {
   })
 })
 
+describe('GoalsList move goal between areas', () => {
+  it('opens the move menu and reassigns the goal to another area', async () => {
+    const onUpdateGoal = vi.fn()
+    const area2: GoalArea = { id: 'a2', name: 'Family & Social', sortOrder: 1, createdAt: new Date() }
+    const goal = makeGoal('Scott and Iris shared activity') // lives in a1
+    const { user } = render(
+      <GoalsList {...baseProps} areas={[area, area2]} goals={[goal]} onUpdateGoal={onUpdateGoal} />,
+    )
+    await user.click(screen.getByRole('button', { name: 'Move to area' }))
+    await user.click(screen.getByRole('button', { name: 'Move to Family & Social' }))
+    expect(onUpdateGoal).toHaveBeenCalledWith(goal.id, { areaId: 'a2' })
+  })
+})
+
 describe('GoalsList loading gate', () => {
   it('while loading with no areas, shows "Loading goals…" and not the empty state', () => {
     render(<GoalsList {...baseProps} areas={[]} loading />)

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
-import { Sparkles } from 'lucide-react'
+import { Sparkles, FolderInput } from 'lucide-react'
 import type { Goal, GoalArea, Quarter } from '@/types/goal'
 import type { TaskContext } from '@/types/task'
 import { PAGE_COLUMN } from '@/components/layout/pageLayout'
@@ -20,7 +20,7 @@ interface GoalsListProps {
   onAddArea: (name: string) => Promise<GoalArea | null>
   onRenameArea: (areaId: string, name: string) => void
   onAddGoal: (areaId: string, name: string) => Promise<Goal | null>
-  onUpdateGoal: (goalId: string, updates: { name?: string; context?: TaskContext | null }) => void
+  onUpdateGoal: (goalId: string, updates: { name?: string; context?: TaskContext | null; areaId?: string }) => void
   onDeleteArea: (areaId: string) => void
 }
 
@@ -298,6 +298,8 @@ export function GoalsList({
                         onDismissSharpen={() => sharpen.dismiss(goal.id)}
                         onUseSuggestion={(name) => { onUpdateGoal(goal.id, { name }); sharpen.dismiss(goal.id) }}
                         onSetContext={(context) => onUpdateGoal(goal.id, { context: context ?? null })}
+                        areas={areas}
+                        onMoveToArea={(areaId) => onUpdateGoal(goal.id, { areaId })}
                       />
                     ))}
                   </div>
@@ -320,6 +322,8 @@ interface GoalRowProps {
   onDismissSharpen: () => void
   onUseSuggestion: (name: string) => void
   onSetContext: (context: TaskContext | undefined) => void
+  areas: GoalArea[]
+  onMoveToArea: (areaId: string) => void
 }
 
 /**
@@ -329,8 +333,10 @@ interface GoalRowProps {
  * map so the open action stays a real <button> while the sharpen controls sit
  * beside it (no nested buttons).
  */
-function GoalRow({ goal, sharpenState, onSelect, onSharpen, onDismissSharpen, onUseSuggestion, onSetContext }: GoalRowProps) {
+function GoalRow({ goal, sharpenState, onSelect, onSharpen, onDismissSharpen, onUseSuggestion, onSetContext, areas, onMoveToArea }: GoalRowProps) {
   const [hintDismissed, setHintDismissed] = useState(false)
+  const [moveOpen, setMoveOpen] = useState(false)
+  const otherAreas = areas.filter((a) => a.id !== goal.areaId)
   const vague = looksVague(goal.name)
   const { loading, suggestion, error } = sharpenState
 
@@ -359,6 +365,43 @@ function GoalRow({ goal, sharpenState, onSelect, onSharpen, onDismissSharpen, on
             </svg>
           </div>
         </button>
+        {/* Move to another area — the goal's area is otherwise fixed at
+            creation. Only shown when there's somewhere to move it to. */}
+        {otherAreas.length > 0 && (
+          <div onClick={(e) => e.stopPropagation()} className="relative shrink-0 -mt-1">
+            <button
+              onClick={() => setMoveOpen((o) => !o)}
+              aria-label="Move to area"
+              title="Move to another area"
+              className="p-2 rounded-lg text-neutral-300 hover:text-primary-500 hover:bg-neutral-100 transition-colors"
+            >
+              <FolderInput className="w-4 h-4" />
+            </button>
+            {moveOpen && (
+              <>
+                <button
+                  aria-hidden
+                  tabIndex={-1}
+                  onClick={() => setMoveOpen(false)}
+                  className="fixed inset-0 z-40 cursor-default"
+                />
+                <div className="absolute right-0 top-full mt-1 z-50 min-w-[180px] bg-white rounded-xl border border-neutral-200 shadow-lg p-1.5">
+                  <p className="px-2.5 py-1 text-[11px] font-medium uppercase tracking-wide text-neutral-400">Move to</p>
+                  {otherAreas.map((a) => (
+                    <button
+                      key={a.id}
+                      aria-label={`Move to ${a.name}`}
+                      onClick={() => { onMoveToArea(a.id); setMoveOpen(false) }}
+                      className="w-full px-2.5 py-1.5 text-sm text-left rounded-lg hover:bg-neutral-50 text-neutral-700 truncate"
+                    >
+                      {a.name}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+        )}
         {/* Domain tag — always visible, so any goal can be (re)tagged even after
             creation. Untagged goals (created in the all-domains view) render the
             grey "Set context" state, which is how orphans get a home. */}
