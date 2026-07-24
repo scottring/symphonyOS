@@ -59,4 +59,51 @@ describe('PickByGoalStep', () => {
       'Renew passport', 'quarter', expect.objectContaining({ goalId: undefined, pickedAt: expect.any(Date) }),
     ))
   })
+
+  it('set aside demotes the pick (pickedAt null), never deletes', () => {
+    const onUpdateTask = vi.fn()
+    const host = makeHost({
+      goals: [goal({ id: 'g1', name: 'Every room' })],
+      tasks: [t({ id: 't1', title: 'Fix door', bucket: 'quarter', pickedAt: new Date(), goalId: 'g1' })],
+      onUpdateTask,
+    })
+    renderStep(<PickByGoalStep />, { step, host, horizon: 'seasonal' })
+    fireEvent.click(screen.getByRole('button', { name: /set aside fix door/i }))
+    expect(onUpdateTask).toHaveBeenCalledWith('t1', { pickedAt: null })
+  })
+
+  it('dropping a pick on another goal re-parents it (goalId update)', () => {
+    const onUpdateTask = vi.fn()
+    const host = makeHost({
+      goals: [goal({ id: 'g1', name: 'Budget plan' }), goal({ id: 'g2', name: 'A real local circle' })],
+      tasks: [t({ id: 't1', title: 'Weed the backyard', bucket: 'quarter', pickedAt: new Date(), goalId: 'g1' })],
+      onUpdateTask,
+    })
+    renderStep(<PickByGoalStep />, { step, host, horizon: 'seasonal' })
+    const target = screen.getByText('A real local circle').closest('section')!
+    fireEvent.drop(target, { dataTransfer: { getData: () => 't1' } })
+    expect(onUpdateTask).toHaveBeenCalledWith('t1', { goalId: 'g2' })
+  })
+
+  it('shows a coherence hint on a mis-anchored pick', () => {
+    const host = makeHost({
+      goals: [goal({ id: 'g1', name: 'A budget & investment plan' })],
+      tasks: [t({ id: 't1', title: 'Weed the backyard', bucket: 'quarter', pickedAt: new Date(), goalId: 'g1' })],
+    })
+    renderStep(<PickByGoalStep />, { step, host, horizon: 'seasonal' })
+    expect(screen.getByText(/re-parent/i)).toBeInTheDocument()
+  })
+
+  it('set aside then pick again re-picks with a Date', () => {
+    const onUpdateTask = vi.fn()
+    const host = makeHost({
+      goals: [goal({ id: 'g1', name: 'Every room' })],
+      tasks: [t({ id: 't1', title: 'Fix door', bucket: 'quarter', pickedAt: new Date(), goalId: 'g1' })],
+      onUpdateTask,
+    })
+    renderStep(<PickByGoalStep />, { step, host, horizon: 'seasonal' })
+    fireEvent.click(screen.getByRole('button', { name: /set aside fix door/i }))
+    fireEvent.click(screen.getByRole('button', { name: /pick again fix door/i }))
+    expect(onUpdateTask).toHaveBeenLastCalledWith('t1', { pickedAt: expect.any(Date) })
+  })
 })
