@@ -189,3 +189,36 @@ describe('ReviewStep — goals source', () => {
     expect(screen.getByText(/No goals waiting on a verdict/)).toBeInTheDocument()
   })
 })
+
+describe('ReviewStep — month grain hint', () => {
+  it('flags a week-sized month item and pushes it to the week in one tap', () => {
+    const host = makeHost({ tasks: [task({ id: 'a', title: 'Weed the backyard', bucket: 'month' })] })
+    renderStep(<ReviewStep />, { step: bucketStep, host })
+    expect(screen.getByText(/one sitting/i)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Push "Weed the backyard" to the week' }))
+    expect(host.onSetBucket).toHaveBeenCalledWith('a', 'week')
+  })
+
+  it('names the project cluster on every member', () => {
+    const host = makeHost({
+      tasks: ['Measure the gap', 'Compare two models', 'Sign the quote'].map((title, i) =>
+        task({ id: `c${i}`, title, bucket: 'month', projectId: 'p1' })),
+      projectsMap: new Map([['p1', { id: 'p1', name: 'Kitchen' }]]) as never,
+    })
+    renderStep(<ReviewStep />, { step: bucketStep, host })
+    expect(screen.getAllByText(/3 items on this project/i)).toHaveLength(3)
+  })
+
+  it('says nothing about a month-sized item', () => {
+    const host = makeHost({ tasks: [task({ id: 'a', title: 'Decide what to do with the car', bucket: 'month' })] })
+    renderStep(<ReviewStep />, { step: bucketStep, host })
+    expect(screen.queryByText(/one sitting/i)).not.toBeInTheDocument()
+  })
+
+  it('leaves the week review alone — the hint is a month-altitude check', () => {
+    const weekStep = { ...bucketStep, id: 'week-review', props: { bucket: 'week' as const } }
+    const host = makeHost({ tasks: [task({ id: 'a', title: 'Weed the backyard', bucket: 'week' })] })
+    renderStep(<ReviewStep />, { step: weekStep, host, horizon: 'weekly' })
+    expect(screen.queryByText(/one sitting/i)).not.toBeInTheDocument()
+  })
+})

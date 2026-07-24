@@ -11,6 +11,7 @@ import type { Task, TaskBucket } from '@/types/task'
 import type { Goal } from '@/types/goal'
 import type { Project } from '@/types/project'
 import { goalsWithoutMoves } from '@/lib/planning/lineage'
+import { weekSizedMoves } from '@/lib/planning/moveGrain'
 
 export type CoachTone = 'nudge' | 'ok'
 
@@ -62,6 +63,21 @@ export function computeCoachLines(input: CoachInput): CoachLine[] {
         id: 'stale-carries',
         tone: 'nudge',
         text: `${stale.length === 1 ? 'One item has' : `${stale.length} items have`} been pushed ${CARRY_THRESHOLD}+ times — ${list(stale.map((t) => t.title))}. Make ${stale.length === 1 ? 'it' : 'them'} smaller, hand ${stale.length === 1 ? 'it' : 'them'} off, or park ${stale.length === 1 ? 'it' : 'them'} without guilt.`,
+      })
+    }
+  }
+
+  // ── Month review: the grain check. A month list quietly fills with single
+  // sittings; naming the count once (the rows carry the per-item hint and the
+  // one-tap push) is the honest observation the narration can't make. ──
+  if (input.stepType === 'review' && input.bucket === 'month') {
+    const flagged = weekSizedMoves(input.tasks)
+    if (flagged.size > 0) {
+      const titles = input.tasks.filter((t) => flagged.has(t.id)).map((t) => t.title)
+      lines.push({
+        id: 'week-sized-moves',
+        tone: 'nudge',
+        text: `${flagged.size} ${flagged.size === 1 ? 'item reads' : 'items read'} week-sized rather than month-sized — ${list(titles)}. A month move is one chunk that ends in a result; push the single sittings to a week.`,
       })
     }
   }

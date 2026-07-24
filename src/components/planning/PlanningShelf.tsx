@@ -20,7 +20,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { useDraggable, useDroppable } from '@dnd-kit/core'
 import {
   Sparkles, Plus, MoreHorizontal, X, GitMerge, Archive,
-  CornerRightDown, CalendarClock, Loader2,
+  CornerRightDown, CalendarClock, Loader2, ChevronRight, ChevronDown,
 } from 'lucide-react'
 import type { Task } from '@/types/task'
 import type { TendState } from '@/hooks/useTendWeek'
@@ -64,6 +64,18 @@ export interface PlanningShelfProps {
    *  reframes this as its own curated list (e.g. "July's moves") rather than
    *  a placement queue; week keeps the default. */
   poolLabel?: string
+  /** Optional roll-up: render these sets as ONE collapsed line each (label +
+   *  count) instead of N loose pills, so a month of five backyard steps reads
+   *  as the single move it is. Members expand on tap. Tasks in no group render
+   *  as ordinary pills after the groups. Omit for the flat shelf (week page). */
+  groups?: ShelfGroup[]
+}
+
+export interface ShelfGroup {
+  id: string
+  /** The move this cluster really is — a season pick, or the project. */
+  label: string
+  taskIds: string[]
 }
 
 const DEFAULT_MOVE_DOWN = { label: 'To month', bucket: 'month' as const }
@@ -273,9 +285,10 @@ export function PlanningShelf(props: PlanningShelfProps) {
     draft, onDraftChange, onSubmitDraft, hiddenCount = 0, showingAll = false, onToggleShowAll,
     tend, onApplyProposal, dragMode = 'dndkit', onNativeUnschedule, moveDown = DEFAULT_MOVE_DOWN,
     draftPlaceholder = 'Add to this week…', tendingLabel = 'Tending this week',
-    poolLabel = 'To place',
+    poolLabel = 'To place', groups,
   } = props
   const [expanded, setExpanded] = useState(false)
+  const [openGroups, setOpenGroups] = useState<Set<string>>(() => new Set())
 
   // Carried-over → project-grouped (by name) → loose. Stable within groups.
   const ordered = useMemo(() => {
@@ -294,8 +307,27 @@ export function PlanningShelf(props: PlanningShelfProps) {
     return [...carried, ...[...byProject.values()].flat(), ...loose]
   }, [tasks, carryOverIds, projectsMap])
 
-  const visible = expanded ? ordered : ordered.slice(0, SHELF_COLLAPSED_COUNT)
-  const overflow = ordered.length - visible.length
+  // Rolled-up members leave the flat run; the header count still speaks for
+  // the whole list, so the month reads as "8 moves", not "21 chores".
+  const { rolled, ungrouped } = useMemo(() => {
+    if (!groups || groups.length === 0) return { rolled: [] as { group: ShelfGroup; tasks: Task[] }[], ungrouped: ordered }
+    const byId = new Map(ordered.map((t) => [t.id, t]))
+    const taken = new Set<string>()
+    const rolled = groups.map((group) => {
+      const members: Task[] = []
+      for (const id of group.taskIds) {
+        const t = byId.get(id)
+        if (!t || taken.has(id)) continue
+        taken.add(id)
+        members.push(t)
+      }
+      return { group, tasks: members }
+    }).filter((g) => g.tasks.length > 0)
+    return { rolled, ungrouped: ordered.filter((t) => !taken.has(t.id)) }
+  }, [groups, ordered])
+
+  const visible = expanded ? ungrouped : ungrouped.slice(0, SHELF_COLLAPSED_COUNT)
+  const overflow = ungrouped.length - visible.length
   const carriedCount = ordered.filter((t) => carryOverIds.has(t.id)).length
   const reviewing = tend.status === 'reviewing'
   const Pill = dragMode === 'native' ? NativeShelfPill : ShelfPill
@@ -369,6 +401,34 @@ export function PlanningShelf(props: PlanningShelfProps) {
         </div>
       ) : (
         <div className="flex flex-wrap items-center gap-2">
+          {rolled.map(({ group, tasks: members }) => {
+            const open = openGroups.has(group.id)
+            return (
+              <div key={group.id} className="w-full">
+                <button type="button"
+                  onClick={() => setOpenGroups((prev) => {
+                    const next = new Set(prev)
+                    if (next.has(group.id)) next.delete(group.id); else next.add(group.id)
+                    return next
+                  })}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-primary-200 bg-primary-50/60 px-3 py-1.5 text-sm text-primary-800 hover:bg-primary-100 transition-colors">
+                  {open ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                  <span className="font-medium">{group.label}</span>
+                  <span className="text-primary-600/70">({members.length})</span>
+                </button>
+                {open && (
+                  <div className="mt-2 ml-5 flex flex-wrap items-center gap-2">
+                    {members.map((t) => (
+                      <Pill key={t.id} task={t} carried={carryOverIds.has(t.id)}
+                        projectName={t.projectId ? projectsMap.get(t.projectId)?.name : undefined}
+                        onOpenTask={onOpenTask} onSetBucket={onSetBucket} onDeleteTask={onDeleteTask} onPushTask={onPushTask}
+                        moveDown={moveDown} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          })}
           {visible.map((t) => (
             <Pill key={t.id} task={t} carried={carryOverIds.has(t.id)}
               projectName={t.projectId ? projectsMap.get(t.projectId)?.name : undefined}

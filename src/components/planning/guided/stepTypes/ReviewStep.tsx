@@ -10,10 +10,17 @@ import { TriageWhenMenu } from '@/components/schedule/TriageWhenMenu'
 import { applyTriageWhen } from '@/lib/triage/applyWhen'
 import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
 import { selectOverdue } from '@/lib/today/taskPools'
+import { weekSizedMoves } from '@/lib/planning/moveGrain'
 import type { Task } from '@/types/task'
 import { useGuided } from '../GuidedContext'
 
-export function TaskTriageRow({ task, onCelebrated }: { task: Task; onCelebrated?: (id: string) => void }) {
+export function TaskTriageRow({ task, onCelebrated, grainHint }: {
+  task: Task
+  onCelebrated?: (id: string) => void
+  /** Month altitude only: why this row reads week-sized (moveGrain). Renders a
+   *  quiet line + a one-tap push to the week. Never blocks the other verdicts. */
+  grainHint?: string
+}) {
   const { host } = useGuided()
   const project = task.projectId ? host.projectsMap.get(task.projectId) : undefined
   // Completing is one click; the note is an optional field that appears on the
@@ -58,16 +65,28 @@ export function TaskTriageRow({ task, onCelebrated }: { task: Task; onCelebrated
   }
 
   return (
-    <li className="flex items-start gap-2 rounded-xl border border-neutral-100 bg-white px-3 py-2">
-      <span className="flex-1 min-w-[10rem] text-sm text-neutral-800 leading-snug">
-        {task.title}
-        {project && <span className="text-xs text-neutral-400 whitespace-nowrap"> · {project.name}</span>}
-      </span>
-      <TriageWhenMenu
-        onPick={(when) => applyTriageWhen(when, task.id, { onPushTask: host.onPushTask, onSetBucket: host.onSetBucket })}
-        onPickDate={(date) => host.onPushTask(task.id, date)}
-        onComplete={complete}
-      />
+    <li className="flex flex-col gap-1 rounded-xl border border-neutral-100 bg-white px-3 py-2">
+      <div className="flex items-start gap-2">
+        <span className="flex-1 min-w-[10rem] text-sm text-neutral-800 leading-snug">
+          {task.title}
+          {project && <span className="text-xs text-neutral-400 whitespace-nowrap"> · {project.name}</span>}
+        </span>
+        <TriageWhenMenu
+          onPick={(when) => applyTriageWhen(when, task.id, { onPushTask: host.onPushTask, onSetBucket: host.onSetBucket })}
+          onPickDate={(date) => host.onPushTask(task.id, date)}
+          onComplete={complete}
+        />
+      </div>
+      {grainHint && (
+        <p className="flex items-center gap-2 flex-wrap text-[11px] text-amber-700">
+          <span>{grainHint}</span>
+          <button type="button" aria-label={`Push "${task.title}" to the week`}
+            onClick={() => host.onSetBucket(task.id, 'week')}
+            className="inline-flex items-center gap-1 rounded-md border border-amber-200 px-1.5 py-0.5 font-medium hover:bg-amber-50">
+            <ArrowDownToLine className="w-3 h-3" /> Push to week
+          </button>
+        </p>
+      )}
     </li>
   )
 }
@@ -298,10 +317,13 @@ export function ReviewStep() {
       </ul>
     )
   }
+  // Grain check runs at month altitude only: a week list is SUPPOSED to be
+  // single sittings, so the same hint there would be noise.
+  const grain = step.props?.bucket === 'month' ? weekSizedMoves(pool) : undefined
   return (
     <ul className="space-y-2">
       {pool.map((t) => (
-        <TaskTriageRow key={t.id} task={t}
+        <TaskTriageRow key={t.id} task={t} grainHint={grain?.get(t.id)}
           onCelebrated={(id) => setCelebratedIds((prev) => new Set(prev).add(id))} />
       ))}
     </ul>

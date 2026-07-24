@@ -149,3 +149,43 @@ describe('PlanningShelf', () => {
     expect(props.onSetBucket).toHaveBeenCalledWith(props.tasks[0].id, 'week')
   })
 })
+
+describe('PlanningShelf — grouped roll-up', () => {
+  const grouped = () => ({
+    tasks: [
+      task('m1', 'Weed the backyard', 'proj'),
+      task('m2', 'Put down sand', 'proj'),
+      task('m3', 'Buy a bench', 'proj'),
+      task('l1', 'Decide what to do with the car'),
+    ],
+    carryOverIds: new Set<string>(),
+    groups: [{ id: 'g1', label: 'Porch and backyard', taskIds: ['m1', 'm2', 'm3'] }],
+  })
+
+  it('shows one line per group with its count, not the member pills', () => {
+    renderShelf(grouped())
+    expect(screen.getByRole('button', { name: /Porch and backyard \(3\)/ })).toBeInTheDocument()
+    expect(screen.queryByText('Weed the backyard')).not.toBeInTheDocument()
+    // Ungrouped items stay visible as ordinary pills.
+    expect(screen.getByText('Decide what to do with the car')).toBeInTheDocument()
+  })
+
+  it('expanding a group reveals its members; collapsing hides them again', () => {
+    renderShelf(grouped())
+    fireEvent.click(screen.getByRole('button', { name: /Porch and backyard \(3\)/ }))
+    expect(screen.getByText('Weed the backyard')).toBeInTheDocument()
+    expect(screen.getByText('Put down sand')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Porch and backyard \(3\)/ }))
+    expect(screen.queryByText('Weed the backyard')).not.toBeInTheDocument()
+  })
+
+  it('counts grouped items in the header total', () => {
+    renderShelf({ ...grouped(), poolLabel: "July's moves" })
+    expect(screen.getByText(/July's moves \(4\)/)).toBeInTheDocument()
+  })
+
+  it('without groups it renders exactly as before', () => {
+    renderShelf()
+    expect(screen.getAllByTestId('shelf-pill-title')).toHaveLength(3)
+  })
+})

@@ -16,6 +16,7 @@ import { ScheduleActionsProvider } from '@/contexts/ScheduleActionsContext';
 import { UndoToast } from '@/components/undo/UndoToast';
 import { HorizonExplainer } from '@/components/planning/explainers/HorizonExplainer';
 import { servingCount } from '@/lib/planning/betPulse';
+import { monthShelfGroups } from '@/lib/planning/monthGroups';
 import { readCadenceConfig } from '@/lib/cadence/config';
 import { useTendWeek } from '@/hooks/useTendWeek';
 import { applyProposal } from '@/lib/tend/applyProposal';
@@ -168,6 +169,14 @@ export function MonthPage() {
   // "doesn't have goals yet", shared.tsx's "don't start stay").
   const shelfPoolLabel = `${viewedDate.toLocaleDateString('en-US', { month: 'long' })}'s moves`;
 
+  // Roll-up: steps of the same move read as ONE line (the season pick they
+  // serve, or their project once three-plus pile up). Keeps the month legible
+  // as a plan rather than a chore list — see monthGroups.
+  const shelfGroups = useMemo(
+    () => monthShelfGroups(pool, domainTasks, projectsMap),
+    [pool, domainTasks, projectsMap],
+  );
+
   return (
     <ScheduleActionsProvider value={scheduleActionsValue}>
       <div className="h-full overflow-y-auto">
@@ -216,6 +225,7 @@ export function MonthPage() {
               tasks={pool}
               carryOverIds={NO_CARRY_OVER}
               poolLabel={shelfPoolLabel}
+              groups={shelfGroups}
               projectsMap={projectsMap}
               tasksById={tasksById}
               onOpenTask={(id) => scheduleActionsValue.onOpenTask?.(id)}

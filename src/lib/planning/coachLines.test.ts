@@ -131,3 +131,27 @@ describe('funRatio', () => {
     expect(funRatio([...two, task({ id: '3', title: 'c', isFun: true })]).met).toBe(true)
   })
 })
+
+describe('review: month grain', () => {
+  it('names how many month items read week-sized', () => {
+    const lines = computeCoachLines(input({
+      stepType: 'review', bucket: 'month',
+      tasks: [
+        task({ id: '1', title: 'Weed the backyard', bucket: 'month' }),
+        task({ id: '2', title: 'Try out the umbrella', bucket: 'month' }),
+        task({ id: '3', title: 'Decide what to do with the car', bucket: 'month' }),
+      ],
+    }))
+    const line = lines.find((l) => l.id === 'week-sized-moves')
+    expect(line?.text).toContain('2')
+    expect(line?.text).toContain('Weed the backyard')
+  })
+
+  it('says nothing at week altitude — single sittings belong there', () => {
+    const lines = computeCoachLines(input({
+      stepType: 'review', bucket: 'week',
+      tasks: [task({ id: '1', title: 'Weed the backyard', bucket: 'week' })],
+    }))
+    expect(lines.find((l) => l.id === 'week-sized-moves')).toBeUndefined()
+  })
+})
