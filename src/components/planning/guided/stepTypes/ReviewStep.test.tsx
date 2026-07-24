@@ -107,6 +107,19 @@ describe('ReviewStep — seasonal fate rows', () => {
     fireEvent.keyDown(input, { key: 'Enter' })
     expect(host.onUpdateTask).toHaveBeenCalledWith('q1', { title: 'Fix up the front porch' })
   })
+
+  it('Carry into this season re-picks the item (writes pickedAt) without touching its goalId', () => {
+    const host = makeHost({ tasks: [task({ id: 'q1', title: 'Fix up outdoor spaces', bucket: 'quarter', goalId: 'g1' })] })
+    renderStep(<ReviewStep />, { step: seasonStep, host, horizon: 'seasonal' })
+    fireEvent.click(screen.getByRole('button', { name: /Carry into this season/ }))
+    // Re-picks for the new season by stamping a fresh pickedAt…
+    expect(host.onUpdateTask).toHaveBeenCalledWith('q1', { pickedAt: expect.any(Date) })
+    // …and preserves goalId by omission — it is never part of the update payload.
+    expect(host.onUpdateTask).not.toHaveBeenCalledWith('q1', expect.objectContaining({ goalId: expect.anything() }))
+    // Row stays visible with a Carried tag instead of vanishing mid-step.
+    expect(screen.getByText('Fix up outdoor spaces')).toBeInTheDocument()
+    expect(screen.getByText('Carried')).toBeInTheDocument()
+  })
 })
 
 describe('ReviewStep — someday source', () => {

@@ -5,7 +5,7 @@
 // (daily look-back), or 'goals' (annual goal review). Task rows reuse the
 // canonical TriageWhenMenu; goal rows get Carry forward / Achieved / Let go.
 import { useMemo, useState } from 'react'
-import { Check, Archive, Sparkles, ArrowRight, Pencil, Undo2 } from 'lucide-react'
+import { Check, Archive, Sparkles, ArrowRight, ArrowDownToLine, Pencil, Undo2 } from 'lucide-react'
 import { TriageWhenMenu } from '@/components/schedule/TriageWhenMenu'
 import { applyTriageWhen } from '@/lib/triage/applyWhen'
 import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
@@ -90,7 +90,16 @@ export function SeasonListRow({ task, fate = false, onCelebrated }: { task: Task
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(task.title)
   const [carried, setCarried] = useState(false)
+  // Re-picking for the new season stamps a fresh pickedAt (the pick mechanism);
+  // goalId is left untouched by omission. Local state keeps the row on screen
+  // with a "Carried" tag — same visibility pattern as `celebrated` below.
+  const [carriedInto, setCarriedInto] = useState(false)
   const [celebrated, setCelebrated] = useState(false)
+
+  const carryIntoSeason = () => {
+    setCarriedInto(true)
+    host.onUpdateTask(task.id, { pickedAt: new Date() })
+  }
 
   const save = () => {
     const title = draft.trim()
@@ -143,6 +152,17 @@ export function SeasonListRow({ task, fate = false, onCelebrated }: { task: Task
             <button type="button" onClick={() => setCarried(true)}
               className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md text-primary-700 bg-primary-50 hover:bg-primary-100 transition-colors">
               <ArrowRight className="w-3 h-3" /> Carry forward
+            </button>
+          ))}
+          {fate && (carriedInto ? (
+            <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md text-primary-700 bg-primary-100 shrink-0">
+              <Check className="w-3 h-3" /> Carried
+            </span>
+          ) : (
+            <button type="button" onClick={carryIntoSeason}
+              title="Re-pick this for the season you're planning"
+              className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md text-primary-700 bg-primary-50 hover:bg-primary-100 transition-colors">
+              <ArrowDownToLine className="w-3 h-3" /> Carry into this season
             </button>
           ))}
           <button type="button" onClick={() => { setDraft(task.title); setEditing(true) }}
