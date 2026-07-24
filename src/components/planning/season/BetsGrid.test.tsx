@@ -3,6 +3,7 @@ import { render, screen, fireEvent } from '@/test/test-utils'
 import { BetsGrid } from './BetsGrid'
 import { OverflowTray } from './OverflowTray'
 import { MonthStrip } from './MonthStrip'
+import { PICK_CAP } from '@/lib/planning/betPulse'
 import type { Task } from '@/types/task'
 
 function bet(id: string, title: string, over: Partial<Task> = {}): Task {
@@ -79,10 +80,10 @@ describe('OverflowTray (the shelf)', () => {
 
   it('at the cap, Pick it opens the swap picker and swapping reports both ids', () => {
     const onPick = vi.fn(); const onSwap = vi.fn()
-    const eightPicks = Array.from({ length: 8 }, (_, i) => picked(`p${i}`, `Pick ${i}`))
+    const capPicks = Array.from({ length: PICK_CAP }, (_, i) => picked(`p${i}`, `Pick ${i}`))
     render(
       <OverflowTray items={[bet('b9', 'The challenger')]}
-        picks={eightPicks}
+        picks={capPicks}
         onPick={onPick} onSwap={onSwap}
         onMakeMove={vi.fn()} onShelf={vi.fn()} onLetGo={vi.fn()} />,
     )
@@ -106,7 +107,7 @@ describe('BetsGrid slots', () => {
       />,
     )
     const slots = screen.getAllByRole('button', { name: /open slot/i })
-    expect(slots).toHaveLength(7)
+    expect(slots).toHaveLength(PICK_CAP - 1)
     fireEvent.click(slots[0])
     expect(onSlotClick).toHaveBeenCalled()
   })
@@ -123,7 +124,7 @@ describe('BetsGrid slots', () => {
       />,
     )
     const slots = screen.getAllByRole('button', { name: /open slot/i })
-    expect(slots).toHaveLength(7)
+    expect(slots).toHaveLength(PICK_CAP - 1)
     expect(screen.getByText('Won this season')).toBeInTheDocument()
     expect(screen.getByText('One won pick')).toBeInTheDocument()
   })
