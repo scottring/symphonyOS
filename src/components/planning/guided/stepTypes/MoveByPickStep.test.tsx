@@ -75,7 +75,7 @@ describe('MoveByPickStep', () => {
     renderStep(<MoveByPickStep />, { step, host, horizon: 'monthly' })
     expect(screen.getByText(/On the shelf/)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'File "Buy a bench" under a pick' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Porch & backyard' }))
+    fireEvent.click(screen.getByRole('button', { name: /^Porch & backyard serves/ }))
     expect(onUpdateTask).toHaveBeenCalledWith('m1', { sourceId: 'p1', goalId: 'g1' })
   })
 
@@ -180,6 +180,40 @@ describe('MoveByPickStep', () => {
     const host = makeHost({ tasks: [pick({ id: 'p1', title: 'Porch and backyard', goalId: 'g1' })] })
     renderStep(<MoveByPickStep />, { step, host, horizon: 'monthly' })
     expect(screen.queryByRole('button', { name: /file an existing item/i })).not.toBeInTheDocument()
+  })
+
+  it('puts the shelf FIRST — the unfiled pile is the work, not a footnote', () => {
+    const host = makeHost({
+      goals: [goal({ id: 'g1', name: 'Every room' })],
+      tasks: [
+        pick({ id: 'p1', title: 'Porch and backyard', goalId: 'g1' }),
+        t({ id: 'm1', title: 'Buy a bench', bucket: 'month' }),
+      ],
+    })
+    const { container } = renderStep(<MoveByPickStep />, { step, host, horizon: 'monthly' })
+    const shelf = screen.getByText(/On the shelf/)
+    const firstPick = container.querySelector('[data-pick-id]')!
+    expect(shelf.compareDocumentPosition(firstPick) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it('filing opens a full-width list in place — no cramped scrolling popover', () => {
+    const onUpdateTask = vi.fn()
+    const host = makeHost({
+      goals: [goal({ id: 'g1', name: 'Every room set up for how we actually live' })],
+      tasks: [
+        pick({ id: 'p1', title: 'Porch and backyard', goalId: 'g1' }),
+        t({ id: 'm1', title: 'Buy a bench', bucket: 'month' }),
+      ],
+      onUpdateTask,
+    })
+    renderStep(<MoveByPickStep />, { step, host, horizon: 'monthly' })
+    fireEvent.click(screen.getByRole('button', { name: 'File "Buy a bench" under a pick' }))
+    const option = screen.getByRole('button', { name: /^Porch and backyard serves/ })
+    // Full-width row, and the goal rides along so you can tell picks apart.
+    expect(option.className).toMatch(/w-full/)
+    expect(option.textContent).toMatch(/Every room set up/)
+    fireEvent.click(option)
+    expect(onUpdateTask).toHaveBeenCalledWith('m1', { sourceId: 'p1', goalId: 'g1' })
   })
 
   it('tells you to go pick a season when there are no picks', () => {

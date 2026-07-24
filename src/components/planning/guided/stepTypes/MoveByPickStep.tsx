@@ -1,14 +1,18 @@
 // src/components/planning/guided/stepTypes/MoveByPickStep.tsx
 //
 // Pick-anchored month step — the season step one altitude down. Season = picks
-// under goals; month = MOVES under picks. Sections are this season's picks;
-// under each are the month-bucket moves that thread to it, and the shelf holds
-// month items serving no pick. Filing a move stamps BOTH sourceId (precise
-// pick attribution) and goalId (goal roll-up) — that's what betPulse reads to
-// decide whether a pick is being fed this month. Set-aside un-threads, never
-// deletes. See handoff 2026-07-24 (A).
+// under goals; month = MOVES under picks. Filing a move stamps BOTH sourceId
+// (precise pick attribution) and goalId (goal roll-up) — that's what betPulse
+// reads to decide whether a pick is being fed this month. Set-aside un-threads,
+// never deletes.
+//
+// LAYOUT (revised after walking it on real data): the shelf comes FIRST. The
+// unfiled pile is the work of this step, and burying it under eight pick cards
+// made the one job invisible. Choosing a destination happens IN PLACE, full
+// width, with the pick's goal underneath — the old 260px popover with its own
+// scrollbar made you squint at truncated titles that all start with "Fix".
 import { useMemo, useState } from 'react'
-import { Plus, Check, X, RotateCcw, ChevronDown } from 'lucide-react'
+import { Plus, Check, X, RotateCcw, ChevronDown, ChevronUp } from 'lucide-react'
 import { partitionSeason, partitionMonth } from '@/lib/planning/betPulse'
 import type { Task } from '@/types/task'
 import { useGuided } from '../GuidedContext'
@@ -23,8 +27,9 @@ export function MoveByPickStep() {
   const [dragOverPick, setDragOverPick] = useState<string | null>(null)
   const [asides, setAsides] = useState<Aside[]>([])
   const [lastAside, setLastAside] = useState<string | null>(null)
-  const [shelfMenu, setShelfMenu] = useState<string | null>(null)
-  // Which pick's "file an existing item" menu is open (only one at a time).
+  /** Which shelf item is currently choosing a pick. */
+  const [filing, setFiling] = useState<string | null>(null)
+  /** Which pick is currently choosing an existing item. */
   const [attachPick, setAttachPick] = useState<string | null>(null)
 
   const tasksById = useMemo(() => new Map(host.tasks.map((t) => [t.id, t])), [host.tasks])
@@ -69,8 +74,46 @@ export function MoveByPickStep() {
     )
   }
 
+  const fed = picks.filter((p) => (byPick.get(p.id) ?? []).length > 0).length
+
   return (
     <div className="space-y-4">
+      {/* ── The shelf, first: this is the pile the step exists to empty. ── */}
+      {shelf.length > 0 && (
+        <div className="rounded-2xl border border-primary-100 bg-primary-50/30 p-3">
+          <h3 className="text-sm font-display text-neutral-800">On the shelf ({shelf.length})</h3>
+          <p className="mt-0.5 mb-2 text-xs text-neutral-500">
+            This month&rsquo;s items that don&rsquo;t serve any pick yet. File each one under the pick it
+            moves — anything that genuinely stands alone can stay here.
+          </p>
+          <ul className="space-y-1.5">
+            {shelf.map((item) => (
+              <li key={item.id} draggable
+                onDragStart={(e) => e.dataTransfer.setData('text/plain', item.id)}
+                className="rounded-xl border border-neutral-200 bg-white px-3 py-2 cursor-grab active:cursor-grabbing">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="flex-1 text-sm text-neutral-800 leading-snug">{item.title}</span>
+                  <button type="button" aria-label={`File "${item.title}" under a pick`}
+                    onClick={() => setFiling((m) => (m === item.id ? null : item.id))}
+                    className="shrink-0 inline-flex items-center gap-1 rounded-md border border-dashed border-primary-200 px-2 py-1 text-xs text-primary-700 hover:bg-primary-50">
+                    File under {filing === item.id ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                  </button>
+                </div>
+                {filing === item.id && (
+                  <PickChooser picks={picks} goalName={goalName}
+                    onChoose={(p) => { thread(item.id, p); setFiling(null) }}
+                    onCancel={() => setFiling(null)} />
+                )}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <p className="text-xs text-neutral-400">
+        {fed} of {picks.length} picks have a move this month.
+      </p>
+
       {picks.map((p) => {
         const moves = byPick.get(p.id) ?? []
         const gname = p.goalId ? goalName.get(p.goalId) : undefined
@@ -118,41 +161,24 @@ export function MoveByPickStep() {
                   <Plus className="w-3 h-3" /> Add a move for this month
                 </button>
                 {/* The reciprocal of the shelf's "File under": most months the
-                    move is already written down somewhere, and making you
-                    retype it (or scroll to the shelf) is the wrong ask. */}
+                    move is already written down, and retyping it is the wrong ask. */}
                 {shelf.length > 0 && (
-                  <div className="relative">
-                    <button type="button" aria-label={`File an existing item under "${p.title}"`}
-                      onClick={() => setAttachPick((x) => (x === p.id ? null : p.id))}
-                      className="inline-flex items-center gap-1 text-xs text-neutral-500 border border-dashed border-neutral-200 rounded-md px-2 py-1 hover:bg-neutral-50">
-                      File an existing item <ChevronDown className="w-3 h-3" />
-                    </button>
-                    {attachPick === p.id && (
-                      <>
-                        <button aria-hidden tabIndex={-1} onClick={() => setAttachPick(null)}
-                          className="fixed inset-0 z-40 cursor-default" />
-                        <div className="absolute left-0 top-full z-50 mt-1 min-w-[260px] max-h-64 overflow-auto rounded-xl border border-neutral-200 bg-white p-1.5 shadow-lg">
-                          <p className="px-2.5 py-1 text-[11px] font-medium uppercase tracking-wide text-neutral-400">
-                            On the month list, serving no pick
-                          </p>
-                          {shelf.map((item) => (
-                            <button key={item.id} type="button"
-                              onClick={() => { thread(item.id, p); setAttachPick(null) }}
-                              className="w-full rounded-lg px-2.5 py-1.5 text-left text-sm text-neutral-700 hover:bg-neutral-50">
-                              {item.title}
-                            </button>
-                          ))}
-                        </div>
-                      </>
-                    )}
-                  </div>
+                  <button type="button" aria-label={`File an existing item under "${p.title}"`}
+                    onClick={() => setAttachPick((x) => (x === p.id ? null : p.id))}
+                    className="inline-flex items-center gap-1 text-xs text-neutral-500 border border-dashed border-neutral-200 rounded-md px-2 py-1 hover:bg-neutral-50">
+                    File an existing item {attachPick === p.id ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                  </button>
                 )}
               </div>
             )}
+            {attachPick === p.id && (
+              <ShelfChooser items={shelf}
+                onChoose={(item) => { thread(item.id, p); setAttachPick(null) }}
+                onCancel={() => setAttachPick(null)} />
+            )}
             {/* AI fuel scoped to THIS pick: the pick is the above-list, its
                 existing moves ride in as do-not-duplicate. Tapping a chip is
-                the ONLY write path — it adds the move already threaded.
-                Offline degrades to one quiet line. */}
+                the ONLY write path — it adds the move already threaded. */}
             <div className="mt-2">
               <ListSuggestions
                 bucket="month"
@@ -195,48 +221,63 @@ export function MoveByPickStep() {
           </ul>
         </div>
       )}
+    </div>
+  )
+}
 
-      {shelf.length > 0 && (
-        <div className="rounded-2xl border border-neutral-100 bg-white/70 p-3">
-          <h3 className="text-sm font-display text-neutral-800">On the shelf ({shelf.length})</h3>
-          <p className="mt-0.5 mb-2 text-xs text-neutral-400">
-            This month&rsquo;s items that don&rsquo;t serve any pick yet. File one under a pick — or drag it up.
-            Anything that genuinely stands alone can stay here.
-          </p>
-          <ul className="space-y-1">
-            {shelf.map((item) => (
-              <li key={item.id} draggable
-                onDragStart={(e) => e.dataTransfer.setData('text/plain', item.id)}
-                className="relative flex items-center justify-between gap-2 rounded-lg border border-neutral-100 bg-white px-2.5 py-1.5 text-xs cursor-grab active:cursor-grabbing">
-                <span className="truncate text-neutral-700">{item.title}</span>
-                <div className="relative shrink-0">
-                  <button type="button" aria-label={`File "${item.title}" under a pick`}
-                    onClick={() => setShelfMenu((m) => (m === item.id ? null : item.id))}
-                    className="inline-flex items-center gap-1 rounded-md border border-dashed border-primary-200 px-2 py-0.5 text-primary-700 hover:bg-primary-50">
-                    File under <ChevronDown className="w-3 h-3" />
-                  </button>
-                  {shelfMenu === item.id && (
-                    <>
-                      <button aria-hidden tabIndex={-1} onClick={() => setShelfMenu(null)}
-                        className="fixed inset-0 z-40 cursor-default" />
-                      <div className="absolute right-0 top-full z-50 mt-1 min-w-[240px] max-h-64 overflow-auto rounded-xl border border-neutral-200 bg-white p-1.5 shadow-lg">
-                        <p className="px-2.5 py-1 text-[11px] font-medium uppercase tracking-wide text-neutral-400">File under</p>
-                        {picks.map((p) => (
-                          <button key={p.id} type="button"
-                            onClick={() => { thread(item.id, p); setShelfMenu(null) }}
-                            className="w-full rounded-lg px-2.5 py-1.5 text-left text-sm text-neutral-700 hover:bg-neutral-50">
-                            {p.title}
-                          </button>
-                        ))}
-                      </div>
-                    </>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
+/** Choose a pick, in place. Full-width rows with the goal underneath — the
+ *  picks read alike at a glance ("Fix up the living room" vs "Fix katubah"),
+ *  so the goal is what tells them apart. No inner scrollbar: the page scrolls. */
+function PickChooser({ picks, goalName, onChoose, onCancel }: {
+  picks: Task[]
+  goalName: Map<string, string>
+  onChoose: (p: Task) => void
+  onCancel: () => void
+}) {
+  return (
+    <div className="mt-2 rounded-xl border border-neutral-200 bg-neutral-50/70 p-1.5">
+      <div className="flex items-center justify-between px-1.5 pb-1">
+        <p className="text-[11px] font-medium uppercase tracking-wide text-neutral-400">File under which pick</p>
+        <button type="button" onClick={onCancel}
+          className="text-[11px] text-neutral-400 hover:text-neutral-600">Cancel</button>
+      </div>
+      <div className="space-y-0.5">
+        {picks.map((p) => {
+          const g = p.goalId ? goalName.get(p.goalId) : undefined
+          return (
+            <button key={p.id} type="button" onClick={() => onChoose(p)}
+              className="w-full rounded-lg px-3 py-2 text-left hover:bg-white hover:shadow-sm transition-colors">
+              <span className="block text-sm text-neutral-800 leading-snug">{p.title}</span>
+              {g && <span className="block text-[11px] text-neutral-400">serves {g}</span>}
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+/** The mirror image: choose one of the unfiled month items, in place. */
+function ShelfChooser({ items, onChoose, onCancel }: {
+  items: Task[]
+  onChoose: (t: Task) => void
+  onCancel: () => void
+}) {
+  return (
+    <div className="mt-2 rounded-xl border border-neutral-200 bg-neutral-50/70 p-1.5">
+      <div className="flex items-center justify-between px-1.5 pb-1">
+        <p className="text-[11px] font-medium uppercase tracking-wide text-neutral-400">On the month list, serving no pick</p>
+        <button type="button" onClick={onCancel}
+          className="text-[11px] text-neutral-400 hover:text-neutral-600">Cancel</button>
+      </div>
+      <div className="space-y-0.5">
+        {items.map((t) => (
+          <button key={t.id} type="button" onClick={() => onChoose(t)}
+            className="w-full rounded-lg px-3 py-2 text-left text-sm text-neutral-800 leading-snug hover:bg-white hover:shadow-sm transition-colors">
+            {t.title}
+          </button>
+        ))}
+      </div>
     </div>
   )
 }
