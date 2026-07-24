@@ -26,6 +26,28 @@ export function partitionSeason(tasks: readonly Task[]): { picks: Task[]; bench:
   return { picks, bench }
 }
 
+/** Month-level partition, one altitude down: this month's open moves filed
+ *  under the pick each one serves, plus the shelf (month items serving no
+ *  pick). A move lands under exactly ONE pick even when picks share a goal —
+ *  sourceId (precise attribution) wins, then the first pick with that goalId —
+ *  so nothing renders twice. Pick order is the caller's (pickedAt). */
+export function partitionMonth(
+  picks: readonly Task[],
+  tasks: readonly Task[],
+): { byPick: Map<string, Task[]>; shelf: Task[] } {
+  const byPick = new Map<string, Task[]>(picks.map((p) => [p.id, []]))
+  const shelf: Task[] = []
+  for (const t of tasks) {
+    if (t.completed || t.bucket !== 'month') continue
+    const owner =
+      picks.find((p) => t.sourceId === p.id) ??
+      picks.find((p) => !!p.goalId && t.goalId === p.goalId)
+    if (owner) byPick.get(owner.id)!.push(t)
+    else shelf.push(t)
+  }
+  return { byPick, shelf }
+}
+
 /** Completed picks from the CURRENT season only — a pick doesn't vanish from
  *  /season the moment it's won; it stays visible (won styling) through the
  *  season it was picked in. Scoped by pickedAt's season; a NaN date

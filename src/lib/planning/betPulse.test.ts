@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { partitionSeason, betPulse, servingCount, goalChapters, wonPicks, PICK_CAP } from './betPulse'
+import { partitionSeason, partitionMonth, betPulse, servingCount, goalChapters, wonPicks, PICK_CAP } from './betPulse'
 import type { Task } from '@/types/task'
 
 let n = 0
@@ -105,5 +105,44 @@ describe('goalChapters', () => {
     expect(ch).toHaveLength(2)
     expect(ch[0].label).toBe('Winter 2026')
     expect(ch[1].label).toBe('Winter 2026')
+  })
+})
+
+describe('partitionMonth', () => {
+  it('files each open month move under the pick it threads to; the rest go on the shelf', () => {
+    const pick = task({ id: 'p1', bucket: 'quarter', pickedAt: NOW, goalId: 'g1' })
+    const child = task({ id: 'm1', bucket: 'month', sourceId: 'p1' })
+    const sameGoal = task({ id: 'm2', bucket: 'month', goalId: 'g1' })
+    const loose = task({ id: 'm3', bucket: 'month' })
+    const { byPick, shelf } = partitionMonth([pick], [pick, child, sameGoal, loose])
+    expect(byPick.get('p1')?.map((t) => t.id)).toEqual(['m1', 'm2'])
+    expect(shelf.map((t) => t.id)).toEqual(['m3'])
+  })
+
+  it('files a move under exactly one pick — sourceId wins over a shared goal', () => {
+    const a = task({ id: 'p1', bucket: 'quarter', pickedAt: new Date(2026, 6, 1), goalId: 'g1' })
+    const b = task({ id: 'p2', bucket: 'quarter', pickedAt: new Date(2026, 6, 2), goalId: 'g1' })
+    const move = task({ id: 'm1', bucket: 'month', sourceId: 'p2', goalId: 'g1' })
+    const { byPick } = partitionMonth([a, b], [a, b, move])
+    expect(byPick.get('p1') ?? []).toEqual([])
+    expect(byPick.get('p2')?.map((t) => t.id)).toEqual(['m1'])
+  })
+
+  it('files a goal-only move under the first pick serving that goal (never twice)', () => {
+    const a = task({ id: 'p1', bucket: 'quarter', pickedAt: new Date(2026, 6, 1), goalId: 'g1' })
+    const b = task({ id: 'p2', bucket: 'quarter', pickedAt: new Date(2026, 6, 2), goalId: 'g1' })
+    const move = task({ id: 'm1', bucket: 'month', goalId: 'g1' })
+    const { byPick } = partitionMonth([a, b], [a, b, move])
+    expect(byPick.get('p1')?.map((t) => t.id)).toEqual(['m1'])
+    expect(byPick.get('p2') ?? []).toEqual([])
+  })
+
+  it('ignores completed moves and anything outside the month bucket', () => {
+    const pick = task({ id: 'p1', bucket: 'quarter', pickedAt: NOW, goalId: 'g1' })
+    const done = task({ id: 'm1', bucket: 'month', sourceId: 'p1', completed: true })
+    const weekly = task({ id: 'w1', bucket: 'week', sourceId: 'p1' })
+    const { byPick, shelf } = partitionMonth([pick], [pick, done, weekly])
+    expect(byPick.get('p1') ?? []).toEqual([])
+    expect(shelf).toEqual([])
   })
 })

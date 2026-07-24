@@ -15,6 +15,7 @@ import { BookNextStep } from './BookNextStep'
 import { WinsStep } from './WinsStep'
 import { MaintenanceStep } from './MaintenanceStep'
 import { PickByGoalStep } from './PickByGoalStep'
+import { MoveByPickStep } from './MoveByPickStep'
 
 registerStepType('narration', NarrationStep)
 registerStepType('reflect', ReflectStep)
@@ -30,3 +31,4 @@ registerStepType('book-next', BookNextStep)
 registerStepType('wins', WinsStep)
 registerStepType('maintenance', MaintenanceStep)
 registerStepType('pick-by-goal', PickByGoalStep)
+registerStepType('move-by-pick', MoveByPickStep)

@@ -150,8 +150,12 @@ export const SESSIONS: Record<PlanningHorizon, GuidedSessionConfig> = {
         narration: "Your projects in motion, for reference. A month moves a project one concrete chunk at a time — an order placed, a call made, a decision written down. Let these suggest month-sized moves for the list you’re about to write.",
       },
       {
-        id: 'write-month', type: 'write-list', title: "Write the month’s list",
-        narration: "Write the month’s list. Keep it honest — and build the fun on purpose: one big experience, a few social things, maybe a themed quest. A month with nothing to look forward to is a scheduling failure.",
+        id: 'move-by-pick', type: 'move-by-pick', title: 'Move the season, pick by pick',
+        narration: "Now the heart of the month. Here are this season’s picks. Under each one, name the move this month makes — the concrete chunk that would leave that pick further along than it is today. Anything already on your month list that serves a pick, file it there. A pick with no move this month is a pick that quietly stops moving.",
+      },
+      {
+        id: 'write-month', type: 'write-list', title: "Everything else the month needs",
+        narration: "Now everything the month needs that no pick covers — the household load, the appointments, the fun. Build the fun on purpose: one big experience, a few social things, maybe a themed quest. A month with nothing to look forward to is a scheduling failure.",
         props: { bucket: 'month', rows: 'plain', funComposition: true },
       },
       {

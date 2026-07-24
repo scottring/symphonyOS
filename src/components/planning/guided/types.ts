@@ -23,6 +23,7 @@ export type StepType =
   | 'wins'           // monthly opener: completed moves, read-only celebration
   | 'maintenance'    // monthly: sweep the "Monthly upkeep" template into month moves
   | 'pick-by-goal'   // goal-anchored season picker
+  | 'move-by-pick'   // pick-anchored month step (one altitude down)
 
 export interface GuidedStepConfig {
   /** Unique within the session; keys the narration manifest as `<horizon>.<id>`. */
