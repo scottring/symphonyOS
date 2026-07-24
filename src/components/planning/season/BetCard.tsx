@@ -1,4 +1,4 @@
-import { Check, Target, ArrowDown } from 'lucide-react'
+import { Check, ArrowDown } from 'lucide-react'
 import type { Task } from '@/types/task'
 import type { Goal } from '@/types/goal'
 import { betPulse } from '@/lib/planning/betPulse'
@@ -38,8 +38,10 @@ export function BetCard({ bet, tasks, goalsById, onSelect, onComplete, onDemote,
         </button>
       </div>
       {goal ? (
-        <p className="mt-1.5 flex items-center gap-1 text-[11px] text-primary-700">
-          <Target aria-hidden="true" className="w-3 h-3" /> {goal.name}
+        // The read side of the thread: a quiet breadcrumb back to the goal this
+        // pick serves (muted caption, truncated to one line inside the card).
+        <p className="mt-1.5 text-[11px] text-neutral-400 truncate" title={goal.name}>
+          ← {goal.name}
         </p>
       ) : (
         <p className="mt-1.5 text-[11px] text-neutral-400">seasonal</p>

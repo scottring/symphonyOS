@@ -9,7 +9,7 @@
 // horizon fixed to 'season').
 
 import { PAGE_COLUMN } from '@/components/layout/pageLayout';
-import { CalendarRange, Plus, Sparkles } from 'lucide-react';
+import { CalendarRange, Plus, Sparkles, Target } from 'lucide-react';
 import { ScheduleActionsProvider } from '@/contexts/ScheduleActionsContext';
 import { UndoToast } from '@/components/undo/UndoToast';
 import { HorizonExplainer } from '@/components/planning/explainers/HorizonExplainer';
@@ -21,6 +21,7 @@ import { FocusLine } from '@/components/planning/season/FocusLine';
 import { matchesDomain } from '@/lib/today/domainFilter';
 import { partitionSeason, PICK_CAP } from '@/lib/planning/betPulse';
 import { looksLikeActivity } from '@/lib/planning/outcomeCoach';
+import { goalsWithoutMoves } from '@/lib/planning/lineage';
 import { CascadeRail, useHorizonPageData } from './shared';
 
 export function SeasonPage() {
@@ -33,10 +34,21 @@ export function SeasonPage() {
     seasonNotes, patchSeasonNotes, composerRef, draft, setDraft, submitDraft,
     sharpenBet, sharpenBetLoading, goals, currentDomain, areas, addGoal,
     handleLetGo, referenceFold,
+    setRefOpen, setTranslatingRefId, setRefDraft,
     scheduleActionsValue, undo,
   } = useHorizonPageData(horizon);
 
   const { picks, bench } = partitionSeason(domainTasks);
+
+  // The read side of the thread, at the season altitude: active goals (this
+  // domain) that carry no season pick yet. Domain-filtered on both sides —
+  // domainTasks for coverage, the goal list for the goals themselves — so a
+  // work goal never surfaces on the Family season page.
+  const uncovered = goalsWithoutMoves(
+    goals.filter((g) => matchesDomain(g.context, currentDomain)),
+    domainTasks,
+    'quarter',
+  );
 
   return (
     <ScheduleActionsProvider value={scheduleActionsValue}>
@@ -191,6 +203,35 @@ export function SeasonPage() {
                 </div>
               </aside>
             </div>
+
+            {/* Coverage — the year goals this season hasn't picked up yet. A
+                quiet coach nudge under the picks; each goal is one tap into the
+                same goal-anchored "add a season move" composer the reference
+                fold opens (setTranslatingRefId), so the new pick threads back
+                to its goal. Shown only when something is uncovered. */}
+            {uncovered.length > 0 && (
+              <section className="mt-8">
+                <h2 className="font-display text-sm tracking-wide text-neutral-400 uppercase mb-3">
+                  Goals not yet picked this season
+                </h2>
+                <ul className="flex flex-wrap gap-2">
+                  {uncovered.map((g) => (
+                    <li key={g.id}>
+                      <button
+                        type="button"
+                        onClick={() => { setRefOpen(true); setTranslatingRefId(g.id); setRefDraft(''); }}
+                        title={`Pick a season move for “${g.name}”`}
+                        className="inline-flex items-center gap-1.5 text-sm px-3 py-1.5 rounded-full border border-neutral-200 text-neutral-600 hover:border-primary-300 hover:text-primary-700 hover:bg-primary-50/50 transition-colors"
+                      >
+                        <Target aria-hidden="true" className="w-3.5 h-3.5 text-neutral-400" />
+                        <span className="truncate max-w-[220px]">{g.name}</span>
+                        <Plus aria-hidden="true" className="w-3.5 h-3.5" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
 
             <OverflowTray
               collapsible

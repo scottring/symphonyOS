@@ -7,13 +7,14 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@/test/test-utils'
-import { render as rtlRender, fireEvent } from '@testing-library/react'
+import { render as rtlRender, fireEvent, within } from '@testing-library/react'
 import { MemoryRouter, useNavigate } from 'react-router-dom'
 import { PlaceProvider } from '@/hooks/usePlace'
 import { DomainProvider } from '@/hooks/useDomain'
 import { createMockTask } from '@/test/mocks/factories'
 import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
 import type { Task } from '@/types/task'
+import type { Goal } from '@/types/goal'
 
 // ── Context/selection hooks that throw without a real provider: mock them
 // directly (same pattern as src/components/omnibox/OmniboxResults.test.tsx). ──
@@ -24,7 +25,7 @@ vi.mock('@/contexts/ListsContext', () => ({
   useListsContext: () => ({ lists: [], listsByCategory: {} }),
 }))
 vi.mock('@/contexts/GoalsContext', () => ({
-  useGoalsContext: () => ({ areas: [], goals: [], addGoal: vi.fn() }),
+  useGoalsContext: () => ({ areas: [], goals: mockGoals, addGoal: vi.fn() }),
 }))
 
 // ── Data hooks: empty fixtures are enough for an empty-state smoke render.
@@ -34,9 +35,10 @@ vi.mock('@/contexts/GoalsContext', () => ({
 // tests. ──
 // `mockUpdateTask` is hoisted (not a fresh `vi.fn()` per hook call) so tests
 // can assert on calls made through it — e.g. MonthPage's onPlaceTask wiring.
-const { mockTasks, mockUpdateTask } = vi.hoisted(() => ({
+const { mockTasks, mockUpdateTask, mockGoals } = vi.hoisted(() => ({
   mockTasks: [] as unknown[],
   mockUpdateTask: vi.fn(),
+  mockGoals: [] as Goal[],
 }))
 vi.mock('@/hooks/useSupabaseTasks', () => ({
   useSupabaseTasks: () => ({
@@ -126,7 +128,7 @@ function todayGridCell(container: HTMLElement): HTMLElement {
 }
 
 describe('horizon pages (smoke)', () => {
-  beforeEach(() => { mockTasks.length = 0; mockUpdateTask.mockClear() })
+  beforeEach(() => { mockTasks.length = 0; mockGoals.length = 0; mockUpdateTask.mockClear() })
 
   it('WeekPage renders the week scaffold with an empty pool', () => {
     render(<WeekPage />)
@@ -226,6 +228,31 @@ describe('horizon pages (smoke)', () => {
   it("SeasonPage renders the season's picks panel", () => {
     render(<SeasonPage />)
     expect(screen.getByText("The season's picks")).toBeInTheDocument()
+  })
+
+  it('SeasonPage surfaces an active goal with no season pick in the coverage row', () => {
+    mockGoals.push({
+      id: 'g1', areaId: 'a1', name: 'Financial calm', year: 2026,
+      context: null, status: 'active', sortOrder: 0,
+      actions: [], milestones: [], createdAt: new Date(), updatedAt: new Date(),
+    } satisfies Goal)
+    render(<SeasonPage />)
+    const heading = screen.getByText('Goals not yet picked this season')
+    const section = heading.closest('section')!
+    expect(within(section).getByText('Financial calm')).toBeInTheDocument()
+  })
+
+  it('SeasonPage hides the coverage row when every active goal has a season pick', () => {
+    mockGoals.push({
+      id: 'g1', areaId: 'a1', name: 'Financial calm', year: 2026,
+      context: null, status: 'active', sortOrder: 0,
+      actions: [], milestones: [], createdAt: new Date(), updatedAt: new Date(),
+    } satisfies Goal)
+    mockTasks.push(createMockTask({
+      id: 'pick-1', title: 'A money plan we follow', bucket: 'quarter', goalId: 'g1',
+    }) satisfies Task)
+    render(<SeasonPage />)
+    expect(screen.queryByText('Goals not yet picked this season')).not.toBeInTheDocument()
   })
 
   it('YearPage renders the plan-the-year door', () => {
