@@ -22,6 +22,7 @@ export type StepType =
   | 'book-next'      // create next session's calendar item
   | 'wins'           // monthly opener: completed moves, read-only celebration
   | 'maintenance'    // monthly: sweep the "Monthly upkeep" template into month moves
+  | 'pick-by-goal'   // goal-anchored season picker
 
 export interface GuidedStepConfig {
   /** Unique within the session; keys the narration manifest as `<horizon>.<id>`. */
@@ -65,6 +66,8 @@ export interface GuidedStepConfig {
     /** calendar: render the annual 12-month landscape (with zoom-into-month)
      *  instead of the per-month commitment counts. Year session only. */
     landscape?: boolean
+    /** pick-by-goal: goal-less "doesn't serve a goal" mode. */
+    standalone?: boolean
   }
 }
 

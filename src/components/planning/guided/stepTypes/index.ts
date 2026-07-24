@@ -14,6 +14,7 @@ import { DomainsGoalsStep } from './DomainsGoalsStep'
 import { BookNextStep } from './BookNextStep'
 import { WinsStep } from './WinsStep'
 import { MaintenanceStep } from './MaintenanceStep'
+import { PickByGoalStep } from './PickByGoalStep'
 
 registerStepType('narration', NarrationStep)
 registerStepType('reflect', ReflectStep)
@@ -28,3 +29,4 @@ registerStepType('domains-goals', DomainsGoalsStep)
 registerStepType('book-next', BookNextStep)
 registerStepType('wins', WinsStep)
 registerStepType('maintenance', MaintenanceStep)
+registerStepType('pick-by-goal', PickByGoalStep)
