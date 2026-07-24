@@ -5,6 +5,11 @@ import { renderStep, makeHost } from './testHarness'
 import type { Task } from '@/types/task'
 import type { Goal } from '@/types/goal'
 
+// Same suggest mechanism the season step uses (streamSymphonyAgent →
+// parseSuggestions), mocked so tapping a chip is the only write path.
+const stream = vi.hoisted(() => vi.fn())
+vi.mock('@/lib/agentStream', () => ({ streamSymphonyAgent: stream }))
+
 const step = {
   id: 'move-by-pick', type: 'move-by-pick' as const, title: 'Move the season',
   narration: 'Under each pick, what moves it this month?',
@@ -118,6 +123,37 @@ describe('MoveByPickStep', () => {
     fireEvent.click(screen.getByRole('button', { name: /set aside weed the backyard/i }))
     fireEvent.click(screen.getByRole('button', { name: /file again weed the backyard/i }))
     expect(onUpdateTask).toHaveBeenLastCalledWith('m1', { sourceId: 'p1', goalId: 'g1' })
+  })
+
+  it('Suggest moves renders AI chips scoped to the pick; tapping one adds it threaded (tap is the only write path)', async () => {
+    stream.mockImplementation(async (_msgs: unknown, handlers: { onDone?: (r: string, e: unknown) => void }) => {
+      handlers.onDone?.('["Price two benches and pick one", "Book the sand delivery"]', null)
+    })
+    const createTaskInBucket = vi.fn().mockResolvedValue(undefined)
+    const host = makeHost({
+      goals: [goal({ id: 'g1', name: 'Every room set up for how we actually live' })],
+      tasks: [
+        pick({ id: 'p1', title: 'Porch and backyard set up for guests', goalId: 'g1' }),
+        t({ id: 'm1', title: 'Weed the backyard', bucket: 'month', sourceId: 'p1', goalId: 'g1' }),
+      ],
+      createTaskInBucket,
+    })
+    renderStep(<MoveByPickStep />, { step, host, horizon: 'monthly' })
+
+    // Quiet until asked — no stream call on render.
+    expect(stream).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: /suggest moves/i }))
+    await waitFor(() => expect(screen.getByText('Price two benches and pick one')).toBeInTheDocument())
+
+    // The pick and its existing move ride in the prompt so the AI won't duplicate.
+    const prompt = stream.mock.calls[0][0][0].content as string
+    expect(prompt).toContain('Porch and backyard set up for guests')
+    expect(prompt).toContain('Weed the backyard')
+
+    fireEvent.click(screen.getByText('Book the sand delivery'))
+    await waitFor(() => expect(createTaskInBucket).toHaveBeenCalledWith(
+      'Book the sand delivery', 'month', { sourceId: 'p1', goalId: 'g1' },
+    ))
   })
 
   it('tells you to go pick a season when there are no picks', () => {

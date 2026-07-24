@@ -12,6 +12,7 @@ import { Plus, Check, X, RotateCcw, ChevronDown } from 'lucide-react'
 import { partitionSeason, partitionMonth } from '@/lib/planning/betPulse'
 import type { Task } from '@/types/task'
 import { useGuided } from '../GuidedContext'
+import { ListSuggestions } from '../ListSuggestions'
 
 /** What we remember about a set-aside move so "File again" can put it back. */
 type Aside = { id: string; sourceId?: string; goalId?: string }
@@ -114,6 +115,21 @@ export function MoveByPickStep() {
                 <Plus className="w-3 h-3" /> Add a move for this month
               </button>
             )}
+            {/* AI fuel scoped to THIS pick: the pick is the above-list, its
+                existing moves ride in as do-not-duplicate. Tapping a chip is
+                the ONLY write path — it adds the move already threaded.
+                Offline degrades to one quiet line. */}
+            <div className="mt-2">
+              <ListSuggestions
+                bucket="month"
+                aboveItems={[p.title]}
+                aboveLabel={`the season pick “${p.title}”`}
+                existingItems={moves.map((m) => m.title)}
+                onPick={(title) => void addMove(p, title)}
+                suggestLabel="Suggest moves"
+                pickCta="Tap to add it as this month’s move for this pick."
+              />
+            </div>
           </section>
         )
       })}
