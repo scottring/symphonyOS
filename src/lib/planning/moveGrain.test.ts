@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { looksSingleSitting, weekSizedMoves } from './moveGrain'
+import { looksSingleSitting, weekSizedMoves, clusterMoves } from './moveGrain'
 import type { Task } from '@/types/task'
 
 let n = 0
@@ -65,5 +65,25 @@ describe('weekSizedMoves', () => {
     const done = task({ id: 'd1', title: 'Weed the backyard', completed: true })
     const weekly = task({ id: 'w1', title: 'Weed the backyard', bucket: 'week' })
     expect(weekSizedMoves([done, weekly]).size).toBe(0)
+  })
+})
+
+describe('clusterMoves', () => {
+  it('returns one cluster per project with 3+ open month items', () => {
+    const cluster = ['Weed the backyard', 'Put down sand', 'Buy a bench'].map((title, i) =>
+      task({ id: `c${i}`, title, projectId: 'proj' }))
+    const pair = ['Order the dishwasher', 'Book the plumber'].map((title, i) =>
+      task({ id: `k${i}`, title, projectId: 'kitchen' }))
+    expect(clusterMoves([...cluster, ...pair])).toEqual([{ projectId: 'proj', taskIds: ['c0', 'c1', 'c2'] }])
+  })
+
+  it('ignores completed items, other buckets, and project-less items', () => {
+    const items = [
+      task({ id: 'a', title: 'one', projectId: 'proj' }),
+      task({ id: 'b', title: 'two', projectId: 'proj', completed: true }),
+      task({ id: 'c', title: 'three', projectId: 'proj', bucket: 'week' }),
+      task({ id: 'd', title: 'four' }),
+    ]
+    expect(clusterMoves(items)).toEqual([])
   })
 })

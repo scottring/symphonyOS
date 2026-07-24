@@ -1,5 +1,5 @@
 // src/components/planning/guided/stepTypes/ReviewStep.test.tsx
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { screen, fireEvent } from '@testing-library/react'
 import { ReviewStep } from './ReviewStep'
 import { renderStep, makeHost } from './testHarness'
@@ -199,14 +199,37 @@ describe('ReviewStep — month grain hint', () => {
     expect(host.onSetBucket).toHaveBeenCalledWith('a', 'week')
   })
 
-  it('names the project cluster on every member', () => {
+  it('collapses a project cluster into ONE row with a bulk push, not N repeated hints', () => {
+    const onSetBucket = vi.fn()
+    const host = makeHost({
+      tasks: ['Measure the gap', 'Compare two models', 'Sign the quote'].map((title, i) =>
+        task({ id: `c${i}`, title, bucket: 'month', projectId: 'p1' })),
+      projectsMap: new Map([['p1', { id: 'p1', name: 'Kitchen' }]]) as never,
+      onSetBucket,
+    })
+    renderStep(<ReviewStep />, { step: bucketStep, host })
+    // One line for the cluster; the members are not listed.
+    expect(screen.getByText('Kitchen')).toBeInTheDocument()
+    expect(screen.queryByText('Measure the gap')).not.toBeInTheDocument()
+    expect(screen.getByText(/one move, three week steps/i)).toBeInTheDocument()
+    // One action, at the cluster's grain.
+    fireEvent.click(screen.getByRole('button', { name: /push all 3 to the week/i }))
+    expect(onSetBucket).toHaveBeenCalledTimes(3)
+    expect(onSetBucket).toHaveBeenCalledWith('c0', 'week')
+    expect(onSetBucket).toHaveBeenCalledWith('c2', 'week')
+  })
+
+  it('the cluster opens up when you want the individual fates', () => {
     const host = makeHost({
       tasks: ['Measure the gap', 'Compare two models', 'Sign the quote'].map((title, i) =>
         task({ id: `c${i}`, title, bucket: 'month', projectId: 'p1' })),
       projectsMap: new Map([['p1', { id: 'p1', name: 'Kitchen' }]]) as never,
     })
     renderStep(<ReviewStep />, { step: bucketStep, host })
-    expect(screen.getAllByText(/3 items on this project/i)).toHaveLength(3)
+    fireEvent.click(screen.getByRole('button', { name: /show the 3/i }))
+    expect(screen.getByText('Measure the gap')).toBeInTheDocument()
+    // No repeated per-row cluster hint inside the expanded cluster.
+    expect(screen.queryByText(/3 items on this project/i)).not.toBeInTheDocument()
   })
 
   it('says nothing about a month-sized item', () => {

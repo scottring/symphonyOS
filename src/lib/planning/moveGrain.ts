@@ -44,12 +44,17 @@ export function looksSingleSitting(title: string): boolean {
 
 const CLUSTER_THRESHOLD = 3
 
-/** Open month items that read week-sized → id ⇒ human reason. Empty map when
- *  the list is honestly month-grained. */
-export function weekSizedMoves(tasks: readonly Task[]): Map<string, string> {
-  const open = tasks.filter((t) => !t.completed && t.bucket === 'month')
-  const flagged = new Map<string, string>()
+export interface MoveCluster {
+  projectId: string
+  taskIds: string[]
+}
 
+/** Projects with enough open month items that the PROJECT, not the item, is
+ *  the month's unit. The caller renders one row per cluster with one bulk
+ *  action — a per-item hint repeated N times says the same thing N times and
+ *  offers the wrong grain of fix. */
+export function clusterMoves(tasks: readonly Task[]): MoveCluster[] {
+  const open = tasks.filter((t) => !t.completed && t.bucket === 'month')
   const byProject = new Map<string, Task[]>()
   for (const t of open) {
     if (!t.projectId) continue
@@ -57,10 +62,23 @@ export function weekSizedMoves(tasks: readonly Task[]): Map<string, string> {
     arr.push(t)
     byProject.set(t.projectId, arr)
   }
-  for (const members of byProject.values()) {
+  const clusters: MoveCluster[] = []
+  for (const [projectId, members] of byProject) {
     if (members.length < CLUSTER_THRESHOLD) continue
-    for (const m of members) {
-      flagged.set(m.id, `${members.length} items on this project — together they're one month move, separately they're week steps.`)
+    clusters.push({ projectId, taskIds: members.map((t) => t.id) })
+  }
+  return clusters
+}
+
+/** Open month items that read week-sized → id ⇒ human reason. Empty map when
+ *  the list is honestly month-grained. */
+export function weekSizedMoves(tasks: readonly Task[]): Map<string, string> {
+  const open = tasks.filter((t) => !t.completed && t.bucket === 'month')
+  const flagged = new Map<string, string>()
+
+  for (const cluster of clusterMoves(open)) {
+    for (const id of cluster.taskIds) {
+      flagged.set(id, `${cluster.taskIds.length} items on this project — together they're one month move, separately they're week steps.`)
     }
   }
 

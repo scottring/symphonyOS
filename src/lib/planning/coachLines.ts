@@ -11,7 +11,7 @@ import type { Task, TaskBucket } from '@/types/task'
 import type { Goal } from '@/types/goal'
 import type { Project } from '@/types/project'
 import { goalsWithoutMoves } from '@/lib/planning/lineage'
-import { weekSizedMoves } from '@/lib/planning/moveGrain'
+import { weekSizedMoves, clusterMoves } from '@/lib/planning/moveGrain'
 
 export type CoachTone = 'nudge' | 'ok'
 
@@ -71,13 +71,25 @@ export function computeCoachLines(input: CoachInput): CoachLine[] {
   // sittings; naming the count once (the rows carry the per-item hint and the
   // one-tap push) is the honest observation the narration can't make. ──
   if (input.stepType === 'review' && input.bucket === 'month') {
+    const clusters = clusterMoves(input.tasks)
+    const clustered = new Set(clusters.flatMap((c) => c.taskIds))
     const flagged = weekSizedMoves(input.tasks)
-    if (flagged.size > 0) {
-      const titles = input.tasks.filter((t) => flagged.has(t.id)).map((t) => t.title)
+    // A cluster is named ONCE, as the move it is — listing its seven steps
+    // here would repeat on screen exactly what the collapsed row already says.
+    const clusterPhrases = clusters.map((c) => {
+      const name = input.projects.find((p) => p.id === c.projectId)?.name ?? 'one project'
+      return `“${name}” has ${c.taskIds.length} steps on the list — that's one move`
+    })
+    const loose = input.tasks.filter((t) => flagged.has(t.id) && !clustered.has(t.id))
+    const parts: string[] = [...clusterPhrases]
+    if (loose.length > 0) {
+      parts.push(`${loose.length} ${loose.length === 1 ? 'item reads' : 'items read'} like a single sitting — ${list(loose.map((t) => t.title))}`)
+    }
+    if (parts.length > 0) {
       lines.push({
         id: 'week-sized-moves',
         tone: 'nudge',
-        text: `${flagged.size} ${flagged.size === 1 ? 'item reads' : 'items read'} week-sized rather than month-sized — ${list(titles)}. A month move is one chunk that ends in a result; push the single sittings to a week.`,
+        text: `${parts.join('; ')}. A month move is one chunk that ends in a result; the steps belong on a week.`,
       })
     }
   }

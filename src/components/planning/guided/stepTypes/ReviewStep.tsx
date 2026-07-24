@@ -10,7 +10,7 @@ import { TriageWhenMenu } from '@/components/schedule/TriageWhenMenu'
 import { applyTriageWhen } from '@/lib/triage/applyWhen'
 import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
 import { selectOverdue } from '@/lib/today/taskPools'
-import { weekSizedMoves } from '@/lib/planning/moveGrain'
+import { weekSizedMoves, clusterMoves, type MoveCluster } from '@/lib/planning/moveGrain'
 import type { Task } from '@/types/task'
 import { useGuided } from '../GuidedContext'
 
@@ -318,14 +318,82 @@ export function ReviewStep() {
     )
   }
   // Grain check runs at month altitude only: a week list is SUPPOSED to be
-  // single sittings, so the same hint there would be noise.
-  const grain = step.props?.bucket === 'month' ? weekSizedMoves(pool) : undefined
+  // single sittings, so the same hint there would be noise. Clusters collapse
+  // to ONE row — the same sentence repeated on seven rows, each offering to
+  // move one of the seven, is the wrong grain of help.
+  const isMonth = step.props?.bucket === 'month'
+  const clusters = isMonth ? clusterMoves(pool) : []
+  const clustered = new Set(clusters.flatMap((c) => c.taskIds))
+  const grain = isMonth ? weekSizedMoves(pool) : undefined
+  const byId = new Map(pool.map((t) => [t.id, t]))
+  const onCelebrated = (id: string) => setCelebratedIds((prev) => new Set(prev).add(id))
   return (
     <ul className="space-y-2">
-      {pool.map((t) => (
+      {clusters.map((c) => (
+        <ClusterRow key={c.projectId} cluster={c}
+          name={host.projectsMap.get(c.projectId)?.name ?? 'This project'}
+          tasks={c.taskIds.map((id) => byId.get(id)).filter((t): t is Task => !!t)}
+          onCelebrated={onCelebrated} />
+      ))}
+      {pool.filter((t) => !clustered.has(t.id)).map((t) => (
         <TaskTriageRow key={t.id} task={t} grainHint={grain?.get(t.id)}
-          onCelebrated={(id) => setCelebratedIds((prev) => new Set(prev).add(id))} />
+          onCelebrated={onCelebrated} />
       ))}
     </ul>
+  )
+}
+
+const COUNT_WORD = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten']
+const spell = (n: number) => COUNT_WORD[n] ?? String(n)
+
+/** A project's month items, as the ONE move they actually are. One line, one
+ *  action at the cluster's grain (push every step down to the week), and an
+ *  opener for when a member needs its own fate. */
+function ClusterRow({ cluster, name, tasks, onCelebrated }: {
+  cluster: MoveCluster
+  name: string
+  tasks: Task[]
+  onCelebrated: (id: string) => void
+}) {
+  const { host } = useGuided()
+  const [open, setOpen] = useState(false)
+  const [pushed, setPushed] = useState(false)
+  const n = cluster.taskIds.length
+
+  if (pushed) {
+    return (
+      <li className="flex items-center gap-2 rounded-xl border border-primary-100 bg-primary-50/40 px-3 py-2 text-sm">
+        <Check className="w-3.5 h-3.5 text-primary-600 shrink-0" strokeWidth={3} />
+        <span className="flex-1 text-neutral-700">{name}</span>
+        <span className="text-xs font-medium text-primary-700">{n} steps moved to the week</span>
+      </li>
+    )
+  }
+
+  return (
+    <li className="rounded-xl border border-amber-200/70 bg-amber-50/30 px-3 py-2">
+      <div className="flex items-start gap-2 flex-wrap">
+        <span className="flex-1 min-w-[10rem] text-sm text-neutral-800 leading-snug">{name}</span>
+        <button type="button"
+          onClick={() => { for (const id of cluster.taskIds) host.onSetBucket(id, 'week'); setPushed(true) }}
+          className="inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-md text-white bg-primary-600 hover:bg-primary-700 transition-colors">
+          <ArrowDownToLine className="w-3 h-3" /> Push all {n} to the week
+        </button>
+        <button type="button" onClick={() => setOpen((v) => !v)}
+          className="text-xs font-medium px-2 py-1 rounded-md text-neutral-500 hover:bg-neutral-100 transition-colors">
+          {open ? 'Hide' : `Show the ${n}`}
+        </button>
+      </div>
+      <p className="mt-0.5 text-[11px] text-amber-700">
+        {n} steps on the month list — one move, {spell(n)} week steps.
+      </p>
+      {open && (
+        <ul className="mt-2 space-y-2">
+          {tasks.map((t) => (
+            <TaskTriageRow key={t.id} task={t} onCelebrated={onCelebrated} />
+          ))}
+        </ul>
+      )}
+    </li>
   )
 }
