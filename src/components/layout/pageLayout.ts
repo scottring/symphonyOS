@@ -16,3 +16,8 @@ export const PAGE_COLUMN = `w-full max-w-[940px] ${PAGE_GUTTER}`
 
 /** Wide column — detail pages that need more room (e.g. project detail). */
 export const PAGE_COLUMN_WIDE = `w-full max-w-[1152px] ${PAGE_GUTTER}`
+
+/** Full-bleed column — hands-on WORK pages (e.g. /season) where a narrow column
+ *  cramps a two-pane grid and wastes the right half of a wide screen. No
+ *  max-width: fills the available width (minus gutter and any open pane). */
+export const PAGE_COLUMN_FULL = `w-full ${PAGE_GUTTER}`

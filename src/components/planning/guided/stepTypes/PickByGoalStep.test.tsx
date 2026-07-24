@@ -77,6 +77,32 @@ describe('PickByGoalStep', () => {
     expect(onUpdateTask).toHaveBeenCalledWith('t1', { pickedAt: null })
   })
 
+  it('standalone: a loose pick can be filed under a goal (threads it, stays picked)', () => {
+    const onUpdateTask = vi.fn()
+    const host = makeHost({
+      goals: [goal({ id: 'g1', name: 'Kids responsibilities' })],
+      tasks: [t({ id: 'p1', title: 'Chore system', bucket: 'quarter', pickedAt: new Date() })], // picked, no goal
+      onUpdateTask,
+    })
+    renderStep(<PickByGoalStep />, { step: { ...step, props: { standalone: true } }, host, horizon: 'seasonal' })
+    expect(screen.getByText('Chore system')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'File "Chore system" under a goal' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Kids responsibilities' }))
+    expect(onUpdateTask).toHaveBeenCalledWith('p1', { goalId: 'g1' })
+  })
+
+  it('standalone: set aside demotes a loose pick (pickedAt null)', () => {
+    const onUpdateTask = vi.fn()
+    const host = makeHost({
+      goals: [goal({ id: 'g1' })],
+      tasks: [t({ id: 'p1', title: 'Renew passport', bucket: 'quarter', pickedAt: new Date() })],
+      onUpdateTask,
+    })
+    renderStep(<PickByGoalStep />, { step: { ...step, props: { standalone: true } }, host, horizon: 'seasonal' })
+    fireEvent.click(screen.getByRole('button', { name: /set aside renew passport/i }))
+    expect(onUpdateTask).toHaveBeenCalledWith('p1', { pickedAt: null })
+  })
+
   it('shows your unpicked items on the shelf and files one under a goal as a pick', () => {
     const onUpdateTask = vi.fn()
     const host = makeHost({

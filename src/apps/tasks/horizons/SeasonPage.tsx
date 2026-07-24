@@ -8,7 +8,7 @@
 // its `horizon === 'season'` block (mechanical split — no behavior change;
 // horizon fixed to 'season').
 
-import { PAGE_COLUMN } from '@/components/layout/pageLayout';
+import { PAGE_COLUMN_FULL } from '@/components/layout/pageLayout';
 import { CalendarRange, Plus, Sparkles, Target } from 'lucide-react';
 import { ScheduleActionsProvider } from '@/contexts/ScheduleActionsContext';
 import { UndoToast } from '@/components/undo/UndoToast';
@@ -54,7 +54,7 @@ export function SeasonPage() {
   return (
     <ScheduleActionsProvider value={scheduleActionsValue}>
       <div className="h-full overflow-y-auto">
-        <div className={PAGE_COLUMN}>
+        <div className={PAGE_COLUMN_FULL}>
           <header className="mb-4 flex items-start justify-between gap-4">
             <div>
               <p className="text-[11px] uppercase tracking-wider text-neutral-400">{label}</p>
@@ -239,6 +239,8 @@ export function SeasonPage() {
               items={bench}
               picks={picks}
               onPick={(id) => updateTask(id, { pickedAt: new Date() })}
+              goals={goals.filter((g) => g.status === 'active' && matchesDomain(g.context, currentDomain)).map((g) => ({ id: g.id, name: g.name }))}
+              onFileUnder={(id, goalId) => updateTask(id, { pickedAt: new Date(), goalId })}
               onSwap={(benchId, replacedPickId) => {
                 void updateTask(replacedPickId, { pickedAt: undefined });
                 void updateTask(benchId, { pickedAt: new Date() });

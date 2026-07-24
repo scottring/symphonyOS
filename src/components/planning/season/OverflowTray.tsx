@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Star, CornerRightDown, Archive, Trash2, Repeat, ChevronRight, Sparkles, Check, RotateCw, Pencil } from 'lucide-react'
+import { Star, CornerRightDown, Archive, Trash2, Repeat, ChevronRight, ChevronDown, Sparkles, Check, RotateCw, Pencil } from 'lucide-react'
 import { SeasonMoveSuggestions } from '@/components/planning/SeasonMoveSuggestions'
 import { useBenchAudit } from '@/hooks/useBenchAudit'
 import type { Task } from '@/types/task'
@@ -10,11 +10,16 @@ import { PICK_CAP } from '@/lib/planning/betPulse'
  *  gesture replaces a current pick. The other exits re-grade or retire.
  *  `collapsible` renders it as a closed drawer (season-spread bottom) —
  *  subordinate by interaction, not just by muting. */
-export function OverflowTray({ items, picks, onPick, onSwap, onMakeMove, onShelf, onLetGo, onRename, onMakeGoal, onFirstMove, onShelfLinked, onApplySlate, collapsible = false }: {
+export function OverflowTray({ items, picks, onPick, onSwap, onMakeMove, onShelf, onLetGo, onRename, onMakeGoal, onFirstMove, onShelfLinked, onApplySlate, onFileUnder, goals, collapsible = false }: {
   items: readonly Task[]
   /** Current picks, for the at-cap swap picker. */
   picks: readonly Task[]
   onPick: (id: string) => void
+  /** Pick an existing shelf item AND thread it under an existing goal, in one
+   *  move (mirrors the wizard's "File under"). Shown only when goals are given. */
+  onFileUnder?: (id: string, goalId: string) => void
+  /** Active goals to file under, in menu order. */
+  goals?: readonly { id: string; name: string }[]
   /** Swap: benchId becomes a pick, replacedPickId returns to the bench. */
   onSwap: (benchId: string, replacedPickId: string) => void
   onMakeMove: (id: string) => void
@@ -34,6 +39,7 @@ export function OverflowTray({ items, picks, onPick, onSwap, onMakeMove, onShelf
   collapsible?: boolean
 }) {
   const [swapFor, setSwapFor] = useState<string | null>(null)
+  const [fileMenuFor, setFileMenuFor] = useState<string | null>(null)
   // Goal-conversion flow per row: taskId → created goalId (prompting for the
   // first move) ; moveDraft is the prompt's input.
   const [goalFlow, setGoalFlow] = useState<{ taskId: string; goalId: string } | null>(null)
@@ -159,6 +165,32 @@ export function OverflowTray({ items, picks, onPick, onSwap, onMakeMove, onShelf
                 className="shrink-0 inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-md text-white bg-primary-600 hover:bg-primary-700 transition-colors">
                 <Star aria-hidden="true" className="w-3 h-3" /> Pick it
               </button>
+              {onFileUnder && goals && goals.length > 0 && (
+                <div className="relative shrink-0">
+                  <button type="button" aria-label={`File "${t.title}" under a goal`}
+                    onClick={() => setFileMenuFor(fileMenuFor === t.id ? null : t.id)}
+                    aria-expanded={fileMenuFor === t.id}
+                    className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-md text-primary-700 bg-primary-50 hover:bg-primary-100 transition-colors">
+                    File under <ChevronDown aria-hidden="true" className="w-3 h-3" />
+                  </button>
+                  {fileMenuFor === t.id && (
+                    <>
+                      <button aria-hidden tabIndex={-1} onClick={() => setFileMenuFor(null)}
+                        className="fixed inset-0 z-40 cursor-default" />
+                      <div className="absolute right-0 top-full z-50 mt-1 min-w-[220px] max-h-64 overflow-auto rounded-xl border border-neutral-200 bg-white p-1.5 shadow-lg">
+                        <p className="px-2.5 py-1 text-[11px] font-medium uppercase tracking-wide text-neutral-400">Pick under</p>
+                        {goals.map((g) => (
+                          <button key={g.id} type="button"
+                            onClick={() => { onFileUnder(t.id, g.id); setFileMenuFor(null) }}
+                            className="w-full rounded-lg px-2.5 py-1.5 text-left text-sm text-neutral-700 hover:bg-neutral-50">
+                            {g.name}
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
               <button type="button" onClick={() => onMakeMove(t.id)}
                 className="shrink-0 inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-md text-primary-700 bg-primary-50 hover:bg-primary-100 transition-colors">
                 <CornerRightDown aria-hidden="true" className="w-3 h-3" /> Month move
