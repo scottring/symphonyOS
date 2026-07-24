@@ -68,7 +68,7 @@ export function PickByGoalStep() {
     const loose = picksByGoal.get('__none__') ?? []
     return (
       <div className="space-y-3">
-        <p className="text-sm text-neutral-500">Job search, admin, one-off fun — picks that don't serve a family goal.</p>
+        <p className="text-sm text-neutral-500">Job search, admin, one-off fun — picks that don't serve any goal.</p>
         {loose.map((p) => (
           <div key={p.id} className="rounded-xl border border-neutral-100 bg-white px-3 py-2 text-sm">{p.title}</div>
         ))}

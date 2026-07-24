@@ -24,7 +24,7 @@ import { CascadeRail, useHorizonPageData } from './shared';
 //
 // `seasonPicks` is THIS domain's picks that thread to this goal (computed by
 // the parent from domainTasks) — the read side of the season↔year thread. One
-// or more = the goal is being worked this season; zero = a quiet "0 moves this
+// or more = the goal is being worked this season; zero = a quiet "0 picks this
 // season" flag (muted, an invitation to pick, not an alarm).
 function YearGoalRow({ goal, tasks, seasonPicks, onOpen }: { goal: Goal; tasks: Task[]; seasonPicks: Task[]; onOpen: () => void }) {
   const { total, done } = goalRollup(goal.id, tasks);
@@ -54,7 +54,7 @@ function YearGoalRow({ goal, tasks, seasonPicks, onOpen }: { goal: Goal; tasks: 
             {pickCount} pick{pickCount === 1 ? '' : 's'} this season
           </span>
         ) : (
-          <span className="mt-1 block text-[11px] text-neutral-300">0 moves this season</span>
+          <span className="mt-1 block text-[11px] text-neutral-300">0 picks this season</span>
         )}
       </span>
       <ChevronRight className="w-4 h-4 text-neutral-300 shrink-0" />

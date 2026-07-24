@@ -248,11 +248,31 @@ describe('horizon pages (smoke)', () => {
       context: null, status: 'active', sortOrder: 0,
       actions: [], milestones: [], createdAt: new Date(), updatedAt: new Date(),
     } satisfies Goal)
+    // An ACTUAL pick (pickedAt set) threaded to the goal covers it.
     mockTasks.push(createMockTask({
       id: 'pick-1', title: 'A money plan we follow', bucket: 'quarter', goalId: 'g1',
+      pickedAt: new Date(),
     }) satisfies Task)
     render(<SeasonPage />)
     expect(screen.queryByText('Goals not yet picked this season')).not.toBeInTheDocument()
+  })
+
+  it('SeasonPage surfaces a goal whose only season item was SET ASIDE (benched, not picked)', () => {
+    mockGoals.push({
+      id: 'g1', areaId: 'a1', name: 'Financial calm', year: 2026,
+      context: null, status: 'active', sortOrder: 0,
+      actions: [], milestones: [], createdAt: new Date(), updatedAt: new Date(),
+    } satisfies Goal)
+    // Bucket 'quarter', threaded to the goal, but NEVER picked (pickedAt null) —
+    // a benched/set-aside item. Coverage is PICK-aware, so the goal still reads
+    // as uncovered (matching /year's "0 picks this season").
+    mockTasks.push(createMockTask({
+      id: 'benched-1', title: 'A money plan we follow', bucket: 'quarter', goalId: 'g1',
+    }) satisfies Task)
+    render(<SeasonPage />)
+    const heading = screen.getByText('Goals not yet picked this season')
+    const section = heading.closest('section')!
+    expect(within(section).getByText('Financial calm')).toBeInTheDocument()
   })
 
   it('YearPage renders the plan-the-year door', () => {
@@ -276,10 +296,10 @@ describe('horizon pages (smoke)', () => {
     render(<YearPage />)
     const row = screen.getByText('Financial calm').closest('button')!
     expect(within(row).getByText(/1 pick this season/i)).toBeInTheDocument()
-    expect(within(row).queryByText('0 moves this season')).not.toBeInTheDocument()
+    expect(within(row).queryByText('0 picks this season')).not.toBeInTheDocument()
   })
 
-  it('YearPage shows a quiet "0 moves this season" flag under an active goal with no pick', () => {
+  it('YearPage shows a quiet "0 picks this season" flag under an active goal with no pick', () => {
     mockGoals.push({
       id: 'g1', areaId: 'a1', name: 'Financial calm', year: 2026,
       context: null, status: 'active', sortOrder: 0,
@@ -287,8 +307,8 @@ describe('horizon pages (smoke)', () => {
     } satisfies Goal)
     render(<YearPage />)
     const row = screen.getByText('Financial calm').closest('button')!
-    expect(within(row).getByText('0 moves this season')).toBeInTheDocument()
-    expect(within(row).queryByText(/pick this season/i)).not.toBeInTheDocument()
+    expect(within(row).getByText('0 picks this season')).toBeInTheDocument()
+    expect(within(row).queryByText(/1 pick this season/i)).not.toBeInTheDocument()
   })
 
   it('SomedayPage renders the timeless-pool empty state', () => {

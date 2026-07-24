@@ -21,7 +21,6 @@ import { FocusLine } from '@/components/planning/season/FocusLine';
 import { matchesDomain } from '@/lib/today/domainFilter';
 import { partitionSeason, PICK_CAP } from '@/lib/planning/betPulse';
 import { looksLikeActivity } from '@/lib/planning/outcomeCoach';
-import { goalsWithoutMoves } from '@/lib/planning/lineage';
 import { CascadeRail, useHorizonPageData } from './shared';
 
 export function SeasonPage() {
@@ -41,13 +40,15 @@ export function SeasonPage() {
   const { picks, bench } = partitionSeason(domainTasks);
 
   // The read side of the thread, at the season altitude: active goals (this
-  // domain) that carry no season pick yet. Domain-filtered on both sides —
-  // domainTasks for coverage, the goal list for the goals themselves — so a
-  // work goal never surfaces on the Family season page.
-  const uncovered = goalsWithoutMoves(
-    goals.filter((g) => matchesDomain(g.context, currentDomain)),
-    domainTasks,
-    'quarter',
+  // domain) that carry no season PICK yet. Coverage is PICK-aware, not
+  // bucket-aware: a goal whose only quarter item was set aside (benched,
+  // pickedAt null) still reads as uncovered here — matching /year, which shows
+  // it as "0 picks this season". Domain-filtered on both sides — the picks for
+  // coverage, the goal list for the goals themselves — so a work goal never
+  // surfaces on the Family season page.
+  const pickedGoalIds = new Set(picks.map((p) => p.goalId).filter(Boolean));
+  const uncovered = goals.filter(
+    (g) => matchesDomain(g.context, currentDomain) && g.status === 'active' && !pickedGoalIds.has(g.id),
   );
 
   return (

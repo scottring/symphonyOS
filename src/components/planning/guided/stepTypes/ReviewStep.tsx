@@ -74,10 +74,10 @@ export function TaskTriageRow({ task, onCelebrated }: { task: Task; onCelebrated
 
 // Season-altitude row: no day/week/month routing. The item is a season-sized
 // intention, so its verdicts are seasonal — Done (it happened; celebrate),
-// Carry forward (stays on the season list), Change (reword it in place),
-// Put aside (→ Someday). Also used by the seasonal write-list (fate=false:
-// title + Change only). Titles wrap rather than truncate: outcome sentences
-// are the payload here, and four buttons were eating them.
+// Carry into this season (re-pick it — stamps a fresh pickedAt), Change (reword
+// it in place), Put aside (→ Someday). Also used by the seasonal write-list
+// (fate=false: title + Change only). Titles wrap rather than truncate: outcome
+// sentences are the payload here, and four buttons were eating them.
 export function SeasonListRow({ task, fate = false, onCelebrated }: { task: Task; fate?: boolean; onCelebrated?: (id: string) => void }) {
   const { host } = useGuided()
   const project = task.projectId ? host.projectsMap.get(task.projectId) : undefined
@@ -89,7 +89,6 @@ export function SeasonListRow({ task, fate = false, onCelebrated }: { task: Task
   const provenance = goalArea?.name ?? goal?.name
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(task.title)
-  const [carried, setCarried] = useState(false)
   // Re-picking for the new season stamps a fresh pickedAt (the pick mechanism);
   // goalId is left untouched by omission. Local state keeps the row on screen
   // with a "Carried" tag — same visibility pattern as `celebrated` below.
@@ -143,17 +142,6 @@ export function SeasonListRow({ task, fate = false, onCelebrated }: { task: Task
               <Check className="w-3 h-3" /> Done
             </button>
           )}
-          {fate && (carried ? (
-            <button type="button" onClick={() => setCarried(false)}
-              className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md text-primary-700 bg-primary-100">
-              <Check className="w-3 h-3" /> Carried forward
-            </button>
-          ) : (
-            <button type="button" onClick={() => setCarried(true)}
-              className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md text-primary-700 bg-primary-50 hover:bg-primary-100 transition-colors">
-              <ArrowRight className="w-3 h-3" /> Carry forward
-            </button>
-          ))}
           {fate && (carriedInto ? (
             <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md text-primary-700 bg-primary-100 shrink-0">
               <Check className="w-3 h-3" /> Carried

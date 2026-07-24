@@ -72,7 +72,10 @@ describe('ReviewStep — seasonal fate rows', () => {
   it('shows season verdicts instead of the day/week/month triage menu', () => {
     const host = makeHost({ tasks: [task({ id: 'q1', title: 'Fix up outdoor spaces', bucket: 'quarter' })] })
     renderStep(<ReviewStep />, { step: seasonStep, host, horizon: 'seasonal' })
-    expect(screen.getByRole('button', { name: /Carry forward/ })).toBeInTheDocument()
+    // "Carry into this season" is the single persisting carry action; the old
+    // cosmetic "Carry forward" toggle was folded (it never persisted anything).
+    expect(screen.getByRole('button', { name: /Carry into this season/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Carry forward$/ })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Change/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Put aside/ })).toBeInTheDocument()
     // No day-planning vocabulary and no Done check at season altitude.
@@ -80,15 +83,6 @@ describe('ReviewStep — seasonal fate rows', () => {
     expect(screen.queryByRole('button', { name: 'Week' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Month' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Mark done' })).not.toBeInTheDocument()
-  })
-
-  it('Carry forward keeps the item on the season list (no bucket write) and confirms', () => {
-    const host = makeHost({ tasks: [task({ id: 'q1', title: 'Fix up outdoor spaces', bucket: 'quarter' })] })
-    renderStep(<ReviewStep />, { step: seasonStep, host, horizon: 'seasonal' })
-    fireEvent.click(screen.getByRole('button', { name: /Carry forward/ }))
-    expect(screen.getByRole('button', { name: /Carried forward/ })).toBeInTheDocument()
-    expect(host.onSetBucket).not.toHaveBeenCalled()
-    expect(host.onPushTask).not.toHaveBeenCalled()
   })
 
   it('Put aside parks the item on Someday', () => {
