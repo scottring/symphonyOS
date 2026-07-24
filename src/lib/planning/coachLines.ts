@@ -71,25 +71,17 @@ export function computeCoachLines(input: CoachInput): CoachLine[] {
   // sittings; naming the count once (the rows carry the per-item hint and the
   // one-tap push) is the honest observation the narration can't make. ──
   if (input.stepType === 'review' && input.bucket === 'month') {
-    const clusters = clusterMoves(input.tasks)
-    const clustered = new Set(clusters.flatMap((c) => c.taskIds))
+    // Clusters are deliberately NOT mentioned here: each one renders as a
+    // collapsed row that says it once, in place, with its own bulk action.
+    // Saying it again up here is the same noise one line higher.
+    const clustered = new Set(clusterMoves(input.tasks).flatMap((c) => c.taskIds))
     const flagged = weekSizedMoves(input.tasks)
-    // A cluster is named ONCE, as the move it is — listing its seven steps
-    // here would repeat on screen exactly what the collapsed row already says.
-    const clusterPhrases = clusters.map((c) => {
-      const name = input.projects.find((p) => p.id === c.projectId)?.name ?? 'one project'
-      return `“${name}” has ${c.taskIds.length} steps on the list — that's one move`
-    })
     const loose = input.tasks.filter((t) => flagged.has(t.id) && !clustered.has(t.id))
-    const parts: string[] = [...clusterPhrases]
     if (loose.length > 0) {
-      parts.push(`${loose.length} ${loose.length === 1 ? 'item reads' : 'items read'} like a single sitting — ${list(loose.map((t) => t.title))}`)
-    }
-    if (parts.length > 0) {
       lines.push({
         id: 'week-sized-moves',
         tone: 'nudge',
-        text: `${parts.join('; ')}. A month move is one chunk that ends in a result; the steps belong on a week.`,
+        text: `${loose.length} ${loose.length === 1 ? 'item reads' : 'items read'} like a single sitting rather than a month move — ${list(loose.map((t) => t.title))}. A month move is one chunk that ends in a result; the sittings belong on a week.`,
       })
     }
   }

@@ -157,16 +157,13 @@ describe('review: month grain', () => {
 })
 
 describe('review: month clusters', () => {
-  it('names a project cluster once, as one move — not each step', () => {
+  it('stays quiet about a cluster — the collapsed row states it once, in place', () => {
     const lines = computeCoachLines(input({
       stepType: 'review', bucket: 'month',
       projects: [project('p1', 'Transform the Back and Frontyards')],
       tasks: ['Weed the backyard', 'Put down sand', 'Buy a bench'].map((title, i) =>
         task({ id: `c${i}`, title, bucket: 'month', projectId: 'p1' })),
     }))
-    const line = lines.find((l) => l.id === 'week-sized-moves')
-    expect(line?.text).toContain('Transform the Back and Frontyards')
-    expect(line?.text).toContain('3 steps')
-    expect(line?.text).not.toContain('Weed the backyard')
+    expect(lines.find((l) => l.id === 'week-sized-moves')).toBeUndefined()
   })
 })
