@@ -83,6 +83,18 @@ describe('GoalsList goal coaching', () => {
   })
 })
 
+describe('GoalsList goal domain tag', () => {
+  it('tapping the tag → picking a domain re-tags the goal', async () => {
+    const onUpdateGoal = vi.fn()
+    const goal = makeGoal('Any important document findable in 5 minutes')
+    const { user } = render(<GoalsList {...baseProps} goals={[goal]} onUpdateGoal={onUpdateGoal} />)
+    // Untagged goal → the tag reads "Set context"; open it and pick Family.
+    await user.click(screen.getByRole('button', { name: 'Set context' }))
+    await user.click(screen.getByRole('button', { name: 'Family' }))
+    expect(onUpdateGoal).toHaveBeenCalledWith(goal.id, { context: 'family' })
+  })
+})
+
 describe('GoalsList loading gate', () => {
   it('while loading with no areas, shows "Loading goals…" and not the empty state', () => {
     render(<GoalsList {...baseProps} areas={[]} loading />)

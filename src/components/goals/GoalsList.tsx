@@ -1,9 +1,11 @@
 import { useState, useRef, useEffect } from 'react'
 import { Sparkles } from 'lucide-react'
 import type { Goal, GoalArea, Quarter } from '@/types/goal'
+import type { TaskContext } from '@/types/task'
 import { PAGE_COLUMN } from '@/components/layout/pageLayout'
 import { looksVague } from '@/lib/planning/goalQuality'
 import { useGoalSharpen, type GoalSharpenState } from '@/hooks/useGoalSharpen'
+import { ContextPicker } from '@/components/triage/ContextPicker'
 
 /** Reused from the guided planning narration — teaches past-tense + a finish line. */
 const GOAL_PLACEHOLDER = "What's true by next year? Past tense — 'shipped…', 'finally…'"
@@ -18,7 +20,7 @@ interface GoalsListProps {
   onAddArea: (name: string) => Promise<GoalArea | null>
   onRenameArea: (areaId: string, name: string) => void
   onAddGoal: (areaId: string, name: string) => Promise<Goal | null>
-  onUpdateGoal: (goalId: string, updates: { name: string }) => void
+  onUpdateGoal: (goalId: string, updates: { name?: string; context?: TaskContext | null }) => void
   onDeleteArea: (areaId: string) => void
 }
 
@@ -295,6 +297,7 @@ export function GoalsList({
                         onSharpen={() => sharpen.sharpen({ id: goal.id, name: goal.name, areaName: area.name, context: goal.context })}
                         onDismissSharpen={() => sharpen.dismiss(goal.id)}
                         onUseSuggestion={(name) => { onUpdateGoal(goal.id, { name }); sharpen.dismiss(goal.id) }}
+                        onSetContext={(context) => onUpdateGoal(goal.id, { context: context ?? null })}
                       />
                     ))}
                   </div>
@@ -316,6 +319,7 @@ interface GoalRowProps {
   onSharpen: () => void
   onDismissSharpen: () => void
   onUseSuggestion: (name: string) => void
+  onSetContext: (context: TaskContext | undefined) => void
 }
 
 /**
@@ -325,35 +329,43 @@ interface GoalRowProps {
  * map so the open action stays a real <button> while the sharpen controls sit
  * beside it (no nested buttons).
  */
-function GoalRow({ goal, sharpenState, onSelect, onSharpen, onDismissSharpen, onUseSuggestion }: GoalRowProps) {
+function GoalRow({ goal, sharpenState, onSelect, onSharpen, onDismissSharpen, onUseSuggestion, onSetContext }: GoalRowProps) {
   const [hintDismissed, setHintDismissed] = useState(false)
   const vague = looksVague(goal.name)
   const { loading, suggestion, error } = sharpenState
 
   return (
     <div className="p-5 rounded-2xl bg-white border border-neutral-100 hover:border-primary-200 hover:shadow-md transition-all duration-200">
-      <button onClick={onSelect} className="w-full text-left group">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-center gap-2 min-w-0">
-            <h3 className="font-medium text-neutral-800 group-hover:text-primary-700 transition-colors">
-              {goal.name}
-            </h3>
-            {goal.status === 'completed' && (
-              <span className="shrink-0 text-[10px] font-medium px-1.5 py-0.5 bg-primary-50 text-primary-600 rounded">
-                Completed
-              </span>
-            )}
+      <div className="flex items-start gap-2">
+        <button onClick={onSelect} className="flex-1 min-w-0 text-left group">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <h3 className="font-medium text-neutral-800 group-hover:text-primary-700 transition-colors">
+                {goal.name}
+              </h3>
+              {goal.status === 'completed' && (
+                <span className="shrink-0 text-[10px] font-medium px-1.5 py-0.5 bg-primary-50 text-primary-600 rounded">
+                  Completed
+                </span>
+              )}
+            </div>
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="w-5 h-5 text-neutral-300 group-hover:text-primary-400 group-hover:translate-x-1 transition-all flex-shrink-0"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+            >
+              <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+            </svg>
           </div>
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            className="w-5 h-5 text-neutral-300 group-hover:text-primary-400 group-hover:translate-x-1 transition-all flex-shrink-0"
-            viewBox="0 0 20 20"
-            fill="currentColor"
-          >
-            <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
-          </svg>
+        </button>
+        {/* Domain tag — always visible, so any goal can be (re)tagged even after
+            creation. Untagged goals (created in the all-domains view) render the
+            grey "Set context" state, which is how orphans get a home. */}
+        <div onClick={(e) => e.stopPropagation()} className="shrink-0 -mr-1 -mt-1">
+          <ContextPicker value={goal.context} onChange={onSetContext} />
         </div>
-      </button>
+      </div>
 
       {/* Sharpen affordance + vague hint — hidden while a suggestion is showing. */}
       {!suggestion && !loading && (
