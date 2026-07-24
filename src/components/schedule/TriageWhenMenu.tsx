@@ -70,6 +70,11 @@ interface TriageWhenMenuProps {
  * Picking an option applies it and closes. Single-option groups (Someday) apply
  * directly with no popover.
  */
+// How long a HOVER-opened fan-out survives after the pointer leaves it. Long
+// enough to cross the gap to the panel and read four options; short enough
+// that a menu you drifted past still tidies itself away.
+const HOVER_CLOSE_MS = 600
+
 export function TriageWhenMenu({ onPick, onDelete, onNote, onComplete, onPickDate }: TriageWhenMenuProps) {
   const [openGroup, setOpenGroup] = useState<string | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -80,11 +85,17 @@ export function TriageWhenMenu({ onPick, onDelete, onNote, onComplete, onPickDat
     if (!openGroup) return
     const onDown = (e: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        openedByClick.current = false
         setOpenGroup(null)
       }
     }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { openedByClick.current = false; setOpenGroup(null) } }
     document.addEventListener('mousedown', onDown)
-    return () => document.removeEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onKey)
+    }
   }, [openGroup])
 
   useEffect(() => () => { if (closeTimer.current) clearTimeout(closeTimer.current) }, [])
@@ -92,15 +103,28 @@ export function TriageWhenMenu({ onPick, onDelete, onNote, onComplete, onPickDat
   const cancelClose = useCallback(() => {
     if (closeTimer.current) { clearTimeout(closeTimer.current); closeTimer.current = null }
   }, [])
+  // A menu the user OPENED ON PURPOSE stays open until they pick, click away,
+  // or press Escape — leaving the button must not dismiss it. Only the
+  // hover-opened fan-out tidies itself away, and then on a human-sized delay:
+  // the old 160ms closed the menu while the pointer was still crossing the gap
+  // to it (or while the user was reading the four options), so the click landed
+  // on nothing and the tap appeared to do nothing at all.
+  const openedByClick = useRef(false)
   const scheduleClose = useCallback(() => {
+    if (openedByClick.current) return
     cancelClose()
-    closeTimer.current = setTimeout(() => setOpenGroup(null), 160)
+    closeTimer.current = setTimeout(() => setOpenGroup(null), HOVER_CLOSE_MS)
   }, [cancelClose])
 
-  const pick = useCallback((when: TriageWhen) => {
+  const close = useCallback(() => {
+    openedByClick.current = false
     setOpenGroup(null)
+  }, [])
+
+  const pick = useCallback((when: TriageWhen) => {
+    close()
     onPick(when)
-  }, [onPick])
+  }, [close, onPick])
 
   return (
     <div ref={containerRef} className="flex items-center gap-1">
@@ -124,7 +148,11 @@ export function TriageWhenMenu({ onPick, onDelete, onNote, onComplete, onPickDat
                 if (single) { pick(group.primary); return }
                 // Always open (don't toggle-close): on desktop the hover already
                 // opened it, so a toggle would dismiss it on the click that
-                // follows the hover. Close happens via outside-click / leave / pick.
+                // follows the hover. Close happens via outside-click / pick /
+                // Escape — a deliberate open is no longer at the mercy of the
+                // pointer wandering off.
+                cancelClose()
+                openedByClick.current = true
                 setOpenGroup(group.label)
               }}
               className={`flex items-center gap-0.5 text-xs px-2.5 py-1 rounded-md font-medium transition-colors ${
@@ -139,10 +167,13 @@ export function TriageWhenMenu({ onPick, onDelete, onNote, onComplete, onPickDat
 
             {!single && isOpen && (
               <div
-                role="menu"
-                className="absolute z-40 top-full right-0 mt-1 bg-white border border-neutral-200 rounded-lg shadow-lg py-1 min-w-[150px]"
+                className="absolute z-40 top-full right-0 pt-1"
                 onMouseEnter={cancelClose}
                 onMouseLeave={scheduleClose}
+              >
+              <div
+                role="menu"
+                className="bg-white border border-neutral-200 rounded-lg shadow-lg py-1 min-w-[150px]"
               >
                 {group.options.map((opt) => (
                   <button
@@ -155,6 +186,7 @@ export function TriageWhenMenu({ onPick, onDelete, onNote, onComplete, onPickDat
                     {opt.label}
                   </button>
                 ))}
+              </div>
               </div>
             )}
           </div>

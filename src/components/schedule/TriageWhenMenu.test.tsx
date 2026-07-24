@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { screen, fireEvent } from '@testing-library/react'
+import { screen, fireEvent, act } from '@testing-library/react'
 import { render } from '@/test/test-utils'
 import { TriageWhenMenu } from './TriageWhenMenu'
 
@@ -65,4 +65,54 @@ describe('TriageWhenMenu', () => {
     await user.click(screen.getByRole('button', { name: 'Delete' }))
     expect(onDelete).toHaveBeenCalled()
   })
+})
+
+// Regression: the fan-out used to close 160ms after the pointer left the
+// button, so crossing the gap to the panel — or pausing to read the four
+// options — dismissed the menu under the cursor and the click landed on
+// nothing. "I clicked This week and nothing happened."
+describe('TriageWhenMenu — the fan-out survives the trip to it', () => {
+  it('a menu opened by click stays open when the pointer leaves the button', async () => {
+    vi.useFakeTimers()
+    try {
+      const onPick = vi.fn()
+      render(<TriageWhenMenu onPick={onPick} onDelete={vi.fn()} />)
+      fireEvent.click(screen.getByRole('button', { name: 'Week' }))
+      fireEvent.mouseLeave(screen.getByRole('button', { name: 'Week' }).parentElement!)
+      act(() => { vi.advanceTimersByTime(2000) })
+      expect(screen.getByRole('menuitem', { name: 'This week' })).toBeInTheDocument()
+      fireEvent.click(screen.getByRole('menuitem', { name: 'This week' }))
+      expect(onPick).toHaveBeenCalledWith('this-week')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('a hover-opened menu still tidies itself away, but only after a human-sized grace period', async () => {
+    vi.useFakeTimers()
+    try {
+      render(<TriageWhenMenu onPick={vi.fn()} onDelete={vi.fn()} />)
+      const group = screen.getByRole('button', { name: 'Week' }).parentElement!
+      fireEvent.mouseEnter(group)
+      expect(screen.getByRole('menuitem', { name: 'This week' })).toBeInTheDocument()
+      fireEvent.mouseLeave(group)
+      // Still there while you're crossing the gap…
+      act(() => { vi.advanceTimersByTime(300) })
+      expect(screen.getByRole('menuitem', { name: 'This week' })).toBeInTheDocument()
+      // …gone once you've clearly moved on.
+      act(() => { vi.advanceTimersByTime(1000) })
+      expect(screen.queryByRole('menuitem', { name: 'This week' })).not.toBeInTheDocument()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
+
+it('Escape closes the fan-out without picking anything', () => {
+  const onPick = vi.fn()
+  render(<TriageWhenMenu onPick={onPick} onDelete={vi.fn()} />)
+  fireEvent.click(screen.getByRole('button', { name: 'Week' }))
+  fireEvent.keyDown(document, { key: 'Escape' })
+  expect(screen.queryByRole('menuitem', { name: 'This week' })).not.toBeInTheDocument()
+  expect(onPick).not.toHaveBeenCalled()
 })
