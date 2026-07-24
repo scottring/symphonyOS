@@ -122,6 +122,14 @@ existing picks).
   only (no delete/recreate); re-runs the coherence check against the new parent.
   The amber nudge and this manual move share one mechanism — the nudge is just the
   AI proactively surfacing an action that is always there.
+- **Removal is recoverable — never a silent delete.** The chip's remove control
+  **sets the pick aside**: a *demote* (clear `picked_at`; the task lives on) to the
+  bench, shown in a "Set aside this season" tray you can re-pick from in one tap,
+  plus a brief **Undo** on the action. Reuses the existing `onDemote` bench path.
+  Actually *deleting* the task is a separate, explicit, confirm-and-undo action —
+  never the default X. This is Hart-Unger's migrate-or-release: you release, you
+  don't destroy. So each pick chip offers three non-destructive moves — **Win** ✓,
+  **Set aside** ↓ (→ bench), **Move to…** ↪ (re-parent).
 - **Soft cap (10):** when total domain picks reach the cap, adding routes through
   the existing swap-at-cap flow. `PICK_CAP` moves 8 → 10 in `betPulse.ts`.
 - **Goals-in-focus nudge:** a coach line when the user is advancing more than
