@@ -116,6 +116,12 @@ existing picks).
 - **Rule 2 — coherence nudge:** on add, a quiet, non-blocking coach line checks
   topical fit between the pick and its goal (deterministic keyword overlap for
   Phase 1). Never blocks the write.
+- **Re-parent any pick (always available):** every pick chip — green/accepted ones
+  included, not only amber-flagged ones — carries a quiet **"Move to…"** control
+  that opens a goal picker and re-homes it. Mechanically an update of `goal_id`
+  only (no delete/recreate); re-runs the coherence check against the new parent.
+  The amber nudge and this manual move share one mechanism — the nudge is just the
+  AI proactively surfacing an action that is always there.
 - **Soft cap (10):** when total domain picks reach the cap, adding routes through
   the existing swap-at-cap flow. `PICK_CAP` moves 8 → 10 in `betPulse.ts`.
 - **Goals-in-focus nudge:** a coach line when the user is advancing more than
@@ -143,6 +149,32 @@ Last season's open picks get an explicit fate, extending the existing `fate` row
 - **Release** — to `someday` (or archive). Enforces the prune Hart-Unger treats as
   the point of the ritual.
 
+## AI assistance on every step (non-negotiable)
+
+AI help must be present on **every** step — reusing the existing two-layer machinery,
+not rebuilding it:
+
+- **Layer 1 — deterministic coach lines** (`coachLines.ts` / `CoachLines.tsx`):
+  instant, no network — the coherence nudge, goals-in-focus, stale-carry callouts.
+- **Layer 2 — session-scoped guide** (`GuideChat.tsx` → `agentStream` →
+  `symphony-agent` edge fn): per-step remount, carries `sessionContext` (horizon,
+  step, **current goal + its existing picks**, domain, level-above, goals).
+
+Every step exposes **both** the always-present "Ask your guide" chat **and** a
+step-appropriate suggest/act affordance:
+
+| Step | AI act |
+|------|--------|
+| `pick-by-goal` | "✨ Suggest picks for [goal]" (goal-scoped, tap-to-fill); AI coherence read; "sharpen this pick" (reuse `sharpen-goal` edge fn) |
+| `season-review` | "which of last season's picks are worth carrying?" |
+| `standalone-picks` | "surface inbox items that don't fit a goal" |
+| calendar / look-within / book-next | guide chat + light summarize ("what's already claimed?") |
+
+**Invariants:** suggestions are **tap-to-add chips — tapping is the only write
+path; AI never writes directly.** `sessionContext` includes the live pick list so
+suggestions never duplicate what's already there. Offline → one quiet line; the
+ritual is never blocked.
+
 ## Horizon pages — read side (Phase 1: `/season` + `/year`)
 
 Both pages render inside `HorizonView`. Today they show the level above as a side
@@ -156,6 +188,9 @@ the thread the organizing structure.
 - A **coverage row** — "goals not yet picked this season" — from `goalsWithoutMoves`
   (bucket `quarter`), so untouched goals are visible on the page, not just in the
   wizard. Each is a one-tap "pick this season" that opens the anchored add.
+- Each pick card carries the same quiet **"Move to…"** re-parent control as the
+  wizard (updates `goal_id` from the page) — re-threading works from the page, not
+  only inside a session.
 - Bench unchanged, below.
 
 **`/year`:**
