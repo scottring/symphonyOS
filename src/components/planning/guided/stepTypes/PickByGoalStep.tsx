@@ -12,6 +12,7 @@ import { partitionSeason, PICK_CAP } from '@/lib/planning/betPulse'
 import { goalsInFocusNudge, coherenceHint } from '@/lib/planning/pickCoherence'
 import type { Task } from '@/types/task'
 import { useGuided } from '../GuidedContext'
+import { ListSuggestions } from '../ListSuggestions'
 
 export function PickByGoalStep() {
   const { host, step } = useGuided()
@@ -131,6 +132,23 @@ export function PickByGoalStep() {
                   <Plus className="w-3 h-3" /> Add a pick for this season
                 </button>
               )
+            )}
+            {/* AI fuel, scoped to THIS goal: the goal name is the above-list and
+                its existing picks ride in as do-not-duplicate. Tapping a chip is
+                the ONLY write path — it adds the pick directly (goal-anchored,
+                picked at insert). Offline degrades to one quiet line. */}
+            {!isSkipped && (
+              <div className="mt-2">
+                <ListSuggestions
+                  bucket="quarter"
+                  aboveItems={[goal.name]}
+                  aboveLabel={`the goal “${goal.name}”`}
+                  existingItems={gp.map((p) => p.title)}
+                  onPick={(title) => { if (!capReached) void addPick(goal.id, title) }}
+                  suggestLabel="Suggest picks"
+                  pickCta="Tap to add it as a pick for this goal."
+                />
+              </div>
             )}
           </section>
         )

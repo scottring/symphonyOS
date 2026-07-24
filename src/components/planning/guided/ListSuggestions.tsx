@@ -47,7 +47,7 @@ const CONFIG: Record<WriteBucket, {
   },
 }
 
-export function ListSuggestions({ bucket, aboveItems, aboveLabel, existingItems = [], onPick }: {
+export function ListSuggestions({ bucket, aboveItems, aboveLabel, existingItems = [], onPick, suggestLabel, pickCta }: {
   bucket: WriteBucket
   /** Titles of the level-above list — the fuel for the suggestions. */
   aboveItems: string[]
@@ -56,8 +56,16 @@ export function ListSuggestions({ bucket, aboveItems, aboveLabel, existingItems 
   /** Titles already on THIS level (list, picks, bench) — suggestions must not
    *  duplicate or near-duplicate these. */
   existingItems?: string[]
-  /** Fills the write input; the human edits and confirms. Never auto-adds. */
+  /** Handles a tapped chip. In WriteListStep this FILLS the input (human edits
+   *  and confirms); in PickByGoalStep it adds the pick directly (tap-to-add).
+   *  Either way the human's tap is the only write path — the AI never writes. */
   onPick: (text: string) => void
+  /** Overrides the idle button copy (default: "Suggest {size}-sized items").
+   *  Pass e.g. "Suggest picks" when the chips add directly rather than fill. */
+  suggestLabel?: string
+  /** Overrides the tap-instruction footer + chip tooltip. Default is the
+   *  fill-the-box copy; pass an add-mode line when a tap creates the item. */
+  pickCta?: string
 }) {
   const [state, setState] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
   const [suggestions, setSuggestions] = useState<string[]>([])
@@ -108,7 +116,7 @@ export function ListSuggestions({ bucket, aboveItems, aboveLabel, existingItems 
       <div>
         <button type="button" onClick={suggest}
           className="inline-flex items-center gap-1 text-[11px] font-medium text-primary-600 hover:text-primary-800 transition-colors">
-          <Sparkles className="w-3 h-3" /> Suggest {cfg.sizeLabel} items
+          <Sparkles className="w-3 h-3" /> {suggestLabel ?? `Suggest ${cfg.sizeLabel} items`}
         </button>
         {state === 'error' && (
           <p className="text-[11px] text-neutral-400 italic mt-1">Your guide is offline — write it yourself; you know the plan best.</p>
@@ -122,7 +130,7 @@ export function ListSuggestions({ bucket, aboveItems, aboveLabel, existingItems 
       <div className="flex flex-wrap items-center gap-1.5">
         {suggestions.map((s) => (
           <button key={s} type="button" onClick={() => onPick(s)}
-            title="Fills the box — edit before adding"
+            title={pickCta ?? 'Fills the box — edit before adding'}
             className="text-[11.5px] px-2 py-1 rounded-md border border-primary-200 bg-white text-neutral-700 hover:border-primary-400 hover:text-primary-800 transition-colors">
             {s}
           </button>
@@ -133,7 +141,7 @@ export function ListSuggestions({ bucket, aboveItems, aboveLabel, existingItems 
           <RotateCw className="w-3 h-3" />
         </button>
       </div>
-      <p className="text-[11px] text-neutral-400">Tap one to fill the box — edit before adding.</p>
+      <p className="text-[11px] text-neutral-400">{pickCta ?? 'Tap one to fill the box — edit before adding.'}</p>
     </div>
   )
 }
