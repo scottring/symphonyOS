@@ -116,12 +116,15 @@ existing picks).
 - **Rule 2 — coherence nudge:** on add, a quiet, non-blocking coach line checks
   topical fit between the pick and its goal (deterministic keyword overlap for
   Phase 1). Never blocks the write.
-- **Re-parent any pick (always available):** every pick chip — green/accepted ones
-  included, not only amber-flagged ones — carries a quiet **"Move to…"** control
-  that opens a goal picker and re-homes it. Mechanically an update of `goal_id`
-  only (no delete/recreate); re-runs the coherence check against the new parent.
-  The amber nudge and this manual move share one mechanism — the nudge is just the
-  AI proactively surfacing an action that is always there.
+- **Re-parent any pick (always available) — by drag.** Primary interaction: **drag
+  a pick chip from one goal section and drop it on another** to re-home it (green/
+  accepted picks included, not only amber-flagged ones). Reuse the existing native-
+  DnD `dropRules` pattern from the routines / week / month drag canvases. Mechanically
+  an update of `goal_id` only (no delete/recreate); re-runs the coherence check
+  against the new parent on drop. A quiet **"Move to…"** menu on the chip remains as
+  a **keyboard/touch fallback** (same `goal_id` write) so re-parenting is accessible
+  without a drag. The amber nudge is just the AI proactively surfacing this same
+  always-available re-home action.
 - **Removal is recoverable — never a silent delete.** The chip's remove control
   **sets the pick aside**: a *demote* (clear `picked_at`; the task lives on) to the
   bench, shown in a "Set aside this season" tray you can re-pick from in one tap,
