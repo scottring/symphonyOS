@@ -1,4 +1,6 @@
-// Guard against the day-band re-partition regression class.
+// Guard against ONE shape of the day-band re-partition regression class —
+// not the whole class. Read the gaps below before trusting this file to
+// catch the next occurrence of this bug.
 //
 // The day used to be three bands (hour<12 morning, hour<18 afternoon, else
 // evening), so ANY consumer iterating ['morning','afternoon','evening','allday']
@@ -8,7 +10,30 @@
 //
 // Twelve sites had the bug and not one test failed, because the failure mode is
 // an item that quietly isn't there. Behavioural tests only catch the sites
-// someone remembered to write a test for; this catches the shape itself.
+// someone remembered to write a test for; this catches the shape itself —
+// but only for ONE of the six historical bug shapes: a single-quoted array
+// literal that contains both 'morning' and 'evening' but not one of
+// earlyMorning/night.
+//
+// What it does NOT catch (verified, not guessed):
+//   - literals missing BOTH 'morning' and 'evening', e.g. ['morning','allday'],
+//     ['evening','allday'], ['afternoon','evening','allday'] — the detector
+//     only fires when both anchor names are present.
+//   - spread-based reads, e.g. [...(today.items.morning ?? []), ...] — there
+//     is no array-of-quoted-strings literal to match.
+//   - double-quoted strings ("morning"), switch/case on DaySection, object
+//     literals ({ morning: ..., evening: ... }), or DaySection type unions.
+//   - every *.test.*/*.spec.* file is skipped by sourceFiles() below — which
+//     matters because tsconfig.app.json excludes test files from `tsc`, so a
+//     bad section fixture inside a test is guarded by neither the compiler
+//     nor this test.
+//
+// One near-miss IS handled: a multi-line literal with a trailing comma
+// (the default formatting for any wrapped list) — see the comment on
+// ARRAY_LITERAL below.
+//
+// Bottom line: this is a narrow, honest tripwire for the exact literal shape
+// that bit twelve call sites, not a general-purpose day-section linter.
 
 import { describe, it, expect } from 'vitest'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
@@ -29,7 +54,17 @@ function sourceFiles(dir: string): string[] {
 }
 
 // An array literal of quoted section names, e.g. ['morning', 'afternoon', ...].
-const ARRAY_LITERAL = /\[\s*(?:'[a-zA-Z]+'\s*,\s*)*'[a-zA-Z]+'\s*\]/g
+// The trailing `,?` matters: without it this literal, split across lines with
+// a trailing comma (the default formatting for any wrapped list), does not
+// match at all —
+//   ['morning',
+//    'afternoon',
+//    'evening',
+//   ]
+// — because the pattern otherwise requires the last element to be followed
+// directly by `]` with no comma. `\s` already matches newlines, so no /s
+// flag or explicit `\n` is needed for the multi-line case itself.
+const ARRAY_LITERAL = /\[\s*(?:'[a-zA-Z]+'\s*,\s*)*'[a-zA-Z]+'\s*,?\s*\]/g
 
 /** Comments describe the rule (including in this file's own docs); only code counts. */
 function stripComments(text: string): string {
@@ -101,5 +136,16 @@ describe('day-section coverage', () => {
       + 'instead of a hand-written section list. If a surface is scoped on '
       + 'purpose, say so in a comment and keep it from spanning morning→evening.',
     ).toEqual([])
+  })
+
+  // ARRAY_LITERAL itself, not the source scan: pins the one near-miss this
+  // file was fixed to catch. Before the trailing `,?`, this multi-line,
+  // trailing-comma literal (the default output of any code formatter that
+  // wraps a list) didn't match the regex at all, so the scan above silently
+  // skipped it — a bad literal formatted this way would pass with no offense
+  // recorded.
+  it('ARRAY_LITERAL matches a multi-line literal with a trailing comma', () => {
+    const source = `const BAD: DaySection[] = [\n  'morning',\n  'afternoon',\n  'evening',\n]`
+    expect(source.match(ARRAY_LITERAL)).not.toBeNull()
   })
 })
