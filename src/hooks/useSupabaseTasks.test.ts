@@ -52,6 +52,7 @@ const mockUpdate = vi.fn()
 const mockDelete = vi.fn()
 const mockInsert = vi.fn()
 const mockEq = vi.fn()
+const mockUpsert = vi.fn()
 
 function createMockDbTask(overrides: Partial<MockDbTask> = {}): MockDbTask {
   return {
@@ -129,6 +130,11 @@ vi.mock('@/lib/supabase', () => ({
             return Promise.resolve({ error: mockError })
           },
         }
+      },
+      // updateTaskOrders() upserts { id, sort_order } rows in one round trip.
+      upsert: (rows: { id: string; sort_order: number }[], opts?: { onConflict?: string }) => {
+        mockUpsert(rows, opts)
+        return Promise.resolve({ error: mockError })
       },
     }),
     // Realtime subscription (added to the hook after this suite was written).
@@ -567,6 +573,79 @@ describe('useSupabaseTasks', () => {
 
       // Should roll back to original
       expect(result.current.tasks[0].title).toBe('Original')
+    })
+  })
+
+  describe('updateTaskOrders', () => {
+    it('updateTaskOrders applies a different sortOrder per task, optimistically', async () => {
+      mockSupabaseData.push(
+        createMockDbTask({ id: 't1', sort_order: null }),
+        createMockDbTask({ id: 't2', sort_order: null })
+      )
+      const { result } = renderHook(() => useSupabaseTasks())
+      await waitFor(() => {
+        expect(result.current.tasks).toHaveLength(2)
+      })
+
+      await act(async () => {
+        await result.current.updateTaskOrders([
+          { id: 't1', sortOrder: 0 },
+          { id: 't2', sortOrder: 1000 },
+        ])
+      })
+
+      const t1 = result.current.tasks.find(t => t.id === 't1')
+      const t2 = result.current.tasks.find(t => t.id === 't2')
+      expect(t1?.sortOrder).toBe(0)
+      expect(t2?.sortOrder).toBe(1000)
+
+      // Only id + sort_order on the wire — a full-row upsert with a partial
+      // object would blank every other column.
+      expect(mockUpsert).toHaveBeenCalledWith(
+        [
+          { id: 't1', sort_order: 0 },
+          { id: 't2', sort_order: 1000 },
+        ],
+        { onConflict: 'id' }
+      )
+    })
+
+    it('updateTaskOrders is a no-op for an empty list', async () => {
+      const { result } = renderHook(() => useSupabaseTasks())
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false)
+      })
+
+      await act(async () => {
+        await result.current.updateTaskOrders([])
+      })
+
+      expect(mockUpsert).not.toHaveBeenCalled()
+    })
+
+    it('rolls back to the previous sortOrder on server error', async () => {
+      mockSupabaseData.push(
+        createMockDbTask({ id: 't1', sort_order: 5 }),
+        createMockDbTask({ id: 't2', sort_order: 10 })
+      )
+      const { result } = renderHook(() => useSupabaseTasks())
+      await waitFor(() => {
+        expect(result.current.tasks).toHaveLength(2)
+      })
+
+      mockError = { message: 'Upsert failed' }
+
+      await act(async () => {
+        await result.current.updateTaskOrders([
+          { id: 't1', sortOrder: 0 },
+          { id: 't2', sortOrder: 1000 },
+        ])
+      })
+
+      const t1 = result.current.tasks.find(t => t.id === 't1')
+      const t2 = result.current.tasks.find(t => t.id === 't2')
+      expect(t1?.sortOrder).toBe(5)
+      expect(t2?.sortOrder).toBe(10)
     })
   })
 

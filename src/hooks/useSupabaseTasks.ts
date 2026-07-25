@@ -1096,6 +1096,57 @@ export function useSupabaseTasks() {
     }
   }, [tasks])
 
+  /**
+   * Write a different sort_order to each of several tasks in one round trip.
+   * `updateTasksBulk` cannot express this — it applies ONE update object to
+   * every id. Optimistic first (the list must not visibly lurch), then one
+   * upsert; on failure the previous orders are restored.
+   */
+  const updateTaskOrders = useCallback(async (writes: { id: string; sortOrder: number }[]) => {
+    if (writes.length === 0) return
+
+    const byId = new Map(writes.map((w) => [w.id, w.sortOrder]))
+    // Read from tasksRef, not the closed-over `tasks` array — this callback
+    // can outlive the render that created it (e.g. captured by a drag
+    // handler), and a stale closure would silently roll back to stale values.
+    // Also snapshot the post-write task objects here, before the optimistic
+    // setTasks below — tasksRef only mirrors `tasks` again after a render, so
+    // it can't be used to build the announced tasks afterward.
+    const previous = new Map<string, number | null>()
+    const updatedTasks: Task[] = []
+    for (const t of tasksRef.current) {
+      if (byId.has(t.id)) {
+        previous.set(t.id, t.sortOrder ?? null)
+        updatedTasks.push({ ...t, sortOrder: byId.get(t.id)! })
+      }
+    }
+
+    const apply = (orders: Map<string, number | null>) =>
+      setTasks((prev) =>
+        prev.map((t) => (orders.has(t.id) ? { ...t, sortOrder: orders.get(t.id)! } : t)))
+
+    apply(byId)
+
+    const { error: upsertError } = await supabase
+      .from('tasks')
+      .upsert(writes.map((w) => ({ id: w.id, sort_order: w.sortOrder })), { onConflict: 'id' })
+
+    if (upsertError) {
+      apply(previous)
+      showToast("Couldn't save the new order", 'warning')
+      logger.error('[updateTaskOrders] failed:', upsertError)
+      return
+    }
+
+    // Fan out to other instances, same as updateTasksBulk — one announcement
+    // per affected task, sent only once the write is confirmed (an earlier,
+    // optimistic announcement here would have no way to be un-announced if
+    // the upsert then failed).
+    for (const t of updatedTasks) {
+      announceLocalWrite({ kind: 'update', task: t })
+    }
+  }, [])
+
   // Schedule a task to a specific date — sets bucket to 'timed'
   const scheduleTask = useCallback(async (id: string, date: Date, isAllDay?: boolean) => {
     await updateTask(id, {
@@ -1245,5 +1296,5 @@ export function useSupabaseTasks() {
     }
   }, [tasks])
 
-  return { tasks, loading, error, refetch: fetchTasks, addTask, addSubtask, addPrepTask, getPrepTasks, getLinkedTasks, toggleTask, toggleWaiting, deleteTask, updateTask, updateTasksBulk, scheduleTask, pushTask, setBucket }
+  return { tasks, loading, error, refetch: fetchTasks, addTask, addSubtask, addPrepTask, getPrepTasks, getLinkedTasks, toggleTask, toggleWaiting, deleteTask, updateTask, updateTasksBulk, updateTaskOrders, scheduleTask, pushTask, setBucket }
 }
