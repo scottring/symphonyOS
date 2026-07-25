@@ -58,6 +58,26 @@ export function weekStartAnchor(now: Date, weekStartsOn: WeekStart): Date {
   return d
 }
 
+/** `YYYY-MM-DD` in LOCAL time. Postgres `date` columns must be written this way —
+ *  `toISOString()` shifts the day backwards anywhere west of Greenwich. */
+export function localYmd(d: Date): string {
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
+}
+
+/** The inverse of `localYmd`: a `date` column's `YYYY-MM-DD` back to LOCAL midnight.
+ *  `new Date('2026-07-20')` would parse as UTC midnight — the same westward shift. */
+export function parseLocalYmd(ymd: string): Date {
+  const [y, m, d] = ymd.slice(0, 10).split('-').map(Number)
+  return new Date(y, m - 1, d)
+}
+
+/** The start of the week `d` falls in — the week a placement addresses. Same math
+ *  as `weekStartAnchor`; named for the placement cascade's "which week" question. */
+export function weekOf(d: Date, weekStartsOn: WeekStart): Date {
+  return weekStartAnchor(d, weekStartsOn)
+}
+
 /** A stable token for the current week (its anchor's ISO date) — used to scope a
  *  nudge dismissal to "this week" so it returns next week. */
 export function weekToken(now: Date, weekStartsOn: WeekStart): string {

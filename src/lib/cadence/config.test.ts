@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { weekStartAnchor, weekToken, getDueSession, DEFAULT_CADENCE, orderedWeekDays, orderedDayKeys } from './config'
+import { weekStartAnchor, weekToken, getDueSession, DEFAULT_CADENCE, orderedWeekDays, orderedDayKeys, localYmd, parseLocalYmd, weekOf } from './config'
 
 describe('cadence config', () => {
   describe('weekStartAnchor', () => {
@@ -77,6 +77,36 @@ describe('cadence config', () => {
       const secondSat = new Date(2026, 5, 13) // Sat Jun 13 (> 7th)
       // Not the weekly day (Sunday default) either → nothing due.
       expect(getDueSession(DEFAULT_CADENCE, secondSat)).toBeNull()
+    })
+  })
+
+  describe('localYmd / parseLocalYmd', () => {
+    it('serializes a local date without shifting the day', () => {
+      // Midnight local on the 20th. toISOString() would give '2026-07-20' east of
+      // Greenwich but '2026-07-19' west of it — this must not depend on where you are.
+      expect(localYmd(new Date(2026, 6, 20))).toBe('2026-07-20')
+      // Late in the evening is still the same calendar day.
+      expect(localYmd(new Date(2026, 6, 20, 23, 30))).toBe('2026-07-20')
+      expect(localYmd(new Date(2026, 0, 5))).toBe('2026-01-05') // zero-padded
+    })
+
+    it('round-trips through the date column', () => {
+      const d = new Date(2026, 6, 20)
+      expect(parseLocalYmd(localYmd(d)).getTime()).toBe(d.getTime())
+    })
+
+    it('parses to local midnight, tolerating a full timestamp', () => {
+      expect(parseLocalYmd('2026-07-20').getDate()).toBe(20)
+      expect(parseLocalYmd('2026-07-20T00:00:00Z').getDate()).toBe(20)
+      expect(parseLocalYmd('2026-07-20').getHours()).toBe(0)
+    })
+  })
+
+  describe('weekOf', () => {
+    it('answers "which week does this day belong to" for both week starts', () => {
+      const wed = new Date(2026, 6, 22, 16, 0) // Wed Jul 22 2026
+      expect(localYmd(weekOf(wed, 0))).toBe('2026-07-19') // Sunday start
+      expect(localYmd(weekOf(wed, 1))).toBe('2026-07-20') // Monday start
     })
   })
 

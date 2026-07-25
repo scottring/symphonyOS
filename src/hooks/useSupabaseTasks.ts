@@ -7,6 +7,7 @@ import { logger } from '@/lib/logger'
 import type { Task, TaskBucket, TaskLink, TaskContext, TaskCategory, TaskCaptureMeta, LinkedActivity, LinkType, LinkedActivityType, GroupMemberRef } from '@/types/task'
 import type { TaskDirections } from '@/types/directions'
 import { defaultScopeForArea, type Scope } from '@/lib/scope'
+import { localYmd, parseLocalYmd } from '@/lib/cadence/config'
 
 // Monotonic suffix so every hook instance gets its own realtime channel topic.
 let tasksChannelSeq = 0
@@ -66,6 +67,7 @@ export interface DbTask {
   needs_discussion: boolean | null
   discussion_note: string | null
   week_deferred_at: string | null
+  week_start: string | null
   picked_at: string | null
   capture_meta: { status?: string; storage_path?: string; suggested_task_id?: string } | null
   source_id: string | null
@@ -136,6 +138,8 @@ export function dbTaskToTask(dbTask: DbTask): Task {
     needsDiscussion: dbTask.needs_discussion ?? undefined,
     discussionNote: dbTask.discussion_note ?? undefined,
     weekDeferredAt: dbTask.week_deferred_at ? new Date(dbTask.week_deferred_at) : undefined,
+    // A `date` column — parse to LOCAL midnight, never `new Date(str)` (that's UTC).
+    weekStart: dbTask.week_start ? parseLocalYmd(dbTask.week_start) : undefined,
     pickedAt: dbTask.picked_at ? new Date(dbTask.picked_at) : undefined,
     sourceId: dbTask.source_id ?? undefined,
     goalId: dbTask.goal_id ?? undefined,
@@ -935,6 +939,8 @@ export function useSupabaseTasks() {
     if ('goalId' in updates) dbUpdates.goal_id = updates.goalId ?? null
     if ('isFun' in updates) dbUpdates.is_fun = updates.isFun ?? false
     if ('weekDeferredAt' in updates) dbUpdates.week_deferred_at = updates.weekDeferredAt?.toISOString() ?? null
+    // `week_start` is a DATE column — localYmd, not toISOString (which shifts the day west of Greenwich).
+    if ('weekStart' in updates) dbUpdates.week_start = updates.weekStart ? localYmd(updates.weekStart) : null
     if ('pickedAt' in updates) dbUpdates.picked_at = updates.pickedAt?.toISOString() ?? null
 
     logger.debug('[updateTask] Sending to DB:', { id, dbUpdates })
@@ -1051,6 +1057,8 @@ export function useSupabaseTasks() {
     if ('goalId' in updates) dbUpdates.goal_id = updates.goalId ?? null
     if ('isFun' in updates) dbUpdates.is_fun = updates.isFun ?? false
     if ('weekDeferredAt' in updates) dbUpdates.week_deferred_at = updates.weekDeferredAt?.toISOString() ?? null
+    // `week_start` is a DATE column — localYmd, not toISOString (which shifts the day west of Greenwich).
+    if ('weekStart' in updates) dbUpdates.week_start = updates.weekStart ? localYmd(updates.weekStart) : null
     if ('pickedAt' in updates) dbUpdates.picked_at = updates.pickedAt?.toISOString() ?? null
 
     logger.debug('[updateTasksBulk] Sending to DB:', { taskIds, dbUpdates })

@@ -13,6 +13,7 @@ function baseRow(overrides: Partial<DbTask> = {}): DbTask {
     linked_activity_type: null, linked_activity_id: null, estimated_duration: null,
     location: null, location_place_id: null, is_waiting: null, waiting_since: null,
     needs_discussion: null, discussion_note: null, week_deferred_at: null,
+    week_start: null,
     group_members: [],
     created_at: '2026-06-05T00:00:00Z', updated_at: '2026-06-05T00:00:00Z',
     ...overrides,
@@ -31,5 +32,27 @@ describe('dbTaskToTask groupMembers', () => {
   it('maps scope, defaulting to individual when the column is null', () => {
     expect(dbTaskToTask(baseRow({ scope: 'compound' })).scope).toBe('compound')
     expect(dbTaskToTask(baseRow({ scope: null })).scope).toBe('individual')
+  })
+})
+
+describe('dbTaskToTask week_start', () => {
+  it('is undefined when the column is null — NULL means "the current week" (legacy rows)', () => {
+    expect(dbTaskToTask(baseRow({ week_start: null })).weekStart).toBeUndefined()
+  })
+
+  // The trap: `week_start` is a DATE column, so `new Date('2026-07-20')` would parse
+  // as UTC midnight and read back as the 19th anywhere west of Greenwich — a week
+  // placement silently landing on the wrong week.
+  it('parses the date string to LOCAL midnight, not UTC', () => {
+    const d = dbTaskToTask(baseRow({ week_start: '2026-07-20' })).weekStart!
+    expect(d.getFullYear()).toBe(2026)
+    expect(d.getMonth()).toBe(6) // July
+    expect(d.getDate()).toBe(20)
+    expect(d.getHours()).toBe(0)
+  })
+
+  it('tolerates a full timestamp coming back from the column', () => {
+    const d = dbTaskToTask(baseRow({ week_start: '2026-07-20T00:00:00Z' })).weekStart!
+    expect(d.getDate()).toBe(20)
   })
 })
