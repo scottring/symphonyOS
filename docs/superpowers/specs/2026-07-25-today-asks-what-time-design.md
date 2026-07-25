@@ -232,7 +232,9 @@ to gap-free `0..n-1`, bulk write. A `taskOrdering.ts` mirrors it.
 
 - Today renders the timed spine plus a bounded set of untimed items; the
   remainder collapses to a counted row (`+14 more today`) that expands.
-- The 21 untimed routines collapse to **one** row, not 21.
+- The 21 untimed routines collapse to **one** row, not 21 — via the section
+  collapse in move #5, not a second mechanism. Unscheduled defaults to collapsed
+  precisely because it is the slab.
 - Carried-over items keep the existing collapsed "N carried over" treatment
   (`OverdueSection.tsx`), which already works.
 
