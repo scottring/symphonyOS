@@ -16,6 +16,12 @@ export function ScheduleGridStep() {
   // (week-boundary spec).
   const todayStart = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d }, [])
   const gridStart = periodStart.getTime() > todayStart.getTime() ? periodStart : todayStart
+  // Open on every day still available in the week, not just gridStart's. A
+  // mid-week session shows the days that remain; a fresh one shows all seven.
+  const gridDays = useMemo(() => {
+    const ms = periodEnd.getTime() - gridStart.getTime()
+    return Math.min(Math.max(Math.floor(ms / 86_400_000) + 1, 1), 7)
+  }, [gridStart, periodEnd])
   const priorities = useMemo(
     () => host.tasks.filter((t) => {
       if (t.completed || !match(t.assignedTo, t.assignedToAll)) return false
@@ -49,6 +55,7 @@ export function ScheduleGridStep() {
     <div className="h-[60vh] min-h-[420px]">
       <StepSchedule
         weekDate={gridStart}
+        days={gridDays}
         minDropDate={todayStart}
         priorities={priorities}
         events={host.events}

@@ -5,6 +5,12 @@ import type { Routine } from '@/types/actionable'
 
 interface Props {
   weekDate: Date
+  /** How many day columns to open with. The week rung places into a DAY, so
+   *  the grid must show the days available to place on — it defaulted to ONE,
+   *  which meant "place the big rocks" offered a single column while /week
+   *  showed seven. Same component, different day count, and the step was the
+   *  one that looked broken. */
+  days?: number
   /** Reject task drops on days before this date (see PlanningSession). */
   minDropDate?: Date
   priorities: Task[]
@@ -22,6 +28,7 @@ interface Props {
 
 export function StepSchedule({
   weekDate,
+  days = 7,
   minDropDate,
   priorities,
   events,
@@ -45,6 +52,7 @@ export function StepSchedule({
         onPushTask={onPushTask}
         onClose={() => {}}
         initialDate={weekDate}
+        initialDays={days}
         minDropDate={minDropDate}
         embedded
         // Weekly session: placing a rock picks its DAY, not its hour (the week

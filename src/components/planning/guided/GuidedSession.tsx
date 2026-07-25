@@ -258,7 +258,11 @@ export function GuidedSession({ horizon, domain, host, onClose, onFinished, onCh
       )}
 
       <div className="relative z-10 flex-1 min-h-0 overflow-auto">
-        <div className={`w-full mx-auto px-6 py-10 md:py-14 space-y-7 ${wideStep ? 'max-w-[1120px]' : 'max-w-[680px]'}`}>
+        {/* A wide step is FULL width, not 1120px: these are grids — seven day
+            columns, five week columns, picks beside their shelf — and a cap
+            just re-creates the cramping the wide container existed to fix. The
+            title and narration keep their 680px reading measure inside it. */}
+        <div className={`w-full mx-auto py-10 md:py-14 space-y-7 ${wideStep ? 'max-w-none px-6 lg:px-10' : 'max-w-[680px] px-6'}`}>
           {loading ? (
             <p className="text-sm text-neutral-500">Gathering your session…</p>
           ) : (
