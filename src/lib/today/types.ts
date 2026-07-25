@@ -63,6 +63,20 @@ export const SECTIONS_ORDER: DaySection[] = [
   'allday', 'earlyMorning', 'morning', 'afternoon', 'evening', 'night', 'unscheduled',
 ]
 
+/**
+ * A fully-keyed, empty section record. Use this instead of writing an object
+ * literal — a hand-written literal is how five-key fixtures survived the
+ * earlyMorning/night split and hid a real regression from every test. Callers
+ * spread their own sections over the result:
+ *
+ *   { ...emptySections<TimelineItem>(), morning: [item] }
+ */
+export function emptySections<T>(): Record<DaySection, T[]> {
+  const out = {} as Record<DaySection, T[]>
+  for (const s of SECTIONS_ORDER) out[s] = []
+  return out
+}
+
 export const EMPTY_TODAY_DATA: TodayData = {
   isToday: false,
   overdueTasks: [],
@@ -70,7 +84,7 @@ export const EMPTY_TODAY_DATA: TodayData = {
   weekTasks: [],
   monthTasks: [],
   completedInboxTasks: [],
-  grouped: { allday: [], earlyMorning: [], morning: [], afternoon: [], evening: [], night: [], unscheduled: [] },
+  grouped: emptySections<TimelineItem>(),
   sectionsOrder: SECTIONS_ORDER,
   counts: { completedCount: 0, incompleteOverdue: 0, actionableCount: 0, totalItems: 0, progressPercent: 0 },
 }

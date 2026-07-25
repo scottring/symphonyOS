@@ -279,7 +279,10 @@ export function MorningLaunchView({ data }: ContextViewProps) {
   const morningItems = useMemo(() => {
     if (!todayData) return []
     const items: TimelineItem[] = []
-    for (const section of ['morning', 'allday'] as const) {
+    // earlyMorning is the whole point of this screen: the morning band now
+    // starts at 08:00, so a 6:30 get-out-the-door routine is `earlyMorning`
+    // and rendered nowhere at all before this.
+    for (const section of ['earlyMorning', 'morning', 'allday'] as const) {
       items.push(...(todayData.items[section] || []))
     }
     return items.filter(i => !i.skipped)

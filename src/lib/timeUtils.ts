@@ -51,6 +51,15 @@ export function getSectionForHour(hour: number): DaySection {
 }
 
 /**
+ * Every section that owns a clock window, chronological. DERIVED — never
+ * hand-write this list. A consumer that iterates a literal
+ * `['morning','afternoon','evening']` silently drops 00:00–07:59 and
+ * 21:00–23:59; that regression is exactly what this constant exists to stop.
+ * Use `SECTIONS_ORDER` (lib/today/types) when you also want allday/unscheduled.
+ */
+export const TIMED_SECTIONS: DaySection[] = DAY_SECTION_BOUNDS.map(b => b.section)
+
+/**
  * Get the current time. Exported for testing (can be mocked).
  */
 export function getCurrentTime(): Date {
@@ -267,16 +276,26 @@ export function formatTimeRangeWithDate(start: Date, end: Date, allDay?: boolean
 }
 
 /**
- * Get the time of day for a given date.
- * Morning: before 12pm
- * Afternoon: 12pm - 6pm
- * Evening: 6pm onwards
+ * Coarse 3-valued ambience band for a date ("This Morning" in FocusMode).
+ *
+ * Boundaries are DERIVED from DAY_SECTION_BOUNDS rather than re-hardcoded, so
+ * this can never disagree with where Today actually files the item. It used to:
+ * `hour < 18 → afternoon` meant 17:30 read "This Afternoon" while Today filed
+ * it under Evening.
+ *
+ * Stays 3-valued on purpose — ambience wants a coarse label, not the five
+ * display bands. earlyMorning folds into morning, night into evening.
  */
+const SECTION_TO_TIME_OF_DAY: Record<string, TimeOfDay> = {
+  earlyMorning: 'morning',
+  morning: 'morning',
+  afternoon: 'afternoon',
+  evening: 'evening',
+  night: 'evening',
+}
+
 export function getTimeOfDay(date: Date): TimeOfDay {
-  const hour = date.getHours()
-  if (hour < 12) return 'morning'
-  if (hour < 18) return 'afternoon'
-  return 'evening'
+  return SECTION_TO_TIME_OF_DAY[getSectionForHour(date.getHours())] ?? 'morning'
 }
 
 /**

@@ -3,6 +3,7 @@ import type { FamilyMember } from '@/types/family'
 import type { TimelineItem } from '@/types/timeline'
 
 import { formatTime } from '@/lib/timeUtils'
+import { SECTIONS_ORDER } from '@/lib/today/types'
 
 interface WallLookAheadProps {
   days: WallDayData[]
@@ -41,7 +42,7 @@ function getDayHighlights(days: WallDayData[], _familyMembers: FamilyMember[]): 
 
     // Collect all non-routine, non-completed items across all sections
     const items: HighlightItem[] = []
-    for (const section of ['allday', 'morning', 'afternoon', 'evening'] as const) {
+    for (const section of SECTIONS_ORDER) {
       const sectionItems = day.items[section] || []
       for (const item of sectionItems) {
         // Show tasks and events. Only show routines that are truly infrequent

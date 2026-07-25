@@ -14,7 +14,7 @@ import { useCallback, useMemo } from 'react'
 import type { WallDayData } from '@/hooks/useWallData'
 import type { TimelineItem } from '@/types/timeline'
 import type { FamilyMember } from '@/types/family'
-import type { DaySection } from '@/lib/timeUtils'
+import { TIMED_SECTIONS } from '@/lib/timeUtils'
 import type { Material } from '@/types/material'
 import { deriveMaterials } from '@/components/surface/hooks/useStagedMaterials'
 import { MaterialChip } from '@/components/surface/MaterialChip'
@@ -22,9 +22,6 @@ import { placeCall } from '@/lib/telephony/placeCall'
 import { WALL } from './wallTheme'
 
 const DEFAULT_DURATION_MS = 60 * 60 * 1000
-// earlyMorning/night included so nothing silently disappears from the wall.
-// Order is chronological; the consumer below sorts by startTime anyway.
-const TIMED_SECTIONS: DaySection[] = ['earlyMorning', 'morning', 'afternoon', 'evening', 'night']
 
 interface WallV2NowNextProps {
   today: WallDayData | undefined

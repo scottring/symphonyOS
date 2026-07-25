@@ -89,7 +89,7 @@ export interface WallV2TimelineEvent {
 
 /** A labeled grouping of events — All-day / Morning / Afternoon / Evening / Night. */
 export interface WallV2TimelineSection {
-  id: 'overdue' | 'allday' | 'anytime' | 'morning' | 'afternoon' | 'evening' | 'night';
+  id: 'overdue' | 'allday' | 'anytime' | 'earlyMorning' | 'morning' | 'afternoon' | 'evening' | 'night';
   label: string;
   icon: LucideIcon;
   tint: WallV2Tint;

@@ -213,7 +213,10 @@ export function WallCalendar() {
   const tomorrowPreview = useMemo(() => {
     const tomorrow = wallData.days.find(d => !d.isToday && d.date > new Date(new Date().setHours(0, 0, 0, 0)))
     if (!tomorrow) return null
-    for (const section of ['morning', 'afternoon', 'evening', 'allday'] as const) {
+    // SECTIONS_ORDER, not a literal: a 7 AM school run is `earlyMorning` and a
+    // 9:30 PM commitment is `night`, and neither appeared in the old four-name
+    // list — so tomorrow's genuinely-first item could be skipped entirely.
+    for (const section of SECTIONS_ORDER) {
       const first = tomorrow.items[section]?.[0]
       if (first) return { title: first.title, startTime: first.startTime ?? null }
     }
@@ -270,7 +273,10 @@ export function WallCalendar() {
 
   const handleTapEvent = useCallback((id: string) => {
     if (!todayDayData) return
-    for (const section of ['allday', 'morning', 'afternoon', 'evening'] as const) {
+    // Must cover every section: an unresolvable id means the tap does nothing
+    // at all on the touchscreen — the detail sheet never opens and there is no
+    // feedback. earlyMorning/night items were exactly that dead zone.
+    for (const section of SECTIONS_ORDER) {
       const found = todayDayData.items[section]?.find(it => it.id === id)
       if (found) { setDetailItem(found); return }
     }
@@ -320,7 +326,7 @@ export function WallCalendar() {
     }
     const tasks: TimelineItem[] = []
     const dailyChores: TimelineItem[] = []
-    for (const section of ['morning', 'afternoon', 'evening', 'allday'] as const) {
+    for (const section of SECTIONS_ORDER) {
       for (const item of (today.items[section] || [])) {
         if (item.skipped) continue
         if (item.type === 'task') {

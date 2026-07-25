@@ -4,6 +4,7 @@ import type { ContextViewProps } from './types'
 import type { TimelineItem } from '@/types/timeline'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
 import { getKidMembers } from '@/lib/familyMembers'
+import { SECTIONS_ORDER } from '@/lib/today/types'
 import { EmailActionStrip } from './EmailActionStrip'
 
 function parseRoutineId(timelineItemId: string): string | null {
@@ -181,7 +182,7 @@ function CenterColumn({ data }: { data: ContextViewProps['data'] }) {
   const tomorrowItems = useMemo(() => {
     if (!tomorrowData) return []
     const items: TimelineItem[] = []
-    for (const section of ['morning', 'afternoon', 'evening', 'allday'] as const) {
+    for (const section of SECTIONS_ORDER) {
       items.push(...(tomorrowData.items[section] || []))
     }
     return items.filter(i => !i.skipped).slice(0, 5)
@@ -307,7 +308,9 @@ export function BedtimeView({ data }: ContextViewProps) {
   const eveningItems = useMemo(() => {
     if (!todayData) return []
     const items: TimelineItem[] = []
-    for (const section of ['evening', 'allday'] as const) {
+    // `night` included: the evening band now ends at 20:59, so a 21:00 bedtime
+    // routine — the literal subject of this screen — files as `night`.
+    for (const section of ['evening', 'night', 'allday'] as const) {
       items.push(...(todayData.items[section] || []))
     }
     return items.filter(i => !i.skipped && i.type === 'routine')

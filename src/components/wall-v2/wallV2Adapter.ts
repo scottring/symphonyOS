@@ -23,6 +23,7 @@ import type { CalendarEvent } from '@/hooks/useGoogleCalendar';
 import type { WallDayData } from '@/hooks/useWallData';
 import { extractRecipeNameHint, resolveRecipeUrl } from '@/lib/recipeDetection';
 import { isEverydayRoutine } from '@/lib/routineUtils';
+import { SECTIONS_ORDER } from '@/lib/today/types';
 
 import type {
   WallV2MemberBubble,
@@ -263,13 +264,10 @@ export function adaptScheduleBand(
 ): WallV2ScheduleBandData {
   if (!today) return { allDay: [], timed: [] };
 
-  const all: TimelineItem[] = [
-    ...(today.items.allday ?? []),
-    ...(today.items.morning ?? []),
-    ...(today.items.afternoon ?? []),
-    ...(today.items.evening ?? []),
-    ...(today.items.unscheduled ?? []),
-  ];
+  // Every section, via SECTIONS_ORDER — a literal list here used to omit
+  // earlyMorning and night, so a 7:00 AM dropoff and a 9:30 PM commitment both
+  // dropped out of the prioritized band.
+  const all: TimelineItem[] = SECTIONS_ORDER.flatMap((s) => today.items[s] ?? []);
 
   const allDay = all
     .filter((i) => i.type === 'event' && i.allDay)
@@ -318,9 +316,10 @@ export function adaptScheduleBand(
 }
 
 /**
- * Split today's items into Afternoon / Evening / Night sections. We re-use
- * the existing `morning|afternoon|evening` buckets from useWallData and
- * carve "Night" out of evening items starting at or after 9 PM.
+ * Turn today's items into the wall's rhythm sections, one per day band.
+ * Every band from DAY_SECTION_BOUNDS gets read directly out of
+ * `today.items` — no re-deriving a band by re-splitting its neighbour, which
+ * is how Night silently stopped rendering. Empty bands are omitted.
  */
 export function adaptTimelineSections(
   today: WallDayData | undefined,
@@ -351,14 +350,15 @@ export function adaptTimelineSections(
     return !isEverydayRoutine(i.recurrencePattern);
   };
 
-  // Whole-day view: render every section in order (All-day, Morning,
-  // Afternoon, Evening, Night). No forward-only filtering — earlier-today
-  // items still show (completed ones render checked) so the wall reflects the
-  // full day rather than only what's next.
+  // Whole-day view: render every section in order (All-day, Early morning,
+  // Morning, Afternoon, Evening, Night). No forward-only filtering —
+  // earlier-today items still show (completed ones render checked) so the wall
+  // reflects the full day rather than only what's next.
   const pick = (items: TimelineItem[] | undefined) =>
     dedupeRoutines((items ?? []).filter(isVisible), members);
 
   const alldayItems = pick(today.items.allday);
+  const earlyMorningItems = pick(today.items.earlyMorning);
   const morningItems = pick(today.items.morning);
   const afternoonItems = pick(today.items.afternoon);
 
@@ -371,21 +371,19 @@ export function adaptTimelineSections(
     (today.items.unscheduled ?? []).filter((i) => i.type === 'routine'),
   );
 
-  // Evening splits into Evening (<9pm) and Night (>=9pm).
-  const eveningRaw = (today.items.evening ?? []).filter(isVisible);
-  const eveningPre: TimelineItem[] = [];
-  const nightPre: TimelineItem[] = [];
-  for (const item of eveningRaw) {
-    const h = item.startTime?.getHours() ?? 0;
-    if (h >= 21) nightPre.push(item);
-    else eveningPre.push(item);
-  }
-  const eveningItems = dedupeRoutines(eveningPre, members);
-  const nightItems = dedupeRoutines(nightPre, members);
+  // Evening and Night are real buckets now — read them, don't re-derive. This
+  // used to re-split `items.evening` on `hour >= 21`, which became dead code
+  // the moment the evening band was capped at hour 20: nothing could ever
+  // match, so Night rendered never and 21:00+ items vanished from the wall.
+  const eveningItems = pick(today.items.evening);
+  const nightItems = pick(today.items.night);
 
   const baseSections: WallV2TimelineSection[] = [];
   if (alldayItems.length > 0) {
     baseSections.push({ id: 'allday', label: 'All day', icon: Calendar, tint: 'sage', events: alldayItems });
+  }
+  if (earlyMorningItems.length > 0) {
+    baseSections.push({ id: 'earlyMorning', label: 'Early morning', icon: Sunrise, tint: 'lavender', events: earlyMorningItems });
   }
   if (morningItems.length > 0) {
     baseSections.push({ id: 'morning', label: 'Morning', icon: Sunrise, tint: 'sky', events: morningItems });
@@ -424,7 +422,7 @@ export function adaptGlanceForMember(
 ) {
   if (!today) return null;
   let next: TimelineItem | null = null;
-  for (const section of ['morning', 'afternoon', 'evening', 'allday'] as const) {
+  for (const section of SECTIONS_ORDER) {
     for (const item of today.items[section] ?? []) {
       if (item.assignedTo !== member.id) continue;
       // Skip high-frequency routines (>4×/week — daily, or weekday-only

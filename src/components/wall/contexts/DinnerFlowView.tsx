@@ -7,6 +7,7 @@ import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import { extractRecipeNameHint, detectRecipeUrl } from '@/lib/recipeDetection'
 import { fetchRecipe, formatIngredientNarrative, toNarrativeStep } from '@/lib/recipeParser'
 import type { RecipeData } from '@/lib/recipeParser'
+import { SECTIONS_ORDER } from '@/lib/today/types'
 
 // ============================================================================
 // HELPERS
@@ -591,7 +592,7 @@ export function DinnerFlowView({ data }: ContextViewProps) {
   const allItems = useMemo(() => {
     if (!todayData) return []
     const items: TimelineItem[] = []
-    for (const section of ['morning', 'afternoon', 'evening', 'allday'] as const) {
+    for (const section of SECTIONS_ORDER) {
       items.push(...(todayData.items[section] || []))
     }
     return items

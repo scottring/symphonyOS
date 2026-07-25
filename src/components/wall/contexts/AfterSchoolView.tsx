@@ -130,7 +130,15 @@ export function AfterSchoolView({ data }: ContextViewProps) {
     const todayData = data.days.find(d => d.isToday)
     if (!todayData) return []
     const items: TimelineItem[] = []
-    for (const section of ['afternoon', 'evening', 'allday'] as const) {
+    // DELIBERATELY scoped, not SECTIONS_ORDER: this screen answers "what's left
+    // after school", so earlyMorning/morning are correctly excluded — that work
+    // is already behind us by the time this view is on the wall.
+    //
+    // `night` IS included, though. Before the day-band re-partition, `evening`
+    // ran to 23:59 and so covered 21:00+ implicitly; capping evening at 20:59
+    // without adding `night` here would silently drop late homework that this
+    // screen used to show. Scoped by intent, not by accident.
+    for (const section of ['afternoon', 'evening', 'night', 'allday'] as const) {
       items.push(...(todayData.items[section] || []))
     }
     return items.filter(i =>
