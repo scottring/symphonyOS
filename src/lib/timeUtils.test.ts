@@ -10,6 +10,10 @@ import {
   formatTimeRange,
   formatTimeLong,
   formatTimeRangeLong,
+  getSectionForHour,
+  getDaySectionLabel,
+  DAY_SECTION_BOUNDS,
+  type DaySection,
 } from './timeUtils'
 import type { TimelineItem } from '@/types/timeline'
 
@@ -315,5 +319,31 @@ describe('formatTimeRangeLong', () => {
     const start = new Date(2026, 4, 20, 13, 0)
     const end = new Date(2026, 4, 20, 14, 0)
     expect(formatTimeRangeLong(start, end)).toBe('1:00 PM|2:00 PM')
+  })
+})
+
+describe('day section boundaries', () => {
+  // Every boundary hour maps to the band its own label claims.
+  const cases: [number, DaySection][] = [
+    [0, 'earlyMorning'], [3, 'earlyMorning'], [7, 'earlyMorning'],
+    [8, 'morning'], [11, 'morning'],
+    [12, 'afternoon'], [16, 'afternoon'],
+    [17, 'evening'], [20, 'evening'],
+    [21, 'night'], [23, 'night'],
+  ]
+  it.each(cases)('hour %i is in %s', (hour, section) => {
+    expect(getSectionForHour(hour)).toBe(section)
+  })
+
+  it('covers all 24 hours with no gaps or overlaps', () => {
+    for (let h = 0; h < 24; h++) {
+      const matches = DAY_SECTION_BOUNDS.filter(b => h >= b.startHour && h <= b.endHour)
+      expect(matches, `hour ${h}`).toHaveLength(1)
+    }
+  })
+
+  it('labels every section', () => {
+    const all: DaySection[] = ['allday', 'earlyMorning', 'morning', 'afternoon', 'evening', 'night', 'unscheduled']
+    for (const s of all) expect(getDaySectionLabel(s)).toBeTruthy()
   })
 })

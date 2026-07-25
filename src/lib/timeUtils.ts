@@ -1,7 +1,54 @@
 import type { TimelineItem, TimeSection } from '@/types/timeline'
 
+/** Ambience only ("This Morning" in FocusMode). Deliberately NOT widened:
+ *  wallBackground.ts already keeps its own richer local time-of-day type,
+ *  because "what does the sky look like" is a different question from
+ *  "which band does this item render in". */
 export type TimeOfDay = 'morning' | 'afternoon' | 'evening'
-export type DaySection = 'allday' | TimeOfDay | 'unscheduled'
+
+export type DaySection =
+  | 'allday'
+  | 'earlyMorning'
+  | 'morning'
+  | 'afternoon'
+  | 'evening'
+  | 'night'
+  | 'unscheduled'
+
+export interface DaySectionBound {
+  section: DaySection
+  /** Inclusive. */
+  startHour: number
+  /** Inclusive. */
+  endHour: number
+  label: string
+  /** Human window shown in the header. Must describe startHour..endHour truthfully. */
+  range: string
+}
+
+/**
+ * THE single source of truth for both bucketing and displayed labels.
+ *
+ * Before this table, `getTimeOfDay` and `daySectionMeta.RANGE` disagreed on
+ * every band: Morning's header read "6:00 AM" while the code took everything
+ * under hour 12; Afternoon claimed to end at 5 but ran to 17:59; Evening was
+ * wrong at both ends. Derive both from here so they cannot drift again.
+ *
+ * Bands do not wrap midnight — a 2 AM item belongs at the TOP of a
+ * chronological page, not the bottom.
+ */
+export const DAY_SECTION_BOUNDS: DaySectionBound[] = [
+  { section: 'earlyMorning', startHour: 0,  endHour: 7,  label: 'Early morning', range: 'Before 8:00 AM' },
+  { section: 'morning',      startHour: 8,  endHour: 11, label: 'Morning',       range: '8:00 AM – 12:00 PM' },
+  { section: 'afternoon',    startHour: 12, endHour: 16, label: 'Afternoon',     range: '12:00 PM – 5:00 PM' },
+  { section: 'evening',      startHour: 17, endHour: 20, label: 'Evening',       range: '5:00 PM – 9:00 PM' },
+  { section: 'night',        startHour: 21, endHour: 23, label: 'Night',         range: 'After 9:00 PM' },
+]
+
+export function getSectionForHour(hour: number): DaySection {
+  const bound = DAY_SECTION_BOUNDS.find(b => hour >= b.startHour && hour <= b.endHour)
+  return bound ? bound.section : 'earlyMorning'
+}
 
 /**
  * Get the current time. Exported for testing (can be mocked).
@@ -273,7 +320,7 @@ export function getDaySection(item: TimelineItem): DaySection {
     return 'allday'
   }
 
-  return getTimeOfDay(item.startTime)
+  return getSectionForHour(item.startTime.getHours())
 }
 
 /**
@@ -301,9 +348,11 @@ export function groupByDaySection(
 ): Record<DaySection, TimelineItem[]> {
   const groups: Record<DaySection, TimelineItem[]> = {
     allday: [],
+    earlyMorning: [],
     morning: [],
     afternoon: [],
     evening: [],
+    night: [],
     unscheduled: [],
   }
 
@@ -316,11 +365,9 @@ export function groupByDaySection(
   const sortByTime = (a: TimelineItem, b: TimelineItem) =>
     getSortTime(a) - getSortTime(b)
 
-  // Sort allday events alphabetically by title
+  // All-day has no times to sort by, so it reads alphabetically.
   groups.allday.sort((a, b) => a.title.localeCompare(b.title))
-  groups.morning.sort(sortByTime)
-  groups.afternoon.sort(sortByTime)
-  groups.evening.sort(sortByTime)
+  for (const { section } of DAY_SECTION_BOUNDS) groups[section].sort(sortByTime)
 
   return groups
 }
@@ -331,10 +378,11 @@ export function groupByDaySection(
 export function getDaySectionLabel(section: DaySection): string {
   switch (section) {
     case 'allday': return 'All Day'
-    case 'morning': return 'Morning'
-    case 'afternoon': return 'Afternoon'
-    case 'evening': return 'Evening'
     case 'unscheduled': return 'Unscheduled'
+    default: {
+      const bound = DAY_SECTION_BOUNDS.find(b => b.section === section)
+      return bound ? bound.label : 'Unscheduled'
+    }
   }
 }
 
