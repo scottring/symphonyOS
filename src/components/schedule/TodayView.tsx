@@ -19,7 +19,7 @@ import type { HomeViewType } from '@/types/homeView'
 import type { DaySection } from '@/lib/timeUtils'
 
 import { parseRoutineTimelineId } from '@/lib/today/doseExpansion'
-import { readCollapsed, toggleCollapsed, onCollapsedChange, sectionKey } from '@/lib/today/sectionCollapse'
+import { readCollapsed, setCollapsed, onCollapsedChange, sectionKey } from '@/lib/today/sectionCollapse'
 import { useMobile } from '@/hooks/useMobile'
 import { useTodayData } from '@/hooks/useTodayData'
 import { mergeAssignees } from '@/lib/today/bulkAssign'
@@ -319,15 +319,24 @@ export function TodayView({
   const [collapsedKeys, setCollapsedKeys] = useState<Set<string>>(() => readCollapsed())
   const [openedByUser, setOpenedByUser] = useState<Set<string>>(new Set())
   useEffect(() => onCollapsedChange(setCollapsedKeys), [])
-  const toggleSection = useCallback((section: DaySection) => {
+  // Sets an explicit state per the CURRENT rendered `collapsed` value rather
+  // than blindly flipping both `collapsedKeys` and `openedByUser` — flipping
+  // both in lockstep made "explicitly folded" and "explicitly opened" track
+  // each other exactly, so the one state that should open an auto-collapsed
+  // section (`collapsedKeys` false AND `openedByUser` true) was unreachable.
+  const toggleSection = useCallback((section: DaySection, currentlyCollapsed: boolean) => {
     const key = sectionKey(section)
-    setCollapsedKeys(toggleCollapsed(key))
-    setOpenedByUser((prev) => {
-      const next = new Set(prev)
-      if (next.has(key)) next.delete(key)
-      else next.add(key)
-      return next
-    })
+    if (currentlyCollapsed) {
+      setCollapsedKeys(setCollapsed(key, false))
+      setOpenedByUser((prev) => new Set(prev).add(key))
+    } else {
+      setCollapsedKeys(setCollapsed(key, true))
+      setOpenedByUser((prev) => {
+        const next = new Set(prev)
+        next.delete(key)
+        return next
+      })
+    }
   }, [])
 
   const proactive = useProactiveSuggestions()
@@ -765,11 +774,18 @@ export function TodayView({
               const emptyBecauseHero = items.length === 0
               const key = sectionKey(section)
 
-              // Collapsed when explicitly folded, or auto-folded because everything in
-              // it is done and the user hasn't opened it.
+              // Precedence: empty-because-hero always collapses; an explicit
+              // fold always wins; an explicit open overrides the auto rule;
+              // otherwise auto-collapse when everything remaining is done.
+              // `collapsedKeys` and `openedByUser` are independent facts —
+              // never derive one from the other.
               const collapsed = emptyBecauseHero
-                || collapsedKeys.has(key)
-                || (restAllDone && !openedByUser.has(key))
+                ? true
+                : collapsedKeys.has(key)
+                  ? true
+                  : openedByUser.has(key)
+                    ? false
+                    : restAllDone
 
               return (
                 <section key={section}>
@@ -779,11 +795,11 @@ export function TodayView({
                     completedCount={completedCount}
                     collapsed={collapsed}
                     emptyBecauseHero={emptyBecauseHero}
-                    onToggle={() => toggleSection(section)}
+                    onToggle={() => toggleSection(section, collapsed)}
                   />
                   {!collapsed && (
                     <>
-                  <div className="space-y-1">
+                      <div className="space-y-1">
                     {items.map((item, itemIndex) => {
                       const taskId = item.id.startsWith('task-') ? item.id.replace('task-', '') : null
                       const contactName = item.contactId && contactsMap?.get(item.contactId)?.name || undefined
@@ -1105,7 +1121,7 @@ export function TodayView({
                         />
                       )
                     })()}
-                  </div>
+                      </div>
                     </>
                   )}
                 </section>

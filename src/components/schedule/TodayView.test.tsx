@@ -374,6 +374,53 @@ describe('TodayView', () => {
     // and typography treatment is covered by DaySectionHeader.test.tsx.
     expect(screen.getByText('Morning')).toBeInTheDocument()
   })
+
+  it('an auto-collapsed all-complete section opens on click and stays open, then closes again on the next click', async () => {
+    // Regression test for a collapse-state bug: `toggleSection` used to flip
+    // `collapsedKeys` and `openedByUser` together on every click. Because a
+    // never-touched, all-complete section starts with both sets false, and
+    // the two sets were always mutated in lockstep, the one combination that
+    // should render it OPEN (`collapsedKeys` false AND `openedByUser` true)
+    // was unreachable — the chevron and aria-expanded flipped, but the body
+    // never rendered. This test clicks through open -> closed and would have
+    // failed against that logic (verified below via reasoning, see the task
+    // report for the full trace).
+    localStorage.clear()
+
+    const afternoonTime = new Date(TODAY)
+    afternoonTime.setHours(14, 0, 0, 0)
+
+    const { user } = renderView({
+      tasks: [
+        {
+          id: 'afternoon-done',
+          title: 'Afternoon task, already done',
+          completed: true,
+          createdAt: TODAY,
+          updatedAt: TODAY,
+          bucket: 'timed' as const,
+          scheduledFor: afternoonTime,
+        },
+      ],
+    } as never)
+
+    // Auto-collapsed on first render: header exists, row does not.
+    const header = () => screen.getByRole('button', { name: /afternoon/i })
+    expect(header()).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByText('Afternoon task, already done')).not.toBeInTheDocument()
+
+    // Click opens it — this is the state the old lockstep toggle could never reach.
+    await user.click(header())
+    expect(header()).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByText('Afternoon task, already done')).toBeInTheDocument()
+
+    // Click again closes it.
+    await user.click(header())
+    expect(header()).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByText('Afternoon task, already done')).not.toBeInTheDocument()
+
+    localStorage.clear()
+  })
 })
 
 // ── Print: a compact list on demand. Today renders ~57 rows of cards, chips

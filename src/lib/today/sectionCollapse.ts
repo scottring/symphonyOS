@@ -52,6 +52,18 @@ export function toggleCollapsed(key: string): Set<string> {
   return next
 }
 
+/** Sets (rather than flips) whether `key` is folded. The primitive the UI
+ *  uses so it can drive collapse from what's currently rendered instead of
+ *  guessing via toggle — see sectionCollapse's caller in TodayView for why
+ *  blind toggling of two independent facts made a state unreachable. */
+export function setCollapsed(key: string, collapsed: boolean): Set<string> {
+  const next = readCollapsed()
+  if (collapsed) next.add(key)
+  else next.delete(key)
+  writeCollapsed(next)
+  return next
+}
+
 /** Subscribe to in-tab + cross-tab changes. Returns cleanup. */
 export function onCollapsedChange(cb: (value: Set<string>) => void): () => void {
   const customHandler = (e: Event) => {

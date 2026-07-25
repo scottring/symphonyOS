@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import {
-  readCollapsed, writeCollapsed, toggleCollapsed,
+  readCollapsed, writeCollapsed, toggleCollapsed, setCollapsed,
   onCollapsedChange, sectionKey, groupKey,
 } from '@/lib/today/sectionCollapse'
 
@@ -23,6 +23,26 @@ describe('sectionCollapse', () => {
     expect(readCollapsed().has(sectionKey('morning'))).toBe(true)
     toggleCollapsed(sectionKey('morning'))
     expect(readCollapsed().has(sectionKey('morning'))).toBe(false)
+  })
+
+  it('setCollapsed(key, true) folds and persists, independent of toggle', () => {
+    const after = setCollapsed(sectionKey('afternoon'), true)
+    expect(after.has(sectionKey('afternoon'))).toBe(true)
+    expect(readCollapsed().has(sectionKey('afternoon'))).toBe(true)
+  })
+
+  it('setCollapsed(key, false) unfolds and persists, even if never folded', () => {
+    // Evening is not in the default-collapsed set, so this proves setCollapsed
+    // sets an explicit state rather than requiring a prior fold to undo.
+    const after = setCollapsed(sectionKey('evening'), false)
+    expect(after.has(sectionKey('evening'))).toBe(false)
+    expect(readCollapsed().has(sectionKey('evening'))).toBe(false)
+
+    setCollapsed(sectionKey('evening'), true)
+    expect(readCollapsed().has(sectionKey('evening'))).toBe(true)
+    const reopened = setCollapsed(sectionKey('evening'), false)
+    expect(reopened.has(sectionKey('evening'))).toBe(false)
+    expect(readCollapsed().has(sectionKey('evening'))).toBe(false)
   })
 
   it('namespaces sections and groups so they cannot collide', () => {
