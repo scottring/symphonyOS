@@ -86,8 +86,6 @@ const ALLOWED: Record<string, string> = {
     'Local 3-valued picker — emits a concrete hour, never a section string (see M5 note there).',
   'src/components/triage/TimePickerPopover.tsx':
     'Local 3-valued picker — emits a concrete hour, never a section string (see M5 note there).',
-  'src/components/wall/now/buildDayGrid.ts':
-    'Deliberately folds earlyMorning→morning and night→evening via FOLD_INTO; nothing is dropped.',
 }
 
 describe('day-section coverage', () => {

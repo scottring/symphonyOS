@@ -15,7 +15,7 @@ export type SidebarSpec = {
 export interface AppDef {
   /** Stable id used by Shell internally and in app registry validation */
   id: string;
-  /** Route path mounted by ShellRoutes (e.g., '/jobs', '/wall'). May contain :params. */
+  /** Route path mounted by ShellRoutes (e.g., '/jobs', '/wall-v2'). May contain :params. */
   route: string;
   /** True for the default app at '/' (only one app may be index) */
   index?: boolean;
