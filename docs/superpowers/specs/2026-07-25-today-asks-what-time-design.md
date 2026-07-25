@@ -317,6 +317,55 @@ They inflate the row count with items that are not real work.
   handoff deferred (`get healthy`/`get healthier`, `Home` ×2) are a different
   surface and remain their own pass.
 
+### 7. Density — tighter rows, with a floor
+
+Raised by Scott 2026-07-25: spacing between items should come down dramatically.
+Correct, and it compounds with collapse — dense rows plus foldable sections is
+what makes a long day readable rather than merely shorter.
+
+**Sequence this AFTER the seven-section rendering lands**, not before. Tuning
+spacing against the five-section layout means tuning it twice.
+
+**The floor is touch, not taste.** Today is the mobile-primary surface. Rows can
+go considerably tighter on desktop, but ~44px stays the minimum tappable height
+on mobile. A blanket reduction improves the desktop and degrades the phone.
+
+### 8. The assistant proposes an order and a grouping
+
+Raised by Scott 2026-07-25: can the AI assistant suggest an optimized order and
+grouping?
+
+**Feasible on what already exists** — the `symphony-agent` edge function, the ⌘K
+unibox and the Help-me-plan drawer are all in place. This is a new prompt plus a
+preview surface, not new plumbing.
+
+**But it needs signal, so it sequences last.** An optimizer needs durations,
+fixed anchors and some notion of energy or location to beat a guess. Today, 27 of
+28 tasks are all-day with no duration — there is almost nothing to reason over.
+Its suggestions get dramatically better once moves #1 and #3 have put real times
+on things. Building it first would produce a confident-sounding shuffle.
+
+**A proposal you accept, never an auto-apply.** It renders a preview — proposed
+order, proposed groups — which you take wholesale, take partially, or discard.
+Same rule as the duplicate sweep, and consistent with the canonical "look, don't
+link" planning model.
+
+---
+
+## Staging
+
+The spec is one design but three shippable units. Ship in this order:
+
+| Stage | Contents | Gated on |
+|---|---|---|
+| **1** | Five divisions with honest labels (#5), all sections collapsible | nothing — independent of the render bug |
+| **2** | Drop→render fix (#0), drag to time (#1), group create/add/remove (#2), reorder (#3), `sort_order` migration | reproducing the render bug |
+| **3** | Page cap (#4), duplicate sweep (#6), density pass (#7), assistant proposal (#8) | Stage 2's times existing |
+
+Stage 1 first specifically because it is independent of the unreproduced
+drop→render defect. Shipping real relief beats sitting blocked behind a
+heisenbug.
+
 ---
 
 ## What this does not do
