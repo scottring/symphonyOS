@@ -75,6 +75,9 @@ export function reorderByDrag(
     return renormalise(moved)
   }
 
+  // Defensive: both neighbours null means moved.length === 1 (the item is alone),
+  // which cannot happen because activeId === overId already returned early. Kept
+  // because a future caller might pass a single-item list through a different path.
   if (before == null && after == null) return renormalise(moved)
   if (before == null) return [{ id: activeId, sortOrder: after! - SORT_ORDER_GAP }]
   if (after == null) return [{ id: activeId, sortOrder: before + SORT_ORDER_GAP }]

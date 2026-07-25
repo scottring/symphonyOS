@@ -56,6 +56,16 @@ describe('reorderByDrag', () => {
     expect(writes[0].sortOrder).toBeGreaterThan(2000)
   })
 
+  it('writes one row when moved to the very front', () => {
+    const writes = reorderByDrag(['a','b','c'], 'b', 'a',
+      orders([['a',0],['b',1000],['c',2000]]))
+    expect(writes).toHaveLength(1)
+    expect(writes[0].id).toBe('b')
+    expect(writes[0].sortOrder).toBeLessThan(0)
+    // negative is correct — sort_order is a plain nullable integer with no non-negative constraint
+    expect(writes[0].sortOrder).toBe(-1000)
+  })
+
   it('renormalises the whole list when the gap collapses', () => {
     // a=0, b=1 — no integer strictly between them
     const writes = reorderByDrag(['a','b','c'], 'c', 'b',
