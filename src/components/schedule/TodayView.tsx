@@ -798,331 +798,332 @@ export function TodayView({
                     onToggle={() => toggleSection(section, collapsed)}
                   />
                   {!collapsed && (
-                    <>
-                      <div className="space-y-1">
-                    {items.map((item, itemIndex) => {
-                      const taskId = item.id.startsWith('task-') ? item.id.replace('task-', '') : null
-                      const contactName = item.contactId && contactsMap?.get(item.contactId)?.name || undefined
-                      const projectName = item.projectId && projectsMap?.get(item.projectId)?.name || undefined
-                      const parentTaskId = item.parentTaskId
-                      const parentTaskName = parentTaskId ? tasksMap.get(parentTaskId)?.title : undefined
-                      const isFirstItem = item.id === firstSectionItemId
+                    <div className="space-y-1">
+                      {items.map((item, itemIndex) => {
+                        const taskId = item.id.startsWith('task-') ? item.id.replace('task-', '') : null
+                        const contactName = item.contactId && contactsMap?.get(item.contactId)?.name || undefined
+                        const projectName = item.projectId && projectsMap?.get(item.projectId)?.name || undefined
+                        const parentTaskId = item.parentTaskId
+                        const parentTaskName = parentTaskId ? tasksMap.get(parentTaskId)?.title : undefined
+                        const isFirstItem = item.id === firstSectionItemId
 
-                      // ── Group cards ──────────────────────────────────────
-                      // A parent task and its adjacent subtask rows (grouping.ts
-                      // places children directly after their parent within a
-                      // section) render inside one enclosed, tinted card. Roles
-                      // are derived purely from adjacency, so a parent whose
-                      // children live in another section gets no card.
-                      const prevItem = itemIndex > 0 ? items[itemIndex - 1] : null
-                      const nextItem = itemIndex < items.length - 1 ? items[itemIndex + 1] : null
-                      const isGroupParent = !!taskId && !!nextItem && !!nextItem.isSubtask && nextItem.parentTaskId === taskId
-                      const isGroupChild = !!item.isSubtask && !!prevItem &&
-                        (prevItem.id === `task-${item.parentTaskId}` ||
-                          (!!prevItem.isSubtask && prevItem.parentTaskId === item.parentTaskId))
-                      const isLastGroupChild = isGroupChild &&
-                        (!nextItem || !(nextItem.isSubtask && nextItem.parentTaskId === item.parentTaskId))
-                      const groupCardClass = isGroupParent
-                        ? 'rounded-t-2xl border border-b-0 border-primary-200/70 bg-primary-50/30 pt-0.5'
-                        : isLastGroupChild
-                          ? 'border-x border-b border-primary-200/70 bg-primary-50/30 rounded-b-2xl pb-1 pl-4'
-                          : isGroupChild
-                            ? 'border-x border-primary-200/70 bg-primary-50/30 pl-4'
+                        // ── Group cards ──────────────────────────────────────
+                        // A parent task and its adjacent subtask rows (grouping.ts
+                        // places children directly after their parent within a
+                        // section) render inside one enclosed, tinted card. Roles
+                        // are derived purely from adjacency, so a parent whose
+                        // children live in another section gets no card.
+                        const prevItem = itemIndex > 0 ? items[itemIndex - 1] : null
+                        const nextItem = itemIndex < items.length - 1 ? items[itemIndex + 1] : null
+                        const isGroupParent = !!taskId && !!nextItem && !!nextItem.isSubtask && nextItem.parentTaskId === taskId
+                        const isGroupChild = !!item.isSubtask && !!prevItem &&
+                          (prevItem.id === `task-${item.parentTaskId}` ||
+                            (!!prevItem.isSubtask && prevItem.parentTaskId === item.parentTaskId))
+                        const isLastGroupChild = isGroupChild &&
+                          (!nextItem || !(nextItem.isSubtask && nextItem.parentTaskId === item.parentTaskId))
+                        const groupCardClass = isGroupParent
+                          ? 'rounded-t-2xl border border-b-0 border-primary-200/70 bg-primary-50/30 pt-0.5'
+                          : isLastGroupChild
+                            ? 'border-x border-b border-primary-200/70 bg-primary-50/30 rounded-b-2xl pb-1 pl-4'
+                            : isGroupChild
+                              ? 'border-x border-primary-200/70 bg-primary-50/30 pl-4'
+                              : ''
+                        // Don't offer an insert point between a parent and its
+                        // children — a task added there wouldn't be in the group.
+                        const showInsert = !isGroupChild
+
+                        // Insert point before this item (rendered unconditionally when totalItems>0)
+                        const prevItemForInsert = itemIndex > 0 ? items[itemIndex - 1] : null
+                        const insertCtxBefore = {
+                          before: prevItemForInsert?.startTime ?? null,
+                          after: item.startTime ?? null,
+                          section,
+                          date: viewedDate,
+                        }
+                        const insertBefore = (
+                          <TimelineInsertPoint
+                            onPick={(k) => insert.handlePick(insertCtxBefore, k)}
+                            onCreate={(kind, r) => {
+                              if (kind === 'task') onCreateTaskAt?.(r)
+                              else if (kind === 'event') onCreateEventAt?.(r)
+                              else onCreateRoutineAt?.(r)
+                            }}
+                            quickInput={{
+                              anchorTime: computeAnchorTime(insertCtxBefore),
+                              parserContext,
+                              currentDomain,
+                            }}
+                          />
+                        )
+
+                        // Evening meal gets a special card (desktop only — on
+                        // mobile we let meal items render as compact rows to
+                        // match the pre-redesign list).
+                        // 'night' too: evening now ends at 20:59, so a 21:00
+                        // dinner is a night item and would otherwise lose its
+                        // meal-card treatment.
+                        if (
+                          !isMobile &&
+                          (section === 'evening' || section === 'night') &&
+                          isMealItem(item.id, item.type, item.title)
+                        ) {
+                          const timeLabel = item.startTime
+                            ? new Date(item.startTime).toLocaleTimeString('en-US', {
+                                hour: 'numeric',
+                                minute: '2-digit',
+                              })
                             : ''
-                      // Don't offer an insert point between a parent and its
-                      // children — a task added there wouldn't be in the group.
-                      const showInsert = !isGroupChild
+                          const parsed = parseMealTitle(item.title)
+                          // For synthesized meal events, MealEventsProvider stores
+                          // the recipe source URL in `description` → maps onto
+                          // `googleDescription` on the timeline item.
+                          const recipeUrl = item.googleDescription?.startsWith('http')
+                            ? item.googleDescription
+                            : undefined
+                          const fromPlan = String(item.id).startsWith('meal:')
+                          // Core members (guests excluded) act as default diners
+                          // until per-meal diner assignment lands. The first few
+                          // surface as small stacked avatars on the card.
+                          const coreMembers = familyMembers.filter((m) => m.member_type === 'core')
+                          const diners = coreMembers.map((m) => ({
+                            id: m.id,
+                            initials: m.initials,
+                            color: m.color,
+                          }))
+                          const servesCount = coreMembers.length > 0 ? coreMembers.length : undefined
+                          return (
+                            <div key={item.id}>
+                              {showInsert && insertBefore}
+                              <div {...(isFirstItem ? { 'data-today-first': '' } : {})}>
+                                <EveningMealCard
+                                  title={parsed.title}
+                                  sides={parsed.sides}
+                                  timeLabel={timeLabel}
+                                  recipeUrl={recipeUrl}
+                                  fromPlan={fromPlan}
+                                  servesCount={servesCount}
+                                  diners={diners}
+                                  onSelect={() => onSelectItem(item.id)}
+                                />
+                              </div>
+                            </div>
+                          )
+                        }
 
-                      // Insert point before this item (rendered unconditionally when totalItems>0)
-                      const prevItemForInsert = itemIndex > 0 ? items[itemIndex - 1] : null
-                      const insertCtxBefore = {
-                        before: prevItemForInsert?.startTime ?? null,
-                        after: item.startTime ?? null,
-                        section,
-                        date: viewedDate,
-                      }
-                      const insertBefore = (
-                        <TimelineInsertPoint
-                          onPick={(k) => insert.handlePick(insertCtxBefore, k)}
-                          onCreate={(kind, r) => {
-                            if (kind === 'task') onCreateTaskAt?.(r)
-                            else if (kind === 'event') onCreateEventAt?.(r)
-                            else onCreateRoutineAt?.(r)
-                          }}
-                          quickInput={{
-                            anchorTime: computeAnchorTime(insertCtxBefore),
-                            parserContext,
-                            currentDomain,
-                          }}
-                        />
-                      )
-
-                      // Evening meal gets a special card (desktop only — on
-                      // mobile we let meal items render as compact rows to
-                      // match the pre-redesign list).
-                      if (
-                        !isMobile &&
-                        section === 'evening' &&
-                        isMealItem(item.id, item.type, item.title)
-                      ) {
-                        const timeLabel = item.startTime
-                          ? new Date(item.startTime).toLocaleTimeString('en-US', {
-                              hour: 'numeric',
-                              minute: '2-digit',
-                            })
-                          : ''
-                        const parsed = parseMealTitle(item.title)
-                        // For synthesized meal events, MealEventsProvider stores
-                        // the recipe source URL in `description` → maps onto
-                        // `googleDescription` on the timeline item.
-                        const recipeUrl = item.googleDescription?.startsWith('http')
-                          ? item.googleDescription
-                          : undefined
-                        const fromPlan = String(item.id).startsWith('meal:')
-                        // Core members (guests excluded) act as default diners
-                        // until per-meal diner assignment lands. The first few
-                        // surface as small stacked avatars on the card.
-                        const coreMembers = familyMembers.filter((m) => m.member_type === 'core')
-                        const diners = coreMembers.map((m) => ({
-                          id: m.id,
-                          initials: m.initials,
-                          color: m.color,
-                        }))
-                        const servesCount = coreMembers.length > 0 ? coreMembers.length : undefined
-                        return (
-                          <div key={item.id}>
-                            {showInsert && insertBefore}
-                            <div {...(isFirstItem ? { 'data-today-first': '' } : {})}>
-                              <EveningMealCard
-                                title={parsed.title}
-                                sides={parsed.sides}
-                                timeLabel={timeLabel}
-                                recipeUrl={recipeUrl}
-                                fromPlan={fromPlan}
-                                servesCount={servesCount}
-                                diners={diners}
-                                onSelect={() => onSelectItem(item.id)}
+                        // Routine collection — collapsed row with per-step completion
+                        if (item.type === 'routine-collection') {
+                          return (
+                            <div key={item.id} data-item-id={item.id}>
+                              {showInsert && insertBefore}
+                              <RoutineCollectionRow
+                                item={item}
+                                onSelect={() => handleSelectItem(item.id)}
+                                onSelectStep={(stepId) => handleSelectItem(stepId)}
+                                onCompleteStep={(stepTimelineId, completed) => {
+                                  if (!onCompleteRoutine) return
+                                  const { routineId, slot } = parseRoutineTimelineId(stepTimelineId)
+                                  const entityId = slot === null ? routineId : `${routineId}#${slot}`
+                                  onCompleteRoutine(entityId, completed)
+                                }}
+                                onSkipStep={onSkipRoutine ? (stepTimelineId) => {
+                                  const { routineId, slot } = parseRoutineTimelineId(stepTimelineId)
+                                  const entityId = slot === null ? routineId : `${routineId}#${slot}`
+                                  onSkipRoutine(entityId)
+                                } : undefined}
+                                onCompleteStepAt={onCompleteRoutine ? (stepTimelineId, completedAt) => {
+                                  const { routineId, slot } = parseRoutineTimelineId(stepTimelineId)
+                                  const entityId = slot === null ? routineId : `${routineId}#${slot}`
+                                  onCompleteRoutine(entityId, true, completedAt)
+                                } : undefined}
+                                onHideToday={onUpdateRoutine ? () => {
+                                  // Pause until tomorrow: reference + paused_until, so the
+                                  // useRoutines auto-resume brings it back on the next day.
+                                  const parentId = item.id.replace('routine-collection-', '')
+                                  const tomorrow = new Date()
+                                  tomorrow.setHours(0, 0, 0, 0)
+                                  tomorrow.setDate(tomorrow.getDate() + 1)
+                                  onUpdateRoutine(parentId, { visibility: 'reference', paused_until: tomorrow.toISOString() })
+                                } : undefined}
+                                onRemove={onUpdateRoutine ? () => {
+                                  const parentId = item.id.replace('routine-collection-', '')
+                                  onUpdateRoutine(parentId, { visibility: 'reference' })
+                                } : undefined}
                               />
                             </div>
-                          </div>
-                        )
-                      }
+                          )
+                        }
 
-                      // Routine collection — collapsed row with per-step completion
-                      if (item.type === 'routine-collection') {
+                        // Standard schedule item — mirror TodaySchedule wiring
                         return (
-                          <div key={item.id} data-item-id={item.id}>
-                            {showInsert && insertBefore}
-                            <RoutineCollectionRow
-                              item={item}
-                              onSelect={() => handleSelectItem(item.id)}
-                              onSelectStep={(stepId) => handleSelectItem(stepId)}
-                              onCompleteStep={(stepTimelineId, completed) => {
-                                if (!onCompleteRoutine) return
-                                const { routineId, slot } = parseRoutineTimelineId(stepTimelineId)
-                                const entityId = slot === null ? routineId : `${routineId}#${slot}`
-                                onCompleteRoutine(entityId, completed)
-                              }}
-                              onSkipStep={onSkipRoutine ? (stepTimelineId) => {
-                                const { routineId, slot } = parseRoutineTimelineId(stepTimelineId)
-                                const entityId = slot === null ? routineId : `${routineId}#${slot}`
-                                onSkipRoutine(entityId)
-                              } : undefined}
-                              onCompleteStepAt={onCompleteRoutine ? (stepTimelineId, completedAt) => {
-                                const { routineId, slot } = parseRoutineTimelineId(stepTimelineId)
-                                const entityId = slot === null ? routineId : `${routineId}#${slot}`
-                                onCompleteRoutine(entityId, true, completedAt)
-                              } : undefined}
-                              onHideToday={onUpdateRoutine ? () => {
-                                // Pause until tomorrow: reference + paused_until, so the
-                                // useRoutines auto-resume brings it back on the next day.
-                                const parentId = item.id.replace('routine-collection-', '')
-                                const tomorrow = new Date()
-                                tomorrow.setHours(0, 0, 0, 0)
-                                tomorrow.setDate(tomorrow.getDate() + 1)
-                                onUpdateRoutine(parentId, { visibility: 'reference', paused_until: tomorrow.toISOString() })
-                              } : undefined}
-                              onRemove={onUpdateRoutine ? () => {
-                                const parentId = item.id.replace('routine-collection-', '')
-                                onUpdateRoutine(parentId, { visibility: 'reference' })
-                              } : undefined}
-                            />
+                          <div key={item.id} className={isGroupChild ? '-mt-1' : undefined}>
+                          {showInsert && insertBefore}
+                          <div data-item-id={item.id} className={groupCardClass || undefined} {...(isFirstItem ? { 'data-today-first': '' } : {})}>
+                          {(() => {
+                            const { routineId: bareRoutineId, slot } = item.type === 'routine'
+                              ? parseRoutineTimelineId(item.id)
+                              : { routineId: '', slot: null }
+                            const routineEntityId = slot === null ? bareRoutineId : `${bareRoutineId}#${slot}`
+                            return (
+                              <>
+                          <ScheduleItem
+                            item={item}
+                            selected={selectedItemId === item.id}
+                            bulkSelectable={true}
+                            bulkSelected={selectedKeys.has(item.id)}
+                            showBulkAffordance={selectedKeys.size > 0}
+                            onToggleBulkSelect={() => toggleBulkSelect(item.id)}
+                            onSelect={() => handleSelectItem(item.id)}
+                            onToggleWaiting={
+                              item.type === 'task' && taskId && onToggleWaiting
+                                ? () => onToggleWaiting(taskId)
+                                : undefined
+                            }
+                            onToggleComplete={() => {
+                              if (item.type === 'task' && taskId) {
+                                onToggleTask(taskId)
+                              } else if (item.type === 'routine' && onCompleteRoutine) {
+                                onCompleteRoutine(routineEntityId, !item.completed)
+                              } else if (item.type === 'event' && onCompleteEvent) {
+                                onCompleteEvent(item.id.replace('event-', ''), !item.completed)
+                              }
+                            }}
+                            onPush={
+                              item.type === 'task' && taskId && onPushTask
+                                ? (target) => onPushTask(taskId, target)
+                                : item.type === 'routine' && onPushRoutine
+                                ? (date) => { if (date instanceof Date) onPushRoutine(bareRoutineId, date) }
+                                : item.type === 'event' && onPushEvent
+                                ? (date) => { if (date instanceof Date) onPushEvent(item.id.replace('event-', ''), date) }
+                                : undefined
+                            }
+                            onSchedule={
+                              item.type === 'task' && taskId && onUpdateTask
+                                ? (date, isAllDay) => onUpdateTask(taskId, { bucket: 'timed', scheduledFor: date, isAllDay })
+                                : undefined
+                            }
+                            onSkip={
+                              item.type === 'routine' && onSkipRoutine
+                                ? () => onSkipRoutine(routineEntityId)
+                                : item.type === 'event' && onSkipEvent
+                                ? () => onSkipEvent(item.id.replace('event-', ''))
+                                : undefined
+                            }
+                            contactName={contactName}
+                            projectName={projectName}
+                            projectId={item.projectId ?? undefined}
+                            parentTaskName={parentTaskName}
+                            parentTaskId={parentTaskId}
+                            onOpenParentTask={onOpenTask}
+                            familyMembers={familyMembers}
+                            assignedTo={item.assignedTo}
+                            onAssign={
+                              item.type === 'task' && taskId && onAssignTask
+                                ? (memberId) => onAssignTask(taskId, memberId)
+                                : item.type === 'event' && onAssignEvent
+                                ? (memberId) => onAssignEvent(item.id.replace('event-', ''), memberId)
+                                : item.type === 'routine' && onAssignRoutine
+                                ? (memberId) => onAssignRoutine(bareRoutineId, memberId)
+                                : undefined
+                            }
+                            assignedToAll={
+                              item.type === 'event' && eventNotesMap
+                                ? eventNotesMap.get(item.id.replace('event-', ''))?.assignedToAll ?? []
+                                : item.type === 'task'
+                                ? item.originalTask?.assignedToAll ?? []
+                                : item.type === 'routine'
+                                ? item.originalRoutine?.assigned_to_all ?? []
+                                : []
+                            }
+                            onAssignAll={
+                              item.type === 'task' && taskId && onAssignTaskAll
+                                ? (memberIds) => onAssignTaskAll(taskId, memberIds)
+                                : item.type === 'event' && onAssignEventAll
+                                ? (memberIds) => onAssignEventAll(item.id.replace('event-', ''), memberIds)
+                                : item.type === 'routine' && onAssignRoutineAll
+                                ? (memberIds) => onAssignRoutineAll(bareRoutineId, memberIds)
+                                : undefined
+                            }
+                            onContextChange={
+                              item.type === 'task' && taskId && onUpdateTask
+                                ? (context) => onUpdateTask(taskId, { context })
+                                : item.type === 'routine' && onUpdateRoutine
+                                ? (context) => onUpdateRoutine(bareRoutineId, { context })
+                                : item.type === 'event' && onUpdateEventContext
+                                ? (context) => onUpdateEventContext(item.id.replace('event-', ''), context ?? null)
+                                : undefined
+                            }
+                            onUpdateDiscussion={
+                              item.type === 'task' && taskId && onUpdateTask
+                                ? (next) => onUpdateTask(taskId, next)
+                                : undefined
+                            }
+                            panelOpen={panelOpen}
+                            onClosePanel={onClosePanel}
+                            isSuggestedPromotion={
+                              item.type === 'event'
+                                ? isPromotionSuggested(item.id.replace('event-', ''))
+                                : undefined
+                            }
+                            variant={item.type === 'routine' ? 'minimal' : 'full'}
+                            routineStreak={
+                              item.type === 'routine'
+                                ? getRoutineStats(bareRoutineId)?.currentStreak
+                                : undefined
+                            }
+                            suggestions={(() => {
+                              const entityType = item.type === 'event' ? 'calendar_event' : item.type === 'task' ? 'task' : null
+                              const entityId = item.type === 'event' ? item.id.replace('event-', '') : taskId
+                              if (!entityType || !entityId) return undefined
+                              const s = proactive.suggestionsForEntity(entityType, entityId)
+                              return s.length > 0 ? s : undefined
+                            })()}
+                            onActSuggestion={proactive.actOnSuggestion}
+                            onDismissSuggestion={proactive.dismissSuggestion}
+                            onOpenGuidedChat={onOpenGuidedChat}
+                          />
+                          {item.type === 'event' && (() => {
+                            const nudge = shareNudgeByEventId.get(item.id.replace('event-', ''))
+                            if (!nudge) return null
+                            return (
+                              <ShareToFamilyNudge
+                                contextLabel={nudge.context}
+                                onAdd={() => ctx.onShareEventWithFamily?.(nudge.eventId)}
+                                onDismiss={() => ctx.onDismissShareNudge?.(nudge.eventId)}
+                              />
+                            )
+                          })()}
+                              </>
+                            )
+                          })()}
+                          </div>
                           </div>
                         )
-                      }
-
-                      // Standard schedule item — mirror TodaySchedule wiring
-                      return (
-                        <div key={item.id} className={isGroupChild ? '-mt-1' : undefined}>
-                        {showInsert && insertBefore}
-                        <div data-item-id={item.id} className={groupCardClass || undefined} {...(isFirstItem ? { 'data-today-first': '' } : {})}>
-                        {(() => {
-                          const { routineId: bareRoutineId, slot } = item.type === 'routine'
-                            ? parseRoutineTimelineId(item.id)
-                            : { routineId: '', slot: null }
-                          const routineEntityId = slot === null ? bareRoutineId : `${bareRoutineId}#${slot}`
-                          return (
-                            <>
-                        <ScheduleItem
-                          item={item}
-                          selected={selectedItemId === item.id}
-                          bulkSelectable={true}
-                          bulkSelected={selectedKeys.has(item.id)}
-                          showBulkAffordance={selectedKeys.size > 0}
-                          onToggleBulkSelect={() => toggleBulkSelect(item.id)}
-                          onSelect={() => handleSelectItem(item.id)}
-                          onToggleWaiting={
-                            item.type === 'task' && taskId && onToggleWaiting
-                              ? () => onToggleWaiting(taskId)
-                              : undefined
-                          }
-                          onToggleComplete={() => {
-                            if (item.type === 'task' && taskId) {
-                              onToggleTask(taskId)
-                            } else if (item.type === 'routine' && onCompleteRoutine) {
-                              onCompleteRoutine(routineEntityId, !item.completed)
-                            } else if (item.type === 'event' && onCompleteEvent) {
-                              onCompleteEvent(item.id.replace('event-', ''), !item.completed)
-                            }
-                          }}
-                          onPush={
-                            item.type === 'task' && taskId && onPushTask
-                              ? (target) => onPushTask(taskId, target)
-                              : item.type === 'routine' && onPushRoutine
-                              ? (date) => { if (date instanceof Date) onPushRoutine(bareRoutineId, date) }
-                              : item.type === 'event' && onPushEvent
-                              ? (date) => { if (date instanceof Date) onPushEvent(item.id.replace('event-', ''), date) }
-                              : undefined
-                          }
-                          onSchedule={
-                            item.type === 'task' && taskId && onUpdateTask
-                              ? (date, isAllDay) => onUpdateTask(taskId, { bucket: 'timed', scheduledFor: date, isAllDay })
-                              : undefined
-                          }
-                          onSkip={
-                            item.type === 'routine' && onSkipRoutine
-                              ? () => onSkipRoutine(routineEntityId)
-                              : item.type === 'event' && onSkipEvent
-                              ? () => onSkipEvent(item.id.replace('event-', ''))
-                              : undefined
-                          }
-                          contactName={contactName}
-                          projectName={projectName}
-                          projectId={item.projectId ?? undefined}
-                          parentTaskName={parentTaskName}
-                          parentTaskId={parentTaskId}
-                          onOpenParentTask={onOpenTask}
-                          familyMembers={familyMembers}
-                          assignedTo={item.assignedTo}
-                          onAssign={
-                            item.type === 'task' && taskId && onAssignTask
-                              ? (memberId) => onAssignTask(taskId, memberId)
-                              : item.type === 'event' && onAssignEvent
-                              ? (memberId) => onAssignEvent(item.id.replace('event-', ''), memberId)
-                              : item.type === 'routine' && onAssignRoutine
-                              ? (memberId) => onAssignRoutine(bareRoutineId, memberId)
-                              : undefined
-                          }
-                          assignedToAll={
-                            item.type === 'event' && eventNotesMap
-                              ? eventNotesMap.get(item.id.replace('event-', ''))?.assignedToAll ?? []
-                              : item.type === 'task'
-                              ? item.originalTask?.assignedToAll ?? []
-                              : item.type === 'routine'
-                              ? item.originalRoutine?.assigned_to_all ?? []
-                              : []
-                          }
-                          onAssignAll={
-                            item.type === 'task' && taskId && onAssignTaskAll
-                              ? (memberIds) => onAssignTaskAll(taskId, memberIds)
-                              : item.type === 'event' && onAssignEventAll
-                              ? (memberIds) => onAssignEventAll(item.id.replace('event-', ''), memberIds)
-                              : item.type === 'routine' && onAssignRoutineAll
-                              ? (memberIds) => onAssignRoutineAll(bareRoutineId, memberIds)
-                              : undefined
-                          }
-                          onContextChange={
-                            item.type === 'task' && taskId && onUpdateTask
-                              ? (context) => onUpdateTask(taskId, { context })
-                              : item.type === 'routine' && onUpdateRoutine
-                              ? (context) => onUpdateRoutine(bareRoutineId, { context })
-                              : item.type === 'event' && onUpdateEventContext
-                              ? (context) => onUpdateEventContext(item.id.replace('event-', ''), context ?? null)
-                              : undefined
-                          }
-                          onUpdateDiscussion={
-                            item.type === 'task' && taskId && onUpdateTask
-                              ? (next) => onUpdateTask(taskId, next)
-                              : undefined
-                          }
-                          panelOpen={panelOpen}
-                          onClosePanel={onClosePanel}
-                          isSuggestedPromotion={
-                            item.type === 'event'
-                              ? isPromotionSuggested(item.id.replace('event-', ''))
-                              : undefined
-                          }
-                          variant={item.type === 'routine' ? 'minimal' : 'full'}
-                          routineStreak={
-                            item.type === 'routine'
-                              ? getRoutineStats(bareRoutineId)?.currentStreak
-                              : undefined
-                          }
-                          suggestions={(() => {
-                            const entityType = item.type === 'event' ? 'calendar_event' : item.type === 'task' ? 'task' : null
-                            const entityId = item.type === 'event' ? item.id.replace('event-', '') : taskId
-                            if (!entityType || !entityId) return undefined
-                            const s = proactive.suggestionsForEntity(entityType, entityId)
-                            return s.length > 0 ? s : undefined
-                          })()}
-                          onActSuggestion={proactive.actOnSuggestion}
-                          onDismissSuggestion={proactive.dismissSuggestion}
-                          onOpenGuidedChat={onOpenGuidedChat}
-                        />
-                        {item.type === 'event' && (() => {
-                          const nudge = shareNudgeByEventId.get(item.id.replace('event-', ''))
-                          if (!nudge) return null
-                          return (
-                            <ShareToFamilyNudge
-                              contextLabel={nudge.context}
-                              onAdd={() => ctx.onShareEventWithFamily?.(nudge.eventId)}
-                              onDismiss={() => ctx.onDismissShareNudge?.(nudge.eventId)}
-                            />
-                          )
-                        })()}
-                            </>
-                          )
-                        })()}
-                        </div>
-                        </div>
-                      )
-                    })}
-                    {/* Trailing insert point: after the last item per section */}
-                    {(() => {
-                      const insertCtxTrailing = {
-                        before: items.length > 0 ? (items[items.length - 1].startTime ?? null) : null,
-                        after: null,
-                        section,
-                        date: viewedDate,
-                      }
-                      return (
-                        <TimelineInsertPoint
-                          onPick={(k) => insert.handlePick(insertCtxTrailing, k)}
-                          onCreate={(kind, r) => {
-                            if (kind === 'task') onCreateTaskAt?.(r)
-                            else if (kind === 'event') onCreateEventAt?.(r)
-                            else onCreateRoutineAt?.(r)
-                          }}
-                          quickInput={{
-                            anchorTime: computeAnchorTime(insertCtxTrailing),
-                            parserContext,
-                            currentDomain,
-                          }}
-                        />
-                      )
-                    })()}
-                      </div>
-                    </>
+                      })}
+                      {/* Trailing insert point: after the last item per section */}
+                      {(() => {
+                        const insertCtxTrailing = {
+                          before: items.length > 0 ? (items[items.length - 1].startTime ?? null) : null,
+                          after: null,
+                          section,
+                          date: viewedDate,
+                        }
+                        return (
+                          <TimelineInsertPoint
+                            onPick={(k) => insert.handlePick(insertCtxTrailing, k)}
+                            onCreate={(kind, r) => {
+                              if (kind === 'task') onCreateTaskAt?.(r)
+                              else if (kind === 'event') onCreateEventAt?.(r)
+                              else onCreateRoutineAt?.(r)
+                            }}
+                            quickInput={{
+                              anchorTime: computeAnchorTime(insertCtxTrailing),
+                              parserContext,
+                              currentDomain,
+                            }}
+                          />
+                        )
+                      })()}
+                    </div>
                   )}
                 </section>
               )

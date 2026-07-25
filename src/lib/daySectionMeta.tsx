@@ -1,4 +1,4 @@
-import { Sunrise, Sun, Sunset, MoonStar, Clock, Inbox, type LucideIcon } from 'lucide-react'
+import { Sunrise, CloudSun, Sun, Sunset, MoonStar, Clock, Inbox, type LucideIcon } from 'lucide-react'
 import type { DaySection } from '@/lib/timeUtils'
 import { getDaySectionLabel, DAY_SECTION_BOUNDS } from '@/lib/timeUtils'
 
@@ -22,10 +22,13 @@ const RANGE: Record<DaySection, string> = {
 }
 for (const bound of DAY_SECTION_BOUNDS) RANGE[bound.section] = bound.range
 
+/** One glyph per band — adjacent sections must not share an icon, or the day
+ *  reads as an undifferentiated run of headers. (morning and afternoon were
+ *  both `Sun`.) */
 const ICON: Record<DaySection, LucideIcon> = {
   allday: Clock,
   earlyMorning: Sunrise,
-  morning: Sun,
+  morning: CloudSun,
   afternoon: Sun,
   evening: Sunset,
   night: MoonStar,

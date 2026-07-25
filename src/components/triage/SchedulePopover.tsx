@@ -89,7 +89,14 @@ function generateTimeOptions(): { value: string; label: string }[] {
 
 const TIME_OPTIONS = generateTimeOptions()
 
-// Group items by time of day section
+// DELIBERATELY LOCAL — not `DaySection` from @/lib/timeUtils, and not a bug.
+//
+// This union only labels the visual grouping of the picker's own context
+// preview. The picker never EMITS a section string: every selection yields a
+// concrete hour, and whoever consumes it re-derives the real band via
+// getDaySection/getSectionForHour. So its arity is free to differ from the
+// canonical seven, and widening it here would add empty groups to the popover
+// for no gain. Verified harmless — leave it local; don't "unify" it.
 type DaySection = 'allday' | 'morning' | 'afternoon' | 'evening'
 
 function getTimeOfDay(date: Date): 'morning' | 'afternoon' | 'evening' {
