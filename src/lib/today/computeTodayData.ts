@@ -21,7 +21,7 @@ export function computeTodayData(input: TodayDataInput): TodayData {
 
   const overdueTasks = selectOverdue(input.tasks, isToday, match)
   const inboxTasks = selectInbox(input.tasks, isToday, match)
-  const weekTasks = selectWeek(input.tasks, isToday, match)
+  const weekTasks = selectWeek(input.tasks, isToday, match, input.weekStart)
   const monthTasks = selectMonth(input.tasks, isToday, match)
   const completedInboxTasks = selectCompletedInbox(input.tasks, input.viewedDate, match)
   const timedTasks = selectTimed(input.tasks, input.viewedDate, match)

@@ -5,6 +5,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { StepSchedule } from '@/components/planning/weekly/StepSchedule'
 import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
+import { belongsToWeek } from '@/lib/today/weekPlacement'
 import { useGuided } from '../GuidedContext'
 
 export function ScheduleGridStep() {
@@ -19,7 +20,9 @@ export function ScheduleGridStep() {
     () => host.tasks.filter((t) => {
       if (t.completed || !match(t.assignedTo, t.assignedToAll)) return false
       // The week's list (unscheduled pool + anything still bucketed to the week).
-      if (t.bucket === 'week') return true
+      // Scoped to THIS session's week — a move placed on a later week is not one
+      // of this week's rocks to place.
+      if (t.bucket === 'week') return belongsToWeek(t, periodStart)
       // Placed rocks: dropping a task onto the grid stamps a scheduledFor and
       // flips its bucket week→timed. Without this it would fall out of the
       // week filter and vanish from the grid the instant it's scheduled. Keep

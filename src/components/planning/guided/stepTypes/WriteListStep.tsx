@@ -6,6 +6,7 @@
 import { useState, useMemo, useCallback, useRef } from 'react'
 import { Plus, Sparkles, Star } from 'lucide-react'
 import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
+import { belongsToWeek } from '@/lib/today/weekPlacement'
 import { funRatio } from '@/lib/planning/coachLines'
 import { looksLikeActivity } from '@/lib/planning/outcomeCoach'
 import { PICK_CAP } from '@/lib/planning/betPulse'
@@ -16,13 +17,19 @@ import { ListSuggestions, type WriteBucket } from '../ListSuggestions'
 import { TaskTriageRow, SeasonListRow } from './ReviewStep'
 
 export function WriteListStep() {
-  const { step, host } = useGuided()
+  const { step, host, periodStart } = useGuided()
   const bucket = step.props?.bucket
   const softCap = step.props?.softCap
   const match = useMemo(() => makeAssigneeFilter([]), [])
   const pool = useMemo(
-    () => (bucket ? host.tasks.filter((t) => !t.completed && t.bucket === bucket && match(t.assignedTo, t.assignedToAll)) : []),
-    [host.tasks, bucket, match],
+    () => (bucket ? host.tasks.filter((t) => {
+      if (t.completed || t.bucket !== bucket || !match(t.assignedTo, t.assignedToAll)) return false
+      // The week list is this session's week — a move placed on a different week
+      // is on that week's list, not this one's.
+      if (bucket === 'week') return belongsToWeek(t, periodStart)
+      return true
+    }) : []),
+    [host.tasks, bucket, match, periodStart],
   )
 
   // The level above, as fuel for AI suggestions (look, don't link): the season

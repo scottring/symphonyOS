@@ -45,6 +45,13 @@ describe('taskPools', () => {
     expect(selectWeek([w], true, all).map(x => x.id)).toEqual(['w'])
     expect(selectWeek([w], false, all)).toEqual([])
   })
+  it('selectWeek: scoped to the current week — a later week\'s placement stays off Today', () => {
+    const thisWeek = task({ id: 'now', bucket: 'week', weekStart: new Date(2026, 6, 19) })
+    const laterWeek = task({ id: 'later', bucket: 'week', weekStart: new Date(2026, 7, 9) })
+    const legacy = task({ id: 'legacy', bucket: 'week' })
+    const ids = selectWeek([thisWeek, laterWeek, legacy], true, all, new Date(2026, 6, 19)).map(x => x.id)
+    expect(ids).toEqual(['now', 'legacy'])
+  })
   it('selectCompletedInbox: completed non-timed updated on viewed date', () => {
     const c = task({ id: 'c', bucket: 'inbox', completed: true, updatedAt: new Date('2026-05-19T10:00:00') })
     const timed = task({ id: 'x', bucket: 'timed', completed: true, updatedAt: new Date('2026-05-19T10:00:00') })

@@ -37,6 +37,7 @@ import { DenseInboxRow } from '@/components/schedule/DenseInboxRow';
 import { TriageWhenMenu, type TriageWhen } from '@/components/schedule/TriageWhenMenu';
 import { selectOverdue } from '@/lib/today/taskPools';
 import { selectHorizonPool, selectPlacedInWeek, HORIZONS, type HorizonId } from '@/lib/today/horizons';
+import { belongsToWeek } from '@/lib/today/weekPlacement';
 import { readCadenceConfig, weekStartAnchor } from '@/lib/cadence/config';
 import { matchesDomain, filterEventsForDomain, domainSessionToken } from '@/lib/today/domainFilter';
 import { makeAssigneeFilter } from '@/lib/today/assigneeFilter';
@@ -169,9 +170,19 @@ export function useHorizonPageData(horizon: HorizonId, anchorDate?: Date) {
     () => (showCarryOver ? selectOverdue(domainTasks, true, match) : []),
     [showCarryOver, domainTasks, match],
   );
+  // ── Which week this page is looking at. Declared before the pool because the
+  // week pool is now scoped to it: a month move placed on the week of Aug 10
+  // belongs to that week's list, not to every week's. Anchored to `anchorDate`
+  // when viewing a specific week (`?start=`); otherwise the current week. ──
+  const todayStart = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; }, []);
+  const weekAnchor = useMemo(
+    () => weekStartAnchor(anchorDate ?? new Date(), readCadenceConfig().weekStartsOn),
+    [anchorDate],
+  );
+
   const pool = useMemo(
-    () => selectHorizonPool(domainTasks, horizon, match),
-    [domainTasks, horizon, match],
+    () => selectHorizonPool(domainTasks, horizon, match, weekAnchor),
+    [domainTasks, horizon, match, weekAnchor],
   );
 
   // The week's placed rocks (bucket week→timed on scheduling drains the pool;
@@ -181,32 +192,23 @@ export function useHorizonPageData(horizon: HorizonId, anchorDate?: Date) {
   const placedThisWeek = useMemo(() => {
     if (horizon !== 'week') return [];
     const carried = new Set(carryOver.map((t) => t.id));
-    return selectPlacedInWeek(
-      domainTasks,
-      weekStartAnchor(new Date(), readCadenceConfig().weekStartsOn),
-      match,
-    ).filter((t) => !carried.has(t.id));
-  }, [horizon, domainTasks, match, carryOver]);
+    return selectPlacedInWeek(domainTasks, weekAnchor, match).filter((t) => !carried.has(t.id));
+  }, [horizon, domainTasks, match, carryOver, weekAnchor]);
 
   // ── Week as a standing 7-day grid — the wizard's "place the big rocks"
   // surface living on the page (the week rung's calendar view, matching the
   // month/year grids). Same conventions as ScheduleGridStep: the grid opens
   // on today mid-week, refuses past-day drops, and keeps a placed rock
   // visible where it was dropped (bucket week→timed on scheduling). ──
-  const todayStart = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; }, []);
-  // Anchored to `anchorDate` when the page is viewing a specific week
-  // (`?start=`); otherwise the current week, as before.
-  const weekAnchor = useMemo(
-    () => weekStartAnchor(anchorDate ?? new Date(), readCadenceConfig().weekStartsOn),
-    [anchorDate],
-  );
   const weekGridStart = weekAnchor.getTime() > todayStart.getTime() ? weekAnchor : todayStart;
   const weekGridTasks = useMemo(() => {
     if (horizon !== 'week') return [];
     const end = new Date(weekAnchor); end.setDate(end.getDate() + 7);
     return domainTasks.filter((t) => {
       if (t.completed || !match(t.assignedTo, t.assignedToAll)) return false;
-      if (t.bucket === 'week') return true;
+      // Only this week's week-bucket items — another week's placement isn't
+      // waiting to be dropped onto these seven days.
+      if (t.bucket === 'week') return belongsToWeek(t, weekAnchor);
       if (t.scheduledFor) {
         const d = new Date(t.scheduledFor);
         return d >= weekAnchor && d < end;
@@ -216,14 +218,15 @@ export function useHorizonPageData(horizon: HorizonId, anchorDate?: Date) {
   }, [horizon, domainTasks, match, weekAnchor]);
 
   // Live counts for the cascade rail (bucketed rungs only — today and year
-  // have no bucket of their own).
+  // have no bucket of their own). The week count uses the same week as the
+  // pool, so the rail and the list can never disagree.
   const railCounts = useMemo(() => {
     const counts: Partial<Record<HorizonId, number>> = {};
     for (const h of HORIZONS) {
-      if (h.bucket && h.bucket !== 'timed') counts[h.id] = selectHorizonPool(domainTasks, h.id, match).length;
+      if (h.bucket && h.bucket !== 'timed') counts[h.id] = selectHorizonPool(domainTasks, h.id, match, weekAnchor).length;
     }
     return counts;
-  }, [domainTasks, match]);
+  }, [domainTasks, match, weekAnchor]);
 
   // The level above, for reference — each level keeps its OWN list; planning
   // means LOOKING at the level above while writing this one. Month looks at

@@ -29,6 +29,8 @@ import { PlanningEventBlock, PLACED_EVENT_DRAG_PREFIX } from './PlanningEventBlo
 import { PlanningRoutineBlock, PLACED_ROUTINE_DRAG_PREFIX } from './PlanningRoutineBlock'
 import { computeEventReschedule } from './planningReschedule'
 import { PlanningSlotQuickCreate } from './PlanningSlotQuickCreate'
+import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
+import { belongsToWeek } from '@/lib/today/weekPlacement'
 
 interface PlanningSessionProps {
   tasks: Task[]
@@ -250,9 +252,11 @@ export function PlanningSession({
   const { relevantUnscheduled, backlogCount } = useMemo(() => {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
+    const currentWeek = weekStartAnchor(today, readCadenceConfig().weekStartsOn)
     const isRelevant = (task: Task) => {
       if (task.isAllDay) return true
-      if (task.bucket === 'week') return true
+      // This week's items only — a move placed on a later week isn't today-relevant.
+      if (task.bucket === 'week') return belongsToWeek(task, currentWeek)
       if (task.scheduledFor) {
         const d = new Date(task.scheduledFor)
         d.setHours(0, 0, 0, 0)

@@ -30,6 +30,13 @@ export interface TodayDataInput {
    * the full pool). Undefined = never hide completed (current desktop behavior).
    */
   completedLingerCutoff?: number
+  /**
+   * Start of the current week, per the user's `weekStartsOn`. Scopes the "This
+   * Week" staging strip to this week, so a move placed on a later week doesn't
+   * crowd Today. Computed at the React boundary (readCadenceConfig touches
+   * localStorage — this stays pure). Undefined = any week, pre-cascade behavior.
+   */
+  weekStart?: Date
 }
 
 export interface TodayCounts {

@@ -47,6 +47,7 @@ import { computeClaritySteps, type ClarityStepId } from '@/lib/clarity/claritySt
 import { selectOverdue } from '@/lib/today/taskPools'
 import { selectHorizonPool } from '@/lib/today/horizons'
 import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
+import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
 import { getRoutinesForDatePure } from '@/lib/routineUtils'
 import { StagingFloat } from './StagingFloat'
 import { EveningMealCard } from './EveningMealCard'
@@ -271,6 +272,16 @@ export function TodayView({
   const completedLingerCutoff = isMobile ? nowTick - COMPLETED_LINGER_MS : undefined
 
   // ── Derived data ─────────────────────────────────────────────────────────────
+  // The week Today belongs to. A week placement now names its week, so the
+  // "This Week" strip has to say which week it is showing — otherwise a move
+  // placed on a week a month out sits on today's strip. Memoized so it stays
+  // referentially stable (todayInput depends on it). Fixed for the session's
+  // lifetime, same as `todayStart` elsewhere — a week boundary crossed with the
+  // tab open is the same edge case a day boundary already is.
+  const currentWeekStart = useMemo(
+    () => weekStartAnchor(new Date(), readCadenceConfig().weekStartsOn),
+    [],
+  )
   const todayInput = useMemo(() => ({
     tasks,
     events,
@@ -280,12 +291,13 @@ export function TodayView({
     selectedAssignee: selectedAssignees ?? [],
     hideRoutines,
     completedLingerCutoff,
+    weekStart: currentWeekStart,
     // Cast: EventNote.notes is string|null; TodayDataInput expects string|undefined — structurally compatible at runtime
     eventNotesMap: ctx.eventNotesMap as unknown as Map<string, { notes?: string; assignedTo?: string | null }> | undefined,
     eventContextOverrides: ctx.eventContextOverrides,
     getDomainForCalendar: ctx.getDomainForCalendar,
   }), [tasks, events, routines, dateInstances, viewedDate, selectedAssignees, hideRoutines, completedLingerCutoff,
-      ctx.eventNotesMap, ctx.eventContextOverrides, ctx.getDomainForCalendar])
+      currentWeekStart, ctx.eventNotesMap, ctx.eventContextOverrides, ctx.getDomainForCalendar])
 
   const data = useTodayData(todayInput)
 
@@ -390,13 +402,13 @@ export function TodayView({
     const matchAll = makeAssigneeFilter([])
     const inboxCount = tasks.filter((t) => !t.completed && t.bucket === 'inbox').length
     const overdueCount = selectOverdue(tasks, true, matchAll).length
-    const weekCount = selectHorizonPool(tasks, 'week', matchAll).length
+    const weekCount = selectHorizonPool(tasks, 'week', matchAll, currentWeekStart).length
     const untimedRoutines = getRoutinesForDatePure(routines, viewedDate).filter(
       (r) => r.recurrence_pattern?.type !== 'daily' && !r.time_of_day && r.visibility !== 'reference',
     ).length
     const isEvening = !!data.isToday && new Date().getHours() >= 17
     return computeClaritySteps({ inboxCount, overdueCount, placeableCount: weekCount + untimedRoutines, isEvening })
-  }, [tasks, routines, viewedDate, data.isToday])
+  }, [tasks, routines, viewedDate, data.isToday, currentWeekStart])
 
   const onClarityStep = useCallback((id: ClarityStepId) => {
     if (id === 'inbox') navigate('/inbox')

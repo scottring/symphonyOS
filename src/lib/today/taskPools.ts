@@ -1,4 +1,5 @@
 import type { Task } from '@/types/task'
+import { belongsToWeek } from './weekPlacement'
 
 type Match = (assignedTo: string | null | undefined, assignedToAll?: readonly string[] | null) => boolean
 
@@ -44,13 +45,18 @@ export function selectInbox(tasks: Task[], isToday: boolean, match: Match): Task
   })
 }
 
-/** Ports TodaySchedule.weekTasks (~673-681). */
-export function selectWeek(tasks: Task[], isToday: boolean, match: Match): Task[] {
+/** Ports TodaySchedule.weekTasks (~673-681).
+ *
+ * `weekStart` scopes the strip to the current week — this is Today's "This Week"
+ * staging area, so a move placed on a week three weeks out does not belong here.
+ * Omitted = any week (pre-cascade behavior). */
+export function selectWeek(tasks: Task[], isToday: boolean, match: Match, weekStart?: Date): Task[] {
   if (!isToday) return []
   return tasks.filter((task) => {
     if (task.completed) return false
     if (task.bucket !== 'week') return false
     if (!match(task.assignedTo, task.assignedToAll)) return false
+    if (weekStart && !belongsToWeek(task, weekStart)) return false
     return true
   })
 }
