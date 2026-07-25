@@ -148,6 +148,27 @@ gap, and it is small: the wrapper already carries both attachment mechanisms —
 `parentTaskId` for tasks, `group_members` refs for events and routines
 (`grouping.ts` relocates the latter under the wrapper card).
 
+**Groups collapse.** This is not decoration — it is the mechanism by which
+grouping reduces the page. Folding 27 all-day rows into 6 groups still renders
+33 rows unless the groups fold shut, so collapse is what makes move #4's cap
+achievable at all.
+
+- A collapsed group is **one row** carrying its name, member count and progress
+  — `Morning errands · 5 · 2 done`. Collapsing must never hide completion state;
+  same honesty rule as the page cap.
+- **State persists per group across reloads.** Use localStorage keyed by group
+  id, mirroring `lib/hideRoutinesSignal.ts` (which also broadcasts an in-tab
+  event so other views react). A view preference is per-device by nature; this
+  avoids both a schema change and a new sync surface. If cross-device collapse
+  is wanted later, add a column then.
+- **A newly created group starts expanded.** Collapsing what the user just built
+  is disorienting — they need to see it worked. Every group after that opens in
+  its remembered state.
+- **Drag interacts with collapse:** dropping a card onto a collapsed group adds
+  it (the collapsed row is a valid drop target). Hovering a dragged card over a
+  collapsed group auto-expands it after a short delay, so members remain
+  reachable mid-drag.
+
 Every drag gesture keeps a tap equivalent in the existing menus. Today is the
 mobile-primary surface; drag is an accelerant, never the only route.
 
@@ -276,6 +297,10 @@ Then open the page and drag:
   survives a reload.
 - A card onto another card → group forms and renders immediately.
 - A card onto that group → it joins. Drag it out → it leaves and keeps its date.
+- Collapse a group → one row with count and progress; reload → still collapsed.
+  A freshly created group is expanded.
+- Drop a card onto a **collapsed** group → it joins. Hover a dragged card over
+  one → it expands so members stay reachable.
 - Reorder two untimed cards → order persists across reload.
 - Drag a timed card above an earlier one → **its time changes to match its new
   position**, the list stays sorted, and no untouched item's time moves.
