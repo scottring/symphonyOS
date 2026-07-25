@@ -391,7 +391,7 @@ describe('horizon pages (smoke)', () => {
     expect(screen.getByRole('button', { name: 'Plan the year' })).toBeInTheDocument()
   })
 
-  it('YearPage shows a season-pick count under an active goal that has a pick', () => {
+  it('YearPage ledger counts a season pick in the Picked column', () => {
     mockGoals.push({
       id: 'g1', areaId: 'a1', name: 'Financial calm', year: 2026,
       context: null, status: 'active', sortOrder: 0,
@@ -403,21 +403,21 @@ describe('horizon pages (smoke)', () => {
       goalId: 'g1', pickedAt: new Date(),
     }) satisfies Task)
     render(<YearPage />)
-    const row = screen.getByText('Financial calm').closest('button')!
-    expect(within(row).getByText(/1 pick this season/i)).toBeInTheDocument()
-    expect(within(row).queryByText('0 picks this season')).not.toBeInTheDocument()
+    const row = screen.getByTestId('ledger-row-g1')
+    expect(within(row).getByText('1')).toBeInTheDocument()
+    expect(row.getAttribute('data-untouched')).toBe('false')
   })
 
-  it('YearPage shows a quiet "0 picks this season" flag under an active goal with no pick', () => {
+  it('YearPage ledger dims an untouched goal rather than hiding it', () => {
     mockGoals.push({
       id: 'g1', areaId: 'a1', name: 'Financial calm', year: 2026,
       context: null, status: 'active', sortOrder: 0,
       actions: [], milestones: [], createdAt: new Date(), updatedAt: new Date(),
     } satisfies Goal)
     render(<YearPage />)
-    const row = screen.getByText('Financial calm').closest('button')!
-    expect(within(row).getByText('0 picks this season')).toBeInTheDocument()
-    expect(within(row).queryByText(/1 pick this season/i)).not.toBeInTheDocument()
+    const row = screen.getByTestId('ledger-row-g1')
+    expect(row).toBeInTheDocument()
+    expect(row.getAttribute('data-untouched')).toBe('true')
   })
 
   it('SomedayPage renders the timeless-pool empty state', () => {

@@ -102,7 +102,7 @@ describe('CalendarStep', () => {
     expect(await screen.findByText('Dentist')).toBeInTheDocument()
   })
 
-  it('landscape: renders the 12-month grid, counting tasks WITHOUT naming them', () => {
+  it('landscape: renders the year ribbon, counting tasks WITHOUT naming them', () => {
     const yearStep = {
       id: 'mountain-ranges', type: 'calendar' as const, title: "The year's mountain ranges",
       narration: 'Map the terrain.', props: { notesKey: 'annualCalendar', landscape: true },
@@ -115,16 +115,19 @@ describe('CalendarStep', () => {
       step: yearStep,
       host: makeHost({ calendarConnected: false, tasks: [septTask] }),
     })
-    // Landscape shows every month name (unlike the count-list, which only lists
-    // months that have commitments).
-    expect(screen.getByText('January')).toBeInTheDocument()
-    expect(screen.getByText('December')).toBeInTheDocument()
+    // The ribbon scales the whole year, so every month tick is present.
+    expect(screen.getByText('JAN')).toBeInTheDocument()
+    expect(screen.getByText('DEC')).toBeInTheDocument()
     // The task is COUNTED, never named: a dated errand is a Today-altitude
     // detail, and reading it here buries what the year view exists to show.
+    // (This is the assertion that "Lay out clothes for the NYSRA interview"
+    // should have tripped before it shipped to the year rung.)
     expect(screen.queryByText('Big launch')).not.toBeInTheDocument()
-    expect(screen.getByText('1 item planned')).toBeInTheDocument()
-    // And there is no day grid at year altitude — the cell expands in place.
-    fireEvent.click(screen.getByText('September'))
+    const counted = screen
+      .getAllByTestId('density-bar')
+      .filter((b) => (b.getAttribute('title') ?? '').endsWith('— 1'))
+    expect(counted).toHaveLength(1)
+    // And nothing at year altitude opens a day grid.
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 

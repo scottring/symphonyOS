@@ -7,7 +7,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { CalendarDays, ChevronRight } from 'lucide-react'
 import { useGuided } from '../GuidedContext'
-import { YearCalendarGrid } from '@/components/planning/horizon/YearCalendarGrid'
+import { YearRibbon } from '@/components/planning/horizon/YearRibbon'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -102,17 +102,18 @@ export function CalendarStep() {
     <div className="space-y-4">
       {landscape ? (
         <>
-          <p className="text-xs text-neutral-400">Tap any month to see everything in it.</p>
+          <p className="text-xs text-neutral-400">
+            Your year on one axis — seasons, what's already claimed, and how full each week is.
+          </p>
           {!host.calendarConnected && !host.calendarChecking && (
             <p className="text-xs text-neutral-400">
               Your calendar isn't connected — you'll still see your dated items below; connect it to layer in events too.
             </p>
           )}
-          {/* Expands in place. No day grid at year altitude, and no walk-down
-              link either — a session is a sequence, not a place to wander off
-              from. Matches the /year page (which does offer the link, because a
-              page is somewhere you browse). */}
-          <YearCalendarGrid
+          {/* The SAME component the /year page renders. Parity across page and
+              session isn't maintained here, it's structural: one ribbon, two
+              mounts, so they cannot drift. */}
+          <YearRibbon
             year={landscapeYear}
             tasks={host.tasks}
             events={fetchedEvents}
