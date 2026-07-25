@@ -160,6 +160,10 @@ export function GuidedSession({ horizon, domain, host, onClose, onFinished, onCh
   // week (walkthrough #10, #16). Give them a wide container; the title/narration
   // stay at reading width inside it.
   const wideStep = step.type === 'calendar' || step.type === 'schedule-grid' || step.type === 'place-on-weeks'
+    // move-by-pick has two halves — the picks and the shelf that feeds them.
+    // In the reading column they stacked, so the destinations were off-screen
+    // while you chose one from a dropdown, eighteen times.
+    || step.type === 'move-by-pick'
 
   // The descent: session progress drives the scene camera and the altimeter.
   // On step 1 you're at this horizon's highest point; Finish is the doorstep.

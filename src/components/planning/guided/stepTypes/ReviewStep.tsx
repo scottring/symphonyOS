@@ -2,12 +2,15 @@
 //
 // "What's still open" for this horizon, with an explicit fate per item.
 // Sources: the horizon's bucket (default), 'someday' (annual), 'overdue'
-// (daily look-back), or 'goals' (annual goal review). Task rows reuse the
-// canonical TriageWhenMenu; goal rows get Carry forward / Achieved / Let go.
+// (daily look-back), or 'goals' (annual goal review).
+//
+// Every row speaks ONE fate vocabulary — Keep · Done · Change · Someday · Let
+// go — matching the narration that introduces it. Task rows used to render the
+// generic scheduling menu (Today/Week/Month + date picker), which offered seven
+// controls for a three-fate decision and no way at all to say "keep". Goal rows
+// get Carry forward / Achieved / Let go.
 import { useMemo, useState } from 'react'
 import { Check, Archive, Sparkles, ArrowRight, ArrowDownToLine, Pencil, Undo2 } from 'lucide-react'
-import { TriageWhenMenu } from '@/components/schedule/TriageWhenMenu'
-import { applyTriageWhen } from '@/lib/triage/applyWhen'
 import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
 import { selectOverdue } from '@/lib/today/taskPools'
 import { needsWeekVerdict } from '@/lib/today/weekPlacement'

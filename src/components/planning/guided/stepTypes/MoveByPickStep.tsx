@@ -77,8 +77,17 @@ export function MoveByPickStep() {
   const fed = picks.filter((p) => (byPick.get(p.id) ?? []).length > 0).length
 
   return (
-    <div className="space-y-4">
-      {/* ── The shelf, first: this is the pile the step exists to empty. ── */}
+    // Two columns, because the decision has two halves: the PICKS you file into
+    // and the SHELF you file from. Stacked in the 680px reading column the picks
+    // scrolled off-screen entirely, so every "File under" was a blind choice
+    // from a dropdown — eighteen times in a row. Side by side you can see both
+    // halves at once and drag straight across. (GuidedSession marks this step
+    // wide for the same reason.)
+    <div className="grid grid-cols-1 lg:grid-cols-[1fr_minmax(320px,26rem)] gap-6 items-start">
+      {/* ── The shelf: the pile this step exists to empty. Sticky, so it stays
+             put while you scroll the picks it feeds. Second in the DOM but
+             FIRST on narrow screens, where the old stacked order was right. ── */}
+      <aside className="order-first lg:order-last lg:sticky lg:top-4 min-w-0">
       {shelf.length > 0 && (
         <div className="rounded-2xl border border-primary-100 bg-primary-50/30 p-3">
           <h3 className="text-sm font-display text-neutral-800">On the shelf ({shelf.length})</h3>
@@ -109,7 +118,9 @@ export function MoveByPickStep() {
           </ul>
         </div>
       )}
+      </aside>
 
+      <div className="space-y-4 min-w-0">
       <p className="text-xs text-neutral-400">
         {fed} of {picks.length} picks have a move this month.
       </p>
@@ -221,6 +232,7 @@ export function MoveByPickStep() {
           </ul>
         </div>
       )}
+      </div>
     </div>
   )
 }
