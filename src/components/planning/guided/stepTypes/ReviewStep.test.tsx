@@ -25,14 +25,14 @@ describe('ReviewStep — bucket source', () => {
     const host = makeHost({ tasks: [task({ id: 'a', title: 'Order dishwasher', bucket: 'month' })] })
     renderStep(<ReviewStep />, { step: bucketStep, host })
     expect(screen.getByText('Order dishwasher')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Mark done' }))
+    fireEvent.click(screen.getByRole('button', { name: /Done/ }))
     expect(host.onCompleteTask).toHaveBeenCalledWith('a')
   })
 
   it('reveals an optional note field on the row after it is completed, and stays visible', () => {
     const host = makeHost({ tasks: [task({ id: 'a', title: 'Order dishwasher', bucket: 'month' })] })
     renderStep(<ReviewStep />, { step: bucketStep, host })
-    fireEvent.click(screen.getByRole('button', { name: 'Mark done' }))
+    fireEvent.click(screen.getByRole('button', { name: /Done/ }))
     // Row remains (marked done) instead of vanishing, with a note field.
     expect(screen.getByText('Order dishwasher')).toBeInTheDocument()
     expect(screen.getByRole('textbox', { name: 'Add a note' })).toBeInTheDocument()
@@ -41,7 +41,7 @@ describe('ReviewStep — bucket source', () => {
   it('saves a completion note to the task notes field', () => {
     const host = makeHost({ tasks: [task({ id: 'a', title: 'Order dishwasher', bucket: 'month' })] })
     renderStep(<ReviewStep />, { step: bucketStep, host })
-    fireEvent.click(screen.getByRole('button', { name: 'Mark done' }))
+    fireEvent.click(screen.getByRole('button', { name: /Done/ }))
     const noteInput = screen.getByRole('textbox', { name: 'Add a note' })
     fireEvent.change(noteInput, { target: { value: 'Picked the Bosch 800 series' } })
     fireEvent.blur(noteInput)
@@ -51,7 +51,7 @@ describe('ReviewStep — bucket source', () => {
   it('does not write notes when the field is left empty', () => {
     const host = makeHost({ tasks: [task({ id: 'a', title: 'Order dishwasher', bucket: 'month' })] })
     renderStep(<ReviewStep />, { step: bucketStep, host })
-    fireEvent.click(screen.getByRole('button', { name: 'Mark done' }))
+    fireEvent.click(screen.getByRole('button', { name: /Done/ }))
     fireEvent.blur(screen.getByRole('textbox', { name: 'Add a note' }))
     expect(host.onUpdateTask).not.toHaveBeenCalled()
   })
@@ -78,11 +78,12 @@ describe('ReviewStep — seasonal fate rows', () => {
     expect(screen.queryByRole('button', { name: /^Carry forward$/ })).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Change/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Put aside/ })).toBeInTheDocument()
-    // No day-planning vocabulary and no Done check at season altitude.
+    // No day-planning vocabulary at season altitude. (A season fate row DOES
+    // offer Done — "it happened". The old assertion here named the triage
+    // menu's 'Mark done' label, so it passed vacuously either way.)
     expect(screen.queryByRole('button', { name: 'Today' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Week' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Month' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Mark done' })).not.toBeInTheDocument()
   })
 
   it('Put aside parks the item on Someday', () => {
@@ -289,5 +290,55 @@ describe('ReviewStep — week review scoping', () => {
       horizon: 'monthly', periodStart: planning,
     })
     expect(screen.getByText('Decide on the car')).toBeInTheDocument()
+  })
+})
+
+// ── "Migrate or release" promises three fates. It used to render the generic
+// scheduling menu — Today/Week/Month/Someday + date + done + delete — so the
+// one verb in the title wasn't a button anywhere, and keeping was the null
+// action. (Scott, 2026-07-25: "i dont understand this page either".) ──
+describe('ReviewStep — the month review offers the fates it names', () => {
+  const monthStep = {
+    id: 'month-review', type: 'review' as const, title: 'Migrate or release',
+    narration: 'Migrate it or release it.',
+    // Exactly the shipped config in sessions.ts — no `rows`, so this routes to
+    // TaskTriageRow, the row Scott was looking at.
+    props: { bucket: 'month' as const },
+  }
+  const open = () => makeHost({
+    tasks: [task({ id: 'm1', title: 'Plan a winter vacation', bucket: 'month' })],
+  })
+
+  it('offers Keep, Done, Someday and Let go — and no scheduling pills', () => {
+    renderStep(<ReviewStep />, { step: monthStep, host: open(), horizon: 'monthly' })
+    expect(screen.getByRole('button', { name: /Keep/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Done/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Someday/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Let go/ })).toBeInTheDocument()
+    // Placements belong to later rungs — place-on-weeks asks "which week".
+    expect(screen.queryByRole('button', { name: 'Today' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Week' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Month' })).not.toBeInTheDocument()
+  })
+
+  it('Keep settles the row so the undecided list visibly shrinks', () => {
+    renderStep(<ReviewStep />, { step: monthStep, host: open(), horizon: 'monthly' })
+    fireEvent.click(screen.getByRole('button', { name: /Keep/ }))
+    expect(screen.getByText('Kept')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Keep/ })).not.toBeInTheDocument()
+  })
+
+  it('Someday parks it — the timing was wrong, not the item', () => {
+    const host = open()
+    renderStep(<ReviewStep />, { step: monthStep, host, horizon: 'monthly' })
+    fireEvent.click(screen.getByRole('button', { name: /Someday/ }))
+    expect(host.onSetBucket).toHaveBeenCalledWith('m1', 'someday')
+  })
+
+  it('Let go actually deletes — the narration promises a fate it can perform', () => {
+    const host = open()
+    renderStep(<ReviewStep />, { step: monthStep, host, horizon: 'monthly' })
+    fireEvent.click(screen.getByRole('button', { name: /Let go/ }))
+    expect(host.onDeleteTask).toHaveBeenCalledWith('m1')
   })
 })

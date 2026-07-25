@@ -36,7 +36,7 @@ interface Props {
  *  assignedTo is NOT here — it's an app-hook read merged at the call site. */
 export function buildAddTaskOptions(
   bucket: TaskBucket,
-  opts: { projectId?: string; sourceId?: string; goalId?: string; pickedAt?: Date } | undefined,
+  opts: { projectId?: string; sourceId?: string; goalId?: string; pickedAt?: Date; isFun?: boolean } | undefined,
   currentDomain: Domain,
 ) {
   return {
@@ -45,6 +45,9 @@ export function buildAddTaskOptions(
     sourceId: opts?.sourceId,
     goalId: opts?.goalId,
     pickedAt: opts?.pickedAt,
+    // Fun is set when the thing is WRITTEN — "build the fun on purpose" means
+    // adding one, not auditing thirty afterwards.
+    isFun: opts?.isFun,
     context: currentDomain !== 'universal' ? currentDomain : undefined,
   }
 }

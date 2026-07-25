@@ -113,7 +113,7 @@ export function computeCoachLines(input: CoachInput): CoachLine[] {
       lines.push(
         met
           ? { id: 'fun-ok', tone: 'ok', text: `Fun check: ${fun} fun · ${obligation} obligation. A list you'll actually want to live.` }
-          : { id: 'fun-low', tone: 'nudge', text: `Fun check: ${fun} fun · ${obligation} obligation — the book's target is 2 : 1. Tap the ✨ on anything that makes you smile, or add one thing purely because you want to.` },
+          : { id: 'fun-low', tone: 'nudge', text: `Fun check: ${fun} fun · ${obligation} obligation. Aim for one fun thing per two obligations — add one you're actually looking forward to.` },
       )
     }
   }

@@ -30,6 +30,19 @@ export function TaskTriageRow({ task, onCelebrated, grainHint }: {
   // completion (the pool otherwise drops completed items mid-step).
   const [done, setDone] = useState(false)
   const [note, setNote] = useState(task.notes ?? '')
+  // The narration promises three fates — migrate, park, let go. Keeping used to
+  // be the NULL action (you kept something by not touching it), so there was
+  // nothing to press and no way to feel finished. `kept` makes the decision
+  // visible: the row settles, and the undecided list visibly shrinks.
+  const [kept, setKept] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [titleDraft, setTitleDraft] = useState(task.title)
+
+  const saveTitle = () => {
+    const next = titleDraft.trim()
+    if (next && next !== task.title) host.onUpdateTask(task.id, { title: next })
+    setEditing(false)
+  }
 
   const complete = () => {
     setDone(true)
@@ -67,17 +80,63 @@ export function TaskTriageRow({ task, onCelebrated, grainHint }: {
 
   return (
     <li className="flex flex-col gap-1 rounded-xl border border-neutral-100 bg-white px-3 py-2">
-      <div className="flex items-start gap-2">
-        <span className="flex-1 min-w-[10rem] text-sm text-neutral-800 leading-snug">
-          {task.title}
-          {project && <span className="text-xs text-neutral-400 whitespace-nowrap"> · {project.name}</span>}
-        </span>
-        <TriageWhenMenu
-          onPick={(when) => applyTriageWhen(when, task.id, { onPushTask: host.onPushTask, onSetBucket: host.onSetBucket })}
-          onPickDate={(date) => host.onPushTask(task.id, date)}
-          onComplete={complete}
-          onDelete={() => host.onDeleteTask(task.id)}
-        />
+      <div className="flex items-start gap-2 flex-wrap">
+        {editing ? (
+          <input
+            type="text" value={titleDraft} autoFocus aria-label="Edit item"
+            onChange={(e) => setTitleDraft(e.target.value)}
+            onBlur={saveTitle}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') saveTitle()
+              if (e.key === 'Escape') { setTitleDraft(task.title); setEditing(false) }
+            }}
+            className="flex-1 min-w-[10rem] text-sm text-neutral-800 bg-transparent border-b border-primary-300 focus:outline-none"
+          />
+        ) : (
+          <span className="flex-1 min-w-[10rem] text-sm text-neutral-800 leading-snug">
+            {task.title}
+            {project && <span className="text-xs text-neutral-400 whitespace-nowrap"> · {project.name}</span>}
+          </span>
+        )}
+        {/* Exactly the fates the narration names, and nothing else. Today/Week/
+            Month pills used to live here via TriageWhenMenu — but those are
+            downward PLACEMENTS, and this same arc asks "which week" four steps
+            later at place-on-weeks. Offering them during review let you skip a
+            rung by accident, and buried the three decisions that matter under
+            seven controls. Matches SeasonListRow, which already worked this way
+            (audit finding 1: four fate vocabularies, now one). */}
+        {!editing && (kept ? (
+          <span className="inline-flex items-center gap-1 shrink-0 text-xs font-medium px-2 py-1 rounded-md text-primary-700 bg-primary-100">
+            <Check className="w-3 h-3" /> Kept
+          </span>
+        ) : (
+          <span className="flex items-center gap-1 shrink-0 flex-wrap">
+            <button type="button" onClick={() => setKept(true)}
+              title="Carry it forward — you'd write it again today"
+              className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md text-primary-700 bg-primary-50 hover:bg-primary-100 transition-colors">
+              <ArrowRight className="w-3 h-3" /> Keep
+            </button>
+            <button type="button" onClick={complete}
+              title="It already happened — take the second of credit"
+              className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md text-primary-700 bg-primary-50 hover:bg-primary-100 transition-colors">
+              <Check className="w-3 h-3" /> Done
+            </button>
+            <button type="button" onClick={() => { setTitleDraft(task.title); setEditing(true) }}
+              className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md text-neutral-500 bg-neutral-50 hover:bg-neutral-100 transition-colors">
+              <Pencil className="w-3 h-3" /> Change
+            </button>
+            <button type="button" onClick={() => host.onSetBucket(task.id, 'someday')}
+              title="The timing is wrong — park it without guilt"
+              className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md text-neutral-500 bg-neutral-50 hover:bg-neutral-100 transition-colors">
+              <Archive className="w-3 h-3" /> Someday
+            </button>
+            <button type="button" onClick={() => host.onDeleteTask(task.id)}
+              title="Let it go"
+              className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md text-neutral-400 bg-neutral-50 hover:bg-red-50 hover:text-red-600 transition-colors">
+              <Undo2 className="w-3 h-3" /> Let go
+            </button>
+          </span>
+        ))}
       </div>
       {grainHint && (
         <p className="flex items-center gap-2 flex-wrap text-[11px] text-amber-700">

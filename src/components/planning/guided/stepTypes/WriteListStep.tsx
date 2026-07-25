@@ -16,8 +16,23 @@ import { extractProjectTag } from '../projectTag'
 import { ListSuggestions, type WriteBucket } from '../ListSuggestions'
 import { TaskTriageRow, SeasonListRow } from './ReviewStep'
 
+// Hart-Unger's fun recipe (Best Laid Plans), as things you ADD rather than a
+// vibe you audit. Each chip seeds the input and stamps the next item fun.
+const FUN_PROMPTS = [
+  { label: 'One big experience', placeholder: 'The one big thing this month — ' },
+  { label: 'A few social things', placeholder: 'Something with people we like — ' },
+  { label: 'A themed quest — optional', placeholder: 'A small quest, just because — ' },
+] as const
+
+// Past this many written items the list stops being readable context and starts
+// being a wall. See the 2026-07-25 pass: the step's job is writing, not review.
+const COLLAPSE_AT = 8
+
 export function WriteListStep() {
   const { step, host, periodStart } = useGuided()
+  // "The next thing I add is fun" — set by the composition chips, cleared on add.
+  const [nextIsFun, setNextIsFun] = useState(false)
+  const [listOpen, setListOpen] = useState(false)
   const bucket = step.props?.bucket
   const softCap = step.props?.softCap
   const match = useMemo(() => makeAssigneeFilter([]), [])
@@ -60,8 +75,9 @@ export function WriteListStep() {
     // "#kitchen order dishwasher" attaches the chunk to its project at birth.
     const { title, projectId } = extractProjectTag(raw, host.projects)
     if (!title) return
-    await host.createTaskInBucket(title, bucket, { projectId })
-  }, [draft, bucket, host])
+    await host.createTaskInBucket(title, bucket, { projectId, isFun: nextIsFun || undefined })
+    setNextIsFun(false)
+  }, [draft, bucket, host, nextIsFun])
 
   if (!bucket) return null
   const over = softCap !== undefined && pool.length > softCap
@@ -154,25 +170,32 @@ export function WriteListStep() {
       {/* Hart-Unger's fun recipe (Best Laid Plans): name the composition so
           "fun" means a shape, not a vibe. Static hint — no classification. */}
       {step.props?.funComposition && (
-        <div className="flex flex-wrap gap-1.5">
-          {['One big experience', 'A few social things', 'A themed quest — optional'].map((label) => (
-            <span key={label}
-              className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50/60 px-2.5 py-1 text-[11px] text-amber-700">
+        <div className="flex flex-wrap items-center gap-1.5">
+          {FUN_PROMPTS.map(({ label, placeholder }) => (
+            <button key={label} type="button"
+              onClick={() => { setNextIsFun(true); setDraft(placeholder); inputRef.current?.focus() }}
+              className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50/60 px-2.5 py-1 text-[11px] text-amber-700 hover:bg-amber-100 transition-colors">
               <Sparkles className="w-3 h-3" />
               {label}
-            </span>
+            </button>
           ))}
+          {nextIsFun && (
+            <span className="text-[11px] text-amber-700 font-medium">— adding as fun</span>
+          )}
         </div>
       )}
-      {/* The fun audit, live: tally chip + per-row ✨ toggle (Best Laid Plans'
-          2:1 rule). Marking is one tap; the coach line reads the same data. */}
-      {pool.length > 0 && (
-        <p className="text-xs text-neutral-400 inline-flex items-center gap-1">
-          <Sparkles className="w-3 h-3 text-amber-500" />
-          {funRatio(pool).fun} fun · {funRatio(pool).obligation} obligation — tap ✨ on the ones that make you smile
-        </p>
+      {/* The written list is CONTEXT here, not the task. This step asks what the
+          month needs; a wall of thirty rows, each carrying a ✨ and a Change,
+          read as "audit these" and buried the one input that does the work.
+          Collapsed by default once it's long — the count is the useful part. */}
+      {pool.length > COLLAPSE_AT && !listOpen && (
+        <button type="button" onClick={() => setListOpen(true)}
+          className="w-full rounded-xl border border-neutral-200 bg-neutral-50/70 px-4 py-2.5 text-left text-xs text-neutral-500 hover:bg-neutral-100 transition-colors">
+          <span className="font-medium text-neutral-700">{pool.length} already written</span>
+          {' · '}{funRatio(pool).fun} fun{' · '}tap to review
+        </button>
       )}
-      {pool.length > 0 && (
+      {pool.length > 0 && (pool.length <= COLLAPSE_AT || listOpen) && (
         <ul className="space-y-2">
           {pool.map((t) => (
             <li key={t.id} className="flex items-start gap-1.5">

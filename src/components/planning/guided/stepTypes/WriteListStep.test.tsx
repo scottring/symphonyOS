@@ -102,3 +102,58 @@ describe('WriteListStep', () => {
     expect(screen.queryByText('One big experience')).not.toBeInTheDocument()
   })
 })
+
+// ── The step's job is WRITING. A wall of already-written rows, each carrying a
+// ✨ and a Change, read as "audit these" and buried the one input that does the
+// work (Scott, 2026-07-25: "just mark what's fun?"). ──
+describe('WriteListStep — writing beats auditing', () => {
+  const monthStep = {
+    id: 'write-month', type: 'write-list' as const, title: 'Everything else the month needs',
+    narration: 'Build the fun on purpose.',
+    props: { bucket: 'month' as const, funComposition: true },
+  }
+  const many = Array.from({ length: 12 }, (_, i) =>
+    t({ id: `m${i}`, title: `Written item ${i}`, bucket: 'month' }))
+
+  it('collapses a long written list to a count instead of a wall of rows', () => {
+    renderStep(<WriteListStep />, { step: monthStep, host: makeHost({ tasks: many }), horizon: 'monthly' })
+    expect(screen.getByText('12 already written')).toBeInTheDocument()
+    expect(screen.queryByText('Written item 0')).not.toBeInTheDocument()
+  })
+
+  it('opens the written list on request', () => {
+    renderStep(<WriteListStep />, { step: monthStep, host: makeHost({ tasks: many }), horizon: 'monthly' })
+    fireEvent.click(screen.getByText('12 already written'))
+    expect(screen.getByText('Written item 0')).toBeInTheDocument()
+  })
+
+  it('a short list still shows in full — nothing to collapse', () => {
+    const few = [t({ id: 'm1', title: 'Only item', bucket: 'month' })]
+    renderStep(<WriteListStep />, { step: monthStep, host: makeHost({ tasks: few }), horizon: 'monthly' })
+    expect(screen.getByText('Only item')).toBeInTheDocument()
+    expect(screen.queryByText(/already written/)).not.toBeInTheDocument()
+  })
+
+  it('a fun prompt seeds the input and stamps the next item fun — built, not audited', () => {
+    const host = makeHost({ tasks: many })
+    renderStep(<WriteListStep />, { step: monthStep, host, horizon: 'monthly' })
+    fireEvent.click(screen.getByText('One big experience'))
+    const input = screen.getByPlaceholderText(/Add a chunk to this month/)
+    fireEvent.change(input, { target: { value: 'Take the kids to the shore' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(host.createTaskInBucket).toHaveBeenCalledWith(
+      'Take the kids to the shore', 'month', { projectId: undefined, isFun: true },
+    )
+  })
+
+  it('an ordinary add is not marked fun', () => {
+    const host = makeHost({ tasks: many })
+    renderStep(<WriteListStep />, { step: monthStep, host, horizon: 'monthly' })
+    const input = screen.getByPlaceholderText(/Add a chunk to this month/)
+    fireEvent.change(input, { target: { value: 'Renew the registration' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(host.createTaskInBucket).toHaveBeenCalledWith(
+      'Renew the registration', 'month', { projectId: undefined, isFun: undefined },
+    )
+  })
+})

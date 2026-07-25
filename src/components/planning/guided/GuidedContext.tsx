@@ -39,7 +39,7 @@ export interface GuidedHost {
   createTaskInBucket: (
     title: string,
     bucket: TaskBucket,
-    opts?: { projectId?: string; sourceId?: string; goalId?: string; pickedAt?: Date },
+    opts?: { projectId?: string; sourceId?: string; goalId?: string; pickedAt?: Date; isFun?: boolean },
   ) => Promise<void>
   /** Dated all-day task (book-next fallback when calendar is disconnected). */
   createDatedTask: (title: string, date: Date) => Promise<void>
