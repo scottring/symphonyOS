@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { groupTasks, removeFromGroup, ungroupTasks, deleteTaskGroup, groupItems } from './groupTasks'
+import { groupTasks, removeFromGroup, ungroupTasks, deleteTaskGroup, groupItems, addToGroup } from './groupTasks'
 import type { GroupMemberRef } from '@/types/task'
 
 describe('groupTasks', () => {
@@ -159,5 +159,67 @@ describe('groupItems', () => {
     )
     expect(wrapperId).toBeUndefined()
     expect(calls).toHaveLength(0)
+  })
+})
+
+describe('addToGroup', () => {
+  const deps = () => {
+    const updateTask = vi.fn()
+    const refetch = vi.fn()
+    return { addTask: vi.fn(), updateTask, refetch }
+  }
+
+  it('reparents each task onto the wrapper, inheriting its date and all-day', async () => {
+    const d = deps()
+    await addToGroup({
+      wrapperId: 'w1', taskIds: ['t1', 't2'], memberRefs: [], existingMemberRefs: [],
+      date: new Date(2026, 6, 25), isAllDay: true,
+    }, d)
+    expect(d.updateTask).toHaveBeenCalledWith('t1',
+      expect.objectContaining({ parentTaskId: 'w1', isAllDay: true }))
+    expect(d.updateTask).toHaveBeenCalledWith('t2',
+      expect.objectContaining({ parentTaskId: 'w1', isAllDay: true }))
+  })
+
+  it('APPENDS new refs to the wrapper rather than replacing them', async () => {
+    const d = deps()
+    const existing = [{ type: 'event' as const, id: 'e1' }]
+    await addToGroup({
+      wrapperId: 'w1', taskIds: [], memberRefs: [{ type: 'routine', id: 'r1' }],
+      existingMemberRefs: existing, date: new Date(2026, 6, 25), isAllDay: true,
+    }, d)
+    expect(d.updateTask).toHaveBeenCalledWith('w1', {
+      groupMembers: [{ type: 'event', id: 'e1' }, { type: 'routine', id: 'r1' }],
+    })
+  })
+
+  it('does not re-add a ref the group already has', async () => {
+    const d = deps()
+    const existing = [{ type: 'event' as const, id: 'e1' }]
+    await addToGroup({
+      wrapperId: 'w1', taskIds: [], memberRefs: [{ type: 'event', id: 'e1' }],
+      existingMemberRefs: existing, date: new Date(2026, 6, 25), isAllDay: true,
+    }, d)
+    const call = d.updateTask.mock.calls.find(c => c[0] === 'w1')
+    if (call) expect(call[1].groupMembers).toEqual(existing)
+  })
+
+  it('refetches once, after all writes', async () => {
+    const d = deps()
+    await addToGroup({
+      wrapperId: 'w1', taskIds: ['t1'], memberRefs: [], existingMemberRefs: [],
+      date: new Date(2026, 6, 25), isAllDay: true,
+    }, d)
+    expect(d.refetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('does nothing when there is nothing to add', async () => {
+    const d = deps()
+    await addToGroup({
+      wrapperId: 'w1', taskIds: [], memberRefs: [], existingMemberRefs: [],
+      date: new Date(2026, 6, 25), isAllDay: true,
+    }, d)
+    expect(d.updateTask).not.toHaveBeenCalled()
+    expect(d.refetch).not.toHaveBeenCalled()
   })
 })

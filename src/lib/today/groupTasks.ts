@@ -148,3 +148,44 @@ export async function deleteTaskGroup(
   await deps.deleteTask(wrapperId)
   await deps.refetch?.()
 }
+
+export interface AddToGroupInput {
+  wrapperId: string
+  /** Tasks to reparent under the wrapper. */
+  taskIds: string[]
+  /** Events/routines to attach as group_members refs. */
+  memberRefs: GroupMemberRef[]
+  /** The wrapper's CURRENT group_members. New refs append to these. */
+  existingMemberRefs: GroupMemberRef[]
+  date: Date
+  isAllDay: boolean
+}
+
+/**
+ * Add members to a group that already exists. Until this, groups were
+ * create-once: `groupItems` builds one and the only way to add was to ungroup
+ * and regroup.
+ *
+ * Note this APPENDS to group_members. `groupItems` replaces the array
+ * wholesale, which is right at creation and wrong here — reusing that shape
+ * would drop every existing event/routine member on the first addition.
+ */
+export async function addToGroup(
+  input: AddToGroupInput,
+  deps: GroupTasksDeps,
+): Promise<void> {
+  const { wrapperId, taskIds, memberRefs, existingMemberRefs, date, isAllDay } = input
+
+  const seen = new Set(existingMemberRefs.map((r) => `${r.type}-${r.id}`))
+  const fresh = memberRefs.filter((r) => !seen.has(`${r.type}-${r.id}`))
+
+  if (taskIds.length === 0 && fresh.length === 0) return
+
+  for (const id of taskIds) {
+    await deps.updateTask(id, { parentTaskId: wrapperId, scheduledFor: date, isAllDay })
+  }
+  if (fresh.length > 0) {
+    await deps.updateTask(wrapperId, { groupMembers: [...existingMemberRefs, ...fresh] })
+  }
+  await deps.refetch?.()
+}
