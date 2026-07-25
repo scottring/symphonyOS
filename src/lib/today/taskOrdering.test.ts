@@ -1,19 +1,19 @@
 import { describe, it, expect } from 'vitest'
 import {
-  SORT_ORDER_GAP, nextSortOrder, sortByManualOrder, reorderByDrag,
+  SORT_ORDER_GAP, nextTaskSortOrder, sortByManualOrder, reorderTasksByDrag,
 } from '@/lib/today/taskOrdering'
 
 const d = (n: number) => new Date(2026, 6, 25, 0, 0, n)
 
-describe('nextSortOrder', () => {
+describe('nextTaskSortOrder', () => {
   it('starts at 0 for an empty list', () => {
-    expect(nextSortOrder([])).toBe(0)
+    expect(nextTaskSortOrder([])).toBe(0)
   })
   it('appends one gap past the highest', () => {
-    expect(nextSortOrder([{ sortOrder: 0 }, { sortOrder: 1000 }])).toBe(2000)
+    expect(nextTaskSortOrder([{ sortOrder: 0 }, { sortOrder: 1000 }])).toBe(2000)
   })
   it('ignores nulls when finding the highest', () => {
-    expect(nextSortOrder([{ sortOrder: null }, { sortOrder: 5000 }])).toBe(6000)
+    expect(nextTaskSortOrder([{ sortOrder: null }, { sortOrder: 5000 }])).toBe(6000)
   })
 })
 
@@ -35,12 +35,12 @@ describe('sortByManualOrder', () => {
   })
 })
 
-describe('reorderByDrag', () => {
+describe('reorderTasksByDrag', () => {
   const orders = (pairs: [string, number | null][]) => new Map(pairs)
 
   it('writes ONE row when there is room between neighbours', () => {
     // a=0, b=1000, c=2000 — move c between a and b
-    const writes = reorderByDrag(['a','b','c'], 'c', 'b',
+    const writes = reorderTasksByDrag(['a','b','c'], 'c', 'b',
       orders([['a',0],['b',1000],['c',2000]]))
     expect(writes).toHaveLength(1)
     expect(writes[0].id).toBe('c')
@@ -49,7 +49,7 @@ describe('reorderByDrag', () => {
   })
 
   it('writes one row when dropped at the very end', () => {
-    const writes = reorderByDrag(['a','b','c'], 'a', 'c',
+    const writes = reorderTasksByDrag(['a','b','c'], 'a', 'c',
       orders([['a',0],['b',1000],['c',2000]]))
     expect(writes).toHaveLength(1)
     expect(writes[0].id).toBe('a')
@@ -57,7 +57,7 @@ describe('reorderByDrag', () => {
   })
 
   it('writes one row when moved to the very front', () => {
-    const writes = reorderByDrag(['a','b','c'], 'b', 'a',
+    const writes = reorderTasksByDrag(['a','b','c'], 'b', 'a',
       orders([['a',0],['b',1000],['c',2000]]))
     expect(writes).toHaveLength(1)
     expect(writes[0].id).toBe('b')
@@ -68,7 +68,7 @@ describe('reorderByDrag', () => {
 
   it('renormalises the whole list when the gap collapses', () => {
     // a=0, b=1 — no integer strictly between them
-    const writes = reorderByDrag(['a','b','c'], 'c', 'b',
+    const writes = reorderTasksByDrag(['a','b','c'], 'c', 'b',
       orders([['a',0],['b',1],['c',5000]]))
     expect(writes.length).toBeGreaterThan(1)
     const byId = new Map(writes.map(w => [w.id, w.sortOrder]))
@@ -80,17 +80,17 @@ describe('reorderByDrag', () => {
   })
 
   it('renormalises when any participant has a null order', () => {
-    const writes = reorderByDrag(['a','b'], 'b', 'a', orders([['a',null],['b',null]]))
+    const writes = reorderTasksByDrag(['a','b'], 'b', 'a', orders([['a',null],['b',null]]))
     expect(writes).toHaveLength(2)
     expect(writes[0].sortOrder).toBe(0)
     expect(writes[1].sortOrder).toBe(SORT_ORDER_GAP)
   })
 
   it('returns no writes when the item is dropped on itself', () => {
-    expect(reorderByDrag(['a','b'], 'a', 'a', orders([['a',0],['b',1000]]))).toEqual([])
+    expect(reorderTasksByDrag(['a','b'], 'a', 'a', orders([['a',0],['b',1000]]))).toEqual([])
   })
 
   it('returns no writes for an unknown id', () => {
-    expect(reorderByDrag(['a','b'], 'zz', 'a', orders([['a',0],['b',1000]]))).toEqual([])
+    expect(reorderTasksByDrag(['a','b'], 'zz', 'a', orders([['a',0],['b',1000]]))).toEqual([])
   })
 })

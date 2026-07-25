@@ -18,7 +18,7 @@ export interface OrderWrite {
 }
 
 /** The sortOrder for a newly appended item. */
-export function nextSortOrder(items: { sortOrder?: number | null }[]): number {
+export function nextTaskSortOrder(items: { sortOrder?: number | null }[]): number {
   const orders = items.map((i) => i.sortOrder).filter((o): o is number => o != null)
   if (orders.length === 0) return 0
   return Math.max(...orders) + SORT_ORDER_GAP
@@ -50,8 +50,14 @@ function renormalise(orderedIds: string[]): OrderWrite[] {
  * Move `activeId` to `overId`'s position. Returns the minimal set of writes:
  * one row when a gap exists between the new neighbours, otherwise a full
  * renormalise. Empty array when the move is a no-op or an id is unknown.
+ *
+ * Named apart from `stepOrdering.ts`'s `reorderByDrag` on purpose — that
+ * sibling takes `Routine[]`, returns `{ id, step_order }` for the WHOLE list,
+ * and is what RoutineStepsSection uses. Two same-named exports in one folder
+ * with opposite persistence costs is a footgun; the names now say which is
+ * which.
  */
-export function reorderByDrag(
+export function reorderTasksByDrag(
   orderedIds: string[],
   activeId: string,
   overId: string,
