@@ -10,7 +10,7 @@ import { PlanningTaskCard } from './PlanningTaskCard'
 import { PlanningEventBlock } from './PlanningEventBlock'
 import { PlanningRoutineBlock } from './PlanningRoutineBlock'
 import { layoutLanes, type Lane } from './overlapLanes'
-import { ALL_DAY_LANE_HEIGHT, allDayLaneCapacity } from '@/lib/planning/allDayLane'
+import { ALL_DAY_LANE_HEIGHT, allDayLaneCapacity, allDayLaneHeight } from '@/lib/planning/allDayLane'
 
 // Max side-by-side lanes before overlapping items collapse into a "+N" chip.
 const MAX_LANES = 4
@@ -70,6 +70,9 @@ interface PlanningColumnProps {
    *  clicked, with the slot's date/time and the clicked DOM node (used to
    *  anchor the quick-create popover). Undefined = slots are not clickable. */
   onSlotClick?: (dateKey: string, hour: number, minute: number, anchorEl: HTMLElement) => void
+  /** Day grain: the week rung places into a DAY, so no hour axis is drawn and
+   *  the column itself is the unit. See PlanningSession's placementGrain. */
+  dayGrain?: boolean
 }
 
 export function PlanningColumn({
@@ -86,6 +89,7 @@ export function PlanningColumn({
   dayStartHour,
   onOpenDay,
   onSlotClick,
+  dayGrain = false,
 }: PlanningColumnProps) {
   // Helper to find family member by ID
   const getMember = useCallback((id: string | null | undefined) => {
@@ -222,6 +226,7 @@ export function PlanningColumn({
 
   return (
     <div
+      data-testid={`day-column-${dateKey}`}
       className={`flex-1 min-w-[200px] border-r border-neutral-200 ${
         isToday ? 'bg-primary-50/30' : ''
       }`}
@@ -257,6 +262,70 @@ export function PlanningColumn({
         )}
       </div>
 
+      {/* Day grain: the week rung places into a DAY, so the column IS the drop
+          target and there is no hour axis to draw. Everything written here is
+          all-day by construction (PlanningSession stamps isAllDay in this
+          mode), so the lane grows to hold the day instead of sitting above a
+          6 AM–10 PM grid whose clicked hour was, in the old code's own words,
+          "deliberately discarded". Timed calendar events still show, as chips
+          in time order — they're facts about the day, not placements. */}
+      {dayGrain ? (
+        <div
+          className={`min-h-[220px] p-2 space-y-1.5 ${onSlotClick ? 'cursor-pointer' : ''}`}
+          // Click-to-create survives the loss of the hour grid — the DAY is the
+          // click target now, which is the same decision the drop makes. Hour
+          // and minute are passed as 0: PlanningSession's day grain floors to
+          // midnight regardless, and there is no longer a clicked hour to
+          // "deliberately discard".
+          onClick={onSlotClick ? (e) => {
+            if (e.target !== e.currentTarget) return
+            onSlotClick(dateKey, 0, 0, e.currentTarget)
+          } : undefined}
+        >
+          {/* Sized to hold every item: a "+N" collapse here would hide a
+              placement the user just made, which reads as data loss. */}
+          <AllDayLaneCell
+            dateKey={dateKey}
+            tasks={allDayTasks}
+            onChipClick={(taskId) => setRaisedId(taskId)}
+            laneHeight={allDayLaneHeight(allDayTasks.length)}
+          />
+          {/* A task that still carries a clock time (written before this rung
+              stopped drawing hours, or dated from Today) must NOT vanish just
+              because there is no hour row to place it on — it renders as a chip
+              in time order. Dropping it here re-writes it all-day. */}
+          {placedTasks.map(({ task }) => (
+            <button
+              key={task.id}
+              type="button"
+              onClick={() => setRaisedId(task.id)}
+              title={task.title}
+              className="block w-full truncate rounded border border-primary-200 bg-primary-50 px-1.5 py-1 text-left text-[10.5px] text-primary-700"
+            >
+              {task.title}
+            </button>
+          ))}
+          {placedEvents.map(({ event }) => (
+            <div
+              key={event.id}
+              className="truncate rounded bg-neutral-100 px-1.5 py-1 text-[10.5px] text-neutral-600"
+              title={event.title}
+            >
+              {event.title}
+            </div>
+          ))}
+          {placedRoutines.map(({ routine }) => (
+            <div
+              key={routine.id}
+              className="truncate rounded bg-neutral-50 px-1.5 py-1 text-[10.5px] text-neutral-500"
+              title={routine.name}
+            >
+              {routine.name}
+            </div>
+          ))}
+        </div>
+      ) : (
+      <>
       {/* All-day lane — same height in every column (the grid's busiest day
           sets it), so the hour rows below stay aligned across days. */}
       <AllDayLaneCell
@@ -366,6 +435,8 @@ export function PlanningColumn({
           )
         })}
       </div>
+      </>
+      )}
     </div>
   )
 }

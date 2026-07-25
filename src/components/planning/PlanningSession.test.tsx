@@ -651,30 +651,46 @@ describe('PlanningSession', () => {
     const day = new Date(2026, 6, 20)
     const slotSelector = `[data-droppable-id="slot-${formatDateKey(day)}-10-30"]`
 
-    it('a slot click creates the task on the DAY, with no time', () => {
+    const dayProps = {
+      tasks: [], events: [], routines: [],
+      onUpdateTask: vi.fn(), onPushTask: vi.fn(), onClose: vi.fn(),
+      initialDate: day, initialDays: 7, placementGrain: 'day' as const,
+    }
+
+    // The drawing follows the decision: a rung that places into a DAY does not
+    // draw hours. There is no clicked hour left to discard.
+    it('draws no hour axis', () => {
+      const { container } = render(<PlanningSession {...dayProps} />)
+      expect(screen.queryByText('6 AM')).not.toBeInTheDocument()
+      expect(screen.queryByText('10 PM')).not.toBeInTheDocument()
+      expect(container.querySelector(slotSelector)).toBeNull()
+    })
+
+    it('still draws one column per day of the range', () => {
+      const { container } = render(<PlanningSession {...dayProps} />)
+      expect(container.querySelectorAll('[data-testid^="day-column-"]').length).toBe(7)
+    })
+
+    it('a day-column click creates the task on the DAY, with no time', () => {
       const onCreateTaskAt = vi.fn()
       const { container } = render(
-        <PlanningSession
-          tasks={[]}
-          events={[]}
-          routines={[]}
-          onUpdateTask={vi.fn()}
-          onPushTask={vi.fn()}
-          onClose={vi.fn()}
-          initialDate={day}
-          onCreateTaskAt={onCreateTaskAt}
-          placementGrain="day"
-        />
+        <PlanningSession {...dayProps} onCreateTaskAt={onCreateTaskAt} />
       )
 
-      fireEvent.click(container.querySelector(slotSelector)!)
+      const column = container.querySelector(`[data-testid="day-column-${formatDateKey(day)}"] .min-h-\\[220px\\]`)
+        ?? container.querySelector(`[data-testid="day-column-${formatDateKey(day)}"] div.min-h-\\[220px\\]`)
+      fireEvent.click(column!)
       const input = screen.getByRole('textbox')
       fireEvent.change(input, { target: { value: 'Order the vanity' } })
       fireEvent.keyDown(input, { key: 'Enter' })
 
       const [, scheduledFor] = onCreateTaskAt.mock.calls[0]
-      // Midnight — the 10:30 slot that was clicked is deliberately ignored.
       expect(scheduledFor).toEqual(new Date(2026, 6, 20))
+    })
+
+    it('the default grain keeps its hour grid (Today still asks what time)', () => {
+      render(<PlanningSession {...dayProps} placementGrain="time" />)
+      expect(screen.getByText('6 AM')).toBeInTheDocument()
     })
 
     it('the default grain still honors the slot time (Today keeps asking what time)', () => {

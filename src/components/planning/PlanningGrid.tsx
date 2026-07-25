@@ -24,6 +24,10 @@ interface PlanningGridProps {
   /** Click-to-create (week-grid-click spec): threaded down to every column's
    *  time slots. Undefined = slots are not clickable. */
   onSlotClick?: (dateKey: string, hour: number, minute: number, anchorEl: HTMLElement) => void
+  /** Day grain: the week rung places into a DAY, so the hour axis is not drawn
+   *  at all. Everything in this mode is written isAllDay, so the columns hold
+   *  the day's items directly. */
+  dayGrain?: boolean
 }
 
 export function PlanningGrid({
@@ -39,6 +43,7 @@ export function PlanningGrid({
   slotDuration,
   onOpenDay,
   onSlotClick,
+  dayGrain = false,
 }: PlanningGridProps) {
   // Generate time labels
   const timeLabels = useMemo(() => {
@@ -77,7 +82,9 @@ export function PlanningGrid({
   return (
     <div className="flex-1 overflow-auto">
       <div className="flex min-w-max">
-        {/* Time labels column */}
+        {/* Time labels column — absent in day grain: there is no hour axis to
+            label when the day is the unit being placed into. */}
+        {!dayGrain && (
         <div className="shrink-0 w-16 border-r border-neutral-200 bg-neutral-50">
           {/* Header spacer */}
           <div className="h-12 border-b border-neutral-200" />
@@ -110,6 +117,7 @@ export function PlanningGrid({
             ))}
           </div>
         </div>
+        )}
 
         {/* Day columns */}
         {dateRange.map((date) => {
@@ -135,6 +143,7 @@ export function PlanningGrid({
               dayStartHour={dayStartHour}
               onOpenDay={onOpenDay}
               onSlotClick={onSlotClick}
+              dayGrain={dayGrain}
             />
           )
         })}

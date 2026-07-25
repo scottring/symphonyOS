@@ -276,10 +276,9 @@ export function MonthPage() {
             />
           </div>
 
-          {/* Month as a real calendar grid — the month's big rocks placed on
-              actual days (the first of the per-horizon calendar views). The
-              shelf above takes the rail's role (hideRail), so a rock is
-              never rendered twice. */}
+          {/* The month as WEEK STRIPS — one row per week, no day columns,
+              because the month rung places into a week. The shelf above takes
+              the rail's role (hideRail), so a rock is never rendered twice. */}
           <div className="mb-8">
             <MonthCalendarGrid
               month={viewedDate}
@@ -297,10 +296,8 @@ export function MonthPage() {
               // invariant that a scheduled_for implies bucket='timed' — leaving
               // the item dated but absent from every day view.
               //
-              // Deliberately NOT passing onPlaceTask: dropping on a day cell
-              // from the month view is gone. Genuinely dated things ("dentist
-              // Tuesday") use the existing date picker in triage, so a drop
-              // means one thing here regardless of where in the row it lands.
+              // Genuinely dated things ("dentist Tuesday") use the date picker
+              // in triage, so a drop here means exactly one thing.
               onPlaceTaskInWeek={(id, weekStart) => updateTask(id, {
                 bucket: 'week', weekStart, scheduledFor: undefined, isAllDay: false,
               })}

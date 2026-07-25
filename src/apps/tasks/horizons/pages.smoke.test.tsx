@@ -160,7 +160,7 @@ describe('horizon pages (smoke)', () => {
   // clicked slot's hour is discarded. isAllDay MUST come along — a midnight task
   // that isn't all-day renders at the 12 AM row, outside the grid's 6 AM–10 PM
   // window, so it would be written and invisible.
-  it('WeekPage: clicking a slot creates the task on the DAY, all-day, no time', () => {
+  it('WeekPage: clicking a day column creates the task on the DAY, all-day, no time', () => {
     // TODAY, not tomorrow. The grid spans the current week, and minDropDate
     // refuses days behind today — so today is the only day guaranteed to be both
     // rendered and droppable on every day of the week. ("Tomorrow" is outside
@@ -169,10 +169,12 @@ describe('horizon pages (smoke)', () => {
     const today = new Date(now)
     today.setHours(0, 0, 0, 0)
 
+    // The week rung draws DAYS now, so the column is the click target — there
+    // is no hour slot to click, and therefore no clicked hour to discard.
     const { container } = render(<WeekPage />)
-    const slot = container.querySelector(`[data-droppable-id^="slot-${localYmd(today)}-"]`)
-    expect(slot).not.toBeNull()
-    fireEvent.click(slot!)
+    const column = container.querySelector(`[data-testid="day-column-${localYmd(today)}"] > div:last-child`)
+    expect(column).not.toBeNull()
+    fireEvent.click(column!)
 
     // Scoped to the popover — the shelf has its own "add" textbox on the page.
     const dialog = screen.getByRole('dialog', { name: /create task/i })

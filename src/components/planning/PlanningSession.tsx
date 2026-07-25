@@ -695,6 +695,7 @@ export function PlanningSession({
                 slotDuration={SLOT_DURATION}
                 onOpenDay={onOpenDay}
                 onSlotClick={onCreateTaskAt ? handleSlotClick : undefined}
+                dayGrain={dayGrain}
               />
             </div>
           ) : (
@@ -711,6 +712,7 @@ export function PlanningSession({
               slotDuration={SLOT_DURATION}
               onOpenDay={onOpenDay}
               onSlotClick={onCreateTaskAt ? handleSlotClick : undefined}
+              dayGrain={dayGrain}
             />
           )}
 
