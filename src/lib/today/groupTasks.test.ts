@@ -200,8 +200,10 @@ describe('addToGroup', () => {
       wrapperId: 'w1', taskIds: [], memberRefs: [{ type: 'event', id: 'e1' }],
       existingMemberRefs: existing, date: new Date(2026, 6, 25), isAllDay: true,
     }, d)
-    const call = d.updateTask.mock.calls.find(c => c[0] === 'w1')
-    if (call) expect(call[1].groupMembers).toEqual(existing)
+    // When all incoming refs are already present, the entire addition is a no-op:
+    // no updateTask to the wrapper, and no refetch.
+    expect(d.updateTask).not.toHaveBeenCalledWith('w1', expect.anything())
+    expect(d.refetch).not.toHaveBeenCalled()
   })
 
   it('refetches once, after all writes', async () => {
@@ -211,6 +213,10 @@ describe('addToGroup', () => {
       date: new Date(2026, 6, 25), isAllDay: true,
     }, d)
     expect(d.refetch).toHaveBeenCalledTimes(1)
+    // Verify refetch happens AFTER the last updateTask, not before/interleaved
+    const lastUpdateOrder = Math.max(...d.updateTask.mock.invocationCallOrder)
+    const refetchOrder = d.refetch.mock.invocationCallOrder[0]
+    expect(refetchOrder).toBeGreaterThan(lastUpdateOrder)
   })
 
   it('does nothing when there is nothing to add', async () => {
@@ -219,6 +225,26 @@ describe('addToGroup', () => {
       wrapperId: 'w1', taskIds: [], memberRefs: [], existingMemberRefs: [],
       date: new Date(2026, 6, 25), isAllDay: true,
     }, d)
+    expect(d.updateTask).not.toHaveBeenCalled()
+    expect(d.refetch).not.toHaveBeenCalled()
+  })
+
+  it('is a no-op when memberRefs are entirely duplicates (with no tasks)', async () => {
+    const d = deps()
+    const existing = [
+      { type: 'event' as const, id: 'e1' },
+      { type: 'routine' as const, id: 'r1' },
+    ]
+    await addToGroup({
+      wrapperId: 'w1',
+      taskIds: [],
+      memberRefs: existing, // Same refs already in the group
+      existingMemberRefs: existing,
+      date: new Date(2026, 6, 25),
+      isAllDay: true,
+    }, d)
+    // No tasks to reparent, and no new refs to add (all duplicates),
+    // so no writes and no refetch.
     expect(d.updateTask).not.toHaveBeenCalled()
     expect(d.refetch).not.toHaveBeenCalled()
   })

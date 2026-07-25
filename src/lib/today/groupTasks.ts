@@ -176,6 +176,7 @@ export async function addToGroup(
 ): Promise<void> {
   const { wrapperId, taskIds, memberRefs, existingMemberRefs, date, isAllDay } = input
 
+  // De-duplicate against existing members; within-batch duplicates in memberRefs itself are not de-duped.
   const seen = new Set(existingMemberRefs.map((r) => `${r.type}-${r.id}`))
   const fresh = memberRefs.filter((r) => !seen.has(`${r.type}-${r.id}`))
 
