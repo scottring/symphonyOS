@@ -16,8 +16,10 @@ import type { FamilyMember } from '@/types/family'
 import type { TimelineCaptureResult } from '@/components/schedule/TimelineQuickInput'
 import type { ParserContext } from '@/lib/quickInputParser'
 import type { HomeViewType } from '@/types/homeView'
+import type { DaySection } from '@/lib/timeUtils'
 
 import { parseRoutineTimelineId } from '@/lib/today/doseExpansion'
+import { readCollapsed, toggleCollapsed, onCollapsedChange, sectionKey } from '@/lib/today/sectionCollapse'
 import { useMobile } from '@/hooks/useMobile'
 import { useTodayData } from '@/hooks/useTodayData'
 import { mergeAssignees } from '@/lib/today/bulkAssign'
@@ -31,11 +33,12 @@ import { useTimelineInsert } from '@/hooks/useTimelineInsert'
 import { useDomain } from '@/hooks/useDomain'
 import { computeAnchorTime } from '@/lib/timelineAnchor'
 
-import { Eye, EyeOff, Repeat, Binoculars, Sun, ChevronDown, ChevronRight, Printer } from 'lucide-react'
+import { Eye, EyeOff, Repeat, Binoculars, Sun, Printer } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { AssigneeFilter } from '@/components/home/AssigneeFilter'
 
 import { TodayAddInput } from './TodayAddInput'
+import { DaySectionHeader } from '@/components/schedule/DaySectionHeader'
 import { UpNextHero } from './UpNextHero'
 import { selectUpNext } from '@/lib/today/upNext'
 import { TimelineInsertPoint } from './TimelineInsertPoint'
@@ -63,7 +66,6 @@ import { TimelineNoteComposer } from './TimelineNoteComposer'
 
 import { discussionItems } from '@/lib/discussionItems'
 import { DiscussionBadge } from './DiscussionBadge'
-import { daySectionMeta } from '@/lib/daySectionMeta'
 import { PrintableDayList } from './PrintableDayList'
 import { parseMealTitle } from '@/lib/mealTitle'
 import { readHideRoutines, writeHideRoutines, onHideRoutinesChange } from '@/lib/hideRoutinesSignal'
@@ -310,14 +312,20 @@ export function TodayView({
   }, [data, nowTick])
   const upNextId = upNext?.item.id
 
-  // Sections whose remaining items are all complete render collapsed by
-  // default; this tracks the ones the user has re-expanded.
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set())
-  const toggleSectionExpanded = useCallback((section: string) => {
-    setExpandedSections((prev) => {
+  // Which sections the user has folded shut. Persisted; Unscheduled starts
+  // collapsed because it holds the untimed-routine slab. A section whose
+  // remaining items are all complete also renders collapsed unless the user
+  // has explicitly opened it — one mechanism, not two.
+  const [collapsedKeys, setCollapsedKeys] = useState<Set<string>>(() => readCollapsed())
+  const [openedByUser, setOpenedByUser] = useState<Set<string>>(new Set())
+  useEffect(() => onCollapsedChange(setCollapsedKeys), [])
+  const toggleSection = useCallback((section: DaySection) => {
+    const key = sectionKey(section)
+    setCollapsedKeys(toggleCollapsed(key))
+    setOpenedByUser((prev) => {
       const next = new Set(prev)
-      if (next.has(section)) next.delete(section)
-      else next.add(section)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
       return next
     })
   }, [])
@@ -747,75 +755,34 @@ export function TodayView({
             {data.sectionsOrder.map((section) => {
               const allSectionItems = data.grouped[section]
               if (!allSectionItems || allSectionItems.length === 0) return null
-              const meta = daySectionMeta(section)
 
-              // The hero item is lifted out of its section; a section whose
-              // remaining items are all complete (or whose only item IS the
-              // hero) collapses to a single header line.
+              // The hero item is lifted out of its section.
               const items = upNextId
                 ? allSectionItems.filter((i) => i.id !== upNextId)
                 : allSectionItems
-              const restAllDone = items.every((i) => i.completed)
-              const sectionExpanded = expandedSections.has(section)
+              const completedCount = items.filter((i) => i.completed).length
+              const restAllDone = items.length > 0 && completedCount === items.length
+              const emptyBecauseHero = items.length === 0
+              const key = sectionKey(section)
 
-              if (restAllDone && !sectionExpanded) {
-                const emptyBecauseHero = items.length === 0
-                return (
-                  <section key={section}>
-                    <button
-                      type="button"
-                      onClick={emptyBecauseHero ? undefined : () => toggleSectionExpanded(section)}
-                      disabled={emptyBecauseHero}
-                      aria-expanded={false}
-                      className={`w-full flex items-center gap-2 text-[11px] uppercase tracking-wider font-semibold text-neutral-400 px-3 md:px-0 py-0.5 text-left ${emptyBecauseHero ? 'cursor-default' : 'hover:text-neutral-600 transition-colors'}`}
-                    >
-                      {createElement(meta.Icon, { className: 'w-4 h-4 text-amber-500/60 shrink-0' })}
-                      <span>{meta.label}</span>
-                      {meta.range && (
-                        <span className="text-neutral-300 normal-case font-normal">{meta.range}</span>
-                      )}
-                      <span className="text-primary-600/70 normal-case font-normal">
-                        · {emptyBecauseHero ? 'up next' : 'complete'}
-                      </span>
-                      {!emptyBecauseHero && <ChevronRight className="w-3.5 h-3.5 text-neutral-300" />}
-                    </button>
-                  </section>
-                )
-              }
+              // Collapsed when explicitly folded, or auto-folded because everything in
+              // it is done and the user hasn't opened it.
+              const collapsed = emptyBecauseHero
+                || collapsedKeys.has(key)
+                || (restAllDone && !openedByUser.has(key))
 
               return (
                 <section key={section}>
-                  <h3 className="hidden md:flex items-center gap-2 text-[11px] uppercase tracking-wider font-semibold text-neutral-400 mb-3 px-3 md:px-0">
-                    {createElement(meta.Icon, { className: 'w-4 h-4 text-amber-500 shrink-0' })}
-                    <span>{meta.label}</span>
-                    {meta.range && (
-                      <span className="text-neutral-300 normal-case font-normal">
-                        {meta.range}
-                      </span>
-                    )}
-                    {restAllDone && sectionExpanded && (
-                      <button
-                        type="button"
-                        onClick={() => toggleSectionExpanded(section)}
-                        aria-label={`Collapse ${meta.label}`}
-                        className="inline-flex items-center gap-1 text-primary-600/70 normal-case font-normal hover:text-primary-700"
-                      >
-                        · complete <ChevronDown className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </h3>
-
-                  <h3 className="md:hidden flex items-baseline gap-2 px-1 mb-2 mt-1">
-                    <span className="font-display italic text-[15px] text-neutral-600">
-                      {meta.label}
-                    </span>
-                    {meta.range && (
-                      <span className="text-[11px] text-neutral-400 tabular-nums">
-                        {meta.range}
-                      </span>
-                    )}
-                  </h3>
-
+                  <DaySectionHeader
+                    section={section}
+                    itemCount={items.length}
+                    completedCount={completedCount}
+                    collapsed={collapsed}
+                    emptyBecauseHero={emptyBecauseHero}
+                    onToggle={() => toggleSection(section)}
+                  />
+                  {!collapsed && (
+                    <>
                   <div className="space-y-1">
                     {items.map((item, itemIndex) => {
                       const taskId = item.id.startsWith('task-') ? item.id.replace('task-', '') : null
@@ -1139,6 +1106,8 @@ export function TodayView({
                       )
                     })()}
                   </div>
+                    </>
+                  )}
                 </section>
               )
             })}

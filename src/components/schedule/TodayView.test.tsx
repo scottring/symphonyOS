@@ -333,7 +333,7 @@ describe('TodayView', () => {
     })
   })
 
-  it('renders the Morning section header on mobile in italic serif', () => {
+  it('renders the Morning section header once when items remain after the hero is lifted', () => {
     // Create a task scheduled for the morning (8am) so the Morning section
     // actually renders.
     const morningTime = new Date(TODAY)
@@ -354,7 +354,7 @@ describe('TodayView', () => {
           scheduledFor: morningTime,
         },
         // Two morning tasks: whichever the Up Next hero lifts, the other keeps
-        // the Morning section (and both responsive headers) rendered.
+        // the Morning section header rendered.
         {
           id: 'morning-task-2',
           title: 'Second morning task',
@@ -367,22 +367,12 @@ describe('TodayView', () => {
       ],
     } as never)
 
-    // Both responsive variants (desktop hidden md:flex + mobile md:hidden)
-    // render in jsdom; verifying both exist is the durable behavior check.
-    // If the responsive split is ever consolidated, this test will fail
-    // loudly and the developer can adjust the count accordingly.
-    expect(screen.getAllByText('Morning')).toHaveLength(2)
-
-    // At least one of the two label nodes must carry the mobile variant's
-    // editorial italic-serif treatment. Asserted via Tailwind utility
-    // classes because that is what makes the mobile variant distinct from
-    // the desktop variant; this is the smallest assertion that still
-    // verifies the design intent.
-    const labels = screen.getAllByText('Morning')
-    const italicSerifMatch = labels.some(
-      (el) => /font-display/.test(el.className) && /italic/.test(el.className),
-    )
-    expect(italicSerifMatch).toBe(true)
+    // Task 6 lifted the header into DaySectionHeader — a single element
+    // rendered once, replacing the old desktop `<h3 className="hidden
+    // md:flex">` / mobile `<h3 className="md:hidden">` italic-serif pair
+    // that jsdom rendered both halves of. DaySectionHeader's own responsive
+    // and typography treatment is covered by DaySectionHeader.test.tsx.
+    expect(screen.getByText('Morning')).toBeInTheDocument()
   })
 })
 
