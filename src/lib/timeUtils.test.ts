@@ -12,7 +12,9 @@ import {
   formatTimeRangeLong,
   getSectionForHour,
   getDaySectionLabel,
+  getTimeOfDay,
   DAY_SECTION_BOUNDS,
+  TIMED_SECTIONS,
   type DaySection,
 } from './timeUtils'
 import type { TimelineItem } from '@/types/timeline'
@@ -345,5 +347,53 @@ describe('day section boundaries', () => {
   it('labels every section', () => {
     const all: DaySection[] = ['allday', 'earlyMorning', 'morning', 'afternoon', 'evening', 'night', 'unscheduled']
     for (const s of all) expect(getDaySectionLabel(s)).toBeTruthy()
+  })
+})
+
+describe('getTimeOfDay', () => {
+  // The 3-valued ambience band (FocusMode's "This Afternoon") must agree with
+  // where Today actually files the item. It used to hardcode `hour < 18 →
+  // afternoon`, so 17:30 read "This Afternoon" while Today filed it under
+  // Evening. Boundaries now derive from DAY_SECTION_BOUNDS.
+  const at = (h: number, m = 0) => new Date(2026, 6, 25, h, m)
+
+  it('calls 17:30 evening, matching the evening band that starts at 17:00', () => {
+    expect(getTimeOfDay(at(17, 30))).toBe('evening')
+  })
+
+  it('calls 07:00 morning even though it is the earlyMorning band', () => {
+    expect(getTimeOfDay(at(7, 0))).toBe('morning')
+  })
+
+  it('folds night into evening and earlyMorning into morning', () => {
+    expect(getTimeOfDay(at(0, 15))).toBe('morning')
+    expect(getTimeOfDay(at(22, 45))).toBe('evening')
+  })
+
+  it('stays 3-valued across all 24 hours', () => {
+    const seen = new Set<string>()
+    for (let h = 0; h < 24; h++) seen.add(getTimeOfDay(at(h)))
+    expect([...seen].sort()).toEqual(['afternoon', 'evening', 'morning'])
+  })
+
+  it('never disagrees with getSectionForHour about which half of the day it is', () => {
+    for (let h = 0; h < 24; h++) {
+      const section = getSectionForHour(h)
+      const tod = getTimeOfDay(at(h))
+      if (section === 'afternoon') expect(tod).toBe('afternoon')
+      if (section === 'evening' || section === 'night') expect(tod).toBe('evening')
+      if (section === 'morning' || section === 'earlyMorning') expect(tod).toBe('morning')
+    }
+  })
+})
+
+describe('TIMED_SECTIONS', () => {
+  it('is derived from the bounds table, not a hand-written copy', () => {
+    expect(TIMED_SECTIONS).toEqual(DAY_SECTION_BOUNDS.map(b => b.section))
+  })
+
+  it('spans the day from hour 0 to hour 23', () => {
+    expect(getSectionForHour(0)).toBe(TIMED_SECTIONS[0])
+    expect(getSectionForHour(23)).toBe(TIMED_SECTIONS[TIMED_SECTIONS.length - 1])
   })
 })

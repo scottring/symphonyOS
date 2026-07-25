@@ -7,7 +7,26 @@ export interface AnchorInput {
   date: Date
 }
 
-const SECTION_FALLBACK_HOUR: Record<string, number> = { morning: 8, afternoon: 13, evening: 18 }
+/**
+ * Prefill hour for a "+" click in an EMPTY timed section (no neighbours to
+ * interpolate between). Each value must fall inside its own band, or the new
+ * item immediately re-buckets and visibly jumps out of the section the user
+ * clicked in.
+ *
+ * Typed against every timed section rather than `Record<string, number>`: the
+ * loose type let earlyMorning and night go missing silently, so both fell back
+ * to `?? 9`, prefilled 9:00 AM and jumped into Morning. Adding a band to
+ * DAY_SECTION_BOUNDS must now fail to compile here until it gets an hour.
+ */
+type TimedSection = Exclude<DaySection, 'allday' | 'unscheduled'>
+
+const SECTION_FALLBACK_HOUR: Record<TimedSection, number> = {
+  earlyMorning: 6,
+  morning: 8,
+  afternoon: 13,
+  evening: 18,
+  night: 21,
+}
 
 function snap5(ms: number): Date {
   const date = new Date(ms)
@@ -24,6 +43,6 @@ export function computeAnchorTime({ before, after, section, date }: AnchorInput)
   if (!before && after) return new Date(after.getTime() - 60_000)  // 1 min before first
   if (before && !after) return new Date(before.getTime() + 60_000)  // 1 min after last
   const r = new Date(date)
-  r.setHours(SECTION_FALLBACK_HOUR[section] ?? 9, 0, 0, 0)
+  r.setHours(SECTION_FALLBACK_HOUR[section], 0, 0, 0)
   return r
 }

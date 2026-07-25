@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { computeAnchorTime } from './timelineAnchor'
+import { TIMED_SECTIONS, getSectionForHour } from './timeUtils'
 
 const d = (h: number, m: number) => { const x = new Date(2026, 4, 18); x.setHours(h, m, 0, 0); return x }
 
@@ -41,5 +42,24 @@ describe('computeAnchorTime', () => {
     const r = computeAnchorTime({ before: null, after: null, section: 'evening', date: new Date(2026, 4, 18) })
     expect(r?.getHours()).toBe(18)
     expect(r?.getMinutes()).toBe(0)
+  })
+  it('empty early morning section → fallback 06:00', () => {
+    const r = computeAnchorTime({ before: null, after: null, section: 'earlyMorning', date: new Date(2026, 4, 18) })
+    expect(r?.getHours()).toBe(6)
+    expect(r?.getMinutes()).toBe(0)
+  })
+  it('empty night section → fallback 21:00', () => {
+    const r = computeAnchorTime({ before: null, after: null, section: 'night', date: new Date(2026, 4, 18) })
+    expect(r?.getHours()).toBe(21)
+    expect(r?.getMinutes()).toBe(0)
+  })
+
+  // The bug this guards: earlyMorning and night were missing from the fallback
+  // table, so both hit `?? 9` and prefilled 9:00 AM — which re-buckets to
+  // Morning, visibly jumping out of the section the user clicked "+" in.
+  it.each(TIMED_SECTIONS)('%s fallback lands inside its own band', (section) => {
+    const r = computeAnchorTime({ before: null, after: null, section, date: new Date(2026, 4, 18) })
+    expect(r).not.toBeNull()
+    expect(getSectionForHour(r!.getHours())).toBe(section)
   })
 })

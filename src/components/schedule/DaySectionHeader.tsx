@@ -34,7 +34,10 @@ export function DaySectionHeader({
       disabled={emptyBecauseHero}
       aria-expanded={!collapsed}
       aria-label={`${collapsed ? 'Expand' : 'Collapse'} ${meta.label}`}
-      className={`w-full flex items-center gap-2 text-[11px] uppercase tracking-wider font-semibold text-neutral-400 px-3 md:px-0 py-0.5 text-left ${
+      // mb-3 restores the desktop precedent: collapsing the two old headers into
+      // one dropped their bottom margin, so every header sat flush against its
+      // first row.
+      className={`w-full flex items-center gap-2 text-[11px] uppercase tracking-wider font-semibold text-neutral-400 px-3 md:px-0 py-0.5 mb-3 text-left ${
         emptyBecauseHero ? 'cursor-default' : 'hover:text-neutral-600 transition-colors'
       }`}
     >

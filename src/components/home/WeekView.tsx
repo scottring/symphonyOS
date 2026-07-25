@@ -2,7 +2,10 @@ import { useMemo } from 'react'
 import type { Task } from '@/types/task'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine, ActionableInstance } from '@/types/actionable'
-import { getDaySection } from '@/lib/timeUtils'
+import { getDaySection, TIMED_SECTIONS } from '@/lib/timeUtils'
+import type { DaySection } from '@/lib/timeUtils'
+import { daySectionMeta } from '@/lib/daySectionMeta'
+import { emptySections } from '@/lib/today/types'
 import { taskToTimelineItem, eventToTimelineItem, routineToTimelineItem } from '@/types/timeline'
 
 // Inline SVG icons
@@ -40,12 +43,19 @@ interface DayData {
   isWeekend: boolean
   completed: number
   total: number
-  sections: {
-    allday: string[]
-    morning: string[]
-    afternoon: string[]
-    evening: string[]
-  }
+  // Fully keyed: the old four-field shape meant an earlyMorning or night item
+  // had nowhere to go, and the `else if` chains that filled it had no final
+  // `else`, so those items were dropped without a trace.
+  sections: Record<DaySection, string[]>
+}
+
+/** Header tint per band. Presentation only — membership comes from TIMED_SECTIONS. */
+const SECTION_TINT: Record<string, string> = {
+  earlyMorning: 'text-violet-600/70',
+  morning: 'text-amber-600/70',
+  afternoon: 'text-sky-600/70',
+  evening: 'text-indigo-600/70',
+  night: 'text-slate-600/70',
 }
 
 // Progress indicator icon
@@ -116,52 +126,38 @@ function DayColumn({
 
       {/* Time sections with tasks */}
       <div className="flex-1 space-y-2 text-left">
-        {/* Morning */}
-        {day.sections.morning.length > 0 && (
-          <div>
-            <div className="text-[10px] font-semibold text-amber-600/70 uppercase tracking-wide mb-0.5">
-              Morning
-            </div>
-            {day.sections.morning.map((title, i) => (
-              <div key={i} className="text-xs text-neutral-600 truncate leading-snug">
-                · {title}
+        {/* Every timed band, in order — driven by TIMED_SECTIONS so a new band
+            can't be silently left out of the week grid. */}
+        {TIMED_SECTIONS.map((section) => (
+          day.sections[section].length > 0 && (
+            <div key={section}>
+              <div className={`text-[10px] font-semibold uppercase tracking-wide mb-0.5 ${SECTION_TINT[section] ?? 'text-neutral-500'}`}>
+                {daySectionMeta(section).label}
               </div>
-            ))}
-          </div>
-        )}
-
-        {/* Afternoon */}
-        {day.sections.afternoon.length > 0 && (
-          <div>
-            <div className="text-[10px] font-semibold text-sky-600/70 uppercase tracking-wide mb-0.5">
-              Afternoon
+              {day.sections[section].map((title, i) => (
+                <div key={i} className="text-xs text-neutral-600 truncate leading-snug">
+                  · {title}
+                </div>
+              ))}
             </div>
-            {day.sections.afternoon.map((title, i) => (
-              <div key={i} className="text-xs text-neutral-600 truncate leading-snug">
-                · {title}
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Evening */}
-        {day.sections.evening.length > 0 && (
-          <div>
-            <div className="text-[10px] font-semibold text-indigo-600/70 uppercase tracking-wide mb-0.5">
-              Evening
-            </div>
-            {day.sections.evening.map((title, i) => (
-              <div key={i} className="text-xs text-neutral-600 truncate leading-snug">
-                · {title}
-              </div>
-            ))}
-          </div>
-        )}
+          )
+        ))}
 
         {/* All day items shown at top if any */}
         {day.sections.allday.length > 0 && (
           <div className="mt-1 pt-1 border-t border-neutral-100">
             {day.sections.allday.map((title, i) => (
+              <div key={i} className="text-[10px] text-neutral-500 truncate">
+                ◇ {title}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Untimed items — previously dropped entirely. */}
+        {day.sections.unscheduled.length > 0 && (
+          <div className="mt-1 pt-1 border-t border-neutral-100">
+            {day.sections.unscheduled.map((title, i) => (
               <div key={i} className="text-[10px] text-neutral-500 truncate">
                 ◇ {title}
               </div>
@@ -251,40 +247,24 @@ export function WeekView({
       )
 
       // Convert to timeline items and group by section
-      const sections: DayData['sections'] = {
-        allday: [],
-        morning: [],
-        afternoon: [],
-        evening: [],
-      }
+      const sections: DayData['sections'] = emptySections<string>()
 
       // Process tasks
       dayTasks.forEach((task) => {
         const item = taskToTimelineItem(task)
-        const section = getDaySection(item)
-        if (section === 'allday') sections.allday.push(task.title)
-        else if (section === 'morning') sections.morning.push(task.title)
-        else if (section === 'afternoon') sections.afternoon.push(task.title)
-        else if (section === 'evening') sections.evening.push(task.title)
+        sections[getDaySection(item)].push(task.title)
       })
 
       // Process events
       dayEvents.forEach((event) => {
         const item = eventToTimelineItem(event)
-        const section = getDaySection(item)
-        if (section === 'allday') sections.allday.push(event.title)
-        else if (section === 'morning') sections.morning.push(event.title)
-        else if (section === 'afternoon') sections.afternoon.push(event.title)
-        else if (section === 'evening') sections.evening.push(event.title)
+        sections[getDaySection(item)].push(event.title)
       })
 
       // Process routines (simplified - just check if they apply to this day of week)
       activeRoutines.forEach((routine) => {
         const item = routineToTimelineItem(routine, date)
-        const section = getDaySection(item)
-        if (section === 'morning') sections.morning.push(routine.name)
-        else if (section === 'afternoon') sections.afternoon.push(routine.name)
-        else if (section === 'evening') sections.evening.push(routine.name)
+        sections[getDaySection(item)].push(routine.name)
       })
 
       // Calculate completion
