@@ -688,6 +688,27 @@ describe('PlanningSession', () => {
       expect(scheduledFor).toEqual(new Date(2026, 6, 20))
     })
 
+    // The week rung briefly stopped accepting drags entirely: removing the hour
+    // slots left `slot-*` (the only task drop target the handler knew) with no
+    // node, and the all-day lane — which DOES have a handler — was a 28px strip
+    // at the top of a 220px column. Technically droppable, practically not.
+    it('the whole day column is the drop target, not a strip at its top', () => {
+      const { container } = render(<PlanningSession {...dayProps} />)
+      const column = container.querySelector(`[data-testid="day-column-${formatDateKey(day)}"]`)!
+      const lane = column.querySelector('[data-testid="allday-lane"]') as HTMLElement
+      expect(lane).toBeTruthy()
+      // It fills the column rather than being pinned to a fixed sliver height.
+      expect(lane.style.height).toBe('')
+      expect(lane.className).toContain('flex-1')
+      expect(lane.className).toContain('min-h-[200px]')
+    })
+
+    it('the day column keeps a drop target even with nothing scheduled', () => {
+      const { container } = render(<PlanningSession {...dayProps} />)
+      const lanes = container.querySelectorAll('[data-testid="allday-lane"]')
+      expect(lanes).toHaveLength(7)
+    })
+
     it('the default grain keeps its hour grid (Today still asks what time)', () => {
       render(<PlanningSession {...dayProps} placementGrain="time" />)
       expect(screen.getByText('6 AM')).toBeInTheDocument()

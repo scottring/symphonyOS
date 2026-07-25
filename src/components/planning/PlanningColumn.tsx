@@ -1,4 +1,4 @@
-import { useMemo, useCallback, useState } from 'react'
+import { useMemo, useCallback, useState, type ReactNode } from 'react'
 import { useDraggable, useDroppable } from '@dnd-kit/core'
 import type { Task } from '@/types/task'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
@@ -271,7 +271,7 @@ export function PlanningColumn({
           in time order — they're facts about the day, not placements. */}
       {dayGrain ? (
         <div
-          className={`min-h-[220px] p-2 space-y-1.5 ${onSlotClick ? 'cursor-pointer' : ''}`}
+          className={`flex min-h-[220px] flex-col p-2 ${onSlotClick ? 'cursor-pointer' : ''}`}
           // Click-to-create survives the loss of the hour grid — the DAY is the
           // click target now, which is the same decision the drop makes. Hour
           // and minute are passed as 0: PlanningSession's day grain floors to
@@ -290,7 +290,7 @@ export function PlanningColumn({
             onChipClick={(taskId) => setRaisedId(taskId)}
             laneHeight={allDayLaneHeight(allDayTasks.length)}
             fluid
-          />
+          >
           {/* A task that still carries a clock time (written before this rung
               stopped drawing hours, or dated from Today) must NOT vanish just
               because there is no hour row to place it on — it renders as a chip
@@ -324,6 +324,7 @@ export function PlanningColumn({
               {routine.name}
             </div>
           ))}
+          </AllDayLaneCell>
         </div>
       ) : (
       <>
@@ -448,16 +449,22 @@ interface AllDayLaneCellProps {
   onChipClick: (taskId: string) => void
   /** Uniform across the grid — the busiest day sets it (see allDayLaneHeight). */
   laneHeight: number
-  /** Day grain: size to content and never collapse into a "+N". Hiding a
-   *  placement the user just made reads as data loss. */
+  /** Day grain: the lane IS the column — it fills the full height so the whole
+   *  column is the drop target, and nothing collapses into a "+N" (hiding a
+   *  placement the user just made reads as data loss). A 28px strip at the top
+   *  of a 220px column is technically a drop target and practically unhittable,
+   *  which is how the week rung briefly stopped accepting drags at all. */
   fluid?: boolean
+  /** Rendered inside the droppable, below the chips — in day grain the day's
+   *  timed items live here so they sit within the drop area, not beside it. */
+  children?: ReactNode
 }
 
 // The all-day lane cell for one column. Its own component so the droppable
 // hook stays unconditional (every column always registers a lane, even with
 // zero tasks) — keeping hook usage clean rather than conditionally calling
 // useDroppable inside PlanningColumn's body.
-function AllDayLaneCell({ dateKey, tasks, onChipClick, laneHeight, fluid = false }: AllDayLaneCellProps) {
+function AllDayLaneCell({ dateKey, tasks, onChipClick, laneHeight, fluid = false, children }: AllDayLaneCellProps) {
   const { isOver, setNodeRef } = useDroppable({ id: `allday-${dateKey}` })
   const capacity = allDayLaneCapacity(laneHeight)
   // One cell short of capacity when there's a surplus, so the "+N" has a slot of
@@ -472,10 +479,12 @@ function AllDayLaneCell({ dateKey, tasks, onChipClick, laneHeight, fluid = false
     <div
       ref={setNodeRef}
       data-testid="allday-lane"
-      style={fluid ? { minHeight: 28 } : { height: laneHeight }}
+      style={fluid ? undefined : { height: laneHeight }}
       className={`px-1.5 py-1 grid content-start gap-1 transition-colors ${
-        fluid ? 'grid-cols-1 rounded-md' : 'grid-cols-2 border-b border-neutral-200 overflow-hidden'
-      } ${isOver ? 'bg-primary-100' : 'bg-neutral-50/60'}`}
+        fluid
+          ? 'grid-cols-1 flex-1 min-h-[200px] rounded-md ring-1 ring-transparent'
+          : 'grid-cols-2 border-b border-neutral-200 overflow-hidden'
+      } ${isOver ? (fluid ? 'bg-primary-100 ring-primary-300' : 'bg-primary-100') : fluid ? 'bg-transparent' : 'bg-neutral-50/60'}`}
     >
       {visible.map((task) => (
         <AllDayChip key={task.id} task={task} onClick={() => onChipClick(task.id)} />
@@ -485,6 +494,7 @@ function AllDayLaneCell({ dateKey, tasks, onChipClick, laneHeight, fluid = false
           +{overflow}
         </span>
       )}
+      {children}
     </div>
   )
 }
