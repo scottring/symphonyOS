@@ -87,7 +87,10 @@ export const SESSIONS: Record<PlanningHorizon, GuidedSessionConfig> = {
       {
         id: 'season-ahead', type: 'calendar', title: 'The season ahead',
         narration: "Scan the season’s calendar — trips, deadlines, school breaks, the weeks that are already spoken for. Notice how much open space actually exists. Plans that respect the calendar get done; plans that ignore it get abandoned.",
-        props: { notesKey: 'tripChildcare' },
+        // `strips` renders the SAME SeasonMonthStrips the /season page shows,
+        // instead of a generic per-month event count — the one page↔wizard
+        // parity gap the 2026-07-25 audit found.
+        props: { notesKey: 'tripChildcare', strips: true },
       },
       {
         id: 'look-within', type: 'reflect', title: 'Look within',

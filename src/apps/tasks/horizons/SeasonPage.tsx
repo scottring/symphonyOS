@@ -16,9 +16,10 @@ import { HorizonExplainer } from '@/components/planning/explainers/HorizonExplai
 import { ListSuggestions } from '@/components/planning/guided/ListSuggestions';
 import { BetsGrid } from '@/components/planning/season/BetsGrid';
 import { OverflowTray } from '@/components/planning/season/OverflowTray';
-import { MonthStrip } from '@/components/planning/season/MonthStrip';
+import { SeasonMonthStrips } from '@/components/planning/season/SeasonMonthStrips';
 import { FocusLine } from '@/components/planning/season/FocusLine';
 import { matchesDomain } from '@/lib/today/domainFilter';
+import { seasonStart } from '@/lib/cadence/periods';
 import { partitionSeason, PICK_CAP } from '@/lib/planning/betPulse';
 import { looksLikeActivity } from '@/lib/planning/outcomeCoach';
 import { CascadeRail, useHorizonPageData } from './shared';
@@ -34,8 +35,10 @@ export function SeasonPage() {
     sharpenBet, sharpenBetLoading, goals, currentDomain, areas, addGoal,
     handleLetGo, referenceFold,
     setRefOpen, setTranslatingRefId, setRefDraft,
-    scheduleActionsValue, undo,
+    scheduleActionsValue, undo, domainEvents,
   } = useHorizonPageData(horizon);
+
+  const seasonStartDate = seasonStart(new Date());
 
   const { picks, shelf } = partitionSeason(domainTasks);
 
@@ -117,6 +120,20 @@ export function SeasonPage() {
               positions, open slots visible), a quiet right rail (the three
               months, the goals to draw from, the composer), and the shelf as
               a collapsed drawer at the very bottom. */}
+          {/* The season on one axis — three month strips, proportional, with
+              elapsed shaded. Same instrument as /year's ribbon, one zoom in;
+              the season rung places into a MONTH, so a month is the finest
+              unit this drawing shows. Shared with the seasonal session's
+              `season-ahead` step. */}
+          <div className="mb-10">
+            <SeasonMonthStrips
+              seasonStart={seasonStartDate}
+              tasks={domainTasks}
+              events={domainEvents}
+              onOpenMonth={() => navigate('/month')}
+            />
+          </div>
+
           <div className="mb-8">
             {/* Epigraph — the focus line closes the masthead. */}
             <div className="mb-10">
@@ -145,10 +162,6 @@ export function SeasonPage() {
               {/* The rail — supporting cast in reading order: the season's
                   shape, the sources, the way in. */}
               <aside className="lg:col-span-5 space-y-8 lg:border-l lg:border-neutral-200/70 lg:pl-10">
-                <div>
-                  <h3 className="font-display text-sm tracking-wide text-neutral-400 uppercase mb-3">The three months</h3>
-                  <MonthStrip tasks={domainTasks} onOpenMonth={() => navigate('/month')} orientation="column" />
-                </div>
                 {referenceFold && <div>{referenceFold}</div>}
                 <div>
                   <h3 className="font-display text-sm tracking-wide text-neutral-400 uppercase mb-3">Add an outcome</h3>

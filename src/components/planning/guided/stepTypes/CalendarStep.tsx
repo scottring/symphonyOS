@@ -8,6 +8,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { CalendarDays, ChevronRight } from 'lucide-react'
 import { useGuided } from '../GuidedContext'
 import { YearRibbon } from '@/components/planning/horizon/YearRibbon'
+import { SeasonMonthStrips } from '@/components/planning/season/SeasonMonthStrips'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -33,6 +34,9 @@ export function CalendarStep() {
   // instead of the per-month commitment counts. Year session only.
   const landscape = step.props?.landscape === true
   const landscapeYear = periodStart.getFullYear()
+  // Seasonal "the season ahead": the same three month strips /season draws,
+  // rather than a generic per-month count list.
+  const strips = step.props?.strips === true
 
   // A look-AHEAD never shows the past: mid-period sessions clamp the window to
   // today (week-boundary spec). The landscape keeps the full year — it maps
@@ -115,6 +119,22 @@ export function CalendarStep() {
               mounts, so they cannot drift. */}
           <YearRibbon
             year={landscapeYear}
+            tasks={host.tasks}
+            events={fetchedEvents}
+          />
+        </>
+      ) : strips ? (
+        <>
+          <p className="text-xs text-neutral-400">
+            The season's three months — what's already claimed, and where the open space is.
+          </p>
+          {!host.calendarConnected && !host.calendarChecking && (
+            <p className="text-xs text-neutral-400">
+              Your calendar isn't connected — you'll still see your dated items; connect it to layer in events too.
+            </p>
+          )}
+          <SeasonMonthStrips
+            seasonStart={periodStart}
             tasks={host.tasks}
             events={fetchedEvents}
           />

@@ -65,9 +65,13 @@ export interface GuidedStepConfig {
     /** book-next: which horizon's session to schedule. */
     bookHorizon?: PlanningHorizon
     bookTitle?: string
-    /** calendar: render the annual 12-month landscape (with zoom-into-month)
-     *  instead of the per-month commitment counts. Year session only. */
+    /** calendar: render the year ribbon (seasons, claims, elapsed, weekly
+     *  density) instead of the per-month commitment counts. Year session only.
+     *  Same component as the /year page. */
     landscape?: boolean
+    /** calendar: render the three season month strips instead of the per-month
+     *  commitment counts. Season session only. Same component as /season. */
+    strips?: boolean
     /** pick-by-goal: goal-less "doesn't serve a goal" mode. */
     standalone?: boolean
   }
