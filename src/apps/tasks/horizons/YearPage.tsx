@@ -7,9 +7,8 @@
 // Extracted verbatim from the former HorizonView.tsx `horizon === 'year'`
 // early-return branch (mechanical split — no behavior change).
 
-import { PAGE_COLUMN } from '@/components/layout/pageLayout';
+import { PAGE_COLUMN_FULL } from '@/components/layout/pageLayout';
 import { YearCalendarGrid } from '@/components/planning/horizon/YearCalendarGrid';
-import { MonthZoomSheet } from '@/components/planning/horizon/MonthZoomSheet';
 import { CalendarRange, Target, ChevronRight, Sparkles } from 'lucide-react';
 import { HorizonExplainer } from '@/components/planning/explainers/HorizonExplainer';
 import { goalRollup } from '@/lib/planning/lineage';
@@ -68,7 +67,6 @@ export function YearPage() {
   const {
     navigate, goals, areas, tasks, domainTasks, domainEvents, railCounts,
     period, progress, hasExplainer, explainerOpen, setExplainerOpen,
-    zoomMonth, setZoomMonth, updateTask, handleSelect,
   } = useHorizonPageData('year');
 
   const activeGoals = goals.filter((g) => g.status === 'active');
@@ -86,7 +84,10 @@ export function YearPage() {
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className={PAGE_COLUMN}>
+      {/* Full-bleed: twelve month cells plus the goals beneath them is a
+          landscape, and a 940px column wasted the right half of the screen while
+          truncating every title inside the cells. */}
+      <div className={PAGE_COLUMN_FULL}>
         <header className="mb-4 flex items-start justify-between gap-4">
           <div>
             <p className="text-[11px] uppercase tracking-wider text-neutral-400">This Year</p>
@@ -125,33 +126,18 @@ export function YearPage() {
         </div>
 
         {/* The year as a 12-month landscape — the big items in each month.
-            Tapping a month zooms into it in place (drag rocks onto days)
-            without leaving the year. */}
+            Tapping a month expands that cell in place. It does NOT open a day
+            grid: the year rung asks what's already claimed, and "which day" is
+            two rungs down. "Open the month →" inside an expanded cell is the
+            deliberate way to walk down. */}
         <div className="mb-8">
           <YearCalendarGrid
             year={new Date().getFullYear()}
             tasks={domainTasks}
             events={domainEvents}
-            onOpenMonth={(m) => setZoomMonth(m)}
+            onGoToMonth={() => navigate('/month')}
           />
         </div>
-        {zoomMonth !== null && (
-          <MonthZoomSheet
-            month={new Date(new Date().getFullYear(), zoomMonth, 1)}
-            tasks={domainTasks}
-            events={domainEvents}
-            onClose={() => setZoomMonth(null)}
-            // The zoomed month places the way /month places: onto a WEEK. The
-            // old day-level drop here skipped the week rung AND omitted
-            // isAllDay, so a midnight drop rendered at the 12 AM row — written
-            // and invisible (the bug bb7bc0ea fixed on the week grid).
-            onPlaceTaskInWeek={(id, weekStart) => updateTask(id, {
-              bucket: 'week', weekStart, scheduledFor: undefined, isAllDay: false,
-            })}
-            onUnscheduleTask={(id) => updateTask(id, { bucket: 'month', scheduledFor: undefined, weekStart: undefined })}
-            onSelectTask={handleSelect}
-          />
-        )}
 
         {goalsByArea.length === 0 && orphanGoals.length === 0 ? (
           <div className="card p-8 text-center">
