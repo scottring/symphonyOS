@@ -44,13 +44,30 @@ export interface BuildDayGridInput {
 // The builder returns the FULL (bounded) list. The visual 3-line cap is
 // applied by WallNowQuadrant; the tap-to-expand overlay shows all of these.
 const MAX_DATA_LINES = 8
+// The wall keeps its three-band face. Today's earlyMorning/night fold into the
+// neighbours so this family-facing surface is visually unchanged by the Today
+// split — but the items must still APPEAR. Revisit in a dedicated wall pass
+// (see the kiosk-design skill).
 const SECTION_ORDER: DaySection[] = ['allday', 'morning', 'afternoon', 'evening', 'unscheduled']
+const FOLD_INTO: Partial<Record<DaySection, DaySection>> = {
+  earlyMorning: 'morning',
+  night: 'evening',
+}
+
+// Each source section is already time-sorted (groupByDaySection). Merging in
+// start-time order keeps the combined bucket sorted too, so "next" still
+// means chronologically next, not "next in whichever section came first".
+function itemsFor(sections: Record<DaySection, TimelineItem[]>, s: DaySection): TimelineItem[] {
+  const folded = (Object.keys(FOLD_INTO) as DaySection[]).filter((k) => FOLD_INTO[k] === s)
+  const combined = [...(sections[s] ?? []), ...folded.flatMap((k) => sections[k] ?? [])]
+  return combined.sort((a, b) => (a.startTime?.getTime() ?? 0) - (b.startTime?.getTime() ?? 0))
+}
 
 function nextFutureItem(days: WallDayData[], now: Date): TimelineItem | null {
   const sorted = [...days].sort((a, b) => a.date.getTime() - b.date.getTime())
   for (const day of sorted) {
     for (const section of SECTION_ORDER) {
-      for (const item of day.items[section] ?? []) {
+      for (const item of itemsFor(day.items, section)) {
         if (item.startTime && item.startTime.getTime() > now.getTime()) return item
       }
     }

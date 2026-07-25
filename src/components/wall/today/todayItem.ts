@@ -1,6 +1,7 @@
 import type { TimelineItem } from '@/types/timeline'
 import type { DaySection } from '@/lib/timeUtils'
 import { isEverydayRoutine } from '@/lib/routineUtils'
+import { SECTIONS_ORDER } from '@/lib/today/types'
 
 export type TodayItemKind = 'task' | 'chore' | 'routine-step' | 'event'
 
@@ -35,7 +36,9 @@ export function buildTodayItems(
   // Restrict the 'unscheduled' bucket to routines — bucketed tasks
   // (week/month/quarter) also live in 'unscheduled' and would otherwise
   // spam the kiosk.
-  for (const section of ['allday', 'morning', 'afternoon', 'evening', 'unscheduled'] as DaySection[]) {
+  // Iterate the canonical section list (SECTIONS_ORDER) rather than a local
+  // literal so a future new section can never be silently skipped here.
+  for (const section of SECTIONS_ORDER) {
     for (const item of sections[section] ?? []) {
       if (section === 'unscheduled' && item.type !== 'routine') continue
       const owner = item.assignedTo ?? null

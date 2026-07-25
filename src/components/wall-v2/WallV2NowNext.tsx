@@ -22,7 +22,9 @@ import { placeCall } from '@/lib/telephony/placeCall'
 import { WALL } from './wallTheme'
 
 const DEFAULT_DURATION_MS = 60 * 60 * 1000
-const TIMED_SECTIONS: DaySection[] = ['morning', 'afternoon', 'evening']
+// earlyMorning/night included so nothing silently disappears from the wall.
+// Order is chronological; the consumer below sorts by startTime anyway.
+const TIMED_SECTIONS: DaySection[] = ['earlyMorning', 'morning', 'afternoon', 'evening', 'night']
 
 interface WallV2NowNextProps {
   today: WallDayData | undefined

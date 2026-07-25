@@ -62,4 +62,20 @@ describe('WallV2NowNext', () => {
     const { container } = render(<WallV2NowNext today={today} familyMembers={[]} now={at(9, 30)} />)
     expect(container).toBeEmptyDOMElement()
   })
+
+  it('surfaces earlyMorning and night items instead of dropping them', () => {
+    const today = day({
+      earlyMorning: [ti({ id: 'task-4', title: '6 AM run', startTime: at(6), endTime: at(6, 30) })],
+    })
+    render(<WallV2NowNext today={today} familyMembers={[]} now={at(6, 10)} />)
+    expect(screen.getByText('6 AM run')).toBeInTheDocument()
+    expect(screen.getByText(/Happening now/)).toBeInTheDocument()
+
+    const todayNight = day({
+      night: [ti({ id: 'task-5', title: 'Lock up', startTime: at(22) })],
+    })
+    render(<WallV2NowNext today={todayNight} familyMembers={[]} now={at(20)} />)
+    expect(screen.getByText('Lock up')).toBeInTheDocument()
+    expect(screen.getByText(/Next up/)).toBeInTheDocument()
+  })
 })

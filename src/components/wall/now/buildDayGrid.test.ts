@@ -20,7 +20,9 @@ function emptyDay(dayOffset: number): WallDayData {
   return {
     date,
     isToday: dayOffset === 0,
-    items: { allday: [], morning: [], afternoon: [], evening: [], unscheduled: [] },
+    items: {
+      allday: [], earlyMorning: [], morning: [], afternoon: [], evening: [], night: [], unscheduled: [],
+    },
     birthdays: [],
     milestones: [],
   } as unknown as WallDayData
@@ -115,5 +117,17 @@ describe('buildDayGrid', () => {
       .toBe('"What was the best part of today?"')
     expect(buildDayGrid(baseInput({ familyPrompt: null })).familyQuestion.headline)
       .toBe('No question today')
+  })
+
+  it('Up Next still surfaces earlyMorning and night items instead of dropping them', () => {
+    const day0 = emptyDay(0)
+    day0.items.earlyMorning = [timeline('e3', '6:00 AM run', 6)]
+    const grid = buildDayGrid(baseInput({ days: [day0, emptyDay(1)], now: new Date('2026-05-18T05:00:00') }))
+    expect(grid.upNext.headline).toBe('6:00 AM run')
+
+    const day0b = emptyDay(0)
+    day0b.items.night = [timeline('e4', 'Lock up', 22)]
+    const gridB = buildDayGrid(baseInput({ days: [day0b, emptyDay(1)], now: new Date('2026-05-18T21:00:00') }))
+    expect(gridB.upNext.headline).toBe('Lock up')
   })
 })
