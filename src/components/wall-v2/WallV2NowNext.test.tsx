@@ -63,19 +63,37 @@ describe('WallV2NowNext', () => {
     expect(container).toBeEmptyDOMElement()
   })
 
-  it('surfaces earlyMorning and night items instead of dropping them', () => {
+  it('surfaces an earlyMorning item instead of dropping it', () => {
     const today = day({
       earlyMorning: [ti({ id: 'task-4', title: '6 AM run', startTime: at(6), endTime: at(6, 30) })],
     })
     render(<WallV2NowNext today={today} familyMembers={[]} now={at(6, 10)} />)
     expect(screen.getByText('6 AM run')).toBeInTheDocument()
     expect(screen.getByText(/Happening now/)).toBeInTheDocument()
+  })
 
+  it('surfaces a night item instead of dropping it', () => {
     const todayNight = day({
       night: [ti({ id: 'task-5', title: 'Lock up', startTime: at(22) })],
     })
     render(<WallV2NowNext today={todayNight} familyMembers={[]} now={at(20)} />)
     expect(screen.getByText('Lock up')).toBeInTheDocument()
     expect(screen.getByText(/Next up/)).toBeInTheDocument()
+  })
+
+  it('picks the soonest item across sections when both a target and a folded section are populated', () => {
+    // earlyMorning (6 AM) and morning (10 AM) are both non-empty at once. This
+    // component sorts the flattened TIMED_SECTIONS list by startTime itself
+    // (see the .sort() a few lines below the flatMap in WallV2NowNext.tsx), so
+    // "Next up" must be the chronologically-soonest item regardless of which
+    // section it came from or where that section sits in TIMED_SECTIONS.
+    const today = day({
+      earlyMorning: [ti({ id: 'task-6', title: '6:00 AM run', startTime: at(6) })],
+      morning: [ti({ id: 'task-7', title: 'Late morning meeting', startTime: at(10) })],
+    })
+    render(<WallV2NowNext today={today} familyMembers={[]} now={at(5)} />)
+    expect(screen.getByText(/Next up/)).toBeInTheDocument()
+    expect(screen.getByText('6:00 AM run')).toBeInTheDocument()
+    expect(screen.queryByText('Late morning meeting')).not.toBeInTheDocument()
   })
 })

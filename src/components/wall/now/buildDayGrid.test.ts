@@ -130,4 +130,16 @@ describe('buildDayGrid', () => {
     const gridB = buildDayGrid(baseInput({ days: [day0b, emptyDay(1)], now: new Date('2026-05-18T21:00:00') }))
     expect(gridB.upNext.headline).toBe('Lock up')
   })
+
+  it('merges the folded earlyMorning item into morning in chronological order, not concatenation order', () => {
+    // Both sections are non-empty at once: a later own-section item (10 AM)
+    // and an earlier folded item (6 AM). A naive [...morning, ...earlyMorning]
+    // concatenation would put the 10 AM item first and Up Next would report
+    // it as "next" even though the 6 AM item is chronologically sooner.
+    const day0 = emptyDay(0)
+    day0.items.morning = [timeline('e5', 'Late morning meeting', 10)]
+    day0.items.earlyMorning = [timeline('e6', '6:00 AM run', 6)]
+    const grid = buildDayGrid(baseInput({ days: [day0, emptyDay(1)], now: new Date('2026-05-18T05:00:00') }))
+    expect(grid.upNext.headline).toBe('6:00 AM run')
+  })
 })

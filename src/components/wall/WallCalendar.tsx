@@ -36,10 +36,19 @@ import { filterDailyRoutines } from './today/filterDailyRoutines'
 import { resolveNowFocus, type OverrideRef } from './nowFocus'
 import type { RhythmMode } from './rhythm/rhythmMode'
 import { useImminentEntity } from './now/useImminentEntity'
+import { SECTIONS_ORDER } from '@/lib/today/types'
 
 // ============================================================================
 // HELPERS
 // ============================================================================
+
+// Imminent-entity candidates need a real start time to compare against "now".
+// getDaySection() routes any item with no startTime into 'unscheduled' (see
+// src/lib/timeUtils.ts), so those items have nothing to be "imminent" about —
+// excluded on purpose, not an oversight. Every other canonical section is
+// included via SECTIONS_ORDER so a future new section can't silently drop out
+// of this calculation the way earlyMorning/night just did.
+const IMMINENT_SECTIONS = SECTIONS_ORDER.filter((s) => s !== 'unscheduled')
 
 function formatWallTime(date: Date): { time: string; period: string; dateStr: string } {
   const hours = date.getHours()
@@ -149,7 +158,7 @@ export function WallCalendar() {
   const todayTasksForImminent = useMemo((): Task[] => {
     if (!todayDayData) return []
     const result: Task[] = []
-    for (const section of ['allday', 'morning', 'afternoon', 'evening'] as const) {
+    for (const section of IMMINENT_SECTIONS) {
       for (const item of todayDayData.items[section] ?? []) {
         if (item.type === 'task' && item.originalTask) {
           result.push(item.originalTask)
