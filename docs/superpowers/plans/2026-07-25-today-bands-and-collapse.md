@@ -399,106 +399,147 @@ git commit -m "feat(today): seven sections in chronological order"
 
 ---
 
-### Task 4: Bring every other `Record<DaySection, …>` consumer back to green
+### Task 4: Stop the wall from silently dropping the two new sections
+
+> **CORRECTED 2026-07-25 after Task 1 landed.** The original version of this
+> task was wrong on both counts and would have broken working code. Verified
+> facts that replace it:
+>
+> - **`tsc` reports only 3 errors, in 2 files** (`daySectionMeta.tsx`,
+>   `today/types.ts`) — both already fixed by Tasks 2 and 3. Not 22 files.
+> - **The two triage pickers declare their OWN local `DaySection`** —
+>   `TimePickerPopover.tsx:48` is `'morning' | 'afternoon' | 'evening'`;
+>   `SchedulePopover.tsx:93` is `'allday' | 'morning' | 'afternoon' | 'evening'`.
+>   Neither imports from `timeUtils`. Adding `earlyMorning`/`night` keys to
+>   their Records would be an **excess-property error against a local union**.
+>   **Do not touch either file.**
+> - The real defect is **silent omission**, which `tsc` cannot see: three
+>   hardcoded section arrays iterate a fixed five- or three-entry list, so any
+>   item bucketed into `earlyMorning` or `night` simply disappears.
 
 **Files:**
-- Modify: `src/components/triage/TimePickerPopover.tsx:57-58`, `:80`, `:87`
-- Modify: `src/components/triage/SchedulePopover.tsx:102-103`, `:138`
-- Modify: `src/components/wall/today/todayItem.ts:29`
-- Modify: `src/components/wall/now/buildDayGrid.ts:47`
-- Modify: `src/components/wall-v2/WallV2NowNext.tsx:25`
-- Modify: `src/hooks/useWallData.ts:41`
+- Modify: `src/components/wall/now/buildDayGrid.ts:47,52`
+- Modify: `src/components/wall-v2/WallV2NowNext.tsx:25,40`
+- Modify: `src/components/wall/today/todayItem.ts:38`
 - Delete: `src/components/schedule/TimeGroup.tsx` (dead — no importers)
-- Test: existing suites for each, plus `src/components/wall/now/buildDayGrid.test.ts`
+- Test: `src/components/wall/now/buildDayGrid.test.ts`, wall-v2 suites
+- **Do NOT modify:** `src/components/triage/TimePickerPopover.tsx`,
+  `src/components/triage/SchedulePopover.tsx`, `src/hooks/useWallData.ts`
+  (its `Record<DaySection, …>` is populated by `groupByDaySection`, so it
+  receives all seven keys automatically and type-checks clean).
 
 **Interfaces:**
-- Consumes: the widened `DaySection` from Task 1, `SECTIONS_ORDER` from Task 3.
-- Produces: no new exports. **Behaviour must be visually unchanged** on the wall and in both pickers.
+- Consumes: the widened `DaySection` from Task 1.
+- Produces: no new exports. **The wall's appearance must not change.**
 
-**Containment rule for this task:** the wall and the triage pickers **fold** the two new sections into their existing three-band display — `earlyMorning` renders with `morning`, `night` renders with `evening`. Stage 1 does not redesign the kitchen wall (a shipped, family-facing surface with its own design pass and skill). Leave a comment saying so at each fold site.
+**Containment rule:** the wall keeps its existing three-band face. `earlyMorning`
+folds into `morning`, `night` folds into `evening`. Stage 1 does not redesign the
+kitchen wall — a shipped, family-facing surface with its own design pass. The
+goal is that an item at 6 AM or 10 PM still *appears* on the wall, in a
+neighbouring band, rather than vanishing.
 
-- [ ] **Step 1: Confirm the failing surface**
+- [ ] **Step 1: Write the failing test**
 
-Run: `npx tsc -b`
-Expected: errors in exactly the files listed above — each a `Record<DaySection, …>` missing the `earlyMorning` and `night` keys.
-
-- [ ] **Step 2: Delete the dead file and verify nothing imports it**
-
-```bash
-grep -rn "TimeGroup" src/ --include=*.tsx --include=*.ts | grep -v "TimeGroup.tsx"
-```
-Expected: no output. Then:
-```bash
-git rm src/components/schedule/TimeGroup.tsx
-```
-
-- [ ] **Step 3: Fix the two triage pickers**
-
-Both files declare their own local `getTimeOfDay` returning three values, and group into a `Record<DaySection, …>`. They only need the two new keys present so the Record type-checks; nothing routes into them because the local functions still return three values.
-
-In `src/components/triage/TimePickerPopover.tsx`, in `groupItemsBySection` (line ~58):
+Add to `src/components/wall/now/buildDayGrid.test.ts` a case proving nothing is
+dropped. Match the file's existing fixture-construction style:
 
 ```typescript
-  const groups: Record<DaySection, ScheduleContextItem[]> = {
-    allday: [], morning: [], afternoon: [], evening: [], unscheduled: [],
-    // Today's five-band split doesn't apply here: this popover keeps its own
-    // three-way local getTimeOfDay, so these two never receive items.
-    earlyMorning: [], night: [],
-  }
+it('keeps earlyMorning and night items visible by folding them into neighbours', () => {
+  const sections = emptySections()            // helper: all seven keys → []
+  sections.earlyMorning = [itemAt('6:00 AM run', 6)]
+  sections.night = [itemAt('Lock up', 22)]
+  const grid = buildDayGrid(sections /* plus whatever args the fn takes */)
+  const titles = JSON.stringify(grid)
+  expect(titles).toContain('6:00 AM run')
+  expect(titles).toContain('Lock up')
+})
 ```
 
-Add to `SECTION_LABELS` (line ~80): `earlyMorning: 'Early morning', night: 'Night',`
-Add to `SECTION_DEFAULT_TIMES` (line ~87): `earlyMorning: 7, night: 21,`
+Read the file's existing tests first and reuse their fixture helpers rather than
+inventing new ones.
 
-In `src/components/triage/SchedulePopover.tsx`, apply the same two additions to `groups` (line ~103) and `SECTION_LABELS` (line ~138), with the same comment.
+- [ ] **Step 2: Run it to verify it fails**
 
-- [ ] **Step 4: Fix the wall consumers**
+Run: `npx vitest run src/components/wall/now/buildDayGrid.test.ts`
+Expected: FAIL — both items missing, because `SECTION_ORDER` never visits their sections.
 
-`src/hooks/useWallData.ts:41` and `src/components/wall/today/todayItem.ts:29` type a `Record<DaySection, TimelineItem[]>` that is populated by `groupByDaySection`, so they now receive seven keys automatically — they need no change unless `tsc` says otherwise. If a literal is constructed there, add `earlyMorning: []` and `night: []`.
-
-`src/components/wall/now/buildDayGrid.ts:47` — the wall folds, it does not gain bands:
+- [ ] **Step 3: Fix `buildDayGrid.ts`**
 
 ```typescript
 // The wall keeps its three-band face. Today's earlyMorning/night fold into the
 // neighbours so this family-facing surface is visually unchanged by the Today
-// split; revisit in a dedicated wall pass (see kiosk-design skill).
+// split — but the items must still APPEAR. Revisit in a dedicated wall pass
+// (see the kiosk-design skill).
 const SECTION_ORDER: DaySection[] = ['allday', 'morning', 'afternoon', 'evening', 'unscheduled']
 const FOLD_INTO: Partial<Record<DaySection, DaySection>> = {
   earlyMorning: 'morning',
   night: 'evening',
 }
-```
 
-Then, wherever this file reads `sections[s]` for `s` of `SECTION_ORDER`, concatenate any folded source:
-
-```typescript
 function itemsFor(sections: Record<DaySection, TimelineItem[]>, s: DaySection): TimelineItem[] {
-  const folded = (Object.keys(FOLD_INTO) as DaySection[]).filter(k => FOLD_INTO[k] === s)
-  return [...sections[s], ...folded.flatMap(k => sections[k])]
+  const folded = (Object.keys(FOLD_INTO) as DaySection[]).filter((k) => FOLD_INTO[k] === s)
+  return [...(sections[s] ?? []), ...folded.flatMap((k) => sections[k] ?? [])]
 }
 ```
 
-`src/components/wall-v2/WallV2NowNext.tsx:25` — same intent, one line:
+Then at line ~52, replace the direct `sections[section]` read inside the
+`for (const section of SECTION_ORDER)` loop with `itemsFor(sections, section)`.
+
+- [ ] **Step 4: Fix `WallV2NowNext.tsx:25`**
 
 ```typescript
 // earlyMorning/night included so nothing silently disappears from the wall.
 const TIMED_SECTIONS: DaySection[] = ['earlyMorning', 'morning', 'afternoon', 'evening', 'night']
 ```
 
-- [ ] **Step 5: Verify green and nothing vanished from the wall**
+Confirm the consumer at line ~40 orders by time rather than by array position;
+if it relies on array order, the new entries are already in chronological order.
+
+- [ ] **Step 5: Fix the inline cast in `todayItem.ts:38`**
+
+This line is the most dangerous of the three — the `as DaySection[]` cast
+silences the type checker:
+
+```typescript
+  for (const section of ['allday', 'morning', 'afternoon', 'evening', 'unscheduled'] as DaySection[]) {
+```
+
+Replace it with the full seven-section list so nothing is skipped. Import
+`SECTIONS_ORDER` from `@/lib/today/types` and iterate that instead of a literal,
+so this list can never fall out of sync again:
+
+```typescript
+  for (const section of SECTIONS_ORDER) {
+```
+
+Verify `SECTIONS_ORDER` is importable here without creating a circular import;
+if it is circular, inline all seven names with a comment pointing at
+`SECTIONS_ORDER` as the source of truth.
+
+- [ ] **Step 6: Delete the dead file**
+
+```bash
+grep -rn "TimeGroup" src/ | grep -v "TimeGroup.tsx"
+```
+Expected: no output. Then `git rm src/components/schedule/TimeGroup.tsx`.
+
+- [ ] **Step 7: Verify**
 
 Run: `npx tsc -b && npx vitest run`
-Expected: `tsc` clean; the full suite passes. If `buildDayGrid.test.ts` or the wall-v2 suites fail, the fold is dropping items — fix the fold, do not weaken the test.
+Expected: `tsc` clean; full suite green including the new fold test. If a wall
+suite fails, the fold is dropping items — fix the fold, do not weaken the test.
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 8: Commit**
 
 ```bash
 git add -A
-git commit -m "fix: consumers absorb the two new day sections without changing face
+git commit -m "fix(wall): the two new day sections no longer vanish
 
-The kitchen wall and both triage pickers fold earlyMorning/night into their
-existing bands, so a family-facing surface is untouched by the Today split.
-Deletes TimeGroup.tsx, which had no importers."
+Three hardcoded section lists iterated a fixed five- or three-entry array, so
+items bucketed into earlyMorning or night were silently dropped from the wall —
+invisible to tsc, including one 'as DaySection[]' cast that defeated it outright.
+They now fold into neighbouring bands, so the wall's face is unchanged but
+nothing disappears. Deletes TimeGroup.tsx, which had no importers."
 ```
 
 ---
