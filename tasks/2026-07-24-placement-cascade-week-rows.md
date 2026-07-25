@@ -1,7 +1,7 @@
 # Spec — Placement cascade: month → week → day → time
 
 **Written:** 2026-07-24 · **Author:** Scott + Claude (session ending in `ebbf04f2`)
-**Status:** ready to implement, not started
+**Status:** SHIPPED to prod 2026-07-24 (all five phases + one follow-up fix). See "What shipped" at the bottom.
 **Kickoff line for a fresh session:** *"Read `tasks/2026-07-24-placement-cascade-week-rows.md` and implement it."*
 
 ---
@@ -210,3 +210,62 @@ when green — every push to `main` deploys to prod.
    triage affordance for genuinely dated things.
 3. **Does the wall need to know?** The kiosk reads day-level items only, so a
    week-placed item is invisible there. Probably correct, but worth confirming.
+
+---
+
+## What shipped (2026-07-24)
+
+All five phases are on `origin/main` and deployed to prod. Each shipped green and
+separately:
+
+| Commit | Phase |
+|---|---|
+| `2aaf204b` | 1 — `week_start` column, both update paths, local-date serialization |
+| `a42cd124` | 2 — `belongsToWeek` + all six week readers scoped |
+| `2c46e167` | 3 — month grid: week ROWS are the drop target, + the row lane |
+| `03d39a1d` | 4 — week grid: a drop picks the day, + the all-day lane grows |
+| `3d175141` | 5 — copy and explainers name each rung |
+| `bb7bc0ea` | follow-up — a day-grain CREATE must be all-day (found in prod) |
+
+### Answers to the open questions
+
+1. **A week placement that never gets a day** → it stays on that week and the next
+   weekly session surfaces it as carry-over. *Not implemented yet* — nothing rolls
+   or clears `week_start` on its own, which is the correct interim state (the item
+   stays visible on its week). The carry-over surfacing is the remaining work.
+2. **Day-level drop from the month grid** → removed. `MonthCalendarGrid` still
+   supports `onPlaceTask` for the year page's month peek and the guided calendar
+   step; `MonthPage` passes only `onPlaceTaskInWeek`.
+3. **The wall** → unchanged, day-level only. A week-placed item is invisible on
+   the kiosk until it gets a day.
+
+### Decisions made during implementation, not in the original spec
+
+- **`belongsToWeek` vs `isPlacedOnWeek`.** Pools ask "should I show this?" and
+  want legacy NULL rows included. The month grid asks "did this land in THIS
+  row?" and a NULL must answer no, or it repeats in all six rows. Two functions,
+  in `src/lib/today/weekPlacement.ts`.
+- **A week placement CLEARS `scheduled_for`.** Dropping an already-dated chip on a
+  row means "move it to that week"; keeping the date with `bucket='week'` would
+  break the invariant that a date implies `bucket='timed'`.
+- **The month row grew a lane.** A week-placed item has no date (no cell) and is
+  no longer `bucket='month'` (no shelf) — without the lane it vanished.
+- **`placementGrain` on `PlanningSession`.** It serves both the week rung and
+  Today from one component, so the grain is a prop (`'day'` for /week and the
+  weekly session, `'time'` — the default — for Today).
+- **The all-day lane grows.** With every week placement landing there, the fixed
+  two-chip lane hid the third. The grid now sizes the lane from its busiest day;
+  math in `src/lib/planning/allDayLane.ts`.
+
+### Verified in prod (app.symphony-os.com, Scott's account)
+
+Dropped a move on the week-of-Jul-19 row: DB wrote
+`bucket='week', week_start='2026-07-19', scheduled_for=null`; it left the shelf,
+appeared in that row's "This week" lane, the masthead placed-count went 11 → 12,
+and `/week?start=2026-07-19` showed it while `?start=2026-07-26` did not. The
+day-grain create was verified by clicking a slot (midnight, not the slot's hour).
+Test rows were deleted afterwards.
+
+**Not exercised end-to-end:** the drag from the /week shelf onto a day. dnd-kit
+drags can't be synthesized reliably from browser automation — that one gesture
+is covered by unit tests only and is worth one manual drag.
