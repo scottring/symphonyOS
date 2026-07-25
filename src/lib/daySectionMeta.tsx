@@ -1,6 +1,6 @@
-import { Sunrise, Sun, Moon, Clock, Inbox, type LucideIcon } from 'lucide-react'
+import { Sunrise, Sun, Sunset, MoonStar, Clock, Inbox, type LucideIcon } from 'lucide-react'
 import type { DaySection } from '@/lib/timeUtils'
-import { getDaySectionLabel } from '@/lib/timeUtils'
+import { getDaySectionLabel, DAY_SECTION_BOUNDS } from '@/lib/timeUtils'
 
 export interface DaySectionMeta {
   label: string
@@ -9,19 +9,26 @@ export interface DaySectionMeta {
   Icon: LucideIcon
 }
 
+/** Ranges come from the boundary table so a header can never claim a window
+ *  the bucketing code doesn't implement. */
 const RANGE: Record<DaySection, string> = {
-  morning: '6:00 AM – 12:00 PM',
-  afternoon: '12:00 PM – 5:00 PM',
-  evening: '5:00 PM – 10:00 PM',
   allday: '',
   unscheduled: '',
+  earlyMorning: '',
+  morning: '',
+  afternoon: '',
+  evening: '',
+  night: '',
 }
+for (const bound of DAY_SECTION_BOUNDS) RANGE[bound.section] = bound.range
 
 const ICON: Record<DaySection, LucideIcon> = {
-  morning: Sunrise,
-  afternoon: Sun,
-  evening: Moon,
   allday: Clock,
+  earlyMorning: Sunrise,
+  morning: Sun,
+  afternoon: Sun,
+  evening: Sunset,
+  night: MoonStar,
   unscheduled: Inbox,
 }
 

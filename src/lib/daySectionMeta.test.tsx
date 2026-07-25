@@ -1,34 +1,23 @@
 import { describe, it, expect } from 'vitest'
-import { Sunrise, Sun, Moon, Clock, Inbox } from 'lucide-react'
-import { daySectionMeta } from './daySectionMeta'
+import { daySectionMeta } from '@/lib/daySectionMeta'
+import { DAY_SECTION_BOUNDS } from '@/lib/timeUtils'
 
 describe('daySectionMeta', () => {
-  it('morning', () => {
-    const m = daySectionMeta('morning')
-    expect(m.label).toBe('Morning')
-    expect(m.range).toBe('6:00 AM – 12:00 PM')
-    expect(m.Icon).toBe(Sunrise)
+  it('takes its range verbatim from the boundary table', () => {
+    for (const bound of DAY_SECTION_BOUNDS) {
+      expect(daySectionMeta(bound.section).range).toBe(bound.range)
+      expect(daySectionMeta(bound.section).label).toBe(bound.label)
+    }
   })
-  it('afternoon', () => {
-    const m = daySectionMeta('afternoon')
-    expect(m.range).toBe('12:00 PM – 5:00 PM')
-    expect(m.Icon).toBe(Sun)
+
+  it('gives the two untimed sections no range', () => {
+    expect(daySectionMeta('allday').range).toBe('')
+    expect(daySectionMeta('unscheduled').range).toBe('')
   })
-  it('evening', () => {
-    const m = daySectionMeta('evening')
-    expect(m.range).toBe('5:00 PM – 10:00 PM')
-    expect(m.Icon).toBe(Moon)
-  })
-  it('allday has no range', () => {
-    const m = daySectionMeta('allday')
-    expect(m.label).toBe('All Day')
-    expect(m.range).toBe('')
-    expect(m.Icon).toBe(Clock)
-  })
-  it('unscheduled has no range', () => {
-    const m = daySectionMeta('unscheduled')
-    expect(m.label).toBe('Unscheduled')
-    expect(m.range).toBe('')
-    expect(m.Icon).toBe(Inbox)
+
+  it('gives every section an icon', () => {
+    for (const s of ['allday', 'earlyMorning', 'morning', 'afternoon', 'evening', 'night', 'unscheduled'] as const) {
+      expect(daySectionMeta(s).Icon).toBeTruthy()
+    }
   })
 })
