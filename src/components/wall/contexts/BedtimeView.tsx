@@ -4,7 +4,7 @@ import type { ContextViewProps } from './types'
 import type { TimelineItem } from '@/types/timeline'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
 import { getKidMembers } from '@/lib/familyMembers'
-import { SECTIONS_ORDER } from '@/lib/today/types'
+import { pickPreviewItems } from '../today/tomorrowPreview'
 import { EmailActionStrip } from './EmailActionStrip'
 
 function parseRoutineId(timelineItemId: string): string | null {
@@ -179,14 +179,15 @@ function CenterColumn({ data }: { data: ContextViewProps['data'] }) {
     })
   }, [data.days, data.now])
 
-  const tomorrowItems = useMemo(() => {
-    if (!tomorrowData) return []
-    const items: TimelineItem[] = []
-    for (const section of SECTIONS_ORDER) {
-      items.push(...(tomorrowData.items[section] || []))
-    }
-    return items.filter(i => !i.skipped).slice(0, 5)
-  }, [tomorrowData])
+  // pickPreviewItems walks timed sections chronologically, all-day last,
+  // unscheduled excluded — NOT SECTIONS_ORDER, which puts 'allday' first
+  // (so a midnight all-day event would head the preview ahead of a real
+  // morning commitment) and includes 'unscheduled' (an untriaged task
+  // shouldn't headline the preview either). See today/tomorrowPreview.ts.
+  const tomorrowItems = useMemo(
+    () => pickPreviewItems(tomorrowData?.items, 5),
+    [tomorrowData],
+  )
 
   return (
     <div className="flex flex-col h-full items-center">

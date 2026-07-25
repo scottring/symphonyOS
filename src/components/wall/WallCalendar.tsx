@@ -31,6 +31,7 @@ import { WallRightColumn } from './WallRightColumn'
 import { buildDayGrid, type DayGridTapTarget, type QuadrantContent } from './now/buildDayGrid'
 import { WallQuadrantExpand } from './now/WallQuadrantExpand'
 import { buildTodayItems } from './today/todayItem'
+import { pickFirstPreviewItem, PREVIEW_SECTIONS } from './today/tomorrowPreview'
 import { groupRoutineStepsByOwner } from './today/groupRoutineStepsByOwner'
 import { filterDailyRoutines } from './today/filterDailyRoutines'
 import { resolveNowFocus, type OverrideRef } from './nowFocus'
@@ -213,14 +214,11 @@ export function WallCalendar() {
   const tomorrowPreview = useMemo(() => {
     const tomorrow = wallData.days.find(d => !d.isToday && d.date > new Date(new Date().setHours(0, 0, 0, 0)))
     if (!tomorrow) return null
-    // SECTIONS_ORDER, not a literal: a 7 AM school run is `earlyMorning` and a
-    // 9:30 PM commitment is `night`, and neither appeared in the old four-name
-    // list — so tomorrow's genuinely-first item could be skipped entirely.
-    for (const section of SECTIONS_ORDER) {
-      const first = tomorrow.items[section]?.[0]
-      if (first) return { title: first.title, startTime: first.startTime ?? null }
-    }
-    return null
+    // pickFirstPreviewItem walks timed sections chronologically, all-day
+    // last, unscheduled excluded — NOT SECTIONS_ORDER, which puts 'allday'
+    // first and would preview a midnight all-day event over a real 7 AM
+    // commitment. See today/tomorrowPreview.ts.
+    return pickFirstPreviewItem(tomorrow.items)
   }, [wallData.days])
 
   // Rebuilds each clock tick (currentTime dep) so "Up Next" stays minute-fresh;
@@ -326,7 +324,11 @@ export function WallCalendar() {
     }
     const tasks: TimelineItem[] = []
     const dailyChores: TimelineItem[] = []
-    for (const section of SECTIONS_ORDER) {
+    // PREVIEW_SECTIONS, not SECTIONS_ORDER: this feeds the context engine's
+    // "what's happening" evaluation, and 'unscheduled' is an untriaged
+    // bucketed task — same policy as adaptTimelineSections, which
+    // deliberately keeps that bucket routines-only.
+    for (const section of PREVIEW_SECTIONS) {
       for (const item of (today.items[section] || [])) {
         if (item.skipped) continue
         if (item.type === 'task') {

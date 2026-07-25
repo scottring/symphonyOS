@@ -664,6 +664,13 @@ describe('adaptGlanceForMember', () => {
     const card = adaptGlanceForMember(member, dayWith([daily, event]), now);
     expect(card?.primary).toBe('Soccer');
   });
+
+  it("never headlines an unscheduled/untriaged task — same policy as adaptTimelineSections's rhythm zone", () => {
+    const untriaged = makeItem({
+      id: 't-someday', type: 'task', title: 'Someday task', assignedTo: 'm', startTime: null,
+    });
+    expect(adaptGlanceForMember(member, dayWith([untriaged], 'unscheduled'), now)).toBeNull();
+  });
 });
 
 // ────────────────────────────────────────────────────────────────────────────

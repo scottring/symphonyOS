@@ -24,6 +24,7 @@ import type { WallDayData } from '@/hooks/useWallData';
 import { extractRecipeNameHint, resolveRecipeUrl } from '@/lib/recipeDetection';
 import { isEverydayRoutine } from '@/lib/routineUtils';
 import { SECTIONS_ORDER } from '@/lib/today/types';
+import { PREVIEW_SECTIONS } from '@/components/wall/today/tomorrowPreview';
 
 import type {
   WallV2MemberBubble,
@@ -422,7 +423,11 @@ export function adaptGlanceForMember(
 ) {
   if (!today) return null;
   let next: TimelineItem | null = null;
-  for (const section of SECTIONS_ORDER) {
+  // PREVIEW_SECTIONS, not SECTIONS_ORDER: 'unscheduled' is an
+  // untriaged/untimed task, and a member's glance card shouldn't be
+  // headlined by one — same policy adaptTimelineSections enforces for the
+  // rhythm zone below.
+  for (const section of PREVIEW_SECTIONS) {
     for (const item of today.items[section] ?? []) {
       if (item.assignedTo !== member.id) continue;
       // Skip high-frequency routines (>4×/week — daily, or weekday-only

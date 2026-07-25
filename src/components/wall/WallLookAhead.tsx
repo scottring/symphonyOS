@@ -3,7 +3,7 @@ import type { FamilyMember } from '@/types/family'
 import type { TimelineItem } from '@/types/timeline'
 
 import { formatTime } from '@/lib/timeUtils'
-import { SECTIONS_ORDER } from '@/lib/today/types'
+import { PREVIEW_SECTIONS } from './today/tomorrowPreview'
 
 interface WallLookAheadProps {
   days: WallDayData[]
@@ -40,9 +40,11 @@ function getDayHighlights(days: WallDayData[], _familyMembers: FamilyMember[]): 
     if (day.isToday) dayLabel = 'TODAY'
     else if (i === 1) dayLabel = 'TOMORROW'
 
-    // Collect all non-routine, non-completed items across all sections
+    // Collect all non-routine, non-completed items across all sections.
+    // PREVIEW_SECTIONS, not SECTIONS_ORDER: 'unscheduled' is an
+    // untriaged/untimed task and shouldn't headline a look-ahead day.
     const items: HighlightItem[] = []
-    for (const section of SECTIONS_ORDER) {
+    for (const section of PREVIEW_SECTIONS) {
       const sectionItems = day.items[section] || []
       for (const item of sectionItems) {
         // Show tasks and events. Only show routines that are truly infrequent
