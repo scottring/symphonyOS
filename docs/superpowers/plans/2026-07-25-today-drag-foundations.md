@@ -641,3 +641,71 @@ Expected: tsc clean; suite green (baseline 4041 + this plan's new tests); build 
 **Type consistency:** `OrderWrite { id, sortOrder }` is defined in Task 2 and consumed with that exact shape by Task 3. `Task.sortOrder?: number | null` from Task 1 is what Task 2's `sortByManualOrder` and Task 3's optimistic patch both read. `GroupMemberRef` and `GroupTasksDeps` are pre-existing in `groupTasks.ts` and used unchanged in Task 4.
 
 **Known risk this plan cannot close:** nothing here is visible in the UI, so no amount of green tests proves the ordering *feels* right. That judgement arrives in Stage 2b.
+
+---
+
+## Outcome, and what Stage 2b inherits
+
+Stage 2a shipped all four tasks. The whole-branch review found **one Critical that
+every per-task review structurally could not see**, and it is worth recording
+because the same trap will recur.
+
+### The Critical: a partial `upsert` cannot work on this table
+
+The plan specified `updateTaskOrders` as
+`.upsert([{ id, sort_order }], { onConflict: 'id' })`. PostgREST renders that as
+`INSERT … ON CONFLICT DO UPDATE`, and **PostgreSQL evaluates NOT NULL constraints
+and the RLS INSERT `WITH CHECK` against the proposed tuple before probing for the
+conflict** — the row already existing does not save you. `tasks` has exactly two
+NOT NULL columns with no default, `title` and `user_id`, and supabase-js sends
+both as explicit NULLs. Verified against production with an isolated temp table:
+
+```
+ERROR: 23502: null value in column "title" … Failing row contains (1, null, 5).
+```
+
+Every call would have failed — 100% of the time, not intermittently — the moment
+Stage 2b wired it up. `defaultToNull: false` does not rescue it, because those two
+columns have no default to fall back on.
+
+**Never partial-`upsert` a row in `tasks`.** Use
+`.update({ … }).eq('id', …)` per row. `reorderTasksByDrag` returns one write in
+the common case by design, so this costs one request in the common case anyway.
+
+**The deeper lesson:** the `upsert` test double accepted any payload
+unconditionally, so two green tests passed against a payload the database rejects
+outright. The mock, not the assertion, was the thing that could not fail. The
+hardened mock now models NOT NULL, and its fidelity was proven by running the new
+tests against the *old* implementation and watching them fail.
+
+### Parked residuals — Stage 2b should handle these
+
+1. **Comment overclaims the rollback's reach.** The inline comment in
+   `updateTaskOrders` says a partial failure "must roll the whole move back, not
+   leave the list half-persisted". True of **local state only** — on a partial
+   failure the DB is genuinely half-written, and local state re-diverges when the
+   realtime echo for the succeeded rows lands. Self-healing toward DB truth, and
+   the common path is a single write, so it is acceptable — but the wording
+   should say "the local list".
+2. **`Promise.all` has no `catch`.** If a query builder ever *rejects* rather than
+   resolving `{ error }`, `updateTaskOrders` rejects with no rollback and no
+   toast. supabase-js normally resolves, and the pre-existing mutations have the
+   same shape, so this is not a regression — but the Stage 2b drop handler should
+   decide deliberately whether to wrap it.
+3. **`renormalise` rewrites only the ids it is given.** If Stage 2b passes a
+   filtered subset (domain switcher, person filter), that subset resets to
+   `0…n×1000` while unfiltered siblings keep their old values and interleave.
+   **Stage 2b must pass the full untimed set, not the rendered one.**
+4. **`existingMemberRefs` is caller-supplied** to `addToGroup`. A stale array
+   silently drops members and the function cannot defend itself. Stage 2b must
+   read it fresh at call time.
+5. `taskOrdering.ts`'s documented-unreachable defensive branch is permanently
+   uncoverable. Honest, harmless, inflates any coverage claim on that file.
+
+### Naming, so Stage 2b reaches for the right one
+
+`src/lib/today/` now holds two ordering modules with deliberately distinct names:
+`stepOrdering.ts` (`reorderByDrag`, `nextStepOrder`) renormalises 0..n-1 every
+move and is live for routine steps; `taskOrdering.ts`
+(`reorderTasksByDrag`, `nextTaskSortOrder`) is gap-based and is what Today's drag
+uses. They were briefly both called `reorderByDrag` — do not merge them.
