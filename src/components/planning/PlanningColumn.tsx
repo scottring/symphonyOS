@@ -227,9 +227,9 @@ export function PlanningColumn({
   return (
     <div
       data-testid={`day-column-${dateKey}`}
-      className={`flex-1 min-w-[200px] border-r border-neutral-200 ${
-        isToday ? 'bg-primary-50/30' : ''
-      }`}
+      className={`flex-1 border-r border-neutral-200 ${
+        dayGrain ? 'min-w-0' : 'min-w-[200px]'
+      } ${isToday ? 'bg-primary-50/30' : ''}`}
     >
       {/* Day header */}
       <div
@@ -289,6 +289,7 @@ export function PlanningColumn({
             tasks={allDayTasks}
             onChipClick={(taskId) => setRaisedId(taskId)}
             laneHeight={allDayLaneHeight(allDayTasks.length)}
+            fluid
           />
           {/* A task that still carries a clock time (written before this rung
               stopped drawing hours, or dated from Today) must NOT vanish just
@@ -447,18 +448,23 @@ interface AllDayLaneCellProps {
   onChipClick: (taskId: string) => void
   /** Uniform across the grid — the busiest day sets it (see allDayLaneHeight). */
   laneHeight: number
+  /** Day grain: size to content and never collapse into a "+N". Hiding a
+   *  placement the user just made reads as data loss. */
+  fluid?: boolean
 }
 
 // The all-day lane cell for one column. Its own component so the droppable
 // hook stays unconditional (every column always registers a lane, even with
 // zero tasks) — keeping hook usage clean rather than conditionally calling
 // useDroppable inside PlanningColumn's body.
-function AllDayLaneCell({ dateKey, tasks, onChipClick, laneHeight }: AllDayLaneCellProps) {
+function AllDayLaneCell({ dateKey, tasks, onChipClick, laneHeight, fluid = false }: AllDayLaneCellProps) {
   const { isOver, setNodeRef } = useDroppable({ id: `allday-${dateKey}` })
   const capacity = allDayLaneCapacity(laneHeight)
   // One cell short of capacity when there's a surplus, so the "+N" has a slot of
-  // its own rather than displacing a chip and undercounting.
-  const overflowing = tasks.length > capacity
+  // its own rather than displacing a chip and undercounting. In fluid (day
+  // grain) mode nothing collapses: the column IS the day's list, and hiding a
+  // placement behind a "+N" is the failure mode that reads as data loss.
+  const overflowing = !fluid && tasks.length > capacity
   const visible = overflowing ? tasks.slice(0, capacity - 1) : tasks
   const overflow = tasks.length - visible.length
 
@@ -466,10 +472,10 @@ function AllDayLaneCell({ dateKey, tasks, onChipClick, laneHeight }: AllDayLaneC
     <div
       ref={setNodeRef}
       data-testid="allday-lane"
-      style={{ height: laneHeight }}
-      className={`px-1.5 py-1 grid grid-cols-2 content-start gap-1 border-b border-neutral-200 transition-colors overflow-hidden ${
-        isOver ? 'bg-primary-100' : 'bg-neutral-50/60'
-      }`}
+      style={fluid ? { minHeight: 28 } : { height: laneHeight }}
+      className={`px-1.5 py-1 grid content-start gap-1 transition-colors ${
+        fluid ? 'grid-cols-1 rounded-md' : 'grid-cols-2 border-b border-neutral-200 overflow-hidden'
+      } ${isOver ? 'bg-primary-100' : 'bg-neutral-50/60'}`}
     >
       {visible.map((task) => (
         <AllDayChip key={task.id} task={task} onClick={() => onChipClick(task.id)} />

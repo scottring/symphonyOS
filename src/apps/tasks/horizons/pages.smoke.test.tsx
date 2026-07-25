@@ -249,7 +249,7 @@ describe('horizon pages (smoke)', () => {
     const { container } = render(<MonthPage />)
     expect(screen.queryByText('Sun')).not.toBeInTheDocument()
     expect(screen.queryByText('Mon')).not.toBeInTheDocument()
-    expect(container.querySelectorAll('[data-testid^="week-row-"]').length).toBeGreaterThanOrEqual(4)
+    expect(container.querySelectorAll('[data-testid^="week-col-"]').length).toBeGreaterThanOrEqual(4)
   })
 
   it('MonthPage masthead shows the rhythm h1 and the calendar/motion/done subtitle', () => {

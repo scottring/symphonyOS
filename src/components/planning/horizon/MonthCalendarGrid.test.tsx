@@ -31,7 +31,7 @@ describe('MonthCalendarGrid draws weeks, not days', () => {
     const { container } = render(
       <MonthCalendarGrid month={JULY} tasks={tasks} events={events} weekStartsOn={0} now={NOW} />,
     )
-    const rows = container.querySelectorAll('[data-testid^="week-row-"]')
+    const rows = container.querySelectorAll('[data-testid^="week-col-"]')
     expect(rows.length).toBeGreaterThanOrEqual(5)
     expect(rows.length).toBeLessThanOrEqual(6)
   })
@@ -50,13 +50,13 @@ describe('MonthCalendarGrid week-start ordering', () => {
   it('defaults to Sunday-first (weekStartsOn 0)', () => {
     render(<MonthCalendarGrid month={JULY} tasks={tasks} events={events} weekStartsOn={0} now={NOW} />)
     // First row of July 2026, Sunday-first, starts Sun Jun 28.
-    expect(screen.getByTestId('week-row-0')).toHaveTextContent('Jun 28')
+    expect(screen.getByTestId('week-col-0')).toHaveTextContent('Jun 28')
   })
 
   it('honors weekStartsOn 1 (Monday-first)', () => {
     render(<MonthCalendarGrid month={JULY} tasks={tasks} events={events} weekStartsOn={1} now={NOW} />)
     // Monday-first shifts the first row to Mon Jun 29.
-    expect(screen.getByTestId('week-row-0')).toHaveTextContent('Jun 29')
+    expect(screen.getByTestId('week-col-0')).toHaveTextContent('Jun 29')
   })
 })
 
@@ -72,7 +72,7 @@ describe('MonthCalendarGrid seam — Open week chip', () => {
     expect(screen.queryByText('Open week →')).not.toBeInTheDocument()
 
     // Monday-first: row 0 = Jun 29, row 1 = Jul 6, row 2 = Jul 13.
-    fireEvent.mouseEnter(screen.getByTestId('week-row-2'))
+    fireEvent.mouseEnter(screen.getByTestId('week-col-2'))
     fireEvent.click(screen.getByText('Open week →'))
 
     expect(onOpenWeek).toHaveBeenCalledTimes(1)
@@ -84,7 +84,7 @@ describe('MonthCalendarGrid seam — Open week chip', () => {
 
   it('renders no chip without onOpenWeek', () => {
     render(<MonthCalendarGrid month={JULY} tasks={tasks} events={events} weekStartsOn={1} now={NOW} />)
-    fireEvent.mouseEnter(screen.getByTestId('week-row-2'))
+    fireEvent.mouseEnter(screen.getByTestId('week-col-2'))
     expect(screen.queryByText('Open week →')).not.toBeInTheDocument()
   })
 })
@@ -105,7 +105,7 @@ describe('MonthCalendarGrid week placement', () => {
         weekStartsOn={1} onPlaceTaskInWeek={onPlaceTaskInWeek} now={NOW}
       />,
     )
-    fireEvent.drop(screen.getByTestId('week-row-2'), {
+    fireEvent.drop(screen.getByTestId('week-col-2'), {
       dataTransfer: { getData: (f: string) => (f === 'text/task-id' ? 'rock' : '') },
     })
     expect(onPlaceTaskInWeek).toHaveBeenCalledTimes(1)
@@ -125,8 +125,10 @@ describe('MonthCalendarGrid week placement', () => {
         events={events} weekStartsOn={1} onPlaceTaskInWeek={vi.fn()} now={NOW}
       />,
     )
-    expect(screen.getByText('Book the mover')).toBeInTheDocument()
-    expect(screen.getAllByText('This week')).toHaveLength(1)
+    // It lands in ITS week's column (Mon-first: Jul 13–19 is column 2), not
+    // loose on the page and not repeated across every column.
+    expect(screen.getByTestId('week-col-2')).toHaveTextContent('Book the mover')
+    expect(screen.getByTestId('week-col-1')).not.toHaveTextContent('Book the mover')
   })
 
   it('a legacy week item (no weekStart) appears in NO row — it has no week of its own', () => {
@@ -138,7 +140,6 @@ describe('MonthCalendarGrid week placement', () => {
       />,
     )
     expect(screen.queryByText('Legacy week item')).not.toBeInTheDocument()
-    expect(screen.queryByText('This week')).not.toBeInTheDocument()
   })
 
   it('the rail asks for a week — the only grain this rung accepts', () => {
@@ -160,7 +161,7 @@ describe('MonthCalendarGrid week placement', () => {
         weekStartsOn={1} onPlaceTaskInWeek={onPlaceTaskInWeek} readOnly now={NOW}
       />,
     )
-    fireEvent.drop(screen.getByTestId('week-row-2'), {
+    fireEvent.drop(screen.getByTestId('week-col-2'), {
       dataTransfer: { getData: (f: string) => (f === 'text/task-id' ? 'rock' : '') },
     })
     expect(onPlaceTaskInWeek).not.toHaveBeenCalled()
@@ -174,9 +175,9 @@ describe('MonthCalendarGrid week content', () => {
     ] as unknown as CalendarEvent[]
     render(<MonthCalendarGrid month={JULY} tasks={tasks} events={trip} weekStartsOn={1} now={NOW} />)
     // Mon-first: Jul 10 falls in row 1 (Jul 6–12), Jul 14 in row 2 (Jul 13–19).
-    expect(screen.getByTestId('week-row-1')).toHaveTextContent('Beech vacation')
-    expect(screen.getByTestId('week-row-2')).toHaveTextContent('Beech vacation')
-    expect(screen.getByTestId('week-row-0')).toHaveTextContent('nothing claimed yet')
+    expect(screen.getByTestId('week-col-1')).toHaveTextContent('Beech vacation')
+    expect(screen.getByTestId('week-col-2')).toHaveTextContent('Beech vacation')
+    expect(screen.getByTestId('week-col-0')).toHaveTextContent('nothing claimed yet')
   })
 })
 
@@ -192,7 +193,7 @@ describe('MonthCalendarGrid hideRail', () => {
     )
     expect(screen.queryByText(/Drag onto a week to place/)).not.toBeInTheDocument()
 
-    fireEvent.drop(screen.getByTestId('week-row-2'), {
+    fireEvent.drop(screen.getByTestId('week-col-2'), {
       dataTransfer: { getData: (f: string) => (f === 'text/task-id' ? 'rock' : '') },
     })
     expect(onPlaceTaskInWeek).toHaveBeenCalledTimes(1)

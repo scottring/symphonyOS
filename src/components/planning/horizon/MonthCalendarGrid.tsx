@@ -181,76 +181,63 @@ export function MonthCalendarGrid({
         </div>
       )}
 
-      <div className="rounded-2xl border border-neutral-200 overflow-hidden bg-white">
-        <div className="px-4 py-3 border-b border-neutral-100">
-          <h2 className="font-display text-lg text-neutral-800">{monthLabel}</h2>
-        </div>
+      <div>
+        <h2 className="font-display text-lg text-neutral-800 mb-2">{monthLabel}</h2>
 
-        {weeks.map((w, row) => {
-          const weekPlaced = weekMode ? placedOnWeek(w.start) : []
-          const rowDragging = weekMode && dragOverRow === row
-          const isCurrent = now >= w.start && now <= w.end
-          const isPast = w.end < now && !isCurrent
-          const rowHovered = onOpenWeek != null && hoverRow === row
-          const weekClaims = claims.filter((c) => c.start <= w.end && c.end >= w.start)
-          const claimed = claimedCount(w.start, w.end)
+        {/* One COLUMN per week. A week that holds nine items reads as a list;
+            as a wide strip it read as a smear. The column is the drop target —
+            the month rung's one decision is which week — and each column's list
+            is what the week rung then breaks into days. */}
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-2 items-start">
+          {weeks.map((w, col) => {
+            const weekPlaced = weekMode ? placedOnWeek(w.start) : []
+            const colDragging = weekMode && dragOverRow === col
+            const isCurrent = now >= w.start && now <= w.end
+            const isPast = w.end < now && !isCurrent
+            const colHovered = onOpenWeek != null && hoverRow === col
+            const weekClaims = claims.filter((c) => c.start <= w.end && c.end >= w.start)
+            const claimed = claimedCount(w.start, w.end)
 
-          return (
-            <div
-              key={w.start.toISOString()}
-              data-testid={`week-row-${row}`}
-              data-current-week={isCurrent ? 'true' : 'false'}
-              onMouseEnter={onOpenWeek ? () => setHoverRow(row) : undefined}
-              onMouseLeave={onOpenWeek ? () => setHoverRow((r) => (r === row ? null : r)) : undefined}
-              onDragOver={weekMode ? (e) => { e.preventDefault(); setDragOverRow(row) } : undefined}
-              onDragLeave={weekMode ? () => setDragOverRow((r) => (r === row ? null : r)) : undefined}
-              onDrop={weekMode ? (e) => {
-                e.preventDefault()
-                setDragOverRow(null)
-                const id = e.dataTransfer.getData('text/task-id')
-                if (!id) return
-                onPlaceTaskInWeek?.(id, w.start)
-              } : undefined}
-              className={`relative border-b border-neutral-100 last:border-b-0 transition-colors ${
-                rowDragging ? 'ring-2 ring-inset ring-primary-400 bg-primary-50/40' : ''
-              } ${isCurrent ? 'bg-primary-50/20' : ''} ${isPast ? 'opacity-60' : ''} ${
-                rowHovered && !rowDragging ? 'bg-amber-50' : ''
-              }`}
-            >
-              <div className="flex items-stretch min-h-[58px]">
-                <div className={`w-36 shrink-0 border-r px-4 py-3 ${isCurrent ? 'border-primary-100' : 'border-neutral-100'}`}>
-                  <div className="text-[12.5px] font-semibold text-neutral-800">
-                    {rangeLabel(w.start, w.end)}
-                  </div>
-                  <div className={`text-[9.5px] mt-0.5 ${isCurrent ? 'text-primary-700 font-semibold' : 'text-neutral-400'}`}>
+            return (
+              <div
+                key={w.start.toISOString()}
+                data-testid={`week-col-${col}`}
+                data-current-week={isCurrent ? 'true' : 'false'}
+                onMouseEnter={onOpenWeek ? () => setHoverRow(col) : undefined}
+                onMouseLeave={onOpenWeek ? () => setHoverRow((r) => (r === col ? null : r)) : undefined}
+                onDragOver={weekMode ? (e) => { e.preventDefault(); setDragOverRow(col) } : undefined}
+                onDragLeave={weekMode ? () => setDragOverRow((r) => (r === col ? null : r)) : undefined}
+                onDrop={weekMode ? (e) => {
+                  e.preventDefault()
+                  setDragOverRow(null)
+                  const id = e.dataTransfer.getData('text/task-id')
+                  if (!id) return
+                  onPlaceTaskInWeek?.(id, w.start)
+                } : undefined}
+                className={`relative flex min-h-[190px] flex-col rounded-xl border bg-white transition-colors ${
+                  colDragging ? 'border-primary-400 ring-2 ring-primary-300 bg-primary-50/40'
+                    : isCurrent ? 'border-primary-200' : 'border-neutral-200'
+                } ${isPast ? 'opacity-60' : ''} ${colHovered && !colDragging ? 'bg-amber-50/60' : ''}`}
+              >
+                <div className={`rounded-t-xl border-b px-3 py-2 ${isCurrent ? 'border-primary-100 bg-primary-50/40' : 'border-neutral-100 bg-neutral-50/60'}`}>
+                  <div className="text-[12px] font-semibold text-neutral-800">{rangeLabel(w.start, w.end)}</div>
+                  <div className={`mt-0.5 text-[9.5px] ${isCurrent ? 'font-semibold text-primary-700' : 'text-neutral-400'}`}>
                     {isCurrent ? 'this week' : isPast ? 'past' : 'ahead'}
+                    {claimed > 0 && <span className="text-neutral-400"> · {claimed} claimed</span>}
                   </div>
                 </div>
 
-                <div className="flex-1 min-w-0 px-4 py-3 flex flex-wrap items-center gap-2">
+                <div className="flex-1 space-y-1 p-2">
                   {weekClaims.map((c) => (
-                    <span
-                      key={c.id}
-                      className="rounded bg-primary-50 px-1.5 py-0.5 text-[10px] text-primary-700"
-                    >
+                    <div key={c.id} className="truncate rounded bg-primary-50 px-1.5 py-1 text-[10px] text-primary-700" title={c.title}>
                       {c.title}
-                    </span>
+                    </div>
                   ))}
-                  <span className="text-[10.5px] text-neutral-400">
-                    {claimed === 0 ? 'nothing claimed yet' : `${claimed} already claimed`}
-                  </span>
-                  {weekMode && !isPast && weekPlaced.length === 0 && (
-                    <span className="ml-auto text-[10px] italic text-primary-600/70">drop a move here</span>
-                  )}
-                </div>
-              </div>
 
-              {/* The week's lane: placed on this week, no day yet. Without it a
-                  dropped rock would have no date and no shelf — it would vanish,
-                  and vanishing reads as data loss. */}
-              {weekPlaced.length > 0 && (
-                <div className="flex flex-wrap items-center gap-1.5 border-t border-neutral-100 bg-primary-50/30 px-4 py-1.5">
-                  <span className="text-[10px] font-medium uppercase tracking-wide text-primary-700/70 shrink-0">This week</span>
+                  {/* Placed on this week, no day yet — what the week rung will
+                      break into days. Without this a dropped rock would have no
+                      date and no shelf: it would vanish, and vanishing reads as
+                      data loss. */}
                   {weekPlaced.map((t) => (
                     <PlacementChip
                       key={t.id}
@@ -260,26 +247,31 @@ export function MonthCalendarGrid({
                       kind="task"
                       draggable={!readOnly}
                       onClick={() => onSelectTask?.(t.id)}
+                      wrap
                     />
                   ))}
-                </div>
-              )}
 
-              {rowHovered && (
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onOpenWeek?.(w.start)
-                  }}
-                  className="absolute top-2 right-3 z-10 inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-md bg-amber-100 text-amber-800 border border-amber-200 shadow-sm hover:bg-amber-200 transition-colors"
-                >
-                  Open week →
-                </button>
-              )}
-            </div>
-          )
-        })}
+                  {weekMode && weekPlaced.length === 0 && !isPast && (
+                    <p className="px-1 pt-1 text-[10px] italic text-primary-600/60">drop a move here</p>
+                  )}
+                  {weekPlaced.length === 0 && weekClaims.length === 0 && claimed === 0 && (
+                    <p className="px-1 pt-1 text-[10px] text-neutral-300">nothing claimed yet</p>
+                  )}
+                </div>
+
+                {colHovered && (
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); onOpenWeek?.(w.start) }}
+                    className="absolute right-2 top-2 z-10 inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-100 px-2 py-1 text-[11px] font-medium text-amber-800 shadow-sm transition-colors hover:bg-amber-200"
+                  >
+                    Open week →
+                  </button>
+                )}
+              </div>
+            )
+          })}
+        </div>
       </div>
     </div>
   )

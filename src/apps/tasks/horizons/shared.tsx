@@ -18,7 +18,7 @@ import { useNavigate } from 'react-router-dom';
 import { Target, Plus, ChevronRight, Check } from 'lucide-react';
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
 import { useSharpenBet } from '@/hooks/useSharpenBet';
-import { useGoogleCalendar } from '@/hooks/useGoogleCalendar';
+import { useGoogleCalendar, type CalendarEvent } from '@/hooks/useGoogleCalendar';
 import { useEventNotes } from '@/hooks/useEventNotes';
 import { useContacts } from '@/hooks/useContacts';
 import { useProjects } from '@/hooks/useProjects';
@@ -127,30 +127,46 @@ export function useHorizonPageData(horizon: HorizonId, anchorDate?: Date) {
   const {
     tasks, addTask, toggleTask, toggleWaiting, deleteTask, updateTask, updateTasksBulk, pushTask, setBucket,
   } = useSupabaseTasks();
-  const { events, fetchEvents } = useGoogleCalendar();
+  const { events, fetchEvents, isConnected: calendarConnected } = useGoogleCalendar();
 
-  // Every horizon page reads the SAME events array, and fetchEvents REPLACES
-  // it wholesale. The only page-side caller is the shell (useShellChrome.ts),
-  // which loads today→+7d — so before this effect the year page drew twelve
-  // months out of one week of calendar, the season page three months out of
-  // the same week, and the new ribbon would have shipped beautiful and empty.
+  // Each rung needs its OWN span of calendar. The shell (useShellChrome.ts) only
+  // ever loads today→+7d, so before this the year page drew twelve months out of
+  // one week and the ribbon would have shipped beautiful and empty.
   //
-  // Each rung now loads its own span on mount, exactly the way the wizard's
-  // CalendarStep / PlaceOnWeeksStep / ScheduleGridStep already do. That is the
-  // whole reason the guided session has always looked richer than the page it
-  // mirrors.
+  // But fetchEvents REPLACES the app-wide provider cache as a side effect (it's
+  // shared with Today's timeline), so a rung that merely called it would (a) get
+  // clobbered by whichever fetch resolved last — the shell's week and this one
+  // race on mount — and (b) leave Today holding a year of events. Verified on
+  // 5173: the endpoint returned 291 events for the year while the page rendered
+  // August as empty, because the shell's 8-event week landed second.
+  //
+  // So keep this rung's own copy, exactly as CalendarStep does for the same
+  // reason, and fall back to the shared array until it arrives.
+  const [periodEvents, setPeriodEvents] = useState<CalendarEvent[] | null>(null);
   const guidedHorizon = horizon === 'year' ? 'annual'
     : horizon === 'season' ? 'seasonal'
     : horizon === 'month' ? 'monthly'
     : horizon === 'week' ? 'weekly'
     : null;
+  // Keyed on calendarConnected, not just mount: the provider re-validates the
+  // Google connection asynchronously, so a mount-time fetch returns [] and the
+  // rung would be stranded on that empty snapshot forever — past weeks reading
+  // "nothing claimed yet" while the calendar holds a trip. Same guard
+  // CalendarStep uses, and the same reason.
   useEffect(() => {
-    if (!guidedHorizon) return;
+    if (!guidedHorizon || !calendarConnected) return;
+    let cancelled = false;
     const { start, end } = guidedPeriod(guidedHorizon);
-    void fetchEvents(start, end);
-  }, [guidedHorizon, fetchEvents]);
+    // Promise.resolve wrap: fetchEvents returns [] synchronously when the
+    // calendar isn't connected, and test doubles return undefined.
+    void Promise.resolve(fetchEvents(start, end)).then((result) => {
+      if (!cancelled && Array.isArray(result)) setPeriodEvents(result);
+    });
+    return () => { cancelled = true; };
+  }, [guidedHorizon, fetchEvents, calendarConnected]);
+  const rungEvents = periodEvents ?? events;
   // Event ids opt in to auto-loaded, realtime event notes (see useEventNotes)
-  const visibleEventIds = useMemo(() => events.map((e) => e.google_event_id || e.id), [events]);
+  const visibleEventIds = useMemo(() => rungEvents.map((e) => e.google_event_id || e.id), [rungEvents]);
   const { notes: eventNotesMap, updateEventAssignment, updateEventAssignmentAll, updateEventContext, updateEventProject } = useEventNotes(visibleEventIds);
   const { contacts, contactsMap, addContact, searchContacts } = useContacts();
   const { projects, projectsMap, addProject, deleteProject } = useProjects();
@@ -384,8 +400,8 @@ export function useHorizonPageData(horizon: HorizonId, anchorDate?: Date) {
   // Events on the month/year calendar grids scope to the current domain just
   // like tasks — otherwise work-calendar events leak into Family/Personal.
   const domainEvents = useMemo(
-    () => filterEventsForDomain(events, currentDomain, { eventContextOverrides, getDomainForCalendar, eventNotesMap }),
-    [events, currentDomain, eventContextOverrides, getDomainForCalendar, eventNotesMap],
+    () => filterEventsForDomain(rungEvents, currentDomain, { eventContextOverrides, getDomainForCalendar, eventNotesMap }),
+    [rungEvents, currentDomain, eventContextOverrides, getDomainForCalendar, eventNotesMap],
   );
 
   // Fresh domain tasks for the add callback's auto-pick count (a plain dep

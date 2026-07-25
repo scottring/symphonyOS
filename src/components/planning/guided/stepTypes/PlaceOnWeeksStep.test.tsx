@@ -31,7 +31,7 @@ describe('PlaceOnWeeksStep', () => {
     renderStep(<PlaceOnWeeksStep />, { step, host })
     // The step renders the same week strips /month does — drop on a ROW, which
     // is the only grain this rung accepts.
-    fireEvent.drop(screen.getByTestId('week-row-2'), {
+    fireEvent.drop(screen.getByTestId('week-col-2'), {
       dataTransfer: { getData: () => 'm1' },
     })
     expect(host.onUpdateTask).toHaveBeenCalledTimes(1)

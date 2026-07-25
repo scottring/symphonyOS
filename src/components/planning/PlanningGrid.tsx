@@ -81,7 +81,10 @@ export function PlanningGrid({
 
   return (
     <div className="flex-1 overflow-auto">
-      <div className="flex min-w-max">
+      {/* Day grain has no hour rail to make room for, so seven columns fit the
+          width — min-w-max would force a horizontal scrollbar and hide half the
+          week, which is the one thing a week view must not do. */}
+      <div className={dayGrain ? 'flex w-full' : 'flex min-w-max'}>
         {/* Time labels column — absent in day grain: there is no hour axis to
             label when the day is the unit being placed into. */}
         {!dayGrain && (
