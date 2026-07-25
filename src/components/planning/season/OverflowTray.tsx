@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Star, CornerRightDown, Archive, Trash2, Repeat, ChevronRight, ChevronDown, Sparkles, Check, RotateCw, Pencil } from 'lucide-react'
 import { SeasonMoveSuggestions } from '@/components/planning/SeasonMoveSuggestions'
-import { useBenchAudit } from '@/hooks/useBenchAudit'
+import { useShelfAudit } from '@/hooks/useShelfAudit'
 import type { Task } from '@/types/task'
 import { PICK_CAP } from '@/lib/planning/betPulse'
 
@@ -10,7 +10,7 @@ import { PICK_CAP } from '@/lib/planning/betPulse'
  *  gesture replaces a current pick. The other exits re-grade or retire.
  *  `collapsible` renders it as a closed drawer (season-spread bottom) —
  *  subordinate by interaction, not just by muting. */
-export function OverflowTray({ items, picks, onPick, onSwap, onMakeMove, onShelf, onLetGo, onRename, onMakeGoal, onFirstMove, onShelfLinked, onApplySlate, onFileUnder, goals, collapsible = false }: {
+export function OverflowTray({ items, picks, onPick, onSwap, onMakeMove, onPutAside, onLetGo, onRename, onMakeGoal, onFirstMove, onPutAsideLinked, onApplySlate, onFileUnder, goals, collapsible = false }: {
   items: readonly Task[]
   /** Current picks, for the at-cap swap picker. */
   picks: readonly Task[]
@@ -20,10 +20,10 @@ export function OverflowTray({ items, picks, onPick, onSwap, onMakeMove, onShelf
   onFileUnder?: (id: string, goalId: string) => void
   /** Active goals to file under, in menu order. */
   goals?: readonly { id: string; name: string }[]
-  /** Swap: benchId becomes a pick, replacedPickId returns to the bench. */
-  onSwap: (benchId: string, replacedPickId: string) => void
+  /** Swap: shelfId becomes a pick, replacedPickId returns to the shelf. */
+  onSwap: (shelfId: string, replacedPickId: string) => void
   onMakeMove: (id: string) => void
-  onShelf: (id: string) => void
+  onPutAside: (id: string) => void
   onLetGo: (id: string) => void
   /** Apply an audit rewrite: replace the item's title (user-confirmed). */
   onRename?: (id: string, title: string) => void
@@ -32,8 +32,8 @@ export function OverflowTray({ items, picks, onPick, onSwap, onMakeMove, onShelf
   onMakeGoal?: (id: string, title: string) => Promise<string | null>
   /** Turn the original item INTO the goal's first season move. */
   onFirstMove?: (id: string, goalId: string, moveText: string) => void
-  /** Skip the first move: shelf the item with the goal link stamped. */
-  onShelfLinked?: (id: string, goalId: string) => void
+  /** Skip the first move: put the item aside (Someday) with the goal link stamped. */
+  onPutAsideLinked?: (id: string, goalId: string) => void
   /** Apply the audit's recommended slate: these ids become the picks. */
   onApplySlate?: (ids: string[]) => void
   collapsible?: boolean
@@ -50,7 +50,7 @@ export function OverflowTray({ items, picks, onPick, onSwap, onMakeMove, onShelf
   const [goalError, setGoalError] = useState<{ taskId: string; message: string } | null>(null)
   const auditItems = useMemo(() => items.map((t) => ({ id: t.id, title: t.title })), [items])
   const auditPicks = useMemo(() => picks.map((t) => ({ id: t.id, title: t.title })), [picks])
-  const { audit, reauditAll, markReady, results, slate, uncachedCount, loading: auditing, error: auditError } = useBenchAudit(auditItems, auditPicks)
+  const { audit, reauditAll, markReady, results, slate, uncachedCount, loading: auditing, error: auditError } = useShelfAudit(auditItems, auditPicks)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editDraft, setEditDraft] = useState('')
   const titleById = useMemo(() => new Map([...items, ...picks].map((t) => [t.id, t.title])), [items, picks])
@@ -80,7 +80,7 @@ export function OverflowTray({ items, picks, onPick, onSwap, onMakeMove, onShelf
       {!open ? null : (<>
       <div className="flex items-center gap-3 mt-0.5 mb-3">
         <p className="text-[12px] text-neutral-400">
-          A season holds 5–8 picks. Pick one up, turn it into a month move, shelf it, or let it go.
+          A season holds at most {PICK_CAP} picks. Pick one up, turn it into a month move, put it aside, or let it go.
         </p>
         <button type="button"
           onClick={() => void (uncachedCount > 0 ? audit() : reauditAll())}
@@ -195,7 +195,7 @@ export function OverflowTray({ items, picks, onPick, onSwap, onMakeMove, onShelf
                 className="shrink-0 inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-md text-primary-700 bg-primary-50 hover:bg-primary-100 transition-colors">
                 <CornerRightDown aria-hidden="true" className="w-3 h-3" /> Month move
               </button>
-              <button type="button" onClick={() => onShelf(t.id)}
+              <button type="button" onClick={() => onPutAside(t.id)}
                 className="shrink-0 inline-flex items-center gap-1 text-[11px] font-medium px-2 py-1 rounded-md text-neutral-500 hover:bg-neutral-100 transition-colors">
                 <Archive aria-hidden="true" className="w-3 h-3" /> Put aside
               </button>
@@ -250,7 +250,7 @@ export function OverflowTray({ items, picks, onPick, onSwap, onMakeMove, onShelf
                     </button>
                   )}
                   {v.verdict === 'goal' && (
-                    <button type="button" onClick={() => onShelf(t.id)}
+                    <button type="button" onClick={() => onPutAside(t.id)}
                       className="inline-flex items-center gap-1 font-medium text-neutral-500 hover:text-neutral-700 transition-colors">
                       <Archive aria-hidden="true" className="w-3 h-3" /> Put it aside
                     </button>
@@ -273,7 +273,7 @@ export function OverflowTray({ items, picks, onPick, onSwap, onMakeMove, onShelf
             )}
             {/* Goal conversion step 2 — the goal exists; the item becomes its
                 first season-sized move (or shelves, linked, if skipped). */}
-            {goalFlow?.taskId === t.id && onFirstMove && onShelfLinked && (
+            {goalFlow?.taskId === t.id && onFirstMove && onPutAsideLinked && (
               <div className="mt-2 rounded-md border border-violet-100 bg-violet-50/40 px-3 py-2">
                 <p className="text-[11px] font-medium text-violet-800 mb-1.5">
                   Goal created. What's the first season-sized move on "{t.title}"?
@@ -287,8 +287,8 @@ export function OverflowTray({ items, picks, onPick, onSwap, onMakeMove, onShelf
                         onFirstMove(t.id, goalFlow.goalId, moveDraft.trim()); setGoalFlow(null)
                       }
                       // Escape only closes the prompt — it must never shelf as
-                      // a side effect of dismissing. "Shelf instead" below is
-                      // the only path to onShelfLinked.
+                      // a side effect of dismissing. "Put aside instead" below is
+                      // the only path to onPutAsideLinked.
                       if (e.key === 'Escape') setGoalFlow(null)
                     }}
                     aria-label="First season-sized move"
@@ -300,9 +300,9 @@ export function OverflowTray({ items, picks, onPick, onSwap, onMakeMove, onShelf
                     Make it the first move
                   </button>
                   <button type="button"
-                    onClick={() => { onShelfLinked(t.id, goalFlow.goalId); setGoalFlow(null) }}
+                    onClick={() => { onPutAsideLinked(t.id, goalFlow.goalId); setGoalFlow(null) }}
                     className="shrink-0 text-xs px-2 py-1.5 text-neutral-500 hover:text-neutral-700 transition-colors">
-                    Shelf instead
+                    Put aside instead
                   </button>
                 </div>
                 <SeasonMoveSuggestions goalName={t.title} onPick={setMoveDraft} />

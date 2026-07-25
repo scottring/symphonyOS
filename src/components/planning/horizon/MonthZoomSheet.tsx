@@ -20,12 +20,16 @@ interface MonthZoomSheetProps {
   onClose: () => void
   readOnly?: boolean
   onPlaceTask?: (taskId: string, day: Date) => void
+  /** Week-mode placement (the cascade's month rung: a drop chooses a WEEK, not
+   *  a day). When given, the grid runs in week mode and takes precedence over
+   *  onPlaceTask — the year page's month peek places exactly like /month. */
+  onPlaceTaskInWeek?: (taskId: string, weekStart: Date) => void
   onUnscheduleTask?: (taskId: string) => void
   onSelectTask?: (taskId: string) => void
 }
 
 export function MonthZoomSheet({
-  month, tasks, events, onClose, readOnly = false, onPlaceTask, onUnscheduleTask, onSelectTask,
+  month, tasks, events, onClose, readOnly = false, onPlaceTask, onPlaceTaskInWeek, onUnscheduleTask, onSelectTask,
 }: MonthZoomSheetProps) {
   // Escape closes — matches the app's other overlays.
   useEffect(() => {
@@ -64,6 +68,7 @@ export function MonthZoomSheet({
           events={events}
           readOnly={readOnly}
           onPlaceTask={onPlaceTask}
+          onPlaceTaskInWeek={onPlaceTaskInWeek}
           onUnscheduleTask={onUnscheduleTask}
           onSelectTask={onSelectTask}
         />

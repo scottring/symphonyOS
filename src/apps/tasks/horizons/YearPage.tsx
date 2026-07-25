@@ -18,9 +18,11 @@ import type { Task } from '@/types/task';
 import type { Goal } from '@/types/goal';
 import { CascadeRail, useHorizonPageData } from './shared';
 
-// A year goal on the Year rung, with its cascade roll-up: every task anywhere
+// A year goal on the Year rung, with its cascade roll-up: every LEAF task
 // that carries this goal's id (goal_id thread, stamped on promotion and
-// inherited by copies). No moves yet = a quiet invitation, not a zero.
+// inherited by copies; a task that has been copied further down is a rung of
+// the descent, not a move — see goalRollup). No moves yet = a quiet
+// invitation, not a zero.
 //
 // `seasonPicks` is THIS domain's picks that thread to this goal (computed by
 // the parent from domainTasks) — the read side of the season↔year thread. One
@@ -139,8 +141,14 @@ export function YearPage() {
             tasks={domainTasks}
             events={domainEvents}
             onClose={() => setZoomMonth(null)}
-            onPlaceTask={(id, day) => updateTask(id, { bucket: 'timed', scheduledFor: day })}
-            onUnscheduleTask={(id) => updateTask(id, { bucket: 'month', scheduledFor: undefined })}
+            // The zoomed month places the way /month places: onto a WEEK. The
+            // old day-level drop here skipped the week rung AND omitted
+            // isAllDay, so a midnight drop rendered at the 12 AM row — written
+            // and invisible (the bug bb7bc0ea fixed on the week grid).
+            onPlaceTaskInWeek={(id, weekStart) => updateTask(id, {
+              bucket: 'week', weekStart, scheduledFor: undefined, isAllDay: false,
+            })}
+            onUnscheduleTask={(id) => updateTask(id, { bucket: 'month', scheduledFor: undefined, weekStart: undefined })}
             onSelectTask={handleSelect}
           />
         )}

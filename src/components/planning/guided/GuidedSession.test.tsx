@@ -36,7 +36,7 @@ function makeHost(): GuidedHost {
   return {
     tasks: [], tasksLoading: false, events: [], calendarConnected: false,
     fetchEvents: vi.fn(async () => {}), createEvent: vi.fn(async () => {}),
-    onPushTask: vi.fn(), onSetBucket: vi.fn(), onCompleteTask: vi.fn(), onUpdateTask: vi.fn(),
+    onPushTask: vi.fn(), onSetBucket: vi.fn(), onCompleteTask: vi.fn(), onDeleteTask: vi.fn(), onUpdateTask: vi.fn(),
     createTaskInBucket: vi.fn(async () => {}), createDatedTask: vi.fn(async () => {}),
     goals: [], goalAreas: [], addGoal: vi.fn(async () => null), addArea: vi.fn(async () => null),
     updateGoalStatus: vi.fn(async () => {}),

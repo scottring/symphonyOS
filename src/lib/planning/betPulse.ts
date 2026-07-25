@@ -3,7 +3,7 @@
 // Pure derivations for the season page (spec 2026-07-20, revised 2026-07-21:
 // UI word is "picks" and picking is EXPLICIT). A pick is an open
 // bucket='quarter' task the user chose (pickedAt set); everything else in the
-// quarter bucket sits on the bench (pickedAt null). PICK_CAP is a soft cap —
+// quarter bucket sits on the shelf (pickedAt null). PICK_CAP is a soft cap —
 // promoting at the cap goes through a swap. A pick's pulse is whether each
 // season month has moves threading to it; a pick with nothing in the CURRENT
 // month is starving.
@@ -14,16 +14,16 @@ import { SEASON_NAMES, seasonIndex, seasonStart } from '@/lib/cadence/periods'
 export const PICK_CAP = 10
 
 /** Open-quarter partition: picks (chosen, by when they were picked) and the
- *  bench (unchosen, oldest first — the order they piled up). */
-export function partitionSeason(tasks: readonly Task[]): { picks: Task[]; bench: Task[] } {
+ *  shelf (unchosen, oldest first — the order they piled up). */
+export function partitionSeason(tasks: readonly Task[]): { picks: Task[]; shelf: Task[] } {
   const open = tasks.filter((t) => !t.completed && t.bucket === 'quarter')
   const picks = open
     .filter((t) => !!t.pickedAt)
     .sort((a, b) => new Date(a.pickedAt as Date).getTime() - new Date(b.pickedAt as Date).getTime())
-  const bench = open
+  const shelf = open
     .filter((t) => !t.pickedAt)
     .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
-  return { picks, bench }
+  return { picks, shelf }
 }
 
 /** Month-level partition, one altitude down: this month's open moves filed
@@ -114,7 +114,7 @@ export function servingCount(tasks: readonly Task[], now: Date = new Date()): { 
 }
 
 /** The goal's story across seasons — one row per PICK that served it, labeled
- *  by the season it was picked in. Bench items don't make the story: chapters
+ *  by the season it was picked in. Shelf items don't make the story: chapters
  *  are what you chose, not what you piled up. */
 export function goalChapters(goalId: string, tasks: readonly Task[]) {
   return tasks

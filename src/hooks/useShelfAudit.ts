@@ -1,7 +1,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 
-export interface BenchAuditResult {
+export interface ShelfAuditResult {
   id: string
   verdict: 'ready' | 'rephrase' | 'month' | 'goal'
   suggestion?: string
@@ -10,7 +10,7 @@ export interface BenchAuditResult {
   reason: string
 }
 
-type CacheEntry = BenchAuditResult & {
+type CacheEntry = ShelfAuditResult & {
   /** The exact title the verdict was computed for — a rename invalidates it. */
   title: string
 }
@@ -29,6 +29,9 @@ function fingerprintOf(items: readonly { id: string; title: string }[]): string 
   return items.map((i) => `${i.id}:${i.title}`).sort().join('|')
 }
 
+// The storage keys keep the old "bench" name on purpose: renaming them would
+// silently discard every cached verdict (each one an API call already paid
+// for). The product word is shelf; the key is just an address.
 const SLATE_KEY = 'symphony.benchAudit.slate.v1'
 
 function loadSlate(): SlateEntry | null {
@@ -65,11 +68,11 @@ function persistCache(cache: Record<string, CacheEntry>) {
 }
 
 /**
- * On-demand bench audit with a persistent per-item cache. `audit()` sends
+ * On-demand shelf audit with a persistent per-item cache. `audit()` sends
  * ONLY items without a valid cached verdict (new or renamed); `reauditAll()`
  * forces a fresh pass. Verdict application stays tap-to-write on the caller.
  */
-export function useBenchAudit(items: readonly { id: string; title: string }[], picks: readonly { id: string; title: string }[] = []) {
+export function useShelfAudit(items: readonly { id: string; title: string }[], picks: readonly { id: string; title: string }[] = []) {
   const [cache, setCache] = useState<Record<string, CacheEntry>>(loadCache)
   const [slateEntry, setSlateEntry] = useState<SlateEntry | null>(loadSlate)
   const [loading, setLoading] = useState(false)
@@ -83,7 +86,7 @@ export function useBenchAudit(items: readonly { id: string; title: string }[], p
 
   /** Valid cached verdicts for the CURRENT items (title must still match). */
   const results = useMemo(() => {
-    const m = new Map<string, BenchAuditResult>()
+    const m = new Map<string, ShelfAuditResult>()
     for (const it of items) {
       const e = cache[it.id]
       if (e && e.title === it.title) m.set(it.id, e)
@@ -105,7 +108,7 @@ export function useBenchAudit(items: readonly { id: string; title: string }[], p
         body: { mode: 'audit', items: targets, picks, wantSlate },
       })
       if (fnError) throw fnError
-      const payload = data as { results?: BenchAuditResult[]; slate?: AuditSlate | null } | null
+      const payload = data as { results?: ShelfAuditResult[]; slate?: AuditSlate | null } | null
       const list = payload?.results
       if (!Array.isArray(list)) throw new Error('no results')
       const titleById = new Map(targets.map((t) => [t.id, t.title]))

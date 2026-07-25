@@ -53,7 +53,7 @@ export function ListSuggestions({ bucket, aboveItems, aboveLabel, existingItems 
   aboveItems: string[]
   /** Human label for the level above, e.g. "your season list". */
   aboveLabel: string
-  /** Titles already on THIS level (list, picks, bench) — suggestions must not
+  /** Titles already on THIS level (list, picks, shelf) — suggestions must not
    *  duplicate or near-duplicate these. */
   existingItems?: string[]
   /** Handles a tapped chip. In WriteListStep this FILLS the input (human edits

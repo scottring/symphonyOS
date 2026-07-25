@@ -159,7 +159,7 @@ export function GuidedSession({ horizon, domain, host, onClose, onFinished, onCh
   // the 680px reading column overflows and can't show more than a sliver of the
   // week (walkthrough #10, #16). Give them a wide container; the title/narration
   // stay at reading width inside it.
-  const wideStep = step.type === 'calendar' || step.type === 'schedule-grid'
+  const wideStep = step.type === 'calendar' || step.type === 'schedule-grid' || step.type === 'place-on-weeks'
 
   // The descent: session progress drives the scene camera and the altimeter.
   // On step 1 you're at this horizon's highest point; Finish is the doorstep.

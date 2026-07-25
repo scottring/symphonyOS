@@ -144,7 +144,7 @@ export function WriteListStep() {
           {pool.length} of ~{softCap}{over ? ' — a list you believe beats a list you admire' : ''}
         </p>
       )}
-      {/* The picks cap, live: writing is unlimited (the bench absorbs it), but
+      {/* The picks cap, live: writing is unlimited (the shelf absorbs it), but
           only PICK_CAP get picked. Never blocks — just names the shape. */}
       {step.props?.rows === 'bets' && (
         <p className={`text-[11px] mb-2 ${pool.length > PICK_CAP ? 'text-amber-700 font-medium' : 'text-neutral-400'}`}>

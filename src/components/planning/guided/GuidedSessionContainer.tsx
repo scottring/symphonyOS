@@ -50,7 +50,7 @@ export function buildAddTaskOptions(
 }
 
 export function GuidedSessionContainer({ horizon, onClose, onFinished, onChain, onScheduleRoutine }: Props) {
-  const { tasks, loading: tasksLoading, addTask, toggleTask, updateTask, pushTask, setBucket } = useSupabaseTasks()
+  const { tasks, loading: tasksLoading, addTask, toggleTask, updateTask, pushTask, setBucket, deleteTask } = useSupabaseTasks()
   const { isConnected, isLoading: calendarChecking, events, fetchEvents, createEvent } = useGoogleCalendar()
   const { areas, goals, addGoal, addArea, updateGoal } = useGoalsContext()
   const { projects, projectsMap } = useProjects()
@@ -135,7 +135,7 @@ export function GuidedSessionContainer({ horizon, onClose, onFinished, onChain, 
     tasks: domainTasks, tasksLoading,
     events: domainEvents, calendarConnected: isConnected, calendarChecking,
     fetchEvents: domainFetchEvents, createEvent,
-    onPushTask: pushTaskStamped, onSetBucket: setBucketStamped, onCompleteTask: toggleTask, onUpdateTask: updateTask,
+    onPushTask: pushTaskStamped, onSetBucket: setBucketStamped, onCompleteTask: toggleTask, onDeleteTask: deleteTask, onUpdateTask: updateTask,
     createTaskInBucket, createDatedTask,
     // projectsMap stays UNFILTERED — it's the name-lookup for task rows, and a
     // domain task may live in an untagged project.
@@ -150,7 +150,7 @@ export function GuidedSessionContainer({ horizon, onClose, onFinished, onChain, 
     onScheduleRoutine,
     getRoutinesForDate: domainGetRoutinesForDate,
     upkeepItems, upkeepLoading, ensureUpkeepList,
-  }), [domainTasks, tasksLoading, domainEvents, isConnected, calendarChecking, domainFetchEvents, createEvent, pushTaskStamped, setBucketStamped, toggleTask, updateTask, createTaskInBucket, createDatedTask, domainProjects, projectsMap, domainGoals, areas, addGoal, addArea, updateGoal, domainRoutines, onScheduleRoutine, domainGetRoutinesForDate, currentDomain, upkeepItems, upkeepLoading, ensureUpkeepList])
+  }), [domainTasks, tasksLoading, domainEvents, isConnected, calendarChecking, domainFetchEvents, createEvent, pushTaskStamped, setBucketStamped, toggleTask, deleteTask, updateTask, createTaskInBucket, createDatedTask, domainProjects, projectsMap, domainGoals, areas, addGoal, addArea, updateGoal, domainRoutines, onScheduleRoutine, domainGetRoutinesForDate, currentDomain, upkeepItems, upkeepLoading, ensureUpkeepList])
 
   return <GuidedSession horizon={horizon} domain={currentDomain} host={host} onClose={onClose} onFinished={onFinished} onChain={onChain} />
 }

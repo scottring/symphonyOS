@@ -47,8 +47,8 @@ export function PickByGoalStep() {
   // The shelf: open quarter items you wrote down but haven't chosen yet.
   // Excludes items demoted this session — those live in the set-aside tray.
   const shelf = useMemo(
-    () => season.bench.filter((b) => !setAsideIds.includes(b.id)),
-    [season.bench, setAsideIds],
+    () => season.shelf.filter((b) => !setAsideIds.includes(b.id)),
+    [season.shelf, setAsideIds],
   )
   const picksByGoal = useMemo(() => {
     const m = new Map<string, Task[]>()

@@ -15,7 +15,7 @@ import { CalendarRange } from 'lucide-react';
 import { ScheduleActionsProvider } from '@/contexts/ScheduleActionsContext';
 import { UndoToast } from '@/components/undo/UndoToast';
 import { HorizonExplainer } from '@/components/planning/explainers/HorizonExplainer';
-import { servingCount } from '@/lib/planning/betPulse';
+import { servingCount, partitionSeason } from '@/lib/planning/betPulse';
 import { monthShelfGroups } from '@/lib/planning/monthGroups';
 import { readCadenceConfig } from '@/lib/cadence/config';
 import { useTendWeek } from '@/hooks/useTendWeek';
@@ -49,8 +49,8 @@ export function MonthPage() {
     explainerOpen, setExplainerOpen, label,
     draft, setDraft, submitDraft,
     scheduleActionsValue, undo, referenceFold,
-    setBucket, deleteTaskWithUndo, projectsMap, tasksById,
-    addTask, deleteTask, pushTask, todayStart,
+    setBucket, deleteTaskWithUndo, projectsMap, tasksById, goalsById,
+    addTask, deleteTask, toggleTask, pushTask, todayStart,
   } = useHorizonPageData(horizon);
 
   // Placed-this-month count for the masthead subtitle — no existing selector
@@ -185,6 +185,27 @@ export function MonthPage() {
     [pool, domainTasks, projectsMap],
   );
 
+  // File a shelf move under a season pick, from the page — the wizard's
+  // move-by-pick step was the only place this thread could be tied; now the
+  // pill's fate menu ties it too. Threads BOTH sourceId (precise pick
+  // attribution) and goalId (goal roll-up), exactly like MoveByPickStep.
+  const seasonPicks = useMemo(() => partitionSeason(domainTasks).picks, [domainTasks]);
+  const fileUnder = useMemo(() => {
+    if (seasonPicks.length === 0) return undefined;
+    return {
+      picks: seasonPicks.map((p) => ({
+        id: p.id,
+        title: p.title,
+        goalName: p.goalId ? goalsById.get(p.goalId)?.name : undefined,
+      })),
+      onFile: (taskId: string, pickId: string) => {
+        const pick = seasonPicks.find((p) => p.id === pickId);
+        if (!pick) return;
+        void updateTask(taskId, { sourceId: pick.id, goalId: pick.goalId });
+      },
+    };
+  }, [seasonPicks, goalsById, updateTask]);
+
   return (
     <ScheduleActionsProvider value={scheduleActionsValue}>
       <div className="h-full overflow-y-auto">
@@ -239,11 +260,12 @@ export function MonthPage() {
               projectsMap={projectsMap}
               tasksById={tasksById}
               onOpenTask={(id) => scheduleActionsValue.onOpenTask?.(id)}
-              onSetBucket={(id, bucket) => setBucket(id, bucket)}
+              onSetBucket={setBucket}
               onDeleteTask={deleteTaskWithUndo}
               onPushTask={pushTask}
+              onCompleteTask={toggleTask}
+              fileUnder={fileUnder}
               onNativeUnschedule={(id) => updateTask(id, { bucket: 'month', scheduledFor: undefined })}
-              moveDown={{ label: 'To week', bucket: 'week' }}
               draft={draft}
               onDraftChange={setDraft}
               onSubmitDraft={() => void submitDraft()}

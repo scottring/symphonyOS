@@ -16,16 +16,17 @@
 // DndShelfFrame (the dnd-kit hook callers) are therefore mounted exclusively
 // in dndkit mode — PlanningShelf itself calls no dnd-kit hooks.
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { useDraggable, useDroppable } from '@dnd-kit/core'
 import {
-  Sparkles, Plus, MoreHorizontal, X, GitMerge, Archive,
+  Sparkles, Plus, X, GitMerge, Archive,
   CornerRightDown, CalendarClock, Loader2, ChevronRight, ChevronDown,
 } from 'lucide-react'
-import type { Task } from '@/types/task'
+import type { Task, TaskBucket } from '@/types/task'
 import type { TendState } from '@/hooks/useTendWeek'
 import type { TendProposal } from '@/lib/tend/types'
-import { PushDropdown } from '@/components/triage'
+import { TaskFateMenu } from '@/components/schedule/TaskFateMenu'
+import { applyTriageWhen } from '@/lib/triage/applyWhen'
 
 export const SHELF_COLLAPSED_COUNT = 8
 
@@ -44,9 +45,19 @@ export interface PlanningShelfProps {
   projectsMap: Map<string, { id: string; name: string }>
   tasksById: Map<string, Task>
   onOpenTask: (id: string) => void
-  onSetBucket: (id: string, bucket: 'week' | 'month' | 'someday') => void
+  onSetBucket: (id: string, bucket: TaskBucket) => void
   onDeleteTask: (id: string) => void
   onPushTask: (id: string, target: Date | 'week' | 'month' | 'quarter') => void
+  /** Done is a first-class fate on the shelf — the week and the month are
+   *  where finished things most often get noticed. */
+  onCompleteTask: (id: string) => void
+  /** Month page only: file a shelf move under a season pick (threads
+   *  sourceId/goalId at the caller) — the page-side twin of the wizard's
+   *  move-by-pick step. */
+  fileUnder?: {
+    picks: { id: string; title: string; goalName?: string }[]
+    onFile: (taskId: string, pickId: string) => void
+  }
   draft: string
   onDraftChange: (v: string) => void
   onSubmitDraft: () => void
@@ -60,9 +71,6 @@ export interface PlanningShelfProps {
   dragMode?: 'dndkit' | 'native'
   /** native mode only: dropping a 'text/task-id' payload on the lane. */
   onNativeUnschedule?: (taskId: string) => void
-  /** Config for the ⋯ menu's demote item. Month page passes
-   *  { label: 'To week', bucket: 'week' }. */
-  moveDown?: { label: string; bucket: 'week' | 'month' }
   /** The add-pill's placeholder — speaks the host page's grain (week vs
    *  month). Defaults to the week page's copy. */
   draftPlaceholder?: string
@@ -87,54 +95,32 @@ export interface ShelfGroup {
   taskIds: string[]
 }
 
-const DEFAULT_MOVE_DOWN = { label: 'To month', bucket: 'month' as const }
-
 // Module-level so the default prop keeps a stable identity across renders.
 const EMPTY_IDS: Set<string> = new Set()
 
-function useShelfPillMenu() {
-  const [menuOpen, setMenuOpen] = useState(false)
-  const containerRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!menuOpen) return
-    function handleClickOutside(event: MouseEvent) {
-      if (!containerRef.current?.contains(event.target as Node)) setMenuOpen(false)
-    }
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [menuOpen])
-
-  useEffect(() => {
-    if (!menuOpen) return
-    function handleEscape(event: KeyboardEvent) {
-      if (event.key === 'Escape') setMenuOpen(false)
-    }
-    document.addEventListener('keydown', handleEscape)
-    return () => document.removeEventListener('keydown', handleEscape)
-  }, [menuOpen])
-
-  return { menuOpen, setMenuOpen, containerRef }
-}
-
-interface ShelfPillSharedProps {
+interface ShelfPillProps {
   task: Task
-  projectName?: string
-  /** This pill carried over because its WEEK passed, not because a date did. */
+  carried: boolean
   staleWeek?: boolean
   onBringForward?: (id: string) => void
+  projectName?: string
   onOpenTask: (id: string) => void
-  onSetBucket: (id: string, bucket: 'week' | 'month' | 'someday') => void
+  onSetBucket: (id: string, bucket: TaskBucket) => void
   onDeleteTask: (id: string) => void
   onPushTask: (id: string, target: Date | 'week' | 'month' | 'quarter') => void
-  moveDown: { label: string; bucket: 'week' | 'month' }
-  menuOpen: boolean
-  setMenuOpen: (v: boolean | ((prev: boolean) => boolean)) => void
+  onCompleteTask: (id: string) => void
+  fileUnder?: PlanningShelfProps['fileUnder']
+}
+
+function pillClassName(carried: boolean) {
+  return `group relative inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm touch-none cursor-grab active:cursor-grabbing transition-shadow hover:shadow-sm ${
+    carried ? 'bg-amber-50 border-amber-200' : 'bg-white border-neutral-200'
+  }`
 }
 
 function ShelfPillContent({
-  task, projectName, staleWeek, onBringForward, onOpenTask, onSetBucket, onDeleteTask, onPushTask, moveDown, menuOpen, setMenuOpen,
-}: ShelfPillSharedProps) {
+  task, projectName, staleWeek, onBringForward, onOpenTask, onSetBucket, onDeleteTask, onPushTask, onCompleteTask, fileUnder,
+}: Omit<ShelfPillProps, 'carried'>) {
   return (
     <>
       <span data-testid="shelf-pill-title" className="text-neutral-700">{task.title}</span>
@@ -146,106 +132,56 @@ function ShelfPillContent({
           · from {task.weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
         </span>
       )}
-      <span
-        className="flex items-center opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
-        onPointerDown={(e) => e.stopPropagation()}
-        onMouseDown={(e) => e.stopPropagation()}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <PushDropdown size="sm" onPush={(date) => onPushTask(task.id, date)} />
-        <button
-          type="button"
-          aria-label="Task actions"
-          aria-haspopup="menu"
-          aria-expanded={menuOpen}
-          onClick={() => setMenuOpen((v) => !v)}
-          className="p-0.5 rounded text-neutral-400 hover:text-neutral-700"
-        >
-          <MoreHorizontal className="w-4 h-4" />
-        </button>
+      {/* The full fate vocabulary, one trigger. TaskFateMenu hosts the SAME
+          TriageWhenMenu the review rows render inline, so a pill on the week
+          shelf offers exactly the verbs a wizard row does — including Done,
+          which the shelf lacked for months. */}
+      <span className="flex items-center opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+        <TaskFateMenu
+          onOpen={() => onOpenTask(task.id)}
+          extras={staleWeek && onBringForward
+            ? [{ label: 'Bring to this week', onSelect: () => onBringForward(task.id) }]
+            : undefined}
+          fileUnder={fileUnder
+            ? { picks: fileUnder.picks, onFile: (pickId) => fileUnder.onFile(task.id, pickId) }
+            : undefined}
+          onPickWhen={(when) => applyTriageWhen(when, task.id, { onPushTask, onSetBucket })}
+          onPickDate={(date) => onPushTask(task.id, date)}
+          onComplete={() => onCompleteTask(task.id)}
+          onDelete={() => onDeleteTask(task.id)}
+        />
       </span>
-      {menuOpen && (
-        <div role="menu" className="absolute top-full left-0 mt-1 z-30 w-36 rounded-lg border border-neutral-200 bg-white shadow-lg py-1 text-sm"
-          onPointerDown={(e) => e.stopPropagation()} onMouseDown={(e) => e.stopPropagation()}
-          onClick={(e) => e.stopPropagation()}>
-          <button role="menuitem" type="button" className="w-full text-left px-3 py-1.5 hover:bg-neutral-50"
-            onClick={() => { setMenuOpen(false); onOpenTask(task.id) }}>Open</button>
-          {staleWeek && onBringForward && (
-            <button role="menuitem" type="button" className="w-full text-left px-3 py-1.5 hover:bg-neutral-50"
-              onClick={() => { setMenuOpen(false); onBringForward(task.id) }}>Bring to this week</button>
-          )}
-          <button role="menuitem" type="button" className="w-full text-left px-3 py-1.5 hover:bg-neutral-50"
-            onClick={() => { setMenuOpen(false); onSetBucket(task.id, moveDown.bucket) }}>{moveDown.label}</button>
-          <button role="menuitem" type="button" className="w-full text-left px-3 py-1.5 hover:bg-neutral-50"
-            onClick={() => { setMenuOpen(false); onSetBucket(task.id, 'someday') }}>Put aside</button>
-          <button role="menuitem" type="button" className="w-full text-left px-3 py-1.5 text-rose-600 hover:bg-rose-50"
-            onClick={() => { setMenuOpen(false); onDeleteTask(task.id) }}>Delete</button>
-        </div>
-      )}
     </>
   )
 }
 
-interface ShelfPillProps {
-  task: Task
-  carried: boolean
-  staleWeek?: boolean
-  onBringForward?: (id: string) => void
-  projectName?: string
-  onOpenTask: (id: string) => void
-  onSetBucket: (id: string, bucket: 'week' | 'month' | 'someday') => void
-  onDeleteTask: (id: string) => void
-  onPushTask: (id: string, target: Date | 'week' | 'month' | 'quarter') => void
-  moveDown: { label: string; bucket: 'week' | 'month' }
-}
-
-function pillClassName(carried: boolean) {
-  return `group relative inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm touch-none cursor-grab active:cursor-grabbing transition-shadow hover:shadow-sm ${
-    carried ? 'bg-amber-50 border-amber-200' : 'bg-white border-neutral-200'
-  }`
-}
-
-function ShelfPill({ task, carried, staleWeek, onBringForward, projectName, onOpenTask, onSetBucket, onDeleteTask, onPushTask, moveDown }: ShelfPillProps) {
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: task.id })
-  const { menuOpen, setMenuOpen, containerRef } = useShelfPillMenu()
+function ShelfPill({ carried, ...rest }: ShelfPillProps) {
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: rest.task.id })
 
   const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: 100 } : undefined
   return (
     <div
-      ref={(node) => { setNodeRef(node); containerRef.current = node }}
+      ref={setNodeRef}
       style={style}
       className={`${pillClassName(carried)} ${isDragging ? 'opacity-40' : ''}`}
-      onClick={() => onOpenTask(task.id)}
+      onClick={() => rest.onOpenTask(rest.task.id)}
       {...attributes}
       {...listeners}
     >
-      <ShelfPillContent
-        task={task} projectName={projectName} staleWeek={staleWeek} onBringForward={onBringForward}
-        onOpenTask={onOpenTask} onSetBucket={onSetBucket}
-        onDeleteTask={onDeleteTask} onPushTask={onPushTask} moveDown={moveDown}
-        menuOpen={menuOpen} setMenuOpen={setMenuOpen}
-      />
+      <ShelfPillContent {...rest} />
     </div>
   )
 }
 
-function NativeShelfPill({ task, carried, staleWeek, onBringForward, projectName, onOpenTask, onSetBucket, onDeleteTask, onPushTask, moveDown }: ShelfPillProps) {
-  const { menuOpen, setMenuOpen, containerRef } = useShelfPillMenu()
-
+function NativeShelfPill({ carried, ...rest }: ShelfPillProps) {
   return (
     <div
-      ref={containerRef}
       draggable
-      onDragStart={(e) => e.dataTransfer.setData('text/task-id', task.id)}
+      onDragStart={(e) => e.dataTransfer.setData('text/task-id', rest.task.id)}
       className={pillClassName(carried)}
-      onClick={() => onOpenTask(task.id)}
+      onClick={() => rest.onOpenTask(rest.task.id)}
     >
-      <ShelfPillContent
-        task={task} projectName={projectName} staleWeek={staleWeek} onBringForward={onBringForward}
-        onOpenTask={onOpenTask} onSetBucket={onSetBucket}
-        onDeleteTask={onDeleteTask} onPushTask={onPushTask} moveDown={moveDown}
-        menuOpen={menuOpen} setMenuOpen={setMenuOpen}
-      />
+      <ShelfPillContent {...rest} />
     </div>
   )
 }
@@ -313,8 +249,9 @@ export function PlanningShelf(props: PlanningShelfProps) {
   const {
     tasks, carryOverIds, staleWeekIds = EMPTY_IDS, onBringForward,
     projectsMap, tasksById, onOpenTask, onSetBucket, onDeleteTask, onPushTask,
+    onCompleteTask, fileUnder,
     draft, onDraftChange, onSubmitDraft, hiddenCount = 0, showingAll = false, onToggleShowAll,
-    tend, onApplyProposal, dragMode = 'dndkit', onNativeUnschedule, moveDown = DEFAULT_MOVE_DOWN,
+    tend, onApplyProposal, dragMode = 'dndkit', onNativeUnschedule,
     draftPlaceholder = 'Add to this week…', tendingLabel = 'Tending this week',
     poolLabel = 'To place', groups,
   } = props
@@ -462,7 +399,7 @@ export function PlanningShelf(props: PlanningShelfProps) {
                         staleWeek={staleWeekIds.has(t.id)} onBringForward={onBringForward}
                         projectName={t.projectId ? projectsMap.get(t.projectId)?.name : undefined}
                         onOpenTask={onOpenTask} onSetBucket={onSetBucket} onDeleteTask={onDeleteTask} onPushTask={onPushTask}
-                        moveDown={moveDown} />
+                        onCompleteTask={onCompleteTask} fileUnder={fileUnder} />
                     ))}
                   </div>
                 )}
@@ -474,7 +411,7 @@ export function PlanningShelf(props: PlanningShelfProps) {
               staleWeek={staleWeekIds.has(t.id)} onBringForward={onBringForward}
               projectName={t.projectId ? projectsMap.get(t.projectId)?.name : undefined}
               onOpenTask={onOpenTask} onSetBucket={onSetBucket} onDeleteTask={onDeleteTask} onPushTask={onPushTask}
-              moveDown={moveDown} />
+              onCompleteTask={onCompleteTask} fileUnder={fileUnder} />
           ))}
           {overflow > 0 && (
             <button type="button" onClick={() => setExpanded(true)}
