@@ -102,7 +102,7 @@ describe('CalendarStep', () => {
     expect(await screen.findByText('Dentist')).toBeInTheDocument()
   })
 
-  it('landscape: renders the 12-month grid with dated tasks, and zooms into a month', () => {
+  it('landscape: renders the 12-month grid, counting tasks WITHOUT naming them', () => {
     const yearStep = {
       id: 'mountain-ranges', type: 'calendar' as const, title: "The year's mountain ranges",
       narration: 'Map the terrain.', props: { notesKey: 'annualCalendar', landscape: true },
@@ -119,11 +119,13 @@ describe('CalendarStep', () => {
     // months that have commitments).
     expect(screen.getByText('January')).toBeInTheDocument()
     expect(screen.getByText('December')).toBeInTheDocument()
-    // The dated task surfaces in its month cell.
-    expect(screen.getByText('Big launch')).toBeInTheDocument()
-    // Tapping September zooms into the month (opens the look-only dialog).
+    // The task is COUNTED, never named: a dated errand is a Today-altitude
+    // detail, and reading it here buries what the year view exists to show.
+    expect(screen.queryByText('Big launch')).not.toBeInTheDocument()
+    expect(screen.getByText('1 item planned')).toBeInTheDocument()
+    // And there is no day grid at year altitude — the cell expands in place.
     fireEvent.click(screen.getByText('September'))
-    expect(screen.getByRole('dialog', { name: /September 2026 calendar/i })).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
   it('renders the notes textarea when notesKey is configured', () => {

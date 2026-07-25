@@ -8,7 +8,6 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { CalendarDays, ChevronRight } from 'lucide-react'
 import { useGuided } from '../GuidedContext'
 import { YearCalendarGrid } from '@/components/planning/horizon/YearCalendarGrid'
-import { MonthZoomSheet } from '@/components/planning/horizon/MonthZoomSheet'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -34,7 +33,6 @@ export function CalendarStep() {
   // instead of the per-month commitment counts. Year session only.
   const landscape = step.props?.landscape === true
   const landscapeYear = periodStart.getFullYear()
-  const [zoomMonth, setZoomMonth] = useState<number | null>(null)
 
   // A look-AHEAD never shows the past: mid-period sessions clamp the window to
   // today (week-boundary spec). The landscape keeps the full year — it maps
@@ -104,27 +102,21 @@ export function CalendarStep() {
     <div className="space-y-4">
       {landscape ? (
         <>
-          <p className="text-xs text-neutral-400">Tap any month to zoom into its shape.</p>
+          <p className="text-xs text-neutral-400">Tap any month to see everything in it.</p>
           {!host.calendarConnected && !host.calendarChecking && (
             <p className="text-xs text-neutral-400">
               Your calendar isn't connected — you'll still see your dated items below; connect it to layer in events too.
             </p>
           )}
+          {/* Expands in place. No day grid at year altitude, and no walk-down
+              link either — a session is a sequence, not a place to wander off
+              from. Matches the /year page (which does offer the link, because a
+              page is somewhere you browse). */}
           <YearCalendarGrid
             year={landscapeYear}
             tasks={host.tasks}
             events={fetchedEvents}
-            onOpenMonth={(m) => setZoomMonth(m)}
           />
-          {zoomMonth !== null && (
-            <MonthZoomSheet
-              month={new Date(landscapeYear, zoomMonth, 1)}
-              tasks={host.tasks}
-              events={fetchedEvents}
-              readOnly
-              onClose={() => setZoomMonth(null)}
-            />
-          )}
         </>
       ) : host.calendarChecking && !host.calendarConnected ? (
         <p className="text-sm text-neutral-400">Checking your calendar…</p>
