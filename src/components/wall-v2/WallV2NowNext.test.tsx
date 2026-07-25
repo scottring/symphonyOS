@@ -8,6 +8,7 @@ vi.mock('@/lib/telephony/placeCall', () => ({ placeCall: (...a: unknown[]) => pl
 import type { WallDayData } from '@/hooks/useWallData'
 import type { TimelineItem } from '@/types/timeline'
 import type { DaySection } from '@/lib/timeUtils'
+import { emptySections } from '@/lib/today/types'
 
 function ti(over: Partial<TimelineItem>): TimelineItem {
   return { id: 't', type: 'task', title: 'Item', startTime: null, endTime: null, completed: false, ...over }
@@ -17,7 +18,7 @@ function day(items: Partial<Record<DaySection, TimelineItem[]>>): WallDayData {
   return {
     date: new Date(2026, 5, 28),
     isToday: true,
-    items: { allday: [], morning: [], afternoon: [], evening: [], unscheduled: [], ...items },
+    items: { ...emptySections<TimelineItem>(), ...items },
     birthdays: [],
     milestones: [],
   }

@@ -10,6 +10,8 @@ import type { TimelineItem } from '@/types/timeline';
 import type { FamilyMember } from '@/types/family';
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar';
 import type { WallDayData } from '@/hooks/useWallData';
+import type { DaySection } from '@/lib/timeUtils';
+import { emptySections } from '@/lib/today/types';
 import {
   adaptGlanceForMember,
   adaptScheduleBand,
@@ -30,13 +32,22 @@ function makeItem(partial: Partial<TimelineItem>): TimelineItem {
   };
 }
 
-function makeDay(partial: Partial<WallDayData>): WallDayData {
+/** `items` is partial here on purpose — see makeDay. */
+type DayOverrides = Omit<Partial<WallDayData>, 'items'> & {
+  items?: Partial<Record<DaySection, TimelineItem[]>>;
+};
+
+function makeDay(partial: DayOverrides): WallDayData {
   return {
     date: partial.date ?? new Date(),
     isToday: partial.isToday ?? false,
-    items: partial.items ?? {
-      allday: [], morning: [], afternoon: [], evening: [], unscheduled: [],
-    },
+    // Fully-keyed base from SECTIONS_ORDER, then the fixture's own sections on
+    // top. Every fixture in this file used to hand-write a five-key literal, so
+    // they all encoded the pre-split world and *could not fail* when the wall
+    // stopped reading earlyMorning/night — that's how the Night regression
+    // shipped green. Spreading a derived base means adding a future section
+    // updates all ~25 fixtures at once.
+    items: { ...emptySections<TimelineItem>(), ...partial.items },
     birthdays: [],
     milestones: [],
   };
@@ -74,13 +85,15 @@ describe('adaptTimelineSections', () => {
   it('places 9 PM+ items into a separate "night" section', () => {
     const today = makeDay({
       isToday: true,
+      // Buckets as groupByDaySection would actually produce them: 22:00 is
+      // `night` (evening ends at 20:59), not an evening item to be re-split.
       items: {
-        allday: [], morning: [], afternoon: [],
         evening: [
-          makeItem({ id: 'wind', type: 'routine', title: 'Wind down', startTime: new Date(2026, 4, 20, 22, 0) }),
           makeItem({ id: 'shower', type: 'routine', title: 'Kids shower', startTime: new Date(2026, 4, 20, 19, 30) }),
         ],
-        unscheduled: [],
+        night: [
+          makeItem({ id: 'wind', type: 'routine', title: 'Wind down', startTime: new Date(2026, 4, 20, 22, 0) }),
+        ],
       },
     });
     const result = adaptTimelineSections(today, members, now, null, false, []);
@@ -599,11 +612,8 @@ describe('adaptGlanceForMember', () => {
     id: 'm', name: 'Mia', initials: 'MK', color: 'blue',
   } as FamilyMember;
 
-  function dayWith(items: TimelineItem[]): WallDayData {
-    return makeDay({
-      isToday: true,
-      items: { allday: [], morning: items, afternoon: [], evening: [], unscheduled: [] },
-    });
+  function dayWith(items: TimelineItem[], section: DaySection = 'morning'): WallDayData {
+    return makeDay({ isToday: true, items: { [section]: items } });
   }
 
   it("excludes everyday routines (>4×/week) — they're daily-rhythm noise, not a glance signal", () => {
@@ -653,5 +663,85 @@ describe('adaptGlanceForMember', () => {
     });
     const card = adaptGlanceForMember(member, dayWith([daily, event]), now);
     expect(card?.primary).toBe('Soccer');
+  });
+});
+
+// ────────────────────────────────────────────────────────────────────────────
+// Day-band coverage regressions.
+//
+// The day was re-partitioned (00:00–07:59 left `morning`, 21:00+ left
+// `evening`) but consumers kept iterating the old four names, so every item
+// before 8 AM and after 9 PM silently vanished from surfaces that had always
+// shown it. Each test below pins one adapter at both ends of the day.
+// ────────────────────────────────────────────────────────────────────────────
+
+describe('day-band coverage: the ends of the day survive every adapter', () => {
+  const now = new Date(2026, 4, 20, 13, 0);
+  const members: FamilyMember[] = [];
+
+  const early = () => makeItem({
+    id: 'early', type: 'routine', title: 'School run prep',
+    startTime: new Date(2026, 4, 20, 6, 30),
+  });
+  const late = () => makeItem({
+    id: 'late', type: 'routine', title: 'Lock up',
+    startTime: new Date(2026, 4, 20, 21, 30),
+  });
+
+  it('adaptTimelineSections renders a 06:30 item in Early morning', () => {
+    const result = adaptTimelineSections(
+      makeDay({ isToday: true, items: { earlyMorning: [early()] } }),
+      members, now, null, false, [],
+    );
+    const section = result.find((s) => s.label === 'Early morning');
+    expect(section?.events.map((e) => e.title)).toEqual(['School run prep']);
+  });
+
+  it('adaptTimelineSections renders a 21:30 item in Night', () => {
+    const result = adaptTimelineSections(
+      makeDay({ isToday: true, items: { night: [late()] } }),
+      members, now, null, false, [],
+    );
+    const section = result.find((s) => s.label === 'Night');
+    expect(section?.events.map((e) => e.title)).toEqual(['Lock up']);
+  });
+
+  it('adaptScheduleBand keeps a 06:30 and a 21:30 timed commitment', () => {
+    const dropoff = makeItem({
+      id: 'dropoff', type: 'event', title: 'Dropoff',
+      startTime: new Date(2026, 4, 20, 7, 0),
+    });
+    const pickup = makeItem({
+      id: 'pickup', type: 'event', title: 'Airport pickup',
+      startTime: new Date(2026, 4, 20, 21, 30),
+    });
+    const band = adaptScheduleBand(
+      makeDay({ isToday: true, items: { earlyMorning: [dropoff], night: [pickup] } }),
+      members, now, null,
+    );
+    expect(band.timed.map((e) => e.title)).toEqual(['Dropoff', 'Airport pickup']);
+  });
+
+  it('adaptGlanceForMember can surface an item from earlyMorning or night', () => {
+    const member: FamilyMember = { id: 'm', name: 'Mia', initials: 'MK', color: 'blue' } as FamilyMember;
+    const dawn = makeItem({
+      id: 'dawn', type: 'event', title: 'Swim practice', assignedTo: 'm',
+      startTime: new Date(2026, 4, 20, 5, 30),
+    });
+    const dusk = makeItem({
+      id: 'dusk', type: 'event', title: 'Late pickup', assignedTo: 'm',
+      startTime: new Date(2026, 4, 20, 22, 0),
+    });
+
+    const early = adaptGlanceForMember(
+      member, makeDay({ isToday: true, items: { earlyMorning: [dawn] } }),
+      new Date(2026, 4, 20, 4, 0),
+    );
+    expect(early?.primary).toBe('Swim practice');
+
+    const late = adaptGlanceForMember(
+      member, makeDay({ isToday: true, items: { night: [dusk] } }), now,
+    );
+    expect(late?.primary).toBe('Late pickup');
   });
 });

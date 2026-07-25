@@ -4,9 +4,11 @@ import { render, screen, within } from '@testing-library/react'
 import { PrintableDayList } from './PrintableDayList'
 import type { TimelineItem } from '@/types/timeline'
 import type { Task } from '@/types/task'
-import type { DaySection } from '@/lib/timeUtils'
+import { SECTIONS_ORDER } from '@/lib/today/types'
 
-const SECTIONS: DaySection[] = ['allday', 'morning', 'afternoon', 'evening', 'unscheduled']
+// The real order, not a five-name copy — a literal here would keep asserting
+// against a day that has no earlyMorning or night band.
+const SECTIONS = SECTIONS_ORDER
 const DATE = new Date(2026, 6, 25)
 
 const item = (over: Partial<TimelineItem>): TimelineItem => ({

@@ -1,6 +1,7 @@
 // src/lib/today/__fixtures__/todayScenarios.ts
 import type { Task } from '@/types/task'
 import type { TodayDataInput } from '../types'
+import type { DaySection } from '@/lib/timeUtils'
 
 const TODAY = new Date()
 TODAY.setHours(0, 0, 0, 0)
@@ -29,13 +30,18 @@ export const mixedDayInput: TodayDataInput = {
 /** Expected, derived by hand from the legacy algorithm. */
 export const mixedDayExpected = {
   isToday: true,
+  // Every section, so the parity sweep below can iterate SECTIONS_ORDER and
+  // actually assert that earlyMorning/night stay empty rather than skipping
+  // them entirely.
   groupedTitles: {
+    allday: [] as string[],
+    earlyMorning: [] as string[],
     morning: ['Hang up hooks'],
     afternoon: ['Cut the rugs'],
     evening: ['Storm vs Blue'],
-    allday: [] as string[],
+    night: [] as string[],
     unscheduled: [] as string[],
-  },
+  } satisfies Record<DaySection, string[]>,
   weekIds: ['w1'],
   inboxIds: ['i1'],
   overdueIds: ['o1', 'o2'],

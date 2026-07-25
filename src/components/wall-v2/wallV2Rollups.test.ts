@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { computePrepWindow, adaptTomorrowMorning, adaptAtAGlanceRollup } from './wallV2Rollups';
 import type { WallDayData } from '@/hooks/useWallData';
 import type { TimelineItem } from '@/types/timeline';
+import { emptySections } from '@/lib/today/types';
 
 const at = (h: number, m = 0) => new Date(2026, 6, 20, h, m);
 
@@ -15,7 +16,9 @@ function item(id: string, startTime: Date | null, over: Partial<TimelineItem> = 
 function day(date: Date, isToday: boolean, sections: Partial<Record<string, TimelineItem[]>>): WallDayData {
   return {
     date, isToday, birthdays: [], milestones: [],
-    items: { allday: [], unscheduled: [], morning: [], afternoon: [], evening: [], ...sections },
+    // Derived base, not a literal: a hand-written key list here silently
+    // encodes whichever sections existed the day it was typed.
+    items: { ...emptySections<TimelineItem>(), ...sections },
   } as unknown as WallDayData;
 }
 

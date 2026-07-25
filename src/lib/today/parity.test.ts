@@ -2,6 +2,7 @@
 import { describe, it, expect } from 'vitest'
 import { computeTodayData } from './computeTodayData'
 import { mixedDayInput, mixedDayExpected } from './__fixtures__/todayScenarios'
+import { SECTIONS_ORDER } from './types'
 
 describe('parity: computeTodayData reproduces legacy TodaySchedule output', () => {
   const d = computeTodayData(mixedDayInput)
@@ -10,7 +11,7 @@ describe('parity: computeTodayData reproduces legacy TodaySchedule output', () =
     expect(d.isToday).toBe(mixedDayExpected.isToday)
   })
   it('grouped section membership matches legacy grouping', () => {
-    for (const s of ['morning', 'afternoon', 'evening', 'allday', 'unscheduled'] as const) {
+    for (const s of SECTIONS_ORDER) {
       expect(d.grouped[s].map(i => i.title)).toEqual(mixedDayExpected.groupedTitles[s])
     }
   })

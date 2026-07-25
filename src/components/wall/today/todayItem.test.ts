@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { buildTodayItems } from './todayItem'
 import type { TimelineItem } from '@/types/timeline'
 import type { DaySection } from '@/lib/timeUtils'
+import { emptySections } from '@/lib/today/types'
 
 const mkItem = (overrides: Partial<TimelineItem> = {}): TimelineItem => ({
   id: 'x',
@@ -13,8 +14,13 @@ const mkItem = (overrides: Partial<TimelineItem> = {}): TimelineItem => ({
   ...overrides,
 })
 
-function sections(items: TimelineItem[]): Record<DaySection, TimelineItem[]> {
-  return { allday: [], morning: items, afternoon: [], evening: [], unscheduled: [] }
+function sections(
+  items: TimelineItem[],
+  section: DaySection = 'morning',
+): Record<DaySection, TimelineItem[]> {
+  // Fully keyed from SECTIONS_ORDER so this fixture can't encode a stale
+  // five-section world, and callers can target any band by name.
+  return { ...emptySections<TimelineItem>(), [section]: items }
 }
 
 function tl(over: Partial<TimelineItem>): TimelineItem {

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { buildDayGrid, type BuildDayGridInput } from './buildDayGrid'
 import type { WallDayData } from '@/hooks/useWallData'
+import { emptySections } from '@/lib/today/types'
 import type { TimelineItem } from '@/types/timeline'
 import type { TodayItem } from '../today/todayItem'
 
@@ -20,9 +21,7 @@ function emptyDay(dayOffset: number): WallDayData {
   return {
     date,
     isToday: dayOffset === 0,
-    items: {
-      allday: [], earlyMorning: [], morning: [], afternoon: [], evening: [], night: [], unscheduled: [],
-    },
+    items: emptySections<TimelineItem>(),
     birthdays: [],
     milestones: [],
   } as unknown as WallDayData
