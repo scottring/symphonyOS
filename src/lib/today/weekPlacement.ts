@@ -25,3 +25,17 @@ export function belongsToWeek(task: Pick<Task, 'weekStart'>, weekStart: Date): b
   if (!task.weekStart) return true
   return localYmd(task.weekStart) === localYmd(weekStart)
 }
+
+/**
+ * Was `task` explicitly PLACED on the week starting `weekStart`?
+ *
+ * The strict twin of `belongsToWeek`, and the difference matters. A pool asks
+ * "should I show this?" and wants legacy rows included. A surface that renders
+ * one row per week — the month grid — asks "did this land HERE?", and there a
+ * NULL weekStart must answer no: it has no week of its own, so counting it as
+ * a member would repeat it in all six rows of the month.
+ */
+export function isPlacedOnWeek(task: Pick<Task, 'weekStart'>, weekStart: Date): boolean {
+  if (!task.weekStart) return false
+  return localYmd(task.weekStart) === localYmd(weekStart)
+}

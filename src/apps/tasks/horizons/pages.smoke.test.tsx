@@ -189,7 +189,9 @@ describe('horizon pages (smoke)', () => {
     expect(screen.getAllByText('Order flowers for the reception')).toHaveLength(1)
   })
 
-  it('dropping a fresh rock (no prior time) onto a grid day marks it all-day', () => {
+  // The month rung places onto a WEEK. Dropping into the row that holds today
+  // must write that week and no day — the whole point of the cascade.
+  it('dropping a rock in the grid places it on that WEEK, with no day', () => {
     mockTasks.push(createMockTask({
       id: 'rock-task',
       title: 'Fresh rock',
@@ -199,13 +201,17 @@ describe('horizon pages (smoke)', () => {
     const { container } = render(<MonthPage />)
     const cell = todayGridCell(container)
     fireEvent.drop(cell, { dataTransfer: { getData: () => 'rock-task' } })
-    expect(mockUpdateTask).toHaveBeenCalledWith('rock-task', expect.objectContaining({
-      bucket: 'timed',
-      isAllDay: true,
-    }))
+    const call = mockUpdateTask.mock.calls.find(([id]) => id === 'rock-task')
+    expect(call).toBeDefined()
+    expect(call![1].bucket).toBe('week')
+    expect(localYmd(call![1].weekStart as Date)).toBe(localYmd(currentWeekStart))
+    expect(call![1].scheduledFor).toBeUndefined()
   })
 
-  it('re-dragging an already-timed item between cells preserves its clock time (not all-day)', () => {
+  // An already-dated item dragged onto a row loses its date on purpose — the
+  // invariant is that a scheduled_for implies bucket='timed', so keeping the
+  // date would leave the item dated but absent from every day view.
+  it('dropping an already-dated item on a row clears its date', () => {
     const timedDate = new Date(now)
     timedDate.setDate(timedDate.getDate() - 3)
     timedDate.setHours(14, 30, 0, 0)
@@ -220,9 +226,26 @@ describe('horizon pages (smoke)', () => {
     fireEvent.drop(cell, { dataTransfer: { getData: () => 'timed-task' } })
     const call = mockUpdateTask.mock.calls.find(([id]) => id === 'timed-task')
     expect(call).toBeDefined()
-    expect(call![1]).toMatchObject({ bucket: 'timed', isAllDay: false })
-    expect((call![1].scheduledFor as Date).getHours()).toBe(14)
-    expect((call![1].scheduledFor as Date).getMinutes()).toBe(30)
+    expect(call![1]).toMatchObject({ bucket: 'week', isAllDay: false })
+    expect(call![1].scheduledFor).toBeUndefined()
+  })
+
+  // Threading is orthogonal to placement: a descent must never cut the line
+  // back to the season pick or goal the move came from.
+  it('a descent to a week never clears the thread (sourceId / goalId untouched)', () => {
+    mockTasks.push(createMockTask({
+      id: 'threaded',
+      title: 'Threaded move',
+      bucket: 'month',
+      sourceId: 'season-pick-1',
+      goalId: 'goal-1',
+    }) satisfies Task)
+    const { container } = render(<MonthPage />)
+    fireEvent.drop(todayGridCell(container), { dataTransfer: { getData: () => 'threaded' } })
+    const call = mockUpdateTask.mock.calls.find(([id]) => id === 'threaded')
+    expect(call).toBeDefined()
+    expect(call![1]).not.toHaveProperty('sourceId')
+    expect(call![1]).not.toHaveProperty('goalId')
   })
 
   it("SeasonPage renders the season's picks panel", () => {

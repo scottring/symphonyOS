@@ -55,17 +55,25 @@ export function MonthPage() {
 
   // Placed-this-month count for the masthead subtitle — no existing selector
   // covers this (selectPlacedInWeek is week-only), so it's derived here from
-  // the already-fetched domainTasks: bucket flips month→timed on placement
-  // (mirrors MonthCalendarGrid's onPlaceTask), same convention as the week
-  // page's placedThisWeek.
+  // the already-fetched domainTasks.
+  //
+  // TWO kinds of placed, and both must count. Dropping a move on a week row
+  // gives it bucket='week' + a week_start and NO date, so counting only
+  // bucket='timed' would make placing something drop it out of the unplaced
+  // count AND never enter the placed count — the page would read as if the
+  // work evaporated. (Same failure mode as the all-day lane's "+N more".)
   const monthPlacedCount = useMemo(() => {
     const start = new Date(viewedDate.getFullYear(), viewedDate.getMonth(), 1);
     const end = new Date(viewedDate.getFullYear(), viewedDate.getMonth() + 1, 1);
+    const inMonth = (d: Date) => d >= start && d < end;
     return domainTasks.filter((t) => {
-      if (t.completed || t.bucket !== 'timed' || !t.scheduledFor) return false;
+      if (t.completed) return false;
       if (!match(t.assignedTo, t.assignedToAll)) return false;
-      const d = new Date(t.scheduledFor);
-      return d >= start && d < end;
+      // Placed on a day inside the month.
+      if (t.bucket === 'timed' && t.scheduledFor) return inMonth(new Date(t.scheduledFor));
+      // Placed on a week whose start falls inside the month.
+      if (t.bucket === 'week' && t.weekStart) return inMonth(new Date(t.weekStart));
+      return false;
     }).length;
   }, [domainTasks, match, viewedDate]);
 
@@ -255,18 +263,26 @@ export function MonthPage() {
               events={domainEvents}
               weekStartsOn={readCadenceConfig().weekStartsOn}
               hideRail
-              // isAllDay heuristic: MonthCalendarGrid builds `day` at
-              // midnight for a fresh rock (no prior scheduledFor) but copies
-              // over the dragged item's existing clock time when re-dragging
-              // an already-timed item between cells. So midnight here means
-              // "never had a time" → all-day; a preserved non-midnight time
-              // means it stays a timed item.
-              onPlaceTask={(id, day) => updateTask(id, {
-                bucket: 'timed',
-                scheduledFor: day,
-                isAllDay: day.getHours() === 0 && day.getMinutes() === 0,
+              // A month move places onto a WEEK, not a day — the month rung's
+              // one decision is "which week". The week page then asks which
+              // day, and Today asks what time.
+              //
+              // scheduledFor is CLEARED, not merely left unwritten: dropping an
+              // already-dated chip onto a row means "move it to that week", and
+              // keeping the old date alongside bucket='week' would break the
+              // invariant that a scheduled_for implies bucket='timed' — leaving
+              // the item dated but absent from every day view.
+              //
+              // Deliberately NOT passing onPlaceTask: dropping on a day cell
+              // from the month view is gone. Genuinely dated things ("dentist
+              // Tuesday") use the existing date picker in triage, so a drop
+              // means one thing here regardless of where in the row it lands.
+              onPlaceTaskInWeek={(id, weekStart) => updateTask(id, {
+                bucket: 'week', weekStart, scheduledFor: undefined, isAllDay: false,
               })}
-              onUnscheduleTask={(id) => updateTask(id, { bucket: 'month', scheduledFor: undefined })}
+              // Back to the shelf clears the week too — otherwise an item
+              // returns to "unplaced" still secretly carrying a week.
+              onUnscheduleTask={(id) => updateTask(id, { bucket: 'month', scheduledFor: undefined, weekStart: undefined })}
               onSelectTask={(id) => scheduleActionsValue.onOpenTask?.(id)}
               onOpenWeek={(d) => navigate(`/week?start=${localYmd(d)}`)}
             />

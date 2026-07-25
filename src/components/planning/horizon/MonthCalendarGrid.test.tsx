@@ -84,6 +84,108 @@ describe('MonthCalendarGrid seam — Open week chip', () => {
   })
 })
 
+// ── Week mode: the row is the drop target, because the month rung's one
+// decision is "which week" — not which Tuesday. ──
+describe('MonthCalendarGrid week placement', () => {
+  const monthTask = (over: Partial<Task>): Task => ({
+    id: 'rock', title: 'Order the vanity', completed: false, bucket: 'month',
+    createdAt: new Date(), updatedAt: new Date(), ...over,
+  })
+
+  it('dropping anywhere in a row places the rock on that ROW\'s week', () => {
+    const onPlaceTaskInWeek = vi.fn()
+    render(
+      <MonthCalendarGrid
+        month={new Date(2026, 6, 1)}
+        tasks={[monthTask({})]}
+        events={events}
+        weekStartsOn={1}
+        onPlaceTaskInWeek={onPlaceTaskInWeek}
+      />
+    )
+    // July 2026 Monday-first: the row holding Wed Jul 15 starts Mon Jul 13.
+    const cell = screen.getByText('15').closest('div')!
+    fireEvent.drop(cell, {
+      dataTransfer: { getData: (f: string) => (f === 'text/task-id' ? 'rock' : '') },
+    })
+    expect(onPlaceTaskInWeek).toHaveBeenCalledTimes(1)
+    const [taskId, weekStart] = onPlaceTaskInWeek.mock.calls[0]
+    expect(taskId).toBe('rock')
+    expect(weekStart.getMonth()).toBe(6)
+    expect(weekStart.getDate()).toBe(13) // the row's Monday, not the 15th
+  })
+
+  it('a day cell no longer places by day when the caller is in week mode', () => {
+    const onPlaceTask = vi.fn()
+    const onPlaceTaskInWeek = vi.fn()
+    render(
+      <MonthCalendarGrid
+        month={new Date(2026, 6, 1)}
+        tasks={[monthTask({})]}
+        events={events}
+        weekStartsOn={1}
+        onPlaceTask={onPlaceTask}
+        onPlaceTaskInWeek={onPlaceTaskInWeek}
+      />
+    )
+    fireEvent.drop(screen.getByText('15').closest('div')!, {
+      dataTransfer: { getData: (f: string) => (f === 'text/task-id' ? 'rock' : '') },
+    })
+    expect(onPlaceTask).not.toHaveBeenCalled()
+    expect(onPlaceTaskInWeek).toHaveBeenCalledTimes(1)
+  })
+
+  // Without the lane a dropped rock would have no date (no cell) and no longer
+  // be bucket='month' (no shelf) — it would vanish, and vanishing reads as loss.
+  it("shows a week-placed item in its row's lane, so a placement is visible", () => {
+    render(
+      <MonthCalendarGrid
+        month={new Date(2026, 6, 1)}
+        tasks={[monthTask({ id: 'placed', title: 'Book the mover', bucket: 'week', weekStart: new Date(2026, 6, 13) })]}
+        events={events}
+        weekStartsOn={1}
+        onPlaceTaskInWeek={vi.fn()}
+      />
+    )
+    expect(screen.getByText('Book the mover')).toBeInTheDocument()
+    expect(screen.getAllByText('This week')).toHaveLength(1) // exactly one row's lane
+  })
+
+  it('a legacy week item (no weekStart) appears in NO row — it has no week of its own', () => {
+    render(
+      <MonthCalendarGrid
+        month={new Date(2026, 6, 1)}
+        tasks={[monthTask({ id: 'legacy', title: 'Legacy week item', bucket: 'week' })]}
+        events={events}
+        weekStartsOn={1}
+        onPlaceTaskInWeek={vi.fn()}
+      />
+    )
+    // Would otherwise repeat in all six rows.
+    expect(screen.queryByText('Legacy week item')).not.toBeInTheDocument()
+    expect(screen.queryByText('This week')).not.toBeInTheDocument()
+  })
+
+  it('renders no lane and keeps day drops when no week handler is given', () => {
+    const onPlaceTask = vi.fn()
+    render(
+      <MonthCalendarGrid
+        month={new Date(2026, 6, 1)}
+        tasks={[monthTask({ id: 'placed', title: 'Book the mover', bucket: 'week', weekStart: new Date(2026, 6, 13) })]}
+        events={events}
+        weekStartsOn={1}
+        onPlaceTask={onPlaceTask}
+      />
+    )
+    expect(screen.queryByText('This week')).not.toBeInTheDocument()
+    fireEvent.drop(screen.getByText('15').closest('div')!, {
+      dataTransfer: { getData: (f: string) => (f === 'text/task-id' ? 'placed' : '') },
+    })
+    expect(onPlaceTask).toHaveBeenCalledTimes(1)
+    expect(onPlaceTask.mock.calls[0][1].getDate()).toBe(15)
+  })
+})
+
 describe('MonthCalendarGrid hideRail', () => {
   it('hides the rail text when hideRail=true but still calls onPlaceTask on cell drop', () => {
     const onPlaceTask = vi.fn()
