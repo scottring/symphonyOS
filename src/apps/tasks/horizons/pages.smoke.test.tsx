@@ -119,12 +119,15 @@ anchorTaskDate.setHours(10, 0, 0, 0)
 const currentWeekTaskDate = new Date(now)
 currentWeekTaskDate.setHours(10, 0, 0, 0)
 
-// Finds the calendar grid cell for "today" — the one cell whose day-number
-// span carries the isToday styling (`bg-primary-600`) — and returns its
-// parent cell div, the element the grid's onDrop handler is bound to.
+// Finds the week ROW holding today — the month rung draws week strips, not day
+// cells, so the row is both what you see and what onDrop is bound to. (It used
+// to find a day-number span styled `bg-primary-600`; there are no day cells to
+// find any more, which is the point of the redraw.)
 function todayGridCell(container: HTMLElement): HTMLElement {
+  const row = container.querySelector('[data-current-week="true"]') as HTMLElement | null
+  if (row) return row
   const span = Array.from(container.querySelectorAll('span')).find((s) => s.className.includes('bg-primary-600'))
-  if (!span?.parentElement) throw new Error('today grid cell not found')
+  if (!span?.parentElement) throw new Error('current week row not found')
   return span.parentElement
 }
 
@@ -238,10 +241,13 @@ describe('horizon pages (smoke)', () => {
     expect(localYmd(call![1].weekStart as Date)).toBe(localYmd(currentWeekStart))
   })
 
-  it('MonthPage renders the calendar grid weekday header', () => {
-    render(<MonthPage />)
-    expect(screen.getByText('Sun')).toBeInTheDocument()
-    expect(screen.getByText('Mon')).toBeInTheDocument()
+  // The month rung places into a WEEK, so it draws weeks. A `Sun Mon Tue…`
+  // header advertised a grain this page has never accepted.
+  it('MonthPage renders week strips and no weekday header', () => {
+    const { container } = render(<MonthPage />)
+    expect(screen.queryByText('Sun')).not.toBeInTheDocument()
+    expect(screen.queryByText('Mon')).not.toBeInTheDocument()
+    expect(container.querySelectorAll('[data-testid^="week-row-"]').length).toBeGreaterThanOrEqual(4)
   })
 
   it('MonthPage masthead shows the rhythm h1 and the calendar/motion/done subtitle', () => {

@@ -29,8 +29,9 @@ describe('PlaceOnWeeksStep', () => {
   it('dropping a move on a row writes the WEEK placement the /month page writes', () => {
     const host = makeHost({ tasks: [t({})] })
     renderStep(<PlaceOnWeeksStep />, { step, host })
-    // Drop on the cell containing July 15 — the drop belongs to its ROW.
-    fireEvent.drop(screen.getByText('15').closest('div')!, {
+    // The step renders the same week strips /month does — drop on a ROW, which
+    // is the only grain this rung accepts.
+    fireEvent.drop(screen.getByTestId('week-row-2'), {
       dataTransfer: { getData: () => 'm1' },
     })
     expect(host.onUpdateTask).toHaveBeenCalledTimes(1)
