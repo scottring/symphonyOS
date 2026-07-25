@@ -10,6 +10,7 @@ import { TriageWhenMenu } from '@/components/schedule/TriageWhenMenu'
 import { applyTriageWhen } from '@/lib/triage/applyWhen'
 import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
 import { selectOverdue } from '@/lib/today/taskPools'
+import { needsWeekVerdict } from '@/lib/today/weekPlacement'
 import { weekSizedMoves, clusterMoves, type MoveCluster } from '@/lib/planning/moveGrain'
 import type { Task } from '@/types/task'
 import { useGuided } from '../GuidedContext'
@@ -189,7 +190,7 @@ export function SeasonListRow({ task, fate = false, onCelebrated }: { task: Task
 }
 
 export function ReviewStep() {
-  const { step, host } = useGuided()
+  const { step, host, periodStart } = useGuided()
   const source = step.props?.source
   const match = useMemo(() => makeAssigneeFilter([]), [])
   // Session-local goal verdicts (goals source only): keeps decided rows on
@@ -207,8 +208,20 @@ export function ReviewStep() {
     if (source === 'overdue') return selectOverdue(host.tasks, true, match)
     const bucket = source === 'someday' ? 'someday' : step.props?.bucket
     if (!bucket) return []
-    return host.tasks.filter((t) => (!t.completed || celebratedIds.has(t.id)) && t.bucket === bucket && match(t.assignedTo, t.assignedToAll))
-  }, [source, step.props?.bucket, host.tasks, match, celebratedIds])
+    return host.tasks.filter((t) => {
+      if (t.completed && !celebratedIds.has(t.id)) return false
+      if (t.bucket !== bucket) return false
+      if (!match(t.assignedTo, t.assignedToAll)) return false
+      // "Last week's list" means everything in the week bucket with no claim on
+      // the week being planned: left behind by an earlier week, or never given a
+      // week at all. A move the month deliberately placed on THIS week or a
+      // later one is not last week's business — before the placement cascade
+      // there was only ever one week, so a bare bucket check was enough; now it
+      // would drag next month's plan into a review of what you didn't finish.
+      if (bucket === 'week' && !celebratedIds.has(t.id)) return needsWeekVerdict(t, periodStart)
+      return true
+    })
+  }, [source, step.props?.bucket, host.tasks, match, celebratedIds, periodStart])
 
   if (source === 'goals') {
     // Three fates, matching the narration: carry forward (the proactive

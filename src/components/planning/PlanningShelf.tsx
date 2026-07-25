@@ -32,6 +32,15 @@ export const SHELF_COLLAPSED_COUNT = 8
 export interface PlanningShelfProps {
   tasks: Task[]
   carryOverIds: Set<string>
+  /** Ids that carried over because the WEEK they were placed on has passed and
+   *  they never got a day (as opposed to a date coming and going). Their pill
+   *  names the week it came from, so "carried over" reads as a fact about the
+   *  plan rather than a mystery. */
+  staleWeekIds?: Set<string>
+  /** Resolve a stale placement by moving it onto the week being planned. The
+   *  one fate a drag can't express: keep it unplaced, but stop it being late.
+   *  Omitted = no such action offered. */
+  onBringForward?: (id: string) => void
   projectsMap: Map<string, { id: string; name: string }>
   tasksById: Map<string, Task>
   onOpenTask: (id: string) => void
@@ -80,6 +89,9 @@ export interface ShelfGroup {
 
 const DEFAULT_MOVE_DOWN = { label: 'To month', bucket: 'month' as const }
 
+// Module-level so the default prop keeps a stable identity across renders.
+const EMPTY_IDS: Set<string> = new Set()
+
 function useShelfPillMenu() {
   const [menuOpen, setMenuOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -108,6 +120,9 @@ function useShelfPillMenu() {
 interface ShelfPillSharedProps {
   task: Task
   projectName?: string
+  /** This pill carried over because its WEEK passed, not because a date did. */
+  staleWeek?: boolean
+  onBringForward?: (id: string) => void
   onOpenTask: (id: string) => void
   onSetBucket: (id: string, bucket: 'week' | 'month' | 'someday') => void
   onDeleteTask: (id: string) => void
@@ -118,12 +133,19 @@ interface ShelfPillSharedProps {
 }
 
 function ShelfPillContent({
-  task, projectName, onOpenTask, onSetBucket, onDeleteTask, onPushTask, moveDown, menuOpen, setMenuOpen,
+  task, projectName, staleWeek, onBringForward, onOpenTask, onSetBucket, onDeleteTask, onPushTask, moveDown, menuOpen, setMenuOpen,
 }: ShelfPillSharedProps) {
   return (
     <>
       <span data-testid="shelf-pill-title" className="text-neutral-700">{task.title}</span>
       {projectName && <span className="text-xs text-neutral-400">· {projectName}</span>}
+      {/* Amber alone says "late"; this says late FROM WHERE. A move placed on a
+          week that came and went is a specific, legible fact about the plan. */}
+      {staleWeek && task.weekStart && (
+        <span data-testid="stale-week-tag" className="text-xs text-amber-700 whitespace-nowrap">
+          · from {task.weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+        </span>
+      )}
       <span
         className="flex items-center opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
         onPointerDown={(e) => e.stopPropagation()}
@@ -148,6 +170,10 @@ function ShelfPillContent({
           onClick={(e) => e.stopPropagation()}>
           <button role="menuitem" type="button" className="w-full text-left px-3 py-1.5 hover:bg-neutral-50"
             onClick={() => { setMenuOpen(false); onOpenTask(task.id) }}>Open</button>
+          {staleWeek && onBringForward && (
+            <button role="menuitem" type="button" className="w-full text-left px-3 py-1.5 hover:bg-neutral-50"
+              onClick={() => { setMenuOpen(false); onBringForward(task.id) }}>Bring to this week</button>
+          )}
           <button role="menuitem" type="button" className="w-full text-left px-3 py-1.5 hover:bg-neutral-50"
             onClick={() => { setMenuOpen(false); onSetBucket(task.id, moveDown.bucket) }}>{moveDown.label}</button>
           <button role="menuitem" type="button" className="w-full text-left px-3 py-1.5 hover:bg-neutral-50"
@@ -163,6 +189,8 @@ function ShelfPillContent({
 interface ShelfPillProps {
   task: Task
   carried: boolean
+  staleWeek?: boolean
+  onBringForward?: (id: string) => void
   projectName?: string
   onOpenTask: (id: string) => void
   onSetBucket: (id: string, bucket: 'week' | 'month' | 'someday') => void
@@ -177,7 +205,7 @@ function pillClassName(carried: boolean) {
   }`
 }
 
-function ShelfPill({ task, carried, projectName, onOpenTask, onSetBucket, onDeleteTask, onPushTask, moveDown }: ShelfPillProps) {
+function ShelfPill({ task, carried, staleWeek, onBringForward, projectName, onOpenTask, onSetBucket, onDeleteTask, onPushTask, moveDown }: ShelfPillProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: task.id })
   const { menuOpen, setMenuOpen, containerRef } = useShelfPillMenu()
 
@@ -192,7 +220,8 @@ function ShelfPill({ task, carried, projectName, onOpenTask, onSetBucket, onDele
       {...listeners}
     >
       <ShelfPillContent
-        task={task} projectName={projectName} onOpenTask={onOpenTask} onSetBucket={onSetBucket}
+        task={task} projectName={projectName} staleWeek={staleWeek} onBringForward={onBringForward}
+        onOpenTask={onOpenTask} onSetBucket={onSetBucket}
         onDeleteTask={onDeleteTask} onPushTask={onPushTask} moveDown={moveDown}
         menuOpen={menuOpen} setMenuOpen={setMenuOpen}
       />
@@ -200,7 +229,7 @@ function ShelfPill({ task, carried, projectName, onOpenTask, onSetBucket, onDele
   )
 }
 
-function NativeShelfPill({ task, carried, projectName, onOpenTask, onSetBucket, onDeleteTask, onPushTask, moveDown }: ShelfPillProps) {
+function NativeShelfPill({ task, carried, staleWeek, onBringForward, projectName, onOpenTask, onSetBucket, onDeleteTask, onPushTask, moveDown }: ShelfPillProps) {
   const { menuOpen, setMenuOpen, containerRef } = useShelfPillMenu()
 
   return (
@@ -212,7 +241,8 @@ function NativeShelfPill({ task, carried, projectName, onOpenTask, onSetBucket, 
       onClick={() => onOpenTask(task.id)}
     >
       <ShelfPillContent
-        task={task} projectName={projectName} onOpenTask={onOpenTask} onSetBucket={onSetBucket}
+        task={task} projectName={projectName} staleWeek={staleWeek} onBringForward={onBringForward}
+        onOpenTask={onOpenTask} onSetBucket={onSetBucket}
         onDeleteTask={onDeleteTask} onPushTask={onPushTask} moveDown={moveDown}
         menuOpen={menuOpen} setMenuOpen={setMenuOpen}
       />
@@ -281,7 +311,8 @@ function NativeShelfFrame({ onNativeUnschedule, children }: {
 
 export function PlanningShelf(props: PlanningShelfProps) {
   const {
-    tasks, carryOverIds, projectsMap, tasksById, onOpenTask, onSetBucket, onDeleteTask, onPushTask,
+    tasks, carryOverIds, staleWeekIds = EMPTY_IDS, onBringForward,
+    projectsMap, tasksById, onOpenTask, onSetBucket, onDeleteTask, onPushTask,
     draft, onDraftChange, onSubmitDraft, hiddenCount = 0, showingAll = false, onToggleShowAll,
     tend, onApplyProposal, dragMode = 'dndkit', onNativeUnschedule, moveDown = DEFAULT_MOVE_DOWN,
     draftPlaceholder = 'Add to this week…', tendingLabel = 'Tending this week',
@@ -290,12 +321,20 @@ export function PlanningShelf(props: PlanningShelfProps) {
   const [expanded, setExpanded] = useState(false)
   const [openGroups, setOpenGroups] = useState<Set<string>>(() => new Set())
 
-  // Carried-over → project-grouped (by name) → loose. Stable within groups.
+  // Stale week placements → other carried-over → project-grouped (by name) →
+  // loose. Stable within groups.
+  //
+  // Stale placements lead because they're the easiest thing here to lose: only
+  // the first SHELF_COLLAPSED_COUNT pills render, so a stranded move sitting
+  // behind ten overdue items would hide under "+N more" — on the one surface
+  // built to stop it being forgotten.
   const ordered = useMemo(() => {
+    const stale: Task[] = []
     const carried: Task[] = []
     const byProject = new Map<string, Task[]>()
     const loose: Task[] = []
     for (const t of tasks) {
+      if (staleWeekIds.has(t.id)) { stale.push(t); continue }
       if (carryOverIds.has(t.id)) { carried.push(t); continue }
       const p = t.projectId ? projectsMap.get(t.projectId) : undefined
       if (p) {
@@ -304,8 +343,8 @@ export function PlanningShelf(props: PlanningShelfProps) {
         byProject.set(p.id, arr)
       } else loose.push(t)
     }
-    return [...carried, ...[...byProject.values()].flat(), ...loose]
-  }, [tasks, carryOverIds, projectsMap])
+    return [...stale, ...carried, ...[...byProject.values()].flat(), ...loose]
+  }, [tasks, carryOverIds, staleWeekIds, projectsMap])
 
   // Rolled-up members leave the flat run; the header count still speaks for
   // the whole list, so the month reads as "8 moves", not "21 chores".
@@ -420,6 +459,7 @@ export function PlanningShelf(props: PlanningShelfProps) {
                   <div className="mt-2 ml-5 flex flex-wrap items-center gap-2">
                     {members.map((t) => (
                       <Pill key={t.id} task={t} carried={carryOverIds.has(t.id)}
+                        staleWeek={staleWeekIds.has(t.id)} onBringForward={onBringForward}
                         projectName={t.projectId ? projectsMap.get(t.projectId)?.name : undefined}
                         onOpenTask={onOpenTask} onSetBucket={onSetBucket} onDeleteTask={onDeleteTask} onPushTask={onPushTask}
                         moveDown={moveDown} />
@@ -431,6 +471,7 @@ export function PlanningShelf(props: PlanningShelfProps) {
           })}
           {visible.map((t) => (
             <Pill key={t.id} task={t} carried={carryOverIds.has(t.id)}
+              staleWeek={staleWeekIds.has(t.id)} onBringForward={onBringForward}
               projectName={t.projectId ? projectsMap.get(t.projectId)?.name : undefined}
               onOpenTask={onOpenTask} onSetBucket={onSetBucket} onDeleteTask={onDeleteTask} onPushTask={onPushTask}
               moveDown={moveDown} />

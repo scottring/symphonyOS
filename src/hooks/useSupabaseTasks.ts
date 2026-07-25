@@ -7,10 +7,17 @@ import { logger } from '@/lib/logger'
 import type { Task, TaskBucket, TaskLink, TaskContext, TaskCategory, TaskCaptureMeta, LinkedActivity, LinkType, LinkedActivityType, GroupMemberRef } from '@/types/task'
 import type { TaskDirections } from '@/types/directions'
 import { defaultScopeForArea, type Scope } from '@/lib/scope'
-import { localYmd, parseLocalYmd } from '@/lib/cadence/config'
+import { localYmd, parseLocalYmd, weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
+import { weekStartForBucket } from '@/lib/today/weekPlacement'
 
 // Monotonic suffix so every hook instance gets its own realtime channel topic.
 let tasksChannelSeq = 0
+
+/** Start of the week we're in now, per the user's weekStartsOn. What "this
+ *  week" resolves to for every triage surface that says those words. */
+function currentWeekStart(): Date {
+  return weekStartAnchor(new Date(), readCadenceConfig().weekStartsOn)
+}
 
 // Same-tab write fan-out. Every hook instance keeps its own copy of the tasks
 // state, and cross-instance sync (detail panel → Today list, QuickCapture →
@@ -1097,10 +1104,12 @@ export function useSupabaseTasks() {
   // Move a task to a bucket (week, month, quarter) or reschedule to a date
   const pushTask = useCallback(async (id: string, target: Date | 'week' | 'month' | 'quarter') => {
     if (target === 'week' || target === 'month' || target === 'quarter') {
-      // Move to pool — clear scheduled date
+      // Move to pool — clear scheduled date, and settle the week (see setBucket:
+      // "to the week" means THIS week; every other bucket has no week at all).
       await updateTask(id, {
         bucket: target,
         scheduledFor: undefined,
+        weekStart: weekStartForBucket(target, currentWeekStart()),
       })
     } else {
       // Reschedule to a specific date
@@ -1133,6 +1142,13 @@ export function useSupabaseTasks() {
   }, [findTaskById, updateTask])
 
   // Set a task's bucket directly (for triage: inbox → week, month, etc.)
+  //
+  // "This week" MEANS this week, so moving into the week bucket stamps the
+  // week. Without it, the one fate the weekly review most needs — "carry it
+  // forward" on a move left behind by an earlier week — was a no-op: the task
+  // was already bucket='week', so the update changed nothing and the item came
+  // back marked stale, forever. Every other bucket has no week, so clear it
+  // (otherwise something sent to the month keeps a secret week).
   const setBucket = useCallback(async (id: string, bucket: TaskBucket, scheduledFor?: Date, isAllDay?: boolean) => {
     const updates: Partial<Task> = { bucket }
     if (bucket === 'timed' && scheduledFor) {
@@ -1141,6 +1157,7 @@ export function useSupabaseTasks() {
     } else if (bucket !== 'timed') {
       updates.scheduledFor = undefined
     }
+    updates.weekStart = weekStartForBucket(bucket, currentWeekStart())
     await updateTask(id, updates)
   }, [updateTask])
 

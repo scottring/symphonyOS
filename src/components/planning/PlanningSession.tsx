@@ -30,7 +30,7 @@ import { PlanningRoutineBlock, PLACED_ROUTINE_DRAG_PREFIX } from './PlanningRout
 import { computeEventReschedule } from './planningReschedule'
 import { PlanningSlotQuickCreate } from './PlanningSlotQuickCreate'
 import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
-import { belongsToWeek } from '@/lib/today/weekPlacement'
+import { belongsToWeek, isStaleWeekPlacement } from '@/lib/today/weekPlacement'
 
 interface PlanningSessionProps {
   tasks: Task[]
@@ -273,8 +273,11 @@ export function PlanningSession({
     const currentWeek = weekStartAnchor(today, readCadenceConfig().weekStartsOn)
     const isRelevant = (task: Task) => {
       if (task.isAllDay) return true
-      // This week's items only — a move placed on a later week isn't today-relevant.
-      if (task.bucket === 'week') return belongsToWeek(task, currentWeek)
+      // This week's items, plus anything left behind by an earlier week — a
+      // stranded placement is the MOST relevant thing here, and burying it
+      // behind "Show more" is how it stays stranded. Only a move placed on a
+      // week still ahead is filtered out.
+      if (task.bucket === 'week') return belongsToWeek(task, currentWeek) || isStaleWeekPlacement(task, currentWeek)
       if (task.scheduledFor) {
         const d = new Date(task.scheduledFor)
         d.setHours(0, 0, 0, 0)

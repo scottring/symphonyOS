@@ -61,7 +61,7 @@ export function WeekPage() {
   const {
     navigate, familyMembers, eventNotesMap, updateTask, pushTask,
     domainEvents, weekGridTasks, todayStart, railCounts,
-    period, placedThisWeek, carryOver, pool,
+    period, placedThisWeek, carryOver, staleWeekPlacements, pool,
     planDisabled, handlePlan, rungName, hasExplainer,
     explainerOpen, setExplainerOpen, label,
     draft, setDraft, submitDraft,
@@ -76,6 +76,16 @@ export function WeekPage() {
     : (period ?? label);
 
   const carryOverIds = useMemo(() => new Set(carryOver.map((t) => t.id)), [carryOver]);
+  // The subset whose reason is "the week it was placed on has passed" — those
+  // pills name that week and offer the one fate a drag can't express.
+  const staleWeekIds = useMemo(() => new Set(staleWeekPlacements.map((t) => t.id)), [staleWeekPlacements]);
+  // Bring it onto the week being planned: still unplaced, no longer late. The
+  // other fates are already here — drag it to a day, or use the ⋯ menu to send
+  // it back to the month, put it aside, or let it go.
+  const onBringForward = useCallback(
+    (id: string) => { void updateTask(id, { weekStart: gridStart }); },
+    [updateTask, gridStart],
+  );
 
   // Union of this week's grid tasks + carried-over (prior-week overdue) tasks,
   // deduped by id. weekGridTasks alone excludes a task scheduled BEFORE the
@@ -172,14 +182,15 @@ export function WeekPage() {
   }, [addTask, getCurrentUserMember, currentDomain]);
 
   const shelf = useMemo(() => ({
-    carryOverIds, projectsMap, tasksById,
+    carryOverIds, staleWeekIds, onBringForward, projectsMap, tasksById,
     onOpenTask: (id: string) => scheduleActionsValue.onOpenTask?.(id),
     onSetBucket: (id: string, bucket: 'week' | 'month' | 'someday') => setBucket(id, bucket),
     onDeleteTask: deleteTaskWithUndo,
     onPushTask: pushTask,
     draft, onDraftChange: setDraft, onSubmitDraft: () => void submitDraft(),
     tend, onApplyProposal: handleApplyProposal,
-  }), [carryOverIds, projectsMap, tasksById, scheduleActionsValue.onOpenTask, setBucket,
+  }), [carryOverIds, staleWeekIds, onBringForward, projectsMap, tasksById,
+       scheduleActionsValue.onOpenTask, setBucket,
        deleteTaskWithUndo, pushTask, draft, setDraft, submitDraft, tend, handleApplyProposal]);
 
   return (

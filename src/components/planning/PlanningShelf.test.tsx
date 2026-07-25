@@ -189,3 +189,55 @@ describe('PlanningShelf — grouped roll-up', () => {
     expect(screen.getAllByTestId('shelf-pill-title')).toHaveLength(3)
   })
 })
+
+// ── Stale week placements: moves placed on a week that came and went without
+// ever getting a day. Amber alone doesn't explain itself, and a drag can't
+// express "keep it unplaced but stop it being late". ──
+describe('PlanningShelf — stale week placements', () => {
+  function staleTask(id: string, title: string, weekStart: Date): Task {
+    return { id, title, completed: false, bucket: 'week', weekStart, createdAt: new Date(), updatedAt: new Date() } as Task
+  }
+
+  const stale = staleTask('s1', 'Order the vanity', new Date(2026, 6, 12))
+
+  function staleProps(overrides: Partial<PlanningShelfProps> = {}) {
+    return baseProps({
+      tasks: [task('l1', 'Make a chore plan'), stale],
+      carryOverIds: new Set(['s1']),
+      staleWeekIds: new Set(['s1']),
+      onBringForward: vi.fn(),
+      ...overrides,
+    })
+  }
+
+  it("names the week it came from, so 'carried over' isn't a mystery", () => {
+    render(<DndContext><PlanningShelf {...staleProps()} /></DndContext>)
+    expect(screen.getByTestId('stale-week-tag')).toHaveTextContent('from Jul 12')
+  })
+
+  it('offers "Bring to this week" — the one fate a drag cannot express', () => {
+    const props = staleProps()
+    render(<DndContext><PlanningShelf {...props} /></DndContext>)
+    // The stale pill sorts first, so its actions button is the first one.
+    fireEvent.click(screen.getAllByLabelText('Task actions')[0])
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Bring to this week' }))
+    expect(props.onBringForward).toHaveBeenCalledWith('s1')
+  })
+
+  it('leads the shelf — only the first pills render, and this is the one to lose', () => {
+    const many = Array.from({ length: SHELF_COLLAPSED_COUNT }, (_, i) => task(`c${i}`, `Overdue ${i}`))
+    render(<DndContext><PlanningShelf {...staleProps({
+      tasks: [...many, stale],
+      carryOverIds: new Set([...many.map((t) => t.id), 's1']),
+    })} /></DndContext>)
+    const titles = screen.getAllByTestId('shelf-pill-title').map((el) => el.textContent)
+    expect(titles[0]).toBe('Order the vanity')
+  })
+
+  it('shows no tag and no bring-forward action for an ordinary carried-over item', () => {
+    render(<DndContext><PlanningShelf {...baseProps()} /></DndContext>)
+    expect(screen.queryByTestId('stale-week-tag')).not.toBeInTheDocument()
+    fireEvent.click(screen.getAllByLabelText('Task actions')[0])
+    expect(screen.queryByRole('menuitem', { name: 'Bring to this week' })).not.toBeInTheDocument()
+  })
+})

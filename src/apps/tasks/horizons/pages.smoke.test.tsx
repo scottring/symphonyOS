@@ -158,12 +158,16 @@ describe('horizon pages (smoke)', () => {
   // that isn't all-day renders at the 12 AM row, outside the grid's 6 AM–10 PM
   // window, so it would be written and invisible.
   it('WeekPage: clicking a slot creates the task on the DAY, all-day, no time', () => {
-    const tomorrow = new Date(now)
-    tomorrow.setDate(tomorrow.getDate() + 1)
-    tomorrow.setHours(0, 0, 0, 0)
+    // TODAY, not tomorrow. The grid spans the current week, and minDropDate
+    // refuses days behind today — so today is the only day guaranteed to be both
+    // rendered and droppable on every day of the week. ("Tomorrow" is outside
+    // the grid on the week's last day, which is a test that fails one day in
+    // seven.)
+    const today = new Date(now)
+    today.setHours(0, 0, 0, 0)
 
     const { container } = render(<WeekPage />)
-    const slot = container.querySelector(`[data-droppable-id^="slot-${localYmd(tomorrow)}-"]`)
+    const slot = container.querySelector(`[data-droppable-id^="slot-${localYmd(today)}-"]`)
     expect(slot).not.toBeNull()
     fireEvent.click(slot!)
 
@@ -176,8 +180,62 @@ describe('horizon pages (smoke)', () => {
     expect(mockAddTask).toHaveBeenCalledTimes(1)
     const [title, , , scheduledFor, opts] = mockAddTask.mock.calls[0]
     expect(title).toBe('Order the vanity')
-    expect(scheduledFor).toEqual(tomorrow) // midnight — the slot's hour is dropped
+    expect(scheduledFor).toEqual(today) // midnight — the slot's hour is dropped
     expect(opts).toMatchObject({ isAllDay: true })
+  })
+
+  // ── The hole the placement cascade left: a move placed on a week that passed
+  // without ever getting a day. The week pool is scoped to the viewed week, so
+  // it shows on NO page you would ever open. Carry-over is the only thing that
+  // puts it back in front of you. ──
+  it('WeekPage surfaces a move left behind by an earlier week', () => {
+    const lastWeek = new Date(currentWeekStart)
+    lastWeek.setDate(lastWeek.getDate() - 7)
+    mockTasks.push(createMockTask({
+      id: 'stranded',
+      title: 'Order the vanity',
+      bucket: 'week',
+      weekStart: lastWeek,
+      scheduledFor: undefined,
+    }) satisfies Task)
+
+    render(<WeekPage />)
+    // On the shelf, and marked with the week it came from.
+    expect(screen.getAllByText('Order the vanity')).toHaveLength(1)
+    expect(screen.getByTestId('stale-week-tag')).toBeInTheDocument()
+    expect(screen.getByText(/1 carried over/)).toBeInTheDocument()
+  })
+
+  it('WeekPage does NOT surface a move placed on a LATER week as carried over', () => {
+    const nextWeek = new Date(currentWeekStart)
+    nextWeek.setDate(nextWeek.getDate() + 7)
+    mockTasks.push(createMockTask({
+      id: 'ahead',
+      title: 'Book the mover',
+      bucket: 'week',
+      weekStart: nextWeek,
+      scheduledFor: undefined,
+    }) satisfies Task)
+
+    render(<WeekPage />)
+    expect(screen.queryByTestId('stale-week-tag')).not.toBeInTheDocument()
+    expect(screen.queryByText(/carried over/)).not.toBeInTheDocument()
+  })
+
+  it('WeekPage: bringing a stale move forward stamps the week being planned', () => {
+    const lastWeek = new Date(currentWeekStart)
+    lastWeek.setDate(lastWeek.getDate() - 7)
+    mockTasks.push(createMockTask({
+      id: 'stranded', title: 'Order the vanity', bucket: 'week', weekStart: lastWeek,
+    }) satisfies Task)
+
+    render(<WeekPage />)
+    fireEvent.click(screen.getAllByLabelText('Task actions')[0])
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Bring to this week' }))
+
+    const call = mockUpdateTask.mock.calls.find(([id]) => id === 'stranded')
+    expect(call).toBeDefined()
+    expect(localYmd(call![1].weekStart as Date)).toBe(localYmd(currentWeekStart))
   })
 
   it('MonthPage renders the calendar grid weekday header', () => {

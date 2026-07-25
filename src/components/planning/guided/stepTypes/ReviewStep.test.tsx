@@ -245,3 +245,49 @@ describe('ReviewStep — month grain hint', () => {
     expect(screen.queryByText(/one sitting/i)).not.toBeInTheDocument()
   })
 })
+
+// ── "Last week's list" means what has no claim on the week being planned. Before
+// the placement cascade there was only ever one week, so `bucket === 'week'` was
+// enough; now the month can place a move on a FUTURE week, and that must not turn
+// up in a review of what you didn't finish. ──
+describe('ReviewStep — week review scoping', () => {
+  const weekStep = { id: 'week-review', type: 'review' as const, title: "Last week's list", props: { bucket: 'week' as const } }
+  const weekOf = (d: number) => new Date(2026, 6, d)
+  const planning = weekOf(19) // the week being planned
+
+  function renderWeekReview(tasks: Task[]) {
+    return renderStep(<ReviewStep />, {
+      step: weekStep, host: makeHost({ tasks }), horizon: 'weekly', periodStart: planning,
+    })
+  }
+
+  it('asks about a move left behind by an earlier week', () => {
+    renderWeekReview([task({ id: 'a', title: 'Order the vanity', bucket: 'week', weekStart: weekOf(12) })])
+    expect(screen.getByText('Order the vanity')).toBeInTheDocument()
+  })
+
+  it('asks about a legacy row that never got a week at all', () => {
+    renderWeekReview([task({ id: 'a', title: 'Weed the backyard', bucket: 'week' })])
+    expect(screen.getByText('Weed the backyard')).toBeInTheDocument()
+  })
+
+  it('does NOT ask about a move the month placed on a LATER week', () => {
+    renderWeekReview([task({ id: 'a', title: 'Book the mover', bucket: 'week', weekStart: weekOf(26) })])
+    expect(screen.queryByText('Book the mover')).not.toBeInTheDocument()
+  })
+
+  it('does NOT ask about a move deliberately placed on the week being planned', () => {
+    renderWeekReview([task({ id: 'a', title: 'Get the plants', bucket: 'week', weekStart: planning })])
+    expect(screen.queryByText('Get the plants')).not.toBeInTheDocument()
+  })
+
+  it('still scopes the MONTH review by bucket alone — a month has no week to miss', () => {
+    const monthStep = { ...weekStep, id: 'month-review', props: { bucket: 'month' as const } }
+    renderStep(<ReviewStep />, {
+      step: monthStep,
+      host: makeHost({ tasks: [task({ id: 'a', title: 'Decide on the car', bucket: 'month', weekStart: weekOf(26) })] }),
+      horizon: 'monthly', periodStart: planning,
+    })
+    expect(screen.getByText('Decide on the car')).toBeInTheDocument()
+  })
+})

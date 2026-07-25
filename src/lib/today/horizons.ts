@@ -1,5 +1,5 @@
 import type { Task, TaskBucket } from '@/types/task'
-import { belongsToWeek } from './weekPlacement'
+import { belongsToWeek, isStaleWeekPlacement } from './weekPlacement'
 
 export type HorizonId = 'today' | 'week' | 'month' | 'season' | 'year' | 'someday'
 type Match = (assignedTo: string | null | undefined, assignedToAll?: readonly string[] | null) => boolean
@@ -39,6 +39,20 @@ export function selectHorizonPool(
     if (horizon === 'week' && viewedWeekStart) return belongsToWeek(task, viewedWeekStart)
     return true
   })
+}
+
+/** The week rung's carry-over: moves placed on a week that has already passed
+ * and never given a day. Nothing rolls them forward on its own — that was the
+ * explicit decision — so without this they sit on a past week that the week pool
+ * won't show and no one will open again. Surfaced on the current week alongside
+ * the overdue-dated carry-over, so a stranded placement gets a fate instead of
+ * quietly aging out.
+ *
+ * Oldest first: the thing you've ignored longest asks first. */
+export function selectStaleWeekPlacements(tasks: Task[], viewedWeekStart: Date, match: Match): Task[] {
+  return tasks
+    .filter(task => isStaleWeekPlacement(task, viewedWeekStart) && match(task.assignedTo, task.assignedToAll))
+    .sort((a, b) => (a.weekStart as Date).getTime() - (b.weekStart as Date).getTime())
 }
 
 /** The week's placed rocks: tasks scheduled onto a day inside the week that

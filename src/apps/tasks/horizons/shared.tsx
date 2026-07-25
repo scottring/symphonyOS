@@ -36,7 +36,7 @@ import { useSelection } from '@/shell/providers/SelectionProvider';
 import { DenseInboxRow } from '@/components/schedule/DenseInboxRow';
 import { TriageWhenMenu, type TriageWhen } from '@/components/schedule/TriageWhenMenu';
 import { selectOverdue } from '@/lib/today/taskPools';
-import { selectHorizonPool, selectPlacedInWeek, HORIZONS, type HorizonId } from '@/lib/today/horizons';
+import { selectHorizonPool, selectPlacedInWeek, selectStaleWeekPlacements, HORIZONS, type HorizonId } from '@/lib/today/horizons';
 import { belongsToWeek } from '@/lib/today/weekPlacement';
 import { readCadenceConfig, weekStartAnchor } from '@/lib/cadence/config';
 import { matchesDomain, filterEventsForDomain, domainSessionToken } from '@/lib/today/domainFilter';
@@ -158,26 +158,46 @@ export function useHorizonPageData(horizon: HorizonId, anchorDate?: Date) {
     [tasks, currentDomain],
   );
 
-  // ── The scoped pool + carry-over. THE INVARIANT lives here. ──
-  // Carry-over (overdue *dated* items) is a near-term concept: it belongs to
-  // Today (rendered by HomeView) and to the weekly working set ("what you didn't
-  // finish last week"). It must NOT bleed into Month / Season / Year / Someday —
-  // those show only their own pool. (Someday is timeless; nothing is ever
-  // "overdue" into it.) Showing the global overdue set on every horizon was the
-  // bug where the same 5 items appeared as "carried over" everywhere.
-  const showCarryOver = horizon === 'week';
-  const carryOver = useMemo(
-    () => (showCarryOver ? selectOverdue(domainTasks, true, match) : []),
-    [showCarryOver, domainTasks, match],
-  );
-  // ── Which week this page is looking at. Declared before the pool because the
-  // week pool is now scoped to it: a month move placed on the week of Aug 10
-  // belongs to that week's list, not to every week's. Anchored to `anchorDate`
-  // when viewing a specific week (`?start=`); otherwise the current week. ──
+  // ── Which week this page is looking at. Declared before the pool and the
+  // carry-over because both are scoped to it: a month move placed on the week of
+  // Aug 10 belongs to that week's list, not to every week's. Anchored to
+  // `anchorDate` when viewing a specific week (`?start=`); otherwise the current
+  // week. ──
   const todayStart = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; }, []);
   const weekAnchor = useMemo(
     () => weekStartAnchor(anchorDate ?? new Date(), readCadenceConfig().weekStartsOn),
     [anchorDate],
+  );
+
+  // ── The scoped pool + carry-over. THE INVARIANT lives here. ──
+  // Carry-over is a near-term concept: it belongs to Today (rendered by
+  // HomeView) and to the weekly working set ("what you didn't finish last
+  // week"). It must NOT bleed into Month / Season / Year / Someday — those show
+  // only their own pool. (Someday is timeless; nothing is ever "overdue" into
+  // it.) Showing the global overdue set on every horizon was the bug where the
+  // same 5 items appeared as "carried over" everywhere.
+  //
+  // TWO kinds of carry-over, and the second is the whole reason this exists:
+  //  - overdue DATED items — a day came and went.
+  //  - stale WEEK placements — a move placed on a week that never got a day, and
+  //    that week has passed. Nothing rolls it forward on its own, and the week
+  //    pool is scoped to the viewed week, so this channel is the only thing that
+  //    puts it back in front of you. Without it the item is stranded on a page
+  //    no one will open again.
+  const showCarryOver = horizon === 'week';
+  const carryOver = useMemo(() => {
+    if (!showCarryOver) return [];
+    const byId = new Map<string, Task>();
+    for (const t of selectOverdue(domainTasks, true, match)) byId.set(t.id, t);
+    for (const t of selectStaleWeekPlacements(domainTasks, weekAnchor, match)) byId.set(t.id, t);
+    return [...byId.values()];
+  }, [showCarryOver, domainTasks, match, weekAnchor]);
+
+  // Just the stale week placements, for surfaces that explain WHY an item
+  // carried over and offer the one-click fate that resolves it.
+  const staleWeekPlacements = useMemo(
+    () => (showCarryOver ? selectStaleWeekPlacements(domainTasks, weekAnchor, match) : []),
+    [showCarryOver, domainTasks, weekAnchor, match],
   );
 
   const pool = useMemo(
@@ -781,7 +801,7 @@ export function useHorizonPageData(horizon: HorizonId, anchorDate?: Date) {
     undo,
     match,
     domainTasks,
-    showCarryOver, carryOver, pool,
+    showCarryOver, carryOver, staleWeekPlacements, pool,
     placedThisWeek,
     todayStart, weekGridStart, weekGridTasks, weekAnchor,
     railCounts,
