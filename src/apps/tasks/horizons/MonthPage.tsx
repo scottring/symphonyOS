@@ -215,9 +215,11 @@ export function MonthPage() {
             </div>
           </header>
 
-          {/* Month identity line — framing for moves (concrete chunks) */}
+          {/* Month identity line — framing for moves (concrete chunks), and the
+              rung's one question: which week. */}
           <p className="mb-3 text-[12px] text-neutral-400">
             Moves — concrete chunks that fit in a sitting; 10–15 is a good month.
+            {' '}Drop one on a week to place it — which day is the week&rsquo;s question.
             {(() => { const s = servingCount(domainTasks); return s.total > 0 ? ` Serving ${s.serving} of ${s.total} picks.` : ''; })()}
           </p>
         </div>

@@ -166,6 +166,31 @@ describe('MonthCalendarGrid week placement', () => {
     expect(screen.queryByText('This week')).not.toBeInTheDocument()
   })
 
+  it("the rail says 'week' in week mode and 'day' otherwise", () => {
+    const { unmount } = render(
+      <MonthCalendarGrid
+        month={new Date(2026, 6, 1)}
+        tasks={[monthTask({})]}
+        events={events}
+        weekStartsOn={1}
+        onPlaceTaskInWeek={vi.fn()}
+      />
+    )
+    expect(screen.getByText(/Drag onto a week to place/)).toBeInTheDocument()
+    unmount()
+
+    render(
+      <MonthCalendarGrid
+        month={new Date(2026, 6, 1)}
+        tasks={[monthTask({})]}
+        events={events}
+        weekStartsOn={1}
+        onPlaceTask={vi.fn()}
+      />
+    )
+    expect(screen.getByText(/Drag onto a day to place/)).toBeInTheDocument()
+  })
+
   it('renders no lane and keeps day drops when no week handler is given', () => {
     const onPlaceTask = vi.fn()
     render(
@@ -211,9 +236,10 @@ describe('MonthCalendarGrid hideRail', () => {
       />
     )
 
-    // Rail text should not be present
-    expect(screen.queryByText(/Drag onto a day to schedule/)).not.toBeInTheDocument()
-    expect(screen.queryByText(/Drag a scheduled item here to unschedule/)).not.toBeInTheDocument()
+    // Rail text should not be present (matches the rail's current copy — an
+    // assertion against text that no longer exists anywhere passes vacuously).
+    expect(screen.queryByText(/Drag onto a day to place/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Drag a placed item here to unplace it/)).not.toBeInTheDocument()
 
     // But cell drop should still work: drag task-1 onto day 15
     const dayCell = screen.getByText('15').closest('div')

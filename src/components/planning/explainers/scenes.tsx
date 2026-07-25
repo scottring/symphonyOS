@@ -42,6 +42,14 @@ function MiniMove({ className = '' }: { className?: string }) {
   return <Chip label="Book the physio assessment" className={className} />
 }
 function MiniDay({ className = '' }: { className?: string }) {
+  return <Chip label="Tue · physio call" className={className} />
+}
+// A week, with no day inside it yet — what a month move becomes when placed.
+function MiniWeek({ className = '' }: { className?: string }) {
+  return <Chip label="Week of the 20th" className={className} />
+}
+// A day AND a time — the end of the cascade, which only Today hands out.
+function MiniTime({ className = '' }: { className?: string }) {
   return <Chip label="Tue 9am · physio call" className={className} />
 }
 
@@ -57,7 +65,7 @@ function CascadeDrop() {
       <ArrowDown className="w-3.5 h-3.5 text-neutral-300" aria-hidden />
       <div className="ex-drop" data-ex-delay="3"><MiniMove /></div>
       <ArrowDown className="w-3.5 h-3.5 text-neutral-300" aria-hidden />
-      <div className="ex-drop" data-ex-delay="4"><MiniDay /></div>
+      <div className="ex-drop" data-ex-delay="4"><MiniTime /></div>
     </div>
   )
 }
@@ -153,20 +161,37 @@ function DuplicateMoves() {
 }
 
 // A move landing on a calendar day — "moves land on real days" (month 3).
-function MoveToDay() {
+function MoveToWeek() {
   return (
     <div className="flex flex-col items-center gap-1.5 ex-rise">
       <MiniMove />
+      <ArrowDown className="w-3.5 h-3.5 text-neutral-300" aria-hidden />
+      <MiniWeek />
+    </div>
+  )
+}
+
+// The next rung down: the week turns a week into a day (month scene 3's
+// sequel, and the week rung's own opening scene).
+function WeekToDay() {
+  return (
+    <div className="flex flex-col items-center gap-1.5 ex-rise">
+      <MiniWeek />
       <ArrowDown className="w-3.5 h-3.5 text-neutral-300" aria-hidden />
       <MiniDay />
     </div>
   )
 }
 
-// A day chip alone, placed on the grid — "the week is where moves get
-// placed" (week scene 1).
-function PlacedDay() {
-  return <div className="ex-rise"><MiniDay /></div>
+// And the last rung: Today is the only place a day becomes a time.
+function DayToTime() {
+  return (
+    <div className="flex flex-col items-center gap-1.5 ex-rise">
+      <MiniDay />
+      <ArrowDown className="w-3.5 h-3.5 text-neutral-300" aria-hidden />
+      <MiniTime />
+    </div>
+  )
 }
 
 // A dimmed, crossed-out "yesterday" slot next to a live day — the grid
@@ -175,7 +200,7 @@ function GridRefusesPast() {
   return (
     <div className="flex items-center gap-3 ex-rise">
       <div className="rounded-xl border border-neutral-100 bg-neutral-50 px-4 py-2.5 text-sm text-neutral-300 line-through">
-        Mon 9am
+        Mon
       </div>
       <ArrowDown className="w-3.5 h-3.5 text-neutral-300 -rotate-90" aria-hidden />
       <MiniDay />
@@ -197,10 +222,10 @@ function EmptyPoolFullGrid() {
   )
 }
 
-// A day chip that stays put — "today shows what the system already decided"
-// (today scene 1).
+// A settled, timed item that stays put — "today shows what the system already
+// decided" (today scene 2).
 function TodayDecided() {
-  return <div className="ex-rise"><MiniDay /></div>
+  return <div className="ex-rise"><MiniTime /></div>
 }
 
 // New capture going into an inbox, not the plan — today scene 2.
@@ -278,9 +303,9 @@ export const EXPLAINER_SCENES: Record<HorizonId, Scene[]> = {
       vignette: <DuplicateMoves />,
     },
     {
-      headline: 'Moves land on real days.',
-      body: 'The month calendar is where ideas become dated.',
-      vignette: <MoveToDay />,
+      headline: 'A move lands on a week, not a day.',
+      body: 'The month asks which week — nothing more. Which day is the week\u2019s question, and what time is Today\u2019s.',
+      vignette: <MoveToWeek />,
     },
     {
       headline: '10–15 is a good month.',
@@ -290,9 +315,9 @@ export const EXPLAINER_SCENES: Record<HorizonId, Scene[]> = {
   ],
   week: [
     {
-      headline: 'The week is where moves get placed.',
-      body: 'A placement is a move with a day and a time.',
-      vignette: <PlacedDay />,
+      headline: 'The week turns a week into a day.',
+      body: 'A move arrives here already belonging to this week. Your one job is to say which day; the time is Today\u2019s call.',
+      vignette: <WeekToDay />,
     },
     {
       headline: 'The grid refuses the past.',
@@ -307,6 +332,11 @@ export const EXPLAINER_SCENES: Record<HorizonId, Scene[]> = {
   ],
   today: [
     {
+      headline: 'Today is where a day gets a time.',
+      body: 'The week already chose the day. The last decision — when, exactly — is the only one left, and it lives here.',
+      vignette: <DayToTime />,
+    },
+    {
       headline: 'Today shows what the system already decided.',
       body: 'The cascade ends here — you execute, you don’t re-plan.',
       vignette: <TodayDecided />,
@@ -318,7 +348,7 @@ export const EXPLAINER_SCENES: Record<HorizonId, Scene[]> = {
     },
     {
       headline: 'Every item on today can explain itself.',
-      body: 'Follow the thread back: day → move → pick → goal.',
+      body: 'Follow the thread back: time → day → week → move → pick → goal.',
       vignette: <CascadeDrop />,
     },
   ],

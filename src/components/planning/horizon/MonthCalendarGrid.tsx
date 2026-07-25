@@ -161,8 +161,8 @@ export function MonthCalendarGrid({ month, tasks, events, onPlaceTask, onPlaceTa
         >
           <p className="text-xs font-medium text-neutral-500 mb-2">
             {rocks.length > 0
-              ? `Drag onto a day to schedule — or drag a scheduled item back here to unschedule (${rocks.length} to place)`
-              : 'Drag a scheduled item here to unschedule it'}
+              ? `Drag onto a ${weekMode ? 'week' : 'day'} to place — or drag a placed item back here to unplace it (${rocks.length} to place)`
+              : 'Drag a placed item here to unplace it'}
           </p>
           {rocks.length > 0 && (
             <div className="flex flex-wrap gap-2">

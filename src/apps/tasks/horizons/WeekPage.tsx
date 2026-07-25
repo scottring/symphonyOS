@@ -207,6 +207,11 @@ export function WeekPage() {
               </div>
             </div>
           </header>
+
+          {/* Week identity line — the rung's one question. Mirrors MonthPage's. */}
+          <p className="mb-3 text-[12px] text-neutral-400">
+            Drop a move on a day to place it — what time is Today&rsquo;s question.
+          </p>
         </div>
 
         {/* One surface: shelf above, week grid below. A task is on a day or
