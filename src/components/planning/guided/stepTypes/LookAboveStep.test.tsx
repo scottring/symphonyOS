@@ -42,7 +42,7 @@ describe('LookAboveStep', () => {
   it('reference mode: unpicked season items collapse behind the shelf disclosure', () => {
     const host = makeHost({ tasks: [
       t({ id: 'q1', title: 'Picked outcome', bucket: 'quarter', pickedAt: new Date() }),
-      t({ id: 'q2', title: 'Benched idea', bucket: 'quarter' }),
+      t({ id: 'q2', title: 'Shelved idea', bucket: 'quarter' }),
     ] })
     renderStep(<LookAboveStep />, {
       step: { id: 'look-at-season', type: 'look-above', title: 'Your season list',
@@ -50,9 +50,9 @@ describe('LookAboveStep', () => {
       host, horizon: 'monthly',
     })
     expect(screen.getByText('Picked outcome')).toBeInTheDocument()
-    expect(screen.queryByText('Benched idea')).toBeNull()
+    expect(screen.queryByText('Shelved idea')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: /Also on the shelf \(1\)/ }))
-    expect(screen.getByText('Benched idea')).toBeInTheDocument()
+    expect(screen.getByText('Shelved idea')).toBeInTheDocument()
   })
 
   it('goals mode: renders active goals grouped by area, read-only', () => {

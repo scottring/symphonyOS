@@ -46,7 +46,7 @@ export function LookAboveStep() {
       : abovePool),
     [pick, host.tasks, above, match, pickedIds, abovePool],
   )
-  // The season reference is the CHOSEN season: picks lead; the bench (items
+  // The season reference is the CHOSEN season: picks lead; the shelf (items
   // the user deliberately didn't pick) collapses below — reachable for the
   // rare grab, but never dressed as part of the plan.
   const isSeasonRef = above === 'quarter'
@@ -54,11 +54,11 @@ export function LookAboveStep() {
     () => (isSeasonRef ? abovePool.filter((t) => !!t.pickedAt) : abovePool),
     [isSeasonRef, abovePool],
   )
-  const benchPool = useMemo(
+  const shelfPool = useMemo(
     () => (isSeasonRef ? abovePool.filter((t) => !t.pickedAt) : []),
     [isSeasonRef, abovePool],
   )
-  const [benchOpen, setBenchOpen] = useState(false)
+  const [shelfOpen, setShelfOpen] = useState(false)
   const ownTitles = useMemo(
     () => new Set(host.tasks.filter((t) => !t.completed && ownBucket && t.bucket === ownBucket).map((t) => t.title)),
     [host.tasks, ownBucket],
@@ -178,7 +178,7 @@ export function LookAboveStep() {
 
   if (host.tasksLoading) return <p className="text-sm text-neutral-400">Gathering the list above…</p>
   const pool = pick ? pickPool : mainPool
-  if (pool.length === 0 && benchPool.length === 0) return <p className="text-sm text-neutral-400">Nothing on that list yet.</p>
+  if (pool.length === 0 && shelfPool.length === 0) return <p className="text-sm text-neutral-400">Nothing on that list yet.</p>
 
   const copyRow = (t: (typeof pool)[number]) => {
     const alreadyHere = ownTitles.has(t.title)
@@ -232,14 +232,14 @@ export function LookAboveStep() {
         return copyRow(t)
       })}
     </ul>
-    {!pick && benchPool.length > 0 && (
+    {!pick && shelfPool.length > 0 && (
       <div className="mt-2">
-        <button type="button" onClick={() => setBenchOpen((v) => !v)} aria-expanded={benchOpen}
+        <button type="button" onClick={() => setShelfOpen((v) => !v)} aria-expanded={shelfOpen}
           className="inline-flex items-center gap-1 text-[11px] text-neutral-400 hover:text-neutral-600 transition-colors">
-          <ChevronRight className={`w-3 h-3 transition-transform ${benchOpen ? 'rotate-90' : ''}`} />
-          Also on the shelf ({benchPool.length}) — not picked this season
+          <ChevronRight className={`w-3 h-3 transition-transform ${shelfOpen ? 'rotate-90' : ''}`} />
+          Also on the shelf ({shelfPool.length}) — not picked this season
         </button>
-        {benchOpen && <ul className="space-y-1 mt-1.5 opacity-75">{benchPool.map(copyRow)}</ul>}
+        {shelfOpen && <ul className="space-y-1 mt-1.5 opacity-75">{shelfPool.map(copyRow)}</ul>}
       </div>
     )}
     </>

@@ -59,18 +59,31 @@ export function lineageLabel(
 }
 
 export interface GoalRollup {
-  /** Tasks serving this goal, all buckets. */
+  /** LEAF tasks serving this goal — the most concrete copy of each thread. */
   total: number
   done: number
 }
 
-/** Flat roll-up: every task stamped with this goal's id, whatever its bucket.
- *  Subtask copies included — they carry the stamp too if created with it. */
+/** Leaf-altitude roll-up: every task stamped with this goal's id that has NOT
+ *  been copied further down. Copy-down duplicates by design (a season pick, its
+ *  month move, its week copy all carry the goal id), so counting every altitude
+ *  inflated the denominator once per descent — finish the one real action and
+ *  the year page read "1 of 2 moves done". A task some other task points at via
+ *  sourceId is a rung of the descent, not a move of its own; the leaf carries
+ *  the truth. Deliberately NOT completion propagation: a pick isn't done
+ *  because one errand under it is — it simply doesn't count as a second move.
+ *  (Set-aside clears the copy's sourceId, so an abandoned descent hands the
+ *  count back to the parent.) */
 export function goalRollup(goalId: string, tasks: readonly Task[]): GoalRollup {
+  const copiedDown = new Set<string>()
+  for (const t of tasks) {
+    if (t.sourceId) copiedDown.add(t.sourceId)
+  }
   let total = 0
   let done = 0
   for (const t of tasks) {
     if (t.goalId !== goalId) continue
+    if (copiedDown.has(t.id)) continue
     total += 1
     if (t.completed) done += 1
   }

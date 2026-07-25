@@ -76,6 +76,7 @@ export function TaskTriageRow({ task, onCelebrated, grainHint }: {
           onPick={(when) => applyTriageWhen(when, task.id, { onPushTask: host.onPushTask, onSetBucket: host.onSetBucket })}
           onPickDate={(date) => host.onPushTask(task.id, date)}
           onComplete={complete}
+          onDelete={() => host.onDeleteTask(task.id)}
         />
       </div>
       {grainHint && (

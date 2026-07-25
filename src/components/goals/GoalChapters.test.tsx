@@ -17,9 +17,9 @@ describe('GoalChapters', () => {
     expect(screen.getByText(/Summer 2026/)).toBeInTheDocument()
   })
 
-  it('renders nothing when the goal has no picks (bench items make no chapter)', () => {
-    const benched = pick('b3', 'Never chosen', { pickedAt: undefined })
-    const { container } = render(<GoalChapters goalId="g1" tasks={[benched]} />)
+  it('renders nothing when the goal has no picks (shelf items make no chapter)', () => {
+    const shelved = pick('b3', 'Never chosen', { pickedAt: undefined })
+    const { container } = render(<GoalChapters goalId="g1" tasks={[shelved]} />)
     expect(container.firstChild).toBeNull()
   })
 })

@@ -15,7 +15,7 @@
 
 import { useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Target, Plus, ChevronRight, Check, Pencil, Archive, Trash2, CornerRightDown } from 'lucide-react';
+import { Target, Plus, ChevronRight, Check } from 'lucide-react';
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
 import { useSharpenBet } from '@/hooks/useSharpenBet';
 import { useGoogleCalendar } from '@/hooks/useGoogleCalendar';
@@ -269,7 +269,7 @@ export function useHorizonPageData(horizon: HorizonId, anchorDate?: Date) {
   // from a goal records the goal itself.
   const referenceItems = useMemo<ReferenceItem[]>(() => {
     if (horizon === 'month') {
-      // The month draws from the CHOSEN season — picks only. The bench (items
+      // The month draws from the CHOSEN season — picks only. The shelf (items
       // deliberately not picked) collapses separately below.
       return selectHorizonPool(domainTasks, 'season', match)
         .filter((t) => !!t.pickedAt)
@@ -294,9 +294,9 @@ export function useHorizonPageData(horizon: HorizonId, anchorDate?: Date) {
     [poolTitles, poolSourceIds, poolGoalIds],
   );
   const [refOpen, setRefOpen] = useState(false);
-  const [refBenchOpen, setRefBenchOpen] = useState(false);
+  const [refShelfOpen, setRefShelfOpen] = useState(false);
   // Month-only: the season's unchosen items, offered quietly for the rare grab.
-  const referenceBenchItems = useMemo(() => {
+  const referenceShelfItems = useMemo(() => {
     if (horizon !== 'month') return [] as ReferenceItem[];
     return selectHorizonPool(domainTasks, 'season', match)
       .filter((t) => !t.pickedAt)
@@ -382,7 +382,7 @@ export function useHorizonPageData(horizon: HorizonId, anchorDate?: Date) {
       // (temp→real id swap not yet rendered) and be silently dropped.
       // Season adds auto-pick while there's room (picking is explicit, but a
       // fresh outcome typed on the season page IS a choice); at the cap the
-      // new item lands on the bench for a deliberate swap. Rides the INSERT
+      // new item lands on the shelf for a deliberate swap. Rides the INSERT
       // (same temp-id race rationale as bucket).
       const autoPick =
         horizon === 'season' && partitionSeason(tasksRefForAdd.current).picks.length < PICK_CAP
@@ -548,60 +548,12 @@ export function useHorizonPageData(horizon: HorizonId, anchorDate?: Date) {
     (task: Task) => {
       const project = projects.find((p) => p.id === task.projectId);
       const lineage = lineageLabel(task, tasksById, goalsById);
-      // Season and month rows speak their altitude — Change / Put aside (month
-      // adds Copy to week) — never the day-routing chips, which belong to
-      // execution horizons. Week/Today route; Month/Season copy or park.
-      const parkingMenu = (
-        <div className="flex items-center gap-1">
-          {/* Re-file down an altitude — a MOVE, not a copy-down. Copy-down is
-              planned descent (the upper list keeps its line); this is for
-              items that were mis-graded and never belonged here. */}
-          {horizon === 'season' && (
-            <button
-              type="button"
-              title="Move to the month list — for items that are month-sized, not season-sized"
-              onClick={() => setBucket(task.id, 'month')}
-              className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md text-neutral-500 bg-neutral-50 hover:bg-neutral-100 transition-colors"
-            >
-              <CornerRightDown className="w-3 h-3" /> To month
-            </button>
-          )}
-          {horizon === 'month' && (
-            <button
-              type="button"
-              title="Move to the week list — for items that are week-sized, not month-sized"
-              onClick={() => setBucket(task.id, 'week')}
-              className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md text-neutral-500 bg-neutral-50 hover:bg-neutral-100 transition-colors"
-            >
-              <CornerRightDown className="w-3 h-3" /> To week
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={() => handleSelect(task.id)}
-            className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md text-neutral-500 bg-neutral-50 hover:bg-neutral-100 transition-colors"
-          >
-            <Pencil className="w-3 h-3" /> Change
-          </button>
-          <button
-            type="button"
-            title="Park on Someday — the timing is wrong, not the idea"
-            onClick={() => setBucket(task.id, 'someday')}
-            className="inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-md text-neutral-500 bg-neutral-50 hover:bg-neutral-100 transition-colors"
-          >
-            <Archive className="w-3 h-3" /> Put aside
-          </button>
-          <button
-            type="button"
-            aria-label="Delete"
-            title="Delete"
-            onClick={() => deleteTask(task.id)}
-            className="p-1.5 rounded-md text-neutral-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      );
+      // ONE fate vocabulary on every row, whatever the horizon: the canonical
+      // TriageWhenMenu (whens + pick-date + delete; complete lives on the
+      // row's checkbox). The old season/month "parking menu" variant was dead
+      // code — no season or month surface ever called renderRow — and its
+      // altitude verbs (To month / To week / Put aside) are the This month /
+      // This week / Someday whens by another name.
       return (
         <DenseInboxRow
           key={task.id}
@@ -614,13 +566,11 @@ export function useHorizonPageData(horizon: HorizonId, anchorDate?: Date) {
           onQuickAction={() => {}}
           draggable
           triageMenu={
-            horizon === 'season' || horizon === 'month' ? parkingMenu : (
-              <TriageWhenMenu
-                onPick={(when) => applyWhen(task, when)}
-                onPickDate={(date) => pushTask(task.id, date)}
-                onDelete={() => deleteTask(task.id)}
-              />
-            )
+            <TriageWhenMenu
+              onPick={(when) => applyWhen(task, when)}
+              onPickDate={(date) => pushTask(task.id, date)}
+              onDelete={() => deleteTask(task.id)}
+            />
           }
           onToggleComplete={() => toggleTask(task.id)}
           onUpdate={(updates) => updateTask(task.id, updates)}
@@ -631,7 +581,7 @@ export function useHorizonPageData(horizon: HorizonId, anchorDate?: Date) {
         />
       );
     },
-    [projects, familyMembers, horizon, setBucket, applyWhen, pushTask, deleteTask, toggleTask, updateTask, handleSelect, scheduleActions, handleCreateProjectForTask, navigate, tasksById, goalsById],
+    [projects, familyMembers, applyWhen, pushTask, deleteTask, toggleTask, updateTask, handleSelect, scheduleActions, handleCreateProjectForTask, navigate, tasksById, goalsById],
   );
 
   // ── "Plan the [horizon]" — routes to the Today rung with a ?plan flag; the
@@ -653,7 +603,7 @@ export function useHorizonPageData(horizon: HorizonId, anchorDate?: Date) {
   // The level above, for reference — folded into one quiet line. Rendered
   // below the grid on Month; inside the right rail on Season (the season
   // spread places sources beside the composer, not under the picks).
-  const referenceFold = (referenceItems.length > 0 || referenceBenchItems.length > 0) ? (
+  const referenceFold = (referenceItems.length > 0 || referenceShelfItems.length > 0) ? (
             <section className="mb-8">
               <button
                 type="button"
@@ -745,16 +695,16 @@ export function useHorizonPageData(horizon: HorizonId, anchorDate?: Date) {
                     </li>
                     );
                   })}
-                  {horizon === 'month' && referenceBenchItems.length > 0 && (
+                  {horizon === 'month' && referenceShelfItems.length > 0 && (
                     <li className="pt-1.5 mt-1 border-t border-neutral-100">
-                      <button type="button" onClick={() => setRefBenchOpen((v) => !v)} aria-expanded={refBenchOpen}
+                      <button type="button" onClick={() => setRefShelfOpen((v) => !v)} aria-expanded={refShelfOpen}
                         className="inline-flex items-center gap-1 text-[11px] text-neutral-400 hover:text-neutral-600 transition-colors">
-                        <ChevronRight className={`w-3 h-3 transition-transform ${refBenchOpen ? 'rotate-90' : ''}`} />
-                        Also on the shelf ({referenceBenchItems.length}) — not picked this season
+                        <ChevronRight className={`w-3 h-3 transition-transform ${refShelfOpen ? 'rotate-90' : ''}`} />
+                        Also on the shelf ({referenceShelfItems.length}) — not picked this season
                       </button>
-                      {refBenchOpen && (
+                      {refShelfOpen && (
                         <ul className="mt-1.5 space-y-1 opacity-75">
-                          {referenceBenchItems.map((it) => (
+                          {referenceShelfItems.map((it) => (
                             <li key={it.id} className="flex items-center gap-3 py-0.5">
                               <span className="flex-1 min-w-0 text-sm text-neutral-700 truncate">{it.title}</span>
                               {isOnThisList(it) ? (
@@ -809,8 +759,8 @@ export function useHorizonPageData(horizon: HorizonId, anchorDate?: Date) {
     seasonNotes, patchSeasonNotes,
     referenceItems, referenceLabel,
     isOnThisList,
-    refOpen, setRefOpen, refBenchOpen, setRefBenchOpen,
-    referenceBenchItems,
+    refOpen, setRefOpen, refShelfOpen, setRefShelfOpen,
+    referenceShelfItems,
     explainerOpen, setExplainerOpen, hasExplainer,
     zoomMonth, setZoomMonth,
     translatingRefId, setTranslatingRefId, refDraft, setRefDraft,

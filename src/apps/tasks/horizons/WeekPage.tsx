@@ -67,7 +67,7 @@ export function WeekPage() {
     draft, setDraft, submitDraft,
     scheduleActionsValue, undo,
     setBucket, deleteTaskWithUndo, projectsMap, tasksById, weekAnchor,
-    addTask, deleteTask, getCurrentUserMember, currentDomain,
+    addTask, deleteTask, toggleTask, getCurrentUserMember, currentDomain,
   } = useHorizonPageData(horizon, anchoredWeekStart ?? undefined);
 
   const gridStart = anchoredWeekStart ?? weekAnchor;
@@ -184,13 +184,14 @@ export function WeekPage() {
   const shelf = useMemo(() => ({
     carryOverIds, staleWeekIds, onBringForward, projectsMap, tasksById,
     onOpenTask: (id: string) => scheduleActionsValue.onOpenTask?.(id),
-    onSetBucket: (id: string, bucket: 'week' | 'month' | 'someday') => setBucket(id, bucket),
+    onSetBucket: setBucket,
     onDeleteTask: deleteTaskWithUndo,
     onPushTask: pushTask,
+    onCompleteTask: toggleTask,
     draft, onDraftChange: setDraft, onSubmitDraft: () => void submitDraft(),
     tend, onApplyProposal: handleApplyProposal,
   }), [carryOverIds, staleWeekIds, onBringForward, projectsMap, tasksById,
-       scheduleActionsValue.onOpenTask, setBucket,
+       scheduleActionsValue.onOpenTask, setBucket, toggleTask,
        deleteTaskWithUndo, pushTask, draft, setDraft, submitDraft, tend, handleApplyProposal]);
 
   return (

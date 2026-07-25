@@ -366,14 +366,14 @@ describe('horizon pages (smoke)', () => {
     expect(screen.queryByText('Goals not yet picked this season')).not.toBeInTheDocument()
   })
 
-  it('SeasonPage surfaces a goal whose only season item was SET ASIDE (benched, not picked)', () => {
+  it('SeasonPage surfaces a goal whose only season item was SET ASIDE (on the shelf, not picked)', () => {
     mockGoals.push({
       id: 'g1', areaId: 'a1', name: 'Financial calm', year: 2026,
       context: null, status: 'active', sortOrder: 0,
       actions: [], milestones: [], createdAt: new Date(), updatedAt: new Date(),
     } satisfies Goal)
     // Bucket 'quarter', threaded to the goal, but NEVER picked (pickedAt null) —
-    // a benched/set-aside item. Coverage is PICK-aware, so the goal still reads
+    // a shelved/set-aside item. Coverage is PICK-aware, so the goal still reads
     // as uncovered (matching /year's "0 picks this season").
     mockTasks.push(createMockTask({
       id: 'benched-1', title: 'A money plan we follow', bucket: 'quarter', goalId: 'g1',

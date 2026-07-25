@@ -28,6 +28,9 @@ export interface GuidedHost {
   onPushTask: (id: string, target: Date | 'week' | 'month' | 'quarter') => void
   onSetBucket: (id: string, bucket: TaskBucket) => void
   onCompleteTask: (id: string) => void
+  /** "Let it go" — every review narration promises it, so every review row
+   *  must be able to perform it. */
+  onDeleteTask: (id: string) => void
   onUpdateTask: (id: string, updates: Partial<Task>) => void
   /** Single atomic create-into-bucket (bucket rides in AddTaskOptions).
    *  projectId attaches the new task to a project — context, not linkage.

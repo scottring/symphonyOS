@@ -6,7 +6,7 @@ import type { StepType } from './types'
 const KNOWN_TYPES: StepType[] = [
   'narration', 'reflect', 'review', 'look-above', 'projects', 'calendar',
   'write-list', 'inbox', 'schedule-grid', 'domains-goals', 'book-next',
-  'wins', 'maintenance', 'pick-by-goal', 'move-by-pick',
+  'wins', 'maintenance', 'pick-by-goal', 'move-by-pick', 'place-on-weeks',
 ]
 
 describe('guided session configs', () => {
@@ -42,14 +42,22 @@ describe('guided session configs', () => {
     expect(SESSIONS.daily.steps.length).toBeLessThanOrEqual(4)
   })
 
-  it('monthly follows the Best Laid Plans arc', () => {
+  it('monthly follows the Best Laid Plans arc, and ends by PLACING the moves', () => {
     expect(SESSIONS.monthly.steps.map((s) => s.id)).toEqual([
       'welcome', 'wins', 'month-review', 'look-at-season', 'month-ahead',
       'look-within', 'projects-in-motion', 'move-by-pick', 'write-month',
-      'maintenance', 'book-next',
+      'maintenance', 'place-on-weeks', 'book-next',
     ])
     const write = SESSIONS.monthly.steps.find((s) => s.id === 'write-month')
     expect(write?.props?.funComposition).toBe(true)
+  })
+
+  it('place-on-weeks comes after every step that writes month moves', () => {
+    const ids = SESSIONS.monthly.steps.map((s) => s.id)
+    // write-month and the upkeep sweep both add to the month list; the
+    // placement step must see everything they wrote.
+    expect(ids.indexOf('place-on-weeks')).toBeGreaterThan(ids.indexOf('write-month'))
+    expect(ids.indexOf('place-on-weeks')).toBeGreaterThan(ids.indexOf('maintenance'))
   })
 
   it('the month threads to the season: move-by-pick comes before the standalone write step', () => {

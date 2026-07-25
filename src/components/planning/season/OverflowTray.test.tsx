@@ -13,7 +13,7 @@ const item = (over: Record<string, unknown>) => ({
 const baseProps = {
   picks: [] as Task[],
   onPick: vi.fn(), onSwap: vi.fn(), onMakeMove: vi.fn(),
-  onShelf: vi.fn(), onLetGo: vi.fn(),
+  onPutAside: vi.fn(), onLetGo: vi.fn(),
 }
 
 describe('OverflowTray — file an existing shelf item under a goal', () => {

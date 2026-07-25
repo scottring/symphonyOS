@@ -163,6 +163,13 @@ export const SESSIONS: Record<PlanningHorizon, GuidedSessionConfig> = {
         narration: 'Last sweep: the quiet upkeep that keeps the month from ambushing you — the budget, the paperwork, the pile you have been ignoring. Pull this month’s picks onto the list. Small, boring, load-bearing.',
       },
       {
+        // The month rung's place-rocks. Sits after EVERY step that writes month
+        // moves (write-month and the upkeep sweep both add to the list), so
+        // nothing written in this session leaves without the chance of a week.
+        id: 'place-on-weeks', type: 'place-on-weeks', title: 'Place the moves on weeks',
+        narration: "Now place the moves. Drag each one onto a week row — you are choosing which week, not which day: the weekly session picks the day, and the day picks the time. A move with a week is on its way to happening; a move still floating is trusting your memory. Leave one unplaced only on purpose.",
+      },
+      {
         id: 'book-next', type: 'book-next', title: 'Anchor the next step',
         narration: "Book next month’s session before you close. First weekend of the month works well.",
         props: { bookHorizon: 'monthly', bookTitle: 'Monthly planning session' },

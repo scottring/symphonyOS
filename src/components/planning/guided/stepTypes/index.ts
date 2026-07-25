@@ -16,6 +16,7 @@ import { WinsStep } from './WinsStep'
 import { MaintenanceStep } from './MaintenanceStep'
 import { PickByGoalStep } from './PickByGoalStep'
 import { MoveByPickStep } from './MoveByPickStep'
+import { PlaceOnWeeksStep } from './PlaceOnWeeksStep'
 
 registerStepType('narration', NarrationStep)
 registerStepType('reflect', ReflectStep)
@@ -32,3 +33,4 @@ registerStepType('wins', WinsStep)
 registerStepType('maintenance', MaintenanceStep)
 registerStepType('pick-by-goal', PickByGoalStep)
 registerStepType('move-by-pick', MoveByPickStep)
+registerStepType('place-on-weeks', PlaceOnWeeksStep)

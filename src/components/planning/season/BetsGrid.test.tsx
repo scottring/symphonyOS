@@ -13,11 +13,11 @@ const picked = (id: string, title: string, over: Partial<Task> = {}): Task =>
   bet(id, title, { pickedAt: new Date(2026, 6, 2), ...over })
 
 describe('BetsGrid', () => {
-  it('renders PICKED cards with goal provenance and starving state; bench items stay out of the grid', () => {
+  it('renders PICKED cards with goal provenance and starving state; shelf items stay out of the grid', () => {
     const goals = new Map([['g1', { id: 'g1', name: 'Financial calm' } as never]])
     render(
       <BetsGrid
-        tasks={[picked('b1', 'A money plan we follow', { goalId: 'g1' }), bet('b2', 'Benched idea')]}
+        tasks={[picked('b1', 'A money plan we follow', { goalId: 'g1' }), bet('b2', 'Shelved idea')]}
         goalsById={goals}
         onSelect={vi.fn()}
         onComplete={vi.fn()}
@@ -26,7 +26,7 @@ describe('BetsGrid', () => {
       />,
     )
     expect(screen.getByText('A money plan we follow')).toBeInTheDocument()
-    expect(screen.queryByText('Benched idea')).not.toBeInTheDocument()
+    expect(screen.queryByText('Shelved idea')).not.toBeInTheDocument()
     expect(screen.getByText(/Financial calm/)).toBeInTheDocument()
     expect(screen.getByText(/nothing on this month's list yet/i)).toBeInTheDocument()
   })

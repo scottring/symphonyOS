@@ -24,6 +24,7 @@ export type StepType =
   | 'maintenance'    // monthly: sweep the "Monthly upkeep" template into month moves
   | 'pick-by-goal'   // goal-anchored season picker
   | 'move-by-pick'   // pick-anchored month step (one altitude down)
+  | 'place-on-weeks' // monthly: place month moves on WEEK rows (the month rung's place-rocks)
 
 export interface GuidedStepConfig {
   /** Unique within the session; keys the narration manifest as `<horizon>.<id>`. */

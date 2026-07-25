@@ -75,7 +75,7 @@ describe('lineageTrail / lineageLabel', () => {
 })
 
 describe('goalRollup', () => {
-  it('counts every task carrying the goal id, across buckets', () => {
+  it('counts independent tasks carrying the goal id, across buckets', () => {
     const tasks = [
       task({ id: '1', title: 'a', bucket: 'quarter', goalId: 'g1' }),
       task({ id: '2', title: 'b', bucket: 'month', goalId: 'g1', completed: true }),
@@ -84,6 +84,29 @@ describe('goalRollup', () => {
     ]
     expect(goalRollup('g1', tasks)).toEqual({ total: 3, done: 2 })
   })
+
+  it('counts LEAVES only: a copy-down chain is one move, not one per altitude', () => {
+    // pick → month copy → week copy: one real action. Finishing the leaf must
+    // read 1 of 1, not 1 of 3 — every copy-down otherwise inflates the
+    // denominator (the audit's Finding 4).
+    const pick = task({ id: 'p', title: 'Porch set up', bucket: 'quarter', goalId: 'g1' })
+    const monthCopy = task({ id: 'm', title: 'Porch set up', bucket: 'month', sourceId: 'p', goalId: 'g1' })
+    const weekCopy = task({ id: 'w', title: 'Porch set up', bucket: 'week', sourceId: 'm', goalId: 'g1', completed: true })
+    expect(goalRollup('g1', [pick, monthCopy, weekCopy])).toEqual({ total: 1, done: 1 })
+  })
+
+  it('a pick with no copies below is itself the leaf', () => {
+    const pick = task({ id: 'p', title: 'Resting goal', bucket: 'quarter', goalId: 'g1' })
+    expect(goalRollup('g1', [pick])).toEqual({ total: 1, done: 0 })
+  })
+
+  it('set-aside (cleared sourceId) hands the count back to the parent', () => {
+    const pick = task({ id: 'p', title: 'Porch', bucket: 'quarter', goalId: 'g1' })
+    // The month copy was set aside: sourceId and goalId cleared (MoveByPickStep).
+    const detached = task({ id: 'm', title: 'Porch', bucket: 'month' })
+    expect(goalRollup('g1', [pick, detached])).toEqual({ total: 1, done: 0 })
+  })
+
   it('is zero for an untouched goal', () => {
     expect(goalRollup('g9', [])).toEqual({ total: 0, done: 0 })
   })

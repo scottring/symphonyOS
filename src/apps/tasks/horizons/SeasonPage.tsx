@@ -1,7 +1,7 @@
 // src/apps/tasks/horizons/SeasonPage.tsx
 //
 // Season — picks and a shape (spec 2026-07-20, revised 2026-07-21: picking is
-// EXPLICIT). Focus line, the chosen picks as cards, the bench below a hard
+// EXPLICIT). Focus line, the chosen picks as cards, the shelf below a hard
 // divider, the season's three months.
 //
 // Extracted verbatim from the former HorizonView.tsx common return branch +
@@ -37,11 +37,11 @@ export function SeasonPage() {
     scheduleActionsValue, undo,
   } = useHorizonPageData(horizon);
 
-  const { picks, bench } = partitionSeason(domainTasks);
+  const { picks, shelf } = partitionSeason(domainTasks);
 
   // The read side of the thread, at the season altitude: active goals (this
   // domain) that carry no season PICK yet. Coverage is PICK-aware, not
-  // bucket-aware: a goal whose only quarter item was set aside (benched,
+  // bucket-aware: a goal whose only quarter item was set aside (on the shelf,
   // pickedAt null) still reads as uncovered here — matching /year, which shows
   // it as "0 picks this season". Domain-filtered on both sides — the picks for
   // coverage, the goal list for the goals themselves — so a work goal never
@@ -115,7 +115,7 @@ export function SeasonPage() {
           {/* Season — the season spread (design pass 2026-07-21). One dominant
               panel (the picks, with the cap rendered as ARCHITECTURE: eight
               positions, open slots visible), a quiet right rail (the three
-              months, the goals to draw from, the composer), and the bench as
+              months, the goals to draw from, the composer), and the shelf as
               a collapsed drawer at the very bottom. */}
           <div className="mb-8">
             {/* Epigraph — the focus line closes the masthead. */}
@@ -236,21 +236,21 @@ export function SeasonPage() {
 
             <OverflowTray
               collapsible
-              items={bench}
+              items={shelf}
               picks={picks}
               onPick={(id) => updateTask(id, { pickedAt: new Date() })}
               goals={goals.filter((g) => g.status === 'active' && matchesDomain(g.context, currentDomain)).map((g) => ({ id: g.id, name: g.name }))}
               onFileUnder={(id, goalId) => updateTask(id, { pickedAt: new Date(), goalId })}
-              onSwap={(benchId, replacedPickId) => {
+              onSwap={(shelfId, replacedPickId) => {
                 void updateTask(replacedPickId, { pickedAt: undefined });
-                void updateTask(benchId, { pickedAt: new Date() });
+                void updateTask(shelfId, { pickedAt: new Date() });
               }}
               onMakeMove={(id) => updateTask(id, { bucket: 'month' })}
-              onShelf={(id) => updateTask(id, { bucket: 'someday' })}
+              onPutAside={(id) => updateTask(id, { bucket: 'someday' })}
               onLetGo={handleLetGo}
               onRename={(id, title) => updateTask(id, { title })}
               onMakeGoal={async (id, title) => {
-                // Goal-sized bench item → a real goal. Filed under the first
+                // Goal-sized shelf item → a real goal. Filed under the first
                 // life area (movable on /goals); context follows the domain.
                 const area = [...areas].sort((a, b) => a.sortOrder - b.sortOrder)[0];
                 if (!area) return null;
@@ -264,17 +264,17 @@ export function SeasonPage() {
               }}
               onFirstMove={(id, goalId, moveText) => {
                 // The original item BECOMES the goal's first season move —
-                // picked if a slot is open, benched otherwise.
+                // picked if a slot is open, shelved otherwise.
                 const room = partitionSeason(domainTasks).picks.length < PICK_CAP;
                 void updateTask(id, { title: moveText, goalId, pickedAt: room ? new Date() : undefined });
               }}
-              onShelfLinked={(id, goalId) => {
+              onPutAsideLinked={(id, goalId) => {
                 void updateTask(id, { bucket: 'someday', goalId, pickedAt: undefined });
               }}
               onApplySlate={(ids) => {
                 // The recommended slate becomes the picks: staggered pickedAt
                 // preserves the recommendation's order; current picks not in
-                // the slate return to the bench.
+                // the slate return to the shelf.
                 const chosen = new Set(ids);
                 const base = Date.now();
                 ids.forEach((id, i) => { void updateTask(id, { pickedAt: new Date(base + i) }); });

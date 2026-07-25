@@ -21,7 +21,7 @@ function baseProps(overrides: Partial<PlanningShelfProps> = {}): PlanningShelfPr
     carryOverIds: new Set(['c1']),
     projectsMap: new Map([['proj', { id: 'proj', name: 'Backyards' }]]),
     tasksById: new Map(),
-    onOpenTask: vi.fn(), onSetBucket: vi.fn(), onDeleteTask: vi.fn(), onPushTask: vi.fn(),
+    onOpenTask: vi.fn(), onSetBucket: vi.fn(), onDeleteTask: vi.fn(), onPushTask: vi.fn(), onCompleteTask: vi.fn(),
     draft: '', onDraftChange: vi.fn(), onSubmitDraft: vi.fn(),
     tend: idleTend, onApplyProposal: vi.fn(),
     ...overrides,
@@ -63,11 +63,45 @@ describe('PlanningShelf', () => {
     expect(onOpenTask).not.toHaveBeenCalled()
   })
 
-  it('pill menu routes To month / Put aside / Delete / Open to the right callbacks', () => {
+  // The pill carries the FULL fate vocabulary — the same TriageWhenMenu the
+  // wizard review rows render, via TaskFateMenu. Whens route through
+  // applyTriageWhen; Done and Delete are first-class.
+  it('pill menu routes whens through the canonical vocabulary (Someday → onSetBucket)', () => {
     const props = renderShelf()
     fireEvent.click(screen.getAllByLabelText('Task actions')[0]) // c1's ⋯
-    fireEvent.click(screen.getByRole('menuitem', { name: 'To month' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Someday' }))
+    expect(props.onSetBucket).toHaveBeenCalledWith('c1', 'someday')
+  })
+
+  it('pill menu offers Done — completing from the shelf is a first-class fate', () => {
+    const props = renderShelf()
+    fireEvent.click(screen.getAllByLabelText('Task actions')[0])
+    fireEvent.click(screen.getByLabelText('Mark done'))
+    expect(props.onCompleteTask).toHaveBeenCalledWith('c1')
+  })
+
+  it('pill menu routes Delete to onDeleteTask', () => {
+    const props = renderShelf()
+    fireEvent.click(screen.getAllByLabelText('Task actions')[0])
+    fireEvent.click(screen.getByLabelText('Delete'))
+    expect(props.onDeleteTask).toHaveBeenCalledWith('c1')
+  })
+
+  it('demoting is a when: Month → This month sets the bucket', () => {
+    const props = renderShelf()
+    fireEvent.click(screen.getAllByLabelText('Task actions')[0])
+    fireEvent.click(screen.getByRole('button', { name: 'Month' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'This month' }))
     expect(props.onSetBucket).toHaveBeenCalledWith('c1', 'month')
+  })
+
+  it('fileUnder lists the season picks and threads the pill under one', () => {
+    const onFile = vi.fn()
+    renderShelf({ fileUnder: { picks: [{ id: 'p1', title: 'Porch set up' }], onFile } })
+    fireEvent.click(screen.getAllByLabelText('Task actions')[0])
+    fireEvent.click(screen.getByRole('menuitem', { name: 'File under a pick' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: /Porch set up/ }))
+    expect(onFile).toHaveBeenCalledWith('c1', 'p1')
   })
 
   it('clicking outside the ⋯ menu closes it', () => {
@@ -141,13 +175,6 @@ describe('PlanningShelf', () => {
     expect(screen.queryByText(/^To place/)).not.toBeInTheDocument()
   })
 
-  it('moveDown customizes the demote menu item', () => {
-    const props = baseProps({ moveDown: { label: 'To week', bucket: 'week' } })
-    render(<DndContext><PlanningShelf {...props} /></DndContext>)
-    fireEvent.click(screen.getAllByLabelText('Task actions')[0])
-    fireEvent.click(screen.getByRole('menuitem', { name: 'To week' }))
-    expect(props.onSetBucket).toHaveBeenCalledWith(props.tasks[0].id, 'week')
-  })
 })
 
 describe('PlanningShelf — grouped roll-up', () => {
