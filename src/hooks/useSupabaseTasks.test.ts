@@ -52,6 +52,7 @@ const mockUpdate = vi.fn()
 const mockDelete = vi.fn()
 const mockInsert = vi.fn()
 const mockEq = vi.fn()
+const mockIn = vi.fn()
 const mockUpsert = vi.fn()
 
 function createMockDbTask(overrides: Partial<MockDbTask> = {}): MockDbTask {
@@ -119,6 +120,11 @@ vi.mock('@/lib/supabase', () => ({
               then: (resolve: (v: { error: typeof mockError }) => unknown) =>
                 resolve({ error: mockError }),
             }
+          },
+          in: (field: string, values: string[]) => {
+            mockIn(field, values)
+            // updateTasksBulk only awaits the promise, doesn't read select()
+            return Promise.resolve({ error: mockError })
           },
         }
       },
@@ -556,6 +562,61 @@ describe('useSupabaseTasks', () => {
       expect(mockUpdate).not.toHaveBeenCalled()
     })
 
+    it('writes sortOrder: 0 as sort_order: 0, not null', async () => {
+      mockSupabaseData.push(createMockDbTask({ id: 'task-1', title: 'Task' }))
+
+      const { result } = renderHook(() => useSupabaseTasks())
+
+      await waitFor(() => {
+        expect(result.current.tasks).toHaveLength(1)
+      })
+
+      await act(async () => {
+        await result.current.updateTask('task-1', { sortOrder: 0 })
+      })
+
+      // Explicitly check that sort_order is 0, not null or undefined
+      expect(mockUpdate).toHaveBeenCalledWith({ sort_order: 0 })
+      expect(result.current.tasks[0].sortOrder).toBe(0)
+    })
+
+    it('writes sortOrder: null as sort_order: null, not 0', async () => {
+      mockSupabaseData.push(createMockDbTask({ id: 'task-1', title: 'Task' }))
+
+      const { result } = renderHook(() => useSupabaseTasks())
+
+      await waitFor(() => {
+        expect(result.current.tasks).toHaveLength(1)
+      })
+
+      await act(async () => {
+        await result.current.updateTask('task-1', { sortOrder: null })
+      })
+
+      // Explicitly check that sort_order is null, not 0
+      expect(mockUpdate).toHaveBeenCalledWith({ sort_order: null })
+      expect(result.current.tasks[0].sortOrder).toBeNull()
+    })
+
+    it('omits sort_order from updates that do not mention sortOrder', async () => {
+      mockSupabaseData.push(createMockDbTask({ id: 'task-1', title: 'Original' }))
+
+      const { result } = renderHook(() => useSupabaseTasks())
+
+      await waitFor(() => {
+        expect(result.current.tasks).toHaveLength(1)
+      })
+
+      await act(async () => {
+        await result.current.updateTask('task-1', { title: 'Updated' })
+      })
+
+      // sort_order should not be in the update payload at all
+      expect(mockUpdate).toHaveBeenCalledWith({ title: 'Updated' })
+      const lastCall = mockUpdate.mock.calls[mockUpdate.mock.calls.length - 1][0]
+      expect(lastCall).not.toHaveProperty('sort_order')
+    })
+
     it('rolls back on server error', async () => {
       mockSupabaseData.push(createMockDbTask({ id: 'task-1', title: 'Original' }))
 
@@ -573,6 +634,74 @@ describe('useSupabaseTasks', () => {
 
       // Should roll back to original
       expect(result.current.tasks[0].title).toBe('Original')
+    })
+  })
+
+  describe('updateTasksBulk', () => {
+    it('writes sortOrder: 0 as sort_order: 0, not null', async () => {
+      mockSupabaseData.push(
+        createMockDbTask({ id: 'task-1', title: 'Task 1' }),
+        createMockDbTask({ id: 'task-2', title: 'Task 2' })
+      )
+
+      const { result } = renderHook(() => useSupabaseTasks())
+
+      await waitFor(() => {
+        expect(result.current.tasks).toHaveLength(2)
+      })
+
+      await act(async () => {
+        await result.current.updateTasksBulk(['task-1', 'task-2'], { sortOrder: 0 })
+      })
+
+      // Explicitly check that sort_order is 0, not null or undefined
+      expect(mockUpdate).toHaveBeenCalledWith({ sort_order: 0 })
+      expect(result.current.tasks.find(t => t.id === 'task-1')?.sortOrder).toBe(0)
+      expect(result.current.tasks.find(t => t.id === 'task-2')?.sortOrder).toBe(0)
+    })
+
+    it('writes sortOrder: null as sort_order: null, not 0', async () => {
+      mockSupabaseData.push(
+        createMockDbTask({ id: 'task-1', title: 'Task 1' }),
+        createMockDbTask({ id: 'task-2', title: 'Task 2' })
+      )
+
+      const { result } = renderHook(() => useSupabaseTasks())
+
+      await waitFor(() => {
+        expect(result.current.tasks).toHaveLength(2)
+      })
+
+      await act(async () => {
+        await result.current.updateTasksBulk(['task-1', 'task-2'], { sortOrder: null })
+      })
+
+      // Explicitly check that sort_order is null, not 0
+      expect(mockUpdate).toHaveBeenCalledWith({ sort_order: null })
+      expect(result.current.tasks.find(t => t.id === 'task-1')?.sortOrder).toBeNull()
+      expect(result.current.tasks.find(t => t.id === 'task-2')?.sortOrder).toBeNull()
+    })
+
+    it('omits sort_order from updates that do not mention sortOrder', async () => {
+      mockSupabaseData.push(
+        createMockDbTask({ id: 'task-1', title: 'Task 1' }),
+        createMockDbTask({ id: 'task-2', title: 'Task 2' })
+      )
+
+      const { result } = renderHook(() => useSupabaseTasks())
+
+      await waitFor(() => {
+        expect(result.current.tasks).toHaveLength(2)
+      })
+
+      await act(async () => {
+        await result.current.updateTasksBulk(['task-1', 'task-2'], { completed: true })
+      })
+
+      // sort_order should not be in the update payload at all
+      expect(mockUpdate).toHaveBeenCalledWith({ completed: true })
+      const lastCall = mockUpdate.mock.calls[mockUpdate.mock.calls.length - 1][0]
+      expect(lastCall).not.toHaveProperty('sort_order')
     })
   })
 
