@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, waitFor, act } from '@testing-library/react'
 import { useSupabaseTasks } from './useSupabaseTasks'
+// The mocked client (see vi.mock below) — used by the test that pins down what
+// the database does to a partial-row upsert.
+import { supabase } from '@/lib/supabase'
 import { resetIdCounter } from '@/test/mocks/factories'
 
 // Mock user for useAuth
@@ -54,6 +57,38 @@ const mockInsert = vi.fn()
 const mockEq = vi.fn()
 const mockIn = vi.fn()
 const mockUpsert = vi.fn()
+// update() and eq() are recorded separately, which loses the pairing when
+// several updates are in flight at once (updateTaskOrders). This records the
+// pair: (payload, filter field, filter value).
+const mockUpdateEq = vi.fn()
+
+// The `tasks` columns that are NOT NULL with no DEFAULT. Postgres rejects any
+// proposed tuple missing them — including the tuple PostgREST builds for an
+// `INSERT … ON CONFLICT DO UPDATE`, which it validates BEFORE probing for the
+// conflict. Verified against production. Modelling this is the whole point of
+// the checks below: a mock that accepts every payload is how a write the real
+// database rejects outright passed as green.
+const NOT_NULL_NO_DEFAULT = ['title', 'user_id'] as const
+
+/** Returns a 23502 error object if `row` violates NOT NULL, else null. */
+function notNullViolation(
+  row: Record<string, unknown>,
+  { insertShaped }: { insertShaped: boolean }
+): { code: string; message: string; details: string } | null {
+  for (const col of NOT_NULL_NO_DEFAULT) {
+    // An INSERT-shaped write must SUPPLY the column (supabase-js sends absent
+    // keys as explicit NULLs). An UPDATE only fails if it explicitly nulls it.
+    const missing = insertShaped ? row[col] == null : col in row && row[col] == null
+    if (missing) {
+      return {
+        code: '23502',
+        message: `null value in column "${col}" violates not-null constraint`,
+        details: `Failing row contains ${JSON.stringify(row)}.`,
+      }
+    }
+  }
+  return null
+}
 
 function createMockDbTask(overrides: Partial<MockDbTask> = {}): MockDbTask {
   return {
@@ -90,6 +125,7 @@ vi.mock('@/lib/supabase', () => ({
       }),
       insert: (data: Partial<MockDbTask>) => {
         mockInsert(data)
+        const violation = notNullViolation(data as Record<string, unknown>, { insertShaped: true })
         const newTask = createMockDbTask({
           ...data,
           id: `new-${Date.now()}`,
@@ -97,6 +133,9 @@ vi.mock('@/lib/supabase', () => ({
         return {
           select: () => ({
             single: () => {
+              if (violation) {
+                return Promise.resolve({ data: null, error: violation })
+              }
               if (mockError) {
                 return Promise.resolve({ data: null, error: mockError })
               }
@@ -108,23 +147,26 @@ vi.mock('@/lib/supabase', () => ({
       },
       update: (data: Partial<MockDbTask>) => {
         mockUpdate(data)
+        const violation = notNullViolation(data as Record<string, unknown>, { insertShaped: false })
         // updateTask() chains .eq().select() and reads { data, error }, while
-        // toggleTask()/deleteTask() await .eq() directly for { error }. Return a
-        // thenable that supports both shapes.
+        // toggleTask()/deleteTask()/updateTaskOrders() await .eq() directly for
+        // { error }. Return a thenable that supports both shapes.
         return {
           eq: (field: string, value: string) => {
             mockEq(field, value)
+            mockUpdateEq(data, field, value)
             const updated = mockSupabaseData.length ? [mockSupabaseData[0]] : [{}]
+            const error = violation ?? mockError
             return {
-              select: () => Promise.resolve({ data: updated, error: mockError, status: 200, count: updated.length }),
+              select: () => Promise.resolve({ data: updated, error, status: 200, count: updated.length }),
               then: (resolve: (v: { error: typeof mockError }) => unknown) =>
-                resolve({ error: mockError }),
+                resolve({ error }),
             }
           },
           in: (field: string, values: string[]) => {
             mockIn(field, values)
             // updateTasksBulk only awaits the promise, doesn't read select()
-            return Promise.resolve({ error: mockError })
+            return Promise.resolve({ error: violation ?? mockError })
           },
         }
       },
@@ -137,9 +179,18 @@ vi.mock('@/lib/supabase', () => ({
           },
         }
       },
-      // updateTaskOrders() upserts { id, sort_order } rows in one round trip.
-      upsert: (rows: { id: string; sort_order: number }[], opts?: { onConflict?: string }) => {
+      // No production code path uses upsert on `tasks` — updateTaskOrders
+      // deliberately does not (see its doc comment). Kept, and kept honest, so
+      // that if anyone reaches for it again the test fails the way the database
+      // would: INSERT … ON CONFLICT validates NOT NULL on the proposed tuple
+      // first, so a partial `{ id, sort_order }` row is a 23502 even for an
+      // existing row.
+      upsert: (rows: Record<string, unknown>[], opts?: { onConflict?: string }) => {
         mockUpsert(rows, opts)
+        for (const row of rows) {
+          const violation = notNullViolation(row, { insertShaped: true })
+          if (violation) return Promise.resolve({ error: violation })
+        }
         return Promise.resolve({ error: mockError })
       },
     }),
@@ -727,16 +778,53 @@ describe('useSupabaseTasks', () => {
       const t2 = result.current.tasks.find(t => t.id === 't2')
       expect(t1?.sortOrder).toBe(0)
       expect(t2?.sortOrder).toBe(1000)
+    })
 
-      // Only id + sort_order on the wire — a full-row upsert with a partial
-      // object would blank every other column.
-      expect(mockUpsert).toHaveBeenCalledWith(
-        [
-          { id: 't1', sort_order: 0 },
-          { id: 't2', sort_order: 1000 },
-        ],
-        { onConflict: 'id' }
+    it('writes only sort_order, scoped by id, and never as an upsert', async () => {
+      mockSupabaseData.push(
+        createMockDbTask({ id: 't1', sort_order: null }),
+        createMockDbTask({ id: 't2', sort_order: null })
       )
+      const { result } = renderHook(() => useSupabaseTasks())
+      await waitFor(() => {
+        expect(result.current.tasks).toHaveLength(2)
+      })
+
+      await act(async () => {
+        await result.current.updateTaskOrders([
+          { id: 't1', sortOrder: 0 },
+          { id: 't2', sortOrder: 1000 },
+        ])
+      })
+
+      // Never an upsert: PostgREST would compile it to INSERT … ON CONFLICT,
+      // and Postgres validates the proposed tuple's NOT NULL columns (title,
+      // user_id — both without defaults) before it looks for the conflict, so
+      // a partial row is rejected with 23502 even though the row exists.
+      expect(mockUpsert).not.toHaveBeenCalled()
+
+      // One narrow UPDATE per row: payload is exactly { sort_order }, filtered
+      // by that row's id. Nothing here can be read as an insert.
+      expect(mockUpdateEq).toHaveBeenCalledTimes(2)
+      expect(mockUpdateEq).toHaveBeenCalledWith({ sort_order: 0 }, 'id', 't1')
+      expect(mockUpdateEq).toHaveBeenCalledWith({ sort_order: 1000 }, 'id', 't2')
+      for (const [payload] of mockUpdateEq.mock.calls) {
+        expect(Object.keys(payload)).toEqual(['sort_order'])
+      }
+    })
+
+    it('resolves true when every row persists', async () => {
+      mockSupabaseData.push(createMockDbTask({ id: 't1', sort_order: null }))
+      const { result } = renderHook(() => useSupabaseTasks())
+      await waitFor(() => {
+        expect(result.current.tasks).toHaveLength(1)
+      })
+
+      let ok: boolean | undefined
+      await act(async () => {
+        ok = await result.current.updateTaskOrders([{ id: 't1', sortOrder: 0 }])
+      })
+      expect(ok).toBe(true)
     })
 
     it('updateTaskOrders is a no-op for an empty list', async () => {
@@ -750,6 +838,23 @@ describe('useSupabaseTasks', () => {
       })
 
       expect(mockUpsert).not.toHaveBeenCalled()
+      expect(mockUpdate).not.toHaveBeenCalled()
+    })
+
+    it('a partial-row upsert of the same payload would be rejected by the database', async () => {
+      // Guards the reasoning behind the per-row UPDATE above: this is what the
+      // old implementation sent, and what Postgres does with it.
+      const { error } = await (
+        supabase.from('tasks') as unknown as {
+          upsert: (
+            rows: Record<string, unknown>[],
+            opts: { onConflict: string }
+          ) => Promise<{ error: { code?: string; message: string } | null }>
+        }
+      ).upsert([{ id: 't1', sort_order: 0 }], { onConflict: 'id' })
+
+      expect(error?.code).toBe('23502')
+      expect(error?.message).toContain('not-null constraint')
     })
 
     it('rolls back to the previous sortOrder on server error', async () => {
@@ -762,10 +867,11 @@ describe('useSupabaseTasks', () => {
         expect(result.current.tasks).toHaveLength(2)
       })
 
-      mockError = { message: 'Upsert failed' }
+      mockError = { message: 'Update failed' }
 
+      let ok: boolean | undefined
       await act(async () => {
-        await result.current.updateTaskOrders([
+        ok = await result.current.updateTaskOrders([
           { id: 't1', sortOrder: 0 },
           { id: 't2', sortOrder: 1000 },
         ])
@@ -775,6 +881,7 @@ describe('useSupabaseTasks', () => {
       const t2 = result.current.tasks.find(t => t.id === 't2')
       expect(t1?.sortOrder).toBe(5)
       expect(t2?.sortOrder).toBe(10)
+      expect(ok).toBe(false)
     })
   })
 

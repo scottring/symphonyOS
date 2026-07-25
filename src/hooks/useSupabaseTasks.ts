@@ -9,6 +9,9 @@ import type { TaskDirections } from '@/types/directions'
 import { defaultScopeForArea, type Scope } from '@/lib/scope'
 import { localYmd, parseLocalYmd, weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
 import { weekStartForBucket } from '@/lib/today/weekPlacement'
+// `import type` on purpose: erased at compile time, so it does NOT drag
+// taskOrdering's @dnd-kit/sortable dependency into this hook's runtime bundle.
+import type { OrderWrite } from '@/lib/today/taskOrdering'
 
 // Monotonic suffix so every hook instance gets its own realtime channel topic.
 let tasksChannelSeq = 0
@@ -1097,13 +1100,30 @@ export function useSupabaseTasks() {
   }, [tasks])
 
   /**
-   * Write a different sort_order to each of several tasks in one round trip.
-   * `updateTasksBulk` cannot express this — it applies ONE update object to
-   * every id. Optimistic first (the list must not visibly lurch), then one
-   * upsert; on failure the previous orders are restored.
+   * Write a different sort_order to each of several tasks. `updateTasksBulk`
+   * cannot express this — it applies ONE update object to every id. Optimistic
+   * first (the list must not visibly lurch), then one narrow UPDATE per row,
+   * issued concurrently; on any failure the previous orders are restored.
+   *
+   * Deliberately NOT an upsert. PostgREST compiles `.upsert()` into
+   * `INSERT … ON CONFLICT DO UPDATE`, and Postgres validates NOT NULL and the
+   * RLS INSERT `WITH CHECK` against the *proposed* tuple before it ever probes
+   * for the conflict. `tasks.title` and `tasks.user_id` are NOT NULL with no
+   * default, so a partial `{ id, sort_order }` row fails with 23502 even though
+   * the row already exists. Per-row UPDATE is the file's own idiom and can
+   * never be reinterpreted as an insert.
+   *
+   * Row count is small by design: `reorderTasksByDrag` returns exactly ONE
+   * write in the common case; only the renormalise path fans out, bounded by
+   * the visible untimed list (~27).
+   *
+   * Unlike `updateTasksBulk` this does NOT `setError()` or rethrow: a failed
+   * drag is a self-healing local event (toast + rollback), not app-level
+   * breakage. Returns `true` when every row persisted, `false` when the order
+   * was rolled back, so a caller that needs to know can still branch.
    */
-  const updateTaskOrders = useCallback(async (writes: { id: string; sortOrder: number }[]) => {
-    if (writes.length === 0) return
+  const updateTaskOrders = useCallback(async (writes: OrderWrite[]): Promise<boolean> => {
+    if (writes.length === 0) return true
 
     const byId = new Map(writes.map((w) => [w.id, w.sortOrder]))
     // Read from tasksRef, not the closed-over `tasks` array — this callback
@@ -1127,24 +1147,30 @@ export function useSupabaseTasks() {
 
     apply(byId)
 
-    const { error: upsertError } = await supabase
-      .from('tasks')
-      .upsert(writes.map((w) => ({ id: w.id, sort_order: w.sortOrder })), { onConflict: 'id' })
+    // One narrow UPDATE per row, in flight together. Every result is inspected
+    // — a partial failure must roll the whole move back, not leave the list
+    // half-persisted.
+    const results = await Promise.all(
+      writes.map((w) =>
+        supabase.from('tasks').update({ sort_order: w.sortOrder }).eq('id', w.id))
+    )
+    const failure = results.find((r) => r.error)?.error
 
-    if (upsertError) {
+    if (failure) {
       apply(previous)
       showToast("Couldn't save the new order", 'warning')
-      logger.error('[updateTaskOrders] failed:', upsertError)
-      return
+      logger.error('[updateTaskOrders] failed:', failure)
+      return false
     }
 
     // Fan out to other instances, same as updateTasksBulk — one announcement
     // per affected task, sent only once the write is confirmed (an earlier,
     // optimistic announcement here would have no way to be un-announced if
-    // the upsert then failed).
+    // the write then failed).
     for (const t of updatedTasks) {
       announceLocalWrite({ kind: 'update', task: t })
     }
+    return true
   }, [])
 
   // Schedule a task to a specific date — sets bucket to 'timed'
