@@ -239,6 +239,82 @@ to gap-free `0..n-1`, bulk write. A `taskOrdering.ts` mirrors it.
 A cap that hides its own truncation is worse than a long page. The count is
 always visible.
 
+### 5. Five day divisions, all collapsible, and labels that are true
+
+**The bands currently lie.** Every one of the three displays a range it does not
+implement — `daySectionMeta.tsx` `RANGE` versus `timeUtils.ts` `getTimeOfDay`:
+
+| Header says | Code actually does | Consequence |
+|---|---|---|
+| Morning `6:00 AM – 12:00 PM` | `hour < 12` → **00:00–11:59** | a 3 AM item sits under a "6 AM" header |
+| Afternoon `12:00 PM – 5:00 PM` | `hour < 18` → **12:00–17:59** | 5:30 PM lands in a band claiming to end at 5 |
+| Evening `5:00 PM – 10:00 PM` | else → **18:00–23:59** | wrong at both ends |
+
+This is the same class of defect as the cascade's "drawings that lie", and it is
+why adding divisions is the right moment to fix it: the boundaries get stated
+once, in one place, honestly.
+
+**New divisions** — `TimeOfDay` gains `earlyMorning` and `night`:
+
+| Section | Hours | Label shown |
+|---|---|---|
+| Early morning | 00:00–07:59 | `Before 8:00 AM` |
+| Morning | 08:00–11:59 | `8:00 AM – 12:00 PM` |
+| Afternoon | 12:00–16:59 | `12:00 PM – 5:00 PM` |
+| Evening | 17:00–20:59 | `5:00 PM – 9:00 PM` |
+| Night | 21:00–23:59 | `After 9:00 PM` |
+
+**Bands do not wrap midnight.** A tempting alternative runs night from 21:00
+through 04:59, which reads better as English but puts a 2 AM item at the
+*bottom* of the page — contradicting a timeline that is otherwise strictly
+chronological top to bottom. Early morning absorbing the small hours is the
+lesser cost: strict chronology is what makes vertical position mean something,
+which is the whole premise of move #3.
+
+`RANGE` and `getTimeOfDay` must be derived from one table so they cannot drift
+apart again. A unit test asserts every boundary hour maps to the band its own
+label claims.
+
+**All sections collapse** — the five time bands plus All day and Unscheduled.
+
+- Same persistence as groups: localStorage keyed by section,
+  `hideRoutinesSignal.ts` as the model.
+- **Extend the existing behaviour, don't duplicate it.** `TodayView.tsx:758-793`
+  already collapses a section whose remaining items are all complete, and
+  already tracks a user re-expand. Explicit collapse folds into that state, it
+  does not become a second mechanism.
+- A collapsed section shows its count and progress, never a bare header.
+
+**Empty bands materialize during a drag.** Empty sections render `null` today
+(`TodayView.tsx:747`), which is right for reading but wrong for dragging — you
+cannot drop something at 6 AM if the Early morning band isn't on screen. While a
+drag is in progress, every band appears as a drop target regardless of
+occupancy, and returns to hidden when the drag ends.
+
+### 6. Sweep for duplicates
+
+Today accumulates near-duplicates — prep tasks regenerated from templates, the
+Reminders bridge, meal upserts, the same errand captured twice on two surfaces.
+They inflate the row count with items that are not real work.
+
+- **On demand, not nagging.** A `Find duplicates` action in the stats row, plus
+  a passive count when any exist (`3 possible duplicates`). Auto-prompting on a
+  page whose whole problem is noise would be self-defeating.
+- **Detection:** group today's visible items by normalized title — lowercased,
+  punctuation and emoji stripped, whitespace collapsed. Exact normalized matches
+  only in the first pass. Fuzzy matching is deliberately excluded: a false
+  positive here deletes real work.
+- **Resolution is always one tap, never automatic.** Each pair offers *keep this
+  one* / *keep both*. When one copy carries more context — notes, links,
+  attachments, a project — it is pre-selected as the keeper, since that is
+  almost always the right answer and the other copy is the accidental one.
+- **Cross-type pairs are surfaced but never deleted.** A task and a routine with
+  the same title are a real duplicate to the eye, but deleting the routine is
+  destructive and wrong; offer *skip the routine today* instead.
+- **Scoped to today's items.** The duplicate *goals* and *areas* the cascade
+  handoff deferred (`get healthy`/`get healthier`, `Home` ×2) are a different
+  surface and remain their own pass.
+
 ---
 
 ## What this does not do
@@ -262,15 +338,28 @@ always visible.
 **New**
 - `src/lib/today/taskOrdering.ts` — mirrors `stepOrdering.ts`. Pure, unit-tested.
 - `addToGroup` in `src/lib/today/groupTasks.ts`.
+- `src/lib/today/duplicates.ts` — normalization + pairing. Pure, unit-tested.
+- Collapse-state module for sections and groups, modelled on
+  `hideRoutinesSignal.ts`.
 - Today's dnd-kit context + drop targets (bands, hours, group cards).
 
 **Changed**
-- `TodayView.tsx` (~1199 lines — the largest file in the chain; this work should
-  reduce it, not grow it: lift the section loop and the drag wiring out).
+- `TodayView.tsx` (~1199 lines — the largest file in the chain; this work adds
+  drag, collapse, five bands and the duplicate sweep, and **must not** grow it.
+  Lift the section loop, the drag wiring and the collapse state into their own
+  units first. If this file is longer at the end than it started, the work was
+  done wrong.)
+- `timeUtils.ts` + `daySectionMeta.tsx` — five bands from **one** shared
+  boundary table, so labels and logic cannot drift again.
+- `lib/today/types.ts` — `SECTIONS_ORDER` gains `earlyMorning` and `night`.
 - `groupTasks.ts` — `addToGroup`, and whatever the render fix requires.
 - `HomeViewContainer.tsx` — wire a real trigger to the time grid.
 - `sessions.ts` — `pick-today` asks for a time.
 - Migration: `tasks.sort_order int`.
+
+**Test debt this creates:** every test asserting three bands, the old
+`getTimeOfDay` boundaries, or `SECTIONS_ORDER`'s length will fail. That is the
+change working, not a regression — but budget for it.
 
 **Schema:** one column. Apply via the Management API — migrations are known to
 be out of sync in this project.
@@ -307,6 +396,15 @@ Then open the page and drag:
 - Drag a routine to a new time → today only; tomorrow's occurrence is unchanged.
 - Attempt to drag a read-only work-calendar event → refused visibly; it does not
   accept the drop and then spring back.
+- Collapse each of the seven sections → count and progress stay visible; reload
+  → still collapsed.
+- Start a drag → empty bands appear as drop targets; end it → they hide again.
+- Check every band boundary against its own printed label: an 07:59 item is in
+  Early morning, 08:00 in Morning, 16:59 Afternoon, 17:00 Evening, 20:59
+  Evening, 21:00 Night. **The old code fails this test at every boundary.**
+- Run the duplicate sweep → pairs are exact normalized matches only, the
+  context-richer copy is pre-selected, and a task/routine pair offers *skip
+  today* rather than delete.
 - Confirm the row count is capped and the hidden count is stated.
 
 **Baseline before starting:** 3,966 tests passing, build clean, 8 lint errors.
