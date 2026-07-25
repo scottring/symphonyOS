@@ -10,18 +10,10 @@ import { PlanningTaskCard } from './PlanningTaskCard'
 import { PlanningEventBlock } from './PlanningEventBlock'
 import { PlanningRoutineBlock } from './PlanningRoutineBlock'
 import { layoutLanes, type Lane } from './overlapLanes'
+import { ALL_DAY_LANE_HEIGHT, allDayLaneCapacity } from '@/lib/planning/allDayLane'
 
 // Max side-by-side lanes before overlapping items collapse into a "+N" chip.
 const MAX_LANES = 4
-
-// Fixed height (px) of the all-day lane in every column — and the matching
-// spacer in the time-label column. Must stay FIXED regardless of chip count:
-// columns are independent flex children, so a variable-height lane would
-// desynchronize hour rows across days.
-export const ALL_DAY_LANE_HEIGHT = 44
-
-// Up to this many chips render before the rest collapse into a "+N" count.
-const MAX_ALL_DAY_CHIPS = 2
 
 // "8:00 AM" style label from minutes-since-day-start.
 function minutesToLabel(minutesFromStart: number, dayStartHour: number): string {
@@ -63,6 +55,9 @@ interface PlanningColumnProps {
   /** Incomplete, isAllDay tasks scheduled on this exact day — rendered as
    *  fixed-height chips in the all-day lane, never in the hour grid below. */
   allDayTasks?: Task[]
+  /** All-day lane height, uniform across the grid (the busiest day sets it).
+   *  Defaults to the one-row height for callers that don't compute it. */
+  laneHeight?: number
   familyMembers: FamilyMember[]
   eventNotesMap?: Map<string, EventNote>
   timeLabels: TimeLabel[]
@@ -83,6 +78,7 @@ export function PlanningColumn({
   events,
   routines,
   allDayTasks = [],
+  laneHeight = ALL_DAY_LANE_HEIGHT,
   familyMembers,
   eventNotesMap,
   timeLabels,
@@ -261,11 +257,13 @@ export function PlanningColumn({
         )}
       </div>
 
-      {/* All-day lane — fixed height in every column, regardless of chip count. */}
+      {/* All-day lane — same height in every column (the grid's busiest day
+          sets it), so the hour rows below stay aligned across days. */}
       <AllDayLaneCell
         dateKey={dateKey}
         tasks={allDayTasks}
         onChipClick={(taskId) => setRaisedId(taskId)}
+        laneHeight={laneHeight}
       />
 
       {/* Time slots (drop targets) */}
@@ -376,23 +374,29 @@ interface AllDayLaneCellProps {
   dateKey: string
   tasks: Task[]
   onChipClick: (taskId: string) => void
+  /** Uniform across the grid — the busiest day sets it (see allDayLaneHeight). */
+  laneHeight: number
 }
 
 // The all-day lane cell for one column. Its own component so the droppable
 // hook stays unconditional (every column always registers a lane, even with
 // zero tasks) — keeping hook usage clean rather than conditionally calling
 // useDroppable inside PlanningColumn's body.
-function AllDayLaneCell({ dateKey, tasks, onChipClick }: AllDayLaneCellProps) {
+function AllDayLaneCell({ dateKey, tasks, onChipClick, laneHeight }: AllDayLaneCellProps) {
   const { isOver, setNodeRef } = useDroppable({ id: `allday-${dateKey}` })
-  const visible = tasks.slice(0, MAX_ALL_DAY_CHIPS)
+  const capacity = allDayLaneCapacity(laneHeight)
+  // One cell short of capacity when there's a surplus, so the "+N" has a slot of
+  // its own rather than displacing a chip and undercounting.
+  const overflowing = tasks.length > capacity
+  const visible = overflowing ? tasks.slice(0, capacity - 1) : tasks
   const overflow = tasks.length - visible.length
 
   return (
     <div
       ref={setNodeRef}
       data-testid="allday-lane"
-      style={{ height: ALL_DAY_LANE_HEIGHT }}
-      className={`px-1.5 py-1 flex items-center gap-1 border-b border-neutral-200 transition-colors overflow-hidden ${
+      style={{ height: laneHeight }}
+      className={`px-1.5 py-1 grid grid-cols-2 content-start gap-1 border-b border-neutral-200 transition-colors overflow-hidden ${
         isOver ? 'bg-primary-100' : 'bg-neutral-50/60'
       }`}
     >
@@ -400,7 +404,7 @@ function AllDayLaneCell({ dateKey, tasks, onChipClick }: AllDayLaneCellProps) {
         <AllDayChip key={task.id} task={task} onClick={() => onChipClick(task.id)} />
       ))}
       {overflow > 0 && (
-        <span className="shrink-0 text-[10px] font-semibold text-neutral-500 bg-neutral-200 rounded-full px-1.5 py-0.5">
+        <span className="h-5 grid place-items-center text-[10px] font-semibold text-neutral-500 bg-neutral-200 rounded-full px-1.5">
           +{overflow}
         </span>
       )}
@@ -425,7 +429,7 @@ function AllDayChip({ task, onClick }: AllDayChipProps) {
     : undefined
 
   if (isDragging) {
-    return <div ref={setNodeRef} className="h-5 min-w-[32px] flex-1 rounded bg-primary-100 border border-dashed border-primary-300 opacity-50" />
+    return <div ref={setNodeRef} className="h-5 w-full rounded bg-primary-100 border border-dashed border-primary-300 opacity-50" />
   }
 
   return (
@@ -437,7 +441,7 @@ function AllDayChip({ task, onClick }: AllDayChipProps) {
       {...listeners}
       onClick={onClick}
       title={task.title}
-      className="min-w-0 flex-1 h-5 px-1.5 rounded bg-primary-50 border border-primary-200 text-[10px] font-medium text-primary-700 truncate text-left cursor-grab active:cursor-grabbing touch-none"
+      className="min-w-0 w-full h-5 px-1.5 rounded bg-primary-50 border border-primary-200 text-[10px] font-medium text-primary-700 truncate text-left cursor-grab active:cursor-grabbing touch-none"
     >
       {task.title}
     </button>

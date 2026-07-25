@@ -65,6 +65,18 @@ interface PlanningSessionProps {
   /** Shelf mode: render the pool as a full-width lane above the grid instead
    *  of the side drawer. The session supplies tasks + backlog toggle. */
   shelf?: Omit<PlanningShelfProps, 'tasks' | 'hiddenCount' | 'showingAll' | 'onToggleShowAll'>
+  /**
+   * How much a placement on this surface decides.
+   *
+   * 'time' (default) — the drop's hour is the answer. This is Today: the day is
+   *   already settled, and the only question left is what time.
+   * 'day'  — the DAY is the answer and the hour under the cursor is incidental;
+   *   the task lands all-day on that date. This is the week rung: it asks which
+   *   day, and leaves the time to Today. Dropping anywhere in a day's column
+   *   means that day, exactly as dropping anywhere in a month row means that
+   *   week.
+   */
+  placementGrain?: 'day' | 'time'
 }
 
 // Time slot duration in minutes
@@ -99,7 +111,9 @@ export function PlanningSession({
   embedded = false,
   onOpenDay,
   shelf,
+  placementGrain = 'time',
 }: PlanningSessionProps) {
+  const dayGrain = placementGrain === 'day'
   // Date range state - start with the initial date if provided
   const [dateRange, setDateRange] = useState<Date[]>(() => {
     const startDate = initialDate ? new Date(initialDate) : new Date()
@@ -175,10 +189,14 @@ export function PlanningSession({
       const parsed = parseDateKey(quickCreate.dateKey)
       setQuickCreate(null)
       if (!parsed) return
-      const scheduledFor = new Date(parsed.year, parsed.month, parsed.day, quickCreate.hour, quickCreate.minute, 0, 0)
+      // Same grain rule as a drop: on a week surface a new item gets the day,
+      // not the hour of the slot that was clicked.
+      const scheduledFor = dayGrain
+        ? new Date(parsed.year, parsed.month, parsed.day)
+        : new Date(parsed.year, parsed.month, parsed.day, quickCreate.hour, quickCreate.minute, 0, 0)
       void onCreateTaskAt(title, scheduledFor)
     },
-    [quickCreate, onCreateTaskAt]
+    [quickCreate, onCreateTaskAt, dayGrain]
   )
 
   // Configure sensors for drag detection
@@ -570,8 +588,14 @@ export function PlanningSession({
           }
         }
 
-        // Create date in local time (not UTC) to avoid timezone shift
-        const scheduledFor = new Date(parsed.year, parsed.month, parsed.day, parsed.hour, parsed.minute, 0, 0)
+        // Create date in local time (not UTC) to avoid timezone shift.
+        // At day grain the hour is dropped on purpose — the week rung's answer
+        // is the day, and giving it a time here would be Today's job done badly
+        // (2 PM chosen by wherever the cursor happened to be). The item lands in
+        // that day's all-day lane; opening Today is where it gets a time.
+        const scheduledFor = dayGrain
+          ? new Date(parsed.year, parsed.month, parsed.day)
+          : new Date(parsed.year, parsed.month, parsed.day, parsed.hour, parsed.minute, 0, 0)
 
         // bucket:'timed' is required for the task to surface in the Today/Day
         // view (selectTimed filters on bucket==='timed'); scheduledFor alone
@@ -579,11 +603,11 @@ export function PlanningSession({
         onUpdateTask(activeId, {
           bucket: 'timed',
           scheduledFor,
-          isAllDay: false,
+          isAllDay: dayGrain,
         })
       }
     },
-    [onUpdateTask, tasks, onScheduleRoutine, onRescheduleEvent, events, minDropDate]
+    [onUpdateTask, tasks, onScheduleRoutine, onRescheduleEvent, events, minDropDate, dayGrain]
   )
 
   return (

@@ -4,7 +4,8 @@ import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { EventNote } from '@/hooks/useEventNotes'
 import type { Routine } from '@/types/actionable'
 import type { FamilyMember } from '@/types/family'
-import { PlanningColumn, ALL_DAY_LANE_HEIGHT } from './PlanningColumn'
+import { PlanningColumn } from './PlanningColumn'
+import { allDayLaneHeight } from '@/lib/planning/allDayLane'
 
 interface PlanningGridProps {
   dateRange: Date[]
@@ -60,6 +61,19 @@ export function PlanningGrid({
   // Calculate slot height (in pixels)
   const slotHeight = 40 // 40px per 30-minute slot
 
+  // The all-day lane's height, set by the busiest day on the grid and applied
+  // uniformly. The week rung places by day, so this lane is where week
+  // placements land — sized to fit them, they stay visible instead of
+  // collapsing behind a "+N" that reads as data loss.
+  const laneHeight = useMemo(() => {
+    let max = 0
+    for (const date of dateRange) {
+      const n = allDayTasksByDate?.get(formatDateKey(date))?.length ?? 0
+      if (n > max) max = n
+    }
+    return allDayLaneHeight(max)
+  }, [dateRange, allDayTasksByDate])
+
   return (
     <div className="flex-1 overflow-auto">
       <div className="flex min-w-max">
@@ -68,10 +82,10 @@ export function PlanningGrid({
           {/* Header spacer */}
           <div className="h-12 border-b border-neutral-200" />
 
-          {/* All-day label spacer — matches ALL_DAY_LANE_HEIGHT in every
-              column so hour rows below stay aligned across the grid. */}
+          {/* All-day label spacer — matches the columns' lane height so hour
+              rows below stay aligned across the grid. */}
           <div
-            style={{ height: ALL_DAY_LANE_HEIGHT }}
+            style={{ height: laneHeight }}
             className="px-2 flex items-center border-b border-neutral-200"
           >
             <span className="text-[10px] uppercase tracking-wide text-neutral-400 font-medium">
@@ -113,6 +127,7 @@ export function PlanningGrid({
               events={events}
               routines={routines}
               allDayTasks={allDayTasks}
+              laneHeight={laneHeight}
               familyMembers={familyMembers}
               eventNotesMap={eventNotesMap}
               timeLabels={timeLabels}

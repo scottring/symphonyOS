@@ -47,6 +47,9 @@ export function StepSchedule({
         initialDate={weekDate}
         minDropDate={minDropDate}
         embedded
+        // Weekly session: placing a rock picks its DAY, not its hour (the week
+        // rung's one decision). Matches the /week page.
+        placementGrain="day"
       />
     </div>
   )

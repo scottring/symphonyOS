@@ -643,6 +643,91 @@ describe('PlanningSession', () => {
       expect(screen.queryByRole('dialog', { name: /create task/i })).not.toBeInTheDocument()
     })
   })
+
+  // ── The week rung asks WHICH DAY and stops there. On a day-grain surface the
+  // hour under the cursor is incidental — giving it a time would be Today's job
+  // done badly, by wherever the pointer happened to land. ──
+  describe('placementGrain="day"', () => {
+    const day = new Date(2026, 6, 20)
+    const slotSelector = `[data-droppable-id="slot-${formatDateKey(day)}-10-30"]`
+
+    it('a slot click creates the task on the DAY, with no time', () => {
+      const onCreateTaskAt = vi.fn()
+      const { container } = render(
+        <PlanningSession
+          tasks={[]}
+          events={[]}
+          routines={[]}
+          onUpdateTask={vi.fn()}
+          onPushTask={vi.fn()}
+          onClose={vi.fn()}
+          initialDate={day}
+          onCreateTaskAt={onCreateTaskAt}
+          placementGrain="day"
+        />
+      )
+
+      fireEvent.click(container.querySelector(slotSelector)!)
+      const input = screen.getByRole('textbox')
+      fireEvent.change(input, { target: { value: 'Order the vanity' } })
+      fireEvent.keyDown(input, { key: 'Enter' })
+
+      const [, scheduledFor] = onCreateTaskAt.mock.calls[0]
+      // Midnight — the 10:30 slot that was clicked is deliberately ignored.
+      expect(scheduledFor).toEqual(new Date(2026, 6, 20))
+    })
+
+    it('the default grain still honors the slot time (Today keeps asking what time)', () => {
+      const onCreateTaskAt = vi.fn()
+      const { container } = render(
+        <PlanningSession
+          tasks={[]}
+          events={[]}
+          routines={[]}
+          onUpdateTask={vi.fn()}
+          onPushTask={vi.fn()}
+          onClose={vi.fn()}
+          initialDate={day}
+          onCreateTaskAt={onCreateTaskAt}
+        />
+      )
+
+      fireEvent.click(container.querySelector(slotSelector)!)
+      fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Dentist' } })
+      fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter' })
+
+      expect(onCreateTaskAt.mock.calls[0][1]).toEqual(new Date(2026, 6, 20, 10, 30, 0, 0))
+    })
+  })
+
+  // Every week placement lands in the all-day lane, so the lane must be able to
+  // hold them. A fixed 2-chip lane would hide the third thing planned for a day
+  // behind "+1" — written but invisible, which reads as data loss.
+  describe('all-day lane capacity', () => {
+    it('shows more than two day-level placements on one day', () => {
+      const day = new Date(2026, 6, 20)
+      const tasks = ['Order the vanity', 'Call the plumber', 'Book the mover', 'Return the tile']
+        .map((title) => createMockTask({ title, isAllDay: true, scheduledFor: day, bucket: 'timed' }))
+
+      render(
+        <PlanningSession
+          tasks={tasks}
+          events={[]}
+          routines={[]}
+          onUpdateTask={vi.fn()}
+          onPushTask={vi.fn()}
+          onClose={vi.fn()}
+          initialDate={day}
+        />
+      )
+
+      const lane = screen.getByTestId('allday-lane')
+      for (const title of ['Order the vanity', 'Call the plumber', 'Book the mover', 'Return the tile']) {
+        expect(lane).toHaveTextContent(title)
+      }
+      expect(lane).not.toHaveTextContent('+1')
+    })
+  })
 })
 
 // Helper to format date as YYYY-MM-DD, matching PlanningSession's internal
