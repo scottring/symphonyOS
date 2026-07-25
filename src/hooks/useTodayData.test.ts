@@ -15,7 +15,7 @@ describe('useTodayData', () => {
     const input = baseInput()
     const { result, rerender } = renderHook((p: TodayDataInput) => useTodayData(p), { initialProps: input })
     const first = result.current
-    expect(first.sectionsOrder).toEqual(['allday', 'morning', 'afternoon', 'evening', 'unscheduled'])
+    expect(first.sectionsOrder).toEqual(['allday', 'earlyMorning', 'morning', 'afternoon', 'evening', 'night', 'unscheduled'])
     rerender(input)
     expect(result.current).toBe(first)
   })

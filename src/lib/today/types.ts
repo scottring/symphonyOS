@@ -59,7 +59,9 @@ export interface TodayData {
   counts: TodayCounts
 }
 
-export const SECTIONS_ORDER: DaySection[] = ['allday', 'morning', 'afternoon', 'evening', 'unscheduled']
+export const SECTIONS_ORDER: DaySection[] = [
+  'allday', 'earlyMorning', 'morning', 'afternoon', 'evening', 'night', 'unscheduled',
+]
 
 export const EMPTY_TODAY_DATA: TodayData = {
   isToday: false,
@@ -68,7 +70,7 @@ export const EMPTY_TODAY_DATA: TodayData = {
   weekTasks: [],
   monthTasks: [],
   completedInboxTasks: [],
-  grouped: { allday: [], morning: [], afternoon: [], evening: [], unscheduled: [] },
+  grouped: { allday: [], earlyMorning: [], morning: [], afternoon: [], evening: [], night: [], unscheduled: [] },
   sectionsOrder: SECTIONS_ORDER,
   counts: { completedCount: 0, incompleteOverdue: 0, actionableCount: 0, totalItems: 0, progressPercent: 0 },
 }

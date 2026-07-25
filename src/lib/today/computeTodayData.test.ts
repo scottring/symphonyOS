@@ -19,7 +19,7 @@ describe('computeTodayData', () => {
   it('empty input → zeroed counts, empty sections, sectionsOrder set', () => {
     const d = computeTodayData(baseInput())
     expect(d.counts).toEqual({ completedCount: 0, incompleteOverdue: 0, actionableCount: 0, totalItems: 0, progressPercent: 0 })
-    expect(d.sectionsOrder).toEqual(['allday', 'morning', 'afternoon', 'evening', 'unscheduled'])
+    expect(d.sectionsOrder).toEqual(['allday', 'earlyMorning', 'morning', 'afternoon', 'evening', 'night', 'unscheduled'])
     expect(d.grouped.morning).toEqual([])
   })
   it('isToday true when viewedDate is today', () => {
