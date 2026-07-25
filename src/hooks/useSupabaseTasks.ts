@@ -80,6 +80,7 @@ export interface DbTask {
   source_id: string | null
   goal_id: string | null
   is_fun: boolean | null
+  sort_order: number | null
   created_at: string
   updated_at: string
 }
@@ -151,6 +152,7 @@ export function dbTaskToTask(dbTask: DbTask): Task {
     sourceId: dbTask.source_id ?? undefined,
     goalId: dbTask.goal_id ?? undefined,
     isFun: dbTask.is_fun ?? undefined,
+    sortOrder: dbTask.sort_order ?? null,
     captureMeta: dbTask.capture_meta
       ? {
           status: dbTask.capture_meta.status as TaskCaptureMeta['status'],
@@ -949,6 +951,7 @@ export function useSupabaseTasks() {
     // `week_start` is a DATE column — localYmd, not toISOString (which shifts the day west of Greenwich).
     if ('weekStart' in updates) dbUpdates.week_start = updates.weekStart ? localYmd(updates.weekStart) : null
     if ('pickedAt' in updates) dbUpdates.picked_at = updates.pickedAt?.toISOString() ?? null
+    if ('sortOrder' in updates) dbUpdates.sort_order = updates.sortOrder ?? null
 
     logger.debug('[updateTask] Sending to DB:', { id, dbUpdates })
     const { data, error: updateError, status, count } = await supabase
@@ -1067,6 +1070,7 @@ export function useSupabaseTasks() {
     // `week_start` is a DATE column — localYmd, not toISOString (which shifts the day west of Greenwich).
     if ('weekStart' in updates) dbUpdates.week_start = updates.weekStart ? localYmd(updates.weekStart) : null
     if ('pickedAt' in updates) dbUpdates.picked_at = updates.pickedAt?.toISOString() ?? null
+    if ('sortOrder' in updates) dbUpdates.sort_order = updates.sortOrder ?? null
 
     logger.debug('[updateTasksBulk] Sending to DB:', { taskIds, dbUpdates })
 

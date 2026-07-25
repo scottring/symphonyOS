@@ -39,6 +39,7 @@ interface MockDbTask {
   contact_id: string | null
   assigned_to: string | null
   project_id: string | null
+  sort_order: number | null
   created_at: string
   updated_at: string
 }
@@ -69,6 +70,7 @@ function createMockDbTask(overrides: Partial<MockDbTask> = {}): MockDbTask {
     contact_id: null,
     assigned_to: null,
     project_id: null,
+    sort_order: null,
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-01T00:00:00Z',
     ...overrides,
@@ -996,6 +998,38 @@ describe('useSupabaseTasks', () => {
         { url: 'https://example.com', title: 'Example' },
         { url: 'https://test.com', title: 'Test' },
       ])
+    })
+
+    it('round-trips sort_order', async () => {
+      mockSupabaseData.push(createMockDbTask({
+        id: 'task-1',
+        sort_order: 2000,
+      } as any))
+
+      const { result } = renderHook(() => useSupabaseTasks())
+
+      await waitFor(() => {
+        expect(result.current.tasks).toHaveLength(1)
+      })
+
+      const task = result.current.tasks[0]
+      expect(task.sortOrder).toBe(2000)
+    })
+
+    it('treats a missing sort_order as null, not 0', async () => {
+      mockSupabaseData.push(createMockDbTask({
+        id: 'task-1',
+        sort_order: null,
+      } as any))
+
+      const { result } = renderHook(() => useSupabaseTasks())
+
+      await waitFor(() => {
+        expect(result.current.tasks).toHaveLength(1)
+      })
+
+      const task = result.current.tasks[0]
+      expect(task.sortOrder).toBeNull()
     })
   })
 

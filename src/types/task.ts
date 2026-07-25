@@ -88,4 +88,8 @@ export interface Task {
   goalId?: string
   /** Fun-audit mark (Best Laid Plans): this item exists because it's fun. */
   isFun?: boolean
+  /** Manual position among items with no time (all-day, unscheduled, group
+   *  members). Gap-based: increments of 1000 so a drag usually rewrites one
+   *  row. null = never manually ordered. Timed items sort by time, not this. */
+  sortOrder?: number | null
 }
