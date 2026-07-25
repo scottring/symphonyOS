@@ -385,3 +385,19 @@ describe('TodayView', () => {
     expect(italicSerifMatch).toBe(true)
   })
 })
+
+// ── Print: a compact list on demand. Today renders ~57 rows of cards, chips
+// and avatars; this is the same day as one line per item. Mounted only while
+// printing so it can't duplicate every title in the DOM. ──
+describe('TodayView print list', () => {
+  it('offers a Print list control', () => {
+    renderView()
+    expect(screen.getByRole('button', { name: /Print list/i })).toBeInTheDocument()
+  })
+
+  it('does not keep the printable list in the DOM when not printing', () => {
+    renderView()
+    expect(screen.queryByTestId('printable-day-list')).not.toBeInTheDocument()
+  })
+})
+

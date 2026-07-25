@@ -113,6 +113,16 @@ the same Keep · Done · Someday · Let go fates as month review; (c) 21 untimed
 routines are a routines-design problem that will flood Unscheduled daily until
 they get times or stop claiming a slot.
 
+**Shipped as a stopgap while that's decided:** a **Print list** button in
+Today's stats row (`PrintableDayList` + an unlayered `@media print` block in
+`index.css`). It renders the same day as one line per item — checkbox, time,
+title — grouped by the same sections, open items only, with the done count
+stated once. Mounted **only while printing**, because keeping it in the DOM
+duplicated every title (invisible to the eye, very real to a screen reader and
+to `getByText` — it broke four TodayView tests before it was made on-demand).
+Cmd+P works too via `beforeprint`. Printing Sat 7/25 reads "47 to do · 2
+already done", which is the overload in one number.
+
 ### 3. Four routines skipped in 29 seconds (cause unknown)
 
 On 2026-07-25 at 12:01:05–12:01:34Z, `Iris weekend workout`, `Kids shower

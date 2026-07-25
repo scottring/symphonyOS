@@ -1351,3 +1351,51 @@ html.desktop-shell img,
 html.desktop-shell a {
   -webkit-user-drag: none;
 }
+
+/* ── Print: the day as a compact list ──────────────────────────────────────
+   PrintableDayList renders hidden on screen and takes over the page when
+   printing. Unlayered on purpose (Tailwind v4: unlayered CSS beats every
+   utility) so a stray utility on an ancestor can't leak into the printout.
+
+   `visibility` rather than `display` for the hide-everything-else pass:
+   display:none on ancestors collapses the layout and takes the printable
+   subtree with it, however carefully you re-show the child. */
+@media screen {
+  .print-only { display: none; }
+}
+
+@media print {
+  body * { visibility: hidden; }
+  .print-only, .print-only * { visibility: visible; }
+  .print-only {
+    position: absolute;
+    inset: 0;
+    display: block;
+    padding: 0;
+    background: #fff;
+    color: #000;
+  }
+  .day-print {
+    font-family: 'Source Sans 3', system-ui, sans-serif;
+    font-size: 11pt;
+    line-height: 1.5;
+  }
+  .day-print-head { margin-bottom: 14pt; border-bottom: 1px solid #999; padding-bottom: 6pt; }
+  .day-print-head h1 { font-family: 'Source Serif 4', Georgia, serif; font-size: 18pt; font-weight: 600; margin: 0; }
+  .day-print-head p { margin: 2pt 0 0; font-size: 9.5pt; color: #555; }
+  .day-print section { margin-bottom: 11pt; break-inside: avoid; }
+  .day-print h2 {
+    font-size: 8.5pt; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.09em; color: #555; margin: 0 0 3pt;
+  }
+  .day-print ul { list-style: none; margin: 0; padding: 0; }
+  .day-print-row {
+    display: flex; align-items: baseline; gap: 7pt;
+    padding: 1.5pt 0; break-inside: avoid;
+  }
+  .day-print-box { font-size: 12pt; line-height: 1; }
+  .day-print-time { min-width: 46pt; font-variant-numeric: tabular-nums; font-size: 9.5pt; color: #444; }
+  .day-print-title { flex: 1; }
+  .day-print-empty { font-style: italic; color: #555; }
+  @page { margin: 14mm; }
+}

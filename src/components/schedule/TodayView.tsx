@@ -31,7 +31,7 @@ import { useTimelineInsert } from '@/hooks/useTimelineInsert'
 import { useDomain } from '@/hooks/useDomain'
 import { computeAnchorTime } from '@/lib/timelineAnchor'
 
-import { Eye, EyeOff, Repeat, Binoculars, Sun, ChevronDown, ChevronRight } from 'lucide-react'
+import { Eye, EyeOff, Repeat, Binoculars, Sun, ChevronDown, ChevronRight, Printer } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { AssigneeFilter } from '@/components/home/AssigneeFilter'
 
@@ -64,6 +64,7 @@ import { TimelineNoteComposer } from './TimelineNoteComposer'
 import { discussionItems } from '@/lib/discussionItems'
 import { DiscussionBadge } from './DiscussionBadge'
 import { daySectionMeta } from '@/lib/daySectionMeta'
+import { PrintableDayList } from './PrintableDayList'
 import { parseMealTitle } from '@/lib/mealTitle'
 import { readHideRoutines, writeHideRoutines, onHideRoutinesChange } from '@/lib/hideRoutinesSignal'
 import { useShareToFamilyNudges } from '@/lib/today/shareNudges'
@@ -504,9 +505,46 @@ export function TodayView({
         return null
       })()
 
+  // ── Print: mount the compact list, then hand the page to the printer ──
+  // The button sets state and an effect prints on the next commit, so the list
+  // is in the DOM before the browser snapshots. beforeprint/afterprint cover
+  // Cmd+P, which never goes through the button.
+  const [printing, setPrinting] = useState(false)
+  useEffect(() => {
+    const before = () => setPrinting(true)
+    const after = () => setPrinting(false)
+    window.addEventListener('beforeprint', before)
+    window.addEventListener('afterprint', after)
+    return () => {
+      window.removeEventListener('beforeprint', before)
+      window.removeEventListener('afterprint', after)
+    }
+  }, [])
+  const printList = useCallback(() => setPrinting(true), [])
+  useEffect(() => {
+    if (!printing) return
+    // Next frame: let the list paint before the print dialog freezes the page.
+    const id = requestAnimationFrame(() => {
+      window.print()
+      setPrinting(false)
+    })
+    return () => cancelAnimationFrame(id)
+  }, [printing])
+
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
     <div className="max-w-[940px] w-full mx-auto px-0 py-2 md:px-8 md:py-8">
+      {/* Mounted only while printing. Keeping it permanently in the DOM would
+          duplicate every title — invisible to the eye (CSS-hidden) but very
+          real to screen readers and to any getByText. */}
+      {printing && (
+        <PrintableDayList
+          date={viewedDate}
+          sectionsOrder={data.sectionsOrder}
+          grouped={data.grouped}
+          overdue={data.overdueTasks}
+        />
+      )}
       {/* Date masthead with prev/next-day nav — mobile only. Desktop renders
           DayNavCluster in HomeHeader above the view; mobile had no date header,
           so surface the same control (it's responsive) here. */}
@@ -565,6 +603,15 @@ export function TodayView({
               >
                 {createElement(hideRoutines ? EyeOff : Eye, { className: 'w-5 h-5' })}
                 <span>{hideRoutines ? 'Show daily' : 'Hide daily'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={printList}
+                title="Print a compact list of this day"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[15px] text-neutral-500 hover:text-neutral-800 hover:bg-neutral-100 transition-all"
+              >
+                <Printer className="w-5 h-5" />
+                <span>Print list</span>
               </button>
               {data.isToday && onOpenPlanToday && (
                 <button
