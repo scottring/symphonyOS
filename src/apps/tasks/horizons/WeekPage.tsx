@@ -159,9 +159,13 @@ export function WeekPage() {
   // addTask with scheduledFor riding the INSERT — bucket:'timed' is derived
   // from it (useSupabaseTasks.ts), so this never needs a follow-up setBucket.
   // Mirrors onCreateTaskFromValue's option stamping in shared.tsx.
+  // This page is placementGrain="day", so the date arriving here is midnight —
+  // the clicked slot's hour is deliberately discarded. isAllDay MUST follow: a
+  // midnight task that isn't all-day renders at the 12 AM row, outside the
+  // grid's 6 AM–10 PM window, so it would be written and invisible.
   const onCreateTaskAt = useCallback((title: string, scheduledFor: Date) => {
     void addTask(title, undefined, undefined, scheduledFor, {
-      isAllDay: false,
+      isAllDay: true,
       assignedTo: getCurrentUserMember()?.id,
       context: currentDomain !== 'universal' ? currentDomain : undefined,
     });

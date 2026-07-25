@@ -35,14 +35,15 @@ vi.mock('@/contexts/GoalsContext', () => ({
 // tests. ──
 // `mockUpdateTask` is hoisted (not a fresh `vi.fn()` per hook call) so tests
 // can assert on calls made through it — e.g. MonthPage's onPlaceTask wiring.
-const { mockTasks, mockUpdateTask, mockGoals } = vi.hoisted(() => ({
+const { mockTasks, mockUpdateTask, mockAddTask, mockGoals } = vi.hoisted(() => ({
   mockTasks: [] as unknown[],
   mockUpdateTask: vi.fn(),
+  mockAddTask: vi.fn(),
   mockGoals: [] as Goal[],
 }))
 vi.mock('@/hooks/useSupabaseTasks', () => ({
   useSupabaseTasks: () => ({
-    tasks: mockTasks, addTask: vi.fn(), toggleTask: vi.fn(), toggleWaiting: vi.fn(),
+    tasks: mockTasks, addTask: mockAddTask, toggleTask: vi.fn(), toggleWaiting: vi.fn(),
     deleteTask: vi.fn(), updateTask: mockUpdateTask, updateTasksBulk: vi.fn(),
     pushTask: vi.fn(), setBucket: vi.fn(),
   }),
@@ -128,7 +129,7 @@ function todayGridCell(container: HTMLElement): HTMLElement {
 }
 
 describe('horizon pages (smoke)', () => {
-  beforeEach(() => { mockTasks.length = 0; mockGoals.length = 0; mockUpdateTask.mockClear() })
+  beforeEach(() => { mockTasks.length = 0; mockGoals.length = 0; mockUpdateTask.mockClear(); mockAddTask.mockClear() })
 
   it('WeekPage renders the week scaffold with an empty pool', () => {
     render(<WeekPage />)
@@ -150,6 +151,33 @@ describe('horizon pages (smoke)', () => {
     expect(screen.queryByText(/^Placed this week/)).not.toBeInTheDocument()
     // The shelf is the only pool surface:
     expect(screen.getByRole('button', { name: /tend/i })).toBeInTheDocument()
+  })
+
+  // The week rung's create path has the same grain rule as its drop path: the
+  // clicked slot's hour is discarded. isAllDay MUST come along — a midnight task
+  // that isn't all-day renders at the 12 AM row, outside the grid's 6 AM–10 PM
+  // window, so it would be written and invisible.
+  it('WeekPage: clicking a slot creates the task on the DAY, all-day, no time', () => {
+    const tomorrow = new Date(now)
+    tomorrow.setDate(tomorrow.getDate() + 1)
+    tomorrow.setHours(0, 0, 0, 0)
+
+    const { container } = render(<WeekPage />)
+    const slot = container.querySelector(`[data-droppable-id^="slot-${localYmd(tomorrow)}-"]`)
+    expect(slot).not.toBeNull()
+    fireEvent.click(slot!)
+
+    // Scoped to the popover — the shelf has its own "add" textbox on the page.
+    const dialog = screen.getByRole('dialog', { name: /create task/i })
+    const input = within(dialog).getByRole('textbox')
+    fireEvent.change(input, { target: { value: 'Order the vanity' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+
+    expect(mockAddTask).toHaveBeenCalledTimes(1)
+    const [title, , , scheduledFor, opts] = mockAddTask.mock.calls[0]
+    expect(title).toBe('Order the vanity')
+    expect(scheduledFor).toEqual(tomorrow) // midnight — the slot's hour is dropped
+    expect(opts).toMatchObject({ isAllDay: true })
   })
 
   it('MonthPage renders the calendar grid weekday header', () => {
