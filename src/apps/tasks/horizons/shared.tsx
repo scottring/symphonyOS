@@ -127,7 +127,28 @@ export function useHorizonPageData(horizon: HorizonId, anchorDate?: Date) {
   const {
     tasks, addTask, toggleTask, toggleWaiting, deleteTask, updateTask, updateTasksBulk, pushTask, setBucket,
   } = useSupabaseTasks();
-  const { events } = useGoogleCalendar();
+  const { events, fetchEvents } = useGoogleCalendar();
+
+  // Every horizon page reads the SAME events array, and fetchEvents REPLACES
+  // it wholesale. The only page-side caller is the shell (useShellChrome.ts),
+  // which loads today→+7d — so before this effect the year page drew twelve
+  // months out of one week of calendar, the season page three months out of
+  // the same week, and the new ribbon would have shipped beautiful and empty.
+  //
+  // Each rung now loads its own span on mount, exactly the way the wizard's
+  // CalendarStep / PlaceOnWeeksStep / ScheduleGridStep already do. That is the
+  // whole reason the guided session has always looked richer than the page it
+  // mirrors.
+  const guidedHorizon = horizon === 'year' ? 'annual'
+    : horizon === 'season' ? 'seasonal'
+    : horizon === 'month' ? 'monthly'
+    : horizon === 'week' ? 'weekly'
+    : null;
+  useEffect(() => {
+    if (!guidedHorizon) return;
+    const { start, end } = guidedPeriod(guidedHorizon);
+    void fetchEvents(start, end);
+  }, [guidedHorizon, fetchEvents]);
   // Event ids opt in to auto-loaded, realtime event notes (see useEventNotes)
   const visibleEventIds = useMemo(() => events.map((e) => e.google_event_id || e.id), [events]);
   const { notes: eventNotesMap, updateEventAssignment, updateEventAssignmentAll, updateEventContext, updateEventProject } = useEventNotes(visibleEventIds);
