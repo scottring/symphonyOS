@@ -1132,18 +1132,37 @@ export function useSupabaseTasks() {
     // Also snapshot the post-write task objects here, before the optimistic
     // setTasks below — tasksRef only mirrors `tasks` again after a render, so
     // it can't be used to build the announced tasks afterward.
+    //
+    // Both levels of the tree: `tasks` is nested (nestSubtasks lifts children
+    // out of the top level onto `parent.subtasks`), and sortOrder governs group
+    // members too — a top-level-only walk would silently no-op every reorder
+    // inside a group. Same two-level shape as updateTask.
     const previous = new Map<string, number | null>()
     const updatedTasks: Task[] = []
+    const record = (t: Task) => {
+      if (!byId.has(t.id)) return
+      previous.set(t.id, t.sortOrder ?? null)
+      updatedTasks.push({ ...t, sortOrder: byId.get(t.id)! })
+    }
     for (const t of tasksRef.current) {
-      if (byId.has(t.id)) {
-        previous.set(t.id, t.sortOrder ?? null)
-        updatedTasks.push({ ...t, sortOrder: byId.get(t.id)! })
-      }
+      record(t)
+      for (const st of t.subtasks ?? []) record(st)
     }
 
     const apply = (orders: Map<string, number | null>) =>
       setTasks((prev) =>
-        prev.map((t) => (orders.has(t.id) ? { ...t, sortOrder: orders.get(t.id)! } : t)))
+        prev.map((t) => {
+          const self = orders.has(t.id) ? { ...t, sortOrder: orders.get(t.id)! } : t
+          if (!t.subtasks?.length) return self
+          let touched = false
+          const subtasks = t.subtasks.map((st) => {
+            if (!orders.has(st.id)) return st
+            touched = true
+            return { ...st, sortOrder: orders.get(st.id)! }
+          })
+          if (!touched) return self
+          return { ...self, subtasks }
+        }))
 
     apply(byId)
 

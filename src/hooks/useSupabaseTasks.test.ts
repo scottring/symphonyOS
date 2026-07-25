@@ -42,6 +42,7 @@ interface MockDbTask {
   contact_id: string | null
   assigned_to: string | null
   project_id: string | null
+  parent_task_id: string | null
   sort_order: number | null
   created_at: string
   updated_at: string
@@ -107,6 +108,7 @@ function createMockDbTask(overrides: Partial<MockDbTask> = {}): MockDbTask {
     contact_id: null,
     assigned_to: null,
     project_id: null,
+    parent_task_id: null,
     sort_order: null,
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-01T00:00:00Z',
@@ -839,6 +841,46 @@ describe('useSupabaseTasks', () => {
 
       expect(mockUpsert).not.toHaveBeenCalled()
       expect(mockUpdate).not.toHaveBeenCalled()
+    })
+
+    it('updates a nested subtask optimistically (group members live one level down)', async () => {
+      mockSupabaseData.push(
+        createMockDbTask({ id: 'group', sort_order: 0 }),
+        createMockDbTask({ id: 'member', parent_task_id: 'group', sort_order: 1000 })
+      )
+      const { result } = renderHook(() => useSupabaseTasks())
+      await waitFor(() => {
+        // nestSubtasks lifts 'member' out of the top level
+        expect(result.current.tasks).toHaveLength(1)
+      })
+
+      await act(async () => {
+        await result.current.updateTaskOrders([{ id: 'member', sortOrder: 7000 }])
+      })
+
+      expect(result.current.tasks[0].subtasks?.[0].sortOrder).toBe(7000)
+      expect(mockUpdateEq).toHaveBeenCalledWith({ sort_order: 7000 }, 'id', 'member')
+    })
+
+    it('rolls a nested subtask back on server error', async () => {
+      mockSupabaseData.push(
+        createMockDbTask({ id: 'group', sort_order: 0 }),
+        createMockDbTask({ id: 'member', parent_task_id: 'group', sort_order: 1000 })
+      )
+      const { result } = renderHook(() => useSupabaseTasks())
+      await waitFor(() => {
+        expect(result.current.tasks).toHaveLength(1)
+      })
+
+      mockError = { message: 'Update failed' }
+
+      let ok: boolean | undefined
+      await act(async () => {
+        ok = await result.current.updateTaskOrders([{ id: 'member', sortOrder: 7000 }])
+      })
+
+      expect(result.current.tasks[0].subtasks?.[0].sortOrder).toBe(1000)
+      expect(ok).toBe(false)
     })
 
     it('a partial-row upsert of the same payload would be rejected by the database', async () => {
