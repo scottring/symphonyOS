@@ -450,7 +450,11 @@ export function TodaySectionList({
                       contactName={contactName}
                       projectName={projectName}
                       projectId={item.projectId ?? undefined}
-                      parentTaskName={parentTaskName}
+                      // Inside a group card the parent's name is already the
+                      // header two rows up — repeating it on every child is
+                      // noise. Keep it for an orphan child, where it is the
+                      // only thing saying what this row belongs to.
+                      parentTaskName={isGroupChild ? undefined : parentTaskName}
                       parentTaskId={parentTaskId}
                       onOpenParentTask={onOpenTask}
                       familyMembers={familyMembers}

@@ -170,9 +170,28 @@ export function dbTaskToTask(dbTask: DbTask): Task {
 function nestSubtasks(tasks: Task[]): Task[] {
   const taskMap = new Map<string, Task>()
   const subtasksByParent = new Map<string, Task[]>()
+  const atTopLevel = new Set(tasks.map((t) => t.id))
 
-  // First pass: index all tasks and group subtasks. Duplicate ids in the
-  // input (e.g. a realtime INSERT racing a refetch) collapse to one.
+  // First pass (a): children ALREADY nested from an earlier call. Without this,
+  // re-nesting a half-nested list rebuilt each parent from the flat rows only
+  // and dropped every child that had been nested by the previous write —
+  // grouping two tasks in one gesture made the first one vanish until refresh.
+  //
+  // A child that also appears as a flat row is skipped here: that copy is the
+  // fresher one (it is what the write just produced) and it decides where the
+  // child now belongs — including out of this parent entirely.
+  for (const task of tasks) {
+    for (const child of task.subtasks ?? []) {
+      if (atTopLevel.has(child.id)) continue
+      const existing = subtasksByParent.get(task.id) || []
+      existing.push(child)
+      subtasksByParent.set(task.id, existing)
+    }
+  }
+
+  // First pass (b): index all tasks and group the flat rows that name a parent.
+  // Duplicate ids in the input (e.g. a realtime INSERT racing a refetch)
+  // collapse to one.
   for (const task of tasks) {
     if (taskMap.has(task.id)) continue
     taskMap.set(task.id, { ...task })
@@ -197,6 +216,12 @@ function nestSubtasks(tasks: Task[]): Task[] {
         taskWithSubtasks.subtasks = [...subtasks].sort(
           (a, b) => a.createdAt.getTime() - b.createdAt.getTime()
         )
+      } else if (task.subtasks) {
+        // It HAD children and none survived the merge — every one of them
+        // turned up as a flat row, so they have been detached or moved. Leave
+        // the array empty rather than stale. (A task that never had a subtasks
+        // array keeps `undefined`, so "not loaded" stays distinguishable.)
+        taskWithSubtasks.subtasks = []
       }
       result.push(taskWithSubtasks)
     }
