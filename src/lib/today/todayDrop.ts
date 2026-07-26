@@ -147,6 +147,13 @@ export function computeBandDropTime(
   return latest > cap ? cap : latest
 }
 
+/** Midnight on the given day, without mutating the input. */
+function startOfDay(d: Date): Date {
+  const out = new Date(d)
+  out.setHours(0, 0, 0, 0)
+  return out
+}
+
 /** The group_members ref for a non-task item, or null if it is a task. */
 function memberRefFor(item: TimelineItem): GroupMemberRef | null {
   if (item.type === 'event') return { type: 'event', id: rawId(item.id) }
@@ -268,13 +275,26 @@ export function resolveDrop(ctx: DropContext): DropIntent[] {
     const activeRefs = activeRef ? [activeRef] : []
     const isAllDay = sectionOf(ctx.sections, targetId) === 'allday'
 
+    // The group inherits the TARGET's moment, never "now".
+    //
+    // `viewedDate` is a live `new Date()` — it carries the current wall-clock
+    // time, not midnight. Passing it straight through stamped the group and
+    // every member with the instant the drop happened: a 7:00 PM commitment
+    // silently became 9:09 PM. Caught by dragging on :5173, on real data,
+    // where it retimed an actual task.
+    const groupDate = isAllDay
+      ? startOfDay(ctx.viewedDate)
+      : target.startTime
+        ? new Date(target.startTime)
+        : startOfDay(ctx.viewedDate)
+
     if (isWrapper(ctx.sections, target)) {
       return [{
         kind: 'add-to-group',
         wrapperId: rawId(target.id),
         taskIds: activeTaskIds,
         memberRefs: activeRefs,
-        date: ctx.viewedDate,
+        date: groupDate,
         isAllDay,
       }]
     }
@@ -286,7 +306,7 @@ export function resolveDrop(ctx: DropContext): DropIntent[] {
       groupName: target.title,
       taskIds: [...activeTaskIds, ...(target.type === 'task' ? [rawId(target.id)] : [])],
       memberRefs: [...activeRefs, ...(targetRef ? [targetRef] : [])],
-      date: ctx.viewedDate,
+      date: groupDate,
       isAllDay,
     }]
   }

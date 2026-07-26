@@ -19,6 +19,7 @@ import type { HomeViewType } from '@/types/homeView'
 import type { DaySection } from '@/lib/timeUtils'
 import type { TimelineItem } from '@/types/timeline'
 
+import { parseRoutineTimelineId } from '@/lib/today/doseExpansion'
 import { readCollapsed, setCollapsed, onCollapsedChange, sectionKey } from '@/lib/today/sectionCollapse'
 import { useMobile } from '@/hooks/useMobile'
 import { useTodayData } from '@/hooks/useTodayData'
@@ -476,8 +477,14 @@ export function TodayView({
       const x = new Date(d); x.setHours(0, 0, 0, 0)
       return x.getTime() === day.getTime()
     }
+    // Completed all-day tasks are INCLUDED. They still render on Today (they
+    // linger), so leaving them out makes this set not-actually-full: a
+    // renormalise would hand 0…n×1000 to the incomplete rows and leave the
+    // completed ones null, sinking every one of them to the bottom of All Day
+    // the first time anything is reordered. Same shape as Stage 2a residual 3,
+    // caught by dragging on :5173 rather than by any test.
     const untimed = tasks
-      .filter((t) => !t.completed && t.bucket === 'timed' && t.isAllDay && sameDay(t.scheduledFor))
+      .filter((t) => t.bucket === 'timed' && t.isAllDay && sameDay(t.scheduledFor))
       .sort((a, b) => {
         const ao = a.sortOrder ?? null, bo = b.sortOrder ?? null
         if (ao != null && bo != null) return ao - bo
@@ -504,8 +511,91 @@ export function TodayView({
     groupMembersOf: (wrapperRawId) => tasksMap.get(wrapperRawId)?.groupMembers ?? [],
   }), [data.grouped, untimedOrder, viewedDate, isReadOnlyEvent, tasksMap])
 
-  // Filled in by Stage 2b Task 8 — until then a drop resolves and does nothing.
-  const applyIntents = useCallback((_intents: DropIntent[]) => {}, [])
+  /**
+   * Apply what the resolver decided. Three rules are worth naming, because each
+   * is a way this could silently do the wrong thing:
+   *
+   * 1. `bucket:'timed'` and `scheduledFor` move in LOCKSTEP. A scheduledFor
+   *    without the bucket never surfaces on Today at all — selectTimed gates on
+   *    the bucket (taskPools.ts).
+   * 2. Retiming a routine writes a ONE-DAY override via onPushRoutine, which
+   *    reaches reschedule() → status:'pending' + deferred_to, exactly what
+   *    grouping.ts reads back as a same-day time override. It must never call
+   *    scheduleRoutineOnDate, which rewrites recurrence_pattern permanently —
+   *    one drag would move every future occurrence.
+   * 3. A refusal is SAID OUT LOUD. Silently ignoring a drop is how a surface
+   *    teaches people not to trust it.
+   */
+  const applyIntents = useCallback(async (intents: DropIntent[]) => {
+    for (const intent of intents) {
+      switch (intent.kind) {
+        case 'refuse':
+          onNotify?.(intent.reason)
+          break
+
+        case 'set-time': {
+          if (intent.itemId.startsWith('task-')) {
+            onUpdateTask?.(intent.itemId.replace('task-', ''), {
+              bucket: 'timed', scheduledFor: intent.when, isAllDay: false,
+            })
+          } else if (intent.itemId.startsWith('routine-')) {
+            const { routineId, slot } = parseRoutineTimelineId(intent.itemId)
+            // Dosed steps are refused upstream; this is belt-and-braces.
+            if (slot === null) onPushRoutine?.(routineId, intent.when)
+          } else if (intent.itemId.startsWith('event-')) {
+            const ev = findTimelineItem(data.grouped, intent.itemId)?.originalEvent
+            if (ev) {
+              const startStr = ev.start_time || ev.startTime
+              const endStr = ev.end_time || ev.endTime
+              const durationMs = startStr && endStr
+                ? new Date(endStr).getTime() - new Date(startStr).getTime()
+                : 30 * 60_000
+              await ctx.onUpdateEvent?.(ev.google_event_id || ev.id, {
+                startTime: intent.when,
+                endTime: new Date(intent.when.getTime() + durationMs),
+              })
+            }
+          }
+          break
+        }
+
+        case 'make-all-day': {
+          if (!intent.itemId.startsWith('task-')) {
+            // A routine/event instance has no all-day concept to write. Say so
+            // rather than accepting the gesture and doing nothing.
+            onNotify?.('Only tasks can be moved to All day.')
+            break
+          }
+          const midnight = new Date(viewedDate)
+          midnight.setHours(0, 0, 0, 0)
+          onUpdateTask?.(intent.itemId.replace('task-', ''), {
+            bucket: 'timed', scheduledFor: midnight, isAllDay: true,
+          })
+          break
+        }
+
+        case 'reorder':
+          await ctx.onReorderTasks?.(intent.writes)
+          break
+
+        case 'create-group':
+          await onGroupItems?.(
+            intent.taskIds, intent.memberRefs, intent.groupName, intent.date, intent.isAllDay,
+          )
+          break
+
+        case 'add-to-group':
+          await ctx.onAddToGroup?.(
+            intent.wrapperId, intent.taskIds, intent.memberRefs, intent.date, intent.isAllDay,
+          )
+          break
+
+        case 'remove-from-group':
+          await ctx.onRemoveFromGroup?.(intent.taskId)
+          break
+      }
+    }
+  }, [ctx, onUpdateTask, onPushRoutine, onGroupItems, onNotify, viewedDate, data.grouped])
 
   // ── Follow-up task state: tracks which task just got completed → show follow-up input ──
   const [followUpTaskId, setFollowUpTaskId] = useState<string | null>(null)
@@ -797,7 +887,7 @@ export function TodayView({
                 carrying the whole day list (Stage 2b spec). */}
             <TodayDragProvider
               resolve={resolve}
-              onIntents={applyIntents}
+              onIntents={(intents) => { void applyIntents(intents) }}
               renderOverlay={(activeId) => {
                 const item = findTimelineItem(data.grouped, activeId)
                 return item ? (

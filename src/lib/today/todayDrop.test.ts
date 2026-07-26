@@ -311,6 +311,57 @@ describe('resolveDrop — rows (grouping)', () => {
     if (out[0].kind === 'create-group') expect(out[0].isAllDay).toBe(false)
   })
 
+  it('an All Day group is dated MIDNIGHT, never the current clock time', () => {
+    // viewedDate is a live `new Date()` and carries a wall-clock time. Passing
+    // it through stamped the group with the instant of the drop.
+    const noon = new Date(2026, 6, 25, 12, 34, 56)
+    const a = item({ id: 'task-a' })
+    const b = item({ id: 'task-b', title: 'Errands' })
+    const out = resolveDrop(ctx({
+      activeId: 'task-a', overId: rowDropId('task-b'), viewedDate: noon,
+      sections: { ...emptySections<TimelineItem>(), allday: [a, b] },
+    }))
+    expect(out[0].kind).toBe('create-group')
+    if (out[0].kind === 'create-group') {
+      expect(out[0].date.getHours()).toBe(0)
+      expect(out[0].date.getMinutes()).toBe(0)
+      expect(out[0].date.getSeconds()).toBe(0)
+    }
+  })
+
+  it("a timed group inherits the TARGET's time, not the moment of the drop", () => {
+    // This one retimed a real 7:00 PM commitment to 9:09 PM on :5173.
+    const dropInstant = new Date(2026, 6, 25, 21, 9, 26)
+    const a = item({ id: 'task-a' })
+    const b = item({ id: 'task-b', title: 'Pizza', startTime: new Date(2026, 6, 25, 19, 0) })
+    const out = resolveDrop(ctx({
+      activeId: 'task-a', overId: rowDropId('task-b'), viewedDate: dropInstant,
+      sections: { ...emptySections<TimelineItem>(), evening: [a, b] },
+    }))
+    expect(out[0].kind).toBe('create-group')
+    if (out[0].kind === 'create-group') {
+      expect(out[0].date.getHours()).toBe(19)
+      expect(out[0].date.getMinutes()).toBe(0)
+      expect(out[0].isAllDay).toBe(false)
+    }
+  })
+
+  it('add-to-group inherits the wrapper\'s time too', () => {
+    const dropInstant = new Date(2026, 6, 25, 21, 9, 26)
+    const wrapper = item({ id: 'task-w1', title: 'Errands', startTime: new Date(2026, 6, 25, 14, 30) })
+    const child = item({ id: 'task-c', isSubtask: true, parentTaskId: 'w1' })
+    const a = item({ id: 'task-a' })
+    const out = resolveDrop(ctx({
+      activeId: 'task-a', overId: rowDropId('task-w1'), viewedDate: dropInstant,
+      sections: { ...emptySections<TimelineItem>(), afternoon: [wrapper, child, a] },
+    }))
+    expect(out[0].kind).toBe('add-to-group')
+    if (out[0].kind === 'add-to-group') {
+      expect(out[0].date.getHours()).toBe(14)
+      expect(out[0].date.getMinutes()).toBe(30)
+    }
+  })
+
   it('dropping a card on itself does nothing', () => {
     const a = item({ id: 'task-a' })
     expect(resolveDrop(ctx({
