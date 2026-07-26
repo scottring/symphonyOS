@@ -65,6 +65,8 @@ import { TimelineNoteComposer } from './TimelineNoteComposer'
 import { discussionItems } from '@/lib/discussionItems'
 import { DiscussionBadge } from './DiscussionBadge'
 import { PrintableDayList } from './PrintableDayList'
+import { DuplicateSweep, DuplicateSweepTrigger } from './DuplicateSweep'
+import { useDuplicateSweep } from '@/hooks/useDuplicateSweep'
 import { readHideRoutines, writeHideRoutines, onHideRoutinesChange } from '@/lib/hideRoutinesSignal'
 import { useShareToFamilyNudges } from '@/lib/today/shareNudges'
 
@@ -458,6 +460,9 @@ export function TodayView({
     return m
   }, [shareNudges])
 
+  // Duplicate sweep — on demand; a passive count is the only unsolicited part.
+  const sweep = useDuplicateSweep(data.sectionsOrder, data.grouped, ctx.onDeleteTask)
+
   // ── Drag: the pure resolver's inputs ─────────────────────────────────────────
   const { isReadOnlyCalendar } = useCalendarPermissions()
 
@@ -753,6 +758,9 @@ export function TodayView({
                 <Printer className="w-5 h-5" />
                 <span>Print list</span>
               </button>
+              {data.isToday && (
+                <DuplicateSweepTrigger count={sweep.pairs.length} onOpen={() => sweep.setOpen(true)} />
+              )}
               {data.isToday && ctx.onOpenPlanning && (
                 <button
                   type="button"
@@ -977,6 +985,15 @@ export function TodayView({
           onSendToList={() => {}}
           onCancel={clearBulkSelection}
           familyMembers={familyMembers}
+        />
+      )}
+
+      {sweep.open && (
+        <DuplicateSweep
+          pairs={sweep.pairs}
+          onClose={() => sweep.setOpen(false)}
+          onKeepOne={sweep.keepOne}
+          onSkipRoutineToday={(routineId) => ctx.onSkipRoutine?.(routineId)}
         />
       )}
 
