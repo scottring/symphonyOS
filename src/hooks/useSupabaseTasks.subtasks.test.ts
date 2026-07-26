@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, waitFor, act } from '@testing-library/react'
-import { useSupabaseTasks } from './useSupabaseTasks'
+import { useSupabaseTasks, __resetTasksCache } from './useSupabaseTasks'
 import { resetIdCounter } from '@/test/mocks/factories'
 
 // Mock user for useAuth
@@ -144,6 +144,7 @@ vi.mock('@/lib/supabase', () => ({
 
 describe('useSupabaseTasks - Subtasks', () => {
   beforeEach(() => {
+    __resetTasksCache()
     vi.clearAllMocks()
     mockSupabaseData.length = 0
     mockError = null

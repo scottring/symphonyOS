@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, waitFor, act } from '@testing-library/react'
-import { useSupabaseTasks } from './useSupabaseTasks'
+import { useSupabaseTasks, __resetTasksCache } from './useSupabaseTasks'
 
 const mockUser = { id: 'test-user-id', email: 'test@example.com' }
 
@@ -92,6 +92,7 @@ function seedGroup() {
 
 describe('updateTask — a group moves as a unit', () => {
   beforeEach(() => {
+    __resetTasksCache()
     vi.clearAllMocks()
     mockSupabaseData.length = 0
     bulkWrites.length = 0

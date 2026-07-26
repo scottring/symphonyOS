@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, waitFor, act } from '@testing-library/react'
-import { useSupabaseTasks } from './useSupabaseTasks'
+import { useSupabaseTasks, __resetTasksCache } from './useSupabaseTasks'
 
 // Mock user for useAuth
 const mockUser = { id: 'test-user-id', email: 'test@example.com' }
@@ -112,6 +112,7 @@ async function renderLoaded() {
 
 describe('useSupabaseTasks - realtime dedup', () => {
   beforeEach(() => {
+    __resetTasksCache()
     vi.clearAllMocks()
     mockSupabaseData.length = 0
     realtimeHandler = null

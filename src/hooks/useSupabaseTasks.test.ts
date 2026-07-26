@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, waitFor, act } from '@testing-library/react'
-import { useSupabaseTasks } from './useSupabaseTasks'
+import { useSupabaseTasks, __resetTasksCache } from './useSupabaseTasks'
 // The mocked client (see vi.mock below) — used by the test that pins down what
 // the database does to a partial-row upsert.
 import { supabase } from '@/lib/supabase'
@@ -227,6 +227,7 @@ vi.mock('@/lib/supabase', () => ({
 
 describe('useSupabaseTasks', () => {
   beforeEach(() => {
+    __resetTasksCache()
     vi.clearAllMocks()
     mockSupabaseData.length = 0
     mockError = null

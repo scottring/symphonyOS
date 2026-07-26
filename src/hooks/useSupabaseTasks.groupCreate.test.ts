@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, waitFor, act } from '@testing-library/react'
-import { useSupabaseTasks } from './useSupabaseTasks'
+import { useSupabaseTasks, __resetTasksCache } from './useSupabaseTasks'
 import { groupItems } from '@/lib/today/groupTasks'
 
 const mockUser = { id: 'test-user-id', email: 'test@example.com' }
@@ -91,6 +91,7 @@ vi.mock('@/lib/supabase', () => ({
 
 describe('groupItems — every member survives the write', () => {
   beforeEach(() => {
+    __resetTasksCache()
     vi.clearAllMocks()
     db.length = 0
     nextId = 1

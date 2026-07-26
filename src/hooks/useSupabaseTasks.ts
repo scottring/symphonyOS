@@ -188,6 +188,82 @@ function cloneRows(rows: Task[]): Task[] {
   return rows.map((t) => (t.subtasks ? { ...t, subtasks: [...t.subtasks] } : { ...t }))
 }
 
+// ── The tab's task list, kept live ───────────────────────────────────────────
+//
+// In-flight sharing alone only helps instances that overlap. Once the app got
+// fast, the nine instances on a route mounted far enough apart to each pull
+// their own 716 KB copy — the fix created its own next bottleneck.
+//
+// So the rows are cached, and kept CORRECT rather than merely fresh: every
+// insert/update/delete that reaches any instance is applied to the cache by the
+// same pure function that updates that instance's state. Realtime carries other
+// tabs, other devices and server-side writes, so nothing changes without the
+// cache hearing about it. The TTL below is a backstop for a missed event, not
+// the mechanism.
+const TASKS_CACHE_TTL_MS = 60_000
+let tasksCache: { userId: string; rows: Task[]; at: number } | null = null
+
+/** Realtime semantics, as pure functions — used for both state and the cache. */
+function applyInsert(rows: Task[], newTask: Task): Task[] {
+  // Realtime is not the only writer: this tab's own addTask has usually
+  // already added the row (optimistically or reconciled).
+  const exists = rows.some(
+    (t) => t.id === newTask.id || t.subtasks?.some((st) => st.id === newTask.id)
+  )
+  if (exists) return rows
+  if (newTask.parentTaskId) {
+    // Append to the parent's nested subtasks. Don't re-run nestSubtasks on an
+    // already-nested list — it would replace the parent's subtasks with just
+    // this one.
+    return rows.map((t) =>
+      t.id === newTask.parentTaskId
+        ? { ...t, subtasks: [...(t.subtasks || []), newTask] }
+        : t
+    )
+  }
+  return [newTask, ...rows]
+}
+
+function applyUpdate(rows: Task[], updatedTask: Task): Task[] {
+  const updated = rows.map((t) => {
+    if (t.id === updatedTask.id) return updatedTask
+    if (t.subtasks) {
+      const updatedSubtasks = t.subtasks.map((st) =>
+        st.id === updatedTask.id ? updatedTask : st
+      )
+      if (updatedSubtasks !== t.subtasks) return { ...t, subtasks: updatedSubtasks }
+    }
+    return t
+  })
+  return nestSubtasks(updated)
+}
+
+function applyDelete(rows: Task[], deletedId: string): Task[] {
+  // Rebuild the parent rather than splicing its array in place: these rows are
+  // shared with the cache and with other instances' state.
+  const out: Task[] = []
+  for (const t of rows) {
+    if (t.id === deletedId) continue
+    if (t.subtasks?.some((st) => st.id === deletedId)) {
+      out.push({ ...t, subtasks: t.subtasks.filter((st) => st.id !== deletedId) })
+    } else {
+      out.push(t)
+    }
+  }
+  return out
+}
+
+/** Keep the cache in step with whatever just reached the instances. */
+function patchCache(patch: (rows: Task[]) => Task[]): void {
+  if (tasksCache) tasksCache = { ...tasksCache, rows: patch(tasksCache.rows) }
+}
+
+/** Test seam — module state outlives a single test. */
+export function __resetTasksCache(): void {
+  tasksCache = null
+  tasksInFlight = null
+}
+
 // Nest subtasks under their parent tasks
 function nestSubtasks(tasks: Task[]): Task[] {
   const taskMap = new Map<string, Task>()
@@ -273,13 +349,23 @@ export function useSupabaseTasks() {
   // is not relied upon for those.
   const fetchTasks = useCallback(async (options?: { force?: boolean }) => {
     if (!user) {
-      tasksInFlight = null // never hand one account's rows to the next
+      // Never hand one account's rows to the next.
+      tasksInFlight = null
+      tasksCache = null
       setTasks([])
       setLoading(false)
       return
     }
 
     const force = options?.force === true
+
+    // The tab already has the list, and live writes have kept it in step.
+    if (!force && tasksCache && tasksCache.userId === user.id &&
+        Date.now() - tasksCache.at < TASKS_CACHE_TTL_MS) {
+      setTasks(cloneRows(tasksCache.rows))
+      setLoading(false)
+      return
+    }
 
     // Ride the load another instance started a moment ago.
     if (!force && tasksInFlight && tasksInFlight.userId === user.id) {
@@ -306,7 +392,9 @@ export function useSupabaseTasks() {
         return null
       }
 
-      return nestSubtasks((data as DbTask[]).map(dbTaskToTask))
+      const rows = nestSubtasks((data as DbTask[]).map(dbTaskToTask))
+      tasksCache = { userId: user.id, rows, at: Date.now() }
+      return rows
     })()
 
     tasksInFlight = { userId: user.id, promise: request }
@@ -327,57 +415,18 @@ export function useSupabaseTasks() {
   // inserts dedupe against optimistic copies, updates match top-level tasks and
   // nested subtasks, deletes sweep both levels.
   const applyIncomingInsert = useCallback((newTask: Task) => {
-    setTasks((prev) => {
-      // Realtime is not the only writer: this tab's own addTask has
-      // usually already added the row (optimistically or reconciled).
-      const exists = prev.some(
-        (t) => t.id === newTask.id || t.subtasks?.some((st) => st.id === newTask.id)
-      )
-      if (exists) return prev
-      if (newTask.parentTaskId) {
-        // Append to the parent's nested subtasks. Don't re-run
-        // nestSubtasks on an already-nested list — it would replace
-        // the parent's subtasks with just this one.
-        return prev.map((t) =>
-          t.id === newTask.parentTaskId
-            ? { ...t, subtasks: [...(t.subtasks || []), newTask] }
-            : t
-        )
-      }
-      return [newTask, ...prev]
-    })
+    patchCache((rows) => applyInsert(rows, newTask))
+    setTasks((prev) => applyInsert(prev, newTask))
   }, [])
 
   const applyIncomingUpdate = useCallback((updatedTask: Task) => {
-    setTasks((prev) => {
-      const updated = prev.map((t) => {
-        if (t.id === updatedTask.id) return updatedTask
-        // Also check subtasks
-        if (t.subtasks) {
-          const updatedSubtasks = t.subtasks.map((st) =>
-            st.id === updatedTask.id ? updatedTask : st
-          )
-          if (updatedSubtasks !== t.subtasks) {
-            return { ...t, subtasks: updatedSubtasks }
-          }
-        }
-        return t
-      })
-      return nestSubtasks(updated)
-    })
+    patchCache((rows) => applyUpdate(rows, updatedTask))
+    setTasks((prev) => applyUpdate(prev, updatedTask))
   }, [])
 
   const applyIncomingDelete = useCallback((deletedId: string) => {
-    setTasks((prev) => {
-      const filtered = prev.filter((t) => {
-        if (t.id === deletedId) return false
-        if (t.subtasks) {
-          t.subtasks = t.subtasks.filter((st) => st.id !== deletedId)
-        }
-        return true
-      })
-      return filtered
-    })
+    patchCache((rows) => applyDelete(rows, deletedId))
+    setTasks((prev) => applyDelete(prev, deletedId))
   }, [])
 
   // Fetch on mount / user change, then subscribe to realtime.
