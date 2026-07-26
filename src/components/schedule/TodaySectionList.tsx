@@ -30,6 +30,10 @@ import { EveningMealCard } from './EveningMealCard'
 import { ScheduleItem } from './ScheduleItem'
 import { RoutineCollectionRow } from './RoutineCollectionRow'
 import { ShareToFamilyNudge } from './ShareToFamilyNudge'
+import { TodayBandDropZone, TodayGapDropZone } from './TodayDropZones'
+import { TodayDraggableRow } from './TodayDraggableRow'
+import { useTodayDragState } from './TodayDragProvider'
+import { refusalFor } from '@/lib/today/todayDrop'
 
 // ─── Meal detection ────────────────────────────────────────────────────────────
 
@@ -79,6 +83,8 @@ export interface TodaySectionListProps {
   onCompleteEvent?: (eventId: string, completed: boolean) => void
   panelOpen?: boolean
   onClosePanel?: () => void
+  /** True when this event sits on a read-only calendar — it refuses the drag. */
+  isReadOnlyEvent: (item: TimelineItem) => boolean
 }
 
 export function TodaySectionList({
@@ -108,8 +114,10 @@ export function TodaySectionList({
   onCompleteEvent,
   panelOpen,
   onClosePanel,
+  isReadOnlyEvent,
 }: TodaySectionListProps) {
   const ctx = useScheduleActionsContext()
+  const { dragging } = useTodayDragState()
   const {
     onToggleWaiting, onUpdateTask, onPushTask,
     onAssignTask, onAssignTaskAll, onAssignEvent, onAssignEventAll,
@@ -139,15 +147,24 @@ export function TodaySectionList({
     <>
       {sectionsOrder.map((section) => {
         const allSectionItems = grouped[section]
-        if (!allSectionItems || allSectionItems.length === 0) return null
+        const isEmpty = !allSectionItems || allSectionItems.length === 0
+        // Empty sections stay hidden for reading, but a drag needs somewhere to
+        // aim: you cannot drop something at 6 AM if the Early morning band
+        // isn't on screen. Unscheduled is never a drop target, so it stays
+        // hidden either way.
+        if (isEmpty && (!dragging || section === 'unscheduled')) return null
 
         // The hero item is lifted out of its section.
+        const sectionItems = allSectionItems ?? []
         const items = upNextId
-          ? allSectionItems.filter((i) => i.id !== upNextId)
-          : allSectionItems
+          ? sectionItems.filter((i) => i.id !== upNextId)
+          : sectionItems
         const completedCount = items.filter((i) => i.completed).length
         const restAllDone = items.length > 0 && completedCount === items.length
-        const emptyBecauseHero = items.length === 0
+        // "Empty because the hero took it" is only true if the section HAD
+        // something. An empty band materialised mid-drag has nothing to lift,
+        // and labelling it "· up next" would be a lie the header tells.
+        const emptyBecauseHero = sectionItems.length > 0 && items.length === 0
         const key = sectionKey(section)
 
         // Precedence: empty-because-hero always collapses; an explicit fold
@@ -164,6 +181,7 @@ export function TodaySectionList({
 
         return (
           <section key={section}>
+            <TodayBandDropZone section={section}>
             <DaySectionHeader
               section={section}
               itemCount={items.length}
@@ -181,6 +199,10 @@ export function TodaySectionList({
                   const parentTaskId = item.parentTaskId
                   const parentTaskName = parentTaskId ? tasksMap.get(parentTaskId)?.title : undefined
                   const isFirstItem = item.id === firstSectionItemId
+                  // No affordance at all when the item refuses — a read-only
+                  // event that accepted the drag would fail at Google and
+                  // spring back for no visible reason.
+                  const dragRefused = !!refusalFor(item, isReadOnlyEvent)
 
                   // ── Group cards ──────────────────────────────────────
                   // A parent task and its adjacent subtask rows (grouping.ts
@@ -216,6 +238,7 @@ export function TodaySectionList({
                     date: viewedDate,
                   }
                   const insertBefore = (
+                    <TodayGapDropZone section={section} index={itemIndex}>
                     <TimelineInsertPoint
                       onPick={(k) => insert.handlePick(insertCtxBefore, k)}
                       onCreate={(kind, r) => {
@@ -229,6 +252,7 @@ export function TodaySectionList({
                         currentDomain,
                       }}
                     />
+                    </TodayGapDropZone>
                   )
 
                   // Evening meal gets a special card (desktop only — on mobile
@@ -258,6 +282,7 @@ export function TodaySectionList({
                     return (
                       <div key={item.id}>
                         {showInsert && insertBefore}
+                        <TodayDraggableRow itemId={item.id} disabled={dragRefused}>
                         <div {...(isFirstItem ? { 'data-today-first': '' } : {})}>
                           <EveningMealCard
                             title={parsed.title}
@@ -270,6 +295,7 @@ export function TodaySectionList({
                             onSelect={() => onSelectItem(item.id)}
                           />
                         </div>
+                        </TodayDraggableRow>
                       </div>
                     )
                   }
@@ -279,6 +305,7 @@ export function TodaySectionList({
                     return (
                       <div key={item.id} data-item-id={item.id}>
                         {showInsert && insertBefore}
+                        <TodayDraggableRow itemId={item.id} disabled={dragRefused}>
                         <RoutineCollectionRow
                           item={item}
                           onSelect={() => onSelectItem(item.id)}
@@ -313,6 +340,7 @@ export function TodaySectionList({
                             onUpdateRoutine(parentId, { visibility: 'reference' })
                           } : undefined}
                         />
+                        </TodayDraggableRow>
                       </div>
                     )
                   }
@@ -321,6 +349,7 @@ export function TodaySectionList({
                   return (
                     <div key={item.id} className={isGroupChild ? '-mt-1' : undefined}>
                     {showInsert && insertBefore}
+                    <TodayDraggableRow itemId={item.id} disabled={dragRefused}>
                     <div data-item-id={item.id} className={groupCardClass || undefined} {...(isFirstItem ? { 'data-today-first': '' } : {})}>
                     {(() => {
                       const { routineId: bareRoutineId, slot } = item.type === 'routine'
@@ -460,6 +489,7 @@ export function TodaySectionList({
                       )
                     })()}
                     </div>
+                    </TodayDraggableRow>
                     </div>
                   )
                 })}
@@ -472,6 +502,7 @@ export function TodaySectionList({
                     date: viewedDate,
                   }
                   return (
+                    <TodayGapDropZone section={section} index={items.length}>
                     <TimelineInsertPoint
                       onPick={(k) => insert.handlePick(insertCtxTrailing, k)}
                       onCreate={(kind, r) => {
@@ -485,10 +516,12 @@ export function TodaySectionList({
                         currentDomain,
                       }}
                     />
+                    </TodayGapDropZone>
                   )
                 })()}
               </div>
             )}
+            </TodayBandDropZone>
           </section>
         )
       })}

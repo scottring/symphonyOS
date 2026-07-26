@@ -17,6 +17,7 @@ import type { TimelineCaptureResult } from '@/components/schedule/TimelineQuickI
 import type { ParserContext } from '@/lib/quickInputParser'
 import type { HomeViewType } from '@/types/homeView'
 import type { DaySection } from '@/lib/timeUtils'
+import type { TimelineItem } from '@/types/timeline'
 
 import { readCollapsed, setCollapsed, onCollapsedChange, sectionKey } from '@/lib/today/sectionCollapse'
 import { useMobile } from '@/hooks/useMobile'
@@ -31,12 +32,15 @@ import { useRecurringEventDetection } from '@/hooks/useRecurringEventDetection'
 import { useTimelineInsert } from '@/hooks/useTimelineInsert'
 import { useDomain } from '@/hooks/useDomain'
 
-import { Eye, EyeOff, Repeat, Binoculars, Sun, Printer } from 'lucide-react'
+import { Eye, EyeOff, Repeat, Binoculars, Sun, Printer, GripVertical } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { AssigneeFilter } from '@/components/home/AssigneeFilter'
 
 import { TodayAddInput } from './TodayAddInput'
-import { TodaySectionList } from './TodaySectionList'
+import { TodaySectionList, findTimelineItem } from './TodaySectionList'
+import { TodayDragProvider } from './TodayDragProvider'
+import { resolveDrop, type DropIntent } from '@/lib/today/todayDrop'
+import { useCalendarPermissions } from '@/hooks/useCalendarPermissions'
 import { UpNextHero } from './UpNextHero'
 import { selectUpNext } from '@/lib/today/upNext'
 import { StatsRow } from './StatsRow'
@@ -453,6 +457,56 @@ export function TodayView({
     return m
   }, [shareNudges])
 
+  // ── Drag: the pure resolver's inputs ─────────────────────────────────────────
+  const { isReadOnlyCalendar } = useCalendarPermissions()
+
+  const isReadOnlyEvent = useCallback((item: TimelineItem) => {
+    const ev = item.originalEvent
+    return isReadOnlyCalendar(ev?.calendar_id ?? ev?.calendarId ?? null)
+  }, [isReadOnlyCalendar])
+
+  // Every untimed task for this day, INCLUDING rows the domain or assignee
+  // filter hides. Reorder renormalises against this: renormalising only the
+  // rendered subset resets it to 0…n×1000 while hidden siblings keep their old
+  // values and interleave on the next render (Stage 2a residual 3).
+  const untimedOrder = useMemo(() => {
+    const day = new Date(viewedDate); day.setHours(0, 0, 0, 0)
+    const sameDay = (d?: Date | null) => {
+      if (!d) return false
+      const x = new Date(d); x.setHours(0, 0, 0, 0)
+      return x.getTime() === day.getTime()
+    }
+    const untimed = tasks
+      .filter((t) => !t.completed && t.bucket === 'timed' && t.isAllDay && sameDay(t.scheduledFor))
+      .sort((a, b) => {
+        const ao = a.sortOrder ?? null, bo = b.sortOrder ?? null
+        if (ao != null && bo != null) return ao - bo
+        if (ao != null) return -1
+        if (bo != null) return 1
+        return a.title.localeCompare(b.title)
+      })
+    return {
+      ids: untimed.map((t) => t.id),
+      orders: new Map(untimed.map((t) => [t.id, t.sortOrder ?? null])),
+    }
+  }, [tasks, viewedDate])
+
+  const resolve = useCallback((activeId: string, overId: string) => resolveDrop({
+    activeId,
+    overId,
+    sections: data.grouped,
+    fullOrderIds: { allday: untimedOrder.ids },
+    orders: untimedOrder.orders,
+    viewedDate,
+    isReadOnlyEvent,
+    // Read fresh at drop time — a stale array silently drops members and
+    // addToGroup cannot defend itself (Stage 2a residual 4).
+    groupMembersOf: (wrapperRawId) => tasksMap.get(wrapperRawId)?.groupMembers ?? [],
+  }), [data.grouped, untimedOrder, viewedDate, isReadOnlyEvent, tasksMap])
+
+  // Filled in by Stage 2b Task 8 — until then a drop resolves and does nothing.
+  const applyIntents = useCallback((_intents: DropIntent[]) => {}, [])
+
   // ── Follow-up task state: tracks which task just got completed → show follow-up input ──
   const [followUpTaskId, setFollowUpTaskId] = useState<string | null>(null)
 
@@ -741,7 +795,21 @@ export function TodayView({
 
             {/* Sections — lifted into TodaySectionList so this file stops
                 carrying the whole day list (Stage 2b spec). */}
+            <TodayDragProvider
+              resolve={resolve}
+              onIntents={applyIntents}
+              renderOverlay={(activeId) => {
+                const item = findTimelineItem(data.grouped, activeId)
+                return item ? (
+                  <div className="inline-flex max-w-[22rem] items-center gap-2 rounded-xl border border-primary-200 bg-bg-elevated px-3 py-2 text-sm shadow-lg">
+                    <GripVertical className="h-4 w-4 shrink-0 text-neutral-400" />
+                    <span className="truncate">{item.title}</span>
+                  </div>
+                ) : null
+              }}
+            >
             <TodaySectionList
+              isReadOnlyEvent={isReadOnlyEvent}
               sectionsOrder={data.sectionsOrder}
               grouped={data.grouped}
               viewedDate={viewedDate}
@@ -769,6 +837,7 @@ export function TodayView({
               panelOpen={panelOpen}
               onClosePanel={onClosePanel}
             />
+            </TodayDragProvider>
           </div>
         )}
       </div>

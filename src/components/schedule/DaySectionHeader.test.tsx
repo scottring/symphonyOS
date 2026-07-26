@@ -42,3 +42,16 @@ describe('DaySectionHeader', () => {
     expect(screen.getByText(/up next/)).toBeInTheDocument()
   })
 })
+
+describe('DaySectionHeader — a band materialised mid-drag', () => {
+  it('does NOT claim "up next" for a band that never had an item', () => {
+    // Stage 2b renders empty bands during a drag so 6 AM is reachable. Such a
+    // band has nothing to lift into the hero, so emptyBecauseHero must be
+    // false for it — otherwise the header tells the user its item is "up next"
+    // when the band is simply empty.
+    render(<DaySectionHeader section="earlyMorning" itemCount={0} completedCount={0}
+      collapsed emptyBecauseHero={false} onToggle={() => {}} />)
+    expect(screen.queryByText(/up next/i)).not.toBeInTheDocument()
+    expect(screen.getByText('Early morning')).toBeInTheDocument()
+  })
+})
