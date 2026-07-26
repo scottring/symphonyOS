@@ -436,7 +436,7 @@ export function HomeViewContainer() {
       date: Date,
       isAllDay: boolean,
     ) => {
-      await groupItems({ taskIds, memberRefs, groupName, date, isAllDay }, { addTask, updateTask, refetch });
+      return await groupItems({ taskIds, memberRefs, groupName, date, isAllDay }, { addTask, updateTask, refetch });
     },
     [addTask, updateTask, refetch],
   );

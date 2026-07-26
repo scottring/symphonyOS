@@ -3,7 +3,7 @@ import type { TimelineItem } from '@/types/timeline'
 import { emptySections } from '@/lib/today/types'
 import {
   resolveDrop, refusalFor, computeBandDropTime,
-  bandDropId, gapDropId, rowDropId,
+  bandDropId, gapDropId, rowDropId, NEW_GROUP_NAME,
   type DropContext,
 } from './todayDrop'
 
@@ -239,10 +239,7 @@ describe('resolveDrop — gaps (reorder)', () => {
 })
 
 describe('resolveDrop — rows (grouping)', () => {
-  it('a card onto a plain card makes the TARGET the group — no new wrapper', () => {
-    // Minting a wrapper named after the target left that title on two rows at
-    // once, and a second drop minted a second identical wrapper. On screen it
-    // read as the dragged item duplicating and the target being replaced.
+  it('two loose cards become a NEW group holding both, named neutrally', () => {
     const a = item({ id: 'task-a', title: 'Pick up dry cleaning' })
     const b = item({ id: 'task-b', title: 'Morning errands' })
     const out = resolveDrop(ctx({
@@ -250,23 +247,44 @@ describe('resolveDrop — rows (grouping)', () => {
       sections: { ...emptySections<TimelineItem>(), allday: [a, b] },
     }))
     expect(out).toHaveLength(1)
-    expect(out[0].kind).toBe('add-to-group')
-    if (out[0].kind === 'add-to-group') {
-      expect(out[0].wrapperId).toBe('b')
-      expect(out[0].taskIds).toEqual(['a'])
+    expect(out[0].kind).toBe('create-group')
+    if (out[0].kind === 'create-group') {
+      expect(out[0].groupName).toBe(NEW_GROUP_NAME)
+      // BOTH cards go in — neither is the parent of the other.
+      expect(out[0].taskIds).toEqual(['a', 'b'])
       expect(out[0].isAllDay).toBe(true)
     }
   })
 
-  it('never produces create-group for a task target, however many times you drop', () => {
-    const a = item({ id: 'task-a', title: 'One' })
-    const b = item({ id: 'task-b', title: 'Errands' })
+  it('never names the wrapper after a card it contains', () => {
+    // Naming it after the target put that title on two rows at once — the
+    // wrapper and its own child — which reads as the dragged item duplicating
+    // and the target being replaced. Reported from real use.
+    const a = item({ id: 'task-a', title: 'Pick up dry cleaning' })
+    const b = item({ id: 'task-b', title: 'Morning errands' })
+    const out = resolveDrop(ctx({
+      activeId: 'task-a', overId: rowDropId('task-b'),
+      sections: { ...emptySections<TimelineItem>(), allday: [a, b] },
+    }))
+    if (out[0].kind === 'create-group') {
+      expect(out[0].groupName).not.toBe('Morning errands')
+      expect(out[0].groupName).not.toBe('Pick up dry cleaning')
+    }
+  })
+
+  it('a second drop onto the new group JOINS it — no second wrapper', () => {
+    // The group now exists, so its header row means "add to me".
+    const wrapper = item({ id: 'task-w1', title: NEW_GROUP_NAME })
+    const first = item({ id: 'task-a', isSubtask: true, parentTaskId: 'w1' })
     const c = item({ id: 'task-c', title: 'Two' })
-    const sections = { ...emptySections<TimelineItem>(), allday: [a, b, c] }
-    for (const activeId of ['task-a', 'task-c']) {
-      const out = resolveDrop(ctx({ activeId, overId: rowDropId('task-b'), sections }))
-      expect(out[0].kind).toBe('add-to-group')
-      if (out[0].kind === 'add-to-group') expect(out[0].wrapperId).toBe('b')
+    const out = resolveDrop(ctx({
+      activeId: 'task-c', overId: rowDropId('task-w1'),
+      sections: { ...emptySections<TimelineItem>(), allday: [wrapper, first, c] },
+    }))
+    expect(out[0].kind).toBe('add-to-group')
+    if (out[0].kind === 'add-to-group') {
+      expect(out[0].wrapperId).toBe('w1')
+      expect(out[0].taskIds).toEqual(['c'])
     }
   })
 
@@ -300,22 +318,21 @@ describe('resolveDrop — rows (grouping)', () => {
     }
   })
 
-  it('an event dropped on a task joins that task as a member ref', () => {
+  it('an event dropped on a plain task groups the two as peers', () => {
     const t = item({ id: 'task-b', title: 'Errands' })
     const ev = item({ id: 'event-e9', type: 'event' })
     const out = resolveDrop(ctx({
       activeId: 'event-e9', overId: rowDropId('task-b'),
       sections: { ...emptySections<TimelineItem>(), allday: [t, ev] },
     }))
-    expect(out[0].kind).toBe('add-to-group')
-    if (out[0].kind === 'add-to-group') {
-      expect(out[0].wrapperId).toBe('b')
-      expect(out[0].taskIds).toEqual([])
+    expect(out[0].kind).toBe('create-group')
+    if (out[0].kind === 'create-group') {
+      expect(out[0].taskIds).toEqual(['b'])
       expect(out[0].memberRefs).toEqual([{ type: 'event', id: 'e9' }])
     }
   })
 
-  it('a card dropped on an EVENT does need a wrapper — events cannot be parents', () => {
+  it('a card dropped on an EVENT wraps both — an event cannot be a parent', () => {
     const t = item({ id: 'task-a', title: 'Prep' })
     const ev = item({ id: 'event-e9', type: 'event', title: 'Dentist' })
     const out = resolveDrop(ctx({
@@ -324,18 +341,19 @@ describe('resolveDrop — rows (grouping)', () => {
     }))
     expect(out[0].kind).toBe('create-group')
     if (out[0].kind === 'create-group') {
-      expect(out[0].groupName).toBe('Dentist')
+      expect(out[0].groupName).toBe(NEW_GROUP_NAME)
       expect(out[0].taskIds).toEqual(['a'])
       expect(out[0].memberRefs).toEqual([{ type: 'event', id: 'e9' }])
     }
   })
 
   it('an undosed routine joins a group by its bare id', () => {
-    const t = item({ id: 'task-b', title: 'Errands' })
+    const wrapper = item({ id: 'task-w1', title: 'Errands' })
+    const child = item({ id: 'task-c', isSubtask: true, parentTaskId: 'w1' })
     const r = item({ id: 'routine-r7', type: 'routine' })
     const out = resolveDrop(ctx({
-      activeId: 'routine-r7', overId: rowDropId('task-b'),
-      sections: { ...emptySections<TimelineItem>(), allday: [t, r] },
+      activeId: 'routine-r7', overId: rowDropId('task-w1'),
+      sections: { ...emptySections<TimelineItem>(), allday: [wrapper, child, r] },
     }))
     expect(out[0].kind).toBe('add-to-group')
     if (out[0].kind === 'add-to-group') {
@@ -350,8 +368,8 @@ describe('resolveDrop — rows (grouping)', () => {
       activeId: 'task-a', overId: rowDropId('task-b'),
       sections: { ...emptySections<TimelineItem>(), morning: [a, b] },
     }))
-    expect(out[0].kind).toBe('add-to-group')
-    if (out[0].kind === 'add-to-group') expect(out[0].isAllDay).toBe(false)
+    expect(out[0].kind).toBe('create-group')
+    if (out[0].kind === 'create-group') expect(out[0].isAllDay).toBe(false)
   })
 
   it('an All Day group is dated MIDNIGHT, never the current clock time', () => {
@@ -364,8 +382,8 @@ describe('resolveDrop — rows (grouping)', () => {
       activeId: 'task-a', overId: rowDropId('task-b'), viewedDate: noon,
       sections: { ...emptySections<TimelineItem>(), allday: [a, b] },
     }))
-    expect(out[0].kind).toBe('add-to-group')
-    if (out[0].kind === 'add-to-group') {
+    expect(out[0].kind).toBe('create-group')
+    if (out[0].kind === 'create-group') {
       expect(out[0].date.getHours()).toBe(0)
       expect(out[0].date.getMinutes()).toBe(0)
       expect(out[0].date.getSeconds()).toBe(0)
@@ -381,8 +399,8 @@ describe('resolveDrop — rows (grouping)', () => {
       activeId: 'task-a', overId: rowDropId('task-b'), viewedDate: dropInstant,
       sections: { ...emptySections<TimelineItem>(), evening: [a, b] },
     }))
-    expect(out[0].kind).toBe('add-to-group')
-    if (out[0].kind === 'add-to-group') {
+    expect(out[0].kind).toBe('create-group')
+    if (out[0].kind === 'create-group') {
       expect(out[0].date.getHours()).toBe(19)
       expect(out[0].date.getMinutes()).toBe(0)
       expect(out[0].isAllDay).toBe(false)

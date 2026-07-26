@@ -27,13 +27,14 @@ export interface ScheduleActionsValue {
     date: Date,
     isAllDay: boolean,
   ) => Promise<void>
+  /** Resolves with the new wrapper's task id — Today uses it to open the rename. */
   onGroupItems?: (
     taskIds: string[],
     memberRefs: import('@/types/task').GroupMemberRef[],
     groupName: string,
     date: Date,
     isAllDay: boolean,
-  ) => Promise<void>
+  ) => Promise<string | undefined>
   /** Persist a reorder: a different sort_order per row, one round trip. */
   onReorderTasks?: (
     writes: import('@/lib/today/taskOrdering').OrderWrite[],

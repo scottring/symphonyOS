@@ -27,6 +27,13 @@ export const BAND_PREFIX = 'today-band-'
 export const GAP_PREFIX = 'today-gap-'
 export const ROW_PREFIX = 'today-row-'
 
+/**
+ * The name a drag-created group starts with. It is a placeholder, not a guess:
+ * the UI drops straight into an inline rename with this text selected, so the
+ * first thing you type replaces it.
+ */
+export const NEW_GROUP_NAME = 'New Group'
+
 export function bandDropId(section: DaySection): string {
   return `${BAND_PREFIX}${section}`
 }
@@ -169,6 +176,17 @@ function findItem(sections: Record<DaySection, TimelineItem[]>, id: string): Tim
   return null
 }
 
+/** Is any rendered row a child of this task? Then the task is already a group. */
+function hasRenderedChildren(
+  sections: Record<DaySection, TimelineItem[]>,
+  wrapperRawId: string,
+): boolean {
+  for (const list of Object.values(sections)) {
+    if (list.some((i) => i.isSubtask && i.parentTaskId === wrapperRawId)) return true
+  }
+  return false
+}
+
 function sectionOf(sections: Record<DaySection, TimelineItem[]>, id: string): DaySection | null {
   for (const key of Object.keys(sections) as DaySection[]) {
     if (sections[key].some((i) => i.id === id)) return key
@@ -278,39 +296,47 @@ export function resolveDrop(ctx: DropContext): DropIntent[] {
         ? new Date(target.startTime)
         : startOfDay(ctx.viewedDate)
 
-    // A TASK target becomes the container itself.
-    //
-    // This used to mint a brand-new wrapper task named after the target and
-    // reparent BOTH cards under it — which left the target's title on two rows
-    // at once (the new wrapper and the original card), and a second drop minted
-    // a second identically-named wrapper. On screen that reads as the dragged
-    // item duplicating and the target being replaced. Reported from real use.
-    //
-    // Dropping A onto B means "A joins B", so B is the group. No new task.
+    // Dropping onto a group that ALREADY exists joins it — never nests a second
+    // group inside the first. That's true whether you aim at the group's own
+    // header row or at one of its children.
     if (target.type === 'task') {
-      // Dropping onto a card that is itself inside a group means joining THAT
-      // group, not nesting a group inside it.
-      const wrapperId = target.isSubtask && target.parentTaskId
+      const targetRawId = rawId(target.id)
+      const isWrapper =
+        (target.subtaskCount ?? 0) > 0 ||
+        ctx.groupMembersOf(targetRawId).length > 0 ||
+        // Rendered children are the authority: a wrapper whose subtasks are on
+        // screen is a group whether or not the task carries a count.
+        hasRenderedChildren(ctx.sections, targetRawId)
+      const existingWrapperId = target.isSubtask && target.parentTaskId
         ? target.parentTaskId
-        : rawId(target.id)
-      return [{
-        kind: 'add-to-group',
-        wrapperId,
-        taskIds: activeTaskIds,
-        memberRefs: activeRefs,
-        date: groupDate,
-        isAllDay,
-      }]
+        : isWrapper
+          ? targetRawId
+          : null
+      if (existingWrapperId) {
+        return [{
+          kind: 'add-to-group',
+          wrapperId: existingWrapperId,
+          taskIds: activeTaskIds,
+          memberRefs: activeRefs,
+          date: groupDate,
+          isAllDay,
+        }]
+      }
     }
 
-    // An event or routine cannot be a parent — `parentTaskId` only exists on
-    // tasks — so joining one genuinely does require a wrapper task, and naming
-    // it after the target is the least surprising choice available.
-    const targetRef = memberRefFor(target)
+    // Two loose cards become a NEW group holding both as peers.
+    //
+    // The wrapper is named neutrally on purpose. Naming it after the target put
+    // the target's title on two rows at once — the wrapper and its own child —
+    // which reads on screen as the dragged item duplicating and the target being
+    // replaced (reported from real use). It is also the wrong claim: neither
+    // card is the parent of the other, and the group is a thing you name.
+    const targetTaskIds = target.type === 'task' ? [rawId(target.id)] : []
+    const targetRef = target.type === 'task' ? null : memberRefFor(target)
     return [{
       kind: 'create-group',
-      groupName: target.title,
-      taskIds: activeTaskIds,
+      groupName: NEW_GROUP_NAME,
+      taskIds: [...activeTaskIds, ...targetTaskIds],
       memberRefs: [...activeRefs, ...(targetRef ? [targetRef] : [])],
       date: groupDate,
       isAllDay,

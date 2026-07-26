@@ -163,6 +163,8 @@ export function TodayView({
 
   // ── Bulk multi-select (hover checkbox on any row → bottom action bar) ──────
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(() => new Set())
+  // Raw task id of a group created by drag, held open on its name field.
+  const [renamingGroupId, setRenamingGroupId] = useState<string | null>(null)
   const [eodReviewOpen, setEodReviewOpen] = useState(false)
   const clearBulkSelection = useCallback(() => setSelectedKeys(new Set()), [])
   const toggleBulkSelect = useCallback((key: string) => {
@@ -591,11 +593,16 @@ export function TodayView({
           await ctx.onReorderTasks?.(intent.writes)
           break
 
-        case 'create-group':
-          await onGroupItems?.(
+        case 'create-group': {
+          const wrapperId = await onGroupItems?.(
             intent.taskIds, intent.memberRefs, intent.groupName, intent.date, intent.isAllDay,
           )
+          // Straight into the name field. The group's placeholder name is the
+          // one thing the drag couldn't infer, so asking for it now — with the
+          // text selected — costs no extra gesture.
+          if (wrapperId) setRenamingGroupId(wrapperId)
           break
+        }
 
         case 'add-to-group':
           await ctx.onAddToGroup?.(
@@ -956,6 +963,8 @@ export function TodayView({
               onCompleteEvent={onCompleteEvent}
               panelOpen={panelOpen}
               onClosePanel={onClosePanel}
+              renamingGroupId={renamingGroupId}
+              onRenameGroupDone={() => setRenamingGroupId(null)}
             />
             </TodayDragProvider>
           </div>

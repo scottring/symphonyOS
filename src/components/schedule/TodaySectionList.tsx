@@ -32,6 +32,7 @@ import { RoutineCollectionRow } from './RoutineCollectionRow'
 import { ShareToFamilyNudge } from './ShareToFamilyNudge'
 import { TodayBandDropZone, TodayGapDropZone } from './TodayDropZones'
 import { TodayDraggableRow } from './TodayDraggableRow'
+import { GroupNameInput } from './GroupNameInput'
 import { useTodayDragState } from './TodayDragProvider'
 import { refusalFor } from '@/lib/today/todayDrop'
 import { capUnits, DEFAULT_SECTION_CAP } from '@/lib/today/pageCap'
@@ -86,6 +87,9 @@ export interface TodaySectionListProps {
   onClosePanel?: () => void
   /** True when this event sits on a read-only calendar — it refuses the drag. */
   isReadOnlyEvent: (item: TimelineItem) => boolean
+  /** Raw task id of a just-created group, rendered as an inline name field. */
+  renamingGroupId?: string | null
+  onRenameGroupDone?: () => void
 }
 
 export function TodaySectionList({
@@ -116,6 +120,8 @@ export function TodaySectionList({
   panelOpen,
   onClosePanel,
   isReadOnlyEvent,
+  renamingGroupId,
+  onRenameGroupDone,
 }: TodaySectionListProps) {
   const ctx = useScheduleActionsContext()
   const { dragging } = useTodayDragState()
@@ -360,6 +366,27 @@ export function TodaySectionList({
                           } : undefined}
                         />
                         </TodayDraggableRow>
+                      </div>
+                    )
+                  }
+
+                  // A group the drag just created: its header row is an open
+                  // name field until it is committed or dismissed. Not
+                  // draggable while editing — the pointer belongs to the text.
+                  if (taskId && taskId === renamingGroupId) {
+                    return (
+                      <div key={item.id}>
+                        {showInsert && insertBefore}
+                        <div data-item-id={item.id} className={groupCardClass || undefined}>
+                          <GroupNameInput
+                            initialName={item.title}
+                            onCommit={(name) => {
+                              if (name !== item.title) onUpdateTask?.(taskId, { title: name })
+                              onRenameGroupDone?.()
+                            }}
+                            onCancel={() => onRenameGroupDone?.()}
+                          />
+                        </div>
                       </div>
                     )
                   }

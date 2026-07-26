@@ -882,6 +882,21 @@ export function useSupabaseTasks() {
       updates = { ...updates, bucket: 'timed' }
     }
 
+    // A group moves as a UNIT: rescheduling a parent carries its children.
+    //
+    // Without this, moving "Yard optimization" to All day today left its two
+    // subtasks dated yesterday — they stayed in the carried-over list, read as
+    // belonging to whatever unrelated row sorted above them, and looked lost.
+    // Reported from real use, twice. Only the scheduling fields travel; a
+    // child's own title, context and assignee are its own.
+    const movesSchedule =
+      'scheduledFor' in updates || 'isAllDay' in updates || 'bucket' in updates
+    const childrenToMove = movesSchedule ? (task.subtasks ?? []) : []
+    const childMove: Partial<Task> = {}
+    if ('scheduledFor' in updates) childMove.scheduledFor = updates.scheduledFor
+    if ('isAllDay' in updates) childMove.isAllDay = updates.isAllDay
+    if ('bucket' in updates) childMove.bucket = updates.bucket
+
     // Optimistic update — handle both top-level tasks and nested subtasks
     const isSubtask = !!task.parentTaskId
     if (isSubtask) {
@@ -895,7 +910,15 @@ export function useSupabaseTasks() {
       )
     } else {
       setTasks((prev) =>
-        prev.map((t) => (t.id === id ? { ...t, ...updates } : t))
+        prev.map((t) => (t.id === id
+          ? {
+              ...t,
+              ...updates,
+              subtasks: childrenToMove.length > 0
+                ? (t.subtasks ?? []).map((s) => ({ ...s, ...childMove }))
+                : t.subtasks,
+            }
+          : t))
       )
     }
 
@@ -991,6 +1014,31 @@ export function useSupabaseTasks() {
       announceLocalWrite({ kind: 'update', task: { ...task, ...updates } })
     } else {
       console.warn('[updateTask] DB update returned no data!')
+    }
+
+    // Carry the children only once the parent's own move actually landed.
+    if (!updateError && childrenToMove.length > 0) {
+      const childDb: Record<string, unknown> = {}
+      if ('bucket' in childMove) childDb.bucket = childMove.bucket ?? 'inbox'
+      if ('scheduledFor' in childMove) {
+        childDb.scheduled_for = childMove.scheduledFor?.toISOString() ?? null
+      }
+      if ('isAllDay' in childMove) childDb.is_all_day = childMove.isAllDay ?? null
+      const childIds = childrenToMove.map((c) => c.id)
+      const { error: childError } = await supabase
+        .from('tasks')
+        .update(childDb)
+        .in('id', childIds)
+      if (childError) {
+        // The parent moved and the children did not — say so, because a silent
+        // half-move is exactly the state that looked like lost tasks.
+        console.error('[updateTask] Group children failed to follow:', childError.message)
+        showToast('Group moved, but its items stayed behind', 'error', 4000)
+      } else {
+        for (const child of childrenToMove) {
+          announceLocalWrite({ kind: 'update', task: { ...child, ...childMove } })
+        }
+      }
     }
   }, [tasks, familyMembers, findTaskById, findParentOfSubtask])
 

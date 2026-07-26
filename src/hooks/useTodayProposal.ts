@@ -16,7 +16,7 @@ function rawId(timelineId: string): string {
 export interface TodayProposalDeps {
   onGroupItems?: (
     taskIds: string[], memberRefs: GroupMemberRef[], groupName: string, date: Date, isAllDay: boolean,
-  ) => Promise<void>
+  ) => Promise<string | undefined>
   onReorderTasks?: (writes: OrderWrite[]) => Promise<boolean>
 }
 
