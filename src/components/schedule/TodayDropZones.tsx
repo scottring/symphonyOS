@@ -36,7 +36,14 @@ export function TodayGapDropZone({
   const { setNodeRef, isOver } = useDroppable({ id: gapDropId(section, index) })
   const { dragging } = useTodayDragState()
   return (
-    <div ref={setNodeRef} data-testid={gapDropId(section, index)} className="relative">
+    <div
+      ref={setNodeRef}
+      data-testid={gapDropId(section, index)}
+      // Compact at rest so the gap costs almost nothing per item, but grown
+      // back while a drag is in flight — this IS the reorder target, and an 8px
+      // target is not one you can hit.
+      className={`relative transition-[padding] ${dragging ? 'py-2.5' : ''}`}
+    >
       {dragging && (
         <div
           aria-hidden

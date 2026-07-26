@@ -43,14 +43,18 @@ export function TimelineInsertPoint({ onPick, onCreate, quickInput }: Props) {
     setInputKind(k); setMode('input')
   }, [onPick])
 
+  // h-2, not h-6: this sits between EVERY pair of rows, so its resting height is
+  // paid once per item. At 24px it was a third of the vertical cost of a row,
+  // while being invisible until hover. The + button is absolutely positioned so
+  // its 28px overflows this box instead of dictating its height.
   return (
-    <div ref={rootRef} className="relative hidden md:flex items-center justify-center h-6 group">
-      <div className="absolute inset-x-0 top-1/2 border-t border-dashed border-neutral-200 opacity-40 group-hover:opacity-100 transition-opacity" />
+    <div ref={rootRef} className="relative hidden md:flex items-center justify-center h-2 group">
+      <div className="absolute inset-x-0 top-1/2 border-t border-dashed border-neutral-200 opacity-0 group-hover:opacity-100 transition-opacity" />
       <button
         type="button"
         aria-label="Add between items"
         onClick={() => setMode(v => v === 'closed' ? 'wheel' : 'closed')}
-        className="relative z-10 w-7 h-7 min-w-[28px] rounded-full bg-primary-500 text-white text-base leading-none flex items-center justify-center shadow-sm opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
+        className="absolute z-10 w-7 h-7 min-w-[28px] rounded-full bg-primary-500 text-white text-base leading-none flex items-center justify-center shadow-sm opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
       >+</button>
 
       {mode === 'wheel' && (
