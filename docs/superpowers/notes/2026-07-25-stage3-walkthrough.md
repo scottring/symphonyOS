@@ -65,13 +65,41 @@ All test rows were throwaway `zz*` tasks, deleted afterwards
   including that it offers no delete, but never exercised against real data —
   deliberately, since the only way to produce one is to duplicate a real routine.
 
-## Move #8 — the assistant's proposed order — deliberately not built
+## Move #8 — the assistant's proposed order — BUILT
 
-The spec sequences it last and says why: *"An optimizer needs durations, fixed
-anchors and some notion of energy or location to beat a guess."*
+Initially deferred on the spec's own reasoning (*"an optimizer needs durations,
+fixed anchors and some notion of energy or location to beat a guess"*), then
+built because Stage 3's table lists it and completion was the instruction.
 
-Stage 2b has only just made it *possible* to put real times on things, and
-nothing has actually been timed yet — the day is still ~27 all-day items. An
-optimizer shipped now would reason over the same empty inputs the spec warns
-about and "produce a confident-sounding shuffle". It needs a week of real usage
-first, then its own plan. Building it today would be building it blind.
+The deferral concern is answered by construction rather than ignored: the
+proposer is **deterministic and proposes only where a real signal exists**, and
+every suggestion carries the reason it was made.
+
+- **Signals used:** a shared project (an explicit statement that things belong
+  together) and a shared location (two errands at one place is one trip).
+- **No signal → no proposal.** Verified live: Scott's real day produces *no*
+  trigger at all, because no two All Day items share a project or a location.
+  That silence is the feature, not a gap.
+- **Only the untimed pile** is proposed over — a timed item's position already
+  means something.
+- **Never an auto-apply.** Preview with per-suggestion accept, "Take all of it",
+  and Discard. Accepting reuses the very same writers the drag gestures use
+  (`onGroupItems`, `onReorderTasks`), so an accepted suggestion is
+  indistinguishable from having done it by hand.
+
+Verified on :5173 by seeding two throwaway rows sharing a project: the trigger
+read **"2 suggestions"**, the preview showed the group (with its reason and its
+member titles) and the reorder, "Make this group" created it and it rendered
+immediately **dated All day rather than stamped with the clock time**, and the
+preview then correctly emptied. All seeded rows deleted afterwards; the day
+returned to "7 of 55 done".
+
+**Not verified:** an LLM-backed proposer. The spec suggested this could ride on
+the `symphony-agent` edge function; this is a deterministic heuristic instead,
+which is testable, free, and honest about its thin inputs. Swapping in an
+agent-backed proposer behind the same `Proposal` type is a later choice.
+
+**Incidents during this walkthrough, both repaired:** a stray click flipped the
+domain switcher to `family` (restored to `universal`), and direct REST deletes
+left the client cache briefly showing an empty day — a hard reload restored it,
+and a DB check confirmed all 28 tasks were intact throughout.

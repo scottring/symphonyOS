@@ -67,6 +67,8 @@ import { DiscussionBadge } from './DiscussionBadge'
 import { PrintableDayList } from './PrintableDayList'
 import { DuplicateSweep, DuplicateSweepTrigger } from './DuplicateSweep'
 import { useDuplicateSweep } from '@/hooks/useDuplicateSweep'
+import { ProposalPreview, ProposalTrigger } from './ProposalPreview'
+import { useTodayProposal } from '@/hooks/useTodayProposal'
 import { readHideRoutines, writeHideRoutines, onHideRoutinesChange } from '@/lib/hideRoutinesSignal'
 import { useShareToFamilyNudges } from '@/lib/today/shareNudges'
 
@@ -463,6 +465,12 @@ export function TodayView({
   // Duplicate sweep — on demand; a passive count is the only unsolicited part.
   const sweep = useDuplicateSweep(data.sectionsOrder, data.grouped, ctx.onDeleteTask)
 
+  // Suggested order + grouping — a preview you accept, never an auto-apply.
+  // Applying reuses the same writers the drag gestures use.
+  const proposal = useTodayProposal(data.sectionsOrder, data.grouped, projects, viewedDate, {
+    onGroupItems, onReorderTasks: ctx.onReorderTasks,
+  })
+
   // ── Drag: the pure resolver's inputs ─────────────────────────────────────────
   const { isReadOnlyCalendar } = useCalendarPermissions()
 
@@ -761,6 +769,9 @@ export function TodayView({
               {data.isToday && (
                 <DuplicateSweepTrigger count={sweep.pairs.length} onOpen={() => sweep.setOpen(true)} />
               )}
+              {data.isToday && (
+                <ProposalTrigger count={proposal.count} onOpen={() => proposal.setOpen(true)} />
+              )}
               {data.isToday && ctx.onOpenPlanning && (
                 <button
                   type="button"
@@ -985,6 +996,17 @@ export function TodayView({
           onSendToList={() => {}}
           onCancel={clearBulkSelection}
           familyMembers={familyMembers}
+        />
+      )}
+
+      {proposal.open && (
+        <ProposalPreview
+          proposal={proposal.proposal}
+          titleOf={proposal.titleOf}
+          onClose={() => proposal.setOpen(false)}
+          onAcceptGroup={proposal.acceptGroup}
+          onAcceptOrder={proposal.acceptOrder}
+          onAcceptAll={proposal.acceptAll}
         />
       )}
 
