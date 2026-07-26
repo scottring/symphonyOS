@@ -385,7 +385,26 @@ export function groupByDaySection(
     getSortTime(a) - getSortTime(b)
 
   // All-day has no times to sort by, so it reads alphabetically.
-  groups.allday.sort((a, b) => a.title.localeCompare(b.title))
+  // All Day has no times to sort by, so MANUAL order governs it and the title
+  // is only the tiebreak among never-ordered items. This used to be a bare
+  // alphabetical sort, which meant persisting a sort_order changed nothing on
+  // screen: the drag would land, the write would succeed, and the row would
+  // snap straight back. Reorder is invisible without this.
+  //
+  // A null sortOrder must NOT be read as 0 — 0 is a real first position, and
+  // the coercion would tie an unordered item with a genuinely-first one and let
+  // the alphabetical tiebreak decide between them.
+  //
+  // Unscheduled stays insertion-ordered: it holds routine instances, which
+  // carry no sortOrder to order by.
+  groups.allday.sort((a, b) => {
+    const ao = a.originalTask?.sortOrder ?? null
+    const bo = b.originalTask?.sortOrder ?? null
+    if (ao != null && bo != null) return ao - bo || a.title.localeCompare(b.title)
+    if (ao != null) return -1
+    if (bo != null) return 1
+    return a.title.localeCompare(b.title)
+  })
   for (const { section } of DAY_SECTION_BOUNDS) groups[section].sort(sortByTime)
 
   return groups

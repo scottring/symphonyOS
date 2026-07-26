@@ -13,6 +13,7 @@ import {
   getSectionForHour,
   getDaySectionLabel,
   getTimeOfDay,
+  groupByDaySection,
   DAY_SECTION_BOUNDS,
   TIMED_SECTIONS,
   type DaySection,
@@ -395,5 +396,54 @@ describe('TIMED_SECTIONS', () => {
   it('spans the day from hour 0 to hour 23', () => {
     expect(getSectionForHour(0)).toBe(TIMED_SECTIONS[0])
     expect(getSectionForHour(23)).toBe(TIMED_SECTIONS[TIMED_SECTIONS.length - 1])
+  })
+})
+
+describe('groupByDaySection — All Day manual order', () => {
+  const allDayItem = (id: string, title: string, sortOrder: number | null): TimelineItem => ({
+    id,
+    type: 'task',
+    title,
+    startTime: new Date(2026, 6, 25),
+    endTime: null,
+    completed: false,
+    allDay: true,
+    originalTask: { sortOrder } as never,
+  })
+
+  it('orders All Day by sortOrder, not alphabetically', () => {
+    const groups = groupByDaySection([
+      allDayItem('task-a', 'Aardvark', 2000),
+      allDayItem('task-z', 'Zebra', 1000),
+    ])
+    expect(groups.allday.map((i) => i.id)).toEqual(['task-z', 'task-a'])
+  })
+
+  it('puts never-ordered items after ordered ones, alphabetically among themselves', () => {
+    const groups = groupByDaySection([
+      allDayItem('task-b', 'Banana', null),
+      allDayItem('task-a', 'Apple', null),
+      allDayItem('task-o', 'Ordered', 1000),
+    ])
+    expect(groups.allday.map((i) => i.id)).toEqual(['task-o', 'task-a', 'task-b'])
+  })
+
+  it('does not read a null sortOrder as 0', () => {
+    // 0 is a real first position. A null → 0 coercion would tie these two and
+    // let the alphabetical tiebreak pin the unordered item above the ordered one.
+    const groups = groupByDaySection([
+      allDayItem('task-unordered', 'Aaa', null),
+      allDayItem('task-first', 'Zzz', 0),
+    ])
+    expect(groups.allday[0].id).toBe('task-first')
+  })
+
+  it('still sorts timed sections by time', () => {
+    const timed = (id: string, hour: number): TimelineItem => ({
+      id, type: 'task', title: id,
+      startTime: new Date(2026, 6, 25, hour), endTime: null, completed: false,
+    })
+    const groups = groupByDaySection([timed('late', 11), timed('early', 9)])
+    expect(groups.morning.map((i) => i.id)).toEqual(['early', 'late'])
   })
 })

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
   SORT_ORDER_GAP, nextTaskSortOrder, sortByManualOrder, reorderTasksByDrag,
+  reorderTasksToIndex,
 } from '@/lib/today/taskOrdering'
 
 const d = (n: number) => new Date(2026, 6, 25, 0, 0, n)
@@ -92,5 +93,62 @@ describe('reorderTasksByDrag', () => {
 
   it('returns no writes for an unknown id', () => {
     expect(reorderTasksByDrag(['a','b'], 'zz', 'a', orders([['a',0],['b',1000]]))).toEqual([])
+  })
+})
+
+describe('reorderTasksToIndex', () => {
+  const orders = (pairs: [string, number | null][]) => new Map(pairs)
+
+  it('writes ONE row when there is room at the target index', () => {
+    // a=0, b=1000, c=2000 — move c into the gap at index 1 (between a and b)
+    const writes = reorderTasksToIndex(['a', 'b', 'c'], 'c', 1,
+      orders([['a', 0], ['b', 1000], ['c', 2000]]))
+    expect(writes).toHaveLength(1)
+    expect(writes[0].id).toBe('c')
+    expect(writes[0].sortOrder).toBeGreaterThan(0)
+    expect(writes[0].sortOrder).toBeLessThan(1000)
+  })
+
+  it('writes one row when moved to the front', () => {
+    const writes = reorderTasksToIndex(['a', 'b', 'c'], 'c', 0,
+      orders([['a', 0], ['b', 1000], ['c', 2000]]))
+    expect(writes).toHaveLength(1)
+    expect(writes[0].id).toBe('c')
+    expect(writes[0].sortOrder).toBeLessThan(0)
+  })
+
+  it('writes one row when moved past the end', () => {
+    const writes = reorderTasksToIndex(['a', 'b', 'c'], 'a', 3,
+      orders([['a', 0], ['b', 1000], ['c', 2000]]))
+    expect(writes).toHaveLength(1)
+    expect(writes[0].id).toBe('a')
+    expect(writes[0].sortOrder).toBeGreaterThan(2000)
+  })
+
+  it('renormalises when the gap at the target is spent', () => {
+    const writes = reorderTasksToIndex(['a', 'b', 'c'], 'c', 1,
+      orders([['a', 0], ['b', 1], ['c', 5000]]))
+    expect(writes.length).toBeGreaterThan(1)
+    const byId = new Map(writes.map((w) => [w.id, w.sortOrder]))
+    expect(byId.get('a')!).toBeLessThan(byId.get('c')!)
+    expect(byId.get('c')!).toBeLessThan(byId.get('b')!)
+  })
+
+  it('returns no writes when the index is where the item already sits', () => {
+    // Dropping into the gap immediately before yourself is a no-op...
+    expect(reorderTasksToIndex(['a', 'b'], 'a', 0, orders([['a', 0], ['b', 1000]]))).toEqual([])
+    // ...and so is the gap immediately after.
+    expect(reorderTasksToIndex(['a', 'b'], 'a', 1, orders([['a', 0], ['b', 1000]]))).toEqual([])
+  })
+
+  it('clamps an out-of-range index rather than producing nonsense', () => {
+    const writes = reorderTasksToIndex(['a', 'b', 'c'], 'a', 99,
+      orders([['a', 0], ['b', 1000], ['c', 2000]]))
+    expect(writes).toHaveLength(1)
+    expect(writes[0].sortOrder).toBeGreaterThan(2000)
+  })
+
+  it('returns no writes for an unknown id', () => {
+    expect(reorderTasksToIndex(['a', 'b'], 'zz', 0, orders([['a', 0], ['b', 1000]]))).toEqual([])
   })
 })
