@@ -39,6 +39,13 @@ export interface ScheduleActionsValue {
   onReorderTasks?: (
     writes: import('@/lib/today/taskOrdering').OrderWrite[],
   ) => Promise<boolean>
+  /**
+   * Offer an undo for the action just performed. Surfaces as the toast the
+   * container renders; the newest action wins.
+   */
+  onRegisterUndo?: (message: string, undo: () => void) => void
+  /** Dissolve a group: detach every child, then delete the wrapper. */
+  onUngroup?: (wrapperId: string, childIds: string[]) => Promise<void>
   /** Add members to a group that already exists (drag a card onto a group). */
   onAddToGroup?: (
     wrapperId: string,

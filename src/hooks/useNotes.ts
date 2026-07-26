@@ -121,14 +121,18 @@ export function useNotes() {
         return
       }
 
-      // Fetch tasks that have notes
-      const { data: tasksData, error: tasksError } = await supabase
-        .from('tasks')
-        .select('*')
-        .eq('user_id', user.id)
-        .not('notes', 'is', null)
-        .neq('notes', '')
-        .order('updated_at', { ascending: false })
+      // Fetch tasks that have notes. Shared for the same reason as the notes
+      // query above — this one was still firing eight times per load.
+      const { data: tasksData, error: tasksError } = await shareInFlight(
+        `notes:tasks:${user.id}`,
+        async () => await supabase
+          .from('tasks')
+          .select('*')
+          .eq('user_id', user.id)
+          .not('notes', 'is', null)
+          .neq('notes', '')
+          .order('updated_at', { ascending: false }),
+      )
 
       if (tasksError) {
         console.error('[useNotes] Error fetching task notes:', tasksError)

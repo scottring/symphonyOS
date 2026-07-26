@@ -550,9 +550,21 @@ export function TodayView({
 
         case 'set-time': {
           if (intent.itemId.startsWith('task-')) {
-            onUpdateTask?.(intent.itemId.replace('task-', ''), {
+            const taskId = intent.itemId.replace('task-', '')
+            const before = tasks.find((t) => t.id === taskId)
+            onUpdateTask?.(taskId, {
               bucket: 'timed', scheduledFor: intent.when, isAllDay: false,
             })
+            // A drag is the easiest action in the app to do by accident.
+            if (before) {
+              ctx.onRegisterUndo?.(`Moved "${before.title}"`, () => {
+                onUpdateTask?.(taskId, {
+                  bucket: before.bucket,
+                  scheduledFor: before.scheduledFor,
+                  isAllDay: before.isAllDay,
+                })
+              })
+            }
           } else if (intent.itemId.startsWith('routine-')) {
             const { routineId, slot } = parseRoutineTimelineId(intent.itemId)
             // Dosed steps are refused upstream; this is belt-and-braces.
@@ -583,9 +595,20 @@ export function TodayView({
           }
           const midnight = new Date(viewedDate)
           midnight.setHours(0, 0, 0, 0)
-          onUpdateTask?.(intent.itemId.replace('task-', ''), {
+          const allDayId = intent.itemId.replace('task-', '')
+          const wasTimed = tasks.find((t) => t.id === allDayId)
+          onUpdateTask?.(allDayId, {
             bucket: 'timed', scheduledFor: midnight, isAllDay: true,
           })
+          if (wasTimed) {
+            ctx.onRegisterUndo?.(`Moved "${wasTimed.title}" to All day`, () => {
+              onUpdateTask?.(allDayId, {
+                bucket: wasTimed.bucket,
+                scheduledFor: wasTimed.scheduledFor,
+                isAllDay: wasTimed.isAllDay,
+              })
+            })
+          }
           break
         }
 
@@ -601,18 +624,42 @@ export function TodayView({
           // one thing the drag couldn't infer, so asking for it now — with the
           // text selected — costs no extra gesture.
           if (wrapperId) setRenamingGroupId(wrapperId)
+          // Undo dissolves the group: detach the members, drop the wrapper.
+          if (wrapperId) {
+            ctx.onRegisterUndo?.('Made a group', () => {
+              void ctx.onUngroup?.(wrapperId, intent.taskIds)
+            })
+          }
           break
         }
 
-        case 'add-to-group':
+        case 'add-to-group': {
           await ctx.onAddToGroup?.(
             intent.wrapperId, intent.taskIds, intent.memberRefs, intent.date, intent.isAllDay,
           )
+          const joined = intent.taskIds
+          if (joined.length > 0) {
+            ctx.onRegisterUndo?.('Added to group', () => {
+              for (const id of joined) void ctx.onRemoveFromGroup?.(id)
+            })
+          }
           break
+        }
 
-        case 'remove-from-group':
+        case 'remove-from-group': {
+          const leaving = tasks.find((t) => t.id === intent.taskId)
+          const formerParent = leaving?.parentTaskId
           await ctx.onRemoveFromGroup?.(intent.taskId)
+          if (formerParent) {
+            ctx.onRegisterUndo?.('Removed from group', () => {
+              void ctx.onAddToGroup?.(
+                formerParent, [intent.taskId], [], leaving?.scheduledFor ?? viewedDate,
+                leaving?.isAllDay ?? false,
+              )
+            })
+          }
           break
+        }
       }
     }
   }, [ctx, onUpdateTask, onPushRoutine, onGroupItems, onNotify, viewedDate, data.grouped])

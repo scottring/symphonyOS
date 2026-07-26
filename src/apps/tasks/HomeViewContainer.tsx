@@ -20,7 +20,7 @@ import { LoadingFallback } from '@/components/layout/LoadingFallback';
 import { isEverydayRoutine, scheduleRoutineOnDate } from '@/lib/routineUtils';
 import type { PlanningHorizon } from '@/hooks/usePlanningSession';
 import { parseRoutineTimelineId } from '@/lib/today/doseExpansion';
-import { groupItems, addToGroup, removeFromGroup } from '@/lib/today/groupTasks';
+import { groupItems, addToGroup, removeFromGroup, ungroupTasks } from '@/lib/today/groupTasks';
 import { useConvertTaskToProject } from '@/hooks/useConvertTaskToProject';
 import { parseQuickInput } from '@/lib/quickInputParser';
 import type { ParserContext } from '@/lib/quickInputParser';
@@ -44,6 +44,7 @@ import { useNotesContext } from '@/contexts/NotesContext';
 import { ScheduleActionsProvider, type ScheduleActionsValue } from '@/contexts/ScheduleActionsContext';
 import { withDefaultEventAssignees } from '@/components/home/eventAssigneeDefaults';
 import { useUndo } from '@/hooks/useUndo';
+import { UndoToast } from '@/components/undo/UndoToast';
 import { useResolutionLearning } from '@/hooks/useResolutionLearning';
 import { HomeView } from '@/components/home';
 import { useSelection } from '@/shell/providers/SelectionProvider';
@@ -477,6 +478,15 @@ export function HomeViewContainer() {
     [updateTask, refetch],
   );
 
+  // Undo of "make a group": detach every child, then delete the wrapper, so
+  // the two cards return to being loose rows.
+  const handleUngroup = useCallback(
+    async (wrapperId: string, childIds: string[]) => {
+      await ungroupTasks(wrapperId, childIds, { updateTask, deleteTask, refetch });
+    },
+    [updateTask, deleteTask, refetch],
+  );
+
   // Optimistic event delete: drop from the local cache immediately, restore
   // on failure. Google keeps deleted events in calendar trash (~30 days), so
   // a confirmed delete is still recoverable from the Calendar web UI.
@@ -537,6 +547,8 @@ export function HomeViewContainer() {
       onGroupItems: handleGroupItems,
       onAddToGroup: handleAddToGroup,
       onRemoveFromGroup: handleRemoveFromGroup,
+      onRegisterUndo: undo.pushAction,
+      onUngroup: handleUngroup,
       onReorderTasks: updateTaskOrders,
       onOpenTask: (taskId: string) => setSelection({ kind: 'task', id: taskId }),
       onOpenProject: (projectId: string) => navigate(`/projects/${projectId}`),
@@ -591,7 +603,7 @@ export function HomeViewContainer() {
       onUpdateEventProject: updateEventProject,
     }),
     [
-      toggleTask, toggleWaiting, updateTask, pushTask, deleteTask, onCreateTaskFromValue, onCreateTaskParsed, parserContext, currentDomain, resolverContext, getRecentTaskForContact, onCreateTaskAt, onCreateEventAt, onCreateRoutineAt, handleCreateFollowUp, handleGroupItems, handleAddToGroup, handleRemoveFromGroup, updateTaskOrders,
+      toggleTask, toggleWaiting, updateTask, pushTask, deleteTask, onCreateTaskFromValue, onCreateTaskParsed, parserContext, currentDomain, resolverContext, getRecentTaskForContact, onCreateTaskAt, onCreateEventAt, onCreateRoutineAt, handleCreateFollowUp, handleGroupItems, handleAddToGroup, handleRemoveFromGroup, handleUngroup, undo.pushAction, updateTaskOrders,
       setSelection, navigate,
       scheduleActions, updateRoutine, updateEventContext, updateEventSharedWithFamily, dismissShareNudge, hideEvent, handleDeleteEvent,
       contactsMap, projectsMap, projects, contacts, familyMembers, lists, listsByCategory,
@@ -682,6 +694,15 @@ export function HomeViewContainer() {
           />
         </Suspense>
       )}
+
+      {/* Every action here already registered an undo — this container just
+          never rendered the toast, so skipping a routine on Today silently
+          offered no way back. Reported after an accidental skip. */}
+      <UndoToast
+        action={undo.currentAction}
+        onUndo={undo.executeUndo}
+        onDismiss={undo.dismiss}
+      />
     </ScheduleActionsProvider>
   );
 }
