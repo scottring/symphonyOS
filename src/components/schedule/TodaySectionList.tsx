@@ -210,7 +210,7 @@ export function TodaySectionList({
               onToggle={() => onToggleSection(section, collapsed)}
             />
             {!collapsed && (
-              <div className="space-y-1">
+              <div className="space-y-1 md:space-y-0.5">
                 {visible.map((item, itemIndex) => {
                   const taskId = item.id.startsWith('task-') ? item.id.replace('task-', '') : null
                   const contactName = item.contactId && contactsMap?.get(item.contactId)?.name || undefined

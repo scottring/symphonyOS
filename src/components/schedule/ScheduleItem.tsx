@@ -477,8 +477,8 @@ export const ScheduleItem = memo(function ScheduleItem({
       className={`
         group relative cursor-pointer transition-all duration-200 rounded-xl border
         ${variant === 'minimal'
-          ? `px-3 py-1 border-transparent hover:bg-neutral-50/60 ${selected ? 'bg-neutral-50 ring-1 ring-neutral-200' : ''}`
-          : `px-3 py-2 ${selected
+          ? `px-3 py-1 md:py-0.5 border-transparent hover:bg-neutral-50/60 ${selected ? 'bg-neutral-50 ring-1 ring-neutral-200' : ''}`
+          : `px-3 py-2 md:py-1.5 ${selected
               ? 'bg-primary-50 border-primary-200 shadow-md ring-1 ring-primary-200'
               : 'border-transparent hover:bg-primary-50/50 hover:border-primary-100'
             }`
