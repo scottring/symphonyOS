@@ -239,7 +239,10 @@ describe('resolveDrop — gaps (reorder)', () => {
 })
 
 describe('resolveDrop — rows (grouping)', () => {
-  it('a card onto a plain card creates a group named after the target', () => {
+  it('a card onto a plain card makes the TARGET the group — no new wrapper', () => {
+    // Minting a wrapper named after the target left that title on two rows at
+    // once, and a second drop minted a second identical wrapper. On screen it
+    // read as the dragged item duplicating and the target being replaced.
     const a = item({ id: 'task-a', title: 'Pick up dry cleaning' })
     const b = item({ id: 'task-b', title: 'Morning errands' })
     const out = resolveDrop(ctx({
@@ -247,12 +250,36 @@ describe('resolveDrop — rows (grouping)', () => {
       sections: { ...emptySections<TimelineItem>(), allday: [a, b] },
     }))
     expect(out).toHaveLength(1)
-    expect(out[0].kind).toBe('create-group')
-    if (out[0].kind === 'create-group') {
-      expect(out[0].groupName).toBe('Morning errands')
-      expect([...out[0].taskIds].sort()).toEqual(['a', 'b'])
+    expect(out[0].kind).toBe('add-to-group')
+    if (out[0].kind === 'add-to-group') {
+      expect(out[0].wrapperId).toBe('b')
+      expect(out[0].taskIds).toEqual(['a'])
       expect(out[0].isAllDay).toBe(true)
     }
+  })
+
+  it('never produces create-group for a task target, however many times you drop', () => {
+    const a = item({ id: 'task-a', title: 'One' })
+    const b = item({ id: 'task-b', title: 'Errands' })
+    const c = item({ id: 'task-c', title: 'Two' })
+    const sections = { ...emptySections<TimelineItem>(), allday: [a, b, c] }
+    for (const activeId of ['task-a', 'task-c']) {
+      const out = resolveDrop(ctx({ activeId, overId: rowDropId('task-b'), sections }))
+      expect(out[0].kind).toBe('add-to-group')
+      if (out[0].kind === 'add-to-group') expect(out[0].wrapperId).toBe('b')
+    }
+  })
+
+  it('dropping onto a card INSIDE a group joins that group, not a nested one', () => {
+    const wrapper = item({ id: 'task-w1', title: 'Errands' })
+    const child = item({ id: 'task-c', title: 'Milk', isSubtask: true, parentTaskId: 'w1' })
+    const a = item({ id: 'task-a', title: 'Bread' })
+    const out = resolveDrop(ctx({
+      activeId: 'task-a', overId: rowDropId('task-c'),
+      sections: { ...emptySections<TimelineItem>(), allday: [wrapper, child, a] },
+    }))
+    expect(out[0].kind).toBe('add-to-group')
+    if (out[0].kind === 'add-to-group') expect(out[0].wrapperId).toBe('w1')
   })
 
   it('a card onto an EXISTING group adds to it', () => {
@@ -273,16 +300,32 @@ describe('resolveDrop — rows (grouping)', () => {
     }
   })
 
-  it('an event dropped on a task groups it as a member ref, not a child', () => {
+  it('an event dropped on a task joins that task as a member ref', () => {
     const t = item({ id: 'task-b', title: 'Errands' })
     const ev = item({ id: 'event-e9', type: 'event' })
     const out = resolveDrop(ctx({
       activeId: 'event-e9', overId: rowDropId('task-b'),
       sections: { ...emptySections<TimelineItem>(), allday: [t, ev] },
     }))
+    expect(out[0].kind).toBe('add-to-group')
+    if (out[0].kind === 'add-to-group') {
+      expect(out[0].wrapperId).toBe('b')
+      expect(out[0].taskIds).toEqual([])
+      expect(out[0].memberRefs).toEqual([{ type: 'event', id: 'e9' }])
+    }
+  })
+
+  it('a card dropped on an EVENT does need a wrapper — events cannot be parents', () => {
+    const t = item({ id: 'task-a', title: 'Prep' })
+    const ev = item({ id: 'event-e9', type: 'event', title: 'Dentist' })
+    const out = resolveDrop(ctx({
+      activeId: 'task-a', overId: rowDropId('event-e9'),
+      sections: { ...emptySections<TimelineItem>(), allday: [t, ev] },
+    }))
     expect(out[0].kind).toBe('create-group')
     if (out[0].kind === 'create-group') {
-      expect(out[0].taskIds).toEqual(['b'])
+      expect(out[0].groupName).toBe('Dentist')
+      expect(out[0].taskIds).toEqual(['a'])
       expect(out[0].memberRefs).toEqual([{ type: 'event', id: 'e9' }])
     }
   })
@@ -294,8 +337,8 @@ describe('resolveDrop — rows (grouping)', () => {
       activeId: 'routine-r7', overId: rowDropId('task-b'),
       sections: { ...emptySections<TimelineItem>(), allday: [t, r] },
     }))
-    expect(out[0].kind).toBe('create-group')
-    if (out[0].kind === 'create-group') {
+    expect(out[0].kind).toBe('add-to-group')
+    if (out[0].kind === 'add-to-group') {
       expect(out[0].memberRefs).toEqual([{ type: 'routine', id: 'r7' }])
     }
   })
@@ -307,8 +350,8 @@ describe('resolveDrop — rows (grouping)', () => {
       activeId: 'task-a', overId: rowDropId('task-b'),
       sections: { ...emptySections<TimelineItem>(), morning: [a, b] },
     }))
-    expect(out[0].kind).toBe('create-group')
-    if (out[0].kind === 'create-group') expect(out[0].isAllDay).toBe(false)
+    expect(out[0].kind).toBe('add-to-group')
+    if (out[0].kind === 'add-to-group') expect(out[0].isAllDay).toBe(false)
   })
 
   it('an All Day group is dated MIDNIGHT, never the current clock time', () => {
@@ -321,8 +364,8 @@ describe('resolveDrop — rows (grouping)', () => {
       activeId: 'task-a', overId: rowDropId('task-b'), viewedDate: noon,
       sections: { ...emptySections<TimelineItem>(), allday: [a, b] },
     }))
-    expect(out[0].kind).toBe('create-group')
-    if (out[0].kind === 'create-group') {
+    expect(out[0].kind).toBe('add-to-group')
+    if (out[0].kind === 'add-to-group') {
       expect(out[0].date.getHours()).toBe(0)
       expect(out[0].date.getMinutes()).toBe(0)
       expect(out[0].date.getSeconds()).toBe(0)
@@ -338,8 +381,8 @@ describe('resolveDrop — rows (grouping)', () => {
       activeId: 'task-a', overId: rowDropId('task-b'), viewedDate: dropInstant,
       sections: { ...emptySections<TimelineItem>(), evening: [a, b] },
     }))
-    expect(out[0].kind).toBe('create-group')
-    if (out[0].kind === 'create-group') {
+    expect(out[0].kind).toBe('add-to-group')
+    if (out[0].kind === 'add-to-group') {
       expect(out[0].date.getHours()).toBe(19)
       expect(out[0].date.getMinutes()).toBe(0)
       expect(out[0].isAllDay).toBe(false)

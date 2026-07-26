@@ -176,16 +176,6 @@ function sectionOf(sections: Record<DaySection, TimelineItem[]>, id: string): Da
   return null
 }
 
-/** True when this row is a group wrapper — something is nested under it. */
-function isWrapper(sections: Record<DaySection, TimelineItem[]>, item: TimelineItem): boolean {
-  if (item.type !== 'task') return false
-  const raw = rawId(item.id)
-  for (const list of Object.values(sections)) {
-    if (list.some((i) => i.isSubtask && i.parentTaskId === raw)) return true
-  }
-  return false
-}
-
 function parseBand(overId: string): DaySection | null {
   if (!overId.startsWith(BAND_PREFIX)) return null
   return overId.slice(BAND_PREFIX.length) as DaySection
@@ -288,10 +278,24 @@ export function resolveDrop(ctx: DropContext): DropIntent[] {
         ? new Date(target.startTime)
         : startOfDay(ctx.viewedDate)
 
-    if (isWrapper(ctx.sections, target)) {
+    // A TASK target becomes the container itself.
+    //
+    // This used to mint a brand-new wrapper task named after the target and
+    // reparent BOTH cards under it — which left the target's title on two rows
+    // at once (the new wrapper and the original card), and a second drop minted
+    // a second identically-named wrapper. On screen that reads as the dragged
+    // item duplicating and the target being replaced. Reported from real use.
+    //
+    // Dropping A onto B means "A joins B", so B is the group. No new task.
+    if (target.type === 'task') {
+      // Dropping onto a card that is itself inside a group means joining THAT
+      // group, not nesting a group inside it.
+      const wrapperId = target.isSubtask && target.parentTaskId
+        ? target.parentTaskId
+        : rawId(target.id)
       return [{
         kind: 'add-to-group',
-        wrapperId: rawId(target.id),
+        wrapperId,
         taskIds: activeTaskIds,
         memberRefs: activeRefs,
         date: groupDate,
@@ -299,12 +303,14 @@ export function resolveDrop(ctx: DropContext): DropIntent[] {
       }]
     }
 
+    // An event or routine cannot be a parent — `parentTaskId` only exists on
+    // tasks — so joining one genuinely does require a wrapper task, and naming
+    // it after the target is the least surprising choice available.
     const targetRef = memberRefFor(target)
     return [{
       kind: 'create-group',
-      // Dropping A onto B reads as "A joins B", so B's title names the group.
       groupName: target.title,
-      taskIds: [...activeTaskIds, ...(target.type === 'task' ? [rawId(target.id)] : [])],
+      taskIds: activeTaskIds,
       memberRefs: [...activeRefs, ...(targetRef ? [targetRef] : [])],
       date: groupDate,
       isAllDay,
