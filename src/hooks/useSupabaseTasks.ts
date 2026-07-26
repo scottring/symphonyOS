@@ -166,6 +166,28 @@ export function dbTaskToTask(dbTask: DbTask): Task {
   }
 }
 
+// ── One first load, shared ───────────────────────────────────────────────────
+// Every instance of this hook used to fetch the whole table on mount, and a
+// single route mounts several (ShellLayout, ShellSearch, useShellChrome, the
+// view container, StagingFloat…). That meant the same 650 rows pulled five
+// times over before anything rendered. Instances still hold their own state
+// and their own optimistic writes — only the network round trip is shared.
+// Only a request ALREADY IN FLIGHT is shared — deliberately not a cache with a
+// lifetime. The instances race each other within one render pass, so in-flight
+// sharing collapses the whole storm; a stored snapshot would additionally hand
+// stale rows to anything mounting later (a panel opened seconds after a
+// server-side write), which is a correctness cost for no extra speed.
+let tasksInFlight: { userId: string; promise: Promise<Task[] | null> } | null = null
+
+/**
+ * Instances must never share task OBJECTS — `applyIncomingDelete` edits
+ * `subtasks` in place, so a shared array would let one instance's delete
+ * reach into another's state.
+ */
+function cloneRows(rows: Task[]): Task[] {
+  return rows.map((t) => (t.subtasks ? { ...t, subtasks: [...t.subtasks] } : { ...t }))
+}
+
 // Nest subtasks under their parent tasks
 function nestSubtasks(tasks: Task[]): Task[] {
   const taskMap = new Map<string, Task>()
@@ -249,9 +271,21 @@ export function useSupabaseTasks() {
   // Fetch tasks. Exposed as `refetch` so an external write (e.g. the assistant
   // creating a task server-side) can force an immediate refresh, since realtime
   // is not relied upon for those.
-  const fetchTasks = useCallback(async () => {
+  const fetchTasks = useCallback(async (options?: { force?: boolean }) => {
     if (!user) {
+      tasksInFlight = null // never hand one account's rows to the next
       setTasks([])
+      setLoading(false)
+      return
+    }
+
+    const force = options?.force === true
+
+    // Ride the load another instance started a moment ago.
+    if (!force && tasksInFlight && tasksInFlight.userId === user.id) {
+      setLoading(true)
+      const shared = await tasksInFlight.promise
+      if (shared) setTasks(cloneRows(shared))
       setLoading(false)
       return
     }
@@ -259,22 +293,34 @@ export function useSupabaseTasks() {
     setLoading(true)
     setError(null)
 
-    // RLS policies handle household sharing - no need to filter by user_id.
-    const { data, error: fetchError } = await supabase
-      .from('tasks')
-      .select('*')
-      .order('created_at', { ascending: false })
+    const request = (async (): Promise<Task[] | null> => {
+      // RLS policies handle household sharing - no need to filter by user_id.
+      const { data, error: fetchError } = await supabase
+        .from('tasks')
+        .select('*')
+        .order('created_at', { ascending: false })
 
-    if (fetchError) {
-      setError(fetchError.message)
-      showToast("Couldn't load tasks — check your connection", 'error', 5000)
+      if (fetchError) {
+        setError(fetchError.message)
+        showToast("Couldn't load tasks — check your connection", 'error', 5000)
+        return null
+      }
+
+      return nestSubtasks((data as DbTask[]).map(dbTaskToTask))
+    })()
+
+    tasksInFlight = { userId: user.id, promise: request }
+    try {
+      const rows = await request
+      if (rows) setTasks(cloneRows(rows))
+    } finally {
+      if (tasksInFlight?.promise === request) tasksInFlight = null
       setLoading(false)
-      return
     }
-
-    setTasks(nestSubtasks((data as DbTask[]).map(dbTaskToTask)))
-    setLoading(false)
   }, [user])
+
+  /** An external write happened — go back to the database, ignoring the share. */
+  const refetch = useCallback(() => fetchTasks({ force: true }), [fetchTasks])
 
   // Apply an incoming write (realtime payload or same-tab announcement) to this
   // instance's state. Insert/update/delete mirror the realtime semantics:
@@ -1431,5 +1477,5 @@ export function useSupabaseTasks() {
     }
   }, [tasks])
 
-  return { tasks, loading, error, refetch: fetchTasks, addTask, addSubtask, addPrepTask, getPrepTasks, getLinkedTasks, toggleTask, toggleWaiting, deleteTask, updateTask, updateTasksBulk, updateTaskOrders, scheduleTask, pushTask, setBucket }
+  return { tasks, loading, error, refetch, addTask, addSubtask, addPrepTask, getPrepTasks, getLinkedTasks, toggleTask, toggleWaiting, deleteTask, updateTask, updateTasksBulk, updateTaskOrders, scheduleTask, pushTask, setBucket }
 }
