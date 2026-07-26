@@ -76,116 +76,176 @@ const dateOf = (s) => { const [y,m,d] = s.split('-').map(Number); return new Dat
 
 // ═══════════════════════════════════════════════════════════════════════════
 // WEEK  — edit this block each week.  `date` is the calendar date the meal is
-//          eaten. `slot` must be 'breakfast', 'lunch', or 'dinner' (the DB
-//          check constraint rejects anything else). Put quantities INLINE
-//          in `steps`.
+//          eaten (or `dates: [...]` to repeat one recipe across several days).
+//          `slot` must be 'breakfast', 'lunch', or 'dinner' (the DB check
+//          constraint rejects anything else). Put quantities INLINE in `steps`.
+//          `forMember` (optional) scopes the entry to one person — omit for a
+//          shared whole-family meal.
+//
+// Week of Sun 2026-07-26 → Sat 2026-08-01: peak summer, protein + 800g
+// challenge, one grain for everyone each night, hard-boiled eggs as the
+// standing kid backup. No Friday dinner planned.
 // ═══════════════════════════════════════════════════════════════════════════
 const WEEK = [
   {
-    date: '2026-07-04', slot: 'dinner',
-    title: 'Peanut Chicken Slaw (No-Cook)',
-    prepMinutes: 15, tags: ['dinner', 'no-cook', 'summer', 'protein'],
+    date: '2026-07-26', slot: 'dinner',
+    title: 'Grilled Pizza Night',
+    prepMinutes: 60, tags: ['dinner', 'grill', 'summer', 'crowd'],
+    notes: 'Make the dough THIS MORNING for a long cold rise. Peak Maryland peaches — the peach pizza is at its best right now.',
     ingredients: [
-      '3 cups cooked shredded chicken (1 rotisserie chicken)', '14 oz Napa cabbage or slaw blend (about 6 cups)',
-      '2 mini cucumbers, thinly sliced', '1/4 cup creamy peanut butter', '2 tbsp less-sodium soy sauce',
-      '2 tbsp rice vinegar', '1 inch fresh ginger, chopped', '1 garlic clove, chopped',
-      '1/2 cup roasted peanuts, chopped', '3 scallions, sliced', '1 pack nori snacks',
+      '3 cups whole wheat or all-purpose flour', '1 tsp active dry yeast', '1 1/4 cups warm water',
+      '2 tbsp olive oil', '1 1/2 tsp salt', '1 tsp honey, plus more for drizzling',
+      '1 cup tomato sauce', '1 lb fresh mozzarella, torn', '1 cup ricotta (optional white pizza)',
+      '2 ears sweet corn, kernels stripped', '1 pint cherry tomatoes, halved',
+      '2 ripe peaches, sliced', '4 oz prosciutto, sliced', '1 cup fresh basil leaves',
     ],
     steps: [
-      'Whisk 1/4 cup peanut butter, 2 tbsp soy sauce, 2 tbsp rice vinegar, 1 inch chopped ginger, and 1 chopped garlic clove until smooth. Add a splash of warm water if it is too thick.',
-      'Toss the 14 oz sliced cabbage and 2 sliced cucumbers with two-thirds of the dressing. Let sit 5 minutes so the cabbage softens slightly.',
-      'Add 3 cups shredded chicken and the remaining dressing. Toss, taste, and adjust.',
-      'Top with 1/2 cup chopped peanuts, 3 sliced scallions, and crumbled nori just before serving. Kid version: plain shredded chicken with noodles or rice on the side, nori snacks to try.',
+      'THIS MORNING, MAKE THE DOUGH: dissolve 1 tsp active dry yeast and 1 tsp honey in 1 1/4 cups warm water and let sit 5 minutes until foamy. Mix in 3 cups flour, 1 1/2 tsp salt, and 2 tbsp olive oil, then knead 8-10 minutes until smooth. Put it in an oiled bowl, cover, and refrigerate all day — the long cold rise gives dramatically better flavor and texture than a quick rise.',
+      'Pull the dough out of the fridge 1-2 hours before grilling and divide it in half. Heat the grill to medium-high, 400-450°F. Char the kernels from 2 ears of corn in a dry pan 3-4 minutes until spotted with black.',
+      'GRILLING METHOD: stretch one dough half and brush the top with olive oil. Lay it oiled-side down on the grill and cook 2-3 minutes until grill marks form. Flip, add the toppings quickly, close the lid, and cook 3-5 minutes until the cheese melts. Watch closely — it goes fast.',
+      'PIZZA 1, CHARRED CORN + BURST TOMATO (the crowd-pleaser): tomato sauce base, torn mozzarella, the charred corn, and a handful of halved cherry tomatoes — they burst and sauce themselves. Tear fresh basil over it the moment it comes off the grill.',
+      'PIZZA 2, GRILLED PEACH + PROSCIUTTO (the showstopper): no red sauce, just a drizzle of olive oil, then fresh mozzarella and 2 sliced ripe peaches. Add the 4 oz prosciutto AFTER grilling so it stays silky and does not overcook, then fresh basil and a drizzle of honey.',
+      'Also offer a white ricotta pizza: spread 1 cup ricotta directly on the dough instead of sauce, add mozzarella, and scatter cherry tomatoes and fresh herbs on after it comes off the grill. Kid version: corn and mozzarella pizza — they will be thrilled.',
     ],
   },
   {
-    date: '2026-07-05', slot: 'dinner',
-    title: 'Walnut Pesto Pasta Bar (Sunday Crowd)',
-    prepMinutes: 40, tags: ['dinner', 'vegetarian', 'crowd', 'summer'],
+    date: '2026-07-27', slot: 'dinner',
+    title: 'The Gold Coast Bowl',
+    prepMinutes: 25, tags: ['dinner', 'seafood', 'protein', '800g', 'summer'],
+    notes: 'Grain: quinoa. About 30g protein, ~300g toward 800g. Kid backup: hard-boiled egg.',
     ingredients: [
-      '2 lbs pasta (spaghetti, linguine, or penne)', '2 lbs zucchini, spiralized (for low-carb guests)',
-      '1 batch walnut pesto (from Saturday)', '4 plant-based sausages (Field Roast or Beyond)',
-      '2 pints cherry tomatoes, halved', '1 lb fresh mozzarella, torn', '4 ears corn, kernels stripped',
-      '1 cup fresh basil leaves', '1 cup parmesan, grated', 'Chili flakes, on the side',
-      '2 loaves crusty bread', 'PB chocolate bark (from the freezer)',
+      '1.5 lbs large shrimp, peeled and deveined', '1.5 cups quinoa, rinsed',
+      '2 ears sweet corn, kernels stripped', '1 cup cherry tomatoes, halved',
+      '2 cucumbers, thinly sliced', '2 shallots, thinly sliced', '2 limes (juice and zest)',
+      '3 tbsp olive oil', '1 tbsp neutral oil', '2 tbsp fresh cilantro, chopped',
+      '1 tsp cumin', '1 tsp smoked paprika', 'Pinch cayenne (optional, very mild)',
+      '4 hard-boiled eggs (kid backup)',
     ],
     steps: [
-      'Cook 2 lbs pasta in heavily salted boiling water until al dente. Reserve 2 cups pasta water, then toss the drained pasta with a drizzle of olive oil.',
-      'Char the kernels from 4 ears of corn in a dry skillet over high heat for 3-4 minutes, without stirring, until toasted and slightly blackened.',
-      'Sear the 4 plant-based sausages in the same skillet with a little oil, 3-4 minutes per side, then slice into rounds.',
-      'Set out the toppings bar: 2 pints halved cherry tomatoes, 1 lb torn mozzarella, the charred corn, 1 cup basil, and 1 cup parmesan. Take the walnut pesto out of the fridge 30 minutes early so it loosens.',
-      'Toss the pasta with generous pesto and a splash of pasta water. Serve alongside the 2 lbs spiralized zucchini, the sausage rounds, and all the toppings. Break the PB bark from the freezer for dessert.',
+      'Cook the quinoa: bring 1.5 cups rinsed quinoa and 3 cups water to a boil, then simmer covered 15 minutes. Fluff with a fork — it makes about 4 cups.',
+      'Crispy shallots: fry 2 thinly sliced shallots in 1 tbsp neutral oil over medium-high 5-6 minutes until golden and crisp, then drain on paper towel.',
+      'Char the kernels from 2 ears of corn in a dry hot skillet 3-4 minutes until spotted with black. Set aside.',
+      'Pat the 1.5 lbs shrimp dry and season with 1 tsp cumin, 1 tsp smoked paprika, a pinch of cayenne, and salt. Heat oil in a skillet over high heat and sear the shrimp 1-2 minutes per side until pink and curled. Do not overcrowd the pan.',
+      'Dressing: whisk the juice and zest of 2 limes with 3 tbsp olive oil, 2 tbsp chopped cilantro, salt, and pepper.',
+      'Build the bowls: a quinoa base for everyone, then corn, tomatoes, cucumber, shrimp, crispy shallots, and the dressing drizzled over. Kid version: the same quinoa, corn, and shrimp with the dressing on the side or skipped entirely — very familiar components. Hard-boiled egg alongside for any skeptics.',
     ],
   },
   {
-    date: '2026-07-06', slot: 'dinner',
-    title: 'Sesame Tofu Bowl with Pearl Barley',
-    prepMinutes: 30, tags: ['dinner', 'vegetarian', 'stovetop', 'protein'],
+    date: '2026-07-28', slot: 'dinner',
+    title: 'The Golden Hour Farro Bowl',
+    prepMinutes: 30, tags: ['dinner', 'vegetarian', '800g', 'summer'],
+    notes: 'New grain: farro. About 23g protein, ~280g toward 800g. The ONLY feta night this week — use the whole block.',
     ingredients: [
-      '14 oz firm tofu, pressed and cubed', '3 tbsp soy sauce', '1 tbsp sesame oil', '1 tbsp rice vinegar',
-      '1 tsp honey', '1 tsp cornstarch', '2 garlic cloves, minced', '1 tsp fresh ginger, grated',
-      '2 tbsp neutral oil', '3 cups cooked barley (from the batch)', '2 cups cucumber, sliced',
-      '2 scallions, sliced', '1 tbsp sesame seeds', '2 tbsp fresh mint or parsley, torn',
+      '1.5 cups farro, rinsed', '1 can (15 oz) chickpeas, drained and patted very dry',
+      '2 cups cherry tomatoes', '4 oz good feta', '3 tbsp olive oil, divided',
+      '1 tbsp good honey', '1/2 cup fresh basil, torn', '1 lemon, juiced',
+      '4 hard-boiled eggs (kid backup)',
     ],
     steps: [
-      'Press the 14 oz tofu at least 20 minutes and pat completely dry. Whisk 3 tbsp soy sauce, 1 tbsp sesame oil, 1 tbsp rice vinegar, 1 tsp honey, 1 tsp cornstarch, and 2 tbsp water for the sauce.',
-      'Heat 2 tbsp oil in a large skillet over high heat. Add the tofu in a single layer and cook 3-4 minutes without moving until golden, then flip and cook 3 minutes more. Remove.',
-      'Lower to medium. Add 2 minced garlic cloves and 1 tsp grated ginger, stir 30 seconds, then pour in the sauce (it bubbles immediately). Return the tofu and toss 1-2 minutes to coat.',
-      'Serve over 3 cups reheated barley. Top with 2 cups sliced cucumber, 2 sliced scallions, 1 tbsp sesame seeds, and 2 tbsp torn herbs.',
+      'Simmer 1.5 cups rinsed farro in salted water 25-30 minutes until tender but still chewy, then drain. Farro is an ancient Italian grain with a gorgeous nutty chew — completely different from rice or pasta.',
+      'Crispy chickpeas: pat 1 can of chickpeas completely dry. Heat 1 tbsp olive oil in a skillet over medium-high, add the chickpeas, and cook 10-12 minutes, shaking the pan often, until golden and crispy. Season with salt.',
+      'Burst tomatoes: in the same skillet add another 1 tbsp olive oil and 2 cups cherry tomatoes. Cook over medium heat 5-7 minutes without stirring too much, until they burst and release their juices. Season generously.',
+      'Whipped feta: blend all 4 oz feta with the remaining 1 tbsp olive oil and a squeeze of lemon in a food processor until completely silky smooth — a splash of water helps loosen it. Spread it into a bowl, make a well in the center, and drizzle with olive oil.',
+      'Build the bowls: farro base, then the burst tomatoes and all their juices, the crispy chickpeas, a generous spoonful of whipped feta, basil torn over the top, and a drizzle of 1 tbsp honey.',
+      'Kid version: plain farro with chickpeas and tomatoes on the side, skipping the whipped feta — the honey drizzle on their bowl often gets them in. Hard-boiled egg alongside.',
     ],
   },
   {
-    date: '2026-07-07', slot: 'dinner',
-    title: 'Chicken Sausage + Summer Veg Skillet over Barley',
-    prepMinutes: 25, tags: ['dinner', 'stovetop', 'protein', '800g'],
+    date: '2026-07-29', slot: 'dinner',
+    title: 'Peak Summer Sheet Pan Salmon',
+    prepMinutes: 35, tags: ['dinner', 'seafood', 'protein', 'sheet-pan', '800g'],
+    notes: 'Highest protein night, about 34g, ~320g toward 800g. Make extra — cold flaked salmon over arugula is Iris’s 2-minute dinner after track.',
     ingredients: [
-      '4 chicken sausages (clean ingredients)', '1 lb green beans, trimmed', '2 ears corn, kernels stripped',
-      '1 cup cherry tomatoes', '3 garlic cloves, sliced', '1 lemon, zested and juiced', '2 tbsp olive oil',
-      '2 tbsp fresh parsley or basil, chopped', '3 cups cooked barley (from the batch)',
+      '4 salmon fillets (6 oz each)', '1 lb green beans, trimmed',
+      '2 ears corn, kernels stripped (or left on the cob for the kids)',
+      '1.5 lbs new potatoes, halved', '3 garlic cloves, minced', '2 lemons',
+      '3 tbsp olive oil', 'Fresh dill or parsley', 'Arugula and fresh mozzarella (for Iris after track)',
+      '4 hard-boiled eggs (kid backup)',
     ],
     steps: [
-      'Heat 2 tbsp olive oil in a large skillet over medium-high. Brown the 4 whole chicken sausages 4-5 minutes, turning, then remove and slice into rounds.',
-      'In the same skillet add 3 sliced garlic cloves for 1 minute, then 1 lb green beans (3-4 minutes), the kernels from 2 ears of corn (2 minutes), and 1 cup cherry tomatoes (1-2 minutes) until the tomatoes just start to burst.',
-      'Return the sausage, add the zest and juice of 1 lemon, and toss everything together. Season with salt and pepper.',
-      'Scatter 2 tbsp chopped herbs over the top and serve over 3 cups reheated barley.',
+      'Heat the oven to 425°F. Toss 1.5 lbs halved new potatoes with 1 tbsp olive oil, salt, and pepper, then roast 15 minutes.',
+      'Add 1 lb trimmed green beans and the kernels from 2 ears of corn to the pan, toss with oil, and roast 5 more minutes. Leave the corn on the cob instead if the kids prefer it that way.',
+      'Pat the 4 salmon fillets dry and rub with the remaining 2 tbsp olive oil, 3 minced garlic cloves, salt, and pepper. Nestle them onto the pan and top with slices from 1 lemon.',
+      'Roast 12-15 minutes until the salmon flakes easily. Pull it slightly underdone — carryover heat finishes it.',
+      'Squeeze the second lemon over everything and scatter fresh dill or parsley on top. Kid version: plain salmon, new potatoes, and corn on the cob, all naturally separated on the pan.',
+      'FOR IRIS AFTER TRACK: flake cold leftover salmon over arugula, squeeze lemon over it, and drizzle with olive oil. Two minutes and it tastes like a restaurant. Bring fresh mozzarella alongside.',
     ],
   },
   {
-    date: '2026-07-08', slot: 'dinner',
-    title: 'White Bean + Peak Tomato Skillet over Barley',
-    prepMinutes: 15, tags: ['dinner', 'vegetarian', 'no-heat', '800g'],
+    date: '2026-07-30', slot: 'dinner',
+    title: 'Tokyo Summer Tofu Bowl',
+    prepMinutes: 30, tags: ['dinner', 'vegetarian', 'protein', '800g', 'summer'],
+    notes: 'Grain: couscous (5 minutes). About 26g protein, ~300g toward 800g. CHECK MISO STOCK BEFORE SHOPPING — it is the key ingredient for the glaze.',
     ingredients: [
-      '2 cans (15 oz) white beans, drained and rinsed', '1.5 lbs peak summer tomatoes, chopped',
-      '4 garlic cloves, thinly sliced', '3 tbsp olive oil', '1/2 cup fresh basil, torn',
-      '2 tbsp fresh parsley, chopped', '1 lemon, juiced', '1/2 cup parmesan, grated (optional)',
-      '3 cups cooked barley (from the batch)',
+      '14 oz firm tofu, pressed 20+ minutes and cubed', '1.5 cups couscous',
+      '1.5 cups vegetable stock', '1 cup shelled edamame (frozen, thawed)',
+      '2 ears corn, kernels stripped', '2 cucumbers, thinly sliced',
+      '8 oz fresh mozzarella, torn', '2 tbsp white or yellow miso paste',
+      '2 tbsp soy sauce', '3 tbsp sesame oil', '2 tbsp honey',
+      '3 tbsp rice vinegar', '1 tsp fresh ginger, grated', '2 tbsp neutral oil',
+      '4 hard-boiled eggs (kid backup)',
     ],
     steps: [
-      'Heat 3 tbsp olive oil in a large skillet over medium. Add 4 sliced garlic cloves and cook gently 2 minutes until fragrant and just golden — do not let it burn.',
-      'Add 1.5 lbs chopped tomatoes and 2 cans drained white beans. Toss gently and cook 4-5 minutes until the tomatoes soften and release their juices. Season generously.',
-      'Off the heat, squeeze in the juice of 1 lemon and fold in 1/2 cup basil and 2 tbsp parsley.',
-      'Serve over 3 cups reheated barley, scattered with 1/2 cup parmesan if using. Red pepper flakes on the side for the adults.',
+      'Couscous: pour 1.5 cups boiling vegetable stock over 1.5 cups couscous in a bowl, cover 5 minutes, and fluff with a fork. Char the kernels from 2 ears of corn in a dry hot skillet 3-4 minutes and set aside.',
+      'MISO-SESAME GLAZE: whisk 2 tbsp miso paste, 1 tbsp soy sauce, 1 tbsp sesame oil, 1 tbsp honey, 1 tsp rice vinegar, and a splash of water to loosen.',
+      'SESAME-GINGER DRESSING: whisk 2 tbsp sesame oil, 2 tbsp rice vinegar, 1 tsp grated fresh ginger, 1 tsp honey, 1 tbsp soy sauce, and salt to taste.',
+      'Crispy tofu: press the 14 oz tofu completely dry. Heat 2 tbsp neutral oil in a wok over high heat and cook the tofu in a single layer without moving it 3-4 minutes until golden, then flip and cook 3 more minutes. Remove from the pan.',
+      'Reduce the heat and add the miso-sesame glaze to the pan — it will bubble immediately. Return the tofu and toss 1-2 minutes to coat.',
+      'Build the bowls: couscous, then 1 cup edamame, the charred corn, 2 sliced cucumbers, the glazed tofu, 8 oz torn mozzarella, and the sesame-ginger dressing drizzled over. Kid version: plain couscous with tofu, corn, and edamame, no dressing needed, torn mozzarella on the side — always popular.',
     ],
   },
   {
-    date: '2026-07-09', slot: 'dinner',
-    title: 'Mozzarella on Toast + Israeli Salad (CSA Night)',
-    prepMinutes: 20, tags: ['dinner', 'no-cook', 'summer', 'csa'],
+    date: '2026-08-01', slot: 'dinner',
+    title: 'Summer Saturday Feast: Corn Chowder + Caprese Chickpea Salad',
+    prepMinutes: 45, tags: ['dinner', 'vegetarian', 'crowd', '800g', 'summer'],
+    notes: 'Grain: potatoes. About 20g+ protein and ~380g toward 800g — the highest 800g night of the week. Celebratory; crusty bread for the table.',
     ingredients: [
-      '3 cucumbers, very finely diced', '3 tomatoes, very finely diced', '1/4 cup fresh parsley, chopped',
-      '2 tbsp fresh mint, chopped', '1 lemon, juiced (salad)', '2 tbsp olive oil (salad)',
-      '1 loaf sourdough or ciabatta, thickly sliced', '1 lb fresh mozzarella, sliced',
-      '2 large tomatoes, sliced', '3 tbsp olive oil (toast)', '1 cup fresh basil leaves',
-      'Flaky salt and black pepper',
+      '4 ears sweet corn (save the cobs for the stock)', '1.5 lbs new potatoes, diced',
+      '1 onion, diced', '3 garlic cloves, minced', '3 cups vegetable stock',
+      '1 cup milk or cream', '2 tbsp butter', '2 tbsp fresh chives or parsley',
+      '2 cans (15 oz) chickpeas, drained', '2 lbs peak summer tomatoes, roughly chopped',
+      '1 lb fresh mozzarella, torn', '1/2 cup fresh basil, torn', '3 tbsp good olive oil',
+      '1 tbsp balsamic (optional)', '2 loaves crusty bread',
     ],
     steps: [
-      'ISRAELI SALAD: Combine 3 finely diced cucumbers, 3 finely diced tomatoes, 1/4 cup parsley, and 2 tbsp mint. Dress with the juice of 1 lemon, 2 tbsp olive oil, and a generous pinch of salt. Toss and marinate at least 15 minutes — the uniform 1/4-inch dice is what makes it.',
-      'Toast the sliced 1 loaf of sourdough in a dry pan or toaster until lightly golden. Rub with a cut garlic clove while hot if you like.',
-      'Layer the 2 sliced tomatoes and 1 lb sliced mozzarella on the toast. Drizzle with 3 tbsp olive oil, scatter 1 cup basil, and finish with flaky salt and cracked black pepper.',
-      'Serve the mozzarella toast alongside the Israeli salad.',
+      'CORN CHOWDER: melt 2 tbsp butter in a large pot over medium heat. Add 1 diced onion and cook 5 minutes, then 3 minced garlic cloves for 1 minute more.',
+      'Add the kernels from 4 ears of corn (reserve 1/2 cup for texture), 1.5 lbs diced new potatoes, 3 cups vegetable stock, and the stripped corn cobs — the cobs deepen the flavor. Simmer 20 minutes until the potatoes are tender.',
+      'Remove the corn cobs. Blend about half the soup smooth with an immersion blender, then stir in the reserved 1/2 cup corn kernels and 1 cup milk or cream. Simmer 5 minutes, season generously, and scatter 2 tbsp chives or parsley over the top.',
+      'CAPRESE CHICKPEA SALAD: combine 2 cans drained chickpeas, 2 lbs roughly chopped summer tomatoes, and 1 lb torn fresh mozzarella. Season generously.',
+      'Add 3 tbsp olive oil and 1 tbsp balsamic if using, then scatter 1/2 cup torn basil over the top. Let it sit 10-15 minutes before serving so the tomatoes release their juices.',
+      'Serve the chowder and the salad together with crusty bread for the table. Kid version: corn chowder is universally beloved by children and the potatoes are a proven hit — offer just the mozzarella and bread if they resist the chickpeas. To boost protein, add chicken on the side or stir a can of white beans into the chowder.',
+    ],
+  },
+  {
+    // Iris's work lunches — made Sunday alongside the pizza prep, packed Mon-Fri.
+    dates: ['2026-07-27', '2026-07-28', '2026-07-29', '2026-07-30', '2026-07-31'],
+    slot: 'lunch', forMember: 'Iris',
+    title: 'Classic Tabbouleh (Iris’s Lunches)',
+    prepMinutes: 25, tags: ['lunch', 'make-ahead', 'vegetarian', 'summer'],
+    notes: 'Made Sunday, keeps beautifully all week. Pack with 1-2 pieces of pre-cooked chicken and a hard-boiled egg for about 35g protein.',
+    ingredients: [
+      '1 cup fine bulgur', '2 cups fresh parsley, very finely chopped',
+      '2 peak summer tomatoes, very finely diced', '2 cucumbers, very finely diced',
+      '3 lemons, juiced', '4 tbsp good olive oil', 'Salt',
+      'Pre-cooked chicken (to pack each day)', 'Hard-boiled eggs (to pack each day)',
+    ],
+    steps: [
+      'MAKE THIS SUNDAY alongside the pizza prep — it keeps beautifully all week and actually tastes better on day 2 and day 3.',
+      'Pour 1 cup boiling water over 1 cup fine bulgur, cover 15-20 minutes until tender, then fluff and let it cool completely.',
+      'Combine the cooled bulgur with 2 cups very finely chopped parsley, 2 very finely diced tomatoes, and 2 very finely diced cucumbers.',
+      'Dress with the juice of 3 lemons, 4 tbsp olive oil, and salt, then toss well and refrigerate. The parsley should be the majority of the salad, not the bulgur — more herb than grain is what makes it a proper tabbouleh.',
+      'TO PACK EACH DAY: a large scoop of tabbouleh, 1-2 pieces of pre-cooked chicken, and 1 hard-boiled egg. About 35g protein — a very complete lunch.',
     ],
   },
 ]
+
+// family_members on the household account (bace953e), for `forMember` above.
+const MEMBER_IDS = {
+  Scott: '4fd6259b-2246-4304-96c3-d93a12fd43ae',
+  Iris: '698227a4-1a01-43f0-b218-5c1307cf33ce',
+  Ella: 'cad5a788-e424-4b50-b7e8-fb35c4f11972',
+  Kaleb: 'aa264b2e-c4ee-44a8-be07-9c0cbdaa7277',
+}
 
 // ── upsert helpers ─────────────────────────────────────────────────────────
 async function upsertRecipe(meal) {
@@ -216,27 +276,36 @@ async function getOrCreatePlan(weekStartIso) {
   return data.id
 }
 
-async function upsertEntry(planId, dayOfWeek, slot, recipeId) {
-  // idempotent: clear this (plan, day, slot) cell first
-  await db.from('meal_plan_entries').delete()
+async function upsertEntry(planId, dayOfWeek, slot, recipeId, forMemberId, notes) {
+  // Idempotent, and SCOPE-AWARE: a shared meal only replaces the shared entry
+  // (for_member_id IS NULL) and a per-person meal only replaces that person's
+  // — so seeding a lunch for Iris never wipes the family's meal in the same cell.
+  const clear = db.from('meal_plan_entries').delete()
     .eq('meal_plan_id', planId).eq('day_of_week', dayOfWeek).eq('slot', slot)
+  await (forMemberId ? clear.eq('for_member_id', forMemberId) : clear.is('for_member_id', null))
   const { error } = await db.from('meal_plan_entries').insert({
     meal_plan_id: planId, day_of_week: dayOfWeek, slot, recipe_id: recipeId,
+    for_member_id: forMemberId ?? null, notes: notes ?? null,
   })
   if (error) throw error
 }
 
 // ── run ─────────────────────────────────────────────────────────────────────
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-console.log(`Seeding ${WEEK.length} meals for ${USER_ID}\n`)
+console.log(`Seeding ${WEEK.length} recipes for ${USER_ID}\n`)
 for (const meal of WEEK) {
-  const d = dateOf(meal.date)
-  const dow = d.getDay()
-  const weekStart = iso(sundayOfWeek(d))
+  const forMemberId = meal.forMember ? MEMBER_IDS[meal.forMember] : null
+  if (meal.forMember && !forMemberId) throw new Error(`Unknown forMember: ${meal.forMember}`)
   const recipeId = await upsertRecipe(meal)
-  const planId = await getOrCreatePlan(weekStart)
-  await upsertEntry(planId, dow, meal.slot, recipeId)
-  console.log(`  ${DAYS[dow]} ${meal.date}  [${meal.slot}]  ${meal.title}`)
-  console.log(`     → plan week_start=${weekStart}  day_of_week=${dow}  recipe=${recipeId}`)
+  const who = meal.forMember ? ` for ${meal.forMember}` : ''
+  console.log(`  ${meal.title}${who}  → recipe=${recipeId}`)
+  for (const date of meal.dates ?? [meal.date]) {
+    const d = dateOf(date)
+    const dow = d.getDay()
+    const weekStart = iso(sundayOfWeek(d))
+    const planId = await getOrCreatePlan(weekStart)
+    await upsertEntry(planId, dow, meal.slot, recipeId, forMemberId, meal.notes)
+    console.log(`     ${DAYS[dow]} ${date}  [${meal.slot}]  plan week_start=${weekStart} day_of_week=${dow}`)
+  }
 }
 console.log('\nDone. The wall picks these up automatically (useMealEventsForDate force:true).')
