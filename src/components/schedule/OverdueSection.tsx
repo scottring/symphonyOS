@@ -70,13 +70,42 @@ export function OverdueSection({
   const isMobile = useMobile()
   const [expanded, setExpanded] = useState(false)
 
-  // Sort: incomplete first (oldest at top), then completed at bottom
-  const sortedTasks = useMemo(() => [...tasks].sort((a, b) => {
-    if (a.completed !== b.completed) return a.completed ? 1 : -1
-    const dateA = a.scheduledFor ? new Date(a.scheduledFor).getTime() : 0
-    const dateB = b.scheduledFor ? new Date(b.scheduledFor).getTime() : 0
-    return dateA - dateB
-  }), [tasks])
+  // Sort: incomplete first (oldest at top), then completed at bottom — and then
+  // pull every child up to sit directly beneath its own parent.
+  //
+  // The date sort alone scattered children away from their parents, while a row
+  // is indented whenever its parent is anywhere in this list. The result read as
+  // a false parent/child relationship: four yard subtasks rendered nested under
+  // an unrelated "Pay Camp Notre Dame final session payment", which itself
+  // showed 1/1. Adjacency is what the indentation is claiming, so adjacency is
+  // what it has to have — the same rule grouping.ts applies to the day sections.
+  const sortedTasks = useMemo(() => {
+    const base = [...tasks].sort((a, b) => {
+      if (a.completed !== b.completed) return a.completed ? 1 : -1
+      const dateA = a.scheduledFor ? new Date(a.scheduledFor).getTime() : 0
+      const dateB = b.scheduledFor ? new Date(b.scheduledFor).getTime() : 0
+      return dateA - dateB
+    })
+
+    const present = new Set(base.map((t) => t.id))
+    const childrenOf = new Map<string, typeof base>()
+    for (const t of base) {
+      if (!t.parentTaskId || !present.has(t.parentTaskId)) continue
+      const arr = childrenOf.get(t.parentTaskId) ?? []
+      arr.push(t)
+      childrenOf.set(t.parentTaskId, arr)
+    }
+    if (childrenOf.size === 0) return base
+
+    const claimed = new Set([...childrenOf.values()].flat().map((t) => t.id))
+    const out: typeof base = []
+    for (const t of base) {
+      if (claimed.has(t.id)) continue // emitted directly under its parent
+      out.push(t)
+      for (const child of childrenOf.get(t.id) ?? []) out.push(child)
+    }
+    return out
+  }, [tasks])
 
   if (tasks.length === 0) return null
 
