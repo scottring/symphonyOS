@@ -20,7 +20,7 @@ import { LoadingFallback } from '@/components/layout/LoadingFallback';
 import { isEverydayRoutine, scheduleRoutineOnDate } from '@/lib/routineUtils';
 import type { PlanningHorizon } from '@/hooks/usePlanningSession';
 import { parseRoutineTimelineId } from '@/lib/today/doseExpansion';
-import { groupItems } from '@/lib/today/groupTasks';
+import { groupItems, addToGroup, removeFromGroup } from '@/lib/today/groupTasks';
 import { useConvertTaskToProject } from '@/hooks/useConvertTaskToProject';
 import { parseQuickInput } from '@/lib/quickInputParser';
 import type { ParserContext } from '@/lib/quickInputParser';
@@ -51,7 +51,7 @@ import { useMealEventsForDate } from '@/shell/providers/MealEventsProvider';
 
 export function HomeViewContainer() {
   // Data hooks
-  const { tasks, loading: tasksLoading, addTask, toggleTask, toggleWaiting, deleteTask, updateTask, pushTask, getLinkedTasks, refetch } = useSupabaseTasks();
+  const { tasks, loading: tasksLoading, addTask, toggleTask, toggleWaiting, deleteTask, updateTask, pushTask, getLinkedTasks, refetch, updateTaskOrders } = useSupabaseTasks();
   const { isConnected, events, fetchEvents, isFetching: eventsFetching, updateEvent, createEvent, deleteEvent, removeEventLocal, restoreEventLocal } = useGoogleCalendar();
   // Passing the visible event ids opts in to auto-loading notes (context
   // overrides, assignees, shared-with-family) + realtime — without it those
@@ -441,6 +441,42 @@ export function HomeViewContainer() {
     [addTask, updateTask, refetch],
   );
 
+  // Add members to a group that already exists (Today's drag-onto-a-group).
+  // `existingMemberRefs` is read HERE, from the live task list, rather than
+  // threaded down from the drag layer — addToGroup cannot defend itself against
+  // a stale array, and a stale one silently drops every member it doesn't see
+  // (Stage 2a residual 4).
+  const handleAddToGroup = useCallback(
+    async (
+      wrapperId: string,
+      taskIds: string[],
+      memberRefs: import('@/types/task').GroupMemberRef[],
+      date: Date,
+      isAllDay: boolean,
+    ) => {
+      const wrapper = tasks.find((t) => t.id === wrapperId);
+      await addToGroup(
+        {
+          wrapperId,
+          taskIds,
+          memberRefs,
+          existingMemberRefs: wrapper?.groupMembers ?? [],
+          date,
+          isAllDay,
+        },
+        { addTask, updateTask, refetch },
+      );
+    },
+    [tasks, addTask, updateTask, refetch],
+  );
+
+  const handleRemoveFromGroup = useCallback(
+    async (taskId: string) => {
+      await removeFromGroup(taskId, { updateTask, refetch });
+    },
+    [updateTask, refetch],
+  );
+
   // Optimistic event delete: drop from the local cache immediately, restore
   // on failure. Google keeps deleted events in calendar trash (~30 days), so
   // a confirmed delete is still recoverable from the Calendar web UI.
@@ -499,6 +535,9 @@ export function HomeViewContainer() {
       onCreateRoutineAt,
       onCreateFollowUp: handleCreateFollowUp,
       onGroupItems: handleGroupItems,
+      onAddToGroup: handleAddToGroup,
+      onRemoveFromGroup: handleRemoveFromGroup,
+      onReorderTasks: updateTaskOrders,
       onOpenTask: (taskId: string) => setSelection({ kind: 'task', id: taskId }),
       onOpenProject: (projectId: string) => navigate(`/projects/${projectId}`),
 
@@ -552,7 +591,7 @@ export function HomeViewContainer() {
       onUpdateEventProject: updateEventProject,
     }),
     [
-      toggleTask, toggleWaiting, updateTask, pushTask, deleteTask, onCreateTaskFromValue, onCreateTaskParsed, parserContext, currentDomain, resolverContext, getRecentTaskForContact, onCreateTaskAt, onCreateEventAt, onCreateRoutineAt, handleCreateFollowUp, handleGroupItems,
+      toggleTask, toggleWaiting, updateTask, pushTask, deleteTask, onCreateTaskFromValue, onCreateTaskParsed, parserContext, currentDomain, resolverContext, getRecentTaskForContact, onCreateTaskAt, onCreateEventAt, onCreateRoutineAt, handleCreateFollowUp, handleGroupItems, handleAddToGroup, handleRemoveFromGroup, updateTaskOrders,
       setSelection, navigate,
       scheduleActions, updateRoutine, updateEventContext, updateEventSharedWithFamily, dismissShareNudge, hideEvent, handleDeleteEvent,
       contactsMap, projectsMap, projects, contacts, familyMembers, lists, listsByCategory,

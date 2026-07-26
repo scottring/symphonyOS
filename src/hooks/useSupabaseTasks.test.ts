@@ -63,6 +63,11 @@ const mockUpsert = vi.fn()
 // pair: (payload, filter field, filter value).
 const mockUpdateEq = vi.fn()
 
+// supabase-js normally RESOLVES `{ error }`, but a transport failure can reject
+// the promise outright. Set this to make the next update() reject, so the
+// rollback path for that case is actually exercised (Stage 2a residual 2).
+let mockRejection: Error | null = null
+
 // The `tasks` columns that are NOT NULL with no DEFAULT. Postgres rejects any
 // proposed tuple missing them — including the tuple PostgREST builds for an
 // `INSERT … ON CONFLICT DO UPDATE`, which it validates BEFORE probing for the
@@ -159,6 +164,17 @@ vi.mock('@/lib/supabase', () => ({
             mockUpdateEq(data, field, value)
             const updated = mockSupabaseData.length ? [mockSupabaseData[0]] : [{}]
             const error = violation ?? mockError
+            if (mockRejection) {
+              const rejection = mockRejection
+              return {
+                select: () => Promise.reject(rejection),
+                then: (
+                  _resolve: (v: { error: typeof mockError }) => unknown,
+                  reject?: (e: unknown) => unknown,
+                ) => (reject ? reject(rejection) : undefined),
+                catch: (reject: (e: unknown) => unknown) => reject(rejection),
+              }
+            }
             return {
               select: () => Promise.resolve({ data: updated, error, status: 200, count: updated.length }),
               then: (resolve: (v: { error: typeof mockError }) => unknown) =>
@@ -214,6 +230,7 @@ describe('useSupabaseTasks', () => {
     vi.clearAllMocks()
     mockSupabaseData.length = 0
     mockError = null
+    mockRejection = null
     mockAuthUser = mockUser
     resetIdCounter()
   })
@@ -827,6 +844,21 @@ describe('useSupabaseTasks', () => {
         ok = await result.current.updateTaskOrders([{ id: 't1', sortOrder: 0 }])
       })
       expect(ok).toBe(true)
+    })
+
+    it('rolls back and reports when a query REJECTS rather than resolving', async () => {
+      // Stage 2a residual 2: Promise.all had no catch. supabase-js normally
+      // resolves { error }, but a rejection would escape with the optimistic
+      // order still applied — the list would show an order the database never
+      // took, and no toast would say so.
+      mockRejection = new Error('network')
+      const { result } = renderHook(() => useSupabaseTasks())
+      await waitFor(() => expect(result.current.loading).toBe(false))
+      let ok: boolean | undefined
+      await act(async () => {
+        ok = await result.current.updateTaskOrders([{ id: 't1', sortOrder: 500 }])
+      })
+      expect(ok).toBe(false)
     })
 
     it('updateTaskOrders is a no-op for an empty list', async () => {

@@ -34,6 +34,20 @@ export interface ScheduleActionsValue {
     date: Date,
     isAllDay: boolean,
   ) => Promise<void>
+  /** Persist a reorder: a different sort_order per row, one round trip. */
+  onReorderTasks?: (
+    writes: import('@/lib/today/taskOrdering').OrderWrite[],
+  ) => Promise<boolean>
+  /** Add members to a group that already exists (drag a card onto a group). */
+  onAddToGroup?: (
+    wrapperId: string,
+    taskIds: string[],
+    memberRefs: import('@/types/task').GroupMemberRef[],
+    date: Date,
+    isAllDay: boolean,
+  ) => Promise<void>
+  /** Detach one task from its group; it keeps its own schedule. */
+  onRemoveFromGroup?: (taskId: string) => Promise<void>
   /** Show a transient toast (e.g. skip-report for bulk actions). Wired to App's toast. */
   onNotify?: (message: string) => void
   onCreateFollowUp?: (title: string, sourceTaskId: string) => void

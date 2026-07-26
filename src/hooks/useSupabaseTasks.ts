@@ -1166,13 +1166,30 @@ export function useSupabaseTasks() {
 
     apply(byId)
 
-    // One narrow UPDATE per row, in flight together. Every result is inspected
-    // — a partial failure must roll the whole move back, not leave the list
-    // half-persisted.
-    const results = await Promise.all(
-      writes.map((w) =>
-        supabase.from('tasks').update({ sort_order: w.sortOrder }).eq('id', w.id))
-    )
+    // One narrow UPDATE per row, in flight together.
+    //
+    // Every result is inspected — a partial failure rolls back THE LOCAL LIST.
+    // The database is genuinely half-written in that case, and local state
+    // re-diverges when the realtime echo for the succeeded rows lands. That is
+    // self-healing toward DB truth, and the common path is a single write, so
+    // it is acceptable — but the rollback's reach is local, not global.
+    //
+    // The try/catch is not decoration: supabase-js normally RESOLVES { error },
+    // but a transport failure rejects. Without this the rejection escaped with
+    // the optimistic order still applied, so the list showed an order the
+    // database never took and nothing said so.
+    let results: { error: unknown }[]
+    try {
+      results = await Promise.all(
+        writes.map((w) =>
+          supabase.from('tasks').update({ sort_order: w.sortOrder }).eq('id', w.id))
+      )
+    } catch (err) {
+      apply(previous)
+      showToast("Couldn't save the new order", 'warning')
+      logger.error('[updateTaskOrders] rejected:', err)
+      return false
+    }
     const failure = results.find((r) => r.error)?.error
 
     if (failure) {
