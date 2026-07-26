@@ -106,3 +106,51 @@ export function buildCollectionItem(
     collectionSteps,
   }
 }
+
+/**
+ * Count routines the way the timeline draws them, for the Today progress band.
+ *
+ * The scoreboard ("N of M done") is only honest if M is the number of routine
+ * ROWS on screen. A flat `routines.length` is a different population entirely:
+ * a collection is one row but many rows in the table, a dosed routine is many
+ * rows but one row in the table, and a step whose parent isn't on today renders
+ * nowhere at all. This mirrors buildGroupedSections' partition exactly — same
+ * `match` filter, same groupRoutineSteps split, same per-dose expansion, same
+ * collection completion rule — so the two can't drift.
+ *
+ * Resolved-but-not-done (skipped) units leave the pool rather than counting as
+ * wins: skipping is how you take work off the day, and a skipped routine left in
+ * the denominator would keep the bar from ever reaching 100%. This is the same
+ * rule buildCollectionItem already applies to a collection's own doses.
+ */
+export function countRoutineUnits(
+  routines: Routine[],
+  viewedDate: Date,
+  routineStatusMap: Map<string, ActionableInstance>,
+  match: (assignedTo: string | null | undefined, assignedToAll?: readonly string[] | null) => boolean,
+): { actionable: number; completed: number } {
+  const matched = routines.filter((r) => match(r.assigned_to, r.assigned_to_all))
+  const { collections, standalone } = groupRoutineSteps(matched)
+
+  let actionable = 0
+  let completed = 0
+
+  for (const routine of standalone) {
+    for (const dose of expandRoutineDoses(routine)) {
+      const status = routineStatusMap.get(routineStatusKey(routine.id, dose.slotIndex))?.status
+      if (status === 'skipped') continue // resolved — off the day, not a win
+      actionable += 1
+      if (status === 'completed') completed += 1
+    }
+  }
+
+  for (const collection of collections) {
+    const item = buildCollectionItem(collection, viewedDate, routineStatusMap)
+    // A collection with no steps applicable today draws nothing.
+    if ((item.collectionProgress?.total ?? 0) === 0) continue
+    actionable += 1
+    if (item.completed) completed += 1
+  }
+
+  return { actionable, completed }
+}

@@ -4,6 +4,7 @@ import { makeAssigneeFilter } from './assigneeFilter'
 import { selectOverdue, selectInbox, selectWeek, selectMonth, selectCompletedInbox, selectTimed } from './taskPools'
 import { buildRoutineStatusMap, buildEventStatusMap, selectVisibleRoutines } from './statusMaps'
 import { buildGroupedSections } from './grouping'
+import { countRoutineUnits } from './routineCollections'
 
 function computeIsToday(viewedDate: Date): boolean {
   const today = new Date()
@@ -76,13 +77,18 @@ export function computeTodayData(input: TodayDataInput): TodayData {
     getDomainForCalendar: input.getDomainForCalendar,
   })
 
-  // Counts — port TodaySchedule ~968-975 exactly.
+  // Counts. The denominator has to be the actionable rows the user can see, or
+  // the progress band reports on a day that isn't on screen: a flat routine
+  // count double-counts collection steps, invents rows for steps whose parent
+  // isn't on today, and misses a dosed routine's extra slots. countRoutineUnits
+  // mirrors the grouping above. Tasks use the FULL pools, not the linger-filtered
+  // display ones, so the numbers don't jump when a completed row fades out.
+  const routineUnits = countRoutineUnits(visibleRoutines, input.viewedDate, routineStatusMap, match)
   const completedTasks = timedTasks.filter((t) => t.completed).length
-  const completedRoutines = visibleRoutines.filter((r) => routineStatusMap.get(r.id)?.status === 'completed').length
   const completedOverdue = overdueTasks.filter((t) => t.completed).length
-  const completedCount = completedTasks + completedRoutines + completedOverdue
+  const completedCount = completedTasks + routineUnits.completed + completedOverdue
   const incompleteOverdue = overdueTasks.filter((t) => !t.completed).length
-  const actionableCount = timedTasks.length + visibleRoutines.length + incompleteOverdue + completedOverdue
+  const actionableCount = timedTasks.length + routineUnits.actionable + incompleteOverdue + completedOverdue
   const totalItems = timedTasks.length + filteredEvents.length + visibleRoutines.length + inboxTasks.length + overdueTasks.length
   const progressPercent = actionableCount > 0 ? (completedCount / actionableCount) * 100 : 0
 

@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { computeTodayData } from './computeTodayData'
 import type { TodayDataInput } from './types'
 import type { Task } from '@/types/task'
+import type { ActionableInstance, ActionableStatus, Routine } from '@/types/actionable'
 
 function task(p: Partial<Task>): Task {
   return { id: 'id', title: 't', completed: false, bucket: 'timed', scheduledFor: null, assignedTo: null,
@@ -123,5 +124,114 @@ describe('computeTodayData', () => {
     const past = computeTodayData(baseInput({ tasks: [w, i], viewedDate: new Date('2020-01-01') }))
     expect(past.weekTasks).toEqual([])
     expect(past.inboxTasks).toEqual([])
+  })
+})
+
+// ── Progress counts must describe the timeline the user is actually looking at ──
+// The Today header ("N of M done") is the day's scoreboard. Its M has to be the
+// number of actionable ROWS on screen; anything else makes the bar unreachable
+// and unresponsive. These lock the count population to the render population.
+describe('computeTodayData — progress counts match the rendered timeline', () => {
+  const NOW = new Date()
+
+  function routine(p: Partial<Routine>): Routine {
+    return {
+      id: 'r', user_id: 'u', name: 'R', description: null, default_assignee: null,
+      assigned_to: null, assigned_to_all: null, visibility: 'active', paused_until: null,
+      recurrence_pattern: { type: 'daily' }, time_of_day: null, times_per_day: null,
+      raw_input: null, show_on_timeline: true, parent_routine_id: null, step_order: null,
+      created_at: '', updated_at: '', ...p,
+    } as unknown as Routine
+  }
+  function instance(entityId: string, status: ActionableStatus): ActionableInstance {
+    return {
+      id: `i-${entityId}`, user_id: 'u', entity_type: 'routine', entity_id: entityId,
+      date: '', status, assignee: null, assigned_to_override: null, deferred_to: null,
+      completed_at: null, skipped_at: null, created_at: '', updated_at: '',
+    }
+  }
+  /** Rows the timeline actually renders, excluding events (not actionable). */
+  function renderedActionableRows(d: ReturnType<typeof computeTodayData>) {
+    return Object.values(d.grouped).flat().filter((i) => i.type !== 'event')
+  }
+
+  it('a collection counts as the one row it renders, not parent + every step', () => {
+    const parent = routine({ id: 'p', name: 'Morning reset' })
+    const steps = [
+      routine({ id: 's1', name: 'Unload dishwasher', parent_routine_id: 'p', step_order: 0 }),
+      routine({ id: 's2', name: 'Pack lunches', parent_routine_id: 'p', step_order: 1 }),
+    ]
+    const d = computeTodayData(baseInput({ viewedDate: NOW, routines: [parent, ...steps] }))
+    expect(renderedActionableRows(d)).toHaveLength(1)
+    expect(d.counts.actionableCount).toBe(1)
+  })
+
+  it('a collection reads as done once every step is done (the bar can reach 100%)', () => {
+    const parent = routine({ id: 'p', name: 'Morning reset' })
+    const steps = [
+      routine({ id: 's1', name: 'Unload dishwasher', parent_routine_id: 'p', step_order: 0 }),
+      routine({ id: 's2', name: 'Pack lunches', parent_routine_id: 'p', step_order: 1 }),
+    ]
+    const d = computeTodayData(baseInput({
+      viewedDate: NOW, routines: [parent, ...steps],
+      dateInstances: [instance('s1', 'completed'), instance('s2', 'completed')],
+    }))
+    expect(d.counts.completedCount).toBe(1)
+    expect(d.counts.actionableCount).toBe(1)
+    expect(d.counts.progressPercent).toBe(100)
+  })
+
+  it('an orphan step — parent not on today — is rendered nowhere, so it is not counted', () => {
+    // Steps carry their own daily recurrence, so a weekday collection's steps
+    // still arrive on a Sunday even though the parent does not. Grouping drops
+    // them; the count must too.
+    const orphan = routine({ id: 's1', name: 'Camp dropoff', parent_routine_id: 'missing-parent' })
+    const d = computeTodayData(baseInput({ viewedDate: NOW, routines: [orphan] }))
+    expect(renderedActionableRows(d)).toHaveLength(0)
+    expect(d.counts.actionableCount).toBe(0)
+  })
+
+  it('a dosed routine counts once per dose, matching its rows', () => {
+    const dosed = routine({ id: 'd1', name: 'PT Exercises', times_per_day: ['07:00', '19:00'] })
+    const d = computeTodayData(baseInput({ viewedDate: NOW, routines: [dosed] }))
+    expect(renderedActionableRows(d)).toHaveLength(2)
+    expect(d.counts.actionableCount).toBe(2)
+  })
+
+  it('completing a dose moves the count — the instance is keyed `id#slot`', () => {
+    const dosed = routine({ id: 'd1', name: 'PT Exercises', times_per_day: ['07:00', '19:00'] })
+    const d = computeTodayData(baseInput({
+      viewedDate: NOW, routines: [dosed], dateInstances: [instance('d1#0', 'completed')],
+    }))
+    expect(d.counts.completedCount).toBe(1)
+    expect(d.counts.actionableCount).toBe(2)
+  })
+
+  it('a routine the assignee filter hides is not counted', () => {
+    const mine = routine({ id: 'r1', name: 'Mine', assigned_to: 'me' })
+    const theirs = routine({ id: 'r2', name: 'Theirs', assigned_to: 'someone-else' })
+    const d = computeTodayData(baseInput({
+      viewedDate: NOW, routines: [mine, theirs], selectedAssignee: ['me'],
+    }))
+    expect(renderedActionableRows(d)).toHaveLength(1)
+    expect(d.counts.actionableCount).toBe(1)
+  })
+
+  it('a skipped routine leaves the pool — skipping is how work comes off the day', () => {
+    const a = routine({ id: 'r1', name: 'Iris weekend workout' })
+    const b = routine({ id: 'r2', name: 'Food prep' })
+    const d = computeTodayData(baseInput({
+      viewedDate: NOW, routines: [a, b], dateInstances: [instance('r1', 'skipped')],
+    }))
+    expect(d.counts.actionableCount).toBe(1)
+    expect(d.counts.completedCount).toBe(0)
+  })
+
+  it('carried-over tasks stay in the denominator and move the numerator when done', () => {
+    const open = task({ id: 'o1', scheduledFor: new Date(NOW.getTime() - 3 * 864e5) })
+    const done = task({ id: 'o2', scheduledFor: new Date(NOW.getTime() - 2 * 864e5), completed: true, updatedAt: NOW })
+    const d = computeTodayData(baseInput({ viewedDate: NOW, tasks: [open, done] }))
+    expect(d.counts.actionableCount).toBe(2)
+    expect(d.counts.completedCount).toBe(1)
   })
 })
