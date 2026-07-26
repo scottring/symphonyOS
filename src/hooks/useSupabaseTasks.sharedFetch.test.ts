@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, waitFor, act } from '@testing-library/react'
-import { useSupabaseTasks, __resetTasksCache } from './useSupabaseTasks'
+import { useSupabaseTasks, __resetTasksCache, __expireTasksCache } from './useSupabaseTasks'
 
 const mockUser = { id: 'test-user-id', email: 'test@example.com' }
 
@@ -122,5 +122,31 @@ describe('useSupabaseTasks — one shared first load', () => {
     await act(async () => { await result.current.refetch() })
 
     expect(selectCalls).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('useSupabaseTasks — an expired cache still renders instantly', () => {
+  beforeEach(() => {
+    __resetTasksCache()
+    selectCalls.mockClear()
+  })
+
+  it('serves stale rows without a spinner, then refreshes behind the render', async () => {
+    // The detail panel mounts its own instance and shows "Loading…" until it
+    // has the task. Waiting on a fetch there is a blank panel — 30 seconds of
+    // one on a contended connection. Reported from real use.
+    const first = renderHook(() => useSupabaseTasks())
+    await waitFor(() => expect(first.result.current.loading).toBe(false))
+
+    __expireTasksCache()
+    selectCalls.mockClear()
+
+    const panel = renderHook(() => useSupabaseTasks())
+    // Rows are there on the very first settled render — no loading gap.
+    await waitFor(() => expect(panel.result.current.loading).toBe(false))
+    expect(panel.result.current.tasks).toHaveLength(1)
+
+    // ...and the refresh still happened, behind the render.
+    await waitFor(() => expect(selectCalls).toHaveBeenCalledTimes(1))
   })
 })

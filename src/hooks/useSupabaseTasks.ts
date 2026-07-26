@@ -264,6 +264,47 @@ export function __resetTasksCache(): void {
   tasksInFlight = null
 }
 
+/** Test seam — age the cache past its TTL without waiting a minute. */
+export function __expireTasksCache(): void {
+  if (tasksCache) tasksCache = { ...tasksCache, at: 0 }
+}
+
+/**
+ * One trip to the database, shared by every instance that asks while it is in
+ * flight. Fills the cache on success. Callers decide whether to show a spinner.
+ */
+async function loadTasks(
+  userId: string,
+  onError: (message: string) => void,
+): Promise<Task[] | null> {
+  if (tasksInFlight && tasksInFlight.userId === userId) return tasksInFlight.promise
+
+  const request = (async (): Promise<Task[] | null> => {
+    // RLS policies handle household sharing - no need to filter by user_id.
+    const { data, error } = await supabase
+      .from('tasks')
+      .select('*')
+      .order('created_at', { ascending: false })
+
+    if (error) {
+      onError(error.message)
+      showToast("Couldn't load tasks — check your connection", 'error', 5000)
+      return null
+    }
+
+    const rows = nestSubtasks((data as DbTask[]).map(dbTaskToTask))
+    tasksCache = { userId, rows, at: Date.now() }
+    return rows
+  })()
+
+  tasksInFlight = { userId, promise: request }
+  try {
+    return await request
+  } finally {
+    if (tasksInFlight?.promise === request) tasksInFlight = null
+  }
+}
+
 // Nest subtasks under their parent tasks
 function nestSubtasks(tasks: Task[]): Task[] {
   const taskMap = new Map<string, Task>()
@@ -360,49 +401,31 @@ export function useSupabaseTasks() {
     const force = options?.force === true
 
     // The tab already has the list, and live writes have kept it in step.
-    if (!force && tasksCache && tasksCache.userId === user.id &&
-        Date.now() - tasksCache.at < TASKS_CACHE_TTL_MS) {
+    //
+    // Serve it even past the TTL, then refresh behind the render. An expired
+    // cache is not a reason to show a spinner: the detail panel mounts its own
+    // instance and renders "Loading…" until it has the task, so waiting on a
+    // fetch here is a blank panel — 30 seconds of one, on a contended
+    // connection. Reported from real use. Stale-by-a-minute rows are worth far
+    // more than an empty panel, and realtime corrects them within the tick.
+    if (!force && tasksCache && tasksCache.userId === user.id) {
+      const expired = Date.now() - tasksCache.at >= TASKS_CACHE_TTL_MS
       setTasks(cloneRows(tasksCache.rows))
       setLoading(false)
-      return
-    }
-
-    // Ride the load another instance started a moment ago.
-    if (!force && tasksInFlight && tasksInFlight.userId === user.id) {
-      setLoading(true)
-      const shared = await tasksInFlight.promise
-      if (shared) setTasks(cloneRows(shared))
-      setLoading(false)
+      if (!expired) return
+      // Refresh behind the render — no spinner, rows already on screen.
+      void loadTasks(user.id, setError).then((rows) => {
+        if (rows) setTasks(cloneRows(rows))
+      })
       return
     }
 
     setLoading(true)
     setError(null)
-
-    const request = (async (): Promise<Task[] | null> => {
-      // RLS policies handle household sharing - no need to filter by user_id.
-      const { data, error: fetchError } = await supabase
-        .from('tasks')
-        .select('*')
-        .order('created_at', { ascending: false })
-
-      if (fetchError) {
-        setError(fetchError.message)
-        showToast("Couldn't load tasks — check your connection", 'error', 5000)
-        return null
-      }
-
-      const rows = nestSubtasks((data as DbTask[]).map(dbTaskToTask))
-      tasksCache = { userId: user.id, rows, at: Date.now() }
-      return rows
-    })()
-
-    tasksInFlight = { userId: user.id, promise: request }
     try {
-      const rows = await request
+      const rows = await loadTasks(user.id, setError)
       if (rows) setTasks(cloneRows(rows))
     } finally {
-      if (tasksInFlight?.promise === request) tasksInFlight = null
       setLoading(false)
     }
   }, [user])
