@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { capItems, DEFAULT_SECTION_CAP } from './pageCap'
+import { capItems, capUnits, DEFAULT_SECTION_CAP } from './pageCap'
 
 const rows = (n: number, completed = false, prefix = 'i') =>
   Array.from({ length: n }, (_, i) => ({ id: `${prefix}${i}`, completed }))
@@ -60,5 +60,53 @@ describe('capItems', () => {
 
   it('exports a sane default', () => {
     expect(DEFAULT_SECTION_CAP).toBeGreaterThan(0)
+  })
+})
+
+describe('capUnits — a group is never split', () => {
+  type Row = { id: string; completed: boolean; child?: boolean }
+  const startsUnit = (r: Row) => !r.child
+  const row = (id: string, completed = false, child = false): Row => ({ id, completed, child })
+
+  it('keeps a parent and its children together rather than cutting mid-group', () => {
+    // cap 4: [a][b] then a 3-row group would overflow, so the group is dropped
+    // whole. A half-rendered group card has no bottom edge.
+    const items = [
+      row('a'), row('b'),
+      row('p'), row('c1', false, true), row('c2', false, true),
+      row('z'),
+    ]
+    const out = capUnits(items, 4, false, startsUnit)
+    expect(out.visible.map((i) => i.id)).not.toContain('c1')
+    expect(out.visible.map((i) => i.id)).not.toContain('p')
+    expect(out.hiddenCount).toBe(items.length - out.visible.length)
+  })
+
+  it('includes a group whole when it fits', () => {
+    const items = [row('p'), row('c1', false, true), row('c2', false, true), row('z')]
+    const out = capUnits(items, 4, false, startsUnit)
+    expect(out.visible).toHaveLength(4)
+    expect(out.hiddenCount).toBe(0)
+  })
+
+  it('drops a fully-completed group before a live one', () => {
+    const items = [
+      row('dp', true), row('dc', true, true),
+      row('lp'), row('lc', false, true),
+    ]
+    const out = capUnits(items, 2, false, startsUnit)
+    expect(out.visible.map((i) => i.id)).toEqual(['lp', 'lc'])
+  })
+
+  it('reports every hidden row, not every hidden group', () => {
+    const items = [row('a'), row('p'), row('c1', false, true), row('c2', false, true)]
+    const out = capUnits(items, 1, false, startsUnit)
+    expect(out.visible.map((i) => i.id)).toEqual(['a'])
+    expect(out.hiddenCount).toBe(3)
+  })
+
+  it('passes everything through when expanded', () => {
+    const items = [row('p'), row('c1', false, true)]
+    expect(capUnits(items, 1, true, startsUnit).visible).toHaveLength(2)
   })
 })

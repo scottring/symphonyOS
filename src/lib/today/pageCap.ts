@@ -36,3 +36,49 @@ export function capItems<T extends { completed: boolean }>(
   const visible = items.filter((i) => kept.has(i))
   return { visible, hiddenCount: items.length - visible.length }
 }
+
+/**
+ * Cap a list that contains GROUPS, without ever splitting one.
+ *
+ * Today renders a group as a parent row followed immediately by its children,
+ * drawn as one enclosed card whose borders are derived from adjacency. Cutting
+ * that run in half renders a card with no bottom edge, or children with a
+ * parent chip and no card at all. So the unit of capping is the whole run, not
+ * the row.
+ *
+ * `startsUnit(item, index)` returns true when `item` begins a new unit — i.e.
+ * it is NOT a child continuing the run above it.
+ */
+export function capUnits<T extends { completed: boolean }>(
+  items: T[],
+  cap: number,
+  expanded: boolean,
+  startsUnit: (item: T, index: number) => boolean,
+): CappedSection<T> {
+  if (expanded || cap <= 0 || items.length <= cap) {
+    return { visible: items, hiddenCount: 0 }
+  }
+
+  const units: T[][] = []
+  items.forEach((item, i) => {
+    if (i === 0 || startsUnit(item, i)) units.push([item])
+    else units[units.length - 1].push(item)
+  })
+
+  // Same honesty rule as capItems: fully-completed units go first, and the
+  // original order survives among whatever is kept.
+  const isDone = (u: T[]) => u.every((i) => i.completed)
+  const live = units.filter((u) => !isDone(u))
+  const done = units.filter(isDone)
+
+  const kept = new Set<T[]>()
+  let budget = cap
+  for (const u of [...live, ...done]) {
+    if (u.length > budget) continue
+    kept.add(u)
+    budget -= u.length
+  }
+
+  const visible = units.filter((u) => kept.has(u)).flat()
+  return { visible, hiddenCount: items.length - visible.length }
+}

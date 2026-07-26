@@ -10,7 +10,7 @@
  * handler props — it is the same context TodayView reads, and threading it
  * through would be a second copy of the same wiring.
  */
-import { useMemo } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import type { Task } from '@/types/task'
 import type { TimelineItem } from '@/types/timeline'
 import type { DaySection } from '@/lib/timeUtils'
@@ -34,6 +34,7 @@ import { TodayBandDropZone, TodayGapDropZone } from './TodayDropZones'
 import { TodayDraggableRow } from './TodayDraggableRow'
 import { useTodayDragState } from './TodayDragProvider'
 import { refusalFor } from '@/lib/today/todayDrop'
+import { capUnits, DEFAULT_SECTION_CAP } from '@/lib/today/pageCap'
 
 // ─── Meal detection ────────────────────────────────────────────────────────────
 
@@ -118,6 +119,13 @@ export function TodaySectionList({
 }: TodaySectionListProps) {
   const ctx = useScheduleActionsContext()
   const { dragging } = useTodayDragState()
+
+  // Which sections the user has expanded past the cap. Not persisted: a cap is
+  // about this reading of the page, not a standing preference.
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(() => new Set())
+  const expandSection = useCallback((key: string) => {
+    setExpandedSections((prev) => new Set(prev).add(key))
+  }, [])
   const {
     onToggleWaiting, onUpdateTask, onPushTask,
     onAssignTask, onAssignTaskAll, onAssignEvent, onAssignEventAll,
@@ -159,6 +167,17 @@ export function TodaySectionList({
         const items = upNextId
           ? sectionItems.filter((i) => i.id !== upNextId)
           : sectionItems
+        // The cap bounds what RENDERS. Every count below still comes from the
+        // full `items` — the header is where the truth about the day lives.
+        // Capped by GROUP, not by row: a group renders as one enclosed card
+        // whose borders come from adjacency, so cutting the run in half leaves
+        // a card with no bottom edge.
+        const { visible, hiddenCount } = capUnits(
+          items,
+          DEFAULT_SECTION_CAP,
+          expandedSections.has(sectionKey(section)),
+          (item) => !item.isSubtask,
+        )
         const completedCount = items.filter((i) => i.completed).length
         const restAllDone = items.length > 0 && completedCount === items.length
         // "Empty because the hero took it" is only true if the section HAD
@@ -192,7 +211,7 @@ export function TodaySectionList({
             />
             {!collapsed && (
               <div className="space-y-1">
-                {items.map((item, itemIndex) => {
+                {visible.map((item, itemIndex) => {
                   const taskId = item.id.startsWith('task-') ? item.id.replace('task-', '') : null
                   const contactName = item.contactId && contactsMap?.get(item.contactId)?.name || undefined
                   const projectName = item.projectId && projectsMap?.get(item.projectId)?.name || undefined
@@ -210,8 +229,8 @@ export function TodaySectionList({
                   // section) render inside one enclosed, tinted card. Roles
                   // are derived purely from adjacency, so a parent whose
                   // children live in another section gets no card.
-                  const prevItem = itemIndex > 0 ? items[itemIndex - 1] : null
-                  const nextItem = itemIndex < items.length - 1 ? items[itemIndex + 1] : null
+                  const prevItem = itemIndex > 0 ? visible[itemIndex - 1] : null
+                  const nextItem = itemIndex < visible.length - 1 ? visible[itemIndex + 1] : null
                   const isGroupParent = !!taskId && !!nextItem && !!nextItem.isSubtask && nextItem.parentTaskId === taskId
                   const isGroupChild = !!item.isSubtask && !!prevItem &&
                     (prevItem.id === `task-${item.parentTaskId}` ||
@@ -230,7 +249,7 @@ export function TodaySectionList({
                   const showInsert = !isGroupChild
 
                   // Insert point before this item
-                  const prevItemForInsert = itemIndex > 0 ? items[itemIndex - 1] : null
+                  const prevItemForInsert = itemIndex > 0 ? visible[itemIndex - 1] : null
                   const insertCtxBefore = {
                     before: prevItemForInsert?.startTime ?? null,
                     after: item.startTime ?? null,
@@ -496,13 +515,13 @@ export function TodaySectionList({
                 {/* Trailing insert point: after the last item per section */}
                 {(() => {
                   const insertCtxTrailing = {
-                    before: items.length > 0 ? (items[items.length - 1].startTime ?? null) : null,
+                    before: visible.length > 0 ? (visible[visible.length - 1].startTime ?? null) : null,
                     after: null,
                     section,
                     date: viewedDate,
                   }
                   return (
-                    <TodayGapDropZone section={section} index={items.length}>
+                    <TodayGapDropZone section={section} index={visible.length}>
                     <TimelineInsertPoint
                       onPick={(k) => insert.handlePick(insertCtxTrailing, k)}
                       onCreate={(kind, r) => {
@@ -519,6 +538,17 @@ export function TodaySectionList({
                     </TodayGapDropZone>
                   )
                 })()}
+                {/* A cap that hides its own truncation is worse than a long
+                    page — the count is always stated, and always expandable. */}
+                {hiddenCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => expandSection(sectionKey(section))}
+                    className="w-full text-left px-3 md:px-0 py-1.5 text-[13px] text-neutral-500 hover:text-neutral-700 transition-colors"
+                  >
+                    +{hiddenCount} more today
+                  </button>
+                )}
               </div>
             )}
             </TodayBandDropZone>
