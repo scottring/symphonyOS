@@ -18,7 +18,6 @@ import type { ParserContext } from '@/lib/quickInputParser'
 import type { HomeViewType } from '@/types/homeView'
 import type { DaySection } from '@/lib/timeUtils'
 
-import { parseRoutineTimelineId } from '@/lib/today/doseExpansion'
 import { readCollapsed, setCollapsed, onCollapsedChange, sectionKey } from '@/lib/today/sectionCollapse'
 import { useMobile } from '@/hooks/useMobile'
 import { useTodayData } from '@/hooks/useTodayData'
@@ -31,17 +30,15 @@ import { useSystemHealth, getHealthTextClasses } from '@/hooks/useSystemHealth'
 import { useRecurringEventDetection } from '@/hooks/useRecurringEventDetection'
 import { useTimelineInsert } from '@/hooks/useTimelineInsert'
 import { useDomain } from '@/hooks/useDomain'
-import { computeAnchorTime } from '@/lib/timelineAnchor'
 
 import { Eye, EyeOff, Repeat, Binoculars, Sun, Printer } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { AssigneeFilter } from '@/components/home/AssigneeFilter'
 
 import { TodayAddInput } from './TodayAddInput'
-import { DaySectionHeader } from '@/components/schedule/DaySectionHeader'
+import { TodaySectionList } from './TodaySectionList'
 import { UpNextHero } from './UpNextHero'
 import { selectUpNext } from '@/lib/today/upNext'
-import { TimelineInsertPoint } from './TimelineInsertPoint'
 import { StatsRow } from './StatsRow'
 import { TodayProgress } from './TodayProgress'
 import { NeedsYourOK } from './NeedsYourOK'
@@ -53,13 +50,9 @@ import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
 import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
 import { getRoutinesForDatePure } from '@/lib/routineUtils'
 import { StagingFloat } from './StagingFloat'
-import { EveningMealCard } from './EveningMealCard'
 import { EndOfDayCard } from './EndOfDayCard'
 import { EndOfDayReview } from './EndOfDayReview'
-import { ScheduleItem } from './ScheduleItem'
-import { RoutineCollectionRow } from './RoutineCollectionRow'
 import { DayNavCluster } from './DayNavCluster'
-import { ShareToFamilyNudge } from './ShareToFamilyNudge'
 import { OverdueSection } from './OverdueSection'
 import { BulkActionToolbar } from './BulkActionToolbar'
 import { TimelineNoteComposer } from './TimelineNoteComposer'
@@ -67,7 +60,6 @@ import { TimelineNoteComposer } from './TimelineNoteComposer'
 import { discussionItems } from '@/lib/discussionItems'
 import { DiscussionBadge } from './DiscussionBadge'
 import { PrintableDayList } from './PrintableDayList'
-import { parseMealTitle } from '@/lib/mealTitle'
 import { readHideRoutines, writeHideRoutines, onHideRoutinesChange } from '@/lib/hideRoutinesSignal'
 import { useShareToFamilyNudges } from '@/lib/today/shareNudges'
 
@@ -115,14 +107,6 @@ interface TodayViewProps {
   onHomeViewChange?: (view: HomeViewType) => void
 }
 
-// ─── Meal detection ────────────────────────────────────────────────────────────
-
-const MEAL_RE = /breakfast|brunch|lunch|dinner|supper/i
-
-function isMealItem(id: string, type: string, title: string): boolean {
-  return String(id).startsWith('meal:') || (type === 'event' && MEAL_RE.test(title))
-}
-
 // ─── Component ─────────────────────────────────────────────────────────────────
 
 export function TodayView({
@@ -155,16 +139,16 @@ export function TodayView({
   const isMobile = useMobile()
   const navigate = useNavigate()
   const ctx = useScheduleActionsContext()
+  // Only what THIS file still uses. The row-level handlers moved with the
+  // section loop into TodaySectionList, which reads the same context itself.
   const {
-    onToggleWaiting, onUpdateTask, onPushTask,
+    onToggleWaiting, onUpdateTask,
     onGroupTasks, onGroupItems,
-    onAssignTask, onAssignTaskAll, onAssignEvent, onAssignEventAll,
-    onAssignRoutine, onAssignRoutineAll,
-    onSkipRoutine, onPushRoutine, onUpdateRoutine,
-    onSkipEvent, onPushEvent, onUpdateEventContext,
-    onOpenTask, onOpenGuidedChat, onCreateFollowUp,
+    onAssignTaskAll, onAssignEventAll,
+    onPushRoutine, onPushEvent, onUpdateEventContext,
+    onOpenGuidedChat, onCreateFollowUp,
     onNotify,
-    contactsMap, projectsMap, familyMembers = [],
+    contactsMap, familyMembers = [],
     eventNotesMap,
   } = ctx
 
@@ -368,11 +352,6 @@ export function TodayView({
     contacts: parserContacts,
     familyMembers: parserFamilyMembersList,
   }), [parserProjectsList, parserContacts, parserFamilyMembersList])
-
-  // Create-at handlers: props take precedence, fall back to context
-  const onCreateTaskAt = ctx.onCreateTaskAt
-  const onCreateEventAt = ctx.onCreateEventAt
-  const onCreateRoutineAt = ctx.onCreateRoutineAt
 
   // Note composer handlers: props take precedence, fall back to context (legacy prop??ctx pattern)
   const onCreateNoteAt = onCreateNoteAtProp ?? ctx.onCreateNoteAt
@@ -760,374 +739,36 @@ export function TodayView({
               </div>
             )}
 
-            {/* Sections */}
-            {data.sectionsOrder.map((section) => {
-              const allSectionItems = data.grouped[section]
-              if (!allSectionItems || allSectionItems.length === 0) return null
-
-              // The hero item is lifted out of its section.
-              const items = upNextId
-                ? allSectionItems.filter((i) => i.id !== upNextId)
-                : allSectionItems
-              const completedCount = items.filter((i) => i.completed).length
-              const restAllDone = items.length > 0 && completedCount === items.length
-              const emptyBecauseHero = items.length === 0
-              const key = sectionKey(section)
-
-              // Precedence: empty-because-hero always collapses; an explicit
-              // fold always wins; an explicit open overrides the auto rule;
-              // otherwise auto-collapse when everything remaining is done.
-              // `collapsedKeys` and `openedByUser` are independent facts —
-              // never derive one from the other.
-              const collapsed = emptyBecauseHero
-                ? true
-                : collapsedKeys.has(key)
-                  ? true
-                  : openedByUser.has(key)
-                    ? false
-                    : restAllDone
-
-              return (
-                <section key={section}>
-                  <DaySectionHeader
-                    section={section}
-                    itemCount={items.length}
-                    completedCount={completedCount}
-                    collapsed={collapsed}
-                    emptyBecauseHero={emptyBecauseHero}
-                    onToggle={() => toggleSection(section, collapsed)}
-                  />
-                  {!collapsed && (
-                    <div className="space-y-1">
-                      {items.map((item, itemIndex) => {
-                        const taskId = item.id.startsWith('task-') ? item.id.replace('task-', '') : null
-                        const contactName = item.contactId && contactsMap?.get(item.contactId)?.name || undefined
-                        const projectName = item.projectId && projectsMap?.get(item.projectId)?.name || undefined
-                        const parentTaskId = item.parentTaskId
-                        const parentTaskName = parentTaskId ? tasksMap.get(parentTaskId)?.title : undefined
-                        const isFirstItem = item.id === firstSectionItemId
-
-                        // ── Group cards ──────────────────────────────────────
-                        // A parent task and its adjacent subtask rows (grouping.ts
-                        // places children directly after their parent within a
-                        // section) render inside one enclosed, tinted card. Roles
-                        // are derived purely from adjacency, so a parent whose
-                        // children live in another section gets no card.
-                        const prevItem = itemIndex > 0 ? items[itemIndex - 1] : null
-                        const nextItem = itemIndex < items.length - 1 ? items[itemIndex + 1] : null
-                        const isGroupParent = !!taskId && !!nextItem && !!nextItem.isSubtask && nextItem.parentTaskId === taskId
-                        const isGroupChild = !!item.isSubtask && !!prevItem &&
-                          (prevItem.id === `task-${item.parentTaskId}` ||
-                            (!!prevItem.isSubtask && prevItem.parentTaskId === item.parentTaskId))
-                        const isLastGroupChild = isGroupChild &&
-                          (!nextItem || !(nextItem.isSubtask && nextItem.parentTaskId === item.parentTaskId))
-                        const groupCardClass = isGroupParent
-                          ? 'rounded-t-2xl border border-b-0 border-primary-200/70 bg-primary-50/30 pt-0.5'
-                          : isLastGroupChild
-                            ? 'border-x border-b border-primary-200/70 bg-primary-50/30 rounded-b-2xl pb-1 pl-4'
-                            : isGroupChild
-                              ? 'border-x border-primary-200/70 bg-primary-50/30 pl-4'
-                              : ''
-                        // Don't offer an insert point between a parent and its
-                        // children — a task added there wouldn't be in the group.
-                        const showInsert = !isGroupChild
-
-                        // Insert point before this item (rendered unconditionally when totalItems>0)
-                        const prevItemForInsert = itemIndex > 0 ? items[itemIndex - 1] : null
-                        const insertCtxBefore = {
-                          before: prevItemForInsert?.startTime ?? null,
-                          after: item.startTime ?? null,
-                          section,
-                          date: viewedDate,
-                        }
-                        const insertBefore = (
-                          <TimelineInsertPoint
-                            onPick={(k) => insert.handlePick(insertCtxBefore, k)}
-                            onCreate={(kind, r) => {
-                              if (kind === 'task') onCreateTaskAt?.(r)
-                              else if (kind === 'event') onCreateEventAt?.(r)
-                              else onCreateRoutineAt?.(r)
-                            }}
-                            quickInput={{
-                              anchorTime: computeAnchorTime(insertCtxBefore),
-                              parserContext,
-                              currentDomain,
-                            }}
-                          />
-                        )
-
-                        // Evening meal gets a special card (desktop only — on
-                        // mobile we let meal items render as compact rows to
-                        // match the pre-redesign list).
-                        // 'night' too: evening now ends at 20:59, so a 21:00
-                        // dinner is a night item and would otherwise lose its
-                        // meal-card treatment.
-                        if (
-                          !isMobile &&
-                          (section === 'evening' || section === 'night') &&
-                          isMealItem(item.id, item.type, item.title)
-                        ) {
-                          const timeLabel = item.startTime
-                            ? new Date(item.startTime).toLocaleTimeString('en-US', {
-                                hour: 'numeric',
-                                minute: '2-digit',
-                              })
-                            : ''
-                          const parsed = parseMealTitle(item.title)
-                          // For synthesized meal events, MealEventsProvider stores
-                          // the recipe source URL in `description` → maps onto
-                          // `googleDescription` on the timeline item.
-                          const recipeUrl = item.googleDescription?.startsWith('http')
-                            ? item.googleDescription
-                            : undefined
-                          const fromPlan = String(item.id).startsWith('meal:')
-                          // Core members (guests excluded) act as default diners
-                          // until per-meal diner assignment lands. The first few
-                          // surface as small stacked avatars on the card.
-                          const coreMembers = familyMembers.filter((m) => m.member_type === 'core')
-                          const diners = coreMembers.map((m) => ({
-                            id: m.id,
-                            initials: m.initials,
-                            color: m.color,
-                          }))
-                          const servesCount = coreMembers.length > 0 ? coreMembers.length : undefined
-                          return (
-                            <div key={item.id}>
-                              {showInsert && insertBefore}
-                              <div {...(isFirstItem ? { 'data-today-first': '' } : {})}>
-                                <EveningMealCard
-                                  title={parsed.title}
-                                  sides={parsed.sides}
-                                  timeLabel={timeLabel}
-                                  recipeUrl={recipeUrl}
-                                  fromPlan={fromPlan}
-                                  servesCount={servesCount}
-                                  diners={diners}
-                                  onSelect={() => onSelectItem(item.id)}
-                                />
-                              </div>
-                            </div>
-                          )
-                        }
-
-                        // Routine collection — collapsed row with per-step completion
-                        if (item.type === 'routine-collection') {
-                          return (
-                            <div key={item.id} data-item-id={item.id}>
-                              {showInsert && insertBefore}
-                              <RoutineCollectionRow
-                                item={item}
-                                onSelect={() => handleSelectItem(item.id)}
-                                onSelectStep={(stepId) => handleSelectItem(stepId)}
-                                onCompleteStep={(stepTimelineId, completed) => {
-                                  if (!onCompleteRoutine) return
-                                  const { routineId, slot } = parseRoutineTimelineId(stepTimelineId)
-                                  const entityId = slot === null ? routineId : `${routineId}#${slot}`
-                                  onCompleteRoutine(entityId, completed)
-                                }}
-                                onSkipStep={onSkipRoutine ? (stepTimelineId) => {
-                                  const { routineId, slot } = parseRoutineTimelineId(stepTimelineId)
-                                  const entityId = slot === null ? routineId : `${routineId}#${slot}`
-                                  onSkipRoutine(entityId)
-                                } : undefined}
-                                onCompleteStepAt={onCompleteRoutine ? (stepTimelineId, completedAt) => {
-                                  const { routineId, slot } = parseRoutineTimelineId(stepTimelineId)
-                                  const entityId = slot === null ? routineId : `${routineId}#${slot}`
-                                  onCompleteRoutine(entityId, true, completedAt)
-                                } : undefined}
-                                onHideToday={onUpdateRoutine ? () => {
-                                  // Pause until tomorrow: reference + paused_until, so the
-                                  // useRoutines auto-resume brings it back on the next day.
-                                  const parentId = item.id.replace('routine-collection-', '')
-                                  const tomorrow = new Date()
-                                  tomorrow.setHours(0, 0, 0, 0)
-                                  tomorrow.setDate(tomorrow.getDate() + 1)
-                                  onUpdateRoutine(parentId, { visibility: 'reference', paused_until: tomorrow.toISOString() })
-                                } : undefined}
-                                onRemove={onUpdateRoutine ? () => {
-                                  const parentId = item.id.replace('routine-collection-', '')
-                                  onUpdateRoutine(parentId, { visibility: 'reference' })
-                                } : undefined}
-                              />
-                            </div>
-                          )
-                        }
-
-                        // Standard schedule item — mirror TodaySchedule wiring
-                        return (
-                          <div key={item.id} className={isGroupChild ? '-mt-1' : undefined}>
-                          {showInsert && insertBefore}
-                          <div data-item-id={item.id} className={groupCardClass || undefined} {...(isFirstItem ? { 'data-today-first': '' } : {})}>
-                          {(() => {
-                            const { routineId: bareRoutineId, slot } = item.type === 'routine'
-                              ? parseRoutineTimelineId(item.id)
-                              : { routineId: '', slot: null }
-                            const routineEntityId = slot === null ? bareRoutineId : `${bareRoutineId}#${slot}`
-                            return (
-                              <>
-                          <ScheduleItem
-                            item={item}
-                            selected={selectedItemId === item.id}
-                            bulkSelectable={true}
-                            bulkSelected={selectedKeys.has(item.id)}
-                            showBulkAffordance={selectedKeys.size > 0}
-                            onToggleBulkSelect={() => toggleBulkSelect(item.id)}
-                            onSelect={() => handleSelectItem(item.id)}
-                            onToggleWaiting={
-                              item.type === 'task' && taskId && onToggleWaiting
-                                ? () => onToggleWaiting(taskId)
-                                : undefined
-                            }
-                            onToggleComplete={() => {
-                              if (item.type === 'task' && taskId) {
-                                onToggleTask(taskId)
-                              } else if (item.type === 'routine' && onCompleteRoutine) {
-                                onCompleteRoutine(routineEntityId, !item.completed)
-                              } else if (item.type === 'event' && onCompleteEvent) {
-                                onCompleteEvent(item.id.replace('event-', ''), !item.completed)
-                              }
-                            }}
-                            onPush={
-                              item.type === 'task' && taskId && onPushTask
-                                ? (target) => onPushTask(taskId, target)
-                                : item.type === 'routine' && onPushRoutine
-                                ? (date) => { if (date instanceof Date) onPushRoutine(bareRoutineId, date) }
-                                : item.type === 'event' && onPushEvent
-                                ? (date) => { if (date instanceof Date) onPushEvent(item.id.replace('event-', ''), date) }
-                                : undefined
-                            }
-                            onSchedule={
-                              item.type === 'task' && taskId && onUpdateTask
-                                ? (date, isAllDay) => onUpdateTask(taskId, { bucket: 'timed', scheduledFor: date, isAllDay })
-                                : undefined
-                            }
-                            onSkip={
-                              item.type === 'routine' && onSkipRoutine
-                                ? () => onSkipRoutine(routineEntityId)
-                                : item.type === 'event' && onSkipEvent
-                                ? () => onSkipEvent(item.id.replace('event-', ''))
-                                : undefined
-                            }
-                            contactName={contactName}
-                            projectName={projectName}
-                            projectId={item.projectId ?? undefined}
-                            parentTaskName={parentTaskName}
-                            parentTaskId={parentTaskId}
-                            onOpenParentTask={onOpenTask}
-                            familyMembers={familyMembers}
-                            assignedTo={item.assignedTo}
-                            onAssign={
-                              item.type === 'task' && taskId && onAssignTask
-                                ? (memberId) => onAssignTask(taskId, memberId)
-                                : item.type === 'event' && onAssignEvent
-                                ? (memberId) => onAssignEvent(item.id.replace('event-', ''), memberId)
-                                : item.type === 'routine' && onAssignRoutine
-                                ? (memberId) => onAssignRoutine(bareRoutineId, memberId)
-                                : undefined
-                            }
-                            assignedToAll={
-                              item.type === 'event' && eventNotesMap
-                                ? eventNotesMap.get(item.id.replace('event-', ''))?.assignedToAll ?? []
-                                : item.type === 'task'
-                                ? item.originalTask?.assignedToAll ?? []
-                                : item.type === 'routine'
-                                ? item.originalRoutine?.assigned_to_all ?? []
-                                : []
-                            }
-                            onAssignAll={
-                              item.type === 'task' && taskId && onAssignTaskAll
-                                ? (memberIds) => onAssignTaskAll(taskId, memberIds)
-                                : item.type === 'event' && onAssignEventAll
-                                ? (memberIds) => onAssignEventAll(item.id.replace('event-', ''), memberIds)
-                                : item.type === 'routine' && onAssignRoutineAll
-                                ? (memberIds) => onAssignRoutineAll(bareRoutineId, memberIds)
-                                : undefined
-                            }
-                            onContextChange={
-                              item.type === 'task' && taskId && onUpdateTask
-                                ? (context) => onUpdateTask(taskId, { context })
-                                : item.type === 'routine' && onUpdateRoutine
-                                ? (context) => onUpdateRoutine(bareRoutineId, { context })
-                                : item.type === 'event' && onUpdateEventContext
-                                ? (context) => onUpdateEventContext(item.id.replace('event-', ''), context ?? null)
-                                : undefined
-                            }
-                            onUpdateDiscussion={
-                              item.type === 'task' && taskId && onUpdateTask
-                                ? (next) => onUpdateTask(taskId, next)
-                                : undefined
-                            }
-                            panelOpen={panelOpen}
-                            onClosePanel={onClosePanel}
-                            isSuggestedPromotion={
-                              item.type === 'event'
-                                ? isPromotionSuggested(item.id.replace('event-', ''))
-                                : undefined
-                            }
-                            variant={item.type === 'routine' ? 'minimal' : 'full'}
-                            routineStreak={
-                              item.type === 'routine'
-                                ? getRoutineStats(bareRoutineId)?.currentStreak
-                                : undefined
-                            }
-                            suggestions={(() => {
-                              const entityType = item.type === 'event' ? 'calendar_event' : item.type === 'task' ? 'task' : null
-                              const entityId = item.type === 'event' ? item.id.replace('event-', '') : taskId
-                              if (!entityType || !entityId) return undefined
-                              const s = proactive.suggestionsForEntity(entityType, entityId)
-                              return s.length > 0 ? s : undefined
-                            })()}
-                            onActSuggestion={proactive.actOnSuggestion}
-                            onDismissSuggestion={proactive.dismissSuggestion}
-                            onOpenGuidedChat={onOpenGuidedChat}
-                          />
-                          {item.type === 'event' && (() => {
-                            const nudge = shareNudgeByEventId.get(item.id.replace('event-', ''))
-                            if (!nudge) return null
-                            return (
-                              <ShareToFamilyNudge
-                                contextLabel={nudge.context}
-                                onAdd={() => ctx.onShareEventWithFamily?.(nudge.eventId)}
-                                onDismiss={() => ctx.onDismissShareNudge?.(nudge.eventId)}
-                              />
-                            )
-                          })()}
-                              </>
-                            )
-                          })()}
-                          </div>
-                          </div>
-                        )
-                      })}
-                      {/* Trailing insert point: after the last item per section */}
-                      {(() => {
-                        const insertCtxTrailing = {
-                          before: items.length > 0 ? (items[items.length - 1].startTime ?? null) : null,
-                          after: null,
-                          section,
-                          date: viewedDate,
-                        }
-                        return (
-                          <TimelineInsertPoint
-                            onPick={(k) => insert.handlePick(insertCtxTrailing, k)}
-                            onCreate={(kind, r) => {
-                              if (kind === 'task') onCreateTaskAt?.(r)
-                              else if (kind === 'event') onCreateEventAt?.(r)
-                              else onCreateRoutineAt?.(r)
-                            }}
-                            quickInput={{
-                              anchorTime: computeAnchorTime(insertCtxTrailing),
-                              parserContext,
-                              currentDomain,
-                            }}
-                          />
-                        )
-                      })()}
-                    </div>
-                  )}
-                </section>
-              )
-            })}
+            {/* Sections — lifted into TodaySectionList so this file stops
+                carrying the whole day list (Stage 2b spec). */}
+            <TodaySectionList
+              sectionsOrder={data.sectionsOrder}
+              grouped={data.grouped}
+              viewedDate={viewedDate}
+              isMobile={isMobile}
+              selectedItemId={selectedItemId}
+              upNextId={upNextId}
+              firstSectionItemId={firstSectionItemId}
+              collapsedKeys={collapsedKeys}
+              openedByUser={openedByUser}
+              onToggleSection={toggleSection}
+              selectedKeys={selectedKeys}
+              onToggleBulkSelect={toggleBulkSelect}
+              tasksMap={tasksMap}
+              shareNudgeByEventId={shareNudgeByEventId}
+              parserContext={parserContext}
+              currentDomain={currentDomain}
+              insert={insert}
+              proactive={proactive}
+              getRoutineStats={getRoutineStats}
+              isPromotionSuggested={isPromotionSuggested}
+              onSelectItem={handleSelectItem}
+              onToggleTask={onToggleTask}
+              onCompleteRoutine={onCompleteRoutine}
+              onCompleteEvent={onCompleteEvent}
+              panelOpen={panelOpen}
+              onClosePanel={onClosePanel}
+            />
           </div>
         )}
       </div>
