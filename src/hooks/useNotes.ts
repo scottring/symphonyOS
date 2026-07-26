@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
+import { shareInFlight } from '@/lib/sharedRequest'
 import { useAuth } from '@/hooks/useAuth'
 import { logger } from '@/lib/logger'
 import { captureToVault } from '@/lib/openBrain'
@@ -102,12 +103,16 @@ export function useNotes() {
       setLoading(true)
       setError(null)
 
-      // Fetch Second Brain notes
-      const { data: notesData, error: notesError } = await supabase
-        .from('notes')
-        .select(NOTE_COLUMNS)
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
+      // Fetch Second Brain notes. Shared: a single route mounts this hook
+      // eight times over, and notes carry their full content.
+      const { data: notesData, error: notesError } = await shareInFlight(
+        `notes:${user.id}`,
+        async () => await supabase
+          .from('notes')
+          .select(NOTE_COLUMNS)
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false }),
+      )
 
       if (notesError) {
         console.error('[useNotes] Error fetching notes:', notesError)

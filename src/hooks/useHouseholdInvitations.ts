@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { supabase } from '@/lib/supabase'
+import { supabase, getAuthUser } from '@/lib/supabase'
 
 export interface HouseholdInvitation {
   id: string
@@ -18,7 +18,7 @@ export function useHouseholdInvitations() {
 
   const fetchInvitations = useCallback(async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { user } } = await getAuthUser()
       if (!user) return
 
       const { data, error } = await supabase
@@ -42,7 +42,7 @@ export function useHouseholdInvitations() {
   }, [fetchInvitations])
 
   const createInvitation = useCallback(async (email: string): Promise<HouseholdInvitation | null> => {
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { user } } = await getAuthUser()
     if (!user) return null
 
     // Get user's household

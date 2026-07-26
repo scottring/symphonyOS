@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { supabase } from '@/lib/supabase'
+import { supabase, getAuthUser } from '@/lib/supabase'
 import type { Routine, RecurrencePattern, RoutineVisibility, PrepFollowupTemplate } from '@/types/actionable'
 import { matchesRecurrenceForDate, type LastCompletionMap } from '@/lib/routineUtils'
 
@@ -89,7 +89,7 @@ export function useRoutines() {
   // Fetch all routines for the user
   const fetchRoutines = useCallback(async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { user } } = await getAuthUser()
       if (!user) {
         setRoutines([])
         setLoading(false)
@@ -147,7 +147,7 @@ export function useRoutines() {
     setError(null)
 
     try {
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { user } } = await getAuthUser()
       if (!user) throw new Error('Not authenticated')
 
       // Determine effective assigned_to: explicit value takes precedence, then fallback

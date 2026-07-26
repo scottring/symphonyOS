@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, createContext, useContext, type ReactNode } from 'react'
-import { supabase } from '@/lib/supabase'
+import { supabase, getAuthUser } from '@/lib/supabase'
 import { logger } from '@/lib/logger'
 import { getRecurringBaseId } from './useHiddenCalendarEvents'
 import { filterOutEvent } from './calendarEventCache'
@@ -143,7 +143,7 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     async function checkAndValidateConnection() {
       try {
-        const { data: { user } } = await supabase.auth.getUser()
+        const { data: { user } } = await getAuthUser()
         if (!user) {
           setIsConnected(false)
           setNeedsReconnect(false)
@@ -265,7 +265,7 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
   // Disconnect from Google Calendar
   const disconnect = useCallback(async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { user } } = await getAuthUser()
       if (!user) return
 
       await supabase
@@ -573,7 +573,7 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
     // so the kiosk For-Discussion list doesn't show orphaned items pointing at
     // a Google event that no longer exists).
     try {
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { user } } = await getAuthUser()
       if (user) {
         const baseId = getRecurringBaseId(params.eventId)
         await supabase
@@ -625,7 +625,7 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
   const setDefaultCalendarId = useCallback(async (calendarId: string | null) => {
     const previous = defaultCalendarId
     setDefaultCalendarIdState(calendarId)
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { user } } = await getAuthUser()
     if (!user) return
     const { error: updateError } = await supabase
       .from('calendar_connections')

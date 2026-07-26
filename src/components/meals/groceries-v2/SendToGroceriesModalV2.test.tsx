@@ -4,12 +4,22 @@ import { SendToGroceriesModalV2 } from './SendToGroceriesModalV2'
 import type { ConsolidatedIngredient } from '@/lib/consolidateIngredients'
 
 const insertMock = vi.fn(() => Promise.resolve({ error: null }))
-vi.mock('@/lib/supabase', () => ({
+vi.mock('@/lib/supabase', () => {
+  const __mod: any = {
   supabase: {
     from: vi.fn(() => ({ insert: insertMock })),
     auth: { getUser: vi.fn(() => Promise.resolve({ data: { user: { id: 'u1' } }, error: null })) },
   },
-}))
+}
+  // getAuthUser is the real module's cached-session reader; here it
+  // just answers from whatever this mock's auth returns.
+  return {
+    ...__mod,
+    getAuthUser: (...a: any[]) =>
+      __mod.supabase.auth?.getUser?.(...a) ??
+      Promise.resolve({ data: { user: null }, error: null }),
+  }
+})
 
 const ci = (text: string, category: ConsolidatedIngredient['category']): ConsolidatedIngredient =>
   ({ text, category, fromRecipeIds: ['r1'] })

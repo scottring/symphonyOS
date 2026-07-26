@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react'
-import { supabase } from '@/lib/supabase'
+import { supabase, getAuthUser } from '@/lib/supabase'
 import { emitInstancesChanged } from '@/lib/instancesChangedSignal'
 import type {
   ActionableInstance,
@@ -28,7 +28,7 @@ export function useActionableInstances() {
     date: Date
   ): Promise<ActionableInstance | null> => {
     try {
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { user } } = await getAuthUser()
       if (!user) throw new Error('Not authenticated')
 
       const dateStr = toDateString(date)
@@ -74,7 +74,7 @@ export function useActionableInstances() {
     date: Date
   ): Promise<ActionableInstance | null> => {
     try {
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { user } } = await getAuthUser()
       if (!user) return null
 
       // RLS handles household sharing
@@ -99,7 +99,7 @@ export function useActionableInstances() {
   // 2. Instances that were deferred TO this date (status='deferred', deferred_to matches this date)
   const getInstancesForDate = useCallback(async (date: Date): Promise<ActionableInstance[]> => {
     try {
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { user } } = await getAuthUser()
       if (!user) return []
 
       const dateStr = toDateString(date)
@@ -451,7 +451,7 @@ export function useActionableInstances() {
     setError(null)
 
     try {
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { user } } = await getAuthUser()
       if (!user) throw new Error('Not authenticated')
 
       const instance = await getOrCreateInstance(entityType, entityId, date)
@@ -509,7 +509,7 @@ export function useActionableInstances() {
     setError(null)
 
     try {
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { user } } = await getAuthUser()
       if (!user) throw new Error('Not authenticated')
 
       const instance = await getOrCreateInstance(entityType, entityId, date)
@@ -563,7 +563,7 @@ export function useActionableInstances() {
     setError(null)
 
     try {
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { user } } = await getAuthUser()
       if (!user) throw new Error('Not authenticated')
 
       const { error: updateError } = await supabase

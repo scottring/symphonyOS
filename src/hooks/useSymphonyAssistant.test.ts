@@ -17,6 +17,9 @@ const db = vi.hoisted(() => ({
 vi.mock('@/lib/supabase', () => {
   const thenable = (data: unknown) => Object.assign(Promise.resolve({ data, error: null }), {})
   return {
+    // Mirrors the real module: the cached-session reader lives beside
+    // `supabase`, so a whole-module mock has to provide it too.
+    getAuthUser: async () => ({ data: { user: { id: 'u1' } }, error: null }),
     supabase: {
       auth: {
         getUser: () => Promise.resolve({ data: { user: { id: 'u1' } }, error: null }),

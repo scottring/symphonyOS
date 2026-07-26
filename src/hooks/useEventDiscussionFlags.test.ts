@@ -62,7 +62,8 @@ const createUpdateChain = () => ({
 
 // Mock Supabase — factory must not reference outer let/const declared after this call
 // so we use inline vi.fn() and then configure them via the imported mock in beforeEach
-vi.mock('@/lib/supabase', () => ({
+vi.mock('@/lib/supabase', () => {
+  const __mod: any = {
   supabase: {
     auth: {
       getUser: vi.fn(),
@@ -88,7 +89,16 @@ vi.mock('@/lib/supabase', () => ({
     })),
     removeChannel: vi.fn(),
   },
-}))
+}
+  // getAuthUser is the real module's cached-session reader; here it
+  // just answers from whatever this mock's auth returns.
+  return {
+    ...__mod,
+    getAuthUser: (...a: any[]) =>
+      __mod.supabase.auth?.getUser?.(...a) ??
+      Promise.resolve({ data: { user: null }, error: null }),
+  }
+})
 
 // Import mocked supabase AFTER vi.mock so we can configure it per-test
 import { supabase } from '@/lib/supabase'

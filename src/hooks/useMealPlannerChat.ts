@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { supabase } from '@/lib/supabase'
+import { supabase, getAuthUser } from '@/lib/supabase'
 import { toIsoDate } from '@/lib/weekHelpers'
 
 export interface ChatMsg {
@@ -97,7 +97,7 @@ export function useMealPlannerChat(weekStart: Date): UseMealPlannerChatResult {
   // chat keeps working even if the write is rejected.
   const persist = useCallback(async (role: ChatMsg['role'], content: string) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { user } } = await getAuthUser()
       if (!user) return
       await supabase
         .from('meal_chat_messages')

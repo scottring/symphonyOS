@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { supabase } from '@/lib/supabase'
+import { supabase, getAuthUser } from '@/lib/supabase'
 
 const PREFS_TITLE = 'Household Meal Preferences'
 
@@ -55,7 +55,7 @@ export function useMealPreferences(): UseMealPreferencesResult {
         if (err) { setError(err.message); return false }
       } else {
         // No note yet — create it couple-scoped so the partner sees it too.
-        const { data: { user } } = await supabase.auth.getUser()
+        const { data: { user } } = await getAuthUser()
         if (!user) { setError('not signed in'); return false }
         const { data, error: err } = await supabase
           .from('notes')

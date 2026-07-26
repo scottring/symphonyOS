@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react'
-import { supabase } from '@/lib/supabase'
+import { supabase, getAuthUser } from '@/lib/supabase'
 import { fetchRecipe } from '@/lib/recipeParser'
 import { recipeDataToInsertRow } from '@/lib/recipeDataMapper'
 import { dbRecipeToRecipe, type Recipe, type DbRecipe } from '@/types/meal-planner'
@@ -59,7 +59,7 @@ export function useRecipes(): UseRecipesResult {
   }, [sort, filter])
 
   const addByUrl = useCallback(async (url: string): Promise<Recipe> => {
-    const { data: userResult } = await supabase.auth.getUser()
+    const { data: userResult } = await getAuthUser()
     const userId = userResult?.user?.id
     if (!userId) throw new Error('not authenticated')
 
@@ -79,7 +79,7 @@ export function useRecipes(): UseRecipesResult {
   }, [])
 
   const addManual = useCallback(async (input: ManualRecipeInput): Promise<Recipe> => {
-    const { data: userResult } = await supabase.auth.getUser()
+    const { data: userResult } = await getAuthUser()
     const userId = userResult?.user?.id
     if (!userId) throw new Error('not authenticated')
 

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { supabase } from '@/lib/supabase'
+import { supabase, getAuthUser } from '@/lib/supabase'
 
 interface HiddenCalendarEvent {
   id: string
@@ -27,7 +27,7 @@ export function useHiddenCalendarEvents() {
   // Fetch hidden events on mount
   useEffect(() => {
     async function fetch() {
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { user } } = await getAuthUser()
       if (!user) { setLoading(false); return }
 
       const { data, error } = await supabase
@@ -54,7 +54,7 @@ export function useHiddenCalendarEvents() {
   const hideEvent = useCallback(async (googleEventId: string, title?: string, calendarId?: string) => {
     const baseId = getRecurringBaseId(googleEventId)
 
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { user } } = await getAuthUser()
     if (!user) return false
 
     const { data, error } = await supabase
@@ -80,7 +80,7 @@ export function useHiddenCalendarEvents() {
 
   // Unhide a recurring event
   const unhideEvent = useCallback(async (googleEventBaseId: string) => {
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { user } } = await getAuthUser()
     if (!user) return false
 
     const { error } = await supabase

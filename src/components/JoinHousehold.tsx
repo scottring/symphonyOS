@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { supabase } from '@/lib/supabase'
+import { getAuthUser } from '@/lib/supabase'
 import { useHouseholdInvitations } from '@/hooks/useHouseholdInvitations'
 import type { HouseholdInvitation } from '@/hooks/useHouseholdInvitations'
 
@@ -24,7 +24,7 @@ export function JoinHousehold() {
       }
 
       // Check if user is logged in
-      const { data: { user: authUser } } = await supabase.auth.getUser()
+      const { data: { user: authUser } } = await getAuthUser()
       setUser(authUser)
 
       // Fetch invitation details

@@ -87,7 +87,8 @@ const createEqChain = (depth: number = 0, isDeferred: boolean = false): unknown 
 })
 
 // Mock Supabase auth
-vi.mock('@/lib/supabase', () => ({
+vi.mock('@/lib/supabase', () => {
+  const __mod: any = {
   supabase: {
     auth: {
       getUser: vi.fn(() =>
@@ -130,7 +131,16 @@ vi.mock('@/lib/supabase', () => ({
       },
     }),
   },
-}))
+}
+  // getAuthUser is the real module's cached-session reader; here it
+  // just answers from whatever this mock's auth returns.
+  return {
+    ...__mod,
+    getAuthUser: (...a: any[]) =>
+      __mod.supabase.auth?.getUser?.(...a) ??
+      Promise.resolve({ data: { user: null }, error: null }),
+  }
+})
 
 describe('useActionableInstances', () => {
   beforeEach(() => {

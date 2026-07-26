@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Check, Eye, EyeOff, Briefcase, Users, User } from 'lucide-react'
 import type { GoogleCalendarInfo } from '@/hooks/useGoogleCalendar'
 import type { TaskContext } from '@/types/task'
-import { supabase } from '@/lib/supabase'
+import { supabase, getAuthUser } from '@/lib/supabase'
 
 interface CalendarDomainMapping {
   calendar_id: string
@@ -27,7 +27,7 @@ export function CalendarListDiscovery({ calendars, onContinue, onBack }: Calenda
 
   useEffect(() => {
     async function loadMappings() {
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { user } } = await getAuthUser()
       if (!user) { setLoadingMappings(false); return }
 
       const { data } = await supabase

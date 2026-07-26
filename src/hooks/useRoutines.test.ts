@@ -15,7 +15,8 @@ const mockDelete = vi.fn()
 const mockSingle = vi.fn()
 const mockGetUser = vi.fn()
 
-vi.mock('@/lib/supabase', () => ({
+vi.mock('@/lib/supabase', () => {
+  const __mod: any = {
   supabase: {
     auth: {
       getUser: () => mockGetUser(),
@@ -36,7 +37,16 @@ vi.mock('@/lib/supabase', () => ({
       delete: () => ({ eq: () => mockDelete() }),
     }),
   },
-}))
+}
+  // getAuthUser is the real module's cached-session reader; here it
+  // just answers from whatever this mock's auth returns.
+  return {
+    ...__mod,
+    getAuthUser: (...a: any[]) =>
+      __mod.supabase.auth?.getUser?.(...a) ??
+      Promise.resolve({ data: { user: null }, error: null }),
+  }
+})
 
 function createMockRoutine(overrides: Partial<Routine> = {}): Routine {
   return {

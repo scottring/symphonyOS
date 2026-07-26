@@ -3,7 +3,7 @@ import { useGoogleCalendar, type GoogleCalendarInfo } from '@/hooks/useGoogleCal
 import type { TaskContext } from '@/types/task'
 import { CalendarListDiscovery } from './CalendarListDiscovery'
 import { CalendarDomainAssignment } from './CalendarDomainAssignment'
-import { supabase } from '@/lib/supabase'
+import { supabase, getAuthUser } from '@/lib/supabase'
 import { Check, Lock, Briefcase, Users, User } from 'lucide-react'
 
 type WizardStep = 'connect' | 'discovery' | 'assignment' | 'confirmation'
@@ -57,7 +57,7 @@ export function CalendarSetupWizard({ onComplete }: CalendarSetupWizardProps) {
     setError(null)
 
     try {
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { user } } = await getAuthUser()
       if (!user) throw new Error('Not authenticated')
 
       // Delete existing mappings

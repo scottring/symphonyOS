@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { supabase } from '@/lib/supabase'
+import { supabase, getAuthUser } from '@/lib/supabase'
 import { getRecurringBaseId } from './useHiddenCalendarEvents'
 import type { EventDiscussionFlag } from '@/types/eventDiscussion'
 
@@ -36,7 +36,7 @@ export function useEventDiscussionFlags() {
   useEffect(() => {
     let cancelled = false
     async function fetch() {
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { user } } = await getAuthUser()
       if (!user) { setLoading(false); return }
 
       const { data, error } = await supabase
@@ -60,7 +60,7 @@ export function useEventDiscussionFlags() {
   useEffect(() => {
     let channel: ReturnType<typeof supabase.channel> | null = null
     async function subscribe() {
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { user } } = await getAuthUser()
       if (!user) return
       channel = supabase
         .channel('event_discussion_flags_changes')
@@ -109,7 +109,7 @@ export function useEventDiscussionFlags() {
   const flagEvent = useCallback(
     async (googleEventId: string, opts: { title?: string; calendarId?: string; note?: string }) => {
       const baseId = getRecurringBaseId(googleEventId)
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { user } } = await getAuthUser()
       if (!user) return false
 
       const { data, error } = await supabase
@@ -146,7 +146,7 @@ export function useEventDiscussionFlags() {
 
   const unflagEvent = useCallback(async (googleEventId: string) => {
     const baseId = getRecurringBaseId(googleEventId)
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { user } } = await getAuthUser()
     if (!user) return false
 
     const { error } = await supabase
@@ -170,7 +170,7 @@ export function useEventDiscussionFlags() {
 
   const updateNote = useCallback(async (googleEventId: string, note: string) => {
     const baseId = getRecurringBaseId(googleEventId)
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { user } } = await getAuthUser()
     if (!user) return false
 
     const { data, error } = await supabase

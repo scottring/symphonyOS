@@ -24,6 +24,9 @@ const mockUserId = '00000000-0000-0000-0000-000000000001'
 vi.mock('@/lib/supabase', () => {
   const mockFrom = vi.fn()
   return {
+    // Mirrors the real module: the cached-session reader lives beside
+    // `supabase`, so a whole-module mock has to provide it too.
+    getAuthUser: async () => ({ data: { user: { id: 'test-user-id' } }, error: null }),
     supabase: {
       from: mockFrom,
       auth: {

@@ -33,12 +33,22 @@ const { db, makeQuery } = vi.hoisted(() => {
   return { db, makeQuery }
 })
 
-vi.mock('@/lib/supabase', () => ({
+vi.mock('@/lib/supabase', () => {
+  const __mod: any = {
   supabase: {
     from: vi.fn(() => makeQuery()),
     auth: { getUser: vi.fn(() => Promise.resolve({ data: { user: { id: 'u1' } }, error: null })) },
   },
-}))
+}
+  // getAuthUser is the real module's cached-session reader; here it
+  // just answers from whatever this mock's auth returns.
+  return {
+    ...__mod,
+    getAuthUser: (...a: any[]) =>
+      __mod.supabase.auth?.getUser?.(...a) ??
+      Promise.resolve({ data: { user: null }, error: null }),
+  }
+})
 
 describe('useMealPreferences', () => {
   beforeEach(() => {

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
+import { shareInFlight } from '@/lib/sharedRequest'
 import { useAuth } from '@/hooks/useAuth'
 import type { Project, DbProject, ProjectStatus } from '@/types/project'
 import type { Task } from '@/types/task'
@@ -55,11 +56,12 @@ export function useProjects() {
       setLoading(true)
       setError(null)
 
-      // RLS policies handle household sharing - no need to filter by user_id
-      const { data, error: fetchError } = await supabase
-        .from('projects')
-        .select('*')
-        .order('name', { ascending: true })
+      // RLS policies handle household sharing - no need to filter by user_id.
+      // Shared: a single route mounts this hook eight times over.
+      const { data, error: fetchError } = await shareInFlight(
+        `projects:${user.id}`,
+        async () => await supabase.from('projects').select('*').order('name', { ascending: true }),
+      )
 
       if (fetchError) {
         setError(fetchError.message)

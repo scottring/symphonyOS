@@ -1,4 +1,4 @@
-import { supabase } from '@/lib/supabase'
+import { supabase, getAuthUser } from '@/lib/supabase'
 import { parseFacets, type Facet } from '@/types/facets'
 
 /** Entity kinds the `attachments` table accepts (its CHECK constraint). Events
@@ -96,7 +96,7 @@ export async function attachFile(
   fileName?: string,
 ): Promise<{ id: string; contentType: string } | null> {
   try {
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { user } } = await getAuthUser()
     if (!user) throw new Error('Not signed in')
 
     let upload: Blob

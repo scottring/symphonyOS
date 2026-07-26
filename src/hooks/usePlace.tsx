@@ -7,7 +7,7 @@
 // devices (and each household member keeps their own).
 import { createContext, useContext, useState, useEffect, useCallback } from 'react'
 import type { ReactNode } from 'react'
-import { supabase } from '@/lib/supabase'
+import { supabase, getAuthUser } from '@/lib/supabase'
 import { DEFAULT_PLACE, isPlaceId, type PlaceId } from '@/config/places'
 
 const STORAGE_KEY = 'symphony-place'
@@ -41,7 +41,7 @@ export function PlaceProvider({ children }: { children: ReactNode }) {
     let cancelled = false
     ;(async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser()
+        const { data: { user } } = await getAuthUser()
         if (!user || cancelled) return
         const { data } = await supabase
           .from('user_profiles')
@@ -64,7 +64,7 @@ export function PlaceProvider({ children }: { children: ReactNode }) {
     setPlaceState(next)
     ;(async () => {
       try {
-        const { data: { user } } = await supabase.auth.getUser()
+        const { data: { user } } = await getAuthUser()
         if (!user) return
         await supabase
           .from('user_profiles')

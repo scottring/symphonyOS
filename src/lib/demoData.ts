@@ -9,7 +9,7 @@
  * Can be reset/reloaded via Settings page
  */
 
-import { supabase } from './supabase'
+import { supabase, getAuthUser } from './supabase'
 import type { Contact } from '@/types/contact'
 import type { Project } from '@/types/project'
 import type { Task } from '@/types/task'
@@ -29,7 +29,7 @@ export interface DemoDataResult {
  */
 export async function clearDemoData(): Promise<{ success: boolean; message: string }> {
   try {
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { user } } = await getAuthUser()
     if (!user) {
       return { success: false, message: 'Not authenticated' }
     }
@@ -53,7 +53,7 @@ export async function clearDemoData(): Promise<{ success: boolean; message: stri
  */
 export async function loadDemoData(): Promise<DemoDataResult> {
   try {
-    const { data: { user } } = await supabase.auth.getUser()
+    const { data: { user } } = await getAuthUser()
     if (!user) {
       return { success: false, message: 'Not authenticated' }
     }

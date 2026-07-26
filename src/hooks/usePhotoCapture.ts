@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react'
-import { supabase } from '@/lib/supabase'
+import { supabase, getAuthUser } from '@/lib/supabase'
 import type { TaskContext } from '@/types/task'
 
 export type PhotoCaptureStatus = 'idle' | 'working' | 'started' | 'error'
@@ -43,7 +43,7 @@ export function usePhotoCapture() {
     setStatus('working')
     setError(null)
     try {
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { user } } = await getAuthUser()
       if (!user) throw new Error('Not signed in')
 
       const taskId = crypto.randomUUID()

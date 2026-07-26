@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { Plus } from 'lucide-react'
-import { supabase } from '@/lib/supabase'
+import { supabase, getAuthUser } from '@/lib/supabase'
 import { CATEGORY_ORDER, type GroceryCategory } from '@/lib/categorizeIngredient'
 import type { ConsolidatedIngredient } from '@/lib/consolidateIngredients'
 import { isStaple } from '@/lib/isStaple'
@@ -122,7 +122,7 @@ export function SendToGroceriesModalV2({
     if (!groceriesListId || items.length === 0) return
     setSending(true)
     setError(null)
-    const { data: userResult } = await supabase.auth.getUser()
+    const { data: userResult } = await getAuthUser()
     const userId = userResult?.user?.id
     if (!userId) {
       setError('not authenticated')

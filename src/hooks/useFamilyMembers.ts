@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
-import { supabase } from '@/lib/supabase'
+import { supabase, getAuthUser } from '@/lib/supabase'
+import { shareInFlight } from '@/lib/sharedRequest'
 import type { FamilyMember } from '@/types/family'
 
 // One in-flight seed attempt shared across ALL hook instances in this tab.
@@ -13,7 +14,7 @@ import type { FamilyMember } from '@/types/family'
 let seedInFlight: Promise<FamilyMember[] | null> | null = null
 
 async function seedSelfMemberOnce(): Promise<FamilyMember[] | null> {
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user } } = await getAuthUser()
   if (!user) return null
 
   // If this user already has ANY member row, adopt it instead of inserting.
@@ -53,16 +54,17 @@ export function useFamilyMembers() {
 
   const fetchMembers = useCallback(async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { user } } = await getAuthUser()
       if (!user) return
 
       setCurrentUserId(user.id)
 
-      // RLS policies handle household sharing - no need to filter by user_id
-      const { data, error } = await supabase
-        .from('family_members')
-        .select('*')
-        .order('display_order', { ascending: true })
+      // RLS policies handle household sharing - no need to filter by user_id.
+      // Shared: a single route mounts this hook ten times over.
+      const { data, error } = await shareInFlight(
+        `family_members:${user.id}`,
+        async () => await supabase.from('family_members').select('*').order('display_order', { ascending: true }),
+      )
 
       if (error) throw error
       // Deduplicate by id (in case of data issues)
@@ -99,7 +101,7 @@ export function useFamilyMembers() {
 
   const addMember = useCallback(async (member: Omit<FamilyMember, 'id' | 'user_id' | 'created_at'>) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser()
+      const { data: { user } } = await getAuthUser()
       if (!user) throw new Error('Not authenticated')
 
       const { data, error } = await supabase

@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
-import { supabase } from '@/lib/supabase'
+import { supabase, getAuthUser } from '@/lib/supabase'
 import { toIsoDate } from '@/lib/weekHelpers'
 import { useAuth } from '@/hooks/useAuth'
 import {
@@ -45,7 +45,7 @@ export function useMealPlan(weekStart: Date): UseMealPlanResult {
   const refresh = useCallback(async () => {
     setLoading(true)
     setError(null)
-    const { data: userResult } = await supabase.auth.getUser()
+    const { data: userResult } = await getAuthUser()
     const userId = userResult?.user?.id
     if (!userId) { setError('not authenticated'); setLoading(false); return }
 

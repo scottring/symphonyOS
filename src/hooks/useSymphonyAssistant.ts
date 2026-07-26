@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { supabase } from '@/lib/supabase'
+import { supabase, getAuthUser } from '@/lib/supabase'
 import { streamSymphonyAgent, type AgentApiMessage, type AssistantTaskContext, type AgentSourceNote } from '@/lib/agentStream'
 import type { ChatMessage, ChatSession } from '@/types/chat'
 import type { ChatAttachment } from '@/components/chat/ChatAttachment'
@@ -131,7 +131,7 @@ export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
             ? { ...s, messages: finalMessages, updatedAt: new Date() }
             : s))
       } else {
-        const { data: { user } } = await supabase.auth.getUser()
+        const { data: { user } } = await getAuthUser()
         if (!user) return
         const title = stored.find((m) => m.role === 'user')?.content.slice(0, 80) ?? 'Chat'
         const { data } = await supabase
