@@ -38,8 +38,19 @@ interface PlanningSessionProps {
   routines: Routine[]
   /** Untimed routines shown in the drawer as draggable chips (weekly planning). */
   draggableRoutines?: Routine[]
-  /** Drop handler for a dragged routine: pins it to a date's weekday + time. */
+  /**
+   * Drop handler for a dragged routine: pins it to a date's weekday + time by
+   * REWRITING the recurrence rule. Right on the week grid, where the gesture
+   * means "this is when this routine happens".
+   */
   onScheduleRoutine?: (routineId: string, date: Date, time: string) => void
+  /**
+   * Pin a routine to a time on ONE day, leaving its recurrence rule alone.
+   * Used at time grain, where the day is already settled and only the time is
+   * in question — `onScheduleRoutine` there would turn one drag into "every
+   * future occurrence moves too".
+   */
+  onScheduleRoutineToday?: (routineId: string, when: Date) => void
   /** Reschedule a placed calendar event to a new start/end (preserves duration). */
   onRescheduleEvent?: (event: CalendarEvent, startTime: Date, endTime: Date) => void
   familyMembers?: FamilyMember[]
@@ -97,6 +108,7 @@ export function PlanningSession({
   routines,
   draggableRoutines = [],
   onScheduleRoutine,
+  onScheduleRoutineToday,
   onRescheduleEvent,
   familyMembers = [],
   eventNotesMap,
@@ -474,6 +486,31 @@ export function PlanningSession({
     // Can add visual feedback here if needed
   }, [])
 
+  /**
+   * A routine was dropped on an hour slot.
+   *
+   * At DAY grain this rewrites the recurrence rule — the week grid's gesture
+   * means "this is when this routine happens". At TIME grain the day is already
+   * settled and only the time is in question, so it writes a ONE-DAY override
+   * instead; rewriting the rule there would move every future occurrence from a
+   * single drag.
+   */
+  const scheduleRoutineFromSlot = useCallback(
+    (routineId: string, parsed: { year: number; month: number; day: number; hour: number; minute: number }) => {
+      if (!dayGrain && onScheduleRoutineToday) {
+        onScheduleRoutineToday(
+          routineId,
+          new Date(parsed.year, parsed.month, parsed.day, parsed.hour, parsed.minute, 0, 0),
+        )
+        return
+      }
+      const date = new Date(parsed.year, parsed.month, parsed.day)
+      const time = `${String(parsed.hour).padStart(2, '0')}:${String(parsed.minute).padStart(2, '0')}`
+      onScheduleRoutine?.(routineId, date, time)
+    },
+    [dayGrain, onScheduleRoutine, onScheduleRoutineToday],
+  )
+
   // Handle drag end
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
@@ -511,9 +548,7 @@ export function PlanningSession({
         if (!dropTarget.startsWith('slot-')) return
         const parsed = parseSlotId(dropTarget)
         if (!parsed) return
-        const date = new Date(parsed.year, parsed.month, parsed.day)
-        const time = `${String(parsed.hour).padStart(2, '0')}:${String(parsed.minute).padStart(2, '0')}`
-        onScheduleRoutine?.(activeId.slice(ROUTINE_DRAG_PREFIX.length), date, time)
+        scheduleRoutineFromSlot(activeId.slice(ROUTINE_DRAG_PREFIX.length), parsed)
         return
       }
 
@@ -523,9 +558,7 @@ export function PlanningSession({
         if (!dropTarget.startsWith('slot-')) return
         const parsed = parseSlotId(dropTarget)
         if (!parsed) return
-        const date = new Date(parsed.year, parsed.month, parsed.day)
-        const time = `${String(parsed.hour).padStart(2, '0')}:${String(parsed.minute).padStart(2, '0')}`
-        onScheduleRoutine?.(activeId.slice(PLACED_ROUTINE_DRAG_PREFIX.length), date, time)
+        scheduleRoutineFromSlot(activeId.slice(PLACED_ROUTINE_DRAG_PREFIX.length), parsed)
         return
       }
 
@@ -610,7 +643,7 @@ export function PlanningSession({
         })
       }
     },
-    [onUpdateTask, tasks, onScheduleRoutine, onRescheduleEvent, events, minDropDate, dayGrain]
+    [onUpdateTask, tasks, scheduleRoutineFromSlot, onRescheduleEvent, events, minDropDate, dayGrain]
   )
 
   return (

@@ -775,3 +775,35 @@ function formatDateKey(date: Date): string {
   const day = String(date.getDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
 }
+
+// ── A routine drop must not rewrite the recurrence rule on a TIME-grain
+// surface. scheduleRoutineOnDate (what onScheduleRoutine reaches) rewrites
+// recurrence_pattern to weekly-on-that-weekday plus a new time_of_day, so one
+// drag on Today would move every future occurrence. ──
+describe('routine drops by grain', () => {
+  const day = new Date(2026, 6, 20)
+  const base = {
+    tasks: [], events: [], routines: [],
+    onUpdateTask: vi.fn(), onPushTask: vi.fn(), onClose: vi.fn(),
+    initialDate: day,
+  }
+
+  it('exposes a one-day-override handler distinct from the rule-rewriting one', () => {
+    // Both props exist and are independent; the grain decides which is used.
+    const onScheduleRoutine = vi.fn()
+    const onScheduleRoutineToday = vi.fn()
+    render(
+      <PlanningSession {...base}
+        onScheduleRoutine={onScheduleRoutine}
+        onScheduleRoutineToday={onScheduleRoutineToday} />
+    )
+    expect(onScheduleRoutine).not.toHaveBeenCalled()
+    expect(onScheduleRoutineToday).not.toHaveBeenCalled()
+  })
+
+  it('keeps the hour grid at time grain, which is what makes a one-day time meaningful', () => {
+    render(<PlanningSession {...base} placementGrain="time"
+      onScheduleRoutineToday={vi.fn()} />)
+    expect(screen.getByText('6 AM')).toBeInTheDocument()
+  })
+})

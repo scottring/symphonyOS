@@ -632,6 +632,12 @@ export function HomeViewContainer() {
               const routine = allRoutines.find(r => r.id === routineId);
               if (routine) updateRoutine(routineId, scheduleRoutineOnDate(routine, date, time));
             }}
+            // This mount is time grain (Today), so a routine drop must write a
+            // one-day override rather than rewriting recurrence_pattern — one
+            // drag should not move every future occurrence.
+            onScheduleRoutineToday={(routineId, when) => {
+              void scheduleActions.onPushRoutine?.(routineId, when);
+            }}
             onRescheduleEvent={(event, startTime, endTime) =>
               updateEvent({
                 eventId: event.google_event_id || event.id,

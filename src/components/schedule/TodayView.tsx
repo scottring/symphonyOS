@@ -33,7 +33,7 @@ import { useRecurringEventDetection } from '@/hooks/useRecurringEventDetection'
 import { useTimelineInsert } from '@/hooks/useTimelineInsert'
 import { useDomain } from '@/hooks/useDomain'
 
-import { Eye, EyeOff, Repeat, Binoculars, Sun, Printer, GripVertical } from 'lucide-react'
+import { Eye, EyeOff, Repeat, Binoculars, Sun, Printer, GripVertical, CalendarClock } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { AssigneeFilter } from '@/components/home/AssigneeFilter'
 
@@ -753,6 +753,17 @@ export function TodayView({
                 <Printer className="w-5 h-5" />
                 <span>Print list</span>
               </button>
+              {data.isToday && ctx.onOpenPlanning && (
+                <button
+                  type="button"
+                  onClick={ctx.onOpenPlanning}
+                  title="Block out the day on an hour grid"
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[15px] text-neutral-500 hover:text-neutral-800 hover:bg-neutral-100 transition-all"
+                >
+                  <CalendarClock className="w-5 h-5" />
+                  <span>Time-block</span>
+                </button>
+              )}
               {data.isToday && onOpenPlanToday && (
                 <button
                   type="button"
