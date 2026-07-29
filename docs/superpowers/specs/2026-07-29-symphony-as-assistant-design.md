@@ -182,12 +182,15 @@ Resume here. Present as sections, one at a time, approval after each:
 
 ---
 
-## Open questions for Scott
+## Open questions — resolved 2026-07-29 (same day, later in session)
 
-- Does Iris actually want her own assistant? Asked once, deferred to phase 2 — but it should
-  be answered before schema work, not after.
-- "Re-rank it" was decided in the abstract. Against what — the job search, or Sappi? The
-  vault's priority stack needs an explicit edit, not a quiet drift.
+- ~~Does Iris actually want her own assistant?~~ **Scott chose to hold off on asking Iris
+  for now.** Still must be answered before phase-2 schema work — but don't raise it again
+  unprompted; it's his call to reopen.
+- ~~"Re-rank it" against what?~~ **Resolved: Symphony promoted to priority #2**, behind the
+  job search and ahead of Sappi. Vault's `context/scott-overview.md` priority stack edited
+  accordingly; supersedes the 2026-05-22 maintenance-mode/household-only decision. Decision
+  captured in the vault inbox.
 
 ---
 
