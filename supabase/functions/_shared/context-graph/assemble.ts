@@ -129,27 +129,26 @@ async function loadPeople(client: SupabaseClient, row: EntityRow, ref: EntityRef
 }
 
 async function loadLineage(client: SupabaseClient, row: EntityRow, ref: EntityRef): Promise<BundleLineage> {
+  const [projectResult, goalResult] = await Promise.all([
+    row.project_id
+      ? client.from('projects').select('id, name, status').eq('id', row.project_id).eq('user_id', ref.userId).maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+    row.goal_id
+      ? client.from('goals').select('id, title').eq('id', row.goal_id).eq('user_id', ref.userId).maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+  ])
+
   const lineage: BundleLineage = {}
-  if (row.project_id) {
-    const { data } = throwIfErrored(
-      await client.from('projects').select('id, name, status').eq('id', row.project_id).eq('user_id', ref.userId).maybeSingle()
-    )
-    const project = data as { id: string; name: string; status: string } | null
-    if (project) {
-      lineage.projectId = project.id
-      lineage.projectName = project.name
-      lineage.projectStatus = project.status
-    }
+  const project = throwIfErrored(projectResult).data as { id: string; name: string; status: string } | null
+  if (project) {
+    lineage.projectId = project.id
+    lineage.projectName = project.name
+    lineage.projectStatus = project.status
   }
-  if (row.goal_id) {
-    const { data } = throwIfErrored(
-      await client.from('goals').select('id, title').eq('id', row.goal_id).eq('user_id', ref.userId).maybeSingle()
-    )
-    const goal = data as { id: string; title: string } | null
-    if (goal) {
-      lineage.goalId = goal.id
-      lineage.goalTitle = goal.title
-    }
+  const goal = throwIfErrored(goalResult).data as { id: string; title: string } | null
+  if (goal) {
+    lineage.goalId = goal.id
+    lineage.goalTitle = goal.title
   }
   return lineage
 }
@@ -167,9 +166,17 @@ async function loadFacts(client: SupabaseClient, entityType: string, entityId: s
   return facetsToFacts((data ?? []) as { id: string; facets: unknown }[])
 }
 
+// note_entity_links predates the context-graph's entity-type vocabulary and only ever
+// stores 'event' for calendar events (022_notes.sql CHECK constraint; written as 'event'
+// in useMeetingNotes.ts) — never 'calendar_event'. Map at the lookup only; the public
+// ContextEntityType ('calendar_event') stays the vocabulary everywhere else.
+function noteLinkEntityType(entityType: string): string {
+  return entityType === 'calendar_event' ? 'event' : entityType
+}
+
 async function loadLinkedNotes(client: SupabaseClient, entityType: string, entityId: string, userId: string): Promise<BundleNote[]> {
   const { data: links } = throwIfErrored(
-    await client.from('note_entity_links').select('note_id').eq('entity_type', entityType).eq('entity_id', entityId)
+    await client.from('note_entity_links').select('note_id').eq('entity_type', noteLinkEntityType(entityType)).eq('entity_id', entityId)
   )
   const noteIds = ((links ?? []) as { note_id: string }[]).map(l => l.note_id)
   if (noteIds.length === 0) return []
@@ -257,20 +264,23 @@ export async function assembleContext(deps: AssembleDeps, ref: EntityRef): Promi
   const degraded: string[] = []
 
   const row = await loadEntity(client, ref)
+  const openAiKey = deps.openAiKey
 
-  const [people, lineage, facts, linkedNotes, history] = await Promise.all([
+  // Semantic lookup only needs row.title (already loaded above), so it runs alongside
+  // the other parts instead of serially after them — the 3s embed timeout was otherwise
+  // pure added latency on every assembly.
+  const [people, lineage, facts, linkedNotes, history, semanticNotes] = await Promise.all([
     part<BundlePerson[]>('people', degraded, () => loadPeople(client, row, ref), []),
     part<BundleLineage>('lineage', degraded, () => ref.entityType === 'task' ? loadLineage(client, row, ref) : Promise.resolve({}), {}),
     part<BundleFact[]>('facts', degraded, () => loadFacts(client, ref.entityType, ref.entityId, ref.userId), []),
     part<BundleNote[]>('knowledge', degraded, () => loadLinkedNotes(client, ref.entityType, ref.entityId, ref.userId), []),
     part<BundleAction[]>('history', degraded, () => loadHistory(client, ref.entityType, ref.entityId, ref.userId), []),
+    openAiKey
+      ? part<BundleNote[]>('knowledge', degraded, () => loadSemanticNotes(client, openAiKey, row.title, ref.userId), [])
+      : Promise.resolve([] as BundleNote[]),
   ])
 
-  let knowledge = linkedNotes
-  if (deps.openAiKey) {
-    const semanticNotes = await part<BundleNote[]>('knowledge', degraded, () => loadSemanticNotes(client, deps.openAiKey!, row.title, ref.userId), [])
-    knowledge = boundKnowledge([...linkedNotes, ...semanticNotes])
-  }
+  const knowledge = boundKnowledge([...linkedNotes, ...semanticNotes])
 
   return {
     ref,

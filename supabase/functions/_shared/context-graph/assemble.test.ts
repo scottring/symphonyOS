@@ -18,6 +18,31 @@ function stubClient(tables: Record<string, { data: unknown; error?: { message: s
   } as never
 }
 
+/** Like stubClient, but every `.eq(col, val)` call is recorded (with its table) so a test
+ *  can assert which entity_type string a query was actually filtered by. */
+function stubClientRecordingEq(
+  tables: Record<string, { data: unknown; error?: { message: string } | null }>,
+  calls: { table: string; col: string; val: unknown }[]
+) {
+  return {
+    from(table: string) {
+      const result = tables[table] ?? { data: null, error: { message: `no stub for ${table}` } }
+      const chain: Record<string, unknown> = {}
+      const self = () => chain
+      for (const m of ['select', 'in', 'order', 'limit', 'not']) chain[m] = self
+      chain.eq = (col: string, val: unknown) => {
+        calls.push({ table, col, val })
+        return chain
+      }
+      chain.single = () => Promise.resolve(result)
+      chain.maybeSingle = () => Promise.resolve(result)
+      chain.then = (res: (v: unknown) => unknown) => Promise.resolve(result).then(res)
+      return chain
+    },
+    rpc: () => Promise.resolve(tables['__rpc__'] ?? { data: [], error: null }),
+  } as never
+}
+
 const TASK = {
   id: 't1', title: 'Call Camp Notre Dame', notes: null, links: [], phone_number: null,
   contact_id: 'c1', assigned_to: null, project_id: 'p1', goal_id: 'g1',
@@ -78,5 +103,48 @@ describe('assembleContext (task)', () => {
     const b = await assembleContext({ client }, { entityType: 'task', entityId: 't1', userId: 'u1' })
     expect(b.knowledge).toEqual([])
     expect(b.degraded).not.toContain('knowledge')  // absent key is a config choice, not a failure
+  })
+})
+
+describe('assembleContext (calendar_event)', () => {
+  const EVENT = {
+    id: 'e1', title: 'Team sync', description: null, location: null,
+    start_time: '2026-07-29T10:00:00Z', created_at: '2026-07-01T00:00:00Z',
+  }
+
+  it('queries note_entity_links with the legacy "event" entity_type, not "calendar_event"', async () => {
+    const calls: { table: string; col: string; val: unknown }[] = []
+    const client = stubClientRecordingEq({
+      calendar_events: { data: EVENT },
+      contacts: { data: [] },
+      attachments: { data: [] },
+      note_entity_links: { data: [] },
+      notes: { data: [] },
+      action_history: { data: [] },
+    }, calls)
+
+    await assembleContext({ client }, { entityType: 'calendar_event', entityId: 'e1', userId: 'u1' })
+
+    const entityTypeCalls = calls.filter(c => c.table === 'note_entity_links' && c.col === 'entity_type')
+    expect(entityTypeCalls).toHaveLength(1)
+    expect(entityTypeCalls[0].val).toBe('event')
+    expect(entityTypeCalls[0].val).not.toBe('calendar_event')
+  })
+
+  it('still returns a well-formed bundle with empty lineage', async () => {
+    const client = stubClientRecordingEq({
+      calendar_events: { data: EVENT },
+      contacts: { data: [] },
+      attachments: { data: [] },
+      note_entity_links: { data: [{ note_id: 'n1' }] },
+      notes: { data: [{ id: 'n1', title: 'sync notes', content: 'agenda: Q3 roadmap', vault_path: null }] },
+      action_history: { data: [] },
+    }, [])
+
+    const b = await assembleContext({ client }, { entityType: 'calendar_event', entityId: 'e1', userId: 'u1' })
+    expect(b.entity.title).toBe('Team sync')
+    expect(b.lineage).toEqual({})
+    expect(b.knowledge[0]).toMatchObject({ id: 'n1', source: 'linked' })
+    expect(b.degraded).toEqual([])
   })
 })
