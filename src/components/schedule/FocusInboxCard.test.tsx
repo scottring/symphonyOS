@@ -168,5 +168,15 @@ describe('FocusInboxCard', () => {
       expect(button).toBeDisabled()
       expect(button).toHaveAttribute('aria-busy', 'true')
     })
+
+    it('does not open the picker via the "e" key while a send is in flight', () => {
+      const onSendToCalendar = vi.fn()
+      render(<FocusInboxCard {...baseProps} onSendToCalendar={onSendToCalendar} sending />)
+
+      fireEvent.keyDown(window, { key: 'e' })
+
+      expect(screen.queryByText('Schedule')).not.toBeInTheDocument()
+      expect(onSendToCalendar).not.toHaveBeenCalled()
+    })
   })
 })

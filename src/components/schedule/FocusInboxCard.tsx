@@ -78,9 +78,9 @@ export function FocusInboxCard({
   // popover it opens anchors to this card's own trigger button, which must
   // stay mounted behind it.
   const openSendToCalendar = useCallback(() => {
-    if (!current || !onSendToCalendar) return
+    if (!current || !onSendToCalendar || sending) return
     setCalendarOpen(true)
-  }, [current, onSendToCalendar])
+  }, [current, onSendToCalendar, sending])
 
   useEffect(() => {
     function handler(e: KeyboardEvent) {
