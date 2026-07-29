@@ -13,6 +13,8 @@ interface ProactiveSuggestionChipsProps {
   onDelete?: (taskId: string) => void
   /** For guided_chat action — opens chat with entity context */
   onOpenGuidedChat?: (entityType: 'task' | 'contact' | 'project' | 'event', entityId: string, entityName: string, prompt?: string) => void
+  /** Replaces the hardcoded `ml-[6.5rem] mt-0.5 mb-2` wrapper margin classes (e.g. for non-Today layouts). Default unchanged when omitted. */
+  className?: string
 }
 
 // Maps action types to ConceptName (null = non-emoji, use text fallback)
@@ -43,6 +45,7 @@ export function ProactiveSuggestionChips({
   onPush,
   onDelete,
   onOpenGuidedChat,
+  className,
 }: ProactiveSuggestionChipsProps) {
   const [pendingOutcome, setPendingOutcome] = useState<{
     suggestionId: string
@@ -146,7 +149,7 @@ export function ProactiveSuggestionChips({
           onCancel={handleOutcomeCancel}
         />
       ) : (
-        <div className="flex gap-2 ml-[6.5rem] mt-0.5 mb-2">
+        <div className={`flex gap-2 ${className ?? 'ml-[6.5rem] mt-0.5 mb-2'}`}>
           {suggestions.map((s) => (
             <button
               key={s.id}

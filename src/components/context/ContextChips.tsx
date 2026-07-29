@@ -1,0 +1,61 @@
+import type { JSX } from 'react'
+import { History } from 'lucide-react'
+import { useEntityContext } from '@/hooks/useEntityContext'
+import { ProactiveSuggestionChips } from '@/components/schedule/ProactiveSuggestionChips'
+import type { SuggestionEntityType } from '@/types/proactiveSuggestion'
+
+interface ContextChipsProps {
+  entityType: SuggestionEntityType
+  entityId: string | null
+  /** 'panel' = all suggestions + last-action line; 'row' = top-1 suggestion only, no last-action */
+  variant?: 'panel' | 'row'
+  /** For guided_chat suggestions — opens chat with entity context */
+  onOpenGuidedChat?: (entityType: 'task' | 'contact' | 'project' | 'event', entityId: string, entityName: string, prompt?: string) => void
+}
+
+// No relative-time helper exists in src/lib/ (checked for
+// formatDistanceToNow/timeAgo/relativeTime) — small local one.
+function daysAgo(date: Date): string {
+  const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate())
+  const diffMs = startOfDay(new Date()).getTime() - startOfDay(date).getTime()
+  const diffDays = Math.round(diffMs / (1000 * 60 * 60 * 24))
+  if (diffDays <= 0) return 'today'
+  if (diffDays === 1) return 'yesterday'
+  return `${diffDays}d ago`
+}
+
+export function ContextChips({
+  entityType,
+  entityId,
+  variant = 'panel',
+  onOpenGuidedChat,
+}: ContextChipsProps): JSX.Element | null {
+  const { suggestions, lastAction, actOnSuggestion, dismissSuggestion } = useEntityContext(entityType, entityId)
+
+  const visibleSuggestions = variant === 'row' ? suggestions.slice(0, 1) : suggestions
+  const showLastAction = variant === 'panel' && lastAction !== null
+
+  if (visibleSuggestions.length === 0 && !showLastAction) return null
+
+  return (
+    <>
+      {visibleSuggestions.length > 0 && (
+        <ProactiveSuggestionChips
+          suggestions={visibleSuggestions}
+          onAct={actOnSuggestion}
+          onDismiss={dismissSuggestion}
+          onOpenGuidedChat={onOpenGuidedChat}
+          className="ml-0"
+        />
+      )}
+      {showLastAction && lastAction && (
+        <div className="flex items-center gap-1.5 text-xs text-neutral-400 mb-2">
+          <History size={16} className="text-neutral-400" />
+          <span>
+            {`Last: ${lastAction.detail || lastAction.actionType}${lastAction.outcome ? ` — ${lastAction.outcome.replace('_', ' ')}` : ''} · ${daysAgo(lastAction.createdAt)}`}
+          </span>
+        </div>
+      )}
+    </>
+  )
+}
