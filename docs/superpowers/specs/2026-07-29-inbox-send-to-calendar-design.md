@@ -2,7 +2,29 @@
 
 **Date:** 2026-07-29
 **Branch:** `inbox-send-to-calendar`
-**Status:** approved, not implemented
+**Status:** implemented — see **As-built** for where it differs from this design
+
+## As-built (2026-07-29)
+
+The design below is the approved intent; the shipped code differs in four
+places, each for a reason found during implementation:
+
+- **No `requestId`.** The edge function turns a `requestId` into a deterministic
+  Google event id and resolves the resulting `409` by *fetching the existing
+  event*. Send → undo → re-send would therefore hand back the **cancelled**
+  event instead of creating a new one. The in-flight guard in
+  `useSendToCalendar` covers the double-tap case the idempotency key was for.
+- **Focus-mode key is `e`, not `c`.** `c` was already Complete in
+  `FocusInboxCard`.
+- **No `<SendToCalendarPopover>`.** `SchedulePopover` gained `showDuration` plus
+  an optional controlled `open` / `onOpenChange` pair, and each call site's own
+  chip *is* the trigger — the popover positions itself from
+  `triggerRef.getBoundingClientRect()`, so a shared instance rendered once in
+  `InboxView` would have had nothing to anchor to.
+- **Seven pre-existing `SchedulePopover` call sites across six files**, not the
+  17 across 10 claimed below (an unverified count). All still pass two-argument
+  `onSchedule` handlers and were left untouched — as did every existing test
+  render.
 
 ## Problem
 
@@ -47,6 +69,10 @@ To make the destruction safe:
   Google can show.
 - Project link, assignees, and completion state do **not** survive. That is the
   accepted cost.
+- Subtasks do **not** survive either: `parent_task_id` is `ON DELETE CASCADE`
+  (`supabase/migrations/016_subtasks.sql:3`) and Undo's `restoreTask` restores
+  only the parent, so a converted task's children are gone for good. Theoretical
+  today — inbox-bucket rows don't render subtasks — but real if that changes.
 
 ### Order of operations is the safety property
 

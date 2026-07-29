@@ -41,6 +41,14 @@ export function FocusInboxCard({
 }: FocusInboxCardProps) {
   const [index, setIndex] = useState(0)
   const [calendarOpen, setCalendarOpen] = useState(false)
+  // The task the picker was opened ON, captured at open time. The picker stays
+  // open for seconds (day -> duration -> time) and `tasks` is sorted newest
+  // first, so a capture arriving meanwhile (Cmd+K, an iOS photo capture over
+  // realtime) shifts every card down. Reading `current` at confirm time would
+  // then convert — and DESTROY — a different task than the one on screen. List
+  // mode is immune because its handler closes over its own row's task; this is
+  // focus mode's equivalent.
+  const [pendingCalendarTask, setPendingCalendarTask] = useState<Task | null>(null)
 
   const total = tasks.length
   const current = tasks[index]
@@ -71,6 +79,19 @@ export function FocusInboxCard({
     advance()
   }, [current, onComplete, advance])
 
+  // Single entry point for every way the picker opens (trigger click via the
+  // popover's own onOpenChange, or the 'e' key) so the task is captured exactly
+  // once, at open, no matter the route.
+  const setCalendarPickerOpen = useCallback((next: boolean) => {
+    if (next) {
+      if (!current || !onSendToCalendar || sending) return
+      setPendingCalendarTask(current)
+    } else {
+      setPendingCalendarTask(null)
+    }
+    setCalendarOpen(next)
+  }, [current, onSendToCalendar, sending])
+
   // Opens the calendar picker rather than converting directly — the picker
   // needs a day, a time, and (optionally) a duration before there's anything
   // to send. It does NOT call advance(): the card only leaves the list once
@@ -78,9 +99,8 @@ export function FocusInboxCard({
   // popover it opens anchors to this card's own trigger button, which must
   // stay mounted behind it.
   const openSendToCalendar = useCallback(() => {
-    if (!current || !onSendToCalendar || sending) return
-    setCalendarOpen(true)
-  }, [current, onSendToCalendar, sending])
+    setCalendarPickerOpen(true)
+  }, [setCalendarPickerOpen])
 
   useEffect(() => {
     function handler(e: KeyboardEvent) {
@@ -92,7 +112,7 @@ export function FocusInboxCard({
       // would delete/complete/triage the card out from under the open
       // popover. Escape closes the picker instead of exiting focus mode.
       if (calendarOpen) {
-        if (e.key === 'Escape') { e.stopPropagation(); setCalendarOpen(false) }
+        if (e.key === 'Escape') { e.stopPropagation(); setCalendarPickerOpen(false) }
         return
       }
 
@@ -117,7 +137,7 @@ export function FocusInboxCard({
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [triage, del, complete, openSendToCalendar, advance, goBack, current, onSelectDetail, onExitFocus, calendarOpen])
+  }, [triage, del, complete, openSendToCalendar, setCalendarPickerOpen, advance, goBack, current, onSelectDetail, onExitFocus, calendarOpen])
 
   if (total === 0 || !current) {
     return (
@@ -172,11 +192,14 @@ export function FocusInboxCard({
         {onSendToCalendar && (
           <SchedulePopover
             showDuration
-            itemTitle={current.title}
+            // The card behind the picker may have shifted; the picker keeps
+            // naming the task it was opened on.
+            itemTitle={(pendingCalendarTask ?? current).title}
             open={calendarOpen}
-            onOpenChange={setCalendarOpen}
+            onOpenChange={setCalendarPickerOpen}
             onSchedule={(date, isAllDay, durationMinutes) => {
-              onSendToCalendar(current.id, date, isAllDay, durationMinutes)
+              if (!pendingCalendarTask) return
+              onSendToCalendar(pendingCalendarTask.id, date, isAllDay, durationMinutes)
             }}
             trigger={
               <button

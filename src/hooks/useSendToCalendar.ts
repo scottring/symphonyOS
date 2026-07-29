@@ -20,7 +20,7 @@ export type SendToCalendarResult =
   | { ok: false; reason: SendFailureReason }
 
 const DEFAULT_DURATION_MINUTES = 60
-const ONE_DAY_MS = 24 * 60 * 60 * 1000
+const ONE_HOUR_MS = 60 * 60 * 1000
 
 /** The task is destroyed by the conversion, so its rich context moves into the
  *  event body — the one place Google will still show it. */
@@ -63,8 +63,15 @@ export function useSendToCalendar(deleteTask: (id: string) => void | Promise<voi
 
       const target = getCalendarForDomain(task.context)
       const start = when.start
+      // All-day end is INCLUSIVE here, not exclusive: the edge function takes
+      // endTime's date as the event's last day and adds the day Google's
+      // exclusive `end.date` needs itself
+      // (google-calendar-create-event/index.ts:329-339). An end 24h out
+      // therefore rendered a two-day banner. Staying on the start's own day —
+      // the same +1h the only other allDay caller uses
+      // (HomeViewContainer.tsx:375-380) — yields a single-day event.
       const end = when.allDay
-        ? new Date(start.getTime() + ONE_DAY_MS)
+        ? new Date(start.getTime() + ONE_HOUR_MS)
         : new Date(start.getTime() + (when.durationMinutes ?? DEFAULT_DURATION_MINUTES) * 60000)
 
       try {

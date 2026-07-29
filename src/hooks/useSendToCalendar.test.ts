@@ -138,15 +138,31 @@ describe('useSendToCalendar', () => {
     )
   })
 
-  it('sends an all-day event when allDay is set', async () => {
+  it('sends an all-day event whose end stays on the start day, so Google gets ONE day', async () => {
     createEvent.mockResolvedValue({ id: 'evt-3' })
     const { result } = renderHook(() => useSendToCalendar(vi.fn()))
 
+    // A fixed UTC instant, not a local-time literal, so the assertions below
+    // don't depend on the runner's timezone. This models "All Day tomorrow" in
+    // US Eastern: the picker emits local midnight, which serializes to 04:00Z
+    // on the same calendar date.
+    const allDayStart = new Date('2026-07-30T04:00:00Z')
+
     await act(async () => {
-      await result.current.sendToCalendar(makeTask(), { start: START, allDay: true })
+      await result.current.sendToCalendar(makeTask(), { start: allDayStart, allDay: true })
     })
 
-    expect(createEvent).toHaveBeenCalledWith(expect.objectContaining({ allDay: true }))
+    const params = createEvent.mock.calls[0][0]
+    expect(params.allDay).toBe(true)
+    expect(params.startTime).toEqual(allDayStart)
+    // The edge function splits the date off endTime, treats it as the event's
+    // LAST day, and adds one to build Google's exclusive `end.date`
+    // (google-calendar-create-event/index.ts:329-339). So endTime must land on
+    // the start's own date: start.date 2026-07-30 -> end.date 2026-07-31 = a
+    // single-day banner. A +24h end (2026-07-31) became end.date 2026-08-01 and
+    // spanned two days.
+    expect(params.endTime.toISOString()).toBe('2026-07-30T05:00:00.000Z')
+    expect(params.endTime.toISOString().split('T')[0]).toBe('2026-07-30')
   })
 
   it('refuses a concurrent send as busy, not as a failure', async () => {

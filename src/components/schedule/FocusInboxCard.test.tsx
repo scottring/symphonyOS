@@ -169,6 +169,30 @@ describe('FocusInboxCard', () => {
       expect(button).toHaveAttribute('aria-busy', 'true')
     })
 
+    it('sends the task the picker was opened on, even if the list shifts underneath', () => {
+      const onSendToCalendar = vi.fn()
+      const { rerender } = render(
+        <FocusInboxCard {...baseProps} onSendToCalendar={onSendToCalendar} />,
+      )
+
+      // Picker opens on the first card ('a')...
+      fireEvent.keyDown(window, { key: 'e' })
+      expect(screen.getByText('Schedule')).toBeInTheDocument()
+
+      // ...then a capture lands mid-interaction. `tasks` is newest-first, so the
+      // new item takes index 0 and every card shifts down: index 0 is now 'z'.
+      const shifted = [createMockTask({ id: 'z', title: 'Just captured' }), ...tasks]
+      rerender(<FocusInboxCard {...baseProps} tasks={shifted} onSendToCalendar={onSendToCalendar} />)
+
+      fireEvent.click(screen.getByRole('button', { name: /tomorrow/i }))
+      fireEvent.click(screen.getByRole('button', { name: '9am' }))
+
+      // The task on screen when the picker opened is the one converted (and
+      // therefore deleted) — never the stranger that shifted into its slot.
+      expect(onSendToCalendar).toHaveBeenCalledTimes(1)
+      expect(onSendToCalendar).toHaveBeenCalledWith('a', expect.any(Date), false, 60)
+    })
+
     it('does not open the picker via the "e" key while a send is in flight', () => {
       const onSendToCalendar = vi.fn()
       render(<FocusInboxCard {...baseProps} onSendToCalendar={onSendToCalendar} sending />)

@@ -281,6 +281,16 @@ export function SchedulePopover({
     }
   }, [isOpen, skipToTime, value])
 
+  // Duration resets on OPEN, not on close. handleClose is not the only way out
+  // any more: a controlled caller can close the popover by flipping its own
+  // `open` state (FocusInboxCard's Escape does exactly that), which used to
+  // leave a previously picked duration selected — and highlighted — on reopen
+  // instead of the documented 1h default. Kept separate from the effect above
+  // so a caller's `value` identity churn can't reset a duration mid-pick.
+  useEffect(() => {
+    if (isOpen) setDurationMinutes(60)
+  }, [isOpen])
+
   // Calculate dropdown position when opening
   useEffect(() => {
     if (isOpen && triggerRef.current) {
@@ -316,7 +326,7 @@ export function SchedulePopover({
     setSelectedDate(null)
     setCustomTimeSearch('')
     setHighlightedIndex(-1)
-    setDurationMinutes(60)
+    // Duration is reset by the on-open effect instead — see the comment there.
   }, [setIsOpen])
 
   const handleDateSelect = (date: Date) => {

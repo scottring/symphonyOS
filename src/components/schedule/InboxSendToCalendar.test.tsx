@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, act } from '@/test/test-utils'
 import { InboxView } from './InboxView'
 import { ScheduleActionsProvider, type ScheduleActionsValue } from '@/contexts/ScheduleActionsContext'
@@ -104,6 +104,14 @@ describe('InboxView send to calendar', () => {
     updateTask.mockResolvedValue(undefined)
   })
 
+  // The read-only test silences console.error with a spy. clearAllMocks clears
+  // recorded calls but leaves the stubbed implementation in place, and this
+  // project configures neither restoreMocks nor clearMocks, so without this any
+  // test added after it would silently lose console.error.
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
   it('puts a Calendar chip on the row that opens a picker instead of firing', () => {
     const { onDeleteTask } = renderInbox()
 
@@ -198,5 +206,12 @@ describe('InboxView send to calendar', () => {
     expect(showToast.mock.calls[0][1]).toBe('error')
     expect(onDeleteTask).not.toHaveBeenCalled()
     expect(screen.queryByRole('button', { name: 'Undo' })).not.toBeInTheDocument()
+  })
+
+  // Guards the afterEach above: the read-only test stubs console.error and
+  // nothing in the vitest config restores it, so without the restore this test —
+  // and anything else appended here — would run with console.error silenced.
+  it('leaves console.error unstubbed for whatever test runs next', () => {
+    expect(vi.isMockFunction(console.error)).toBe(false)
   })
 })
