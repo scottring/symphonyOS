@@ -45,7 +45,7 @@ export function useEntityContext(
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    if (!entityId) {
+    if (!entityId || !user) {
       setSuggestions([])
       setLastAction(null)
       setLoading(false)
@@ -60,6 +60,7 @@ export function useEntityContext(
         supabase
           .from('proactive_suggestions')
           .select('*')
+          .eq('user_id', user!.id)
           .eq('entity_type', entityType)
           .eq('entity_id', entityId as string)
           .eq('status', 'active')
@@ -67,6 +68,7 @@ export function useEntityContext(
         supabase
           .from('action_history')
           .select('action_type, detail, outcome, created_at')
+          .eq('user_id', user!.id)
           .eq('entity_type', entityType)
           .eq('entity_id', entityId as string)
           .order('created_at', { ascending: false })
@@ -101,7 +103,7 @@ export function useEntityContext(
     return () => {
       cancelled = true
     }
-  }, [entityType, entityId])
+  }, [entityType, entityId, user])
 
   // Mark suggestion as acted on + log to action_history.
   // Copied exactly from useProactiveSuggestions.ts:82-128 (status update +

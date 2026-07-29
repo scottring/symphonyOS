@@ -27,8 +27,12 @@ vi.mock('@/hooks/useAuth', () => ({
 }))
 
 // Chainable mock matching the exact query shapes the hook issues:
-// proactive_suggestions: select('*').eq(entity_type).eq(entity_id).eq(status).order(confidence)
-// action_history: select(cols).eq(entity_type).eq(entity_id).order(created_at).limit(1)
+// proactive_suggestions: select('*').eq(user_id).eq(entity_type).eq(entity_id).eq(status).order(confidence)
+// action_history: select(cols).eq(user_id).eq(entity_type).eq(entity_id).order(created_at).limit(1)
+// The nesting itself enforces the shape non-vacuously: if the hook drops the
+// leading .eq('user_id', ...) call, the mock records only 3 (suggestions) or
+// 2 (history) eq() invocations instead of 4/3, so the explicit
+// toHaveBeenCalledWith('user_id', ...) assertions below fail.
 vi.mock('@/lib/supabase', () => ({
   supabase: {
     from: (table: string) => {
@@ -44,9 +48,14 @@ vi.mock('@/lib/supabase', () => ({
                     eq: (f3: string, v3: string) => {
                       mockSuggestionsEq(f3, v3)
                       return {
-                        order: (col: string, opts: unknown) => {
-                          mockSuggestionsOrder(col, opts)
-                          return Promise.resolve(mockSuggestionsResult)
+                        eq: (f4: string, v4: string) => {
+                          mockSuggestionsEq(f4, v4)
+                          return {
+                            order: (col: string, opts: unknown) => {
+                              mockSuggestionsOrder(col, opts)
+                              return Promise.resolve(mockSuggestionsResult)
+                            },
+                          }
                         },
                       }
                     },
@@ -75,12 +84,17 @@ vi.mock('@/lib/supabase', () => ({
                 eq: (f2: string, v2: string) => {
                   mockHistoryEq(f2, v2)
                   return {
-                    order: (col: string, opts: unknown) => {
-                      mockHistoryOrder(col, opts)
+                    eq: (f3: string, v3: string) => {
+                      mockHistoryEq(f3, v3)
                       return {
-                        limit: (n: number) => {
-                          mockHistoryLimit(n)
-                          return Promise.resolve(mockHistoryResult)
+                        order: (col: string, opts: unknown) => {
+                          mockHistoryOrder(col, opts)
+                          return {
+                            limit: (n: number) => {
+                              mockHistoryLimit(n)
+                              return Promise.resolve(mockHistoryResult)
+                            },
+                          }
                         },
                       }
                     },
@@ -139,6 +153,7 @@ describe('useEntityContext', () => {
 
     await waitFor(() => expect(result.current.loading).toBe(false))
 
+    expect(mockSuggestionsEq).toHaveBeenCalledWith('user_id', mockUser.id)
     expect(mockSuggestionsEq).toHaveBeenCalledWith('entity_type', 'task')
     expect(mockSuggestionsEq).toHaveBeenCalledWith('entity_id', 'task-1')
     expect(mockSuggestionsEq).toHaveBeenCalledWith('status', 'active')
@@ -157,6 +172,7 @@ describe('useEntityContext', () => {
 
     await waitFor(() => expect(result.current.loading).toBe(false))
 
+    expect(mockHistoryEq).toHaveBeenCalledWith('user_id', mockUser.id)
     expect(mockHistoryEq).toHaveBeenCalledWith('entity_type', 'task')
     expect(mockHistoryEq).toHaveBeenCalledWith('entity_id', 'task-1')
     expect(mockHistoryOrder).toHaveBeenCalledWith('created_at', { ascending: false })
@@ -171,6 +187,18 @@ describe('useEntityContext', () => {
 
   it('returns empty state without querying when entityId is null', async () => {
     const { result } = renderHook(() => useEntityContext('task', null))
+
+    expect(result.current.suggestions).toEqual([])
+    expect(result.current.lastAction).toBeNull()
+    expect(result.current.loading).toBe(false)
+    expect(mockSuggestionsEq).not.toHaveBeenCalled()
+    expect(mockHistoryEq).not.toHaveBeenCalled()
+  })
+
+  it('returns empty state without querying when there is no authenticated user', async () => {
+    mockUserState = null
+
+    const { result } = renderHook(() => useEntityContext('task', 'task-1'))
 
     expect(result.current.suggestions).toEqual([])
     expect(result.current.lastAction).toBeNull()
