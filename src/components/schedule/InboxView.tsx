@@ -62,7 +62,7 @@ export function InboxView({
     onAddProject, onDeleteProject,
   } = useScheduleActionsContext()
   const { notes, addNote, updateNote, deleteNote } = useNotes()
-  const { addTask, updateTask } = useSupabaseTasks()
+  const { addTask } = useSupabaseTasks()
 
   const { currentDomain } = useDomain()
 
@@ -126,9 +126,14 @@ export function InboxView({
     [onAddProject, onDeleteProject, onUpdateTask],
   )
 
-  // Restore a task snapshot after a note-route deletion — two-step to preserve rich fields
+  // Restore a task snapshot verbatim after a destructive triage route (note
+  // conversion, send-to-calendar). ONE insert, deliberately: the old two-step
+  // issued updateTask immediately after addTask, and that write hit
+  // findTaskById before the new row was in state — so it was dropped whole
+  // ("Task not found") and every restore silently lost notes, links, phone
+  // number and the discussion flags. Everything rides the INSERT now.
   const restoreTask = useCallback(async (snapshot: Task) => {
-    const newId = await addTask(
+    await addTask(
       snapshot.title,
       snapshot.contactId,
       snapshot.projectId,
@@ -141,18 +146,17 @@ export function InboxView({
         isAllDay: snapshot.isAllDay,
         location: snapshot.location,
         locationPlaceId: snapshot.locationPlaceId,
+        // addTask forces bucket 'timed' when scheduledFor is set, which is the
+        // same invariant the snapshot already satisfies.
+        bucket: snapshot.bucket,
+        notes: snapshot.notes,
+        links: snapshot.links,
+        phoneNumber: snapshot.phoneNumber,
+        needsDiscussion: snapshot.needsDiscussion,
+        discussionNote: snapshot.discussionNote,
       },
     )
-    if (!newId) return
-    await updateTask(newId, {
-      notes: snapshot.notes,
-      links: snapshot.links,
-      phoneNumber: snapshot.phoneNumber,
-      needsDiscussion: snapshot.needsDiscussion,
-      discussionNote: snapshot.discussionNote,
-      bucket: snapshot.bucket,
-    })
-  }, [addTask, updateTask])
+  }, [addTask])
 
   const { sendToCalendar, undoSend, sendingTaskId } = useSendToCalendar((id) => onDeleteTask?.(id))
 
@@ -192,8 +196,17 @@ export function InboxView({
         previous: {},
         undoable: true,
         onUndoExtra: async () => {
-          await undoSend(outcome.eventId, outcome.calendarId)
+          const eventRemoved = await undoSend(outcome.eventId, outcome.calendarId)
           await restoreTask(snapshot)
+          // Half an undo has to look different from a whole one: the task is
+          // back, but a real event is still sitting on the calendar and only the
+          // user can clear it.
+          if (!eventRemoved) {
+            showToast(
+              `'${snapshot.title}' is back in your inbox, but the event is still on ${outcome.calendarName} — remove it there.`,
+              'error',
+            )
+          }
         },
       })
     },

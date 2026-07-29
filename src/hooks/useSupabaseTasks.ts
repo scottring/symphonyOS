@@ -540,6 +540,14 @@ export function useSupabaseTasks() {
     goalId?: string
     /** Fun-audit mark. */
     isFun?: boolean
+    /** Rich context carried on the INSERT. Same race rationale as `bucket`: a
+     *  follow-up updateTask can reach findTaskById before the temp->real id swap
+     *  has landed and be dropped whole ("Task not found"), which silently lost
+     *  these fields on every undo/restore. */
+    notes?: string
+    links?: TaskLink[]
+    needsDiscussion?: boolean
+    discussionNote?: string
   }
 
   const addTask = useCallback(async (
@@ -588,6 +596,10 @@ export function useSupabaseTasks() {
       goalId: options?.goalId,
       isFun: options?.isFun,
       pickedAt: options?.pickedAt,
+      notes: options?.notes,
+      links: options?.links,
+      needsDiscussion: options?.needsDiscussion,
+      discussionNote: options?.discussionNote,
     }
     setTasks((prev) => [optimisticTask, ...prev])
 
@@ -618,6 +630,10 @@ export function useSupabaseTasks() {
         goal_id: options?.goalId ?? null,
         is_fun: options?.isFun ?? false,
         picked_at: options?.pickedAt?.toISOString() ?? null,
+        notes: options?.notes ?? null,
+        links: options?.links ?? null,
+        needs_discussion: options?.needsDiscussion ?? false,
+        discussion_note: options?.discussionNote ?? null,
       })
       .select()
       .single()

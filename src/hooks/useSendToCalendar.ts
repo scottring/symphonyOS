@@ -45,8 +45,8 @@ function classifyFailure(err: unknown): SendFailureReason {
 }
 
 export function useSendToCalendar(deleteTask: (id: string) => void | Promise<void>) {
-  const { isConnected, createEvent, deleteEvent } = useGoogleCalendar()
-  const { getCalendarForDomain } = useCalendarDomainMappings()
+  const { isConnected, createEvent, deleteEvent, defaultCalendarId } = useGoogleCalendar()
+  const { getCalendarForDomain, mappings } = useCalendarDomainMappings()
 
   const [sendingTaskId, setSendingTaskId] = useState<string | null>(null)
   // Ref, not state: a double-tap fires both handlers in the same tick, before
@@ -62,6 +62,26 @@ export function useSendToCalendar(deleteTask: (id: string) => void | Promise<voi
       setSendingTaskId(task.id)
 
       const target = getCalendarForDomain(task.context)
+      // The edge function picks the destination itself —
+      //   `calendarId || connection.calendar_id || 'primary'`
+      // (google-calendar-create-event/index.ts:274) — and its response says only
+      // `eventId`/`htmlLink`, never which calendar it chose. So mirror that
+      // precedence here: without this, an untagged task (no domain mapping) sent
+      // `calendarId: undefined`, landed on the user's chosen default write
+      // calendar, and Undo then deleted from 'primary' — where the event does not
+      // exist — leaving a real orphaned event behind.
+      const resolvedCalendarId = target?.calendarId ?? defaultCalendarId ?? undefined
+      // Name it from data already in hand. When the resolved calendar is one the
+      // user has mapped to a domain we know its real name, so the toast can say
+      // where the item actually went instead of the vague 'your calendar'.
+      // Naming an unmapped default would need a fetchCalendarList round-trip on
+      // the send path, which isn't worth a toast label.
+      const resolvedCalendarName =
+        target?.calendarName ??
+        (resolvedCalendarId
+          ? mappings.find((m) => m.calendarId === resolvedCalendarId)?.calendarName
+          : undefined) ??
+        'your calendar'
       const start = when.start
       // All-day end is INCLUSIVE here, not exclusive: the edge function takes
       // endTime's date as the event's last day and adds the day Google's
@@ -82,7 +102,7 @@ export function useSendToCalendar(deleteTask: (id: string) => void | Promise<voi
           endTime: end,
           allDay: when.allDay,
           location: task.location,
-          calendarId: target?.calendarId,
+          calendarId: resolvedCalendarId,
         })
 
         // Only now is it safe to destroy the task.
@@ -91,8 +111,8 @@ export function useSendToCalendar(deleteTask: (id: string) => void | Promise<voi
         return {
           ok: true,
           eventId: created.id,
-          calendarId: target?.calendarId,
-          calendarName: target?.calendarName ?? 'your calendar',
+          calendarId: resolvedCalendarId,
+          calendarName: resolvedCalendarName,
         }
       } catch (err) {
         console.error('Failed to send task to calendar:', err)
@@ -102,15 +122,21 @@ export function useSendToCalendar(deleteTask: (id: string) => void | Promise<voi
         setSendingTaskId(null)
       }
     },
-    [isConnected, createEvent, getCalendarForDomain, deleteTask],
+    [isConnected, createEvent, getCalendarForDomain, defaultCalendarId, mappings, deleteTask],
   )
 
+  /** Resolves `false` when the event could NOT be removed. A swallowed failure
+   *  looks identical to a clean undo while a real event stays on the user's
+   *  calendar, so the outcome has to reach the caller — the restored task alone
+   *  is not the whole story. */
   const undoSend = useCallback(
-    async (eventId: string, calendarId?: string): Promise<void> => {
+    async (eventId: string, calendarId?: string): Promise<boolean> => {
       try {
         await deleteEvent({ eventId, calendarId })
+        return true
       } catch (err) {
         console.error('Failed to remove the event during undo:', err)
+        return false
       }
     },
     [deleteEvent],

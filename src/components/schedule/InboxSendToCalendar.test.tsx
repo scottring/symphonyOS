@@ -12,26 +12,73 @@ import type { Task } from '@/types/task'
 const createEvent = vi.fn()
 const deleteEvent = vi.fn()
 
+/** calendar_connections.calendar_id — Settings -> Calendar -> "Create events on".
+ *  Mutable so a test can model a user who has picked one. */
+let defaultCalendarId: string | null = null
+
+const FAMILY_MAPPING = {
+  calendarId: 'fam@group.calendar.google.com',
+  calendarName: 'Family calendar',
+  domain: 'family',
+}
+
 vi.mock('@/hooks/useGoogleCalendar', () => ({
-  useGoogleCalendar: () => ({ isConnected: true, createEvent, deleteEvent }),
+  useGoogleCalendar: () => ({ isConnected: true, createEvent, deleteEvent, defaultCalendarId }),
   CalendarReconnectError: class CalendarReconnectError extends Error {},
 }))
 
 vi.mock('@/hooks/useCalendarDomainMappings', () => ({
   useCalendarDomainMappings: () => ({
+    mappings: [FAMILY_MAPPING],
     getCalendarForDomain: (domain?: string | null) =>
-      domain === 'family'
-        ? { calendarId: 'fam@group.calendar.google.com', calendarName: 'Family calendar' }
-        : null,
+      domain === 'family' ? FAMILY_MAPPING : null,
   }),
 }))
 
-const addTask = vi.fn()
-const updateTask = vi.fn()
+/** Rows addTask has "inserted", keyed by the id it handed back. */
+const insertedRows: { id: string; row: Record<string, unknown> }[] = []
+/** Ids updateTask can see. Deliberately never populated: the whole point is the
+ *  race a restore actually runs into — a write issued in the same tick as the
+ *  insert reaches findTaskById before the temp->real id swap has landed. */
+const visibleTaskIds = new Set<string>()
+
+/** Records the INSERT and hands back the new id, like the real addTask. */
+const fakeAddTask = async (
+  title: string,
+  contactId?: string,
+  projectId?: string,
+  scheduledFor?: Date,
+  options?: Record<string, unknown>,
+): Promise<string> => {
+  const id = `task-restored-${insertedRows.length + 1}`
+  insertedRows.push({ id, row: { title, contactId, projectId, scheduledFor, ...options } })
+  return id
+}
+
+/** Reproduces the real guard (useSupabaseTasks.ts:990) instead of accepting
+ *  anything: a write aimed at a row that is not in state yet is DROPPED whole.
+ *  A mock that merrily applied it is what let the two-step restore ship losing
+ *  notes, links and phone number. */
+const fakeUpdateTask = async (id: string, updates: Record<string, unknown>): Promise<void> => {
+  if (!visibleTaskIds.has(id)) return
+  const entry = insertedRows.find((r) => r.id === id)
+  if (entry) Object.assign(entry.row, updates)
+}
+
+// Implementations are (re)attached in beforeEach — the afterEach restoreAllMocks
+// below strips them.
+const addTask = vi.fn(fakeAddTask)
+const updateTask = vi.fn(fakeUpdateTask)
 
 vi.mock('@/hooks/useSupabaseTasks', () => ({
   useSupabaseTasks: () => ({ addTask, updateTask }),
 }))
+
+/** The single row a restore produced, with whatever actually survived. */
+function restoredRow(): Record<string, unknown> {
+  expect(insertedRows).toHaveLength(1)
+  return insertedRows[0].row
+}
 
 vi.mock('@/hooks/useNotes', () => ({
   useNotes: () => ({ notes: [], addNote: vi.fn(), updateNote: vi.fn(), deleteNote: vi.fn() }),
@@ -58,9 +105,15 @@ const inboxTask = {
   bucket: 'inbox',
   context: 'family',
   notes: 'Bring the insurance card',
+  phoneNumber: '555-0100',
+  links: [{ url: 'https://dentist.example/portal', title: 'Portal' }],
 } as Task
 
-function renderInbox(overrides: Partial<ScheduleActionsValue> = {}) {
+/** No domain mapping exists for a null context, so the edge function would send
+ *  this to the user's default write calendar. */
+const untaggedTask = { ...inboxTask, id: 'task-2', context: null } as Task
+
+function renderInbox(overrides: Partial<ScheduleActionsValue> = {}, task: Task = inboxTask) {
   const onDeleteTask = vi.fn()
   const actions = {
     onToggleTask: vi.fn(),
@@ -74,7 +127,7 @@ function renderInbox(overrides: Partial<ScheduleActionsValue> = {}) {
   render(
     <ScheduleActionsProvider value={actions}>
       <InboxView
-        tasks={[inboxTask]}
+        tasks={[task]}
         projects={[]}
         selectedItemId={null}
         onSelectItem={vi.fn()}
@@ -97,11 +150,20 @@ function sendToTomorrowAt2pm(duration: string) {
 
 describe('InboxView send to calendar', () => {
   beforeEach(() => {
-    vi.clearAllMocks()
+    // Only the call records — mockClear, not clearAllMocks, so the addTask /
+    // updateTask fakes above keep their implementations.
+    createEvent.mockClear()
+    deleteEvent.mockClear()
+    addTask.mockClear()
+    updateTask.mockClear()
+    showToast.mockClear()
+    insertedRows.length = 0
+    visibleTaskIds.clear()
     createEvent.mockResolvedValue({ id: 'evt-1' })
     deleteEvent.mockResolvedValue(undefined)
-    addTask.mockResolvedValue('task-restored')
-    updateTask.mockResolvedValue(undefined)
+    addTask.mockImplementation(fakeAddTask)
+    updateTask.mockImplementation(fakeUpdateTask)
+    defaultCalendarId = null
   })
 
   // The read-only test silences console.error with a spy. clearAllMocks clears
@@ -169,14 +231,63 @@ describe('InboxView send to calendar', () => {
       }),
     )
     await waitFor(() => expect(addTask).toHaveBeenCalled())
-    expect(addTask.mock.calls[0][0]).toBe('Dentist appointment')
-    // The rich context is restored too — the snapshot, not just the title.
+
+    // The restored ROW, not merely the fact a call happened: the rich context has
+    // to survive the guard that drops a same-tick follow-up write, which means it
+    // has to ride the INSERT. Asserting a call was *made* is what let notes,
+    // links and phone number ship silently lost.
+    const restored = restoredRow()
+    expect(restored).toMatchObject({
+      title: 'Dentist appointment',
+      notes: 'Bring the insurance card',
+      phoneNumber: '555-0100',
+      links: [{ url: 'https://dentist.example/portal', title: 'Portal' }],
+      bucket: 'inbox',
+      context: 'family',
+    })
+    // Nothing may depend on a second write — it would be dropped.
+    expect(updateTask).not.toHaveBeenCalled()
+  })
+
+  // Defect: an untagged task has no domain mapping, so the hook reported
+  // `calendarId: undefined` while the edge function had actually created the
+  // event on connection.calendar_id and never said so
+  // (google-calendar-create-event/index.ts:274). Undo then deleted from
+  // 'primary', the delete failed, and a real event was left on the calendar.
+  it('undo deletes from the default write calendar when the task has no domain mapping', async () => {
+    defaultCalendarId = 'default@group.calendar.google.com'
+    renderInbox({}, untaggedTask)
+
+    sendToTomorrowAt2pm('1h')
+
+    await waitFor(() => expect(createEvent).toHaveBeenCalledTimes(1))
+    expect(createEvent.mock.calls[0][0].calendarId).toBe('default@group.calendar.google.com')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Undo' }))
+
     await waitFor(() =>
-      expect(updateTask).toHaveBeenCalledWith(
-        'task-restored',
-        expect.objectContaining({ notes: 'Bring the insurance card', bucket: 'inbox' }),
-      ),
+      expect(deleteEvent).toHaveBeenCalledWith({
+        eventId: 'evt-1',
+        calendarId: 'default@group.calendar.google.com',
+      }),
     )
+  })
+
+  it('tells the user the event survived when undo cannot delete it', async () => {
+    // The hook logs the rejection by design; keep the run's output clean.
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    deleteEvent.mockRejectedValue(new Error('404: Not Found'))
+    renderInbox()
+
+    sendToTomorrowAt2pm('1h')
+    fireEvent.click(await screen.findByRole('button', { name: 'Undo' }))
+
+    // The task still comes back — a failed Google delete must not cost the item.
+    await waitFor(() => expect(addTask).toHaveBeenCalled())
+    // But a half-undo cannot look like a clean one.
+    await waitFor(() => expect(showToast).toHaveBeenCalled())
+    expect(showToast.mock.calls[0][0]).toMatch(/still on Family calendar/i)
+    expect(showToast.mock.calls[0][1]).toBe('error')
   })
 
   it('marks the chip busy and blocks a second send while the write is in flight', async () => {

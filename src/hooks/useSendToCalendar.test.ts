@@ -5,19 +5,30 @@ import type { Task } from '@/types/task'
 const createEvent = vi.fn()
 const deleteEvent = vi.fn()
 
+/** calendar_connections.calendar_id — the "Create events on" calendar from
+ *  Settings. Mutable so a test can model a user who has chosen one. */
+let defaultCalendarId: string | null = null
+/** calendar_domain_mappings rows, as the hook sees them. */
+let mappings: { calendarId: string; calendarName: string; domain: string }[] = []
+
 vi.mock('@/hooks/useGoogleCalendar', () => ({
-  useGoogleCalendar: () => ({ isConnected: true, createEvent, deleteEvent }),
+  useGoogleCalendar: () => ({ isConnected: true, createEvent, deleteEvent, defaultCalendarId }),
   CalendarReconnectError: class CalendarReconnectError extends Error {},
 }))
 
 vi.mock('@/hooks/useCalendarDomainMappings', () => ({
   useCalendarDomainMappings: () => ({
+    mappings,
     getCalendarForDomain: (domain?: string | null) =>
-      domain === 'family'
-        ? { calendarId: 'fam@group.calendar.google.com', calendarName: 'Family' }
-        : null,
+      domain ? mappings.find((m) => m.domain === domain) ?? null : null,
   }),
 }))
+
+const FAMILY_MAPPING = {
+  calendarId: 'fam@group.calendar.google.com',
+  calendarName: 'Family',
+  domain: 'family',
+}
 
 import { useSendToCalendar, buildEventDescription } from './useSendToCalendar'
 
@@ -59,6 +70,8 @@ describe('useSendToCalendar', () => {
   beforeEach(() => {
     createEvent.mockReset()
     deleteEvent.mockReset()
+    defaultCalendarId = null
+    mappings = [FAMILY_MAPPING]
   })
 
   it('creates the event on the domain-mapped calendar, then deletes the task', async () => {
@@ -122,7 +135,7 @@ describe('useSendToCalendar', () => {
     expect(outcome).toEqual({ ok: false, reason: 'failed' })
   })
 
-  it('defaults to a 60 minute event and falls back to the default calendar', async () => {
+  it('defaults to a 60 minute event and to Google primary with no mapping and no default', async () => {
     createEvent.mockResolvedValue({ id: 'evt-2' })
     const { result } = renderHook(() => useSendToCalendar(vi.fn()))
 
@@ -135,6 +148,70 @@ describe('useSendToCalendar', () => {
         calendarId: undefined,
         endTime: new Date(START.getTime() + 60 * 60000),
       }),
+    )
+  })
+
+  // The regression: an untagged task has no domain mapping, so the hook used to
+  // report `calendarId: undefined`. The edge function does NOT fall back to
+  // primary — it uses connection.calendar_id
+  // (google-calendar-create-event/index.ts:274) and never says so in its
+  // response — so undo deleted from primary and the real event survived.
+  it('reports the default write calendar when the task has no domain mapping', async () => {
+    defaultCalendarId = 'default@group.calendar.google.com'
+    createEvent.mockResolvedValue({ id: 'evt-4' })
+    deleteEvent.mockResolvedValue(undefined)
+    const { result } = renderHook(() => useSendToCalendar(vi.fn()))
+
+    let outcome
+    await act(async () => {
+      outcome = await result.current.sendToCalendar(makeTask({ context: null }), { start: START })
+    })
+
+    expect(createEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ calendarId: 'default@group.calendar.google.com' }),
+    )
+    expect(outcome).toEqual({
+      ok: true,
+      eventId: 'evt-4',
+      calendarId: 'default@group.calendar.google.com',
+      calendarName: 'your calendar',
+    })
+
+    // ...and undo therefore deletes from the calendar the event is actually on.
+    await act(async () => {
+      await result.current.undoSend('evt-4', (outcome as { calendarId?: string }).calendarId)
+    })
+    expect(deleteEvent).toHaveBeenCalledWith({
+      eventId: 'evt-4',
+      calendarId: 'default@group.calendar.google.com',
+    })
+  })
+
+  it('names the default write calendar when it is one the user has mapped', async () => {
+    defaultCalendarId = FAMILY_MAPPING.calendarId
+    createEvent.mockResolvedValue({ id: 'evt-5' })
+    const { result } = renderHook(() => useSendToCalendar(vi.fn()))
+
+    let outcome
+    await act(async () => {
+      outcome = await result.current.sendToCalendar(makeTask({ context: null }), { start: START })
+    })
+
+    // No extra network call — the name comes from mappings already in memory.
+    expect(outcome).toMatchObject({ calendarName: 'Family' })
+  })
+
+  it('an explicit domain mapping still wins over the default write calendar', async () => {
+    defaultCalendarId = 'default@group.calendar.google.com'
+    createEvent.mockResolvedValue({ id: 'evt-6' })
+    const { result } = renderHook(() => useSendToCalendar(vi.fn()))
+
+    await act(async () => {
+      await result.current.sendToCalendar(makeTask(), { start: START })
+    })
+
+    expect(createEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ calendarId: 'fam@group.calendar.google.com' }),
     )
   })
 
@@ -189,17 +266,36 @@ describe('useSendToCalendar', () => {
     expect(deleteTask).toHaveBeenCalledWith('task-a')
   })
 
-  it('undoSend deletes the created event', async () => {
+  it('undoSend deletes the created event and reports success', async () => {
     deleteEvent.mockResolvedValue(undefined)
     const { result } = renderHook(() => useSendToCalendar(vi.fn()))
 
+    let removed
     await act(async () => {
-      await result.current.undoSend('evt-1', 'fam@group.calendar.google.com')
+      removed = await result.current.undoSend('evt-1', 'fam@group.calendar.google.com')
     })
 
     expect(deleteEvent).toHaveBeenCalledWith({
       eventId: 'evt-1',
       calendarId: 'fam@group.calendar.google.com',
     })
+    expect(removed).toBe(true)
+  })
+
+  // It must not throw (the caller still has a task to restore) but it must not
+  // stay silent either: a swallowed failure leaves a real event on the calendar
+  // and reads to the user as a clean undo.
+  it('undoSend reports a failed delete instead of swallowing it', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    deleteEvent.mockRejectedValue(new Error('404 not found'))
+    const { result } = renderHook(() => useSendToCalendar(vi.fn()))
+
+    let removed
+    await act(async () => {
+      removed = await result.current.undoSend('evt-1', 'fam@group.calendar.google.com')
+    })
+
+    expect(removed).toBe(false)
+    vi.restoreAllMocks()
   })
 })
