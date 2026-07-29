@@ -29,7 +29,8 @@ type ScheduleItem = ScheduleContextItem
 interface SchedulePopoverProps {
   value?: Date
   isAllDay?: boolean
-  onSchedule: (date: Date, isAllDay: boolean) => void
+  /** `durationMinutes` is only supplied when `showDuration` is set. */
+  onSchedule: (date: Date, isAllDay: boolean, durationMinutes?: number) => void
   onClear?: () => void
   trigger?: React.ReactNode
   // Schedule context for showing what's on the selected day
@@ -43,6 +44,10 @@ interface SchedulePopoverProps {
   // (This Week / Next Month / Someday), unifying scheduling + deferring into one
   // control. Omit to keep a dates-only picker (existing per-row behavior).
   onDefer?: (target: 'week' | 'month' | 'quarter') => void
+  /** Renders a duration chip row on the time step and reports the choice as
+   *  `onSchedule`'s third argument. Used when the picker feeds a real calendar
+   *  event rather than a task's scheduled date. */
+  showDuration?: boolean
 }
 
 type Step = 'date' | 'time'
@@ -88,6 +93,8 @@ function generateTimeOptions(): { value: string; label: string }[] {
 }
 
 const TIME_OPTIONS = generateTimeOptions()
+
+const DURATION_OPTIONS = [30, 60, 90, 120] as const
 
 // DELIBERATELY LOCAL — not `DaySection` from @/lib/timeUtils, and not a bug.
 //
@@ -167,6 +174,7 @@ export function SchedulePopover({
   skipToTime = false,
   itemTitle,
   onDefer,
+  showDuration = false,
 }: SchedulePopoverProps) {
   void _isAllDay // Reserved for visual indicator
   const [isOpen, setIsOpen] = useState(false)
@@ -208,6 +216,7 @@ export function SchedulePopover({
 
   const [customTimeSearch, setCustomTimeSearch] = useState('')
   const [highlightedIndex, setHighlightedIndex] = useState<number>(-1)
+  const [durationMinutes, setDurationMinutes] = useState<number>(60)
   const containerRef = useRef<HTMLDivElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const customTimeInputRef = useRef<HTMLInputElement>(null)
@@ -284,6 +293,7 @@ export function SchedulePopover({
     setSelectedDate(null)
     setCustomTimeSearch('')
     setHighlightedIndex(-1)
+    setDurationMinutes(60)
   }, [])
 
   const handleDateSelect = (date: Date) => {
@@ -304,10 +314,10 @@ export function SchedulePopover({
     const finalDate = new Date(selectedDate)
     if (hour === 'all-day') {
       finalDate.setHours(0, 0, 0, 0)
-      onSchedule(finalDate, true)
+      onSchedule(finalDate, true, showDuration ? durationMinutes : undefined)
     } else {
       finalDate.setHours(hour, 0, 0, 0)
-      onSchedule(finalDate, false)
+      onSchedule(finalDate, false, showDuration ? durationMinutes : undefined)
     }
     handleClose()
   }
@@ -317,7 +327,7 @@ export function SchedulePopover({
     const [hours, minutes] = timeValue.split(':').map(Number)
     const finalDate = new Date(selectedDate)
     finalDate.setHours(hours, minutes, 0, 0)
-    onSchedule(finalDate, false)
+    onSchedule(finalDate, false, showDuration ? durationMinutes : undefined)
     handleClose()
   }
 
@@ -601,6 +611,31 @@ export function SchedulePopover({
           {/* Step 2: Pick time - with schedule context if available */}
           {step === 'time' && (
             <div className="p-3">
+              {/* Duration row - opt-in, only when converting to a calendar event */}
+              {showDuration && (
+                <div
+                  role="group"
+                  aria-label="Duration"
+                  className="flex items-center gap-1.5 py-2 mb-3 border-b border-neutral-100"
+                >
+                  <span className="text-xs text-neutral-500 mr-1">For</span>
+                  {DURATION_OPTIONS.map((minutes) => (
+                    <button
+                      key={minutes}
+                      type="button"
+                      onClick={() => setDurationMinutes(minutes)}
+                      className={`text-xs px-2 py-1 rounded-md font-medium transition-colors ${
+                        durationMinutes === minutes
+                          ? 'bg-primary-100 text-primary-800'
+                          : 'bg-neutral-50 text-neutral-600 hover:bg-neutral-100'
+                      }`}
+                    >
+                      {minutes < 60 ? `${minutes}m` : minutes % 60 === 0 ? `${minutes / 60}h` : `${minutes}m`}
+                    </button>
+                  ))}
+                </div>
+              )}
+
               {/* Back button with selected date and task title */}
               <button
                 onClick={() => setStep('date')}
