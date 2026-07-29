@@ -173,6 +173,12 @@ Resume here. Present as sections, one at a time, approval after each:
    should shrink as the rule tier gets better inputs.
 6. **"Assistant runs the cascade"** — Scott approved this as direction but it has no design.
    The largest unscoped piece. Probably its own spec after the context graph lands.
+   Success criteria Scott named on 2026-07-29 when green-lighting the context-graph build:
+   the AI-run cascade should make planning **more intuitive** (it walks you through, you
+   don't navigate), **less buggy** (fewer hand-maintained UI paths doing the same thing),
+   and **less redundant/duplicative** (the wizards' overlapping step logic collapses into
+   the assistant reasoning over one context source). Design the cascade-runner against
+   these three, not just feature parity with the wizards.
 7. **Two-way vault sync, completed** — `vault-write` exists; what's missing, conflict
    handling, what Symphony is allowed to write into the vault.
 8. **Iris as phase 2** — privacy boundaries, shared layer, schema implications. Confirm she
