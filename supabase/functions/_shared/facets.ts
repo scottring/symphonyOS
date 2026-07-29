@@ -64,7 +64,7 @@ function parseOne(raw: unknown): Facet | null {
   }
 }
 
-export function parseFacets(raw: unknown): Facet[] {
+export function tryParseFacets(raw: unknown): Facet[] | null {
   let value = raw
   if (typeof raw === 'string') {
     // Strip markdown fences and trim
@@ -72,7 +72,8 @@ export function parseFacets(raw: unknown): Facet[] {
     try {
       value = JSON.parse(jsonStr)
     } catch {
-      return []
+      // JSON parse failure: structural error
+      return null
     }
   }
 
@@ -81,10 +82,17 @@ export function parseFacets(raw: unknown): Facet[] {
     const wrapped = value as Record<string, unknown>
     if (Array.isArray(wrapped.facets)) {
       value = wrapped.facets
+    } else {
+      // Object exists but no facets array: structural error
+      return null
     }
   }
 
   // Now validate the array
-  if (!Array.isArray(value)) return []
+  if (!Array.isArray(value)) return null
   return value.map(parseOne).filter((f): f is Facet => f !== null).slice(0, MAX_FACETS)
+}
+
+export function parseFacets(raw: unknown): Facet[] {
+  return tryParseFacets(raw) ?? []
 }

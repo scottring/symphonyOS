@@ -5,7 +5,7 @@
 // after one retry so the panel quietly shows nothing. Auth: user JWT; row
 // reads/writes go through the caller-scoped client so RLS enforces ownership.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { parseFacets } from '../_shared/facets.ts'
+import { tryParseFacets, type Facet } from '../_shared/facets.ts'
 
 const MODEL = 'claude-sonnet-4-6'
 const MAX_CONTEXT = 300
@@ -112,13 +112,17 @@ Deno.serve(async (req) => {
   if (signErr || !signed?.signedUrl) return json({ error: `Could not sign URL: ${signErr?.message}` }, 500)
 
   const prompt = buildPrompt(entityContext)
-  let facets: Record<string, unknown>[] = []
+  let facets: Facet[] = []
   try {
-    facets = parseFacets(await callVision(signed.signedUrl, isPdf, prompt, apiKey))
+    const result = tryParseFacets(await callVision(signed.signedUrl, isPdf, prompt, apiKey))
+    if (result === null) throw new Error('Invalid facets structure from model')
+    facets = result
   } catch (err) {
     console.error('first analysis attempt failed, retrying once:', err instanceof Error ? err.message : err)
     try {
-      facets = parseFacets(await callVision(signed.signedUrl, isPdf, prompt, apiKey))
+      const result = tryParseFacets(await callVision(signed.signedUrl, isPdf, prompt, apiKey))
+      if (result === null) throw new Error('Invalid facets structure from model')
+      facets = result
     } catch (err2) {
       console.error('analysis failed after retry:', err2 instanceof Error ? err2.message : err2)
     }
