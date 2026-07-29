@@ -16,6 +16,7 @@ export type QuickAction =
   | { kind: 'someday' }
   | { kind: 'next-week' }
   | { kind: 'note' }
+  | { kind: 'calendar' }
   | { kind: 'complete' }
   | { kind: 'delete' }
 
@@ -26,6 +27,7 @@ const ACTION_LABELS: Record<QuickAction['kind'], string> = {
   someday: 'Someday',
   'next-week': 'Next Week',
   note: 'Note',
+  calendar: 'Calendar',
   complete: 'Done',
   delete: 'Delete',
 }
@@ -292,6 +294,19 @@ export const DenseInboxRow = memo(function DenseInboxRow({
                 className="text-xs px-2.5 py-1 rounded-md font-medium bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors"
               >
                 <ConceptIcon name="note" decorative /> Note
+              </button>
+            )
+          }
+          if (action.kind === 'calendar') {
+            return (
+              <button
+                key="calendar"
+                type="button"
+                aria-label="Send to calendar"
+                onClick={() => onQuickAction(action)}
+                className="text-xs px-2.5 py-1 rounded-md font-medium bg-sky-50 text-sky-700 hover:bg-sky-100 transition-colors"
+              >
+                <ConceptIcon name="when" decorative /> Calendar
               </button>
             )
           }

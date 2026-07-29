@@ -61,6 +61,11 @@ interface TriageWhenMenuProps {
   onComplete?: () => void
   /** When provided, adds a "Pick date" chip for a specific date/time. */
   onPickDate?: (date: Date, isAllDay: boolean) => void
+  /** A ready-made control rendered between Note and Delete. A slot rather than a
+   *  handler because the Inbox's "Send to calendar" chip must BE the trigger of
+   *  its own SchedulePopover — the popover anchors itself to the element it
+   *  clones, so the caller has to own that element. */
+  calendarAction?: React.ReactNode
 }
 
 /**
@@ -75,7 +80,7 @@ interface TriageWhenMenuProps {
 // that a menu you drifted past still tidies itself away.
 const HOVER_CLOSE_MS = 600
 
-export function TriageWhenMenu({ onPick, onDelete, onNote, onComplete, onPickDate }: TriageWhenMenuProps) {
+export function TriageWhenMenu({ onPick, onDelete, onNote, onComplete, onPickDate, calendarAction }: TriageWhenMenuProps) {
   const [openGroup, setOpenGroup] = useState<string | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -232,6 +237,8 @@ export function TriageWhenMenu({ onPick, onDelete, onNote, onComplete, onPickDat
           <ConceptIcon name="note" decorative /> Note
         </button>
       )}
+
+      {calendarAction}
 
       {onComplete && (
         <button

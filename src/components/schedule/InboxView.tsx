@@ -10,6 +10,10 @@ import { useDomain } from '@/hooks/useDomain'
 import { useInboxMode } from '@/hooks/useInboxMode'
 import { useNotes } from '@/hooks/useNotes'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
+import { useSendToCalendar } from '@/hooks/useSendToCalendar'
+import { showToast } from '@/hooks/useToast'
+import { SchedulePopover } from '@/components/triage'
+import { ConceptIcon } from '@/lib/conceptIcons'
 import { AssigneeFilter } from '@/components/home/AssigneeFilter'
 import { HomeNeedsDetailsSection } from '@/apps/home/inbox/HomeNeedsDetailsSection'
 import { NotePicker, type NotePickerSelection } from '@/components/notes/NotePicker'
@@ -149,6 +153,49 @@ export function InboxView({
       bucket: snapshot.bucket,
     })
   }, [addTask, updateTask])
+
+  const { sendToCalendar, undoSend } = useSendToCalendar((id) => onDeleteTask?.(id))
+
+  // Convert an inbox item into a real Google event. The hook writes to Google
+  // first and only then deletes the task, so a failure leaves the inbox exactly
+  // as it was — all this has to do is say so.
+  const handleSendToCalendar = useCallback(
+    async (task: Task, start: Date, isAllDay: boolean, durationMinutes?: number) => {
+      const snapshot = { ...task }
+
+      const outcome = await sendToCalendar(task, {
+        start,
+        allDay: isAllDay || undefined,
+        durationMinutes,
+      })
+
+      if (!outcome.ok) {
+        showToast(
+          outcome.reason === 'read-only'
+            ? 'That calendar is shared read-only — the item is still in your inbox.'
+            : outcome.reason === 'not-connected'
+              ? 'Google Calendar isn’t connected — the item is still in your inbox.'
+              : 'Couldn’t reach Google Calendar — the item is still in your inbox.',
+          'error',
+        )
+        return
+      }
+
+      setUndo({
+        taskId: snapshot.id,
+        message: `Sent to ${outcome.calendarName}`,
+        // Empty: the task is gone, so there is nothing to update — handleUndo
+        // skips onUpdateTask and the whole restore happens in onUndoExtra.
+        previous: {},
+        undoable: true,
+        onUndoExtra: async () => {
+          await undoSend(outcome.eventId, outcome.calendarId)
+          await restoreTask(snapshot)
+        },
+      })
+    },
+    [sendToCalendar, undoSend, restoreTask],
+  )
 
   const handleNoteSelect = useCallback(async (task: Task, selection: NotePickerSelection) => {
     const now = new Date()
@@ -440,6 +487,24 @@ export function InboxView({
               onPickDate={(date) => applyDate(task, date)}
               onNote={() => setNotePickerTaskId(task.id)}
               onDelete={() => applyTriage(task, { kind: 'delete' })}
+              calendarAction={
+                <SchedulePopover
+                  showDuration
+                  itemTitle={task.title}
+                  onSchedule={(date, isAllDay, durationMinutes) =>
+                    void handleSendToCalendar(task, date, isAllDay, durationMinutes)
+                  }
+                  trigger={
+                    <button
+                      type="button"
+                      aria-label="Send to calendar"
+                      className="text-xs px-2.5 py-1 rounded-md font-medium bg-sky-50 text-sky-700 hover:bg-sky-100 transition-colors"
+                    >
+                      <ConceptIcon name="when" decorative /> Calendar
+                    </button>
+                  }
+                />
+              }
             />
           }
           onToggleComplete={() => onToggleTask?.(task.id)}
