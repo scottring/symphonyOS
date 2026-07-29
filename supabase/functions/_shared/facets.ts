@@ -1,8 +1,7 @@
-/** Closed vocabulary of typed facts extracted from an attachment
- *  (docs/superpowers/specs/2026-07-14-attachment-facets-design.md).
- *  The model proposes; this parser disposes — nothing renders unvalidated.
- *  A twin validator lives in supabase/functions/_shared/facets.ts (edge
- *  functions can't import from src/) — keep the two in sync. */
+/** Edge-side facet validator — twin of src/types/facets.ts.
+ *  Accepts either parsed JSON or raw model text (with markdown fences).
+ *  Keep the two in sync. */
+
 export type Facet =
   | { type: 'summary'; text: string }
   | { type: 'location'; label?: string; address: string }
@@ -66,6 +65,26 @@ function parseOne(raw: unknown): Facet | null {
 }
 
 export function parseFacets(raw: unknown): Facet[] {
-  if (!Array.isArray(raw)) return []
-  return raw.map(parseOne).filter((f): f is Facet => f !== null).slice(0, MAX_FACETS)
+  let value = raw
+  if (typeof raw === 'string') {
+    // Strip markdown fences and trim
+    const jsonStr = raw.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim()
+    try {
+      value = JSON.parse(jsonStr)
+    } catch {
+      return []
+    }
+  }
+
+  // If value is wrapped in {facets: [...]}, extract the array
+  if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+    const wrapped = value as Record<string, unknown>
+    if (Array.isArray(wrapped.facets)) {
+      value = wrapped.facets
+    }
+  }
+
+  // Now validate the array
+  if (!Array.isArray(value)) return []
+  return value.map(parseOne).filter((f): f is Facet => f !== null).slice(0, MAX_FACETS)
 }

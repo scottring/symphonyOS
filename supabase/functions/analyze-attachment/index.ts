@@ -5,10 +5,9 @@
 // after one retry so the panel quietly shows nothing. Auth: user JWT; row
 // reads/writes go through the caller-scoped client so RLS enforces ownership.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { parseFacets } from '../_shared/facets.ts'
 
 const MODEL = 'claude-sonnet-4-6'
-const MAX_FACETS = 12
-const MAX_ITEMS = 20
 const MAX_CONTEXT = 300
 
 const corsHeaders = {
@@ -40,37 +39,6 @@ Rules:
 - datetime iso is the file's local time; no timezone guessing.
 - A photo of a broken/burned-out part or product → purchase_item with buy-ready specs.
 - A document/screenshot → transcribe the load-bearing facts into typed facets, not prose.`
-}
-
-// Twin of src/types/facets.ts parseFacets — duplicated because edge functions
-// can't import from src/. Keep the two in sync.
-function str(v: unknown): string | null {
-  return typeof v === 'string' && v.trim() ? v.trim() : null
-}
-function parseOne(raw: unknown): Record<string, unknown> | null {
-  if (typeof raw !== 'object' || raw === null) return null
-  const f = raw as Record<string, unknown>
-  const label = str(f.label) ?? undefined
-  switch (f.type) {
-    case 'summary': { const text = str(f.text); return text ? { type: 'summary', text } : null }
-    case 'location': { const address = str(f.address); return address ? { type: 'location', label, address } : null }
-    case 'access_code': { const code = str(f.code); return code ? { type: 'access_code', label: label ?? 'Code', code } : null }
-    case 'phone': { const number = str(f.number); return number ? { type: 'phone', label, number } : null }
-    case 'datetime': { const iso = str(f.iso); return iso && label ? { type: 'datetime', label, iso } : null }
-    case 'link': { const url = str(f.url); return url && /^https?:\/\//.test(url) ? { type: 'link', label, url } : null }
-    case 'checklist': {
-      const items = Array.isArray(f.items) ? f.items.map(str).filter((s): s is string => !!s).slice(0, MAX_ITEMS) : []
-      return items.length ? { type: 'checklist', label, items } : null
-    }
-    case 'purchase_item': { const name = str(f.name); const specs = str(f.specs); return name && specs ? { type: 'purchase_item', name, specs } : null }
-    default: return null
-  }
-}
-function parseFacets(text: string): Record<string, unknown>[] {
-  const stripped = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '')
-  const parsed = JSON.parse(stripped) as { facets?: unknown }
-  if (!Array.isArray(parsed.facets)) throw new Error('No facets array')
-  return parsed.facets.map(parseOne).filter((f): f is Record<string, unknown> => f !== null).slice(0, MAX_FACETS)
 }
 
 async function callVision(fileUrl: string, isPdf: boolean, prompt: string, apiKey: string): Promise<string> {
