@@ -48,6 +48,15 @@ interface SchedulePopoverProps {
    *  `onSchedule`'s third argument. Used when the picker feeds a real calendar
    *  event rather than a task's scheduled date. */
   showDuration?: boolean
+  /** Controlled open state — lets a caller with no trigger click to react to
+   *  (e.g. a keyboard shortcut) drive the popover open programmatically.
+   *  Both props are optional and must be supplied together; when `open` is
+   *  omitted the popover keeps its original uncontrolled, open-on-trigger-
+   *  click behavior unchanged. Positioning still reads from the trigger's
+   *  `getBoundingClientRect()`, so the trigger must be a real rendered
+   *  element regardless of which mode is in use. */
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }
 
 type Step = 'date' | 'time'
@@ -175,9 +184,23 @@ export function SchedulePopover({
   itemTitle,
   onDefer,
   showDuration = false,
+  open,
+  onOpenChange,
 }: SchedulePopoverProps) {
   void _isAllDay // Reserved for visual indicator
-  const [isOpen, setIsOpen] = useState(false)
+  // Hybrid controlled/uncontrolled open state. When `open` is not supplied
+  // (the vast majority of call sites), this behaves exactly like the plain
+  // `useState` it replaces: `setIsOpen` just updates `uncontrolledOpen` and
+  // `isOpen` reads it straight back. When a caller passes `open`, `isOpen`
+  // instead mirrors that prop and `setIsOpen` reports intent via
+  // `onOpenChange` for the caller to act on — the caller owns the state.
+  const isControlled = open !== undefined
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false)
+  const isOpen = isControlled ? open : uncontrolledOpen
+  const setIsOpen = useCallback((next: boolean) => {
+    if (!isControlled) setUncontrolledOpen(next)
+    onOpenChange?.(next)
+  }, [isControlled, onOpenChange])
   const [step, setStep] = useState<Step>('date')
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
 
@@ -294,7 +317,7 @@ export function SchedulePopover({
     setCustomTimeSearch('')
     setHighlightedIndex(-1)
     setDurationMinutes(60)
-  }, [])
+  }, [setIsOpen])
 
   const handleDateSelect = (date: Date) => {
     setSelectedDate(date)

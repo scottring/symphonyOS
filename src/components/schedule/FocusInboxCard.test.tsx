@@ -96,4 +96,77 @@ describe('FocusInboxCard', () => {
     render(<FocusInboxCard {...baseProps} tasks={[]} />)
     expect(screen.getByText(/inbox zero/i)).toBeInTheDocument()
   })
+
+  describe('send to calendar', () => {
+    it('hides the button when onSendToCalendar is not provided', () => {
+      render(<FocusInboxCard {...baseProps} />)
+      expect(screen.queryByRole('button', { name: /send to calendar/i })).not.toBeInTheDocument()
+    })
+
+    it('opens the day/time picker via the button and sends the current card', () => {
+      const onSendToCalendar = vi.fn()
+      render(<FocusInboxCard {...baseProps} onSendToCalendar={onSendToCalendar} />)
+
+      fireEvent.click(screen.getByRole('button', { name: /send to calendar/i }))
+      fireEvent.click(screen.getByRole('button', { name: /tomorrow/i }))
+      fireEvent.click(screen.getByRole('button', { name: '9am' }))
+
+      expect(onSendToCalendar).toHaveBeenCalledWith('a', expect.any(Date), false, 60)
+    })
+
+    it('opens the picker with the "e" key and sends the current card', () => {
+      const onSendToCalendar = vi.fn()
+      render(<FocusInboxCard {...baseProps} onSendToCalendar={onSendToCalendar} />)
+
+      expect(screen.queryByText('Schedule')).not.toBeInTheDocument()
+      fireEvent.keyDown(window, { key: 'e' })
+      expect(screen.getByText('Schedule')).toBeInTheDocument()
+
+      fireEvent.click(screen.getByRole('button', { name: /tomorrow/i }))
+      fireEvent.click(screen.getByRole('button', { name: '9am' }))
+
+      expect(onSendToCalendar).toHaveBeenCalledWith('a', expect.any(Date), false, 60)
+    })
+
+    it('leaves "c" bound to complete', () => {
+      const onComplete = vi.fn()
+      const onSendToCalendar = vi.fn()
+      render(<FocusInboxCard {...baseProps} onComplete={onComplete} onSendToCalendar={onSendToCalendar} />)
+
+      fireEvent.keyDown(window, { key: 'c' })
+
+      expect(onComplete).toHaveBeenCalledWith('a')
+      expect(onSendToCalendar).not.toHaveBeenCalled()
+    })
+
+    it('suppresses other shortcuts while the picker is open, and Escape closes the picker instead of exiting focus mode', () => {
+      const onComplete = vi.fn()
+      const onExitFocus = vi.fn()
+      render(
+        <FocusInboxCard
+          {...baseProps}
+          onComplete={onComplete}
+          onExitFocus={onExitFocus}
+          onSendToCalendar={vi.fn()}
+        />,
+      )
+
+      fireEvent.keyDown(window, { key: 'e' })
+      expect(screen.getByText('Schedule')).toBeInTheDocument()
+
+      fireEvent.keyDown(window, { key: 'c' })
+      expect(onComplete).not.toHaveBeenCalled()
+
+      fireEvent.keyDown(window, { key: 'Escape' })
+      expect(onExitFocus).not.toHaveBeenCalled()
+      expect(screen.queryByText('Schedule')).not.toBeInTheDocument()
+    })
+
+    it('disables the button while a send is in flight', () => {
+      render(<FocusInboxCard {...baseProps} onSendToCalendar={vi.fn()} sending />)
+      const button = screen.getByRole('button', { name: /send to calendar/i })
+      expect(button).toBeDisabled()
+      expect(button).toHaveAttribute('aria-busy', 'true')
+    })
+  })
 })

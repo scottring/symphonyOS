@@ -448,6 +448,19 @@ export function InboxView({
     applyTriage(task, { kind: 'delete' })
   }, [filteredTasks, applyTriage])
 
+  // Focus mode has no row to look the task up from (unlike list mode's
+  // per-row closure), so it hands back just the id plus what the picker
+  // chose — look the task up here and forward to the same conversion flow
+  // list mode uses.
+  const handleFocusSendToCalendar = useCallback(
+    (taskId: string, start: Date, isAllDay: boolean, durationMinutes?: number) => {
+      const task = filteredTasks.find((t) => t.id === taskId)
+      if (!task) return
+      void handleSendToCalendar(task, start, isAllDay, durationMinutes)
+    },
+    [filteredTasks, handleSendToCalendar],
+  )
+
   // Merge a photo capture into its AI-suggested destination task.
   const [mergingCaptureId, setMergingCaptureId] = useState<string | null>(null)
   const handleMergeCapture = useCallback(async (capture: Task, target: Task) => {
@@ -614,6 +627,8 @@ export function InboxView({
           onUpdate={(taskId, updates) => onUpdateTask?.(taskId, updates)}
           onSelectDetail={handleSelect}
           onExitFocus={() => setMode('dense')}
+          onSendToCalendar={handleFocusSendToCalendar}
+          sending={sendingTaskId !== null}
         />
       ) : (
         <div className="space-y-2">

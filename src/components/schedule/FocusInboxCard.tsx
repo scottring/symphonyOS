@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Check } from 'lucide-react'
 import { ConceptIcon } from '@/lib/conceptIcons'
+import { SchedulePopover } from '@/components/triage'
 import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { FamilyMember } from '@/types/family'
@@ -17,6 +18,13 @@ interface FocusInboxCardProps {
   onUpdate: (taskId: string, updates: Partial<Task>) => void
   onSelectDetail: (taskId: string) => void
   onExitFocus: () => void
+  /** Converts the current card into a real calendar event. Omitted entirely
+   *  hides the button — mirrors the other optional-callback props here. */
+  onSendToCalendar?: (taskId: string, start: Date, isAllDay: boolean, durationMinutes?: number) => void
+  /** True while a send-to-calendar write is in flight anywhere on the page
+   *  (one hook instance serves both list and focus mode) — disables the
+   *  button so a second click can't race the first, matching list mode. */
+  sending?: boolean
 }
 
 const WHEN_BUTTONS: Array<{ key: string; bucket: FocusBucket; label: string; sub: string }> = [
@@ -29,8 +37,10 @@ const WHEN_BUTTONS: Array<{ key: string; bucket: FocusBucket; label: string; sub
 export function FocusInboxCard({
   tasks, projects, familyMembers: _familyMembers,
   onTriage, onDelete, onComplete, onUpdate: _onUpdate, onSelectDetail, onExitFocus,
+  onSendToCalendar, sending = false,
 }: FocusInboxCardProps) {
   const [index, setIndex] = useState(0)
+  const [calendarOpen, setCalendarOpen] = useState(false)
 
   const total = tasks.length
   const current = tasks[index]
@@ -61,10 +71,30 @@ export function FocusInboxCard({
     advance()
   }, [current, onComplete, advance])
 
+  // Opens the calendar picker rather than converting directly — the picker
+  // needs a day, a time, and (optionally) a duration before there's anything
+  // to send. It does NOT call advance(): the card only leaves the list once
+  // the task is actually deleted (after a confirmed Google write), and the
+  // popover it opens anchors to this card's own trigger button, which must
+  // stay mounted behind it.
+  const openSendToCalendar = useCallback(() => {
+    if (!current || !onSendToCalendar) return
+    setCalendarOpen(true)
+  }, [current, onSendToCalendar])
+
   useEffect(() => {
     function handler(e: KeyboardEvent) {
       const target = e.target as HTMLElement
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) return
+
+      // While the calendar picker is open, every other shortcut is
+      // suppressed — otherwise 'd'/'c'/digit keys typed while browsing dates
+      // would delete/complete/triage the card out from under the open
+      // popover. Escape closes the picker instead of exiting focus mode.
+      if (calendarOpen) {
+        if (e.key === 'Escape') { e.stopPropagation(); setCalendarOpen(false) }
+        return
+      }
 
       switch (e.key) {
         case '1': triage('today'); break
@@ -76,6 +106,8 @@ export function FocusInboxCard({
         case 'd':
         case 'D':
         case 'Backspace': del(); break
+        case 'e':
+        case 'E': openSendToCalendar(); break
         case 'ArrowRight':
         case ' ': e.preventDefault(); advance(); break
         case 'ArrowLeft': goBack(); break
@@ -85,7 +117,7 @@ export function FocusInboxCard({
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [triage, del, complete, advance, goBack, current, onSelectDetail, onExitFocus])
+  }, [triage, del, complete, openSendToCalendar, advance, goBack, current, onSelectDetail, onExitFocus, calendarOpen])
 
   if (total === 0 || !current) {
     return (
@@ -136,6 +168,33 @@ export function FocusInboxCard({
             </button>
           ))}
         </div>
+
+        {onSendToCalendar && (
+          <SchedulePopover
+            showDuration
+            itemTitle={current.title}
+            open={calendarOpen}
+            onOpenChange={setCalendarOpen}
+            onSchedule={(date, isAllDay, durationMinutes) => {
+              onSendToCalendar(current.id, date, isAllDay, durationMinutes)
+            }}
+            trigger={
+              <button
+                type="button"
+                aria-label="Send to calendar"
+                aria-busy={sending}
+                disabled={sending}
+                className={`w-full flex items-center justify-center gap-2 px-3 py-3 mb-6 rounded-xl border-2 border-neutral-100 bg-white transition-colors ${
+                  sending ? 'opacity-50 cursor-not-allowed' : 'hover:border-primary-400 hover:bg-primary-50/40'
+                }`}
+              >
+                <span className="text-xs text-neutral-400 bg-neutral-50 rounded px-2 py-0.5">e</span>
+                <ConceptIcon name="when" decorative />
+                <span className="font-medium text-sm text-neutral-800">Send to calendar</span>
+              </button>
+            }
+          />
+        )}
 
         {/* Resolve-without-scheduling: the item is already handled, so check it
             off rather than filing it to a horizon. (keyboard: C) */}
