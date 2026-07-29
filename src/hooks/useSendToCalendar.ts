@@ -10,7 +10,10 @@ export interface SendToCalendarWhen {
   allDay?: boolean
 }
 
-export type SendFailureReason = 'read-only' | 'not-connected' | 'failed'
+/** `busy` is not an error: another send is still in flight on this hook
+ *  instance. It is separate from `failed` so callers don't tell the user
+ *  something went wrong with Google when nothing did. */
+export type SendFailureReason = 'read-only' | 'not-connected' | 'failed' | 'busy'
 
 export type SendToCalendarResult =
   | { ok: true; eventId: string; calendarId?: string; calendarName: string }
@@ -53,7 +56,7 @@ export function useSendToCalendar(deleteTask: (id: string) => void | Promise<voi
   const sendToCalendar = useCallback(
     async (task: Task, when: SendToCalendarWhen): Promise<SendToCalendarResult> => {
       if (!isConnected) return { ok: false, reason: 'not-connected' }
-      if (inFlight.current) return { ok: false, reason: 'failed' }
+      if (inFlight.current) return { ok: false, reason: 'busy' }
 
       inFlight.current = true
       setSendingTaskId(task.id)

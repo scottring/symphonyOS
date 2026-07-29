@@ -1,48 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@/test/test-utils'
-import { DenseInboxRow, type QuickAction } from './DenseInboxRow'
+import { render, screen, fireEvent, waitFor, act } from '@/test/test-utils'
 import { InboxView } from './InboxView'
 import { ScheduleActionsProvider, type ScheduleActionsValue } from '@/contexts/ScheduleActionsContext'
 import type { Task } from '@/types/task'
 
-const task = {
-  id: 'task-1',
-  title: 'Dentist appointment',
-  completed: false,
-  createdAt: new Date(),
-  updatedAt: new Date(),
-  bucket: 'inbox',
-  context: 'family',
-} as Task
-
-const ACTIONS: QuickAction[] = [{ kind: 'calendar' }]
-
-describe('DenseInboxRow calendar quick action', () => {
-  it('renders a Calendar chip and reports the action without firing it', () => {
-    const onQuickAction = vi.fn()
-    render(
-      <DenseInboxRow
-        task={task}
-        familyMembers={[]}
-        quickActions={ACTIONS}
-        onQuickAction={onQuickAction}
-        onToggleComplete={vi.fn()}
-        onUpdate={vi.fn()}
-        onSelect={vi.fn()}
-      />,
-    )
-
-    fireEvent.click(screen.getByRole('button', { name: /send to calendar/i }))
-    expect(onQuickAction).toHaveBeenCalledWith({ kind: 'calendar' })
-  })
-})
-
-// --- InboxView integration -------------------------------------------------
-//
-// The undo path is what makes destroying a task acceptable, so it is covered
-// against the real composed handler: a full InboxView render, the real
-// SchedulePopover, the real useSendToCalendar, and only the Google/Supabase
-// edges mocked.
+// The undo path is what makes destroying a task acceptable, so the whole feature
+// is covered against the real composed handler: a full InboxView render, the real
+// SchedulePopover, the real useSendToCalendar, and only the Google/Supabase edges
+// mocked.
 
 const createEvent = vi.fn()
 const deleteEvent = vi.fn()
@@ -139,6 +104,19 @@ describe('InboxView send to calendar', () => {
     updateTask.mockResolvedValue(undefined)
   })
 
+  it('puts a Calendar chip on the row that opens a picker instead of firing', () => {
+    const { onDeleteTask } = renderInbox()
+
+    const chip = screen.getByRole('button', { name: /send to calendar/i })
+    expect(chip).toHaveTextContent('Calendar')
+
+    fireEvent.click(chip)
+
+    // Opening the picker must not convert anything on its own.
+    expect(createEvent).not.toHaveBeenCalled()
+    expect(onDeleteTask).not.toHaveBeenCalled()
+  })
+
   it('opens the day/time/duration picker from the calendar action', () => {
     renderInbox()
 
@@ -191,6 +169,20 @@ describe('InboxView send to calendar', () => {
         expect.objectContaining({ notes: 'Bring the insurance card', bucket: 'inbox' }),
       ),
     )
+  })
+
+  it('marks the chip busy and blocks a second send while the write is in flight', async () => {
+    let release: (value: { id: string }) => void = () => {}
+    createEvent.mockReturnValueOnce(new Promise((resolve) => { release = resolve }))
+    renderInbox()
+
+    sendToTomorrowAt2pm('1h')
+
+    const chip = screen.getByRole('button', { name: /send to calendar/i })
+    await waitFor(() => expect(chip).toBeDisabled())
+    expect(chip).toHaveAttribute('aria-busy', 'true')
+
+    await act(async () => { release({ id: 'evt-1' }) })
   })
 
   it('keeps the task in the inbox and explains why when the calendar is read-only', async () => {

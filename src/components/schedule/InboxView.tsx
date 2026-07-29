@@ -154,7 +154,7 @@ export function InboxView({
     })
   }, [addTask, updateTask])
 
-  const { sendToCalendar, undoSend } = useSendToCalendar((id) => onDeleteTask?.(id))
+  const { sendToCalendar, undoSend, sendingTaskId } = useSendToCalendar((id) => onDeleteTask?.(id))
 
   // Convert an inbox item into a real Google event. The hook writes to Google
   // first and only then deletes the task, so a failure leaves the inbox exactly
@@ -170,6 +170,9 @@ export function InboxView({
       })
 
       if (!outcome.ok) {
+        // 'busy' = another row's send is still writing. Nothing went wrong and
+        // nothing was lost, so there is nothing worth interrupting the user for.
+        if (outcome.reason === 'busy') return
         showToast(
           outcome.reason === 'read-only'
             ? 'That calendar is shared read-only — the item is still in your inbox.'
@@ -498,7 +501,14 @@ export function InboxView({
                     <button
                       type="button"
                       aria-label="Send to calendar"
-                      className="text-xs px-2.5 py-1 rounded-md font-medium bg-sky-50 text-sky-700 hover:bg-sky-100 transition-colors"
+                      // One hook instance serves the whole page, so a send in
+                      // flight anywhere blocks every chip — and the row actually
+                      // writing says so.
+                      aria-busy={sendingTaskId === task.id}
+                      disabled={sendingTaskId !== null}
+                      className={`text-xs px-2.5 py-1 rounded-md font-medium bg-sky-50 text-sky-700 transition-colors ${
+                        sendingTaskId !== null ? 'opacity-50 cursor-not-allowed' : 'hover:bg-sky-100'
+                      }`}
                     >
                       <ConceptIcon name="when" decorative /> Calendar
                     </button>

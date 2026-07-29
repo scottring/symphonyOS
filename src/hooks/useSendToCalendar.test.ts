@@ -149,6 +149,30 @@ describe('useSendToCalendar', () => {
     expect(createEvent).toHaveBeenCalledWith(expect.objectContaining({ allDay: true }))
   })
 
+  it('refuses a concurrent send as busy, not as a failure', async () => {
+    // One hook instance serves every row on the page, so this is ordinary fast
+    // triage — send row B while row A is still writing — not just a double-tap.
+    let releaseFirst: (value: { id: string }) => void = () => {}
+    createEvent.mockReturnValueOnce(new Promise((resolve) => { releaseFirst = resolve }))
+    const deleteTask = vi.fn()
+    const { result } = renderHook(() => useSendToCalendar(deleteTask))
+
+    let first: Promise<unknown>
+    let second
+    await act(async () => {
+      first = result.current.sendToCalendar(makeTask({ id: 'task-a' }), { start: START })
+      second = await result.current.sendToCalendar(makeTask({ id: 'task-b' }), { start: START })
+      releaseFirst({ id: 'evt-1' })
+      await first
+    })
+
+    expect(second).toEqual({ ok: false, reason: 'busy' })
+    expect(createEvent).toHaveBeenCalledTimes(1)
+    // The first send is untouched by the second's refusal.
+    expect(deleteTask).toHaveBeenCalledTimes(1)
+    expect(deleteTask).toHaveBeenCalledWith('task-a')
+  })
+
   it('undoSend deletes the created event', async () => {
     deleteEvent.mockResolvedValue(undefined)
     const { result } = renderHook(() => useSendToCalendar(vi.fn()))
