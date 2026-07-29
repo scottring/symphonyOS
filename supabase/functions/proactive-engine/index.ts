@@ -563,7 +563,7 @@ For each item where you find a useful insight, return a suggestion. Focus on:
 2. Cross-entity connections (an email mentions something related to a task or event)
 3. Tasks that are complex/reflective and would benefit from guided thinking
 4. Stale tasks that need a personalized nudge based on their notes
-5. Vault context that adds useful background to tasks or events (e.g., related notes, prior decisions, contact history)
+5. Each task's NOTES and ATTACHED FACTS lines that add useful background (related notes, prior decisions, extracted phone numbers/codes)
 
 Rules:
 - Be SPECIFIC with actions. Include phone numbers, email addresses from contacts.
