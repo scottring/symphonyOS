@@ -1,4 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { assembleContext } from '../_shared/context-graph/assemble.ts'
+import { facetsToFacts, renderBundleForPrompt } from '../_shared/context-graph/build.ts'
+import { facetRuleSuggestions } from './lib/facetRules.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -481,53 +484,10 @@ async function fetchCalendarEvents(
   }))
 }
 
-// ── Open Brain vault enrichment ──
-async function fetchVaultContext(queries: string[]): Promise<string> {
-  const openBrainUrl = Deno.env.get('OPEN_BRAIN_URL')
-  const openBrainApiKey = Deno.env.get('OPEN_BRAIN_API_KEY')
-  if (!openBrainUrl || queries.length === 0) return ''
-
-  // Deduplicate and limit queries
-  const uniqueQueries = [...new Set(queries)].slice(0, 5)
-  const results: string[] = []
-
-  for (const query of uniqueQueries) {
-    try {
-      const controller = new AbortController()
-      const timeout = setTimeout(() => controller.abort(), 3000)
-      const res = await fetch(
-        `${openBrainUrl}/api/search?q=${encodeURIComponent(query)}&k=3`,
-        {
-          signal: controller.signal,
-          headers: {
-            'Content-Type': 'application/json',
-            ...(openBrainApiKey ? { 'X-Api-Key': openBrainApiKey } : {}),
-          },
-        },
-      )
-      clearTimeout(timeout)
-
-      if (res.ok) {
-        const data = await res.json()
-        const hits = data.results || []
-        for (const hit of hits.slice(0, 2)) {
-          if (hit.snippet && hit.title) {
-            results.push(`[${hit.title}] ${hit.snippet.substring(0, 150)}`)
-          }
-        }
-      }
-    } catch {
-      // Open Brain unreachable — continue without vault context
-      console.log(`Open Brain search failed for "${query}", continuing without vault`)
-      break // If one fails, likely all will — skip remaining
-    }
-  }
-
-  return results.length > 0 ? results.join('\n') : ''
-}
-
 // ── LLM reasoning pass ──
 async function runLLMPass(
+  supabase: ReturnType<typeof createClient>,
+  userId: string,
   tasks: TaskRow[],
   calendarEvents: CalendarEventRow[],
   emailActions: EmailActionRow[],
@@ -548,7 +508,7 @@ async function runLLMPass(
   // Tasks needing AI: complex/reflective, stale with context, or no rule suggestions
   const aiTasks = tasks
     .filter(t => !ruleEntityIds.has(t.id) || (t.notes && t.notes.length > 50))
-    .slice(0, 15) // Cap to control token usage
+    .slice(0, 8) // Cap to control token usage (context bundles are heavier than one-liners)
 
   // All calendar events (they need inference for downstream needs)
   const aiEvents = calendarEvents.slice(0, 10)
@@ -560,12 +520,13 @@ async function runLLMPass(
     return []
   }
 
-  // Fetch vault context for tasks and events (best-effort, non-blocking)
-  const vaultQueries = [
-    ...aiTasks.slice(0, 3).map(t => t.title),
-    ...aiEvents.slice(0, 2).map(e => e.title),
-  ]
-  const vaultContext = await fetchVaultContext(vaultQueries)
+  // Assemble rich context bundles for the AI tasks (best-effort per-task; a failed
+  // assembly degrades to omission rather than failing the whole pass).
+  const openAiKey = Deno.env.get('OPENAI_API_KEY') ?? undefined
+  const bundles = await Promise.all(aiTasks.map(t =>
+    assembleContext({ client: supabase, openAiKey }, { entityType: 'task', entityId: t.id, userId })
+      .catch(() => null)
+  ))
 
   // Build contacts lookup string
   const contactsList = Array.from(contactsMap.values())
@@ -585,14 +546,11 @@ TODAY: ${new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeri
 CONTACTS:
 ${contactsList || 'None'}
 
-VAULT CONTEXT (relevant notes from the user's personal knowledge base):
-${vaultContext || 'None available'}
-
 RECENT ACTIONS (what the user already did — do NOT suggest these again):
 ${actionsSummary || 'None'}
 
-TASKS:
-${aiTasks.map(t => `- [${t.id}] "${t.title}"${t.notes ? ` notes: ${t.notes.substring(0, 200)}` : ''}${t.scheduled_for ? ` scheduled: ${t.scheduled_for}` : ''}${t.is_waiting ? ' (WAITING)' : ''}${t.contact_id ? ` contact: ${contactsMap.get(t.contact_id)?.name || t.contact_id}` : ''}`).join('\n') || 'None'}
+TASKS (each with its assembled context):
+${bundles.filter(Boolean).map(b => renderBundleForPrompt(b!)).join('\n\n') || 'None'}
 
 CALENDAR EVENTS TODAY:
 ${aiEvents.map(e => `- [${e.id}] "${e.title}" at ${e.start_time}${e.location ? ` location: ${e.location}` : ''}${e.description ? ` desc: ${e.description.substring(0, 150)}` : ''}${e.attendees?.length ? ` attendees: ${e.attendees.map(a => a.displayName || a.email).join(', ')}` : ''}`).join('\n') || 'None'}
@@ -694,15 +652,27 @@ Deno.serve(async (req) => {
     }
 
     const token = authHeader.replace('Bearer ', '')
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+    let userId: string
+    if (token === supabaseServiceKey) {
+      // Cron/service invocation: trusted caller names the user explicitly.
+      const body = await req.json().catch(() => ({}))
+      if (typeof body.user_id !== 'string') {
+        return new Response(JSON.stringify({ error: 'user_id required for service invocation' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+      userId = body.user_id
+    } else {
+      const { data: { user }, error: authError } = await supabase.auth.getUser(token)
+      if (authError || !user) {
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+          status: 401,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+      userId = user.id
     }
-
-    const userId = user.id
 
     // ── GATHER DATA ──
 
@@ -713,6 +683,18 @@ Deno.serve(async (req) => {
       .eq('user_id', userId)
       .eq('completed', false)
       .order('scheduled_for', { ascending: true })
+
+    // Attached facets for all tasks (one batch query, not per-task)
+    const taskIds = (tasks || []).map(t => t.id)
+    const { data: taskAttachments } = taskIds.length > 0
+      ? await supabase.from('attachments').select('id, entity_id, facets')
+          .eq('user_id', userId).eq('entity_type', 'task').in('entity_id', taskIds).not('facets', 'is', null)
+      : { data: [] }
+    const factsByTask = new Map<string, ReturnType<typeof facetsToFacts>>()
+    for (const att of (taskAttachments || []) as { id: string; entity_id: string; facets: unknown }[]) {
+      const facts = facetsToFacts([att])
+      if (facts.length) factsByTask.set(att.entity_id, [...(factsByTask.get(att.entity_id) || []), ...facts])
+    }
 
     // Contacts
     const { data: contacts } = await supabase
@@ -763,6 +745,7 @@ Deno.serve(async (req) => {
         (actionHistory || []) as ActionHistoryRow[],
       )
       allSuggestions.push(...taskSuggestions)
+      allSuggestions.push(...facetRuleSuggestions(task as TaskRow, factsByTask.get(task.id) || []))
     }
 
     // 2. Rule-based calendar event suggestions
@@ -778,6 +761,8 @@ Deno.serve(async (req) => {
     // 3. LLM reasoning pass (calendar inference, cross-entity connections)
     try {
       const llmSuggestions = await runLLMPass(
+        supabase,
+        userId,
         (tasks || []) as TaskRow[],
         calendarEvents,
         (emailActions || []) as EmailActionRow[],
