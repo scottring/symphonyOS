@@ -4,6 +4,8 @@
 
 import type { LucideIcon } from 'lucide-react';
 import { WALL, wallQuote } from './wallTheme';
+import { WallV2FreshnessLine } from './WallV2FreshnessLine';
+import type { Freshness } from './wallFreshness';
 
 interface Props {
   weekday: string;
@@ -16,11 +18,13 @@ interface Props {
   condition: string;
   high: number;
   low: number;
+  /** Data freshness, shown under the weather chip. */
+  freshness: Freshness;
 }
 
 export function WallV2DateColumn({
   weekday, fullDate, time, date, weatherIcon: WeatherIcon, weatherTint,
-  temp, condition, high, low,
+  temp, condition, high, low, freshness,
 }: Props) {
   const quote = wallQuote(date);
   return (
@@ -44,6 +48,7 @@ export function WallV2DateColumn({
           </div>
         </div>
       </div>
+      <WallV2FreshnessLine freshness={freshness} />
       <div className={`mt-auto pt-4 font-display italic text-center text-[0.85rem] leading-relaxed ${WALL.muted}`}>
         "{quote.text}"<br />— {quote.author}
       </div>

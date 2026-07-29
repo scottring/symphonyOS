@@ -10,6 +10,7 @@ import {
 } from '@/types/timeline'
 import { groupByDaySection, type DaySection } from '@/lib/timeUtils'
 import { isQuietHours } from '@/lib/quietHours'
+import { resolveFetchOutcome } from '@/hooks/wallDataCommit'
 import { computeScreenTimeSummaries, type ChildScreenTimeSummary } from '@/hooks/useScreenTime'
 import type { TimelineItem } from '@/types/timeline'
 import type { Task } from '@/types/task'
@@ -101,6 +102,9 @@ export function useWallData(): UseWallDataReturn {
   const [error, setError] = useState<string | null>(null)
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null)
   const mountedRef = useRef(true)
+  // Tracked in a ref, not read from `days`, so fetchAllData keeps a stable identity
+  // and the poll interval isn't torn down and rebuilt on every data change.
+  const hasRenderedDataRef = useRef(false)
 
   const fetchAllData = useCallback(async () => {
     if (!user) return
@@ -400,15 +404,27 @@ export function useWallData(): UseWallDataReturn {
       })
 
       if (mountedRef.current) {
-        setDays(wallDays)
-        setCalendarEventsState(events)
+        // A failed fetch used to blank the wall (every failed query yields
+        // `data: null`, which collapsed to empty arrays) *and* still advance the
+        // refresh clock — so the kiosk showed nothing while reporting itself
+        // freshly updated. Keep the last good render and freeze the clock instead.
+        const { commitData, advanceLastRefresh } = resolveFetchOutcome({
+          dataError,
+          hasRenderedData: hasRenderedDataRef.current,
+        })
+
+        if (commitData) {
+          hasRenderedDataRef.current = wallDays.length > 0
+          setDays(wallDays)
+          setCalendarEventsState(events)
+          setScreenTimeSummaries(stSummaries)
+          setOverdueTasks(overdueItems)
+          setAllTasks(tasks)
+          setInboxCount(inboxCountRes.count ?? 0)
+        }
         setCalendarUnavailable(calendarFailed)
-        setScreenTimeSummaries(stSummaries)
-        setOverdueTasks(overdueItems)
-        setAllTasks(tasks)
-        setInboxCount(inboxCountRes.count ?? 0)
         setError(dataError)
-        setLastRefresh(new Date())
+        if (advanceLastRefresh) setLastRefresh(new Date())
         setLoading(false)
       }
     } catch (err) {

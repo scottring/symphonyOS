@@ -25,6 +25,8 @@ import {
 } from '@/lib/hideRoutinesSignal';
 import { TINTS } from './tints';
 import { WallV2DateColumn } from './WallV2DateColumn';
+import { WallV2StaleBanner } from './WallV2StaleBanner';
+import { computeFreshness } from './wallFreshness';
 import { WallV2NowNext } from './WallV2NowNext';
 import { WallV2Timeline } from './WallV2Timeline';
 import { WallV2RightColumn } from './WallV2RightColumn';
@@ -194,6 +196,19 @@ export function WallV2Shell() {
 
   // ─── Adapted live data ───
   const liveWeather = useMemo(() => adaptWeather(weather), [weather]);
+
+  // The kiosk's worst failure is looking authoritative while hours out of date
+  // (Pi lost WiFi on 2026-07-21 and 2026-07-29). useWallData already tracked the
+  // error and the last good refresh; nothing rendered them until now.
+  const freshness = useMemo(
+    () =>
+      computeFreshness({
+        lastRefresh: wallData.lastRefresh,
+        error: wallData.error,
+        now,
+      }),
+    [wallData.lastRefresh, wallData.error, now],
+  );
 
   const todayData = useMemo(
     () => wallData.days.find((d) => d.isToday),
@@ -457,7 +472,11 @@ export function WallV2Shell() {
         aria-hidden
         className="absolute top-0 right-0 w-[340px] h-[110px] opacity-30 dark:opacity-15 pointer-events-none"
       />
-      <div className="h-full w-full p-4 grid grid-cols-[220px_minmax(0,1fr)_264px] grid-rows-[minmax(0,1fr)_116px] gap-3">
+      {/* flex column so the stale banner can claim height without the fixed grid
+          clipping — the grid below simply shrinks when the banner appears. */}
+      <div className="h-full w-full p-4 flex flex-col">
+      <WallV2StaleBanner freshness={freshness} />
+      <div className="flex-1 min-h-0 grid grid-cols-[220px_minmax(0,1fr)_264px] grid-rows-[minmax(0,1fr)_116px] gap-3">
         {/* Row 1 — rail */}
         <div className="row-span-1 col-start-1 min-h-0">
           <WallV2DateColumn
@@ -471,6 +490,7 @@ export function WallV2Shell() {
             condition={weatherData.condition}
             high={weatherData.high}
             low={weatherData.low}
+            freshness={freshness}
           />
         </div>
 
@@ -519,6 +539,7 @@ export function WallV2Shell() {
           )}
           <WallV2FamilyStrip familyMembers={wallData.familyMembers} today={todayData} now={now} onDockAction={handleDockAction} />
         </div>
+      </div>
       </div>
 
       {showUtilities && (

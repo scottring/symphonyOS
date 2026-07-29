@@ -16,6 +16,11 @@ export const WALL = {
   dinnerLabel: 'text-[0.7rem] font-bold uppercase tracking-[0.15em] text-[#A8743F] dark:text-[#D8BC85]',
   prepChip: 'bg-[#F2E4C4] dark:bg-[#4A3D28] text-[#7A5A2E] dark:text-[#D8BC85] rounded-lg px-3 py-1.5 text-[0.8rem] font-bold',
   nowAccent: 'border-l-4 border-l-[#2E4638] dark:border-l-[#4E7261]',
+  // Freshness warnings. Warm amber rather than alarm-red: the wall lives in a
+  // kitchen, and a stale wall is a nudge to check the Pi, not an emergency.
+  warn: 'text-[#A8600F] dark:text-[#E0A959]',
+  warnBanner:
+    'bg-[#F7E4C0] dark:bg-[#4A3A1E] border border-[#E0BE7E] dark:border-[#6B5430] text-[#7A5316] dark:text-[#F0D9A6]',
 } as const;
 
 export const PERSON_ACCENTS = [
