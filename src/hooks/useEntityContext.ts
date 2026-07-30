@@ -7,6 +7,7 @@ import type {
   SuggestionEntityType,
 } from '@/types/proactiveSuggestion'
 import { rowToSuggestion } from '@/types/proactiveSuggestion'
+import { actOnSuggestionDb, dismissSuggestionDb } from '@/lib/assistant/suggestionMutations'
 
 export interface LastAction {
   actionType: string
@@ -105,9 +106,11 @@ export function useEntityContext(
     }
   }, [entityType, entityId, user])
 
-  // Mark suggestion as acted on + log to action_history.
-  // Copied exactly from useProactiveSuggestions.ts:82-128 (status update +
-  // acted_at/dismissed_at + action_history insert) — do not re-derive.
+  // Mark acted + log to action_history. Shared with useProactiveSuggestions and
+  // useUnpromptedSuggestions via lib/assistant/suggestionMutations.
+  //
+  // NOTE: anchored delivery deliberately never marks seen_at — you looked at the
+  // entity, the assistant didn't interrupt you.
   const actOnSuggestion = useCallback(async (
     suggestionId: string,
     actionDetail?: string,
@@ -118,27 +121,7 @@ export function useEntityContext(
     const suggestion = suggestions.find(s => s.id === suggestionId)
     if (!suggestion) return
 
-    // Update suggestion status
-    await supabase
-      .from('proactive_suggestions')
-      .update({
-        status: 'acted',
-        acted_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', suggestionId)
-
-    // Log to action history
-    await supabase
-      .from('action_history')
-      .insert({
-        user_id: user.id,
-        entity_type: suggestion.entityType,
-        entity_id: suggestion.entityId,
-        action_type: suggestion.actionType || suggestion.suggestionType,
-        detail: actionDetail || suggestion.title,
-        outcome: outcome || null,
-      })
+    await actOnSuggestionDb(user.id, suggestion, actionDetail, outcome)
 
     // Optimistic update
     setSuggestions(prev => prev.filter(s => s.id !== suggestionId))
@@ -146,15 +129,7 @@ export function useEntityContext(
 
   // Dismiss a suggestion
   const dismissSuggestion = useCallback(async (suggestionId: string) => {
-    await supabase
-      .from('proactive_suggestions')
-      .update({
-        status: 'dismissed',
-        dismissed_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', suggestionId)
-
+    await dismissSuggestionDb(suggestionId)
     setSuggestions(prev => prev.filter(s => s.id !== suggestionId))
   }, [])
 

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { ProactiveSuggestion } from '@/types/proactiveSuggestion'
 import { ConceptIcon, type ConceptName } from '@/lib/conceptIcons'
+import { isActionableSuggestion } from '@/lib/assistant/actionable'
 import { OutcomePicker, type ActionOutcome } from './OutcomePicker'
 
 interface ProactiveSuggestionChipsProps {
@@ -38,24 +39,10 @@ const ICON_FALLBACKS: Record<string, string> = {
   stale: '?',
 }
 
-/**
- * A suggestion's chip is only worth rendering if its click handler actually
- * does something. `someday`/`stale`/`guided_chat` are no-ops in
- * ProactiveSuggestionChips.handleClick when the corresponding optional prop
- * (onPush/onDelete/onOpenGuidedChat) is absent — callers must filter those
- * out themselves before rendering (and before any top-N slice, so a dead
- * suggestion can't shadow a live one).
- */
-export function isActionableSuggestion(
-  s: ProactiveSuggestion,
-  opts: { hasPush?: boolean; hasDelete?: boolean; hasGuidedChat?: boolean } = {}
-): boolean {
-  const actionType = s.actionType || s.suggestionType
-  if (actionType === 'someday') return !!opts.hasPush
-  if (actionType === 'stale') return !!opts.hasDelete
-  if (actionType === 'guided_chat') return !!opts.hasGuidedChat
-  return true
-}
+// Re-exported: several call sites import this from here. Canonical home is
+// @/lib/assistant/actionable — a pure policy module (interruptionPolicy) needs it
+// and must not import from a React component.
+export { isActionableSuggestion }
 
 export function ProactiveSuggestionChips({
   suggestions,
