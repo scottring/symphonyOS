@@ -50,3 +50,6 @@ playwright-report/
 # Swift/Xcode build artifacts
 .build/
 apple/**/.build/
+
+# Claude Code runtime lock (session-local, never share)
+.claude/scheduled_tasks.lock
