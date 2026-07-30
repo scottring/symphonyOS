@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { computeCadenceOverdue } from './cadenceDue'
+import { computeCadenceOverdue, completedCadenceTokens, isSessionSubstantive } from './cadenceDue'
 import { DEFAULT_CADENCE, weekToken } from '@/lib/cadence/config'
 
 // Thursday 2026-07-30. Week anchor (Sunday start) is 2026-07-26.
@@ -55,9 +55,57 @@ describe('computeCadenceOverdue', () => {
   })
 
   it('scores an overdue month above the wall floor via urgency', async () => {
+    // (see below for the completion-signal tests)
     // Integration sanity: a 4-week-late month must clear the wall's floor of 70.
     const { computeUrgency } = await import('./urgency')
     const r = computeCadenceOverdue(DEFAULT_CADENCE, thu, new Set(['season:2026-S2']))
     expect(computeUrgency({ cadenceWeeksLate: r!.weeksLate })).toBeGreaterThanOrEqual(70)
+  })
+})
+
+describe('isSessionSubstantive', () => {
+  it('rejects a row that was merely opened', () => {
+    // usePlanningSession creates the row on open; stepIndex lands on first nav.
+    expect(isSessionSubstantive({})).toBe(false)
+    expect(isSessionSubstantive({ stepIndex: 3 })).toBe(false)
+    expect(isSessionSubstantive(null)).toBe(false)
+    expect(isSessionSubstantive(undefined)).toBe(false)
+  })
+
+  it('rejects answers that are only whitespace', () => {
+    expect(isSessionSubstantive({ stepIndex: 2, review: '   ' })).toBe(false)
+  })
+
+  it('accepts a real answer', () => {
+    expect(isSessionSubstantive({ stepIndex: 4, review: 'Shipped the context graph' })).toBe(true)
+    expect(isSessionSubstantive({ oneWord: 'steady' })).toBe(true)
+  })
+})
+
+describe('completedCadenceTokens', () => {
+  it('maps planning horizons to cadence kinds', () => {
+    const set = completedCadenceTokens([
+      { horizon: 'weekly', period_token: '2026-7-26', notes: { review: 'done' } },
+      { horizon: 'monthly', period_token: '2026-7', notes: { review: 'done' } },
+      { horizon: 'seasonal', period_token: '2026-S2', notes: { review: 'done' } },
+      { horizon: 'annual', period_token: '2026', notes: { review: 'done' } },
+    ])
+    expect(set).toEqual(new Set([
+      'week:2026-7-26', 'month:2026-7', 'season:2026-S2', 'year:2026',
+    ]))
+  })
+
+  it('excludes opened-but-empty sessions, so the nudge survives a bail-out', () => {
+    const set = completedCadenceTokens([
+      { horizon: 'monthly', period_token: '2026-7', notes: { stepIndex: 2 } },
+    ])
+    expect(set.size).toBe(0)
+  })
+
+  it('ignores the daily horizon, which has no cadence ritual', () => {
+    const set = completedCadenceTokens([
+      { horizon: 'daily', period_token: '2026-07-30', notes: { oneWord: 'steady' } },
+    ])
+    expect(set.size).toBe(0)
   })
 })

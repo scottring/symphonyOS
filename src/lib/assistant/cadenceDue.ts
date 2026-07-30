@@ -22,6 +22,57 @@ export interface CadenceOverdue {
   weeksLate: number
 }
 
+/**
+ * planning_sessions.horizon uses a different vocabulary than the cadence config's
+ * SessionHorizon. Keep the mapping here so only one place knows both.
+ */
+export const PLANNING_HORIZON_BY_KIND: Record<SessionHorizon, string> = {
+  week: 'weekly',
+  month: 'monthly',
+  season: 'seasonal',
+  year: 'annual',
+}
+
+const KIND_BY_PLANNING_HORIZON: Record<string, SessionHorizon> = Object.fromEntries(
+  Object.entries(PLANNING_HORIZON_BY_KIND).map(([kind, horizon]) => [horizon, kind]),
+) as Record<string, SessionHorizon>
+
+/**
+ * A planning_sessions row is NOT evidence the ritual happened: usePlanningSession
+ * lazily CREATES the row as soon as a wizard is opened, and `stepIndex` is written
+ * on the first navigation. So "opened it and bailed" would otherwise silence the
+ * nudge forever.
+ *
+ * Substantive = at least one non-empty answer that isn't bookkeeping.
+ */
+const BOOKKEEPING_KEYS = new Set(['stepIndex'])
+
+export function isSessionSubstantive(notes: unknown): boolean {
+  if (!notes || typeof notes !== 'object') return false
+  return Object.entries(notes as Record<string, unknown>).some(([key, value]) => {
+    if (BOOKKEEPING_KEYS.has(key)) return false
+    if (typeof value === 'string') return value.trim().length > 0
+    return value !== undefined && value !== null && value !== false
+  })
+}
+
+/**
+ * Build the completed-token set `computeCadenceOverdue` expects, from
+ * planning_sessions rows. Rows that were merely opened are excluded.
+ */
+export function completedCadenceTokens(
+  rows: Array<{ horizon: string; period_token: string; notes?: unknown }>,
+): Set<string> {
+  const set = new Set<string>()
+  for (const row of rows) {
+    const kind = KIND_BY_PLANNING_HORIZON[row.horizon]
+    if (!kind) continue // 'daily' has no cadence ritual of its own
+    if (!isSessionSubstantive(row.notes)) continue
+    set.add(`${kind}:${row.period_token}`)
+  }
+  return set
+}
+
 const WEEK_MS = 7 * 86_400_000
 
 function wholeWeeksSince(anchor: Date, now: Date): number {

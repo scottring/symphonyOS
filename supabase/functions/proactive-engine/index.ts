@@ -2,6 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { assembleContext } from '../_shared/context-graph/assemble.ts'
 import { facetsToFacts, renderBundleForPrompt } from '../_shared/context-graph/build.ts'
 import { facetRuleSuggestions } from './lib/facetRules.ts'
+import { computeUrgency, deriveUrgencyFacts, type UrgencyInput } from '../_shared/urgency.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -88,6 +89,9 @@ interface Suggestion {
   action_type?: string
   action_payload: Record<string, unknown>
   suggestion_key: string
+  /** Set only when the rule already knows it (e.g. cadence lateness). Otherwise
+   *  derived from the entity at upsert time. See computeSuggestionUrgency. */
+  urgency?: number
 }
 
 interface LLMSuggestion {
@@ -836,6 +840,34 @@ Deno.serve(async (req) => {
 
     // Upsert new suggestions
     if (allSuggestions.length > 0) {
+      // Urgency lookup, built once. This is a COARSE ORDERING HINT only — the
+      // engine runs every 6h, so "event starts within 90 min" is false at 06:30
+      // and true at 14:00. The client recomputes live and that value governs
+      // every interruption decision (see src/lib/assistant/urgency.ts).
+      const urgencyInputs = new Map<string, UrgencyInput>()
+      for (const t of tasks || []) {
+        urgencyInputs.set(`task:${t.id}`, {
+          dueAt: t.scheduled_for,
+          waitingSince: t.is_waiting ? t.waiting_since : null,
+          deferCount: t.defer_count,
+        })
+      }
+      for (const e of calendarEvents) {
+        // All-day events carry no time pressure — only timed ones can be imminent.
+        urgencyInputs.set(`event:${e.id}`, {
+          eventStartAt: e.all_day ? null : e.start_time,
+        })
+      }
+
+      const now = new Date()
+      const urgencyFor = (s: Suggestion): number => {
+        if (typeof s.urgency === 'number') return s.urgency
+        const key = `${s.entity_type === 'calendar_event' ? 'event' : s.entity_type}:${s.entity_id}`
+        const input = urgencyInputs.get(key)
+        if (!input) return 0 // fail closed: unknown entity never interrupts
+        return computeUrgency(deriveUrgencyFacts(input, now))
+      }
+
       const rows = allSuggestions.map(s => ({
         user_id: userId,
         entity_type: s.entity_type,
@@ -848,6 +880,7 @@ Deno.serve(async (req) => {
         action_payload: s.action_payload,
         status: 'active',
         suggestion_key: s.suggestion_key,
+        urgency: urgencyFor(s),
         generated_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
         expires_at: new Date(Date.now() + 24 * 3600000).toISOString(),
