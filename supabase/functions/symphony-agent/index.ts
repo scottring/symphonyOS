@@ -1,4 +1,6 @@
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { assembleContext } from '../_shared/context-graph/assemble.ts'
+import { renderBundleForPrompt } from '../_shared/context-graph/build.ts'
 
 // ════════════════════════════════════════════════════════════════
 // SYMPHONY AGENT — a smart, Symphony-scoped assistant.
@@ -1063,18 +1065,35 @@ Deno.serve(async (req) => {
   let datePrefix = `(Today is ${today}.)${familyLine}`
   if (taskContext) {
     const isRoutine = taskContext.kind === 'routine'
-    const notesPart = taskContext.notes ? ` Notes: ${taskContext.notes}.` : ''
-    const projectPart = taskContext.projectName ? ` Project: ${taskContext.projectName}.` : ''
-    datePrefix += isRoutine
-      ? `\n(This conversation is about the recurring routine "${taskContext.title}" (id ${taskContext.id}).${notesPart}` +
+    if (isRoutine) {
+      // routine-kind taskContext.id is a routines row, not a task — assembleContext only
+      // knows tasks/calendar_events/projects, so routines always get the thin rendering.
+      const notesPart = taskContext.notes ? ` Notes: ${taskContext.notes}.` : ''
+      datePrefix += `\n(This conversation is about the recurring routine "${taskContext.title}" (id ${taskContext.id}).${notesPart}` +
         ' The user wants help making this routine work. You can adjust it via symphony_update_routine' +
         ' (time_of_day, recurrence), create supporting tasks with symphony_create_task, or talk through' +
         ' how to structure it. Look the routine up by id before writing to it.)'
-      : `\n(This conversation is about the task "${taskContext.title}" (id ${taskContext.id}).${notesPart}${projectPart}` +
-        ' The user wants help making this task doable. You can: break it into subtasks' +
+    } else {
+      let taskContextBlock = ''
+      try {
+        const bundle = await assembleContext(
+          { client: service, openAiKey: Deno.env.get('OPENAI_API_KEY') ?? undefined },
+          { entityType: 'task', entityId: taskContext.id, userId: user.id },
+        )
+        taskContextBlock = `\nThe user is asking about this item — full assembled context:\n${renderBundleForPrompt(bundle)}`
+        if (bundle.degraded.length) taskContextBlock += `\n(context parts unavailable: ${bundle.degraded.join(', ')})`
+      } catch (_e) {
+        // Fall back to the thin client-provided fields — never fail the chat over context.
+        const notesPart = taskContext.notes ? ` Notes: ${taskContext.notes}.` : ''
+        const projectPart = taskContext.projectName ? ` Project: ${taskContext.projectName}.` : ''
+        taskContextBlock = `\nThe user is asking about the task "${taskContext.title}" (id ${taskContext.id}).${notesPart}${projectPart}`
+      }
+      datePrefix += taskContextBlock +
+        '\nThe user wants help making this task doable. You can: break it into subtasks' +
         ' (symphony_create_task with parent_task_id), enrich its notes with what you find out,' +
         ' or — when the real next step is a conversation with someone — set needs_discussion true' +
-        ' with a discussion_note via symphony_update_task. Look the task up by id before writing to it.)'
+        ' with a discussion_note via symphony_update_task. Look the task up by id before writing to it.'
+    }
   }
   if (sessionContext) {
     const strList = (label: string, items?: string[]) =>
