@@ -37,8 +37,12 @@ export function ContextChips({
 
   if (visibleSuggestions.length === 0 && !showLastAction) return null
 
+  // A single wrapping element (not a Fragment) so callers that stack this
+  // inside a `divide-y [&>*]:py-4` list (TapContextPanel) get one row, not
+  // one per part — a Fragment's children land as separate direct children
+  // of whatever divide-y container hosts this component.
   return (
-    <>
+    <div className="space-y-1">
       {visibleSuggestions.length > 0 && (
         <ProactiveSuggestionChips
           suggestions={visibleSuggestions}
@@ -56,6 +60,6 @@ export function ContextChips({
           </span>
         </div>
       )}
-    </>
+    </div>
   )
 }

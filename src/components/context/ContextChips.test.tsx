@@ -50,11 +50,15 @@ describe('ContextChips', () => {
       dismissSuggestion: vi.fn(),
     })
 
-    render(<ContextChips entityType="task" entityId="task-1" variant="panel" />)
+    const { container } = render(<ContextChips entityType="task" entityId="task-1" variant="panel" />)
 
     expect(screen.getByText('Call the vet')).toBeInTheDocument()
     expect(screen.getByText('Text the vet')).toBeInTheDocument()
     expect(screen.getByText(/Last: Called the vet — left message · today/)).toBeInTheDocument()
+    // Suggestions + last-action must land inside ONE root element, not two
+    // separate direct children — a Fragment root would break TapContextPanel's
+    // `divide-y [&>*]:py-4` layout into two hairline-divided rows.
+    expect(container.children).toHaveLength(1)
   })
 
   it('renders only the top suggestion in row variant', () => {
