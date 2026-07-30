@@ -11,6 +11,7 @@ import type { PlanningHorizon } from '@/hooks/usePlanningSession'
 import { domainSessionToken, DOMAIN_LABELS, type PlanningDomain } from '@/lib/today/domainFilter'
 import { getDueSession, readCadenceConfig, dismissNudgeForToken } from '@/lib/cadence/config'
 import { SESSIONS } from './sessions'
+import { composeSession, deriveSessionState } from '@/lib/planning/composeSession'
 import { resolveGuidedTarget, daysRemainingIn, type GuidedTargetChoice } from './periods'
 import { narrationClip } from './narration'
 import { useNarrationPlayer } from './useNarrationPlayer'
@@ -71,7 +72,7 @@ interface Props {
 }
 
 export function GuidedSession({ horizon, domain, host, onClose, onFinished, onChain }: Props) {
-  const config = SESSIONS[horizon]
+  const baseConfig = SESSIONS[horizon]
   // Which period this session plans: the threshold rule by default (late in a
   // period → the next one), with a header toggle to pin the other candidate.
   const [targetChoice, setTargetChoice] = useState<GuidedTargetChoice>('auto')
@@ -84,6 +85,39 @@ export function GuidedSession({ horizon, domain, host, onClose, onFinished, onCh
   const period = target.period
   const { notes, patchNotes, loading } = usePlanningSession(horizon, domainSessionToken(period.token, domain))
 
+  // ── The cascade-runner ─────────────────────────────────────────────────────
+  // The step list is composed from real state instead of being a constant: steps
+  // with nothing to do are dropped (with a stated reason — never silently), and
+  // the composer step is hoisted when the period is already underway with
+  // nothing chosen. Rules, not a model. See lib/planning/composeSession.ts.
+  const composed = useMemo(() => composeSession(
+    baseConfig,
+    horizon,
+    deriveSessionState({
+      // Defensive on every field: composition must never be able to crash the
+      // ritual shell. Hosts are assembled by callers (and by test doubles) and a
+      // missing array here would take the whole session down — a composed step
+      // list is a nice-to-have, the wizard rendering at all is not.
+      tasks: host.tasks ?? [],
+      // CalendarEvent carries snake_case (edge fn) OR camelCase (cached) start
+      // times, both optional — take whichever is present, drop the rest.
+      events: (host.events ?? []).flatMap((e) => {
+        const raw: string | Date | undefined = e.start_time ?? e.startTime
+        if (!raw) return []
+        const startTime = typeof raw === 'string' ? new Date(raw) : raw
+        return Number.isNaN(startTime.getTime()) ? [] : [{ title: e.title, startTime }]
+      }),
+      upkeepCount: host.upkeepItems?.length ?? 0,
+      periodStart: period.start,
+      periodEnd: period.end,
+    }, horizon, new Date()),
+  ), [baseConfig, horizon, host.tasks, host.events, host.upkeepItems, period.start, period.end])
+
+  const config = useMemo(
+    () => ({ ...baseConfig, steps: composed.steps }),
+    [baseConfig, composed.steps],
+  )
+
   // Resume position starts at 0 and is synced from notes.stepIndex exactly
   // once per horizon+period, the first time loading flips false. `syncedKeyRef`
   // is the guard: after the initial sync, later notes changes (including the
@@ -94,14 +128,24 @@ export function GuidedSession({ horizon, domain, host, onClose, onFinished, onCh
   const [index, setIndex] = useState(0)
   const syncedKeyRef = useRef<string | null>(null)
 
+  // Resume is keyed by step ID, not position. `stepIndex` alone was correct only
+  // while the step list was a constant: now that composeSession can drop or
+  // reorder steps, position 7 in one sitting is a different step in the next, so
+  // a positional resume would silently drop you somewhere you'd never been.
+  // `stepIndex` is still read as a fallback for sessions saved before this.
   useEffect(() => {
     if (loading) return
     const syncKey = `${horizon}|${period.token}`
     if (syncedKeyRef.current === syncKey) return
-    const persisted = typeof notes.stepIndex === 'number' ? notes.stepIndex : 0
+    const byId = typeof notes.stepId === 'string'
+      ? config.steps.findIndex((s) => s.id === notes.stepId)
+      : -1
+    const persisted = byId >= 0
+      ? byId
+      : (typeof notes.stepIndex === 'number' ? notes.stepIndex : 0)
     setIndex(Math.min(Math.max(persisted, 0), config.steps.length - 1))
     syncedKeyRef.current = syncKey
-  }, [loading, horizon, period.token, notes.stepIndex, config.steps.length])
+  }, [loading, horizon, period.token, notes.stepId, notes.stepIndex, config.steps])
 
   // Safety net: if `horizon` changes, `config` swaps to a session with a
   // different (possibly shorter) step list in the same render that the sync
@@ -113,8 +157,10 @@ export function GuidedSession({ horizon, domain, host, onClose, onFinished, onCh
   const go = useCallback((next: number) => {
     const clamped = Math.min(Math.max(next, 0), config.steps.length - 1)
     setIndex(clamped)
-    patchNotes({ stepIndex: clamped })
-  }, [config.steps.length, patchNotes])
+    // Both: stepId is what resume reads (position isn't stable across a composed
+    // step list), stepIndex stays written so older clients still resume sanely.
+    patchNotes({ stepIndex: clamped, stepId: config.steps[clamped]?.id })
+  }, [config.steps, patchNotes])
 
   // Shared completion bookkeeping: reset the resume position (the flushed
   // unmount persist carries it to the DB) and stamp the daily first-run flag.
@@ -122,7 +168,7 @@ export function GuidedSession({ horizon, domain, host, onClose, onFinished, onCh
   // this horizon's, else the planned period's token (they byte-match — the
   // weekly session token IS the nudge's weekToken).
   const completeSession = useCallback(() => {
-    patchNotes({ stepIndex: 0 })
+    patchNotes({ stepIndex: 0, stepId: '' })
     if (horizon === 'daily') {
       localStorage.setItem('guided.daily.completed', '1')
       return
@@ -187,7 +233,20 @@ export function GuidedSession({ horizon, domain, host, onClose, onFinished, onCh
           </div>
           <p className="text-sm text-neutral-500">
             {period.label} · Step {safeIndex + 1} of {config.steps.length}
+            {composed.skipped.length > 0 && (
+              // A skipped step must never be merely absent — a wizard that
+              // quietly loses steps is indistinguishable from a broken one.
+              <span
+                className="ml-1.5 text-neutral-400"
+                title={composed.skipped.map((s) => `${s.title} — ${s.reason}`).join('\n')}
+              >
+                ({composed.skipped.length} skipped)
+              </span>
+            )}
           </p>
+          {composed.why[step.id] && (
+            <p className="mt-0.5 text-xs text-primary-600">{composed.why[step.id]}</p>
+          )}
           {/* Mid-period targeting: say which period is being planned when it
               isn't the obvious one, and offer the flip (threshold rule —
               week-boundary spec). Quiet on fresh period-start sessions. */}

@@ -34,7 +34,8 @@ import { TodayDraggableRow } from './TodayDraggableRow'
 import { GroupNameInput } from './GroupNameInput'
 import { useTodayDragState } from './TodayDragProvider'
 import { refusalFor } from '@/lib/today/todayDrop'
-import { capUnits, DEFAULT_SECTION_CAP } from '@/lib/today/pageCap'
+import { DEFAULT_SECTION_CAP } from '@/lib/today/pageCap'
+import { curateUnits } from '@/lib/today/curate'
 
 // ─── Meal detection ────────────────────────────────────────────────────────────
 
@@ -135,7 +136,7 @@ export function TodaySectionList({
     onAssignRoutine, onAssignRoutineAll,
     onSkipRoutine, onPushRoutine, onUpdateRoutine,
     onSkipEvent, onPushEvent, onUpdateEventContext,
-    onOpenTask, onOpenGuidedChat,
+    onOpenTask,
     contactsMap, projectsMap, familyMembers = [],
     eventNotesMap,
   } = ctx
@@ -175,7 +176,11 @@ export function TodaySectionList({
         // Capped by GROUP, not by row: a group renders as one enclosed card
         // whose borders come from adjacency, so cutting the run in half leaves
         // a card with no bottom edge.
-        const { visible, hiddenCount } = capUnits(
+        // curateUnits, not capUnits: same unit model and the same honest count,
+        // but the survivors are chosen by relevance rather than by position, so
+        // the row you needed can't be the one hidden behind "+9 more" purely
+        // because of where it landed in the sort.
+        const { visible, hiddenCount } = curateUnits(
           items,
           DEFAULT_SECTION_CAP,
           expandedSections.has(sectionKey(section)),

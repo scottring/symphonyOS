@@ -32,9 +32,31 @@ vi.mock('@/hooks/usePlanningSession', () => ({
   },
 }))
 
+// The shell now COMPOSES its step list from real state (lib/planning/composeSession),
+// so an empty host legitimately yields a shorter ritual — steps with nothing to do
+// are dropped. These shell tests are about navigation and narration, not
+// composition, so the host carries just enough state to keep every step present
+// and the positional expectations below meaningful. composeSession's own rules are
+// covered by lib/planning/composeSession.test.ts.
+const now = new Date()
 function makeHost(): GuidedHost {
   return {
-    tasks: [], tasksLoading: false, events: [], calendarConnected: false,
+    tasks: [
+      // completed this period → keeps the `wins` step
+      { id: 'w1', title: 'done thing', completed: true, updatedAt: now, bucket: 'month' },
+      // untriaged → keeps `inbox`
+      { id: 'i1', title: 'inbox thing', completed: false },
+      // month move with no week row → keeps `place-on-weeks`
+      { id: 'm1', title: 'unplaced move', completed: false, bucket: 'month' },
+      // filed under a pick → chosenCount > 0, so nothing gets hoisted
+      { id: 'm2', title: 'filed move', completed: false, bucket: 'month', sourceId: 'p1' },
+      // an explicit season pick, for the seasonal session
+      { id: 'q1', title: 'a pick', completed: false, bucket: 'quarter', pickedAt: now },
+    ] as unknown as GuidedHost['tasks'],
+    tasksLoading: false, events: [], calendarConnected: false,
+    projects: [], projectsMap: new Map(),
+    upkeepItems: [{ id: 'u1', text: 'upkeep thing' }], upkeepLoading: false,
+    ensureUpkeepList: vi.fn(async () => {}),
     fetchEvents: vi.fn(async () => {}), createEvent: vi.fn(async () => {}),
     onPushTask: vi.fn(), onSetBucket: vi.fn(), onCompleteTask: vi.fn(), onDeleteTask: vi.fn(), onUpdateTask: vi.fn(),
     createTaskInBucket: vi.fn(async () => {}), createDatedTask: vi.fn(async () => {}),
@@ -64,7 +86,7 @@ describe('GuidedSession shell', () => {
     render(<GuidedSession horizon="seasonal" domain="universal" host={makeHost()} onClose={vi.fn()} />)
     fireEvent.click(screen.getByRole('button', { name: /^Next$/ }))
     expect(screen.getByText(/Step 2 of 7/)).toBeInTheDocument()
-    expect(patchNotes).toHaveBeenCalledWith({ stepIndex: 1 })
+    expect(patchNotes).toHaveBeenCalledWith(expect.objectContaining({ stepIndex: 1 }))
     fireEvent.click(screen.getByRole('button', { name: /Back/ }))
     expect(screen.getByText(/Step 1 of 7/)).toBeInTheDocument()
   })
@@ -86,7 +108,7 @@ describe('GuidedSession shell', () => {
     const onClose = vi.fn()
     render(<GuidedSession horizon="seasonal" domain="universal" host={makeHost()} onClose={onClose} />)
     fireEvent.click(screen.getByRole('button', { name: /Finish/ }))
-    expect(patchNotes).toHaveBeenCalledWith({ stepIndex: 0 })
+    expect(patchNotes).toHaveBeenCalledWith(expect.objectContaining({ stepIndex: 0 }))
     expect(onClose).toHaveBeenCalled()
   })
 
@@ -115,7 +137,7 @@ describe('GuidedSession shell', () => {
     const onChain = vi.fn()
     render(<GuidedSession horizon="seasonal" domain="universal" host={makeHost()} onClose={onClose} onChain={onChain} />)
     fireEvent.click(screen.getByRole('button', { name: /Plan the month now/ }))
-    expect(patchNotes).toHaveBeenCalledWith({ stepIndex: 0 })
+    expect(patchNotes).toHaveBeenCalledWith(expect.objectContaining({ stepIndex: 0 }))
     expect(onChain).toHaveBeenCalledWith('monthly')
     expect(onClose).not.toHaveBeenCalled()
   })
@@ -206,16 +228,19 @@ describe('GuidedSession domain mode', () => {
   })
 
   it('renders a byDomain narration variant in place of the whole-life line', () => {
-    // monthly look-within has a work variant; navigate isn't needed — jump via
-    // persisted stepIndex (step 6 = look-within, index 5).
-    mockNotes = { stepIndex: 5 }
+    // monthly look-within has a work variant; navigate isn't needed — resume
+    // straight onto it. Resume is by step ID now: the composed step list can
+    // legitimately differ between sittings (late in July the monthly session
+    // targets August, so nothing is "completed in period" and `wins` drops out),
+    // which is exactly why a positional jump is no longer meaningful.
+    mockNotes = { stepId: 'look-within' }
     render(<GuidedSession horizon="monthly" domain="work" host={makeHost()} onClose={vi.fn()} />)
     expect(screen.getByText(/colleague, a client, or a commitment/)).toBeInTheDocument()
     expect(screen.queryByText(/each other or the kids/)).not.toBeInTheDocument()
   })
 
   it('universal keeps the original whole-life narration', () => {
-    mockNotes = { stepIndex: 5 }
+    mockNotes = { stepId: 'look-within' }
     render(<GuidedSession horizon="monthly" domain="universal" host={makeHost()} onClose={vi.fn()} />)
     expect(screen.getByText(/each other or the kids/)).toBeInTheDocument()
   })

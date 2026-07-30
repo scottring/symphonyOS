@@ -29,8 +29,13 @@ export interface PlanningNotes {
   lookingBack?: string   // annual: write from one year in the future
   energy?: string        // look-within
   oneWord?: string       // daily tone word
-  /** Guided session shell (Five Horizons): resume position within the step list. */
+  /** Guided session shell (Five Horizons): resume position within the step list.
+   *  Positional — kept for back-compat only; `stepId` is authoritative now that
+   *  composeSession can drop/reorder steps. */
   stepIndex?: number
+  /** Guided session shell: the step to resume ON, by id. Survives a step list
+   *  that differs between sittings. Empty string = finished/reset. */
+  stepId?: string
   [key: string]: string | number | boolean | undefined
 }
 
