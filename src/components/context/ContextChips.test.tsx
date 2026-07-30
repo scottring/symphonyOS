@@ -95,4 +95,69 @@ describe('ContextChips', () => {
 
     expect(container).toBeEmptyDOMElement()
   })
+
+  it('filters out a someday suggestion — ContextChips never wires onPush, so its chip would be dead', () => {
+    mockUseEntityContext.mockReturnValue({
+      suggestions: [makeSuggestion({ id: 's1', suggestionType: 'someday', actionType: 'someday', title: 'Move to Someday' })],
+      lastAction: null,
+      loading: false,
+      actOnSuggestion: vi.fn(),
+      dismissSuggestion: vi.fn(),
+    })
+
+    const { container } = render(<ContextChips entityType="task" entityId="task-1" variant="panel" />)
+
+    expect(screen.queryByText('Move to Someday')).not.toBeInTheDocument()
+    expect(container).toBeEmptyDOMElement()
+  })
+
+  it('filters out a stale suggestion — ContextChips never wires onDelete, so its chip would be dead', () => {
+    mockUseEntityContext.mockReturnValue({
+      suggestions: [makeSuggestion({ id: 's1', suggestionType: 'stale', actionType: 'stale', title: 'Delete stale task' })],
+      lastAction: null,
+      loading: false,
+      actOnSuggestion: vi.fn(),
+      dismissSuggestion: vi.fn(),
+    })
+
+    const { container } = render(<ContextChips entityType="task" entityId="task-1" variant="panel" />)
+
+    expect(screen.queryByText('Delete stale task')).not.toBeInTheDocument()
+    expect(container).toBeEmptyDOMElement()
+  })
+
+  it('renders a guided_chat suggestion only when onOpenGuidedChat is provided', () => {
+    mockUseEntityContext.mockReturnValue({
+      suggestions: [makeSuggestion({ id: 's1', suggestionType: 'guided_chat', actionType: 'guided_chat', title: 'Help me think this through' })],
+      lastAction: null,
+      loading: false,
+      actOnSuggestion: vi.fn(),
+      dismissSuggestion: vi.fn(),
+    })
+
+    const withoutHandler = render(<ContextChips entityType="task" entityId="task-1" variant="panel" />)
+    expect(withoutHandler.container).toBeEmptyDOMElement()
+    withoutHandler.unmount()
+
+    render(<ContextChips entityType="task" entityId="task-1" variant="panel" onOpenGuidedChat={vi.fn()} />)
+    expect(screen.getByText('Help me think this through')).toBeInTheDocument()
+  })
+
+  it('row variant picks the first ACTIONABLE suggestion, skipping a dead one ahead of it', () => {
+    mockUseEntityContext.mockReturnValue({
+      suggestions: [
+        makeSuggestion({ id: 's1', suggestionType: 'someday', actionType: 'someday', title: 'Move to Someday' }),
+        makeSuggestion({ id: 's2', title: 'Call the vet' }),
+      ],
+      lastAction: null,
+      loading: false,
+      actOnSuggestion: vi.fn(),
+      dismissSuggestion: vi.fn(),
+    })
+
+    render(<ContextChips entityType="task" entityId="task-1" variant="row" />)
+
+    expect(screen.queryByText('Move to Someday')).not.toBeInTheDocument()
+    expect(screen.getByText('Call the vet')).toBeInTheDocument()
+  })
 })

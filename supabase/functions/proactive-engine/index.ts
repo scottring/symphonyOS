@@ -745,7 +745,20 @@ Deno.serve(async (req) => {
         (actionHistory || []) as ActionHistoryRow[],
       )
       allSuggestions.push(...taskSuggestions)
-      allSuggestions.push(...facetRuleSuggestions(task as TaskRow, factsByTask.get(task.id) || []))
+
+      // Dedupe facet_call against the contact-phone rule above: when a task's
+      // linked contact has a phone, generateTaskSuggestions already pushed a
+      // `task:{id}:call` suggestion for it (line ~221) — the phone-facet rule
+      // would add a second "call" chip with a different number. facet_link
+      // has no such overlapping rule, so it's untouched. facetRules.ts itself
+      // stays pure/unaware of sibling suggestions — this ordering-dependent
+      // check belongs at the wiring site, not in the tested rule module.
+      for (const facetSuggestion of facetRuleSuggestions(task as TaskRow, factsByTask.get(task.id) || [])) {
+        const alreadyHasCall = facetSuggestion.suggestion_type === 'call' &&
+          allSuggestions.some((s) => s.entity_id === facetSuggestion.entity_id && s.suggestion_type === 'call')
+        if (alreadyHasCall) continue
+        allSuggestions.push(facetSuggestion)
+      }
     }
 
     // 2. Rule-based calendar event suggestions

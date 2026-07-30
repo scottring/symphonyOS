@@ -1,7 +1,7 @@
 import type { JSX } from 'react'
 import { History } from 'lucide-react'
 import { useEntityContext } from '@/hooks/useEntityContext'
-import { ProactiveSuggestionChips } from '@/components/schedule/ProactiveSuggestionChips'
+import { ProactiveSuggestionChips, isActionableSuggestion } from '@/components/schedule/ProactiveSuggestionChips'
 import type { SuggestionEntityType } from '@/types/proactiveSuggestion'
 
 interface ContextChipsProps {
@@ -32,7 +32,14 @@ export function ContextChips({
 }: ContextChipsProps): JSX.Element | null {
   const { suggestions, lastAction, actOnSuggestion, dismissSuggestion } = useEntityContext(entityType, entityId)
 
-  const visibleSuggestions = variant === 'row' ? suggestions.slice(0, 1) : suggestions
+  // ContextChips never wires onPush/onDelete (no someday/stale handlers here),
+  // and only wires onOpenGuidedChat when a caller passes one — filter dead
+  // suggestions out BEFORE the row variant's top-1 slice, so a dead
+  // suggestion can't shadow a live one.
+  const actionableSuggestions = suggestions.filter((s) =>
+    isActionableSuggestion(s, { hasGuidedChat: !!onOpenGuidedChat })
+  )
+  const visibleSuggestions = variant === 'row' ? actionableSuggestions.slice(0, 1) : actionableSuggestions
   const showLastAction = variant === 'panel' && lastAction !== null
 
   if (visibleSuggestions.length === 0 && !showLastAction) return null

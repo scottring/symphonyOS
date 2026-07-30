@@ -40,6 +40,13 @@ BEGIN
 END;
 $$;
 
+-- SECURITY DEFINER functions in public default to EXECUTE TO PUBLIC, which
+-- PostgREST exposes to the anon key — an unauthenticated caller could hit
+-- this and trigger LLM-billed proactive-engine runs for every user with an
+-- incomplete task. This function is invoked only by pg_cron (as its owner),
+-- never by a client, so it needs no PostgREST-reachable grant at all.
+REVOKE EXECUTE ON FUNCTION proactive_engine_warm() FROM PUBLIC, anon, authenticated;
+
 -- 10:30 UTC = 6:30am US/Eastern in summer — before the first coffee glance,
 -- after the quiet-hours window (lib/quietHours.ts ends at 6am local).
 DO $$

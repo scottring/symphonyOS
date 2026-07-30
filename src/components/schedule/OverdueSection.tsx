@@ -8,7 +8,7 @@ import type { ProactiveSuggestion, SuggestionEntityType } from '@/types/proactiv
 import { ScheduleItem } from './ScheduleItem'
 import { SwipeableCard } from './SwipeableCard'
 import { FollowUpInput } from './FollowUpInput'
-import { ProactiveSuggestionChips } from './ProactiveSuggestionChips'
+import { ProactiveSuggestionChips, isActionableSuggestion } from './ProactiveSuggestionChips'
 import { taskToTimelineItem } from '@/types/timeline'
 import { formatOverdueDate } from '@/lib/timeUtils'
 import { useMobile } from '@/hooks/useMobile'
@@ -210,7 +210,9 @@ export function OverdueSection({
                 />
                 {suggestionsForTask && (
                   <ProactiveSuggestionChips
-                    suggestions={suggestionsForTask('task', task.id).slice(0, 1)}
+                    suggestions={suggestionsForTask('task', task.id)
+                    .filter((s) => isActionableSuggestion(s, { hasGuidedChat: !!onOpenGuidedChat }))
+                    .slice(0, 1)}
                     onAct={onActSuggestion ?? (() => {})}
                     onDismiss={onDismissSuggestion ?? (() => {})}
                     onOpenGuidedChat={onOpenGuidedChat}
@@ -272,7 +274,9 @@ export function OverdueSection({
               />
               {suggestionsForTask && (
                 <ProactiveSuggestionChips
-                  suggestions={suggestionsForTask('task', task.id).slice(0, 1)}
+                  suggestions={suggestionsForTask('task', task.id)
+                    .filter((s) => isActionableSuggestion(s, { hasGuidedChat: !!onOpenGuidedChat }))
+                    .slice(0, 1)}
                   onAct={onActSuggestion ?? (() => {})}
                   onDismiss={onDismissSuggestion ?? (() => {})}
                   onOpenGuidedChat={onOpenGuidedChat}
