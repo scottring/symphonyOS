@@ -13,6 +13,7 @@ export type SuggestionType =
   | 'someday'
   | 'stale'
   | 'do_today'
+  | 'plan_session'
 
 export type SuggestionActionType =
   | 'call'
@@ -45,6 +46,17 @@ export interface ProactiveSuggestion {
   generatedAt: string
   createdAt: string
   updatedAt: string
+
+  // ── Interruption policy (unprompted delivery tier) ──────────────────────
+  /** Rules-derived 0-100, written by the engine. A HINT only — recompute live
+   *  before any interruption decision (see src/lib/assistant/urgency.ts). */
+  urgency?: number
+  /** First render on an unprompted surface. Anchored chips never set this. */
+  seenAt?: string
+  /** Urgency at the moment it was seen — lets escalation override cooldown. */
+  seenUrgency?: number
+  /** "Not now" — muted while in the future. The row stays `active`. */
+  snoozedUntil?: string
 }
 
 // DB row shape (snake_case)
@@ -67,6 +79,10 @@ export interface ProactiveSuggestionRow {
   generated_at: string
   created_at: string
   updated_at: string
+  urgency: number | null
+  seen_at: string | null
+  seen_urgency: number | null
+  snoozed_until: string | null
 }
 
 export function rowToSuggestion(row: ProactiveSuggestionRow): ProactiveSuggestion {
@@ -89,5 +105,9 @@ export function rowToSuggestion(row: ProactiveSuggestionRow): ProactiveSuggestio
     generatedAt: row.generated_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    urgency: row.urgency ?? undefined,
+    seenAt: row.seen_at ?? undefined,
+    seenUrgency: row.seen_urgency ?? undefined,
+    snoozedUntil: row.snoozed_until ?? undefined,
   }
 }
