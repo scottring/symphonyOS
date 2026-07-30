@@ -1,7 +1,8 @@
 import { useState, useCallback, useRef } from 'react'
-import { MoreHorizontal, Redo2, Clock, Trash2, CalendarCog } from 'lucide-react'
+import { MoreHorizontal, Redo2, Clock, Trash2, CalendarCog, Hourglass } from 'lucide-react'
 import type { TimelineItem } from '@/types/timeline'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
+import { WaitingForPopover } from './WaitingForPopover'
 
 interface Props {
   item: TimelineItem
@@ -14,9 +15,35 @@ export function ScheduleItemActionsMenu({ item, onOpenDetail }: Props) {
   const [open, setOpen] = useState(false)
   const [openUp, setOpenUp] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [waitingOpen, setWaitingOpen] = useState(false)
   const triggerRef = useRef<HTMLButtonElement>(null)
 
   const close = useCallback(() => { setOpen(false); setConfirmDelete(false) }, [])
+
+  const taskId = item.originalTask?.id
+
+  const saveWaitingFor = useCallback((waitingFor: string) => {
+    if (!taskId) return
+    ctx.onUpdateTask?.(taskId, {
+      isWaiting: true,
+      waitingFor,
+      // Starting a NEW wait stamps the clock; editing the sentence on an
+      // existing wait must not reset it, or the wait never ages and the
+      // assistant never surfaces it.
+      ...(item.isWaiting ? {} : { waitingSince: new Date() }),
+    })
+    setWaitingOpen(false)
+  }, [ctx, taskId, item.isWaiting])
+
+  const clearWaiting = useCallback(() => {
+    if (!taskId) return
+    ctx.onUpdateTask?.(taskId, {
+      isWaiting: false,
+      waitingFor: undefined,
+      waitingSince: undefined,
+    })
+    setWaitingOpen(false)
+  }, [ctx, taskId])
 
   const isTask = item.type === 'task'
   const isEvent = item.type === 'event'
@@ -75,10 +102,26 @@ export function ScheduleItemActionsMenu({ item, onOpenDetail }: Props) {
                 type="button"
                 role="menuitem"
                 onClick={run(() => ctx.onSkipEvent?.(eid))}
-                className="flex w-full items-center gap-2.5 px-3 py-2.5 text-sm text-neutral-700 hover:bg-neutral-50"
+                className="flex w-full text-left items-center gap-2.5 px-3 py-2.5 text-sm text-neutral-700 hover:bg-neutral-50"
               >
                 <Redo2 className="w-4 h-4 text-neutral-400" />
                 Skip today
+              </button>
+            )}
+
+            {/* Waiting for… — tasks only. Opens a text field rather than
+                toggling a bare flag: the value is WHAT you're waiting on, which
+                is what shows on the row and what the assistant can act on once
+                the wait goes long. */}
+            {isTask && ctx.onUpdateTask && item.originalTask && (
+              <button
+                type="button"
+                role="menuitem"
+                onClick={(e) => { e.stopPropagation(); setOpen(false); setWaitingOpen(true) }}
+                className="flex w-full text-left items-center gap-2.5 px-3 py-2.5 text-sm text-neutral-700 hover:bg-neutral-50"
+              >
+                <Hourglass className={`w-4 h-4 shrink-0 ${item.isWaiting ? 'text-amber-500' : 'text-neutral-400'}`} />
+                {item.isWaiting ? 'Edit what you’re waiting for' : 'Waiting for…'}
               </button>
             )}
 
@@ -90,7 +133,7 @@ export function ScheduleItemActionsMenu({ item, onOpenDetail }: Props) {
                 type="button"
                 role="menuitem"
                 onClick={run(onOpenDetail)}
-                className="flex w-full items-center gap-2.5 px-3 py-2.5 text-sm text-neutral-700 hover:bg-neutral-50"
+                className="flex w-full text-left items-center gap-2.5 px-3 py-2.5 text-sm text-neutral-700 hover:bg-neutral-50"
               >
                 <CalendarCog className="w-4 h-4 text-neutral-400" />
                 Edit details
@@ -100,7 +143,7 @@ export function ScheduleItemActionsMenu({ item, onOpenDetail }: Props) {
                 type="button"
                 role="menuitem"
                 onClick={run(onOpenDetail)}
-                className="flex w-full items-center gap-2.5 px-3 py-2.5 text-sm text-neutral-700 hover:bg-neutral-50"
+                className="flex w-full text-left items-center gap-2.5 px-3 py-2.5 text-sm text-neutral-700 hover:bg-neutral-50"
               >
                 <Clock className="w-4 h-4 text-neutral-400" />
                 Reschedule
@@ -113,7 +156,7 @@ export function ScheduleItemActionsMenu({ item, onOpenDetail }: Props) {
                 type="button"
                 role="menuitem"
                 onClick={run(() => ctx.onDeleteTask?.(item.originalTask!.id))}
-                className="flex w-full items-center gap-2.5 px-3 py-2.5 text-sm text-red-600 hover:bg-red-50"
+                className="flex w-full text-left items-center gap-2.5 px-3 py-2.5 text-sm text-red-600 hover:bg-red-50"
               >
                 <Trash2 className="w-4 h-4" />
                 Delete
@@ -126,7 +169,7 @@ export function ScheduleItemActionsMenu({ item, onOpenDetail }: Props) {
                 type="button"
                 role="menuitem"
                 onClick={run(() => ctx.onDeleteEvent?.(item.originalEvent!))}
-                className="flex w-full items-center gap-2.5 px-3 py-2.5 text-sm text-red-600 hover:bg-red-50"
+                className="flex w-full text-left items-center gap-2.5 px-3 py-2.5 text-sm text-red-600 hover:bg-red-50"
               >
                 <Trash2 className="w-4 h-4" />
                 Delete
@@ -140,7 +183,7 @@ export function ScheduleItemActionsMenu({ item, onOpenDetail }: Props) {
                   type="button"
                   role="menuitem"
                   onClick={run(() => ctx.onDeleteRoutine?.(rid))}
-                  className="flex w-full items-center gap-2.5 px-3 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-50"
+                  className="flex w-full text-left items-center gap-2.5 px-3 py-2.5 text-sm font-semibold text-red-700 hover:bg-red-50"
                 >
                   <Trash2 className="w-4 h-4" />
                   Confirm delete
@@ -150,7 +193,7 @@ export function ScheduleItemActionsMenu({ item, onOpenDetail }: Props) {
                   type="button"
                   role="menuitem"
                   onClick={(e) => { e.stopPropagation(); setConfirmDelete(true) }}
-                  className="flex w-full items-center gap-2.5 px-3 py-2.5 text-sm text-red-600 hover:bg-red-50"
+                  className="flex w-full text-left items-center gap-2.5 px-3 py-2.5 text-sm text-red-600 hover:bg-red-50"
                 >
                   <Trash2 className="w-4 h-4" />
                   Delete routine
@@ -158,6 +201,25 @@ export function ScheduleItemActionsMenu({ item, onOpenDetail }: Props) {
               )
             )}
           </div>
+        </>
+      )}
+
+      {waitingOpen && (
+        <>
+          <button
+            type="button"
+            aria-hidden
+            tabIndex={-1}
+            className="fixed inset-0 z-40 cursor-default"
+            onClick={(e) => { e.stopPropagation(); setWaitingOpen(false) }}
+          />
+          <WaitingForPopover
+            initialValue={item.waitingFor}
+            taskId={taskId}
+            onSave={saveWaitingFor}
+            onClear={item.isWaiting ? clearWaiting : undefined}
+            onCancel={() => setWaitingOpen(false)}
+          />
         </>
       )}
     </div>

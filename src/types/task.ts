@@ -54,6 +54,10 @@ export interface Task {
   isSomeday?: boolean // Legacy — replaced by bucket system
   isWaiting?: boolean // True = waiting on someone else (all actions done, pending response)
   waitingSince?: Date // When the task entered waiting state
+  /** WHAT you're waiting for, in your own words — e.g. "Guy's response on
+   *  whether they can make it to pizza Saturday". Displayed beneath the title
+   *  and used by the assistant when a wait goes long. */
+  waitingFor?: string
   context?: TaskContext | null // Context: work, family, personal (null = untagged/private)
   scope?: Scope // Who can SEE it: individual (private) | couple | compound (household)
   category?: TaskCategory // What kind of family item (default: 'task')

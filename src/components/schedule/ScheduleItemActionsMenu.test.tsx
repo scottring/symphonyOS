@@ -74,6 +74,89 @@ describe('ScheduleItemActionsMenu', () => {
     expect(screen.queryByText('Reschedule')).not.toBeInTheDocument()
   })
 
+  const taskItem = {
+    id: 'task-11', type: 'task', title: 'Invite Guy + Jess for pizza', completed: false,
+    originalTask: { id: '11', title: 'Invite Guy + Jess for pizza' },
+  } as unknown as TimelineItem
+
+  it('captures WHAT you are waiting for and stamps the clock on a new wait', () => {
+    const onUpdateTask = vi.fn()
+    renderMenu(taskItem, { onUpdateTask })
+
+    fireEvent.click(screen.getByText('Waiting for…'))
+    fireEvent.change(screen.getByRole('textbox'), {
+      target: { value: "Guy's response about pizza Saturday" },
+    })
+    fireEvent.click(screen.getByText('Save'))
+
+    expect(onUpdateTask).toHaveBeenCalledWith('11', expect.objectContaining({
+      isWaiting: true,
+      waitingFor: "Guy's response about pizza Saturday",
+      waitingSince: expect.any(Date),
+    }))
+  })
+
+  it('does NOT reset waitingSince when only editing the sentence', () => {
+    const waitingItem = {
+      ...taskItem, id: 'task-12', isWaiting: true, waitingFor: 'old text',
+      originalTask: { id: '12', title: 'x' },
+    } as unknown as TimelineItem
+    const onUpdateTask = vi.fn()
+    renderMenu(waitingItem, { onUpdateTask })
+
+    fireEvent.click(screen.getByText('Edit what you’re waiting for'))
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'new text' } })
+    fireEvent.click(screen.getByText('Save'))
+
+    // Resetting the clock would make the wait never age, so the assistant would
+    // never surface it.
+    const patch = onUpdateTask.mock.calls[0][1]
+    expect(patch.waitingFor).toBe('new text')
+    expect(patch).not.toHaveProperty('waitingSince')
+  })
+
+  it('pre-fills the existing sentence when editing', () => {
+    const waitingItem = {
+      ...taskItem, id: 'task-13', isWaiting: true, waitingFor: 'Guy’s reply',
+      originalTask: { id: '13', title: 'x' },
+    } as unknown as TimelineItem
+    renderMenu(waitingItem, { onUpdateTask: vi.fn() })
+    fireEvent.click(screen.getByText('Edit what you’re waiting for'))
+    expect(screen.getByRole('textbox')).toHaveValue('Guy’s reply')
+  })
+
+  it('clears the wait entirely via "Not waiting anymore"', () => {
+    const waitingItem = {
+      ...taskItem, id: 'task-14', isWaiting: true, waitingFor: 'something',
+      originalTask: { id: '14', title: 'x' },
+    } as unknown as TimelineItem
+    const onUpdateTask = vi.fn()
+    renderMenu(waitingItem, { onUpdateTask })
+
+    fireEvent.click(screen.getByText('Edit what you’re waiting for'))
+    fireEvent.click(screen.getByText('Not waiting anymore'))
+
+    expect(onUpdateTask).toHaveBeenCalledWith('14', {
+      isWaiting: false, waitingFor: undefined, waitingSince: undefined,
+    })
+  })
+
+  it('offers no clear option on a task that is not waiting yet', () => {
+    renderMenu(taskItem, { onUpdateTask: vi.fn() })
+    fireEvent.click(screen.getByText('Waiting for…'))
+    expect(screen.queryByText('Not waiting anymore')).not.toBeInTheDocument()
+  })
+
+  it('omits the waiting item for events', () => {
+    renderMenu(eventItem, { onUpdateTask: vi.fn() })
+    expect(screen.queryByText('Waiting for…')).not.toBeInTheDocument()
+  })
+
+  it('omits the waiting item for routines', () => {
+    renderMenu(routineItem, { onUpdateTask: vi.fn() })
+    expect(screen.queryByText('Waiting for…')).not.toBeInTheDocument()
+  })
+
   it('a TASK still offers Edit details (full panel)', () => {
     const taskItem = {
       id: 'task-8', type: 'task', title: 'x', completed: false, originalTask: { id: '8', title: 'x' },

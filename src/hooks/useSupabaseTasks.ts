@@ -74,6 +74,7 @@ export interface DbTask {
   directions: TaskDirections | null
   is_waiting: boolean | null
   waiting_since: string | null
+  waiting_for: string | null
   needs_discussion: boolean | null
   discussion_note: string | null
   week_deferred_at: string | null
@@ -146,6 +147,7 @@ export function dbTaskToTask(dbTask: DbTask): Task {
     directions: dbTask.directions ?? undefined,
     isWaiting: dbTask.is_waiting ?? undefined,
     waitingSince: dbTask.waiting_since ? new Date(dbTask.waiting_since) : undefined,
+    waitingFor: dbTask.waiting_for ?? undefined,
     needsDiscussion: dbTask.needs_discussion ?? undefined,
     discussionNote: dbTask.discussion_note ?? undefined,
     weekDeferredAt: dbTask.week_deferred_at ? new Date(dbTask.week_deferred_at) : undefined,
@@ -832,7 +834,7 @@ export function useSupabaseTasks() {
               ...t,
               completed: newCompleted,
               // Clear waiting state when completing
-              ...(newCompleted && t.isWaiting ? { isWaiting: false, waitingSince: undefined } : {}),
+              ...(newCompleted && t.isWaiting ? { isWaiting: false, waitingSince: undefined, waitingFor: undefined } : {}),
               // Clear discussion flag when completing
               ...(newCompleted && t.needsDiscussion ? { needsDiscussion: false, discussionNote: undefined } : {}),
               subtasks: newCompleted
@@ -849,6 +851,7 @@ export function useSupabaseTasks() {
       if (newCompleted && task.isWaiting) {
         dbUpdate.is_waiting = false
         dbUpdate.waiting_since = null
+        dbUpdate.waiting_for = null
       }
       if (newCompleted && task.needsDiscussion) {
         dbUpdate.needs_discussion = false
@@ -875,7 +878,7 @@ export function useSupabaseTasks() {
         task: {
           ...task,
           completed: newCompleted,
-          ...(newCompleted && task.isWaiting ? { isWaiting: false, waitingSince: undefined } : {}),
+          ...(newCompleted && task.isWaiting ? { isWaiting: false, waitingSince: undefined, waitingFor: undefined } : {}),
           ...(newCompleted && task.needsDiscussion ? { needsDiscussion: false, discussionNote: undefined } : {}),
           subtasks: newCompleted
             ? task.subtasks?.map((s) => ({ ...s, completed: true }))
@@ -1127,6 +1130,7 @@ export function useSupabaseTasks() {
     if ('directions' in updates) dbUpdates.directions = updates.directions ?? null
     if ('isWaiting' in updates) dbUpdates.is_waiting = updates.isWaiting ?? false
     if ('waitingSince' in updates) dbUpdates.waiting_since = updates.waitingSince?.toISOString() ?? null
+    if ('waitingFor' in updates) dbUpdates.waiting_for = updates.waitingFor?.trim() || null
     if ('needsDiscussion' in updates) dbUpdates.needs_discussion = updates.needsDiscussion ?? false
     if ('discussionNote' in updates) dbUpdates.discussion_note = updates.discussionNote ?? null
     if ('sourceId' in updates) dbUpdates.source_id = updates.sourceId ?? null
@@ -1271,6 +1275,7 @@ export function useSupabaseTasks() {
     if ('directions' in updates) dbUpdates.directions = updates.directions ?? null
     if ('isWaiting' in updates) dbUpdates.is_waiting = updates.isWaiting ?? false
     if ('waitingSince' in updates) dbUpdates.waiting_since = updates.waitingSince?.toISOString() ?? null
+    if ('waitingFor' in updates) dbUpdates.waiting_for = updates.waitingFor?.trim() || null
     if ('needsDiscussion' in updates) dbUpdates.needs_discussion = updates.needsDiscussion ?? false
     if ('discussionNote' in updates) dbUpdates.discussion_note = updates.discussionNote ?? null
     if ('sourceId' in updates) dbUpdates.source_id = updates.sourceId ?? null

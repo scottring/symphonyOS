@@ -3,6 +3,7 @@ import { History } from 'lucide-react'
 import { useEntityContext } from '@/hooks/useEntityContext'
 import { ProactiveSuggestionChips, isActionableSuggestion } from '@/components/schedule/ProactiveSuggestionChips'
 import type { SuggestionEntityType } from '@/types/proactiveSuggestion'
+import { linkifyText } from '@/lib/linkifyText'
 
 interface ContextChipsProps {
   entityType: SuggestionEntityType
@@ -62,8 +63,14 @@ export function ContextChips({
       {showLastAction && lastAction && (
         <div className="flex items-center gap-1.5 text-xs text-neutral-400 mb-2">
           <History size={16} className="text-neutral-400" />
+          {/* Linkified: action_history details embed the URL that was opened, and
+              rendering it as dead text meant you could see the link you followed
+              but not follow it again. stopPropagation so the click opens the link
+              rather than the row behind it. */}
           <span>
-            {`Last: ${lastAction.detail || lastAction.actionType}${lastAction.outcome ? ` — ${lastAction.outcome.replace('_', ' ')}` : ''} · ${daysAgo(lastAction.createdAt)}`}
+            {linkifyText(
+              `Last: ${lastAction.detail || lastAction.actionType}${lastAction.outcome ? ` — ${lastAction.outcome.replace('_', ' ')}` : ''} · ${daysAgo(lastAction.createdAt)}`
+            )}
           </span>
         </div>
       )}

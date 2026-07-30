@@ -30,6 +30,7 @@ interface TaskRow {
   project_id: string | null
   is_waiting: boolean | null
   waiting_since: string | null
+  waiting_for: string | null
   defer_count: number | null
   location: string | null
   location_place_id: string | null
@@ -297,9 +298,16 @@ function generateTaskSuggestions(
   }
 
   // ── Rule 5: Waiting + 3+ days → suggest follow-up ──
+  //
+  // Used to require a linked contact, so a wait recorded in plain words ("Guy's
+  // response about pizza Saturday") produced nothing at all. waiting_for now
+  // carries the substance, so a wait can surface with or without a contact —
+  // which is the point of asking WHAT you're waiting for rather than just
+  // flagging that you are.
   if (task.is_waiting && task.waiting_since) {
     const waitingDays = Math.floor((now - new Date(task.waiting_since).getTime()) / 86400000)
-    if (waitingDays >= 3 && contactName) {
+    const waitingFor = task.waiting_for?.trim()
+    if (waitingDays >= 3 && (contactName || waitingFor)) {
       // Pick best follow-up channel
       const actionType = phoneNumber ? 'call' : contactEmail ? 'email' : undefined
       const payload: Record<string, unknown> = {}
@@ -310,8 +318,10 @@ function generateTaskSuggestions(
         entity_type: 'task',
         entity_id: task.id,
         suggestion_type: 'followup',
-        title: `Follow up with ${contactName}`,
-        detail: `Waiting ${waitingDays} days`,
+        title: contactName ? `Follow up with ${contactName}` : 'Chase this up',
+        detail: waitingFor
+          ? `Waiting ${waitingDays} days on ${waitingFor}`
+          : `Waiting ${waitingDays} days`,
         confidence: 0.9,
         action_type: actionType,
         action_payload: payload,
@@ -683,7 +693,7 @@ Deno.serve(async (req) => {
     // Active tasks (not completed)
     const { data: tasks } = await supabase
       .from('tasks')
-      .select('id, title, completed, bucket, scheduled_for, context, notes, links, phone_number, contact_id, assigned_to, project_id, is_waiting, waiting_since, defer_count, location, location_place_id, created_at, updated_at')
+      .select('id, title, completed, bucket, scheduled_for, context, notes, links, phone_number, contact_id, assigned_to, project_id, is_waiting, waiting_since, waiting_for, defer_count, location, location_place_id, created_at, updated_at')
       .eq('user_id', userId)
       .eq('completed', false)
       .order('scheduled_for', { ascending: true })

@@ -6,7 +6,7 @@ import { formatTimeLong, formatTimeRangeLong, inferMealTime } from '@/lib/timeUt
 import { getProjectColor } from '@/lib/projectUtils'
 import { SchedulePopover, ContextPicker, DiscussionPicker, type ScheduleContextItem } from '@/components/triage'
 import { AssigneeDropdown, MultiAssigneeDropdown } from '@/components/family'
-import { Video, Tag, Check, Pencil, CircleSlash } from 'lucide-react'
+import { Video, Tag, Check, Pencil, CircleSlash, Hourglass } from 'lucide-react'
 import { ScheduleItemActionsMenu } from './ScheduleItemActionsMenu'
 import { RescheduleButton } from './RescheduleButton'
 import { ConceptIcon } from '@/lib/conceptIcons'
@@ -150,6 +150,18 @@ interface ScheduleItemProps {
   hideTime?: boolean
   // Routine streak count (shown as badge for routines)
   routineStreak?: number
+  /**
+   * Rendered directly BENEATH the title, inside the title's own column — so it
+   * left-aligns with the title text automatically, whatever the row's leading
+   * columns are (time label, checkbox, date gutter).
+   *
+   * Used for the anchored suggestion chip. It previously rendered as a block
+   * sibling of the whole row at the card's left edge, which put it under the
+   * leading columns and made it read as belonging to the NEXT task down.
+   * Aligning by structure rather than a hardcoded margin is deliberate: the old
+   * `ml-[6.5rem]` default was tuned for one layout and was wrong everywhere else.
+   */
+  belowTitleAccessory?: React.ReactNode
 }
 
 // Warm muted color tokens for overdue styling
@@ -256,6 +268,7 @@ export const ScheduleItem = memo(function ScheduleItem({
   variant = 'full',
   hideTime,
   routineStreak,
+  belowTitleAccessory,
 }: ScheduleItemProps) {
   const isMobile = useMobile()
   // Hover state powers the smooth expanding banner (location-only metadata row).
@@ -266,6 +279,10 @@ export const ScheduleItem = memo(function ScheduleItem({
   const isRoutine = item.type === 'routine'
   const isEvent = item.type === 'event'
   const isActionable = isTask || isRoutine || isEvent // Events are now checkable
+  /** Anything rendering beneath the title makes the title column taller — the
+   *  leading columns then need pinning to the title's first line. */
+  const hasBelowTitleContent = !!belowTitleAccessory
+    || !!(item.isWaiting && item.waitingFor && !item.completed)
   const contextColor = item.context ? DOMAIN_COLORS[item.context]?.dot : undefined
 
   const handleCheckboxClick = (e: React.MouseEvent) => {
@@ -591,8 +608,15 @@ export const ScheduleItem = memo(function ScheduleItem({
         )}
 
         {/* Checkbox/circle/calendar - fixed width for alignment, hidden on mobile when overdue */}
+        {/* When something renders beneath the title (suggestion chip, "waiting on"
+            line) the title column grows taller, and a centred checkbox drifts
+            down, away from the name it belongs to. self-start pins it to the top
+            of the row — which IS the title's first line, the title column being
+            the tallest child — with a nudge to centre it on that line's box. */}
         {!(isMobile && isOverdue) && (
-          <div className="w-5 shrink-0 flex items-center justify-center relative z-[1]">
+          <div className={`w-5 shrink-0 flex items-center justify-center relative z-[1] ${
+            hasBelowTitleContent ? `self-start ${variant === 'minimal' ? '' : 'mt-0.5'}` : ''
+          }`}>
             {isEvent ? (
               // Calendar events show a calendar icon with the context color
               <button
@@ -640,7 +664,9 @@ export const ScheduleItem = memo(function ScheduleItem({
               `}
             >
               {item.title}
-              {item.isWaiting && !item.completed && (
+              {/* Bare marker only when there's no sentence — otherwise the
+                  "Waiting on …" line below says it better. */}
+              {item.isWaiting && !item.waitingFor && !item.completed && (
                 <span className="ml-1.5 text-xs text-amber-500 not-italic font-normal">waiting</span>
               )}
             </span>
@@ -680,6 +706,18 @@ export const ScheduleItem = memo(function ScheduleItem({
               </span>
             )}
           </div>
+          {/* What the wait is ON — its own line beneath the title, never a
+              replacement for it. Replacing the title would break scanning: two
+              months from now "Guy's response about pizza" won't tell you which
+              task it belonged to. */}
+          {item.isWaiting && item.waitingFor && !item.completed && (
+            <div className="flex items-baseline gap-1.5 text-[12px] text-amber-600/90 leading-tight mt-0.5 min-w-0">
+              <Hourglass className="w-3 h-3 shrink-0 translate-y-[1px]" aria-hidden />
+              <span className="truncate" title={item.waitingFor}>
+                Waiting on {item.waitingFor}
+              </span>
+            </div>
+          )}
           {/* Subtitle: category + duration. Empty for plain tasks. */}
           {(() => {
             const subtitle = rowSubtitle(item)
@@ -690,6 +728,8 @@ export const ScheduleItem = memo(function ScheduleItem({
               </div>
             )
           })()}
+          {/* Suggestion chip — under the title, left-aligned WITH the title. */}
+          {belowTitleAccessory && <div className="mt-1">{belowTitleAccessory}</div>}
         </div>
 
         {/* Start Meeting button - for timed events only, shows on hover */}

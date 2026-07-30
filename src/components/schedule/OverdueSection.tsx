@@ -271,18 +271,21 @@ export function OverdueSection({
                 hideTime={shouldHideTime}
                 panelOpen={panelOpen}
                 onClosePanel={onClosePanel}
+                // Under the title and left-aligned WITH it. As a block sibling of
+                // the whole row it sat at the card's left edge, beneath the date
+                // gutter and checkbox, so it read as the NEXT task's chip.
+                belowTitleAccessory={suggestionsForTask ? (
+                  <ProactiveSuggestionChips
+                    suggestions={suggestionsForTask('task', task.id)
+                      .filter((s) => isActionableSuggestion(s, { hasGuidedChat: !!onOpenGuidedChat }))
+                      .slice(0, 1)}
+                    onAct={onActSuggestion ?? (() => {})}
+                    onDismiss={onDismissSuggestion ?? (() => {})}
+                    onOpenGuidedChat={onOpenGuidedChat}
+                    className="ml-0"
+                  />
+                ) : undefined}
               />
-              {suggestionsForTask && (
-                <ProactiveSuggestionChips
-                  suggestions={suggestionsForTask('task', task.id)
-                    .filter((s) => isActionableSuggestion(s, { hasGuidedChat: !!onOpenGuidedChat }))
-                    .slice(0, 1)}
-                  onAct={onActSuggestion ?? (() => {})}
-                  onDismiss={onDismissSuggestion ?? (() => {})}
-                  onOpenGuidedChat={onOpenGuidedChat}
-                  className="ml-0 mt-1"
-                />
-              )}
               {followUpTaskId === taskId && onFollowUpSubmit && onFollowUpDismiss && (
                 <FollowUpInput
                   sourceTask={task}

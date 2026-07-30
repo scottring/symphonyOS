@@ -29,6 +29,9 @@ export interface TimelineItem {
   completed: boolean
   skipped?: boolean
   isWaiting?: boolean
+  /** What the wait is ON, in the user's words. Rendered beneath the title. */
+  waitingFor?: string
+  waitingSince?: Date
   needsDiscussion?: boolean
   discussionNote?: string
   // Context (from tasks)
@@ -82,6 +85,8 @@ export function taskToTimelineItem(task: Task): TimelineItem {
     endTime: null, // Tasks don't have duration/end time
     completed: task.completed,
     isWaiting: task.isWaiting,
+    waitingFor: task.waitingFor,
+    waitingSince: task.waitingSince,
     needsDiscussion: task.needsDiscussion,
     discussionNote: task.discussionNote,
     notes: task.notes,

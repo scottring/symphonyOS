@@ -161,7 +161,9 @@ export function ProactiveSuggestionChips({
               key={s.id}
               onClick={() => handleClick(s)}
               title={s.detail || s.title}
-              className="text-xs px-2.5 py-1 rounded-full border transition-colors bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100"
+              // Capped: rendered inline beside a task title, an uncapped chip
+              // squeezes the title it belongs to. Full text stays in the tooltip.
+              className="max-w-[15rem] truncate text-xs px-2.5 py-1 rounded-full border transition-colors bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100"
             >
               {(() => { const concept = ICON_CONCEPTS[s.actionType || s.suggestionType]; const fallback = ICON_FALLBACKS[s.actionType || s.suggestionType]; return concept ? <ConceptIcon name={concept} decorative className="mr-1" /> : fallback ? <span className="mr-1">{fallback}</span> : <ConceptIcon name="ai" decorative className="mr-1" /> })()}
               {s.title}
