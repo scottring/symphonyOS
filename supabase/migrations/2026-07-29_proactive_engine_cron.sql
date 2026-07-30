@@ -44,7 +44,12 @@ BEGIN
           'Content-Type', 'application/json',
           'Authorization', 'Bearer ' || service_role_key
         ),
-        body := jsonb_build_object('user_id', u.user_id)
+        body := jsonb_build_object('user_id', u.user_id),
+        -- Engine runs take 15-60s (LLM pass); pg_net's 5s default records a
+        -- misleading timeout row every morning even though the function
+        -- completes fine after the disconnect. 90s covers the worst case so
+        -- net._http_response actually shows the 200.
+        timeout_milliseconds := 90000
       );
     END IF;
   END LOOP;
