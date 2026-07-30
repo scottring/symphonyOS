@@ -8,6 +8,7 @@ import type { ProactiveSuggestion, SuggestionEntityType } from '@/types/proactiv
 import { ScheduleItem } from './ScheduleItem'
 import { SwipeableCard } from './SwipeableCard'
 import { FollowUpInput } from './FollowUpInput'
+import { ProactiveSuggestionChips } from './ProactiveSuggestionChips'
 import { taskToTimelineItem } from '@/types/timeline'
 import { formatOverdueDate } from '@/lib/timeUtils'
 import { useMobile } from '@/hooks/useMobile'
@@ -63,6 +64,7 @@ export function OverdueSection({
   onFollowUpDismiss,
   panelOpen,
   onClosePanel,
+  suggestionsForTask,
   onActSuggestion,
   onDismissSuggestion,
   onOpenGuidedChat,
@@ -206,6 +208,15 @@ export function OverdueSection({
                   }
                   onOpenDetail={() => onSelectTask(`task-${task.id}`)}
                 />
+                {suggestionsForTask && (
+                  <ProactiveSuggestionChips
+                    suggestions={suggestionsForTask('task', task.id).slice(0, 1)}
+                    onAct={onActSuggestion ?? (() => {})}
+                    onDismiss={onDismissSuggestion ?? (() => {})}
+                    onOpenGuidedChat={onOpenGuidedChat}
+                    className="ml-0 mt-1"
+                  />
+                )}
                 {followUpTaskId === taskId && onFollowUpSubmit && onFollowUpDismiss && (
                   <FollowUpInput
                     sourceTask={task}
@@ -259,6 +270,15 @@ export function OverdueSection({
                 panelOpen={panelOpen}
                 onClosePanel={onClosePanel}
               />
+              {suggestionsForTask && (
+                <ProactiveSuggestionChips
+                  suggestions={suggestionsForTask('task', task.id).slice(0, 1)}
+                  onAct={onActSuggestion ?? (() => {})}
+                  onDismiss={onDismissSuggestion ?? (() => {})}
+                  onOpenGuidedChat={onOpenGuidedChat}
+                  className="ml-0 mt-1"
+                />
+              )}
               {followUpTaskId === taskId && onFollowUpSubmit && onFollowUpDismiss && (
                 <FollowUpInput
                   sourceTask={task}

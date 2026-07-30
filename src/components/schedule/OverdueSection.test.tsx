@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import type { Task } from '@/types/task'
+import type { ProactiveSuggestion } from '@/types/proactiveSuggestion'
 import { ScheduleActionsProvider } from '@/contexts/ScheduleActionsContext'
 import { OverdueSection } from './OverdueSection'
 
@@ -87,5 +88,57 @@ describe('OverdueSection — a child sits under its own parent', () => {
     renderSection(tasks)
     const text = document.body.textContent ?? ''
     expect(text.indexOf('Older thing')).toBeLessThan(text.indexOf('Orphan child'))
+  })
+})
+
+describe('OverdueSection — proactive suggestion chips', () => {
+  const suggestion = (over: Partial<ProactiveSuggestion> = {}): ProactiveSuggestion => ({
+    id: 's1',
+    userId: 'u1',
+    entityType: 'task',
+    entityId: 'overdue-1',
+    suggestionType: 'call',
+    title: 'Call the vet',
+    detail: undefined,
+    confidence: 0.9,
+    actionType: 'call',
+    actionPayload: { phoneNumber: '555-1234' },
+    status: 'active',
+    suggestionKey: 'k1',
+    generatedAt: '2024-01-01T00:00:00Z',
+    createdAt: '2024-01-01T00:00:00Z',
+    updatedAt: '2024-01-01T00:00:00Z',
+    ...over,
+  })
+
+  it('renders a top-1 suggestion chip below an overdue task when suggestionsForTask is provided', () => {
+    const tasks = [task({ id: 'overdue-1', title: 'Reschedule the vet', scheduledFor: day(2) })]
+    const suggestionsForTask = vi.fn().mockReturnValue([
+      suggestion(),
+      suggestion({ id: 's2', title: 'Text the vet', actionType: 'text' }),
+    ])
+
+    render(
+      <ScheduleActionsProvider value={ctxValue as never}>
+        <OverdueSection
+          tasks={tasks}
+          selectedItemId={null}
+          onSelectTask={vi.fn()}
+          onToggleTask={vi.fn()}
+          suggestionsForTask={suggestionsForTask}
+        />
+      </ScheduleActionsProvider>
+    )
+    fireEvent.click(screen.getByRole('button', { name: /carried over/i }))
+
+    expect(suggestionsForTask).toHaveBeenCalledWith('task', 'overdue-1')
+    expect(screen.getByText('Call the vet')).toBeInTheDocument()
+    expect(screen.queryByText('Text the vet')).not.toBeInTheDocument()
+  })
+
+  it('does not render chips when suggestionsForTask is omitted', () => {
+    const tasks = [task({ id: 'overdue-1', title: 'Reschedule the vet', scheduledFor: day(2) })]
+    renderSection(tasks)
+    expect(screen.queryByText('Call the vet')).not.toBeInTheDocument()
   })
 })

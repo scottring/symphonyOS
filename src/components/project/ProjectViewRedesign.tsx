@@ -9,6 +9,7 @@ import { formatTimeWithDate } from '@/lib/timeUtils'
 import { TaskQuickActions, type ScheduleContextItem } from '@/components/triage'
 import { calculateProjectStatus } from '@/hooks/useProjects'
 import { UnifiedNotesEditor } from '@/components/notes/UnifiedNotesEditor'
+import { ContextChips } from '@/components/context/ContextChips'
 
 interface ProjectViewProps {
   project: Project
@@ -411,8 +412,8 @@ export function ProjectViewRedesign({
                       const isSelected = selectedTaskId === `task-${task.id}`
 
                       return (
+                        <div key={task.id}>
                         <div
-                          key={task.id}
                           onClick={() => onSelectTask(`task-${task.id}`)}
                           role="button"
                           tabIndex={0}
@@ -506,6 +507,12 @@ export function ProjectViewRedesign({
                           <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-neutral-300 shrink-0" viewBox="0 0 20 20" fill="currentColor">
                             <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
                           </svg>
+                        </div>
+                        {!task.completed && (
+                          <div className="pl-14 pr-4 -mt-1">
+                            <ContextChips entityType="task" entityId={task.id} variant="row" />
+                          </div>
+                        )}
                         </div>
                       )
                     })}

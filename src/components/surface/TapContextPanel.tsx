@@ -6,6 +6,7 @@ import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { FamilyMember } from '@/types/family'
 import { PanelHeader } from './sections/PanelHeader'
 import { PanelActions } from './sections/PanelActions'
+import { PanelAssistant } from './sections/PanelAssistant'
 import { PanelWhy } from './sections/PanelWhy'
 import { PanelSubtasks } from './sections/PanelSubtasks'
 import { PanelPeople } from './sections/PanelPeople'
@@ -146,6 +147,7 @@ export function TapContextPanel(props: TapContextPanelProps) {
         onDeleteGroup={(task.subtasks?.length ?? 0) > 0 ? props.onDeleteGroup : undefined}
         onAssist={props.onAssistMutate ? () => setAssistOpen(true) : undefined}
       />
+      <PanelAssistant taskId={task.id} />
       <PanelClassify
         context={task.context}
         onContextChange={props.onContextChange}
