@@ -35,6 +35,9 @@ import { WallV2FamilyStrip, type WallDockActionId } from './WallV2FamilyStrip';
 import { WallV2UtilitySheet } from './WallV2UtilitySheet';
 import { CallerIdTakeover } from './CallerIdTakeover';
 import { WallV2PhoneScreen } from './WallV2PhoneScreen';
+import { WallV2AssistantLine } from './WallV2AssistantLine';
+import type { WallAction } from './wallAssistantAdapter';
+import { useUnpromptedSuggestions, type UnpromptedItem } from '@/hooks/useUnpromptedSuggestions';
 import {
   adaptScheduleBand,
   adaptTimelineSections,
@@ -367,6 +370,22 @@ export function WallV2Shell() {
     }
   }, [discussionItems.length, showFlash]);
 
+  // ── Unprompted tier ────────────────────────────────────────────────────────
+  // The wall does NOT pass a facts resolver: useWallData narrows its task columns
+  // and doesn't carry defer_count/waiting_since, so the engine's stored urgency
+  // hint is the honest input here. It fails closed — a null hint reads as 0 and
+  // never interrupts.
+  // includeCadence:false — "Plan the season" is not a kitchen-wall action. It has
+  // no timeline event to reveal, so "Show me" would be a dead tap, and nobody
+  // plans a season standing at a touchscreen from eight feet away. Cadence
+  // belongs to Today, where the guided session actually opens.
+  const wallUnprompted = useUnpromptedSuggestions('wall', { includeCadence: false });
+
+  const showWhyDebug = useMemo(
+    () => new URLSearchParams(window.location.search).get('why') === '1',
+    [],
+  );
+
   const handleTapEvent = useCallback((id: string) => {
     // Meal cards: open recipe viewer if a URL/stored recipe was detected,
     // otherwise flash the meal name so the tap registers visibly.
@@ -393,6 +412,21 @@ export function WallV2Shell() {
       showFlash(tapped.title);
     }
   }, [dinner, breakfast, timeline, showFlash]);
+
+  const handleAssistantAct = useCallback((action: WallAction, item: UnpromptedItem) => {
+    if (action.kind === 'wall_call') {
+      // The wall's own phone flow — never tel:, which is inert on the Pi.
+      setShowPhone(true);
+    } else {
+      // "Show me" — reveal the entity using the sheet the wall already has.
+      // handleTapEvent silently no-ops on an id it can't find, which on a
+      // wall-mounted screen reads as a broken button, so confirm the tap landed.
+      const known = timeline.flatMap((s) => s.events).some((e) => e.id === item.suggestion.entityId);
+      if (known) handleTapEvent(item.suggestion.entityId);
+      else showFlash(item.suggestion.title);
+    }
+    void wallUnprompted.act(item.suggestion.id);
+  }, [handleTapEvent, wallUnprompted, timeline, showFlash]);
 
   const handleWallSkip = useCallback(async (id: string, kind: 'event' | 'routine') => {
     const entityType = kind === 'routine' ? 'routine' : 'calendar_event';
@@ -497,6 +531,13 @@ export function WallV2Shell() {
         {/* Row 1 — center: NOW + timeline + Keep Moving */}
         <div className="row-span-1 col-start-2 flex flex-col gap-3 min-h-0 min-w-0">
           <WallV2NowNext today={todayData} familyMembers={wallData.familyMembers} now={now} />
+          <WallV2AssistantLine
+            item={wallUnprompted.items[0] ?? null}
+            onAct={handleAssistantAct}
+            onSnooze={(id) => void wallUnprompted.snooze(id, 'now')}
+            decisions={wallUnprompted.decisions}
+            showWhy={showWhyDebug}
+          />
           <div className="min-h-0 flex-1">
             <WallV2Timeline
               band={scheduleBand}

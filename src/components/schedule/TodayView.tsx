@@ -27,6 +27,10 @@ import { mergeAssignees } from '@/lib/today/bulkAssign'
 import { partitionSelection } from '@/lib/today/timelineKey'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
 import { useProactiveSuggestions } from '@/hooks/useProactiveSuggestions'
+import type { ProactiveSuggestion } from '@/types/proactiveSuggestion'
+import { useUnpromptedSuggestions, type UnpromptedItem } from '@/hooks/useUnpromptedSuggestions'
+import { UnpromptedLines } from '@/components/assistant/UnpromptedLines'
+import { resolveSuggestionAction } from '@/lib/assistant/suggestionAction'
 import { useRoutineStats } from '@/hooks/useRoutineStats'
 import { useSystemHealth, getHealthTextClasses } from '@/hooks/useSystemHealth'
 import { useRecurringEventDetection } from '@/hooks/useRecurringEventDetection'
@@ -335,6 +339,74 @@ export function TodayView({
   }, [])
 
   const proactive = useProactiveSuggestions()
+
+  // ── Unprompted tier ────────────────────────────────────────────────────────
+  // Live urgency facts, resolved from the tasks/events this view already has, so
+  // the policy scores against the real clock rather than the engine's 6h-old hint.
+  const resolveUnpromptedFacts = useCallback((s: ProactiveSuggestion) => {
+    if (s.entityType === 'task') {
+      const t = tasks.find(x => x.id === s.entityId)
+      if (!t) return null
+      return {
+        dueAt: t.scheduledFor ? new Date(t.scheduledFor).toISOString() : null,
+        waitingSince: t.isWaiting && t.waitingSince
+          ? new Date(t.waitingSince).toISOString()
+          : null,
+        deferCount: t.deferCount ?? null,
+      }
+    }
+    if (s.entityType === 'calendar_event') {
+      const e = events.find(x => x.id === s.entityId)
+      if (!e) return null
+      return { eventStartAt: e.allDay ? null : (e.startTime ?? null) }
+    }
+    return null
+  }, [tasks, events])
+
+  const unprompted = useUnpromptedSuggestions('today', {
+    resolveFacts: resolveUnpromptedFacts,
+  })
+
+  // `?why=1` renders each suggestion's policy verdict — the thing that makes a
+  // silent surface debuggable instead of mystical.
+  const showWhyDebug = useMemo(() => {
+    if (typeof window === 'undefined') return false
+    return new URLSearchParams(window.location.search).get('why') === '1'
+  }, [])
+
+  const handleUnpromptedAct = useCallback((item: UnpromptedItem) => {
+    const action = resolveSuggestionAction(item.suggestion)
+    switch (action.kind) {
+      case 'plan_session':
+        navigate(`/today?plan=${action.horizon}`)
+        return
+      case 'call':
+        window.open(`tel:${action.phoneNumber}`, '_self')
+        break
+      case 'text':
+        window.open(`sms:${action.phoneNumber}`, '_self')
+        break
+      case 'email':
+        window.open(`mailto:${action.email}`, '_blank')
+        break
+      case 'open_link':
+        window.open(action.url, '_blank')
+        break
+      case 'navigate':
+        window.open(
+          action.placeId
+            ? `https://www.google.com/maps/place/?q=place_id:${action.placeId}`
+            : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(action.location)}`,
+          '_blank',
+        )
+        break
+      case 'reveal':
+        onSelectItem?.(item.suggestion.entityId)
+        return
+    }
+    void unprompted.act(item.suggestion.id)
+  }, [navigate, unprompted, onSelectItem])
+
   const { getStats: getRoutineStats } = useRoutineStats()
   const { isPromotionSuggested } = useRecurringEventDetection(events, eventNotesMap)
 
@@ -867,6 +939,17 @@ export function TodayView({
         </div>
       )}
 
+      {/* Assistant lines — the unprompted tier. Under the hero because it makes
+          the same kind of claim; above the add input, which is mechanics.
+          Deliberately calm lines, not a card: see UnpromptedLines. */}
+      <UnpromptedLines
+        items={unprompted.items}
+        onAct={handleUnpromptedAct}
+        onSnooze={unprompted.snooze}
+        decisions={unprompted.decisions}
+        showWhy={showWhyDebug}
+      />
+
       {/* Inline "Add to today" — today-only, when onCreateTask is wired.
           Desktop: full-width add input. Mobile: same input but flanked by the
           assignee + show-daily filters on the right, so the whole filter row
@@ -1001,7 +1084,6 @@ export function TodayView({
               parserContext={parserContext}
               currentDomain={currentDomain}
               insert={insert}
-              proactive={proactive}
               getRoutineStats={getRoutineStats}
               isPromotionSuggested={isPromotionSuggested}
               onSelectItem={handleSelectItem}

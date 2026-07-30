@@ -2,7 +2,6 @@ import { memo, useState, useRef, useEffect } from 'react'
 import type { TimelineItem } from '@/types/timeline'
 import type { FamilyMember } from '@/types/family'
 import type { TaskContext } from '@/types/task'
-import type { ProactiveSuggestion } from '@/types/proactiveSuggestion'
 import { formatTimeLong, formatTimeRangeLong, inferMealTime } from '@/lib/timeUtils'
 import { getProjectColor } from '@/lib/projectUtils'
 import { SchedulePopover, ContextPicker, DiscussionPicker, type ScheduleContextItem } from '@/components/triage'
@@ -151,11 +150,6 @@ interface ScheduleItemProps {
   hideTime?: boolean
   // Routine streak count (shown as badge for routines)
   routineStreak?: number
-  // Proactive suggestions — shown on hover
-  suggestions?: ProactiveSuggestion[]
-  onActSuggestion?: (suggestionId: string, detail?: string, outcome?: string) => void
-  onDismissSuggestion?: (suggestionId: string) => void
-  onOpenGuidedChat?: (entityType: 'task' | 'contact' | 'project' | 'event', entityId: string, entityName: string, prompt?: string) => void
 }
 
 // Warm muted color tokens for overdue styling

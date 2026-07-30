@@ -16,7 +16,6 @@ import type { TimelineItem } from '@/types/timeline'
 import type { DaySection } from '@/lib/timeUtils'
 import type { ParserContext } from '@/lib/quickInputParser'
 import type { useTimelineInsert } from '@/hooks/useTimelineInsert'
-import type { useProactiveSuggestions } from '@/hooks/useProactiveSuggestions'
 
 import { parseRoutineTimelineId } from '@/lib/today/doseExpansion'
 import { sectionKey } from '@/lib/today/sectionCollapse'
@@ -76,7 +75,6 @@ export interface TodaySectionListProps {
   parserContext: ParserContext
   currentDomain: 'work' | 'family' | 'personal' | 'universal'
   insert: ReturnType<typeof useTimelineInsert>
-  proactive: ReturnType<typeof useProactiveSuggestions>
   getRoutineStats: (id: string) => { currentStreak?: number } | undefined
   isPromotionSuggested: (eventId: string) => boolean
   onSelectItem: (id: string | null) => void
@@ -110,7 +108,6 @@ export function TodaySectionList({
   parserContext,
   currentDomain,
   insert,
-  proactive,
   getRoutineStats,
   isPromotionSuggested,
   onSelectItem,
@@ -513,16 +510,6 @@ export function TodaySectionList({
                           ? getRoutineStats(bareRoutineId)?.currentStreak
                           : undefined
                       }
-                      suggestions={(() => {
-                        const entityType = item.type === 'event' ? 'calendar_event' : item.type === 'task' ? 'task' : null
-                        const entityId = item.type === 'event' ? item.id.replace('event-', '') : taskId
-                        if (!entityType || !entityId) return undefined
-                        const s = proactive.suggestionsForEntity(entityType, entityId)
-                        return s.length > 0 ? s : undefined
-                      })()}
-                      onActSuggestion={proactive.actOnSuggestion}
-                      onDismissSuggestion={proactive.dismissSuggestion}
-                      onOpenGuidedChat={onOpenGuidedChat}
                     />
                     {item.type === 'event' && (() => {
                       const nudge = shareNudgeByEventId.get(item.id.replace('event-', ''))
