@@ -15,9 +15,20 @@ DECLARE
   u RECORD;
   service_role_key text;
 BEGIN
-  service_role_key := current_setting('app.settings.service_role_key', true);
+  -- The key lives in Supabase Vault (managed Postgres denies ALTER DATABASE
+  -- SET for custom GUCs — 42501 — so the 029-era current_setting pattern
+  -- can't be provisioned; it remains only as a fallback for local stacks).
+  BEGIN
+    SELECT decrypted_secret INTO service_role_key
+    FROM vault.decrypted_secrets WHERE name = 'service_role_key' LIMIT 1;
+  EXCEPTION WHEN OTHERS THEN
+    service_role_key := NULL; -- vault absent (local stack) — try the GUC
+  END;
   IF service_role_key IS NULL THEN
-    RAISE NOTICE 'proactive_engine_warm: app.settings.service_role_key not set; skipping';
+    service_role_key := current_setting('app.settings.service_role_key', true);
+  END IF;
+  IF service_role_key IS NULL THEN
+    RAISE NOTICE 'proactive_engine_warm: no service key in vault or settings; skipping';
     RETURN;
   END IF;
 
