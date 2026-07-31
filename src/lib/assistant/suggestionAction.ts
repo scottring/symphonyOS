@@ -65,6 +65,28 @@ export function resolveSuggestionAction(s: ProactiveSuggestion): ResolvedAction 
   }
 }
 
+/**
+ * The Today-list item id a `reveal` action should select, or null when the
+ * suggestion points at something Today has no row for.
+ *
+ * Today's selection API (`onSelectItem`) is keyed by a PREFIXED composite id —
+ * `task-<uuid>` / `event-<uuid>` — not by the bare entity uuid a suggestion
+ * carries. Selection is an id match, not a lookup, so a bare uuid matches no row
+ * and the panel silently never opens.
+ */
+export function revealItemId(s: ProactiveSuggestion): string | null {
+  if (!s.entityId) return null
+  switch (s.entityType) {
+    case 'task':
+      return `task-${s.entityId}`
+    case 'calendar_event':
+      return `event-${s.entityId}`
+    default:
+      // email_action / general have no Today row to reveal.
+      return null
+  }
+}
+
 /** A short verb for the action button. Never a sentence — these sit on one line. */
 export function actionLabel(action: ResolvedAction): string {
   switch (action.kind) {

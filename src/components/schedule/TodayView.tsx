@@ -30,7 +30,7 @@ import { useProactiveSuggestions } from '@/hooks/useProactiveSuggestions'
 import type { ProactiveSuggestion } from '@/types/proactiveSuggestion'
 import { useUnpromptedSuggestions, type UnpromptedItem } from '@/hooks/useUnpromptedSuggestions'
 import { UnpromptedLines } from '@/components/assistant/UnpromptedLines'
-import { resolveSuggestionAction } from '@/lib/assistant/suggestionAction'
+import { resolveSuggestionAction, revealItemId } from '@/lib/assistant/suggestionAction'
 import { useRoutineStats } from '@/hooks/useRoutineStats'
 import { useSystemHealth, getHealthTextClasses } from '@/hooks/useSystemHealth'
 import { useRecurringEventDetection } from '@/hooks/useRecurringEventDetection'
@@ -400,9 +400,13 @@ export function TodayView({
           '_blank',
         )
         break
-      case 'reveal':
-        onSelectItem?.(item.suggestion.entityId)
+      case 'reveal': {
+        // Must be the prefixed composite id Today selects by — a bare entity
+        // uuid matches no row, so the panel silently never opens.
+        const itemId = revealItemId(item.suggestion)
+        if (itemId) onSelectItem?.(itemId)
         return
+      }
     }
     void unprompted.act(item.suggestion.id)
   }, [navigate, unprompted, onSelectItem])
