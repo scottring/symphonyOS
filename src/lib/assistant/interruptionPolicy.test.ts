@@ -97,3 +97,57 @@ describe('mayInterrupt', () => {
     expect(d).toEqual({ allow: false, reason: 'snoozed' })
   })
 })
+
+describe('mayInterrupt — reveal targets', () => {
+  // A suggestion whose action falls through to `reveal` is only worth showing on
+  // Today if Today has a row to select. `general`/`email_action` have none, so
+  // the row rendered a "Show me" button that could never do anything.
+  const revealOnly = { ...base, suggestionType: 'followup' as const, actionType: undefined }
+
+  it('rejects a reveal with no Today row to select', () => {
+    const d = mayInterrupt(
+      { ...revealOnly, entityType: 'general' }, 95, SURFACES.today, state, noon,
+    )
+    expect(d).toEqual({ allow: false, reason: 'no_reveal_target' })
+  })
+
+  it('rejects an email_action reveal on Today', () => {
+    const d = mayInterrupt(
+      { ...revealOnly, entityType: 'email_action' }, 95, SURFACES.today, state, noon,
+    )
+    expect(d).toEqual({ allow: false, reason: 'no_reveal_target' })
+  })
+
+  it('allows a reveal that maps to a task row', () => {
+    const d = mayInterrupt(
+      { ...revealOnly, entityType: 'task' }, 95, SURFACES.today, state, noon,
+    )
+    expect(d.allow).toBe(true)
+  })
+
+  it('allows a reveal that maps to a calendar event row', () => {
+    const d = mayInterrupt(
+      { ...revealOnly, entityType: 'calendar_event' }, 95, SURFACES.today, state, noon,
+    )
+    expect(d.allow).toBe(true)
+  })
+
+  it('does not apply the reveal gate to the wall, which shows its own sheet', () => {
+    const d = mayInterrupt(
+      { ...revealOnly, entityType: 'general' }, 95, SURFACES.wall, state, noon,
+    )
+    expect(d.allow).toBe(true)
+  })
+
+  it('keeps a plan_session on Today — it navigates, it does not reveal', () => {
+    const cadence = {
+      ...base,
+      entityType: 'general' as const,
+      entityId: 'cadence:weekly',
+      suggestionType: 'plan_session' as const,
+      actionType: undefined,
+      actionPayload: { planHorizon: 'weekly' },
+    }
+    expect(mayInterrupt(cadence, 95, SURFACES.today, state, noon).allow).toBe(true)
+  })
+})

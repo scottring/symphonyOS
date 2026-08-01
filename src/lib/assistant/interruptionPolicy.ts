@@ -4,6 +4,7 @@
 
 import type { ProactiveSuggestion } from '@/types/proactiveSuggestion'
 import { isActionableSuggestion } from './actionable'
+import { resolveSuggestionAction, revealItemId } from './suggestionAction'
 import { CRITICAL_URGENCY } from './urgency'
 import { inInterruptionWindow } from './interruptionWindow'
 
@@ -22,6 +23,12 @@ export interface SurfaceProfile {
   /** How many may show at once on this surface. */
   concurrent: number
   respectsWindow: boolean
+  /**
+   * True when this surface's only fallback action is revealing the entity, so a
+   * suggestion with nothing to reveal is a dead tap. Today reveals by selecting
+   * a row in its own list, which exists only for tasks and calendar events.
+   */
+  requiresRevealTarget: boolean
 }
 
 /**
@@ -31,12 +38,13 @@ export interface SurfaceProfile {
  * window. Today still CONSUMES budget: attention spent is attention spent.
  */
 export const SURFACES: Record<SurfaceId, SurfaceProfile> = {
-  wall: { id: 'wall', urgencyFloor: 70, concurrent: 1, respectsWindow: true },
-  today: { id: 'today', urgencyFloor: 55, concurrent: 3, respectsWindow: false },
+  wall: { id: 'wall', urgencyFloor: 70, concurrent: 1, respectsWindow: true, requiresRevealTarget: false },
+  today: { id: 'today', urgencyFloor: 55, concurrent: 3, respectsWindow: false, requiresRevealTarget: true },
 }
 
 export type RejectReason =
   | 'not_actionable'
+  | 'no_reveal_target'
   | 'not_active'
   | 'snoozed'
   | 'below_floor'
@@ -67,6 +75,17 @@ export function mayInterrupt(
   // These two are never bypassable, not even by critical: a dead chip is a dead
   // tap, and an already-handled suggestion must not resurface.
   if (!isActionableSuggestion(s)) return { allow: false, reason: 'not_actionable' }
+  // Same rule, one step more specific: the action resolves, but this surface can
+  // only honour it by revealing an entity it has no row for. Rejecting here — in
+  // the policy, ahead of the concurrent-slice — is what stops a dead row from
+  // shadowing a live one.
+  if (
+    surface.requiresRevealTarget &&
+    resolveSuggestionAction(s).kind === 'reveal' &&
+    !revealItemId(s)
+  ) {
+    return { allow: false, reason: 'no_reveal_target' }
+  }
   if (s.status !== 'active') return { allow: false, reason: 'not_active' }
 
   if (s.snoozedUntil && new Date(s.snoozedUntil).getTime() > now.getTime()) {
