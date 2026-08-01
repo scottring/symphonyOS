@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { assembleContext } from '../_shared/context-graph/assemble.ts'
+import { resolveVisibleOwners } from '../_shared/context-graph/visibility.ts'
 import { facetsToFacts, renderBundleForPrompt } from '../_shared/context-graph/build.ts'
 import { facetRuleSuggestions } from './lib/facetRules.ts'
 import { computeUrgency, deriveUrgencyFacts, type UrgencyInput } from '../_shared/urgency.ts'
@@ -536,10 +537,19 @@ async function runLLMPass(
 
   // Assemble rich context bundles for the AI tasks (best-effort per-task; a failed
   // assembly degrades to omission rather than failing the whole pass).
+  //
+  // Resolve the household owner set ONCE for the whole pass — assembleContext would otherwise
+  // repeat the two household_members reads for every task in aiTasks.
   const openAiKey = Deno.env.get('OPENAI_API_KEY') ?? undefined
+  const visibleOwnerIds = await resolveVisibleOwners(supabase, userId)
   const bundles = await Promise.all(aiTasks.map(t =>
-    assembleContext({ client: supabase, openAiKey }, { entityType: 'task', entityId: t.id, userId })
-      .catch(() => null)
+    assembleContext({ client: supabase, openAiKey, visibleOwnerIds }, { entityType: 'task', entityId: t.id, userId })
+      // A swallowed failure here is invisible by construction: the task simply drops out of the
+      // AI tier with no trace. That hid the household-visibility gap for weeks — so log it.
+      .catch((err) => {
+        console.warn(`proactive-engine: context bundle failed for task ${t.id}:`, err?.message ?? err)
+        return null
+      })
   ))
 
   // Build contacts lookup string

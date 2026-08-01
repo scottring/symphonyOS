@@ -129,8 +129,8 @@ Deno.serve(async (req) => {
   if (!taskId) return json({ error: 'taskId required' }, 400)
 
   try {
-    // Bundle queries are user-scoped inside assembleContext, which matters here
-    // because this runs on a service client.
+    // Runs on a service client, so assembleContext restates the RLS itself: the caller's own
+    // rows plus household-shared ones. A single bundle, so it resolves the owner set inline.
     const bundle = await assembleContext(
       { client: service, openAiKey: Deno.env.get('OPENAI_API_KEY') || undefined },
       { entityType: 'task', entityId: taskId, userId: user.id },
@@ -140,6 +140,10 @@ Deno.serve(async (req) => {
     const text = await callClaude(buildPrompt(bundle.entity.title, renderBundleForPrompt(bundle)), apiKey)
     return json({ suggestions: parseSuggestions(text), degraded: bundle.degraded })
   } catch (e) {
-    return json({ error: e instanceof Error ? e.message : 'Suggest failed' }, 502)
+    const message = e instanceof Error ? e.message : 'Suggest failed'
+    // An unreachable entity is a 404, not a gateway failure. Reporting it as 502 is what made
+    // the household-visibility gap read as "the model broke" rather than "you can't see this".
+    if (message.includes('not found')) return json({ error: 'Task not found' }, 404)
+    return json({ error: message }, 502)
   }
 })

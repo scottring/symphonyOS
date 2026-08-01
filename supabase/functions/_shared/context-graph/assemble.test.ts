@@ -8,7 +8,36 @@ function stubClient(tables: Record<string, { data: unknown; error?: { message: s
       const result = tables[table] ?? { data: null, error: { message: `no stub for ${table}` } }
       const chain: Record<string, unknown> = {}
       const self = () => chain
-      for (const m of ['select', 'eq', 'in', 'order', 'limit', 'not']) chain[m] = self
+      for (const m of ['select', 'eq', 'in', 'or', 'order', 'limit', 'not']) chain[m] = self
+      chain.single = () => Promise.resolve(result)
+      chain.maybeSingle = () => Promise.resolve(result)
+      chain.then = (res: (v: unknown) => unknown) => Promise.resolve(result).then(res)
+      return chain
+    },
+    rpc: () => Promise.resolve(tables['__rpc__'] ?? { data: [], error: null }),
+  } as never
+}
+
+/** Records the narrowing filter each table was queried with, so a test can assert whether a
+ *  query mirrored the scope-gated RLS (`.or`) or the owner-only RLS (`.eq('user_id', …)`). */
+function stubClientRecordingFilters(
+  tables: Record<string, { data: unknown; error?: { message: string } | null }>,
+  filters: { table: string; kind: 'eq' | 'or'; value: string }[]
+) {
+  return {
+    from(table: string) {
+      const result = tables[table] ?? { data: null, error: { message: `no stub for ${table}` } }
+      const chain: Record<string, unknown> = {}
+      const self = () => chain
+      for (const m of ['select', 'in', 'order', 'limit', 'not']) chain[m] = self
+      chain.eq = (col: string, val: unknown) => {
+        if (col === 'user_id') filters.push({ table, kind: 'eq', value: String(val) })
+        return chain
+      }
+      chain.or = (filter: string) => {
+        filters.push({ table, kind: 'or', value: filter })
+        return chain
+      }
       chain.single = () => Promise.resolve(result)
       chain.maybeSingle = () => Promise.resolve(result)
       chain.then = (res: (v: unknown) => unknown) => Promise.resolve(result).then(res)
@@ -29,7 +58,7 @@ function stubClientRecordingEq(
       const result = tables[table] ?? { data: null, error: { message: `no stub for ${table}` } }
       const chain: Record<string, unknown> = {}
       const self = () => chain
-      for (const m of ['select', 'in', 'order', 'limit', 'not']) chain[m] = self
+      for (const m of ['select', 'in', 'or', 'order', 'limit', 'not']) chain[m] = self
       chain.eq = (col: string, val: unknown) => {
         calls.push({ table, col, val })
         return chain
@@ -103,6 +132,123 @@ describe('assembleContext (task)', () => {
     const b = await assembleContext({ client }, { entityType: 'task', entityId: 't1', userId: 'u1' })
     expect(b.knowledge).toEqual([])
     expect(b.degraded).not.toContain('knowledge')  // absent key is a config choice, not a failure
+  })
+})
+
+// The graph runs service-role, so it must restate each table's RLS itself. These tests pin
+// WHICH tables widen to household-shared rows and which stay owner-only — mirroring the real
+// policies, not applying the most permissive one everywhere.
+describe('assembleContext (household visibility)', () => {
+  const HOUSEHOLD = {
+    household_members: { data: [{ household_id: 'h1' }, { user_id: 'u1' }, { user_id: 'u2' }] },
+  }
+
+  /** household_members is read twice (my households, then their members); one stub row set
+   *  satisfies both because each read selects a different column. */
+  function sharedWorld(extra: Record<string, { data: unknown; error?: { message: string } | null }> = {}) {
+    return {
+      ...HOUSEHOLD,
+      tasks: { data: TASK }, contacts: { data: [] }, projects: { data: null }, goals: { data: null },
+      attachments: { data: [] }, note_entity_links: { data: [] }, notes: { data: [] },
+      action_history: { data: [] },
+      ...extra,
+    }
+  }
+
+  it('reaches a task owned by an active co-member', async () => {
+    const client = stubClient(sharedWorld())
+    const b = await assembleContext({ client }, { entityType: 'task', entityId: 't1', userId: 'u1' })
+    expect(b.entity.title).toBe('Call Camp Notre Dame')
+  })
+
+  it('gates tasks, projects, contacts and notes on scope — never on user_id alone', async () => {
+    const filters: { table: string; kind: 'eq' | 'or'; value: string }[] = []
+    const client = stubClientRecordingFilters(
+      sharedWorld({
+        tasks: { data: { ...TASK, project_id: 'p1' } },
+        contacts: { data: [] },
+        projects: { data: { id: 'p1', name: 'Summer 2026', status: 'in_progress' } },
+        note_entity_links: { data: [{ note_id: 'n1' }] },
+      }),
+      filters
+    )
+
+    await assembleContext({ client }, { entityType: 'task', entityId: 't1', userId: 'u1' })
+
+    for (const table of ['tasks', 'projects', 'contacts', 'notes']) {
+      const applied = filters.filter(f => f.table === table)
+      expect(applied.length, `${table} was never narrowed`).toBeGreaterThan(0)
+      for (const f of applied) {
+        expect(f.kind, `${table} used a bare user_id filter instead of the scope predicate`).toBe('or')
+        expect(f.value).toContain('and(scope.in.(couple,compound)')
+      }
+    }
+  })
+
+  it('keeps goals, attachments and action_history owner-only, matching their own RLS', async () => {
+    const filters: { table: string; kind: 'eq' | 'or'; value: string }[] = []
+    const client = stubClientRecordingFilters(
+      sharedWorld({ tasks: { data: { ...TASK, goal_id: 'g1' } } }),
+      filters
+    )
+
+    await assembleContext({ client }, { entityType: 'task', entityId: 't1', userId: 'u1' })
+
+    for (const table of ['goals', 'attachments', 'action_history']) {
+      const applied = filters.filter(f => f.table === table)
+      expect(applied.length, `${table} was never narrowed`).toBeGreaterThan(0)
+      for (const f of applied) {
+        expect(f.kind, `${table} widened past its owner-only RLS`).toBe('eq')
+        expect(f.value).toBe('u1')
+      }
+    }
+  })
+
+  it('keeps calendar_events owner-only — the scope axis deliberately skipped that table', async () => {
+    const filters: { table: string; kind: 'eq' | 'or'; value: string }[] = []
+    const client = stubClientRecordingFilters({
+      ...HOUSEHOLD,
+      calendar_events: { data: { id: 'e1', title: 'Team sync', description: null, location: null, start_time: '2026-07-29T10:00:00Z', created_at: '2026-07-01T00:00:00Z' } },
+      contacts: { data: [] }, attachments: { data: [] },
+      note_entity_links: { data: [] }, notes: { data: [] }, action_history: { data: [] },
+    }, filters)
+
+    await assembleContext({ client }, { entityType: 'calendar_event', entityId: 'e1', userId: 'u1' })
+
+    const applied = filters.filter(f => f.table === 'calendar_events')
+    expect(applied).toEqual([{ table: 'calendar_events', kind: 'eq', value: 'u1' }])
+  })
+
+  it('falls back to owner-only when household membership cannot be resolved', async () => {
+    const filters: { table: string; kind: 'eq' | 'or'; value: string }[] = []
+    const client = stubClientRecordingFilters({
+      household_members: { data: null, error: { message: 'boom' } },
+      tasks: { data: TASK }, contacts: { data: [] }, projects: { data: null }, goals: { data: null },
+      attachments: { data: [] }, note_entity_links: { data: [] }, notes: { data: [] },
+      action_history: { data: [] },
+    }, filters)
+
+    await assembleContext({ client }, { entityType: 'task', entityId: 't1', userId: 'u1' })
+
+    expect(filters.filter(f => f.kind === 'or')).toEqual([])
+    expect(filters.filter(f => f.table === 'tasks')).toEqual([{ table: 'tasks', kind: 'eq', value: 'u1' }])
+  })
+
+  it('honours a caller-supplied owner set without re-reading household_members', async () => {
+    const filters: { table: string; kind: 'eq' | 'or'; value: string }[] = []
+    const client = stubClientRecordingFilters({
+      tasks: { data: TASK }, contacts: { data: [] }, projects: { data: null }, goals: { data: null },
+      attachments: { data: [] }, note_entity_links: { data: [] }, notes: { data: [] },
+      action_history: { data: [] },
+    }, filters)
+
+    await assembleContext(
+      { client, visibleOwnerIds: ['u1', 'u2'] },
+      { entityType: 'task', entityId: 't1', userId: 'u1' }
+    )
+
+    expect(filters.some(f => f.table === 'household_members')).toBe(false)
+    expect(filters.find(f => f.table === 'tasks')?.kind).toBe('or')
   })
 })
 

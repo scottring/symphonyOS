@@ -2,11 +2,16 @@ import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import type { BundleAction, BundleFact, BundleLineage, BundleNote, BundlePerson, ContextBundle, EntityRef } from './types.ts'
 import { HISTORY_N, KNOWLEDGE_K, SIMILARITY_FLOOR, SNIPPET_LEN } from './types.ts'
 import { facetsToFacts, boundKnowledge, buildTime } from './build.ts'
+import { applyScopeVisibility, resolveVisibleOwners } from './visibility.ts'
 
 export interface AssembleDeps {
   client: SupabaseClient        // service-role client
   openAiKey?: string            // enables semantic knowledge; absent → linked notes only
   now?: Date                    // injectable for tests; defaults to new Date()
+  /** Owner set from `resolveVisibleOwners`. Optional: assembly resolves it itself when absent.
+   *  Callers assembling many bundles for one user (proactive-engine) should resolve once and
+   *  pass it, so the two household_members reads aren't paid per task. */
+  visibleOwnerIds?: string[]
 }
 
 type DegradedPart = 'people' | 'lineage' | 'facts' | 'knowledge' | 'history'
@@ -69,19 +74,20 @@ function nullRow(): Omit<EntityRow, 'id' | 'title' | 'created_at'> {
   }
 }
 
-async function loadEntity(client: SupabaseClient, ref: EntityRef): Promise<EntityRow> {
+async function loadEntity(client: SupabaseClient, ref: EntityRef, owners: string[]): Promise<EntityRow> {
   if (ref.entityType === 'task') {
-    const { data, error } = await client
-      .from('tasks')
-      .select(TASK_ENTITY_COLUMNS)
-      .eq('id', ref.entityId)
-      .eq('user_id', ref.userId)
-      .maybeSingle()
+    const { data, error } = await applyScopeVisibility(
+      client.from('tasks').select(TASK_ENTITY_COLUMNS).eq('id', ref.entityId),
+      ref.userId,
+      owners
+    ).maybeSingle()
     if (error || !data) throw new Error(`context-graph: ${ref.entityType} ${ref.entityId} not found`)
     return data as EntityRow
   }
 
   if (ref.entityType === 'calendar_event') {
+    // calendar_events RLS is owner-only (001_calendar_connections.sql:57-58) — the scope axis
+    // deliberately skipped it (2026-06-07_scope_axis.sql:91). Stays a plain user_id filter.
     const { data, error } = await client
       .from('calendar_events')
       .select(CALENDAR_EVENT_COLUMNS)
@@ -94,26 +100,25 @@ async function loadEntity(client: SupabaseClient, ref: EntityRef): Promise<Entit
   }
 
   // project
-  const { data, error } = await client
-    .from('projects')
-    .select(PROJECT_COLUMNS)
-    .eq('id', ref.entityId)
-    .eq('user_id', ref.userId)
-    .maybeSingle()
+  const { data, error } = await applyScopeVisibility(
+    client.from('projects').select(PROJECT_COLUMNS).eq('id', ref.entityId),
+    ref.userId,
+    owners
+  ).maybeSingle()
   if (error || !data) throw new Error(`context-graph: ${ref.entityType} ${ref.entityId} not found`)
   const project = data as { id: string; name: string; status: string; notes: string | null; created_at: string }
   return { id: project.id, title: project.name, created_at: project.created_at, ...nullRow(), notes: project.notes, completed: project.status === 'completed' }
 }
 
-async function loadPeople(client: SupabaseClient, row: EntityRow, ref: EntityRef): Promise<BundlePerson[]> {
+async function loadPeople(client: SupabaseClient, row: EntityRow, ref: EntityRef, owners: string[]): Promise<BundlePerson[]> {
   const ids = [...new Set([row.contact_id, row.assigned_to].filter((id): id is string => Boolean(id)))]
   if (ids.length === 0) return []
   const { data } = throwIfErrored(
-    await client
-      .from('contacts')
-      .select('id, name, phone, email, relationship, category')
-      .in('id', ids)
-      .eq('user_id', ref.userId)
+    await applyScopeVisibility(
+      client.from('contacts').select('id, name, phone, email, relationship, category').in('id', ids),
+      ref.userId,
+      owners
+    )
   )
   const contacts = (data ?? []) as { id: string; name: string; phone: string | null; email: string | null; relationship: string | null }[]
   const out: BundlePerson[] = []
@@ -128,11 +133,17 @@ async function loadPeople(client: SupabaseClient, row: EntityRow, ref: EntityRef
   return out
 }
 
-async function loadLineage(client: SupabaseClient, row: EntityRow, ref: EntityRef): Promise<BundleLineage> {
+async function loadLineage(client: SupabaseClient, row: EntityRow, ref: EntityRef, owners: string[]): Promise<BundleLineage> {
   const [projectResult, goalResult] = await Promise.all([
     row.project_id
-      ? client.from('projects').select('id, name, status').eq('id', row.project_id).eq('user_id', ref.userId).maybeSingle()
+      ? applyScopeVisibility(
+          client.from('projects').select('id, name, status').eq('id', row.project_id),
+          ref.userId,
+          owners
+        ).maybeSingle()
       : Promise.resolve({ data: null, error: null }),
+    // goals RLS is owner-only (046_goals.sql:59-61) and goals never got a scope column, so a
+    // shared task hanging off a peer's goal resolves to no goal rather than leaking its title.
     row.goal_id
       ? client.from('goals').select('id, title').eq('id', row.goal_id).eq('user_id', ref.userId).maybeSingle()
       : Promise.resolve({ data: null, error: null }),
@@ -153,6 +164,8 @@ async function loadLineage(client: SupabaseClient, row: EntityRow, ref: EntityRe
   return lineage
 }
 
+// attachments RLS is owner-only (023_attachments.sql:33-35) with no scope column, so facts
+// stay owner-scoped: a peer's shared task contributes its fields but not its attachments.
 async function loadFacts(client: SupabaseClient, entityType: string, entityId: string, userId: string): Promise<BundleFact[]> {
   const { data } = throwIfErrored(
     await client
@@ -174,14 +187,18 @@ function noteLinkEntityType(entityType: string): string {
   return entityType === 'calendar_event' ? 'event' : entityType
 }
 
-async function loadLinkedNotes(client: SupabaseClient, entityType: string, entityId: string, userId: string): Promise<BundleNote[]> {
+async function loadLinkedNotes(client: SupabaseClient, entityType: string, entityId: string, userId: string, owners: string[]): Promise<BundleNote[]> {
   const { data: links } = throwIfErrored(
     await client.from('note_entity_links').select('note_id').eq('entity_type', noteLinkEntityType(entityType)).eq('entity_id', entityId)
   )
   const noteIds = ((links ?? []) as { note_id: string }[]).map(l => l.note_id)
   if (noteIds.length === 0) return []
   const { data } = throwIfErrored(
-    await client.from('notes').select('id, title, content, vault_path').in('id', noteIds).eq('user_id', userId)
+    await applyScopeVisibility(
+      client.from('notes').select('id, title, content, vault_path').in('id', noteIds),
+      userId,
+      owners
+    )
   )
   return ((data ?? []) as { id: string; title: string; content: string; vault_path: string | null }[]).map(n => ({
     id: n.id,
@@ -263,18 +280,27 @@ export async function assembleContext(deps: AssembleDeps, ref: EntityRef): Promi
   const now = deps.now ?? new Date()
   const degraded: string[] = []
 
-  const row = await loadEntity(client, ref)
+  // Restates the RLS the service-role client bypasses. Resolved before loadEntity because the
+  // entity read itself is scope-gated; pass deps.visibleOwnerIds to skip the two extra reads.
+  const owners = deps.visibleOwnerIds ?? await resolveVisibleOwners(client, ref.userId)
+
+  const row = await loadEntity(client, ref, owners)
   const openAiKey = deps.openAiKey
 
   // Semantic lookup only needs row.title (already loaded above), so it runs alongside
   // the other parts instead of serially after them — the 3s embed timeout was otherwise
   // pure added latency on every assembly.
   const [people, lineage, facts, linkedNotes, history, semanticNotes] = await Promise.all([
-    part<BundlePerson[]>('people', degraded, () => loadPeople(client, row, ref), []),
-    part<BundleLineage>('lineage', degraded, () => ref.entityType === 'task' ? loadLineage(client, row, ref) : Promise.resolve({}), {}),
+    part<BundlePerson[]>('people', degraded, () => loadPeople(client, row, ref, owners), []),
+    part<BundleLineage>('lineage', degraded, () => ref.entityType === 'task' ? loadLineage(client, row, ref, owners) : Promise.resolve({}), {}),
     part<BundleFact[]>('facts', degraded, () => loadFacts(client, ref.entityType, ref.entityId, ref.userId), []),
-    part<BundleNote[]>('knowledge', degraded, () => loadLinkedNotes(client, ref.entityType, ref.entityId, ref.userId), []),
+    part<BundleNote[]>('knowledge', degraded, () => loadLinkedNotes(client, ref.entityType, ref.entityId, ref.userId, owners), []),
+    // action_history is the CALLER's own record of what they did to this entity, so it stays
+    // keyed to ref.userId regardless of who owns the entity.
     part<BundleAction[]>('history', degraded, () => loadHistory(client, ref.entityType, ref.entityId, ref.userId), []),
+    // Semantic knowledge goes through search_notes_semantic_for_user, a SECURITY DEFINER fn
+    // whose only gate is `n.user_id = p_user_id` (2026-07-29_semantic_search_service.sql:27).
+    // Widening it is a migration, not a client change — left owner-only deliberately.
     openAiKey
       ? part<BundleNote[]>('knowledge', degraded, () => loadSemanticNotes(client, openAiKey, row.title, ref.userId), [])
       : Promise.resolve([] as BundleNote[]),
