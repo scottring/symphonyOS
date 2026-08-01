@@ -31,6 +31,7 @@ import { computeEventReschedule } from './planningReschedule'
 import { PlanningSlotQuickCreate } from './PlanningSlotQuickCreate'
 import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
 import { belongsToWeek, isStaleWeekPlacement } from '@/lib/today/weekPlacement'
+import { resolveRoutineTime } from '@/lib/today/routineTime'
 
 interface PlanningSessionProps {
   tasks: Task[]
@@ -462,6 +463,23 @@ export function PlanningSession({
     return tasks.find((t) => t.id === activeId) ?? null
   }, [activeId, tasks])
 
+  // Drawer contents: the draggable routines that aren't already ON the grid.
+  //
+  // Every drawer routine is untimed, so the only way it gets a time is a drop.
+  // Leaving a placed one in the drawer shows the same routine twice and invites
+  // dropping it again. Deliberately NOT applied to `draggableRoutines` itself —
+  // the drag overlay still has to resolve a routine mid-drag, after it has a
+  // placement but before the pointer is released.
+  const unplacedRoutines = useMemo(() => {
+    if (!draggableRoutines.length) return draggableRoutines
+    return draggableRoutines.filter((routine) =>
+      !dateRange.some((date) => {
+        const instance = routineInstancesByDate.get(formatDateKey(date))?.get(routine.id)
+        return instance ? resolveRoutineTime(routine, instance, date) !== null : false
+      }),
+    )
+  }, [draggableRoutines, dateRange, routineInstancesByDate])
+
   // Get the currently dragged routine (drag ids are prefixed `routine-`)
   const activeRoutine = useMemo(() => {
     if (!activeId || !activeId.startsWith(ROUTINE_DRAG_PREFIX)) return null
@@ -753,7 +771,7 @@ export function PlanningSession({
             /* Task drawer (sidebar) */
             <PlanningTaskDrawer
               tasks={unscheduledTasks}
-              routines={draggableRoutines}
+              routines={unplacedRoutines}
               onPushTask={onPushTask}
               hiddenCount={showAllUnscheduled ? 0 : backlogCount}
               showingAll={showAllUnscheduled}

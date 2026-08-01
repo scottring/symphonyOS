@@ -914,3 +914,49 @@ describe('PlanningSession — cross-day routine drops', () => {
     expect(screen.queryByText('Moved away')).not.toBeInTheDocument()
   })
 })
+
+describe('PlanningSession — drawer drops placed routines', () => {
+  beforeEach(() => { resetIdCounter() })
+
+  // The drawer offers untimed routines. Once one is dropped it has a time on the
+  // grid, so leaving it in the drawer shows the same routine twice and invites
+  // dropping it again.
+  const sat = new Date(2026, 7, 1)
+  const placedAt = (h: number) => {
+    const d = new Date(sat); d.setHours(h, 0, 0, 0); return d.toISOString()
+  }
+  const inst = (entityId: string, status: 'pending' | 'deferred', deferred_to: string) => ({
+    id: `i-${entityId}`, user_id: 'u1', entity_type: 'routine' as const,
+    entity_id: entityId, date: '2026-08-01', status,
+    deferred_to, created_at: '', updated_at: '',
+  })
+
+  it('removes a routine from the drawer once it is placed on a visible day', () => {
+    const routine = createMockRoutine({ name: 'Kitchen laundry', time_of_day: null })
+    render(
+      <PlanningSession
+        tasks={[]} events={[]} routines={[routine]}
+        draggableRoutines={[routine]} allRoutines={[routine]}
+        dateInstances={[inst(routine.id, 'pending', placedAt(9))]}
+        initialDate={sat}
+        onUpdateTask={vi.fn()} onPushTask={vi.fn()} onClose={vi.fn()}
+      />
+    )
+    // Exactly one rendering: the grid block, not the drawer chip too.
+    expect(screen.getAllByText('Kitchen laundry')).toHaveLength(1)
+  })
+
+  it('keeps an unplaced routine in the drawer', () => {
+    const routine = createMockRoutine({ name: 'Not yet placed', time_of_day: null })
+    render(
+      <PlanningSession
+        tasks={[]} events={[]} routines={[routine]}
+        draggableRoutines={[routine]} allRoutines={[routine]}
+        dateInstances={[]}
+        initialDate={sat}
+        onUpdateTask={vi.fn()} onPushTask={vi.fn()} onClose={vi.fn()}
+      />
+    )
+    expect(screen.getByText('Not yet placed')).toBeInTheDocument()
+  })
+})
