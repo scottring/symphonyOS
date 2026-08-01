@@ -17,7 +17,7 @@ import {
 import type { Task } from '@/types/task'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { EventNote } from '@/hooks/useEventNotes'
-import type { Routine } from '@/types/actionable'
+import type { Routine, ActionableInstance } from '@/types/actionable'
 import type { FamilyMember } from '@/types/family'
 import { PlanningHeader } from './PlanningHeader'
 import { PlanningGrid } from './PlanningGrid'
@@ -38,6 +38,11 @@ interface PlanningSessionProps {
   routines: Routine[]
   /** Untimed routines shown in the drawer as draggable chips (weekly planning). */
   draggableRoutines?: Routine[]
+  /** Instances for the viewed date. A time-grain drop writes a one-day time
+   *  override here rather than rewriting the recurrence rule, so the grid needs
+   *  these to place a dropped routine. Day grain rewrites the rule instead, so
+   *  the week view does not depend on them. */
+  dateInstances?: ActionableInstance[]
   /**
    * Drop handler for a dragged routine: pins it to a date's weekday + time by
    * REWRITING the recurrence rule. Right on the week grid, where the gesture
@@ -107,6 +112,7 @@ export function PlanningSession({
   events,
   routines,
   draggableRoutines = [],
+  dateInstances,
   onScheduleRoutine,
   onScheduleRoutineToday,
   onRescheduleEvent,
@@ -387,6 +393,19 @@ export function PlanningSession({
   // the hideRoutinesSignal). Toggling here syncs everywhere.
   const [hideRoutines, setHideRoutines] = useState<boolean>(() => readHideRoutines())
   useEffect(() => onHideRoutinesChange(setHideRoutines), [])
+
+  // routine id → instance, bucketed by the instance's own date key. Built once
+  // here so each column can look up its own day without rescanning the list.
+  const routineInstancesByDate = useMemo(() => {
+    const byDate = new Map<string, Map<string, ActionableInstance>>()
+    for (const instance of dateInstances ?? []) {
+      if (instance.entity_type !== 'routine') continue
+      const key = instance.date as string
+      if (!byDate.has(key)) byDate.set(key, new Map())
+      byDate.get(key)!.set(instance.entity_id, instance)
+    }
+    return byDate
+  }, [dateInstances])
 
   // Get routines for the date range. Mirrors the Week grid's routine visibility:
   //   1. show_on_timeline === false → never render.
@@ -720,6 +739,7 @@ export function PlanningSession({
                 scheduledTasksByDate={scheduledTasksByDate}
                 eventsByDate={eventsByDate}
                 routinesByDate={routinesByDate}
+                routineInstancesByDate={routineInstancesByDate}
                 allDayTasksByDate={allDayTasksByDate}
                 familyMembers={familyMembers}
                 eventNotesMap={eventNotesMap}
@@ -737,6 +757,7 @@ export function PlanningSession({
               scheduledTasksByDate={scheduledTasksByDate}
               eventsByDate={eventsByDate}
               routinesByDate={routinesByDate}
+              routineInstancesByDate={routineInstancesByDate}
               allDayTasksByDate={allDayTasksByDate}
               familyMembers={familyMembers}
               eventNotesMap={eventNotesMap}

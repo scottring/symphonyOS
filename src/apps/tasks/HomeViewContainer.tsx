@@ -640,6 +640,9 @@ export function HomeViewContainer() {
             routines={filteredRoutines}
             // Untimed, non-daily routines become draggable chips in the drawer.
             draggableRoutines={allRoutines.filter(r => r.visibility === 'active' && !isEverydayRoutine(r.recurrence_pattern) && !r.time_of_day)}
+            // The grid places a dropped routine from its instance's one-day
+            // time override, so it needs the instances for the viewed date.
+            dateInstances={dateInstances}
             onScheduleRoutine={(routineId, date, time) => {
               const routine = allRoutines.find(r => r.id === routineId);
               if (routine) updateRoutine(routineId, scheduleRoutineOnDate(routine, date, time));

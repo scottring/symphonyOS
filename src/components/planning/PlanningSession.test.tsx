@@ -807,3 +807,61 @@ describe('routine drops by grain', () => {
     expect(screen.getByText('6 AM')).toBeInTheDocument()
   })
 })
+
+describe('PlanningSession — routine time overrides', () => {
+  beforeEach(() => { resetIdCounter() })
+
+  // A drop writes a ONE-DAY override to the instance rather than rewriting
+  // recurrence_pattern. The grid used to place routines from time_of_day alone,
+  // so the drop appeared to land and then reverted on the next render — and an
+  // untimed routine (the only kind the drawer offers) never rendered at all.
+  const today = new Date()
+  const dateKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+  const at = (h: number, m = 0) => {
+    const d = new Date(today); d.setHours(h, m, 0, 0); return d.toISOString()
+  }
+  const instance = (entityId: string, deferredTo: string) => ({
+    id: `i-${entityId}`, user_id: 'u1', entity_type: 'routine' as const,
+    entity_id: entityId, date: dateKey, status: 'pending' as const,
+    deferred_to: deferredTo, created_at: '', updated_at: '',
+  })
+
+  it('places an untimed routine at its dropped time', () => {
+    const routine = createMockRoutine({ name: 'Family first floor organization', time_of_day: null })
+    render(
+      <PlanningSession
+        tasks={[]} events={[]} routines={[routine]}
+        dateInstances={[instance(routine.id, at(10, 30))]}
+        initialDate={today}
+        onUpdateTask={vi.fn()} onPushTask={vi.fn()} onClose={vi.fn()}
+      />
+    )
+    expect(screen.getByText('Family first floor organization')).toBeInTheDocument()
+  })
+
+  it('does not place an untimed routine that was never dropped', () => {
+    const routine = createMockRoutine({ name: 'Never dropped', time_of_day: null })
+    render(
+      <PlanningSession
+        tasks={[]} events={[]} routines={[routine]}
+        dateInstances={[]}
+        initialDate={today}
+        onUpdateTask={vi.fn()} onPushTask={vi.fn()} onClose={vi.fn()}
+      />
+    )
+    expect(screen.queryByText('Never dropped')).not.toBeInTheDocument()
+  })
+
+  it('still places a timed routine with no override, at its rule time', () => {
+    const routine = createMockRoutine({ name: 'Rule timed', time_of_day: '09:00' })
+    render(
+      <PlanningSession
+        tasks={[]} events={[]} routines={[routine]}
+        dateInstances={[]}
+        initialDate={today}
+        onUpdateTask={vi.fn()} onPushTask={vi.fn()} onClose={vi.fn()}
+      />
+    )
+    expect(screen.getByText('Rule timed')).toBeInTheDocument()
+  })
+})

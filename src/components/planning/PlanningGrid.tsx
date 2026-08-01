@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import type { Task } from '@/types/task'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { EventNote } from '@/hooks/useEventNotes'
-import type { Routine } from '@/types/actionable'
+import type { Routine, ActionableInstance } from '@/types/actionable'
 import type { FamilyMember } from '@/types/family'
 import { PlanningColumn } from './PlanningColumn'
 import { allDayLaneHeight } from '@/lib/planning/allDayLane'
@@ -12,6 +12,8 @@ interface PlanningGridProps {
   scheduledTasksByDate: Map<string, Task[]>
   eventsByDate: Map<string, CalendarEvent[]>
   routinesByDate: Map<string, Routine[]>
+  /** routine id → this date's instance, per date key. Carries drop-time overrides. */
+  routineInstancesByDate?: Map<string, Map<string, ActionableInstance>>
   /** Incomplete, isAllDay tasks scheduled on each day — rendered in the fixed
    *  all-day lane, not the hour grid. */
   allDayTasksByDate?: Map<string, Task[]>
@@ -35,6 +37,7 @@ export function PlanningGrid({
   scheduledTasksByDate,
   eventsByDate,
   routinesByDate,
+  routineInstancesByDate,
   allDayTasksByDate,
   familyMembers,
   eventNotesMap,
@@ -137,6 +140,7 @@ export function PlanningGrid({
               tasks={tasks}
               events={events}
               routines={routines}
+              routineInstances={routineInstancesByDate?.get(dateKey)}
               allDayTasks={allDayTasks}
               laneHeight={laneHeight}
               familyMembers={familyMembers}

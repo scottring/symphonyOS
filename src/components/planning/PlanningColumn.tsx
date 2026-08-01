@@ -10,6 +10,8 @@ import { PlanningTaskCard } from './PlanningTaskCard'
 import { PlanningEventBlock } from './PlanningEventBlock'
 import { PlanningRoutineBlock } from './PlanningRoutineBlock'
 import { layoutLanes, type Lane } from './overlapLanes'
+import { resolveRoutineTime } from '@/lib/today/routineTime'
+import type { ActionableInstance } from '@/types/actionable'
 import { ALL_DAY_LANE_HEIGHT, allDayLaneCapacity, allDayLaneHeight } from '@/lib/planning/allDayLane'
 
 // Max side-by-side lanes before overlapping items collapse into a "+N" chip.
@@ -52,6 +54,10 @@ interface PlanningColumnProps {
   tasks: Task[]
   events: CalendarEvent[]
   routines: Routine[]
+  /** Per-routine instance for THIS date, keyed by routine id. Carries the
+   *  one-day time override a drop writes; without it the grid renders every
+   *  dropped routine back at its recurrence-rule time. */
+  routineInstances?: Map<string, ActionableInstance>
   /** Incomplete, isAllDay tasks scheduled on this exact day — rendered as
    *  fixed-height chips in the all-day lane, never in the hour grid below. */
   allDayTasks?: Task[]
@@ -80,6 +86,7 @@ export function PlanningColumn({
   tasks,
   events,
   routines,
+  routineInstances,
   allDayTasks = [],
   laneHeight = ALL_DAY_LANE_HEIGHT,
   familyMembers,
@@ -177,17 +184,20 @@ export function PlanningColumn({
     }).filter(Boolean) as { event: CalendarEvent; top: number; height: number; startMinutes: number; endMinutes: number }[]
   }, [events, slotHeight, dayStartHour])
 
-  // Calculate positions for routines
+  // Calculate positions for routines.
+  //
+  // Position comes from resolveRoutineTime, NOT from time_of_day: a drop writes
+  // a one-day override to the instance rather than rewriting the recurrence
+  // rule, so reading time_of_day alone renders every dropped routine back at
+  // its old slot — or, for the untimed routines the drawer offers, nowhere.
   const placedRoutines = useMemo(() => {
     return routines
-      .filter((r) => r.time_of_day) // Only show routines with specific times
       .map((routine) => {
-        const [hourStr, minuteStr] = (routine.time_of_day || '09:00').split(':')
-        const hour = parseInt(hourStr, 10)
-        const minute = parseInt(minuteStr, 10)
+        const start = resolveRoutineTime(routine, routineInstances?.get(routine.id), date)
+        if (!start) return null // untimed today — belongs in the drawer, not the grid
 
-        // Calculate top position
-        const minutesFromStart = (hour - dayStartHour) * 60 + minute
+        const minutesFromStart =
+          (start.getHours() - dayStartHour) * 60 + start.getMinutes()
         const top = (minutesFromStart / 30) * slotHeight
 
         return {
@@ -198,7 +208,8 @@ export function PlanningColumn({
           endMinutes: minutesFromStart + 30,
         }
       })
-  }, [routines, slotHeight, dayStartHour])
+      .filter(Boolean) as { routine: Routine; top: number; height: number; startMinutes: number; endMinutes: number }[]
+  }, [routines, routineInstances, date, slotHeight, dayStartHour])
 
   // Single overlap pass across ALL placed items (tasks + events + routines) so
   // anything sharing a time gets its own side-by-side lane regardless of type.

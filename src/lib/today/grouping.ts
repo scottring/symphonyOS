@@ -7,6 +7,7 @@ import { taskToTimelineItem, eventToTimelineItem, routineToTimelineItem } from '
 import { groupByDaySection } from '@/lib/timeUtils'
 import { resolveEventContext } from './eventContext'
 import { expandRoutineDoses, routineStatusKey } from './doseExpansion'
+import { resolveRoutineTime } from './routineTime'
 import { groupRoutineSteps, buildCollectionItem } from './routineCollections'
 
 export interface GroupingInput {
@@ -78,22 +79,16 @@ export function buildGroupedSections(input: GroupingInput): Record<DaySection, T
       const instance = routineStatusMap.get(routineStatusKey(routine.id, dose.slotIndex))
       if (instance?.status === 'completed') item.completed = true
       else if (instance?.status === 'skipped') item.skipped = true
-      // Override time if rescheduled (only applies to non-dosed routines via bare id)
-      // This applies when:
-      // 1. Same-day reschedule (status='pending', deferred_to is a time change)
-      // 2. Cross-day reschedule showing on target day (status='deferred', viewing the deferred_to date)
-      if (instance?.deferred_to) {
-        const deferredTime = new Date(instance.deferred_to)
-        const deferredDateStr = deferredTime.toISOString().split('T')[0]
-        const viewedDateStr = viewedDate.toISOString().split('T')[0]
-
-        // Apply time override if:
-        // - Same-day time change (pending status)
-        // - Or this is a deferred routine and we're viewing the target date
-        if (instance.status === 'pending' || (instance.status === 'deferred' && deferredDateStr === viewedDateStr)) {
-          item.startTime = deferredTime
-        }
-      }
+      // Time override if rescheduled (only applies to non-dosed routines via bare
+      // id). Resolution lives in resolveRoutineTime so this and the time-block
+      // grid cannot disagree about where a dropped routine goes — they did, and
+      // that is what made a drop on the grid silently revert.
+      const resolved = resolveRoutineTime(
+        { time_of_day: dose.time ?? routine.time_of_day },
+        instance,
+        viewedDate,
+      )
+      if (resolved) item.startTime = resolved
       return item
     }),
   )
