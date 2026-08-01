@@ -275,6 +275,10 @@ export function HomeViewContainer() {
     () => filterRoutinesForDomain(filteredRoutines, currentDomain),
     [filteredRoutines, currentDomain],
   );
+  const planningAllRoutines = useMemo(
+    () => filterRoutinesForDomain(allRoutines, currentDomain),
+    [allRoutines, currentDomain],
+  );
   const planningDraggableRoutines = useMemo(
     () => filterRoutinesForDomain(
       allRoutines.filter(r => r.visibility === 'active' && !isEverydayRoutine(r.recurrence_pattern) && !r.time_of_day),
@@ -678,7 +682,12 @@ export function HomeViewContainer() {
             // The grid places a dropped routine from its instance's one-day
             // time override, so it needs the instances for the viewed date.
             dateInstances={dateInstances}
-            allRoutines={allRoutines}
+            // Only used to resolve a routine DEFERRED INTO a visible day (it
+            // doesn't recur there, so the day's own list can't name it). That
+            // lookup draws on the grid, so it has to be domain-scoped too —
+            // otherwise a family routine deferred to today reappears on the
+            // Personal grid through the back door.
+            allRoutines={planningAllRoutines}
             onScheduleRoutine={(routineId, date, time) => {
               const routine = allRoutines.find(r => r.id === routineId);
               if (routine) updateRoutine(routineId, scheduleRoutineOnDate(routine, date, time));
