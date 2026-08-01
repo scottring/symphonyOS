@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { toWallAction, wallActionLabel } from './wallAssistantAdapter'
+import { toWallAction, wallActionLabel, wallRevealTarget } from './wallAssistantAdapter'
 import type { ProactiveSuggestion, SuggestionActionType } from '@/types/proactiveSuggestion'
 
 const s = (
@@ -43,5 +43,34 @@ describe('toWallAction', () => {
   it('labels only the call action as Call', () => {
     expect(wallActionLabel(toWallAction(s('call', { phoneNumber: '5' })))).toBe('Call')
     expect(wallActionLabel(toWallAction(s('email', { email: 'a@b.c' })))).toBe('Show me')
+  })
+})
+
+describe('wallRevealTarget', () => {
+  // The wall's timeline ids are the prefixed TimelineItem ids (`event-<uuid>`,
+  // see types/timeline.ts), but a suggestion carries a BARE entity uuid.
+  // Comparing the two directly never matched, so every "Show me" fell through
+  // to the flash fallback instead of opening the action sheet.
+  const reveal = (entityType: ProactiveSuggestion['entityType'], entityId: string) =>
+    ({ ...s('followup'), entityType, entityId }) as ProactiveSuggestion
+
+  it('matches a task suggestion against the prefixed timeline id', () => {
+    expect(wallRevealTarget(reveal('task', 't1'), ['event-e1', 'task-t1'])).toBe('task-t1')
+  })
+
+  it('matches a calendar_event suggestion against the prefixed timeline id', () => {
+    expect(wallRevealTarget(reveal('calendar_event', 'e1'), ['event-e1'])).toBe('event-e1')
+  })
+
+  it('returns null when the entity is not on the timeline', () => {
+    expect(wallRevealTarget(reveal('task', 'nope'), ['task-t1'])).toBeNull()
+  })
+
+  it('does not match a bare id against a prefixed timeline id', () => {
+    expect(wallRevealTarget(reveal('task', 't1'), ['t1'])).toBeNull()
+  })
+
+  it('returns null for entity types with nothing to reveal', () => {
+    expect(wallRevealTarget(reveal('general', 'cadence:weekly'), ['task-t1'])).toBeNull()
   })
 })

@@ -36,7 +36,7 @@ import { WallV2UtilitySheet } from './WallV2UtilitySheet';
 import { CallerIdTakeover } from './CallerIdTakeover';
 import { WallV2PhoneScreen } from './WallV2PhoneScreen';
 import { WallV2AssistantLine } from './WallV2AssistantLine';
-import type { WallAction } from './wallAssistantAdapter';
+import { wallRevealTarget, type WallAction } from './wallAssistantAdapter';
 import { useUnpromptedSuggestions, type UnpromptedItem } from '@/hooks/useUnpromptedSuggestions';
 import {
   adaptScheduleBand,
@@ -421,8 +421,13 @@ export function WallV2Shell() {
       // "Show me" — reveal the entity using the sheet the wall already has.
       // handleTapEvent silently no-ops on an id it can't find, which on a
       // wall-mounted screen reads as a broken button, so confirm the tap landed.
-      const known = timeline.flatMap((s) => s.events).some((e) => e.id === item.suggestion.entityId);
-      if (known) handleTapEvent(item.suggestion.entityId);
+      // Match on the prefixed timeline id, not the bare entity id — see
+      // wallRevealTarget.
+      const target = wallRevealTarget(
+        item.suggestion,
+        timeline.flatMap((s) => s.events).map((e) => e.id),
+      );
+      if (target) handleTapEvent(target);
       else showFlash(item.suggestion.title);
     }
     void wallUnprompted.act(item.suggestion.id);

@@ -9,7 +9,7 @@
 // the wall's limitations cannot leak into the phone and desktop paths.
 
 import type { ProactiveSuggestion } from '@/types/proactiveSuggestion'
-import { resolveSuggestionAction } from '@/lib/assistant/suggestionAction'
+import { resolveSuggestionAction, revealItemId } from '@/lib/assistant/suggestionAction'
 
 export type WallAction =
   | { kind: 'wall_call'; phoneNumber: string }
@@ -27,4 +27,21 @@ export function toWallAction(s: ProactiveSuggestion): WallAction {
 
 export function wallActionLabel(action: WallAction): string {
   return action.kind === 'wall_call' ? 'Call' : 'Show me'
+}
+
+/**
+ * The timeline id a `show_me` tap should open, or null if the wall has no row
+ * for it (in which case the caller flashes the title so the tap still lands).
+ *
+ * The comparison has to happen on the PREFIXED TimelineItem id (`event-<uuid>`,
+ * `task-<uuid>` — see types/timeline.ts). A suggestion carries the bare entity
+ * uuid, so matching the two directly never succeeded and every "Show me" fell
+ * through to the flash instead of opening the action sheet.
+ */
+export function wallRevealTarget(
+  s: ProactiveSuggestion,
+  timelineIds: readonly string[],
+): string | null {
+  const id = revealItemId(s)
+  return id && timelineIds.includes(id) ? id : null
 }
