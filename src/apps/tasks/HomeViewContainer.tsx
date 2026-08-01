@@ -643,6 +643,7 @@ export function HomeViewContainer() {
             // The grid places a dropped routine from its instance's one-day
             // time override, so it needs the instances for the viewed date.
             dateInstances={dateInstances}
+            allRoutines={allRoutines}
             onScheduleRoutine={(routineId, date, time) => {
               const routine = allRoutines.find(r => r.id === routineId);
               if (routine) updateRoutine(routineId, scheduleRoutineOnDate(routine, date, time));

@@ -41,13 +41,18 @@ describe('resolveRoutineTime', () => {
     expect(resolveRoutineTime({ time_of_day: null }, instance(), viewedDate)).toBeNull()
   })
 
-  it('applies a deferred override only on the day it was deferred to', () => {
+  it('applies a deferred override on the day it was deferred to', () => {
     const i = instance({ status: 'deferred', deferred_to: at(16, 0).toISOString() })
     expect(resolveRoutineTime({ time_of_day: '09:00' }, i, viewedDate)).toEqual(at(16, 0))
+  })
 
+  // A routine moved to another day is not on this one at all. Falling back to
+  // the rule time here leaves a ghost sitting on the day it left, while the day
+  // it moved to also has to draw it — the same routine twice.
+  it('returns null on days a routine was deferred AWAY from, without falling back', () => {
+    const i = instance({ status: 'deferred', deferred_to: at(16, 0).toISOString() })
     const otherDay = new Date(2026, 7, 2)
-    expect(resolveRoutineTime({ time_of_day: '09:00' }, i, otherDay))
-      .toEqual(new Date(2026, 7, 2, 9, 0, 0, 0))
+    expect(resolveRoutineTime({ time_of_day: '09:00' }, i, otherDay)).toBeNull()
   })
 
   it('ignores an override on a completed or skipped instance', () => {

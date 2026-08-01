@@ -38,6 +38,9 @@ interface PlanningSessionProps {
   routines: Routine[]
   /** Untimed routines shown in the drawer as draggable chips (weekly planning). */
   draggableRoutines?: Routine[]
+  /** Full routine set, used to resolve a routine dragged into a day it does not
+   *  recur on — the day's own list will not contain it. */
+  allRoutines?: Routine[]
   /** Instances for the viewed date. A time-grain drop writes a one-day time
    *  override here rather than rewriting the recurrence rule, so the grid needs
    *  these to place a dropped routine. Day grain rewrites the rule instead, so
@@ -112,6 +115,7 @@ export function PlanningSession({
   events,
   routines,
   draggableRoutines = [],
+  allRoutines,
   dateInstances,
   onScheduleRoutine,
   onScheduleRoutineToday,
@@ -394,15 +398,26 @@ export function PlanningSession({
   const [hideRoutines, setHideRoutines] = useState<boolean>(() => readHideRoutines())
   useEffect(() => onHideRoutinesChange(setHideRoutines), [])
 
-  // routine id → instance, bucketed by the instance's own date key. Built once
-  // here so each column can look up its own day without rescanning the list.
+  // routine id → instance, bucketed under EVERY date the instance has a say in.
+  //
+  // A cross-day drop keeps the row's original `date` and sets status 'deferred'
+  // with `deferred_to` on the target day, so the instance speaks for two days:
+  // the day it left (which must stop drawing it) and the day it moved to (which
+  // must start). Filing it under one key only makes it fall between the columns
+  // and disappear. resolveRoutineTime already decides correctly per day — it
+  // just has to be handed the instance in both places.
   const routineInstancesByDate = useMemo(() => {
     const byDate = new Map<string, Map<string, ActionableInstance>>()
-    for (const instance of dateInstances ?? []) {
-      if (instance.entity_type !== 'routine') continue
-      const key = instance.date as string
+    const put = (key: string, instance: ActionableInstance) => {
       if (!byDate.has(key)) byDate.set(key, new Map())
       byDate.get(key)!.set(instance.entity_id, instance)
+    }
+    for (const instance of dateInstances ?? []) {
+      if (instance.entity_type !== 'routine') continue
+      put(instance.date as string, instance)
+      if (instance.status === 'deferred' && instance.deferred_to) {
+        put(formatDateKey(new Date(instance.deferred_to)), instance)
+      }
     }
     return byDate
   }, [dateInstances])
@@ -420,11 +435,26 @@ export function PlanningSession({
       const routinesForDay = (getRoutinesForDate ? getRoutinesForDate(date) : routines)
         .filter((r) => r.show_on_timeline !== false)
         .filter((r) => !hideRoutines || !isEverydayRoutine(r.recurrence_pattern))
-      map.set(dateKey, routinesForDay)
+
+      // A routine dragged INTO this day usually doesn't recur on it, so the
+      // day's own list won't contain it. Pull it in from the full set, the same
+      // way useScheduleFiltering does for the Today rung.
+      const placed = routineInstancesByDate.get(dateKey)
+      const deferredIn: Routine[] = []
+      if (placed) {
+        for (const [routineId, instance] of placed) {
+          if (instance.status !== 'deferred' || !instance.deferred_to) continue
+          if (formatDateKey(new Date(instance.deferred_to)) !== dateKey) continue
+          if (routinesForDay.some((r) => r.id === routineId)) continue
+          const routine = allRoutines?.find((r) => r.id === routineId)
+          if (routine && routine.show_on_timeline !== false) deferredIn.push(routine)
+        }
+      }
+      map.set(dateKey, deferredIn.length ? [...routinesForDay, ...deferredIn] : routinesForDay)
     }
 
     return map
-  }, [dateRange, getRoutinesForDate, routines, hideRoutines])
+  }, [dateRange, getRoutinesForDate, routines, hideRoutines, routineInstancesByDate, allRoutines])
 
   // Get the currently dragged task
   const activeTask = useMemo(() => {

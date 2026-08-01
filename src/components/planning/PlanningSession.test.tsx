@@ -865,3 +865,52 @@ describe('PlanningSession — routine time overrides', () => {
     expect(screen.getByText('Rule timed')).toBeInTheDocument()
   })
 })
+
+describe('PlanningSession — cross-day routine drops', () => {
+  beforeEach(() => { resetIdCounter() })
+
+  // Dragging a routine into ANOTHER day's column writes status:'deferred' with
+  // deferred_to on the target day, while the row keeps its ORIGINAL date. Keying
+  // the grid by that original date files the routine under the day it left, so
+  // the source column correctly declines to draw it and the target column never
+  // receives it — it falls between the two and disappears.
+  const sat = new Date(2026, 7, 1)
+  const sun = new Date(2026, 7, 2)
+  const dayAfter = new Date(2026, 7, 2, 7, 0, 0, 0)
+
+  const deferredInstance = (entityId: string) => ({
+    id: `i-${entityId}`, user_id: 'u1', entity_type: 'routine' as const,
+    entity_id: entityId, date: '2026-08-01', status: 'deferred' as const,
+    deferred_to: dayAfter.toISOString(), created_at: '', updated_at: '',
+  })
+
+  it('draws a routine deferred into another day on that day', () => {
+    const routine = createMockRoutine({ name: 'Do kitchen Laundry', time_of_day: null })
+    render(
+      <PlanningSession
+        tasks={[]} events={[]} routines={[]}
+        allRoutines={[routine]}
+        dateInstances={[deferredInstance(routine.id)]}
+        initialDate={sat}
+        initialDays={2}
+        onUpdateTask={vi.fn()} onPushTask={vi.fn()} onClose={vi.fn()}
+      />
+    )
+    expect(screen.getByText('Do kitchen Laundry')).toBeInTheDocument()
+  })
+
+  it('does not draw it on the day it was moved away from', () => {
+    const routine = createMockRoutine({ name: 'Moved away', time_of_day: '09:00' })
+    render(
+      <PlanningSession
+        tasks={[]} events={[]} routines={[routine]}
+        allRoutines={[routine]}
+        dateInstances={[deferredInstance(routine.id)]}
+        initialDate={sat}
+        onUpdateTask={vi.fn()} onPushTask={vi.fn()} onClose={vi.fn()}
+      />
+    )
+    // Single-day range = Saturday only, and it left Saturday.
+    expect(screen.queryByText('Moved away')).not.toBeInTheDocument()
+  })
+})

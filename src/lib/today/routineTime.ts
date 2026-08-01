@@ -20,6 +20,13 @@ export function resolveRoutineTime(
   instance: ActionableInstance | undefined,
   viewedDate: Date,
 ): Date | null {
+  // Moved to another day: it is not on THIS day at all, so the rule time must
+  // not stand in as a fallback — that would leave a ghost on the day it left.
+  if (instance?.status === 'deferred' && instance.deferred_to) {
+    const deferred = new Date(instance.deferred_to)
+    return isSameLocalDay(deferred, viewedDate) ? deferred : null
+  }
+
   const override = resolveOverride(instance, viewedDate)
   if (override) return override
 
