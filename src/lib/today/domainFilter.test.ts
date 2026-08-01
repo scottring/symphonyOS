@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest'
 import {
   matchesDomain,
   filterTasksForPlanning,
+  filterTasksForDomainView,
   filterEventsForDomain,
   filterRoutinesForDomain,
   domainSessionToken,
@@ -51,6 +52,36 @@ describe('filterTasksForPlanning', () => {
   it('untagged bucketed (non-inbox) items are hidden from domain sessions', () => {
     const ids = filterTasksForPlanning(pool, 'family').map((t) => t.id)
     expect(ids).toEqual(['f', 'ni'])
+  })
+})
+
+describe('filterTasksForDomainView', () => {
+  const pool = [
+    task({ id: 'w', context: 'work', bucket: 'week' }),
+    task({ id: 'f', context: 'family', bucket: 'week' }),
+    task({ id: 'p', context: 'personal', bucket: 'week' }),
+    task({ id: 'n', context: null, bucket: 'week' }),
+    task({ id: 'ni', context: null, bucket: 'inbox' }),
+  ]
+  it('universal returns the pool untouched', () => {
+    expect(filterTasksForDomainView(pool, 'universal')).toEqual(pool)
+  })
+  it('a domain shows its own items plus UNTAGGED ones, whatever the bucket', () => {
+    // The Time-block grid's leak: a personal week-bucket task showing in Family.
+    expect(filterTasksForDomainView(pool, 'family').map((t) => t.id)).toEqual(['f', 'n', 'ni'])
+    expect(filterTasksForDomainView(pool, 'work').map((t) => t.id)).toEqual(['w', 'n', 'ni'])
+  })
+  it("hides another member's work/personal tasks in every domain", () => {
+    const mine = 'me'
+    const priv = [
+      task({ id: 'theirs', context: 'personal', assignedTo: 'someone-else' }),
+      task({ id: 'mine', context: 'personal', assignedTo: mine }),
+      task({ id: 'shared', context: 'work', assignedToAll: ['someone-else', mine] }),
+      task({ id: 'unassigned', context: 'personal' }),
+      task({ id: 'fam', context: 'family', assignedTo: 'someone-else' }),
+    ]
+    expect(filterTasksForDomainView(priv, 'universal', mine).map((t) => t.id))
+      .toEqual(['mine', 'shared', 'unassigned', 'fam'])
   })
 })
 

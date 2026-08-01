@@ -5,7 +5,7 @@ import type { Project } from '@/types/project'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine, ActionableInstance } from '@/types/actionable'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
-import { filterEventsForDomain, filterRoutinesForDomain } from '@/lib/today/domainFilter'
+import { filterEventsForDomain, filterRoutinesForDomain, filterTasksForDomainView } from '@/lib/today/domainFilter'
 import { useHomeView } from '@/hooks/useHomeView'
 import { useMobile } from '@/hooks/useMobile'
 import { useUndo } from '@/hooks/useUndo'
@@ -77,34 +77,15 @@ export function HomeView({
   const navigate = useNavigate()
   const { config: cadenceConfig } = useCadenceConfig()
 
-  // Filter tasks, routines, projects, and events by current domain
-  // Specific domains show ONLY matching items — untagged items stay in universal
-  // For work/personal: hide tasks assigned to someone else (they're not yours)
-  const filteredTasks = useMemo(() => {
-    return tasks.filter(task => {
-      // Hide other members' work/personal tasks (private domains) in ALL views.
-      // A private task is visible to anyone it's assigned to, so check membership
-      // in the full assignee set — not just the first entry. (The old code used
-      // assignedToAll?.[0], which hid a shared private task from everyone but the
-      // first assignee.)
-      if (currentUserMemberId && (task.context === 'work' || task.context === 'personal')) {
-        const assignees = task.assignedToAll && task.assignedToAll.length > 0
-          ? task.assignedToAll
-          : (task.assignedTo ? [task.assignedTo] : [])
-        if (assignees.length > 0 && !assignees.includes(currentUserMemberId)) return false
-      }
-      // Universal shows everything that passes the privacy filter above
-      if (currentDomain === 'universal') return true
-
-      // A specific domain isolates to its OWN items plus UNTAGGED tasks.
-      // Untagged tasks stay visible in every domain (and get a pulsing tag glow
-      // nudging the user to categorize them) so they're never lost — but tagged
-      // items from OTHER domains don't leak in. This deliberately replaces the
-      // old "always show overdue/inbox regardless of domain" overrides, which
-      // leaked e.g. family overdue items into the Work view.
-      return task.context === currentDomain || task.context == null
-    })
-  }, [tasks, currentDomain, currentUserMemberId])
+  // Filter tasks, routines, projects, and events by current domain.
+  // Task scoping lives in filterTasksForDomainView (shared with the Time-block
+  // grid, which is launched from this page and must show the same day): a
+  // specific domain isolates to its OWN items plus UNTAGGED ones (which get a
+  // pulsing tag glow rather than disappearing), and another member's
+  // work/personal tasks are private in every domain.
+  const filteredTasks = useMemo(
+    () => filterTasksForDomainView(tasks, currentDomain, currentUserMemberId),
+    [tasks, currentDomain, currentUserMemberId])
 
   // W4 — Today landing: whether a planning rhythm nudge is due right now.
   const dueSession = useMemo(() => getDueSession(cadenceConfig, new Date()), [cadenceConfig])

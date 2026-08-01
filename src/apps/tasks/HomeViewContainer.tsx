@@ -39,6 +39,7 @@ import { useInstancesRealtime } from '@/hooks/useInstancesRealtime';
 import { useScheduleActions } from '@/hooks/useScheduleActions';
 import { useDomain } from '@/hooks/useDomain';
 import { useCalendarDomainMappings } from '@/hooks/useCalendarDomainMappings';
+import { filterTasksForDomainView, filterRoutinesForDomain, filterEventsForDomain } from '@/lib/today/domainFilter';
 import { useListsContext } from '@/contexts/ListsContext';
 import { useNotesContext } from '@/contexts/NotesContext';
 import { ScheduleActionsProvider, type ScheduleActionsValue } from '@/contexts/ScheduleActionsContext';
@@ -211,7 +212,8 @@ export function HomeViewContainer() {
     [eventNotesMap, events, getCurrentUserMember],
   );
 
-  // Schedule filtering (events/routines/instances filtered to viewed date + domain)
+  // Schedule filtering (events/routines/instances narrowed to the VIEWED DATE
+  // only — domain scoping is each consumer's job; see planningEvents below)
   const { filteredEvents, filteredRoutines, dateInstances, refreshDateInstances } = useScheduleFiltering({
     viewedDate,
     events: eventsWithMeals,
@@ -258,6 +260,36 @@ export function HomeViewContainer() {
     }
     return overrides;
   }, [eventNotesMap]);
+
+  // ── Domain-scoped pools for the time-block grid ──
+  // useScheduleFiltering only narrows to the VIEWED DATE — HomeView applies the
+  // domain scope itself, on its own copy of these props. PlanningSession has no
+  // such internal filter, so the container has to hand it already-scoped pools;
+  // passing the raw ones leaked e.g. a personal task and family routines into
+  // the Family/Personal grid. Same helpers, same semantics as HomeView.
+  const planningTasks = useMemo(
+    () => filterTasksForDomainView(tasks, currentDomain, getCurrentUserMember()?.id),
+    [tasks, currentDomain, getCurrentUserMember],
+  );
+  const planningRoutines = useMemo(
+    () => filterRoutinesForDomain(filteredRoutines, currentDomain),
+    [filteredRoutines, currentDomain],
+  );
+  const planningDraggableRoutines = useMemo(
+    () => filterRoutinesForDomain(
+      allRoutines.filter(r => r.visibility === 'active' && !isEverydayRoutine(r.recurrence_pattern) && !r.time_of_day),
+      currentDomain,
+    ),
+    [allRoutines, currentDomain],
+  );
+  const planningEvents = useMemo(
+    () => filterEventsForDomain(filteredEvents, currentDomain, {
+      eventContextOverrides,
+      getDomainForCalendar,
+      eventNotesMap: eventNotesMapWithDefaults,
+    }),
+    [filteredEvents, currentDomain, eventContextOverrides, getDomainForCalendar, eventNotesMapWithDefaults],
+  );
 
   const onCreateTaskFromValue = useCallback(
     async (raw: string) => {
@@ -635,11 +667,14 @@ export function HomeViewContainer() {
       {planningOpen && (
         <Suspense fallback={<LoadingFallback />}>
           <PlanningSession
-            tasks={tasks}
-            events={filteredEvents}
-            routines={filteredRoutines}
+            // The time-block grid is Today with a clock on it — it must scope to
+            // the chosen domain exactly as Today does. Passing the raw pool here
+            // leaked e.g. a personal task into the Family grid.
+            tasks={planningTasks}
+            events={planningEvents}
+            routines={planningRoutines}
             // Untimed, non-daily routines become draggable chips in the drawer.
-            draggableRoutines={allRoutines.filter(r => r.visibility === 'active' && !isEverydayRoutine(r.recurrence_pattern) && !r.time_of_day)}
+            draggableRoutines={planningDraggableRoutines}
             // The grid places a dropped routine from its instance's one-day
             // time override, so it needs the instances for the viewed date.
             dateInstances={dateInstances}

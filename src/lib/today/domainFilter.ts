@@ -38,6 +38,28 @@ export function filterTasksForPlanning(tasks: Task[], domain: PlanningDomain): T
   return tasks.filter((t) => t.context === domain || (!t.context && t.bucket === 'inbox'))
 }
 
+/** The Today/day-view task pool — the rule HomeView has always used, lifted
+ *  here so every surface that shows "the day" scopes identically. Differs from
+ *  filterTasksForPlanning in two ways: UNTAGGED tasks stay visible in every
+ *  domain (they get a tag nudge rather than disappearing), and another
+ *  member's work/personal tasks are hidden as private in ALL domains. */
+export function filterTasksForDomainView(
+  tasks: Task[],
+  domain: PlanningDomain,
+  currentUserMemberId?: string,
+): Task[] {
+  return tasks.filter((task) => {
+    if (currentUserMemberId && (task.context === 'work' || task.context === 'personal')) {
+      const assignees = task.assignedToAll && task.assignedToAll.length > 0
+        ? task.assignedToAll
+        : (task.assignedTo ? [task.assignedTo] : [])
+      if (assignees.length > 0 && !assignees.includes(currentUserMemberId)) return false
+    }
+    if (domain === 'universal') return true
+    return task.context === domain || task.context == null
+  })
+}
+
 /** Resolution inputs for event domain filtering. All optional — a caller that
  *  only has the calendar→domain mapping still gets correct calendar-level
  *  scoping; overrides and family-share notes refine it where available. */
