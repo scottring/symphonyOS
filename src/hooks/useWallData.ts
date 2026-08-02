@@ -18,7 +18,7 @@ import type { Routine, ActionableInstance } from '@/types/actionable'
 import type { FamilyMember } from '@/types/family'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 
-const POLL_INTERVAL_MS = 12 * 60 * 1000 // 12 minutes — wall is glanceable, not live
+export const WALL_POLL_INTERVAL_MS = 12 * 60 * 1000 // 12 minutes — wall is glanceable, not live
 
 // Only the columns the wall actually renders. Avoids `select('*')`, which pulls
 // heavy/unused columns (links jsonb, codes, etc.) on every poll and dominates egress.
@@ -450,7 +450,7 @@ export function useWallData(): UseWallDataReturn {
       // egress floor. Manual refresh + visibility-return below still refetch.
       if (isQuietHours()) return
       fetchAllData()
-    }, POLL_INTERVAL_MS)
+    }, WALL_POLL_INTERVAL_MS)
 
     const onVisibility = () => {
       if (!document.hidden) fetchAllData()

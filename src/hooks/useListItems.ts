@@ -26,40 +26,37 @@ export function useListItems(listId: string | null) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  // Fetch items when listId changes
-  useEffect(() => {
+  const fetchItems = useCallback(async () => {
     if (!user || !listId) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- clearing on dependency change is valid
       setItems([])
       setLoading(false)
       return
     }
 
-    async function fetchItems() {
-      if (!user || !listId) return
+    setLoading(true)
+    setError(null)
 
-      setLoading(true)
-      setError(null)
+    const { data, error: fetchError } = await supabase
+      .from('list_items')
+      .select('*')
+      .eq('list_id', listId)
+      .order('sort_order', { ascending: true })
+      .order('created_at', { ascending: true })
 
-      const { data, error: fetchError } = await supabase
-        .from('list_items')
-        .select('*')
-        .eq('list_id', listId)
-        .order('sort_order', { ascending: true })
-        .order('created_at', { ascending: true })
-
-      if (fetchError) {
-        setError(fetchError.message)
-        setLoading(false)
-        return
-      }
-
-      setItems((data as DbListItem[]).map(dbListItemToListItem))
+    if (fetchError) {
+      setError(fetchError.message)
       setLoading(false)
+      return
     }
 
-    fetchItems()
+    setItems((data as DbListItem[]).map(dbListItemToListItem))
+    setLoading(false)
   }, [user, listId])
+
+  // Fetch on mount and whenever the user or list changes.
+  useEffect(() => {
+    void fetchItems()
+  }, [fetchItems])
 
   const addItem = useCallback(async (item: {
     text: string
@@ -264,6 +261,7 @@ export function useListItems(listId: string | null) {
     itemCount,
     loading,
     error,
+    refetch: fetchItems,
     addItem,
     updateItem,
     deleteItem,

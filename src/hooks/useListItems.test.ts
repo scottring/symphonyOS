@@ -180,6 +180,20 @@ describe('useListItems', () => {
         expect(mockEqListId).toHaveBeenCalledWith('list_id', 'list-2')
       })
     })
+
+    it('refetch re-runs the fetch query', async () => {
+      mockOrder.mockResolvedValue({ data: [createMockDbListItem()], error: null })
+      const { result } = renderHook(() => useListItems('list-1'))
+
+      await waitFor(() => expect(result.current.loading).toBe(false))
+      const callsAfterMount = mockOrder.mock.calls.length
+
+      await act(async () => {
+        await result.current.refetch()
+      })
+
+      expect(mockOrder.mock.calls.length).toBe(callsAfterMount + 1)
+    })
   })
 
   describe('itemCount', () => {
