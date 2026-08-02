@@ -14,6 +14,13 @@
 
 - **Worktree:** all work happens in `.worktrees/wall-lists` on branch `wall-lists`. Never edit or commit in the main worktree. Copy `.env` from the main worktree before running the dev server or the wall renders blank.
 - **Tests:** `npm test` is watch mode. Always run `npx vitest run <path>`.
+- **Node 22.14.0 is required to run the tests.** Export this before any test command:
+  `export PATH="$HOME/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:$PATH"` (confirm with `node -v`).
+  The default `node` on PATH is Homebrew v26, whose inert built-in `localStorage`
+  global shadows happy-dom's; under it every test in this repo that touches bare
+  `localStorage` fails, including pre-existing ones unrelated to this work
+  (`WeekStrip.test.tsx` fails 14/14). Those are environment failures, not code
+  failures — never "fix" them with a mock or a polyfill.
 - **No emojis anywhere in UI or code.** Use `lucide-react` icons.
 - **Styling:** use tokens from `src/components/wall-v2/wallTheme.ts` (`WALL.card`, `WALL.cardInset`, `WALL.label`, `WALL.muted`, `WALL.ink`, `WALL.inkStrong`, `WALL.root`, `WALL.rail`). Never assemble theme hexes ad hoc — every token already carries its dark twin.
 - **Touch targets:** sheet rows are 72px tall; card rows 44px; dock buttons stay ≥52px. This screen is touched at arm's length from a TV mount.
