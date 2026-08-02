@@ -57,14 +57,16 @@ can exceed it. All reads/writes are wrapped in try/catch and fail silent, as the
 hide-routines signal does.
 
 **`src/components/wall-v2/WallV2PinnedListCard.tsx`** — one card per pinned list,
-rendered in the right column. Props: `listId`, `title`, `onOpen`. Calls
-`useListItems(listId)` internally. Renders up to 5 open items as tap-to-toggle
-rows with large checkboxes, then a `+N more` line when there are more. Tapping
-the card header calls `onOpen`. Completed items never appear here.
+rendered in the right column. Presentational: `title`, `openItems`, `onToggle`,
+`onOpen`. Renders up to 5 open items as tap-to-toggle rows with large
+checkboxes, then a `+N more` line when there are more. Completed items never
+appear here. **`WallV2PinnedList.tsx`** is its container — it calls
+`useListItems(listId)` and owns the poll.
 
-**`src/components/wall-v2/WallV2ListSheet.tsx`** — full-screen overlay. Props:
-`lists`, `initialListId`, `pinnedIds`, `onTogglePin`, `onClose`. Owns which list
-is selected and calls `useListItems(selectedId)`.
+**`src/components/wall-v2/WallV2ListSheet.tsx`** — full-screen overlay,
+presentational. **`WallV2ListSheetContainer.tsx`** owns which list is selected,
+calls `useListItems(selectedId)`, and maps the sheet's callbacks onto the hook's
+mutations.
 
 Layout:
 - Left rail: family lists, each row showing title, open-item count, and a pin
@@ -77,8 +79,11 @@ Layout:
 - Bottom: collapsed `Done (N)` expander, and `Clear done` when N > 0.
 
 **`WallV2FamilyStrip`** — the dock cluster grows from four actions to five
-(`task`, `discuss`, `phone`, `utilities`, `list`), so its grid goes 2×2 → 2×3.
-`WallDockActionId` gains `'list'`. The new action uses the `ClipboardList` icon.
+(`task`, `discuss`, `list`, `phone`, `utilities`), so its grid goes 2×2 → 3
+columns × 2 rows and the cluster widens from 124px to 182px. It grows sideways,
+not taller: a third row inside the 116px strip would leave ~36px buttons, too
+small to hit on a wall-mounted screen at arm's length. `WallDockActionId` gains
+`'list'`; the new action uses the `ClipboardList` icon.
 
 **`WallV2Shell`** — holds `showListSheet` / `sheetListId` state, reads pinned ids
 via `wallPinnedLists`, filters `useLists()` to `visibility === 'family'`
@@ -133,7 +138,9 @@ sheet always shows current state.
   the Pi blocks the automation/extension channel and can white-screen the wall.
 - Deleting a single item is only reachable through the per-row `⋯` menu, never a
   bare tap, so a lean on the touchscreen cannot destroy a row.
-- A failed add leaves the typed text in the input so it isn't lost.
+- Presentational components take every value and callback as props; the hooks
+  live in thin containers (`WallV2PinnedList`, `WallV2ListSheetContainer`). That
+  keeps the component tests free of Supabase and auth mocking.
 
 ## Testing
 
