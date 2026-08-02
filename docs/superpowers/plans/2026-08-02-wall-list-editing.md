@@ -14,6 +14,12 @@
 
 - **Worktree:** all work happens in `.worktrees/wall-lists` on branch `wall-lists`. Never edit or commit in the main worktree. Copy `.env` from the main worktree before running the dev server or the wall renders blank.
 - **Tests:** `npm test` is watch mode. Always run `npx vitest run <path>`.
+- **Type-check with `npx tsc -p tsconfig.app.json --noEmit`.** A bare `npx tsc --noEmit`
+  type-checks **zero files**: the root `tsconfig.json` is a solution file (`"files": []`,
+  references only) and `tsc` ignores project references without `-b`. The `pre-push`
+  hook runs that bare command, so the repo's "blocking" type gate currently checks
+  nothing. Note also that every tsconfig excludes `src/**/*.test.*`, so test files are
+  never type-checked at all (138 pre-existing errors sit in them on `origin/main`).
 - **Node 22.14.0 is required to run the tests.** Export this before any test command:
   `export PATH="$HOME/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:$PATH"` (confirm with `node -v`).
   The default `node` on PATH is Homebrew v26, whose inert built-in `localStorage`
@@ -319,7 +325,7 @@ Expected: PASS, including the new refetch test. (`useWallData` has no test file;
 - [ ] **Step 6: Type-check and commit**
 
 ```bash
-npx tsc --noEmit
+npx tsc -p tsconfig.app.json --noEmit
 git add src/hooks/useListItems.ts src/hooks/useListItems.test.ts src/hooks/useWallData.ts
 git commit -m "feat(lists): expose refetch on useListItems; export wall poll interval"
 ```
@@ -1145,7 +1151,7 @@ export function WallV2ListSheetContainer({
 
 - [ ] **Step 2: Type-check**
 
-Run: `npx tsc --noEmit`
+Run: `npx tsc -p tsconfig.app.json --noEmit`
 Expected: no errors.
 
 - [ ] **Step 3: Commit**
@@ -1345,7 +1351,7 @@ Render the sheet with the other overlays, next to `{showPhone && ...}`:
 - [ ] **Step 3: Type-check and run the full unit suite**
 
 ```bash
-npx tsc --noEmit
+npx tsc -p tsconfig.app.json --noEmit
 npx vitest run src/components/wall-v2 src/lib/wallPinnedLists.test.ts src/hooks/useListItems.test.ts
 ```
 
