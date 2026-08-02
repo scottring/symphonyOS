@@ -33,4 +33,17 @@ describe('WallV2FamilyStrip', () => {
     // Portrait img should be gone
     expect(screen.queryByAltText('Scott')).not.toBeInTheDocument();
   });
+  it('fires the list dock action', () => {
+    const onDockAction = vi.fn();
+    render(
+      <WallV2FamilyStrip
+        familyMembers={[]}
+        today={undefined}
+        now={new Date('2026-08-02T12:00:00')}
+        onDockAction={onDockAction}
+      />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /lists/i }));
+    expect(onDockAction).toHaveBeenCalledWith('list');
+  });
 });

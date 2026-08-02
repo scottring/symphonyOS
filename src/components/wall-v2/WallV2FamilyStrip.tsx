@@ -4,18 +4,19 @@
 // Replaces WallV2ActionDock and the old WallV2AtAGlance strip.
 
 import { useState } from 'react';
-import { MessagesSquare, Phone, Plus, Settings } from 'lucide-react';
+import { ClipboardList, MessagesSquare, Phone, Plus, Settings } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { FamilyMember } from '@/types/family';
 import type { WallDayData } from '@/hooks/useWallData';
 import { adaptGlanceForMember } from './wallV2Adapter';
 import { WALL, personAccent } from './wallTheme';
 
-export type WallDockActionId = 'task' | 'discuss' | 'phone' | 'utilities';
+export type WallDockActionId = 'task' | 'discuss' | 'list' | 'phone' | 'utilities';
 
 const DOCK: { id: WallDockActionId; label: string; icon: LucideIcon }[] = [
   { id: 'task', label: 'Add a task', icon: Plus },
   { id: 'discuss', label: 'Discuss', icon: MessagesSquare },
+  { id: 'list', label: 'Lists', icon: ClipboardList },
   { id: 'phone', label: 'Phone', icon: Phone },
   { id: 'utilities', label: 'Utilities', icon: Settings },
 ];
@@ -64,7 +65,7 @@ export function WallV2FamilyStrip({ familyMembers, today, now, onDockAction }: P
           </div>
         );
       })}
-      <div className={`${WALL.rail} rounded-2xl shrink-0 w-[124px] grid grid-cols-2 gap-1.5 p-1.5`}>
+      <div className={`${WALL.rail} rounded-2xl shrink-0 w-[182px] grid grid-cols-3 grid-rows-2 gap-1.5 p-1.5`}>
         {DOCK.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
