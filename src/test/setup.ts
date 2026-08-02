@@ -2,19 +2,6 @@ import '@testing-library/jest-dom'
 import { cleanup } from '@testing-library/react'
 import { afterEach, vi } from 'vitest'
 
-// localStorage polyfill for happy-dom
-if (!window.localStorage) {
-  const store: Record<string, string> = {}
-  window.localStorage = {
-    getItem: (key: string) => store[key] || null,
-    setItem: (key: string, value: string) => { store[key] = value },
-    removeItem: (key: string) => { delete store[key] },
-    clear: () => { Object.keys(store).forEach(k => delete store[k]) },
-    key: (index: number) => Object.keys(store)[index] || null,
-    length: Object.keys(store).length,
-  } as Storage
-}
-
 // Global mock for Supabase client - provides chainable query methods
 // Individual tests can override with more specific mocks if needed
 vi.mock('@/lib/supabase', () => {
