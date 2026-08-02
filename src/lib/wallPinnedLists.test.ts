@@ -7,33 +7,9 @@ import {
   onPinnedListsChange,
 } from './wallPinnedLists'
 
-// Mock localStorage
-let localStorageStore: Record<string, string> = {}
-const localStorageMock = {
-  getItem: vi.fn((key: string) => localStorageStore[key] || null),
-  setItem: vi.fn((key: string, value: string) => {
-    localStorageStore[key] = value
-  }),
-  clear: vi.fn(() => {
-    localStorageStore = {}
-  }),
-  removeItem: vi.fn((key: string) => {
-    delete localStorageStore[key]
-  }),
-  key: vi.fn((index: number) => Object.keys(localStorageStore)[index] || null),
-  length: 0,
-}
-
-Object.defineProperty(window, 'localStorage', {
-  value: localStorageMock,
-  writable: true,
-})
-
 describe('wallPinnedLists', () => {
   beforeEach(() => {
-    vi.clearAllMocks()
-    localStorageStore = {}
-    Object.defineProperty(localStorageMock, 'length', { value: Object.keys(localStorageStore).length })
+    localStorage.clear()
   })
 
   it('reads an empty array when nothing is stored', () => {
