@@ -14,13 +14,19 @@ const MAX_ROWS = 5;
 interface Props {
   title: string;
   openItems: ListItem[];
+  /** True while the container's initial fetch is still in flight. */
+  loading: boolean;
   onToggle: (id: string) => void;
   onOpen: () => void;
 }
 
-export function WallV2PinnedListCard({ title, openItems, onToggle, onOpen }: Props) {
+export function WallV2PinnedListCard({ title, openItems, loading, onToggle, onOpen }: Props) {
   const rows = openItems.slice(0, MAX_ROWS);
   const overflow = openItems.length - rows.length;
+  // useListItems starts with items:[] and loading:true, so without this guard
+  // every reload briefly renders "Nothing on this list" for a genuinely
+  // populated list. Only show the empty state once loading has resolved.
+  const stillLoading = loading && openItems.length === 0;
 
   return (
     <div className={`${WALL.card} p-3`}>
@@ -36,7 +42,9 @@ export function WallV2PinnedListCard({ title, openItems, onToggle, onOpen }: Pro
       </button>
 
       {rows.length === 0 ? (
-        <div className={`text-[0.85rem] ${WALL.muted}`}>Nothing on this list</div>
+        stillLoading ? null : (
+          <div className={`text-[0.85rem] ${WALL.muted}`}>Nothing on this list</div>
+        )
       ) : (
         <ul className="flex flex-col gap-1">
           {rows.map((item) => (

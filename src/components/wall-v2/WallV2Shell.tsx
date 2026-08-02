@@ -1,7 +1,7 @@
 // src/components/wall-v2/WallV2Shell.tsx
 //
 // Orchestrates the WallV2 kiosk surface — three-column grid (rail / center
-// timeline+Keep Moving / right column) with a family-strip + 2x2 dock cluster
+// timeline+Keep Moving / right column) with a family-strip + 3x2 dock cluster
 // spanning the bottom row.
 //
 // The shell pulls live data via the existing wall hooks (useWallData,
@@ -281,6 +281,11 @@ export function WallV2Shell() {
   const [showListSheet, setShowListSheet] = useState(false);
   const [sheetListId, setSheetListId] = useState<string | null>(null);
   const [pinnedListIds, setPinnedListIds] = useState<string[]>(() => readPinnedLists());
+  // Bumped whenever the list sheet closes, so pinned cards refetch and pick
+  // up edits made in the sheet — the sheet and each card own separate
+  // useListItems instances with no realtime channel or write bus between
+  // them.
+  const [listRefreshKey, setListRefreshKey] = useState(0);
 
   // Pins are wall-local; subscribe so a pin made in the sheet updates the face.
   useEffect(() => onPinnedListsChange(setPinnedListIds), []);
@@ -601,6 +606,7 @@ export function WallV2Shell() {
                   key={id}
                   listId={id}
                   title={list.title}
+                  refreshKey={listRefreshKey}
                   onOpen={() => { setSheetListId(id); setShowListSheet(true); }}
                 />
               );
@@ -702,7 +708,7 @@ export function WallV2Shell() {
           pinnedIds={pinnedListIds}
           onTogglePin={(id) => setPinnedListIds(togglePinnedList(id))}
           onError={showFlash}
-          onClose={() => setShowListSheet(false)}
+          onClose={() => { setShowListSheet(false); setListRefreshKey((k) => k + 1); }}
         />
       )}
 

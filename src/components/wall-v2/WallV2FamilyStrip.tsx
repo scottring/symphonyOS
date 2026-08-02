@@ -1,6 +1,6 @@
 // Bottom band: one warm card per family member (watercolor portrait when the
 // asset exists at /wall/portrait-<id>.png, monogram medallion otherwise, name
-// in serif, their next thing today) + the 2×2 dock cluster on the right.
+// in serif, their next thing today) + the 3×2 dock cluster on the right.
 // Replaces WallV2ActionDock and the old WallV2AtAGlance strip.
 
 import { useState } from 'react';

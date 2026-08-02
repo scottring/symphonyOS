@@ -18,6 +18,7 @@ function item(id: string, text: string): ListItem {
 const props = (openItems: ListItem[]) => ({
   title: 'Groceries',
   openItems,
+  loading: false,
   onToggle: vi.fn(),
   onOpen: vi.fn(),
 });
@@ -60,6 +61,16 @@ describe('WallV2PinnedListCard', () => {
 
   it('shows an empty state when nothing is open', () => {
     render(<WallV2PinnedListCard {...props([])} />);
+    expect(screen.getByText(/nothing on this list/i)).toBeInTheDocument();
+  });
+
+  it('renders nothing in place of the empty state while the initial fetch is still in flight', () => {
+    render(<WallV2PinnedListCard {...props([])} loading={true} />);
+    expect(screen.queryByText(/nothing on this list/i)).not.toBeInTheDocument();
+  });
+
+  it('shows the empty state once loading resolves with no items', () => {
+    render(<WallV2PinnedListCard {...props([])} loading={false} />);
     expect(screen.getByText(/nothing on this list/i)).toBeInTheDocument();
   });
 });

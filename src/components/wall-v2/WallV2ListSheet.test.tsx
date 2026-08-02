@@ -23,6 +23,7 @@ const props = (items: ListItem[] = [item('1', 'Milk')]) => ({
   selectedListId: 'list-1',
   onSelectList: vi.fn(),
   items,
+  loading: false,
   pinnedIds: ['list-1'],
   onTogglePin: vi.fn(),
   onAdd: vi.fn(),
@@ -113,6 +114,22 @@ describe('WallV2ListSheet', () => {
     expect(p.onClearDone).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: /tap again to confirm/i }));
     expect(p.onClearDone).toHaveBeenCalled();
+  });
+
+  it('disarms the two-tap clear-done confirm when the done drawer is collapsed', () => {
+    const p = props([item('2', 'Bread', true)]);
+    render(<WallV2ListSheet {...p} />);
+    fireEvent.click(screen.getByRole('button', { name: /done \(1\)/i })); // expand
+    fireEvent.click(screen.getByRole('button', { name: /^clear done$/i })); // arm
+    expect(screen.getByRole('button', { name: /tap again to confirm/i })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: /done \(1\)/i })); // collapse
+    fireEvent.click(screen.getByRole('button', { name: /done \(1\)/i })); // re-expand
+
+    const clear = screen.getByRole('button', { name: /clear done/i });
+    expect(clear).toHaveTextContent(/^clear done$/i);
+    fireEvent.click(clear);
+    expect(p.onClearDone).not.toHaveBeenCalled();
   });
 
   it('switches lists and toggles pins from the rail', () => {

@@ -25,7 +25,7 @@ export function WallV2ListSheetContainer({
   const [selectedListId, setSelectedListId] = useState<string | null>(
     initialListId ?? lists[0]?.id ?? null,
   );
-  const { items, addItem, updateItem, deleteItem, clearCompleted, error } =
+  const { items, addItem, updateItem, deleteItem, clearCompleted, error, loading } =
     useListItems(selectedListId);
 
   // Track the last-surfaced error so we only call onError once per unique error,
@@ -73,6 +73,7 @@ export function WallV2ListSheetContainer({
       selectedListId={selectedListId}
       onSelectList={setSelectedListId}
       items={items}
+      loading={loading}
       pinnedIds={pinnedIds}
       onTogglePin={onTogglePin}
       onAdd={(text) => void addItem({ text })}

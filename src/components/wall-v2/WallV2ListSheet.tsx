@@ -23,6 +23,8 @@ interface Props {
   selectedListId: string | null;
   onSelectList: (id: string) => void;
   items: ListItem[];
+  /** True while the container's initial fetch for the selected list is in flight. */
+  loading: boolean;
   pinnedIds: string[];
   onTogglePin: (id: string) => void;
   onAdd: (text: string) => void;
@@ -34,7 +36,7 @@ interface Props {
 }
 
 export function WallV2ListSheet({
-  lists, selectedListId, onSelectList, items, pinnedIds, onTogglePin,
+  lists, selectedListId, onSelectList, items, loading, pinnedIds, onTogglePin,
   onAdd, onToggle, onEditText, onDelete, onClearDone, onClose,
 }: Props) {
   const [draft, setDraft] = useState('');
@@ -69,6 +71,9 @@ export function WallV2ListSheet({
   const selected = lists.find((l) => l.id === selectedListId) ?? null;
   const open = items.filter((i) => !i.completed);
   const done = items.filter((i) => i.completed);
+  // useListItems starts with items:[] and loading:true, so without this guard
+  // every reload briefly announces the list is empty before the fetch lands.
+  const stillLoading = loading && items.length === 0;
 
   const submitAdd = () => {
     const text = draft.trim();
@@ -164,7 +169,7 @@ export function WallV2ListSheet({
           </div>
 
           <div className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-2">
-            {open.length === 0 && (
+            {open.length === 0 && !stillLoading && (
               <div className={`px-1 py-3 text-[1rem] ${WALL.muted}`}>Nothing open on this list</div>
             )}
 
@@ -223,7 +228,7 @@ export function WallV2ListSheet({
                     <button
                       type="button"
                       onClick={() => { setMenuItemId(null); onDelete(item.id); }}
-                      className={`${WALL.card} px-5 h-[72px] text-[1rem] font-semibold text-[#A8600F] dark:text-[#E0A959]`}
+                      className={`${WALL.card} px-5 h-[72px] text-[1rem] font-semibold ${WALL.warn}`}
                     >
                       Delete
                     </button>
@@ -237,7 +242,16 @@ export function WallV2ListSheet({
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => setShowDone(!showDone)}
+                    onClick={() => {
+                      // Collapsing the drawer must disarm an armed "Clear
+                      // done" — otherwise re-expanding within the 4s timer
+                      // leaves it primed and a single tap deletes every done
+                      // row (not undoable, and it propagates to everyone's
+                      // Apple Reminders within 60s).
+                      const next = !showDone;
+                      setShowDone(next);
+                      if (!next) setConfirmClear(false);
+                    }}
                     className={`${WALL.cardInset} flex items-center gap-2 px-4 h-14 ${WALL.muted}`}
                   >
                     {showDone ? <ChevronDown className="w-5 h-5" /> : <ChevronRight className="w-5 h-5" />}
@@ -250,7 +264,7 @@ export function WallV2ListSheet({
                         if (confirmClear) { setConfirmClear(false); onClearDone(); }
                         else setConfirmClear(true);
                       }}
-                      className={`${WALL.card} px-5 h-14 text-[1rem] font-semibold text-[#A8600F] dark:text-[#E0A959]`}
+                      className={`${WALL.card} px-5 h-14 text-[1rem] font-semibold ${WALL.warn}`}
                     >
                       {confirmClear ? 'Tap again to confirm' : 'Clear done'}
                     </button>
