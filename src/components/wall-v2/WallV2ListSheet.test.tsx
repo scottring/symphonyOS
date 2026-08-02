@@ -130,4 +130,31 @@ describe('WallV2ListSheet', () => {
     fireEvent.click(screen.getByRole('button', { name: /close/i }));
     expect(p.onClose).toHaveBeenCalled();
   });
+
+  it('closes a stale row menu when the list changes underneath it', () => {
+    const p = props();
+    const { rerender } = render(<WallV2ListSheet {...p} />);
+    fireEvent.click(screen.getByRole('button', { name: /more actions for milk/i }));
+    expect(screen.getByRole('button', { name: /^edit$/i })).toBeInTheDocument();
+
+    rerender(<WallV2ListSheet {...p} selectedListId="list-2" />);
+    rerender(<WallV2ListSheet {...p} selectedListId="list-1" />);
+
+    expect(screen.queryByRole('button', { name: /^edit$/i })).not.toBeInTheDocument();
+  });
+
+  it('disarms the two-tap clear-done confirm when the list changes underneath it', () => {
+    const p = props([item('2', 'Bread', true)]);
+    const { rerender } = render(<WallV2ListSheet {...p} />);
+    fireEvent.click(screen.getByRole('button', { name: /done \(1\)/i }));
+    fireEvent.click(screen.getByRole('button', { name: /clear done/i }));
+    expect(screen.getByRole('button', { name: /tap again to confirm/i })).toBeInTheDocument();
+
+    rerender(<WallV2ListSheet {...p} selectedListId="list-2" />);
+    rerender(<WallV2ListSheet {...p} selectedListId="list-1" />);
+
+    fireEvent.click(screen.getByRole('button', { name: /done \(1\)/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^clear done$/i }));
+    expect(p.onClearDone).not.toHaveBeenCalled();
+  });
 });

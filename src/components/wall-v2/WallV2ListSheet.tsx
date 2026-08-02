@@ -53,6 +53,19 @@ export function WallV2ListSheet({
     return () => clearTimeout(timer);
   }, [confirmClear]);
 
+  // A list switch invalidates every bit of transient UI state below: an open
+  // row menu or in-progress edit can point at an item id that happens to
+  // exist on the new list too, and a stray tap on a still-armed "Clear done"
+  // must not fire on the wrong list. Reset it all so nothing carries across.
+  useEffect(() => {
+    setDraft('');
+    setMenuItemId(null);
+    setEditingId(null);
+    setEditDraft('');
+    setShowDone(false);
+    setConfirmClear(false);
+  }, [selectedListId]);
+
   const selected = lists.find((l) => l.id === selectedListId) ?? null;
   const open = items.filter((i) => !i.completed);
   const done = items.filter((i) => i.completed);
