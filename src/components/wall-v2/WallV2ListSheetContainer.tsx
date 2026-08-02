@@ -40,6 +40,12 @@ export function WallV2ListSheetContainer({
     }
   }, [selectedListId, lists, initialListId]);
 
+  // Reset the error ref when switching lists so a new list gets a clean slate.
+  // If a different list has the same error message, it will now be shown.
+  useEffect(() => {
+    lastErrorRef.current = null;
+  }, [selectedListId]);
+
   // useListItems rolls its optimistic update back on failure; without this the
   // row would just silently reappear and nobody would know why. Guard with a ref
   // so we don't re-fire on every re-render if onError is unstable.

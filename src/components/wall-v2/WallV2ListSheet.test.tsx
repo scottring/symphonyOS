@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
-import { WallV2ListSheet } from './WallV2ListSheet';
+import { WallV2ListSheet, type WallListSummary } from './WallV2ListSheet';
 import type { ListItem } from '@/types/list';
 
 function item(id: string, text: string, completed = false): ListItem {
@@ -19,7 +19,7 @@ const props = (items: ListItem[] = [item('1', 'Milk')]) => ({
   lists: [
     { id: 'list-1', title: 'Groceries', openCount: 1 },
     { id: 'list-2', title: 'Need now', openCount: 0 },
-  ],
+  ] as WallListSummary[],
   selectedListId: 'list-1',
   onSelectList: vi.fn(),
   items,
@@ -158,15 +158,15 @@ describe('WallV2ListSheet', () => {
     expect(p.onClearDone).not.toHaveBeenCalled();
   });
 
-  it('does not render count for lists with null openCount', () => {
+  it('does not render count for lists with null openCount, but does render 0', () => {
     const p = props();
     p.lists = [
-      { id: 'list-1', title: 'Groceries', openCount: 1 },
+      { id: 'list-1', title: 'Groceries', openCount: 0 },
       { id: 'list-2', title: 'Need now', openCount: null },
-    ];
+    ] as WallListSummary[];
     render(<WallV2ListSheet {...p} />);
-    // Selected list should show its count
-    expect(screen.getByText('1')).toBeInTheDocument();
+    // Selected list with count 0 should show "0"
+    expect(screen.getByText('0')).toBeInTheDocument();
     // Non-selected list with null count should show no number
     const needNowButton = screen.getByRole('button', { name: /show need now/i });
     expect(needNowButton.textContent).not.toMatch(/\d+/);
