@@ -30,6 +30,14 @@ import { computeFreshness } from './wallFreshness';
 import { WallV2NowNext } from './WallV2NowNext';
 import { WallV2Timeline } from './WallV2Timeline';
 import { WallV2RightColumn } from './WallV2RightColumn';
+import { WallV2PinnedList } from './WallV2PinnedList';
+import { WallV2ListSheetContainer } from './WallV2ListSheetContainer';
+import { useLists } from '@/hooks/useLists';
+import {
+  readPinnedLists,
+  togglePinnedList,
+  onPinnedListsChange,
+} from '@/lib/wallPinnedLists';
 import { WallV2KeepMoving } from './WallV2KeepMoving';
 import { WallV2FamilyStrip, type WallDockActionId } from './WallV2FamilyStrip';
 import { WallV2UtilitySheet } from './WallV2UtilitySheet';
@@ -270,6 +278,20 @@ export function WallV2Shell() {
   const [recipeViewerMeal, setRecipeViewerMeal] = useState<'dinner' | 'breakfast' | null>(null);
   const [showDiscussion, setShowDiscussion] = useState(false);
   const [showQuickCapture, setShowQuickCapture] = useState(false);
+  const [showListSheet, setShowListSheet] = useState(false);
+  const [sheetListId, setSheetListId] = useState<string | null>(null);
+  const [pinnedListIds, setPinnedListIds] = useState<string[]>(() => readPinnedLists());
+
+  // Pins are wall-local; subscribe so a pin made in the sheet updates the face.
+  useEffect(() => onPinnedListsChange(setPinnedListIds), []);
+
+  const { lists } = useLists();
+  // The wall is a shared kitchen display — personal lists never appear on it.
+  const familyLists = useMemo(
+    () => lists.filter((l) => l.visibility === 'family'),
+    [lists],
+  );
+
   const [showPhone, setShowPhone] = useState(false);
   const [showUtilities, setShowUtilities] = useState(false);
   const [flashMessage, setFlashMessage] = useState<string | null>(null);
@@ -365,6 +387,7 @@ export function WallV2Shell() {
         if (discussionItems.length > 0) setShowDiscussion(true);
         else showFlash('Nothing flagged for discussion right now');
         break;
+      case 'list': setSheetListId(null); setShowListSheet(true); break;
       case 'phone': setShowPhone(true); break;
       case 'utilities': setShowUtilities(true); break;
     }
@@ -570,6 +593,18 @@ export function WallV2Shell() {
             tomorrowRows={tomorrowRows}
             glanceRows={glanceRows}
             question={tonightQuestion}
+            pinnedLists={pinnedListIds.map((id) => {
+              const list = familyLists.find((l) => l.id === id);
+              if (!list) return null;
+              return (
+                <WallV2PinnedList
+                  key={id}
+                  listId={id}
+                  title={list.title}
+                  onOpen={() => { setSheetListId(id); setShowListSheet(true); }}
+                />
+              );
+            })}
           />
         </div>
 
@@ -659,6 +694,17 @@ export function WallV2Shell() {
       )}
 
       {showPhone && <WallV2PhoneScreen onClose={() => setShowPhone(false)} />}
+
+      {showListSheet && (
+        <WallV2ListSheetContainer
+          lists={familyLists}
+          initialListId={sheetListId}
+          pinnedIds={pinnedListIds}
+          onTogglePin={(id) => setPinnedListIds(togglePinnedList(id))}
+          onError={showFlash}
+          onClose={() => setShowListSheet(false)}
+        />
+      )}
 
       {/* Caller-ID takeover — full-screen when the kid phone has a live call. */}
       <CallerIdTakeover />

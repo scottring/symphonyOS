@@ -4,6 +4,7 @@
 // tonight's question. Drag-scrolls when content exceeds the column.
 // Phase 2 reserves the slot ABOVE the dinner card for "Symphony Noticed".
 
+import type { ReactNode } from 'react';
 import { useDragScroll } from '@/hooks/useDragScroll';
 import { WallV2DinnerCard } from './WallV2DinnerCard';
 import { WallV2TomorrowCard } from './WallV2TomorrowCard';
@@ -23,9 +24,11 @@ interface Props {
   glanceRows: GlanceRollupRow[];
   question: string | null;
   onTapQuestion?: () => void;
+  /** Pinned list cards, rendered below the dinner card. Empty when nothing is pinned. */
+  pinnedLists?: ReactNode;
 }
 
-export function WallV2RightColumn({ dinner, tomorrowRows, glanceRows, question, onTapQuestion }: Props) {
+export function WallV2RightColumn({ dinner, tomorrowRows, glanceRows, question, onTapQuestion, pinnedLists }: Props) {
   const scrollRef = useDragScroll<HTMLDivElement>();
   return (
     <div ref={scrollRef} className="flex flex-col gap-3 h-full min-h-0 overflow-y-auto pr-1 -mr-1">
@@ -36,6 +39,7 @@ export function WallV2RightColumn({ dinner, tomorrowRows, glanceRows, question, 
         photoUrl={dinner.photoUrl}
         onTap={dinner.onTap}
       />
+      {pinnedLists}
       <WallV2TomorrowCard rows={tomorrowRows} />
       <WallV2GlanceRollupCard rows={glanceRows} />
       {question && <WallV2QuestionCard question={question} onTap={onTapQuestion} />}
