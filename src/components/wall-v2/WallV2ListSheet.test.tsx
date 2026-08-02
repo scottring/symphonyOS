@@ -157,4 +157,18 @@ describe('WallV2ListSheet', () => {
     fireEvent.click(screen.getByRole('button', { name: /^clear done$/i }));
     expect(p.onClearDone).not.toHaveBeenCalled();
   });
+
+  it('does not render count for lists with null openCount', () => {
+    const p = props();
+    p.lists = [
+      { id: 'list-1', title: 'Groceries', openCount: 1 },
+      { id: 'list-2', title: 'Need now', openCount: null },
+    ];
+    render(<WallV2ListSheet {...p} />);
+    // Selected list should show its count
+    expect(screen.getByText('1')).toBeInTheDocument();
+    // Non-selected list with null count should show no number
+    const needNowButton = screen.getByRole('button', { name: /show need now/i });
+    expect(needNowButton.textContent).not.toMatch(/\d+/);
+  });
 });

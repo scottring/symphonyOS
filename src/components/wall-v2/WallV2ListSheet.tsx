@@ -15,7 +15,7 @@ import type { ListItem } from '@/types/list';
 export interface WallListSummary {
   id: string;
   title: string;
-  openCount: number;
+  openCount: number | null;
 }
 
 interface Props {
@@ -122,7 +122,9 @@ export function WallV2ListSheet({
                   <span className={`flex-1 truncate text-[1.05rem] font-semibold ${WALL.inkStrong}`}>
                     {list.title}
                   </span>
-                  <span className={WALL.label}>{list.openCount}</span>
+                  {list.openCount !== null && (
+                    <span className={WALL.label}>{list.openCount}</span>
+                  )}
                 </button>
                 <button
                   type="button"
