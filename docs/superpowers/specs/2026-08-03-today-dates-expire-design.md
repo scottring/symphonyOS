@@ -177,10 +177,18 @@ is wired up and non-functional.
 
 #### 5a. Make the signal real (deterministic)
 
-Increment `defer_count` on every push/reschedule, and treat **expiry as itself
-a slip event** so aging out of Today bumps it. One write turns five dead
+Increment `defer_count` on every push/reschedule. One write turns five dead
 consumers live and gives the review a true ranking. Forward-looking only — the
 current 35 all sit at zero and this cannot retroactively rank them.
+
+An earlier draft of this section also had expiry itself bump `defer_count`.
+That contradicts §1 (expiry never writes) and is dropped. The two signals stay
+separate and neither needs a background job:
+
+- **`defer_count`** = how many times *Scott actively pushed it*. A deliberate
+  act, written at the moment it happens.
+- **age in days** = how long it has *passively slipped*. Already derivable from
+  `scheduled_for`, which §1 preserves precisely so this stays knowable.
 
 #### 5b. LLM triage pass over the queue (for the pile that exists now)
 
