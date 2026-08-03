@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+import { useRef, useState, type ReactNode } from 'react'
 import type { Task, TaskContext, Scope } from '@/types/task'
 import type { Contact } from '@/types/contact'
 import type { Project } from '@/types/project'
@@ -110,8 +110,14 @@ export function TapContextPanel(props: TapContextPanelProps) {
 
   const mightBeRelevant = useMightBeRelevant(task, { allTasks })
 
+  // The whole panel accepts file drops, not just the Photos & files section
+  // — that section was 16% of the panel, and a miss navigated the tab to
+  // the file instead of attaching it.
+  const panelRef = useRef<HTMLElement>(null)
+
   return (
     <article
+      ref={panelRef}
       className="
         bg-bg-elevated max-w-md w-full
         rounded-2xl
@@ -171,6 +177,7 @@ export function TapContextPanel(props: TapContextPanelProps) {
       <PanelPhotos
         entityType="task"
         entityId={task.id}
+        dropZoneRef={panelRef}
         entityContext={[task.title, task.notes?.split('\n')[0]].filter(Boolean).join(' — ')}
         promotions={{
           onAddPrepTask: props.onAddSubtask,

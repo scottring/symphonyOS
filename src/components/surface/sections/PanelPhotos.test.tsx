@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { useRef } from 'react'
 import { render, screen, waitFor } from '@/test/test-utils'
 import { PanelPhotos } from './PanelPhotos'
 
@@ -140,6 +141,54 @@ describe('PanelPhotos', () => {
     Object.defineProperty(drop, 'dataTransfer', { value: { files: [file], types: ['Files'] } })
     section.dispatchEvent(drop as unknown as Event)
     await waitFor(() => expect(attachFile).toHaveBeenCalledWith('event_note', 'e1', file, 'shot.png'))
+  })
+
+  it('attaches files dropped anywhere in the panel, not just on the section', async () => {
+    // The section is ~16% of a 1237px panel; everywhere else the browser's
+    // default fires and navigates the tab to the PDF. Given a panel-level drop
+    // zone, a drop far from the section must still attach.
+    function Host() {
+      const ref = useRef<HTMLDivElement>(null)
+      return (
+        <div ref={ref} data-testid="panel">
+          <div data-testid="far-from-section">links, notes, etc.</div>
+          <PanelPhotos entityType="task" entityId="t1" dropZoneRef={ref} />
+        </div>
+      )
+    }
+    render(<Host />)
+    await waitFor(() => expect(listAttachments).toHaveBeenCalled())
+
+    const far = screen.getByTestId('far-from-section')
+    const pdf = new File(['%PDF'], 'permission-slip.pdf', { type: 'application/pdf' })
+    const drop = new Event('drop', { bubbles: true, cancelable: true })
+    Object.defineProperty(drop, 'dataTransfer', { value: { files: [pdf], types: ['Files'] } })
+    far.dispatchEvent(drop)
+
+    await waitFor(() =>
+      expect(attachFile).toHaveBeenCalledWith('task', 't1', pdf, 'permission-slip.pdf'),
+    )
+  })
+
+  it('ignores a non-file drag (an internal item drag crossing the panel)', async () => {
+    function Host() {
+      const ref = useRef<HTMLDivElement>(null)
+      return (
+        <div ref={ref} data-testid="panel">
+          <PanelPhotos entityType="task" entityId="t1" dropZoneRef={ref} />
+        </div>
+      )
+    }
+    render(<Host />)
+    await waitFor(() => expect(listAttachments).toHaveBeenCalled())
+
+    const panel = screen.getByTestId('panel')
+    const drop = new Event('drop', { bubbles: true, cancelable: true })
+    Object.defineProperty(drop, 'dataTransfer', { value: { files: [], types: ['text/plain'] } })
+    panel.dispatchEvent(drop)
+
+    await new Promise((r) => setTimeout(r, 10))
+    expect(attachFile).not.toHaveBeenCalled()
   })
 
   it('⌘V paste accepts a non-image file (copied PDF) too', async () => {

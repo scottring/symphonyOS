@@ -7,6 +7,7 @@ import { SelectionProvider } from './providers/SelectionProvider';
 import { MealEventsProvider } from './providers/MealEventsProvider';
 import { AssistantLaunchProvider, useAssistantLaunchRequests } from '@/contexts/AssistantLaunchContext';
 import { ShellRoutes } from './ShellRoutes';
+import { useFileDropGuard } from '@/hooks/useFileDropGuard';
 import { DetailPanel } from './DetailPanel';
 import { LegacyDetailPanelHost } from './LegacyDetailPanelHost';
 import { appRegistry } from './appRegistry';
@@ -143,6 +144,9 @@ function resolveActiveApp(registry: typeof appRegistry, pathname: string) {
 
 export function Shell({ registry = appRegistry, Layout = DefaultShellLayout, layout }: Props) {
   const { pathname } = useLocation();
+  // A file dropped outside a real drop zone would otherwise navigate the tab
+  // to that file, replacing the app and any unsaved state.
+  useFileDropGuard();
   const activeApp = resolveActiveApp(registry, pathname);
   const useChrome = activeApp ? activeApp.chromeless !== true : true;
 

@@ -19,6 +19,19 @@ interface PanelPhotosProps {
   entityContext?: string
   /** Handlers for promoting extracted facets into the entity's fields. */
   promotions?: FacetPromotions
+  /**
+   * Element that should accept file drops — normally the whole detail panel.
+   *
+   * Measured on the live panel 2026-08-03: the Photos & files section is 200px
+   * of a 1237px panel, so only 16% of it accepted a drop. Everywhere else no
+   * handler called preventDefault, and the browser's default for a dropped
+   * file is to NAVIGATE THE TAB TO IT — you don't get an error, you get thrown
+   * out of Symphony. Widening the target to the panel is the fix; the section
+   * still highlights so it stays obvious where the file lands.
+   *
+   * Omitted → falls back to this section alone (its own drop target).
+   */
+  dropZoneRef?: React.RefObject<HTMLElement | null>
 }
 
 /**
@@ -29,7 +42,7 @@ interface PanelPhotosProps {
  * render as thumbnails; documents as file chips. Hover (or touch) shows a ✕
  * to remove. Everything opens full size in a new tab.
  */
-export function PanelPhotos({ entityType, entityId, entityContext, promotions }: PanelPhotosProps) {
+export function PanelPhotos({ entityType, entityId, entityContext, promotions, dropZoneRef }: PanelPhotosProps) {
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [busy, setBusy] = useState(false)
   const [analyzingIds, setAnalyzingIds] = useState<Set<string>>(new Set())
@@ -133,15 +146,53 @@ export function PanelPhotos({ entityType, entityId, entityContext, promotions }:
   }, [attach])
 
   // Drag & drop — the other route that carries real file contents. Dropping
-  // the macOS screenshot thumbnail (or any file) onto the section attaches it.
+  // the macOS screenshot thumbnail (or any file) attaches it.
+  //
+  // Bound natively to the whole panel (see `dropZoneRef`) rather than as React
+  // handlers on the section, because the section alone was a 16% target and a
+  // miss navigates the tab to the file. One listener on the outer element also
+  // means a drop on the section still lands exactly once, by bubbling.
   const [dragOver, setDragOver] = useState(false)
-  const onDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    setDragOver(false)
-    for (const file of Array.from(e.dataTransfer?.files ?? [])) {
-      void attach(file, file.name || undefined)
+  const sectionRef = useRef<HTMLElement>(null)
+
+  useEffect(() => {
+    const zone = dropZoneRef?.current ?? sectionRef.current
+    if (!zone) return
+
+    // Only intercept file drags. Internal item drags (dnd-kit, the planning
+    // grids, the routines canvas) must pass through untouched.
+    const isFileDrag = (e: DragEvent) =>
+      Array.from(e.dataTransfer?.types ?? []).includes('Files')
+
+    const onDragOver = (e: DragEvent) => {
+      if (!isFileDrag(e)) return
+      e.preventDefault() // this is what makes the drop legal
+      if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy'
+      setDragOver(true)
     }
-  }, [attach])
+    const onDragLeave = (e: DragEvent) => {
+      // dragleave also fires when crossing into a child; ignore those.
+      if (e.relatedTarget instanceof Node && zone.contains(e.relatedTarget)) return
+      setDragOver(false)
+    }
+    const onDrop = (e: DragEvent) => {
+      if (!isFileDrag(e)) return
+      e.preventDefault()
+      setDragOver(false)
+      for (const file of Array.from(e.dataTransfer?.files ?? [])) {
+        void attach(file, file.name || undefined)
+      }
+    }
+
+    zone.addEventListener('dragover', onDragOver)
+    zone.addEventListener('dragleave', onDragLeave)
+    zone.addEventListener('drop', onDrop)
+    return () => {
+      zone.removeEventListener('dragover', onDragOver)
+      zone.removeEventListener('dragleave', onDragLeave)
+      zone.removeEventListener('drop', onDrop)
+    }
+  }, [attach, dropZoneRef])
 
   const images = attachments.filter((a) => a.fileType.startsWith('image/'))
   const documents = attachments.filter((a) => !a.fileType.startsWith('image/'))
@@ -160,9 +211,7 @@ export function PanelPhotos({ entityType, entityId, entityContext, promotions }:
 
   return (
     <section
-      onDrop={onDrop}
-      onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
-      onDragLeave={() => setDragOver(false)}
+      ref={sectionRef}
       className={dragOver ? 'rounded-lg outline-2 outline-dashed outline-primary-400 outline-offset-4' : undefined}
     >
       <div className="text-[10px] uppercase tracking-wider font-semibold text-neutral-400 mb-2">Photos &amp; files</div>

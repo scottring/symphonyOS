@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { Check, MessageSquare, Video } from 'lucide-react'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Task, TaskLink } from '@/types/task'
@@ -163,10 +163,15 @@ export function TapEventPanel(props: TapEventPanelProps) {
     setPrepDraft('')
   }
 
+  // The whole panel accepts file drops — same reason as the task panel: the
+  // Photos & files section alone is a small target and a miss navigates away.
+  const panelRef = useRef<HTMLElement>(null)
+
   return (
     // Same section rhythm as the task panel (TapContextPanel): hairline dividers
     // with even vertical padding, so grouped blocks never scrunch together.
     <article
+      ref={panelRef}
       className="
         bg-bg-elevated max-w-md w-full
         rounded-2xl
@@ -401,6 +406,7 @@ export function TapEventPanel(props: TapEventPanelProps) {
       <PanelPhotos
         entityType="event_note"
         entityId={eventId}
+        dropZoneRef={panelRef}
         entityContext={[event.title, startTime && new Date(startTime).toLocaleString(), event.location].filter(Boolean).join(' — ')}
         promotions={{
           onAddPrepTask: props.onAddPrepTask,
