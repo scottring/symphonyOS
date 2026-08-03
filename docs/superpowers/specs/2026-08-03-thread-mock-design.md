@@ -84,7 +84,9 @@ need it" structural rather than aspirational.
   composer sits on top of it rather than re-querying.
 - A first-pass composer that sorts the merged day into the three bands.
 - Moment cards with context inlined per the section above.
-- Three actions per moment: complete, snooze, defer.
+- Two actions per moment: **complete**, and **push** (move it out of Now — to
+  later today, or to tomorrow). No third action; "snooze" and "defer" are the
+  same gesture at different distances.
 - One capture input at the top. Text in, task out. Nothing clever.
 - Legible at 8 feet so it can be judged on the kitchen wall as well as the
   laptop.
@@ -95,7 +97,7 @@ need it" structural rather than aspirational.
 - Any deletion or migration of existing surfaces.
 - Drag, reorder, grouping.
 - Mobile polish.
-- Editing beyond the three actions.
+- Editing beyond the two actions.
 - Tests beyond whatever the composer needs to not be obviously wrong. This is a
   throwaway.
 
