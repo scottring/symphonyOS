@@ -98,7 +98,11 @@ const TOOLS = [
         phone_number: { type: 'string' },
         location: { type: 'string' },
         estimated_duration: { type: 'number', description: 'minutes' },
-        parent_task_id: { type: 'string', description: 'id of the parent task to make this a subtask of' },
+        parent_task_id: {
+          type: 'string',
+          description:
+            'id of the parent task to make this a subtask of. A subtask is a STEP, not a day commitment: it is always created undated, and any scheduled_for passed alongside this is ignored. If a step genuinely happens on its own separate day, create it as a normal task and link it afterwards.',
+        },
       },
       required: ['title'],
     },
@@ -562,8 +566,16 @@ async function runTool(
       }
       case 'symphony_create_task': {
         const { id: _id, scheduled_for, is_all_day, bucket: rawBucket, ...rest } = input as Record<string, unknown>
-        const sched = normalizeSchedule(scheduled_for, is_all_day)
-        const bucket = sched.scheduled_for ? 'timed' : ((rawBucket as string) ?? 'inbox')
+        // A subtask is a STEP, not a day commitment, so it is born undated —
+        // matching the in-app addSubtask. Passing the parent's scheduled_for
+        // down to every child is what produced five permanent Today rows from
+        // one decomposed task ("Brainstorm vacation ideas", 2026-07-31): each
+        // step independently qualified as overdue, forever.
+        const isSubtask = !!rest.parent_task_id
+        const sched = isSubtask
+          ? { scheduled_for: null, is_all_day: null }
+          : normalizeSchedule(scheduled_for, is_all_day)
+        const bucket = sched.scheduled_for ? 'timed' : (isSubtask ? 'inbox' : ((rawBucket as string) ?? 'inbox'))
         const row: Record<string, unknown> = {
           ...rest,
           scheduled_for: sched.scheduled_for,
