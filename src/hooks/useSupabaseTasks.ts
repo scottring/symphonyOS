@@ -1432,6 +1432,15 @@ export function useSupabaseTasks() {
 
   // Move a task to a bucket (week, month, quarter) or reschedule to a date
   const pushTask = useCallback(async (id: string, target: Date | 'week' | 'month' | 'quarter') => {
+    // A push is a deliberate act of deferral, so it is what defer_count counts.
+    // Passive slippage is covered by age instead (expiry is read-side and
+    // preserves scheduled_for, so "245 days" stays knowable without a write).
+    // Until now this column was READ in five places — urgency.ts, useReviewData,
+    // coachLines, overdueSuggestions and proactive-engine Rule 6 — and
+    // incremented nowhere, so every `>= 3` branch in the app was dead code.
+    const task = findTaskById(id)
+    const deferCount = (task?.deferCount ?? 0) + 1
+
     if (target === 'week' || target === 'month' || target === 'quarter') {
       // Move to pool — clear scheduled date, and settle the week (see setBucket:
       // "to the week" means THIS week; every other bucket has no week at all).
@@ -1439,10 +1448,10 @@ export function useSupabaseTasks() {
         bucket: target,
         scheduledFor: undefined,
         weekStart: weekStartForBucket(target, currentWeekStart()),
+        deferCount,
       })
     } else {
       // Reschedule to a specific date
-      const task = findTaskById(id)
       const newScheduledFor = new Date(target)
 
       // Check if task is overdue (scheduled before today)
@@ -1466,6 +1475,7 @@ export function useSupabaseTasks() {
         bucket: 'timed',
         scheduledFor: newScheduledFor,
         isAllDay: !hasSpecificTime,
+        deferCount,
       })
     }
   }, [findTaskById, updateTask])

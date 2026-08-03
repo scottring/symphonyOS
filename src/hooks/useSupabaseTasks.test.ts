@@ -464,6 +464,36 @@ describe('useSupabaseTasks', () => {
       expect(mockUpdate).toHaveBeenCalledWith({ title: 'Updated Title' })
     })
 
+    it('pushTask increments defer_count from zero', async () => {
+      mockSupabaseData.push(createMockDbTask({ id: 'task-1', title: 'Task', defer_count: null }))
+
+      const { result } = renderHook(() => useSupabaseTasks())
+      await waitFor(() => {
+        expect(result.current.tasks).toHaveLength(1)
+      })
+
+      await act(async () => {
+        await result.current.pushTask('task-1', 'week')
+      })
+
+      expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({ defer_count: 1 }))
+    })
+
+    it('pushTask increments from an existing count rather than resetting', async () => {
+      mockSupabaseData.push(createMockDbTask({ id: 'task-1', title: 'Task', defer_count: 4 }))
+
+      const { result } = renderHook(() => useSupabaseTasks())
+      await waitFor(() => {
+        expect(result.current.tasks).toHaveLength(1)
+      })
+
+      await act(async () => {
+        await result.current.pushTask('task-1', new Date('2026-09-01T09:00:00'))
+      })
+
+      expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({ defer_count: 5 }))
+    })
+
     it('updates task scheduledFor', async () => {
       mockSupabaseData.push(createMockDbTask({ id: 'task-1', title: 'Task' }))
 
