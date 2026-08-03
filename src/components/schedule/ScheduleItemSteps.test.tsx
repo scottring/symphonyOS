@@ -1,0 +1,80 @@
+import { describe, it, expect, vi } from 'vitest'
+import { fireEvent } from '@testing-library/react'
+import { render } from '@/test/test-utils'
+import { ScheduleItem } from './ScheduleItem'
+import type { TimelineItem } from '@/types/timeline'
+
+// The subtask chip is desktop-only (`hidden md:inline-flex`) and lives in the
+// desktop render branch. ScheduleItem.test.tsx mocks useMobile to TRUE for the
+// swipe-card tests, so the steps disclosure needs its own file on the desktop
+// path.
+vi.mock('@/hooks/useMobile', () => ({ useMobile: () => false }))
+
+// The desktop branch reads the schedule-actions context; same stub the
+// SkipButton desktop tests use.
+vi.mock('@/contexts/ScheduleActionsContext', () => ({
+  useScheduleActionsContext: () => ({}),
+  ScheduleActionsProvider: ({ children }: { children: React.ReactNode }) => children,
+}))
+
+const withSteps = {
+  id: 'task-parent',
+  type: 'task',
+  title: 'Brainstorm vacation ideas + start exploring',
+  completed: false,
+  subtaskCount: 3,
+  subtaskCompletedCount: 1,
+  originalTask: {
+    subtasks: [
+      { id: 's1', title: 'Talk with Iris about the trip', completed: true },
+      { id: 's2', title: 'Everyone writes down 2-3 ideas', completed: false },
+      { id: 's3', title: 'Research top 3 destinations', completed: false },
+    ],
+  },
+} as unknown as TimelineItem
+
+function renderRow(overrides: Partial<TimelineItem> = {}) {
+  const onSelect = vi.fn()
+  const utils = render(
+    <ScheduleItem
+      item={{ ...withSteps, ...overrides }}
+      onSelect={onSelect}
+      onToggleComplete={vi.fn()}
+    />,
+  )
+  return { ...utils, onSelect }
+}
+
+describe('ScheduleItem subtask steps', () => {
+  it('is collapsed by default', () => {
+    const { queryByText } = renderRow()
+    expect(queryByText('Talk with Iris about the trip')).toBeNull()
+  })
+
+  it('shows the progress count on the toggle', () => {
+    const { getByRole } = renderRow()
+    expect(getByRole('button', { name: /3 steps/i })).toHaveTextContent('1/3')
+  })
+
+  it('expands and collapses the step list', () => {
+    const { getByRole, getByText, queryByText } = renderRow()
+    fireEvent.click(getByRole('button', { name: /3 steps/i }))
+    expect(getByText('Talk with Iris about the trip')).toBeInTheDocument()
+    expect(getByText('Research top 3 destinations')).toBeInTheDocument()
+    fireEvent.click(getByRole('button', { name: /3 steps/i }))
+    expect(queryByText('Talk with Iris about the trip')).toBeNull()
+  })
+
+  it('expanding does not also open the detail panel', () => {
+    const { getByRole, onSelect } = renderRow()
+    fireEvent.click(getByRole('button', { name: /3 steps/i }))
+    expect(onSelect).not.toHaveBeenCalled()
+  })
+
+  it('renders no toggle when the task has no steps', () => {
+    const { queryByRole } = renderRow({
+      subtaskCount: 0, subtaskCompletedCount: 0,
+    } as Partial<TimelineItem>)
+    expect(queryByRole('button', { name: /steps/i })).toBeNull()
+  })
+})

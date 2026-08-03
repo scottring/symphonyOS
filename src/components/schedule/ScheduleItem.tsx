@@ -6,7 +6,7 @@ import { formatTimeLong, formatTimeRangeLong, inferMealTime } from '@/lib/timeUt
 import { getProjectColor } from '@/lib/projectUtils'
 import { SchedulePopover, ContextPicker, DiscussionPicker, type ScheduleContextItem } from '@/components/triage'
 import { AssigneeDropdown, MultiAssigneeDropdown } from '@/components/family'
-import { Video, Tag, Check, Pencil, CircleSlash, Hourglass } from 'lucide-react'
+import { Video, Tag, Check, Pencil, CircleSlash, Hourglass, ListChecks, ChevronUp, ChevronDown } from 'lucide-react'
 import { ScheduleItemActionsMenu } from './ScheduleItemActionsMenu'
 import { RescheduleButton } from './RescheduleButton'
 import { ConceptIcon } from '@/lib/conceptIcons'
@@ -349,6 +349,9 @@ export const ScheduleItem = memo(function ScheduleItem({
   // Check if we should hide project on mobile (passed as prop or detected)
   const hasContactChip = !!contactName
   const hasSubtasks = item.subtaskCount && item.subtaskCount > 0
+  // Steps disclosure — collapsed by default. Local because it is pure view
+  // state and each row opens independently.
+  const [stepsOpen, setStepsOpen] = useState(false)
 
   // Get project color for left edge indicator
   const projectColor = projectId ? getProjectColor(projectId) : null
@@ -684,14 +687,25 @@ export const ScheduleItem = memo(function ScheduleItem({
                 </svg>
               </span>
             )}
-            {/* Subtask indicator — desktop only */}
+            {/* Subtask indicator — desktop only. A disclosure, not a label:
+                steps no longer earn their own Today rows (they used to inherit
+                the parent's date and produce N competing rows), so this is the
+                only way to see them without leaving the page. Collapsed by
+                default — the parent holds the slot, the steps are detail. */}
             {hasSubtasks && (
-              <span className="hidden md:inline-flex shrink-0 items-center gap-1 text-xs text-neutral-400">
-                <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 4a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clipRule="evenodd" />
-                </svg>
+              <button
+                type="button"
+                aria-expanded={stepsOpen}
+                aria-label={`${item.subtaskCount} steps`}
+                onClick={(e) => { e.stopPropagation(); setStepsOpen((v) => !v) }}
+                className="hidden md:inline-flex shrink-0 items-center gap-1 text-xs text-neutral-400 hover:text-neutral-600 transition-colors"
+              >
+                <ListChecks className="w-3 h-3" />
                 {item.subtaskCompletedCount}/{item.subtaskCount}
-              </span>
+                {stepsOpen
+                  ? <ChevronUp className="w-3 h-3" />
+                  : <ChevronDown className="w-3 h-3" />}
+              </button>
             )}
             {/* Project chip — inline pill next to title (desktop only) */}
             {projectName && (
@@ -728,6 +742,20 @@ export const ScheduleItem = memo(function ScheduleItem({
               </div>
             )
           })()}
+          {/* Steps — revealed by the subtask chip above. Left-aligned WITH the
+              title (a block sibling of the whole row would sit under the time
+              gutter and read as the next task's content). */}
+          {stepsOpen && item.originalTask?.subtasks?.length ? (
+            <ul className="hidden md:block mt-1 space-y-0.5 border-l-2 border-neutral-200 pl-3">
+              {item.originalTask.subtasks.map((s) => (
+                <li key={s.id} className="text-[13px] text-neutral-600">
+                  <span className={s.completed ? 'line-through text-neutral-400' : ''}>
+                    {s.title}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : null}
           {/* Suggestion chip — under the title, left-aligned WITH the title. */}
           {belowTitleAccessory && <div className="mt-1">{belowTitleAccessory}</div>}
         </div>
