@@ -27,7 +27,15 @@ export const mixedDayInput: TodayDataInput = {
   viewedDate: new Date(), selectedAssignee: null, hideRoutines: false,
 }
 
-/** Expected, derived by hand from the legacy algorithm. */
+/**
+ * Expected, derived by hand from the legacy algorithm — with ONE deliberate
+ * divergence, recorded rather than smoothed over.
+ *
+ * Legacy put every past-dated task in `overdueTasks`. A date now expires after
+ * GRACE_DAYS (2), so `o1` at 3 days old is slipped: it leaves Today entirely
+ * and belongs to the review queue. `o2` at 2 days old is still carried over.
+ * The counts below drop by one incomplete overdue for the same reason.
+ */
 export const mixedDayExpected = {
   isToday: true,
   // Every section, so the parity sweep below can iterate SECTIONS_ORDER and
@@ -44,10 +52,11 @@ export const mixedDayExpected = {
   } satisfies Record<DaySection, string[]>,
   weekIds: ['w1'],
   inboxIds: ['i1'],
-  overdueIds: ['o1', 'o2'],
+  overdueIds: ['o2'],
+  slippedIds: ['o1'],
   counts: {
-    actionableCount: 3 + 0 + 1 + 1,
+    actionableCount: 3 + 0 + 0 + 1,
     completedCount: 0 + 0 + 1,
-    incompleteOverdue: 1,
+    incompleteOverdue: 0,
   },
 }

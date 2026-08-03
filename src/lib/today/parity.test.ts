@@ -19,6 +19,9 @@ describe('parity: computeTodayData reproduces legacy TodaySchedule output', () =
     expect(d.weekTasks.map(t => t.id)).toEqual(mixedDayExpected.weekIds)
     expect(d.inboxTasks.map(t => t.id)).toEqual(mixedDayExpected.inboxIds)
     expect(d.overdueTasks.map(t => t.id).sort()).toEqual([...mixedDayExpected.overdueIds].sort())
+    // The one deliberate divergence from legacy: a date expires, so anything
+    // past the grace window leaves Today for the slipped queue.
+    expect(d.slippedTasks.map(t => t.id).sort()).toEqual([...mixedDayExpected.slippedIds].sort())
   })
   it('counts match legacy formulas', () => {
     expect(d.counts.actionableCount).toBe(mixedDayExpected.counts.actionableCount)

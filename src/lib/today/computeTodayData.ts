@@ -1,7 +1,7 @@
 import type { TodayDataInput, TodayData } from './types'
 import { SECTIONS_ORDER } from './types'
 import { makeAssigneeFilter } from './assigneeFilter'
-import { selectOverdue, selectInbox, selectWeek, selectMonth, selectCompletedInbox, selectTimed } from './taskPools'
+import { selectCarriedOver, selectSlipped, selectInbox, selectWeek, selectMonth, selectCompletedInbox, selectTimed } from './taskPools'
 import { buildRoutineStatusMap, buildEventStatusMap, selectVisibleRoutines } from './statusMaps'
 import { buildGroupedSections } from './grouping'
 import { countRoutineUnits } from './routineCollections'
@@ -20,7 +20,11 @@ export function computeTodayData(input: TodayDataInput): TodayData {
   const match = makeAssigneeFilter(input.selectedAssignee)
   const isToday = computeIsToday(input.viewedDate)
 
-  const overdueTasks = selectOverdue(input.tasks, isToday, match)
+  // A date expires. Only work inside the grace window keeps a Today slot;
+  // everything older is slipped and belongs to the review queue, so every
+  // count and linger filter below correctly describes the carried-over lane.
+  const overdueTasks = selectCarriedOver(input.tasks, isToday, match)
+  const slippedTasks = selectSlipped(input.tasks, isToday, match)
   const inboxTasks = selectInbox(input.tasks, isToday, match)
   const weekTasks = selectWeek(input.tasks, isToday, match, input.weekStart)
   const monthTasks = selectMonth(input.tasks, isToday, match)
@@ -95,6 +99,7 @@ export function computeTodayData(input: TodayDataInput): TodayData {
   return {
     isToday,
     overdueTasks: displayOverdueTasks,
+    slippedTasks,
     inboxTasks,
     weekTasks,
     monthTasks,

@@ -49,7 +49,11 @@ export interface TodayCounts {
 
 export interface TodayData {
   isToday: boolean
+  /** Overdue but inside the grace window — Today's "Carried over" lane. */
   overdueTasks: Task[]
+  /** Overdue past the grace window. Never rendered as Today rows: the page
+   *  shows a single pointer line and the review surface owns the list. */
+  slippedTasks: Task[]
   inboxTasks: Task[]
   weekTasks: Task[]
   monthTasks: Task[]
@@ -80,6 +84,7 @@ export function emptySections<T>(): Record<DaySection, T[]> {
 export const EMPTY_TODAY_DATA: TodayData = {
   isToday: false,
   overdueTasks: [],
+  slippedTasks: [],
   inboxTasks: [],
   weekTasks: [],
   monthTasks: [],

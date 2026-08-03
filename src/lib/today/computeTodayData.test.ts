@@ -16,6 +16,34 @@ function baseInput(over: Partial<TodayDataInput> = {}): TodayDataInput {
   }
 }
 
+describe('computeTodayData grace window', () => {
+  // computeTodayData takes no `now` — it derives isToday from a live
+  // new Date(), and selectOverdue defaults the same way. A fixed past
+  // viewedDate would make isToday false and the overdue pool empty, so these
+  // use dates relative to now.
+  function daysAgo(n: number): Date {
+    const d = new Date()
+    d.setHours(9, 0, 0, 0)
+    d.setDate(d.getDate() - n)
+    return d
+  }
+
+  it('overdueTasks is carried-over only; slippedTasks is the rest', () => {
+    const carried = task({ id: 'c', bucket: 'timed', scheduledFor: daysAgo(1) })
+    const slipped = task({ id: 's', bucket: 'timed', scheduledFor: daysAgo(200) })
+    const d = computeTodayData(baseInput({ tasks: [carried, slipped], viewedDate: new Date() }))
+    expect(d.overdueTasks.map(t => t.id)).toEqual(['c'])
+    expect(d.slippedTasks.map(t => t.id)).toEqual(['s'])
+  })
+
+  it('counts describe the visible page, not the slipped queue', () => {
+    const carried = task({ id: 'c', bucket: 'timed', scheduledFor: daysAgo(1) })
+    const slipped = task({ id: 's', bucket: 'timed', scheduledFor: daysAgo(200) })
+    const d = computeTodayData(baseInput({ tasks: [carried, slipped], viewedDate: new Date() }))
+    expect(d.counts.incompleteOverdue).toBe(1)
+  })
+})
+
 describe('computeTodayData', () => {
   it('empty input → zeroed counts, empty sections, sectionsOrder set', () => {
     const d = computeTodayData(baseInput())
@@ -228,7 +256,9 @@ describe('computeTodayData — progress counts match the rendered timeline', () 
   })
 
   it('carried-over tasks stay in the denominator and move the numerator when done', () => {
-    const open = task({ id: 'o1', scheduledFor: new Date(NOW.getTime() - 3 * 864e5) })
+    // Both fixtures must sit INSIDE the grace window — past it they are
+    // slipped, which is a different pool and deliberately not counted here.
+    const open = task({ id: 'o1', scheduledFor: new Date(NOW.getTime() - 1 * 864e5) })
     const done = task({ id: 'o2', scheduledFor: new Date(NOW.getTime() - 2 * 864e5), completed: true, updatedAt: NOW })
     const d = computeTodayData(baseInput({ viewedDate: NOW, tasks: [open, done] }))
     expect(d.counts.actionableCount).toBe(2)
