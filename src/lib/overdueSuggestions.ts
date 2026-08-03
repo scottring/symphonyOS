@@ -1,7 +1,7 @@
 import type { Task } from '@/types/task'
 
 export type OverdueSuggestion = {
-  type: 'call' | 'open_link' | 'someday' | 'stale' | 'followup' | 'do_today'
+  type: 'call' | 'open_link' | 'someday' | 'followup' | 'do_today'
   label: string
   detail?: string
   /** For 'call' type */
@@ -52,14 +52,10 @@ export function getOverdueSuggestions(
     })
   }
 
-  // 7+ days overdue, no rich context → might be stale
-  if (daysOverdue >= 7 && !task.phoneNumber && !task.links?.length && !task.notes) {
-    suggestions.push({
-      type: 'stale',
-      label: 'Still relevant?',
-      detail: `${daysOverdue} days overdue, no context`,
-    })
-  }
+  // The "Still relevant?" stale check lived here. Removed: a date now expires
+  // after GRACE_DAYS, so anything 7+ days overdue is already off Today and in
+  // the slipped review queue. The chip asked a question it could not resolve —
+  // 57 of them at once on 2026-08-03 — and expiry answers it structurally.
 
   // Is waiting on someone → suggest follow-up
   if (task.isWaiting && contactName) {

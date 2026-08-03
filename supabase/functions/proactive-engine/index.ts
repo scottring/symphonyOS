@@ -344,19 +344,12 @@ function generateTaskSuggestions(
     })
   }
 
-  // ── Rule 7: 7+ days overdue, no context → stale check ──
-  if (daysOverdue >= 7 && !task.phone_number && !task.links?.length && !task.notes) {
-    suggestions.push({
-      entity_type: 'task',
-      entity_id: task.id,
-      suggestion_type: 'stale',
-      title: 'Still relevant?',
-      detail: `${daysOverdue} days overdue, no context`,
-      confidence: 0.6,
-      action_payload: {},
-      suggestion_key: `task:${task.id}:stale`,
-    })
-  }
+  // ── Rule 7 (removed): "Still relevant?" stale check ──
+  // A date now expires after GRACE_DAYS, so anything 7+ days overdue is
+  // already off Today and sitting in the slipped review queue. This rule asked
+  // a question it could not resolve and fired 57 times at once on 2026-08-03.
+  // Expiry answers it structurally. The 'stale' suggestion_type is retained in
+  // the shared union so previously-stored rows still render and dismiss.
 
   // ── Rule 8: Short overdue with notes → do today ──
   if (isOverdue && daysOverdue <= 2 && task.notes && suggestions.length === 0) {
