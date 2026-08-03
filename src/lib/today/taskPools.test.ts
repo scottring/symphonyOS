@@ -128,6 +128,54 @@ describe('taskPools', () => {
     })
   })
 
+  describe('subtask containment', () => {
+    it('selectOverdue: a subtask copying the parent timestamp gets no row of its own', () => {
+      const at = new Date('2026-05-17T09:00:00')
+      const child = task({ id: 'c1', parentTaskId: 'p1', scheduledFor: at })
+      const parent = task({ id: 'p1', scheduledFor: at, subtasks: [child] })
+      expect(selectOverdue([parent], true, all, TODAY).map(x => x.id)).toEqual(['p1'])
+    })
+
+    it('selectOverdue: a subtask with its OWN different date keeps its row', () => {
+      const child = task({ id: 'c1', parentTaskId: 'p1', scheduledFor: new Date('2026-05-15T09:00:00') })
+      const parent = task({ id: 'p1', scheduledFor: new Date('2026-05-17T09:00:00'), subtasks: [child] })
+      expect(selectOverdue([parent], true, all, TODAY).map(x => x.id).sort()).toEqual(['c1', 'p1'])
+    })
+
+    it('selectOverdue: a subtask with its own TIME on the parent day keeps its row', () => {
+      const child = task({ id: 'c1', parentTaskId: 'p1', scheduledFor: new Date('2026-05-17T14:00:00') })
+      const parent = task({ id: 'p1', scheduledFor: new Date('2026-05-17T09:00:00'), subtasks: [child] })
+      expect(selectOverdue([parent], true, all, TODAY).map(x => x.id).sort()).toEqual(['c1', 'p1'])
+    })
+
+    it('selectOverdue: an orphan subtask (parent undated) keeps its row', () => {
+      const child = task({ id: 'c1', parentTaskId: 'p1', scheduledFor: new Date('2026-05-15T09:00:00') })
+      const parent = task({ id: 'p1', bucket: 'inbox', scheduledFor: null, subtasks: [child] })
+      expect(selectOverdue([parent], true, all, TODAY).map(x => x.id)).toEqual(['c1'])
+    })
+
+    it('selectTimed: a subtask copying the parent timestamp gets no row of its own', () => {
+      const at = new Date('2026-05-19T09:00:00')
+      const child = task({ id: 'c1', parentTaskId: 'p1', bucket: 'timed', scheduledFor: at })
+      const parent = task({ id: 'p1', bucket: 'timed', scheduledFor: at, subtasks: [child] })
+      expect(selectTimed([parent], TODAY, all).map(x => x.id)).toEqual(['p1'])
+    })
+
+    it('selectTimed: a subtask timed on the day while the parent is undated keeps its row', () => {
+      const child = task({ id: 'c1', parentTaskId: 'p1', bucket: 'timed', scheduledFor: new Date('2026-05-19T09:00:00') })
+      const parent = task({ id: 'p1', bucket: 'inbox', scheduledFor: null, subtasks: [child] })
+      expect(selectTimed([parent], TODAY, all).map(x => x.id)).toEqual(['c1'])
+    })
+
+    it('the five vacation steps collapse to one row (regression: 2026-08-03)', () => {
+      const at = new Date('2026-05-17T04:00:00')
+      const steps = ['s1', 's2', 's3', 's4', 's5'].map((id) =>
+        task({ id, parentTaskId: 'vac', scheduledFor: at }))
+      const parent = task({ id: 'vac', scheduledFor: at, subtasks: steps })
+      expect(selectOverdue([parent], true, all, TODAY).map(x => x.id)).toEqual(['vac'])
+    })
+  })
+
   describe('graceFloor', () => {
     it('is midnight, graceDays before the given date', () => {
       const floor = graceFloor(new Date('2026-08-03T18:42:11'))

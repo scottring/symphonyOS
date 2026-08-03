@@ -44,6 +44,25 @@ export function graceFloor(from: Date, graceDays: number = GRACE_DAYS): Date {
   return floor
 }
 
+/**
+ * True when a subtask's date was copied from its parent rather than chosen.
+ *
+ * `symphony-agent` stamps the parent's exact `scheduled_for` onto every child
+ * it creates, so decomposing one task turns into N competing Today rows — the
+ * five "Brainstorm vacation ideas" steps all carried 2026-08-01T04:00:00Z, the
+ * parent's timestamp to the second. The in-app `addSubtask` correctly creates
+ * children undated.
+ *
+ * A step is not a day commitment: the parent holds the slot and shows `n/m`.
+ * But a step deliberately given its own date OR its own time on the parent's
+ * day IS a real commitment, so this compares the full instant rather than the
+ * calendar day. Suppress only exact copies.
+ */
+function hasCopiedParentDate(subtask: Task, parent: Task): boolean {
+  if (!subtask.scheduledFor || !parent.scheduledFor) return false
+  return new Date(subtask.scheduledFor).getTime() === new Date(parent.scheduledFor).getTime()
+}
+
 /** Ports TodaySchedule.overdueTasks (~621-657). `now` defaults to new Date(). */
 export function selectOverdue(tasks: Task[], isToday: boolean, match: Match, now: Date = new Date()): Task[] {
   if (!isToday) return []
@@ -68,6 +87,7 @@ export function selectOverdue(tasks: Task[], isToday: boolean, match: Match, now
     if (isOverdue(task)) result.push(task)
     if (task.subtasks) {
       for (const subtask of task.subtasks) {
+        if (hasCopiedParentDate(subtask, task)) continue
         if (isOverdue(subtask)) result.push(subtask)
       }
     }
@@ -170,6 +190,7 @@ export function selectTimed(tasks: Task[], viewedDate: Date, match: Match): Task
     if (task.bucket === 'timed' && isOnViewedDate(task.scheduledFor)) result.push(task)
     if (task.subtasks) {
       for (const subtask of task.subtasks) {
+        if (hasCopiedParentDate(subtask, task)) continue
         if (!match(subtask.assignedTo, subtask.assignedToAll)) continue
         if (subtask.bucket === 'timed' && isOnViewedDate(subtask.scheduledFor)) result.push(subtask)
       }
