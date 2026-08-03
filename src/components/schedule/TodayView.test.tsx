@@ -436,5 +436,54 @@ describe('TodayView print list', () => {
     renderView()
     expect(screen.queryByTestId('printable-day-list')).not.toBeInTheDocument()
   })
+
+})
+
+describe('TodayView slipped queue', () => {
+  function daysAgo(n: number) {
+    const d = new Date(TODAY)
+    d.setDate(d.getDate() - n)
+    return d
+  }
+  const mk = (id: string, title: string, n: number) => ({
+    id, title, completed: false,
+    createdAt: daysAgo(n), updatedAt: daysAgo(n),
+    bucket: 'timed' as const, scheduledFor: daysAgo(n),
+  })
+
+  it('keeps slipped rows off the page and points at them instead', () => {
+    renderView({ viewedDate: TODAY, tasks: [mk('c', 'carried thing', 1), mk('s', 'slipped thing', 200)] } as never)
+    // OverdueSection is collapsed by default — expand it to see the rows.
+    fireEvent.click(screen.getByText(/1 carried over/i))
+    expect(screen.getByText('carried thing')).toBeInTheDocument()
+    expect(screen.queryByText('slipped thing')).toBeNull()
+    expect(screen.getByText(/1 slipped/)).toBeInTheDocument()
+  })
+
+  it('points at the queue even when the rest of the day is empty', () => {
+    // counts.totalItems excludes slipped work, so this day renders "Your day
+    // is clear". The pointer must survive that branch or the queue is
+    // invisible exactly when it is all that is left.
+    renderView({ viewedDate: TODAY, tasks: [mk('s', 'slipped thing', 200)] } as never)
+    expect(screen.getByText(/Your day is clear/i)).toBeInTheDocument()
+    expect(screen.getByText(/1 slipped/)).toBeInTheDocument()
+  })
+
+  it('opens the review from the pointer', () => {
+    renderView({ viewedDate: TODAY, tasks: [mk('s', 'slipped thing', 200)] } as never)
+    fireEvent.click(screen.getByText(/1 slipped/))
+    expect(screen.getByRole('region', { name: /slipped work review/i })).toBeInTheDocument()
+    expect(screen.getByText('slipped thing')).toBeInTheDocument()
+  })
+
+  it('still shows the pointer when the carried-over lane is empty', () => {
+    renderView({ viewedDate: TODAY, tasks: [mk('s', 'slipped thing', 200)] } as never)
+    expect(screen.getByText(/1 slipped/)).toBeInTheDocument()
+  })
+
+  it('renders no pointer when nothing has slipped', () => {
+    renderView({ viewedDate: TODAY, tasks: [mk('c', 'carried thing', 1)] } as never)
+    expect(screen.queryByText(/slipped/)).toBeNull()
+  })
 })
 

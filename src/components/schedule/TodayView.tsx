@@ -63,6 +63,8 @@ import { EndOfDayCard } from './EndOfDayCard'
 import { EndOfDayReview } from './EndOfDayReview'
 import { DayNavCluster } from './DayNavCluster'
 import { OverdueSection } from './OverdueSection'
+import { SlippedPointer } from './SlippedPointer'
+import { SlippedReview, type SlippedFate } from './SlippedReview'
 import { BulkActionToolbar } from './BulkActionToolbar'
 import { TimelineNoteComposer } from './TimelineNoteComposer'
 
@@ -542,6 +544,24 @@ export function TodayView({
 
   // Duplicate sweep — on demand; a passive count is the only unsolicited part.
   const sweep = useDuplicateSweep(data.sectionsOrder, data.grouped, ctx.onDeleteTask)
+
+  // Slipped review — work that aged out of Today entirely. Opened only from
+  // the pointer line; never expands inline, so Today stays short.
+  const [slippedOpen, setSlippedOpen] = useState(false)
+
+  // The four fates map onto writers this component already has. 'today' and
+  // 'week' go through onPushTask so they inherit its weekStart handling and
+  // its defer_count increment; 'someday' is a resolution rather than a
+  // deferral, so it writes the bucket directly and does not count as a defer.
+  const handleSlippedApply = useCallback((ids: string[], fate: SlippedFate) => {
+    for (const id of ids) {
+      if (fate === 'delete') ctx.onDeleteTask?.(id)
+      else if (fate === 'today') ctx.onPushTask?.(id, new Date())
+      else if (fate === 'week') ctx.onPushTask?.(id, 'week')
+      else ctx.onUpdateTask?.(id, { bucket: 'someday', scheduledFor: undefined })
+    }
+    setSlippedOpen(false)
+  }, [ctx])
 
   // Suggested order + grouping — a preview you accept, never an auto-apply.
   // Applying reuses the same writers the drag gestures use.
@@ -1101,6 +1121,27 @@ export function TodayView({
             />
             </TodayDragProvider>
           </div>
+        )}
+
+        {/* Slipped pointer — deliberately OUTSIDE the totalItems ternary
+            above, and outside the carried-over guard within it.
+            `counts.totalItems` does not include slipped work, so a day whose
+            only remaining work has slipped renders "Your day is clear" — with
+            35 items rotting invisibly behind it. That is exactly the
+            permanently-buried failure expiry must not cause, so the pointer
+            renders in BOTH branches whenever the queue is non-empty. */}
+        {data.isToday && (
+          <SlippedPointer
+            tasks={data.slippedTasks}
+            onReview={() => setSlippedOpen(true)}
+          />
+        )}
+        {data.isToday && slippedOpen && (
+          <SlippedReview
+            tasks={data.slippedTasks}
+            onApply={handleSlippedApply}
+            onClose={() => setSlippedOpen(false)}
+          />
         )}
       </div>
 
