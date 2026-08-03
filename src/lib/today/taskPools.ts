@@ -3,6 +3,47 @@ import { belongsToWeek } from './weekPlacement'
 
 type Match = (assignedTo: string | null | undefined, assignedToAll?: readonly string[] | null) => boolean
 
+/**
+ * How many days past its date a task keeps a slot on Today.
+ *
+ * A date is a commitment to a day, and it expires. Two days covers a weekend
+ * of slippage; past that the item moves to the slipped review queue instead of
+ * living on Today forever. Measured against real data on 2026-08-03: items
+ * existed at 1 and 2 days old and then nothing until day 7, so the cliff is
+ * natural rather than arbitrary.
+ *
+ * Expiry is a READ-SIDE contract. Nothing here writes, and `scheduled_for` is
+ * never cleared — the original date is what makes "slipping for 245 days"
+ * knowable, and a wrong filter is a one-line fix where a wrong migration is
+ * not.
+ */
+export const GRACE_DAYS = 2
+
+/** Whole days between two instants, both floored to local midnight first. */
+function daysBetween(from: Date, to: Date): number {
+  const a = new Date(from)
+  a.setHours(0, 0, 0, 0)
+  const b = new Date(to)
+  b.setHours(0, 0, 0, 0)
+  return Math.round((b.getTime() - a.getTime()) / 86400000)
+}
+
+/**
+ * The oldest date still inside the grace window, floored to local midnight.
+ *
+ * Exists so query-side consumers (the kitchen wall) can apply the same floor
+ * the in-memory selectors apply, from one definition. The wall runs its own
+ * PostgREST query rather than going through `selectCarriedOver`, and before
+ * this it had no lower bound at all — it rendered every past-dated family task
+ * ever created.
+ */
+export function graceFloor(from: Date, graceDays: number = GRACE_DAYS): Date {
+  const floor = new Date(from)
+  floor.setHours(0, 0, 0, 0)
+  floor.setDate(floor.getDate() - graceDays)
+  return floor
+}
+
 /** Ports TodaySchedule.overdueTasks (~621-657). `now` defaults to new Date(). */
 export function selectOverdue(tasks: Task[], isToday: boolean, match: Match, now: Date = new Date()): Task[] {
   if (!isToday) return []
@@ -32,6 +73,30 @@ export function selectOverdue(tasks: Task[], isToday: boolean, match: Match, now
     }
   }
   return result
+}
+
+/**
+ * Overdue and still within the grace window — Today's "Carried over" lane.
+ *
+ * Derived from `selectOverdue` rather than reimplementing its rules, so the
+ * completed-today exception is inherited and the union/disjoint invariant with
+ * `selectSlipped` holds by construction.
+ */
+export function selectCarriedOver(
+  tasks: Task[], isToday: boolean, match: Match,
+  now: Date = new Date(), graceDays: number = GRACE_DAYS,
+): Task[] {
+  return selectOverdue(tasks, isToday, match, now)
+    .filter((t) => daysBetween(t.scheduledFor as Date, now) <= graceDays)
+}
+
+/** Overdue past the grace window — the slipped review queue, NOT on Today. */
+export function selectSlipped(
+  tasks: Task[], isToday: boolean, match: Match,
+  now: Date = new Date(), graceDays: number = GRACE_DAYS,
+): Task[] {
+  return selectOverdue(tasks, isToday, match, now)
+    .filter((t) => daysBetween(t.scheduledFor as Date, now) > graceDays)
 }
 
 /** Ports TodaySchedule.inboxTasks (~662-670). */

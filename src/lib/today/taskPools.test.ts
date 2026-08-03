@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest'
-import { selectOverdue, selectInbox, selectWeek, selectCompletedInbox, selectTimed } from './taskPools'
+import {
+  selectOverdue, selectInbox, selectWeek, selectCompletedInbox, selectTimed,
+  selectCarriedOver, selectSlipped, graceFloor,
+} from './taskPools'
 import type { Task } from '@/types/task'
 
 const TODAY = new Date('2026-05-19T12:00:00')
@@ -64,5 +67,93 @@ describe('taskPools', () => {
     const other = task({ id: 'no', bucket: 'timed', scheduledFor: new Date('2026-05-20T09:00:00') })
     const ids = selectTimed([t, other], new Date('2026-05-19T00:00:00'), all).map(x => x.id)
     expect(ids).toEqual(['t1', 'sub'])
+  })
+
+  describe('grace window partition', () => {
+    // TODAY is 2026-05-19. Grace = 2 days → 05-17 and 05-18 are carried over,
+    // 05-16 and older are slipped.
+    const d1 = task({ id: 'd1', scheduledFor: new Date('2026-05-18T09:00:00') })
+    const d2 = task({ id: 'd2', scheduledFor: new Date('2026-05-17T09:00:00') })
+    const d3 = task({ id: 'd3', scheduledFor: new Date('2026-05-16T09:00:00') })
+    const old = task({ id: 'old', scheduledFor: new Date('2025-09-01T09:00:00') })
+    const pool = [d1, d2, d3, old]
+
+    it('selectCarriedOver: keeps items inside the grace window', () => {
+      expect(selectCarriedOver(pool, true, all, TODAY).map(x => x.id)).toEqual(['d1', 'd2'])
+    })
+
+    it('selectSlipped: keeps items past the grace window', () => {
+      expect(selectSlipped(pool, true, all, TODAY).map(x => x.id)).toEqual(['d3', 'old'])
+    })
+
+    it('the two partitions exactly reconstruct selectOverdue', () => {
+      const overdue = selectOverdue(pool, true, all, TODAY).map(x => x.id).sort()
+      const split = [
+        ...selectCarriedOver(pool, true, all, TODAY),
+        ...selectSlipped(pool, true, all, TODAY),
+      ].map(x => x.id).sort()
+      expect(split).toEqual(overdue)
+    })
+
+    it('the two partitions are disjoint', () => {
+      const carried = new Set(selectCarriedOver(pool, true, all, TODAY).map(x => x.id))
+      const slipped = selectSlipped(pool, true, all, TODAY).map(x => x.id)
+      expect(slipped.filter(id => carried.has(id))).toEqual([])
+    })
+
+    it('boundary: exactly graceDays old is carried over, one day more is slipped', () => {
+      const onBoundary = task({ id: 'b', scheduledFor: new Date('2026-05-17T23:59:00') })
+      const pastBoundary = task({ id: 'p', scheduledFor: new Date('2026-05-16T00:01:00') })
+      expect(selectCarriedOver([onBoundary, pastBoundary], true, all, TODAY).map(x => x.id)).toEqual(['b'])
+      expect(selectSlipped([onBoundary, pastBoundary], true, all, TODAY).map(x => x.id)).toEqual(['p'])
+    })
+
+    it('ignores the wall clock on both sides — late-evening now still partitions by date', () => {
+      const lateNow = new Date('2026-05-19T23:45:00')
+      const d = task({ id: 'x', scheduledFor: new Date('2026-05-17T00:05:00') })
+      expect(selectCarriedOver([d], true, all, lateNow).map(x => x.id)).toEqual(['x'])
+    })
+
+    it('returns [] when not today, like selectOverdue', () => {
+      expect(selectCarriedOver(pool, false, all, TODAY)).toEqual([])
+      expect(selectSlipped(pool, false, all, TODAY)).toEqual([])
+    })
+
+    it('a task completed today stays in the carried-over lane', () => {
+      const doneToday = task({
+        id: 'done', scheduledFor: new Date('2026-05-18'),
+        completed: true, updatedAt: new Date('2026-05-19T08:00:00'),
+      })
+      expect(selectCarriedOver([doneToday], true, all, TODAY).map(x => x.id)).toEqual(['done'])
+    })
+  })
+
+  describe('graceFloor', () => {
+    it('is midnight, graceDays before the given date', () => {
+      const floor = graceFloor(new Date('2026-08-03T18:42:11'))
+      expect(floor.getFullYear()).toBe(2026)
+      expect(floor.getMonth()).toBe(7) // August
+      expect(floor.getDate()).toBe(1)
+      expect(floor.getHours()).toBe(0)
+      expect(floor.getMinutes()).toBe(0)
+      expect(floor.getSeconds()).toBe(0)
+      expect(floor.getMilliseconds()).toBe(0)
+    })
+
+    it('crosses a month boundary', () => {
+      expect(graceFloor(new Date('2026-08-01T12:00:00')).getMonth()).toBe(6) // July
+      expect(graceFloor(new Date('2026-08-01T12:00:00')).getDate()).toBe(30)
+    })
+
+    it('honours an explicit graceDays', () => {
+      expect(graceFloor(new Date('2026-08-03T12:00:00'), 0).getDate()).toBe(3)
+      expect(graceFloor(new Date('2026-08-03T12:00:00'), 10).getDate()).toBe(24)
+    })
+
+    it('agrees with the partition: anything at the floor is carried over', () => {
+      const now = new Date('2026-08-03T12:00:00')
+      const atFloor = task({ id: 'f', scheduledFor: graceFloor(now) })
+      expect(selectCarriedOver([atFloor], true, all, now).map(x => x.id)).toEqual(['f'])
+    })
   })
 })
