@@ -2,7 +2,7 @@
 // `shell:tray-update` event payload — the shape is deserialized by serde in
 // desktop/src-tauri/src/lib.rs, so keep the two in sync.
 import type { Task } from '@/types/task'
-import { selectTimed, selectOverdue } from '@/lib/today/taskPools'
+import { selectTimed, selectCarriedOver } from '@/lib/today/taskPools'
 
 export interface TrayPayload {
   remaining: number
@@ -14,7 +14,9 @@ const matchAll = () => true
 
 export function buildTrayPayload(tasks: Task[], now: Date): TrayPayload {
   const todayRemaining = selectTimed(tasks, now, matchAll).filter((t) => !t.completed)
-  const overdueRemaining = selectOverdue(tasks, true, matchAll, now).filter((t) => !t.completed)
+  // Carried-over only: a date expires, so the badge counts the day's real
+  // obligations rather than the whole slipped backlog.
+  const overdueRemaining = selectCarriedOver(tasks, true, matchAll, now).filter((t) => !t.completed)
   const all = [...overdueRemaining, ...todayRemaining]
   return {
     remaining: all.length,

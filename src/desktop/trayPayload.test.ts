@@ -44,6 +44,12 @@ describe('buildTrayPayload', () => {
     expect(buildTrayPayload(tasks, NOW).remaining).toBe(0)
   })
 
+  it('the badge counts carried-over work, not the whole slipped backlog', () => {
+    const recent = makeTask({ id: 'r', bucket: 'timed', scheduledFor: new Date('2026-07-06T09:00:00') })
+    const ancient = makeTask({ id: 'a', bucket: 'timed', scheduledFor: new Date('2025-12-01T09:00:00') })
+    expect(buildTrayPayload([recent, ancient], NOW).remaining).toBe(1)
+  })
+
   it('caps items at 8 but reports the full remaining count', () => {
     const tasks = Array.from({ length: 12 }, (_, i) => makeTask({ title: `t${i}` }))
     const payload = buildTrayPayload(tasks, NOW)

@@ -10,6 +10,7 @@ import {
 } from '@/types/timeline'
 import { groupByDaySection, type DaySection } from '@/lib/timeUtils'
 import { isQuietHours } from '@/lib/quietHours'
+import { graceFloor } from '@/lib/today/taskPools'
 import { resolveFetchOutcome } from '@/hooks/wallDataCommit'
 import { computeScreenTimeSummaries, type ChildScreenTimeSummary } from '@/hooks/useScreenTime'
 import type { TimelineItem } from '@/types/timeline'
@@ -118,6 +119,10 @@ export function useWallData(): UseWallDataReturn {
       const startStr = toDateString(startDate)
       const endStr = toDateString(dates[6])
       const todayStr = toDateString(new Date())
+      // Expiry floor — mirrors Today's grace window so the wall and the laptop
+      // agree. Without it the wall pulled every past-dated family task ever
+      // created; on 2026-08-03 that was 50 rows, the oldest 245 days old.
+      const overdueFloor = graceFloor(startDate)
 
       // Fetch all data sources in parallel
       const [
@@ -191,6 +196,7 @@ export function useWallData(): UseWallDataReturn {
           .from('tasks')
           .select(TASK_COLUMNS)
           .lt('scheduled_for', startDate.toISOString())
+          .gte('scheduled_for', overdueFloor.toISOString())
           .eq('completed', false)
           .eq('context', 'family'),
 
