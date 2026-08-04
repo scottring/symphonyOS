@@ -17,13 +17,25 @@ const corsHeaders = {
 // case the `ended` event is ever lost (missed Twilio callback).
 const ACTIVE_TTL_MS = 90_000
 
+// The warmline holds for ~60s before hanging up. This TTL outlives that, so a
+// receiver hung up mid-hold (which sends us nothing) still clears on its own.
+const HANDSET_TTL_MS = 75_000
+
+export type HandsetState = 'offhook' | 'offhook_ended'
+export type CallOnlyState = 'ringing' | 'connected' | 'ended'
+
 export interface CallEventBody {
   callSid?: string
   direction?: 'inbound' | 'outbound'
-  state?: 'ringing' | 'connected' | 'ended'
+  state?: CallOnlyState | HandsetState
   name?: string
   number?: string
   photoURL?: string
+}
+
+/** Off-hook events describe the receiver, not a call — different table. */
+export function isHandsetState(state: string | undefined): state is HandsetState {
+  return state === 'offhook' || state === 'offhook_ended'
 }
 
 type ValidationResult =
@@ -39,8 +51,9 @@ export function validateRequest(
   if (!provided || provided !== expectedSecret) {
     return { ok: false, status: 401, error: 'invalid or missing kidphone secret' }
   }
-  if (body.state !== 'ringing' && body.state !== 'connected' && body.state !== 'ended') {
-    return { ok: false, status: 400, error: 'state must be ringing|connected|ended' }
+  const s = body.state
+  if (!isHandsetState(s) && s !== 'ringing' && s !== 'connected' && s !== 'ended') {
+    return { ok: false, status: 400, error: 'state must be ringing|connected|ended|offhook|offhook_ended' }
   }
   if (body.direction && body.direction !== 'inbound' && body.direction !== 'outbound') {
     return { ok: false, status: 400, error: 'direction must be inbound|outbound' }
@@ -62,6 +75,17 @@ export function buildRow(body: CallEventBody, now: Date): Record<string, unknown
     at: now.toISOString(),
     // Ended rows expire immediately; active rows get a TTL safety net.
     expires_at: new Date(ended ? now.getTime() : now.getTime() + ACTIVE_TTL_MS).toISOString(),
+  }
+}
+
+/** Build the singleton handset row to upsert. Pure; unit-tested. */
+export function buildHandsetRow(body: CallEventBody, now: Date): Record<string, unknown> {
+  const up = body.state === 'offhook'
+  return {
+    id: 'singleton',
+    off_hook: up,
+    at: now.toISOString(),
+    expires_at: new Date(up ? now.getTime() + HANDSET_TTL_MS : now.getTime()).toISOString(),
   }
 }
 
@@ -93,7 +117,10 @@ Deno.serve(async (req: Request) => {
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
   const admin = createClient(supabaseUrl, serviceRoleKey)
 
-  const { error } = await admin.from('current_call').upsert(buildRow(v.body, new Date()))
+  const now = new Date()
+  const { error } = isHandsetState(v.body.state)
+    ? await admin.from('handset_state').upsert(buildHandsetRow(v.body, now))
+    : await admin.from('current_call').upsert(buildRow(v.body, now))
   if (error) return jsonResponse({ error: error.message }, 500)
 
   return jsonResponse({ ok: true })

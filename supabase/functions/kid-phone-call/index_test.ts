@@ -1,5 +1,5 @@
 import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts'
-import { validateRequest, buildRow } from './index.ts'
+import { validateRequest, buildRow, buildHandsetRow, isHandsetState } from './index.ts'
 
 type FailResult = { ok: false; status: number; error: string }
 
@@ -44,4 +44,35 @@ Deno.test('buildRow expires an ended row immediately', () => {
   const row = buildRow({ state: 'ended', direction: 'outbound' }, now)
   assertEquals(row.state, 'ended')
   assertEquals(row.expires_at, '2026-06-27T10:00:00.000Z') // == now
+})
+
+Deno.test('isHandsetState recognizes the off-hook states', () => {
+  assertEquals(isHandsetState('offhook'), true)
+  assertEquals(isHandsetState('offhook_ended'), true)
+})
+
+Deno.test('isHandsetState rejects call states', () => {
+  assertEquals(isHandsetState('ringing'), false)
+  assertEquals(isHandsetState('ended'), false)
+  assertEquals(isHandsetState(undefined), false)
+})
+
+Deno.test('validateRequest accepts the off-hook states', () => {
+  const h = new Headers({ 'x-kidphone-secret': 'expected' })
+  assertEquals(validateRequest(h, { state: 'offhook' }, 'expected').ok, true)
+  assertEquals(validateRequest(h, { state: 'offhook_ended' }, 'expected').ok, true)
+})
+
+Deno.test('buildHandsetRow marks the handset up with a TTL past the 60s hold', () => {
+  const now = new Date('2026-08-04T12:00:00Z')
+  const row = buildHandsetRow({ state: 'offhook' }, now)
+  assertEquals(row.off_hook, true)
+  assertEquals(new Date(row.expires_at as string).getTime() - now.getTime() > 60_000, true)
+})
+
+Deno.test('buildHandsetRow marks the handset down and expires immediately', () => {
+  const now = new Date('2026-08-04T12:00:00Z')
+  const row = buildHandsetRow({ state: 'offhook_ended' }, now)
+  assertEquals(row.off_hook, false)
+  assertEquals(row.expires_at, now.toISOString())
 })
