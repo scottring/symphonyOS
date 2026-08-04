@@ -1,7 +1,7 @@
 import type { Task } from '@/types/task'
 import { belongsToWeek } from './weekPlacement'
 
-type Match = (assignedTo: string | null | undefined, assignedToAll?: readonly string[] | null) => boolean
+export type Match = (assignedTo: string | null | undefined, assignedToAll?: readonly string[] | null) => boolean
 
 /**
  * How many days past its date a task keeps a slot on Today.
