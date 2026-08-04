@@ -33,6 +33,7 @@ import { WallV2RightColumn } from './WallV2RightColumn';
 import { WallV2PinnedList } from './WallV2PinnedList';
 import { WallV2ListSheetContainer } from './WallV2ListSheetContainer';
 import { useLists } from '@/hooks/useLists';
+import { defaultScopeForArea } from '@/lib/scope';
 import {
   readPinnedLists,
   togglePinnedList,
@@ -373,6 +374,11 @@ export function WallV2Shell() {
       user_id: user.id,
       title: trimmed,
       context: 'family',
+      // This insert bypasses addTask, so it must apply the same context→scope
+      // default addTask gets for free. RLS shares on scope, not context: without
+      // this the capture shows on the wall (which filters on context) but stays
+      // invisible to everyone else in the household.
+      scope: defaultScopeForArea('family'),
       scheduled_for: null,
       completed: false,
     });

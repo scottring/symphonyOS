@@ -55,11 +55,19 @@ function candidateToTaskRow(
   //   bucket     — text (inbox|week|month|quarter|timed)      (present in app + capture-to-inbox)
   //   context    — text check ('work','family','personal')    (010_add_context_and_assigned_to)
   //   category   — text check ('task','chore','errand','event','activity') default 'task' (028_task_category)
+  //   scope      — text check ('individual','couple','compound') NOT NULL
+  //                default 'individual'                       (2026-06-07_scope_axis)
+  //
+  // scope MUST be set explicitly. RLS shares on scope, not context, so a
+  // family-context row left at the 'individual' default is visible to its owner
+  // on the family view but unreadable by the rest of the household — the row
+  // looks shared and isn't. Mirrors defaultScopeForArea() in src/lib/scope.ts.
   return {
     user_id: userId,
     title: c.title,
     bucket: 'inbox',
     context: 'family',
+    scope: 'compound',
     category: c.category,
     completed: false,
     notes: notesLines.join('\n'),
@@ -133,11 +141,14 @@ Deno.serve(async (req: Request) => {
     //             NOTE: plan used 'inbox_triage' which violates this constraint;
     //             corrected to 'import' (closest valid value for programmatic ingestion).
     //   type    — text check (...,'general',...) — using 'general' (appropriate default)
+    //   scope   — same scope axis as tasks (2026-06-07_scope_axis); notes RLS
+    //             shares on scope too, so 'family' context alone shares nothing.
     const { error: noteErr } = await supabase.from('notes').insert({
       user_id: capture.user_id,
       title: `Capture: ${capture.source_label ?? capture.source_key ?? 'note'}`,
       content: `${result.summary}${gapText}`,
       context: 'family',
+      scope: 'compound',
       source: 'import',
       type: 'general',
     })
