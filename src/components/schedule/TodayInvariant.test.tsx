@@ -81,12 +81,13 @@ describe('Today invariant: non-commitment space is fixed', () => {
     expect(computeTodayData(baseInput({ tasks: backlog(500), viewedDate: new Date() })).counts.totalItems).toBe(0)
   })
 
-  it('the attention set is the ONLY thing that grows, and it is rendered as one line', () => {
+  it('backlog reaches the attention set and never the timeline', () => {
     const large = computeTodayData(baseInput({ tasks: backlog(500), viewedDate: new Date() }))
     expect(large.attentionItems.length).toBeGreaterThan(0)
-    // AttentionLine.test.tsx asserts the one-row rendering; this asserts the
-    // data reaches it rather than reaching the timeline. If backlog were
-    // re-added to Today as a pool, it would show up in grouped and fail this check.
-    expect(large.grouped).toBeDefined()
+    // 500 backlog items must reach the attention set and NOTHING else.
+    // Inspect contents, not just presence: a pool fed into buildGroupedSections
+    // would land here even if the separate counts formula stayed untouched —
+    // which is the drift countRoutineUnits was built to prevent.
+    expect(Object.values(large.grouped).flat()).toHaveLength(0)
   })
 })
