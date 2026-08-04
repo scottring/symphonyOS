@@ -456,7 +456,7 @@ export function Sidebar({
 
           {/* House */}
           <button
-            onClick={() => onViewChange('home-app')}
+            onClick={() => navigate('/home')}
             className={navItemClass(homeAppActive)}
             aria-label="House"
           >

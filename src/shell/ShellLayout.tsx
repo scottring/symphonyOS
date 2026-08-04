@@ -54,7 +54,7 @@ const TODAY_PATHS = new Set(['/', '/today', '/tasks-new/today', '/tasks-new']);
  * Derive ViewType from pathname so the Sidebar's active-item highlight
  * works for both legacy and Shell-mounted routes.
  */
-function deriveActiveView(pathname: string): ViewType {
+export function deriveActiveView(pathname: string): ViewType {
   if (pathname.startsWith('/goals')) return 'goals';
   if (pathname.startsWith('/projects')) return 'projects';
   if (pathname.startsWith('/routines')) return 'routines';
@@ -66,6 +66,7 @@ function deriveActiveView(pathname: string): ViewType {
   if (pathname === '/morning') return 'morning';
   if (pathname === '/bedtime') return 'bedtime';
   if (pathname === '/inbox' || pathname.endsWith('/tasks-new/inbox')) return 'inbox';
+  if (pathname.startsWith('/home')) return 'home-app';
   // /, /today, /tasks-new/today, /tasks-new and /task/:id all live under "today"
   return 'today';
 }
@@ -163,6 +164,9 @@ function ShellLayoutInner({ children }: Props) {
         case 'home':
         case 'today':
           navigate('/');
+          return;
+        case 'home-app':
+          navigate('/home');
           return;
         case 'inbox':
           navigate('/inbox');
