@@ -18,6 +18,7 @@ import { goalsAppDef } from '@/apps/goals';
 import { familyAppDef } from '@/apps/family';
 import { agentAppDef } from '@/apps/agent';
 import { usAppDef } from '@/apps/us';
+import { threadAppDef } from '@/apps/thread';
 
 export type AppRegistry = ReadonlyArray<AppDef>;
 
@@ -84,4 +85,5 @@ export const appRegistry: AppRegistry = createRegistry([
   familyAppDef,
   agentAppDef,
   usAppDef,
+  threadAppDef,
 ]);
