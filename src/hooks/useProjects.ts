@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { shareInFlight } from '@/lib/sharedRequest'
 import { useAuth } from '@/hooks/useAuth'
 import type { Project, DbProject, ProjectStatus } from '@/types/project'
+import { defaultScopeForArea } from '@/lib/scope'
 import type { Task } from '@/types/task'
 
 /**
@@ -105,6 +106,9 @@ export function useProjects() {
         phone_number: project.phoneNumber ?? null,
         parent_id: project.parentId ?? null,
         context: project.context ?? null,
+        // projects RLS shares on scope, not context, so a family project
+        // without this stays private to its owner despite looking shared.
+        scope: defaultScopeForArea(project.context ?? null),
       })
       .select()
       .single()

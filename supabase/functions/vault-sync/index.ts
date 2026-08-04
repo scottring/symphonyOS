@@ -312,6 +312,13 @@ async function syncFile(
   const embedding = openAiKey ? await generateEmbedding(embeddingText, openAiKey) : null
 
   // Upsert note
+  //
+  // scope must be set alongside context. notes RLS shares on scope ONLY
+  // (2026-06-07_scope_axis.sql:67) and the column is NOT NULL DEFAULT
+  // 'individual', so a family-domain note written without it is visible to its
+  // owner on every family surface and unreadable by the rest of the household.
+  // Mirrors defaultScopeForArea() in src/lib/scope.ts, which this Deno function
+  // cannot import from src/.
   const noteData: Record<string, unknown> = {
     user_id: userId,
     title,
@@ -323,6 +330,7 @@ async function syncFile(
     vault_frontmatter: frontmatter,
     vault_last_commit_sha: commitSha,
     context: context,
+    scope: context === 'family' ? 'compound' : 'individual',
     external_id: filePath,
     external_url: `https://github.com/${repoFullName}/blob/main/${filePath}`,
   }

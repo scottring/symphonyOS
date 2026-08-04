@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { shareInFlight } from '@/lib/sharedRequest'
 import { useAuth } from '@/hooks/useAuth'
 import { logger } from '@/lib/logger'
+import { defaultScopeForArea } from '@/lib/scope'
 import { captureToVault } from '@/lib/openBrain'
 import type {
   Note,
@@ -198,6 +199,9 @@ export function useNotes() {
           source: input.source ?? 'manual',
           topic_id: input.topicId ?? null,
           context: input.context ?? null,
+          // notes RLS shares on scope, not context, so a family note without
+          // this stays private to its author despite looking shared.
+          scope: defaultScopeForArea(input.context ?? null),
           timeline_at: input.timelineAt?.toISOString() ?? null,
         })
         .select()
