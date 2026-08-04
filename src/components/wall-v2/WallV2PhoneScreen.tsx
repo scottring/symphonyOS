@@ -1,13 +1,15 @@
 // src/components/wall-v2/WallV2PhoneScreen.tsx
 //
 // Full-screen kid phone book on the wall. Big photo buttons (favorites first,
-// then all allowed contacts). Tap a face → confirm → the in-house handset rings;
-// pick it up to bridge to the callee (placeCall with source:'kiosk'). Numbers
-// never reach the browser; we dial by contactId.
+// then all allowed contacts). Tap a face → confirm → the callee is parked for
+// the in-house handset (placeCall with source:'kiosk'). If the receiver is
+// already up, the warmline connects it within ~2s; if not, pick up the phone
+// and it connects. Numbers never reach the browser; we dial by contactId.
 
 import { useRef, useState } from 'react'
 import { Phone, X, PhoneCall } from 'lucide-react'
 import { useKidPhoneContacts } from '@/hooks/useKidPhoneContacts'
+import { useHandsetState } from '@/hooks/useHandsetState'
 import { placeCall } from '@/lib/telephony/placeCall'
 import { WALL } from './wallTheme'
 import type { KidPhoneContact } from '@/lib/telephony/listContacts'
@@ -40,6 +42,7 @@ function ContactButton({ c, large, onTap }: { c: KidPhoneContact; large?: boolea
 
 export function WallV2PhoneScreen({ onClose }: { onClose: () => void }) {
   const { favorites, others, loading, error } = useKidPhoneContacts(true)
+  const { offHook } = useHandsetState()
   const [pending, setPending] = useState<Pending | null>(null)
   // Bumped on cancel so a placeCall() that resolves after the user has
   // already backed out can't resurrect the "calling" modal.
@@ -55,7 +58,7 @@ export function WallV2PhoneScreen({ onClose }: { onClose: () => void }) {
     if (r.ok) {
       // Call is armed and waiting for the handset. The CallerIdTakeover paints
       // "Calling …" once it connects; close the book after a beat.
-      setTimeout(onClose, 1200)
+      setTimeout(onClose, offHook ? 1200 : 4000)
     } else {
       const message = r.reason === 'quiet_hours'
         ? "It's quiet hours — calls are off right now."
@@ -77,6 +80,9 @@ export function WallV2PhoneScreen({ onClose }: { onClose: () => void }) {
         <h1 className={`flex items-center gap-3 text-3xl font-extrabold ${WALL.inkStrong}`}>
           <Phone className="w-8 h-8" /> Call someone
         </h1>
+        {offHook && (
+          <p className={`text-xl font-bold ${WALL.muted}`}>You&rsquo;re holding the phone — pick someone.</p>
+        )}
         <button
           type="button"
           onClick={onClose}
@@ -123,9 +129,12 @@ export function WallV2PhoneScreen({ onClose }: { onClose: () => void }) {
             {pending.state === 'calling' ? (
               <>
                 <p className={`flex items-center justify-center gap-2 text-2xl font-bold ${WALL.inkStrong}`}>
-                  <PhoneCall className="w-6 h-6 animate-pulse" /> Calling {pending.contact.name}…
+                  <PhoneCall className="w-6 h-6 animate-pulse" />
+                  {offHook ? `Connecting to ${pending.contact.name}…` : `Calling ${pending.contact.name}…`}
                 </p>
-                <p className={`mt-1 text-base ${WALL.muted}`}>Pick up the phone when it rings.</p>
+                <p className={`mt-1 text-base ${WALL.muted}`}>
+                  {offHook ? 'Hold the phone to your ear.' : 'Now pick up the phone.'}
+                </p>
                 <button
                   type="button"
                   onClick={cancelCalling}
@@ -139,7 +148,9 @@ export function WallV2PhoneScreen({ onClose }: { onClose: () => void }) {
                 <p className={`text-2xl font-extrabold mb-1 ${WALL.inkStrong}`}>Call {pending.contact.name}?</p>
                 {pending.state === 'error'
                   ? <p className="text-base text-red-600 font-semibold mb-6">{pending.message}</p>
-                  : <p className={`text-base mb-6 ${WALL.muted}`}>The phone will ring — pick it up to talk.</p>}
+                  : <p className={`text-base mb-6 ${WALL.muted}`}>
+                      {offHook ? 'Hold the phone to your ear.' : 'Then pick up the phone to talk.'}
+                    </p>}
                 <div className="flex gap-4">
                   <button
                     type="button"

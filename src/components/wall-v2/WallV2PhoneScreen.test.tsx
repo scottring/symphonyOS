@@ -10,13 +10,17 @@ vi.mock('@/hooks/useKidPhoneContacts', () => ({
     error: undefined,
   }),
 }));
+const handset = vi.hoisted(() => ({ offHook: false }));
+vi.mock('@/hooks/useHandsetState', () => ({
+  useHandsetState: () => ({ offHook: handset.offHook }),
+}));
 const placeCall = vi.fn().mockResolvedValue({ ok: true });
 vi.mock('@/lib/telephony/placeCall', () => ({ placeCall: (...a: unknown[]) => placeCall(...a) }));
 
 import { WallV2PhoneScreen } from './WallV2PhoneScreen';
 
 describe('WallV2PhoneScreen', () => {
-  beforeEach(() => placeCall.mockClear());
+  beforeEach(() => { placeCall.mockClear(); handset.offHook = false; });
 
   it('requires a confirm before placing the call', async () => {
     render(<WallV2PhoneScreen onClose={() => {}} />);
@@ -58,5 +62,35 @@ describe('WallV2PhoneScreen', () => {
     await Promise.resolve();
     expect(screen.queryByText(/Calling Grandma/)).not.toBeInTheDocument();
     expect(onClose).not.toHaveBeenCalled();
+  });
+});
+
+describe('WallV2PhoneScreen handset awareness', () => {
+  beforeEach(() => { placeCall.mockClear(); handset.offHook = false; });
+
+  it('tells you to pick up the phone when the receiver is down', async () => {
+    render(<WallV2PhoneScreen onClose={() => {}} />);
+    fireEvent.click(screen.getByRole('button', { name: /Grandma/ }));
+    fireEvent.click(screen.getByRole('button', { name: /^Call$/ }));
+    await waitFor(() => expect(screen.getByText(/now pick up the phone/i)).toBeTruthy());
+  });
+
+  it('says connecting when you are already holding the receiver', async () => {
+    handset.offHook = true;
+    render(<WallV2PhoneScreen onClose={() => {}} />);
+    fireEvent.click(screen.getByRole('button', { name: /Grandma/ }));
+    fireEvent.click(screen.getByRole('button', { name: /^Call$/ }));
+    await waitFor(() => expect(screen.getByText(/connecting to grandma/i)).toBeTruthy());
+  });
+
+  it('hints that the phone is in hand when off-hook', () => {
+    handset.offHook = true;
+    render(<WallV2PhoneScreen onClose={() => {}} />);
+    expect(screen.getByText(/holding the phone/i)).toBeTruthy();
+  });
+
+  it('shows no off-hook hint when the receiver is down', () => {
+    render(<WallV2PhoneScreen onClose={() => {}} />);
+    expect(screen.queryByText(/holding the phone/i)).toBeNull();
   });
 });
