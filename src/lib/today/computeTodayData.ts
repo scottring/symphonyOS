@@ -27,7 +27,7 @@ export function computeTodayData(input: TodayDataInput): TodayData {
   const overdueTasks = selectCarriedOver(input.tasks, isToday, match)
   const slippedTasks = selectSlipped(input.tasks, isToday, match)
   const attentionItems = isToday
-    ? selectNeedsAttention(input.tasks, match, new Date(), input.weekStart ?? new Date())
+    ? selectNeedsAttention(input.tasks, match, new Date(), input.weekStart)
     : []
   const completedInboxTasks = selectCompletedInbox(input.tasks, input.viewedDate, match)
   const timedTasks = selectTimed(input.tasks, input.viewedDate, match)

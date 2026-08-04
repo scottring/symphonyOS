@@ -8,11 +8,23 @@ function task(p: Partial<Task>): Task {
   return { id: 'id', title: 't', completed: false, bucket: 'timed', scheduledFor: null, assignedTo: null,
     updatedAt: new Date('2026-05-19T12:00:00'), subtasks: undefined, ...p } as Task
 }
+/** Midnight Sunday on or before `d` — a real week anchor, never a fabricated
+ *  stand-in. Mirrors `weekStartAnchor(d, 0)` without importing the cadence
+ *  module into this pure-lib test file. */
+function sundayOf(d: Date): Date {
+  const s = new Date(d)
+  s.setHours(0, 0, 0, 0)
+  s.setDate(s.getDate() - s.getDay())
+  return s
+}
 function baseInput(over: Partial<TodayDataInput> = {}): TodayDataInput {
+  const viewedDate = over.viewedDate ?? new Date('2026-05-19T00:00:00')
   return {
     tasks: [], events: [], routines: [], dateInstances: [],
-    viewedDate: new Date('2026-05-19T00:00:00'),
-    selectedAssignee: null, hideRoutines: false, ...over,
+    viewedDate,
+    selectedAssignee: null, hideRoutines: false,
+    weekStart: sundayOf(viewedDate),
+    ...over,
   }
 }
 
@@ -276,5 +288,14 @@ describe('computeTodayData — Today is a commitment surface', () => {
         createdAt: new Date('2026-01-01'), updatedAt: new Date('2026-01-01') } as Task,
     ]
     expect(computeTodayData(input).counts.totalItems).toBe(0)
+  })
+
+  it('attentionItems stays empty when the viewed date is not today, even with attention-worthy backlog', () => {
+    // A stale-enough inbox item that WOULD trip 'aging-inbox' if this were the
+    // live day — isToday's ternary must still zero it out for any other date.
+    const ancientInbox = task({ id: 'i-old', bucket: 'inbox', createdAt: new Date('2000-01-01') })
+    const data = computeTodayData(baseInput({ viewedDate: new Date('2020-01-01T00:00:00'), tasks: [ancientInbox] }))
+    expect(data.isToday).toBe(false)
+    expect(data.attentionItems).toEqual([])
   })
 })

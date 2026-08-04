@@ -3,10 +3,19 @@ import { renderHook } from '@testing-library/react'
 import { useTodayData } from './useTodayData'
 import type { TodayDataInput } from '@/lib/today/types'
 
+/** Midnight Sunday on or before `d` — a real week anchor. */
+function sundayOf(d: Date): Date {
+  const s = new Date(d)
+  s.setHours(0, 0, 0, 0)
+  s.setDate(s.getDate() - s.getDay())
+  return s
+}
 function baseInput(over: Partial<TodayDataInput> = {}): TodayDataInput {
+  const viewedDate = over.viewedDate ?? new Date()
   return {
     tasks: [], events: [], routines: [], dateInstances: [],
-    viewedDate: new Date(), selectedAssignee: null, hideRoutines: false, ...over,
+    viewedDate, selectedAssignee: null, hideRoutines: false,
+    weekStart: sundayOf(viewedDate), ...over,
   }
 }
 

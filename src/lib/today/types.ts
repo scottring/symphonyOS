@@ -32,12 +32,15 @@ export interface TodayDataInput {
    */
   completedLingerCutoff?: number
   /**
-   * Start of the current week, per the user's `weekStartsOn`. Scopes the "This
-   * Week" staging strip to this week, so a move placed on a later week doesn't
-   * crowd Today. Computed at the React boundary (readCadenceConfig touches
-   * localStorage — this stays pure). Undefined = any week, pre-cascade behavior.
+   * Start of the current week, per the user's `weekStartsOn`. Required: it is
+   * the anchor `selectNeedsAttention` compares a `bucket='week'` task's own
+   * `weekStart` against to decide "stranded" vs "still this week". A fallback
+   * value here (e.g. substituting "today") would fabricate a wrong anchor and
+   * misclassify a task correctly placed on the real current week — silently,
+   * since every calendar-date compare "succeeds." Computed at the React
+   * boundary (readCadenceConfig touches localStorage — this stays pure).
    */
-  weekStart?: Date
+  weekStart: Date
 }
 
 export interface TodayCounts {
