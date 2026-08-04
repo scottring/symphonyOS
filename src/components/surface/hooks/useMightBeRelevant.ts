@@ -11,6 +11,10 @@ const STOPWORDS = new Set([
   'about', 'call', 'email', 'text', 'send', 'get', 'go', 'do', 'is', 'are',
   // Family-app noise: these words appear in half the tasks and prove nothing.
   'make', 'plan', 'new', 'set', 'buy', 'find', 'family', 'kids', 'together',
+  // Same class as the above — bare verbs that describe every task ever written.
+  // "Finish FFG forms" was matching "finish weeding the backyard".
+  'finish', 'start', 'throw', 'take', 'put', 'add', 'check', 'clean', 'fix',
+  'need', 'schedule', 'book', 'order', 'pick', 'drop', 'sort', 'move', 'update',
 ])
 
 function tokenize(s: string | undefined): Set<string> {
@@ -76,18 +80,30 @@ export function useMightBeRelevant(target: Task, data: MightBeRelevantData): Mig
       }
     }
 
-    // 4) keyword overlap in title or notes — likely about the same thing.
-    //    Ranked by overlap size so two shared words beat one.
+    // 4) keyword overlap in title or notes — a GUESS, unlike the three tiers
+    //    above, which are structural links the data actually asserts. Held to a
+    //    much higher bar for two reasons learned the hard way:
+    //
+    //    - Two shared words minimum. One shared word is noise: "Finish FFG
+    //      forms and payments" surfaced "finish weeding backyard" on the
+    //      strength of "finish" alone. No stopword list is ever complete, so
+    //      the arity check does the work the blocklist can't.
+    //    - Never a completed task. A done item cannot be acted on and cannot
+    //      inform the one you're looking at; it just eats a slot. Two of the
+    //      three slots were consistently spent this way. The structural tiers
+    //      above still admit completed items, where "already handled this one"
+    //      is real information.
     if (targetTokens.size > 0) {
       const keyword: Array<MightBeRelevantItem & { overlapCount: number }> = []
       for (const t of data.allTasks) {
         if (seen.has(t.id)) continue
+        if (t.completed) continue
         const candidateTokens = new Set([...tokenize(t.title), ...tokenize(t.notes)])
         const overlap = intersect(targetTokens, candidateTokens)
-        if (overlap.length > 0) {
+        if (overlap.length >= 2) {
           keyword.push({
             id: t.id, kind: 'task', title: t.title, completed: t.completed,
-            reason: `matches "${overlap[0]}"`,
+            reason: `mentions ${overlap.slice(0, 2).map((w) => `"${w}"`).join(' and ')}`,
             overlapCount: overlap.length,
           })
           seen.add(t.id)

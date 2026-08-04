@@ -124,4 +124,59 @@ describe('useMightBeRelevant', () => {
     }))
     expect(result.current).toEqual([])
   })
+
+  // ── The keyword tier is a guess, and it was guessing badly ────────────────
+  //
+  // Observed in prod on "Finish FFG forms and payments": all three slots went
+  // to a bare "finish" match, two of them completed tasks. The structural tiers
+  // (goal / project / contact) are unaffected by these rules.
+
+  it('does not match on a single shared word', () => {
+    const target = createMockTask({ id: 't1', title: 'Renew passport photos' })
+    const oneWord = createMockTask({ id: 't2', title: 'Passport for the dog' })
+    const { result } = renderHook(() => useMightBeRelevant(target, {
+      allTasks: [target, oneWord],
+    }))
+    expect(result.current).toEqual([])
+  })
+
+  it('matches when two content words are shared', () => {
+    const target = createMockTask({ id: 't1', title: 'Renew passport photos' })
+    const twoWords = createMockTask({ id: 't2', title: 'Passport photos at CVS' })
+    const { result } = renderHook(() => useMightBeRelevant(target, {
+      allTasks: [target, twoWords],
+    }))
+    expect(result.current.map(r => r.id)).toEqual(['t2'])
+    expect(result.current[0].reason).toBe('mentions "passport" and "photos"')
+  })
+
+  it('never surfaces a completed task on keyword overlap alone', () => {
+    const target = createMockTask({ id: 't1', title: 'Renew passport photos' })
+    const done = createMockTask({ id: 't2', title: 'Passport photos ordered', completed: true })
+    const { result } = renderHook(() => useMightBeRelevant(target, {
+      allTasks: [target, done],
+    }))
+    expect(result.current).toEqual([])
+  })
+
+  it('still surfaces a completed task when the link is structural', () => {
+    const target = createMockTask({ id: 't1', projectId: 'p1', title: 'Alpha' })
+    const done = createMockTask({ id: 't2', projectId: 'p1', title: 'Beta', completed: true })
+    const { result } = renderHook(() => useMightBeRelevant(target, {
+      allTasks: [target, done],
+    }))
+    expect(result.current.map(r => r.id)).toEqual(['t2'])
+    expect(result.current[0].reason).toBe('same project')
+  })
+
+  it('treats bare action verbs as noise, not signal', () => {
+    // The real regression: "Finish FFG forms" pulled in "finish weeding the
+    // backyard" because they both start with the word everyone starts with.
+    const target = createMockTask({ id: 't1', title: 'Finish FFG forms and payments' })
+    const unrelated = createMockTask({ id: 't2', title: 'Finish weeding backyard' })
+    const { result } = renderHook(() => useMightBeRelevant(target, {
+      allTasks: [target, unrelated],
+    }))
+    expect(result.current).toEqual([])
+  })
 })
