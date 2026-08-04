@@ -43,6 +43,27 @@ export const AGING_MONTH_DAYS = 45
 export interface AttentionItem {
   task: Task
   reason: AttentionReason
+  /**
+   * Age in whole days — but measured from a DIFFERENT origin per reason:
+   *
+   *  - `slipped`      → days past `scheduledFor` (the date it missed)
+   *  - `stranded-week`,
+   *    `aging-month`,
+   *    `aging-inbox`  → days since `createdAt` (how long it has existed)
+   *
+   * This is deliberate: a slipped task's own date is the sharper signal, and
+   * the other three have no date to be late against. The unifying question
+   * every value answers is "how long has this been wrong", not "how old is
+   * this row".
+   *
+   * The consequence is load-bearing for callers. `AttentionLine` reduces to a
+   * max across the whole mixed set and renders "oldest N days", so that one
+   * number can be a due-date age on one render and a creation age on the
+   * next, and the set it summarises can mix both. That is acceptable for a
+   * signal ("something here is 38 days wrong") and NOT acceptable for
+   * arithmetic — never sum, average, or compare these across reasons, and
+   * never present one as an age-since-capture without checking `reason`.
+   */
   ageDays: number
 }
 
@@ -108,6 +129,22 @@ export function selectNeedsAttention(
     // 'someday' is deliberately absent. Someday means "no timeline"; aging it
     // would make the count un-drainable, which is the exact failure this
     // design exists to avoid.
+    //
+    // 'quarter' is deliberately absent too — decided, not forgotten. It is
+    // excluded for the same reason as 'someday' plus one of its own:
+    //
+    //  1. Like someday, it has no anchor that can go stale. `tasks` carries
+    //     exactly one period anchor, `week_start`, so a quarter-bucket task
+    //     can no more be "placed on a quarter that passed" than a month one
+    //     can — there is nothing to compare it against.
+    //  2. Unlike someday, it is not invisible: quarter items always render on
+    //     the season horizon via selectHorizonPool(tasks, 'season', …). They
+    //     have a page that lists them, so they are not the podiatrist case
+    //     this signal exists to catch.
+    //
+    // A time-in-bucket rule like aging-month would therefore be noise: a
+    // quarter is three months, so any honest threshold is long enough that
+    // the season page has surfaced the item many times first.
   }
 
   return out
