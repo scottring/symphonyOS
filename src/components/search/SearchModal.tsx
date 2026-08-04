@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import type { SearchResult, GroupedSearchResults } from '@/hooks/useSearch'
+import type { FieldIntent } from '@/lib/search/fieldIntent'
 import { SearchResultItem } from './SearchResultItem'
 
 interface SearchModalProps {
@@ -11,6 +12,8 @@ interface SearchModalProps {
   totalResults: number
   isSearching: boolean
   onSelectResult: (result: SearchResult) => void
+  /** The field the query is asking for (e.g. 'phone') — lets result rows render that field as an actionable link. */
+  intent?: FieldIntent | null
 }
 
 const MAX_RESULTS_PER_TYPE = 5
@@ -24,6 +27,7 @@ export function SearchModal({
   totalResults,
   isSearching,
   onSelectResult,
+  intent = null,
 }: SearchModalProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const modalRef = useRef<HTMLDivElement>(null)
@@ -201,6 +205,7 @@ export function SearchModal({
               result={result}
               isSelected={selectedIndex === getResultIndex(type, idx)}
               onClick={() => onSelectResult(result)}
+              intent={intent}
             />
           ))}
         </div>

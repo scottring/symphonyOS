@@ -37,7 +37,7 @@ export function OmniboxResults({ query, onNavigate }: OmniboxResultsProps) {
   const openResult = useSearchNavigation()
   const [selectedIndex, setSelectedIndex] = useState(-1)
 
-  const { results, totalResults, setQuery } = useSearch({
+  const { results, totalResults, setQuery, intent } = useSearch({
     tasks, projects, contacts, routines, lists,
   })
   // useSearch holds its own (debounced) query state; mirror the input into it.
@@ -95,6 +95,7 @@ export function OmniboxResults({ query, onNavigate }: OmniboxResultsProps) {
                 openResult(r, tasks)
                 onNavigate()
               }}
+              intent={intent}
             />
           </li>
         ))}

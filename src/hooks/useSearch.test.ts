@@ -351,6 +351,93 @@ describe('useSearch', () => {
     })
   })
 
+  describe('field intent search (finding "podiatrist phone number")', () => {
+    it('finds a task via fuzzy title match and surfaces the phone number in the subtitle', async () => {
+      // "podiatrist" vs "podiatry" is a fuzzy match, not exact — this also
+      // guards the FUSE_OPTIONS.threshold tuning that makes it tolerable
+      // (score ~0.18 at threshold 0.3; see the comment on FUSE_OPTIONS).
+      const tasks = [
+        createMockTask({ id: 'task-1', title: 'Call podiatry', phoneNumber: '555-867-5309' }),
+      ]
+      const { result } = renderHook(() =>
+        useSearch({ tasks, projects: [], contacts: [], routines: [] })
+      )
+
+      act(() => {
+        result.current.setQuery('podiatrist phone number')
+      })
+
+      await act(async () => {
+        vi.advanceTimersByTime(200)
+      })
+
+      expect(result.current.intent).toBe('phone')
+      expect(result.current.results.tasks).toHaveLength(1)
+      expect(result.current.results.tasks[0].title).toBe('Call podiatry')
+      expect(result.current.results.tasks[0].subtitle).toBe('555-867-5309')
+    })
+
+    it('demotes, but does not remove, tasks that lack the requested field', async () => {
+      const tasks = [
+        createMockTask({ id: 'no-phone', title: 'Podiatrist follow-up notes' }),
+        createMockTask({ id: 'has-phone', title: 'Podiatrist appointment', phoneNumber: '555-1212' }),
+      ]
+      const { result } = renderHook(() =>
+        useSearch({ tasks, projects: [], contacts: [], routines: [] })
+      )
+
+      act(() => {
+        result.current.setQuery('podiatrist phone number')
+      })
+
+      await act(async () => {
+        vi.advanceTimersByTime(200)
+      })
+
+      const ids = result.current.results.tasks.map((t) => t.id)
+      expect(ids).toContain('no-phone')
+      expect(ids[0]).toBe('has-phone')
+    })
+
+    it('surfaces a project phone number in the subtitle under phone intent', async () => {
+      const projects = [
+        createMockProject({ id: 'proj-1', name: 'Podiatrist visits', phoneNumber: '555-2020' }),
+      ]
+      const { result } = renderHook(() =>
+        useSearch({ tasks: [], projects, contacts: [], routines: [] })
+      )
+
+      act(() => {
+        result.current.setQuery('podiatrist phone number')
+      })
+
+      await act(async () => {
+        vi.advanceTimersByTime(200)
+      })
+
+      expect(result.current.results.projects).toHaveLength(1)
+      expect(result.current.results.projects[0].subtitle).toBe('555-2020')
+    })
+
+    it('does not treat plain-text queries as field intent', async () => {
+      const tasks = [createMockTask({ title: 'Buy groceries' })]
+      const { result } = renderHook(() =>
+        useSearch({ tasks, projects: [], contacts: [], routines: [] })
+      )
+
+      act(() => {
+        result.current.setQuery('groceries')
+      })
+
+      await act(async () => {
+        vi.advanceTimersByTime(200)
+      })
+
+      expect(result.current.intent).toBeNull()
+      expect(result.current.results.tasks[0].subtitle).toBeUndefined()
+    })
+  })
+
   describe('project search', () => {
     it('finds projects by name', async () => {
       const projects = [

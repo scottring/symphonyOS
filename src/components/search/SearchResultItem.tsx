@@ -1,12 +1,34 @@
 import type { SearchResult } from '@/hooks/useSearch'
+import type { FieldIntent } from '@/lib/search/fieldIntent'
+import type { Task } from '@/types/task'
+import type { Project } from '@/types/project'
+import type { Contact } from '@/types/contact'
 
 interface SearchResultItemProps {
   result: SearchResult
   isSelected: boolean
   onClick: () => void
+  /** The field the active query is asking for — lets a phone-number subtitle render as a tap-to-call link. */
+  intent?: FieldIntent | null
 }
 
-export function SearchResultItem({ result, isSelected, onClick }: SearchResultItemProps) {
+// The raw phone value behind this result, if the result's type carries one.
+// Field names differ per type (Task/Project use phoneNumber, Contact uses
+// phone), so this is the one place that has to know all three.
+function phoneValueFor(result: SearchResult): string | undefined {
+  switch (result.type) {
+    case 'task':
+      return (result.item as Task).phoneNumber
+    case 'project':
+      return (result.item as Project).phoneNumber
+    case 'contact':
+      return (result.item as Contact).phone
+    default:
+      return undefined
+  }
+}
+
+export function SearchResultItem({ result, isSelected, onClick, intent = null }: SearchResultItemProps) {
   // Type-specific icon
   const renderIcon = () => {
     switch (result.type) {
@@ -63,12 +85,29 @@ export function SearchResultItem({ result, isSelected, onClick }: SearchResultIt
     }
   }
 
+  // Under phone intent, when the subtitle IS the field value we just surfaced
+  // (see useSearch), render it as a tap-to-call link — same tel: treatment as
+  // everywhere else in the app (PanelReach, ContactCard, DetailPanelRedesign).
+  // The exact-match check keeps this from misfiring on subtitles that merely
+  // contain other text (e.g. a routine's recurrence line).
+  const phoneValue = intent === 'phone' ? phoneValueFor(result) : undefined
+  const subtitleIsPhoneLink = Boolean(phoneValue && result.subtitle === phoneValue)
+
+  // A native <button> can't legally contain the <a> the phone link needs, so
+  // this is a div with role="button" instead — Enter/Space wired up to match.
   return (
-    <button
-      type="button"
+    <div
+      role="button"
+      tabIndex={0}
       onClick={onClick}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onClick()
+        }
+      }}
       className={`
-        w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg transition-colors
+        w-full flex items-center gap-3 px-3 py-2 text-left rounded-lg transition-colors cursor-pointer
         ${isSelected
           ? 'bg-primary-50 text-primary-900'
           : 'hover:bg-neutral-50'
@@ -88,10 +127,20 @@ export function SearchResultItem({ result, isSelected, onClick }: SearchResultIt
         </div>
         {result.subtitle && (
           <div className="text-xs text-neutral-500 truncate">
-            {result.subtitle}
+            {subtitleIsPhoneLink ? (
+              <a
+                href={`tel:${phoneValue!.replace(/[^\d+]/g, '')}`}
+                onClick={(e) => e.stopPropagation()}
+                className="hover:underline"
+              >
+                {result.subtitle}
+              </a>
+            ) : (
+              result.subtitle
+            )}
           </div>
         )}
       </div>
-    </button>
+    </div>
   )
 }

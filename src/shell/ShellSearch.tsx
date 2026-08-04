@@ -22,7 +22,7 @@ export function ShellSearch({ onClose }: { onClose: () => void }) {
   const { lists } = useListsContext();
   const openResult = useSearchNavigation();
 
-  const { query, setQuery, results, totalResults, isSearching, clearSearch } = useSearch({
+  const { query, setQuery, results, totalResults, isSearching, clearSearch, intent } = useSearch({
     tasks, projects, contacts, routines, lists,
   });
 
@@ -43,6 +43,7 @@ export function ShellSearch({ onClose }: { onClose: () => void }) {
       totalResults={totalResults}
       isSearching={isSearching}
       onSelectResult={handleSelect}
+      intent={intent}
     />
   );
 }
