@@ -1,5 +1,9 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
+import { screen } from '@testing-library/react'
+import { render } from '@/test/test-utils'
+import { ScheduleActionsProvider } from '@/contexts/ScheduleActionsContext'
 import { computeTodayData } from '@/lib/today/computeTodayData'
+import { TodayView } from './TodayView'
 import type { Task } from '@/types/task'
 import type { TodayDataInput } from '@/lib/today/types'
 
@@ -10,7 +14,38 @@ import type { TodayDataInput } from '@/lib/today/types'
  * Every one of the six pools Today used to render arrived for a defensible
  * reason and none was ever removed. A stated, tested invariant is what stops
  * the seventh.
+ *
+ * Guarded at TWO levels, because the historical failure was in the UI, not in
+ * the data layer:
+ *
+ *  - the data-layer tests below pin `computeTodayData`, and
+ *  - the PAGE test pins the rendered output. A seventh pool rendered straight
+ *    from the `tasks` prop — bypassing `computeTodayData` entirely, exactly as
+ *    PullStrip and StagingFloat did — passes every data-layer assertion here
+ *    and would ship. Only rendering Today catches it.
+ *
+ * The mock stack below is the one from AnytimeRow.test.tsx. It is duplicated
+ * rather than imported because `vi.mock` is hoisted per test FILE and cannot
+ * be shared through a helper module.
  */
+
+vi.mock('@/hooks/useMobile', () => ({ useMobile: () => true }))
+vi.mock('@/hooks/useWeather', () => ({ useWeather: () => ({ weather: null, loading: false, error: 'x', requestLocation: vi.fn() }) }))
+vi.mock('@/hooks/useProactiveSuggestions', () => ({ useProactiveSuggestions: () => ({ suggestions: [], topSuggestions: [], suggestionsForEntity: () => [], actOnSuggestion: vi.fn(), dismissSuggestion: vi.fn(), isLoading: false }) }))
+vi.mock('@/hooks/useRoutineStats', () => ({ useRoutineStats: () => ({ getStats: () => undefined }) }))
+vi.mock('@/hooks/useRecurringEventDetection', () => ({ useRecurringEventDetection: () => ({ isPromotionSuggested: () => false }) }))
+vi.mock('@/hooks/useProjects', () => ({ useProjects: () => ({ projects: [], loading: false, addProject: vi.fn(), deleteProject: vi.fn(), updateProject: vi.fn() }) }))
+vi.mock('@/hooks/useNotes', () => ({ useNotes: () => ({ notes: [], loading: false, addNote: vi.fn(), updateNote: vi.fn(), deleteNote: vi.fn() }) }))
+vi.mock('@/hooks/useSupabaseTasks', () => ({ useSupabaseTasks: () => ({ tasks: [], loading: false, addTask: vi.fn(), updateTask: vi.fn(), deleteTask: vi.fn() }) }))
+vi.mock('@/hooks/usePinnedItems', () => ({ usePinnedItems: () => ({ isPinned: () => false, pin: vi.fn(), unpin: vi.fn() }) }))
+vi.mock('@/hooks/useActionQueue', () => ({ useActionQueue: () => ({ actions: [], loading: false, approveAction: vi.fn(), rejectAction: vi.fn(), pendingCount: 0, refetch: vi.fn() }) }))
+vi.mock('@/hooks/useDomain.tsx', async (importOriginal) => {
+  const actual = await importOriginal() as Record<string, unknown>
+  return { ...actual, useDomain: () => ({ currentDomain: 'universal', setDomain: vi.fn() }) }
+})
+vi.mock('@/hooks/useTimelineInsert', () => ({
+  useTimelineInsert: () => ({ handlePick: vi.fn(), noteComposer: null, closeNoteComposer: vi.fn() }),
+}))
 
 function task(p: Partial<Task>): Task {
   return {
@@ -67,6 +102,57 @@ function baseInput(over: Partial<TodayDataInput> = {}): TodayDataInput {
     ...over,
   }
 }
+
+const ctxValue = {
+  onToggleTask: vi.fn(),
+  projects: [], contacts: [], familyMembers: [], lists: [],
+}
+
+function renderToday(tasks: Task[]) {
+  return render(
+    <ScheduleActionsProvider value={ctxValue as never}>
+      <TodayView
+        tasks={tasks} events={[]} routines={[]} dateInstances={[]}
+        selectedItemId={null} onSelectItem={vi.fn()} onToggleTask={vi.fn()}
+        onCompleteRoutine={vi.fn()} onCompleteEvent={vi.fn()} loading={false}
+        viewedDate={new Date()} onDateChange={vi.fn()}
+        projects={[]}
+      />
+    </ScheduleActionsProvider>
+  )
+}
+
+describe('Today invariant: the PAGE does not grow with the backlog', () => {
+  it('renders the same number of elements at 5 backlog items and at 500', () => {
+    // Element count, not markup equality: the attention line's TEXT must
+    // differ ("5 need attention" vs "500 need attention") — that is the
+    // signal doing its job. What must NOT differ is how much page it takes.
+    // Counting every element makes this fail for ANY per-task rendering,
+    // wherever it is added and whichever pool it reads from.
+    const small = renderToday(backlog(5))
+    const smallElements = small.container.querySelectorAll('*').length
+    expect(smallElements).toBeGreaterThan(0)
+    small.unmount()
+
+    const large = renderToday(backlog(500))
+    expect(large.container.querySelectorAll('*').length).toBe(smallElements)
+  })
+
+  it('renders no backlog item on the page at all', () => {
+    // The count above would also be satisfied by rendering exactly N elements
+    // in both cases. This pins the actual rule: backlog is not the day.
+    renderToday(backlog(500))
+    expect(screen.queryByText('backlog 0')).toBeNull()
+    expect(screen.queryByText('backlog 250')).toBeNull()
+    expect(screen.queryByText('backlog 499')).toBeNull()
+  })
+
+  it('still reports the whole backlog in the one bounded line', () => {
+    // The budget is fixed, but nothing is hidden — the line names the size.
+    renderToday(backlog(500))
+    expect(screen.getByText(/500 need attention/)).toBeInTheDocument()
+  })
+})
 
 describe('Today invariant: non-commitment space is fixed', () => {
   it('a 5-item backlog and a 500-item backlog produce the same committed rows', () => {
