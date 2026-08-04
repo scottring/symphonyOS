@@ -4,6 +4,7 @@ import type { Routine, ActionableInstance } from '@/types/actionable'
 import type { TimelineItem } from '@/types/timeline'
 import type { DaySection } from '@/lib/timeUtils'
 import type { Contact } from '@/types/contact'
+import type { AttentionItem } from './attention'
 
 // A single selected id, an array of selected ids (multi-select / union), or
 // null/undefined/[] meaning "everyone". The pseudo-id 'unassigned' is allowed.
@@ -54,9 +55,10 @@ export interface TodayData {
   /** Overdue past the grace window. Never rendered as Today rows: the page
    *  shows a single pointer line and the review surface owns the list. */
   slippedTasks: Task[]
-  inboxTasks: Task[]
-  weekTasks: Task[]
-  monthTasks: Task[]
+  /** What needs attention, and why — Today's one bounded signal. Replaces the
+   *  inbox/week/month pools, which were backlog rendered on an execution
+   *  surface. */
+  attentionItems: AttentionItem[]
   completedInboxTasks: Task[]
   grouped: Record<DaySection, TimelineItem[]>
   sectionsOrder: DaySection[]
@@ -85,9 +87,7 @@ export const EMPTY_TODAY_DATA: TodayData = {
   isToday: false,
   overdueTasks: [],
   slippedTasks: [],
-  inboxTasks: [],
-  weekTasks: [],
-  monthTasks: [],
+  attentionItems: [],
   completedInboxTasks: [],
   grouped: emptySections<TimelineItem>(),
   sectionsOrder: SECTIONS_ORDER,

@@ -142,17 +142,6 @@ describe('computeTodayData', () => {
     expect(eventItems).toHaveLength(2)
   })
 
-  it('week + inbox pools populate only when isToday', () => {
-    const now = new Date()
-    const w = task({ id: 'w', bucket: 'week' })
-    const i = task({ id: 'i', bucket: 'inbox' })
-    const today = computeTodayData(baseInput({ tasks: [w, i], viewedDate: now }))
-    expect(today.weekTasks.map(t => t.id)).toEqual(['w'])
-    expect(today.inboxTasks.map(t => t.id)).toEqual(['i'])
-    const past = computeTodayData(baseInput({ tasks: [w, i], viewedDate: new Date('2020-01-01') }))
-    expect(past.weekTasks).toEqual([])
-    expect(past.inboxTasks).toEqual([])
-  })
 })
 
 // ── Progress counts must describe the timeline the user is actually looking at ──
@@ -263,5 +252,29 @@ describe('computeTodayData — progress counts match the rendered timeline', () 
     const d = computeTodayData(baseInput({ viewedDate: NOW, tasks: [open, done] }))
     expect(d.counts.actionableCount).toBe(2)
     expect(d.counts.completedCount).toBe(1)
+  })
+})
+
+describe('computeTodayData — Today is a commitment surface', () => {
+  it('no longer returns the inbox, week, or month pools', () => {
+    const data = computeTodayData(baseInput())
+    expect('inboxTasks' in data).toBe(false)
+    expect('weekTasks' in data).toBe(false)
+    expect('monthTasks' in data).toBe(false)
+  })
+
+  it('returns the attention set instead', () => {
+    const data = computeTodayData(baseInput())
+    expect(Array.isArray(data.attentionItems)).toBe(true)
+  })
+
+  it('totalItems does not count backlog — a day with only inbox items is clear', () => {
+    const input = baseInput()
+    input.tasks = [
+      { id: 'i1', title: 'old capture', completed: false, bucket: 'inbox',
+        scheduledFor: null, assignedTo: null,
+        createdAt: new Date('2026-01-01'), updatedAt: new Date('2026-01-01') } as Task,
+    ]
+    expect(computeTodayData(input).counts.totalItems).toBe(0)
   })
 })

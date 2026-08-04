@@ -6,8 +6,7 @@ describe('today types', () => {
   it('EMPTY_TODAY_DATA has the documented zeroed shape', () => {
     expect(EMPTY_TODAY_DATA.isToday).toBe(false)
     expect(EMPTY_TODAY_DATA.overdueTasks).toEqual([])
-    expect(EMPTY_TODAY_DATA.weekTasks).toEqual([])
-    expect(EMPTY_TODAY_DATA.inboxTasks).toEqual([])
+    expect(EMPTY_TODAY_DATA.attentionItems).toEqual([])
     expect(EMPTY_TODAY_DATA.sectionsOrder).toEqual(['allday', 'earlyMorning', 'morning', 'afternoon', 'evening', 'night', 'unscheduled'])
     expect(EMPTY_TODAY_DATA.counts).toEqual({
       completedCount: 0, incompleteOverdue: 0, actionableCount: 0, totalItems: 0, progressPercent: 0,

@@ -15,9 +15,7 @@ describe('parity: computeTodayData reproduces legacy TodaySchedule output', () =
       expect(d.grouped[s].map(i => i.title)).toEqual(mixedDayExpected.groupedTitles[s])
     }
   })
-  it('week / inbox / overdue pools match', () => {
-    expect(d.weekTasks.map(t => t.id)).toEqual(mixedDayExpected.weekIds)
-    expect(d.inboxTasks.map(t => t.id)).toEqual(mixedDayExpected.inboxIds)
+  it('overdue pool matches', () => {
     expect(d.overdueTasks.map(t => t.id).sort()).toEqual([...mixedDayExpected.overdueIds].sort())
     // The one deliberate divergence from legacy: a date expires, so anything
     // past the grace window leaves Today for the slipped queue.

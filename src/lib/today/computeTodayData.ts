@@ -1,7 +1,8 @@
 import type { TodayDataInput, TodayData } from './types'
 import { SECTIONS_ORDER } from './types'
 import { makeAssigneeFilter } from './assigneeFilter'
-import { selectCarriedOver, selectSlipped, selectInbox, selectWeek, selectMonth, selectCompletedInbox, selectTimed } from './taskPools'
+import { selectCarriedOver, selectSlipped, selectCompletedInbox, selectTimed } from './taskPools'
+import { selectNeedsAttention } from './attention'
 import { buildRoutineStatusMap, buildEventStatusMap, selectVisibleRoutines } from './statusMaps'
 import { buildGroupedSections } from './grouping'
 import { countRoutineUnits } from './routineCollections'
@@ -25,9 +26,9 @@ export function computeTodayData(input: TodayDataInput): TodayData {
   // count and linger filter below correctly describes the carried-over lane.
   const overdueTasks = selectCarriedOver(input.tasks, isToday, match)
   const slippedTasks = selectSlipped(input.tasks, isToday, match)
-  const inboxTasks = selectInbox(input.tasks, isToday, match)
-  const weekTasks = selectWeek(input.tasks, isToday, match, input.weekStart)
-  const monthTasks = selectMonth(input.tasks, isToday, match)
+  const attentionItems = isToday
+    ? selectNeedsAttention(input.tasks, match, new Date(), input.weekStart ?? new Date())
+    : []
   const completedInboxTasks = selectCompletedInbox(input.tasks, input.viewedDate, match)
   const timedTasks = selectTimed(input.tasks, input.viewedDate, match)
 
@@ -93,16 +94,14 @@ export function computeTodayData(input: TodayDataInput): TodayData {
   const completedCount = completedTasks + routineUnits.completed + completedOverdue
   const incompleteOverdue = overdueTasks.filter((t) => !t.completed).length
   const actionableCount = timedTasks.length + routineUnits.actionable + incompleteOverdue + completedOverdue
-  const totalItems = timedTasks.length + filteredEvents.length + visibleRoutines.length + inboxTasks.length + overdueTasks.length
+  const totalItems = timedTasks.length + filteredEvents.length + visibleRoutines.length + overdueTasks.length
   const progressPercent = actionableCount > 0 ? (completedCount / actionableCount) * 100 : 0
 
   return {
     isToday,
     overdueTasks: displayOverdueTasks,
     slippedTasks,
-    inboxTasks,
-    weekTasks,
-    monthTasks,
+    attentionItems,
     completedInboxTasks,
     grouped,
     sectionsOrder: SECTIONS_ORDER,
