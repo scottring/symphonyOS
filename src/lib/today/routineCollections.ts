@@ -159,10 +159,22 @@ export function countRoutineUnits(
  * Count routine units already sitting in a rendered section's item list (e.g.
  * the Unscheduled/"Anytime" band). Reads the SAME TimelineItem[] the timeline
  * would draw if the section were expanded — one row per routine-collection
- * item, one row per standalone dose — so this cannot drift from
- * countRoutineUnits above: it is the identical rule (skip resolves a unit out
- * of the pool rather than counting it as a loss) applied to the already-built
- * rows instead of re-deriving them from raw routines.
+ * item, one row per standalone dose — instead of re-deriving the population
+ * from raw routines a second time.
+ *
+ * This shares exactly two rules with countRoutineUnits above, both applied
+ * here against the item rather than re-computed from the routine:
+ *   1. a skipped unit is resolved and leaves the pool, not counted as a loss
+ *      (item.skipped here ↔ status === 'skipped' there);
+ *   2. a collection with no steps applicable today draws nothing and is
+ *      excluded entirely (item.collectionProgress.total === 0 here ↔
+ *      item.collectionProgress.total === 0 there — same field, same check).
+ * Sharing rules by hand, not by a single shared code path, is exactly the
+ * kind of thing that drifts silently — that is why
+ * `countRoutineUnits agrees with countRoutineRowUnits` in
+ * routineCollections.test.ts runs both functions over the same routine set
+ * (including an empty-collection day) and asserts the two figures match, so
+ * a future edit to one side that breaks parity fails a test, not a review.
  */
 export function countRoutineRowUnits(items: TimelineItem[]): { done: number; total: number } {
   let total = 0
@@ -170,6 +182,9 @@ export function countRoutineRowUnits(items: TimelineItem[]): { done: number; tot
   for (const item of items) {
     if (item.type !== 'routine' && item.type !== 'routine-collection') continue
     if (item.skipped) continue // resolved — off the day, not a loss
+    // A collection with no steps applicable today draws nothing — same rule,
+    // same field, as countRoutineUnits' collection branch above.
+    if (item.type === 'routine-collection' && (item.collectionProgress?.total ?? 0) === 0) continue
     total += 1
     if (item.completed) done += 1
   }

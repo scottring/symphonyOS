@@ -1,8 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import type { Routine } from '@/types/actionable'
-import { groupRoutineSteps, buildCollectionItem } from './routineCollections'
+import { groupRoutineSteps, buildCollectionItem, countRoutineUnits, countRoutineRowUnits } from './routineCollections'
 import type { ActionableInstance } from '@/types/actionable'
+import type { TimelineItem } from '@/types/timeline'
 import { weekdayKeyForDate, WEEKDAY_KEYS } from '@/lib/routineUtils'
+import { buildGroupedSections } from './grouping'
 
 function r(over: Partial<Routine>): Routine {
   return {
@@ -150,5 +152,142 @@ describe('buildCollectionItem', () => {
     expect(ids).toContain('today')
     expect(ids).not.toContain('other')
     expect(item.collectionProgress.total).toBe(2)
+  })
+})
+
+// ─── Parity: countRoutineUnits (raw routines) vs countRoutineRowUnits (built
+// items) ────────────────────────────────────────────────────────────────────
+//
+// The two functions count the same concept — "actionable routine rows on
+// screen" — from two different starting points (raw Routine[] vs the
+// TimelineItem[] buildGroupedSections already produced from that same
+// Routine[]). Nothing in the type system keeps their rules in lockstep; this
+// suite is what does. Every case here runs BOTH counters over the identical
+// routine set and status map and asserts they land on the same {done, total}.
+describe('countRoutineUnits agrees with countRoutineRowUnits', () => {
+  const viewed = new Date(2026, 0, 5) // a Monday
+  const todayKey = weekdayKeyForDate(viewed)
+  const otherKey = WEEKDAY_KEYS.find(k => k !== todayKey)!
+  const matchAll = () => true
+
+  /**
+   * Run both counters over the same routines + status map; return both
+   * results. `countRoutineRowUnits` runs over every day-section's items, not
+   * just `unscheduled` — a dosed routine's doses carry real times
+   * (`times_per_day`) and land in timed sections, so restricting to
+   * `unscheduled` would silently test an empty list for that case. The
+   * production call site (the Anytime row) only ever feeds it the
+   * `unscheduled` items; summing across all sections here is what makes this
+   * a like-for-like parity check against `countRoutineUnits`, which counts
+   * routine rows across the whole day regardless of section.
+   */
+  function parity(routines: Routine[], status: Map<string, ActionableInstance>) {
+    const viaRoutines = countRoutineUnits(routines, viewed, status, matchAll)
+    const grouped = buildGroupedSections({
+      timedTasks: [],
+      events: [],
+      routines,
+      viewedDate: viewed,
+      routineStatusMap: status,
+      eventStatusMap: new Map(),
+      match: matchAll,
+    })
+    const viaItems = countRoutineRowUnits(Object.values(grouped).flat())
+    return { viaRoutines, viaItems }
+  }
+
+  function expectAgreement(result: ReturnType<typeof parity>) {
+    expect(result.viaItems).toEqual({ done: result.viaRoutines.completed, total: result.viaRoutines.actionable })
+  }
+
+  it('a plain untimed routine', () => {
+    const result = parity([r({ id: 'a' })], new Map())
+    expectAgreement(result)
+    expect(result.viaRoutines).toEqual({ actionable: 1, completed: 0 })
+  })
+
+  it('a skipped routine leaves the pool on both sides', () => {
+    const status = new Map<string, ActionableInstance>([
+      ['a', { entity_type: 'routine', entity_id: 'a', status: 'skipped' } as ActionableInstance],
+    ])
+    const result = parity([r({ id: 'a' })], status)
+    expectAgreement(result)
+    expect(result.viaRoutines).toEqual({ actionable: 0, completed: 0 })
+  })
+
+  it('a dosed routine with multiple slots counts once per dose on both sides', () => {
+    const status = new Map<string, ActionableInstance>([
+      ['d#0', { entity_type: 'routine', entity_id: 'd#0', status: 'completed' } as ActionableInstance],
+    ])
+    const result = parity([r({ id: 'd', times_per_day: ['07:00', '19:00'] })], status)
+    expectAgreement(result)
+    expect(result.viaRoutines).toEqual({ actionable: 2, completed: 1 })
+  })
+
+  it('a collection with applicable steps counts as its one row on both sides', () => {
+    const parent = r({ id: 'p', name: 'Morning' })
+    const steps = [
+      r({ id: 's1', parent_routine_id: 'p', step_order: 0 }),
+      r({ id: 's2', parent_routine_id: 'p', step_order: 1 }),
+    ]
+    const status = new Map<string, ActionableInstance>([
+      ['s1', { entity_type: 'routine', entity_id: 's1', status: 'completed' } as ActionableInstance],
+    ])
+    const result = parity([parent, ...steps], status)
+    expectAgreement(result)
+    expect(result.viaRoutines).toEqual({ actionable: 1, completed: 0 }) // one step done, not all — not complete
+  })
+
+  it('a collection whose steps are ALL scheduled for other days is excluded on both sides', () => {
+    // This is Finding 1's reachable divergence: stepAppliesOnDate (via
+    // recurrence overrides on steps) can leave a collection with zero
+    // applicable steps today. buildGroupedSections still puts that empty
+    // collection's TimelineItem into `unscheduled` — countRoutineRowUnits
+    // must exclude it exactly like countRoutineUnits' own
+    // `(item.collectionProgress?.total ?? 0) === 0` check does, or the two
+    // counters read different totals for the same day.
+    const parent = r({ id: 'p2', name: 'Evening', recurrence_pattern: { type: 'daily' } })
+    const steps = [
+      r({ id: 'os1', parent_routine_id: 'p2', step_order: 0, recurrence_pattern: { type: 'weekly', days: [otherKey] } }),
+      r({ id: 'os2', parent_routine_id: 'p2', step_order: 1, recurrence_pattern: { type: 'weekly', days: [otherKey] } }),
+    ]
+    const result = parity([parent, ...steps], new Map())
+    expectAgreement(result)
+    expect(result.viaRoutines).toEqual({ actionable: 0, completed: 0 })
+  })
+})
+
+// ─── countRoutineRowUnits: direct unit coverage ─────────────────────────────
+// Cheaper than the full TodayView render harness in AnytimeRow.test.tsx —
+// items in, {done, total} out.
+describe('countRoutineRowUnits', () => {
+  function item(over: Partial<TimelineItem>): TimelineItem {
+    return {
+      id: 'i', type: 'routine', title: 't', startTime: null, endTime: null, completed: false,
+      ...over,
+    } as TimelineItem
+  }
+
+  it('counts standalone routine rows, done vs pending', () => {
+    const items = [item({ id: 'a', completed: true }), item({ id: 'b', completed: false })]
+    expect(countRoutineRowUnits(items)).toEqual({ done: 1, total: 2 })
+  })
+
+  it('a skipped row leaves the pool entirely', () => {
+    const items = [item({ id: 'a', skipped: true }), item({ id: 'b', completed: true })]
+    expect(countRoutineRowUnits(items)).toEqual({ done: 1, total: 1 })
+  })
+
+  it('an empty collection (no applicable steps today) is excluded', () => {
+    const items = [
+      item({ id: 'c1', type: 'routine-collection', collectionProgress: { done: 0, total: 0 } }),
+      item({ id: 'c2', type: 'routine-collection', collectionProgress: { done: 1, total: 2 } }),
+    ]
+    expect(countRoutineRowUnits(items)).toEqual({ done: 0, total: 1 })
+  })
+
+  it('ignores non-routine item types (e.g. tasks, events)', () => {
+    const items = [item({ id: 't', type: 'task', completed: true }), item({ id: 'e', type: 'event' })]
+    expect(countRoutineRowUnits(items)).toEqual({ done: 0, total: 0 })
   })
 })
