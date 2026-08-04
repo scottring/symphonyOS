@@ -57,6 +57,7 @@ export interface DbTask {
   notes: string | null
   links: (string | TaskLink)[] | null // Can be old string format or new object format
   phone_number: string | null
+  email: string | null
   contact_id: string | null
   assigned_to: string | null
   assigned_to_all: string[] | null
@@ -125,6 +126,7 @@ export function dbTaskToTask(dbTask: DbTask): Task {
     notes: dbTask.notes ?? undefined,
     links: normalizeLinks(dbTask.links),
     phoneNumber: dbTask.phone_number ?? undefined,
+    email: dbTask.email ?? undefined,
     contactId: dbTask.contact_id ?? undefined,
     assignedTo: dbTask.assigned_to ?? undefined,
     // Normalize assignee: legacy single-assignee tasks store only `assigned_to`
@@ -528,6 +530,7 @@ export function useSupabaseTasks() {
     isAllDay?: boolean  // Whether the task is all-day (no specific time)
     parentTaskId?: string  // Link as follow-up to a parent task (for context lineage)
     phoneNumber?: string  // Tap-to-call number (e.g. resolved from a linked contact)
+    email?: string        // Tap-to-mail address
     /** Create directly into a horizon pool (week/month/quarter/someday). Doing it
      *  in the INSERT avoids the addTask-then-setBucket race: the follow-up write
      *  can hit tasksRef before the temp→real id swap has rendered, and be
@@ -594,6 +597,7 @@ export function useSupabaseTasks() {
       isAllDay: options?.isAllDay,
       parentTaskId: options?.parentTaskId,
       phoneNumber: options?.phoneNumber,
+      email: options?.email,
       sourceId: options?.sourceId,
       goalId: options?.goalId,
       isFun: options?.isFun,
@@ -628,6 +632,7 @@ export function useSupabaseTasks() {
         is_all_day: options?.isAllDay ?? null,
         parent_task_id: options?.parentTaskId ?? null,
         phone_number: options?.phoneNumber ?? null,
+        email: options?.email ?? null,
         source_id: options?.sourceId ?? null,
         goal_id: options?.goalId ?? null,
         is_fun: options?.isFun ?? false,
@@ -1110,6 +1115,7 @@ export function useSupabaseTasks() {
     if ('notes' in updates) dbUpdates.notes = updates.notes ?? null
     if ('links' in updates) dbUpdates.links = updates.links ?? null
     if ('phoneNumber' in updates) dbUpdates.phone_number = updates.phoneNumber ?? null
+    if ('email' in updates) dbUpdates.email = updates.email ?? null
     if ('contactId' in updates) dbUpdates.contact_id = updates.contactId ?? null
     if ('assignedTo' in updates) dbUpdates.assigned_to = updates.assignedTo ?? null
     if ('assignedToAll' in updates) dbUpdates.assigned_to_all = updates.assignedToAll ?? null
@@ -1255,6 +1261,7 @@ export function useSupabaseTasks() {
     if ('notes' in updates) dbUpdates.notes = updates.notes ?? null
     if ('links' in updates) dbUpdates.links = updates.links ?? null
     if ('phoneNumber' in updates) dbUpdates.phone_number = updates.phoneNumber ?? null
+    if ('email' in updates) dbUpdates.email = updates.email ?? null
     if ('contactId' in updates) dbUpdates.contact_id = updates.contactId ?? null
     if ('assignedTo' in updates) dbUpdates.assigned_to = updates.assignedTo ?? null
     if ('assignedToAll' in updates) dbUpdates.assigned_to_all = updates.assignedToAll ?? null

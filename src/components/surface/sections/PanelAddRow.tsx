@@ -1,9 +1,12 @@
-import { MapPin, FileText, Camera, ListChecks, Link as LinkIcon, User } from 'lucide-react'
+import { MapPin, FileText, Camera, ListChecks, Link as LinkIcon, User, Phone, Mail } from 'lucide-react'
 
 /** The fields a task can carry that aren't set yet. */
-export type AddableField = 'location' | 'notes' | 'photo' | 'subtask' | 'link' | 'person'
+export type AddableField =
+  | 'phone' | 'email' | 'location' | 'notes' | 'photo' | 'subtask' | 'link' | 'person'
 
 const FIELD_META: Record<AddableField, { label: string; icon: typeof MapPin }> = {
+  phone: { label: 'Phone', icon: Phone },
+  email: { label: 'Email', icon: Mail },
   location: { label: 'Location', icon: MapPin },
   notes: { label: 'Notes', icon: FileText },
   photo: { label: 'Photo', icon: Camera },

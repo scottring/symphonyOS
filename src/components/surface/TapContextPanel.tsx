@@ -16,6 +16,7 @@ import { PanelPhotos } from './sections/PanelPhotos'
 import { PanelConversations } from './sections/PanelConversations'
 import { PanelLocation } from './sections/PanelLocation'
 import { PanelAddRow, type AddableField } from './sections/PanelAddRow'
+import { PanelReach } from './sections/PanelReach'
 import { PanelMightBeRelevant } from './sections/PanelMightBeRelevant'
 import { PanelClassify } from './sections/PanelClassify'
 import { PanelFooter } from './sections/PanelFooter'
@@ -70,6 +71,10 @@ interface TapContextPanelProps {
   /** Delete this group and all its tasks. Present only when the task has subtasks. */
   onDeleteGroup?: () => void
   onAddLink: (url: string) => void
+  /** Set/clear the tap-to-call number carried by this task. */
+  onPhoneChange: (next: string | undefined) => void
+  /** Set/clear the tap-to-mail address carried by this task. */
+  onEmailChange: (next: string | undefined) => void
   onUpdateLocation: (location: string, placeId?: string) => void
   onClearLocation: () => void
   /** Persist the task's route (origin/stops/mode). Omit to keep directions ephemeral. */
@@ -126,6 +131,8 @@ export function TapContextPanel(props: TapContextPanelProps) {
   // A section earns its header by having something in it. Everything else
   // collapses into the single Add row near the bottom.
   const has = {
+    phone: !!task.phoneNumber,
+    email: !!task.email,
     location: !!(task.location || task.locationPlaceId),
     notes: !!task.notes?.trim(),
     subtask: (task.subtasks?.length ?? 0) > 0,
@@ -136,7 +143,7 @@ export function TapContextPanel(props: TapContextPanelProps) {
     photo: photosHaveContent,
   }
   const show = (field: AddableField): boolean => has[field] || revealed.has(field)
-  const addable = (['location', 'notes', 'photo', 'subtask', 'link', 'person'] as const)
+  const addable = (['phone', 'email', 'location', 'notes', 'photo', 'subtask', 'link', 'person'] as const)
     .filter((f) => !show(f))
 
   // The whole panel accepts file drops, not just the Photos & files section
@@ -192,6 +199,23 @@ export function TapContextPanel(props: TapContextPanelProps) {
         selectedAssigneeIds={task.assignedToAll ?? (task.assignedTo ? [task.assignedTo] : [])}
         onAssigneesChange={props.onAssigneesChange}
       />
+      {show('phone') && (
+        <PanelReach
+          kind="phone"
+          value={task.phoneNumber}
+          onChange={props.onPhoneChange}
+          autoFocus={revealed.has('phone')}
+          asLink={false}
+        />
+      )}
+      {show('email') && (
+        <PanelReach
+          kind="email"
+          value={task.email}
+          onChange={props.onEmailChange}
+          autoFocus={revealed.has('email')}
+        />
+      )}
       {show('location') && <PanelLocation
         location={task.location}
         locationPlaceId={task.locationPlaceId}

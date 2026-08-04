@@ -192,6 +192,8 @@ function TaskPanelBody({ id }: { id: string }) {
       onClose={handleClose}
       onTitleChange={(t) => updateTask(task.id, { title: t })}
       onNotesChange={(n) => updateTask(task.id, { notes: n })}
+      onPhoneChange={(v) => updateTask(task.id, { phoneNumber: v })}
+      onEmailChange={(v) => updateTask(task.id, { email: v })}
       // onSaveNoteToVault intentionally omitted (vault integration removed)
       onToggleComplete={() => toggleTask(task.id)}
       onSchedule={(date, isAllDay) => {

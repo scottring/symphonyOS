@@ -220,4 +220,58 @@ describe('TapContextPanel', () => {
     expect(screen.getByText(/measurements are 30x40/i)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Notes' })).not.toBeInTheDocument()
   })
+
+  // ── Phone and email: how to reach whoever the task requires ───────────────
+
+  it('offers Phone and Email chips on a task that has neither', () => {
+    const task = createMockTask({ title: 'bare' })
+    render(<TapContextPanel
+      task={task}
+      contacts={[]} projects={[]} events={[]} familyMembers={[]} siblingTaskCandidates={[]} allTasks={[task]}
+      {...baseHandlers}
+    />)
+    expect(screen.getByRole('button', { name: 'Phone' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Email' })).toBeInTheDocument()
+  })
+
+  it('shows a stored number in the Phone section without a second call link', () => {
+    const task = createMockTask({ title: 'Call the school', phoneNumber: '(413) 555-0142' })
+    render(<TapContextPanel
+      task={task}
+      contacts={[]} projects={[]} events={[]} familyMembers={[]} siblingTaskCandidates={[]} allTasks={[task]}
+      {...baseHandlers}
+    />)
+    // The action bar owns the call button; the Phone section is the editor, so
+    // the number appears there as text rather than as a second tel: link.
+    expect(document.querySelectorAll('a[href^="tel:"]')).toHaveLength(1)
+    expect(screen.getAllByText('(413) 555-0142').length).toBeGreaterThan(0)
+    expect(screen.queryByRole('button', { name: 'Phone' })).not.toBeInTheDocument()
+  })
+
+  it('renders a stored address as a mailto: link', () => {
+    const task = createMockTask({ title: 'Email the office', email: 'office@school.org' })
+    render(<TapContextPanel
+      task={task}
+      contacts={[]} projects={[]} events={[]} familyMembers={[]} siblingTaskCandidates={[]} allTasks={[task]}
+      {...baseHandlers}
+    />)
+    expect(document.querySelector('a[href="mailto:office@school.org"]')).not.toBeNull()
+    expect(screen.queryByRole('button', { name: 'Email' })).not.toBeInTheDocument()
+  })
+
+  it('saves a typed number on blur', async () => {
+    const user = userEvent.setup()
+    const onPhoneChange = vi.fn()
+    const task = createMockTask({ title: 'bare' })
+    render(<TapContextPanel
+      task={task}
+      contacts={[]} projects={[]} events={[]} familyMembers={[]} siblingTaskCandidates={[]} allTasks={[task]}
+      {...baseHandlers}
+      onPhoneChange={onPhoneChange}
+    />)
+    await user.click(screen.getByRole('button', { name: 'Phone' }))
+    await user.type(screen.getByLabelText('Phone'), '413-555-0142')
+    await user.tab()
+    expect(onPhoneChange).toHaveBeenCalledWith('413-555-0142')
+  })
 })

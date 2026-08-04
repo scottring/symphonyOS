@@ -64,6 +64,10 @@ export interface Task {
   notes?: string
   links?: TaskLink[]
   phoneNumber?: string
+  /** Address to reach for this task — the school office, the vendor, the
+   *  claims desk. Sibling to phoneNumber: both are "how do I reach whoever
+   *  this task requires", captured once and surfaced when you act. */
+  email?: string
   contactId?: string // Linked contact (who task is ABOUT)
   assignedTo?: string // Who should DO this task (family member id) - legacy single assignment
   assignedToAll?: string[] // Multi-member assignment
