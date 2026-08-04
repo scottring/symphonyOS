@@ -2,7 +2,7 @@
  * TodayView — editorial Today shell.
  *
  * Drop-in replacement for TodaySchedule (same TodayScheduleProps interface).
- * Composes: TodayHeader, StatsRow, WeatherChip,
+ * Composes: TodayHeader, TodayOverflowMenu, WeatherChip,
  *           EveningMealCard, ScheduleItem.
  *
  * NOT wired to the route yet — that happens in R4.
@@ -37,7 +37,7 @@ import { useRecurringEventDetection } from '@/hooks/useRecurringEventDetection'
 import { useTimelineInsert } from '@/hooks/useTimelineInsert'
 import { useDomain } from '@/hooks/useDomain'
 
-import { Eye, EyeOff, Repeat, Binoculars, Sun, Printer, GripVertical, CalendarClock } from 'lucide-react'
+import { Eye, EyeOff, Repeat, Binoculars, Sun, Printer, GripVertical, CalendarClock, Moon } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { AssigneeFilter } from '@/components/home/AssigneeFilter'
 
@@ -48,8 +48,6 @@ import { resolveDrop, type DropIntent } from '@/lib/today/todayDrop'
 import { useCalendarPermissions } from '@/hooks/useCalendarPermissions'
 import { UpNextHero } from './UpNextHero'
 import { selectUpNext } from '@/lib/today/upNext'
-import { StatsRow } from './StatsRow'
-import { TodayProgress } from './TodayProgress'
 import { NeedsYourOK } from './NeedsYourOK'
 import { ClarityCurtain } from '@/components/clarity/ClarityCurtain'
 import { computeClaritySteps, type ClarityStepId } from '@/lib/clarity/claritySteps'
@@ -59,7 +57,7 @@ import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
 import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
 import { getRoutinesForDatePure } from '@/lib/routineUtils'
 import { StagingFloat } from './StagingFloat'
-import { EndOfDayCard } from './EndOfDayCard'
+import { TodayOverflowMenu } from './TodayOverflowMenu'
 import { EndOfDayReview } from './EndOfDayReview'
 import { DayNavCluster } from './DayNavCluster'
 import { OverdueSection } from './OverdueSection'
@@ -473,7 +471,7 @@ export function TodayView({
 
   const discussion = discussionItems(tasks)
 
-  // ── Clarity binoculars + remediation popover for StatsRow ─────────────────────
+  // ── Clarity binoculars + remediation popover (overflow menu) ────────────────
   // Interactive Clarity readout restored to the Today header (a static status
   // glance also lives in the sidebar). Trigger is a binoculars icon with an
   // explanatory hover tooltip; clicking opens ClarityIndicator's popover.
@@ -864,90 +862,97 @@ export function TodayView({
         </div>
       )}
 
-      {/* Unified Today header — one strip: momentum band (headline · rail ·
-          count) with the controls chips on the same row. Collapsing the old
-          two-row preamble is what buys the Up Next hero its above-the-fold
-          position. */}
-      <div className="px-3 md:px-0 mb-4 md:card md:rounded-2xl md:border md:border-neutral-200/70 md:px-4 md:py-2.5 md:flex md:flex-wrap md:items-center md:gap-x-5 md:gap-y-1">
-        <div className="md:flex-1 md:min-w-0 md:basis-[18rem] overflow-hidden">
-          <TodayProgress
-            completedCount={data.counts.completedCount}
-            actionableCount={data.counts.actionableCount}
-            isToday={data.isToday}
-          />
-        </div>
-        <div className="hidden md:block shrink-0">
-          <StatsRow
-          dueToday={data.counts.actionableCount}
-          doneToday={data.counts.completedCount}
-          thisWeek={data.weekTasks.length}
-          total={tasks.filter((t) => !t.completed).length}
-          aiAvailable={false}
-          weekTrigger={weekTrigger}
-          monthTrigger={monthTrigger}
-          clarityTrigger={clarityTrigger}
-          discussionTrigger={discussion.length > 0 ? <DiscussionBadge items={discussion} onSelectItem={onSelectItem} /> : undefined}
-          endControls={
-            <>
-              {onSelectAssignees && ((assigneesWithTasks?.length ?? 0) > 0 || hasUnassignedTasks) && (
-                <AssigneeFilter
-                  selectedAssignees={selectedAssignees ?? []}
-                  onSelectAssignees={onSelectAssignees}
-                  assigneesWithTasks={assigneesWithTasks ?? []}
-                  hasUnassignedTasks={!!hasUnassignedTasks}
-                />
+      {/* Today's controls — one primary action, everything else one tap away.
+          This strip used to carry a progress bar, four counters and seven
+          always-visible buttons above a list of two tasks. Nothing here was
+          removed; the rarely-used controls moved behind the overflow so the
+          page spends its space on the day instead of on itself. */}
+      <div
+        data-testid="today-controls"
+        className="px-3 md:px-0 mb-3 md:-mt-5 hidden md:flex items-center justify-end gap-1"
+      >
+        {data.isToday && onOpenPlanToday && (
+          <button
+            type="button"
+            onClick={onOpenPlanToday}
+            title="Plan today — review carried-over and pull from the week"
+            className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[15px] text-primary-600 transition-all hover:bg-primary-50"
+          >
+            <Sun className="w-5 h-5" />
+            <span>Plan today</span>
+          </button>
+        )}
+
+        <TodayOverflowMenu>
+          {onSelectAssignees && ((assigneesWithTasks?.length ?? 0) > 0 || hasUnassignedTasks) && (
+            <AssigneeFilter
+              selectedAssignees={selectedAssignees ?? []}
+              onSelectAssignees={onSelectAssignees}
+              assigneesWithTasks={assigneesWithTasks ?? []}
+              hasUnassignedTasks={!!hasUnassignedTasks}
+            />
+          )}
+          <button
+            type="button"
+            onClick={toggleHideRoutines}
+            title={hideRoutines ? 'Show daily activities' : 'Hide daily activities'}
+            aria-label={hideRoutines ? 'Show daily' : 'Hide daily'}
+            className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[15px] text-neutral-600 transition-all hover:bg-neutral-100"
+          >
+            {createElement(hideRoutines ? EyeOff : Eye, { className: 'w-5 h-5' })}
+            <span>{hideRoutines ? 'Show daily' : 'Hide daily'}</span>
+          </button>
+          {data.isToday && ctx.onOpenPlanning && (
+            <button
+              type="button"
+              onClick={ctx.onOpenPlanning}
+              title="Block out the day on an hour grid"
+              className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[15px] text-neutral-600 transition-all hover:bg-neutral-100"
+            >
+              <CalendarClock className="w-5 h-5" />
+              <span>Time-block</span>
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={printList}
+            title="Print a compact list of this day"
+            className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[15px] text-neutral-600 transition-all hover:bg-neutral-100"
+          >
+            <Printer className="w-5 h-5" />
+            <span>Print list</span>
+          </button>
+          {data.isToday && (
+            <button
+              type="button"
+              onClick={() => setEodReviewOpen(true)}
+              title="Reflect, prep for tomorrow, and close the day"
+              className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[15px] text-neutral-600 transition-all hover:bg-neutral-100"
+            >
+              <Moon className="w-5 h-5" />
+              <span>End of day review</span>
+            </button>
+          )}
+
+          {/* Signals that only appear when they have something to say. */}
+          {(weekTrigger || monthTrigger || clarityTrigger || discussion.length > 0 ||
+            (data.isToday && (sweep.pairs.length > 0 || proposal.count > 0))) && (
+            <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-neutral-100 px-2.5 pt-2 text-[12px] text-neutral-400">
+              {weekTrigger}
+              {monthTrigger}
+              {clarityTrigger}
+              {discussion.length > 0 && (
+                <DiscussionBadge items={discussion} onSelectItem={onSelectItem} />
               )}
-              <button
-                type="button"
-                onClick={toggleHideRoutines}
-                title={hideRoutines ? 'Show daily activities' : 'Hide daily activities'}
-                aria-label={hideRoutines ? 'Show daily' : 'Hide daily'}
-                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[15px] transition-all ${hideRoutines ? 'text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100' : 'text-neutral-600 hover:text-neutral-800 hover:bg-neutral-100'}`}
-              >
-                {createElement(hideRoutines ? EyeOff : Eye, { className: 'w-5 h-5' })}
-                <span>{hideRoutines ? 'Show daily' : 'Hide daily'}</span>
-              </button>
-              <button
-                type="button"
-                onClick={printList}
-                title="Print a compact list of this day"
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[15px] text-neutral-500 hover:text-neutral-800 hover:bg-neutral-100 transition-all"
-              >
-                <Printer className="w-5 h-5" />
-                <span>Print list</span>
-              </button>
-              {data.isToday && (
+              {data.isToday && sweep.pairs.length > 0 && (
                 <DuplicateSweepTrigger count={sweep.pairs.length} onOpen={() => sweep.setOpen(true)} />
               )}
-              {data.isToday && (
+              {data.isToday && proposal.count > 0 && (
                 <ProposalTrigger count={proposal.count} onOpen={() => proposal.setOpen(true)} />
               )}
-              {data.isToday && ctx.onOpenPlanning && (
-                <button
-                  type="button"
-                  onClick={ctx.onOpenPlanning}
-                  title="Block out the day on an hour grid"
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[15px] text-neutral-500 hover:text-neutral-800 hover:bg-neutral-100 transition-all"
-                >
-                  <CalendarClock className="w-5 h-5" />
-                  <span>Time-block</span>
-                </button>
-              )}
-              {data.isToday && onOpenPlanToday && (
-                <button
-                  type="button"
-                  onClick={onOpenPlanToday}
-                  title="Plan today — review carried-over and pull from the week"
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[15px] text-primary-600 hover:bg-primary-50 transition-all"
-                >
-                  <Sun className="w-5 h-5" />
-                  <span>Plan today</span>
-                </button>
-              )}
-            </>
-          }
-        />
-        </div>
+            </div>
+          )}
+        </TodayOverflowMenu>
       </div>
 
       {/* Up Next hero — the single next commitment, above everything else.
@@ -1145,11 +1150,8 @@ export function TodayView({
         )}
       </div>
 
-      {/* End of day — closing chapter for the timeline. Desktop-only; mobile
-          keeps a tighter schedule-focused view. */}
-      <div className="mt-5 hidden md:block">
-        <EndOfDayCard onOpenReview={() => setEodReviewOpen(true)} />
-      </div>
+      {/* End of day review lives in the overflow menu now. It was a permanent
+          full-width card advertising a feature you use once a day at most. */}
       <EndOfDayReview
         isOpen={eodReviewOpen}
         onClose={() => setEodReviewOpen(false)}

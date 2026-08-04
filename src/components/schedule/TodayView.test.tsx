@@ -52,6 +52,16 @@ const ctxValue = {
 // Use the actual current date so computeIsToday() returns true for today-mode tests
 const TODAY = new Date()
 
+/**
+ * Today's secondary controls (staging triggers, Clarity, discussion, assignee
+ * filter, show/hide daily, print, time-block) live behind one overflow button.
+ * They are hidden, not removed — these tests assert exactly that, so opening the
+ * menu is part of the contract rather than a workaround.
+ */
+async function openOverflow(user: { click: (el: Element) => Promise<void> }) {
+  await user.click(screen.getByRole('button', { name: /more controls/i }))
+}
+
 function renderView(props: Record<string, unknown> = {}, ctxOverrides: Record<string, unknown> = {}) {
   return render(
     <ScheduleActionsProvider value={{ ...ctxValue, ...ctxOverrides } as never}>
@@ -69,15 +79,14 @@ function renderView(props: Record<string, unknown> = {}, ctxOverrides: Record<st
 describe('TodayView', () => {
   it('renders the controls strip (HomeHeader date label is now in HomeView, not TodayView)', () => {
     // The date label (e.g. "Tuesday, May 19, 2026") moved to HomeHeader which is
-    // rendered by HomeView — it is not in TodayView's subtree. The numeric counts
-    // moved into the unified TodayProgress header; the StatsRow is now a
-    // controls-only strip, identified by data-testid="today-controls".
+    // rendered by HomeView — it is not in TodayView's subtree. The counts and the
+    // always-on control chips are gone entirely; what remains is a thin strip of
+    // "Plan today" + the overflow, identified by data-testid="today-controls".
     renderView()
     expect(screen.getByTestId('today-controls')).toBeInTheDocument()
   })
   it('renders exactly one controls strip (regression guard vs the duplicate-row defect)', () => {
-    // The controls strip is always rendered by StatsRow and unique to it — use
-    // it as the duplicate-row sentinel.
+    // The controls strip is unique to TodayView — the duplicate-row sentinel.
     renderView()
     expect(screen.getAllByTestId('today-controls')).toHaveLength(1)
   })
@@ -90,12 +99,14 @@ describe('TodayView', () => {
     expect(screen.queryByRole('button', { name: 'Week' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Month' })).not.toBeInTheDocument()
   })
-  it('renders the This Week staging trigger', () => {
-    renderView()
+  it('keeps the This Week staging trigger, one tap into the overflow', async () => {
+    const { user } = renderView()
+    await openOverflow(user)
     expect(screen.getByRole('button', { name: /this week/i })).toBeInTheDocument()
   })
-  it('renders the assignee filter and a routine show/hide toggle', () => {
-    renderView({ assigneesWithTasks: [{ id: 'm1', name: 'Iris' } as never], hasUnassignedTasks: true })
+  it('keeps the assignee filter and routine show/hide toggle in the overflow', async () => {
+    const { user } = renderView({ assigneesWithTasks: [{ id: 'm1', name: 'Iris' } as never], hasUnassignedTasks: true })
+    await openOverflow(user)
     expect(screen.getByRole('button', { name: /hide daily|show daily/i })).toBeInTheDocument()
   })
 
@@ -107,8 +118,9 @@ describe('TodayView', () => {
 
   it('routine toggle flips its label after click', async () => {
     const { user } = renderView()
-    const toggle = screen.getByRole('button', { name: /hide daily/i })
-    await user.click(toggle)
+    await openOverflow(user)
+    await user.click(screen.getByRole('button', { name: /hide daily/i }))
+    await openOverflow(user)
     expect(screen.getByRole('button', { name: /show daily/i })).toBeInTheDocument()
   })
 
@@ -245,8 +257,8 @@ describe('TodayView', () => {
     }
   })
 
-  it('shows the discussion badge when a task needs discussion', () => {
-    renderView({
+  it('shows the discussion badge in the overflow when a task needs discussion', async () => {
+    const { user } = renderView({
       tasks: [
         {
           id: 'disc-1',
@@ -258,13 +270,15 @@ describe('TodayView', () => {
         },
       ],
     })
+    await openOverflow(user)
     expect(screen.getByText(/to discuss/i)).toBeInTheDocument()
   })
 
-  it('renders the Clarity binoculars in the content stats row', () => {
-    // Clarity was restored to the Today header as a binoculars icon with an
-    // explanatory hover tooltip; the static status glance still lives in the sidebar.
-    renderView()
+  it('keeps the Clarity binoculars reachable from the overflow', async () => {
+    // Clarity is a binoculars icon with an explanatory hover tooltip; the static
+    // status glance still lives in the sidebar.
+    const { user } = renderView()
+    await openOverflow(user)
     expect(screen.getByLabelText(/clarity/i)).toBeInTheDocument()
   })
 
@@ -427,8 +441,9 @@ describe('TodayView', () => {
 // and avatars; this is the same day as one line per item. Mounted only while
 // printing so it can't duplicate every title in the DOM. ──
 describe('TodayView print list', () => {
-  it('offers a Print list control', () => {
-    renderView()
+  it('offers a Print list control in the overflow', async () => {
+    const { user } = renderView()
+    await openOverflow(user)
     expect(screen.getByRole('button', { name: /Print list/i })).toBeInTheDocument()
   })
 
