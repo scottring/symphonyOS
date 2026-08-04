@@ -40,6 +40,18 @@ describe('AttentionLine', () => {
     expect(onReview).toHaveBeenCalledOnce()
   })
 
+  // Regression guard for the mobile bottom-nav/FAB clipping bug: jsdom has no
+  // real layout engine, so this can't assert actual pixel clearance (that was
+  // verified visually in Chrome — see FIXES-BATCH-1.md). What IS meaningfully
+  // assertable here is that the mobile-only clearance utility hasn't been
+  // silently dropped, which is the most likely way this regresses again.
+  it('keeps a mobile-only bottom margin so it clears the fixed tab bar and FAB', () => {
+    render(<AttentionLine items={[item('a', 'slipped', 3)]} onReview={() => {}} />)
+    const button = screen.getByRole('button')
+    expect(button.className).toContain('mb-[7.5rem]')
+    expect(button.className).toContain('md:mb-0')
+  })
+
   // The invariant, at component scale.
   it('renders the same number of rows for 3 items as for 300', () => {
     const few = Array.from({ length: 3 }, (_, i) => item(`f${i}`, 'aging-inbox', i + 1))

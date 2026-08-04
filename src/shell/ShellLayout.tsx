@@ -20,6 +20,7 @@ import { useScratchpadHidden } from '@/hooks/useScratchpadHidden';
 import { useAssistantLaunchRequests, useAssistantLauncher } from '@/contexts/AssistantLaunchContext';
 import { useShellChrome } from './useShellChrome';
 import { useSelection } from './providers/SelectionProvider';
+import { MOBILE_TAB_BAR_HEIGHT } from './mobileChrome';
 
 /**
  * ShellLayout wraps Shell-mounted apps with the Symphony app chrome — the
@@ -259,7 +260,14 @@ function ShellLayoutInner({ children }: Props) {
         className={`relative flex-1 overflow-auto overflow-x-hidden ${isMobile ? '' : 'transition-all duration-300 ease-in-out'}`}
         style={
           isMobile
-            ? { paddingBottom: 'calc(2.75rem + env(safe-area-inset-bottom, 0px))' }
+            ? {
+                // Must clear the fixed bottom tab bar below (MOBILE_TAB_BAR_HEIGHT),
+                // plus a little slack, plus the safe-area inset the bar itself sits
+                // above. See mobileChrome.ts — this used to be a separate, smaller
+                // hardcoded literal (2.75rem) that silently fell out of sync with
+                // the bar's actual height and clipped AttentionLine.
+                paddingBottom: `calc(${MOBILE_TAB_BAR_HEIGHT} + 0.5rem + env(safe-area-inset-bottom, 0px))`,
+              }
             : { marginRight: selection ? '480px' : rightRailVisible ? '380px' : todayRailVisible ? '420px' : '0' }
         }
       >

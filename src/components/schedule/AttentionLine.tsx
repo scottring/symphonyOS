@@ -35,7 +35,15 @@ export function AttentionLine({ items, onReview }: AttentionLineProps) {
     <button
       type="button"
       onClick={onReview}
-      className="w-full flex items-center gap-2 px-3 md:px-0 py-2 mt-1 text-left text-[13px] text-neutral-500 hover:text-neutral-700 transition-colors"
+      // mb-[7.5rem] (mobile only): this is the last row on the mobile Today
+      // page, so without real clearance it lands directly under the fixed
+      // QuickCapture FAB (bottom-right) once the page is scrolled all the
+      // way down — obscuring the "Review" label, the one thing on this line
+      // a user can act on. Measured in Chrome: the FAB's own band is ~5rem
+      // tall, so a plain rem-for-rem guess undershoots; this value was
+      // verified in the browser to clear it with margin to spare. Desktop
+      // has no FAB, hence md:mb-0.
+      className="w-full flex items-center gap-2 px-3 md:px-0 py-2 mt-1 mb-[7.5rem] md:mb-0 text-left text-[13px] text-neutral-500 hover:text-neutral-700 transition-colors"
     >
       <Archive className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
       <span className="font-medium text-neutral-600 shrink-0">
