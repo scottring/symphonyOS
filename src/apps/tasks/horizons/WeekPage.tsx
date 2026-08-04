@@ -117,17 +117,49 @@ export function WeekPage() {
   // The four fates map onto writers this page already has. 'today' and 'week'
   // go through pushTask so they inherit its weekStart handling and defer_count
   // increment; 'someday' is a resolution rather than a deferral, so it writes
-  // the bucket directly and does not count as a defer. Delete routes through
-  // the undo-wrapped writer, same as every other delete on this page.
+  // the bucket directly and does not count as a defer.
+  //
+  // Delete is NOT deleteTaskWithUndo-in-a-loop, for the same reason the merge
+  // branch of handleApplyProposal below isn't: deleteTaskWithUndo (handleLetGo)
+  // pushes its OWN undo action per call, and the undo store is single-slot
+  // (useUndo.ts — setCurrentAction REPLACES), so letting go of N≥2 items would
+  // push N actions, keep only the last, and silently strand the rest. This
+  // surface's whole point is bulk triage, so N≥2 is the NORMAL case here, not
+  // an edge one. Snapshot the batch first, delete each via the RAW deleteTask
+  // (no per-call undo), then push exactly ONE undo that recreates every
+  // snapshot. Restore fields mirror handleLetGo's recreate-body exactly.
   const handleAttentionApply = useCallback((ids: string[], fate: AttentionFate) => {
+    if (fate === 'delete') {
+      const doomed = ids
+        .map((id) => tasksById.get(id))
+        .filter((t): t is Task => !!t);
+      if (doomed.length > 0) {
+        undo.pushAction(`Deleted ${doomed.length} item${doomed.length === 1 ? '' : 's'}`, () => {
+          for (const t of doomed) {
+            void addTask(t.title, t.contactId, t.projectId, t.scheduledFor, {
+              bucket: t.bucket,
+              context: t.context ?? undefined,
+              assignedTo: t.assignedTo ?? null,
+              assignedToAll: t.assignedToAll,
+              goalId: t.goalId,
+              sourceId: t.sourceId,
+              phoneNumber: t.phoneNumber,
+              isFun: t.isFun,
+            });
+          }
+        });
+        for (const t of doomed) deleteTask(t.id);
+      }
+      setReviewOpen(false);
+      return;
+    }
     for (const id of ids) {
-      if (fate === 'delete') deleteTaskWithUndo(id);
-      else if (fate === 'today') void pushTask(id, new Date());
+      if (fate === 'today') void pushTask(id, new Date());
       else if (fate === 'week') void pushTask(id, 'week');
       else void updateTask(id, { bucket: 'someday', scheduledFor: undefined });
     }
     setReviewOpen(false);
-  }, [deleteTaskWithUndo, pushTask, updateTask]);
+  }, [tasksById, undo, addTask, deleteTask, pushTask, updateTask]);
 
   // Union of this week's grid tasks + carried-over (prior-week overdue) tasks,
   // deduped by id. weekGridTasks alone excludes a task scheduled BEFORE the

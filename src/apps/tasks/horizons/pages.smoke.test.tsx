@@ -289,6 +289,44 @@ describe('horizon pages (smoke)', () => {
     expect(screen.queryByRole('region', { name: /needs attention review/i })).toBeNull()
   })
 
+  it('WeekPage: letting go of N items is ONE undo that restores ALL of them', async () => {
+    // The undo store is single-slot (useUndo.ts — setCurrentAction REPLACES),
+    // so a loop of per-task undo pushes leaves only the last one recoverable
+    // and silently loses the rest. This is the user's real personal data, so
+    // the delete fate must snapshot the whole batch and push exactly one undo
+    // that recreates every row — the same shape handleApplyProposal's merge
+    // branch already uses, and for the same reason.
+    pushStranded('s1', 'Order the vanity')
+    pushStranded('s2', 'Call the plumber')
+    pushStranded('s3', 'Return the tiles')
+    renderWeekAt('/week?review=attention')
+
+    const region = screen.getByRole('region', { name: /needs attention review/i })
+    fireEvent.click(within(region).getByRole('checkbox', { name: /select all/i }))
+    fireEvent.click(within(region).getByRole('button', { name: 'Delete' }))
+
+    // One toast for the batch, worded for the count — not the last title.
+    expect(await screen.findByText('Deleted 3 items')).toBeInTheDocument()
+
+    mockAddTask.mockClear()
+    fireEvent.click(screen.getByRole('button', { name: /undo/i }))
+
+    // EVERY deleted task comes back, not just the most recent.
+    const restored = mockAddTask.mock.calls.map(([title]) => title).sort()
+    expect(restored).toEqual(['Call the plumber', 'Order the vanity', 'Return the tiles'])
+  })
+
+  it('WeekPage: letting go of a single item still reads in the singular', () => {
+    pushStranded('s1', 'Order the vanity')
+    renderWeekAt('/week?review=attention')
+
+    const region = screen.getByRole('region', { name: /needs attention review/i })
+    fireEvent.click(within(region).getByRole('checkbox', { name: /select all/i }))
+    fireEvent.click(within(region).getByRole('button', { name: 'Delete' }))
+
+    expect(screen.getByText('Deleted 1 item')).toBeInTheDocument()
+  })
+
   it('WeekPage keeps the fate actions working after the move off Today', () => {
     pushStranded()
     renderWeekAt('/week?review=attention')
