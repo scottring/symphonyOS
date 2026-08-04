@@ -17,7 +17,7 @@
  */
 
 import type { Task } from '@/types/task'
-import { selectSlipped, type Match } from './taskPools'
+import { selectSlipped, daysBetween, type Match } from './taskPools'
 import { isStaleWeekPlacement } from './weekPlacement'
 
 export type AttentionReason = 'slipped' | 'stranded-week' | 'aging-month' | 'aging-inbox'
@@ -44,15 +44,6 @@ export interface AttentionItem {
   task: Task
   reason: AttentionReason
   ageDays: number
-}
-
-/** Whole days between two instants, both floored to local midnight. */
-function daysBetween(from: Date, to: Date): number {
-  const a = new Date(from)
-  a.setHours(0, 0, 0, 0)
-  const b = new Date(to)
-  b.setHours(0, 0, 0, 0)
-  return Math.round((b.getTime() - a.getTime()) / 86400000)
 }
 
 /**

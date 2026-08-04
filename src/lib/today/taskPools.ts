@@ -20,7 +20,7 @@ export type Match = (assignedTo: string | null | undefined, assignedToAll?: read
 export const GRACE_DAYS = 2
 
 /** Whole days between two instants, both floored to local midnight first. */
-function daysBetween(from: Date, to: Date): number {
+export function daysBetween(from: Date, to: Date): number {
   const a = new Date(from)
   a.setHours(0, 0, 0, 0)
   const b = new Date(to)
