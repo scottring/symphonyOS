@@ -1,7 +1,20 @@
-import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import DOMPurify from 'dompurify'
 import { fetchRecipe, formatIngredientNarrative, toNarrativeStep } from '@/lib/recipeParser'
 import type { RecipeData } from '@/lib/recipeParser'
+
+/** Swipe must travel this far, and be this much more horizontal than vertical,
+ *  before it pages a day. Tuned for a wall-mounted panel, not a phone. */
+const SWIPE_MIN_PX = 70
+const SWIPE_AXIS_RATIO = 1.5
+
+/** One step of day paging: which day the arrow goes to, and what's cooking there. */
+export interface RecipeDayNeighbor {
+  /** "Tonight" / "Mon, Aug 3" */
+  label: string
+  /** The meal name on that day, so the cook knows before tapping. */
+  title: string
+}
 
 interface WallRecipeViewerProps {
   /** Web recipe URL to fetch + parse. Omit when passing `content` directly. */
@@ -10,10 +23,21 @@ interface WallRecipeViewerProps {
   content?: { title: string; ingredients: string[]; instructions: string[] }
   mealName: string
   mealIcon: string
+  /** Which day is on screen — "Tonight" or "Mon, Aug 3". Omit to hide. */
+  dayLabel?: string
+  /** Adjacent planned days. `null`/omitted hides that arrow. */
+  prevDay?: RecipeDayNeighbor | null
+  nextDay?: RecipeDayNeighbor | null
+  onPrevDay?: () => void
+  onNextDay?: () => void
   onClose: () => void
 }
 
-export function WallRecipeViewer({ url, content, mealName, mealIcon, onClose }: WallRecipeViewerProps) {
+export function WallRecipeViewer({
+  url, content, mealName, mealIcon,
+  dayLabel, prevDay, nextDay, onPrevDay, onNextDay,
+  onClose,
+}: WallRecipeViewerProps) {
   const [recipe, setRecipe] = useState<RecipeData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -26,17 +50,48 @@ export function WallRecipeViewer({ url, content, mealName, mealIcon, onClose }: 
     return () => clearTimeout(timer)
   }, [])
 
-  // Escape key to close
+  const goPrev = prevDay && onPrevDay ? onPrevDay : null
+  const goNext = nextDay && onNextDay ? onNextDay : null
+
+  // Escape closes; left/right page days (a keyboard is only ever attached in
+  // dev, but it costs nothing and makes the viewer testable without touch).
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
       if (e.key === 'Escape') onClose()
+      else if (e.key === 'ArrowLeft') goPrev?.()
+      else if (e.key === 'ArrowRight') goNext?.()
     }
     document.addEventListener('keydown', handleKey)
     return () => document.removeEventListener('keydown', handleKey)
-  }, [onClose])
+  }, [onClose, goPrev, goNext])
+
+  // Horizontal swipe to page days. The ingredient/step columns scroll
+  // vertically, so a swipe only counts when it's decisively sideways —
+  // otherwise a slightly-angled scroll would yank the cook to another day.
+  const swipeStart = useRef<{ x: number; y: number } | null>(null)
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    const t = e.touches[0]
+    swipeStart.current = t ? { x: t.clientX, y: t.clientY } : null
+  }, [])
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    const start = swipeStart.current
+    swipeStart.current = null
+    const t = e.changedTouches[0]
+    if (!start || !t) return
+    const dx = t.clientX - start.x
+    const dy = t.clientY - start.y
+    if (Math.abs(dx) < SWIPE_MIN_PX) return
+    if (Math.abs(dx) < Math.abs(dy) * SWIPE_AXIS_RATIO) return
+    // Swipe left = move forward in time, matching every photo/day carousel.
+    if (dx < 0) goNext?.()
+    else goPrev?.()
+  }, [goPrev, goNext])
 
   // Load recipe: use stored content directly when provided, otherwise fetch+parse the URL.
+  // Ticked-off ingredients belong to the recipe on screen, so paging to another
+  // day starts that day's list unchecked.
   useEffect(() => {
+    setCheckedIngredients(new Set())
     if (content) {
       setRecipe({
         title: content.title,
@@ -91,11 +146,26 @@ export function WallRecipeViewer({ url, content, mealName, mealIcon, onClose }: 
     })
   }, [])
 
+  const hasDayNav = !!(goPrev || goNext)
+  // Rendered in every state (loading/error included) so a day with a slow web
+  // recipe is never a dead end — you can always page onward.
+  const dayNav = hasDayNav ? (
+    <>
+      {prevDay && goPrev && <DayNavButton side="prev" day={prevDay} onClick={goPrev} />}
+      {nextDay && goNext && <DayNavButton side="next" day={nextDay} onClick={goNext} />}
+    </>
+  ) : null
+
   // ── Loading state ──
   if (loading) {
     return (
-      <div className={`absolute inset-0 z-50 transition-all duration-400 ease-out ${visible ? 'opacity-100' : 'opacity-0'}`}>
+      <div
+        className={`absolute inset-0 z-50 transition-all duration-400 ease-out ${visible ? 'opacity-100' : 'opacity-0'}`}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
         <div className="absolute inset-0 bg-[#0f172a]/95" />
+        {dayNav}
         <div className="absolute inset-0 flex items-center justify-center">
           <div className="text-center">
             <div className="text-[4rem] mb-4">{mealIcon}</div>
@@ -115,8 +185,13 @@ export function WallRecipeViewer({ url, content, mealName, mealIcon, onClose }: 
   // ── Error state ──
   if (error || !recipe) {
     return (
-      <div className={`absolute inset-0 z-50 transition-all duration-400 ease-out ${visible ? 'opacity-100' : 'opacity-0'}`}>
+      <div
+        className={`absolute inset-0 z-50 transition-all duration-400 ease-out ${visible ? 'opacity-100' : 'opacity-0'}`}
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+      >
         <div className="absolute inset-0 bg-[#0f172a]/95" />
+        {dayNav}
         <div className="absolute inset-0 flex items-center justify-center">
           <div className="text-center max-w-lg">
             <div className="text-[4rem] mb-4">{mealIcon}</div>
@@ -141,9 +216,14 @@ export function WallRecipeViewer({ url, content, mealName, mealIcon, onClose }: 
 
   // ── Main split-screen view ──
   return (
-    <div className={`absolute inset-0 z-50 transition-all duration-500 ease-out ${visible ? 'opacity-100' : 'opacity-0'}`}>
+    <div
+      className={`absolute inset-0 z-50 transition-all duration-500 ease-out ${visible ? 'opacity-100' : 'opacity-0'}`}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+    >
       {/* Backdrop */}
       <div className="absolute inset-0 bg-[#0f172a]/97" />
+      {dayNav}
 
       {/* Content */}
       <div className={`absolute inset-0 transition-all duration-500 ease-out ${visible ? 'translate-y-0 scale-100' : 'translate-y-4 scale-[0.98]'}`}>
@@ -159,6 +239,11 @@ export function WallRecipeViewer({ url, content, mealName, mealIcon, onClose }: 
                 {recipe.title}
               </h1>
               <div className="flex items-center gap-4 mt-1">
+                {dayLabel && (
+                  <span className="text-[#F9C35C] font-black text-[1rem] uppercase tracking-widest">
+                    {dayLabel}
+                  </span>
+                )}
                 {recipe.totalTime && (
                   <span className="text-white/40 font-bold text-[1rem] flex items-center gap-1.5">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -188,7 +273,8 @@ export function WallRecipeViewer({ url, content, mealName, mealIcon, onClose }: 
         </div>
 
         {/* ── Split Screen Body ── */}
-        <div className="flex gap-0 px-12 pb-8 h-[calc(100%-120px)]">
+        {/* Padded clear of the day-nav rails when they're showing. */}
+        <div className={`flex gap-0 pb-8 h-[calc(100%-120px)] ${hasDayNav ? 'px-[168px]' : 'px-12'}`}>
 
           {/* ─── LEFT: Ingredients ─── */}
           <div className="w-[35%] h-full flex flex-col pr-8">
@@ -314,6 +400,49 @@ export function WallRecipeViewer({ url, content, mealName, mealIcon, onClose }: 
         .duration-400 { transition-duration: 400ms; }
       `}</style>
     </div>
+  )
+}
+
+// ── Day nav rail ──
+//
+// A full-height edge rail rather than a small arrow: the cook is at the counter
+// with wet hands, so the target is 112px wide and the whole body tall. It names
+// the day AND the meal, so you know where the arrow goes before you commit.
+
+function DayNavButton({
+  side, day, onClick,
+}: { side: 'prev' | 'next'; day: RecipeDayNeighbor; onClick: () => void }) {
+  const isPrev = side === 'prev'
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label={`${isPrev ? 'Previous' : 'Next'} day: ${day.label}, ${day.title}`}
+      style={{ touchAction: 'pan-y' }}
+      className={`
+        absolute top-[112px] bottom-6 w-[150px] z-40
+        ${isPrev ? 'left-0 bg-gradient-to-r border-r' : 'right-0 bg-gradient-to-l border-l'}
+        from-white/[0.07] to-transparent border-white/[0.08]
+        flex flex-col items-center justify-center gap-4 px-4
+        transition-all duration-150 active:scale-[0.97] active:from-white/[0.16]
+        hover:from-white/[0.11]
+      `}
+    >
+      <div className="w-14 h-14 rounded-2xl bg-white/[0.08] border border-white/15 flex items-center justify-center flex-shrink-0">
+        <svg
+          className="w-8 h-8 text-white/75"
+          fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2.5}
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d={isPrev ? 'M15 19l-7-7 7-7' : 'M9 5l7 7-7 7'} />
+        </svg>
+      </div>
+      <div className="text-[#F9C35C]/70 font-black text-[0.9rem] uppercase tracking-widest">
+        {day.label}
+      </div>
+      <div className="text-white/65 font-bold text-[1.1rem] leading-tight line-clamp-4">
+        {day.title}
+      </div>
+    </button>
   )
 }
 

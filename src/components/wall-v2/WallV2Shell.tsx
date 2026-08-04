@@ -57,6 +57,9 @@ import { WALL } from './wallTheme';
 import { useWallData } from '@/hooks/useWallData';
 import { useWeather } from '@/hooks/useWeather';
 import { useMealEventsForDate } from '@/shell/providers/MealEventsProvider';
+import { useMealDayRecipes } from '@/hooks/useMealDayRecipes';
+import { localDateKey, mealDayLabel, neighborDays, type MealDayRecipe } from '@/lib/mealDayRecipes';
+import type { MealSlot } from '@/types/meal-planner';
 import { findDinnerEvent, findBreakfastEvent, getMealIcon } from '@/components/wall/WallDinnerWidget';
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar';
 import { extractRecipeNameHint, resolveRecipeUrl } from '@/lib/recipeDetection';
@@ -277,6 +280,9 @@ export function WallV2Shell() {
   // behind a full-screen ambient clock/weather screen.
   const [guestMode, setGuestMode] = useState(false);
   const [recipeViewerMeal, setRecipeViewerMeal] = useState<'dinner' | 'breakfast' | null>(null);
+  // Which day the open recipe viewer is showing. null = today (the day the
+  // wall face is about); a date key = the cook paged to another planned day.
+  const [viewerDayKey, setViewerDayKey] = useState<string | null>(null);
   const [showDiscussion, setShowDiscussion] = useState(false);
   const [showQuickCapture, setShowQuickCapture] = useState(false);
   const [showListSheet, setShowListSheet] = useState(false);
@@ -321,6 +327,83 @@ export function WallV2Shell() {
   const breakfast = useMealCardData(breakfastEvent, 'Breakfast');
   const viewerMeal = recipeViewerMeal === 'breakfast' ? breakfast : dinner;
   const viewerEvent = recipeViewerMeal === 'breakfast' ? breakfastEvent : dinnerEvent;
+
+  // ─── Recipe viewer: paging to the previous / next planned day ───
+  // `now` ticks every minute; the day list must not, so everything below keys
+  // off the date only.
+  const todayKey = useMemo(() => localDateKey(now), [now]);
+  const anchorDate = useMemo(() => {
+    const d = new Date(now);
+    d.setHours(0, 0, 0, 0);
+    return d;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [todayKey]);
+  const viewerSlot: MealSlot = recipeViewerMeal === 'breakfast' ? 'breakfast' : 'dinner';
+  const { days: plannedDays } = useMealDayRecipes(anchorDate, viewerSlot, recipeViewerMeal !== null);
+
+  // Today's entry comes from the live wall data, not the plan — tonight's
+  // dinner can be a calendar event rather than a meal-plan row, and the viewer
+  // must open on exactly what the dinner card said.
+  const liveTodayName = viewerMeal.recipeUrl || viewerMeal.recipeContent ? viewerMeal.mealName : null;
+  const navDays = useMemo(() => {
+    const others = plannedDays.filter((d) => d.dateKey !== todayKey);
+    const todayEntry: MealDayRecipe | null = liveTodayName
+      ? { dateKey: todayKey, date: anchorDate, title: liveTodayName, ingredients: [], instructions: [] }
+      : plannedDays.find((d) => d.dateKey === todayKey) ?? null;
+    return [...others, ...(todayEntry ? [todayEntry] : [])]
+      .sort((a, b) => a.dateKey.localeCompare(b.dateKey));
+  }, [plannedDays, todayKey, anchorDate, liveTodayName]);
+
+  const selectedDayKey = viewerDayKey ?? todayKey;
+  const selectedPlannedDay = useMemo(
+    () => (selectedDayKey === todayKey ? null : plannedDays.find((d) => d.dateKey === selectedDayKey) ?? null),
+    [selectedDayKey, todayKey, plannedDays],
+  );
+  // A paged-to day that disappears (plan edited from the phone mid-view) drops
+  // back to today rather than showing a blank recipe.
+  useEffect(() => {
+    if (viewerDayKey && viewerDayKey !== todayKey && !selectedPlannedDay) setViewerDayKey(null);
+  }, [viewerDayKey, todayKey, selectedPlannedDay]);
+
+  const { prev: prevNavDay, next: nextNavDay } = useMemo(
+    () => neighborDays(navDays, selectedDayKey),
+    [navDays, selectedDayKey],
+  );
+  const toNeighbor = useCallback(
+    (day: MealDayRecipe | null) =>
+      day ? { label: mealDayLabel(day.date, viewerSlot, todayKey), title: day.title } : null,
+    [viewerSlot, todayKey],
+  );
+
+  // What the viewer actually renders: the live meal on today, the stored recipe
+  // on any other day. Memoized so the `content` object keeps a stable identity —
+  // the viewer reloads whenever it changes.
+  const viewerPayload = useMemo(() => {
+    if (!recipeViewerMeal) return null;
+    if (selectedPlannedDay) {
+      const hasBody =
+        selectedPlannedDay.ingredients.length > 0 || selectedPlannedDay.instructions.length > 0;
+      return {
+        url: hasBody ? undefined : selectedPlannedDay.sourceUrl,
+        content: hasBody
+          ? {
+              title: selectedPlannedDay.title,
+              ingredients: selectedPlannedDay.ingredients,
+              instructions: selectedPlannedDay.instructions,
+            }
+          : undefined,
+        mealName: selectedPlannedDay.title,
+        mealIcon: getMealIcon(selectedPlannedDay.title),
+      };
+    }
+    if (!viewerMeal.recipeUrl && !viewerMeal.recipeContent) return null;
+    return {
+      url: viewerMeal.recipeUrl ?? undefined,
+      content: !viewerMeal.recipeUrl ? (viewerMeal.recipeContent ?? undefined) : undefined,
+      mealName: viewerMeal.mealName,
+      mealIcon: viewerEvent ? getMealIcon(viewerEvent.title) : '🍽️',
+    };
+  }, [recipeViewerMeal, selectedPlannedDay, viewerMeal, viewerEvent]);
 
   const tomorrowRows = useMemo(
     () => adaptTomorrowMorning(wallData.days, now),
@@ -424,12 +507,14 @@ export function WallV2Shell() {
     // Meal cards: open recipe viewer if a URL/stored recipe was detected,
     // otherwise flash the meal name so the tap registers visibly.
     if (id.startsWith('dinner-')) {
-      if (dinner.recipeUrl || dinner.recipeContent) setRecipeViewerMeal('dinner');
+      // Always reopen on today — the wall face is about today, so a viewer left
+      // paged to Thursday must not be what the next person sees.
+      if (dinner.recipeUrl || dinner.recipeContent) { setViewerDayKey(null); setRecipeViewerMeal('dinner'); }
       else showFlash(`Tonight: ${dinner.mealName}`);
       return;
     }
     if (id.startsWith('breakfast-')) {
-      if (breakfast.recipeUrl || breakfast.recipeContent) setRecipeViewerMeal('breakfast');
+      if (breakfast.recipeUrl || breakfast.recipeContent) { setViewerDayKey(null); setRecipeViewerMeal('breakfast'); }
       else showFlash(`Breakfast: ${breakfast.mealName}`);
       return;
     }
@@ -659,13 +744,22 @@ export function WallV2Shell() {
         />
       )}
 
-      {recipeViewerMeal && (viewerMeal.recipeUrl || viewerMeal.recipeContent) && (
+      {viewerPayload && (
         <WallRecipeViewer
-          url={viewerMeal.recipeUrl ?? undefined}
-          content={!viewerMeal.recipeUrl ? (viewerMeal.recipeContent ?? undefined) : undefined}
-          mealName={viewerMeal.mealName}
-          mealIcon={viewerEvent ? getMealIcon(viewerEvent.title) : '🍽️'}
-          onClose={() => setRecipeViewerMeal(null)}
+          url={viewerPayload.url}
+          content={viewerPayload.content}
+          mealName={viewerPayload.mealName}
+          mealIcon={viewerPayload.mealIcon}
+          dayLabel={
+            navDays.length > 1
+              ? mealDayLabel(selectedPlannedDay?.date ?? anchorDate, viewerSlot, todayKey)
+              : undefined
+          }
+          prevDay={toNeighbor(prevNavDay)}
+          nextDay={toNeighbor(nextNavDay)}
+          onPrevDay={() => prevNavDay && setViewerDayKey(prevNavDay.dateKey === todayKey ? null : prevNavDay.dateKey)}
+          onNextDay={() => nextNavDay && setViewerDayKey(nextNavDay.dateKey === todayKey ? null : nextNavDay.dateKey)}
+          onClose={() => { setRecipeViewerMeal(null); setViewerDayKey(null); }}
         />
       )}
 
