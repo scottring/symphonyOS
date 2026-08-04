@@ -43,6 +43,43 @@ describe('DaySectionHeader', () => {
   })
 })
 
+describe('DaySectionHeader — the Anytime section keeps its name', () => {
+  const summary = { done: 4, total: 12 }
+
+  it('is called "Anytime" collapsed AND expanded, so toggling never renames it', () => {
+    // The bug: showAnytime required `collapsed`, so one control renamed its
+    // own section as you used it — "Anytime" folded, "Unscheduled" open — and
+    // a screen-reader user toggling it heard two different section names.
+    const props = {
+      section: 'unscheduled' as const, itemCount: 12, completedCount: 4,
+      emptyBecauseHero: false, onToggle: () => {}, anytimeSummary: summary,
+    }
+    const { rerender } = render(<DaySectionHeader {...props} collapsed />)
+    expect(screen.getByText('Anytime')).toBeInTheDocument()
+    expect(screen.getByRole('button')).toHaveAccessibleName('Expand Anytime')
+    expect(screen.queryByText('Unscheduled')).toBeNull()
+
+    rerender(<DaySectionHeader {...props} collapsed={false} />)
+    expect(screen.getByText('Anytime')).toBeInTheDocument()
+    expect(screen.getByRole('button')).toHaveAccessibleName('Collapse Anytime')
+    expect(screen.queryByText('Unscheduled')).toBeNull()
+  })
+
+  it('still shows the done/total summary only while collapsed', () => {
+    // The name is unconditional; the summary is not, and that part was never
+    // the bug — expanded, the rows carry their own state.
+    const props = {
+      section: 'unscheduled' as const, itemCount: 12, completedCount: 4,
+      emptyBecauseHero: false, onToggle: () => {}, anytimeSummary: summary,
+    }
+    const { rerender } = render(<DaySectionHeader {...props} collapsed />)
+    expect(screen.getByText(/4 of 12 done/)).toBeInTheDocument()
+
+    rerender(<DaySectionHeader {...props} collapsed={false} />)
+    expect(screen.queryByText(/4 of 12 done/)).toBeNull()
+  })
+})
+
 describe('DaySectionHeader — a band materialised mid-drag', () => {
   it('does NOT claim "up next" for a band that never had an item', () => {
     // Stage 2b renders empty bands during a drag so 6 AM is reachable. Such a

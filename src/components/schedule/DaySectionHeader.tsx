@@ -14,12 +14,19 @@ export interface DaySectionHeaderProps {
   onToggle: () => void
   /**
    * Unscheduled-only. The untimed-routine slab's own unit count (done/total,
-   * skip-excluded — see `countRoutineRowUnits`). While collapsed, it replaces
-   * the generic "Unscheduled · N · M done" readout with one line that names
-   * the count directly — "Anytime · M of N done" — so the row reads the same
-   * whether the slab holds 12 routines or 60: the collapsed row's height
-   * never grows with the count, only the number inside it changes. Ignored
-   * for every other section and while expanded.
+   * skip-excluded — see `countRoutineRowUnits`).
+   *
+   * Its PRESENCE renames the section to "Anytime" in both states — the slab
+   * is what the section actually holds, so that is what it is called whether
+   * you have it folded or open.
+   *
+   * Its VALUE is rendered only while collapsed, replacing the generic
+   * "Unscheduled · N · M done" readout with "Anytime · M of N done", so the
+   * folded row reads the same whether the slab holds 12 routines or 60: its
+   * height never grows with the count, only the number inside it changes.
+   * Expanded, the rows carry their own state and the summary is redundant.
+   *
+   * Ignored entirely for every other section.
    */
   anytimeSummary?: { done: number; total: number }
 }
@@ -36,8 +43,20 @@ export function DaySectionHeader({
 }: DaySectionHeaderProps) {
   const meta = daySectionMeta(section)
   const allDone = itemCount > 0 && completedCount === itemCount
-  const showAnytime = section === 'unscheduled' && collapsed && !emptyBecauseHero && !!anytimeSummary
-  const label = showAnytime ? 'Anytime' : meta.label
+
+  // The section's NAME, in BOTH states. It used to be tied to `collapsed`, so
+  // one control renamed its own section as you used it: "Anytime · 4 of 12
+  // done" folded, "Unscheduled · 12" open — and the aria-label flipped between
+  // "Expand Anytime" and "Collapse Unscheduled", so a screen-reader user
+  // toggling one button heard two different sections.
+  const isAnytime = section === 'unscheduled' && !emptyBecauseHero && !!anytimeSummary
+
+  // The SUMMARY is still collapsed-only, and that part was never the bug: the
+  // folded row has to carry its own answer ("did I do my daily stuff") because
+  // the rows holding it are hidden. Expanded, the rows are right there.
+  const showAnytime = isAnytime && collapsed
+
+  const label = isAnytime ? 'Anytime' : meta.label
 
   return (
     <button
