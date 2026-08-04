@@ -10,8 +10,12 @@
  */
 import { Check, ArrowUpRight } from 'lucide-react'
 import type { Project } from '@/types/project'
+import type { TaskContext } from '@/types/task'
 import { formatUpNextStatus, type UpNextSelection } from '@/lib/today/upNext'
 import { RescheduleButton } from './RescheduleButton'
+import { SchedulePopover, ContextPicker } from '@/components/triage'
+import { AssigneeDropdown, MultiAssigneeDropdown } from '@/components/family'
+import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
 
 interface UpNextHeroProps {
   selection: UpNextSelection
@@ -28,11 +32,31 @@ function formatHeroTime(date: Date): { time: string; meridiem: string } {
 }
 
 export function UpNextHero({ selection, onSelectItem, onToggleTask, projectsMap }: UpNextHeroProps) {
+  const ctx = useScheduleActionsContext()
   const { item } = selection
   const { time, meridiem } = formatHeroTime(item.startTime!)
   const projectName = item.projectId ? projectsMap?.get(item.projectId)?.name : undefined
   const taskId = item.type === 'task' && item.id.startsWith('task-') ? item.id.replace('task-', '') : null
   const estimatedMin = item.originalTask?.estimatedDuration
+
+  // The full triage set (when / context / assign) — task items only. Events
+  // and routines surfaced by selectUpNext degrade to the plain read-only
+  // display below rather than showing a control that can't act, mirroring
+  // how TodayView's bulk actions skip non-task items instead of faking it.
+  const onSchedule = taskId && ctx.onUpdateTask
+    ? (date: Date, isAllDay: boolean) => ctx.onUpdateTask!(taskId, { bucket: 'timed', scheduledFor: date, isAllDay })
+    : undefined
+  const onContextChange = taskId && ctx.onUpdateTask
+    ? (context: TaskContext | undefined) => ctx.onUpdateTask!(taskId, { context })
+    : undefined
+  const familyMembers = ctx.familyMembers ?? []
+  const assignedToAll = item.originalTask?.assignedToAll ?? []
+  const onAssignAll = taskId && ctx.onAssignTaskAll
+    ? (memberIds: string[]) => ctx.onAssignTaskAll!(taskId, memberIds)
+    : undefined
+  const onAssign = taskId && ctx.onAssignTask
+    ? (memberId: string | null) => ctx.onAssignTask!(taskId, memberId)
+    : undefined
 
   return (
     <section
@@ -49,12 +73,35 @@ export function UpNextHero({ selection, onSelectItem, onToggleTask, projectsMap 
       </div>
 
       <div className="flex items-center gap-4">
-        <div className="shrink-0 flex items-baseline gap-1">
-          <span className="font-display text-3xl md:text-4xl leading-none text-neutral-900 tabular-nums">
-            {time}
-          </span>
-          {meridiem && (
-            <span className="text-[12px] font-medium text-neutral-500 uppercase">{meridiem}</span>
+        <div className="shrink-0 flex items-baseline gap-1" onClick={onSchedule ? (e) => e.stopPropagation() : undefined}>
+          {onSchedule ? (
+            <SchedulePopover
+              value={item.startTime ?? undefined}
+              isAllDay={item.allDay}
+              onSchedule={onSchedule}
+              onClear={() => onSchedule(undefined as unknown as Date, false)}
+              skipToTime
+              itemTitle={item.title}
+              trigger={
+                <button type="button" className="flex items-baseline gap-1" title="Change time">
+                  <span className="font-display text-3xl md:text-4xl leading-none text-neutral-900 tabular-nums">
+                    {time}
+                  </span>
+                  {meridiem && (
+                    <span className="text-[12px] font-medium text-neutral-500 uppercase">{meridiem}</span>
+                  )}
+                </button>
+              }
+            />
+          ) : (
+            <>
+              <span className="font-display text-3xl md:text-4xl leading-none text-neutral-900 tabular-nums">
+                {time}
+              </span>
+              {meridiem && (
+                <span className="text-[12px] font-medium text-neutral-500 uppercase">{meridiem}</span>
+              )}
+            </>
           )}
         </div>
 
@@ -81,6 +128,25 @@ export function UpNextHero({ selection, onSelectItem, onToggleTask, projectsMap 
           {/* Tasks get the same one-tap reschedule the timeline rows have —
               triaging out of the hero must not require opening the panel. */}
           {item.type === 'task' && item.originalTask && <RescheduleButton item={item} />}
+          {onContextChange && (
+            <ContextPicker value={item.context ?? undefined} onChange={onContextChange} />
+          )}
+          {familyMembers.length > 0 && onAssignAll ? (
+            <MultiAssigneeDropdown
+              members={familyMembers}
+              selectedIds={assignedToAll}
+              onSelect={onAssignAll}
+              size="sm"
+              label="Who's responsible?"
+            />
+          ) : familyMembers.length > 0 && onAssign ? (
+            <AssigneeDropdown
+              members={familyMembers}
+              selectedId={item.assignedTo}
+              onSelect={onAssign}
+              size="sm"
+            />
+          ) : null}
           {taskId && onToggleTask ? (
             <button
               type="button"
