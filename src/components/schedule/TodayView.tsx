@@ -56,12 +56,11 @@ import { selectHorizonPool } from '@/lib/today/horizons'
 import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
 import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
 import { getRoutinesForDatePure } from '@/lib/routineUtils'
-import { StagingFloat } from './StagingFloat'
 import { TodayOverflowMenu } from './TodayOverflowMenu'
 import { EndOfDayReview } from './EndOfDayReview'
 import { DayNavCluster } from './DayNavCluster'
 import { OverdueSection } from './OverdueSection'
-import { SlippedPointer } from './SlippedPointer'
+import { AttentionLine } from './AttentionLine'
 import { SlippedReview, type SlippedFate } from './SlippedReview'
 import { BulkActionToolbar } from './BulkActionToolbar'
 import { TimelineNoteComposer } from './TimelineNoteComposer'
@@ -445,29 +444,6 @@ export function TodayView({
   const onAppendNoteAt = onAppendNoteAtProp ?? ctx.onAppendNoteAt
   const onLinkNote = onLinkNoteProp ?? ctx.onLinkNote
   const timelineNotes = timelineNotesProp ?? ctx.timelineNotes
-
-  const stagingHandlers = {
-    allTasks: tasks,
-    projects: projects ?? [],
-    familyMembers,
-    onPullToToday: (taskId: string) => {
-      const t = new Date(); t.setHours(0, 0, 0, 0)
-      ctx.onUpdateTask?.(taskId, { bucket: 'timed' as const, scheduledFor: t, isAllDay: true })
-    },
-    onSelectTask: (taskId: string) => onSelectItem(`task-${taskId}`),
-    onCompleteTask: onToggleTask,
-    onDeferTask: ctx.onPushTask ? (taskId: string, target: 'month' | 'quarter') => ctx.onPushTask!(taskId, target) : undefined,
-    onDeleteTask: ctx.onDeleteTask,
-    onUpdateTask: ctx.onUpdateTask,
-  }
-
-  const weekTrigger = (
-    <StagingFloat tasks={data.weekTasks} horizon="week" {...stagingHandlers} inline />
-  )
-
-  const monthTrigger = (
-    <StagingFloat tasks={data.monthTasks} horizon="month" {...stagingHandlers} inline />
-  )
 
   const discussion = discussionItems(tasks)
 
@@ -935,11 +911,9 @@ export function TodayView({
           )}
 
           {/* Signals that only appear when they have something to say. */}
-          {(weekTrigger || monthTrigger || clarityTrigger || discussion.length > 0 ||
+          {(clarityTrigger || discussion.length > 0 ||
             (data.isToday && (sweep.pairs.length > 0 || proposal.count > 0))) && (
             <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-neutral-100 px-2.5 pt-2 text-[12px] text-neutral-400">
-              {weekTrigger}
-              {monthTrigger}
               {clarityTrigger}
               {discussion.length > 0 && (
                 <DiscussionBadge items={discussion} onSelectItem={onSelectItem} />
@@ -1128,22 +1102,22 @@ export function TodayView({
           </div>
         )}
 
-        {/* Slipped pointer — deliberately OUTSIDE the totalItems ternary
+        {/* Attention line — deliberately OUTSIDE the totalItems ternary
             above, and outside the carried-over guard within it.
-            `counts.totalItems` does not include slipped work, so a day whose
-            only remaining work has slipped renders "Your day is clear" — with
-            35 items rotting invisibly behind it. That is exactly the
-            permanently-buried failure expiry must not cause, so the pointer
-            renders in BOTH branches whenever the queue is non-empty. */}
+            `counts.totalItems` does not include this work, so a day whose
+            only remaining work needs attention renders "Your day is clear" —
+            with 35 items rotting invisibly behind it. That is exactly the
+            permanently-buried failure expiry must not cause, so the line
+            renders in BOTH branches whenever the set is non-empty. */}
         {data.isToday && (
-          <SlippedPointer
-            tasks={data.slippedTasks}
+          <AttentionLine
+            items={data.attentionItems}
             onReview={() => setSlippedOpen(true)}
           />
         )}
         {data.isToday && slippedOpen && (
           <SlippedReview
-            tasks={data.slippedTasks}
+            items={data.attentionItems}
             onApply={handleSlippedApply}
             onClose={() => setSlippedOpen(false)}
           />

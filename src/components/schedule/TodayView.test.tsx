@@ -99,10 +99,13 @@ describe('TodayView', () => {
     expect(screen.queryByRole('button', { name: 'Week' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Month' })).not.toBeInTheDocument()
   })
-  it('keeps the This Week staging trigger, one tap into the overflow', async () => {
+  it('no longer offers the This Week / This Month staging triggers (backlog left the page)', async () => {
+    // Inbox, /week and /month are now the canonical homes for that work;
+    // Today surfaces it only through the attention line.
     const { user } = renderView()
     await openOverflow(user)
-    expect(screen.getByRole('button', { name: /this week/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /this week/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /this month/i })).not.toBeInTheDocument()
   })
   it('keeps the assignee filter and routine show/hide toggle in the overflow', async () => {
     const { user } = renderView({ assigneesWithTasks: [{ id: 'm1', name: 'Iris' } as never], hasUnassignedTasks: true })
@@ -472,33 +475,34 @@ describe('TodayView slipped queue', () => {
     fireEvent.click(screen.getByText(/1 carried over/i))
     expect(screen.getByText('carried thing')).toBeInTheDocument()
     expect(screen.queryByText('slipped thing')).toBeNull()
-    expect(screen.getByText(/1 slipped/)).toBeInTheDocument()
+    expect(screen.getByText(/1 needs attention/)).toBeInTheDocument()
+    expect(screen.getByText(/oldest 200 days/)).toBeInTheDocument()
   })
 
   it('points at the queue even when the rest of the day is empty', () => {
     // counts.totalItems excludes slipped work, so this day renders "Your day
-    // is clear". The pointer must survive that branch or the queue is
+    // is clear". The attention line must survive that branch or the queue is
     // invisible exactly when it is all that is left.
     renderView({ viewedDate: TODAY, tasks: [mk('s', 'slipped thing', 200)] } as never)
     expect(screen.getByText(/Your day is clear/i)).toBeInTheDocument()
-    expect(screen.getByText(/1 slipped/)).toBeInTheDocument()
+    expect(screen.getByText(/1 needs attention/)).toBeInTheDocument()
   })
 
   it('opens the review from the pointer', () => {
     renderView({ viewedDate: TODAY, tasks: [mk('s', 'slipped thing', 200)] } as never)
-    fireEvent.click(screen.getByText(/1 slipped/))
+    fireEvent.click(screen.getByText(/1 needs attention/))
     expect(screen.getByRole('region', { name: /slipped work review/i })).toBeInTheDocument()
     expect(screen.getByText('slipped thing')).toBeInTheDocument()
   })
 
   it('still shows the pointer when the carried-over lane is empty', () => {
     renderView({ viewedDate: TODAY, tasks: [mk('s', 'slipped thing', 200)] } as never)
-    expect(screen.getByText(/1 slipped/)).toBeInTheDocument()
+    expect(screen.getByText(/1 needs attention/)).toBeInTheDocument()
   })
 
   it('renders no pointer when nothing has slipped', () => {
     renderView({ viewedDate: TODAY, tasks: [mk('c', 'carried thing', 1)] } as never)
-    expect(screen.queryByText(/slipped/)).toBeNull()
+    expect(screen.queryByText(/needs attention/)).toBeNull()
   })
 })
 
