@@ -856,6 +856,9 @@ async function runTool(
             content: input.content,
             type: input.type ?? 'quick_capture',
             context: input.context ?? null,
+            // Same coupling the task path already applies below: notes RLS
+            // shares on scope, so a family note without this stays private.
+            scope: input.context === 'family' ? 'compound' : 'individual',
             source: 'assistant',
             user_id: userId,
           })
