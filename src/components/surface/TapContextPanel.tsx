@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from 'react'
+import { useCallback, useRef, useState, type ReactNode } from 'react'
 import type { Task, TaskContext, Scope } from '@/types/task'
 import type { Contact } from '@/types/contact'
 import type { Project } from '@/types/project'
@@ -15,6 +15,7 @@ import { PanelLinks } from './sections/PanelLinks'
 import { PanelPhotos } from './sections/PanelPhotos'
 import { PanelConversations } from './sections/PanelConversations'
 import { PanelLocation } from './sections/PanelLocation'
+import { PanelAddRow, type AddableField } from './sections/PanelAddRow'
 import { PanelMightBeRelevant } from './sections/PanelMightBeRelevant'
 import { PanelClassify } from './sections/PanelClassify'
 import { PanelFooter } from './sections/PanelFooter'
@@ -91,13 +92,25 @@ export function TapContextPanel(props: TapContextPanelProps) {
   const [showDirections, setShowDirections] = useState(false)
   const [assistOpen, setAssistOpen] = useState(false)
 
-  // Collapse the directions builder when switching to a different task
-  // (React-recommended "adjust state during render" pattern, not an effect).
+  // Which empty fields the user asked to fill in. Cleared when the panel
+  // switches tasks — revealing Notes on one task shouldn't open it on the next.
+  const [revealed, setRevealed] = useState<Set<AddableField>>(() => new Set())
+  // Attachments are fetched inside PanelPhotos; it reports up so the Add row
+  // knows whether to offer "Photo".
+  const [photosHaveContent, setPhotosHaveContent] = useState(false)
+  const reveal = useCallback((field: AddableField) => {
+    setRevealed((prev) => new Set(prev).add(field))
+  }, [])
+
+  // Reset per-task panel state when switching tasks (React-recommended
+  // "adjust state during render" pattern, not an effect).
   const [prevTaskId, setPrevTaskId] = useState(task.id)
   if (task.id !== prevTaskId) {
     setPrevTaskId(task.id)
     setShowDirections(false)
     setAssistOpen(false)
+    setRevealed(new Set())
+    setPhotosHaveContent(false)
   }
 
   const linked = useLinkedEntities(task, {
@@ -109,6 +122,22 @@ export function TapContextPanel(props: TapContextPanelProps) {
   })
 
   const mightBeRelevant = useMightBeRelevant(task, { allTasks })
+
+  // A section earns its header by having something in it. Everything else
+  // collapses into the single Add row near the bottom.
+  const has = {
+    location: !!(task.location || task.locationPlaceId),
+    notes: !!task.notes?.trim(),
+    subtask: (task.subtasks?.length ?? 0) > 0,
+    link: (task.links?.length ?? 0) > 0,
+    person: !!linked.contact,
+    // Photos load inside PanelPhotos, so emptiness isn't knowable here — that
+    // section hides itself and reports back.
+    photo: photosHaveContent,
+  }
+  const show = (field: AddableField): boolean => has[field] || revealed.has(field)
+  const addable = (['location', 'notes', 'photo', 'subtask', 'link', 'person'] as const)
+    .filter((f) => !show(f))
 
   // The whole panel accepts file drops, not just the Photos & files section
   // — that section was 16% of the panel, and a miss navigated the tab to
@@ -163,7 +192,7 @@ export function TapContextPanel(props: TapContextPanelProps) {
         selectedAssigneeIds={task.assignedToAll ?? (task.assignedTo ? [task.assignedTo] : [])}
         onAssigneesChange={props.onAssigneesChange}
       />
-      <PanelLocation
+      {show('location') && <PanelLocation
         location={task.location}
         locationPlaceId={task.locationPlaceId}
         title={task.title}
@@ -172,9 +201,11 @@ export function TapContextPanel(props: TapContextPanelProps) {
         onClearLocation={props.onClearLocation}
         directions={task.directions}
         onDirectionsChange={props.onDirectionsChange}
-      />
-      <PanelWhy key={task.id} label="Notes" notes={task.notes} onChange={props.onNotesChange} onSaveToVault={props.onSaveNoteToVault} />
+      />}
+      {show('notes') && <PanelWhy key={task.id} label="Notes" notes={task.notes} onChange={props.onNotesChange} onSaveToVault={props.onSaveNoteToVault} />}
       <PanelPhotos
+        hideWhenEmpty={!revealed.has('photo')}
+        onContentChange={setPhotosHaveContent}
         entityType="task"
         entityId={task.id}
         dropZoneRef={panelRef}
@@ -186,7 +217,7 @@ export function TapContextPanel(props: TapContextPanelProps) {
         }}
       />
       <PanelConversations taskId={task.id} />
-      <PanelSubtasks
+      {show('subtask') && <PanelSubtasks
         subtasks={task.subtasks ?? []}
         onToggleSubtask={props.onToggleSubtask}
         onAddSubtask={props.onAddSubtask}
@@ -194,17 +225,15 @@ export function TapContextPanel(props: TapContextPanelProps) {
         onRemoveSubtask={props.onRemoveSubtask}
         onRescheduleSubtask={props.onRescheduleSubtask}
         onScheduleSubtask={props.onScheduleSubtask}
-      />
-      <PanelPeople
+      />}
+      {show('person') && <PanelPeople
         contact={linked.contact}
-        assignee={linked.assignee}
         onOpenContact={props.onOpenContact}
-        onOpenMember={props.onOpenMember}
         contacts={props.contacts}
         onContactChange={props.onContactChange}
         onSearchContacts={props.onSearchContacts}
         onAddContact={props.onAddContact}
-      />
+      />}
       <PanelLinked
         project={linked.project}
         linkedEvent={linked.linkedEvent}
@@ -213,11 +242,12 @@ export function TapContextPanel(props: TapContextPanelProps) {
         onOpenEvent={props.onOpenEvent}
         onOpenTask={props.onOpenTask}
       />
-      <PanelLinks
+      {show('link') && <PanelLinks
         links={task.links}
         onAddLink={props.onAddLink}
-      />
+      />}
       <PanelMightBeRelevant items={mightBeRelevant} onOpen={props.onOpenRelated} />
+      <PanelAddRow fields={addable} onReveal={reveal} />
       <PanelFooter
         createdAt={task.createdAt}
         updatedAt={task.updatedAt}

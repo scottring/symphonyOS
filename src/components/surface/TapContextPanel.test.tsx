@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { screen, fireEvent } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { render } from '@/test/test-utils'
 import { TapContextPanel } from './TapContextPanel'
 import { createMockTask, createMockContact, createMockProject } from '@/test/mocks/factories'
@@ -165,5 +166,58 @@ describe('TapContextPanel', () => {
     // First child has collapsed top padding, last child has collapsed bottom padding
     expect(article!.className).toMatch(/\[&>\*:first-child\]:pt-0/)
     expect(article!.className).toMatch(/\[&>\*:last-child\]:pb-0/)
+  })
+
+  // ── Empty fields collapse into one Add row ────────────────────────────────
+  //
+  // The panel used to render Location, Notes, Photos & files, Subtasks and
+  // Links as full titled sections with empty inputs on every task — six
+  // headers asking for data before the panel told you anything.
+
+  it('collapses a sparse task\'s empty fields into the Add row instead of six empty sections', () => {
+    const task = createMockTask({ title: 'bare' })
+    render(<TapContextPanel
+      task={task}
+      contacts={[]} projects={[]} events={[]} familyMembers={[]} siblingTaskCandidates={[]} allTasks={[task]}
+      {...baseHandlers}
+    />)
+    // Assert on the empty INPUTS, which were the actual complaint — the Add
+    // chips legitimately carry the same words as the section headers.
+    expect(screen.queryByPlaceholderText(/add a location/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/add notes/i)).not.toBeInTheDocument()
+    expect(screen.queryByPlaceholderText(/paste a url/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/^Photos & files$/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/add a subtask/i)).not.toBeInTheDocument()
+
+    // Every one of them is still one tap away.
+    expect(screen.getByRole('button', { name: 'Location' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Notes' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Photo' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Subtask' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Link' })).toBeInTheDocument()
+  })
+
+  it('reveals a field when its Add chip is clicked, and drops the chip', async () => {
+    const user = userEvent.setup()
+    const task = createMockTask({ title: 'bare' })
+    render(<TapContextPanel
+      task={task}
+      contacts={[]} projects={[]} events={[]} familyMembers={[]} siblingTaskCandidates={[]} allTasks={[task]}
+      {...baseHandlers}
+    />)
+    await user.click(screen.getByRole('button', { name: 'Notes' }))
+    expect(screen.getByText(/add notes/i)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Notes' })).not.toBeInTheDocument()
+  })
+
+  it('shows a field as a real section, and no chip, when it already has content', () => {
+    const task = createMockTask({ title: 'has notes', notes: 'measurements are 30x40' })
+    render(<TapContextPanel
+      task={task}
+      contacts={[]} projects={[]} events={[]} familyMembers={[]} siblingTaskCandidates={[]} allTasks={[task]}
+      {...baseHandlers}
+    />)
+    expect(screen.getByText(/measurements are 30x40/i)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Notes' })).not.toBeInTheDocument()
   })
 })

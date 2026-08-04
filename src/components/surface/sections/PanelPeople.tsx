@@ -1,13 +1,20 @@
 import type { Contact, ContactCategory } from '@/types/contact'
-import type { FamilyMember } from '@/types/family'
 import { ConceptIcon } from '@/lib/conceptIcons'
 import { AssignPicker } from '@/components/triage/AssignPicker'
 
+/**
+ * Who the task is ABOUT — its related contact.
+ *
+ * Deliberately NOT who it's assigned to. This section used to also list the
+ * assignee, labelled "— for whom", which was wrong twice over: the assignee is
+ * who DOES it (`contactId` is the "about" link), and the panel already shows
+ * assignees as chips at the top, from the current multi-assignee field. So the
+ * row duplicated those chips while contradicting the data model, and sat under
+ * a "No related contact" line saying the section was empty.
+ */
 interface PanelPeopleProps {
   contact?: Contact
-  assignee?: FamilyMember
   onOpenContact: (id: string) => void
-  onOpenMember: (id: string) => void
   // When provided, the section shows a picker to link/change/clear the related contact.
   contacts?: Contact[]
   onContactChange?: (contactId: string | undefined) => void
@@ -17,16 +24,17 @@ interface PanelPeopleProps {
 
 export function PanelPeople({
   contact,
-  assignee,
   onOpenContact,
-  onOpenMember,
   contacts,
   onContactChange,
   onSearchContacts,
   onAddContact,
 }: PanelPeopleProps) {
   const canEditContact = !!onContactChange
-  if (!contact && !assignee && !canEditContact) return null
+  // Nothing to show and no way to add: render nothing. When the panel reveals
+  // this section from the Add row there IS a picker, so it stays — minus the
+  // old "No related contact" line, which announced its own emptiness.
+  if (!contact && !canEditContact) return null
 
   return (
     <section>
@@ -53,23 +61,6 @@ export function PanelPeople({
           <span className="flex-1 text-sm">
             <div className="text-neutral-800">{contact.name}</div>
             {contact.phone && <div className="text-xs text-neutral-500"><ConceptIcon name="call" decorative /> {contact.phone}</div>}
-          </span>
-        </button>
-      )}
-      {!contact && canEditContact && (
-        <div className="text-sm text-neutral-400 px-1 py-1.5">No related contact</div>
-      )}
-      {assignee && (
-        <button
-          onClick={() => onOpenMember(assignee.id)}
-          className="flex items-center gap-2 w-full text-left py-1.5 hover:bg-neutral-100/60 rounded-md px-1"
-        >
-          <span className="w-7 h-7 rounded-full bg-violet-100 text-violet-800 flex items-center justify-center text-xs font-medium">
-            {(assignee.name || '?').slice(0, 1)}
-          </span>
-          <span className="flex-1 text-sm">
-            <span className="text-neutral-800">{assignee.name}</span>
-            <span className="text-xs text-neutral-500"> — for whom</span>
           </span>
         </button>
       )}

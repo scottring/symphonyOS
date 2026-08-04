@@ -32,6 +32,13 @@ interface PanelPhotosProps {
    * Omitted → falls back to this section alone (its own drop target).
    */
   dropZoneRef?: React.RefObject<HTMLElement | null>
+  /** When true and there are no attachments, render nothing. The component
+   *  stays mounted (returning null still runs hooks), so the panel-wide drop
+   *  listeners bound in the effect below keep working. */
+  hideWhenEmpty?: boolean
+  /** Reports whether this entity has any attachments, so the panel's Add row
+   *  knows whether to offer "Photo". */
+  onContentChange?: (hasContent: boolean) => void
 }
 
 /**
@@ -42,7 +49,7 @@ interface PanelPhotosProps {
  * render as thumbnails; documents as file chips. Hover (or touch) shows a ✕
  * to remove. Everything opens full size in a new tab.
  */
-export function PanelPhotos({ entityType, entityId, entityContext, promotions, dropZoneRef }: PanelPhotosProps) {
+export function PanelPhotos({ entityType, entityId, entityContext, promotions, dropZoneRef, hideWhenEmpty, onContentChange }: PanelPhotosProps) {
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [busy, setBusy] = useState(false)
   const [analyzingIds, setAnalyzingIds] = useState<Set<string>>(new Set())
@@ -64,6 +71,9 @@ export function PanelPhotos({ entityType, entityId, entityContext, promotions, d
   }, [entityType, entityId])
 
   useEffect(() => { void reload() }, [reload])
+
+  // Report emptiness up so the panel's Add row can offer "Photo".
+  useEffect(() => { onContentChange?.(attachments.length > 0) }, [attachments.length, onContentChange])
 
   const attach = useCallback(async (blob: Blob, fileName?: string) => {
     setBusy(true)
@@ -208,6 +218,13 @@ export function PanelPhotos({ entityType, entityId, entityContext, promotions, d
     'w-20 h-20 rounded-lg border border-dashed border-neutral-300 text-neutral-400 ' +
     'hover:text-neutral-600 hover:border-neutral-400 hover:bg-neutral-50 ' +
     'grid place-items-center transition-colors disabled:opacity-60'
+
+  // Three empty dropzones under a header, on every task, forever, was the
+  // single largest block of the panel asking for something instead of showing
+  // something. Returning null here keeps every hook above running — including
+  // the panel-wide drag/drop and paste listeners — so files still attach by
+  // drop or ⌘V even when the section is invisible.
+  if (hideWhenEmpty && attachments.length === 0) return null
 
   return (
     <section
