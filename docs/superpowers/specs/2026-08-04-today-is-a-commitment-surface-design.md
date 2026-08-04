@@ -112,8 +112,23 @@ Four reasons qualify:
 |---|---|---|
 | `slipped` | dated, 3+ days past | `GRACE_DAYS = 2` (existing) |
 | `stranded-week` | `bucket='week'`, `week_start` before the current week | immediate |
-| `stranded-month` | `bucket='month'`, placed month already past | immediate |
+| `aging-month` | `bucket='month'`, aged since **`created_at`** | `AGING_MONTH_DAYS = 45` |
 | `aging-inbox` | `bucket='inbox'`, aged since **`created_at`** | `AGING_INBOX_DAYS = 14` |
+
+**Why month aging is not month *stranding*.** `tasks` has exactly one period
+anchor — `week_start`. There is no month column, and this spec forbids schema
+changes. So a `bucket='month'` task has no month of its own; by the same rule
+that makes `weekStart: null` mean "the current week", it can never be *placed on
+a past month*, and `stranded-month` is not a derivable state.
+
+Month items still need an aging signal — there are 31 of them, and burying them
+is the same hole the podiatrist fell through. So the rule is honest about what it
+knows: not "you placed this on a month that passed" but "this has sat in the
+month bucket for 45 days." 45 covers a full month plus slack, so a genuine
+this-month placement never trips it.
+
+If a month anchor is ever added, this becomes `stranded-month` with the same
+shape as `stranded-week`. That is a later decision, not a prerequisite.
 
 Age for `aging-inbox` is measured from **`created_at`, never `updated_at`**.
 `tasks` has no `updated_at` trigger (unlike `contacts`, `projects`, and
@@ -171,9 +186,10 @@ reverts by changing a filter.
 
 ```ts
 export type AttentionReason =
-  | 'slipped' | 'stranded-week' | 'stranded-month' | 'aging-inbox'
+  | 'slipped' | 'stranded-week' | 'aging-month' | 'aging-inbox'
 
 export const AGING_INBOX_DAYS = 14
+export const AGING_MONTH_DAYS = 45
 
 export interface AttentionItem {
   task: Task
@@ -186,9 +202,11 @@ export function selectNeedsAttention(
   match: Match,
   now: Date,
   weekStart: Date,
-  monthStart: Date,
 ): AttentionItem[]
 ```
+
+No `monthStart` parameter: month aging is measured from `created_at`, so the
+current month's boundary is never needed.
 
 `Match` is currently declared but **not exported** in `taskPools.ts:4`. Export it
 there and import it here rather than redeclaring — two copies of the assignee
