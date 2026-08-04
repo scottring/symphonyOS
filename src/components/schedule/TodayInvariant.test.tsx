@@ -6,6 +6,7 @@ import { computeTodayData } from '@/lib/today/computeTodayData'
 import { TodayView } from './TodayView'
 import type { Task } from '@/types/task'
 import type { TodayDataInput } from '@/lib/today/types'
+import { sundayOfWeek } from '@/lib/weekHelpers'
 
 /**
  * The invariant the redesign rests on: anything on Today that is not a
@@ -62,18 +63,6 @@ function task(p: Partial<Task>): Task {
   } as Task
 }
 
-/**
- * Midnight Sunday on or before `d` — a real week anchor, never a fabricated
- * stand-in. Mirrors `weekStartAnchor(d, 0)` without importing the cadence
- * module into this pure-lib test file.
- */
-function sundayOf(d: Date): Date {
-  const s = new Date(d)
-  s.setHours(0, 0, 0, 0)
-  s.setDate(s.getDate() - s.getDay())
-  return s
-}
-
 function backlog(n: number): Task[] {
   return Array.from({ length: n }, (_, i) =>
     task({
@@ -98,7 +87,7 @@ function baseInput(over: Partial<TodayDataInput> = {}): TodayDataInput {
     viewedDate,
     selectedAssignee: null,
     hideRoutines: false,
-    weekStart: sundayOf(viewedDate),
+    weekStart: sundayOfWeek(viewedDate),
     ...over,
   }
 }

@@ -3,19 +3,11 @@ import { computeTodayData } from './computeTodayData'
 import type { TodayDataInput } from './types'
 import type { Task } from '@/types/task'
 import type { ActionableInstance, ActionableStatus, Routine } from '@/types/actionable'
+import { sundayOfWeek } from '@/lib/weekHelpers'
 
 function task(p: Partial<Task>): Task {
   return { id: 'id', title: 't', completed: false, bucket: 'timed', scheduledFor: null, assignedTo: null,
     updatedAt: new Date('2026-05-19T12:00:00'), subtasks: undefined, ...p } as Task
-}
-/** Midnight Sunday on or before `d` — a real week anchor, never a fabricated
- *  stand-in. Mirrors `weekStartAnchor(d, 0)` without importing the cadence
- *  module into this pure-lib test file. */
-function sundayOf(d: Date): Date {
-  const s = new Date(d)
-  s.setHours(0, 0, 0, 0)
-  s.setDate(s.getDate() - s.getDay())
-  return s
 }
 function baseInput(over: Partial<TodayDataInput> = {}): TodayDataInput {
   const viewedDate = over.viewedDate ?? new Date('2026-05-19T00:00:00')
@@ -23,7 +15,7 @@ function baseInput(over: Partial<TodayDataInput> = {}): TodayDataInput {
     tasks: [], events: [], routines: [], dateInstances: [],
     viewedDate,
     selectedAssignee: null, hideRoutines: false,
-    weekStart: sundayOf(viewedDate),
+    weekStart: sundayOfWeek(viewedDate),
     ...over,
   }
 }

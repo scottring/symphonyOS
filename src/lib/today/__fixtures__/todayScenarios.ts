@@ -2,15 +2,10 @@
 import type { Task } from '@/types/task'
 import type { TodayDataInput } from '../types'
 import type { DaySection } from '@/lib/timeUtils'
+import { sundayOfWeek } from '@/lib/weekHelpers'
 
 const TODAY = new Date()
 TODAY.setHours(0, 0, 0, 0)
-/** Midnight Sunday on or before `d` — a real week anchor, not a fabricated one. */
-function sundayOf(d: Date): Date {
-  const s = new Date(d)
-  s.setDate(s.getDate() - s.getDay())
-  return s
-}
 function at(h: number, m = 0) { const d = new Date(TODAY); d.setHours(h, m, 0, 0); return d }
 function task(p: Partial<Task>): Task {
   return { id: 'id', title: 't', completed: false, bucket: 'timed', scheduledFor: null,
@@ -31,7 +26,7 @@ export const mixedDayInput: TodayDataInput = {
   ],
   events: [], routines: [], dateInstances: [],
   viewedDate: new Date(), selectedAssignee: null, hideRoutines: false,
-  weekStart: sundayOf(TODAY),
+  weekStart: sundayOfWeek(TODAY),
 }
 
 /**
