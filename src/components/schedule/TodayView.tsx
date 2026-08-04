@@ -61,7 +61,6 @@ import { EndOfDayReview } from './EndOfDayReview'
 import { DayNavCluster } from './DayNavCluster'
 import { OverdueSection } from './OverdueSection'
 import { AttentionLine } from './AttentionLine'
-import { SlippedReview, type SlippedFate } from './SlippedReview'
 import { BulkActionToolbar } from './BulkActionToolbar'
 import { TimelineNoteComposer } from './TimelineNoteComposer'
 
@@ -518,24 +517,6 @@ export function TodayView({
 
   // Duplicate sweep — on demand; a passive count is the only unsolicited part.
   const sweep = useDuplicateSweep(data.sectionsOrder, data.grouped, ctx.onDeleteTask)
-
-  // Slipped review — work that aged out of Today entirely. Opened only from
-  // the pointer line; never expands inline, so Today stays short.
-  const [slippedOpen, setSlippedOpen] = useState(false)
-
-  // The four fates map onto writers this component already has. 'today' and
-  // 'week' go through onPushTask so they inherit its weekStart handling and
-  // its defer_count increment; 'someday' is a resolution rather than a
-  // deferral, so it writes the bucket directly and does not count as a defer.
-  const handleSlippedApply = useCallback((ids: string[], fate: SlippedFate) => {
-    for (const id of ids) {
-      if (fate === 'delete') ctx.onDeleteTask?.(id)
-      else if (fate === 'today') ctx.onPushTask?.(id, new Date())
-      else if (fate === 'week') ctx.onPushTask?.(id, 'week')
-      else ctx.onUpdateTask?.(id, { bucket: 'someday', scheduledFor: undefined })
-    }
-    setSlippedOpen(false)
-  }, [ctx])
 
   // Suggested order + grouping — a preview you accept, never an auto-apply.
   // Applying reuses the same writers the drag gestures use.
@@ -1108,18 +1089,17 @@ export function TodayView({
             only remaining work needs attention renders "Your day is clear" —
             with 35 items rotting invisibly behind it. That is exactly the
             permanently-buried failure expiry must not cause, so the line
-            renders in BOTH branches whenever the set is non-empty. */}
+            renders in BOTH branches whenever the set is non-empty.
+
+            The SIGNAL stays here; the review LIST does not. Deciding an
+            item's fate is planning work, so Review navigates to /week, where
+            NeedsAttentionReview lives. The line itself cannot move with it —
+            Today is the most-read page, and a signal only /week carries is a
+            signal nobody sees, which is the podiatrist bug again. */}
         {data.isToday && (
           <AttentionLine
             items={data.attentionItems}
-            onReview={() => setSlippedOpen(true)}
-          />
-        )}
-        {data.isToday && slippedOpen && (
-          <SlippedReview
-            items={data.attentionItems}
-            onApply={handleSlippedApply}
-            onClose={() => setSlippedOpen(false)}
+            onReview={() => navigate('/week?review=attention')}
           />
         )}
       </div>

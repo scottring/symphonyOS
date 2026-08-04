@@ -2,15 +2,15 @@ import { useMemo, useState } from 'react'
 import { X } from 'lucide-react'
 import type { AttentionItem, AttentionReason } from '@/lib/today/attention'
 
-export type SlippedFate = 'today' | 'week' | 'someday' | 'delete'
+export type AttentionFate = 'today' | 'week' | 'someday' | 'delete'
 
-interface SlippedReviewProps {
+interface NeedsAttentionReviewProps {
   items: AttentionItem[]
-  onApply: (ids: string[], fate: SlippedFate) => void
+  onApply: (ids: string[], fate: AttentionFate) => void
   onClose: () => void
 }
 
-const FATES: Array<{ fate: SlippedFate; label: string }> = [
+const FATES: Array<{ fate: AttentionFate; label: string }> = [
   { fate: 'today', label: 'Today' },
   { fate: 'week', label: 'This week' },
   { fate: 'someday', label: 'Someday' },
@@ -42,8 +42,19 @@ const REASON_HEADINGS: Record<AttentionReason, string> = {
  *
  * Nothing here is automatic. Delete is one of four equal options, never a
  * default, and only ever applies to a hand-made selection.
+ *
+ * This surface lives on `/week`, not on Today. Deciding an item's fate is
+ * planning work, not execution work, and Today is a commitment surface. The
+ * one-line SIGNAL (`AttentionLine`) stays on Today — moving that too would
+ * recreate the exact burial this feature exists to fix — and its Review
+ * affordance navigates here.
+ *
+ * It is called "Needs attention", never "Slipped": only one of the four
+ * reasons it renders is a slipped date. The other three are placement and
+ * triage debt, and a never-triaged inbox item filed under "Slipped" is a lie
+ * about why it is on the screen.
  */
-export function SlippedReview({ items, onApply, onClose }: SlippedReviewProps) {
+export function NeedsAttentionReview({ items, onApply, onClose }: NeedsAttentionReviewProps) {
   const [selected, setSelected] = useState<Set<string>>(new Set())
 
   const groups = useMemo(() => {
@@ -81,23 +92,23 @@ export function SlippedReview({ items, onApply, onClose }: SlippedReviewProps) {
     })
   }
 
-  const apply = (fate: SlippedFate) => {
+  const apply = (fate: AttentionFate) => {
     if (selected.size === 0) return
     onApply(orderedIds.filter((id) => selected.has(id)), fate)
     setSelected(new Set())
   }
 
   return (
-    <div role="region" aria-label="Slipped work review" className="card p-4 mt-2">
+    <div role="region" aria-label="Needs attention review" className="card p-4 mt-2">
       <div className="flex items-center gap-3 mb-4">
-        <h2 className="font-display text-xl">Slipped</h2>
+        <h2 className="font-display text-xl">Needs attention</h2>
         <span className="text-sm text-neutral-500">
-          {orderedIds.length} item{orderedIds.length === 1 ? '' : 's'} needing attention
+          {orderedIds.length} item{orderedIds.length === 1 ? '' : 's'}
         </span>
         <button
           type="button"
           onClick={onClose}
-          aria-label="Close slipped review"
+          aria-label="Close needs attention review"
           className="ml-auto text-neutral-400 hover:text-neutral-600 transition-colors"
         >
           <X className="w-4 h-4" />

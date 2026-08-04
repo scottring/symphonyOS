@@ -457,7 +457,7 @@ describe('TodayView print list', () => {
 
 })
 
-describe('TodayView slipped queue', () => {
+describe('TodayView attention line', () => {
   function daysAgo(n: number) {
     const d = new Date(TODAY)
     d.setDate(d.getDate() - n)
@@ -488,11 +488,22 @@ describe('TodayView slipped queue', () => {
     expect(screen.getByText(/1 needs attention/)).toBeInTheDocument()
   })
 
-  it('opens the review from the pointer', () => {
-    renderView({ viewedDate: TODAY, tasks: [mk('s', 'slipped thing', 200)] } as never)
-    fireEvent.click(screen.getByText(/1 needs attention/))
-    expect(screen.getByRole('region', { name: /slipped work review/i })).toBeInTheDocument()
-    expect(screen.getByText('slipped thing')).toBeInTheDocument()
+  it('sends Review to /week instead of opening a list on Today', () => {
+    // The review LIST is planning work and lives on /week
+    // (NeedsAttentionReview). Today keeps the one-line signal and nothing
+    // else: no list may open here, or the commitment surface grows a triage
+    // surface again — the fusion this whole branch exists to undo.
+    const back = window.location.pathname + window.location.search
+    try {
+      renderView({ viewedDate: TODAY, tasks: [mk('s', 'slipped thing', 200)] } as never)
+      fireEvent.click(screen.getByText(/1 needs attention/))
+      expect(window.location.pathname).toBe('/week')
+      expect(window.location.search).toBe('?review=attention')
+      expect(screen.queryByRole('region', { name: /needs attention review/i })).toBeNull()
+      expect(screen.queryByText('slipped thing')).toBeNull()
+    } finally {
+      window.history.replaceState({}, '', back)
+    }
   })
 
   it('still shows the pointer when the carried-over lane is empty', () => {

@@ -243,6 +243,66 @@ describe('horizon pages (smoke)', () => {
     expect(localYmd(call![1].weekStart as Date)).toBe(localYmd(currentWeekStart))
   })
 
+  // ── Needs attention: the review surface lives HERE, not on Today. Today
+  // keeps the one-line signal and its Review link lands on /week?review=attention. ──
+
+  function renderWeekAt(entry: string) {
+    return rtlRender(
+      <MemoryRouter initialEntries={[entry]}>
+        <PlaceProvider>
+          <DomainProvider>
+            <WeekPage />
+          </DomainProvider>
+        </PlaceProvider>
+      </MemoryRouter>
+    )
+  }
+
+  /** A stranded-week move — one of the four reasons that needs attention. */
+  function pushStranded(id = 'stranded', title = 'Order the vanity') {
+    const lastWeek = new Date(currentWeekStart)
+    lastWeek.setDate(lastWeek.getDate() - 7)
+    mockTasks.push(createMockTask({
+      id, title, bucket: 'week', weekStart: lastWeek, scheduledFor: undefined,
+    }) satisfies Task)
+  }
+
+  it('WeekPage shows the attention signal but keeps the review closed by default', () => {
+    pushStranded()
+    renderWeekAt('/week')
+    // Secondary, not dominant: one line until you ask for it.
+    expect(screen.getByText(/1 needs attention/)).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: /needs attention review/i })).toBeNull()
+  })
+
+  it('WeekPage opens the review on arrival from Today’s Review link', () => {
+    pushStranded()
+    renderWeekAt('/week?review=attention')
+    const region = screen.getByRole('region', { name: /needs attention review/i })
+    expect(region).toBeInTheDocument()
+    expect(within(region).getByText('Order the vanity')).toBeInTheDocument()
+  })
+
+  it('WeekPage renders no attention surface at all when nothing is late', () => {
+    renderWeekAt('/week?review=attention')
+    expect(screen.queryByText(/needs attention/i)).toBeNull()
+    expect(screen.queryByRole('region', { name: /needs attention review/i })).toBeNull()
+  })
+
+  it('WeekPage keeps the fate actions working after the move off Today', () => {
+    pushStranded()
+    renderWeekAt('/week?review=attention')
+    const region = screen.getByRole('region', { name: /needs attention review/i })
+    fireEvent.click(within(region).getByRole('checkbox', { name: /select all/i }))
+    fireEvent.click(within(region).getByRole('button', { name: 'Someday' }))
+
+    // 'someday' is a resolution, not a deferral, so it writes the bucket
+    // directly rather than going through pushTask's defer_count increment.
+    expect(mockUpdateTask).toHaveBeenCalledWith('stranded', { bucket: 'someday', scheduledFor: undefined })
+    // Applying closes the surface — the decision is made.
+    expect(screen.queryByRole('region', { name: /needs attention review/i })).toBeNull()
+  })
+
   // The month rung places into a WEEK, so it draws weeks. A `Sun Mon Tue…`
   // header advertised a grain this page has never accepted.
   it('MonthPage renders week strips and no weekday header', () => {

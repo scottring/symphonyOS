@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { screen, within, fireEvent } from '@testing-library/react'
 import { render } from '@/test/test-utils'
-import { SlippedReview } from './SlippedReview'
+import { NeedsAttentionReview } from './NeedsAttentionReview'
 import type { Task } from '@/types/task'
 import type { AttentionItem, AttentionReason } from '@/lib/today/attention'
 
@@ -22,9 +22,9 @@ const items: AttentionItem[] = [
   item('slipped', 245, { id: 'old', title: 'call window blinds' }),
 ]
 
-describe('SlippedReview', () => {
+describe('NeedsAttentionReview', () => {
   it('lists oldest first with the age shown', () => {
-    render(<SlippedReview items={items} onApply={() => {}} onClose={() => {}} />)
+    render(<NeedsAttentionReview items={items} onApply={() => {}} onClose={() => {}} />)
     const rows = screen.getAllByRole('listitem')
     expect(within(rows[0]).getByText('call window blinds')).toBeInTheDocument()
     expect(within(rows[0]).getByText(/245 days/)).toBeInTheDocument()
@@ -32,14 +32,14 @@ describe('SlippedReview', () => {
 
   it('applies a fate to every selected row in one action', () => {
     const onApply = vi.fn()
-    render(<SlippedReview items={items} onApply={onApply} onClose={() => {}} />)
+    render(<NeedsAttentionReview items={items} onApply={onApply} onClose={() => {}} />)
     fireEvent.click(screen.getByRole('checkbox', { name: /select all/i }))
     fireEvent.click(screen.getByRole('button', { name: 'Someday' }))
     expect(onApply).toHaveBeenCalledWith(['old', 'new'], 'someday')
   })
 
   it('offers all four fates', () => {
-    render(<SlippedReview items={items} onApply={() => {}} onClose={() => {}} />)
+    render(<NeedsAttentionReview items={items} onApply={() => {}} onClose={() => {}} />)
     for (const name of ['Today', 'This week', 'Someday', 'Delete']) {
       expect(screen.getByRole('button', { name })).toBeInTheDocument()
     }
@@ -47,14 +47,14 @@ describe('SlippedReview', () => {
 
   it('does nothing when no rows are selected', () => {
     const onApply = vi.fn()
-    render(<SlippedReview items={items} onApply={onApply} onClose={() => {}} />)
+    render(<NeedsAttentionReview items={items} onApply={onApply} onClose={() => {}} />)
     fireEvent.click(screen.getByRole('button', { name: 'Someday' }))
     expect(onApply).not.toHaveBeenCalled()
   })
 
   it('applies to only the rows actually selected', () => {
     const onApply = vi.fn()
-    render(<SlippedReview items={items} onApply={onApply} onClose={() => {}} />)
+    render(<NeedsAttentionReview items={items} onApply={onApply} onClose={() => {}} />)
     fireEvent.click(screen.getByRole('checkbox', { name: /select recent thing/i }))
     fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
     expect(onApply).toHaveBeenCalledWith(['new'], 'delete')
@@ -67,7 +67,7 @@ describe('SlippedReview', () => {
       item('stranded-week', 10, { id: 'week', title: 'week task' }),
       item('slipped', 5, { id: 'slip', title: 'slipped task' }),
     ]
-    render(<SlippedReview items={mixed} onApply={() => {}} onClose={() => {}} />)
+    render(<NeedsAttentionReview items={mixed} onApply={() => {}} onClose={() => {}} />)
     const headings = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent)
     expect(headings).toEqual([
       'Past their date',
@@ -77,8 +77,20 @@ describe('SlippedReview', () => {
     ])
   })
 
+  it('names itself "Needs attention", never "Slipped"', () => {
+    // Only one of the four reasons it renders is a slipped date; it also holds
+    // never-triaged inbox items and stranded placements. The old name
+    // contradicted its own contents, and the region label is what a screen
+    // reader announces on arrival from Today's Review link.
+    render(<NeedsAttentionReview items={items} onApply={() => {}} onClose={() => {}} />)
+    expect(screen.getByRole('region', { name: /needs attention review/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 2, name: 'Needs attention' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /close needs attention review/i })).toBeInTheDocument()
+    expect(screen.queryByText(/slipped/i)).toBeNull()
+  })
+
   it('omits a heading for a reason with no items', () => {
-    render(<SlippedReview items={items} onApply={() => {}} onClose={() => {}} />)
+    render(<NeedsAttentionReview items={items} onApply={() => {}} onClose={() => {}} />)
     expect(screen.queryByText('Sitting in this month')).toBeNull()
     expect(screen.queryByText('Never triaged')).toBeNull()
     expect(screen.queryByText('Left behind on a past week')).toBeNull()

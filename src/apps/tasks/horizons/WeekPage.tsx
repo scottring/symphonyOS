@@ -5,11 +5,14 @@
 // listed again elsewhere on the page (no carry-over section, no placed
 // section, no project-grouped lists — those all collapsed into the shelf).
 
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { PAGE_COLUMN } from '@/components/layout/pageLayout';
 import { PlanningSession } from '@/components/planning/PlanningSession';
 import { CalendarRange } from 'lucide-react';
+import { AttentionLine } from '@/components/schedule/AttentionLine';
+import { NeedsAttentionReview, type AttentionFate } from '@/components/schedule/NeedsAttentionReview';
+import { selectNeedsAttention } from '@/lib/today/attention';
 import { ScheduleActionsProvider } from '@/contexts/ScheduleActionsContext';
 import { UndoToast } from '@/components/undo/UndoToast';
 import { HorizonExplainer } from '@/components/planning/explainers/HorizonExplainer';
@@ -68,6 +71,7 @@ export function WeekPage() {
     scheduleActionsValue, undo,
     setBucket, deleteTaskWithUndo, projectsMap, tasksById, weekAnchor,
     addTask, deleteTask, toggleTask, getCurrentUserMember, currentDomain,
+    match, domainTasks,
   } = useHorizonPageData(horizon, anchoredWeekStart ?? undefined);
 
   const gridStart = anchoredWeekStart ?? weekAnchor;
@@ -86,6 +90,44 @@ export function WeekPage() {
     (id: string) => { void updateTask(id, { weekStart: gridStart }); },
     [updateTask, gridStart],
   );
+
+  // ── Needs attention ───────────────────────────────────────────────────────
+  // The review surface for everything that aged out of its home: slipped
+  // dates, stranded week placements, stale month items, never-triaged
+  // capture. Today renders the one-line SIGNAL of this same set and its
+  // Review link lands here (`?review=attention`), because deciding an item's
+  // fate is planning work and Today is a commitment surface.
+  //
+  // Anchored to the LIVE week, never to `gridStart`. "Stranded" means "placed
+  // on a week that has passed", which is a fact about now — browsing back to
+  // a past week via `?start=` must not make this week's work look stranded,
+  // and browsing forward must not hide work that genuinely is.
+  const liveWeekStart = useMemo(
+    () => weekStartAnchor(new Date(), readCadenceConfig().weekStartsOn),
+    [],
+  );
+  const attentionItems = useMemo(
+    () => selectNeedsAttention(domainTasks, match, new Date(), liveWeekStart),
+    [domainTasks, match, liveWeekStart],
+  );
+  const [reviewOpen, setReviewOpen] = useState(
+    () => searchParams.get('review') === 'attention',
+  );
+
+  // The four fates map onto writers this page already has. 'today' and 'week'
+  // go through pushTask so they inherit its weekStart handling and defer_count
+  // increment; 'someday' is a resolution rather than a deferral, so it writes
+  // the bucket directly and does not count as a defer. Delete routes through
+  // the undo-wrapped writer, same as every other delete on this page.
+  const handleAttentionApply = useCallback((ids: string[], fate: AttentionFate) => {
+    for (const id of ids) {
+      if (fate === 'delete') deleteTaskWithUndo(id);
+      else if (fate === 'today') void pushTask(id, new Date());
+      else if (fate === 'week') void pushTask(id, 'week');
+      else void updateTask(id, { bucket: 'someday', scheduledFor: undefined });
+    }
+    setReviewOpen(false);
+  }, [deleteTaskWithUndo, pushTask, updateTask]);
 
   // Union of this week's grid tasks + carried-over (prior-week overdue) tasks,
   // deduped by id. weekGridTasks alone excludes a task scheduled BEFORE the
@@ -228,6 +270,28 @@ export function WeekPage() {
           <p className="mb-3 text-[12px] text-neutral-400">
             Drop a move on a day to place it — what time is Today&rsquo;s question.
           </p>
+
+          {/* Needs attention — secondary to the shelf and the grid, which are
+              what this page is for. Closed it costs exactly one line, the same
+              line Today shows and the same fixed budget the invariant demands;
+              opened it is bounded and scrolls inside itself, so the 7-day grid
+              below keeps its own scroll region and is never pushed off screen.
+              Reuses AttentionLine as the trigger so the sentence a user reads
+              on Today is byte-for-byte the sentence they read on arrival. */}
+          {attentionItems.length > 0 && (
+            <div className="mb-3">
+              <AttentionLine items={attentionItems} onReview={() => setReviewOpen((o) => !o)} />
+              {reviewOpen && (
+                <div className="max-h-[45vh] overflow-y-auto">
+                  <NeedsAttentionReview
+                    items={attentionItems}
+                    onApply={handleAttentionApply}
+                    onClose={() => setReviewOpen(false)}
+                  />
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* One surface: shelf above, week grid below. A task is on a day or
