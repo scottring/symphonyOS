@@ -132,6 +132,74 @@ describe('RoutineCollectionRow dose handling', () => {
   })
 })
 
+describe('RoutineCollectionRow untimed ("anytime") dose', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  function untimedItem(doseOverrides: Partial<{ completed: boolean; skipped: boolean }> = {}) {
+    const item = collectionItem()
+    item.collectionSteps![0].doses = [
+      { id: 'routine-chin#0', time: null, completed: false, ...doseOverrides },
+    ]
+    item.collectionNextUp = { stepId: 'chin', stepName: 'Chin Tuck', time: null, doseSlot: 0 }
+    return item
+  }
+
+  it('renders the standard check circle, not a text pill, for an untimed dose', () => {
+    renderRow(untimedItem())
+    expandRow()
+
+    const dose = screen.getByRole('button', { name: /complete chin tuck/i })
+    // No time to show, so the old "anytime" pill text is gone…
+    expect(dose).not.toHaveTextContent('anytime')
+    // …and it's rendered as a circle (TaskCheckbox's shape/size/border
+    // language: w-5 h-5 rounded-full border-2), not the pill's `text-xs` pill.
+    expect(dose.className).toContain('w-5 h-5 rounded-full border-2')
+    expect(dose.className).not.toContain('text-xs') // old pill's own signature
+  })
+
+  it('tapping an untimed dose completes it, same as a timed one', () => {
+    renderRow(untimedItem())
+    expandRow()
+
+    fireEvent.click(screen.getByRole('button', { name: /complete chin tuck/i }))
+    expect(handlers.onCompleteStep).toHaveBeenCalledWith('routine-chin#0', true)
+  })
+
+  it('a completed untimed dose shows a checkmark and taps back to pending', () => {
+    renderRow(untimedItem({ completed: true }))
+    expandRow()
+
+    const dose = screen.getByRole('button', { name: /uncomplete chin tuck/i })
+    expect(dose.className).toContain('bg-primary-500')
+    fireEvent.click(dose)
+    expect(handlers.onCompleteStep).toHaveBeenCalledWith('routine-chin#0', false)
+  })
+
+  it('a skipped untimed dose is visually muted and taps back to pending', () => {
+    renderRow(untimedItem({ skipped: true }))
+    expandRow()
+
+    const dose = screen.getByRole('button', { name: /unskip chin tuck/i })
+    expect(dose.className).toContain('bg-neutral-100')
+    fireEvent.click(dose)
+    expect(handlers.onCompleteStep).toHaveBeenCalledWith('routine-chin#0', false)
+  })
+
+  // isPastDue() short-circuits to false whenever `dose.time` is null — an
+  // "anytime" dose has no due time to have missed, so it can never enter the
+  // amber past-due/resolve-missed state (true before this fix too; the pill
+  // had the same unreachable amber branch). Even with a stale startTime
+  // (YESTERDAY, from collectionItem()), it stays a plain single-tap-completes
+  // dose, never the resolve-missed menu.
+  it('an untimed dose is never past-due, even with a stale startTime', () => {
+    renderRow(untimedItem())
+    expandRow()
+
+    expect(screen.getByRole('button', { name: /^complete chin tuck$/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /resolve missed/i })).toBeNull()
+  })
+})
+
 describe('RoutineCollectionRow management menu', () => {
   beforeEach(() => vi.clearAllMocks())
 

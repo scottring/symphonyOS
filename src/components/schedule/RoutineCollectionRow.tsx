@@ -172,7 +172,10 @@ export function RoutineCollectionRow({ item, onSelect, onSelectStep, onCompleteS
               </button>
             </div>
           )}
-          {/* One row per exercise; its doses are tappable pills (filled = done). */}
+          {/* One row per exercise; its doses are tappable. A timed dose is a
+              pill showing its time (filled = done); an untimed ("anytime")
+              dose is the standard check circle instead, since it has no time
+              to show and a text pill didn't read as tappable. */}
           {(item.collectionSteps ?? []).map(group => {
             const stepDone = group.progress.done === group.progress.total && group.progress.total > 0
             return (
@@ -189,6 +192,7 @@ export function RoutineCollectionRow({ item, onSelect, onSelectStep, onCompleteS
                 <div className="flex flex-wrap gap-1 mt-1">
                   {group.doses.map(dose => {
                     const pastDue = isPastDue(dose)
+                    const untimed = !dose.time
                     const label = dose.completed
                       ? `Uncomplete ${group.name}${dose.time ? ` at ${fmt(dose.time)}` : ''}`
                       : dose.skipped
@@ -198,21 +202,49 @@ export function RoutineCollectionRow({ item, onSelect, onSelectStep, onCompleteS
                       : `Complete ${group.name}${dose.time ? ` at ${fmt(dose.time)}` : ''}`
                     return (
                       <span key={dose.id} className="relative">
-                        <button
-                          onClick={() => handleDoseClick(dose)}
-                          aria-label={label}
-                          className={`px-2 py-0.5 rounded-full text-xs border transition-colors ${
-                            dose.completed
-                              ? 'bg-primary-600 border-primary-600 text-white'
-                              : dose.skipped
-                              ? 'bg-neutral-100 border-neutral-200 text-neutral-400 line-through'
-                              : pastDue
-                              ? 'bg-amber-50 border-amber-300 text-amber-700 hover:border-amber-400'
-                              : 'bg-white border-neutral-300 text-neutral-600 hover:border-primary-300'
-                          }`}
-                        >
-                          {fmtShort(dose.time)}
-                        </button>
+                        {untimed ? (
+                          // Untimed dose: no time to show, so render the app's
+                          // standard check circle (same shape/size/border
+                          // language as TaskCheckbox) instead of a text pill —
+                          // an "anytime" pill didn't read as tappable. Colors
+                          // are the same ones the pill already used per state,
+                          // just carried by a circle instead of pill text.
+                          <button
+                            onClick={() => handleDoseClick(dose)}
+                            aria-label={label}
+                            className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors ${
+                              dose.completed
+                                ? 'bg-primary-500 border-primary-500 text-white'
+                                : dose.skipped
+                                ? 'bg-neutral-100 border-neutral-300 text-neutral-400'
+                                : pastDue
+                                ? 'bg-amber-50 border-amber-300 text-amber-700 hover:border-amber-400'
+                                : 'bg-bg-base border-neutral-300 hover:border-primary-400'
+                            }`}
+                          >
+                            {dose.completed ? (
+                              <Check className="w-3 h-3" strokeWidth={3} />
+                            ) : dose.skipped ? (
+                              <SkipForward className="w-2.5 h-2.5" />
+                            ) : null}
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleDoseClick(dose)}
+                            aria-label={label}
+                            className={`px-2 py-0.5 rounded-full text-xs border transition-colors ${
+                              dose.completed
+                                ? 'bg-primary-600 border-primary-600 text-white'
+                                : dose.skipped
+                                ? 'bg-neutral-100 border-neutral-200 text-neutral-400 line-through'
+                                : pastDue
+                                ? 'bg-amber-50 border-amber-300 text-amber-700 hover:border-amber-400'
+                                : 'bg-white border-neutral-300 text-neutral-600 hover:border-primary-300'
+                            }`}
+                          >
+                            {fmtShort(dose.time)}
+                          </button>
+                        )}
 
                         {menuDoseId === dose.id && (
                           <>
