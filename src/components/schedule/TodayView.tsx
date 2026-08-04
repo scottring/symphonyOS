@@ -1091,15 +1091,15 @@ export function TodayView({
             permanently-buried failure expiry must not cause, so the line
             renders in BOTH branches whenever the set is non-empty.
 
-            The SIGNAL stays here; the review LIST does not. Deciding an
-            item's fate is planning work, so Review navigates to /week, where
-            NeedsAttentionReview lives. The line itself cannot move with it —
-            Today is the most-read page, and a signal only /week carries is a
-            signal nobody sees, which is the podiatrist bug again. */}
+            This line is awareness only — it carries no list and no dismiss.
+            The affordance to actually act on the set lives on /week, in
+            PlanningShelf's carried-over pills (drag onto a day, or use the
+            ⋯ menu) — a surface that already existed and already does this
+            job, so Review is a plain navigate with no `?review=` param. */}
         {data.isToday && (
           <AttentionLine
             items={data.attentionItems}
-            onReview={() => navigate('/week?review=attention')}
+            onReview={() => navigate('/week')}
           />
         )}
       </div>

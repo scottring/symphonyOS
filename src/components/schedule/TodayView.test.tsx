@@ -489,16 +489,18 @@ describe('TodayView attention line', () => {
   })
 
   it('sends Review to /week instead of opening a list on Today', () => {
-    // The review LIST is planning work and lives on /week
-    // (NeedsAttentionReview). Today keeps the one-line signal and nothing
-    // else: no list may open here, or the commitment surface grows a triage
-    // surface again — the fusion this whole branch exists to undo.
+    // The review LIST is planning work and lives on /week, in PlanningShelf's
+    // carried-over pills — a surface that already existed. Today keeps the
+    // one-line signal and nothing else: no list may open here, or the
+    // commitment surface grows a triage surface again — the fusion this
+    // whole branch exists to undo. Plain navigate, no `?review=` param: the
+    // shelf shows this work unconditionally, it needs no seeding.
     const back = window.location.pathname + window.location.search
     try {
       renderView({ viewedDate: TODAY, tasks: [mk('s', 'slipped thing', 200)] } as never)
       fireEvent.click(screen.getByText(/1 needs attention/))
       expect(window.location.pathname).toBe('/week')
-      expect(window.location.search).toBe('?review=attention')
+      expect(window.location.search).toBe('')
       expect(screen.queryByRole('region', { name: /needs attention review/i })).toBeNull()
       expect(screen.queryByText('slipped thing')).toBeNull()
     } finally {
