@@ -107,10 +107,25 @@ describe('TodayView', () => {
     expect(screen.queryByRole('button', { name: /this week/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /this month/i })).not.toBeInTheDocument()
   })
-  it('keeps the assignee filter and routine show/hide toggle in the overflow', async () => {
+  it('keeps the routine show/hide toggle in the overflow', async () => {
     const { user } = renderView({ assigneesWithTasks: [{ id: 'm1', name: 'Iris' } as never], hasUnassignedTasks: true })
     await openOverflow(user)
     expect(screen.getByRole('button', { name: /hide daily|show daily/i })).toBeInTheDocument()
+  })
+
+  it('shows the assignee filter directly in the controls strip, not behind the overflow', () => {
+    // Scott reaches for assignee filtering far more than "Plan today" — it's the
+    // one visible control now; "Plan today" moved into the overflow instead.
+    renderView({ assigneesWithTasks: [{ id: 'm1', name: 'Iris' } as never], hasUnassignedTasks: true, onSelectAssignees: vi.fn() })
+    expect(screen.getByRole('button', { name: /filter by assignee/i })).toBeInTheDocument()
+  })
+
+  it('moves "Plan today" into the overflow menu', async () => {
+    const onOpenPlanToday = vi.fn()
+    const { user } = renderView({ onOpenPlanToday })
+    expect(screen.queryByRole('button', { name: /plan today/i })).not.toBeInTheDocument()
+    await openOverflow(user)
+    expect(screen.getByRole('button', { name: /plan today/i })).toBeInTheDocument()
   })
 
   it('no longer shows a standalone "Plan day" button (time-blocking moved into the Plan today flow)', () => {

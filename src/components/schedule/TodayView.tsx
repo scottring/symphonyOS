@@ -828,26 +828,26 @@ export function TodayView({
         data-testid="today-controls"
         className="px-3 md:px-0 mb-3 md:-mt-5 hidden md:flex items-center justify-end gap-1"
       >
-        {data.isToday && onOpenPlanToday && (
-          <button
-            type="button"
-            onClick={onOpenPlanToday}
-            title="Plan today — review carried-over and pull from the week"
-            className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[15px] text-primary-600 transition-all hover:bg-primary-50"
-          >
-            <Sun className="w-5 h-5" />
-            <span>Plan today</span>
-          </button>
+        {onSelectAssignees && ((assigneesWithTasks?.length ?? 0) > 0 || hasUnassignedTasks) && (
+          <AssigneeFilter
+            selectedAssignees={selectedAssignees ?? []}
+            onSelectAssignees={onSelectAssignees}
+            assigneesWithTasks={assigneesWithTasks ?? []}
+            hasUnassignedTasks={!!hasUnassignedTasks}
+          />
         )}
 
         <TodayOverflowMenu>
-          {onSelectAssignees && ((assigneesWithTasks?.length ?? 0) > 0 || hasUnassignedTasks) && (
-            <AssigneeFilter
-              selectedAssignees={selectedAssignees ?? []}
-              onSelectAssignees={onSelectAssignees}
-              assigneesWithTasks={assigneesWithTasks ?? []}
-              hasUnassignedTasks={!!hasUnassignedTasks}
-            />
+          {data.isToday && onOpenPlanToday && (
+            <button
+              type="button"
+              onClick={onOpenPlanToday}
+              title="Plan today — review carried-over and pull from the week"
+              className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[15px] text-neutral-600 transition-all hover:bg-neutral-100"
+            >
+              <Sun className="w-5 h-5" />
+              <span>Plan today</span>
+            </button>
           )}
           <button
             type="button"
