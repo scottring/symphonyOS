@@ -154,3 +154,24 @@ export function countRoutineUnits(
 
   return { actionable, completed }
 }
+
+/**
+ * Count routine units already sitting in a rendered section's item list (e.g.
+ * the Unscheduled/"Anytime" band). Reads the SAME TimelineItem[] the timeline
+ * would draw if the section were expanded — one row per routine-collection
+ * item, one row per standalone dose — so this cannot drift from
+ * countRoutineUnits above: it is the identical rule (skip resolves a unit out
+ * of the pool rather than counting it as a loss) applied to the already-built
+ * rows instead of re-deriving them from raw routines.
+ */
+export function countRoutineRowUnits(items: TimelineItem[]): { done: number; total: number } {
+  let total = 0
+  let done = 0
+  for (const item of items) {
+    if (item.type !== 'routine' && item.type !== 'routine-collection') continue
+    if (item.skipped) continue // resolved — off the day, not a loss
+    total += 1
+    if (item.completed) done += 1
+  }
+  return { done, total }
+}

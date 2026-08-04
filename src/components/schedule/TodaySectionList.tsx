@@ -36,6 +36,7 @@ import { useTodayDragState } from './TodayDragProvider'
 import { refusalFor } from '@/lib/today/todayDrop'
 import { DEFAULT_SECTION_CAP } from '@/lib/today/pageCap'
 import { curateUnits } from '@/lib/today/curate'
+import { countRoutineRowUnits } from '@/lib/today/routineCollections'
 
 // ─── Meal detection ────────────────────────────────────────────────────────────
 
@@ -188,6 +189,11 @@ export function TodaySectionList({
         )
         const completedCount = items.filter((i) => i.completed).length
         const restAllDone = items.length > 0 && completedCount === items.length
+        // The untimed-routine slab collapses to one "Anytime · M of N done"
+        // row regardless of whether it holds 12 routines or 60 — computed
+        // from the same `items` the rows below would render, so it can't
+        // drift from what's actually on screen.
+        const anytimeSummary = section === 'unscheduled' ? countRoutineRowUnits(items) : undefined
         // "Empty because the hero took it" is only true if the section HAD
         // something. An empty band materialised mid-drag has nothing to lift,
         // and labelling it "· up next" would be a lie the header tells.
@@ -216,6 +222,7 @@ export function TodaySectionList({
               collapsed={collapsed}
               emptyBecauseHero={emptyBecauseHero}
               onToggle={() => onToggleSection(section, collapsed)}
+              anytimeSummary={anytimeSummary}
             />
             {!collapsed && (
               <div className="space-y-1 md:space-y-0.5">

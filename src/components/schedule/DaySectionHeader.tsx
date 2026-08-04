@@ -12,6 +12,16 @@ export interface DaySectionHeaderProps {
   /** True when the section's only item was lifted into the hero. */
   emptyBecauseHero: boolean
   onToggle: () => void
+  /**
+   * Unscheduled-only. The untimed-routine slab's own unit count (done/total,
+   * skip-excluded — see `countRoutineRowUnits`). While collapsed, it replaces
+   * the generic "Unscheduled · N · M done" readout with one line that names
+   * the count directly — "Anytime · M of N done" — so the row reads the same
+   * whether the slab holds 12 routines or 60: the collapsed row's height
+   * never grows with the count, only the number inside it changes. Ignored
+   * for every other section and while expanded.
+   */
+  anytimeSummary?: { done: number; total: number }
 }
 
 /**
@@ -22,10 +32,12 @@ export interface DaySectionHeaderProps {
  * the row, same honesty rule as the page cap.
  */
 export function DaySectionHeader({
-  section, itemCount, completedCount, collapsed, emptyBecauseHero, onToggle,
+  section, itemCount, completedCount, collapsed, emptyBecauseHero, onToggle, anytimeSummary,
 }: DaySectionHeaderProps) {
   const meta = daySectionMeta(section)
   const allDone = itemCount > 0 && completedCount === itemCount
+  const showAnytime = section === 'unscheduled' && collapsed && !emptyBecauseHero && !!anytimeSummary
+  const label = showAnytime ? 'Anytime' : meta.label
 
   return (
     <button
@@ -33,7 +45,7 @@ export function DaySectionHeader({
       onClick={emptyBecauseHero ? undefined : onToggle}
       disabled={emptyBecauseHero}
       aria-expanded={!collapsed}
-      aria-label={`${collapsed ? 'Expand' : 'Collapse'} ${meta.label}`}
+      aria-label={`${collapsed ? 'Expand' : 'Collapse'} ${label}`}
       // mb-3 restores the desktop precedent: collapsing the two old headers into
       // one dropped their bottom margin, so every header sat flush against its
       // first row.
@@ -44,13 +56,17 @@ export function DaySectionHeader({
       {createElement(meta.Icon, {
         className: `w-4 h-4 shrink-0 ${collapsed ? 'text-amber-500/60' : 'text-amber-500'}`,
       })}
-      <span>{meta.label}</span>
-      {meta.range && (
+      <span>{label}</span>
+      {meta.range && !showAnytime && (
         <span className="text-neutral-300 normal-case font-normal">{meta.range}</span>
       )}
 
       {emptyBecauseHero ? (
         <span className="text-primary-600/70 normal-case font-normal">· up next</span>
+      ) : showAnytime ? (
+        <span className="text-neutral-400 normal-case font-normal tabular-nums">
+          · {anytimeSummary.done} of {anytimeSummary.total} done
+        </span>
       ) : (
         <span className="text-neutral-400 normal-case font-normal tabular-nums">
           · {itemCount}
