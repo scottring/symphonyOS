@@ -243,6 +243,38 @@ describe('horizon pages (smoke)', () => {
     expect(localYmd(call![1].weekStart as Date)).toBe(localYmd(currentWeekStart))
   })
 
+  // handleLetGo (shared.tsx) recreates a deleted task from a snapshot on undo.
+  // The snapshot used to carry only title/bucket/context/assignees/contactId/
+  // projectId/scheduledFor/goalId/sourceId/phoneNumber/isFun — notes and links
+  // (the whole point of a Symphony task) were silently dropped. Delete via the
+  // shelf pill's "Task actions" menu, then Undo, and check they survive.
+  it('deleting a shelf task and undoing it restores notes and links intact', () => {
+    mockTasks.push(createMockTask({
+      id: 'context-task',
+      title: 'Confirm the venue',
+      bucket: 'week',
+      notes: 'Ask about parking validation',
+      links: [{ url: 'https://venue.example.com', title: 'Venue site' }],
+    }) satisfies Task)
+
+    render(<WeekPage />)
+    fireEvent.click(screen.getAllByLabelText('Task actions')[0])
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }))
+
+    // Delete fires immediately; addTask must NOT have been called yet.
+    expect(mockAddTask).not.toHaveBeenCalled()
+
+    fireEvent.click(screen.getByRole('button', { name: /undo/i }))
+
+    expect(mockAddTask).toHaveBeenCalledTimes(1)
+    const [title, , , , opts] = mockAddTask.mock.calls[0]
+    expect(title).toBe('Confirm the venue')
+    expect(opts).toMatchObject({
+      notes: 'Ask about parking validation',
+      links: [{ url: 'https://venue.example.com', title: 'Venue site' }],
+    })
+  })
+
   // The month rung places into a WEEK, so it draws weeks. A `Sun Mon Tue…`
   // header advertised a grain this page has never accepted.
   it('MonthPage renders week strips and no weekday header', () => {

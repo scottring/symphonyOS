@@ -502,6 +502,15 @@ export function useHorizonPageData(horizon: HorizonId, anchorDate?: Date) {
         sourceId: task.sourceId,
         phoneNumber: task.phoneNumber,
         isFun: task.isFun,
+        // Context is first-class here — notes/links are the whole point of a
+        // task, so an undo that drops them silently returns a stripped task.
+        notes: task.notes,
+        links: task.links,
+        parentTaskId: task.parentTaskId,
+        // NOTE: task.weekStart is NOT restored — AddTaskOptions has no INSERT-time
+        // week_start field (only updateTask sets it), and a follow-up updateTask
+        // call here would reintroduce the addTask-then-setBucket race this file
+        // otherwise avoids. A 'week'-bucket task's original week is lost on undo.
       });
     });
   }, [tasks, deleteTask, addTask, undo.pushAction]);

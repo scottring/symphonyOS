@@ -147,6 +147,12 @@ export function WeekPage() {
             sourceId: t.sourceId,
             phoneNumber: t.phoneNumber,
             isFun: t.isFun,
+            // Mirrors handleLetGo's recreate-body exactly (see shared.tsx) —
+            // notes/links/parentTaskId are restorable via the existing addTask
+            // options; weekStart is not (see the note there).
+            notes: t.notes,
+            links: t.links,
+            parentTaskId: t.parentTaskId,
           });
         }
       });
