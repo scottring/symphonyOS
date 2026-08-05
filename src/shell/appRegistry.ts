@@ -11,6 +11,7 @@ import { settingsAppDef } from '@/apps/settings';
 import { historyAppDef } from '@/apps/history';
 import { listsAppDef } from '@/apps/lists';
 import { contactsAppDef } from '@/apps/contacts';
+import { documentsAppDef } from '@/apps/documents';
 import { routinesAppDef } from '@/apps/routines';
 import { medsAppDef } from '@/apps/meds';
 import { projectsAppDef } from '@/apps/projects';
@@ -77,6 +78,7 @@ export const appRegistry: AppRegistry = createRegistry([
   historyAppDef,
   listsAppDef,
   contactsAppDef,
+  documentsAppDef,
   routinesAppDef,
   medsAppDef,
   projectsAppDef,
