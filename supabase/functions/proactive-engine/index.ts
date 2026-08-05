@@ -3,6 +3,7 @@ import { assembleContext } from '../_shared/context-graph/assemble.ts'
 import { resolveVisibleOwners } from '../_shared/context-graph/visibility.ts'
 import { facetsToFacts, renderBundleForPrompt } from '../_shared/context-graph/build.ts'
 import { facetRuleSuggestions } from './lib/facetRules.ts'
+import { documentExpirySuggestions, type DocumentRow } from './lib/documentRules.ts'
 import { computeUrgency, deriveUrgencyFacts, type UrgencyInput } from '../_shared/urgency.ts'
 
 const corsHeaders = {
@@ -777,6 +778,18 @@ Deno.serve(async (req) => {
         allSuggestions.push(facetSuggestion)
       }
     }
+
+    // 1b. Documents shelf: renewal nudges for anything expiring soon. Carries
+    // only the label and the date — never facet content — so a renewal nudge
+    // can't become a side channel for a sensitive document's own contents.
+    const { data: documentRows, error: documentsErr } = await supabase
+      .from('attachments')
+      .select('id, document_label, document_kind, document_expires_on')
+      .eq('user_id', userId)
+      .eq('document_status', 'kept')
+      .not('document_expires_on', 'is', null)
+    if (documentsErr) console.error('document expiry query failed:', documentsErr.message)
+    allSuggestions.push(...documentExpirySuggestions((documentRows ?? []) as DocumentRow[]))
 
     // 2. Rule-based calendar event suggestions
     for (const event of calendarEvents) {
