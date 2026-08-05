@@ -2,6 +2,7 @@ import { useDirections } from '@/hooks/useDirections'
 import { PlacesAutocomplete } from '@/components/location/PlacesAutocomplete'
 import { DirectionsBuilder } from '@/components/directions'
 import type { TaskDirections } from '@/types/directions'
+import { PanelSection } from './PanelSection'
 
 interface PanelLocationProps {
   location?: string
@@ -31,8 +32,7 @@ export function PanelLocation({
   const { searchPlaces, getPlaceDetails, placesError } = useDirections()
 
   return (
-    <section>
-      <div className="text-[10px] uppercase tracking-wider font-semibold text-neutral-400 mb-2">Location</div>
+    <PanelSection id="location" label="Location" preview={location || undefined}>
       <PlacesAutocomplete
         value={location ? { address: location, placeId: locationPlaceId } : null}
         onSelect={(place) => onUpdateLocation(place.address, place.placeId)}
@@ -52,6 +52,6 @@ export function PanelLocation({
           />
         </div>
       )}
-    </section>
+    </PanelSection>
   )
 }

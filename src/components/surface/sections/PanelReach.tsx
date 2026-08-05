@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Phone, Mail, X } from 'lucide-react'
+import { PanelSection } from './PanelSection'
 
 export type ReachKind = 'phone' | 'email'
 
@@ -73,10 +74,7 @@ export function PanelReach({ kind, value, onChange, autoFocus, asLink = true }: 
   }
 
   return (
-    <section>
-      <div className="text-[10px] uppercase tracking-wider font-semibold text-neutral-400 mb-2">
-        {meta.label}
-      </div>
+    <PanelSection id={kind} label={meta.label} preview={value || undefined}>
 
       {value && !editing ? (
         <div className="flex items-center gap-1">
@@ -125,6 +123,6 @@ export function PanelReach({ kind, value, onChange, autoFocus, asLink = true }: 
           />
         </form>
       )}
-    </section>
+    </PanelSection>
   )
 }

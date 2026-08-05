@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { PanelSection } from './PanelSection'
 
 interface PanelWhatToBringProps {
   notes: string | undefined
@@ -12,8 +13,7 @@ export function PanelWhatToBring({ notes, onChange }: PanelWhatToBringProps) {
   if (!hasText && !onChange) return null
 
   return (
-    <section>
-      <div className="text-[10px] uppercase tracking-wider font-semibold text-neutral-400 mb-2">What to bring</div>
+    <PanelSection id="what-to-bring" label="What to bring" preview={hasText ? (notes ?? '').trim().slice(0, 60) : undefined}>
       {onChange ? (
         <textarea
           value={draft}
@@ -26,6 +26,6 @@ export function PanelWhatToBring({ notes, onChange }: PanelWhatToBringProps) {
       ) : (
         <p className="text-sm text-neutral-700 whitespace-pre-wrap">{notes}</p>
       )}
-    </section>
+    </PanelSection>
   )
 }

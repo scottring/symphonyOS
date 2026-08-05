@@ -2,6 +2,8 @@ import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import { ConceptIcon } from '@/lib/conceptIcons'
+import { PanelSection } from './PanelSection'
+import { PanelRow } from './PanelRow'
 
 interface PanelLinkedProps {
   project?: Project
@@ -23,39 +25,33 @@ export function PanelLinked({ project, linkedEvent, siblingTasks, onOpenProject,
   if (!hasAny) return null
 
   return (
-    <section>
-      <div className="text-[10px] uppercase tracking-wider font-semibold text-neutral-400 mb-2">Linked</div>
+    <PanelSection id="linked" label="Linked" preview={project?.name ?? (linkedEvent?.title || (siblingTasks.length ? `${siblingTasks.length} related` : undefined))}>
       {project && (
-        <button
+        <PanelRow
           onClick={() => onOpenProject(project.id)}
-          className="flex items-center gap-2 w-full text-left mb-1 py-1.5 px-2 rounded-md bg-white shadow-[inset_0_0_0_1px_#e5e7eb] hover:bg-neutral-50"
+          icon={<span className="w-6 h-6 flex items-center justify-center rounded-md bg-violet-100"><ConceptIcon name="project" decorative /></span>}
         >
-          <span className="w-6 h-6 flex items-center justify-center rounded-md bg-violet-100"><ConceptIcon name="project" decorative /></span>
-          <span className="text-sm text-neutral-800 flex-1">{project.name}</span>
-        </button>
+          <span className="block text-sm text-neutral-800">{project.name}</span>
+        </PanelRow>
       )}
       {linkedEvent && (
-        <button
+        <PanelRow
           onClick={() => onOpenEvent(linkedEvent.id)}
-          className="flex items-center gap-2 w-full text-left mb-1 py-1.5 px-2 rounded-md bg-white shadow-[inset_0_0_0_1px_#e5e7eb] hover:bg-neutral-50"
+          icon={<span className="w-6 h-6 flex items-center justify-center rounded-md bg-amber-100"><ConceptIcon name="when" decorative /></span>}
         >
-          <span className="w-6 h-6 flex items-center justify-center rounded-md bg-amber-100"><ConceptIcon name="when" decorative /></span>
-          <span className="text-sm text-neutral-800 flex-1">
-            <div>{linkedEvent.title}</div>
-            <div className="text-xs text-neutral-500">{formatEventTime((linkedEvent as { start_time?: string; startTime?: string }).start_time || (linkedEvent as { start_time?: string; startTime?: string }).startTime)}</div>
-          </span>
-        </button>
+          <span className="block text-sm text-neutral-800">{linkedEvent.title}</span>
+          <span className="block text-xs text-neutral-500">{formatEventTime((linkedEvent as { start_time?: string; startTime?: string }).start_time || (linkedEvent as { start_time?: string; startTime?: string }).startTime)}</span>
+        </PanelRow>
       )}
       {siblingTasks.map(t => (
-        <button
+        <PanelRow
           key={t.id}
           onClick={() => onOpenTask(t.id)}
-          className="flex items-center gap-2 w-full text-left mb-1 py-1.5 px-2 rounded-md bg-white shadow-[inset_0_0_0_1px_#e5e7eb] hover:bg-neutral-50"
+          icon={<span className="w-6 h-6 flex items-center justify-center rounded-md bg-neutral-100"><ConceptIcon name="list" decorative /></span>}
         >
-          <span className="w-6 h-6 flex items-center justify-center rounded-md bg-neutral-100"><ConceptIcon name="list" decorative /></span>
-          <span className="text-sm text-neutral-800 flex-1">{t.title}</span>
-        </button>
+          <span className="block text-sm text-neutral-800">{t.title}</span>
+        </PanelRow>
       ))}
-    </section>
+    </PanelSection>
   )
 }

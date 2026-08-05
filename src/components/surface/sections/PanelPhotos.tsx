@@ -13,6 +13,7 @@ import { CameraCaptureModal } from '@/components/capture/CameraCaptureModal'
 import { AttachmentFacets, type FacetPromotions } from './AttachmentFacets'
 import { DocumentProposalRow } from './DocumentProposal'
 import { setDocumentStatus } from '@/lib/taskAttachments'
+import { PanelSection } from './PanelSection'
 
 interface PanelPhotosProps {
   entityType: AttachmentEntityType
@@ -170,7 +171,9 @@ export function PanelPhotos({ entityType, entityId, entityContext, promotions, d
   // miss navigates the tab to the file. One listener on the outer element also
   // means a drop on the section still lands exactly once, by bubbling.
   const [dragOver, setDragOver] = useState(false)
-  const sectionRef = useRef<HTMLElement>(null)
+  // The drop zone is now a plain wrapper div around PanelSection, so the
+  // section itself can stay a pure PanelSection with no ref or className.
+  const sectionRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const zone = dropZoneRef?.current ?? sectionRef.current
@@ -234,11 +237,15 @@ export function PanelPhotos({ entityType, entityId, entityContext, promotions, d
   if (hideWhenEmpty && attachments.length === 0) return null
 
   return (
-    <section
+    <div
       ref={sectionRef}
       className={dragOver ? 'rounded-lg outline-2 outline-dashed outline-primary-400 outline-offset-4' : undefined}
     >
-      <div className="text-[10px] uppercase tracking-wider font-semibold text-neutral-400 mb-2">Photos &amp; files</div>
+      <PanelSection
+        id="photos"
+        label="Photos &amp; files"
+        preview={attachments.length ? `${attachments.length} file${attachments.length === 1 ? '' : 's'}` : undefined}
+      >
 
       <div className="flex flex-wrap gap-2">
         {images.map((img) => (
@@ -363,6 +370,7 @@ export function PanelPhotos({ entityType, entityId, entityContext, promotions, d
           onClose={() => setShowCamera(false)}
         />
       )}
-    </section>
+      </PanelSection>
+    </div>
   )
 }

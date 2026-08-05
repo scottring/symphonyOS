@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ChevronDown, ChevronRight, MessageCircle } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { PanelSection } from './PanelSection'
 
 interface StoredMessage {
   role: 'user' | 'assistant'
@@ -52,8 +53,7 @@ export function PanelConversations({ taskId }: PanelConversationsProps) {
   if (conversations.length === 0) return null
 
   return (
-    <section>
-      <div className="text-[10px] uppercase tracking-wider font-semibold text-neutral-400 mb-2">Conversations</div>
+    <PanelSection id="conversations" label="Conversations" preview={`${conversations.length} message${conversations.length === 1 ? '' : 's'}`}>
       <div className="space-y-1">
         {conversations.map((c) => {
           const open = openId === c.id
@@ -91,6 +91,6 @@ export function PanelConversations({ taskId }: PanelConversationsProps) {
           )
         })}
       </div>
-    </section>
+    </PanelSection>
   )
 }

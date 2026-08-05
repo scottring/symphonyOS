@@ -1,6 +1,7 @@
 import type { Contact, ContactCategory } from '@/types/contact'
 import { ConceptIcon } from '@/lib/conceptIcons'
 import { AssignPicker } from '@/components/triage/AssignPicker'
+import { PanelSection } from './PanelSection'
 
 /**
  * Who the task is ABOUT — its related contact.
@@ -37,9 +38,11 @@ export function PanelPeople({
   if (!contact && !canEditContact) return null
 
   return (
-    <section>
-      <div className="flex items-center justify-between mb-2">
-        <div className="text-[10px] uppercase tracking-wider font-semibold text-neutral-400">People</div>
+    <PanelSection
+      id="people"
+      label="People"
+      preview={contact?.name}
+      actions={<>
         {canEditContact && (
           <AssignPicker
             value={contact?.id}
@@ -49,7 +52,8 @@ export function PanelPeople({
             onAddContact={onAddContact}
           />
         )}
-      </div>
+      </>}
+    >
       {contact && (
         <button
           onClick={() => onOpenContact(contact.id)}
@@ -64,6 +68,6 @@ export function PanelPeople({
           </span>
         </button>
       )}
-    </section>
+    </PanelSection>
   )
 }

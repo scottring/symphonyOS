@@ -4,6 +4,7 @@ import type { Task } from '@/types/task'
 import { ConceptIcon } from '@/lib/conceptIcons'
 import { RescheduleGrid } from '@/components/schedule/RescheduleGrid'
 import type { TriageWhen } from '@/components/schedule/TriageWhenMenu'
+import { PanelSection } from './PanelSection'
 
 interface PanelSubtasksProps {
   subtasks: Task[]
@@ -90,8 +91,7 @@ export function PanelSubtasks({ subtasks, onToggleSubtask, onAddSubtask, onOpenS
   }
 
   return (
-    <section>
-      <div className="text-[10px] uppercase tracking-wider font-semibold text-neutral-400 mb-2">Subtasks</div>
+    <PanelSection id="subtasks" label="Subtasks" preview={subtasks.length ? `${subtasks.filter(s => s.completed).length}/${subtasks.length} done` : undefined}>
       <div className="flex flex-col gap-1.5">
         {subtasks.map(sub => (
           onOpenSubtask ? (
@@ -157,6 +157,6 @@ export function PanelSubtasks({ subtasks, onToggleSubtask, onAddSubtask, onOpenS
           />
         )}
       </div>
-    </section>
+    </PanelSection>
   )
 }

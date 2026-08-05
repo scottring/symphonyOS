@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { TaskLink } from '@/types/task'
 import { ConceptIcon } from '@/lib/conceptIcons'
 import { AttachmentFacets, type FacetPromotions } from './AttachmentFacets'
+import { PanelSection } from './PanelSection'
 
 interface PanelLinksProps {
   links: TaskLink[] | undefined
@@ -31,8 +32,7 @@ export function PanelLinks({ links, onAddLink, facetPromotions }: PanelLinksProp
   }
 
   return (
-    <section>
-      <div className="text-[10px] uppercase tracking-wider font-semibold text-neutral-400 mb-2">Links</div>
+    <PanelSection id="links" label="Links" preview={list.length ? `${list.length} link${list.length === 1 ? '' : 's'}` : undefined}>
       {list.map((link) => (
         <div key={link.url} className="mb-1">
           <a
@@ -67,6 +67,6 @@ export function PanelLinks({ links, onAddLink, facetPromotions }: PanelLinksProp
           className="w-full text-sm px-2 py-1.5 rounded-md bg-transparent text-neutral-500 placeholder:text-neutral-400 focus:outline-none focus:bg-neutral-50 hover:bg-neutral-50"
         />
       )}
-    </section>
+    </PanelSection>
   )
 }

@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { PanelSection } from './PanelSection'
 
 interface PanelIngredientsProps {
   ingredients: string[] | undefined
@@ -18,8 +19,7 @@ export function PanelIngredients({ ingredients }: PanelIngredientsProps) {
   }
 
   return (
-    <section>
-      <div className="text-[10px] uppercase tracking-wider font-semibold text-neutral-400 mb-2">Ingredients</div>
+    <PanelSection id="ingredients" label="Ingredients" preview={`${list.length} item${list.length === 1 ? '' : 's'}`}>
       <ul className="space-y-1">
         {list.map((item, i) => (
           <li key={`${item}-${i}`} className="flex items-center gap-2">
@@ -36,6 +36,6 @@ export function PanelIngredients({ ingredients }: PanelIngredientsProps) {
           </li>
         ))}
       </ul>
-    </section>
+    </PanelSection>
   )
 }
