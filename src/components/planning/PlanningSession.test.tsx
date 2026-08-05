@@ -1022,3 +1022,48 @@ describe('PlanningSession — drawer drops placed routines', () => {
     expect(screen.getByText('Not yet placed')).toBeInTheDocument()
   })
 })
+
+// The /week masthead read "2 to place" directly above a shelf listing 9: it
+// recomputed a pool of its own instead of mirroring what the shelf renders.
+// The count is now reported outward from the single derivation.
+describe('onShelfCount', () => {
+  it('reports how many tasks the shelf is actually rendering', () => {
+    const onShelfCount = vi.fn()
+    const pool = [
+      createMockTask({ title: 'Unplaced one', bucket: 'week' }),
+      createMockTask({ title: 'Unplaced two', bucket: 'week' }),
+      createMockTask({ title: 'Unplaced three', bucket: 'week' }),
+    ]
+    render(
+      <PlanningSession
+        tasks={pool}
+        events={[]}
+        routines={[]}
+        onUpdateTask={vi.fn()}
+        onPushTask={vi.fn()}
+        onClose={vi.fn()}
+        onShelfCount={onShelfCount}
+      />,
+    )
+    expect(onShelfCount).toHaveBeenLastCalledWith(3)
+  })
+
+  it('excludes a completed task, which the shelf does not render either', () => {
+    const onShelfCount = vi.fn()
+    render(
+      <PlanningSession
+        tasks={[
+          createMockTask({ title: 'Open', bucket: 'week' }),
+          createMockTask({ title: 'Finished', bucket: 'week', completed: true }),
+        ]}
+        events={[]}
+        routines={[]}
+        onUpdateTask={vi.fn()}
+        onPushTask={vi.fn()}
+        onClose={vi.fn()}
+        onShelfCount={onShelfCount}
+      />,
+    )
+    expect(onShelfCount).toHaveBeenLastCalledWith(1)
+  })
+})

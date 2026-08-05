@@ -62,6 +62,14 @@ interface PlanningSessionProps {
   onScheduleRoutineToday?: (routineId: string, when: Date) => void
   /** Reschedule a placed calendar event to a new start/end (preserves duration). */
   onRescheduleEvent?: (event: CalendarEvent, startTime: Date, endTime: Date) => void
+  /** Reports how many tasks the shelf/drawer is ACTUALLY rendering, whenever
+   *  that number changes. A host masthead that wants to say "N to place" must
+   *  use this rather than recomputing a pool of its own: the /week masthead
+   *  said "2 to place" over a shelf showing 9, because the shelf's population
+   *  is a union (grid tasks + carried-over) filtered by range, deferral and
+   *  relevance, and no second formula stayed in step with it. One derivation,
+   *  reported outward. */
+  onShelfCount?: (count: number) => void
   /** Does this event's calendar accept writes? Gates the day-grain drag
    *  affordance — Google 403s writes to a reader-role share, so an event we
    *  can't move must not look movable. Omitted = no event is draggable at day
@@ -126,6 +134,7 @@ export function PlanningSession({
   onScheduleRoutine,
   onScheduleRoutineToday,
   onRescheduleEvent,
+  onShelfCount,
   canMoveEvent,
   familyMembers = [],
   eventNotesMap,
@@ -319,6 +328,12 @@ export function PlanningSession({
   }, [allUnscheduledTasks])
 
   const unscheduledTasks = showAllUnscheduled ? allUnscheduledTasks : relevantUnscheduled
+
+  // Tell the host what the shelf is showing, so its masthead can mirror the
+  // rendered population instead of guessing at it.
+  useEffect(() => {
+    onShelfCount?.(unscheduledTasks.length)
+  }, [unscheduledTasks.length, onShelfCount])
 
   // Get scheduled tasks for the date range
   const scheduledTasksByDate = useMemo(() => {

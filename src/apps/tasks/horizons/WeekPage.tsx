@@ -118,6 +118,12 @@ export function WeekPage() {
   }, [fetchCalendarList]);
   const canMoveEvent = useMemo(() => makeCanMoveEvent(calendars), [calendars]);
 
+  // What the shelf is actually rendering. The masthead used `pool.length` (the
+  // bucket pool from shared.tsx) while the shelf renders a union filtered by
+  // range and relevance — so the page said "2 to place" directly above a shelf
+  // listing 9. Mirror the render, don't recompute it.
+  const [shelfCount, setShelfCount] = useState<number | null>(null);
+
   const rescheduleEvent = useCallback(
     (event: Parameters<typeof canMoveEvent>[0], startTime: Date, endTime: Date) => {
       void updateEvent({
@@ -234,7 +240,7 @@ export function WeekPage() {
             <div>
               <h1 className="font-display text-3xl font-semibold tracking-tight text-neutral-800">{label}</h1>
               <p className="mt-1 text-sm text-neutral-500">
-                {displayPeriod} · {placedThisWeek.length} placed, {pool.length} to place
+                {displayPeriod} · {placedThisWeek.length} placed, {shelfCount ?? pool.length} to place
               </p>
             </div>
             <div className="shrink-0 flex flex-col items-end gap-1.5">
@@ -286,6 +292,7 @@ export function WeekPage() {
             // all-day on the day it was dropped in; the time is Today's call.
             placementGrain="day"
             onRescheduleEvent={rescheduleEvent}
+            onShelfCount={setShelfCount}
             canMoveEvent={canMoveEvent}
           />
         </div>
