@@ -246,6 +246,27 @@ describe('ContextPicker', () => {
     })
   })
 
+  // The Today action rail needs a 28px trigger to fit a rail cell. Every other
+  // call site (inbox cards, bulk action bar) keeps the 36px one, so the size is
+  // opt-in — these are the guard on that default.
+  describe('sizing', () => {
+    it('defaults to the 36px trigger so existing call sites are unchanged', () => {
+      render(<ContextPicker onChange={mockOnChange} />)
+
+      const trigger = screen.getByRole('button', { name: 'Set context' })
+      expect(trigger).toHaveClass('p-2')
+      expect(trigger.querySelector('svg')?.getAttribute('class')).toContain('w-5 h-5')
+    })
+
+    it('renders a 28px trigger at size="sm" so it fits a rail cell', () => {
+      render(<ContextPicker size="sm" onChange={mockOnChange} />)
+
+      const trigger = screen.getByRole('button', { name: 'Set context' })
+      expect(trigger).toHaveClass('p-1.5')
+      expect(trigger.querySelector('svg')?.getAttribute('class')).toContain('w-4 h-4')
+    })
+  })
+
   describe('accessibility', () => {
     it('trigger button has accessible label', () => {
       render(<ContextPicker onChange={mockOnChange} />)

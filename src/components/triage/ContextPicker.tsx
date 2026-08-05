@@ -5,6 +5,12 @@ import type { TaskContext } from '@/types/task'
 interface ContextPickerProps {
   value?: TaskContext | null
   onChange: (context: TaskContext | undefined) => void
+  /**
+   * 'sm' = 28px box, sized to a Today action-rail cell. 'md' (default) = 36px,
+   * which is every other call site — inbox cards, the bulk action bar. Opt-in
+   * so shrinking the rail can't quietly shrink them too.
+   */
+  size?: 'sm' | 'md'
 }
 
 const CONTEXTS: { value: TaskContext; label: string; color: string }[] = [
@@ -13,7 +19,7 @@ const CONTEXTS: { value: TaskContext; label: string; color: string }[] = [
   { value: 'personal', label: 'Personal', color: 'rgb(147 51 234)' }, // Purple-600 (matches domain switcher)
 ]
 
-export function ContextPicker({ value, onChange }: ContextPickerProps) {
+export function ContextPicker({ value, onChange, size = 'md' }: ContextPickerProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [menuPosition, setMenuPosition] = useState<{ top?: number; bottom?: number; right: number }>({ top: 0, right: 0 })
   const triggerRef = useRef<HTMLDivElement>(null)
@@ -71,6 +77,10 @@ export function ContextPicker({ value, onChange }: ContextPickerProps) {
     personal: { color: 'rgb(147 51 234)' }, // Purple-600
   }
 
+  const isSmall = size === 'sm'
+  const padClass = isSmall ? 'p-1.5' : 'p-2'
+  const iconClass = isSmall ? 'w-4 h-4' : 'w-5 h-5'
+
   const menuContent = isOpen ? (
     <div
       ref={menuRef}
@@ -116,12 +126,12 @@ export function ContextPicker({ value, onChange }: ContextPickerProps) {
     <div ref={triggerRef} className="relative">
       <button
         onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen) }}
-        className={`p-2 rounded-lg transition-colors hover:bg-neutral-100 ${hasValue ? '' : 'tag-needs-context'}`}
+        className={`${padClass} rounded-lg transition-colors hover:bg-neutral-100 ${hasValue ? '' : 'tag-needs-context'}`}
         aria-label="Set context"
         title={hasValue ? undefined : 'Untagged — tap to set Work / Family / Personal'}
       >
         <svg
-          className="w-5 h-5 transition-colors"
+          className={`${iconClass} transition-colors`}
           fill={selectedContext ? 'currentColor' : 'none'}
           stroke={selectedContext ? undefined : 'currentColor'}
           strokeWidth={selectedContext ? undefined : 2}
