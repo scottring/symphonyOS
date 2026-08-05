@@ -22,7 +22,7 @@ function groupByOwner(docs: SymphonyDocument[]): [string, SymphonyDocument[]][] 
 export function DocumentsApp() {
   const {
     documents, proposals, isLoading, error,
-    keepDocument, dismissDocument, setScope, deleteDocument, reload,
+    keepDocument, dismissDocument, setScope, deleteDocument, updateDocument, reload,
   } = useDocuments()
   const { user } = useAuth()
   const groups = useMemo(() => groupByOwner(documents), [documents])
@@ -108,6 +108,7 @@ export function DocumentsApp() {
                   document={d}
                   onToggleScope={() => void setScope(d.id, d.scope === 'private' ? 'household' : 'private')}
                   onDelete={() => void deleteDocument(d)}
+                  onSave={(id, edits) => void updateDocument(id, edits)}
                 />
               ))}
             </div>

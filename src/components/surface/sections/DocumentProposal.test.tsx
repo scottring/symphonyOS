@@ -12,9 +12,21 @@ describe('DocumentProposalRow', () => {
         onDismiss={vi.fn()}
       />
     )
-    // The recognized kind is called out on its own, above the file's label.
-    expect(screen.getByText("driver's license")).toBeInTheDocument()
+    // The label leads so two proposals of the same kind stay distinguishable;
+    // the recognized kind sits underneath it.
     expect(screen.getByText("Scott's driver's license")).toBeInTheDocument()
+    expect(screen.getByText(/looks like a driver's license/i)).toBeInTheDocument()
+  })
+
+  it('distinguishes two proposals of the same kind by their labels', () => {
+    const { rerender } = render(
+      <DocumentProposalRow kind="drivers_license" label="Maryland licence (front)" onKeep={vi.fn()} onDismiss={vi.fn()} />
+    )
+    expect(screen.getByText('Maryland licence (front)')).toBeInTheDocument()
+    rerender(
+      <DocumentProposalRow kind="drivers_license" label="Maryland licence (back)" onKeep={vi.fn()} onDismiss={vi.fn()} />
+    )
+    expect(screen.getByText('Maryland licence (back)')).toBeInTheDocument()
   })
 
   it('calls onKeep when kept', () => {

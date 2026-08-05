@@ -46,7 +46,9 @@ Also decide whether this file is a DURABLE DOCUMENT — something the user will 
 If it is, add a sibling key to the JSON object:
 "document": {"kind":"<one of: drivers_license, passport, birth_certificate, social_security_card, insurance_card, vehicle_registration, vehicle_title, medical_record, tax_document, bank_document, warranty, receipt, contract, other>","label":"short human name, e.g. Scott's driver's license","owner":"whose document it is, if visible","expires_on":"YYYY-MM-DD if an expiry is printed"}
 
-Omit the "document" key entirely for ordinary files (a party invite, a photo of a broken part, a screenshot). A receipt is only a document when it is proof of a purchase worth keeping — not a grocery receipt.`
+Omit the "document" key entirely for ordinary files (a party invite, a photo of a broken part, a screenshot). A receipt is only a document when it is proof of a purchase worth keeping — not a grocery receipt.
+
+The label must identify this file on its own, because the user will see it in a list next to other documents of the same kind. When the file is clearly ONE PART of a multi-part document, the label MUST end with the part in parentheses — "(front)", "(back)", "(page 2)". Judge the side from what is visible: the side with the photo, name and date of birth is the front; the side with barcodes, magnetic stripe, endorsements or donor/organ text is the back. If you genuinely cannot tell which part it is, still say so — end the label with "(one side)" rather than leaving it ambiguous. Never return the same label for two different sides.`
 }
 
 async function callVision(fileUrl: string, isPdf: boolean, prompt: string, apiKey: string): Promise<string> {
