@@ -77,15 +77,24 @@ currently on the wrong side of that line moves.
 Replace `ScheduleItem.tsx:754-850` with a single fixed-width grid, rendered
 unconditionally on every row: **four cells of 28px, uniform 4px gap.**
 
-| Slot | Contents | Renders empty when |
-|---|---|---|
-| 1 · verb | task → `RescheduleButton`; routine → `SkipRoutineButton`; event (timed) → `StartMeetingButton` | row is completed or skipped |
-| 2 · ⋯ | `ScheduleItemActionsMenu` | `variant === 'minimal'` |
-| 3 · ctx | `ContextPicker` | never |
-| 4 · who | `MultiAssigneeDropdown` / `AssigneeDropdown` | no family members loaded |
+| Slot | Width | Contents | Renders empty when |
+|---|---|---|---|
+| 1 · verb | 28px | task → `RescheduleButton`; routine → `SkipRoutineButton`; event (timed) → `StartMeetingButton` | row is completed or skipped |
+| 2 · ⋯ | 28px | `ScheduleItemActionsMenu` | `variant === 'minimal'` |
+| 3 · ctx | 28px | `ContextPicker` | never |
+| 4 · who | 72px, right-aligned | `MultiAssigneeDropdown` / `AssigneeDropdown` | no family members loaded |
 
 Empty slots render as spacers, not as nothing — that is what holds the columns
 across row types.
+
+**The assignee cell is wider than an icon cell, and that is not an
+inconsistency.** `MultiAssigneeDropdown` draws up to four 24px circles at -8px
+overlap, so the stack is 24px for one person and 72px for four. It is the last
+cell, so sizing it to its content would shove every column to its left around
+whenever a row's assignees changed — the exact bug this rail exists to kill.
+Reserving the maximum and right-aligning inside it puts the rightmost avatar on
+the same x on every row, and pushes the slack into whitespace between the
+context icon and the stack, where it reads as padding.
 
 **Exactly one verb per row.** No row type has two of them: a task can be
 rescheduled, a routine can be skipped, a timed event can be started. They share
@@ -118,11 +127,12 @@ stands. They are the verb slot.
 
 ### What deliberately does not change
 
-**The avatar stays 24px, centred in its 28px cell.** Resizing it means editing
-`MultiAssigneeDropdown`, which `SwipeableCard`, `UpNextHero`, `InboxTaskCard`,
-`ClarityIndicator`, `DenseInboxRow`, and `BulkActionToolbar` all share. The blast
-radius is not worth it, and a solid 24px circle already reads as equal visual
-weight to a 16px line icon — filled shapes carry more weight per pixel.
+**The avatar stays 24px.** Resizing it means editing `MultiAssigneeDropdown`,
+which `SwipeableCard`, `UpNextHero`, `InboxTaskCard`, `ClarityIndicator`,
+`DenseInboxRow`, and `BulkActionToolbar` all share. The blast radius is not worth
+it, and a solid 24px circle already reads as equal visual weight to a 16px line
+icon — filled shapes carry more weight per pixel. Its *cell* is 72px (above);
+the circle itself is untouched.
 
 **`ContextPicker` gets an optional size prop, defaulting to today's 36px.** Only
 the Today rail passes the 28px variant. Every other call site is untouched.
