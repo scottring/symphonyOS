@@ -31,6 +31,7 @@ import {
   Inbox,
   Users2,
   List,
+  FileText,
   Repeat,
   Pill,
   Target,
@@ -144,7 +145,7 @@ export function Sidebar({
     location.pathname.startsWith('/goals') || location.pathname.startsWith('/meals') ||
     location.pathname.startsWith('/lists') || location.pathname.startsWith('/contacts') ||
     location.pathname.startsWith('/history') || location.pathname.startsWith('/home') ||
-    location.pathname.startsWith('/jobs')
+    location.pathname.startsWith('/jobs') || location.pathname.startsWith('/documents')
 
   useEffect(() => {
     if (libraryActive) openGroup('library')
@@ -422,6 +423,15 @@ export function Sidebar({
           >
             {createElement(Users2, { className: 'w-5 h-5 shrink-0' })}
             {!collapsed && <span>Contacts</span>}
+          </button>
+
+          {/* Documents */}
+          <button
+            onClick={() => navigate('/documents')}
+            className={navItemClass(location.pathname.startsWith('/documents'))}
+          >
+            {createElement(FileText, { className: 'w-5 h-5 shrink-0' })}
+            {!collapsed && <span>Documents</span>}
           </button>
 
           {/* Lists */}
