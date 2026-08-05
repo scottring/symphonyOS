@@ -1,10 +1,12 @@
 import { supabase, getAuthUser } from '@/lib/supabase'
 import { parseFacets, type Facet } from '@/types/facets'
+import { isDocumentKind, type DocumentKind, type DocumentStatus } from '@/types/document'
 
 /** Entity kinds the `attachments` table accepts (its CHECK constraint). Events
  *  attach under 'event_note', keyed by the stable Google event id — the same
- *  key event notes use — so no note row needs to exist first. */
-export type AttachmentEntityType = 'task' | 'project' | 'event_note' | 'instance_note' | 'note' | 'routine'
+ *  key event notes use — so no note row needs to exist first. 'document' is a
+ *  shelf upload with no parent entity: entity_id is the user's own id. */
+export type AttachmentEntityType = 'task' | 'project' | 'event_note' | 'instance_note' | 'note' | 'routine' | 'document'
 
 export interface Attachment {
   id: string
@@ -14,6 +16,10 @@ export interface Attachment {
   /** Typed facts extracted by analyze-attachment; [] = analyzed, nothing found. */
   facets: Facet[]
   analyzedAt: string | null
+  /** Null unless analyze-attachment classified this as a durable document. */
+  documentStatus: DocumentStatus | null
+  documentKind: DocumentKind | null
+  documentLabel: string | null
 }
 
 /** Document types the storage bucket's allowed_mime_types accepts. Images are
@@ -58,7 +64,7 @@ export async function listAttachments(
 ): Promise<Attachment[]> {
   const { data: rows, error } = await supabase
     .from('attachments')
-    .select('id, file_name, file_type, storage_path, facets, analyzed_at')
+    .select('id, file_name, file_type, storage_path, facets, analyzed_at, document_status, document_kind, document_label')
     .eq('entity_type', entityType)
     .eq('entity_id', entityId)
     .order('created_at', { ascending: true })
@@ -77,6 +83,9 @@ export async function listAttachments(
         url: data.signedUrl,
         facets: parseFacets(row.facets),
         analyzedAt: row.analyzed_at ?? null,
+        documentStatus: (row.document_status as DocumentStatus | null) ?? null,
+        documentKind: isDocumentKind(row.document_kind) ? row.document_kind : null,
+        documentLabel: row.document_label ?? null,
       })
     }
   }
@@ -176,4 +185,25 @@ export async function deleteAttachment(id: string): Promise<boolean> {
     console.error('deleteAttachment failed:', err)
     return false
   }
+}
+
+/**
+ * Answer a document proposal: 'kept' puts it on the Documents shelf,
+ * 'dismissed' means never ask about this file again. Scope is deliberately
+ * untouched — it stays at the column default ('private') until the user
+ * shares it from the shelf.
+ */
+export async function setDocumentStatus(
+  id: string,
+  status: 'kept' | 'dismissed',
+): Promise<boolean> {
+  const { error } = await supabase
+    .from('attachments')
+    .update({ document_status: status })
+    .eq('id', id)
+  if (error) {
+    console.error('setDocumentStatus failed:', error.message)
+    return false
+  }
+  return true
 }
