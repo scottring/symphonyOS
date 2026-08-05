@@ -23,6 +23,26 @@ launch — never bundle the frontend here.
   realtime → web bridge → tray
 - Launch at Login (Symphony menu), close-to-hide, Dock reopen
 
+## Why `dragDropEnabled: false`
+
+The main window sets `"dragDropEnabled": false` — **do not remove it.** With
+Tauri's drag-drop handler on (the default), wry subclasses the WKWebView and
+overrides `draggingEntered:` / `draggingUpdated:` / `performDragOperation:`
+(`wry/src/wkwebview/drag_drop.rs`). Tauri's handler returns `true`
+unconditionally (`tauri-runtime-wry/src/lib.rs`), so wry never forwards to
+`super` and **WebKit never sees the drag** — the page gets no `dragover` and no
+`drop`.
+
+The symptom is a drag that visibly starts and then no drop target ever lights
+up: on `/month` a move could be picked up off the shelf but no week column
+would accept it; same for any other HTML5 drag surface and for dragging a file
+into a detail panel's Photos & files zone. All of it worked in a browser, which
+is the tell. Turning the handler off is free here — the shell never listens for
+Tauri drag-drop events, so nothing native depended on it.
+
+Same class as the `target="_blank"` / `tel:` bug: the shell intercepting a web
+behavior. See "Known limitations" below.
+
 ## How the shell talks to the web app
 
 Event contract (see `src/lib/desktop.ts` and `src/desktop/` in the web repo):
