@@ -11,7 +11,23 @@
 
 import { sundayOfWeek, toIsoDate } from '@/lib/weekHelpers'
 import { resolveMealTitle } from '@/lib/mealTitle'
-import type { MealPlan, MealPlanEntry, MealSlot, Recipe } from '@/types/meal-planner'
+import type { MealPlanEntry, MealSlot, Recipe } from '@/types/meal-planner'
+
+/**
+ * A week's plan, keyed by the week_start string EXACTLY as stored.
+ *
+ * Deliberately not `MealPlan`: that type carries `weekStart` as a Date built by
+ * `new Date('2026-08-02')`, which parses as UTC midnight and therefore reads
+ * back as Aug 1 in every timezone west of UTC. Matching plans to days through
+ * that Date silently found nothing. The stored string has no such ambiguity, so
+ * it never gets converted here.
+ */
+export interface MealDayPlan {
+  weekStartIso: string
+  entries: MealPlanEntry[]
+  /** Tie-break only, when two household members planned the same week. */
+  createdAt: Date
+}
 
 export interface MealDayRecipe {
   /** Local YYYY-MM-DD — the stable identity used for selection. */
@@ -74,7 +90,7 @@ function bodyEntryFor(entry: MealPlanEntry, entriesById: Map<string, MealPlanEnt
 }
 
 export function buildMealDayRecipes(params: {
-  plans: MealPlan[]
+  plans: MealDayPlan[]
   recipes: Recipe[]
   centerDate: Date
   slot: MealSlot
@@ -85,10 +101,9 @@ export function buildMealDayRecipes(params: {
   const recipesById = new Map(recipes.map((r) => [r.id, r]))
   // Oldest plan per week wins, matching useMealPlan's tie-break when two
   // household members each created a plan for the same week.
-  const planByWeek = new Map<string, MealPlan>()
+  const planByWeek = new Map<string, MealDayPlan>()
   for (const plan of [...plans].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())) {
-    const key = toIsoDate(plan.weekStart)
-    if (!planByWeek.has(key)) planByWeek.set(key, plan)
+    if (!planByWeek.has(plan.weekStartIso)) planByWeek.set(plan.weekStartIso, plan)
   }
   const entriesByIdPerPlan = new Map<string, Map<string, MealPlanEntry>>()
   for (const [key, plan] of planByWeek) {

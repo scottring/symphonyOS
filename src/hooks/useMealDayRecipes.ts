@@ -13,15 +13,15 @@ import { supabase } from '@/lib/supabase'
 import {
   buildMealDayRecipes,
   weekStartsCovering,
+  type MealDayPlan,
   type MealDayRecipe,
 } from '@/lib/mealDayRecipes'
 import {
-  dbMealPlanToMealPlan,
+  dbMealPlanEntryToMealPlanEntry,
   dbRecipeToRecipe,
   type DbMealPlan,
   type DbMealPlanEntry,
   type DbRecipe,
-  type MealPlan,
   type MealSlot,
   type Recipe,
 } from '@/types/meal-planner'
@@ -37,7 +37,7 @@ export function useMealDayRecipes(
   slot: MealSlot,
   enabled: boolean,
 ): UseMealDayRecipesResult {
-  const [plans, setPlans] = useState<MealPlan[]>([])
+  const [plans, setPlans] = useState<MealDayPlan[]>([])
   const [recipes, setRecipes] = useState<Recipe[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -95,7 +95,13 @@ export function useMealDayRecipes(
         loadedRecipes = ((recipeRows ?? []) as DbRecipe[]).map(dbRecipeToRecipe)
       }
 
-      setPlans(rows.map((r) => dbMealPlanToMealPlan(r, byPlan.get(r.id) ?? [])))
+      // week_start is carried through as the stored string, never as a Date —
+      // `new Date('2026-08-02')` is UTC midnight and reads back as Aug 1 here.
+      setPlans(rows.map((r) => ({
+        weekStartIso: r.week_start,
+        entries: (byPlan.get(r.id) ?? []).map(dbMealPlanEntryToMealPlanEntry),
+        createdAt: new Date(r.created_at),
+      })))
       setRecipes(loadedRecipes)
       setLoading(false)
     }
