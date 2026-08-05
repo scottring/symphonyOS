@@ -65,7 +65,9 @@ hook feature-detects and hides the UI, so it degrades correctly rather than
 breaking. No downloads, notifications, or service workers in the app.
 
 **Fixed.** HTML5 drag-and-drop (see above). `tel:`/`sms:`/`mailto:` from
-`location.href` and `window.open` (see `system_scheme_plugin`).
+`location.href` and `window.open` (see `system_scheme_plugin`, and note the
+hand-off *destination* matters too — `open_externally` pins Phone.app/Messages
+because Chrome had claimed `tel:`). Printing (see `PRINT_BRIDGE_JS`).
 
 **Still broken — known cost:**
 
@@ -76,13 +78,12 @@ breaking. No downloads, notifications, or service workers in the app.
   `NSLocationWhenInUseUsageDescription` in the bundle — real work, not a flag.
   Both call sites already feature-detect and fall back, so it degrades rather
   than hangs.
-- **Printing.** `window.print()` (Today's "print the list") is a no-op in
-  WKWebView. `Webview::print()` exists and works, but wry runs it via
-  `runOperationModalForWindow` as a **non-blocking sheet with no completion
-  callback** — so the app cannot know when to unmount `PrintableDayList`, which
-  it currently tears down on the line after `window.print()`. Bridging it
-  naively prints the wrong DOM. Doing this properly means driving the teardown
-  off `afterprint` and having Rust signal completion; deliberately not hacked in.
+(Printing was on this list and is now fixed — see `PRINT_BRIDGE_JS` in
+`lib.rs`. The subtlety worth keeping in mind: a browser's `window.print()`
+blocks, AppKit's is a sheet that renders the page *after* the call returns, so
+the page must hold its print-only DOM until the sheet is gone. `TodayView` now
+ends a print on `afterprint` alone, guarded by a test — don't "simplify" the
+eager teardown back in.)
 
 ## Known limitations (v1, deliberate)
 

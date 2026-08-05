@@ -145,6 +145,53 @@ const EXTERNAL_LINKS_JS: &str = r#"
 })();
 "#;
 
+// WKWebView's window.print() is a silent no-op — there is no print path in a
+// bare webview — so Today's "print the list" did nothing in the Mac app.
+//
+// The timing is the whole problem. A browser's window.print() BLOCKS: the page
+// mounts its print-only list, calls print, and tears the list down when the
+// call returns. AppKit's print panel is a SHEET — it returns immediately and
+// renders the page only once the user confirms — so the page must hold its
+// printable DOM for as long as the sheet is up. wry runs the operation with a
+// null delegate, so there is no completion callback to wait on.
+//
+// Hence: the next deliberate interaction with the PAGE ends the print. Clicks
+// inside the sheet never reach the page, so this fires only after the sheet is
+// gone — always late, never early. Being late costs nothing: the printable list
+// is `display: none` on screen (see `.print-only` in index.css), so a stale one
+// is invisible until the synthetic `afterprint` clears it.
+const PRINT_BRIDGE_JS: &str = r#"
+(function () {
+  if (window.__symphonyPrint) return;
+  window.__symphonyPrint = true;
+  var tauri = window.__TAURI__ && window.__TAURI__.event;
+  if (!tauri) return;
+  var appAsked = false;
+  var endPrint = function () {
+    window.removeEventListener('pointerdown', endPrint, true);
+    window.removeEventListener('keydown', endPrint, true);
+    window.dispatchEvent(new Event('afterprint'));
+  };
+  var runPrint = function () {
+    tauri.emit('shell:print');
+    window.addEventListener('pointerdown', endPrint, true);
+    window.addEventListener('keydown', endPrint, true);
+  };
+  window.print = function () { appAsked = true; runPrint(); };
+  // Cmd+P from the menu bar. Let the page swap in its print-only DOM first
+  // (Today mounts the compact list on `beforeprint`); if nothing on the page
+  // claimed it within two frames, print the page as it stands — which is what
+  // Cmd+P does in a browser.
+  tauri.listen('shell:print-request', function () {
+    appAsked = false;
+    window.dispatchEvent(new Event('beforeprint'));
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () { if (!appAsked) runPrint(); });
+    });
+  });
+})();
+"#;
+
 const NAV_EVENTS: [(&str, &str); 4] = [
     ("nav-today", "today"),
     ("nav-inbox", "inbox"),
@@ -288,6 +335,12 @@ fn build_menu(app: &AppHandle, autostart_enabled: bool) -> tauri::Result<Menu<ta
                 .build(app)?,
         )
         .separator()
+        .item(
+            &MenuItemBuilder::with_id("print", "Print…")
+                .accelerator("Cmd+P")
+                .build(app)?,
+        )
+        .separator()
         .close_window()
         .build()?;
 
@@ -356,6 +409,11 @@ fn handle_menu_event(app: &AppHandle, id: &str) {
         }
         return;
     }
+    if id == "print" {
+        show_main(app);
+        let _ = app.emit_to("main", "shell:print-request", ());
+        return;
+    }
     if id == "new-capture" {
         show_main(app);
         let _ = app.emit_to("main", "shell:quick-capture", ());
@@ -408,6 +466,13 @@ pub fn run() {
                     let _ = win.hide();
                 }
             });
+            // The page asks AppKit to print (see PRINT_BRIDGE_JS).
+            let print_handle = app.handle().clone();
+            app.listen_any("shell:print", move |_| {
+                if let Some(win) = print_handle.get_webview_window("main") {
+                    let _ = win.print();
+                }
+            });
             // External links forwarded by EXTERNAL_LINKS_JS → system browser.
             app.listen_any("shell:open-external", move |event| {
                 if let Ok(url) = serde_json::from_str::<String>(event.payload()) {
@@ -418,6 +483,7 @@ pub fn run() {
         })
         .on_page_load(|webview, _payload| {
             let _ = webview.eval(EXTERNAL_LINKS_JS);
+            let _ = webview.eval(PRINT_BRIDGE_JS);
         })
         .on_window_event(|window, event| {
             // Mac convention: the red button closes the window, not the app.

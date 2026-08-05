@@ -781,10 +781,14 @@ export function TodayView({
   useEffect(() => {
     if (!printing) return
     // Next frame: let the list paint before the print dialog freezes the page.
-    const id = requestAnimationFrame(() => {
-      window.print()
-      setPrinting(false)
-    })
+    //
+    // Teardown belongs to `afterprint` alone. In a browser window.print()
+    // blocks and afterprint fires as the dialog closes, so clearing here too
+    // was merely redundant — but in the Mac shell printing is handed to AppKit,
+    // whose print panel is a sheet that outlives this call and renders the page
+    // when the user confirms. Unmounting the list on the next line would print
+    // the screen layout instead of the list.
+    const id = requestAnimationFrame(() => window.print())
     return () => cancelAnimationFrame(id)
   }, [printing])
 

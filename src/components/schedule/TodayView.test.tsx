@@ -470,6 +470,32 @@ describe('TodayView print list', () => {
     expect(screen.queryByTestId('printable-day-list')).not.toBeInTheDocument()
   })
 
+  // The teardown contract. A browser's window.print() blocks, so unmounting on
+  // the next line was harmless there — but the Mac shell hands printing to
+  // AppKit, whose panel is a sheet that renders the page AFTER this call
+  // returns. Clearing eagerly printed the screen layout instead of the list.
+  // Only `afterprint` may end a print. Don't "simplify" this back.
+  it('keeps the printable list mounted until afterprint fires', async () => {
+    const print = vi.spyOn(window, 'print').mockImplementation(() => {})
+    const raf = vi.spyOn(window, 'requestAnimationFrame')
+      .mockImplementation((cb: FrameRequestCallback) => { cb(0); return 0 })
+    try {
+      const { user } = renderView()
+      await openOverflow(user)
+      await user.click(screen.getByRole('button', { name: /Print list/i }))
+
+      expect(print).toHaveBeenCalled()
+      // Still mounted after print() returned — the sheet has not rendered yet.
+      expect(screen.getByTestId('printable-day-list')).toBeInTheDocument()
+
+      fireEvent(window, new Event('afterprint'))
+      expect(screen.queryByTestId('printable-day-list')).not.toBeInTheDocument()
+    } finally {
+      print.mockRestore()
+      raf.mockRestore()
+    }
+  })
+
 })
 
 describe('TodayView attention line', () => {
