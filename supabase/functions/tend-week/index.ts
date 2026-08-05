@@ -26,7 +26,20 @@ interface TendTask {
 }
 interface BusySlot { title: string; start: string; end: string }
 
-function buildPrompt(tasks: TendTask[], weekStart: string, today: string, busy: BusySlot[], grain: 'week' | 'month' = 'week', monthEnd?: string): string {
+interface PlaceWindow { start: string; end: string }
+
+function buildPrompt(
+  tasks: TendTask[],
+  weekStart: string,
+  today: string,
+  busy: BusySlot[],
+  grain: 'week' | 'month' = 'week',
+  monthEnd?: string,
+  // The days a placement may land on: the period being planned, clamped
+  // forward by today. Null when that period has already passed (the user is
+  // reviewing an old `?start=` week) — then we don't ask for placements at all.
+  placeWindow?: PlaceWindow | null,
+): string {
   const taskLines = tasks
     .map((t) => {
       const bits = [
@@ -46,11 +59,21 @@ function buildPrompt(tasks: TendTask[], weekStart: string, today: string, busy: 
 
   const greeting = grain === 'month' ? `The user's month list (today is ${today}, month ends ${monthEnd}) has grown unwieldy` : `The user's week list (week starting ${weekStart}; today is ${today}) has grown unwieldy`
 
-  const rulesText = grain === 'month'
-    ? `- "regrade": wrong-sized for a month — {"kind":"regrade","taskId":"...","to":"week"|"season"|"someday","why":"..."} — "week" when it's small enough to just do this week, "season" when it's bigger than a month.
-- "place": a concrete DAY suggestion this month. {"kind":"place","taskIds":["..."],"date":"YYYY-MM-DD","why":"..."} — no clock time; month placement is day-granular. "date" must be between ${today} and ${monthEnd}, never before ${today}.`
-    : `- "regrade": wrong-sized for a week — a month-scale chunk or a timeless idea. {"kind":"regrade","taskId":"...","to":"month"|"someday","why":"..."}
-- "place": a concrete day/time suggestion this week. {"kind":"place","taskIds":["..."],"date":"YYYY-MM-DD","time":"HH:MM","why":"..."} — you may pair naturally-batched tasks (errands, outdoor work) in one proposal.`
+  const regradeRule = grain === 'month'
+    ? `- "regrade": wrong-sized for a month — {"kind":"regrade","taskId":"...","to":"week"|"season"|"someday","why":"..."} — "week" when it's small enough to just do this week, "season" when it's bigger than a month.`
+    : `- "regrade": wrong-sized for a week — a month-scale chunk or a timeless idea. {"kind":"regrade","taskId":"...","to":"month"|"someday","why":"..."}`
+
+  const placeRule = !placeWindow
+    ? null
+    : grain === 'month'
+      ? `- "place": a concrete DAY suggestion. {"kind":"place","taskIds":["..."],"date":"YYYY-MM-DD","why":"..."} — no clock time; month placement is day-granular. "date" must be between ${placeWindow.start} and ${placeWindow.end} inclusive.`
+      : `- "place": a concrete day/time suggestion. {"kind":"place","taskIds":["..."],"date":"YYYY-MM-DD","time":"HH:MM","why":"..."} — you may pair naturally-batched tasks (errands, outdoor work) in one proposal. "date" must be between ${placeWindow.start} and ${placeWindow.end} inclusive.`
+
+  const rulesText = [regradeRule, placeRule].filter(Boolean).join('\n')
+
+  const dateRule = placeWindow
+    ? `- "date" must be between ${placeWindow.start} and ${placeWindow.end} inclusive — never outside that range.`
+    : `- Do NOT propose any "place" actions: the ${grain} being reviewed has already passed, so nothing can be scheduled onto it. Merge, put aside and regrade still apply.`
 
   return `You are the list gardener for Symphony, a personal planning app. ${greeting}. Here are the unplaced tasks:
 
@@ -66,7 +89,7 @@ ${rulesText}
 
 Rules:
 - Use ONLY the task ids listed above. Never invent ids.
-${grain === 'month' ? `- "date" must be between ${today} and ${monthEnd}, never before ${today}.` : `- "date" must be between ${today} and 6 days after ${weekStart}, never before ${today}.`}
+${dateRule}
 - Avoid the busy times listed. Prefer mornings for focused work, weekends for house/outdoor work.
 - Be conservative: at most 8 proposals, only ones you'd defend. An empty list is a fine answer.
 - "why" is ONE short sentence, plain language, addressed to the user.
@@ -113,7 +136,11 @@ Deno.serve(async (req) => {
   const { data: { user }, error: authErr } = await service.auth.getUser(token)
   if (authErr || !user) return json({ error: 'Invalid token' }, 401)
 
-  let body: { tasks?: unknown; weekStart?: unknown; today?: unknown; busy?: unknown; grain?: unknown; monthEnd?: unknown }
+  let body: {
+    tasks?: unknown; weekStart?: unknown; today?: unknown; busy?: unknown
+    grain?: unknown; monthEnd?: unknown
+    allowPlace?: unknown; placeStart?: unknown; placeEnd?: unknown
+  }
   try {
     body = await req.json()
   } catch {
@@ -146,8 +173,30 @@ Deno.serve(async (req) => {
 
   if (tasks.length === 0 || !weekStart || !today) return json({ error: 'tasks, weekStart, today required' }, 400)
 
+  // The client owns the placement window (it knows which week/month is on
+  // screen, `?start=` and all). Fall back to the old today→period-end
+  // derivation only for a client that predates these fields.
+  const ymd = (v: unknown) => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null)
+  const placeStart = ymd(body.placeStart)
+  const placeEnd = ymd(body.placeEnd)
+  let placeWindow: PlaceWindow | null
+  if (body.allowPlace === false) {
+    placeWindow = null
+  } else if (placeStart && placeEnd && placeStart <= placeEnd) {
+    placeWindow = { start: placeStart, end: placeEnd }
+  } else if (grain === 'month' && monthEnd) {
+    placeWindow = today <= monthEnd ? { start: today, end: monthEnd } : null
+  } else {
+    const [wy, wm, wd] = weekStart.split('-').map(Number)
+    const end = new Date(Date.UTC(wy, wm - 1, wd + 6)).toISOString().slice(0, 10)
+    placeWindow = today <= end ? { start: today > weekStart ? today : weekStart, end } : null
+  }
+
   try {
-    const text = await callClaude(buildPrompt(tasks, weekStart, today, busy, grain, monthEnd || undefined), apiKey)
+    const text = await callClaude(
+      buildPrompt(tasks, weekStart, today, busy, grain, monthEnd || undefined, placeWindow),
+      apiKey,
+    )
     const stripped = text.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '')
     const parsed = JSON.parse(stripped) as { proposals?: unknown }
     const proposals = Array.isArray(parsed.proposals) ? parsed.proposals.slice(0, 12) : []

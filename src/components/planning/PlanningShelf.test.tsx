@@ -157,6 +157,26 @@ describe('PlanningShelf', () => {
     expect(remove).toHaveBeenCalledWith('x1')
   })
 
+  it('a place card names the day in plain language, never the raw ISO date', () => {
+    const proposal = { kind: 'place' as const, id: 'x2', taskIds: ['c1'], date: '2026-08-07', time: '09:30', why: '' }
+    renderShelf({
+      tasksById: new Map([['c1', task('c1', 'Ask for YNAB refund')]]),
+      tend: { ...idleTend, status: 'reviewing', proposals: [proposal] },
+    })
+    expect(screen.getByText(/Fri, Aug 7 · 9:30 AM/)).toBeInTheDocument()
+    expect(screen.queryByText(/2026-08-07/)).not.toBeInTheDocument()
+  })
+
+  it('a place card with no time shows only the day', () => {
+    const proposal = { kind: 'place' as const, id: 'x3', taskIds: ['c1'], date: '2026-08-07', why: '' }
+    renderShelf({
+      tasksById: new Map([['c1', task('c1', 'Ask for YNAB refund')]]),
+      tend: { ...idleTend, status: 'reviewing', proposals: [proposal] },
+    })
+    expect(screen.getByText(/Fri, Aug 7/)).toBeInTheDocument()
+    expect(screen.queryByText(/AM|PM/)).not.toBeInTheDocument()
+  })
+
   it('reviewing mode with no proposals and AI settled shows the healthy message', () => {
     renderShelf({ tend: { ...idleTend, status: 'reviewing', proposals: [] } })
     expect(screen.getByText(/nothing to tend/i)).toBeInTheDocument()

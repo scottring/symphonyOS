@@ -159,6 +159,9 @@ export function MonthPage() {
             notes: t.notes,
             links: t.links,
             parentTaskId: t.parentTaskId,
+            // See WeekPage: without isAllDay an undone all-day placement comes
+            // back TIMED at midnight, i.e. restored and invisible on the grid.
+            isAllDay: t.isAllDay,
           });
         }
       });

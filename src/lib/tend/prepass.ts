@@ -8,6 +8,13 @@ import type { TendMerge, TendProposal, TendPutAside } from './types'
 const STALE_DAYS = 21
 const SIMILARITY_THRESHOLD = 0.85
 
+// A real week list is mostly months old, so "everything past 21 days" is not a
+// finding — it's the whole list restated as identical cards, which buries the
+// merge/place cards that carry actual judgment. Surface the worst offenders
+// only. The AI pass holds itself to 8 proposals; the deterministic pass gets a
+// smaller share of the same attention budget.
+export const MAX_PUT_ASIDE = 5
+
 export function normalizeTitle(title: string): string {
   return title
     .toLowerCase()
@@ -71,23 +78,24 @@ export function runPrepass(pool: Task[], carryOver: Task[], now: Date = new Date
   }
 
   // ── Stale: unfinished for ≥21 days (we don't store carry history; age
-  // while unfinished is the proxy — see spec). Merge drops are excluded. ──
+  // while unfinished is the proxy — see spec). Merge drops are excluded.
+  // Oldest first, then capped: if the list can only stand a few of these, they
+  // should be the ones that have sat longest. ──
   const dropIds = new Set(merges.flatMap((m) => m.dropIds))
-  const stale: TendPutAside[] = []
   const cutoff = now.getTime() - STALE_DAYS * 24 * 60 * 60 * 1000
-  for (const t of tasks) {
-    if (dropIds.has(t.id)) continue
-    const created = new Date(t.createdAt).getTime()
-    if (created <= cutoff) {
-      const weeks = Math.floor((now.getTime() - created) / (7 * 24 * 60 * 60 * 1000))
-      stale.push({
-        kind: 'put_aside',
+  const stale: TendPutAside[] = tasks
+    .filter((t) => !dropIds.has(t.id) && new Date(t.createdAt).getTime() <= cutoff)
+    .sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+    .slice(0, MAX_PUT_ASIDE)
+    .map((t) => {
+      const weeks = Math.floor((now.getTime() - new Date(t.createdAt).getTime()) / (7 * 24 * 60 * 60 * 1000))
+      return {
+        kind: 'put_aside' as const,
         id: `prepass-stale-${t.id}`,
         taskId: t.id,
         why: `Sitting unfinished for ${weeks} weeks — park it on Someday?`,
-      })
-    }
-  }
+      }
+    })
 
   return [...merges, ...stale]
 }

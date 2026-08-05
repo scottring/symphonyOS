@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { runPrepass, normalizeTitle, titleSimilarity } from './prepass'
+import { runPrepass, normalizeTitle, titleSimilarity, MAX_PUT_ASIDE } from './prepass'
 import type { Task } from '@/types/task'
 
 const NOW = new Date(2026, 6, 22) // Jul 22 2026, local
@@ -58,6 +58,26 @@ describe('runPrepass', () => {
     // drop 'b' is consumed by the merge; only 'a' may additionally be stale
     const staleIds = proposals.filter((p) => p.kind === 'put_aside').map((p) => p.taskId)
     expect(staleIds).not.toContain('b')
+  })
+
+  it('caps put_aside at MAX_PUT_ASIDE and keeps the oldest, so a long-standing list does not bury the judgment cards', () => {
+    // A real week list is mostly months old — without a cap every one of these
+    // becomes an identical "sitting unfinished" card and the merge/place cards
+    // that carry actual judgment scroll off the shelf.
+    // Titles must be mutually dissimilar or the dedup pass consumes them.
+    const TITLES = [
+      'Ask for YNAB refund', 'Weed the backyard', 'Book the dentist', 'Replace furnace filter',
+      'Call about the roof', 'Renew passport photos', 'Sort the garage shelves', 'Email the accountant',
+      'Fix the porch light',
+    ]
+    const many = TITLES.slice(0, MAX_PUT_ASIDE + 4).map((title, i) =>
+      task({ id: `s${i}`, title, createdAt: new Date(2026, 5, 20 - i) }),
+    )
+    const proposals = runPrepass(many, [], NOW)
+    const aside = proposals.filter((p) => p.kind === 'put_aside')
+    expect(aside).toHaveLength(MAX_PUT_ASIDE)
+    // Oldest first: s{n-1} is the oldest (created earliest).
+    expect(aside[0].taskId).toBe(`s${MAX_PUT_ASIDE + 3}`)
   })
 
   it('ignores completed tasks and same-id overlap between pool and carryOver', () => {

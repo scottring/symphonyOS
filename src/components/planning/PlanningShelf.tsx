@@ -252,6 +252,23 @@ const PROPOSAL_META: Record<TendProposal['kind'], { label: string; applyLabel: s
   place: { label: 'Placement', applyLabel: 'Place', Icon: CalendarClock, tone: 'text-primary-700' },
 }
 
+// "2026-08-07" + "09:30" → "Fri, Aug 7 · 9:30 AM". A place card is the one
+// proposal that names a moment, and a raw ISO string makes the reader do the
+// calendar arithmetic the card exists to save them. Built from LOCAL date
+// parts — never Date.parse on a bare YYYY-MM-DD, which is read as UTC and
+// shifts the day back for anyone west of Greenwich.
+function formatPlaceWhen(dateYmd: string, time?: string): string {
+  const [y, m, d] = dateYmd.split('-').map(Number)
+  const at = new Date(y, m - 1, d)
+  if (Number.isNaN(at.getTime())) return dateYmd
+  const day = at.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+  if (!time) return day
+  const [hh, mm] = time.split(':').map(Number)
+  const clock = new Date(y, m - 1, d, hh, mm)
+  if (Number.isNaN(clock.getTime())) return day
+  return `${day} · ${clock.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
+}
+
 function proposalTitles(p: TendProposal, tasksById: Map<string, Task>): string[] {
   const ids = p.kind === 'merge' ? [p.keepId, ...p.dropIds] : p.kind === 'place' ? p.taskIds : [p.taskId]
   return ids.map((id) => tasksById.get(id)?.title ?? '(missing task)')
@@ -500,7 +517,7 @@ export function PlanningShelf(props: PlanningShelfProps) {
                 <div className={`flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide ${meta.tone}`}>
                   <meta.Icon className="w-3 h-3" /> {meta.label}
                   {p.kind === 'regrade' && <span className="normal-case font-normal">→ {p.to}</span>}
-                  {p.kind === 'place' && <span className="normal-case font-normal">→ {p.date}{p.time ? ` ${p.time}` : ''}</span>}
+                  {p.kind === 'place' && <span className="normal-case font-normal">→ {formatPlaceWhen(p.date, p.time)}</span>}
                 </div>
                 <div className="mt-1 text-sm text-neutral-700">
                   {titles.map((t, i) => (

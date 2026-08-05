@@ -20,6 +20,8 @@ function why(v: unknown): string {
 
 export interface ParseTendOptions {
   dateWindow?: { minYmd: string; maxYmd: string }
+  /** False when the period being planned has already passed — nothing can be placed on it. */
+  allowPlace?: boolean
   allowedRegrades?: ReadonlySet<'week' | 'month' | 'season' | 'someday'>
 }
 
@@ -28,7 +30,7 @@ export function parseTendProposals(
   validIds: Set<string>,
   opts: ParseTendOptions = {},
 ): TendProposal[] {
-  const { dateWindow, allowedRegrades } = opts
+  const { dateWindow, allowPlace = true, allowedRegrades } = opts
   const raw = (data as { proposals?: unknown })?.proposals
   if (!Array.isArray(raw)) return []
   const out: TendProposal[] = []
@@ -61,6 +63,7 @@ export function parseTendProposals(
         break
       }
       case 'place': {
+        if (!allowPlace) continue
         const taskIds = Array.isArray(e.taskIds) ? e.taskIds.filter((t): t is string => typeof t === 'string') : []
         const date = str(e.date)
         if (taskIds.length === 0 || !taskIds.every((t) => validIds.has(t))) continue

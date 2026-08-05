@@ -42,6 +42,27 @@ function localYmd(d: Date): string {
   return `${y}-${m}-${day}`
 }
 
+/**
+ * The days a placement may land on: the period BEING PLANNED, clamped forward
+ * by today. Null when the period has already passed.
+ *
+ * The window used to be [today, periodEnd], which is only the same thing on the
+ * current period. On a `?start=` week it went wrong both ways: on a future week
+ * the span opened all the way back to today, so a placement could land on a day
+ * that isn't on the grid the user is looking at; on a past week min > max, so
+ * every placement was silently dropped after the model had already been asked
+ * for them. YYYY-MM-DD compares correctly lexicographically.
+ */
+export function placeWindow(
+  periodStartYmd: string,
+  periodEndYmd: string,
+  todayYmd: string,
+): { minYmd: string; maxYmd: string } | null {
+  const minYmd = todayYmd > periodStartYmd ? todayYmd : periodStartYmd
+  if (minYmd > periodEndYmd) return null
+  return { minYmd, maxYmd: periodEndYmd }
+}
+
 /** Task ids a proposal touches, keyed for overlap-dedup between prepass and AI. */
 function touchedIds(p: TendProposal): string[] {
   switch (p.kind) {
@@ -83,6 +104,20 @@ export function useTendWeek(args: UseTendWeekArgs): TendState {
       return
     }
 
+    // The period's last day, then the window placements may land in. Both are
+    // computed HERE, before the call, so the prompt and the validator agree on
+    // one window instead of each deriving its own from weekStart/today.
+    // LOCAL date parts only (never Date.parse/toISOString, which shift near
+    // midnight in negative-UTC-offset timezones).
+    let periodEndYmd: string
+    if (grain === 'month' && monthEndYmd) {
+      periodEndYmd = monthEndYmd
+    } else {
+      const [wy, wm, wd] = weekStartYmd.split('-').map(Number)
+      periodEndYmd = localYmd(new Date(wy, wm - 1, wd + 6))
+    }
+    const window = placeWindow(weekStartYmd, periodEndYmd, todayYmd)
+
     const now = Date.now()
     const body: Record<string, unknown> = {
       tasks: tasks.map((t) => ({
@@ -97,6 +132,14 @@ export function useTendWeek(args: UseTendWeekArgs): TendState {
       today: todayYmd,
       busy,
       grain,
+      // A period that has already passed is reviewable (merge/put aside/
+      // regrade all still apply) but not placeable — say so rather than letting
+      // the model spend the call on placements the validator will discard.
+      allowPlace: window !== null,
+    }
+    if (window) {
+      body.placeStart = window.minYmd
+      body.placeEnd = window.maxYmd
     }
     if (grain === 'month' && monthEndYmd) {
       body.monthEnd = monthEndYmd
@@ -110,22 +153,15 @@ export function useTendWeek(args: UseTendWeekArgs): TendState {
         return
       }
       const validIds = new Set(tasks.map((t) => t.id))
-      // AI place proposals and regrade filtering depend on grain. LOCAL date
-      // parts only (never Date.parse/toISOString, which shift near midnight in
-      // negative-UTC-offset timezones).
-      let dateWindowMax: string
-      let allowedRegrades: Set<'week' | 'month' | 'season' | 'someday'>
-      if (grain === 'month' && monthEndYmd) {
-        dateWindowMax = monthEndYmd
-        allowedRegrades = new Set(['week', 'season', 'someday'])
-      } else {
-        const [wy, wm, wd] = weekStartYmd.split('-').map(Number)
-        const weekEnd = new Date(wy, wm - 1, wd + 6)
-        dateWindowMax = localYmd(weekEnd)
-        allowedRegrades = new Set(['month', 'someday'])
-      }
+      // Regrade filtering depends on grain; the place window was already fixed
+      // above and is re-checked here because the model's JSON is untrusted.
+      const allowedRegrades: Set<'week' | 'month' | 'season' | 'someday'> =
+        grain === 'month' && monthEndYmd
+          ? new Set(['week', 'season', 'someday'])
+          : new Set(['month', 'someday'])
       const ai = parseTendProposals(data, validIds, {
-        dateWindow: { minYmd: todayYmd, maxYmd: dateWindowMax },
+        dateWindow: window ?? undefined,
+        allowPlace: window !== null,
         allowedRegrades,
       })
       setProposals((current) => {

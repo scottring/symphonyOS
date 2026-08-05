@@ -185,6 +185,11 @@ export function WeekPage() {
             notes: t.notes,
             links: t.links,
             parentTaskId: t.parentTaskId,
+            // isAllDay must ride along or an undone all-day placement comes
+            // back as a TIMED midnight task — bucket 'timed' is derived from
+            // scheduledFor, and midnight sits outside the grid's 6 AM–10 PM
+            // window, so the task is restored and invisible.
+            isAllDay: t.isAllDay,
           });
         }
       });

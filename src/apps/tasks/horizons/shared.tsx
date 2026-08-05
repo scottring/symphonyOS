@@ -507,6 +507,11 @@ export function useHorizonPageData(horizon: HorizonId, anchorDate?: Date) {
         notes: task.notes,
         links: task.links,
         parentTaskId: task.parentTaskId,
+        // Without this an undone all-day task comes back TIMED at midnight —
+        // bucket 'timed' is derived from scheduledFor, and midnight falls
+        // outside the day/week grids' 6 AM–10 PM window, so it is restored
+        // and invisible.
+        isAllDay: task.isAllDay,
         // NOTE: task.weekStart is NOT restored — AddTaskOptions has no INSERT-time
         // week_start field (only updateTask sets it), and a follow-up updateTask
         // call here would reintroduce the addTask-then-setBucket race this file
