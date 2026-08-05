@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react'
-import { Check, MessageSquare, Video } from 'lucide-react'
+
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Task, TaskLink } from '@/types/task'
 import { PanelHeader } from './sections/PanelHeader'
@@ -19,7 +19,6 @@ import { useDayLoads } from './hooks/useDayLoads'
 import { PanelLocation } from './sections/PanelLocation'
 import { locationLink } from '@/lib/locationLink'
 import { ConceptIcon } from '@/lib/conceptIcons'
-import { SchedulePopover } from '@/components/triage/SchedulePopover'
 import { computeEventReschedule } from '@/components/planning/planningReschedule'
 
 interface TapEventPanelProps {
