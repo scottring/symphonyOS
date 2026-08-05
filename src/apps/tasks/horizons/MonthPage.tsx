@@ -177,6 +177,43 @@ export function MonthPage() {
     applyProposal(p, { setBucket, deleteTask: deleteTaskWithUndo });
   }, [setBucket, deleteTaskWithUndo, deleteTask, addTask, tasksById, undo]);
 
+  // Placing a block moves every member at once. useUndo is SINGLE-SLOT, so N
+  // updateTask calls with N pushAction calls would leave only the last
+  // recoverable and silently orphan the rest — the same hazard the merge
+  // branch above documents. Snapshot everything, push exactly ONE action,
+  // then write.
+  //
+  // The restore uses updateTask, not setBucket: setBucket cannot write
+  // weekStart, so an undone placement would return to the shelf still
+  // secretly carrying a week.
+  const handlePlaceInWeek = useCallback((ids: string[], weekStart: Date) => {
+    const prior = ids
+      .map((id) => tasksById.get(id))
+      .filter((t): t is Task => !!t)
+      .map((t) => ({
+        id: t.id,
+        bucket: t.bucket ?? 'month',
+        scheduledFor: t.scheduledFor,
+        weekStart: t.weekStart,
+        isAllDay: t.isAllDay,
+      }));
+    if (prior.length === 0) return;
+    undo.pushAction(`Placed ${prior.length} move${prior.length === 1 ? '' : 's'}`, () => {
+      for (const t of prior) {
+        void updateTask(t.id, {
+          bucket: t.bucket, scheduledFor: t.scheduledFor,
+          weekStart: t.weekStart, isAllDay: t.isAllDay,
+        });
+      }
+    });
+    for (const t of prior) {
+      // scheduledFor is CLEARED, not merely left unwritten: a scheduled_for
+      // alongside bucket='week' breaks the invariant that a date implies
+      // bucket='timed', leaving the item dated but absent from every day view.
+      void updateTask(t.id, { bucket: 'week', weekStart, scheduledFor: undefined, isAllDay: false });
+    }
+  }, [tasksById, updateTask, undo]);
+
   // "<Month>'s moves" — the shelf reframed as the month's own curated list
   // (Best Laid Plans reframe), not a placement queue. Straight apostrophe:
   // matches the codebase's dominant UI-string convention (see e.g. YearPage's
@@ -259,6 +296,7 @@ export function MonthPage() {
           <div className="mb-6">
             <PlanningShelf
               dragMode="native"
+              layout="board"
               tasks={pool}
               carryOverIds={NO_CARRY_OVER}
               poolLabel={shelfPoolLabel}
@@ -304,9 +342,7 @@ export function MonthPage() {
               //
               // Genuinely dated things ("dentist Tuesday") use the date picker
               // in triage, so a drop here means exactly one thing.
-              onPlaceTasksInWeek={(ids, weekStart) => ids.forEach((id) => updateTask(id, {
-                bucket: 'week', weekStart, scheduledFor: undefined, isAllDay: false,
-              }))}
+              onPlaceTasksInWeek={handlePlaceInWeek}
               // Back to the shelf clears the week too — otherwise an item
               // returns to "unplaced" still secretly carrying a week.
               onUnscheduleTask={(id) => updateTask(id, { bucket: 'month', scheduledFor: undefined, weekStart: undefined })}

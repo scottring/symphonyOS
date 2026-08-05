@@ -315,6 +315,46 @@ describe('horizon pages (smoke)', () => {
     expect(screen.getAllByText('Order flowers for the reception')).toHaveLength(1)
   })
 
+  it('placing a block writes every member to the week under ONE undo action', () => {
+    mockTasks.push(createMockTask({
+      id: 'season-1', title: 'Living room upgrades', bucket: 'quarter', pickedAt: new Date(),
+    }) satisfies Task)
+    for (const [id, title] of [['a', 'Rug'], ['b', 'Lamp'], ['c', 'Shelving']]) {
+      mockTasks.push(createMockTask({ id, title, bucket: 'month', sourceId: 'season-1' }) satisfies Task)
+    }
+
+    const { container } = render(<MonthPage />)
+
+    const payload: Record<string, string> = {}
+    fireEvent.dragStart(screen.getByTestId('shelf-block-drag-pick:season-1'), {
+      dataTransfer: { setData: (f: string, v: string) => { payload[f] = v } },
+    })
+    expect(payload['text/task-ids']).toBe('a,b,c')
+
+    fireEvent.drop(todayGridCell(container), {
+      dataTransfer: { getData: (f: string) => payload[f] ?? '' },
+    })
+
+    for (const id of ['a', 'b', 'c']) {
+      const call = mockUpdateTask.mock.calls.find(([taskId]) => taskId === id)
+      expect(call, `expected ${id} to be placed`).toBeDefined()
+      expect(call![1].bucket).toBe('week')
+      expect(localYmd(call![1].weekStart as Date)).toBe(localYmd(currentWeekStart))
+      expect(call![1].scheduledFor).toBeUndefined()
+    }
+
+    // useUndo is SINGLE-SLOT: three pushes would leave only the last
+    // recoverable. One toast naming all three is the observable proof.
+    expect(screen.getByText('Placed 3 moves')).toBeInTheDocument()
+  })
+
+  it('the Unfiled block gets no drag handle — it is a residue, not a cluster', () => {
+    mockTasks.push(createMockTask({ id: 'loose', title: 'Research keyboards', bucket: 'month' }) satisfies Task)
+    render(<MonthPage />)
+    expect(screen.getByTestId('shelf-block-unfiled')).toHaveTextContent('Research keyboards')
+    expect(screen.queryByTestId('shelf-block-drag-unfiled')).not.toBeInTheDocument()
+  })
+
   // The month rung places onto a WEEK. Dropping into the row that holds today
   // must write that week and no day — the whole point of the cascade.
   it('dropping a rock in the grid places it on that WEEK, with no day', () => {
