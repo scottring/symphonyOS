@@ -87,6 +87,31 @@ describe('PlanningShelf', () => {
     expect(props.onDeleteTask).toHaveBeenCalledWith('c1')
   })
 
+  // Done and gone are the two fates a pill earns most, so they sit ON the
+  // pill — the ⋯ menu keeps them too, but shouldn't be the only way there.
+  it('the pill check-circle completes without opening the task', () => {
+    const props = renderShelf()
+    fireEvent.click(screen.getByLabelText('Complete Ask for YNAB refund'))
+    expect(props.onCompleteTask).toHaveBeenCalledWith('c1')
+    expect(props.onOpenTask).not.toHaveBeenCalled()
+  })
+
+  it('the pill delete button deletes without opening the task', () => {
+    const props = renderShelf()
+    fireEvent.click(screen.getByLabelText('Delete Weed the backyard'))
+    expect(props.onDeleteTask).toHaveBeenCalledWith('p1')
+    expect(props.onOpenTask).not.toHaveBeenCalled()
+  })
+
+  it('inline pill actions render in native drag mode too (month page)', () => {
+    const props = baseProps({ dragMode: 'native' })
+    render(<PlanningShelf {...props} />)
+    fireEvent.click(screen.getByLabelText('Complete Make a chore plan'))
+    expect(props.onCompleteTask).toHaveBeenCalledWith('l1')
+    fireEvent.click(screen.getByLabelText('Delete Make a chore plan'))
+    expect(props.onDeleteTask).toHaveBeenCalledWith('l1')
+  })
+
   it('demoting is a when: Month → This month sets the bucket', () => {
     const props = renderShelf()
     fireEvent.click(screen.getAllByLabelText('Task actions')[0])

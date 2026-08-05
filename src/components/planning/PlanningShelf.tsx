@@ -16,10 +16,13 @@
 // DndShelfFrame (the dnd-kit hook callers) are therefore mounted exclusively
 // in dndkit mode — PlanningShelf itself calls no dnd-kit hooks.
 
-import { useMemo, useState, type ReactNode } from 'react'
+import {
+  useMemo, useState,
+  type ReactNode, type PointerEvent as ReactPointerEvent, type MouseEvent as ReactMouseEvent,
+} from 'react'
 import { useDraggable, useDroppable } from '@dnd-kit/core'
 import {
-  Sparkles, Plus, X, GitMerge, Archive,
+  Sparkles, Plus, X, Check, GitMerge, Archive,
   CornerRightDown, CalendarClock, Loader2, ChevronRight, ChevronDown,
 } from 'lucide-react'
 import type { Task, TaskBucket } from '@/types/task'
@@ -118,11 +121,34 @@ function pillClassName(carried: boolean) {
   }`
 }
 
+// A pill sits inside a drag handle (dnd-kit listeners in dndkit mode, an HTML5
+// `draggable` root in native mode) AND inside a click-to-open target. An inline
+// button must therefore stop the pointer BEFORE the sensor arms a drag and stop
+// the click before it opens the task — same guard the draft input uses below.
+const stopDragAndOpen = {
+  onPointerDown: (e: ReactPointerEvent) => e.stopPropagation(),
+  onMouseDown: (e: ReactMouseEvent) => e.stopPropagation(),
+}
+
 function ShelfPillContent({
   task, projectName, staleWeek, onBringForward, onOpenTask, onSetBucket, onDeleteTask, onPushTask, onCompleteTask, fileUnder,
 }: Omit<ShelfPillProps, 'carried'>) {
   return (
     <>
+      {/* Done in one tap. The two fates a pill earns most on a planning
+          surface — it's finished, or it never should have been here — were
+          both buried two clicks deep in the ⋯ menu. The menu still carries
+          them (and everything else); these are the shortcuts. */}
+      <button
+        type="button"
+        aria-label={`Complete ${task.title}`}
+        title="Mark complete"
+        {...stopDragAndOpen}
+        onClick={(e) => { e.stopPropagation(); onCompleteTask(task.id) }}
+        className="shrink-0 w-4 h-4 rounded-full border-[1.5px] border-neutral-300 text-transparent grid place-items-center cursor-pointer transition-colors hover:border-primary-500 hover:bg-primary-500 hover:text-white"
+      >
+        <Check className="w-2.5 h-2.5" strokeWidth={3} />
+      </button>
       <span data-testid="shelf-pill-title" className="text-neutral-700">{task.title}</span>
       {projectName && <span className="text-xs text-neutral-400">· {projectName}</span>}
       {/* Amber alone says "late"; this says late FROM WHERE. A move placed on a
@@ -136,7 +162,17 @@ function ShelfPillContent({
           TriageWhenMenu the review rows render inline, so a pill on the week
           shelf offers exactly the verbs a wizard row does — including Done,
           which the shelf lacked for months. */}
-      <span className="flex items-center opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+      <span className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+        <button
+          type="button"
+          aria-label={`Delete ${task.title}`}
+          title="Delete"
+          {...stopDragAndOpen}
+          onClick={(e) => { e.stopPropagation(); onDeleteTask(task.id) }}
+          className="p-0.5 rounded text-neutral-400 cursor-pointer transition-colors hover:text-red-600 hover:bg-red-50"
+        >
+          <X className="w-3.5 h-3.5" />
+        </button>
         <TaskFateMenu
           onOpen={() => onOpenTask(task.id)}
           extras={staleWeek && onBringForward
