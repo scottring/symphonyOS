@@ -363,4 +363,26 @@ describe('PlanningShelf board layout', () => {
     expect(screen.queryByTestId('shelf-block-unfiled')).not.toBeInTheDocument()
     expect(screen.getByText('Rug')).toBeInTheDocument()
   })
+
+  // A project block's own tasks restating "· <that project>" on every pill is
+  // pure noise — the block header already says it. projectsMap names 'proj'
+  // "Backyards"; the suffix must not appear anywhere in this block.
+  it('suppresses the project suffix on a project block for its own project', () => {
+    renderBoard()
+    const block = screen.getByTestId('shelf-block-project:proj')
+    expect(block).not.toHaveTextContent('· Backyards')
+  })
+
+  // A pick block's members can belong to a DIFFERENT project than the block
+  // itself names — that's genuinely useful information, so it must survive.
+  it('keeps the project suffix on a pick block whose task belongs to a project', () => {
+    renderBoard({
+      groups: [
+        { id: 'pick:p1', label: 'Porch and backyard set up', kind: 'pick', taskIds: ['a'] },
+        { id: 'unfiled', label: 'Unfiled', kind: 'unfiled', taskIds: ['c'] },
+      ],
+    })
+    const block = screen.getByTestId('shelf-block-pick:p1')
+    expect(block).toHaveTextContent('· Backyards')
+  })
 })

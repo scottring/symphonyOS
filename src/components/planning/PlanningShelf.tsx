@@ -311,6 +311,22 @@ function NativeShelfFrame({ onNativeUnschedule, children }: {
   )
 }
 
+// Board mode only: a pill's own block already names its project in the
+// header, so restating it on every member pill is pure noise (and roughly
+// doubles each pill's text, which is what made blocks wrap to two lines). Only
+// suppress for a task whose project IS the block's project — a pick block
+// (or a different project block) still needs the name, since its members
+// come from elsewhere and the name is the useful part.
+function boardPillProjectName(
+  t: Task,
+  group: ShelfGroup,
+  projectsMap: Map<string, { id: string; name: string }>,
+): string | undefined {
+  if (!t.projectId) return undefined
+  if (group.kind === 'project' && group.id === `project:${t.projectId}`) return undefined
+  return projectsMap.get(t.projectId)?.name
+}
+
 // One block on the board. The header is the cluster's drag handle: dropping
 // it on a week row places every member at once, which is the whole payoff of
 // grouping — placing 24 moves one at a time is the chore the board exists to
@@ -443,12 +459,13 @@ export function PlanningShelf(props: PlanningShelfProps) {
         onPointerDown={(e) => e.stopPropagation()}
         onMouseDown={(e) => e.stopPropagation()}
         placeholder={draftPlaceholder}
-        // min-w-0 + flex-1 (not a fixed w-64): the composer sits inside a
-        // shrink-to-fit pill with no outer flex-grow, so it still sizes to
-        // its natural width in the full-width flow lane (/week) but can now
-        // be squeezed down to fit a ~200px board column (/month) instead of
-        // holding a 256px floor that overflowed the block.
-        className="min-w-0 flex-1 bg-transparent text-sm placeholder:text-neutral-400 focus:outline-none" />
+        // w-64 max-w-full min-w-0, not flex-1: the outer pill has no flex-grow
+        // (shrink-to-fit), so flex-1 alone collapsed the input to the browser
+        // default (~20 chars) on /week instead of restoring its 256px width.
+        // w-64 gives that width back when there's room; max-w-full still lets
+        // it shrink to fit a ~300px board column (/month) instead of
+        // overflowing the block the way the old fixed w-64 used to.
+        className="w-64 max-w-full min-w-0 bg-transparent text-sm placeholder:text-neutral-400 focus:outline-none" />
     </span>
   )
 
@@ -531,7 +548,7 @@ export function PlanningShelf(props: PlanningShelfProps) {
               {members.map((t) => (
                 <Pill key={t.id} task={t} carried={carryOverIds.has(t.id)}
                   staleWeek={staleWeekIds.has(t.id)} onBringForward={onBringForward}
-                  projectName={t.projectId ? projectsMap.get(t.projectId)?.name : undefined}
+                  projectName={boardPillProjectName(t, group, projectsMap)}
                   onOpenTask={onOpenTask} onSetBucket={onSetBucket} onDeleteTask={onDeleteTask}
                   onPushTask={onPushTask} onCompleteTask={onCompleteTask} fileUnder={fileUnder} />
               ))}
