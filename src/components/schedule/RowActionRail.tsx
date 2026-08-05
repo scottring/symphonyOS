@@ -20,6 +20,8 @@ interface RowActionRailProps {
   familyMembers: FamilyMember[]
   assignedTo?: string | null
   assignedToAll: string[]
+  /** Events the system suggests promoting — tints the overflow trigger amber. */
+  isSuggestedPromotion?: boolean
 }
 
 /** One rail cell. Every slot is this size, on every row, always. */
@@ -114,6 +116,7 @@ export function RowActionRail({
   familyMembers,
   assignedTo,
   assignedToAll,
+  isSuggestedPromotion,
 }: RowActionRailProps) {
   const isTask = item.type === 'task'
   const isRoutine = item.type === 'routine'
@@ -132,6 +135,7 @@ export function RowActionRail({
         item={item}
         onOpenDetail={onSelect}
         onUpdateDiscussion={onUpdateDiscussion}
+        isSuggestedPromotion={isSuggestedPromotion}
       />
     )
     : null

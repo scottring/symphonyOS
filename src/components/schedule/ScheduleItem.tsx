@@ -4,17 +4,12 @@ import type { FamilyMember } from '@/types/family'
 import type { TaskContext } from '@/types/task'
 import { formatTimeLong, formatTimeRangeLong, inferMealTime } from '@/lib/timeUtils'
 import { getProjectColor } from '@/lib/projectUtils'
-import { SchedulePopover, ContextPicker, DiscussionPicker, type ScheduleContextItem } from '@/components/triage'
+import { SchedulePopover, type ScheduleContextItem } from '@/components/triage'
 import { AssigneeDropdown, MultiAssigneeDropdown } from '@/components/family'
-import { Video, Tag, Check, Pencil, CircleSlash, Hourglass, ListChecks, ChevronUp, ChevronDown } from 'lucide-react'
-import { ScheduleItemActionsMenu } from './ScheduleItemActionsMenu'
-import { RescheduleButton } from './RescheduleButton'
-import { ConceptIcon } from '@/lib/conceptIcons'
-import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
+import { Video, Tag, Check, Pencil, Hourglass, ListChecks, ChevronUp, ChevronDown, MessageCircle } from 'lucide-react'
+import { RowActionRail } from './RowActionRail'
 import { useMobile } from '@/hooks/useMobile'
 import { TaskCheckbox } from './TaskCheckbox'
-import { PromoteToProjectButton } from './PromoteToProjectButton'
-import { PromoteTaskToProjectButton } from './PromoteTaskToProjectButton'
 import { ExpandingPanel } from './ExpandingPanel'
 import { MobileTypeTile } from './MobileTypeTile'
 import { DOMAIN_COLORS } from '@/lib/domainColors'
@@ -171,65 +166,6 @@ const overdueColors = {
 
 // Domain context colors - shared utility (kept for future use)
 const _contextColors: Record<string, { dot: string; bg: string }> = DOMAIN_COLORS
-
-// Start Meeting button - uses context to avoid prop drilling
-function StartMeetingButton({ item }: { item: TimelineItem }) {
-  const ctx = useScheduleActionsContext()
-  const onStartMeeting = ctx.onStartMeeting
-
-  if (!onStartMeeting) return null
-
-  const handleClick = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    const eventId = item.id.replace('event-', '')
-    onStartMeeting(
-      eventId,
-      item.title,
-      item.attendees || [],
-      item.startTime ?? undefined,
-      item.endTime ?? undefined
-    )
-  }
-
-  return (
-    <button
-      onClick={handleClick}
-      className="shrink-0 p-1.5 rounded-lg text-neutral-400 hover:text-primary-600 hover:bg-primary-50 transition-all opacity-0 group-hover:opacity-100"
-      title="Start meeting"
-      aria-label="Start meeting"
-    >
-      <Video className="w-4 h-4" />
-    </button>
-  )
-}
-
-// Skip-today button — routines only. Surfaces the "Skip today" action that
-// otherwise hides in the '...' menu, so skipping a single instance is one tap.
-// Reads onSkipRoutine from context (same handler the menu uses; it fires the
-// undo toast) to avoid prop-drilling. The instance is skipped for the viewed
-// day only; the routine returns on its next scheduled occurrence.
-function SkipRoutineButton({ item }: { item: TimelineItem }) {
-  const ctx = useScheduleActionsContext()
-  const onSkipRoutine = ctx.onSkipRoutine
-
-  if (!onSkipRoutine) return null
-
-  const handleClick = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    onSkipRoutine(item.id.replace('routine-', ''))
-  }
-
-  return (
-    <button
-      onClick={handleClick}
-      className="shrink-0 p-1.5 rounded-lg text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors"
-      title="Skip today"
-      aria-label="Skip today"
-    >
-      <CircleSlash className="w-4 h-4" />
-    </button>
-  )
-}
 
 export const ScheduleItem = memo(function ScheduleItem({
   item,
@@ -678,6 +614,18 @@ export const ScheduleItem = memo(function ScheduleItem({
                 </svg>
               </span>
             )}
+            {/* Flagged for discussion — STATE, so it belongs with the title
+                chips, not in the action rail. The control that sets it lives in
+                the row's '...' menu. */}
+            {item.needsDiscussion && (
+              <span
+                className="hidden md:inline shrink-0 text-primary-500"
+                aria-label={item.discussionNote ? `Needs discussion: ${item.discussionNote}` : 'Needs discussion'}
+                title={item.discussionNote || 'Needs discussion'}
+              >
+                <MessageCircle className="w-3.5 h-3.5" />
+              </span>
+            )}
             {/* Subtask indicator — desktop only. A disclosure, not a label:
                 steps no longer earn their own Today rows (they used to inherit
                 the parent's date and produce N competing rows), so this is the
@@ -751,103 +699,23 @@ export const ScheduleItem = memo(function ScheduleItem({
           {belowTitleAccessory && <div className="mt-1">{belowTitleAccessory}</div>}
         </div>
 
-        {/* Start Meeting button - for timed events only, shows on hover */}
-        {isEvent && !item.allDay && !item.completed && !item.skipped && (
-          <StartMeetingButton item={item} />
-        )}
-
-        {/* Promote to Project button - for events */}
-        {isEvent && !item.completed && !item.skipped && (
-          <PromoteToProjectButton item={item} isSuggestedPromotion={isSuggestedPromotion} />
-        )}
-
-        {/* Convert to Project button - for tasks */}
-        {isTask && !item.completed && (
-          <PromoteTaskToProjectButton item={item} />
-        )}
-
-        {/* Dedicated one-tap reschedule (tasks) — its own button so rescheduling
-            doesn't require digging into the '...' menu. */}
-        {variant !== 'minimal' && isTask && !item.completed && (
-          <RescheduleButton item={item} />
-        )}
-
-        {/* Skip-today — routines only, always visible so skipping a single
-            instance doesn't require opening the '...' menu. Rendered on both
-            variants: TodayView draws routine rows as `minimal` (which drops the
-            '...' menu entirely), so gating this on the full variant would hide
-            it from exactly the rows it's meant for. */}
-        {isRoutine && !item.completed && !item.skipped && (
-          <SkipRoutineButton item={item} />
-        )}
-
-        {/* Unified actions menu — always visible (touch + desktop) */}
-        {variant !== 'minimal' && (isRoutine || isTask || item.type === 'event') && (
-          <ScheduleItemActionsMenu item={item} onOpenDetail={onSelect} />
-        )}
-
-        {/* Right indicators — compact group: context + assignee */}
-        <div className="shrink-0 flex items-center gap-0.5">
-          {/* Context picker — always visible on events (no hover to reveal on touch);
-              hover-only for tasks/routines to reduce visual noise */}
-          {(isTask || isRoutine || isEvent) && onContextChange && (
-            <div
-              className={
-                isEvent || item.context
-                  ? 'transition-opacity'
-                  : 'opacity-0 group-hover:opacity-100 transition-opacity'
-              }
-              onClick={(e) => e.stopPropagation()}
-            >
-              <ContextPicker
-                value={item.context ?? undefined}
-                onChange={onContextChange}
-              />
-            </div>
-          )}
-
-          {/* Needs-discussion picker — tasks only (events use detail-panel toggle) */}
-          {isTask && onUpdateDiscussion && (
-            <div
-              className="transition-opacity"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <DiscussionPicker
-                flagged={item.needsDiscussion ?? false}
-                note={item.discussionNote ?? ''}
-                onChange={({ flagged, note }) => {
-                  onUpdateDiscussion({
-                    needsDiscussion: flagged,
-                    discussionNote: flagged ? note : undefined,
-                  })
-                }}
-              />
-            </div>
-          )}
-
-          {/* Assignee avatar — context is conveyed by the chip elsewhere on
-              the row, so the avatar stays clean (no ring). */}
-          {familyMembers.length > 0 && onAssignAll ? (
-            <div onClick={(e) => e.stopPropagation()}>
-              <MultiAssigneeDropdown
-                members={familyMembers}
-                selectedIds={assignedToAll}
-                onSelect={onAssignAll}
-                size="sm"
-                label={item.type === 'event' ? "Who's attending?" : "Who's responsible?"}
-              />
-            </div>
-          ) : familyMembers.length > 0 && onAssign && (
-            <div onClick={(e) => e.stopPropagation()}>
-              <AssigneeDropdown
-                members={familyMembers}
-                selectedId={assignedTo}
-                onSelect={onAssign}
-                size="sm"
-              />
-            </div>
-          )}
-        </div>
+        {/* Trailing controls — a FIXED four-slot rail, not a run of conditional
+            siblings. See RowActionRail for why: the old version rendered six
+            controls on a task, five on an event, three on a routine, so nothing
+            formed a column down the page. */}
+        <RowActionRail
+          item={item}
+          variant={variant}
+          onSelect={onSelect}
+          onContextChange={onContextChange}
+          onUpdateDiscussion={onUpdateDiscussion}
+          onAssign={onAssign}
+          onAssignAll={onAssignAll}
+          familyMembers={familyMembers}
+          assignedTo={assignedTo}
+          assignedToAll={assignedToAll}
+          isSuggestedPromotion={isSuggestedPromotion}
+        />
       </div>
 
       {/* Metadata row — location on hover, contact/parentTask always compact */}

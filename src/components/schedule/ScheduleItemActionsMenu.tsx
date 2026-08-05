@@ -16,9 +16,15 @@ interface Props {
    * itself shows in the row's title cluster (state); this is where it's set.
    */
   onUpdateDiscussion?: (next: { needsDiscussion: boolean; discussionNote?: string }) => void
+  /**
+   * Events the system thinks should become projects. Promote used to be its own
+   * amber-tinted row icon; now that it lives in here, the trigger carries the
+   * hint — otherwise moving the action would have silently killed the signal.
+   */
+  isSuggestedPromotion?: boolean
 }
 
-export function ScheduleItemActionsMenu({ item, onOpenDetail, onUpdateDiscussion }: Props) {
+export function ScheduleItemActionsMenu({ item, onOpenDetail, onUpdateDiscussion, isSuggestedPromotion }: Props) {
   const ctx = useScheduleActionsContext()
   const [open, setOpen] = useState(false)
   const [openUp, setOpenUp] = useState(false)
@@ -85,7 +91,11 @@ export function ScheduleItemActionsMenu({ item, onOpenDetail, onUpdateDiscussion
           }
           setOpen((o) => !o)
         }}
-        className="shrink-0 p-1.5 rounded-lg text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors"
+        className={`shrink-0 p-1.5 rounded-lg transition-colors ${
+          isSuggestedPromotion
+            ? 'text-amber-400 hover:text-amber-600 hover:bg-amber-50'
+            : 'text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100'
+        }`}
       >
         <MoreHorizontal className="w-4 h-4" />
       </button>
