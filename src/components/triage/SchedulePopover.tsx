@@ -10,6 +10,7 @@ import {
   parseDateInput,
   formatDateLabel,
   formatShortDate,
+  TIME_PRESETS,
 } from '@/lib/dateHelpers'
 
 // Minimal schedule item for display
@@ -60,27 +61,6 @@ interface SchedulePopoverProps {
 }
 
 type Step = 'date' | 'time'
-
-// Expanded time presets for quick selection (6am - 10pm in 1-hour increments)
-const TIME_PRESETS = [
-  { label: '6am', hour: 6 },
-  { label: '7am', hour: 7 },
-  { label: '8am', hour: 8 },
-  { label: '9am', hour: 9 },
-  { label: '10am', hour: 10 },
-  { label: '11am', hour: 11 },
-  { label: '12pm', hour: 12 },
-  { label: '1pm', hour: 13 },
-  { label: '2pm', hour: 14 },
-  { label: '3pm', hour: 15 },
-  { label: '4pm', hour: 16 },
-  { label: '5pm', hour: 17 },
-  { label: '6pm', hour: 18 },
-  { label: '7pm', hour: 19 },
-  { label: '8pm', hour: 20 },
-  { label: '9pm', hour: 21 },
-  { label: '10pm', hour: 22 },
-]
 
 // Generate 15-minute increment options
 function generateTimeOptions(): { value: string; label: string }[] {

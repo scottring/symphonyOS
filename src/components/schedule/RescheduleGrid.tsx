@@ -9,7 +9,7 @@ import { useState } from 'react'
 import { Sun, Moon, Sunrise, CalendarDays, CalendarRange, Calendar, CalendarClock, Hourglass, CalendarPlus, ChevronLeft } from 'lucide-react'
 import type { TriageWhen } from './TriageWhenMenu'
 import { SpecificDatePicker } from './SpecificDatePicker'
-import { getBaseDate, getNextWeekend, getWeekendAfterNext, getNextMonday } from '@/lib/dateHelpers'
+import { getBaseDate, getNextWeekend, getWeekendAfterNext, getNextMonday, TIME_PRESETS } from '@/lib/dateHelpers'
 
 const WHENS: { when: TriageWhen; label: string; Icon: typeof Sun }[] = [
   { when: 'today', label: 'Today', Icon: Sun },
@@ -38,16 +38,6 @@ const WHEN_DATE: Partial<Record<TriageWhen, () => Date>> = {
 function tileDate(date: Date): string {
   return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
 }
-
-/** Quick times for the "Today" step — low-friction chips; the native input covers the rest. */
-const TODAY_TIMES: { label: string; hour: number }[] = [
-  { label: '9 AM', hour: 9 },
-  { label: '12 PM', hour: 12 },
-  { label: '3 PM', hour: 15 },
-  { label: '5 PM', hour: 17 },
-  { label: '7 PM', hour: 19 },
-  { label: '9 PM', hour: 21 },
-]
 
 const tileClass =
   'flex items-center gap-2 px-2.5 py-2.5 rounded-lg text-sm font-medium whitespace-nowrap ' +
@@ -84,7 +74,7 @@ export function RescheduleGrid({ onPick, onPickDate }: Props) {
           onClick={(e) => { e.stopPropagation(); setPickingToday(false) }}
           className="flex items-center gap-1.5 px-1 pb-1 text-[11px] uppercase tracking-wider font-medium text-neutral-400 hover:text-neutral-600"
         >
-          <ChevronLeft className="w-3.5 h-3.5" /> Reschedule to
+          <ChevronLeft className="w-3.5 h-3.5" /> Back
         </button>
         <div className="px-1 text-[11px] uppercase tracking-wider text-neutral-400">Today · {tileDate(base)}</div>
         <button
@@ -94,17 +84,19 @@ export function RescheduleGrid({ onPick, onPickDate }: Props) {
         >
           All day
         </button>
-        <div className="grid grid-cols-3 gap-2">
-          {TODAY_TIMES.map(({ label, hour }) => (
-            <button
-              key={hour}
-              type="button"
-              onClick={(e) => { e.stopPropagation(); at(hour) }}
-              className={`${tileClass} justify-center`}
-            >
-              {label}
-            </button>
-          ))}
+        <div className="max-h-64 overflow-y-auto">
+          <div className="grid grid-cols-3 gap-2">
+            {TIME_PRESETS.map(({ label, hour }) => (
+              <button
+                key={hour}
+                type="button"
+                onClick={(e) => { e.stopPropagation(); at(hour) }}
+                className={`${tileClass} justify-center`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
         <input
           type="time"

@@ -143,6 +143,21 @@ export function formatShortDate(date: Date): string {
 }
 
 /**
+ * The canonical quick-time chips — 6am–10pm hourly. Every picker that offers
+ * "pick a time" reads from this list so the reschedule fan-out and the schedule
+ * popover never disagree about how granular a time choice is. Minute-level
+ * precision stays with the exact-time input in each host.
+ */
+export const TIME_PRESETS: { label: string; hour: number }[] = Array.from(
+  { length: 17 },
+  (_, i) => {
+    const hour = 6 + i
+    const displayHour = hour > 12 ? hour - 12 : hour
+    return { label: `${displayHour}${hour >= 12 ? 'pm' : 'am'}`, hour }
+  }
+)
+
+/**
  * Format time in compact style (e.g., "2p", "2:30p")
  */
 export function formatTimeCompact(date: Date): string {

@@ -3,6 +3,7 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { RescheduleButton } from './RescheduleButton'
 import { ScheduleActionsProvider, type ScheduleActionsValue } from '@/contexts/ScheduleActionsContext'
 import type { TimelineItem } from '@/types/timeline'
+import { TIME_PRESETS } from '@/lib/dateHelpers'
 
 const taskItem = {
   id: 'task-7', type: 'task', title: 'Go to sketchers', completed: false,
@@ -50,6 +51,30 @@ describe('RescheduleButton', () => {
     expect(d.getMonth()).toBe(5) // June
     expect(d.getDate()).toBe(20)
     expect(d.getHours()).toBe(14)
+  })
+
+  it('Today → offers the canonical hourly presets, not a coarse subset', () => {
+    renderBtn({ onUpdateTask: vi.fn() })
+    fireEvent.click(screen.getByLabelText('Reschedule'))
+    fireEvent.click(screen.getByText('Today'))
+    // Same 6am–10pm hourly granularity the schedule popover offers.
+    for (const label of TIME_PRESETS.map((p) => p.label)) {
+      expect(screen.getByText(label)).toBeInTheDocument()
+    }
+    expect(screen.getByText('All day')).toBeInTheDocument()
+  })
+
+  it('Today → an hour chip schedules that hour today', () => {
+    const onUpdateTask = vi.fn()
+    renderBtn({ onUpdateTask })
+    fireEvent.click(screen.getByLabelText('Reschedule'))
+    fireEvent.click(screen.getByText('Today'))
+    fireEvent.click(screen.getByText('7am'))
+    expect(onUpdateTask).toHaveBeenCalledWith('7', expect.objectContaining({ bucket: 'timed', isAllDay: false }))
+    const [, updates] = onUpdateTask.mock.calls[0]
+    const d = updates.scheduledFor as Date
+    expect(d.getHours()).toBe(7)
+    expect(d.toDateString()).toBe(new Date().toDateString())
   })
 
   it('Pick date with no time → all-day', () => {
