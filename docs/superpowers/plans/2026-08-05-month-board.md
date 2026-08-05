@@ -471,13 +471,18 @@ Update `weekMode` at line 78 — it gates every drop handler, so missing it make
 
 - [ ] **Step 4: Update both call sites so the build stays green**
 
-In `src/components/planning/guided/stepTypes/PlaceOnWeeksStep.tsx:74`, change the prop name and loop over the ids. Read the surrounding lines first — the body is a single `updateTask` call; keep whatever it does and wrap it:
+In `src/components/planning/guided/stepTypes/PlaceOnWeeksStep.tsx:73-75`, keep the existing comment and body exactly as they are; only the prop name and the loop are new:
 
 ```tsx
+        // The month rung's one decision: which WEEK. scheduledFor is cleared,
+        // not just left unwritten — a date implies bucket='timed' (the timed
+        // invariant), and a week placement must set neither.
         onPlaceTasksInWeek={(ids, weekStart) =>
-          ids.forEach((id) => /* the EXISTING single-task body, with `id` in place of the old param */)
-        }
+          ids.forEach((id) =>
+            host.onUpdateTask(id, { bucket: 'week', weekStart, scheduledFor: undefined, isAllDay: false }))}
 ```
+
+The wizard step has no undo store of its own, so a plain loop is correct here — the batched-undo treatment is `MonthPage`'s alone (Task 4).
 
 In `src/apps/tasks/horizons/MonthPage.tsx:307`, apply the same minimal shim for now — Task 4 replaces it with the batched, undoable version:
 
