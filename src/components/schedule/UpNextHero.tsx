@@ -13,6 +13,7 @@ import type { Project } from '@/types/project'
 import type { TaskContext } from '@/types/task'
 import { formatUpNextStatus, type UpNextSelection } from '@/lib/today/upNext'
 import { RescheduleButton } from './RescheduleButton'
+import { ScheduleItemActionsMenu } from './ScheduleItemActionsMenu'
 import { TaskCheckbox } from './TaskCheckbox'
 import { SchedulePopover, ContextPicker } from '@/components/triage'
 import { AssigneeDropdown, MultiAssigneeDropdown } from '@/components/family'
@@ -58,6 +59,11 @@ export function UpNextHero({ selection, onSelectItem, onToggleTask, projectsMap 
     : undefined
   const onAssign = taskId && ctx.onAssignTask
     ? (memberId: string | null) => ctx.onAssignTask!(taskId, memberId)
+    : undefined
+  // Tasks only — the flag shows in the title cluster, the picker lives in the
+  // menu. Mirrors how TodaySectionList wires it for an ordinary row.
+  const onUpdateDiscussion = taskId && ctx.onUpdateTask
+    ? (next: { needsDiscussion: boolean; discussionNote?: string }) => ctx.onUpdateTask!(taskId, next)
     : undefined
 
   return (
@@ -143,10 +149,11 @@ export function UpNextHero({ selection, onSelectItem, onToggleTask, projectsMap 
           )}
         </div>
 
-        {/* Same reading order as RowActionRail: assignee -> context -> verb.
-            The hero has no overflow slot (it carries no menu), but the three
-            controls it does share with a row must not appear in a different
-            sequence from the rows directly beneath it. */}
+        {/* Same reading order as RowActionRail: assignee -> context -> verb ->
+            overflow. The hero is the same commitment as the rows beneath it, so
+            its controls must not appear in a different sequence from theirs —
+            and it carries the same '...' menu, because being the most prominent
+            card on the page is no reason to be the least actionable one. */}
         <div className="shrink-0 flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
           {familyMembers.length > 0 && onAssignAll ? (
             <MultiAssigneeDropdown
@@ -170,6 +177,15 @@ export function UpNextHero({ selection, onSelectItem, onToggleTask, projectsMap 
           {/* Tasks get the same one-tap reschedule the timeline rows have —
               triaging out of the hero must not require opening the panel. */}
           {item.type === 'task' && item.originalTask && <RescheduleButton item={item} />}
+          {/* The same menu every timeline row carries — Waiting for…, Edit
+              details, View project, Promote, Delete — which already picks its
+              own items by item.type, so the event and routine the hero can
+              surface are handled without a special case here. */}
+          <ScheduleItemActionsMenu
+            item={item}
+            onOpenDetail={() => onSelectItem(item.id)}
+            onUpdateDiscussion={onUpdateDiscussion}
+          />
           {/* Non-tasks (events, routines) have nothing to check off, so they
               keep an explicit way in. A task needs none — its check circle is
               left of the title and the whole card already opens on tap. */}

@@ -113,6 +113,42 @@ describe('UpNextHero triage set', () => {
   })
 })
 
+// The hero used to be the one card on Today with no '...' menu, so the most
+// prominent item on the page was also the least actionable. It now carries the
+// same ScheduleItemActionsMenu every row does.
+describe('UpNextHero overflow menu', () => {
+  it('offers the actions menu for a task', () => {
+    renderHero(taskItem(), { onUpdateTask: vi.fn(), onDeleteTask: vi.fn() })
+    const trigger = screen.getByLabelText('Item actions')
+    fireEvent.click(trigger)
+    expect(screen.getByRole('menuitem', { name: /waiting for/i })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: /edit details/i })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: /delete/i })).toBeInTheDocument()
+  })
+
+  // selectUpNext can surface an event or routine; the menu picks its own items
+  // by type, so those get the menu too — just a different set.
+  it('offers the actions menu for an event', () => {
+    renderHero(eventItem(), { onSkipEvent: vi.fn() })
+    fireEvent.click(screen.getByLabelText('Item actions'))
+    expect(screen.getByRole('menuitem', { name: /skip today/i })).toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: /waiting for/i })).not.toBeInTheDocument()
+  })
+
+  it('opens the detail panel from Edit details', () => {
+    const onSelectItem = vi.fn()
+    const selection: UpNextSelection = { item: taskItem(), status: 'upcoming', minutes: 10 }
+    render(
+      <ScheduleActionsProvider value={baseCtx({ onUpdateTask: vi.fn() })}>
+        <UpNextHero selection={selection} onSelectItem={onSelectItem} onToggleTask={vi.fn()} />
+      </ScheduleActionsProvider>
+    )
+    fireEvent.click(screen.getByLabelText('Item actions'))
+    fireEvent.click(screen.getByRole('menuitem', { name: /edit details/i }))
+    expect(onSelectItem).toHaveBeenCalledWith('task-t1')
+  })
+})
+
 // The hero is the same commitment as a timeline row, lifted to the top of the
 // page — so it completes with the same gesture. It used to carry a bespoke
 // "Done" pill, which made the most prominent card on the page the one place
