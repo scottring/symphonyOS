@@ -20,6 +20,7 @@ import { CoachLines } from './CoachLines'
 import { GuideChat } from './GuideChat'
 import { GuidedScene } from './GuidedScene'
 import { placeAt } from './altitude'
+import { isWideStep, stepColumnClassName } from './stepLayout'
 import type { StepType } from './types'
 import { HorizonExplainer } from '@/components/planning/explainers/HorizonExplainer'
 import { EXPLAINER_SCENES } from '@/components/planning/explainers/scenes'
@@ -205,7 +206,7 @@ export function GuidedSession({ horizon, domain, host, onClose, onFinished, onCh
   // the 680px reading column overflows and can't show more than a sliver of the
   // week (walkthrough #10, #16). Give them a wide container; the title/narration
   // stay at reading width inside it.
-  const wideStep = step.type === 'calendar' || step.type === 'schedule-grid' || step.type === 'place-on-weeks'
+  const wideStep = isWideStep(step.type)
     // move-by-pick has two halves — the picks and the shelf that feeds them.
     // In the reading column they stacked, so the destinations were off-screen
     // while you chose one from a dropdown, eighteen times.
@@ -317,11 +318,8 @@ export function GuidedSession({ horizon, domain, host, onClose, onFinished, onCh
       )}
 
       <div className="relative z-10 flex-1 min-h-0 overflow-auto">
-        {/* A wide step is FULL width, not 1120px: these are grids — seven day
-            columns, five week columns, picks beside their shelf — and a cap
-            just re-creates the cramping the wide container existed to fix. The
-            title and narration keep their 680px reading measure inside it. */}
-        <div className={`w-full mx-auto py-10 md:py-14 space-y-7 ${wideStep ? 'max-w-none px-6 lg:px-10' : 'max-w-[680px] px-6'}`}>
+        {/* Widths and the rail clearance both live in stepLayout.ts. */}
+        <div className={stepColumnClassName(wideStep)}>
           {loading ? (
             <p className="text-sm text-neutral-500">Gathering your session…</p>
           ) : (

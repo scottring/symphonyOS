@@ -245,3 +245,4 @@ describe('GuidedSession domain mode', () => {
     expect(screen.getByText(/each other or the kids/)).toBeInTheDocument()
   })
 })
+
