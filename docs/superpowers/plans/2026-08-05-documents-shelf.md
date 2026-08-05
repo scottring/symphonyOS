@@ -18,7 +18,12 @@
 - **`npm test` is watch mode.** Always use `npx vitest run <path>`.
 - **Root `npx tsc --noEmit` is a no-op.** Type-check with `npx tsc --noEmit -p tsconfig.app.json`.
 - **Migrations are out of sync with the DB.** DDL is applied via the Supabase Management API, not the CLI:
-  `POST https://api.supabase.com/v1/projects/mwadppyrqzuzgstmwpuy/database/query` with `{"query": "..."}`, bearer token from the keychain. The `.sql` file in `supabase/migrations/` is still committed as the record.
+  `POST https://api.supabase.com/v1/projects/mwadppyrqzuzgstmwpuy/database/query` with `{"query": "..."}`.
+  Get the token first — the on-disk `~/.supabase/access-token` is stale, the live one is in the keychain:
+  ```bash
+  export SUPABASE_ACCESS_TOKEN=$(security find-generic-password -s "Supabase CLI" -a "access-token" -w | sed 's/^go-keyring-base64://' | base64 -d)
+  ```
+  The `.sql` file in `supabase/migrations/` is still committed as the record.
 - **Twin validators must stay in sync.** `src/types/facets.ts` (client) and `supabase/functions/_shared/facets.ts` (edge) are hand-maintained copies — edge functions cannot import from `src/`. Every change to one is made to the other in the same commit.
 - **Never `.upsert()` partial rows into `tasks`** — always `.update().eq()`. (Not used in this plan, but holds if a task edit sneaks in.)
 - **No emojis in UI.** Use `lucide-react` icons.
@@ -142,7 +147,7 @@ The migration drops and recreates `attachments_entity_type_check`. Confirm the r
 Run:
 ```bash
 curl -s -X POST "https://api.supabase.com/v1/projects/mwadppyrqzuzgstmwpuy/database/query" \
-  -H "Authorization: Bearer $(security find-generic-password -s supabase-management-token -w)" \
+  -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"query":"select conname, pg_get_constraintdef(oid) from pg_constraint where conrelid = '"'"'attachments'"'"'::regclass;"}'
 ```
@@ -154,7 +159,7 @@ Run the same `curl` with the file contents as the `query` value:
 ```bash
 python3 -c "import json,sys;print(json.dumps({'query':open('supabase/migrations/2026-08-05_documents_shelf.sql').read()}))" > /tmp/mig.json
 curl -s -X POST "https://api.supabase.com/v1/projects/mwadppyrqzuzgstmwpuy/database/query" \
-  -H "Authorization: Bearer $(security find-generic-password -s supabase-management-token -w)" \
+  -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
   -H "Content-Type: application/json" --data @/tmp/mig.json
 ```
 Expected: `[]` or a success payload, no `error` key.
@@ -164,11 +169,11 @@ Expected: `[]` or a success payload, no `error` key.
 Run:
 ```bash
 curl -s -X POST "https://api.supabase.com/v1/projects/mwadppyrqzuzgstmwpuy/database/query" \
-  -H "Authorization: Bearer $(security find-generic-password -s supabase-management-token -w)" \
+  -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"query":"select column_name from information_schema.columns where table_name='"'"'attachments'"'"' and column_name like '"'"'document%'"'"' order by 1;"}'
 curl -s -X POST "https://api.supabase.com/v1/projects/mwadppyrqzuzgstmwpuy/database/query" \
-  -H "Authorization: Bearer $(security find-generic-password -s supabase-management-token -w)" \
+  -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"query":"select policyname, permissive from pg_policies where tablename='"'"'attachments'"'"';"}'
 ```
@@ -1781,7 +1786,7 @@ Expected: `re-classified N/N` with no errors.
 Run:
 ```bash
 curl -s -X POST "https://api.supabase.com/v1/projects/mwadppyrqzuzgstmwpuy/database/query" \
-  -H "Authorization: Bearer $(security find-generic-password -s supabase-management-token -w)" \
+  -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"query":"select document_kind, document_status, document_scope, jsonb_array_length(facets) as facet_count from attachments where document_kind is not null order by created_at desc limit 20;"}'
 ```
