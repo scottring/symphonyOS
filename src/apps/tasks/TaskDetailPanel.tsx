@@ -50,6 +50,7 @@ import { WhyChain } from '@/components/why/WhyChain';
 import { applyTriageWhen, describeTriageWhen } from '@/lib/triage/applyWhen';
 import { formatDateLabel } from '@/lib/dateHelpers';
 import type { Task, TaskLink } from '@/types/task';
+import { enrichLink } from '@/lib/enrichLink';
 
 /** Find a task by id, searching one level of nested subtasks (group children). */
 function findTask(tasks: Task[], id: string): Task | null {
@@ -273,6 +274,9 @@ function TaskPanelBody({ id }: { id: string }) {
       onAddLink={(url) => {
         const next: TaskLink[] = [...(task.links ?? []), { url }];
         updateTask(task.id, { links: next });
+        // Read the page now, while saving it is still the user's intent —
+        // so the facts are on the card by the time the task surfaces.
+        enrichLink('task', task.id, url, task.title);
       }}
       onUpdateLocation={(location, placeId) =>
         updateTask(task.id, { location, locationPlaceId: placeId })

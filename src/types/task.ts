@@ -1,10 +1,20 @@
 import type { Scope } from '@/lib/scope'
 import type { TaskDirections } from '@/types/directions'
+import type { Facet } from '@/types/facets'
 export type { Scope }
 
 export interface TaskLink {
   url: string
   title?: string // Fetched page title, falls back to URL if not available
+  /** What the page actually says, read once at save time by the analyze-link
+   *  edge function and stored in the same closed vocabulary attachments use.
+   *  A saved link is context you'll want at execution time; this is what turns
+   *  it from a blue hostname into the phone number you needed. */
+  facets?: Facet[]
+  /** Set when analysis finished, success or failure — the idempotency flag.
+   *  Absent = never looked at; present with empty facets = looked at, nothing
+   *  worth keeping. */
+  analyzedAt?: string
 }
 
 export type TaskBucket = 'inbox' | 'week' | 'month' | 'quarter' | 'someday' | 'timed'
