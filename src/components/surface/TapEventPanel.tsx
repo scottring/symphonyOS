@@ -10,6 +10,12 @@ import { PanelMightBeRelevant } from './sections/PanelMightBeRelevant'
 import { PanelFooter } from './sections/PanelFooter'
 import { useEntityRelations } from './hooks/useEntityRelations'
 import type { MightBeRelevantItem } from './types'
+import { PanelShell } from './PanelShell'
+import { PanelActions, type PanelAction } from './sections/PanelActions'
+import { PanelSection } from './sections/PanelSection'
+import { PanelRow } from './sections/PanelRow'
+import { SchedulePicker } from '@/components/schedule/SchedulePicker'
+import { useDayLoads } from './hooks/useDayLoads'
 import { PanelLocation } from './sections/PanelLocation'
 import { locationLink } from '@/lib/locationLink'
 import { ConceptIcon } from '@/lib/conceptIcons'
@@ -23,6 +29,12 @@ interface TapEventPanelProps {
   /** Links saved on this event (from event_notes table). */
   links?: TaskLink[]
   allTasks: Task[]
+  /**
+   * Feeds the scheduler's day-fullness readout. Optional so tests and callers
+   * without them can omit them — the bars then count tasks and events only.
+   */
+  routines?: import('@/types/actionable').Routine[]
+  dateInstances?: import('@/types/actionable').ActionableInstance[]
 
   /** Whether the event is marked done (actionable_instances, Symphony-side). */
   completed?: boolean
@@ -167,21 +179,99 @@ export function TapEventPanel(props: TapEventPanelProps) {
   // Photos & files section alone is a small target and a miss navigates away.
   const panelRef = useRef<HTMLElement>(null)
 
+  const dayLoads = useDayLoads({
+    tasks: props.allTasks ?? [],
+    routines: props.routines ?? [],
+    dateInstances: props.dateInstances ?? [],
+    enabled: true,
+  })
+
+  // The duration control owns its own popover, so it arrives as a rendered node
+  // rather than a plain chip. Extracted verbatim from the old hand-built header.
+  const durationMenu = durationMinutes === null ? null : (
+            <div className="relative">
+              <button
+                onClick={() => setShowDurationMenu((v) => !v)}
+                aria-expanded={showDurationMenu}
+                aria-label="Change duration"
+                className="px-3 py-1.5 rounded-lg text-sm font-medium bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition-colors"
+              >
+                <ConceptIcon name="time" decorative /> {formatDuration(durationMinutes)} {showDurationMenu ? '▾' : '▸'}
+              </button>
+              {showDurationMenu && (
+                <div className="absolute left-0 top-full mt-1 z-20 bg-white rounded-xl shadow-lg border border-neutral-100 py-1 min-w-[7rem]">
+                  {DURATION_PRESETS.map((m) => (
+                    <button
+                      key={m}
+                      onClick={() => handleDurationChange(m)}
+                      className={`block w-full text-left px-4 py-2 text-sm transition-colors hover:bg-neutral-50 ${
+                        m === durationMinutes ? 'text-primary-700 font-medium' : 'text-neutral-700'
+                      }`}
+                    >
+                      {formatDuration(m)}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+  )
+
+  const actions: PanelAction[] = [
+    ...(props.onToggleComplete
+      ? [{
+          id: 'complete',
+          label: props.completed ? 'Completed' : 'Complete',
+          kind: (props.completed ? 'completed' : 'primary') as PanelAction['kind'],
+          onClick: props.onToggleComplete,
+        }]
+      : []),
+    ...(event.location && joinUrl
+      ? [{ id: 'join', label: 'Join meeting', icon: 'video' as const, href: joinUrl }]
+      : []),
+    ...(event.location && isPhysicalLocation
+      ? [{
+          id: 'directions',
+          label: 'Directions',
+          icon: 'location' as const,
+          onClick: () => setShowDirections((v) => !v),
+        }]
+      : []),
+    ...(canEdit && props.onReschedule
+      ? [{
+          id: 'reschedule',
+          label: 'Reschedule',
+          render: () => (
+            <SchedulePicker
+              label="Reschedule"
+              scheduledFor={startTime ? new Date(startTime) : undefined}
+              onSchedule={(date) => handleReschedule(date)}
+              loads={dayLoads}
+            />
+          ),
+        }]
+      : []),
+    ...(canEdit && props.onReschedule && durationMinutes !== null && durationMinutes > 0
+      ? [{ id: 'duration', label: formatDuration(durationMinutes), render: () => durationMenu }]
+      : []),
+    ...(props.onToggleDiscussion
+      ? [{
+          id: 'discuss',
+          label: discussionFlagged ? 'To discuss' : 'Discuss',
+          kind: (discussionFlagged ? 'flagged' : 'default') as PanelAction['kind'],
+          pressed: discussionFlagged,
+          title: discussionFlagged
+            ? 'Remove from the For Discussion list'
+            : 'Flag to talk through together — shows on the For Discussion list',
+          onClick: () => props.onToggleDiscussion?.(!discussionFlagged),
+        }]
+      : []),
+  ]
+
   return (
-    // Same section rhythm as the task panel (TapContextPanel): hairline dividers
-    // with even vertical padding, so grouped blocks never scrunch together.
-    <article
-      ref={panelRef}
-      className="
-        bg-bg-elevated max-w-md w-full
-        rounded-2xl
-        px-4 md:px-5 py-3 md:py-5
-        divide-y divide-neutral-200/60
-        [&>*]:py-4 [&>*:first-child]:pt-0 [&>*:last-child]:pb-0
-      "
-    >
-      {/* Identity block: title, when, calendar, and the action chips read as one unit. */}
-      <header>
+    <PanelShell
+      innerRef={panelRef}
+      identity={
+        <>
         <PanelHeader
           title={event.title}
           onTitleChange={() => { /* event title is read-only from gcal */ }}
@@ -233,202 +323,107 @@ export function TapEventPanel(props: TapEventPanelProps) {
           </div>
         )}
 
-        <div className="mt-4 flex flex-wrap gap-2">
-          {/* Mark done — same pill as the task panel (PanelActions): outline when
-              open, greyed + checked when done (click to reopen). */}
-          {props.onToggleComplete && (
-            <button
-              onClick={props.onToggleComplete}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
-                props.completed
-                  ? 'border-neutral-200 bg-neutral-100 text-neutral-400 hover:bg-neutral-200'
-                  : 'border-primary-600 text-primary-700 hover:bg-primary-50'
-              }`}
-            >
-              {props.completed ? <><Check className="w-4 h-4" /> Completed</> : 'Complete'}
-            </button>
-          )}
-          {/* Physical address → Directions toggle. Video meeting → Join link (or a
-              non-clickable label when no join URL is known). Never offer directions
-              to a Teams/Zoom/Meet "location". */}
-          {event.location && isPhysicalLocation && (
-            <button
-              onClick={() => setShowDirections((v) => !v)}
-              aria-expanded={showDirections}
-              className="px-3 py-1.5 rounded-lg text-sm font-medium bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition-colors"
-            >
-              <ConceptIcon name="location" decorative /> Directions {showDirections ? '▾' : '▸'}
-            </button>
-          )}
-          {event.location && joinUrl && (
-            <a
-              href={joinUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium bg-primary-50 text-primary-700 hover:bg-primary-100 transition-colors"
-            >
-              <Video className="w-4 h-4" aria-hidden /> Join meeting
-            </a>
-          )}
           {event.location && isVirtualMeeting && !joinUrl && (
-            <span className="px-3 py-1.5 rounded-lg text-sm font-medium bg-neutral-100 text-neutral-500">
-              {event.location}
-            </span>
+            <div className="mt-2 text-[13px] text-neutral-500">{event.location}</div>
           )}
-          {canEdit && props.onReschedule && (
-            <SchedulePopover
-              value={startTime ? new Date(startTime) : undefined}
-              onSchedule={handleReschedule}
-              itemTitle={event.title}
-              trigger={
-                <button className="px-3 py-1.5 rounded-lg text-sm font-medium bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition-colors">
-                  <ConceptIcon name="when" decorative /> Reschedule
-                </button>
-              }
+        </>
+      }
+      act={<PanelActions actions={actions} />}
+      details={
+        <>
+          {/* Location editor: for physical addresses or to add one. A virtual
+              meeting is handled by the Join chip above, not a Places field. */}
+          {!isVirtualMeeting && (
+            <PanelLocation
+              location={event.location ?? undefined}
+              title={event.title}
+              showDirections={isPhysicalLocation && showDirections}
+              onUpdateLocation={(addr) => props.onUpdateEventLocation?.(eventId, addr, calendarId)}
+              onClearLocation={() => props.onUpdateEventLocation?.(eventId, null, calendarId)}
             />
           )}
-          {canEdit && props.onReschedule && durationMinutes !== null && durationMinutes > 0 && (
-            <div className="relative">
-              <button
-                onClick={() => setShowDurationMenu((v) => !v)}
-                aria-expanded={showDurationMenu}
-                aria-label="Change duration"
-                className="px-3 py-1.5 rounded-lg text-sm font-medium bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition-colors"
-              >
-                <ConceptIcon name="time" decorative /> {formatDuration(durationMinutes)} {showDurationMenu ? '▾' : '▸'}
-              </button>
-              {showDurationMenu && (
-                <div className="absolute left-0 top-full mt-1 z-20 bg-white rounded-xl shadow-lg border border-neutral-100 py-1 min-w-[7rem]">
-                  {DURATION_PRESETS.map((m) => (
-                    <button
-                      key={m}
-                      onClick={() => handleDurationChange(m)}
-                      className={`block w-full text-left px-4 py-2 text-sm transition-colors hover:bg-neutral-50 ${
-                        m === durationMinutes ? 'text-primary-700 font-medium' : 'text-neutral-700'
-                      }`}
-                    >
-                      {formatDuration(m)}
-                    </button>
-                  ))}
-                </div>
-              )}
+
+          <PanelNotes
+            key={event.id}
+            notes={props.notes}
+            onChange={props.onNotesChange}
+            label="What to bring"
+            id="what-to-bring"
+          />
+
+          {discussionFlagged && props.onDiscussionNoteChange && (
+            <PanelSection
+              id="for-discussion"
+              label="For discussion"
+              preview={props.discussion?.note || undefined}
+            >
+              <textarea
+                key={eventId}
+                defaultValue={props.discussion?.note ?? ''}
+                onBlur={(e) => {
+                  if ((e.target.value || '') !== (props.discussion?.note ?? '')) {
+                    props.onDiscussionNoteChange?.(e.target.value)
+                  }
+                }}
+                placeholder="What's the question?"
+                rows={2}
+                className="w-full px-2 py-1.5 text-sm rounded-md bg-white text-neutral-700 placeholder:text-neutral-400 shadow-[inset_0_0_0_1px_#e5e7eb] focus:outline-none focus:shadow-[inset_0_0_0_1px_#d97706] resize-none"
+              />
+            </PanelSection>
+          )}
+
+          {/* Prep tasks are the event's subtasks — real tasks linked to this event. */}
+          <PanelSection
+            id="prep-tasks"
+            label="Prep tasks"
+            preview={relations.tasks.length ? `${relations.tasks.length} task${relations.tasks.length === 1 ? '' : 's'}` : undefined}
+          >
+            <div className="flex flex-col gap-1.5">
+              {relations.tasks.map((t) => (
+                <PanelRow
+                  key={t.id}
+                  onClick={() => props.onOpenTask(t.id)}
+                  icon={<span className="w-6 h-6 flex items-center justify-center rounded-md bg-amber-100"><ConceptIcon name="list" decorative /></span>}
+                >
+                  <span className="block text-sm text-neutral-800">{t.title}</span>
+                </PanelRow>
+              ))}
+              <input
+                type="text"
+                value={prepDraft}
+                onChange={(e) => setPrepDraft(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') commitPrepTask() }}
+                onBlur={commitPrepTask}
+                placeholder="+ Add a prep task…"
+                className="text-sm px-2 py-1.5 rounded-md bg-transparent text-neutral-500 placeholder:text-neutral-400 focus:outline-none focus:bg-neutral-50 hover:bg-neutral-50"
+              />
             </div>
-          )}
-          {props.onToggleDiscussion && (
-            <button
-              onClick={() => props.onToggleDiscussion?.(!discussionFlagged)}
-              aria-pressed={discussionFlagged}
-              title={discussionFlagged
-                ? 'Remove from the For Discussion list'
-                : 'Flag to talk through together — shows on the For Discussion list'}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-                discussionFlagged
-                  ? 'bg-amber-100 text-amber-800 hover:bg-amber-200'
-                  : 'bg-neutral-100 text-neutral-700 hover:bg-neutral-200'
-              }`}
-            >
-              <MessageSquare className={`w-4 h-4 ${discussionFlagged ? 'text-amber-600' : ''}`} aria-hidden />
-              {discussionFlagged ? 'To discuss' : 'Discuss'}
-            </button>
-          )}
-        </div>
-      </header>
+          </PanelSection>
 
-      {/* Location editor: for physical addresses or to add one. A virtual
-          meeting is handled by the Join/label chip above, not a Places field. */}
-      {!isVirtualMeeting && (
-        <PanelLocation
-          location={event.location ?? undefined}
-          title={event.title}
-          showDirections={isPhysicalLocation && showDirections}
-          onUpdateLocation={(addr) => props.onUpdateEventLocation?.(eventId, addr, calendarId)}
-          onClearLocation={() => props.onUpdateEventLocation?.(eventId, null, calendarId)}
-        />
-      )}
-
-      <PanelNotes
-        key={event.id}
-        notes={props.notes}
-        onChange={props.onNotesChange}
-        label="What to bring"
-        id="what-to-bring"
-      />
-
-      {discussionFlagged && props.onDiscussionNoteChange && (
-        <section>
-          <div className="text-[10px] uppercase tracking-wider font-semibold text-neutral-400 mb-2">
-            For discussion
-          </div>
-          <textarea
-            key={eventId}
-            defaultValue={props.discussion?.note ?? ''}
-            onBlur={(e) => {
-              if ((e.target.value || '') !== (props.discussion?.note ?? '')) {
-                props.onDiscussionNoteChange?.(e.target.value)
-              }
+          {/* Attachments key on the stable Google event id (the same key event
+              notes use), under the 'event_note' entity type the table allows. */}
+          <PanelPhotos
+            entityType="event_note"
+            entityId={eventId}
+            dropZoneRef={panelRef}
+            entityContext={[event.title, startTime && new Date(startTime).toLocaleString(), event.location].filter(Boolean).join(' — ')}
+            promotions={{
+              onAddPrepTask: props.onAddPrepTask,
+              onAddLink: props.onAddLink,
+              onUseLocation: props.onUpdateEventLocation && canEdit
+                ? (address) => props.onUpdateEventLocation!(eventId, address, calendarId)
+                : undefined,
             }}
-            placeholder="What's the question?"
-            rows={2}
-            className="w-full px-2 py-1.5 text-sm rounded-md bg-white text-neutral-700 placeholder:text-neutral-400 shadow-[inset_0_0_0_1px_#e5e7eb] focus:outline-none focus:shadow-[inset_0_0_0_1px_#d97706] resize-none"
           />
-        </section>
-      )}
 
-      {/* Prep tasks are the event's subtasks — real tasks linked to this event. */}
-      <section>
-        <div className="text-[10px] uppercase tracking-wider font-semibold text-neutral-400 mb-2">
-          Prep tasks
-        </div>
-        <div className="flex flex-col gap-1.5">
-          {relations.tasks.map(t => (
-            <button
-              key={t.id}
-              onClick={() => props.onOpenTask(t.id)}
-              className="flex items-center gap-2 w-full text-left py-1.5 px-2 rounded-md bg-white shadow-[inset_0_0_0_1px_#e5e7eb] hover:bg-neutral-50"
-            >
-              <span className="w-6 h-6 flex items-center justify-center rounded-md bg-amber-100"><ConceptIcon name="list" decorative /></span>
-              <span className="text-sm text-neutral-800 flex-1">{t.title}</span>
-            </button>
-          ))}
-          <input
-            type="text"
-            value={prepDraft}
-            onChange={(e) => setPrepDraft(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') commitPrepTask() }}
-            onBlur={commitPrepTask}
-            placeholder="+ Add a prep task…"
-            className="text-sm px-2 py-1.5 rounded-md bg-transparent text-neutral-500 placeholder:text-neutral-400 focus:outline-none focus:bg-neutral-50 hover:bg-neutral-50"
-          />
-        </div>
-      </section>
-
-      {/* Attachments key on the stable Google event id (the same key event
-          notes use), under the 'event_note' entity type the table allows. */}
-      <PanelPhotos
-        entityType="event_note"
-        entityId={eventId}
-        dropZoneRef={panelRef}
-        entityContext={[event.title, startTime && new Date(startTime).toLocaleString(), event.location].filter(Boolean).join(' — ')}
-        promotions={{
-          onAddPrepTask: props.onAddPrepTask,
-          onAddLink: props.onAddLink,
-          onUseLocation: props.onUpdateEventLocation && canEdit
-            ? (address) => props.onUpdateEventLocation!(eventId, address, calendarId)
-            : undefined,
-        }}
-      />
-
-      <PanelLinks links={props.links} onAddLink={props.onAddLink} />
-
-      <PanelMightBeRelevant items={[]} onOpen={props.onOpenRelated} />
-
-      {/* Events carry no created/updated timestamps; show the start time when present. */}
-      {startTime && (
-        <PanelFooter
-          createdAt={new Date(startTime)}
-          updatedAt={new Date(startTime)}
-        />
-      )}
-    </article>
+          <PanelLinks links={props.links} onAddLink={props.onAddLink} />
+        </>
+      }
+      related={<PanelMightBeRelevant items={[]} onOpen={props.onOpenRelated} />}
+      footer={
+        /* Events carry no created/updated timestamps; show the start time. */
+        startTime ? <PanelFooter createdAt={new Date(startTime)} updatedAt={new Date(startTime)} /> : undefined
+      }
+    />
   )
 }

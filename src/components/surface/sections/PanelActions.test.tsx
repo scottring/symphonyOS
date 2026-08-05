@@ -1,79 +1,78 @@
 import { describe, it, expect, vi } from 'vitest'
-import { screen } from '@testing-library/react'
-import { render } from '@/test/test-utils'
-import { PanelActions } from './PanelActions'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { PanelActions, MAX_VISIBLE_ACTIONS, type PanelAction } from './PanelActions'
+
+const act = (id: string, over: Partial<PanelAction> = {}): PanelAction => ({
+  id,
+  label: id,
+  onClick: vi.fn(),
+  ...over,
+})
 
 describe('PanelActions', () => {
-  const baseProps = {
-    completed: false,
-    isPinned: false,
-    onToggleComplete: vi.fn(),
-    onSchedule: vi.fn<[Date, boolean], void>(),
-    onTogglePin: vi.fn(),
-    onDelete: vi.fn(),
-  }
-
-  it('renders an outline Complete button when not completed', () => {
-    render(<PanelActions {...baseProps} />)
-    expect(screen.getByRole('button', { name: 'Complete' })).toBeInTheDocument()
+  it('renders actions in the given order', () => {
+    render(<PanelActions actions={[act('Complete'), act('Call'), act('Schedule')]} />)
+    const labels = screen.getAllByRole('button').map((b) => b.textContent)
+    expect(labels).toEqual(['Complete', 'Call', 'Schedule'])
   })
 
-  it('renders Completed (greyed) when completed', () => {
-    render(<PanelActions {...baseProps} completed />)
-    expect(screen.getByRole('button', { name: /completed/i })).toBeInTheDocument()
+  it('fires onClick', async () => {
+    const onClick = vi.fn()
+    render(<PanelActions actions={[act('Complete', { onClick })]} />)
+    await userEvent.click(screen.getByRole('button', { name: 'Complete' }))
+    expect(onClick).toHaveBeenCalledOnce()
   })
 
-  it('renders Call button when phoneNumber present', () => {
-    render(<PanelActions {...baseProps} phoneNumber="555-0107" />)
-    const call = screen.getByRole('link', { name: /555-0107/ })
-    expect(call).toHaveAttribute('href', 'tel:555-0107')
+  it('renders an href action as a link', () => {
+    render(<PanelActions actions={[act('Call', { href: 'tel:5551234' })]} />)
+    expect(screen.getByRole('link', { name: 'Call' })).toHaveAttribute('href', 'tel:5551234')
   })
 
-  it('does not render Call when phoneNumber missing', () => {
-    render(<PanelActions {...baseProps} />)
-    expect(screen.queryByText(/call/i)).not.toBeInTheDocument()
+  it('delegates a render action to its own node', () => {
+    render(<PanelActions actions={[act('Schedule', { render: () => <button>Custom</button> })]} />)
+    expect(screen.getByRole('button', { name: 'Custom' })).toBeInTheDocument()
   })
 
-  it('calls onToggleComplete when Complete clicked', async () => {
-    const onToggleComplete = vi.fn()
-    const { user } = render(<PanelActions {...baseProps} onToggleComplete={onToggleComplete} />)
-    await user.click(screen.getByRole('button', { name: 'Complete' }))
-    expect(onToggleComplete).toHaveBeenCalledOnce()
+  it(`folds actions past ${MAX_VISIBLE_ACTIONS} into an overflow menu`, async () => {
+    const user = userEvent.setup()
+    const many = ['a', 'b', 'c', 'd', 'e', 'f', 'g'].map((id) => act(id))
+    render(<PanelActions actions={many} />)
+
+    expect(screen.getByRole('button', { name: 'e' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'f' })).not.toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: /more actions/i }))
+    expect(screen.getByRole('button', { name: 'f' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'g' })).toBeInTheDocument()
   })
 
-  it('renders Schedule trigger button', () => {
-    render(<PanelActions {...baseProps} />)
-    expect(screen.getByText(/schedule/i)).toBeInTheDocument()
+  it('fires a folded action from the overflow menu', async () => {
+    const user = userEvent.setup()
+    const onClick = vi.fn()
+    const many = ['a', 'b', 'c', 'd', 'e'].map((id) => act(id))
+    render(<PanelActions actions={[...many, act('f', { onClick })]} />)
+
+    await user.click(screen.getByRole('button', { name: /more actions/i }))
+    await user.click(screen.getByRole('button', { name: 'f' }))
+    expect(onClick).toHaveBeenCalledOnce()
   })
 
-  it('renders More menu trigger', () => {
-    render(<PanelActions
-      completed={false}
-      isPinned={false}
-      onToggleComplete={vi.fn()}
-      onSchedule={vi.fn()}
-      onTogglePin={vi.fn()}
-      onDelete={vi.fn()}
-    />)
-    expect(screen.getByLabelText('More actions')).toBeInTheDocument()
+  it('does not show an overflow trigger when everything fits', () => {
+    render(<PanelActions actions={[act('a'), act('b')]} />)
+    expect(screen.queryByRole('button', { name: /more actions/i })).not.toBeInTheDocument()
   })
 
-  it('renders Directions button when location present', () => {
-    render(<PanelActions {...baseProps} location="500 Market St" onShowDirections={vi.fn()} />)
-    expect(screen.getByRole('button', { name: /directions/i })).toBeInTheDocument()
+  it('renders the supplied overflow node last', () => {
+    render(<PanelActions actions={[act('Complete')]} overflow={<button>More</button>} />)
+    const buttons = screen.getAllByRole('button')
+    expect(buttons[buttons.length - 1]).toHaveTextContent('More')
   })
 
-  it('does not render Directions button when location missing', () => {
-    render(<PanelActions {...baseProps} />)
-    expect(screen.queryByRole('button', { name: /directions/i })).not.toBeInTheDocument()
-  })
-
-  it('calls onShowDirections when Directions clicked', async () => {
-    const onShowDirections = vi.fn()
-    const { user } = render(
-      <PanelActions {...baseProps} location="500 Market St" onShowDirections={onShowDirections} />
+  it('renders a check on the completed state', () => {
+    const { container } = render(
+      <PanelActions actions={[act('Completed', { kind: 'completed' })]} />,
     )
-    await user.click(screen.getByRole('button', { name: /directions/i }))
-    expect(onShowDirections).toHaveBeenCalledOnce()
+    expect(container.querySelector('svg')).toBeInTheDocument()
   })
 })

@@ -3,6 +3,7 @@ import { Trash2 } from 'lucide-react'
 import type { Routine, RoutineVisibility, RecurrencePattern } from '@/types/routine'
 import type { TaskContext } from '@/types/task'
 import type { FamilyMember } from '@/types/family'
+import { PanelShell } from './PanelShell'
 import { PanelHeader } from './sections/PanelHeader'
 import { PanelMedia } from './sections/PanelMedia'
 import { PanelNotes } from './sections/PanelNotes'
@@ -84,14 +85,17 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
   const projectDoc = routine.project_id ? getAttachments('project', routine.project_id)[0] : undefined
 
   return (
-    <article className="bg-bg-elevated rounded-2xl p-5 max-w-md w-full">
+    <PanelShell
+      identity={
       <PanelHeader
         title={routine.name}
         onTitleChange={(name) => props.onRename?.(name)}
         onClose={props.onClose}
       />
 
-      <section className="pb-4 mb-4 border-b border-neutral-200 flex flex-col gap-3">
+      }
+      act={
+      <section className="flex flex-col gap-3">
         {/* Who does it + context + streak */}
         <div className="flex flex-wrap items-center gap-2">
           {familyMembers.length > 0 && props.onAssignChange && (
@@ -189,9 +193,12 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
           </div>
         )}
       </section>
+      }
+      details={
+        <>
 
       {props.steps && props.onSelectStep && props.onAddStep && props.onReorderSteps && (
-        <section className="pb-4 mb-4 border-b border-neutral-200">
+        <section>
           <RoutineStepsSection
             steps={props.steps}
             onSelectStep={props.onSelectStep}
@@ -204,7 +211,7 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
       )}
 
       {props.onUpdateLocation && props.onClearLocation && (
-        <section className="pb-4 mb-4 border-b border-neutral-200">
+        <section>
           {routine.location && (
             <button
               onClick={() => setShowDirections((v) => !v)}
@@ -241,7 +248,7 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
       )}
 
       {(routine.image_url || projectDoc) && (
-        <section className="pb-4 mb-4 border-b border-neutral-200">
+        <section>
           <PanelMedia
             imageUrl={routine.image_url}
             sourceDoc={projectDoc ? {
@@ -313,10 +320,15 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
         </button>
       </div>
 
+        </>
+      }
+      footer={
       <PanelFooter
         createdAt={new Date(routine.created_at)}
         updatedAt={new Date(routine.updated_at)}
       />
+      }
+    >
       {assistOpen && (
         <AssistDrawer
           item={{
@@ -329,6 +341,7 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
           onMutate={props.onAssistMutate}
         />
       )}
-    </article>
+    </PanelShell>
+
   )
 }

@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo } from 'react'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
+import { PanelShell } from './PanelShell'
 import { PanelNotes } from './sections/PanelNotes'
 import { PanelWhatToBring } from './sections/PanelWhatToBring'
 import { PanelIngredients } from './sections/PanelIngredients'
@@ -67,7 +68,9 @@ export function TapMealPanel({ event, onClose }: TapMealPanelProps) {
     : ''
 
   return (
-    <article className="bg-bg-elevated rounded-2xl p-6 max-w-md w-full">
+    <PanelShell
+      identity={
+        <>
       {/* Header: title + close */}
       <div className="flex items-start justify-between gap-3 mb-1">
         <h2 className="font-display text-2xl text-neutral-900 leading-snug flex-1">{event.title}</h2>
@@ -157,6 +160,10 @@ export function TapMealPanel({ event, onClose }: TapMealPanelProps) {
         </div>
       </div>
 
+        </>
+      }
+      details={
+        <>
       <PanelNotes
         key={entry?.id ?? event.id}
         notes={recipe?.title ? `Recipe: ${recipe.title}` : entry?.adHocTitle}
@@ -169,11 +176,15 @@ export function TapMealPanel({ event, onClose }: TapMealPanelProps) {
       <PanelSteps steps={recipe?.instructions} />
       <PanelLinks links={recipe?.sourceUrl ? [{ url: recipe.sourceUrl, title: recipe.title }] : undefined} />
 
+        </>
+      }
+      footer={
       <PanelFooter
         createdAt={baseDate}
         updatedAt={baseDate}
       />
-
+      }
+    >
       <RecipePickerModal
         isOpen={pickerOpen}
         slot={entry?.slot}
@@ -181,6 +192,6 @@ export function TapMealPanel({ event, onClose }: TapMealPanelProps) {
         onClose={() => setPickerOpen(false)}
         onPick={handlePick}
       />
-    </article>
+    </PanelShell>
   )
 }

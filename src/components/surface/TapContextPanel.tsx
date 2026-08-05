@@ -4,8 +4,12 @@ import type { Contact } from '@/types/contact'
 import type { Project } from '@/types/project'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { FamilyMember } from '@/types/family'
+import { PanelShell } from './PanelShell'
 import { PanelHeader } from './sections/PanelHeader'
-import { PanelActions } from './sections/PanelActions'
+import { PanelActions, type PanelAction } from './sections/PanelActions'
+import { PanelMoreMenu } from './sections/PanelMoreMenu'
+import { SchedulePicker } from '@/components/schedule/SchedulePicker'
+import { useDayLoads } from './hooks/useDayLoads'
 import { PanelAssistant } from './sections/PanelAssistant'
 import { PanelNotes } from './sections/PanelNotes'
 import { PanelSubtasks } from './sections/PanelSubtasks'
@@ -34,6 +38,20 @@ interface TapContextPanelProps {
   familyMembers: FamilyMember[]
   siblingTaskCandidates: Task[]
   allTasks: Task[]
+  /**
+   * Feeds the scheduler's day-fullness readout. Optional so tests and any
+   * caller that doesn't have them can omit them — the bars then count tasks and
+   * events only, which is honest but thinner.
+   */
+  routines?: import('@/types/actionable').Routine[]
+  /**
+   * Completion/skip status for routines on a given day. The host leaves this
+   * empty: useActionableInstances is an imperative API with no list read, and
+   * for the future days the scheduler offers no instances exist yet anyway. The
+   * one gap is a routine already SKIPPED today, which still counts toward
+   * today's all-day tally.
+   */
+  dateInstances?: import('@/types/actionable').ActionableInstance[]
   /** Optional why-chain (Task → Project → Goal), rendered under the title. */
   whyChain?: ReactNode
   /** Optional creator name for the meta row + footer. */
@@ -151,132 +169,203 @@ export function TapContextPanel(props: TapContextPanelProps) {
   // the file instead of attaching it.
   const panelRef = useRef<HTMLElement>(null)
 
+  const dayLoads = useDayLoads({
+    tasks: allTasks,
+    routines: props.routines ?? [],
+    dateInstances: props.dateInstances ?? [],
+    enabled: true,
+  })
+
+  const phone = task.phoneNumber || linked.contact?.phone || linked.project?.phoneNumber
+  const hasGroup = (task.subtasks?.length ?? 0) > 0
+
+  // Fixed order — complete, then how to reach it, then when, then help. The
+  // renderer folds anything past the fifth into its overflow menu.
+  const actions: PanelAction[] = [
+    {
+      id: 'complete',
+      label: task.completed ? 'Completed' : 'Complete',
+      kind: task.completed ? 'completed' : 'primary',
+      onClick: props.onToggleComplete,
+    },
+    ...(phone ? [{ id: 'call', label: phone, icon: 'call' as const, href: `tel:${phone}` }] : []),
+    ...(task.location
+      ? [{
+          id: 'directions',
+          label: 'Directions',
+          icon: 'location' as const,
+          onClick: () => setShowDirections((v) => !v),
+        }]
+      : []),
+    {
+      id: 'schedule',
+      label: 'Schedule',
+      render: () => (
+        <SchedulePicker
+          scheduledFor={task.scheduledFor || undefined}
+          onSchedule={props.onSchedule}
+          onReschedule={props.onReschedule}
+          onClearSchedule={props.onClearSchedule}
+          loads={dayLoads}
+        />
+      ),
+    },
+    ...(props.onAssistMutate
+      ? [{
+          id: 'assist',
+          label: 'Help me plan',
+          icon: 'ai' as const,
+          onClick: () => setAssistOpen(true),
+        }]
+      : []),
+  ]
+
   return (
-    <article
-      ref={panelRef}
-      className="
-        bg-bg-elevated max-w-md w-full
-        rounded-2xl
-        px-4 md:px-5 py-3 md:py-5
-        divide-y divide-neutral-200/60
-        [&>*]:py-4 [&>*:first-child]:pt-0 [&>*:last-child]:pb-0
-      "
+    <PanelShell
+      innerRef={panelRef}
+      identity={
+        <>
+          <PanelHeader
+            title={task.title}
+            onTitleChange={props.onTitleChange}
+            onClose={props.onClose}
+          />
+          {/* The read-only "FAMILY · timed · for Iris" meta row was removed — it
+              duplicated (in jargon) the interactive context chooser + who-picker
+              below. The why-chain stays. */}
+          {props.whyChain}
+        </>
+      }
+      act={
+        <>
+          <PanelActions
+            actions={actions}
+            overflow={
+              <PanelMoreMenu
+                isPinned={props.isPinned}
+                onTogglePin={props.onTogglePin}
+                onDelete={props.onDelete}
+                onUngroup={hasGroup ? props.onUngroup : undefined}
+                onDeleteGroup={hasGroup ? props.onDeleteGroup : undefined}
+              />
+            }
+          />
+          <PanelAssistant taskId={task.id} />
+        </>
+      }
+      classify={
+        <PanelClassify
+          context={task.context}
+          onContextChange={props.onContextChange}
+          scope={task.scope}
+          onScopeChange={props.onScopeChange}
+          members={props.familyMembers}
+          selectedAssigneeIds={task.assignedToAll ?? (task.assignedTo ? [task.assignedTo] : [])}
+          onAssigneesChange={props.onAssigneesChange}
+        />
+      }
+      details={
+        <>
+          {show('phone') && (
+            <PanelReach
+              kind="phone"
+              value={task.phoneNumber}
+              onChange={props.onPhoneChange}
+              autoFocus={revealed.has('phone')}
+              asLink={false}
+            />
+          )}
+          {show('email') && (
+            <PanelReach
+              kind="email"
+              value={task.email}
+              onChange={props.onEmailChange}
+              autoFocus={revealed.has('email')}
+            />
+          )}
+          {show('location') && (
+            <PanelLocation
+              location={task.location}
+              locationPlaceId={task.locationPlaceId}
+              title={task.title}
+              showDirections={showDirections}
+              onUpdateLocation={props.onUpdateLocation}
+              onClearLocation={props.onClearLocation}
+              directions={task.directions}
+              onDirectionsChange={props.onDirectionsChange}
+            />
+          )}
+          {show('notes') && (
+            <PanelNotes
+              key={task.id}
+              label="Notes"
+              notes={task.notes}
+              onChange={props.onNotesChange}
+              onSaveToVault={props.onSaveNoteToVault}
+            />
+          )}
+          <PanelPhotos
+            hideWhenEmpty={!revealed.has('photo')}
+            onContentChange={setPhotosHaveContent}
+            entityType="task"
+            entityId={task.id}
+            dropZoneRef={panelRef}
+            entityContext={[task.title, task.notes?.split('\n')[0]].filter(Boolean).join(' — ')}
+            promotions={{
+              onAddPrepTask: props.onAddSubtask,
+              onAddLink: props.onAddLink,
+              onUseLocation: (address) => props.onUpdateLocation(address),
+            }}
+          />
+          <PanelConversations taskId={task.id} />
+          {show('subtask') && (
+            <PanelSubtasks
+              subtasks={task.subtasks ?? []}
+              onToggleSubtask={props.onToggleSubtask}
+              onAddSubtask={props.onAddSubtask}
+              onOpenSubtask={props.onOpenTask}
+              onRemoveSubtask={props.onRemoveSubtask}
+              onRescheduleSubtask={props.onRescheduleSubtask}
+              onScheduleSubtask={props.onScheduleSubtask}
+            />
+          )}
+          {show('person') && (
+            <PanelPeople
+              contact={linked.contact}
+              onOpenContact={props.onOpenContact}
+              contacts={props.contacts}
+              onContactChange={props.onContactChange}
+              onSearchContacts={props.onSearchContacts}
+              onAddContact={props.onAddContact}
+            />
+          )}
+          {show('link') && <PanelLinks links={task.links} onAddLink={props.onAddLink} />}
+          {/* The tail of the details list, not a zone of its own: every field
+              the task doesn't carry yet, as one quiet row. */}
+          <PanelAddRow fields={addable} onReveal={reveal} />
+        </>
+      }
+      related={
+        <>
+          <PanelLinked
+            project={linked.project}
+            linkedEvent={linked.linkedEvent}
+            siblingTasks={linked.siblingTasks}
+            onOpenProject={props.onOpenProject}
+            onOpenEvent={props.onOpenEvent}
+            onOpenTask={props.onOpenTask}
+          />
+          <PanelMightBeRelevant items={mightBeRelevant} onOpen={props.onOpenRelated} />
+        </>
+      }
+      footer={
+        <PanelFooter
+          createdAt={task.createdAt}
+          updatedAt={task.updatedAt}
+          createdByName={createdByName}
+        />
+      }
     >
-      <PanelHeader
-        title={task.title}
-        onTitleChange={props.onTitleChange}
-        onClose={props.onClose}
-      />
-      {/* The read-only "FAMILY · timed · for Iris" meta row was removed — it
-          duplicated (in jargon) the interactive context chooser + who-picker
-          below. The why-chain stays. */}
-      {props.whyChain && <div>{props.whyChain}</div>}
-      <PanelActions
-        completed={task.completed}
-        phoneNumber={task.phoneNumber || linked.contact?.phone || linked.project?.phoneNumber}
-        location={task.location}
-        onShowDirections={() => setShowDirections((v) => !v)}
-        scheduledFor={task.scheduledFor || undefined}
-        isAllDay={task.isAllDay}
-        isPinned={props.isPinned}
-        onToggleComplete={props.onToggleComplete}
-        onSchedule={props.onSchedule}
-        onReschedule={props.onReschedule}
-        onClearSchedule={props.onClearSchedule}
-        onTogglePin={props.onTogglePin}
-        onDelete={props.onDelete}
-        onUngroup={(task.subtasks?.length ?? 0) > 0 ? props.onUngroup : undefined}
-        onDeleteGroup={(task.subtasks?.length ?? 0) > 0 ? props.onDeleteGroup : undefined}
-        onAssist={props.onAssistMutate ? () => setAssistOpen(true) : undefined}
-      />
-      <PanelAssistant taskId={task.id} />
-      <PanelClassify
-        context={task.context}
-        onContextChange={props.onContextChange}
-        scope={task.scope}
-        onScopeChange={props.onScopeChange}
-        members={props.familyMembers}
-        selectedAssigneeIds={task.assignedToAll ?? (task.assignedTo ? [task.assignedTo] : [])}
-        onAssigneesChange={props.onAssigneesChange}
-      />
-      {show('phone') && (
-        <PanelReach
-          kind="phone"
-          value={task.phoneNumber}
-          onChange={props.onPhoneChange}
-          autoFocus={revealed.has('phone')}
-          asLink={false}
-        />
-      )}
-      {show('email') && (
-        <PanelReach
-          kind="email"
-          value={task.email}
-          onChange={props.onEmailChange}
-          autoFocus={revealed.has('email')}
-        />
-      )}
-      {show('location') && <PanelLocation
-        location={task.location}
-        locationPlaceId={task.locationPlaceId}
-        title={task.title}
-        showDirections={showDirections}
-        onUpdateLocation={props.onUpdateLocation}
-        onClearLocation={props.onClearLocation}
-        directions={task.directions}
-        onDirectionsChange={props.onDirectionsChange}
-      />}
-      {show('notes') && <PanelNotes key={task.id} label="Notes" notes={task.notes} onChange={props.onNotesChange} onSaveToVault={props.onSaveNoteToVault} />}
-      <PanelPhotos
-        hideWhenEmpty={!revealed.has('photo')}
-        onContentChange={setPhotosHaveContent}
-        entityType="task"
-        entityId={task.id}
-        dropZoneRef={panelRef}
-        entityContext={[task.title, task.notes?.split('\n')[0]].filter(Boolean).join(' — ')}
-        promotions={{
-          onAddPrepTask: props.onAddSubtask,
-          onAddLink: props.onAddLink,
-          onUseLocation: (address) => props.onUpdateLocation(address),
-        }}
-      />
-      <PanelConversations taskId={task.id} />
-      {show('subtask') && <PanelSubtasks
-        subtasks={task.subtasks ?? []}
-        onToggleSubtask={props.onToggleSubtask}
-        onAddSubtask={props.onAddSubtask}
-        onOpenSubtask={props.onOpenTask}
-        onRemoveSubtask={props.onRemoveSubtask}
-        onRescheduleSubtask={props.onRescheduleSubtask}
-        onScheduleSubtask={props.onScheduleSubtask}
-      />}
-      {show('person') && <PanelPeople
-        contact={linked.contact}
-        onOpenContact={props.onOpenContact}
-        contacts={props.contacts}
-        onContactChange={props.onContactChange}
-        onSearchContacts={props.onSearchContacts}
-        onAddContact={props.onAddContact}
-      />}
-      <PanelLinked
-        project={linked.project}
-        linkedEvent={linked.linkedEvent}
-        siblingTasks={linked.siblingTasks}
-        onOpenProject={props.onOpenProject}
-        onOpenEvent={props.onOpenEvent}
-        onOpenTask={props.onOpenTask}
-      />
-      {show('link') && <PanelLinks
-        links={task.links}
-        onAddLink={props.onAddLink}
-      />}
-      <PanelMightBeRelevant items={mightBeRelevant} onOpen={props.onOpenRelated} />
-      <PanelAddRow fields={addable} onReveal={reveal} />
-      <PanelFooter
-        createdAt={task.createdAt}
-        updatedAt={task.updatedAt}
-        createdByName={createdByName}
-      />
       {assistOpen && (
         <AssistDrawer
           item={{
@@ -289,6 +378,6 @@ export function TapContextPanel(props: TapContextPanelProps) {
           onMutate={props.onAssistMutate}
         />
       )}
-    </article>
+    </PanelShell>
   )
 }

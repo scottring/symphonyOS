@@ -8,6 +8,8 @@
 import { useState } from 'react'
 import { Sun, Moon, Sunrise, CalendarDays, CalendarRange, Calendar, CalendarClock, Hourglass, CalendarPlus, ChevronLeft } from 'lucide-react'
 import type { TriageWhen } from './TriageWhenMenu'
+import type { DayLoad } from '@/lib/today/dayLoad'
+import { DayLoadBar } from './DayLoadBar'
 import { SpecificDatePicker } from './SpecificDatePicker'
 import { getBaseDate, getNextWeekend, getWeekendAfterNext, getNextMonday, TIME_PRESETS } from '@/lib/dateHelpers'
 
@@ -47,9 +49,28 @@ interface Props {
   onPick: (when: TriageWhen) => void
   /** When provided, adds a "Pick date…" tile for a specific date/time. */
   onPickDate?: (date: Date, isAllDay: boolean) => void
+  /**
+   * How full each dated tile's day already is, keyed by `loadKeyFor(when)`.
+   * Omit for a plain grid — every existing caller renders exactly as before.
+   */
+  loads?: Map<string, DayLoad>
+  /** Tapping a tile's bar opens the day peek instead of scheduling. */
+  onPeek?: (date: Date, when: TriageWhen) => void
 }
 
-export function RescheduleGrid({ onPick, onPickDate }: Props) {
+/**
+ * Key a `when` into the loads map. `tonight` is scoped to the evening band, so
+ * it gets its own key rather than colliding with `today`'s full-day load.
+ */
+export function loadKeyFor(when: TriageWhen): string {
+  const dateFn = when === 'today' || when === 'tonight' ? () => getBaseDate(0) : WHEN_DATE[when]
+  if (!dateFn) return `pool:${when}`
+  const d = dateFn()
+  const ymd = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+  return when === 'tonight' ? `${ymd}|evening` : ymd
+}
+
+export function RescheduleGrid({ onPick, onPickDate, loads, onPeek }: Props) {
   const [picking, setPicking] = useState(false)
   const [pickingToday, setPickingToday] = useState(false)
 
@@ -119,26 +140,35 @@ export function RescheduleGrid({ onPick, onPickDate }: Props) {
       {WHENS.map(({ when, label, Icon }) => {
         const dateFn = WHEN_DATE[when]
         const sub = dateFn ? tileDate(dateFn()) : null
+        // Pool whens (this-week / this-month / someday) have no day to measure,
+        // so they carry no bar. `loads` is keyed by the caller.
+        const load = loads?.get(loadKeyFor(when))
         return (
-          <button
-            key={when}
-            type="button"
-            role="menuitem"
-            onClick={(e) => {
-              e.stopPropagation()
-              // Today opens the time step when the host can take a specific time;
-              // otherwise it stays an instant all-day pick.
-              if (when === 'today' && onPickDate) setPickingToday(true)
-              else onPick(when)
-            }}
-            className={tileClass}
-          >
-            <Icon className="w-4 h-4 shrink-0" />
-            <span className="flex flex-col leading-tight min-w-0">
-              <span>{label}</span>
-              {sub && <span className="text-[11px] font-normal text-neutral-400">{sub}</span>}
-            </span>
-          </button>
+          <div key={when} data-tile className="flex flex-col">
+            <button
+              type="button"
+              role="menuitem"
+              onClick={(e) => {
+                e.stopPropagation()
+                // Today opens the time step when the host can take a specific
+                // time; otherwise it stays an instant all-day pick.
+                if (when === 'today' && onPickDate) setPickingToday(true)
+                else onPick(when)
+              }}
+              className={tileClass}
+            >
+              <Icon className="w-4 h-4 shrink-0" />
+              <span className="flex flex-col leading-tight min-w-0">
+                <span>{label}</span>
+                {sub && <span className="text-[11px] font-normal text-neutral-400">{sub}</span>}
+              </span>
+            </button>
+            {load && (
+              <div className="px-2.5">
+                <DayLoadBar load={load} onPeek={onPeek ? () => onPeek(load.date, when) : undefined} />
+              </div>
+            )}
+          </div>
         )
       })}
       {onPickDate && (

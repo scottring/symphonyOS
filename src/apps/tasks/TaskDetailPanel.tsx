@@ -155,6 +155,9 @@ function TaskPanelBody({ id }: { id: string }) {
   const { events } = useGoogleCalendar();
   const { members: familyMembers } = useFamilyMembers();
   const pinnedItems = usePinnedItems();
+  // Feeds the scheduler's day-fullness readout. Cheap: useRoutines is a plain
+  // fetch with no realtime channel of its own.
+  const { routines } = useRoutines();
 
   // Meal-plan entries synthesized as CalendarEvent objects, for linked-event
   // resolution (mirrors the legacy `eventsWithMeals`).
@@ -179,6 +182,7 @@ function TaskPanelBody({ id }: { id: string }) {
       familyMembers={familyMembers}
       siblingTaskCandidates={tasks}
       allTasks={tasks}
+      routines={routines}
       whyChain={
         <WhyChain
           task={task}
@@ -410,6 +414,8 @@ function EventPanelBody({ id }: { id: string }) {
   const { events, updateEvent, moveEvent, fetchEvents, fetchCalendarList, isFetching, isLoading } = useGoogleCalendar();
   const { getNote, updateNote, fetchNote, addEventLink } = useEventNotes();
   const { tasks, addPrepTask } = useSupabaseTasks();
+  // Feeds the scheduler's day-fullness readout (see the task branch).
+  const { routines } = useRoutines();
   const {
     isFlagged,
     getFlag,
@@ -512,6 +518,7 @@ function EventPanelBody({ id }: { id: string }) {
       event={event}
       notes={getNote(eventId)?.notes ?? undefined}
       allTasks={tasks}
+      routines={routines}
       completed={completed}
       onToggleComplete={handleToggleComplete}
       calendarAccess={calendarAccess}
