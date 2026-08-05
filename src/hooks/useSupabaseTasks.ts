@@ -6,7 +6,7 @@ import { showToast } from './useToast'
 import { logger } from '@/lib/logger'
 import type { Task, TaskBucket, TaskLink, TaskContext, TaskCategory, TaskCaptureMeta, LinkedActivity, LinkType, LinkedActivityType, GroupMemberRef } from '@/types/task'
 import type { TaskDirections } from '@/types/directions'
-import { defaultScopeForArea, type Scope } from '@/lib/scope'
+import { defaultScopeForArea, scopeForContextChange, type Scope } from '@/lib/scope'
 import { localYmd, parseLocalYmd, weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
 import { weekStartForBucket } from '@/lib/today/weekPlacement'
 // `import type` on purpose: erased at compile time, so it does NOT drag
@@ -1107,10 +1107,17 @@ export function useSupabaseTasks() {
     if ('isAllDay' in updates) dbUpdates.is_all_day = updates.isAllDay ?? null
     if ('isSomeday' in updates) dbUpdates.is_someday = updates.isSomeday ?? false
     if ('context' in updates) dbUpdates.context = updates.context ?? null
-    // Scope follows area unless explicitly set (default-coupling): setting context
-    // to 'family' shares the item with the household (compound). Never auto-unshare.
+    // Scope follows area unless explicitly set (default-coupling). This used to
+    // run one way only — family made a row compound and nothing ever walked it
+    // back — which leaked: re-tagging a shared household task as `personal`
+    // left scope='compound', so a partner kept read access to items every
+    // surface now called private. scopeForContextChange applies both halves and
+    // leaves a deliberately-chosen scope (e.g. `couple`) alone.
     if ('scope' in updates) dbUpdates.scope = updates.scope ?? 'individual'
-    else if ('context' in updates && updates.context === 'family') dbUpdates.scope = 'compound'
+    else if ('context' in updates) {
+      const nextScope = scopeForContextChange(task.context, updates.context, task.scope)
+      if (nextScope) dbUpdates.scope = nextScope
+    }
     if ('category' in updates) dbUpdates.category = updates.category ?? 'task'
     if ('notes' in updates) dbUpdates.notes = updates.notes ?? null
     if ('links' in updates) dbUpdates.links = updates.links ?? null
@@ -1253,8 +1260,9 @@ export function useSupabaseTasks() {
     if ('isAllDay' in updates) dbUpdates.is_all_day = updates.isAllDay ?? null
     if ('isSomeday' in updates) dbUpdates.is_someday = updates.isSomeday ?? false
     if ('context' in updates) dbUpdates.context = updates.context ?? null
-    // Scope follows area unless explicitly set (default-coupling): setting context
-    // to 'family' shares the item with the household (compound). Never auto-unshare.
+    // Scope follows area unless explicitly set (default-coupling). Bulk writes
+    // one payload for many rows, so the per-row unshare (see updateTask) can't
+    // be expressed here — a second, narrower update below handles it.
     if ('scope' in updates) dbUpdates.scope = updates.scope ?? 'individual'
     else if ('context' in updates && updates.context === 'family') dbUpdates.scope = 'compound'
     if ('category' in updates) dbUpdates.category = updates.category ?? 'task'
@@ -1311,6 +1319,28 @@ export function useSupabaseTasks() {
       setError(updateError.message)
       showToast('Failed to update tasks', 'error', 4000)
       throw updateError
+    }
+
+    // The unshare half of the coupling, which one bulk payload can't express:
+    // only the rows that were family+compound lose the share, and only when
+    // the new area is a private one. Bulk-tagging a mixed selection `personal`
+    // otherwise leaves the previously-family rows readable by the household.
+    if (!('scope' in updates) && 'context' in updates && updates.context !== 'family') {
+      const toUnshare = tasksToUpdate
+        .filter((t) => scopeForContextChange(t.context, updates.context, t.scope) === 'individual')
+        .map((t) => t.id)
+      if (toUnshare.length > 0) {
+        const { error: unshareError } = await supabase
+          .from('tasks')
+          .update({ scope: 'individual' })
+          .in('id', toUnshare)
+        if (unshareError) {
+          // The area change already landed; report rather than roll back, so a
+          // still-shared row is visible instead of silent.
+          console.error('[updateTasksBulk] unshare failed:', unshareError.message)
+          showToast('Updated, but some items may still be shared', 'error', 4000)
+        }
+      }
     }
 
     for (const t of tasksToUpdate) {

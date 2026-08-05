@@ -20,3 +20,37 @@ export type Scope = 'individual' | 'couple' | 'compound'
 export function defaultScopeForArea(area: TaskContext | null | undefined): Scope {
   return area === 'family' ? 'compound' : 'individual'
 }
+
+/**
+ * Scope to write when an item's life-area CHANGES and the caller didn't set a
+ * scope explicitly. Returns null to leave the existing scope alone.
+ *
+ * The coupling used to run one way only — family made a row compound, and
+ * nothing ever walked it back ("never auto-unshare"). That produced the leak
+ * this function exists to stop: re-tagging a shared household task as
+ * `personal` left `scope='compound'`, so a partner kept read access to
+ * medical and job-search items that every surface now called private. Three of
+ * Scott's open tasks were in exactly that state on 2026-08-05.
+ *
+ * It walks scope back only when the row still carries the compound scope that
+ * the family tag itself applied. A scope the user chose deliberately —
+ * `couple` on a personal item, the case scope.ts calls out as legitimate — is
+ * never touched, because moving to a private area should not silently undo an
+ * explicit share.
+ */
+export function scopeForContextChange(
+  previousArea: TaskContext | null | undefined,
+  nextArea: TaskContext | null | undefined,
+  currentScope: Scope | null | undefined,
+): Scope | null {
+  if (previousArea === nextArea) return null
+
+  // Into family: share with the household. This half always applied.
+  if (nextArea === 'family') return 'compound'
+
+  // Out of family, into a private area, still carrying the scope the family
+  // tag gave it — take the share back.
+  if (previousArea === 'family' && currentScope === 'compound') return 'individual'
+
+  return null
+}
