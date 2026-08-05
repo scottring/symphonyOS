@@ -9,12 +9,58 @@ use tauri_plugin_global_shortcut::ShortcutState;
 
 const APP_URL: &str = "https://app.symphony-os.com";
 
+// Schemes macOS owns and WKWebView silently drops. Kept in sync with the
+// SYSTEM_SCHEMES list inside EXTERNAL_LINKS_JS below.
+const SYSTEM_SCHEMES: [&str; 4] = ["tel", "mailto", "sms", "facetime"];
+
+/// Hand a URL to macOS. The allowlist is the security boundary: the page can
+/// ask for these and nothing else (no file://, no arbitrary app schemes).
+fn open_externally(url: &str) {
+    let allowed = ["https://", "http://", "tel:", "mailto:", "sms:", "facetime:"];
+    if allowed.iter().any(|p| url.starts_with(p)) {
+        let _ = std::process::Command::new("open").arg(url).spawn();
+    }
+}
+
+/// Catch `tel:`/`sms:`/`mailto:`/`facetime:` **navigations** and hand them to
+/// macOS.
+///
+/// EXTERNAL_LINKS_JS already intercepts anchor *clicks*, but a click is only
+/// one of the ways the app reaches a phone: it also does
+/// `window.location.href = 'tel:…'` (ContactCard, DetailPanelRedesign) and
+/// `window.open('tel:…', '_self')` (TodayView, DailyBriefing,
+/// ProactiveSuggestionChips). Neither is a click, so neither was intercepted —
+/// WKWebView accepted the navigation and then did nothing with it, and every
+/// call/text/email action in those surfaces was dead in the Mac app while
+/// working in any browser.
+///
+/// A navigation policy hook is the one place ALL of them converge — anchors,
+/// `location.href`, `window.open(…, '_self')`, form submits, and anything added
+/// later. Returning false cancels the doomed navigation.
+fn system_scheme_plugin<R: tauri::Runtime>() -> tauri::plugin::TauriPlugin<R> {
+    tauri::plugin::Builder::new("symphony-system-schemes")
+        .on_navigation(|_webview, url| {
+            if SYSTEM_SCHEMES.contains(&url.scheme()) {
+                open_externally(url.as_str());
+                return false;
+            }
+            true
+        })
+        .build()
+}
+
 // WKWebView silently drops target="_blank" clicks and window.open() calls —
 // there is no popup handler in this shell, so external links did nothing.
 // This script (injected on every page load) forwards external http(s) URLs to
 // Rust over the event bridge the page is already permitted to use
 // (capabilities/remote.json → core:event:default); Rust hands them to the
 // system browser via `open`.
+//
+// Division of labour with system_scheme_plugin above: that hook owns every
+// tel:/sms:/mailto: *navigation*, which is the durable catch-all. This script
+// owns the two things a navigation hook cannot see — popup requests
+// (`window.open`, including `target="_blank"`) and http(s) links that should
+// leave the app rather than replace it.
 const EXTERNAL_LINKS_JS: &str = r#"
 (function () {
   if (window.__symphonyExternalLinks) return;
@@ -32,12 +78,15 @@ const EXTERNAL_LINKS_JS: &str = r#"
     }
   };
   var SYSTEM_SCHEMES = ['tel:', 'mailto:', 'sms:', 'facetime:'];
+  var systemScheme = function (raw) {
+    var s = String(raw || '').toLowerCase();
+    return SYSTEM_SCHEMES.some(function (p) { return s.indexOf(p) === 0; });
+  };
   document.addEventListener('click', function (e) {
     var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
     if (!a) return;
     var href = a.href || '';
-    var scheme = SYSTEM_SCHEMES.find(function (s) { return href.toLowerCase().indexOf(s) === 0; });
-    if (scheme) {
+    if (systemScheme(href)) {
       // WKWebView ignores tel:/mailto:/… navigations — hand them to macOS.
       e.preventDefault();
       e.stopPropagation();
@@ -53,6 +102,10 @@ const EXTERNAL_LINKS_JS: &str = r#"
   }, true);
   var originalOpen = window.open ? window.open.bind(window) : null;
   window.open = function (raw) {
+    // window.open('mailto:…', '_blank') asks for a popup, and a popup request
+    // is NOT a navigation — the Rust navigation hook never sees it. Catch it
+    // here. ('_self' variants do navigate, so they are caught either way.)
+    if (raw && systemScheme(raw)) { send(String(raw)); return null; }
     var url = raw ? external(String(raw)) : null;
     if (url) { send(url); return null; }
     return originalOpen ? originalOpen.apply(null, arguments) : null;
@@ -287,6 +340,7 @@ fn handle_menu_event(app: &AppHandle, id: &str) {
 
 pub fn run() {
     tauri::Builder::default()
+        .plugin(system_scheme_plugin())
         .plugin(
             tauri_plugin_global_shortcut::Builder::new()
                 .with_shortcuts(["cmd+shift+space"])
@@ -325,10 +379,7 @@ pub fn run() {
             // External links forwarded by EXTERNAL_LINKS_JS → system browser.
             app.listen_any("shell:open-external", move |event| {
                 if let Ok(url) = serde_json::from_str::<String>(event.payload()) {
-                    let allowed = ["https://", "http://", "tel:", "mailto:", "sms:", "facetime:"];
-                    if allowed.iter().any(|p| url.starts_with(p)) {
-                        let _ = std::process::Command::new("open").arg(&url).spawn();
-                    }
+                    open_externally(&url);
                 }
             });
             Ok(())
