@@ -657,6 +657,50 @@ describe('PlanningSession', () => {
       initialDate: day, initialDays: 7, placementGrain: 'day' as const,
     }
 
+    // An event on a calendar we can write to is movable between days; one on a
+    // reader-role share is not, because Google 403s that write. A grip that
+    // always fails is worse than no grip — so the affordance itself is gated,
+    // not just the outcome.
+    describe('event drag affordance', () => {
+      const meeting = {
+        id: 'ev1',
+        title: 'PT appointment',
+        start_time: new Date(2026, 6, 20, 14, 30).toISOString(),
+        end_time: new Date(2026, 6, 20, 15, 30).toISOString(),
+      } as CalendarEvent
+
+      function eventColumn(container: HTMLElement) {
+        const column = container.querySelector(`[data-testid="day-column-${formatDateKey(day)}"]`)!
+        return column.querySelector('[data-testid="event-day-chip"]')
+      }
+
+      it('renders a writable event as draggable', () => {
+        const { container } = render(
+          <PlanningSession {...dayProps} events={[meeting]} canMoveEvent={() => true} />,
+        )
+        const chip = eventColumn(container)
+        expect(chip).toBeTruthy()
+        expect(chip!.getAttribute('aria-roledescription')).toBe('draggable')
+      })
+
+      it('renders a view-only event as static, and says why on hover', () => {
+        const { container } = render(
+          <PlanningSession {...dayProps} events={[meeting]} canMoveEvent={() => false} />,
+        )
+        const chip = eventColumn(container)
+        expect(chip).toBeTruthy()
+        expect(chip!.getAttribute('aria-roledescription')).toBeNull()
+        expect(chip!.getAttribute('title')).toMatch(/view-only/)
+      })
+
+      // Callers that never wire canMoveEvent (the wizard drawer, older mounts)
+      // must not suddenly sprout event drags they have no handler for.
+      it('offers no drag when the caller does not supply canMoveEvent', () => {
+        const { container } = render(<PlanningSession {...dayProps} events={[meeting]} />)
+        expect(eventColumn(container)!.getAttribute('aria-roledescription')).toBeNull()
+      })
+    })
+
     // The drawing follows the decision: a rung that places into a DAY does not
     // draw hours. There is no clicked hour left to discard.
     it('draws no hour axis', () => {

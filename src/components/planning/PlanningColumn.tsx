@@ -7,7 +7,7 @@ import type { Routine } from '@/types/actionable'
 import type { FamilyMember } from '@/types/family'
 import { PlanningTimeSlot } from './PlanningTimeSlot'
 import { PlanningTaskCard } from './PlanningTaskCard'
-import { PlanningEventBlock } from './PlanningEventBlock'
+import { PlanningEventBlock, PLACED_EVENT_DRAG_PREFIX } from './PlanningEventBlock'
 import { PlanningRoutineBlock } from './PlanningRoutineBlock'
 import { layoutLanes, type Lane } from './overlapLanes'
 import { resolveRoutineTime } from '@/lib/today/routineTime'
@@ -61,6 +61,11 @@ interface PlanningColumnProps {
   /** Incomplete, isAllDay tasks scheduled on this exact day — rendered as
    *  fixed-height chips in the all-day lane, never in the hour grid below. */
   allDayTasks?: Task[]
+  /** Whether this event's calendar accepts writes. Day-grain columns only
+   *  offer a drag when it returns true — Google 403s writes to a reader-role
+   *  share. Omitted = nothing is draggable, which is the safe default for
+   *  callers that don't know the calendar roles. */
+  canMoveEvent?: (event: CalendarEvent) => boolean
   /** All-day lane height, uniform across the grid (the busiest day sets it).
    *  Defaults to the one-row height for callers that don't compute it. */
   laneHeight?: number
@@ -88,6 +93,7 @@ export function PlanningColumn({
   routines,
   routineInstances,
   allDayTasks = [],
+  canMoveEvent,
   laneHeight = ALL_DAY_LANE_HEIGHT,
   familyMembers,
   eventNotesMap,
@@ -315,13 +321,11 @@ export function PlanningColumn({
             <AllDayChip key={task.id} task={task} onClick={() => setRaisedId(task.id)} />
           ))}
           {placedEvents.map(({ event }) => (
-            <div
+            <EventDayChip
               key={event.id}
-              className="truncate rounded bg-neutral-100 px-1.5 py-1 text-[10.5px] text-neutral-600"
-              title={event.title}
-            >
-              {event.title}
-            </div>
+              event={event}
+              movable={canMoveEvent ? canMoveEvent(event) : false}
+            />
           ))}
           {placedRoutines.map(({ routine }) => (
             <div
@@ -510,6 +514,47 @@ function AllDayLaneCell({ dateKey, tasks, onChipClick, laneHeight, fluid = false
 interface AllDayChipProps {
   task: Task
   onClick: () => void
+}
+
+// A calendar event in a day-grain column. Draggable ONLY when Symphony can
+// actually write to its calendar: Google 403s writes to a `reader`-role share
+// (Scott's work calendar was exactly that — see gcal read-only history), and a
+// grip that always fails is worse than no grip. A view-only event keeps the
+// old flat look and says why on hover.
+//
+// `event-<id>` drag id, matching PlanningEventBlock, so the existing
+// PLACED_EVENT branch in handleDragEnd picks it up.
+function EventDayChip({ event, movable }: { event: CalendarEvent; movable: boolean }) {
+  // Hooks can't be conditional; dnd-kit's own `disabled` is the supported way
+  // to render a non-draggable instance.
+  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    id: `${PLACED_EVENT_DRAG_PREFIX}${event.id}`,
+    disabled: !movable,
+  })
+
+  if (isDragging) {
+    return <div ref={setNodeRef} className="h-5 w-full rounded bg-neutral-100 border border-dashed border-neutral-300 opacity-50" />
+  }
+
+  const style = transform
+    ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: 100 }
+    : undefined
+
+  return (
+    <div
+      ref={movable ? setNodeRef : undefined}
+      data-testid="event-day-chip"
+      style={style}
+      {...(movable ? attributes : {})}
+      {...(movable ? listeners : {})}
+      title={movable ? event.title : `${event.title} — this calendar is shared with you view-only, so it can't be moved here`}
+      className={`truncate rounded bg-neutral-100 px-1.5 py-1 text-[10.5px] text-neutral-600 ${
+        movable ? 'cursor-grab active:cursor-grabbing touch-none' : ''
+      }`}
+    >
+      {event.title}
+    </div>
+  )
 }
 
 // Compact, truncating, draggable chip for a lane task. Bare `task.id` as the

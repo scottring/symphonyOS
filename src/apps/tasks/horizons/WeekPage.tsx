@@ -5,7 +5,7 @@
 // listed again elsewhere on the page (no carry-over section, no placed
 // section, no project-grouped lists — those all collapsed into the shelf).
 
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { PAGE_COLUMN } from '@/components/layout/pageLayout';
 import { PlanningSession } from '@/components/planning/PlanningSession';
@@ -18,6 +18,8 @@ import { useTendWeek } from '@/hooks/useTendWeek';
 import { applyProposal } from '@/lib/tend/applyProposal';
 import type { TendProposal } from '@/lib/tend/types';
 import type { Task } from '@/types/task';
+import { useGoogleCalendar, type GoogleCalendarInfo } from '@/hooks/useGoogleCalendar';
+import { makeCanMoveEvent } from '@/lib/planning/calendarWriteAccess';
 import { CascadeRail, useHorizonPageData } from './shared';
 
 // `?start=YYYY-MM-DD` parsed from LOCAL date parts — never Date.parse/UTC,
@@ -103,6 +105,30 @@ export function WeekPage() {
     for (const t of carryOver) byId.set(t.id, t);
     return [...byId.values()];
   }, [weekGridTasks, carryOver]);
+
+  // Moving an event to another day is a real weekly-planning gesture, but only
+  // where Google will accept the write — a reader-role share 403s. Load the
+  // calendar roles once and let the grid ask per event.
+  const { fetchCalendarList, updateEvent } = useGoogleCalendar();
+  const [calendars, setCalendars] = useState<GoogleCalendarInfo[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    fetchCalendarList().then((cals) => { if (!cancelled) setCalendars(cals); });
+    return () => { cancelled = true; };
+  }, [fetchCalendarList]);
+  const canMoveEvent = useMemo(() => makeCanMoveEvent(calendars), [calendars]);
+
+  const rescheduleEvent = useCallback(
+    (event: Parameters<typeof canMoveEvent>[0], startTime: Date, endTime: Date) => {
+      void updateEvent({
+        eventId: event.google_event_id || event.id,
+        startTime,
+        endTime,
+        calendarId: event.calendar_id || event.calendarId,
+      });
+    },
+    [updateEvent],
+  );
 
   const busy = useMemo(() => domainEvents
     .map((e) => ({
@@ -259,6 +285,8 @@ export function WeekPage() {
             // The week rung answers "which day" and stops there. A drop lands
             // all-day on the day it was dropped in; the time is Today's call.
             placementGrain="day"
+            onRescheduleEvent={rescheduleEvent}
+            canMoveEvent={canMoveEvent}
           />
         </div>
       </div>

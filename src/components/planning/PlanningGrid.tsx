@@ -11,6 +11,9 @@ interface PlanningGridProps {
   dateRange: Date[]
   scheduledTasksByDate: Map<string, Task[]>
   eventsByDate: Map<string, CalendarEvent[]>
+  /** Passed straight to each column: does this event's calendar accept writes?
+   *  Gates the day-grain drag affordance. */
+  canMoveEvent?: (event: CalendarEvent) => boolean
   routinesByDate: Map<string, Routine[]>
   /** routine id → this date's instance, per date key. Carries drop-time overrides. */
   routineInstancesByDate?: Map<string, Map<string, ActionableInstance>>
@@ -36,6 +39,7 @@ export function PlanningGrid({
   dateRange,
   scheduledTasksByDate,
   eventsByDate,
+  canMoveEvent,
   routinesByDate,
   routineInstancesByDate,
   allDayTasksByDate,
@@ -142,6 +146,7 @@ export function PlanningGrid({
               routines={routines}
               routineInstances={routineInstancesByDate?.get(dateKey)}
               allDayTasks={allDayTasks}
+              canMoveEvent={canMoveEvent}
               laneHeight={laneHeight}
               familyMembers={familyMembers}
               eventNotesMap={eventNotesMap}

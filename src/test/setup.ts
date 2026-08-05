@@ -75,7 +75,9 @@ vi.mock('@/hooks/useGoogleCalendar', () => ({
     deleteEvent: vi.fn(),
     removeEventLocal: vi.fn(),
     restoreEventLocal: vi.fn(),
-    fetchCalendarList: vi.fn(),
+    // Returns Promise<GoogleCalendarInfo[]> for real; a bare vi.fn() hands back
+    // undefined and every caller that awaits it throws on `.then`.
+    fetchCalendarList: vi.fn().mockResolvedValue([]),
     defaultCalendarId: null,
     setDefaultCalendarId: vi.fn(),
   }),

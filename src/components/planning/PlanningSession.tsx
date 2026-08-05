@@ -27,7 +27,7 @@ import { PlanningTaskCard } from './PlanningTaskCard'
 import { PlanningRoutineDragCard, ROUTINE_DRAG_PREFIX } from './PlanningRoutineDragCard'
 import { PlanningEventBlock, PLACED_EVENT_DRAG_PREFIX } from './PlanningEventBlock'
 import { PlanningRoutineBlock, PLACED_ROUTINE_DRAG_PREFIX } from './PlanningRoutineBlock'
-import { computeEventReschedule } from './planningReschedule'
+import { computeEventReschedule, parseAllDayDropForEvent } from './planningReschedule'
 import { PlanningSlotQuickCreate } from './PlanningSlotQuickCreate'
 import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
 import { belongsToWeek, isStaleWeekPlacement } from '@/lib/today/weekPlacement'
@@ -62,6 +62,11 @@ interface PlanningSessionProps {
   onScheduleRoutineToday?: (routineId: string, when: Date) => void
   /** Reschedule a placed calendar event to a new start/end (preserves duration). */
   onRescheduleEvent?: (event: CalendarEvent, startTime: Date, endTime: Date) => void
+  /** Does this event's calendar accept writes? Gates the day-grain drag
+   *  affordance — Google 403s writes to a reader-role share, so an event we
+   *  can't move must not look movable. Omitted = no event is draggable at day
+   *  grain, the safe default for callers that don't know the roles. */
+  canMoveEvent?: (event: CalendarEvent) => boolean
   familyMembers?: FamilyMember[]
   eventNotesMap?: Map<string, EventNote>
   onUpdateTask: (id: string, updates: Partial<Task>) => void
@@ -121,6 +126,7 @@ export function PlanningSession({
   onScheduleRoutine,
   onScheduleRoutineToday,
   onRescheduleEvent,
+  canMoveEvent,
   familyMembers = [],
   eventNotesMap,
   onUpdateTask,
@@ -630,13 +636,30 @@ export function PlanningSession({
       }
 
       // Placed event reschedule (id `event-<id>`): rewrite the calendar event's
-      // start/end, preserving its duration. Only meaningful on a slot drop.
+      // start/end, preserving its duration.
+      //
+      // Two drop shapes, because the two grains ask different questions. A
+      // `slot-` drop (time grain) sets the clock time. An `allday-` drop (day
+      // grain, /week) moves the event to another DAY and keeps the time it
+      // already had — the week rung's question is which day, and inventing
+      // 00:00 from a lane with no hours would silently reschedule a 2pm
+      // meeting to midnight.
       if (activeId.startsWith(PLACED_EVENT_DRAG_PREFIX)) {
-        if (!dropTarget.startsWith('slot-')) return
-        const parsed = parseSlotId(dropTarget)
-        if (!parsed) return
         const ev = events.find((e) => e.id === activeId.slice(PLACED_EVENT_DRAG_PREFIX.length))
         if (!ev) return
+        const parsed = dropTarget.startsWith('slot-')
+          ? parseSlotId(dropTarget)
+          : parseAllDayDropForEvent(dropTarget, ev)
+        if (!parsed) return
+        if (minDropDate) {
+          const dropDay = new Date(parsed.year, parsed.month, parsed.day)
+          const minDay = new Date(minDropDate)
+          minDay.setHours(0, 0, 0, 0)
+          if (dropDay.getTime() < minDay.getTime()) {
+            setDropNotice('That day is already behind you — pick a day ahead.')
+            return
+          }
+        }
         const { startTime, endTime } = computeEventReschedule(ev, parsed)
         onRescheduleEvent?.(ev, startTime, endTime)
         return
@@ -797,6 +820,7 @@ export function PlanningSession({
                 onOpenDay={onOpenDay}
                 onSlotClick={onCreateTaskAt ? handleSlotClick : undefined}
                 dayGrain={dayGrain}
+                canMoveEvent={canMoveEvent}
               />
             </div>
           ) : (
@@ -815,6 +839,7 @@ export function PlanningSession({
               onOpenDay={onOpenDay}
               onSlotClick={onCreateTaskAt ? handleSlotClick : undefined}
               dayGrain={dayGrain}
+              canMoveEvent={canMoveEvent}
             />
           )}
 
