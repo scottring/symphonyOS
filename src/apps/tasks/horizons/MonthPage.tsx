@@ -220,9 +220,11 @@ export function MonthPage() {
   // "doesn't have goals yet", shared.tsx's "don't start stay").
   const shelfPoolLabel = `${viewedDate.toLocaleDateString('en-US', { month: 'long' })}'s moves`;
 
-  // Roll-up: steps of the same move read as ONE line (the season pick they
-  // serve, or their project once three-plus pile up). Keeps the month legible
-  // as a plan rather than a chore list — see monthGroups.
+  // Roll-up: steps of the same move read as ONE boxed block (the season pick
+  // they serve, or their project once three-plus pile up), every member
+  // always visible — not a collapsed line, since the shelf renders in board
+  // layout here. Keeps the month legible as a plan rather than a chore list
+  // — see monthGroups.
   const shelfGroups = useMemo(
     () => monthShelfGroups(pool, domainTasks, projectsMap),
     [pool, domainTasks, projectsMap],
@@ -309,7 +311,14 @@ export function MonthPage() {
               onPushTask={pushTask}
               onCompleteTask={toggleTask}
               fileUnder={fileUnder}
-              onNativeUnschedule={(id) => updateTask(id, { bucket: 'month', scheduledFor: undefined })}
+              // weekStart is cleared here too, same as the grid's
+              // onUnscheduleTask below — otherwise a week-placed move sent
+              // back to the shelf returns to "unplaced" still secretly
+              // carrying a week (see the note on onUnscheduleTask). The
+              // board makes this shelf path the LIVE one on /month, not the
+              // rail (hideRail'd below), so this was the primary path, not
+              // a corner case.
+              onNativeUnschedule={(id) => updateTask(id, { bucket: 'month', scheduledFor: undefined, weekStart: undefined })}
               draft={draft}
               onDraftChange={setDraft}
               onSubmitDraft={() => void submitDraft()}

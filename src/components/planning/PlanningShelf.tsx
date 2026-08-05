@@ -84,10 +84,15 @@ export interface PlanningShelfProps {
    *  reframes this as its own curated list (e.g. "July's moves") rather than
    *  a placement queue; week keeps the default. */
   poolLabel?: string
-  /** Optional roll-up: render these sets as ONE collapsed line each (label +
-   *  count) instead of N loose pills, so a month of five backyard steps reads
-   *  as the single move it is. Members expand on tap. Tasks in no group render
-   *  as ordinary pills after the groups. Omit for the flat shelf (week page). */
+  /** Optional roll-up so a month of five backyard steps reads as the single
+   *  move it is, not five loose chores. Rendering differs by `layout`: in
+   *  'flow' (week), each group is ONE collapsed pill-shaped line (label +
+   *  count) that expands its members on tap, and tasks in no group render as
+   *  ordinary pills after the groups. In 'board' (month), every group is
+   *  always-expanded — a boxed block showing all its members — and tasks in
+   *  no group land in the Unfiled block alongside any caller-supplied
+   *  `kind: 'unfiled'` group (see `boardBlocks`); there is no tap-to-expand
+   *  and no loose-pill tail. Omit for the flat shelf (no grouping at all). */
   groups?: ShelfGroup[]
   /** 'board' renders each group as a boxed block in a CSS multi-column, with
    *  every member always visible and a draggable cluster header. Used by
@@ -123,8 +128,13 @@ interface ShelfPillProps {
   fileUnder?: PlanningShelfProps['fileUnder']
 }
 
+// max-w-full caps the pill at whatever box contains it — load-bearing in
+// board mode, where the box is a ~300px multicol column, not the full-width
+// flow lane /week uses. A CSS multicol container never shrinks or clips an
+// overflowing child, so without this a long title's pill spills across the
+// column boundary into its neighbour.
 function pillClassName(carried: boolean) {
-  return `group relative inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm touch-none cursor-grab active:cursor-grabbing transition-shadow hover:shadow-sm ${
+  return `group relative inline-flex items-center gap-1.5 max-w-full rounded-full border px-3 py-1.5 text-sm touch-none cursor-grab active:cursor-grabbing transition-shadow hover:shadow-sm ${
     carried ? 'bg-amber-50 border-amber-200' : 'bg-white border-neutral-200'
   }`
 }
@@ -157,7 +167,12 @@ function ShelfPillContent({
       >
         <Check className="w-2.5 h-2.5" strokeWidth={3} />
       </button>
-      <span data-testid="shelf-pill-title" className="text-neutral-700">{task.title}</span>
+      {/* min-w-0 lets the span shrink below its max-content width so long
+          titles WRAP instead of forcing the pill wider than its column
+          (never truncate — see PlanningShelf.test.tsx's never-truncates
+          assertion); break-words covers the case where a single word alone
+          (e.g. a long URL) is wider than the block. */}
+      <span data-testid="shelf-pill-title" className="min-w-0 break-words text-neutral-700">{task.title}</span>
       {projectName && <span className="text-xs text-neutral-400">· {projectName}</span>}
       {/* Amber alone says "late"; this says late FROM WHERE. A move placed on a
           week that came and went is a specific, legible fact about the plan. */}
@@ -280,8 +295,14 @@ function NativeShelfFrame({ onNativeUnschedule, children }: {
       onDrop={(e) => {
         e.preventDefault()
         setIsOver(false)
-        const many = e.dataTransfer.getData('text/task-ids')
-        const id = many ? many.split(',').filter(Boolean)[0] : e.dataTransfer.getData('text/task-id')
+        // 'text/task-ids' (plural — a cluster header's payload) is deliberately
+        // NOT read here. There is no cluster gesture in the unschedule
+        // direction: unschedule is a single-task write (bucket: 'month' +
+        // clear scheduledFor), so honoring a multi-id payload by taking just
+        // ids[0] used to fire an unlabeled, un-undoable write for one
+        // arbitrary member of the dragged block. Reading only the singular
+        // key makes a cluster-header drop on the shelf a clean no-op instead.
+        const id = e.dataTransfer.getData('text/task-id')
         if (id) onNativeUnschedule?.(id)
       }}
     >
@@ -387,18 +408,21 @@ export function PlanningShelf(props: PlanningShelfProps) {
   }, [groups, ordered])
 
   // Board blocks. monthShelfGroups is a total partition, so `ungrouped` is
-  // normally empty — but folding any remainder into Unfiled here keeps this
-  // component correct for any caller, since the board renders blocks and
-  // nothing else. Unfiled always exists in board mode even at zero members:
-  // it hosts the composer, and a newly captured chunk starts unfiled.
+  // normally empty and callers pass at most one 'unfiled' group — but this
+  // component makes no such assumption about `groups`: it merges the tasks
+  // from EVERY 'unfiled' group (not just the first) plus `ungrouped` into the
+  // single Unfiled block the board renders, so a second 'unfiled' group from
+  // a future or different caller can't silently lose its tasks. Unfiled
+  // always exists in board mode even at zero members: it hosts the composer,
+  // and a newly captured chunk starts unfiled.
   const boardBlocks = useMemo(() => {
     if (layout !== 'board') return [] as { group: ShelfGroup; tasks: Task[] }[]
     const blocks = rolled.filter((b) => b.group.kind !== 'unfiled')
-    const unfiledGroup = rolled.find((b) => b.group.kind === 'unfiled')
-    const unfiledTasks = [...(unfiledGroup?.tasks ?? []), ...ungrouped]
+    const unfiledGroups = rolled.filter((b) => b.group.kind === 'unfiled')
+    const unfiledTasks = [...unfiledGroups.flatMap((b) => b.tasks), ...ungrouped]
     return [
       ...blocks,
-      { group: unfiledGroup?.group ?? { id: 'unfiled', label: 'Unfiled', kind: 'unfiled' as const, taskIds: [] }, tasks: unfiledTasks },
+      { group: unfiledGroups[0]?.group ?? { id: 'unfiled', label: 'Unfiled', kind: 'unfiled' as const, taskIds: [] }, tasks: unfiledTasks },
     ]
   }, [layout, rolled, ungrouped])
 
@@ -419,7 +443,12 @@ export function PlanningShelf(props: PlanningShelfProps) {
         onPointerDown={(e) => e.stopPropagation()}
         onMouseDown={(e) => e.stopPropagation()}
         placeholder={draftPlaceholder}
-        className="w-64 bg-transparent text-sm placeholder:text-neutral-400 focus:outline-none" />
+        // min-w-0 + flex-1 (not a fixed w-64): the composer sits inside a
+        // shrink-to-fit pill with no outer flex-grow, so it still sizes to
+        // its natural width in the full-width flow lane (/week) but can now
+        // be squeezed down to fit a ~200px board column (/month) instead of
+        // holding a 256px floor that overflowed the block.
+        className="min-w-0 flex-1 bg-transparent text-sm placeholder:text-neutral-400 focus:outline-none" />
     </span>
   )
 
@@ -507,6 +536,16 @@ export function PlanningShelf(props: PlanningShelfProps) {
                   onPushTask={onPushTask} onCompleteTask={onCompleteTask} fileUnder={fileUnder} />
               ))}
               {group.kind === 'unfiled' && composer}
+              {/* Mirrors the flow branch's empty-pool copy below, worded for
+                  the month grain (the page calls its items "moves" and their
+                  destination "a week", not "a day"). Without this, an empty
+                  month showed a bare Unfiled block with nothing but the
+                  composer — no cue that the emptiness is a good sign. */}
+              {group.kind === 'unfiled' && ordered.length === 0 && (
+                <span className="block mt-1.5 text-sm text-neutral-400">
+                  {isOver ? 'Drop to unschedule' : 'Every move is placed on a week.'}
+                </span>
+              )}
             </ShelfBlock>
           ))}
         </div>

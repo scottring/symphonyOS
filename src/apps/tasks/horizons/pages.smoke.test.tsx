@@ -348,6 +348,46 @@ describe('horizon pages (smoke)', () => {
     expect(screen.getByText('Placed 3 moves')).toBeInTheDocument()
   })
 
+  // The forward direction (above) proves ONE undo action fires and the
+  // forward writes are correct, but never exercises the RESTORE itself.
+  // handlePlaceInWeek's undo callback replays a snapshot taken BEFORE the
+  // placement (bucket/scheduledFor/weekStart/isAllDay) — restoring must
+  // therefore put every member back to bucket: 'month' with weekStart AND
+  // scheduledFor cleared, mirroring the grid's onUnscheduleTask invariant
+  // (see the "stale weekStart" note on MonthPage's onNativeUnschedule).
+  it('undoing a cluster placement restores all three members to the shelf', () => {
+    mockTasks.push(createMockTask({
+      id: 'season-1', title: 'Living room upgrades', bucket: 'quarter', pickedAt: new Date(),
+    }) satisfies Task)
+    for (const [id, title] of [['a', 'Rug'], ['b', 'Lamp'], ['c', 'Shelving']]) {
+      mockTasks.push(createMockTask({ id, title, bucket: 'month', sourceId: 'season-1' }) satisfies Task)
+    }
+
+    const { container } = render(<MonthPage />)
+
+    const payload: Record<string, string> = {}
+    fireEvent.dragStart(screen.getByTestId('shelf-block-drag-pick:season-1'), {
+      dataTransfer: { setData: (f: string, v: string) => { payload[f] = v } },
+    })
+    fireEvent.drop(todayGridCell(container), {
+      dataTransfer: { getData: (f: string) => payload[f] ?? '' },
+    })
+    expect(screen.getByText('Placed 3 moves')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /undo/i }))
+
+    for (const id of ['a', 'b', 'c']) {
+      // The forward placement already wrote once per id; the restore is the
+      // MOST RECENT call for that id.
+      const calls = mockUpdateTask.mock.calls.filter(([taskId]) => taskId === id)
+      const restoreCall = calls[calls.length - 1]
+      expect(restoreCall, `expected ${id} to be restored`).toBeDefined()
+      expect(restoreCall[1].bucket).toBe('month')
+      expect(restoreCall[1].weekStart).toBeUndefined()
+      expect(restoreCall[1].scheduledFor).toBeUndefined()
+    }
+  })
+
   it('the Unfiled block gets no drag handle — it is a residue, not a cluster', () => {
     mockTasks.push(createMockTask({ id: 'loose', title: 'Research keyboards', bucket: 'month' }) satisfies Task)
     render(<MonthPage />)
