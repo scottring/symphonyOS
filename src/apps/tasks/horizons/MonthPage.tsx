@@ -304,9 +304,9 @@ export function MonthPage() {
               //
               // Genuinely dated things ("dentist Tuesday") use the date picker
               // in triage, so a drop here means exactly one thing.
-              onPlaceTaskInWeek={(id, weekStart) => updateTask(id, {
+              onPlaceTasksInWeek={(ids, weekStart) => ids.forEach((id) => updateTask(id, {
                 bucket: 'week', weekStart, scheduledFor: undefined, isAllDay: false,
-              })}
+              }))}
               // Back to the shelf clears the week too — otherwise an item
               // returns to "unplaced" still secretly carrying a week.
               onUnscheduleTask={(id) => updateTask(id, { bucket: 'month', scheduledFor: undefined, weekStart: undefined })}

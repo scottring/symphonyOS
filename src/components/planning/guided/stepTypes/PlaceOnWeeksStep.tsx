@@ -71,8 +71,9 @@ export function PlaceOnWeeksStep() {
         // The month rung's one decision: which WEEK. scheduledFor is cleared,
         // not just left unwritten — a date implies bucket='timed' (the timed
         // invariant), and a week placement must set neither.
-        onPlaceTaskInWeek={(id, weekStart) =>
-          host.onUpdateTask(id, { bucket: 'week', weekStart, scheduledFor: undefined, isAllDay: false })}
+        onPlaceTasksInWeek={(ids, weekStart) =>
+          ids.forEach((id) =>
+            host.onUpdateTask(id, { bucket: 'week', weekStart, scheduledFor: undefined, isAllDay: false }))}
         // Back to the rail clears the week too, or the move returns to
         // "unplaced" secretly carrying one (the MonthPage rule).
         onUnscheduleTask={(id) =>

@@ -29,8 +29,9 @@ interface MonthCalendarGridProps {
   month: Date
   tasks: Task[]
   events: CalendarEvent[]
-  /** Place a rock onto a WEEK — the row. Absent = look-only rows. */
-  onPlaceTaskInWeek?: (taskId: string, weekStart: Date) => void
+  /** Place rocks onto a WEEK — the row. Receives one id for a single pill,
+   *  many for a dragged block header. Absent = look-only rows. */
+  onPlaceTasksInWeek?: (taskIds: string[], weekStart: Date) => void
   /** Send a placed item back to the unplaced rail. */
   onUnscheduleTask?: (taskId: string) => void
   onSelectTask?: (taskId: string) => void
@@ -62,11 +63,23 @@ function rangeLabel(start: Date, end: Date): string {
   return `${s} – ${e}`
 }
 
+// The drag payload. A single pill writes 'text/task-id' (unchanged, so
+// PlacementChip and every other existing source keeps working); a block
+// header writes 'text/task-ids' as a comma-joined list. Reading ids-first
+// with a singular fallback keeps ONE drop path instead of two handlers that
+// can drift apart.
+function readTaskIds(dt: DataTransfer): string[] {
+  const many = dt.getData('text/task-ids')
+  if (many) return many.split(',').filter(Boolean)
+  const one = dt.getData('text/task-id')
+  return one ? [one] : []
+}
+
 export function MonthCalendarGrid({
   month,
   tasks,
   events,
-  onPlaceTaskInWeek,
+  onPlaceTasksInWeek,
   onUnscheduleTask,
   onSelectTask,
   readOnly = false,
@@ -75,7 +88,7 @@ export function MonthCalendarGrid({
   onOpenWeek,
   now = new Date(),
 }: MonthCalendarGridProps) {
-  const weekMode = !readOnly && onPlaceTaskInWeek != null
+  const weekMode = !readOnly && onPlaceTasksInWeek != null
   const [dragOverRow, setDragOverRow] = useState<number | null>(null)
   const [railOver, setRailOver] = useState(false)
   const [hoverRow, setHoverRow] = useState<number | null>(null)
@@ -153,7 +166,7 @@ export function MonthCalendarGrid({
           onDrop={(e) => {
             e.preventDefault()
             setRailOver(false)
-            const id = e.dataTransfer.getData('text/task-id')
+            const [id] = readTaskIds(e.dataTransfer)
             if (id) onUnscheduleTask?.(id)
           }}
           className={`rounded-xl border border-dashed p-3 transition-colors ${railOver ? 'border-primary-400 bg-primary-50/40' : 'border-neutral-200'}`}
@@ -210,9 +223,9 @@ export function MonthCalendarGrid({
                 onDrop={weekMode ? (e) => {
                   e.preventDefault()
                   setDragOverRow(null)
-                  const id = e.dataTransfer.getData('text/task-id')
-                  if (!id) return
-                  onPlaceTaskInWeek?.(id, w.start)
+                  const ids = readTaskIds(e.dataTransfer)
+                  if (ids.length === 0) return
+                  onPlaceTasksInWeek?.(ids, w.start)
                 } : undefined}
                 className={`relative flex min-h-[190px] flex-col rounded-xl border bg-white transition-colors ${
                   colDragging ? 'border-primary-400 ring-2 ring-primary-300 bg-primary-50/40'

@@ -98,19 +98,19 @@ describe('MonthCalendarGrid week placement', () => {
   })
 
   it('dropping on a row places the rock on that ROW\'s week', () => {
-    const onPlaceTaskInWeek = vi.fn()
+    const onPlaceTasksInWeek = vi.fn()
     render(
       <MonthCalendarGrid
         month={JULY} tasks={[monthTask({})]} events={events}
-        weekStartsOn={1} onPlaceTaskInWeek={onPlaceTaskInWeek} now={NOW}
+        weekStartsOn={1} onPlaceTasksInWeek={onPlaceTasksInWeek} now={NOW}
       />,
     )
     fireEvent.drop(screen.getByTestId('week-col-2'), {
       dataTransfer: { getData: (f: string) => (f === 'text/task-id' ? 'rock' : '') },
     })
-    expect(onPlaceTaskInWeek).toHaveBeenCalledTimes(1)
-    const [taskId, weekStart] = onPlaceTaskInWeek.mock.calls[0]
-    expect(taskId).toBe('rock')
+    expect(onPlaceTasksInWeek).toHaveBeenCalledTimes(1)
+    const [ids, weekStart] = onPlaceTasksInWeek.mock.calls[0]
+    expect(ids).toEqual(['rock'])
     expect(weekStart.getMonth()).toBe(6)
     expect(weekStart.getDate()).toBe(13)
   })
@@ -122,7 +122,7 @@ describe('MonthCalendarGrid week placement', () => {
       <MonthCalendarGrid
         month={JULY}
         tasks={[monthTask({ id: 'placed', title: 'Book the mover', bucket: 'week', weekStart: new Date(2026, 6, 13) })]}
-        events={events} weekStartsOn={1} onPlaceTaskInWeek={vi.fn()} now={NOW}
+        events={events} weekStartsOn={1} onPlaceTasksInWeek={vi.fn()} now={NOW}
       />,
     )
     // It lands in ITS week's column (Mon-first: Jul 13–19 is column 2), not
@@ -136,7 +136,7 @@ describe('MonthCalendarGrid week placement', () => {
       <MonthCalendarGrid
         month={JULY}
         tasks={[monthTask({ id: 'legacy', title: 'Legacy week item', bucket: 'week' })]}
-        events={events} weekStartsOn={1} onPlaceTaskInWeek={vi.fn()} now={NOW}
+        events={events} weekStartsOn={1} onPlaceTasksInWeek={vi.fn()} now={NOW}
       />,
     )
     expect(screen.queryByText('Legacy week item')).not.toBeInTheDocument()
@@ -146,7 +146,7 @@ describe('MonthCalendarGrid week placement', () => {
     render(
       <MonthCalendarGrid
         month={JULY} tasks={[monthTask({})]} events={events}
-        weekStartsOn={1} onPlaceTaskInWeek={vi.fn()} now={NOW}
+        weekStartsOn={1} onPlaceTasksInWeek={vi.fn()} now={NOW}
       />,
     )
     expect(screen.getByText(/Drag onto a week to place/)).toBeInTheDocument()
@@ -154,17 +154,87 @@ describe('MonthCalendarGrid week placement', () => {
   })
 
   it('read-only rows place nothing', () => {
-    const onPlaceTaskInWeek = vi.fn()
+    const onPlaceTasksInWeek = vi.fn()
     render(
       <MonthCalendarGrid
         month={JULY} tasks={[monthTask({})]} events={events}
-        weekStartsOn={1} onPlaceTaskInWeek={onPlaceTaskInWeek} readOnly now={NOW}
+        weekStartsOn={1} onPlaceTasksInWeek={onPlaceTasksInWeek} readOnly now={NOW}
       />,
     )
     fireEvent.drop(screen.getByTestId('week-col-2'), {
       dataTransfer: { getData: (f: string) => (f === 'text/task-id' ? 'rock' : '') },
     })
-    expect(onPlaceTaskInWeek).not.toHaveBeenCalled()
+    expect(onPlaceTasksInWeek).not.toHaveBeenCalled()
+  })
+})
+
+describe('MonthCalendarGrid cluster drop', () => {
+  const monthTask = (over: Partial<Task>): Task => ({
+    id: 'rock', title: 'Order the vanity', completed: false, bucket: 'month',
+    createdAt: new Date(), updatedAt: new Date(), ...over,
+  })
+
+  // Placing 24 moves one at a time is the actual chore the board exists to
+  // kill, so a block header hands the whole cluster over in one gesture.
+  it('a text/task-ids drop places every id in that row\'s week', () => {
+    const onPlaceTasksInWeek = vi.fn()
+    render(
+      <MonthCalendarGrid
+        month={JULY} tasks={[monthTask({})]} events={events}
+        weekStartsOn={1} onPlaceTasksInWeek={onPlaceTasksInWeek} now={NOW}
+      />,
+    )
+    fireEvent.drop(screen.getByTestId('week-col-2'), {
+      dataTransfer: { getData: (f: string) => (f === 'text/task-ids' ? 'a,b,c' : '') },
+    })
+    expect(onPlaceTasksInWeek).toHaveBeenCalledTimes(1)
+    const [ids, weekStart] = onPlaceTasksInWeek.mock.calls[0]
+    expect(ids).toEqual(['a', 'b', 'c'])
+    expect(weekStart.getDate()).toBe(13)
+  })
+
+  // Single pills never changed their payload — the new MIME type is purely
+  // additive, so PlacementChip and the wizard keep working untouched.
+  it('a text/task-id drop still places exactly one', () => {
+    const onPlaceTasksInWeek = vi.fn()
+    render(
+      <MonthCalendarGrid
+        month={JULY} tasks={[monthTask({})]} events={events}
+        weekStartsOn={1} onPlaceTasksInWeek={onPlaceTasksInWeek} now={NOW}
+      />,
+    )
+    fireEvent.drop(screen.getByTestId('week-col-2'), {
+      dataTransfer: { getData: (f: string) => (f === 'text/task-id' ? 'rock' : '') },
+    })
+    expect(onPlaceTasksInWeek).toHaveBeenCalledWith(['rock'], expect.any(Date))
+  })
+
+  it('read-only rows refuse a cluster drop too', () => {
+    const onPlaceTasksInWeek = vi.fn()
+    render(
+      <MonthCalendarGrid
+        month={JULY} tasks={[monthTask({})]} events={events}
+        weekStartsOn={1} onPlaceTasksInWeek={onPlaceTasksInWeek} readOnly now={NOW}
+      />,
+    )
+    fireEvent.drop(screen.getByTestId('week-col-2'), {
+      dataTransfer: { getData: (f: string) => (f === 'text/task-ids' ? 'a,b' : '') },
+    })
+    expect(onPlaceTasksInWeek).not.toHaveBeenCalled()
+  })
+
+  it('an empty payload places nothing', () => {
+    const onPlaceTasksInWeek = vi.fn()
+    render(
+      <MonthCalendarGrid
+        month={JULY} tasks={[monthTask({})]} events={events}
+        weekStartsOn={1} onPlaceTasksInWeek={onPlaceTasksInWeek} now={NOW}
+      />,
+    )
+    fireEvent.drop(screen.getByTestId('week-col-2'), {
+      dataTransfer: { getData: () => '' },
+    })
+    expect(onPlaceTasksInWeek).not.toHaveBeenCalled()
   })
 })
 
@@ -183,12 +253,12 @@ describe('MonthCalendarGrid week content', () => {
 
 describe('MonthCalendarGrid hideRail', () => {
   it('hides the rail copy but keeps row drops working', () => {
-    const onPlaceTaskInWeek = vi.fn()
+    const onPlaceTasksInWeek = vi.fn()
     render(
       <MonthCalendarGrid
         month={JULY}
         tasks={[{ id: 'rock', title: 'Order the vanity', completed: false, bucket: 'month', createdAt: new Date(), updatedAt: new Date() } as Task]}
-        events={events} weekStartsOn={1} onPlaceTaskInWeek={onPlaceTaskInWeek} hideRail now={NOW}
+        events={events} weekStartsOn={1} onPlaceTasksInWeek={onPlaceTasksInWeek} hideRail now={NOW}
       />,
     )
     expect(screen.queryByText(/Drag onto a week to place/)).not.toBeInTheDocument()
@@ -196,7 +266,7 @@ describe('MonthCalendarGrid hideRail', () => {
     fireEvent.drop(screen.getByTestId('week-col-2'), {
       dataTransfer: { getData: (f: string) => (f === 'text/task-id' ? 'rock' : '') },
     })
-    expect(onPlaceTaskInWeek).toHaveBeenCalledTimes(1)
-    expect(onPlaceTaskInWeek.mock.calls[0][1].getDate()).toBe(13)
+    expect(onPlaceTasksInWeek).toHaveBeenCalledTimes(1)
+    expect(onPlaceTasksInWeek.mock.calls[0][1].getDate()).toBe(13)
   })
 })
