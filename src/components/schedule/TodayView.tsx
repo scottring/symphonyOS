@@ -409,7 +409,6 @@ export function TodayView({
     void unprompted.act(item.suggestion.id)
   }, [navigate, unprompted, onSelectItem])
 
-  const { getStats: getRoutineStats } = useRoutineStats()
   const { isPromotionSuggested } = useRecurringEventDetection(events, eventNotesMap)
 
   // Timeline insert points: radial wheel pick → note composer (task/event/routine
@@ -1068,7 +1067,6 @@ export function TodayView({
               parserContext={parserContext}
               currentDomain={currentDomain}
               insert={insert}
-              getRoutineStats={getRoutineStats}
               isPromotionSuggested={isPromotionSuggested}
               onSelectItem={handleSelectItem}
               onToggleTask={onToggleTask}

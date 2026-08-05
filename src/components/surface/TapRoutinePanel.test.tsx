@@ -4,12 +4,6 @@ import { TapRoutinePanel } from './TapRoutinePanel'
 import type { Routine } from '@/types/actionable'
 import type { FamilyMember } from '@/types/family'
 
-// The panel reads streaks via useRoutineStats (which needs auth/supabase).
-// Mock it so this is a pure render test.
-vi.mock('@/hooks/useRoutineStats', () => ({
-  useRoutineStats: () => ({ getStats: () => ({ currentStreak: 5 }), loading: false, stats: new Map(), refetch: vi.fn() }),
-}))
-
 // useRoutineStepChecklist fetches today's actionable_instances; mock it so
 // render tests stay pure.
 vi.mock('@/hooks/useRoutineStepChecklist', () => ({
@@ -63,11 +57,6 @@ describe('TapRoutinePanel', () => {
     render(<TapRoutinePanel routine={routine} onClose={vi.fn()} onNotesChange={vi.fn()} onContextChange={vi.fn()} onVisibilityChange={onVisibilityChange} />)
     fireEvent.click(screen.getByRole('switch', { name: /^active$/i }))
     expect(onVisibilityChange).toHaveBeenCalledWith('reference')
-  })
-
-  it('shows the streak when present', () => {
-    render(<TapRoutinePanel routine={routine} onClose={vi.fn()} onNotesChange={vi.fn()} onContextChange={vi.fn()} onVisibilityChange={vi.fn()} />)
-    expect(screen.getByText('5-day streak')).toBeInTheDocument()
   })
 
   it('renders the assignee picker when members + onAssignChange are provided', () => {

@@ -148,8 +148,6 @@ interface ScheduleItemProps {
   variant?: 'full' | 'minimal'
   // Hide time label (for same-time grouping) — preserves column space
   hideTime?: boolean
-  // Routine streak count (shown as badge for routines)
-  routineStreak?: number
   /**
    * Rendered directly BENEATH the title, inside the title's own column — so it
    * left-aligns with the title text automatically, whatever the row's leading
@@ -267,7 +265,6 @@ export const ScheduleItem = memo(function ScheduleItem({
   isSuggestedPromotion,
   variant = 'full',
   hideTime,
-  routineStreak,
   belowTitleAccessory,
 }: ScheduleItemProps) {
   const isMobile = useMobile()
@@ -673,12 +670,6 @@ export const ScheduleItem = memo(function ScheduleItem({
                 <span className="ml-1.5 text-xs text-amber-500 not-italic font-normal">waiting</span>
               )}
             </span>
-            {/* Routine streak badge — desktop only */}
-            {isRoutine && routineStreak != null && routineStreak > 0 && !item.completed && !item.skipped && (
-              <span className="hidden md:inline-flex shrink-0 items-center gap-0.5 px-1.5 py-0.5 bg-amber-50 text-amber-600 rounded text-xs font-medium" title={`${routineStreak}-day streak`}>
-                <ConceptIcon name="streak" decorative /> {routineStreak}
-              </span>
-            )}
             {/* Coaching sparkle indicator — desktop only */}
             {hasCoaching && (
               <span className="hidden md:inline shrink-0 text-amber-400 opacity-60" title="Coaching tips available">

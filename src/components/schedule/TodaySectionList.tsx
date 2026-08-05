@@ -77,7 +77,6 @@ export interface TodaySectionListProps {
   parserContext: ParserContext
   currentDomain: 'work' | 'family' | 'personal' | 'universal'
   insert: ReturnType<typeof useTimelineInsert>
-  getRoutineStats: (id: string) => { currentStreak?: number } | undefined
   isPromotionSuggested: (eventId: string) => boolean
   onSelectItem: (id: string | null) => void
   onToggleTask: (taskId: string) => void
@@ -110,7 +109,6 @@ export function TodaySectionList({
   parserContext,
   currentDomain,
   insert,
-  getRoutineStats,
   isPromotionSuggested,
   onSelectItem,
   onToggleTask,
@@ -517,11 +515,6 @@ export function TodaySectionList({
                           : undefined
                       }
                       variant={item.type === 'routine' ? 'minimal' : 'full'}
-                      routineStreak={
-                        item.type === 'routine'
-                          ? getRoutineStats(bareRoutineId)?.currentStreak
-                          : undefined
-                      }
                     />
                     {item.type === 'event' && (() => {
                       const nudge = shareNudgeByEventId.get(item.id.replace('event-', ''))

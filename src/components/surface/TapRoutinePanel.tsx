@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Flame, Trash2 } from 'lucide-react'
+import { Trash2 } from 'lucide-react'
 import type { Routine, RoutineVisibility, RecurrencePattern } from '@/types/routine'
 import type { TaskContext } from '@/types/task'
 import type { FamilyMember } from '@/types/family'
@@ -16,7 +16,6 @@ import { PanelAttachments } from './sections/PanelAttachments'
 import { ExtractSteps } from '@/components/routine/ExtractSteps'
 import { ConceptIcon } from '@/lib/conceptIcons'
 import { AssistDrawer } from '@/components/assist/AssistDrawer'
-import { useRoutineStats } from '@/hooks/useRoutineStats'
 import { useAttachments } from '@/hooks/useAttachments'
 import { useRoutineStepChecklist } from '@/hooks/useRoutineStepChecklist'
 
@@ -62,8 +61,6 @@ interface TapRoutinePanelProps {
 
 export function TapRoutinePanel(props: TapRoutinePanelProps) {
   const { routine, familyMembers = [] } = props
-  const { getStats } = useRoutineStats()
-  const streak = getStats(routine.id)?.currentStreak ?? 0
   const assigneeIds = routine.assigned_to_all && routine.assigned_to_all.length > 0
     ? routine.assigned_to_all
     : (routine.assigned_to ? [routine.assigned_to] : [])
@@ -114,12 +111,6 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
             >
               <ConceptIcon name="ai" size={14} decorative /> Help me plan
             </button>
-          )}
-          {streak > 0 && (
-            <span className="inline-flex items-center gap-1 text-sm font-medium text-amber-600 ml-auto">
-              <Flame className="w-4 h-4" />
-              {streak}-day streak
-            </span>
           )}
         </div>
 
