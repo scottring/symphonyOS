@@ -24,8 +24,20 @@ interface RowActionRailProps {
   isSuggestedPromotion?: boolean
 }
 
-/** One rail cell. Every slot is this size, on every row, always. */
+/** An icon cell — 28px, on every row, always. */
 const SLOT = 'w-7 h-7 flex items-center justify-center'
+
+/**
+ * The assignee cell is wider than an icon cell because the avatar stack grows
+ * with the number of people: MultiAssigneeDropdown draws up to four 24px
+ * circles at -8px overlap, so 24px for one and 72px for four. It is the LAST
+ * cell, so letting it size to its content would push every column to its left
+ * around as the assignees change — the exact bug this rail exists to kill.
+ * Reserve the maximum and right-align inside it: the rightmost avatar then
+ * lands on the same x on every row, and the slack falls as whitespace between
+ * the context icon and the stack, where it reads as padding.
+ */
+const WHO_SLOT = 'w-[4.5rem] h-7 flex items-center justify-end'
 
 // Start Meeting button - uses context to avoid prop drilling
 function StartMeetingButton({ item }: { item: TimelineItem }) {
@@ -181,11 +193,18 @@ export function RowActionRail({
     </div>
   ) : null
 
+  const cells: Array<{ node: React.ReactNode; className: string }> = [
+    { node: verb, className: SLOT },
+    { node: menu, className: SLOT },
+    { node: context, className: SLOT },
+    { node: who, className: WHO_SLOT },
+  ]
+
   return (
     <div className="shrink-0 flex items-center gap-1">
-      {[verb, menu, context, who].map((slot, i) => (
-        <div key={i} data-rail-slot className={SLOT}>
-          {slot}
+      {cells.map((cell, i) => (
+        <div key={i} data-rail-slot className={cell.className}>
+          {cell.node}
         </div>
       ))}
     </div>

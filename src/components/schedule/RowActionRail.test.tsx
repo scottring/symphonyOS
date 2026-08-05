@@ -133,12 +133,31 @@ describe('RowActionRail', () => {
   })
 
   describe('sizing', () => {
-    it('gives every slot the same 28px box', () => {
+    it('gives the three icon slots the same 28px box', () => {
       const { container } = renderRail({ type: 'task' })
-      slots(container).forEach((slot) => {
+      Array.from(slots(container)).slice(0, 3).forEach((slot) => {
         expect(slot.className).toContain('w-7')
         expect(slot.className).toContain('h-7')
       })
+    })
+
+    // The avatar stack is 24px for one person and 72px for four. As the LAST
+    // cell, sizing it to content would shove every column to its left around
+    // whenever assignees change — the bug the rail exists to kill.
+    it('reserves the full avatar-stack width and right-aligns it', () => {
+      const { container } = renderRail({ type: 'task' })
+      const who = slots(container)[3]
+      expect(who.className).toContain('w-[4.5rem]')
+      expect(who.className).toContain('justify-end')
+    })
+
+    it('keeps the assignee cell the same width however many people are on it', () => {
+      const one = renderRail({ type: 'task' })
+      const oneWidth = slots(one.container)[3].className
+      one.unmount()
+
+      const many = renderRail({ type: 'task', assignedTo: 'a' })
+      expect(slots(many.container)[3].className).toBe(oneWidth)
     })
 
     it('uses the 28px ContextPicker so it matches the other cells', () => {
