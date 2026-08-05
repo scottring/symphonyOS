@@ -206,7 +206,7 @@ describe('TapContextPanel', () => {
       {...baseHandlers}
     />)
     await user.click(screen.getByRole('button', { name: 'Notes' }))
-    expect(screen.getByText(/add notes/i)).toBeInTheDocument()
+    expect(await screen.findByText(/add notes/i)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Notes' })).not.toBeInTheDocument()
   })
 

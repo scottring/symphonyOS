@@ -4,7 +4,7 @@ import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Project } from '@/types/project'
 import { PanelHeader } from './sections/PanelHeader'
 import { PanelMetaRow } from './sections/PanelMetaRow'
-import { PanelWhy } from './sections/PanelWhy'
+import { PanelNotes } from './sections/PanelNotes'
 import { PanelLinks } from './sections/PanelLinks'
 import { PanelMightBeRelevant } from './sections/PanelMightBeRelevant'
 import { PanelFooter } from './sections/PanelFooter'
@@ -80,11 +80,12 @@ export function TapContactPanel(props: TapContactPanelProps) {
         </button>
       </div>
 
-      <PanelWhy
+      <PanelNotes
         key={contact.id}
         notes={contact.notes}
         onChange={props.onNotesChange}
         label="About"
+        id="about"
       />
 
       {hasOpenItems && (

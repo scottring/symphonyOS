@@ -45,12 +45,12 @@ const mealEvent = {
 describe('TapMealPanel', () => {
   beforeEach(() => { removeMeal.mockClear(); addMeal.mockClear() })
 
-  it('renders the meal title and recipe info (not generic event chrome)', () => {
+  it('renders the meal title and recipe info (not generic event chrome)', async () => {
     render(<TapMealPanel event={mealEvent} onClose={vi.fn()} />)
     // The event title shows in the header
     expect(screen.getByText('Dinner · Pasta e fagioli + salad')).toBeInTheDocument()
     // The WHY section surfaces the recipe title via PanelWhy notes prop
-    expect(screen.getByText('Recipe: Skillet Lasagna')).toBeInTheDocument()
+    expect(await screen.findByText('Recipe: Skillet Lasagna')).toBeInTheDocument()
     // Generic event panel labels must NOT appear for a meal
     // (What to bring only renders when entry.notes has text or onChange is provided)
     expect(screen.queryByText('What to bring')).not.toBeInTheDocument()

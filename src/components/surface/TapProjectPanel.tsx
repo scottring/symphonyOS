@@ -4,7 +4,7 @@ import type { Task } from '@/types/task'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import { PanelHeader } from './sections/PanelHeader'
 import { PanelMetaRow } from './sections/PanelMetaRow'
-import { PanelWhy } from './sections/PanelWhy'
+import { PanelNotes } from './sections/PanelNotes'
 import { PanelLinks } from './sections/PanelLinks'
 import { PanelMightBeRelevant } from './sections/PanelMightBeRelevant'
 import { PanelFooter } from './sections/PanelFooter'
@@ -68,11 +68,12 @@ export function TapProjectPanel(props: TapProjectPanelProps) {
         </button>
       </div>
 
-      <PanelWhy
+      <PanelNotes
         key={project.id}
         notes={project.notes}
         onChange={props.onNotesChange}
         label="What this is"
+        id="what-this-is"
       />
 
       <section className="mb-4">

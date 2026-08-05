@@ -3,7 +3,7 @@ import { Check, MessageSquare, Video } from 'lucide-react'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Task, TaskLink } from '@/types/task'
 import { PanelHeader } from './sections/PanelHeader'
-import { PanelWhy } from './sections/PanelWhy'
+import { PanelNotes } from './sections/PanelNotes'
 import { PanelLinks } from './sections/PanelLinks'
 import { PanelPhotos } from './sections/PanelPhotos'
 import { PanelMightBeRelevant } from './sections/PanelMightBeRelevant'
@@ -346,11 +346,12 @@ export function TapEventPanel(props: TapEventPanelProps) {
         />
       )}
 
-      <PanelWhy
+      <PanelNotes
         key={event.id}
         notes={props.notes}
         onChange={props.onNotesChange}
         label="What to bring"
+        id="what-to-bring"
       />
 
       {discussionFlagged && props.onDiscussionNoteChange && (

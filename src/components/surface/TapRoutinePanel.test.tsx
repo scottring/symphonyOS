@@ -38,10 +38,11 @@ const members: FamilyMember[] = [
 ]
 
 describe('TapRoutinePanel', () => {
-  it('renders the routine name and notes', () => {
+  it('renders the routine name and notes', async () => {
     render(<TapRoutinePanel routine={routine} onClose={vi.fn()} onNotesChange={vi.fn()} onContextChange={vi.fn()} onVisibilityChange={vi.fn()} />)
     expect(screen.getByText('Trash night')).toBeInTheDocument()
-    expect(screen.getByText('Take bins to curb')).toBeInTheDocument()
+    // Notes mount through a lazy editor boundary — it lands a tick after render.
+    expect(await screen.findByText('Take bins to curb')).toBeInTheDocument()
   })
 
   it('renders visibility as a labelled on/off switch (checked when active)', () => {

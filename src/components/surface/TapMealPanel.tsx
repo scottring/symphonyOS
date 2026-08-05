@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo } from 'react'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
-import { PanelWhy } from './sections/PanelWhy'
+import { PanelNotes } from './sections/PanelNotes'
 import { PanelWhatToBring } from './sections/PanelWhatToBring'
 import { PanelIngredients } from './sections/PanelIngredients'
 import { PanelSteps } from './sections/PanelSteps'
@@ -157,11 +157,12 @@ export function TapMealPanel({ event, onClose }: TapMealPanelProps) {
         </div>
       </div>
 
-      <PanelWhy
+      <PanelNotes
         key={entry?.id ?? event.id}
         notes={recipe?.title ? `Recipe: ${recipe.title}` : entry?.adHocTitle}
         onChange={() => { /* ABOUT derives from the recipe; read-only here */ }}
         label="ABOUT"
+        id="meal-about"
       />
       <PanelWhatToBring notes={entry?.notes} />
       <PanelIngredients ingredients={recipe?.ingredients} />

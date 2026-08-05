@@ -7,7 +7,7 @@ import type { FamilyMember } from '@/types/family'
 import { PanelHeader } from './sections/PanelHeader'
 import { PanelActions } from './sections/PanelActions'
 import { PanelAssistant } from './sections/PanelAssistant'
-import { PanelWhy } from './sections/PanelWhy'
+import { PanelNotes } from './sections/PanelNotes'
 import { PanelSubtasks } from './sections/PanelSubtasks'
 import { PanelPeople } from './sections/PanelPeople'
 import { PanelLinked } from './sections/PanelLinked'
@@ -226,7 +226,7 @@ export function TapContextPanel(props: TapContextPanelProps) {
         directions={task.directions}
         onDirectionsChange={props.onDirectionsChange}
       />}
-      {show('notes') && <PanelWhy key={task.id} label="Notes" notes={task.notes} onChange={props.onNotesChange} onSaveToVault={props.onSaveNoteToVault} />}
+      {show('notes') && <PanelNotes key={task.id} label="Notes" notes={task.notes} onChange={props.onNotesChange} onSaveToVault={props.onSaveNoteToVault} />}
       <PanelPhotos
         hideWhenEmpty={!revealed.has('photo')}
         onContentChange={setPhotosHaveContent}

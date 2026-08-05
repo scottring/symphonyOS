@@ -3,7 +3,7 @@ import { Link2Off, Trash2 } from 'lucide-react'
 import type { Routine, RecurrencePattern } from '@/types/actionable'
 import { WEEKDAY_KEYS } from '@/lib/routineUtils'
 import { PanelHeader } from './sections/PanelHeader'
-import { PanelWhy } from './sections/PanelWhy'
+import { PanelNotes } from './sections/PanelNotes'
 import { PanelAttachments } from './sections/PanelAttachments'
 import { DosePills } from './sections/DosePills'
 
@@ -127,7 +127,7 @@ export function TapStepPanel(props: TapStepPanelProps) {
         </section>
       )}
 
-      <PanelWhy key={step.id} label="Instructions" notes={step.description ?? undefined} onChange={props.onNotesChange} />
+      <PanelNotes key={step.id} label="Instructions" id="instructions" notes={step.description ?? undefined} onChange={props.onNotesChange} />
 
       {/* Photos & Files — exercise photos / form diagrams for this step */}
       <PanelAttachments entityType="routine" entityId={step.id} />

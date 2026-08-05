@@ -5,7 +5,7 @@ import type { TaskContext } from '@/types/task'
 import type { FamilyMember } from '@/types/family'
 import { PanelHeader } from './sections/PanelHeader'
 import { PanelMedia } from './sections/PanelMedia'
-import { PanelWhy } from './sections/PanelWhy'
+import { PanelNotes } from './sections/PanelNotes'
 import { PanelLocation } from './sections/PanelLocation'
 import { PanelFooter } from './sections/PanelFooter'
 import { ContextPicker } from '@/components/triage/ContextPicker'
@@ -225,7 +225,7 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
         </section>
       )}
 
-      <PanelWhy
+      <PanelNotes
         key={routine.id}
         label="Notes"
         notes={routine.description ?? undefined}

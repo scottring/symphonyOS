@@ -1,4 +1,5 @@
 import '@testing-library/jest-dom'
+import React from 'react'
 import { cleanup } from '@testing-library/react'
 import { afterEach, vi } from 'vitest'
 
@@ -104,6 +105,22 @@ Object.defineProperty(window, 'matchMedia', {
     dispatchEvent: () => false,
   }),
 })
+
+// The rich-text editor is a lazily-imported ProseMirror instance. Panels now
+// mount it directly (PanelNotes is always live — there is no click-to-edit
+// mode), so without this every panel test asserting note text would either race
+// the lazy chunk or end up asserting ProseMirror's internals. Stand in with a
+// plain element that renders the same content and placeholder.
+vi.mock('@/components/notes/TiptapEditor', () => ({
+  TiptapEditor: ({ content, placeholder }: { content?: string; placeholder?: string }) => {
+    const text = (content ?? '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
+    return React.createElement(
+      'div',
+      { 'data-testid': 'tiptap-editor' },
+      text || placeholder || '',
+    )
+  },
+}))
 
 // Cleanup after each test
 afterEach(() => {
