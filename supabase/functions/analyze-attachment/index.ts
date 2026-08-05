@@ -6,6 +6,7 @@
 // reads/writes go through the caller-scoped client so RLS enforces ownership.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { tryParseFacets, type Facet } from '../_shared/facets.ts'
+import { parseDocumentProposal, stripSensitive, type DocumentProposal } from '../_shared/documents.ts'
 
 const MODEL = 'claude-sonnet-4-6'
 const MAX_CONTEXT = 300
@@ -38,7 +39,14 @@ Rules:
 - Prefer fewer, higher-value facets; skip trivia.
 - datetime iso is the file's local time; no timezone guessing.
 - A photo of a broken/burned-out part or product → purchase_item with buy-ready specs.
-- A document/screenshot → transcribe the load-bearing facts into typed facets, not prose.`
+- A document/screenshot → transcribe the load-bearing facts into typed facets, not prose.
+
+Also decide whether this file is a DURABLE DOCUMENT — something the user will need again later, independent of whatever it is attached to (an ID, a passport, an insurance card, a registration, a title, a policy, a warranty, a contract, a tax or bank statement, a medical record).
+
+If it is, add a sibling key to the JSON object:
+"document": {"kind":"<one of: drivers_license, passport, birth_certificate, social_security_card, insurance_card, vehicle_registration, vehicle_title, medical_record, tax_document, bank_document, warranty, receipt, contract, other>","label":"short human name, e.g. Scott's driver's license","owner":"whose document it is, if visible","expires_on":"YYYY-MM-DD if an expiry is printed"}
+
+Omit the "document" key entirely for ordinary files (a party invite, a photo of a broken part, a screenshot). A receipt is only a document when it is proof of a purchase worth keeping — not a grocery receipt.`
 }
 
 async function callVision(fileUrl: string, isPdf: boolean, prompt: string, apiKey: string): Promise<string> {
@@ -98,9 +106,19 @@ Deno.serve(async (req) => {
 
   const isImage = row.file_type?.startsWith('image/')
   const isPdf = row.file_type === 'application/pdf'
-  const finish = async (facets: unknown[]) => {
+  const finish = async (facets: unknown[], proposal: DocumentProposal | null = null) => {
+    const patch: Record<string, unknown> = { facets, analyzed_at: new Date().toISOString() }
+    if (proposal) {
+      // document_scope is deliberately left to its column default ('private'),
+      // so a proposal can never arrive pre-shared.
+      patch.document_status = 'proposed'
+      patch.document_kind = proposal.kind
+      patch.document_label = proposal.label
+      patch.document_owner = proposal.owner
+      patch.document_expires_on = proposal.expiresOn
+    }
     const { error } = await db.from('attachments')
-      .update({ facets, analyzed_at: new Date().toISOString() })
+      .update(patch)
       .eq('id', attachmentId)
     if (error) console.error('facets write failed:', error.message)
   }
@@ -112,21 +130,42 @@ Deno.serve(async (req) => {
   if (signErr || !signed?.signedUrl) return json({ error: `Could not sign URL: ${signErr?.message}` }, 500)
 
   const prompt = buildPrompt(entityContext)
+
+  /** One vision call → validated facets plus an optional document proposal.
+   *  Redaction happens here, before anything is returned to the caller: a
+   *  sensitive document's own numbers never reach the row, and therefore never
+   *  reach the context graph (see _shared/context-graph/build.ts). */
+  const analyzeOnce = async (): Promise<{ facets: Facet[]; proposal: DocumentProposal | null }> => {
+    const raw = await callVision(signed.signedUrl, isPdf, prompt, apiKey)
+    const parsed = tryParseFacets(raw)
+    if (parsed === null) throw new Error('Invalid facets structure from model')
+
+    // The document block rides alongside `facets` in the same object. A failure
+    // to read it must not cost us the facets we already parsed.
+    let proposal: DocumentProposal | null = null
+    try {
+      const stripped = raw.replace(/^```(?:json)?\s*|\s*```$/g, '').trim()
+      const obj = JSON.parse(stripped) as Record<string, unknown>
+      proposal = parseDocumentProposal(obj.document)
+    } catch {
+      proposal = null
+    }
+
+    return { facets: proposal ? stripSensitive(parsed, proposal.kind) : parsed, proposal }
+  }
+
   let facets: Facet[] = []
+  let proposal: DocumentProposal | null = null
   try {
-    const result = tryParseFacets(await callVision(signed.signedUrl, isPdf, prompt, apiKey))
-    if (result === null) throw new Error('Invalid facets structure from model')
-    facets = result
+    ;({ facets, proposal } = await analyzeOnce())
   } catch (err) {
     console.error('first analysis attempt failed, retrying once:', err instanceof Error ? err.message : err)
     try {
-      const result = tryParseFacets(await callVision(signed.signedUrl, isPdf, prompt, apiKey))
-      if (result === null) throw new Error('Invalid facets structure from model')
-      facets = result
+      ;({ facets, proposal } = await analyzeOnce())
     } catch (err2) {
       console.error('analysis failed after retry:', err2 instanceof Error ? err2.message : err2)
     }
   }
-  await finish(facets)
-  return json({ status: 'done', facetCount: facets.length })
+  await finish(facets, proposal)
+  return json({ status: 'done', facetCount: facets.length, document: proposal?.kind ?? null })
 })
