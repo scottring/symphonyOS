@@ -15,11 +15,43 @@ const SYSTEM_SCHEMES: [&str; 4] = ["tel", "mailto", "sms", "facetime"];
 
 /// Hand a URL to macOS. The allowlist is the security boundary: the page can
 /// ask for these and nothing else (no file://, no arbitrary app schemes).
+///
+/// Plain `open <url>` is NOT enough for tel:. Launch Services sends a scheme to
+/// whichever app claimed the default, and on this machine Google Chrome claimed
+/// `tel:` — so tapping a phone number yanked focus to a browser that cannot
+/// place a call and then did nothing. Handing off "correctly" was
+/// indistinguishable from the shell being broken, which is why this looked
+/// unfixed after the navigation hook landed.
+///
+/// Phone.app claims `tel` (alongside facetime-audio, telephony) and is what
+/// actually dials; Messages claims `sms`. Pin the two schemes that have exactly
+/// one right destination rather than trusting whatever registered last.
+/// mailto: → Mail and http(s) → the default browser are already correct, so
+/// those still go through the normal default.
 fn open_externally(url: &str) {
     let allowed = ["https://", "http://", "tel:", "mailto:", "sms:", "facetime:"];
-    if allowed.iter().any(|p| url.starts_with(p)) {
-        let _ = std::process::Command::new("open").arg(url).spawn();
+    if !allowed.iter().any(|p| url.starts_with(p)) {
+        return;
     }
+
+    let pinned = if url.starts_with("tel:") {
+        // Phone.app is macOS 26+; before that FaceTime was the dialer.
+        if std::path::Path::new("/System/Applications/Phone.app").exists() {
+            Some("Phone")
+        } else {
+            Some("FaceTime")
+        }
+    } else if url.starts_with("sms:") {
+        Some("Messages")
+    } else {
+        None
+    };
+
+    let mut cmd = std::process::Command::new("open");
+    if let Some(app) = pinned {
+        cmd.arg("-a").arg(app);
+    }
+    let _ = cmd.arg(url).spawn();
 }
 
 /// Catch `tel:`/`sms:`/`mailto:`/`facetime:` **navigations** and hand them to
