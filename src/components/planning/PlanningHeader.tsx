@@ -7,6 +7,11 @@ interface PlanningHeaderProps {
   onAddDay: () => void
   onRemoveDay: () => void
   onDateChange: (startDate: Date) => void
+  /** Whether this surface can actually be closed. Gates BOTH close
+   *  affordances — the X and the Done button. They are one concept: an
+   *  embedded host passes `onClose={() => {}}`, and a primary-styled "Done"
+   *  wired to a no-op is a dead control that teaches people not to trust the
+   *  screen. */
   showClose?: boolean
   hideRoutines?: boolean
   onToggleRoutines?: () => void
@@ -148,7 +153,8 @@ export function PlanningHeader({
           )}
         </div>
 
-        {/* Right side: routine toggle + Done button */}
+        {/* Right side: routine toggle + Done (Done only where closing means
+            something — see showClose). */}
         <div className="flex items-center gap-2">
           {onToggleRoutines && (
             <button
@@ -160,12 +166,14 @@ export function PlanningHeader({
               {hideRoutines ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
             </button>
           )}
-          <button
-            onClick={onClose}
-            className="btn-primary px-6 py-2"
-          >
-            Done
-          </button>
+          {showClose && (
+            <button
+              onClick={onClose}
+              className="btn-primary px-6 py-2"
+            >
+              Done
+            </button>
+          )}
         </div>
       </div>
     </div>

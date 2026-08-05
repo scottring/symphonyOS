@@ -287,6 +287,7 @@ export function WeekPage() {
             minDropDate={todayStart}
             onOpenDay={(d) => navigate(`/today?date=${localYmd(d)}`)}
             embedded
+            hideHeader
             shelf={shelf}
             // The week rung answers "which day" and stops there. A drop lands
             // all-day on the day it was dropped in; the time is Today's call.

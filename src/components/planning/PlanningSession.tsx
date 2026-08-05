@@ -92,6 +92,12 @@ interface PlanningSessionProps {
   minDropDate?: Date
   getRoutinesForDate?: (date: Date) => Routine[]
   embedded?: boolean
+  /** Skip the planning header entirely. For a host page that already carries
+   *  its own masthead, breadcrumb and period navigation — /week showed
+   *  "Plan Your Time / Drag tasks to schedule them" plus a second date-range
+   *  picker directly beneath "This Week · Week of Aug 2 · N placed, N to
+   *  place", which is the same information twice and one control set too many. */
+  hideHeader?: boolean
   /** Week→Today seam: when present, each day header renders a small "→ day"
    *  button that jumps straight to that date on the Today rung. */
   onOpenDay?: (date: Date) => void
@@ -147,6 +153,7 @@ export function PlanningSession({
   minDropDate,
   getRoutinesForDate,
   embedded = false,
+  hideHeader = false,
   onOpenDay,
   shelf,
   placementGrain = 'time',
@@ -753,7 +760,8 @@ export function PlanningSession({
 
   return (
     <div className={embedded ? 'relative h-full bg-bg-base flex flex-col' : 'fixed inset-0 z-50 bg-bg-base flex flex-col'}>
-      {/* Header */}
+      {/* Header — omitted where the host page owns its own chrome. */}
+      {!hideHeader && (
       <PlanningHeader
         dateRange={dateRange}
         onClose={onClose}
@@ -764,6 +772,7 @@ export function PlanningSession({
         hideRoutines={hideRoutines}
         onToggleRoutines={() => writeHideRoutines(!hideRoutines)}
       />
+      )}
 
       {/* Past-day drop refusal — quiet, transient */}
       {dropNotice && (

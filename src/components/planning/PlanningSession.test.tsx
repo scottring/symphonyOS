@@ -1067,3 +1067,30 @@ describe('onShelfCount', () => {
     expect(onShelfCount).toHaveBeenLastCalledWith(1)
   })
 })
+
+describe('hideHeader', () => {
+  // /week carries its own masthead, breadcrumb and week anchoring. The
+  // planning header sat under all of it repeating the date range and offering
+  // a Done button wired to a no-op.
+  it('omits the planning header when the host page owns its chrome', () => {
+    render(
+      <PlanningSession
+        tasks={[]} events={[]} routines={[]}
+        onUpdateTask={vi.fn()} onPushTask={vi.fn()} onClose={vi.fn()}
+        embedded hideHeader
+      />,
+    )
+    expect(screen.queryByText('Plan Your Time')).not.toBeInTheDocument()
+    expect(screen.queryByText('Drag tasks to schedule them')).not.toBeInTheDocument()
+  })
+
+  it('still renders it for hosts that rely on it', () => {
+    render(
+      <PlanningSession
+        tasks={[]} events={[]} routines={[]}
+        onUpdateTask={vi.fn()} onPushTask={vi.fn()} onClose={vi.fn()}
+      />,
+    )
+    expect(screen.getByText('Plan Your Time')).toBeInTheDocument()
+  })
+})
