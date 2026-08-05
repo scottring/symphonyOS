@@ -11,6 +11,8 @@ import {
 } from '@/lib/taskAttachments'
 import { CameraCaptureModal } from '@/components/capture/CameraCaptureModal'
 import { AttachmentFacets, type FacetPromotions } from './AttachmentFacets'
+import { DocumentProposalRow } from './DocumentProposal'
+import { setDocumentStatus } from '@/lib/taskAttachments'
 
 interface PanelPhotosProps {
   entityType: AttachmentEntityType
@@ -95,6 +97,11 @@ export function PanelPhotos({ entityType, entityId, entityContext, promotions, d
       setBusy(false)
     }
   }, [entityType, entityId, entityContext, reload, flashNotice])
+
+  const answerProposal = useCallback(async (id: string, status: 'kept' | 'dismissed') => {
+    if (await setDocumentStatus(id, status)) await reload()
+    else flashNotice("Couldn't update that document")
+  }, [reload, flashNotice])
 
   const remove = useCallback(async (att: Attachment) => {
     setBusy(true)
@@ -332,6 +339,14 @@ export function PanelPhotos({ entityType, entityId, entityContext, promotions, d
         <div key={`facets-${att.id}`}>
           {analyzingIds.has(att.id) && !att.analyzedAt && (
             <p className="text-[11px] text-neutral-400 mt-1.5 animate-pulse">Reading {att.fileName}…</p>
+          )}
+          {att.documentStatus === 'proposed' && att.documentKind && (
+            <DocumentProposalRow
+              kind={att.documentKind}
+              label={att.documentLabel ?? att.fileName}
+              onKeep={() => void answerProposal(att.id, 'kept')}
+              onDismiss={() => void answerProposal(att.id, 'dismissed')}
+            />
           )}
           <AttachmentFacets facets={att.facets} promotions={promotions} />
         </div>
