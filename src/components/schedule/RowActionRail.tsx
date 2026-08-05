@@ -30,12 +30,16 @@ const SLOT = 'w-7 h-7 flex items-center justify-center'
 /**
  * The assignee cell is wider than an icon cell because the avatar stack grows
  * with the number of people: MultiAssigneeDropdown draws up to four 24px
- * circles at -8px overlap, so 24px for one and 72px for four. It is the LAST
- * cell, so letting it size to its content would push every column to its left
- * around as the assignees change — the exact bug this rail exists to kill.
- * Reserve the maximum and right-align inside it: the rightmost avatar then
- * lands on the same x on every row, and the slack falls as whitespace between
- * the context icon and the stack, where it reads as padding.
+ * circles at -8px overlap, so 24px for one and 72px for four. Reserving the
+ * maximum is what stops that growth shoving its neighbours around as the
+ * assignees change — the exact bug this rail exists to kill. Because EVERY
+ * cell is a reserved fixed width, the slot order below is free: it is a
+ * reading decision, not a layout constraint.
+ *
+ * Right-aligned inside the cell (not centred) so the stack sits flush against
+ * the context icon that follows it. The reserve then spends itself as
+ * whitespace on the cell's LEFT, where it merges with the title column's own
+ * slack and reads as the gap before the rail rather than a hole inside it.
  */
 const WHO_SLOT = 'w-[4.5rem] h-7 flex items-center justify-end'
 
@@ -108,10 +112,17 @@ function SkipRoutineButton({ item }: { item: TimelineItem }) {
  * column absorbed the slack, only the last one ever formed a column. Nothing
  * down the page lined up. Reserve the shape and the columns hold.
  *
- * Slot order is fixed: verb | overflow | context | assignee. Exactly one verb
+ * Slot order is fixed: assignee | context | verb | overflow. Exactly one verb
  * exists per row type — a task reschedules, a routine skips, a timed event
  * starts — so they share one slot without ever competing for it. That is what
  * lets the rail be four cells wide instead of six.
+ *
+ * The order reads WHO -> WHAT KIND -> DO IT -> MORE: identity and
+ * classification first, because "is this mine?" is the question you ask of a
+ * whole list at once and it wants a column near the text; the two action
+ * controls sit outboard, where a mis-aimed tap is least costly. Any order is
+ * equally stable — every cell is a reserved width — so this is chosen for
+ * reading, not for layout.
  *
  * The rail carries ACTIONS only. State (flagged for discussion, subtask
  * counts, project) belongs with the title, because a strip that means two
@@ -193,11 +204,12 @@ export function RowActionRail({
     </div>
   ) : null
 
+  // assignee | context | verb | overflow — see the slot-order note above.
   const cells: Array<{ node: React.ReactNode; className: string }> = [
+    { node: who, className: WHO_SLOT },
+    { node: context, className: SLOT },
     { node: verb, className: SLOT },
     { node: menu, className: SLOT },
-    { node: context, className: SLOT },
-    { node: who, className: WHO_SLOT },
   ]
 
   return (

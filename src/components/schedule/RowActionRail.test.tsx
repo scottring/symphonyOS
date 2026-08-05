@@ -58,6 +58,16 @@ function renderRail(overrides: Partial<TimelineItem> = {}, variant: 'full' | 'mi
 
 const slots = (container: HTMLElement) => container.querySelectorAll('[data-rail-slot]')
 
+// Slot order: assignee | context | verb | overflow. Named rather than inlined
+// so re-ordering the rail is one edit here, not a hunt through every index —
+// these tests care WHICH control sits in a cell, not where the cell falls.
+const WHO = 0
+const CONTEXT = 1
+const VERB = 2
+const OVERFLOW = 3
+/** The three plain 28px icon cells — everything except the wider assignee cell. */
+const ICON_SLOTS = [CONTEXT, VERB, OVERFLOW]
+
 describe('RowActionRail', () => {
   // The whole point of the rail: the same number of cells on every row, so the
   // controls form columns down the page. Before this, a task rendered six
@@ -83,28 +93,28 @@ describe('RowActionRail', () => {
   describe('the verb slot', () => {
     it('holds Reschedule for an open task', () => {
       const { container } = renderRail({ type: 'task' })
-      expect(slots(container)[0].querySelector('[aria-label="Reschedule"]')).toBeTruthy()
+      expect(slots(container)[VERB].querySelector('[aria-label="Reschedule"]')).toBeTruthy()
     })
 
     it('holds Skip today for an open routine', () => {
       const { container } = renderRail({ type: 'routine', id: 'routine-1' })
-      expect(slots(container)[0].querySelector('[aria-label="Skip today"]')).toBeTruthy()
+      expect(slots(container)[VERB].querySelector('[aria-label="Skip today"]')).toBeTruthy()
     })
 
     it('holds Start meeting for a timed event', () => {
       const { container } = renderRail({ type: 'event', id: 'event-1', allDay: false })
-      expect(slots(container)[0].querySelector('[aria-label="Start meeting"]')).toBeTruthy()
+      expect(slots(container)[VERB].querySelector('[aria-label="Start meeting"]')).toBeTruthy()
     })
 
     it('is empty — but still present — on a completed task', () => {
       const { container } = renderRail({ type: 'task', completed: true })
-      expect(slots(container)[0].querySelector('button')).toBeNull()
+      expect(slots(container)[VERB].querySelector('button')).toBeNull()
       expect(slots(container)).toHaveLength(4)
     })
 
     it('is empty on an all-day event, which has no meeting to start', () => {
       const { container } = renderRail({ type: 'event', id: 'event-1', allDay: true })
-      expect(slots(container)[0].querySelector('button')).toBeNull()
+      expect(slots(container)[VERB].querySelector('button')).toBeNull()
     })
 
     it('never holds more than one verb', () => {
@@ -114,7 +124,7 @@ describe('RowActionRail', () => {
         ['e', { type: 'event', id: 'event-1', allDay: false }, 'full'],
       ] as Array<[string, Partial<TimelineItem>, 'full' | 'minimal']>) {
         const { container, unmount } = renderRail(overrides, variant)
-        expect(slots(container)[0].querySelectorAll('button').length).toBeLessThanOrEqual(1)
+        expect(slots(container)[VERB].querySelectorAll('button').length).toBeLessThanOrEqual(1)
         unmount()
       }
     })
@@ -123,46 +133,47 @@ describe('RowActionRail', () => {
   describe('the overflow slot', () => {
     it('holds the actions menu on the full variant', () => {
       const { container } = renderRail({ type: 'task' })
-      expect(slots(container)[1].querySelector('[aria-label="Item actions"]')).toBeTruthy()
+      expect(slots(container)[OVERFLOW].querySelector('[aria-label="Item actions"]')).toBeTruthy()
     })
 
     it('is empty on the minimal variant, which drops the menu', () => {
       const { container } = renderRail({ type: 'routine', id: 'routine-1' }, 'minimal')
-      expect(slots(container)[1].querySelector('[aria-label="Item actions"]')).toBeNull()
+      expect(slots(container)[OVERFLOW].querySelector('[aria-label="Item actions"]')).toBeNull()
     })
   })
 
   describe('sizing', () => {
     it('gives the three icon slots the same 28px box', () => {
       const { container } = renderRail({ type: 'task' })
-      Array.from(slots(container)).slice(0, 3).forEach((slot) => {
+      ICON_SLOTS.map((i) => slots(container)[i]).forEach((slot) => {
         expect(slot.className).toContain('w-7')
         expect(slot.className).toContain('h-7')
       })
     })
 
-    // The avatar stack is 24px for one person and 72px for four. As the LAST
-    // cell, sizing it to content would shove every column to its left around
-    // whenever assignees change — the bug the rail exists to kill.
+    // The avatar stack is 24px for one person and 72px for four. Sizing it to
+    // content would shove its neighbouring cells around whenever assignees
+    // change — the bug the rail exists to kill. Reserving the max is what makes
+    // the slot order a free choice.
     it('reserves the full avatar-stack width and right-aligns it', () => {
       const { container } = renderRail({ type: 'task' })
-      const who = slots(container)[3]
+      const who = slots(container)[WHO]
       expect(who.className).toContain('w-[4.5rem]')
       expect(who.className).toContain('justify-end')
     })
 
     it('keeps the assignee cell the same width however many people are on it', () => {
       const one = renderRail({ type: 'task' })
-      const oneWidth = slots(one.container)[3].className
+      const oneWidth = slots(one.container)[WHO].className
       one.unmount()
 
       const many = renderRail({ type: 'task', assignedTo: 'a' })
-      expect(slots(many.container)[3].className).toBe(oneWidth)
+      expect(slots(many.container)[WHO].className).toBe(oneWidth)
     })
 
     it('uses the 28px ContextPicker so it matches the other cells', () => {
       const { container } = renderRail({ type: 'task' })
-      const trigger = slots(container)[2].querySelector('[aria-label="Set context"]')
+      const trigger = slots(container)[CONTEXT].querySelector('[aria-label="Set context"]')
       expect(trigger?.className).toContain('p-1.5')
     })
   })
