@@ -19,6 +19,10 @@ interface Props {
     dinnerStart: Date | null;
     photoUrl?: string | null;
     onTap?: () => void;
+    /** Set only when the card is showing a day other than today. */
+    dayLabel?: string | null;
+    onPrevDay?: (() => void) | null;
+    onNextDay?: (() => void) | null;
   };
   tomorrowRows: { id: string; time: string; title: string }[];
   glanceRows: GlanceRollupRow[];
@@ -38,6 +42,9 @@ export function WallV2RightColumn({ dinner, tomorrowRows, glanceRows, question, 
         dinnerStart={dinner.dinnerStart}
         photoUrl={dinner.photoUrl}
         onTap={dinner.onTap}
+        dayLabel={dinner.dayLabel}
+        onPrevDay={dinner.onPrevDay}
+        onNextDay={dinner.onNextDay}
       />
       {pinnedLists}
       <WallV2TomorrowCard rows={tomorrowRows} />
