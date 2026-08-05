@@ -122,10 +122,17 @@ export function TiptapEditor({
     }
   }, [content, editor])
 
-  // Update editable state
+  // Update editable state.
+  //
+  // The second argument MUST stay false. Tiptap's setEditable(editable,
+  // emitUpdate = true) emits an `update` carrying no document change, which
+  // onUpdate below turns into onChange(getHTML()) — a write the user never
+  // made. Panels mount this editor before their notes have loaded, so that
+  // echo persists an empty document over the real note. It destroyed a live
+  // event note on 2026-08-05. Editability is not content; it must never write.
   useEffect(() => {
     if (editor) {
-      editor.setEditable(editable)
+      editor.setEditable(editable, false)
     }
   }, [editor, editable])
 
