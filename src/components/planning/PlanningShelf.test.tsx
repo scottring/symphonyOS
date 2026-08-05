@@ -293,3 +293,74 @@ describe('PlanningShelf — stale week placements', () => {
     expect(screen.queryByRole('menuitem', { name: 'Bring to this week' })).not.toBeInTheDocument()
   })
 })
+
+describe('PlanningShelf board layout', () => {
+  const boardTasks = [
+    task('a', 'Rug', 'proj'),
+    task('b', 'Lamp', 'proj'),
+    task('c', 'Research keyboards'),
+  ]
+  const boardGroups = [
+    { id: 'project:proj', label: 'Living room upgrades', kind: 'project' as const, taskIds: ['a', 'b'] },
+    { id: 'unfiled', label: 'Unfiled', kind: 'unfiled' as const, taskIds: ['c'] },
+  ]
+
+  // No DndContext: board mode is native-drag only, and PlanningShelf itself
+  // calls no dnd-kit hooks.
+  const renderBoard = (over: Partial<PlanningShelfProps> = {}) => {
+    const props = baseProps({
+      layout: 'board', dragMode: 'native', carryOverIds: new Set<string>(),
+      tasks: boardTasks, groups: boardGroups, ...over,
+    })
+    render(<PlanningShelf {...props} />)
+    return props
+  }
+
+  it('renders one block per group, each showing all its members', () => {
+    renderBoard()
+    const block = screen.getByTestId('shelf-block-project:proj')
+    expect(block).toHaveTextContent('Living room upgrades')
+    expect(block).toHaveTextContent('Rug')
+    expect(block).toHaveTextContent('Lamp')
+  })
+
+  // The chevron existed to tame the wrap-flow. Once blocks are boxed, hiding
+  // moves behind a disclosure is exactly what let 24 pile up unnoticed.
+  it('renders no expand/collapse control and no overflow control', () => {
+    renderBoard()
+    expect(screen.queryByText(/more$/)).not.toBeInTheDocument()
+    expect(screen.queryByText('Show fewer')).not.toBeInTheDocument()
+  })
+
+  it('gives a cluster header a drag handle carrying every member id', () => {
+    renderBoard()
+    const handle = screen.getByTestId('shelf-block-drag-project:proj')
+    const setData = vi.fn()
+    fireEvent.dragStart(handle, { dataTransfer: { setData } })
+    expect(setData).toHaveBeenCalledWith('text/task-ids', 'a,b')
+  })
+
+  // Unfiled is a residue, not a cluster — dragging it would fling unrelated
+  // moves into one week.
+  it('gives the Unfiled block NO drag handle', () => {
+    renderBoard()
+    expect(screen.queryByTestId('shelf-block-drag-unfiled')).not.toBeInTheDocument()
+    expect(screen.getByTestId('shelf-block-unfiled')).toHaveTextContent('Research keyboards')
+  })
+
+  it('hosts the composer inside the Unfiled block, which renders even when empty', () => {
+    renderBoard({
+      tasks: [task('a', 'Rug', 'proj'), task('b', 'Lamp', 'proj')],
+      groups: [boardGroups[0]],
+      draftPlaceholder: 'Add a chunk to this month',
+    })
+    const unfiled = screen.getByTestId('shelf-block-unfiled')
+    expect(unfiled).toContainElement(screen.getByPlaceholderText('Add a chunk to this month'))
+  })
+
+  it('flow layout is untouched — /week still gets its wrap-flow pills', () => {
+    renderShelf({ tasks: boardTasks, carryOverIds: new Set<string>() })
+    expect(screen.queryByTestId('shelf-block-unfiled')).not.toBeInTheDocument()
+    expect(screen.getByText('Rug')).toBeInTheDocument()
+  })
+})

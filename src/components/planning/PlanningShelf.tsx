@@ -23,7 +23,7 @@ import {
 import { useDraggable, useDroppable } from '@dnd-kit/core'
 import {
   Sparkles, Plus, X, Check, GitMerge, Archive,
-  CornerRightDown, CalendarClock, Loader2, ChevronRight, ChevronDown,
+  CornerRightDown, CalendarClock, Loader2, ChevronRight, ChevronDown, GripVertical,
 } from 'lucide-react'
 import type { Task, TaskBucket } from '@/types/task'
 import type { TendState } from '@/hooks/useTendWeek'
@@ -89,12 +89,20 @@ export interface PlanningShelfProps {
    *  as the single move it is. Members expand on tap. Tasks in no group render
    *  as ordinary pills after the groups. Omit for the flat shelf (week page). */
   groups?: ShelfGroup[]
+  /** 'board' renders each group as a boxed block in a CSS multi-column, with
+   *  every member always visible and a draggable cluster header. Used by
+   *  /month, whose pool carries grouping and runs 20+ items; /week keeps the
+   *  default wrap-flow, where a handful of pills reads fine. */
+  layout?: 'flow' | 'board'
 }
 
 export interface ShelfGroup {
   id: string
   /** The move this cluster really is — a season pick, or the project. */
   label: string
+  /** Board layout only. 'unfiled' is the residue, not a cluster: it renders
+   *  last, hosts the composer, and gets no drag handle. */
+  kind?: 'pick' | 'project' | 'unfiled'
   taskIds: string[]
 }
 
@@ -272,11 +280,51 @@ function NativeShelfFrame({ onNativeUnschedule, children }: {
       onDrop={(e) => {
         e.preventDefault()
         setIsOver(false)
-        const id = e.dataTransfer.getData('text/task-id')
+        const many = e.dataTransfer.getData('text/task-ids')
+        const id = many ? many.split(',').filter(Boolean)[0] : e.dataTransfer.getData('text/task-id')
         if (id) onNativeUnschedule?.(id)
       }}
     >
       {children(isOver)}
+    </div>
+  )
+}
+
+// One block on the board. The header is the cluster's drag handle: dropping
+// it on a week row places every member at once, which is the whole payoff of
+// grouping — placing 24 moves one at a time is the chore the board exists to
+// kill. Unfiled gets no handle (see ShelfGroup.kind).
+function ShelfBlock({ group, members, draggable: canDrag, children }: {
+  group: ShelfGroup
+  members: Task[]
+  draggable: boolean
+  children: ReactNode
+}) {
+  return (
+    <div
+      data-testid={`shelf-block-${group.id}`}
+      className="mb-2 break-inside-avoid rounded-lg border border-neutral-200 bg-white px-3 py-2"
+    >
+      <div className="flex items-center gap-1.5 mb-1.5">
+        {canDrag && (
+          <span
+            data-testid={`shelf-block-drag-${group.id}`}
+            draggable
+            onDragStart={(e) => e.dataTransfer.setData('text/task-ids', members.map((t) => t.id).join(','))}
+            title={`Place all ${members.length} on a week`}
+            className="shrink-0 cursor-grab active:cursor-grabbing text-neutral-300 hover:text-primary-500 transition-colors"
+          >
+            <GripVertical className="w-3.5 h-3.5" />
+          </span>
+        )}
+        <span className={`flex-1 min-w-0 text-[11px] font-semibold uppercase tracking-wide truncate ${
+          group.kind === 'unfiled' ? 'text-neutral-400' : 'text-primary-800'
+        }`}>
+          {group.label}
+        </span>
+        <span className="shrink-0 text-[11px] text-neutral-400">{members.length}</span>
+      </div>
+      <div className="flex flex-wrap items-center gap-1.5">{children}</div>
     </div>
   )
 }
@@ -289,7 +337,7 @@ export function PlanningShelf(props: PlanningShelfProps) {
     draft, onDraftChange, onSubmitDraft, hiddenCount = 0, showingAll = false, onToggleShowAll,
     tend, onApplyProposal, dragMode = 'dndkit', onNativeUnschedule,
     draftPlaceholder = 'Add to this week…', tendingLabel = 'Tending this week',
-    poolLabel = 'To place', groups,
+    poolLabel = 'To place', groups, layout = 'flow',
   } = props
   const [expanded, setExpanded] = useState(false)
   const [openGroups, setOpenGroups] = useState<Set<string>>(() => new Set())
@@ -338,11 +386,42 @@ export function PlanningShelf(props: PlanningShelfProps) {
     return { rolled, ungrouped: ordered.filter((t) => !taken.has(t.id)) }
   }, [groups, ordered])
 
+  // Board blocks. monthShelfGroups is a total partition, so `ungrouped` is
+  // normally empty — but folding any remainder into Unfiled here keeps this
+  // component correct for any caller, since the board renders blocks and
+  // nothing else. Unfiled always exists in board mode even at zero members:
+  // it hosts the composer, and a newly captured chunk starts unfiled.
+  const boardBlocks = useMemo(() => {
+    if (layout !== 'board') return [] as { group: ShelfGroup; tasks: Task[] }[]
+    const blocks = rolled.filter((b) => b.group.kind !== 'unfiled')
+    const unfiledGroup = rolled.find((b) => b.group.kind === 'unfiled')
+    const unfiledTasks = [...(unfiledGroup?.tasks ?? []), ...ungrouped]
+    return [
+      ...blocks,
+      { group: unfiledGroup?.group ?? { id: 'unfiled', label: 'Unfiled', kind: 'unfiled' as const, taskIds: [] }, tasks: unfiledTasks },
+    ]
+  }, [layout, rolled, ungrouped])
+
   const visible = expanded ? ungrouped : ungrouped.slice(0, SHELF_COLLAPSED_COUNT)
   const overflow = ungrouped.length - visible.length
   const carriedCount = ordered.filter((t) => carryOverIds.has(t.id)).length
   const reviewing = tend.status === 'reviewing'
   const Pill = dragMode === 'native' ? NativeShelfPill : ShelfPill
+
+  const composer = (
+    <span className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-neutral-300 px-3 py-1.5">
+      <button type="button" onClick={onSubmitDraft} aria-label="Add task"
+        className="w-5 h-5 rounded-full bg-primary-600 text-white grid place-items-center hover:bg-primary-700">
+        <Plus className="w-3.5 h-3.5" />
+      </button>
+      <input type="text" value={draft} onChange={(e) => onDraftChange(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter') onSubmitDraft() }}
+        onPointerDown={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
+        placeholder={draftPlaceholder}
+        className="w-64 bg-transparent text-sm placeholder:text-neutral-400 focus:outline-none" />
+    </span>
+  )
 
   const content = (isOver: boolean) => (
     <>
@@ -411,6 +490,26 @@ export function PlanningShelf(props: PlanningShelfProps) {
             <p className="w-full text-xs text-neutral-400">AI pass failed — showing the built-in checks only.</p>
           )}
         </div>
+      ) : layout === 'board' ? (
+        <div className="columns-1 sm:columns-2 lg:columns-3 gap-2">
+          {boardBlocks.map(({ group, tasks: members }) => (
+            <ShelfBlock
+              key={group.id}
+              group={group}
+              members={members}
+              draggable={dragMode === 'native' && group.kind !== 'unfiled' && members.length > 0}
+            >
+              {members.map((t) => (
+                <Pill key={t.id} task={t} carried={carryOverIds.has(t.id)}
+                  staleWeek={staleWeekIds.has(t.id)} onBringForward={onBringForward}
+                  projectName={t.projectId ? projectsMap.get(t.projectId)?.name : undefined}
+                  onOpenTask={onOpenTask} onSetBucket={onSetBucket} onDeleteTask={onDeleteTask}
+                  onPushTask={onPushTask} onCompleteTask={onCompleteTask} fileUnder={fileUnder} />
+              ))}
+              {group.kind === 'unfiled' && composer}
+            </ShelfBlock>
+          ))}
+        </div>
       ) : (
         <div className="flex flex-wrap items-center gap-2">
           {rolled.map(({ group, tasks: members }) => {
@@ -467,18 +566,7 @@ export function PlanningShelf(props: PlanningShelfProps) {
               {showingAll ? 'Week only' : `+${hiddenCount} from the backlog`}
             </button>
           )}
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-neutral-300 px-3 py-1.5">
-            <button type="button" onClick={onSubmitDraft} aria-label="Add task"
-              className="w-5 h-5 rounded-full bg-primary-600 text-white grid place-items-center hover:bg-primary-700">
-              <Plus className="w-3.5 h-3.5" />
-            </button>
-            <input type="text" value={draft} onChange={(e) => onDraftChange(e.target.value)}
-              onKeyDown={(e) => { if (e.key === 'Enter') onSubmitDraft() }}
-              onPointerDown={(e) => e.stopPropagation()}
-              onMouseDown={(e) => e.stopPropagation()}
-              placeholder={draftPlaceholder}
-              className="w-64 bg-transparent text-sm placeholder:text-neutral-400 focus:outline-none" />
-          </span>
+          {composer}
           {ordered.length === 0 && (
             <span className="text-sm text-neutral-400 py-1">
               {isOver ? 'Drop to unschedule' : 'Everything is placed on a day.'}
