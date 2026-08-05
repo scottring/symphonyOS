@@ -1,5 +1,8 @@
 // Entity types that can have attachments
-export type AttachmentEntityType = 'task' | 'project' | 'event_note' | 'instance_note' | 'note' | 'routine'
+// 'document' is a Documents-shelf upload with no parent entity: entity_id is
+// the user's own id. Mirrors the CHECK constraint on attachments.entity_type
+// and the parallel list in src/lib/taskAttachments.ts — keep all three aligned.
+export type AttachmentEntityType = 'task' | 'project' | 'event_note' | 'instance_note' | 'note' | 'routine' | 'document'
 
 // ============================================================================
 // Attachment
