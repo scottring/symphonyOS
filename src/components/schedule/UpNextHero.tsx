@@ -8,14 +8,16 @@
  * preamble. The hero item is lifted out of its day section; completing or
  * passing it promotes the next one.
  */
-import { Check, ArrowUpRight } from 'lucide-react'
+import { ArrowUpRight } from 'lucide-react'
 import type { Project } from '@/types/project'
 import type { TaskContext } from '@/types/task'
 import { formatUpNextStatus, type UpNextSelection } from '@/lib/today/upNext'
 import { RescheduleButton } from './RescheduleButton'
+import { TaskCheckbox } from './TaskCheckbox'
 import { SchedulePopover, ContextPicker } from '@/components/triage'
 import { AssigneeDropdown, MultiAssigneeDropdown } from '@/components/family'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
+import { DOMAIN_COLORS } from '@/lib/domainColors'
 
 interface UpNextHeroProps {
   selection: UpNextSelection
@@ -105,6 +107,23 @@ export function UpNextHero({ selection, onSelectItem, onToggleTask, projectsMap 
           )}
         </div>
 
+        {/* Completion is a check circle here for the same reason it is one on
+            every timeline row: the hero is the same commitment, lifted. A
+            distinct "Done" pill made the most prominent card on the page the
+            one place the app's own gesture didn't work. Left of the title,
+            where every other row puts it. */}
+        {taskId && onToggleTask && (
+          <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
+            <TaskCheckbox
+              completed={item.completed}
+              isWaiting={item.isWaiting}
+              onToggleComplete={() => onToggleTask(taskId)}
+              onToggleWaiting={() => ctx.onToggleWaiting?.(taskId)}
+              contextColor={item.context ? DOMAIN_COLORS[item.context]?.dot : undefined}
+            />
+          </div>
+        )}
+
         <div className="min-w-0 flex-1">
           <p className="text-[17px] md:text-lg font-semibold text-neutral-900 truncate">
             {item.title}
@@ -124,13 +143,11 @@ export function UpNextHero({ selection, onSelectItem, onToggleTask, projectsMap 
           )}
         </div>
 
+        {/* Same reading order as RowActionRail: assignee -> context -> verb.
+            The hero has no overflow slot (it carries no menu), but the three
+            controls it does share with a row must not appear in a different
+            sequence from the rows directly beneath it. */}
         <div className="shrink-0 flex items-center gap-1.5" onClick={(e) => e.stopPropagation()}>
-          {/* Tasks get the same one-tap reschedule the timeline rows have —
-              triaging out of the hero must not require opening the panel. */}
-          {item.type === 'task' && item.originalTask && <RescheduleButton item={item} />}
-          {onContextChange && (
-            <ContextPicker value={item.context ?? undefined} onChange={onContextChange} />
-          )}
           {familyMembers.length > 0 && onAssignAll ? (
             <MultiAssigneeDropdown
               members={familyMembers}
@@ -147,16 +164,16 @@ export function UpNextHero({ selection, onSelectItem, onToggleTask, projectsMap 
               size="sm"
             />
           ) : null}
-          {taskId && onToggleTask ? (
-            <button
-              type="button"
-              onClick={() => onToggleTask(taskId)}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-primary-600 px-3.5 py-2 text-[14px] font-medium text-white hover:bg-primary-700 transition-colors"
-            >
-              <Check className="w-4 h-4" />
-              Done
-            </button>
-          ) : (
+          {onContextChange && (
+            <ContextPicker value={item.context ?? undefined} onChange={onContextChange} />
+          )}
+          {/* Tasks get the same one-tap reschedule the timeline rows have —
+              triaging out of the hero must not require opening the panel. */}
+          {item.type === 'task' && item.originalTask && <RescheduleButton item={item} />}
+          {/* Non-tasks (events, routines) have nothing to check off, so they
+              keep an explicit way in. A task needs none — its check circle is
+              left of the title and the whole card already opens on tap. */}
+          {!(taskId && onToggleTask) && (
             <button
               type="button"
               onClick={() => onSelectItem(item.id)}

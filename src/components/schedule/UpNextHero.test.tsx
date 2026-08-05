@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { screen } from '@testing-library/react'
+import { screen, fireEvent } from '@testing-library/react'
 import { render } from '@/test/test-utils'
 import { ScheduleActionsProvider, type ScheduleActionsValue } from '@/contexts/ScheduleActionsContext'
 import type { TimelineItem } from '@/types/timeline'
@@ -110,5 +110,55 @@ describe('UpNextHero triage set', () => {
     // When/context are independent of family members and still render.
     expect(screen.getByTitle('Change time')).toBeInTheDocument()
     expect(screen.getByLabelText('Set context')).toBeInTheDocument()
+  })
+})
+
+// The hero is the same commitment as a timeline row, lifted to the top of the
+// page — so it completes with the same gesture. It used to carry a bespoke
+// "Done" pill, which made the most prominent card on the page the one place
+// the app's own check circle didn't appear.
+describe('UpNextHero completion gesture', () => {
+  function renderTask(item: TimelineItem = taskItem()) {
+    const onToggleTask = vi.fn()
+    const selection: UpNextSelection = { item, status: 'upcoming', minutes: 10 }
+    render(
+      <ScheduleActionsProvider value={baseCtx()}>
+        <UpNextHero selection={selection} onSelectItem={vi.fn()} onToggleTask={onToggleTask} />
+      </ScheduleActionsProvider>
+    )
+    return { onToggleTask }
+  }
+
+  it('completes a task with the check circle, not a Done pill', () => {
+    renderTask()
+    expect(screen.getByLabelText(/mark complete/i)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^done$/i })).not.toBeInTheDocument()
+  })
+
+  // TaskCheckbox completes on mouse-UP via useLongPress (a 1.5s hold means
+  // "waiting" instead), so a bare click() never fires it.
+  it('toggles the task through the check circle', () => {
+    const { onToggleTask } = renderTask()
+    const circle = screen.getByLabelText(/mark complete/i)
+    fireEvent.mouseDown(circle)
+    fireEvent.mouseUp(circle)
+    expect(onToggleTask).toHaveBeenCalledWith('t1')
+  })
+
+  it('offers a completed task the way back, same as a row', () => {
+    renderTask(taskItem({ completed: true }))
+    expect(screen.getByLabelText(/mark incomplete/i)).toBeInTheDocument()
+  })
+
+  // An event has nothing to check off, so it keeps an explicit way in.
+  it('gives a non-task no check circle but keeps Open', () => {
+    renderHero(eventItem())
+    expect(screen.queryByLabelText(/mark complete/i)).not.toBeInTheDocument()
+    expect(screen.getByLabelText('Open')).toBeInTheDocument()
+  })
+
+  it('drops Open for a task — the card itself opens', () => {
+    renderTask()
+    expect(screen.queryByLabelText('Open')).not.toBeInTheDocument()
   })
 })

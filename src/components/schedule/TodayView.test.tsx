@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { screen, fireEvent } from '@testing-library/react'
+import { screen, fireEvent, within } from '@testing-library/react'
 import { render } from '@/test/test-utils'
 import { ScheduleActionsProvider } from '@/contexts/ScheduleActionsContext'
 import { TodayView } from './TodayView'
@@ -325,8 +325,10 @@ describe('TodayView', () => {
       const hero = screen.getByTestId('up-next-hero')
       expect(hero).toHaveTextContent('Call the pediatrician')
       expect(hero).toHaveTextContent(/since|starts in|starting now/i)
-      // Tasks get a one-tap Done as the hero action
-      expect(screen.getByRole('button', { name: /done/i })).toBeInTheDocument()
+      // Completion uses the app's check circle, the same gesture every
+      // timeline row carries — not a hero-only "Done" pill.
+      expect(within(hero).getByLabelText(/mark complete/i)).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /^done$/i })).not.toBeInTheDocument()
       // The hero item is lifted OUT of its day section — it must not render twice
       expect(screen.getAllByText('Call the pediatrician')).toHaveLength(1)
     })
