@@ -305,17 +305,14 @@ export function PlanningColumn({
           {/* A task that still carries a clock time (written before this rung
               stopped drawing hours, or dated from Today) must NOT vanish just
               because there is no hour row to place it on — it renders as a chip
-              in time order. Dropping it here re-writes it all-day. */}
+              in time order. Dropping it here re-writes it all-day.
+              It renders through the SAME AllDayChip as the lane's own tasks:
+              these were once a plain button, which made every timed task on the
+              week grid immovable — no drag to another day, and no drag back to
+              the shelf. A task's mobility must not depend on whether it happens
+              to carry an hour. */}
           {placedTasks.map(({ task }) => (
-            <button
-              key={task.id}
-              type="button"
-              onClick={() => setRaisedId(task.id)}
-              title={task.title}
-              className="block w-full truncate rounded border border-primary-200 bg-primary-50 px-1.5 py-1 text-left text-[10.5px] text-primary-700"
-            >
-              {task.title}
-            </button>
+            <AllDayChip key={task.id} task={task} onClick={() => setRaisedId(task.id)} />
           ))}
           {placedEvents.map(({ event }) => (
             <div

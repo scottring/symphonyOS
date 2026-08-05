@@ -709,6 +709,25 @@ describe('PlanningSession', () => {
       expect(lanes).toHaveLength(7)
     })
 
+    // A task's mobility must not depend on whether it happens to carry an hour.
+    // Timed tasks used to render as a plain button in the day column, so every
+    // task scheduled from Today (or ⌘K, or the picker) was stuck on the week
+    // grid — it could not be dragged to another day, nor back to the shelf.
+    it('a task that still carries a clock time is draggable in the day column', () => {
+      const timed = createMockTask({
+        title: 'Call the plumber',
+        bucket: 'timed',
+        scheduledFor: new Date(2026, 6, 20, 14, 0, 0, 0),
+        isAllDay: false,
+      })
+      const { container } = render(<PlanningSession {...dayProps} tasks={[timed]} />)
+
+      const column = container.querySelector(`[data-testid="day-column-${formatDateKey(day)}"]`)!
+      const chip = [...column.querySelectorAll('button')].find((b) => b.textContent === 'Call the plumber')
+      expect(chip).toBeTruthy()
+      expect(chip!.getAttribute('aria-roledescription')).toBe('draggable')
+    })
+
     it('the default grain keeps its hour grid (Today still asks what time)', () => {
       render(<PlanningSession {...dayProps} placementGrain="time" />)
       expect(screen.getByText('6 AM')).toBeInTheDocument()
@@ -875,7 +894,6 @@ describe('PlanningSession — cross-day routine drops', () => {
   // the source column correctly declines to draw it and the target column never
   // receives it — it falls between the two and disappears.
   const sat = new Date(2026, 7, 1)
-  const sun = new Date(2026, 7, 2)
   const dayAfter = new Date(2026, 7, 2, 7, 0, 0, 0)
 
   const deferredInstance = (entityId: string) => ({
