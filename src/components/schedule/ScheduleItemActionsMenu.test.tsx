@@ -4,10 +4,13 @@ import { ScheduleItemActionsMenu } from './ScheduleItemActionsMenu'
 import { ScheduleActionsProvider, type ScheduleActionsValue } from '@/contexts/ScheduleActionsContext'
 import type { TimelineItem } from '@/types/timeline'
 
+type MenuProps = { onUpdateDiscussion?: (next: { needsDiscussion: boolean; discussionNote?: string }) => void }
+
 function renderMenu(
   item: TimelineItem,
   overrides: Partial<ScheduleActionsValue> = {},
   onOpenDetail: () => void = vi.fn(),
+  menuProps: MenuProps = {},
 ) {
   const value = {
     onToggleTask: vi.fn(),
@@ -16,7 +19,7 @@ function renderMenu(
   } as unknown as ScheduleActionsValue
   render(
     <ScheduleActionsProvider value={value}>
-      <ScheduleItemActionsMenu item={item} onOpenDetail={onOpenDetail} />
+      <ScheduleItemActionsMenu item={item} onOpenDetail={onOpenDetail} {...menuProps} />
     </ScheduleActionsProvider>
   )
   // open the menu
@@ -155,6 +158,68 @@ describe('ScheduleItemActionsMenu', () => {
   it('omits the waiting item for routines', () => {
     renderMenu(routineItem, { onUpdateTask: vi.fn() })
     expect(screen.queryByText('Waiting for…')).not.toBeInTheDocument()
+  })
+
+  // Promote-to-project and the discussion picker moved off the row and into
+  // this menu, so the row's action rail could be a fixed four slots.
+  describe('actions that moved off the row', () => {
+    it('offers Convert to project for an unlinked task', () => {
+      renderMenu(taskItem, {})
+      expect(screen.getByText('Convert to project')).toBeInTheDocument()
+    })
+
+    it('offers Promote to project for an unlinked event', () => {
+      renderMenu(eventItem, {})
+      expect(screen.getByText('Promote to project')).toBeInTheDocument()
+    })
+
+    it('offers View project instead when the item is already linked', () => {
+      const onOpenProject = vi.fn()
+      const linked = { ...taskItem, projectId: 'proj-1' } as unknown as TimelineItem
+      renderMenu(linked, { onOpenProject })
+
+      expect(screen.queryByText('Convert to project')).not.toBeInTheDocument()
+      fireEvent.click(screen.getByText('View project'))
+      expect(onOpenProject).toHaveBeenCalledWith('proj-1')
+    })
+
+    it('omits the promote item for routines', () => {
+      renderMenu(routineItem, {})
+      expect(screen.queryByText('Convert to project')).not.toBeInTheDocument()
+      expect(screen.queryByText('Promote to project')).not.toBeInTheDocument()
+    })
+
+    it('opens the discussion popover from the menu and reports the flag', () => {
+      const onUpdateDiscussion = vi.fn()
+      renderMenu(taskItem, {}, vi.fn(), { onUpdateDiscussion })
+
+      fireEvent.click(screen.getByText('Flag for discussion…'))
+      fireEvent.change(screen.getByPlaceholderText("What's the question?"), {
+        target: { value: 'ask Iris' },
+      })
+
+      expect(onUpdateDiscussion).toHaveBeenCalledWith({
+        needsDiscussion: true,
+        discussionNote: 'ask Iris',
+      })
+    })
+
+    it('labels the discussion item as an edit once the task is flagged', () => {
+      const flagged = { ...taskItem, needsDiscussion: true, discussionNote: 'ask Iris' } as unknown as TimelineItem
+      renderMenu(flagged, {}, vi.fn(), { onUpdateDiscussion: vi.fn() })
+
+      expect(screen.getByText('Edit discussion note')).toBeInTheDocument()
+    })
+
+    it('omits the discussion item when no handler is wired', () => {
+      renderMenu(taskItem, {})
+      expect(screen.queryByText('Flag for discussion…')).not.toBeInTheDocument()
+    })
+
+    it('omits the discussion item for events', () => {
+      renderMenu(eventItem, {}, vi.fn(), { onUpdateDiscussion: vi.fn() })
+      expect(screen.queryByText('Flag for discussion…')).not.toBeInTheDocument()
+    })
   })
 
   it('a TASK still offers Edit details (full panel)', () => {

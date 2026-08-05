@@ -63,7 +63,7 @@ interface ConvertTaskModalProps {
   onClose: () => void
 }
 
-function ConvertTaskModal({ item, onClose }: ConvertTaskModalProps) {
+export function ConvertTaskModal({ item, onClose }: ConvertTaskModalProps) {
   const ctx = useScheduleActionsContext()
   const modalRef = useRef<HTMLDivElement>(null)
   const searchRef = useRef<HTMLInputElement>(null)

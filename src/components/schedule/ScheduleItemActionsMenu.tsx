@@ -1,21 +1,31 @@
 import { useState, useCallback, useRef } from 'react'
-import { MoreHorizontal, Redo2, Clock, Trash2, CalendarCog, Hourglass } from 'lucide-react'
+import { MoreHorizontal, Redo2, Clock, Trash2, CalendarCog, Hourglass, FolderPlus, FolderOpen, MessageCircle } from 'lucide-react'
 import type { TimelineItem } from '@/types/timeline'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
+import { DiscussionPopover } from '@/components/triage'
 import { WaitingForPopover } from './WaitingForPopover'
+import { ConvertTaskModal } from './PromoteTaskToProjectButton'
+import { PromoteToProjectModal } from './PromoteToProjectButton'
 
 interface Props {
   item: TimelineItem
   /** Opens the full detail panel. */
   onOpenDetail: () => void
+  /**
+   * Tasks only — flag/unflag "needs discussion" and edit the note. The flag
+   * itself shows in the row's title cluster (state); this is where it's set.
+   */
+  onUpdateDiscussion?: (next: { needsDiscussion: boolean; discussionNote?: string }) => void
 }
 
-export function ScheduleItemActionsMenu({ item, onOpenDetail }: Props) {
+export function ScheduleItemActionsMenu({ item, onOpenDetail, onUpdateDiscussion }: Props) {
   const ctx = useScheduleActionsContext()
   const [open, setOpen] = useState(false)
   const [openUp, setOpenUp] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [waitingOpen, setWaitingOpen] = useState(false)
+  const [discussionOpen, setDiscussionOpen] = useState(false)
+  const [promoteOpen, setPromoteOpen] = useState(false)
   const triggerRef = useRef<HTMLButtonElement>(null)
 
   const close = useCallback(() => { setOpen(false); setConfirmDelete(false) }, [])
@@ -150,6 +160,46 @@ export function ScheduleItemActionsMenu({ item, onOpenDetail }: Props) {
               </button>
             )}
 
+            {/* Promote to project — moved off the row, where a hover-only icon
+                cost a permanent rail column for a rarely-taken action. */}
+            {(isTask || isEvent) && (
+              item.projectId ? (
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={run(() => ctx.onOpenProject?.(item.projectId!))}
+                  className="flex w-full text-left items-center gap-2.5 px-3 py-2.5 text-sm text-neutral-700 hover:bg-neutral-50"
+                >
+                  <FolderOpen className="w-4 h-4 text-neutral-400" />
+                  View project
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={(e) => { e.stopPropagation(); setOpen(false); setPromoteOpen(true) }}
+                  className="flex w-full text-left items-center gap-2.5 px-3 py-2.5 text-sm text-neutral-700 hover:bg-neutral-50"
+                >
+                  <FolderPlus className="w-4 h-4 text-neutral-400" />
+                  {isTask ? 'Convert to project' : 'Promote to project'}
+                </button>
+              )
+            )}
+
+            {/* Needs discussion — tasks only. The flag shows in the title
+                cluster; this is where you set it. */}
+            {isTask && onUpdateDiscussion && (
+              <button
+                type="button"
+                role="menuitem"
+                onClick={(e) => { e.stopPropagation(); setOpen(false); setDiscussionOpen(true) }}
+                className="flex w-full text-left items-center gap-2.5 px-3 py-2.5 text-sm text-neutral-700 hover:bg-neutral-50"
+              >
+                <MessageCircle className={`w-4 h-4 ${item.needsDiscussion ? 'text-primary-500' : 'text-neutral-400'}`} />
+                {item.needsDiscussion ? 'Edit discussion note' : 'Flag for discussion…'}
+              </button>
+            )}
+
             {/* Delete — task */}
             {isTask && ctx.onDeleteTask && item.originalTask && (
               <button
@@ -221,6 +271,37 @@ export function ScheduleItemActionsMenu({ item, onOpenDetail }: Props) {
             onCancel={() => setWaitingOpen(false)}
           />
         </>
+      )}
+
+      {discussionOpen && onUpdateDiscussion && (
+        <>
+          <button
+            type="button"
+            aria-hidden
+            tabIndex={-1}
+            className="fixed inset-0 z-40 cursor-default"
+            onClick={(e) => { e.stopPropagation(); setDiscussionOpen(false) }}
+          />
+          <DiscussionPopover
+            flagged={item.needsDiscussion ?? false}
+            note={item.discussionNote ?? ''}
+            onChange={({ flagged, note }) => onUpdateDiscussion({
+              needsDiscussion: flagged,
+              discussionNote: flagged ? note : undefined,
+            })}
+            onClose={() => setDiscussionOpen(false)}
+          />
+        </>
+      )}
+
+      {/* Promote modals live OUTSIDE the menu's own open-state: the menu closes
+          the moment you pick the item, and a modal mounted inside it would
+          unmount with it. */}
+      {promoteOpen && isTask && (
+        <ConvertTaskModal item={item} onClose={() => setPromoteOpen(false)} />
+      )}
+      {promoteOpen && isEvent && (
+        <PromoteToProjectModal item={item} onClose={() => setPromoteOpen(false)} />
       )}
     </div>
   )

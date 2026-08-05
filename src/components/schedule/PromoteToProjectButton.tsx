@@ -80,7 +80,7 @@ interface PromoteToProjectModalProps {
   onClose: () => void
 }
 
-function PromoteToProjectModal({ item, onClose }: PromoteToProjectModalProps) {
+export function PromoteToProjectModal({ item, onClose }: PromoteToProjectModalProps) {
   const ctx = useScheduleActionsContext()
   const modalRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
