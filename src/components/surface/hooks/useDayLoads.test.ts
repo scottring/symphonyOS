@@ -15,7 +15,7 @@ import { DATED_WHENS } from '@/components/schedule/SchedulePicker'
 import { loadKeyFor } from '@/components/schedule/RescheduleGrid'
 import { DAY_WINDOW, EVENING_WINDOW } from '@/lib/today/dayLoad'
 
-const base = { tasks: [], routines: [], dateInstances: [], enabled: true }
+const base = { tasks: [], enabled: true }
 
 describe('useDayLoads', () => {
   it('returns one load per dated tile and none for pool tiles', () => {

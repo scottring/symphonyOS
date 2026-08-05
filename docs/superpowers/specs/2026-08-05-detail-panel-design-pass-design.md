@@ -231,20 +231,28 @@ interface DayLoad {
 }
 ```
 
-It **reuses the selectors `computeTodayData` already uses** — `selectTimed`, the
-same events-for-day filter and instant-keyed dedupe, and `countRoutineUnits` —
-skipping only the grouping work. This is not stylistic: a count that doesn't
-mirror the render population is a lying count, and `countRoutineUnits` exists
-precisely because a flat routine count double-counts collection steps, invents
-rows for steps whose parent isn't on the day, and misses a dosed routine's extra
-slots.
+It **reuses the selectors `computeTodayData` already uses** — `selectTimed` and
+the same events-for-day filter and instant-keyed dedupe — skipping only the
+grouping work. This is not stylistic: a count that doesn't mirror the render
+population is a lying count.
+
+**Amended after the walkthrough (2026-08-05): routines are NOT counted.** The
+first build included `countRoutineUnits`, and every tile then read `+48` — because
+a recurring routine is by definition on every day, so it contributes the same
+constant to all six tiles. A number identical across every option carries no
+information about which day to choose. Routines are the day's rhythm; this
+measures its load. This was only visible in the running app; all 14 unit tests
+passed with the wrong number.
 
 - `bookedMinutes` = timed event durations + timed tasks (30 min default when a
   timed task carries no duration), clipped to the window.
 - `windowMinutes` = the waking window, **8:00–21:00 (13h)**, matching Today's
   existing day-part bands (Early morning < 8:00, Morning 8:00–12:00, Evening
   17:00–21:00). Exported as a single named constant so it is one edit to change.
-- `allDayCount` = all-day tasks + routine units for that date.
+- `allDayCount` = all-day tasks and all-day events for that date. Suppressed
+  entirely for a banded window (see `tonight` below): an all-day item belongs to
+  the day, not to a band inside it, so reporting "+5" beside Tonight claimed five
+  things were happening that evening.
 - `openSlots` = gaps in the window ≥ 30 min, between timed items.
 
 **Day load counts everyone, with no assignee filter.** `computeTodayData` takes a

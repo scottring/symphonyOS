@@ -38,20 +38,6 @@ interface TapContextPanelProps {
   familyMembers: FamilyMember[]
   siblingTaskCandidates: Task[]
   allTasks: Task[]
-  /**
-   * Feeds the scheduler's day-fullness readout. Optional so tests and any
-   * caller that doesn't have them can omit them — the bars then count tasks and
-   * events only, which is honest but thinner.
-   */
-  routines?: import('@/types/actionable').Routine[]
-  /**
-   * Completion/skip status for routines on a given day. The host leaves this
-   * empty: useActionableInstances is an imperative API with no list read, and
-   * for the future days the scheduler offers no instances exist yet anyway. The
-   * one gap is a routine already SKIPPED today, which still counts toward
-   * today's all-day tally.
-   */
-  dateInstances?: import('@/types/actionable').ActionableInstance[]
   /** Optional why-chain (Task → Project → Goal), rendered under the title. */
   whyChain?: ReactNode
   /** Optional creator name for the meta row + footer. */
@@ -169,12 +155,7 @@ export function TapContextPanel(props: TapContextPanelProps) {
   // the file instead of attaching it.
   const panelRef = useRef<HTMLElement>(null)
 
-  const dayLoads = useDayLoads({
-    tasks: allTasks,
-    routines: props.routines ?? [],
-    dateInstances: props.dateInstances ?? [],
-    enabled: true,
-  })
+  const dayLoads = useDayLoads({ tasks: allTasks, enabled: true })
 
   const phone = task.phoneNumber || linked.contact?.phone || linked.project?.phoneNumber
   const hasGroup = (task.subtasks?.length ?? 0) > 0

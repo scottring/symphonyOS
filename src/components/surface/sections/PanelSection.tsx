@@ -12,8 +12,12 @@ export interface PanelSectionProps {
    * fact that this exists".
    */
   preview?: string
-  /** Trailing controls (e.g. Notes' widen button). Never toggles the section. */
-  actions?: ReactNode
+  /**
+   * Trailing controls (e.g. Notes' widen button). Never toggles the section.
+   * Pass a function to vary them by state — controls that only make sense on an
+   * open section shouldn't sit on a collapsed one.
+   */
+  actions?: ReactNode | ((collapsed: boolean) => ReactNode)
   children: ReactNode
 }
 
@@ -28,6 +32,7 @@ export interface PanelSectionProps {
 export function PanelSection({ id, label, preview, actions, children }: PanelSectionProps) {
   const [collapsed, toggle] = usePanelCollapse(id)
   const Chevron = collapsed ? ChevronRight : ChevronDown
+  const trailing = typeof actions === 'function' ? actions(collapsed) : actions
 
   return (
     <section>
@@ -55,7 +60,7 @@ export function PanelSection({ id, label, preview, actions, children }: PanelSec
             aria-hidden
           />
         </button>
-        {actions && <div className="flex shrink-0 items-center gap-3">{actions}</div>}
+        {trailing && <div className="flex shrink-0 items-center gap-3">{trailing}</div>}
       </div>
       {!collapsed && children}
     </section>

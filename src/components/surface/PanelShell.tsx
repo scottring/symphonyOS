@@ -1,5 +1,13 @@
 import type { ReactNode, Ref } from 'react'
 
+/**
+ * Hairline rules with even vertical padding, and no padding at the ends. Applied
+ * to the article AND to each zone, so a zone holding several sections spaces
+ * them exactly the way the zones themselves are spaced.
+ */
+const RHYTHM =
+  'divide-y divide-neutral-200/60 [&>*]:py-4 [&>*:first-child]:pt-0 [&>*:last-child]:pb-0'
+
 export interface PanelShellProps {
   identity: ReactNode
   act?: ReactNode
@@ -40,16 +48,22 @@ export function PanelShell({
   return (
     <article
       ref={innerRef}
-      className="
-        bg-bg-elevated max-w-md w-full
-        rounded-2xl
-        px-4 md:px-5 py-3 md:py-5
-        divide-y divide-neutral-200/60
-        [&>*]:py-4 [&>*:first-child]:pt-0 [&>*:last-child]:pb-0
-      "
+      className={`bg-bg-elevated max-w-md w-full rounded-2xl px-4 md:px-5 py-3 md:py-5 ${RHYTHM}`}
     >
       {zones.map((zone, i) =>
-        zone == null || zone === false ? null : <div key={i}>{zone}</div>,
+        // The rhythm repeats INSIDE a zone: `details` holds many sections, and
+        // without it Phone and Notes butt together with no rule between them
+        // while zones a single section wide keep their breathing room.
+        zone == null || zone === false ? null : (
+          // `empty:hidden` is load-bearing, not defensive. A zone is usually a
+          // fragment of sections that each decide for themselves whether to
+          // render — `related` on a task with no project and no suggestions is a
+          // truthy fragment that produces nothing — and a wrapper with no
+          // children still draws a divider and a chunk of padding.
+          <div key={i} className={`${RHYTHM} empty:hidden`}>
+            {zone}
+          </div>
+        ),
       )}
       {children}
     </article>

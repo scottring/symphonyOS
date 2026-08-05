@@ -92,7 +92,7 @@ export function TapMealPanel({ event, onClose }: TapMealPanelProps) {
       </span>
 
       {/* Action row */}
-      <div className="flex items-center justify-around pb-4 mb-4 border-b border-neutral-200">
+      <div className="flex items-center justify-around">
         <button
           onClick={() => { /* meals: inert */ }}
           className="flex flex-col items-center gap-1 text-[11px] text-neutral-500 hover:text-neutral-700"

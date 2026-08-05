@@ -6,6 +6,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useAttachments } from '@/hooks/useAttachments'
 import { FileUpload, AttachmentList } from '@/components/attachments'
 import type { Attachment, AttachmentEntityType } from '@/types/attachment'
+import { PanelSection } from './PanelSection'
 
 export function PanelAttachments({ entityType, entityId }: {
   entityType: AttachmentEntityType
@@ -34,10 +35,11 @@ export function PanelAttachments({ entityType, entityId }: {
   }, [getSignedUrl])
 
   return (
-    <section className="pb-4 mb-4 border-b border-neutral-200">
-      <h3 className="text-xs font-bold tracking-wider uppercase text-neutral-400 mb-2">
-        Photos &amp; Files {files.length > 0 && `(${files.length})`}
-      </h3>
+    <PanelSection
+      id="attachments"
+      label="Photos &amp; files"
+      preview={files.length ? `${files.length} file${files.length === 1 ? '' : 's'}` : undefined}
+    >
       {files.length > 0 && (
         <div className="mb-2">
           <AttachmentList
@@ -53,6 +55,6 @@ export function PanelAttachments({ entityType, entityId }: {
         error={error}
         compact={files.length > 0}
       />
-    </section>
+    </PanelSection>
   )
 }

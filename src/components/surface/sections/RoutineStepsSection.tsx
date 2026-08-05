@@ -7,6 +7,7 @@ import { GripVertical, Plus } from 'lucide-react'
 import type { Routine } from '@/types/actionable'
 import { reorderByDrag } from '@/lib/today/stepOrdering'
 import { ConceptIcon } from '@/lib/conceptIcons'
+import { PanelSection } from './PanelSection'
 
 export interface RoutineStepsSectionProps {
   steps: Routine[]
@@ -83,8 +84,11 @@ export function RoutineStepsSection({ steps, onSelectStep, onAddStep, onReorderS
   }
 
   return (
-    <section className="pb-4 mb-4 border-b border-neutral-200">
-      <h3 className="text-sm font-medium text-neutral-700 mb-2">Steps</h3>
+    <PanelSection
+      id="routine-steps"
+      label="Steps"
+      preview={steps.length ? `${steps.length} step${steps.length === 1 ? '' : 's'}` : undefined}
+    >
       <DndContext collisionDetection={closestCenter} onDragEnd={onDragEnd}>
         <SortableContext items={steps.map(s => s.id)} strategy={verticalListSortingStrategy}>
           <div className="flex flex-col gap-2">
@@ -113,6 +117,6 @@ export function RoutineStepsSection({ steps, onSelectStep, onAddStep, onReorderS
           <Plus className="w-4 h-4" /> Add step
         </button>
       </div>
-    </section>
+    </PanelSection>
   )
 }

@@ -198,16 +198,14 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
         <>
 
       {props.steps && props.onSelectStep && props.onAddStep && props.onReorderSteps && (
-        <section>
-          <RoutineStepsSection
-            steps={props.steps}
-            onSelectStep={props.onSelectStep}
-            onAddStep={props.onAddStep}
-            onReorderSteps={props.onReorderSteps}
-            checkedByStep={checkedByStep}
-            onToggleStep={(s) => void toggleStep(s)}
-          />
-        </section>
+        <RoutineStepsSection
+          steps={props.steps}
+          onSelectStep={props.onSelectStep}
+          onAddStep={props.onAddStep}
+          onReorderSteps={props.onReorderSteps}
+          checkedByStep={checkedByStep}
+          onToggleStep={(s) => void toggleStep(s)}
+        />
       )}
 
       {props.onUpdateLocation && props.onClearLocation && (

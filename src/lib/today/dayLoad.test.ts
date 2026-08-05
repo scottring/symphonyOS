@@ -26,8 +26,6 @@ const task = (id: string, over: Partial<Task> = {}): Task =>
 const base = {
   tasks: [] as Task[],
   events: [] as CalendarEvent[],
-  routines: [],
-  dateInstances: [],
   eventsAvailable: true,
 }
 
@@ -147,6 +145,15 @@ describe('computeDayLoad', () => {
       events: [event('e1', '2026-08-06T00:00:00', '2026-08-06T23:59:00')],
     })
     expect(load.bookedMinutes).toBeLessThanOrEqual(load.windowMinutes)
+  })
+
+  it('reports no all-day count for a banded window — they belong to the day', () => {
+    const load = computeDayLoad(DAY, {
+      ...base,
+      tasks: [task('t1', { isAllDay: true, scheduledFor: new Date(2026, 7, 6) })],
+      window: EVENING_WINDOW,
+    })
+    expect(load.allDayCount).toBe(0)
   })
 
   it('sorts all-day items ahead of timed ones', () => {

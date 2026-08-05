@@ -89,7 +89,10 @@ export function SchedulePicker({
       </button>
 
       {open && (
-        <div className="absolute left-0 z-50 mt-1 w-80 rounded-xl border border-neutral-200 bg-white p-2 shadow-lg">
+        // Right-anchored so it grows LEFTWARD over the main view. The panel is
+        // ~360px wide and the trigger sits well into the chip row, so a
+        // left-anchored 320px popover ran off the edge of the screen.
+        <div className="absolute right-0 z-50 mt-1 w-80 rounded-xl border border-neutral-200 bg-white p-2 shadow-lg">
           {peek ? (
             <DayPeek
               load={peek}

@@ -28,12 +28,6 @@ interface TapEventPanelProps {
   /** Links saved on this event (from event_notes table). */
   links?: TaskLink[]
   allTasks: Task[]
-  /**
-   * Feeds the scheduler's day-fullness readout. Optional so tests and callers
-   * without them can omit them — the bars then count tasks and events only.
-   */
-  routines?: import('@/types/actionable').Routine[]
-  dateInstances?: import('@/types/actionable').ActionableInstance[]
 
   /** Whether the event is marked done (actionable_instances, Symphony-side). */
   completed?: boolean
@@ -178,12 +172,7 @@ export function TapEventPanel(props: TapEventPanelProps) {
   // Photos & files section alone is a small target and a miss navigates away.
   const panelRef = useRef<HTMLElement>(null)
 
-  const dayLoads = useDayLoads({
-    tasks: props.allTasks ?? [],
-    routines: props.routines ?? [],
-    dateInstances: props.dateInstances ?? [],
-    enabled: true,
-  })
+  const dayLoads = useDayLoads({ tasks: props.allTasks ?? [], enabled: true })
 
   // The duration control owns its own popover, so it arrives as a rendered node
   // rather than a plain chip. Extracted verbatim from the old hand-built header.
@@ -270,7 +259,10 @@ export function TapEventPanel(props: TapEventPanelProps) {
     <PanelShell
       innerRef={panelRef}
       identity={
-        <>
+        // One wrapper, not a fragment: title, when-line and calendar row are a
+        // single statement of what this event IS. As separate zone children the
+        // shell's rhythm would rule between them and read as three facts.
+        <div>
         <PanelHeader
           title={event.title}
           onTitleChange={() => { /* event title is read-only from gcal */ }}
@@ -325,7 +317,7 @@ export function TapEventPanel(props: TapEventPanelProps) {
           {event.location && isVirtualMeeting && !joinUrl && (
             <div className="mt-2 text-[13px] text-neutral-500">{event.location}</div>
           )}
-        </>
+        </div>
       }
       act={<PanelActions actions={actions} />}
       details={

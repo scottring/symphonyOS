@@ -122,13 +122,16 @@ export function PanelNotes({
         label={label}
         preview={notesPreview(notes)}
         // While the overlay is open it owns both controls — leaving a second
-        // pair in the inline header gave the panel two "Narrow" buttons.
-        actions={wide ? undefined : (
-          <>
-            {saveButton}
-            {widenButton}
-          </>
-        )}
+        // pair in the inline header gave the panel two "Narrow" buttons. And a
+        // collapsed section has nothing to widen or save.
+        actions={(collapsed) =>
+          wide || collapsed ? undefined : (
+            <>
+              {saveButton}
+              {widenButton}
+            </>
+          )
+        }
       >
         {wide ? (
           <div className="text-sm italic text-neutral-400 border-l-2 border-neutral-300 pl-3 py-1">

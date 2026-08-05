@@ -1,9 +1,6 @@
 import type { Task } from '@/types/task'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
-import type { Routine, ActionableInstance } from '@/types/actionable'
 import { selectTimed } from './taskPools'
-import { countRoutineUnits } from './routineCollections'
-import { buildRoutineStatusMap, selectVisibleRoutines } from './statusMaps'
 import { makeAssigneeFilter } from './assigneeFilter'
 
 /**
@@ -51,8 +48,6 @@ export interface DayLoad {
 export interface DayLoadInput {
   tasks: Task[]
   events: CalendarEvent[]
-  routines: Routine[]
-  dateInstances: ActionableInstance[]
   eventsAvailable: boolean
   window?: { startHour: number; endHour: number }
 }
@@ -86,17 +81,22 @@ function sameDay(a: Date, b: Date): boolean {
 /**
  * How full a day already is.
  *
- * Reuses the selectors computeTodayData uses — selectTimed, the same
- * instant-keyed event dedupe, countRoutineUnits — and skips only the grouping
- * work. That sharing is load-bearing rather than stylistic: a flat routine count
- * double-counts collection steps, invents rows for steps whose parent isn't on
- * the day, and misses a dosed routine's extra slots, so a bar built on one would
- * confidently report on a day that isn't there.
+ * Reuses the selectors computeTodayData uses — selectTimed and the same
+ * instant-keyed event dedupe — and skips the grouping work. That sharing is
+ * load-bearing rather than stylistic: re-deriving "what's on this day" by hand
+ * is how a readout drifts from the day it claims to describe.
  *
- * It departs from Today in exactly one way, on purpose: there is NO assignee
- * filter. You are asking whether a DAY has room, and a day is shared — filtering
- * to your own items would call a Thursday open when someone else has three
- * appointments on it.
+ * Two deliberate departures from Today's population:
+ *
+ * 1. NO assignee filter. You are asking whether a DAY has room, and a day is
+ *    shared — filtering to your own items would call a Thursday open when
+ *    someone else has three appointments on it.
+ *
+ * 2. NO routines. This one was measured, not assumed: counting routine units
+ *    made every tile read "+48", because recurring routines are by definition
+ *    the same on every day. A number identical across all six tiles carries no
+ *    information about which day to choose. Routines are the day's rhythm; this
+ *    measures its load.
  */
 export function computeDayLoad(date: Date, input: DayLoadInput): DayLoad {
   const win = input.window ?? DAY_WINDOW
@@ -182,14 +182,11 @@ export function computeDayLoad(date: Date, input: DayLoadInput): DayLoad {
     openSlots.push({ start: new Date(gapFrom), end: new Date(windowEnd) })
   }
 
-  const routineUnits = countRoutineUnits(
-    selectVisibleRoutines(input.routines, false),
-    date,
-    buildRoutineStatusMap(input.dateInstances),
-    matchAll,
-  )
-
-  const allDayCount = items.filter((i) => i.start === null).length + routineUnits.actionable
+  // An all-day item belongs to the day, not to a band within it. Reporting "+5"
+  // next to Tonight claimed five things were happening this evening when they
+  // were the day's all-day list.
+  const isFullDay = win.startHour === DAY_WINDOW.startHour && win.endHour === DAY_WINDOW.endHour
+  const allDayCount = isFullDay ? items.filter((i) => i.start === null).length : 0
 
   return {
     date,
