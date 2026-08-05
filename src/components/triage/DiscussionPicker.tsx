@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { MessageCircle } from 'lucide-react'
+import { DiscussionPopover } from './DiscussionPopover'
 
 interface DiscussionPickerProps {
   flagged: boolean
@@ -10,7 +11,6 @@ interface DiscussionPickerProps {
 export function DiscussionPicker({ flagged, note, onChange }: DiscussionPickerProps) {
   const [isOpen, setIsOpen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   // Close on outside click
   useEffect(() => {
@@ -24,13 +24,6 @@ export function DiscussionPicker({ flagged, note, onChange }: DiscussionPickerPr
       return () => document.removeEventListener('mousedown', handleClickOutside)
     }
   }, [isOpen])
-
-  // Focus textarea when opening if already flagged
-  useEffect(() => {
-    if (isOpen && flagged && textareaRef.current) {
-      textareaRef.current.focus()
-    }
-  }, [isOpen, flagged])
 
   return (
     <div ref={containerRef} className="relative">
@@ -47,44 +40,12 @@ export function DiscussionPicker({ flagged, note, onChange }: DiscussionPickerPr
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 top-full mt-1 z-50 bg-white rounded-xl border border-neutral-200 shadow-lg p-3 min-w-[260px]">
-          <label className="flex items-center gap-2 text-sm text-neutral-700 mb-2">
-            <input
-              type="checkbox"
-              checked={flagged}
-              onChange={(e) => onChange({ flagged: e.target.checked, note })}
-              className="rounded"
-            />
-            <span>Needs discussion</span>
-          </label>
-          <textarea
-            ref={textareaRef}
-            value={note}
-            onChange={(e) => {
-              // If user starts typing in an unflagged state, auto-flag.
-              const nextFlagged = flagged || e.target.value.length > 0
-              onChange({ flagged: nextFlagged, note: e.target.value })
-            }}
-            placeholder="What's the question?"
-            rows={3}
-            className={`w-full px-2 py-1.5 text-sm rounded-lg border border-neutral-200
-                       focus:outline-none focus:ring-2 focus:ring-primary-500 ${flagged ? '' : 'opacity-60'}`}
-          />
-          {flagged && (
-            <>
-              <div className="border-t border-neutral-100 my-2" />
-              <button
-                onClick={() => {
-                  onChange({ flagged: false, note: '' })
-                  setIsOpen(false)
-                }}
-                className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-red-50 text-red-600"
-              >
-                Clear
-              </button>
-            </>
-          )}
-        </div>
+        <DiscussionPopover
+          flagged={flagged}
+          note={note}
+          onChange={onChange}
+          onClose={() => setIsOpen(false)}
+        />
       )}
     </div>
   )
