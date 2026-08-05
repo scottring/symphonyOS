@@ -18,14 +18,18 @@ describe('monthShelfGroups', () => {
       task({ id: 'm2', title: 'Put down sand', goalId: 'g1' }),
     ]
     const groups = monthShelfGroups(pool, [pick, ...pool], projects)
-    expect(groups).toEqual([{ id: 'pick:p1', label: 'Porch and backyard set up for guests', taskIds: ['m1', 'm2'] }])
+    expect(groups).toEqual([
+      { id: 'pick:p1', label: 'Porch and backyard set up for guests', kind: 'pick', taskIds: ['m1', 'm2'] },
+    ])
   })
 
   it('rolls an unthreaded 3+ project cluster up under the project', () => {
     const pool = ['Weed the backyard', 'Put down sand', 'Buy a bench'].map((title, i) =>
       task({ id: `c${i}`, title, projectId: 'proj' }))
     const groups = monthShelfGroups(pool, pool, projects)
-    expect(groups).toEqual([{ id: 'project:proj', label: 'Transform the Back and Frontyards', taskIds: ['c0', 'c1', 'c2'] }])
+    expect(groups).toEqual([
+      { id: 'project:proj', label: 'Transform the Back and Frontyards', kind: 'project', taskIds: ['c0', 'c1', 'c2'] },
+    ])
   })
 
   it('files a threaded move under its pick even when it also has a project', () => {
@@ -35,21 +39,57 @@ describe('monthShelfGroups', () => {
     expect(groups.find((g) => g.id === 'pick:p1')?.taskIds).toEqual(['c0'])
     // Two left on the project is under the cluster threshold — no project group.
     expect(groups.find((g) => g.id === 'project:proj')).toBeUndefined()
+    // ...but they are not lost: they fall to Unfiled.
+    expect(groups.find((g) => g.kind === 'unfiled')?.taskIds).toEqual(['c1', 'c2'])
   })
 
-  it('leaves loose items and small project sets ungrouped', () => {
+  // THE load-bearing property. The board renders one block per group and
+  // nothing else, so anything missing from a block is invisible on the page.
+  it('is a TOTAL partition — every pool task lands in exactly one block', () => {
+    const pick = task({ id: 'p1', title: 'A pick', bucket: 'quarter', pickedAt: new Date() })
+    const pool = [
+      task({ id: 'a', sourceId: 'p1' }),
+      task({ id: 'b', projectId: 'proj' }),
+      task({ id: 'c', projectId: 'proj' }),
+      task({ id: 'd', projectId: 'proj' }),
+      task({ id: 'e' }),
+    ]
+    const groups = monthShelfGroups(pool, [pick, ...pool], projects)
+    const placed = groups.flatMap((g) => g.taskIds)
+    expect(placed.slice().sort()).toEqual(['a', 'b', 'c', 'd', 'e'])
+    expect(new Set(placed).size).toBe(placed.length)
+  })
+
+  it('collects the remainder into a single Unfiled block, pinned last', () => {
     const pool = [
       task({ id: 'l1', title: 'Decide what to do with the car' }),
       task({ id: 'l2', title: 'Plan a winter vacation', projectId: 'proj' }),
     ]
-    expect(monthShelfGroups(pool, pool, projects)).toEqual([])
+    const groups = monthShelfGroups(pool, pool, projects)
+    expect(groups).toEqual([
+      { id: 'unfiled', label: 'Unfiled', kind: 'unfiled', taskIds: ['l1', 'l2'] },
+    ])
   })
 
-  it('never names a task outside the pool (placed items keep their day)', () => {
-    const pick = task({ id: 'p1', title: 'Porch and backyard', bucket: 'quarter', pickedAt: new Date() })
-    const placed = task({ id: 'x1', title: 'Placed on a day', bucket: 'timed', sourceId: 'p1' })
-    const pool = [task({ id: 'm1', title: 'Weed the backyard', sourceId: 'p1' })]
-    const groups = monthShelfGroups(pool, [pick, placed, ...pool], projects)
-    expect(groups[0].taskIds).toEqual(['m1'])
+  it('orders blocks by member count descending, Unfiled always last', () => {
+    const big = task({ id: 'pBig', title: 'Big pick', bucket: 'quarter', pickedAt: new Date() })
+    const small = task({ id: 'pSmall', title: 'Small pick', bucket: 'quarter', pickedAt: new Date() })
+    const pool = [
+      task({ id: 'loose1' }),
+      task({ id: 'loose2' }),
+      task({ id: 'loose3' }),
+      task({ id: 's1', sourceId: 'pSmall' }),
+      task({ id: 'b1', sourceId: 'pBig' }),
+      task({ id: 'b2', sourceId: 'pBig' }),
+    ]
+    const groups = monthShelfGroups(pool, [big, small, ...pool], projects)
+    expect(groups.map((g) => g.id)).toEqual(['pick:pBig', 'pick:pSmall', 'unfiled'])
+  })
+
+  it('omits the Unfiled block entirely when nothing is left over', () => {
+    const pick = task({ id: 'p1', title: 'A pick', bucket: 'quarter', pickedAt: new Date() })
+    const pool = [task({ id: 'm1', sourceId: 'p1' })]
+    const groups = monthShelfGroups(pool, [pick, ...pool], projects)
+    expect(groups.map((g) => g.kind)).toEqual(['pick'])
   })
 })
