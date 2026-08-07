@@ -8,6 +8,7 @@ import type {
 } from '@/types/proactiveSuggestion'
 import { rowToSuggestion } from '@/types/proactiveSuggestion'
 import { actOnSuggestionDb, dismissSuggestionDb } from '@/lib/assistant/suggestionMutations'
+import { unexpiredFilter } from '@/lib/assistant/suggestionFreshness'
 
 export interface LastAction {
   actionType: string
@@ -65,6 +66,8 @@ export function useEntityContext(
           .eq('entity_type', entityType)
           .eq('entity_id', entityId as string)
           .eq('status', 'active')
+          // 'active' alone never expired anything — see suggestionFreshness.ts.
+          .or(unexpiredFilter())
           .order('confidence', { ascending: false }),
         supabase
           .from('action_history')

@@ -27,7 +27,7 @@ vi.mock('@/hooks/useAuth', () => ({
 }))
 
 // Chainable mock matching the exact query shapes the hook issues:
-// proactive_suggestions: select('*').eq(user_id).eq(entity_type).eq(entity_id).eq(status).order(confidence)
+// proactive_suggestions: select('*').eq(user_id).eq(entity_type).eq(entity_id).eq(status).or(unexpired).order(confidence)
 // action_history: select(cols).eq(user_id).eq(entity_type).eq(entity_id).order(created_at).limit(1)
 // The nesting itself enforces the shape non-vacuously: if the hook drops the
 // leading .eq('user_id', ...) call, the mock records only 3 (suggestions) or
@@ -51,10 +51,14 @@ vi.mock('@/lib/supabase', () => ({
                         eq: (f4: string, v4: string) => {
                           mockSuggestionsEq(f4, v4)
                           return {
-                            order: (col: string, opts: unknown) => {
-                              mockSuggestionsOrder(col, opts)
-                              return Promise.resolve(mockSuggestionsResult)
-                            },
+                            // .or(unexpiredFilter()) — status 'active' alone
+                            // never expired anything; see suggestionFreshness.ts.
+                            or: () => ({
+                              order: (col: string, opts: unknown) => {
+                                mockSuggestionsOrder(col, opts)
+                                return Promise.resolve(mockSuggestionsResult)
+                              },
+                            }),
                           }
                         },
                       }

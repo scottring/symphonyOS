@@ -22,8 +22,12 @@ vi.mock('@/lib/supabase', () => ({
           select: () => ({
             eq: () => ({
               eq: () => ({
-                order: () => ({
-                  limit: () => Promise.resolve(mockRowsResult),
+                // .or(unexpiredFilter(now)) — expired rows must not consume the
+                // limit(50), since they sort by their peak urgency.
+                or: () => ({
+                  order: () => ({
+                    limit: () => Promise.resolve(mockRowsResult),
+                  }),
                 }),
               }),
             }),
@@ -49,6 +53,54 @@ function makeRow(id: string, urgency: number): ProactiveSuggestionRow {
     urgency, seen_at: null, seen_urgency: null, snoozed_until: null,
   }
 }
+
+// A suggestion about a calendar event outlived its event: the resolver looks the
+// event up in the day the view has loaded, doesn't find yesterday's, and returns
+// null. The hook used to read that as "no live facts, fall back to the stored
+// urgency" — the very score the engine wrote while the event was imminent. So a
+// dead suggestion kept its peak score and OUTRANKED live ones into the top 3.
+// Unresolvable has to mean less confidence, never maximum.
+describe('useUnpromptedSuggestions — stale entity suggestions', () => {
+  it('does not deliver an entity suggestion whose facts cannot be resolved', async () => {
+    mockRowsResult = { data: [makeRow('gone', 80)], error: null }
+
+    const { result } = renderHook(() =>
+      useUnpromptedSuggestions('today', {
+        includeCadence: false,
+        resolveFacts: () => null, // the entity is not in the loaded day
+      }))
+
+    await waitFor(() => expect(result.current.decisions.length).toBeGreaterThan(0))
+    expect(result.current.items).toHaveLength(0)
+  })
+
+  it('still uses the stored hint when no resolver was supplied at all', async () => {
+    // Surfaces without loaded entity data (the wall) pass no resolver. They must
+    // keep working off the engine's hint — the fix targets a resolver that ran
+    // and came back empty, not the absence of one.
+    mockRowsResult = { data: [makeRow('hint', 80)], error: null }
+
+    const { result } = renderHook(() =>
+      useUnpromptedSuggestions('today', { includeCadence: false }))
+
+    await waitFor(() => expect(result.current.items.length).toBeGreaterThan(0))
+    expect(result.current.items).toHaveLength(1)
+  })
+
+  it('drops rows whose engine-stamped expires_at has passed', async () => {
+    // proactive-engine stamps expires_at = +24h on every row it writes
+    // (proactive-engine/index.ts:912) and, until this fix, every client read
+    // threw that column away — so nothing ever expired.
+    const expired = { ...makeRow('old', 80), expires_at: '2020-01-01T00:00:00Z' }
+    mockRowsResult = { data: [expired], error: null }
+
+    const { result } = renderHook(() =>
+      useUnpromptedSuggestions('today', { includeCadence: false }))
+
+    await waitFor(() => expect(result.current.decisions).toBeDefined())
+    expect(result.current.items).toHaveLength(0)
+  })
+})
 
 describe('useUnpromptedSuggestions — Today proposal cap', () => {
   // This pins a value this hook does not own. `items.length` for the

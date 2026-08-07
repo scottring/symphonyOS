@@ -9,6 +9,7 @@ import type {
 } from '@/types/proactiveSuggestion'
 import { rowToSuggestion } from '@/types/proactiveSuggestion'
 import { actOnSuggestionDb, dismissSuggestionDb } from '@/lib/assistant/suggestionMutations'
+import { unexpiredFilter } from '@/lib/assistant/suggestionFreshness'
 
 const POLL_INTERVAL_MS = 30 * 60 * 1000 // 30 minutes — realtime covers new rows; poll is a safety net
 const ENGINE_INTERVAL_MS = 6 * 60 * 60 * 1000 // 6 hours (was 4h) — cut AI engine spend
@@ -29,6 +30,8 @@ export function useProactiveSuggestions() {
       .select('*')
       .eq('user_id', user.id)
       .eq('status', 'active')
+      // 'active' alone never expired anything — see suggestionFreshness.ts.
+      .or(unexpiredFilter())
       .order('confidence', { ascending: false })
       .limit(50)
 

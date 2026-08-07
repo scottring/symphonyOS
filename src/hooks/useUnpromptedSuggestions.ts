@@ -23,6 +23,9 @@ import {
   readCadenceConfig, readDismissedNudgeToken, dismissNudgeForToken,
   NUDGE_DISMISS_EVENT,
 } from '@/lib/cadence/config'
+import {
+  unexpiredFilter, isSuggestionExpired, isTimeBoundEntity,
+} from '@/lib/assistant/suggestionFreshness'
 
 export interface UnpromptedItem {
   suggestion: ProactiveSuggestion
@@ -91,16 +94,22 @@ export function useUnpromptedSuggestions(
 
   const fetchRows = useCallback(async () => {
     if (!user) { setRows([]); return }
+    const now = new Date()
     const { data, error } = await supabase
       .from('proactive_suggestions')
       .select('*')
       .eq('user_id', user.id)
       .eq('status', 'active')
+      .or(unexpiredFilter(now))
       .order('urgency', { ascending: false })
       .limit(50)
 
     if (error || !data) { setRows([]); return }
-    const list = (data as ProactiveSuggestionRow[]).map(rowToSuggestion)
+    // Filtered again client-side: the query keeps expired rows from eating the
+    // limit, this keeps one from reaching the screen if the filter ever drifts.
+    const list = (data as ProactiveSuggestionRow[])
+      .map(rowToSuggestion)
+      .filter(s => !isSuggestionExpired(s, now))
     setRows(list)
 
     // Budget = distinct suggestions already seen today, across ALL surfaces.
@@ -165,9 +174,17 @@ export function useUnpromptedSuggestions(
       // Live recompute — the stored column is only a hint, because the engine runs
       // every 6h and "event starts within 90 min" flips true between runs.
       const facts = resolveFacts?.(s) ?? null
+      // A resolver that ran and found nothing means the entity is not in the
+      // data this surface loaded — for a time-bound entity that is the
+      // signature of a subject that has already passed (Today loads ONE day, so
+      // yesterday's meeting simply isn't there). Falling back to the stored
+      // hint here scored it at the peak urgency the engine wrote while the
+      // event was imminent, so dead suggestions outranked live ones and took
+      // the top slots. Unresolvable must cost confidence, never grant it.
+      const unresolvable = !facts && !!resolveFacts && isTimeBoundEntity(s.entityType)
       const urgency = facts
         ? computeUrgency(deriveUrgencyFacts(facts, now))
-        : (s.urgency ?? 0)
+        : unresolvable ? 0 : (s.urgency ?? 0)
       consider(s, urgency)
     }
 
