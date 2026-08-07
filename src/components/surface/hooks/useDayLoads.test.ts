@@ -18,9 +18,15 @@ import { DAY_WINDOW, EVENING_WINDOW } from '@/lib/today/dayLoad'
 const base = { tasks: [], enabled: true }
 
 describe('useDayLoads', () => {
-  it('returns one load per dated tile and none for pool tiles', () => {
+  it('returns one load per dated DAY and none for pool tiles', () => {
     const { result } = renderHook(() => useDayLoads(base))
-    expect(result.current.size).toBe(DATED_WHENS.length)
+    // Two dated tiles can land on the same calendar day — run this on a Friday
+    // and `tomorrow` and `this-weekend` are both Saturday — and loadKeyFor keys
+    // by date, so they share one entry. That is correct: the map is keyed by
+    // day, not by tile, and both tiles want the same day's load. Asserting
+    // DATED_WHENS.length instead made this test fail every Friday.
+    const distinctDays = new Set(DATED_WHENS.map((t) => loadKeyFor(t.when)))
+    expect(result.current.size).toBe(distinctDays.size)
     expect(result.current.has(loadKeyFor('someday'))).toBe(false)
     expect(result.current.has(loadKeyFor('this-month'))).toBe(false)
   })
