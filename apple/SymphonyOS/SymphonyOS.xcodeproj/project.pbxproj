@@ -22,7 +22,9 @@
 		30D02C1243BC999F654F3957 /* UserProfile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37846053B387BAA8FC10D3E6 /* UserProfile.swift */; };
 		3347A8A85D27BF705AE97C82 /* PendingChange.swift in Sources */ = {isa = PBXBuildFile; fileRef = 779DC68DE6348BF47C96A130 /* PendingChange.swift */; };
 		35F21F6A8EF1704BD98B3FF5 /* Routine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1A3E9139010E51C7040394A0 /* Routine.swift */; };
+		386379CF5A08540EE1B036D4 /* CarriedOverUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0190D691EF214A5E96258AF1 /* CarriedOverUITests.swift */; };
 		38A50C4687C8342D2B6F0DE0 /* Contact.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B89F2EB3CAD8F9EF5A476A8 /* Contact.swift */; };
+		3BD45BCD6DC5749F4AA19BC0 /* CarriedOverTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9AE2E825DD3974AD3BF7833 /* CarriedOverTests.swift */; };
 		414C7AC80E35A0CC4027D21D /* EventNote.swift in Sources */ = {isa = PBXBuildFile; fileRef = CBF0FC1CF6088ADE5D739EB5 /* EventNote.swift */; };
 		47E06813C2F26251F785910B /* RoutineListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96C82C536D6E13BD9ECB5DDD /* RoutineListView.swift */; };
 		4AE3289D3236007A5F98C6C0 /* MainView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E4D95EEAD58A126302E8231 /* MainView.swift */; };
@@ -93,6 +95,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		0190D691EF214A5E96258AF1 /* CarriedOverUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarriedOverUITests.swift; sourceTree = "<group>"; };
 		092BB44BAB79A5C7BC3022FB /* PlaybookBlock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybookBlock.swift; sourceTree = "<group>"; };
 		09BD930B3AFC90435DE5E822 /* SlideRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlideRow.swift; sourceTree = "<group>"; };
 		0B6DCA8E5B9A0200DBB46513 /* SymphonyOSUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = SymphonyOSUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -141,6 +144,7 @@
 		976CC1C0AE86C75E25C45F45 /* SymphonyApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SymphonyApp.swift; sourceTree = "<group>"; };
 		9BB546AEA1DD397A0999083E /* ContactListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactListView.swift; sourceTree = "<group>"; };
 		A99D77B01B73C4E9753A3494 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		A9AE2E825DD3974AD3BF7833 /* CarriedOverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarriedOverTests.swift; sourceTree = "<group>"; };
 		AFD8CF30E6FA1E8858E08894 /* ScanReviewSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScanReviewSheet.swift; sourceTree = "<group>"; };
 		B03612661785F1EE17B02E03 /* FamilyMember.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyMember.swift; sourceTree = "<group>"; };
 		B14F0DAE984F23F841936E31 /* SyncStatus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SyncStatus.swift; sourceTree = "<group>"; };
@@ -427,6 +431,7 @@
 		D2B0F106883B7CE27ADDB25B /* SymphonyOSTests */ = {
 			isa = PBXGroup;
 			children = (
+				A9AE2E825DD3974AD3BF7833 /* CarriedOverTests.swift */,
 				5FB4D96D411C7D7D86349E97 /* SymphonyOSTests.swift */,
 				91980E464779ADF9B4FE89A3 /* SyncSerializationTests.swift */,
 			);
@@ -464,6 +469,7 @@
 		F509736A738E0324AF72974B /* SymphonyOSUITests */ = {
 			isa = PBXGroup;
 			children = (
+				0190D691EF214A5E96258AF1 /* CarriedOverUITests.swift */,
 				718E56D8B02093D599728E35 /* SymphonyOSUITests.swift */,
 			);
 			path = SymphonyOSUITests;
@@ -579,6 +585,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				3BD45BCD6DC5749F4AA19BC0 /* CarriedOverTests.swift in Sources */,
 				F6622C0BA431BC0127286CC5 /* SymphonyOSTests.swift in Sources */,
 				02E7F7BF8E5CF9DB0592F619 /* SyncSerializationTests.swift in Sources */,
 			);
@@ -656,6 +663,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				386379CF5A08540EE1B036D4 /* CarriedOverUITests.swift in Sources */,
 				B243747A711245915530C319 /* SymphonyOSUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

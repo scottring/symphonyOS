@@ -10,6 +10,13 @@ final class TimelineViewModel {
     /// Overdue, incomplete tasks (scheduled before today) — the "Carried over" section.
     var carriedOverTasks: [SymphonyTask] = []
 
+    /// How many days past its date a task keeps a slot on Today.
+    ///
+    /// Mirrors `GRACE_DAYS` in `src/lib/today/taskPools.ts` — the web and the
+    /// phone must agree on what "carried over" means, or the two Todays show
+    /// different work. Two days covers a weekend of slippage.
+    static let graceDays = 2
+
     // Order mirrors the web app's section order (all-day first, then by time of day).
     enum TimeSection: String, CaseIterable {
         case allDay = "All Day"
@@ -52,7 +59,14 @@ final class TimelineViewModel {
                 //   • past date + today → Carried over (overdue), mirrors web OverdueSection
                 if !task.completed {
                     if let s = task.scheduledFor {
-                        if isToday && s < startOfDay { carried.append(task) }
+                        // A date is a commitment to a day, and it EXPIRES. Only work
+                        // inside the grace window keeps a Today slot; older items
+                        // belong to the review queue on /week. Without this bound the
+                        // phone rendered every past-dated task ever created — a July
+                        // 25 item was still sitting on Today on August 8, and nine
+                        // carried-over rows pushed the actual day off the screen.
+                        let age = cal.dateComponents([.day], from: cal.startOfDay(for: s), to: startOfDay).day ?? 0
+                        if isToday && age > 0 && age <= Self.graceDays { carried.append(task) }
                     } else if task.bucket == "inbox" {
                         inbox.append(task)   // true inbox only; week/month/someday excluded
                     }

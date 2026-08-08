@@ -50,10 +50,10 @@ struct TodayView: View {
                         if isSearching {
                             searchResultsContent
                         } else {
-                        // Carried over (overdue) — mirrors the web's OverdueSection, at the top.
+                        // Carried over (overdue) — mirrors the web's OverdueSection,
+                        // at the top and COLLAPSED by default.
                         if !viewModel.carriedOverTasks.isEmpty {
-                            InboxSectionView(
-                                title: "Carried over",
+                            CarriedOverSection(
                                 tasks: viewModel.carriedOverTasks,
                                 modelContext: modelContext,
                                 userId: auth.currentUser?.id ?? UUID()
@@ -390,6 +390,88 @@ struct TimelineSectionView: View {
                     .padding(.vertical, 3)
             }
         }
+    }
+}
+
+// MARK: - Carried Over Section
+
+/// Carried-over work, collapsed to one line by default — the same stance the
+/// web's `OverdueSection` takes.
+///
+/// These are obligations to review, not the day's headline. Rendered expanded
+/// they ate the entire first screen (nine rows on an iPhone 17 Pro) and the
+/// actual day never appeared above the fold. One calm line keeps the timeline
+/// visible on load; tap to open the full list.
+struct CarriedOverSection: View {
+    let tasks: [SymphonyTask]
+    let modelContext: ModelContext
+    let userId: UUID
+
+    @State private var expanded = false
+
+    var body: some View {
+        if expanded {
+            VStack(alignment: .leading, spacing: 0) {
+                InboxSectionView(
+                    title: "Carried over",
+                    tasks: tasks,
+                    modelContext: modelContext,
+                    userId: userId
+                )
+                Button { withAnimation(.easeInOut(duration: 0.2)) { expanded = false } } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: "chevron.up")
+                            .font(.system(size: 10, weight: .semibold))
+                        Text("Collapse")
+                            .font(.captionText)
+                    }
+                    .foregroundStyle(Color.textTertiary)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 8)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Collapse carried over")
+            }
+        } else {
+            Button { withAnimation(.easeInOut(duration: 0.2)) { expanded = true } } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: "arrow.uturn.left")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(Color.feedbackAmber)
+
+                    Text("\(tasks.count) carried over")
+                        .font(.bodySmallBold)
+                        .foregroundStyle(Color.feedbackAmber)
+                        .fixedSize()
+
+                    if let first = tasks.first {
+                        Text(summary(after: first))
+                            .font(.bodySmall)
+                            .foregroundStyle(Color.textTertiary)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                    }
+
+                    Spacer(minLength: 4)
+
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundStyle(Color.textTertiary)
+                }
+                .padding(.horizontal, 20)
+                .padding(.top, 20)
+                .padding(.bottom, 4)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Show \(tasks.count) carried over tasks")
+        }
+    }
+
+    private func summary(after first: SymphonyTask) -> String {
+        tasks.count > 1
+            ? "— \(first.title) +\(tasks.count - 1) more"
+            : "— \(first.title)"
     }
 }
 

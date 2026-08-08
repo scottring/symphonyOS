@@ -108,8 +108,14 @@ actor SyncEngine {
                     // Surface the failure — silent push errors hid a schema drift
                     // (phantom columns) that dropped every iOS write for days.
                     Self.syncLog.error("push \(change.tableName, privacy: .public) \(change.changeType, privacy: .public) FAILED (attempt \(change.attempts)): \(error.localizedDescription, privacy: .public)")
-                    // Keep in queue for retry (up to 10 attempts)
-                    if change.attempts >= 10 {
+                    // Keep in queue for retry (up to 10 attempts) — EXCEPT inserts,
+                    // which retry forever. A queued change is also what shields its
+                    // row from pull-reconcile, so dropping a failed insert would let
+                    // the next launch delete a task the user typed on the phone and
+                    // that exists nowhere else. That failure mode is real: a schema
+                    // drift once rejected every iOS write for days. Updates/deletes
+                    // are safe to give up on — the server row survives them.
+                    if change.attempts >= 10 && change.changeType != "insert" {
                         Self.syncLog.error("DROPPING \(change.tableName, privacy: .public) \(change.changeType, privacy: .public) after 10 failed attempts")
                         context.delete(change)
                     }
@@ -135,7 +141,14 @@ actor SyncEngine {
         await pullTable("family_members", as: FamilyMember.self, userId: userId)
         await pullTable("contacts", as: Contact.self, userId: userId)
         await pullTable("projects", as: Project.self, userId: userId)
-        await pullTable("tasks", as: SymphonyTask.self, userId: userId, reconcile: false)
+        // Tasks reconcile like every other table. They used to be exempt, to protect
+        // locally-created rows that hadn't pushed yet — but `pendingIds` in
+        // `pullTable` already does exactly that, so the exemption bought nothing and
+        // cost correctness: a task deleted or completed on the web while the app was
+        // closed was never removed, because realtime only delivers deletes to a
+        // RUNNING app. Scott's phone showed nine carried-over rows on 2026-08-08 of
+        // which six no longer existed in the database at all.
+        await pullTable("tasks", as: SymphonyTask.self, userId: userId)
         await pullTable("routines", as: Routine.self, userId: userId)
         await pullTable("actionable_instances", as: ActionableInstance.self, userId: userId)
         await pullTable("event_notes", as: EventNote.self, userId: userId)
@@ -151,11 +164,24 @@ actor SyncEngine {
     private func pullTable<T: PersistentModel & HasUUID>(_ table: String, as type: T.Type, userId: UUID, reconcile: Bool = true) async {
         let context = ModelContext(modelContainer)
         do {
-            let rows: [[String: AnyJSON]] = try await supabase
-                .from(table)
-                .select()
-                .execute()
-                .value
+            // PostgREST caps a bare select at the project's `max_rows` (1000 here).
+            // Reconcile DELETES local rows missing from the response, so a single
+            // truncated page would wipe every row past the cap off the device —
+            // Scott already owns 514 tasks. Page until a short page comes back.
+            var rows: [[String: AnyJSON]] = []
+            let pageSize = 500
+            var offset = 0
+            while true {
+                let page: [[String: AnyJSON]] = try await supabase
+                    .from(table)
+                    .select()
+                    .range(from: offset, to: offset + pageSize - 1)
+                    .execute()
+                    .value
+                rows.append(contentsOf: page)
+                if page.count < pageSize { break }
+                offset += pageSize
+            }
 
             let serverIds = Set(rows.compactMap { $0["id"]?.stringValue?.lowercased() })
 
@@ -169,10 +195,10 @@ actor SyncEngine {
                     .map(\.recordId)
             )
 
-            // Phase 1: delete any local row we're about to replace (same id), plus —
-            // for server-owned tables — rows that no longer exist on the server
-            // (stale duplicates, deleted people, etc.). NOT tasks for the latter,
-            // which can have locally-created rows that haven't pushed yet.
+            // Phase 1: delete any local row we're about to replace (same id), plus
+            // rows that no longer exist on the server (stale duplicates, deleted
+            // people, tasks completed or deleted on another device). Locally-created
+            // rows that haven't pushed yet are protected by `pendingIds` above.
             //
             // We delete-then-insert (with a save between the phases) rather than a
             // bare insert because SwiftData's implicit unique-id upsert does NOT
