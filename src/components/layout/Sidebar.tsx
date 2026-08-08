@@ -33,7 +33,6 @@ import {
   List,
   FileText,
   Repeat,
-  Pill,
   Target,
   History,
   Settings,
@@ -390,14 +389,15 @@ export function Sidebar({
             {!collapsed && <span>Routines</span>}
           </button>
 
-          {/* Meds */}
-          <button
-            onClick={() => navigate('/meds')}
-            className={navItemClass(location.pathname.startsWith('/meds'))}
-          >
-            {createElement(Pill, { className: 'w-5 h-5 shrink-0' })}
-            {!collapsed && <span>Health</span>}
-          </button>
+          {/* Health (medications + symptoms) is WITHHELD, not deleted — the nav
+              entry, the /meds route and the registry entry are the three seams
+              that hide it, and putting all three back restores it exactly.
+              Everything under src/apps/meds/ and the four hooks it uses are
+              untouched. Withheld because only finished work should be reachable:
+              deletes on medications/medication_logs/symptoms/symptom_logs are
+              silently never delivered by realtime (those tables are published
+              but still on default REPLICA IDENTITY, so Postgres can't evaluate
+              RLS against the old row). */}
 
           {/* Meals */}
           <button

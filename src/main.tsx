@@ -1,6 +1,6 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import * as Sentry from '@sentry/react'
 
 // Initialize Sentry for error tracking
@@ -146,7 +146,12 @@ createRoot(document.getElementById('root')!).render(
               <Route path="/goals/*" element={cutoverShell} />
               <Route path="/projects/*" element={cutoverShell} />
               <Route path="/routines/*" element={cutoverShell} />
-              <Route path="/meds/*" element={cutoverShell} />
+              {/* /meds withheld — see the note in Sidebar.tsx. Redirected
+                  rather than simply deleted: unmounting the app alone left the
+                  path falling through to the catch-all, which rendered a
+                  half-drawn shell with an empty body. A stale bookmark, or the
+                  Mac shell restoring its last route, would land there. */}
+              <Route path="/meds/*" element={<Navigate to="/today" replace />} />
               <Route path="/contacts/*" element={cutoverShell} />
               <Route path="/family/*" element={cutoverShell} />
               <Route path="/agent/*" element={cutoverShell} />
