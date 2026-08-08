@@ -130,17 +130,21 @@ export function Sidebar({
 
   const { state: groupState, toggle: toggleGroup, setOpen: openGroup } = useSidebarGroupState()
 
-  // The rhythm spine (Phase 2b): Inbox · the horizon rungs · Someday · Library.
-  // The Library group (Projects, Goals, Routines, Meals, Contacts, Lists, House,
-  // History, + registry apps) auto-expands when any of its destinations is the
-  // active route. Group→state-key: LIBRARY→'library'.
+  // The rhythm spine (Phase 2b): Inbox · the horizon rungs · Routines · Library.
+  // The Library group (Projects, Goals, Meals, Contacts, Lists, House, History,
+  // + registry apps) auto-expands when any of its destinations is the active
+  // route. Group→state-key: LIBRARY→'library'.
+  //
+  // Routines is deliberately absent from this list now that it sits outside the
+  // group: leaving it in would throw Library open every time you visited a page
+  // that is no longer in it.
   const libraryActive =
-    activeView === 'projects' || activeView === 'routines' ||
+    activeView === 'projects' ||
     activeView === 'goals' || activeView === 'meals' ||
     activeView === 'home-app' || activeView === 'lists' ||
     activeView === 'contacts' || activeView === 'contact-detail' ||
     activeView === 'history' ||
-    location.pathname.startsWith('/projects') || location.pathname.startsWith('/routines') ||
+    location.pathname.startsWith('/projects') ||
     location.pathname.startsWith('/goals') || location.pathname.startsWith('/meals') ||
     location.pathname.startsWith('/lists') || location.pathname.startsWith('/contacts') ||
     location.pathname.startsWith('/history') || location.pathname.startsWith('/home') ||
@@ -353,6 +357,28 @@ export function Sidebar({
           )
         })}
 
+        {/* Routines sits under the ladder but NOT in it, separated by nothing
+            more than its own spacing.
+
+            Every rung above answers one question — how far out am I looking? —
+            and moving between them changes magnification, not subject. Routines
+            answers "what recurs?", so putting it in the ladder would cost the
+            section the single question that makes it readable at a glance. But
+            it isn't a peer of Contacts and Documents either: the page renders
+            as a rhythm (daily arc, week strip, seasonal shelf), and burying it
+            in Library was the thing that felt wrong. Adjacent, not inside. */}
+        {/* mt-3: without it this butts straight up against Someday and reads as
+            a seventh rung, which is the one thing it must not look like. The
+            gap is the whole distinction — no divider, because a rule would
+            announce a new section instead of a neighbour. */}
+        <button
+          onClick={() => navigate('/routines')}
+          className={`mt-3 ${navItemClass(location.pathname.startsWith('/routines'))}`}
+        >
+          {createElement(Repeat, { className: 'w-5 h-5 shrink-0' })}
+          {!collapsed && <span>Routines</span>}
+        </button>
+
         {/* ── Library ── the non-horizon surfaces, collapsible (not daily clutter). */}
         <div className="border-t border-neutral-200/60 my-2" />
         <SidebarGroup
@@ -378,15 +404,6 @@ export function Sidebar({
           >
             {createElement(Target, { className: 'w-5 h-5 shrink-0' })}
             {!collapsed && <span>Goals</span>}
-          </button>
-
-          {/* Routines */}
-          <button
-            onClick={() => navigate('/routines')}
-            className={navItemClass(location.pathname.startsWith('/routines'))}
-          >
-            {createElement(Repeat, { className: 'w-5 h-5 shrink-0' })}
-            {!collapsed && <span>Routines</span>}
           </button>
 
           {/* Health (medications + symptoms) is WITHHELD, not deleted — the nav
