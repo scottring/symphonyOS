@@ -12,6 +12,7 @@ actor SyncEngine {
 
     private let modelContainer: ModelContainer
     private var realtimeChannels: [RealtimeChannelV2] = []
+    private var statusTasks: [Task<Void, Never>] = []
     private var networkMonitor: NWPathMonitor?
     private var isOnline = true
     private var isSyncing = false
@@ -59,6 +60,43 @@ actor SyncEngine {
         startPushLoop()
     }
 
+    /// Re-sync after the app returns to the foreground.
+    ///
+    /// iOS suspends a backgrounded app, which kills the realtime socket, and
+    /// `postgres_changes` has **no replay** — anything that happened while we were
+    /// away is never delivered, not even after the socket reconnects. Since
+    /// `performInitialSync` previously ran only at login, the only way to see that
+    /// work was to force-relaunch the app: Scott deleted "Jax to good doggie
+    /// daycare" on the web and the row sat on his phone until he restarted it.
+    ///
+    /// Push first so local edits are on the server before the pull reconciles
+    /// against it, then re-establish the socket so live changes flow again.
+    func resync() async {
+        guard userId != nil, isOnline, !isSyncing else { return }
+        await pushPendingChanges()
+        await performInitialSync()
+        await resubscribeToRealtime()
+    }
+
+    /// Tear the channels down and re-subscribe. A socket that was suspended can
+    /// come back in a half-dead state that still accepts `subscribe()` but never
+    /// delivers, so this replaces rather than tops up — and without the teardown
+    /// every foreground would stack another set of channels.
+    private func resubscribeToRealtime() async {
+        for task in statusTasks { task.cancel() }
+        statusTasks.removeAll()
+        // removeChannel, NOT unsubscribe: unsubscribe leaves the topic registered on
+        // the realtime client, and `channel(topic)` hands back that same instance —
+        // so re-subscribing would stack a second postgresChange callback on it and
+        // every event would be handled twice. removeChannel clears the registry so
+        // subscribeToRealtime builds genuinely fresh channels.
+        for channel in realtimeChannels {
+            await supabase.realtimeV2.removeChannel(channel)
+        }
+        realtimeChannels.removeAll()
+        await subscribeToRealtime()
+    }
+
     /// Periodically flush local edits up to Supabase. Edits enqueue a PendingChange;
     /// this loop pushes them within a few seconds (previously push only ran on a
     /// network reconnect, so edits effectively never synced).
@@ -77,8 +115,15 @@ actor SyncEngine {
         self.userId = nil
         pushTask?.cancel()
         pushTask = nil
+        for task in statusTasks { task.cancel() }
+        statusTasks.removeAll()
+        // removeChannel, NOT unsubscribe: unsubscribe leaves the topic registered on
+        // the realtime client, and `channel(topic)` hands back that same instance —
+        // so re-subscribing would stack a second postgresChange callback on it and
+        // every event would be handled twice. removeChannel clears the registry so
+        // subscribeToRealtime builds genuinely fresh channels.
         for channel in realtimeChannels {
-            await channel.unsubscribe()
+            await supabase.realtimeV2.removeChannel(channel)
         }
         realtimeChannels.removeAll()
         networkMonitor?.cancel()
@@ -545,9 +590,20 @@ actor SyncEngine {
 
             Task { [weak self] in
                 for await change in changes {
+                    Self.syncLog.info("realtime \(table, privacy: .public): event received")
                     await self?.handleRealtimeChange(table: table, change: change)
                 }
             }
+
+            // A channel that silently fails to join delivers nothing forever, and
+            // looks identical to "nothing changed" — log the transition so the next
+            // "sync is broken" report starts with evidence instead of a guess.
+            let statusTask = Task {
+                for await status in channel.statusChange {
+                    Self.syncLog.info("realtime \(table, privacy: .public): channel \(String(describing: status), privacy: .public)")
+                }
+            }
+            statusTasks.append(statusTask)
 
             await channel.subscribe()
             realtimeChannels.append(channel)
