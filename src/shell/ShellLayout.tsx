@@ -9,17 +9,18 @@ import { NewVersionBanner } from '@/components/layout/NewVersionBanner';
 import { OmniboxResults } from '@/components/omnibox/OmniboxResults';
 import { DomainSwitcher } from '@/components/domain/DomainSwitcher';
 import { Toast, ConfirmationToast } from '@/components/toast';
-import { ChatPanel } from '@/components/chat/ChatPanel';
 import { NotesProvider } from '@/contexts/NotesContext';
 import { ListsProvider } from '@/contexts/ListsContext';
 import { useAuth } from '@/hooks/useAuth';
 import { useMobile } from '@/hooks/useMobile';
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
-import { useSymphonyAssistant } from '@/hooks/useSymphonyAssistant';
-import { useScratchpadHidden } from '@/hooks/useScratchpadHidden';
-import { useAssistantLaunchRequests, useAssistantLauncher } from '@/contexts/AssistantLaunchContext';
+import { useWideViewport } from '@/hooks/useWideViewport';
+import { useAssistantLauncher } from '@/contexts/AssistantLaunchContext';
+import { useAssistant } from '@/contexts/AssistantContext';
 import { useShellChrome } from './useShellChrome';
-import { useSelection } from './providers/SelectionProvider';
+import { appRegistry } from './appRegistry';
+import { useDetailPaneWidth } from './useDetailPaneWidth';
+import { computeContentInset } from './railLayout';
 import { MOBILE_TAB_BAR_HEIGHT } from './mobileChrome';
 
 /**
@@ -39,16 +40,13 @@ import { MOBILE_TAB_BAR_HEIGHT } from './mobileChrome';
  * setting `chromeless: true` on their AppDef — Shell.tsx skips this wrapper for
  * those apps, so the chrome here only ever wraps non-chromeless apps.
  *
- * NOTE on the AI rail: on Today (desktop) the assistant rail is owned by
- * Shell.tsx's <ShellAssistantHost>. For non-Today views ShellLayout renders its
- * own assistant rail toggled by the top-bar AI button — kept self-contained so
- * Shell.tsx's global DetailPanel model is untouched.
+ * NOTE on the AI rail: ShellLayout does NOT render it. Shell.tsx mounts a
+ * single <AssistantRail> over every route and <AssistantProvider> owns the one
+ * conversation. ShellLayout only reserves content-column space for the rail
+ * and drives the top-bar AI button.
  */
 
 const SIDEBAR_STORAGE_KEY = 'symphony-sidebar-collapsed';
-
-// Mirrors Shell.tsx — the AI rail is owned by ShellAssistantHost on these paths.
-const TODAY_PATHS = new Set(['/', '/today', '/tasks-new/today', '/tasks-new']);
 
 /**
  * Derive ViewType from pathname so the Sidebar's active-item highlight
@@ -94,7 +92,6 @@ function ShellLayoutInner({ children }: Props) {
   }, [sidebarCollapsed]);
 
   const activeView = useMemo(() => deriveActiveView(location.pathname), [location.pathname]);
-  const isToday = TODAY_PATHS.has(location.pathname);
 
   const { tasks } = useSupabaseTasks();
   const inboxCount = useMemo(
@@ -104,10 +101,6 @@ function ShellLayoutInner({ children }: Props) {
 
   // Chrome data + handlers, sourced from shared hooks (not props).
   const chrome = useShellChrome();
-
-  // When a detail panel (480px fixed-right) is open, reflow content left so the
-  // panel doesn't obscure it.
-  const { selection } = useSelection();
 
   // Mobile/UI chrome state
   const [moreSheetOpen, setMoreSheetOpen] = useState(false);
@@ -137,26 +130,17 @@ function ShellLayoutInner({ children }: Props) {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, []);
 
-  // Non-Today AI rail (desktop Today's rail is owned by Shell.tsx's
-  // ShellAssistantHost; mobile Today has no other surface, so this rail's
-  // full-screen mobile overlay covers it too).
-  const [chatOpen, setChatOpen] = useState(false);
-  const assistant = useSymphonyAssistant({ persistKey: 'symphony_rail' });
-  const showAiRail = chatOpen && (!isToday || isMobile);
+  // The assistant rail is rendered by Shell's <AssistantRail> and its
+  // conversation lives in <AssistantProvider>. ShellLayout only reserves space
+  // for the rail and drives the top-bar toggle — it no longer owns an instance
+  // (two instances is what made the conversation vanish on navigation), and
+  // the rail owns the launch nonce.
+  const { open: assistantOpen, setOpen: setAssistantOpen } = useAssistant();
+  const detailPaneWidth = useDetailPaneWidth(appRegistry);
+  const isWide = useWideViewport();
 
-  // Programmatic launches (unibox "Ask Symphony", Add-to-today…): this host
-  // owns every surface except desktop-Today (Shell's ShellAssistantHost).
+  // QuickCapture's "Ask Symphony" row still needs the launcher.
   const { openAssistant } = useAssistantLauncher();
-  const { nonce: launchNonce, consumeSeed } = useAssistantLaunchRequests();
-  const seenLaunchNonce = useRef(0);
-  useEffect(() => {
-    if (launchNonce === 0 || launchNonce === seenLaunchNonce.current) return;
-    if (isToday && !isMobile) return;
-    seenLaunchNonce.current = launchNonce;
-    setChatOpen(true);
-    const seed = consumeSeed();
-    if (seed && seed.autoSend !== false) void assistant.sendMessage(seed.message);
-  }, [launchNonce, isToday, isMobile, consumeSeed, assistant]);
 
   const handleViewChange = useCallback(
     (view: ViewType) => {
@@ -221,17 +205,6 @@ function ShellLayoutInner({ children }: Props) {
     [chrome, navigate],
   );
 
-  // The AI rail is shared with main content margin so content isn't covered.
-  const rightRailVisible = showAiRail;
-
-  // Today's assistant rail is owned by Shell.tsx (ShellAssistantHost, 420px wide)
-  // and its visibility is the shared scratchpad-hidden state. When it's open on
-  // Today, reflow the main column left by the rail width instead of letting the
-  // fixed overlay cover it. (Detail-pane `selection` takes precedence below,
-  // matching ShellAssistantHost which hides the rail while a detail pane is open.)
-  const { hidden: scratchpadHidden } = useScratchpadHidden();
-  const todayRailVisible = isToday && !scratchpadHidden && !isMobile;
-
   return (
     <div className="h-screen flex overflow-hidden overflow-x-hidden bg-bg-base w-full max-w-[100vw]">
       {/* "New version available — reload" banner: shows when a newer build
@@ -272,7 +245,14 @@ function ShellLayoutInner({ children }: Props) {
                 // the bar's actual height and clipped AttentionLine.
                 paddingBottom: `calc(${MOBILE_TAB_BAR_HEIGHT} + 0.5rem + env(safe-area-inset-bottom, 0px))`,
               }
-            : { marginRight: selection ? '480px' : rightRailVisible ? '380px' : todayRailVisible ? '420px' : '0' }
+            : {
+                marginRight: computeContentInset({
+                  isMobile,
+                  railOpen: assistantOpen,
+                  detailWidth: detailPaneWidth,
+                  isWide,
+                }),
+              }
         }
       >
         {/* Mobile header — logo + sign-out (date nav lives in HomeHeader on Today) */}
@@ -321,9 +301,9 @@ function ShellLayoutInner({ children }: Props) {
           <div className="absolute top-4 right-6 z-20 flex items-center gap-2">
             <DomainSwitcher />
             <button
-              onClick={() => setChatOpen((o) => !o)}
+              onClick={() => setAssistantOpen(!assistantOpen)}
               className={`w-9 h-9 rounded-full bg-bg-elevated border border-neutral-200 text-neutral-500 hover:text-primary-500 hover:border-primary-300 transition-all grid place-items-center shadow-card ${
-                chatOpen ? 'ring-2 ring-primary-500/30 text-primary-500 border-primary-500' : ''
+                assistantOpen ? 'ring-2 ring-primary-500/30 text-primary-500 border-primary-500' : ''
               }`}
               aria-label="AI chat"
               title="AI chat"
@@ -351,61 +331,6 @@ function ShellLayoutInner({ children }: Props) {
           resultsSlot={(query, close) => <OmniboxResults query={query} onNavigate={close} />}
           onAskSymphony={(text) => openAssistant({ message: text, autoSend: true })}
         />
-      )}
-
-      {/* Non-Today AI rail (desktop). Today's rail is in Shell.tsx. */}
-      {showAiRail && !isMobile && (
-        <aside
-          className="fixed top-0 bottom-0 right-0 w-[380px] bg-bg-elevated border-l border-neutral-200/80 shadow-xl z-20"
-          aria-label="Symphony AI"
-        >
-          <ChatPanel
-            messages={assistant.messages}
-            loading={assistant.loading}
-            error={assistant.error}
-            entityContext={null}
-            mode="chat"
-            onSend={assistant.sendMessage}
-            onClear={assistant.resetSession}
-            onClose={() => setChatOpen(false)}
-            onNewChat={assistant.resetSession}
-            toolActivity={assistant.toolActivity}
-            sessions={assistant.sessions}
-            sessionsLoading={assistant.sessionsLoading}
-            onLoadSession={assistant.loadSession}
-            onDeleteSession={assistant.deleteSession}
-            activeSessionId={assistant.activeSessionId}
-          />
-        </aside>
-      )}
-
-      {/* Mobile AI rail — full-screen overlay */}
-      {showAiRail && isMobile && (
-        <div
-          className="fixed inset-0 z-50 bg-bg-elevated"
-          style={{
-            paddingTop: 'env(safe-area-inset-top, 0px)',
-            paddingBottom: 'env(safe-area-inset-bottom, 0px)',
-          }}
-        >
-          <ChatPanel
-            messages={assistant.messages}
-            loading={assistant.loading}
-            error={assistant.error}
-            entityContext={null}
-            mode="chat"
-            onSend={assistant.sendMessage}
-            onClear={assistant.resetSession}
-            onClose={() => setChatOpen(false)}
-            onNewChat={assistant.resetSession}
-            toolActivity={assistant.toolActivity}
-            sessions={assistant.sessions}
-            sessionsLoading={assistant.sessionsLoading}
-            onLoadSession={assistant.loadSession}
-            onDeleteSession={assistant.deleteSession}
-            activeSessionId={assistant.activeSessionId}
-          />
-        </div>
       )}
 
       {/* Mobile bottom navigation — the rhythm spine: Today · Week · Month ·

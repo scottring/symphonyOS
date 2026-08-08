@@ -5,7 +5,7 @@ import { ListsProvider } from '@/contexts/ListsContext';
 import { NotesProvider } from '@/contexts/NotesContext';
 import { GoalsProvider } from '@/contexts/GoalsContext';
 import { AppShellChromeContext, type AppShellChromeContextValue } from '@/contexts/AppShellChromeContext';
-import { useScratchpadHidden } from '@/hooks/useScratchpadHidden';
+import { useAssistant } from '@/contexts/AssistantContext';
 import { HomeViewContainer } from './HomeViewContainer';
 import { InboxViewContainer } from './InboxViewContainer';
 import { TaskViewRoute } from './TaskViewRoute';
@@ -26,16 +26,15 @@ import { WeekView, MonthView, SeasonView, YearView, SomedayView } from './Horizo
 
 export function TasksApp() {
   // HomeHeader (rendered by HomeView) consumes AppShellChrome. The Today AI
-  // button toggles the right-rail assistant, whose shared visibility lives in
-  // useScratchpadHidden (the same state Shell.tsx's ShellAssistantHost reads),
-  // so the masthead button and the rail stay in sync.
-  const { hidden, setHidden } = useScratchpadHidden();
+  // button toggles the shared assistant rail — the same state the top-bar
+  // button and the rail's own edge tab drive, so all three stay in sync.
+  const { open, setOpen } = useAssistant();
   const chrome = useMemo<AppShellChromeContextValue>(
     () => ({
-      chatOpen: !hidden,
-      onChatOpenChange: (open: boolean) => setHidden(!open),
+      chatOpen: open,
+      onChatOpenChange: setOpen,
     }),
-    [hidden, setHidden],
+    [open, setOpen],
   );
 
   return (

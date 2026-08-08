@@ -50,3 +50,18 @@ describe('Shell chrome wrapping', () => {
     expect(screen.getByTestId('chromeless-content')).toBeTruthy();
   });
 });
+
+// The rail used to render only on desktop Today paths (ShellAssistantHost),
+// with a second, separate instance in ShellLayout for everywhere else — so
+// navigating swapped which conversation you were looking at. One host now.
+describe('Shell assistant rail', () => {
+  it('mounts the rail on every chromed route', () => {
+    renderAt('/chromed');
+    expect(screen.getByLabelText('Show Symphony AI')).toBeTruthy();
+  });
+
+  it('does not mount the rail on a chromeless app', () => {
+    renderAt('/chromeless');
+    expect(screen.queryByLabelText('Show Symphony AI')).toBeNull();
+  });
+});
