@@ -767,7 +767,10 @@ export function WallV2Shell() {
           {flashMessage && (
             <div
               role="status"
-              className="animate-fade-in-up absolute -top-9 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full bg-stone-800/90 dark:bg-stone-200/90 text-white dark:text-stone-900 text-[0.85rem] font-bold shadow-lg backdrop-blur-md whitespace-nowrap"
+              // z-[60] clears the sheets (all `z-50`). This is the wall's only
+              // confirmation that a tap did anything, so it must never be the
+              // thing hidden behind whatever the tap came from.
+              className="animate-fade-in-up absolute -top-9 left-1/2 z-[60] -translate-x-1/2 px-4 py-2 rounded-full bg-stone-800/90 dark:bg-stone-200/90 text-white dark:text-stone-900 text-[0.85rem] font-bold shadow-lg backdrop-blur-md whitespace-nowrap"
             >
               {flashMessage}
             </div>
@@ -783,7 +786,17 @@ export function WallV2Shell() {
           isDark={isDark}
           refreshing={wallData.loading}
           onGuestMode={() => { setShowUtilities(false); setGuestMode(true); }}
-          onRefresh={() => { void wallData.refetch(); showFlash('Refreshing…'); }}
+          // Close the sheet, like Guest mode does. Every scrap of evidence that
+          // a refresh happened — the "Refreshing…" flash and the rail's
+          // "Updated HH:MM" — sits UNDER this sheet's `fixed inset-0 z-50`, so
+          // leaving it open meant tapping Refresh produced no visible change
+          // whatsoever. It ran; you just couldn't tell. Theme and hide-routines
+          // get away with staying open because they repaint the wall behind it.
+          onRefresh={() => {
+            setShowUtilities(false);
+            void wallData.refetch();
+            showFlash('Refreshing…');
+          }}
           onToggleHideRoutines={toggleHideRoutines}
           onToggleTheme={toggleTheme}
           onClose={() => setShowUtilities(false)}
