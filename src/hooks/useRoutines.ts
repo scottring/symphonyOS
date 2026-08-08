@@ -2,6 +2,43 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase, getAuthUser } from '@/lib/supabase'
 import type { Routine, RecurrencePattern, RoutineVisibility, PrepFollowupTemplate } from '@/types/actionable'
 import { matchesRecurrenceForDate, type LastCompletionMap } from '@/lib/routineUtils'
+import { onRealtimeResumed } from '@/lib/realtime/keepAlive'
+
+// ── Same-tab sync ────────────────────────────────────────────────────────────
+//
+// Every useRoutines() call is its own instance with its own `routines` state —
+// the detail panel, HomeViewContainer, ShellSearch, the horizons pages and more
+// each mount one. A mutation updated ONLY the instance that made it, and until
+// now there was no second path: this hook never subscribed to realtime at all,
+// and nothing anywhere in the app subscribed to the `routines` table. So
+// renaming a routine in the detail pane genuinely could not reach Today. There
+// was no lag to wait out; a reload was the only way.
+//
+// Both halves are added below. This bus is what makes the rename land instantly
+// in the same tab; the realtime subscription covers other tabs and devices.
+// Exactly the shape useSupabaseTasks already uses — see localTaskWrites there.
+
+type LocalRoutineWrite =
+  | { kind: 'upsert'; routine: Routine }
+  | { kind: 'patch'; id: string; updates: Partial<Routine> }
+  | { kind: 'delete'; id: string }
+
+const localRoutineWrites = new EventTarget()
+
+function announceRoutineWrite(detail: LocalRoutineWrite) {
+  localRoutineWrites.dispatchEvent(new CustomEvent('write', { detail }))
+}
+
+/** Monotonic suffix so every hook instance gets its own realtime channel topic. */
+let routinesChannelSeq = 0
+
+const byName = (a: Routine, b: Routine) => a.name.localeCompare(b.name)
+
+/** Insert-or-replace, keeping the name ordering every consumer assumes. */
+function applyUpsert(prev: Routine[], routine: Routine): Routine[] {
+  const without = prev.filter(r => r.id !== routine.id)
+  return [...without, routine].sort(byName)
+}
 
 export interface CreateRoutineInput {
   name: string
@@ -142,6 +179,49 @@ export function useRoutines() {
     fetchLastCompletions()
   }, [fetchRoutines, fetchLastCompletions])
 
+  // Writes from OTHER instances in this tab, and from other tabs/devices.
+  useEffect(() => {
+    const onLocalWrite = (e: Event) => {
+      const detail = (e as CustomEvent<LocalRoutineWrite>).detail
+      setRoutines(prev => {
+        if (detail.kind === 'delete') return prev.filter(r => r.id !== detail.id)
+        if (detail.kind === 'patch') {
+          return prev
+            .map(r => (r.id === detail.id ? { ...r, ...detail.updates } as Routine : r))
+            .sort(byName)
+        }
+        return applyUpsert(prev, detail.routine)
+      })
+    }
+    localRoutineWrites.addEventListener('write', onLocalWrite)
+
+    // The topic must be unique per instance: supabase-js hands back the SAME
+    // channel object for a repeated topic, so a second .subscribe() errors and
+    // any one instance's unmount would tear down the channel for everyone —
+    // the bug useSupabaseTasks already had to fix.
+    const channel = supabase
+      .channel(`routines-changes-${++routinesChannelSeq}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'routines' }, (payload) => {
+        if (payload.eventType === 'DELETE') {
+          const id = (payload.old as { id?: string })?.id
+          if (id) setRoutines(prev => prev.filter(r => r.id !== id))
+          return
+        }
+        const row = payload.new as Routine
+        if (row?.id) setRoutines(prev => applyUpsert(prev, row))
+      })
+      .subscribe()
+
+    // A reconnect resumes delivery going forward only; refetch to close the gap.
+    const stopResumed = onRealtimeResumed(() => { void fetchRoutines() })
+
+    return () => {
+      localRoutineWrites.removeEventListener('write', onLocalWrite)
+      channel.unsubscribe()
+      stopResumed()
+    }
+  }, [fetchRoutines])
+
   // Create a new routine
   const addRoutine = useCallback(async (input: CreateRoutineInput): Promise<Routine | null> => {
     setError(null)
@@ -183,7 +263,8 @@ export function useRoutines() {
       if (insertError) throw insertError
 
       const routine = data as Routine
-      setRoutines(prev => [...prev, routine].sort((a, b) => a.name.localeCompare(b.name)))
+      setRoutines(prev => applyUpsert(prev, routine))
+      announceRoutineWrite({ kind: 'upsert', routine })
       return routine
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to create routine'
@@ -230,10 +311,14 @@ export function useRoutines() {
       if (updateError) throw updateError
 
       setRoutines(prev =>
-        prev
-          .map(r => (r.id === id ? { ...r, ...updates } as Routine : r))
-          .sort((a, b) => a.name.localeCompare(b.name))
+        prev.map(r => (r.id === id ? { ...r, ...updates } as Routine : r)).sort(byName)
       )
+      // A PATCH, not the merged row: every instance holds its own copy, so each
+      // applies the same delta to whatever it has. Announcing a whole row built
+      // from this instance's state would push this instance's staleness onto
+      // the others, and computing it inside the setState updater would be a
+      // side effect in a reducer that StrictMode double-invokes.
+      announceRoutineWrite({ kind: 'patch', id, updates })
       return true
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to update routine'
@@ -256,6 +341,7 @@ export function useRoutines() {
       if (deleteError) throw deleteError
 
       setRoutines(prev => prev.filter(r => r.id !== id))
+      announceRoutineWrite({ kind: 'delete', id })
       return true
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to delete routine'

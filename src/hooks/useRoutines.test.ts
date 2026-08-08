@@ -36,6 +36,11 @@ vi.mock('@/lib/supabase', () => {
       },
       delete: () => ({ eq: () => mockDelete() }),
     }),
+    // No-op realtime. Keeping it inert is deliberate: it means the same-tab
+    // cross-instance tests below prove the WRITE BUS, not a mocked socket.
+    channel: () => ({
+      on: () => ({ subscribe: () => ({ unsubscribe: () => {} }) }),
+    }),
   },
 }
   // getAuthUser is the real module's cached-session reader; here it
@@ -620,4 +625,47 @@ describe('useRoutines', () => {
       })
     })
   })
+
+// The reported bug: renaming a routine in the detail pane left Today showing
+// the old name until a manual refresh. Every useRoutines() call is its own
+// instance (TaskDetailPanel and HomeViewContainer each mount one), a mutation
+// only ever updated the instance that made it, and this hook subscribed to
+// nothing — no realtime, no bus — so the rename had no path to Today at all.
+// The realtime mock above is inert, so these prove the same-tab write bus.
+describe('same-tab cross-instance sync', () => {
+  it('a rename in one instance reaches another', async () => {
+    mockOrder.mockResolvedValue({ data: [createMockRoutine({ id: 'r1', name: 'Old name' })], error: null })
+    mockUpdate.mockResolvedValue({ error: null })
+
+    const panel = renderHook(() => useRoutines())
+    const today = renderHook(() => useRoutines())
+    await waitFor(() => {
+      expect(panel.result.current.routines).toHaveLength(1)
+      expect(today.result.current.routines).toHaveLength(1)
+    })
+
+    await act(async () => {
+      await panel.result.current.updateRoutine('r1', { name: 'New name' })
+    })
+
+    expect(panel.result.current.routines[0].name).toBe('New name')
+    expect(today.result.current.routines[0].name).toBe('New name')
+  })
+
+  it('a delete in one instance reaches another', async () => {
+    mockOrder.mockResolvedValue({ data: [createMockRoutine({ id: 'r1' })], error: null })
+    mockDelete.mockResolvedValue({ error: null })
+
+    const panel = renderHook(() => useRoutines())
+    const today = renderHook(() => useRoutines())
+    await waitFor(() => expect(today.result.current.routines).toHaveLength(1))
+
+    await act(async () => {
+      await panel.result.current.deleteRoutine('r1')
+    })
+
+    expect(today.result.current.routines).toHaveLength(0)
+  })
+})
+
 })
