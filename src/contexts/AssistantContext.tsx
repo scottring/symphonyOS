@@ -10,7 +10,7 @@
 // instance. (Entity-scoped chats — AssistDrawer, GuideChat — are deliberately
 // separate and keep their own.)
 
-import { createContext, useContext, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useContext, useCallback, useMemo, useState, type ReactNode } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useSymphonyAssistant } from '@/hooks/useSymphonyAssistant'
 import { useScratchpadHidden } from '@/hooks/useScratchpadHidden'
@@ -35,10 +35,15 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
   const { hidden, setHidden } = useScratchpadHidden()
   const [mobileOpen, setMobileOpen] = useState(false)
 
-  // Mobile can't keep a full-screen overlay up over a page you navigated to.
-  useEffect(() => {
-    if (isMobile) setMobileOpen(false)
-  }, [pathname, isMobile])
+  // Mobile can't keep a full-screen overlay up over a page you navigated to, so
+  // close it on route change. Adjusting state during render is React's
+  // documented alternative to a reset effect and avoids a cascading re-render.
+  // Desktop never sets mobileOpen, so this is a no-op there.
+  const [lastPathname, setLastPathname] = useState(pathname)
+  if (pathname !== lastPathname) {
+    setLastPathname(pathname)
+    if (mobileOpen) setMobileOpen(false)
+  }
 
   const open = isMobile ? mobileOpen : !hidden
   const setOpen = useCallback(

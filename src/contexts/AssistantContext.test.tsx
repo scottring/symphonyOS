@@ -11,7 +11,8 @@ vi.mock('@/lib/agentStream', () => ({
   }),
 }))
 
-vi.mock('@/hooks/useMobile', () => ({ useMobile: () => false }))
+const mocks = vi.hoisted(() => ({ isMobile: false }))
+vi.mock('@/hooks/useMobile', () => ({ useMobile: () => mocks.isMobile }))
 
 /** Two independent consumers of the context, to prove they share one instance. */
 function ConsumerA() {
@@ -48,7 +49,30 @@ function renderShared() {
   )
 }
 
-beforeEach(() => { localStorage.clear() })
+beforeEach(() => {
+  localStorage.clear()
+  mocks.isMobile = false
+})
+
+/** Renders A + B with a navigate button, so tests can move routes. */
+function renderWithNav() {
+  function Navigator() {
+    const navigate = useNavigate()
+    return <button onClick={() => navigate('/projects')}>go</button>
+  }
+  return render(
+    <MemoryRouter initialEntries={['/today']}>
+      <AssistantProvider>
+        <ConsumerA />
+        <Navigator />
+        <Routes>
+          <Route path="/today" element={<ConsumerB />} />
+          <Route path="/projects" element={<ConsumerB />} />
+        </Routes>
+      </AssistantProvider>
+    </MemoryRouter>,
+  )
+}
 
 describe('AssistantProvider', () => {
   it('shares one conversation across consumers', async () => {
@@ -80,28 +104,47 @@ describe('AssistantProvider', () => {
   })
 
   it('keeps the conversation across a route change', async () => {
-    function Navigator() {
-      const navigate = useNavigate()
-      return <button onClick={() => navigate('/projects')}>go</button>
-    }
-    render(
-      <MemoryRouter initialEntries={['/today']}>
-        <AssistantProvider>
-          <ConsumerA />
-          <Navigator />
-          <Routes>
-            <Route path="/today" element={<ConsumerB />} />
-            <Route path="/projects" element={<ConsumerB />} />
-          </Routes>
-        </AssistantProvider>
-      </MemoryRouter>,
-    )
+    renderWithNav()
     await act(async () => { screen.getByText('send-a').click() })
     expect(screen.getByTestId('b-count').textContent).toBe('2')
     await act(async () => { screen.getByText('go').click() })
     // THE BUG THIS FIXES: the transcript survives navigation.
     expect(screen.getByTestId('b-count').textContent).toBe('2')
     expect(screen.getByTestId('b-text').textContent).toContain('pack sunscreen')
+  })
+
+  it('stays open across a route change on desktop', async () => {
+    renderWithNav()
+    await act(async () => { screen.getByText('open-a').click() })
+    expect(screen.getByTestId('b-open').textContent).toBe('true')
+    await act(async () => { screen.getByText('go').click() })
+    expect(screen.getByTestId('b-open').textContent).toBe('true')
+  })
+})
+
+describe('AssistantProvider on mobile', () => {
+  it('closes the full-screen overlay on navigation but keeps the conversation', async () => {
+    mocks.isMobile = true
+    renderWithNav()
+    await act(async () => { screen.getByText('open-a').click() })
+    await act(async () => { screen.getByText('send-a').click() })
+    expect(screen.getByTestId('b-open').textContent).toBe('true')
+    expect(screen.getByTestId('b-count').textContent).toBe('2')
+
+    await act(async () => { screen.getByText('go').click() })
+    // The overlay would otherwise cover the page you navigated to.
+    expect(screen.getByTestId('b-open').textContent).toBe('false')
+    // ...but the conversation is what's sticky on mobile.
+    expect(screen.getByTestId('b-count').textContent).toBe('2')
+    expect(screen.getByTestId('b-text').textContent).toContain('pack sunscreen')
+  })
+
+  it('does not persist its open state to localStorage', async () => {
+    mocks.isMobile = true
+    renderWithNav()
+    await act(async () => { screen.getByText('open-a').click() })
+    expect(screen.getByTestId('b-open').textContent).toBe('true')
+    expect(localStorage.getItem('symphony-scratchpad-hidden')).toBeNull()
   })
 })
 

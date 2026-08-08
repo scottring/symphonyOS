@@ -1,5 +1,5 @@
 // src/shell/ShellLayout.tsx
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Sparkles, Sun, CalendarRange, CalendarDays, Inbox as InboxIcon, MoreHorizontal } from 'lucide-react';
 import { Sidebar, type ViewType } from '@/components/layout/Sidebar';
