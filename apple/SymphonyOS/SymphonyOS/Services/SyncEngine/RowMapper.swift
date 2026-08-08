@@ -33,6 +33,10 @@ enum RowMapper {
             return familyRuleFromRow(row) as? T
         case is Responsibility.Type:
             return responsibilityFromRow(row) as? T
+        case is SymphonyList.Type:
+            return listFromRow(row) as? T
+        case is SymphonyListItem.Type:
+            return listItemFromRow(row) as? T
         case is Household.Type:
             return householdFromRow(row) as? T
         case is UserProfile.Type:
@@ -117,6 +121,46 @@ enum RowMapper {
         routine.createdAt = row.date("created_at") ?? Date()
         routine.updatedAt = row.date("updated_at") ?? Date()
         return routine
+    }
+
+    private static func listFromRow(_ row: [String: AnyJSON]) -> SymphonyList? {
+        guard let id = row.uuid("id"),
+              let userId = row.uuid("user_id"),
+              let title = row.string("title") else { return nil }
+
+        let list = SymphonyList(id: id, userId: userId, title: title, syncStatus: .synced)
+        list.icon = row.string("icon")
+        list.category = row.string("category") ?? "general"
+        list.visibility = row.string("visibility") ?? "self"
+        list.sortOrder = row.int("sort_order") ?? 0
+        list.externalSource = row.string("external_source")
+        list.externalId = row.string("external_id")
+        list.lastSyncedAt = Date()
+        list.createdAt = row.date("created_at") ?? Date()
+        list.updatedAt = row.date("updated_at") ?? Date()
+        return list
+    }
+
+    private static func listItemFromRow(_ row: [String: AnyJSON]) -> SymphonyListItem? {
+        guard let id = row.uuid("id"),
+              let userId = row.uuid("user_id"),
+              let listId = row.uuid("list_id"),
+              let text = row.string("text") else { return nil }
+
+        // `completed`, not the legacy `is_checked` — both columns still exist,
+        // but the web reads and writes `completed`/`completed_at`.
+        let item = SymphonyListItem(id: id, userId: userId, listId: listId, text: text, syncStatus: .synced)
+        item.note = row.string("note")
+        item.completed = row.bool("completed") ?? false
+        item.completedAt = row.date("completed_at")
+        item.sortOrder = row.int("sort_order") ?? 0
+        item.parentItemId = row.uuid("parent_item_id")
+        item.externalSource = row.string("external_source")
+        item.externalId = row.string("external_id")
+        item.lastSyncedAt = Date()
+        item.createdAt = row.date("created_at") ?? Date()
+        item.updatedAt = row.date("updated_at") ?? Date()
+        return item
     }
 
     private static func contactFromRow(_ row: [String: AnyJSON]) -> Contact? {

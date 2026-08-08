@@ -293,6 +293,12 @@ struct MoreView: View {
                 }
 
                 NavigationLink {
+                    ListsView()
+                } label: {
+                    Label("Lists", systemImage: "checklist")
+                }
+
+                NavigationLink {
                     ContactListView()
                 } label: {
                     Label("Contacts", systemImage: "person.2")

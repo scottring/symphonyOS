@@ -40,6 +40,8 @@ struct SymphonyApp: App {
             Responsibility.self,
             Household.self,
             UserProfile.self,
+            SymphonyList.self,
+            SymphonyListItem.self,
             PendingChange.self,
         ])
     }

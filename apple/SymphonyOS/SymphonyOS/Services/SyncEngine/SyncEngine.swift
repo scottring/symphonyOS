@@ -28,6 +28,8 @@ actor SyncEngine {
         ("projects", Project.self),
         ("tasks", SymphonyTask.self),
         ("routines", Routine.self),
+        ("lists", SymphonyList.self),
+        ("list_items", SymphonyListItem.self),
         ("actionable_instances", ActionableInstance.self),
         ("event_notes", EventNote.self),
         ("weekly_templates", WeeklyTemplate.self),
@@ -195,6 +197,10 @@ actor SyncEngine {
         // which six no longer existed in the database at all.
         await pullTable("tasks", as: SymphonyTask.self, userId: userId)
         await pullTable("routines", as: Routine.self, userId: userId)
+        // Lists before their items, so a pull never leaves items pointing at a
+        // list that isn't there yet.
+        await pullTable("lists", as: SymphonyList.self, userId: userId)
+        await pullTable("list_items", as: SymphonyListItem.self, userId: userId)
         await pullTable("actionable_instances", as: ActionableInstance.self, userId: userId)
         await pullTable("event_notes", as: EventNote.self, userId: userId)
         await pullTable("weekly_templates", as: WeeklyTemplate.self, userId: userId)
@@ -394,6 +400,12 @@ actor SyncEngine {
         case "event_notes":
             guard let n = find(EventNote.self) else { return nil }
             return eventNoteRow(n)
+        case "lists":
+            guard let l = find(SymphonyList.self) else { return nil }
+            return listRow(l)
+        case "list_items":
+            guard let i = find(SymphonyListItem.self) else { return nil }
+            return listItemRow(i)
         default:
             return nil   // other tables aren't edited from iOS
         }
@@ -481,6 +493,39 @@ actor SyncEngine {
             "context": s(r.context),
             "assigned_to": u(r.assignedTo),
             "created_at": .string(isoOut.string(from: r.createdAt)),
+            "updated_at": .string(isoOut.string(from: Date())),
+        ]
+    }
+
+    private static func listRow(_ l: SymphonyList) -> [String: AnyJSON] {
+        [
+            "id": .string(l.id.uuidString),
+            "user_id": .string(l.userId.uuidString),
+            "title": .string(l.title),
+            "icon": s(l.icon),
+            "category": .string(l.category),
+            "visibility": .string(l.visibility),
+            "sort_order": .double(Double(l.sortOrder)),
+            "created_at": .string(isoOut.string(from: l.createdAt)),
+            "updated_at": .string(isoOut.string(from: Date())),
+        ]
+    }
+
+    private static func listItemRow(_ i: SymphonyListItem) -> [String: AnyJSON] {
+        // `is_checked` is deliberately absent: it's the legacy twin of
+        // `completed`, NOT NULL but defaulted, so leaving it out is safe on
+        // insert and avoids writing a column the web no longer reads.
+        [
+            "id": .string(i.id.uuidString),
+            "user_id": .string(i.userId.uuidString),
+            "list_id": .string(i.listId.uuidString),
+            "text": .string(i.text),
+            "note": s(i.note),
+            "completed": .bool(i.completed),
+            "completed_at": i.completedAt.map { AnyJSON.string(isoOut.string(from: $0)) } ?? .null,
+            "sort_order": .double(Double(i.sortOrder)),
+            "parent_item_id": u(i.parentItemId),
+            "created_at": .string(isoOut.string(from: i.createdAt)),
             "updated_at": .string(isoOut.string(from: Date())),
         ]
     }
@@ -793,3 +838,5 @@ extension FamilyRule: HasUUID {}
 extension Responsibility: HasUUID {}
 extension Household: HasUUID {}
 extension UserProfile: HasUUID {}
+extension SymphonyList: HasUUID {}
+extension SymphonyListItem: HasUUID {}

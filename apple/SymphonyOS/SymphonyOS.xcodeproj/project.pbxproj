@@ -32,6 +32,7 @@
 		53CDAD91081EB2442A2A0010 /* DateNavigator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F3522449230AFDDBFBBAA95 /* DateNavigator.swift */; };
 		5480BD7E5D83BED5704A2D87 /* SymphonyTask.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4990741A74AC21CB7B92A74A /* SymphonyTask.swift */; };
 		61710E3386CF139725EF739E /* Supabase in Frameworks */ = {isa = PBXBuildFile; productRef = 7E9B499A191F0220599C23CC /* Supabase */; };
+		61EBDB3A7C44135DE1B7F406 /* SymphonyList.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0EFF39D03A032DEB889523B4 /* SymphonyList.swift */; };
 		643E1691CD4A09CF3180B1D7 /* QuickCaptureBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 12B34400FA4BE790C66C54FD /* QuickCaptureBar.swift */; };
 		64B72D487929953D9BF0468B /* RowMapper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 23C9315FE094AD463C763A78 /* RowMapper.swift */; };
 		69C0D3EC970FE467BCEB47DC /* NordicColors.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3550614A2441567DA7ED9B00 /* NordicColors.swift */; };
@@ -67,6 +68,7 @@
 		DA525AE0EB06BB4184E85BC8 /* EventDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4053D1678E9C1DF45E6BA6C /* EventDetailView.swift */; };
 		DDE8C94DBDC1189E1D3C66B0 /* TaskAttachmentsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC121327DD5EAA34D4F0F0CA /* TaskAttachmentsSection.swift */; };
 		E0B9D195877BF64C575CC6B0 /* CardStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 15C9B2674A0AE5DFA973DAF0 /* CardStyle.swift */; };
+		E63350EC1724E4A07675CEDE /* ListsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9F45CDE5093407A022589D06 /* ListsView.swift */; };
 		E8B5EA11D41BBF3272A9E57F /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A99D77B01B73C4E9753A3494 /* ContentView.swift */; };
 		EC475DE919BDE2B3F16AB6DD /* SymphonyApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 976CC1C0AE86C75E25C45F45 /* SymphonyApp.swift */; };
 		ED73ECCD14D5BD8905977FBC /* MedTokenStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3E5D5FD9C80A901E371BBA0 /* MedTokenStore.swift */; };
@@ -101,6 +103,7 @@
 		0B6DCA8E5B9A0200DBB46513 /* SymphonyOSUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = SymphonyOSUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		0CCEA1013A6E197978F4C424 /* CalendarSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarSettingsView.swift; sourceTree = "<group>"; };
 		0E4D95EEAD58A126302E8231 /* MainView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainView.swift; sourceTree = "<group>"; };
+		0EFF39D03A032DEB889523B4 /* SymphonyList.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SymphonyList.swift; sourceTree = "<group>"; };
 		0F4D6DCD44B9569D9A00BD12 /* FamilyRulesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FamilyRulesView.swift; sourceTree = "<group>"; };
 		12B34400FA4BE790C66C54FD /* QuickCaptureBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuickCaptureBar.swift; sourceTree = "<group>"; };
 		15C9B2674A0AE5DFA973DAF0 /* CardStyle.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CardStyle.swift; sourceTree = "<group>"; };
@@ -143,6 +146,7 @@
 		96C82C536D6E13BD9ECB5DDD /* RoutineListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RoutineListView.swift; sourceTree = "<group>"; };
 		976CC1C0AE86C75E25C45F45 /* SymphonyApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SymphonyApp.swift; sourceTree = "<group>"; };
 		9BB546AEA1DD397A0999083E /* ContactListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContactListView.swift; sourceTree = "<group>"; };
+		9F45CDE5093407A022589D06 /* ListsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListsView.swift; sourceTree = "<group>"; };
 		A99D77B01B73C4E9753A3494 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		A9AE2E825DD3974AD3BF7833 /* CarriedOverTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarriedOverTests.swift; sourceTree = "<group>"; };
 		AFD8CF30E6FA1E8858E08894 /* ScanReviewSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScanReviewSheet.swift; sourceTree = "<group>"; };
@@ -233,6 +237,7 @@
 				B55EEBF75CF09F5235D227D4 /* Project.swift */,
 				472A2A149D3307ED84982544 /* Responsibility.swift */,
 				1A3E9139010E51C7040394A0 /* Routine.swift */,
+				0EFF39D03A032DEB889523B4 /* SymphonyList.swift */,
 				4990741A74AC21CB7B92A74A /* SymphonyTask.swift */,
 				B14F0DAE984F23F841936E31 /* SyncStatus.swift */,
 				37846053B387BAA8FC10D3E6 /* UserProfile.swift */,
@@ -361,6 +366,14 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		883B3DE1E44FFA1AD51B5B36 /* Lists */ = {
+			isa = PBXGroup;
+			children = (
+				9F45CDE5093407A022589D06 /* ListsView.swift */,
+			);
+			path = Lists;
+			sourceTree = "<group>";
+		};
 		89D7CADB18E338A59340A14A /* Views */ = {
 			isa = PBXGroup;
 			children = (
@@ -369,6 +382,7 @@
 				ED3517ACF7EA835C369F01EF /* Contact */,
 				61266F5F1E5762FCA6B19579 /* Event */,
 				D0AB9FF8AC58262AB408ED68 /* Inbox */,
+				883B3DE1E44FFA1AD51B5B36 /* Lists */,
 				7F98BDE5CB4EE6695015F8D2 /* Playbook */,
 				658E00E606F376B2D3FB0DC9 /* Project */,
 				1B6EFA158ED5A0F6FBE13206 /* Routine */,
@@ -620,6 +634,7 @@
 				6B06FC18C6E07F67F06CE80F /* Household.swift in Sources */,
 				BF88A69DE3576ADBEA6AC909 /* InboxView.swift in Sources */,
 				B6A3F79EF2C00858CB49FA78 /* KeyboardShortcuts.swift in Sources */,
+				E63350EC1724E4A07675CEDE /* ListsView.swift in Sources */,
 				D4B40B6C5DF437E57BA45693 /* LogMedicationIntent.swift in Sources */,
 				4AE3289D3236007A5F98C6C0 /* MainView.swift in Sources */,
 				ED73ECCD14D5BD8905977FBC /* MedTokenStore.swift in Sources */,
@@ -643,6 +658,7 @@
 				A936C12D2B64DE7CFB1471C6 /* SlideRow.swift in Sources */,
 				0C4A58B20B67EBDA3028040D /* SupabaseClient.swift in Sources */,
 				EC475DE919BDE2B3F16AB6DD /* SymphonyApp.swift in Sources */,
+				61EBDB3A7C44135DE1B7F406 /* SymphonyList.swift in Sources */,
 				5480BD7E5D83BED5704A2D87 /* SymphonyTask.swift in Sources */,
 				9F7F645DDEABED299DE4578C /* SyncEngine.swift in Sources */,
 				D354A97A4ECB2147BCF1653C /* SyncStatus.swift in Sources */,
