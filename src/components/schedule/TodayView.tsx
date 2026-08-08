@@ -31,13 +31,12 @@ import type { ProactiveSuggestion } from '@/types/proactiveSuggestion'
 import { useUnpromptedSuggestions, type UnpromptedItem } from '@/hooks/useUnpromptedSuggestions'
 import { UnpromptedLines } from '@/components/assistant/UnpromptedLines'
 import { resolveSuggestionAction, revealItemId } from '@/lib/assistant/suggestionAction'
-import { useRoutineStats } from '@/hooks/useRoutineStats'
 import { useSystemHealth, getHealthTextClasses } from '@/hooks/useSystemHealth'
 import { useRecurringEventDetection } from '@/hooks/useRecurringEventDetection'
 import { useTimelineInsert } from '@/hooks/useTimelineInsert'
 import { useDomain } from '@/hooks/useDomain'
 
-import { Eye, EyeOff, Repeat, Binoculars, Sun, Printer, GripVertical, CalendarClock, Moon } from 'lucide-react'
+import { Eye, EyeOff, Repeat, Binoculars, Sun, Printer, GripVertical, CalendarClock, Moon, Sparkles } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { AssigneeFilter } from '@/components/home/AssigneeFilter'
 
@@ -54,6 +53,7 @@ import { computeClaritySteps, type ClarityStepId } from '@/lib/clarity/claritySt
 import { selectOverdue } from '@/lib/today/taskPools'
 import { selectHorizonPool } from '@/lib/today/horizons'
 import { reviewDestination } from '@/lib/today/attention'
+import { useSuggestionsEnabled } from '@/lib/assistant/suggestionsPref'
 import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
 import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
 import { getRoutinesForDatePure } from '@/lib/routineUtils'
@@ -362,8 +362,13 @@ export function TodayView({
     return null
   }, [tasks, events])
 
+  const [suggestionsEnabled, setSuggestionsEnabled] = useSuggestionsEnabled()
+
   const unprompted = useUnpromptedSuggestions('today', {
     resolveFacts: resolveUnpromptedFacts,
+    // Off means off, including the synthetic planning-cadence nudge, which is
+    // generated client-side and would otherwise survive the toggle.
+    includeCadence: suggestionsEnabled,
   })
 
   // `?why=1` renders each suggestion's policy verdict — the thing that makes a
@@ -863,6 +868,22 @@ export function TodayView({
             {createElement(hideRoutines ? EyeOff : Eye, { className: 'w-5 h-5' })}
             <span>{hideRoutines ? 'Show daily' : 'Hide daily'}</span>
           </button>
+          {/* Silences the unprompted tier only — the assistant pane and the
+              chips inside an item you opened still work. Lives here, next to
+              "Hide daily", because both answer the same question: how much is
+              this page allowed to put in front of me. */}
+          <button
+            type="button"
+            onClick={() => setSuggestionsEnabled(!suggestionsEnabled)}
+            title={suggestionsEnabled
+              ? 'Stop the assistant suggesting things on this page'
+              : 'Let the assistant suggest things on this page again'}
+            aria-pressed={!suggestionsEnabled}
+            className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[15px] text-neutral-600 transition-all hover:bg-neutral-100"
+          >
+            <Sparkles className={`w-5 h-5 ${suggestionsEnabled ? '' : 'opacity-40'}`} />
+            <span>{suggestionsEnabled ? 'Hide suggestions' : 'Show suggestions'}</span>
+          </button>
           {data.isToday && ctx.onOpenPlanning && (
             <button
               type="button"
@@ -929,14 +950,20 @@ export function TodayView({
 
       {/* Assistant lines — the unprompted tier. Under the hero because it makes
           the same kind of claim; above the add input, which is mechanics.
-          Deliberately calm lines, not a card: see UnpromptedLines. */}
-      <UnpromptedLines
-        items={unprompted.items}
-        onAct={handleUnpromptedAct}
-        onSnooze={unprompted.snooze}
-        decisions={unprompted.decisions}
-        showWhy={showWhyDebug}
-      />
+          Deliberately calm lines, not a card: see UnpromptedLines.
+
+          Silenced wholesale by the suggestions preference (Today's ⋯ menu).
+          Only this tier is gated: chips inside an item you opened are answers
+          to a question you asked by opening it. */}
+      {suggestionsEnabled && (
+        <UnpromptedLines
+          items={unprompted.items}
+          onAct={handleUnpromptedAct}
+          onSnooze={unprompted.snooze}
+          decisions={unprompted.decisions}
+          showWhy={showWhyDebug}
+        />
+      )}
 
       {/* Inline "Add to today" — today-only, when onCreateTask is wired.
           Desktop: full-width add input. Mobile: same input but flanked by the
