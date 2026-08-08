@@ -28,6 +28,12 @@ export interface AppDef {
   /** Selection kinds this app owns (e.g., ['task'] or ['application']). Must be unique across registry. */
   ownsSelectionKinds?: string[];
   /**
+   * Width in px of this app's DetailPanelComponent (which positions itself
+   * `fixed right-0`). The assistant rail slides left by this much so the two
+   * sit side by side. Defaults to DEFAULT_DETAIL_PANEL_WIDTH (480).
+   */
+  detailPanelWidth?: number;
+  /**
    * If true, the app renders without Shell chrome (sidebar / topbar / etc.).
    * Default (omitted or false) wraps the app's Component in <ShellLayout>.
    * Use this for kiosk/fullscreen surfaces like Wall.

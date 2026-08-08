@@ -10,6 +10,8 @@ export const jobPipelineAppDef: AppDef = {
   Component: JobPipelineApp,
   DetailPanelComponent: ApplicationDetailPanel,
   ownsSelectionKinds: ['application'],
+  // ApplicationDetailPanel renders at w-[420px], not the 480 default.
+  detailPanelWidth: 420,
   sidebar: {
     label: 'Jobs',
     icon: Briefcase,
