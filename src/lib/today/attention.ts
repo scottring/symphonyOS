@@ -149,3 +149,57 @@ export function selectNeedsAttention(
 
   return out
 }
+
+/**
+ * Where "Review" should actually go.
+ *
+ * It used to go unconditionally to `/week`, on the reasoning that the week's
+ * planning shelf already draws carried-over work so no new surface was needed.
+ * That reasoning held for exactly one of the four reasons. Nothing on `/week`
+ * reads this set — it computes its own, from THIS week's `week_start` — so a
+ * count built mostly from aging inbox capture sent you to a page that said
+ * "Everything is placed on a day." Told six things were wrong, then shown a
+ * page asserting nothing was.
+ *
+ * Each reason goes to the rung that actually draws its unit:
+ *   slipped / stranded-week -> /week   (the planning shelf's carried-over pills)
+ *   aging-month             -> /month
+ *   aging-inbox             -> /inbox
+ */
+const REASON_ROUTE: Record<AttentionReason, string> = {
+  slipped: '/week',
+  'stranded-week': '/week',
+  'aging-month': '/month',
+  'aging-inbox': '/inbox',
+}
+
+export function reviewDestination(items: AttentionItem[]): string {
+  if (items.length === 0) return '/week'
+
+  // Route to where the most work is, so one trip clears the most of it. Ties
+  // break toward whichever group holds the oldest item — the line advertises
+  // "oldest N days", so that item should be somewhere you can see it.
+  const byRoute = new Map<string, { count: number; oldest: number }>()
+  for (const item of items) {
+    const route = REASON_ROUTE[item.reason]
+    const seen = byRoute.get(route)
+    if (seen) {
+      seen.count += 1
+      if (item.ageDays > seen.oldest) seen.oldest = item.ageDays
+    } else {
+      byRoute.set(route, { count: 1, oldest: item.ageDays })
+    }
+  }
+
+  let best = '/week'
+  let bestCount = -1
+  let bestOldest = -1
+  for (const [route, { count, oldest }] of byRoute) {
+    if (count > bestCount || (count === bestCount && oldest > bestOldest)) {
+      best = route
+      bestCount = count
+      bestOldest = oldest
+    }
+  }
+  return best
+}

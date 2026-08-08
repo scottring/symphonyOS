@@ -95,7 +95,12 @@ export function HomeHeader(props: HomeHeaderProps) {
 
   return (
     <header className="mb-6 px-3 md:px-0">
-      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between md:gap-4">
+      {/* Wraps rather than competing for one line. Every part of the date
+          cluster is shrink-0 except the <h1> itself, and this right-hand group
+          is shrink-0 too — so when the detail panel narrows the column, the
+          title was the only thing that could give and "August 7, 2026"
+          collapsed to "Au…". The controls drop to their own line instead. */}
+      <div className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-end md:justify-between md:gap-4">
         {currentView === 'today' ? (
           <DayNavCluster viewedDate={viewedDate} onDateChange={onDateChange} />
         ) : (

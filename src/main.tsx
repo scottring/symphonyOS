@@ -87,6 +87,7 @@ if (savedPlace && savedPlace !== 'cabin' &&
 import { Suspense, lazy } from 'react'
 import { CalendarCallback } from './pages/CalendarCallback'
 import { isDesktopShell } from './lib/desktop'
+import { startRealtimeKeepAlive } from './lib/realtime/keepAlive'
 import { JoinHousehold } from './components/JoinHousehold'
 import { GoogleCalendarProvider } from './hooks/useGoogleCalendar'
 import { DomainProvider } from './hooks/useDomain'
@@ -124,6 +125,11 @@ const CapturePage = lazy(() => import('./desktop/CapturePage').then((m) => ({ de
 if (isDesktopShell()) {
   document.documentElement.classList.add('desktop-shell')
 }
+
+// Bring the realtime socket back when it dies. Module scope, not a component:
+// it watches the one shared socket for the whole app, so it should not be tied
+// to any tree that can unmount. See lib/realtime/keepAlive.ts.
+startRealtimeKeepAlive()
 
 const cutoverShell = <AuthGate>{() => <Shell />}</AuthGate>
 

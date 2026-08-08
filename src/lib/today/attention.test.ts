@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest'
-import { selectNeedsAttention, AGING_INBOX_DAYS, AGING_MONTH_DAYS } from './attention'
+import {
+  selectNeedsAttention, reviewDestination, AGING_INBOX_DAYS, AGING_MONTH_DAYS,
+  type AttentionItem, type AttentionReason,
+} from './attention'
 import type { Task } from '@/types/task'
 
 const NOW = new Date('2026-08-04T12:00:00')
@@ -96,5 +99,47 @@ describe('selectNeedsAttention', () => {
   it('reports each task at most once', () => {
     const t = task({ id: 'once', bucket: 'week', weekStart: new Date('2026-07-26T00:00:00') })
     expect(selectNeedsAttention([t, t], all, NOW, WEEK_START).filter(i => i.task.id === 'once')).toHaveLength(1)
+  })
+})
+
+// Review used to navigate to /week unconditionally, on the reasoning that the
+// week's planning shelf already draws carried-over work. Nothing on /week reads
+// this set though — it computes its own from THIS week's week_start — so a
+// count built from aging inbox capture sent you to a page reading "Everything
+// is placed on a day." Told six things were wrong, shown a page saying nothing
+// was.
+describe('reviewDestination', () => {
+  const item = (reason: AttentionReason, ageDays: number): AttentionItem =>
+    ({ task: task({ id: `${reason}-${ageDays}` }), reason, ageDays })
+
+  it('sends aging inbox capture to the inbox, not the week', () => {
+    expect(reviewDestination([item('aging-inbox', 83)])).toBe('/inbox')
+  })
+
+  it('sends an aging month item to the month', () => {
+    expect(reviewDestination([item('aging-month', 60)])).toBe('/month')
+  })
+
+  it('still sends week-anchored reasons to the week', () => {
+    expect(reviewDestination([item('stranded-week', 12)])).toBe('/week')
+    expect(reviewDestination([item('slipped', 9)])).toBe('/week')
+  })
+
+  it('routes a mixed set to where the most work is', () => {
+    const items = [
+      item('aging-inbox', 5), item('aging-inbox', 6), item('aging-inbox', 7),
+      item('stranded-week', 40),
+    ]
+    expect(reviewDestination(items)).toBe('/inbox')
+  })
+
+  it('breaks a tie toward the group holding the oldest item', () => {
+    // The line advertises "oldest N days", so that item must be somewhere the
+    // destination actually shows it.
+    expect(reviewDestination([item('aging-inbox', 10), item('aging-month', 200)])).toBe('/month')
+  })
+
+  it('falls back to the week when there is nothing to review', () => {
+    expect(reviewDestination([])).toBe('/week')
   })
 })

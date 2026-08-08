@@ -23,6 +23,20 @@ const load = (over: Partial<DayLoad> = {}): DayLoad => ({
 const todayLoads = (over: Partial<DayLoad> = {}) =>
   new Map([[loadKeyFor('today'), load(over)]])
 
+
+/**
+ * Scope a query to the "Today" tile.
+ *
+ * `loadKeyFor` keys by calendar DAY, so more than one tile can legitimately
+ * resolve to the same day and render the same load — run this on a Saturday and
+ * `today` and `this-weekend` are both today, so a bare screen.getByLabelText
+ * for the fullness bar matched two elements and every one of these tests failed.
+ * The load fixture is Today's; assert against Today's tile.
+ */
+function todayTile(): HTMLElement {
+  return screen.getAllByText('Today')[0].closest('[data-tile]') as HTMLElement
+}
+
 async function openPicker(user: ReturnType<typeof userEvent.setup>) {
   await user.click(screen.getByRole('button', { name: /^schedule$/i }))
 }
@@ -45,7 +59,7 @@ describe('SchedulePicker', () => {
     )
     await openPicker(user)
 
-    const bar = screen.getByLabelText(/50% booked/i)
+    const bar = within(todayTile()).getByLabelText(/50% booked/i)
     expect(bar).toBeInTheDocument()
     expect(within(bar.closest('[data-tile]')!).getByText('+5')).toBeInTheDocument()
   })
@@ -81,7 +95,7 @@ describe('SchedulePicker', () => {
       />,
     )
     await openPicker(user)
-    await user.click(screen.getByLabelText(/15% booked/i))
+    await user.click(within(todayTile()).getByLabelText(/15% booked/i))
 
     expect(onReschedule).not.toHaveBeenCalled()
     expect(screen.getByRole('button', { name: /back to schedule for/i })).toBeInTheDocument()
@@ -91,7 +105,7 @@ describe('SchedulePicker', () => {
     const user = userEvent.setup()
     render(<SchedulePicker onSchedule={vi.fn()} loads={todayLoads({ bookedMinutes: 120 })} />)
     await openPicker(user)
-    await user.click(screen.getByLabelText(/15% booked/i))
+    await user.click(within(todayTile()).getByLabelText(/15% booked/i))
     await user.click(screen.getByRole('button', { name: /back to schedule for/i }))
     expect(screen.getByText('Tomorrow')).toBeInTheDocument()
   })
@@ -111,7 +125,7 @@ describe('SchedulePicker', () => {
       />,
     )
     await openPicker(user)
-    await user.click(screen.getByLabelText(/8% booked/i))
+    await user.click(within(todayTile()).getByLabelText(/8% booked/i))
     await user.click(screen.getByRole('button', { name: /open 10:00 AM/i }))
 
     expect(onSchedule).toHaveBeenCalledWith(slotStart, false)
@@ -124,7 +138,7 @@ describe('SchedulePicker', () => {
       <SchedulePicker onSchedule={onSchedule} loads={todayLoads({ bookedMinutes: 120 })} />,
     )
     await openPicker(user)
-    await user.click(screen.getByLabelText(/15% booked/i))
+    await user.click(within(todayTile()).getByLabelText(/15% booked/i))
     await user.click(screen.getByRole('button', { name: /put it here · all day/i }))
 
     expect(onSchedule).toHaveBeenCalledWith(today, true)
@@ -134,7 +148,7 @@ describe('SchedulePicker', () => {
     const user = userEvent.setup()
     render(<SchedulePicker onSchedule={vi.fn()} loads={todayLoads({ eventsAvailable: false })} />)
     await openPicker(user)
-    expect(screen.getByText(/events unavailable/i)).toBeInTheDocument()
+    expect(within(todayTile()).getByText(/events unavailable/i)).toBeInTheDocument()
   })
 
   it('offers Clear schedule only when the item is already scheduled', async () => {

@@ -77,13 +77,40 @@ function getEndTime(event: CalendarEvent): string | undefined {
   return (event as AnyEvent).end_time || (event as AnyEvent).endTime
 }
 
+const MINUTES_PER_DAY = 1440
+
 const DURATION_PRESETS = [15, 30, 45, 60, 90, 120]
+/**
+ * A boarding stay or a trip is measured in days. Offering only 15–120 MINUTES
+ * for one meant the menu's every option silently collapsed a five-day booking
+ * to at most two hours — the control could destroy the event but never express
+ * it.
+ */
+const MULTI_DAY_PRESETS = [1, 2, 3, 4, 5, 7].map((d) => d * MINUTES_PER_DAY)
 
 function formatDuration(minutes: number): string {
+  if (minutes >= MINUTES_PER_DAY) {
+    const days = Math.floor(minutes / MINUTES_PER_DAY)
+    const hours = Math.round((minutes % MINUTES_PER_DAY) / 60)
+    const d = `${days} day${days === 1 ? '' : 's'}`
+    return hours === 0 ? d : `${d} ${hours} hr`
+  }
   const h = Math.floor(minutes / 60)
   const m = minutes % 60
   if (h === 0) return `${m} min`
   return m === 0 ? `${h} hr` : `${h} hr ${m} min`
+}
+
+/** Short day label for the far end of an event that crosses midnight. */
+function formatDayShort(iso?: string): string {
+  if (!iso) return ''
+  return new Date(iso).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+}
+
+/** Does this event end on a different calendar day than it starts? */
+function spansDays(start?: string, end?: string): boolean {
+  if (!start || !end) return false
+  return new Date(start).toDateString() !== new Date(end).toDateString()
 }
 
 function formatDayLabel(iso?: string): string {
@@ -188,7 +215,7 @@ export function TapEventPanel(props: TapEventPanelProps) {
               </button>
               {showDurationMenu && (
                 <div className="absolute left-0 top-full mt-1 z-20 bg-white rounded-xl shadow-lg border border-neutral-100 py-1 min-w-[7rem]">
-                  {DURATION_PRESETS.map((m) => (
+                  {(durationMinutes >= MINUTES_PER_DAY ? MULTI_DAY_PRESETS : DURATION_PRESETS).map((m) => (
                     <button
                       key={m}
                       onClick={() => handleDurationChange(m)}
@@ -273,9 +300,16 @@ export function TapEventPanel(props: TapEventPanelProps) {
         {startTime && (
           <div className="mt-1.5 flex items-baseline gap-2 flex-wrap">
             <span className="text-[15px] font-medium text-neutral-800">{formatDayLabel(startTime)}</span>
+            {/* A multi-day event must name the day it ends on. Without it a
+                five-day boarding stay read "8:00 AM – 8:00 AM", which looks
+                like a bug rather than a fact about the event. */}
             <span className="text-[15px] text-neutral-600 tabular-nums">
               {formatClock(startTime)}
-              {endTime ? ` – ${formatClock(endTime)}` : ''}
+              {endTime
+                ? spansDays(startTime, endTime)
+                  ? ` – ${formatDayShort(endTime)}, ${formatClock(endTime)}`
+                  : ` – ${formatClock(endTime)}`
+                : ''}
             </span>
             {durationMinutes !== null && durationMinutes > 0 && (
               <span className="text-[13px] text-neutral-400">· {formatDuration(durationMinutes)}</span>

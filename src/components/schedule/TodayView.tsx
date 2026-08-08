@@ -53,6 +53,7 @@ import { ClarityCurtain } from '@/components/clarity/ClarityCurtain'
 import { computeClaritySteps, type ClarityStepId } from '@/lib/clarity/claritySteps'
 import { selectOverdue } from '@/lib/today/taskPools'
 import { selectHorizonPool } from '@/lib/today/horizons'
+import { reviewDestination } from '@/lib/today/attention'
 import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
 import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
 import { getRoutinesForDatePure } from '@/lib/routineUtils'
@@ -1094,14 +1095,18 @@ export function TodayView({
             renders in BOTH branches whenever the set is non-empty.
 
             This line is awareness only — it carries no list and no dismiss.
-            The affordance to actually act on the set lives on /week, in
-            PlanningShelf's carried-over pills (drag onto a day, or use the
-            ⋯ menu) — a surface that already existed and already does this
-            job, so Review is a plain navigate with no `?review=` param. */}
+            The affordance to actually act on the set lives on the horizon
+            rungs, which already draw these units, so Review is a plain
+            navigate with no `?review=` param.
+
+            The destination is computed rather than fixed: it used to always be
+            /week, but only two of the four reasons have a home there. A count
+            built from aging inbox capture sent you to a page reading
+            "Everything is placed on a day." See reviewDestination(). */}
         {data.isToday && (
           <AttentionLine
             items={data.attentionItems}
-            onReview={() => navigate('/week')}
+            onReview={() => navigate(reviewDestination(data.attentionItems))}
           />
         )}
       </div>

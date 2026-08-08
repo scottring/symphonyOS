@@ -7,6 +7,9 @@ import { WaitingForPopover } from './WaitingForPopover'
 import { ConvertTaskModal } from './PromoteTaskToProjectButton'
 import { PromoteToProjectModal } from './PromoteToProjectButton'
 
+/** Roughly the tallest the menu gets; below this much room it opens upward. */
+const MENU_MAX_HEIGHT = 280
+
 interface Props {
   item: TimelineItem
   /** Opens the full detail panel. */
@@ -27,7 +30,9 @@ interface Props {
 export function ScheduleItemActionsMenu({ item, onOpenDetail, onUpdateDiscussion, isSuggestedPromotion }: Props) {
   const ctx = useScheduleActionsContext()
   const [open, setOpen] = useState(false)
-  const [openUp, setOpenUp] = useState(false)
+  // Where the menu sits, in viewport coords. The up/down flip lives in here as
+  // a top-or-bottom offset rather than a separate boolean + Tailwind class.
+  const [anchor, setAnchor] = useState<{ right: number; top?: number; bottom?: number } | null>(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [waitingOpen, setWaitingOpen] = useState(false)
   const [discussionOpen, setDiscussionOpen] = useState(false)
@@ -87,7 +92,15 @@ export function ScheduleItemActionsMenu({ item, onOpenDetail, onUpdateDiscussion
           e.stopPropagation()
           if (!open) {
             const rect = triggerRef.current?.getBoundingClientRect()
-            setOpenUp(rect ? window.innerHeight - rect.bottom < 280 : false)
+            const below = rect ? window.innerHeight - rect.bottom : 0
+            // Anchor in viewport coords — see the note on the menu itself.
+            setAnchor(rect
+              ? {
+                  right: Math.max(8, window.innerWidth - rect.right),
+                  top: below < MENU_MAX_HEIGHT ? undefined : rect.bottom + 4,
+                  bottom: below < MENU_MAX_HEIGHT ? window.innerHeight - rect.top + 4 : undefined,
+                }
+              : null)
           }
           setOpen((o) => !o)
         }}
@@ -110,9 +123,17 @@ export function ScheduleItemActionsMenu({ item, onOpenDetail, onUpdateDiscussion
             className="fixed inset-0 z-40 cursor-default"
             onClick={(e) => { e.stopPropagation(); close() }}
           />
+          {/* Fixed at z-[9999], matching ContextPicker and MultiAssigneeDropdown.
+              As `absolute … z-50` this menu lost to its own neighbours: those two
+              rail cells already escape to z-[9999], and every row further down
+              the page paints later, so an open menu was covered by the avatars
+              and icons of the rows behind it — legible text with other rows'
+              controls sitting on top of it. Three of the four rail cells now
+              agree on one stacking rule. */}
           <div
             role="menu"
-            className={`absolute right-0 z-50 min-w-[176px] py-1 bg-white rounded-xl border border-neutral-200 shadow-lg ${openUp ? 'bottom-full mb-1' : 'top-full mt-1'}`}
+            style={{ right: anchor?.right, top: anchor?.top, bottom: anchor?.bottom }}
+            className="fixed z-[9999] min-w-[176px] py-1 bg-white rounded-xl border border-neutral-200 shadow-lg"
           >
             {/* Skip today — events only. Routines surface a dedicated inline
                 skip icon on the row (SkipRoutineButton), so keeping it here too

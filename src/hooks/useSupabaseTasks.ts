@@ -9,6 +9,7 @@ import type { TaskDirections } from '@/types/directions'
 import { defaultScopeForArea, scopeForContextChange, type Scope } from '@/lib/scope'
 import { localYmd, parseLocalYmd, weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
 import { weekStartForBucket } from '@/lib/today/weekPlacement'
+import { onRealtimeResumed } from '@/lib/realtime/keepAlive'
 // `import type` on purpose: erased at compile time, so it does NOT drag
 // taskOrdering's @dnd-kit/sortable dependency into this hook's runtime bundle.
 import type { OrderWrite } from '@/lib/today/taskOrdering'
@@ -508,10 +509,17 @@ export function useSupabaseTasks() {
     }
     localTaskWrites.addEventListener('write', onLocalWrite)
 
+    // A reconnect only resumes delivery going forward — every change made while
+    // the socket was down was never sent and never will be. Without this the
+    // list would look live again while quietly missing whatever it slept
+    // through, which is worse than being visibly stale.
+    const stopResumed = onRealtimeResumed(() => { void fetchTasks({ force: true }) })
+
     // Cleanup subscription on unmount
     return () => {
       channel.unsubscribe()
       localTaskWrites.removeEventListener('write', onLocalWrite)
+      stopResumed()
     }
   }, [user, fetchTasks, applyIncomingInsert, applyIncomingUpdate, applyIncomingDelete])
 
