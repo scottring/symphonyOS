@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest'
 import { renderHook, act, waitFor } from '@testing-library/react'
 import type { Task } from '@/types/task'
 
@@ -20,7 +20,18 @@ const ARGS = {
   projectNameFor: () => undefined,
 }
 
-beforeEach(() => invoke.mockReset())
+// runPrepass ages tasks off the wall clock (stale at 21 days), so a fixture
+// with a hard-coded createdAt quietly grows a put_aside card once enough real
+// time passes — these tests went red on 2026-08-10, exactly 21 days after the
+// createdAt above, having asserted the prepass output since July. Pin "now" to
+// the same day ARGS calls today. Only Date is faked: waitFor needs real timers.
+beforeEach(() => {
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date(2026, 6, 22, 9, 0, 0))
+  invoke.mockReset()
+})
+
+afterAll(() => vi.useRealTimers())
 
 describe('useTendWeek', () => {
   it('start() enters reviewing with prepass proposals immediately, then appends AI proposals', async () => {
