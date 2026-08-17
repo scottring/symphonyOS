@@ -19,6 +19,7 @@ import type { Routine } from '@/types/routine'
 import { ConceptIcon } from '@/lib/conceptIcons'
 import {
   Sun,
+  CalendarRange,
   UtensilsCrossed,
   FolderKanban,
   Home,
@@ -294,10 +295,9 @@ export function Sidebar({
           )}
         </button>
 
-        {/* Today — the single commitment surface. The horizon ladder
-            (Week/Month/Season/Year/Someday) was de-navved 2026-08: planning
-            happens on paper and enters as data; the bucket/week_start model
-            and its readers (Up Next, Tend, dinner seeding) are unchanged. */}
+        {/* Today — the execution surface. The horizon ladder was de-navved
+            2026-08 (analog-planning pivot); planning happens on paper and
+            enters as data. */}
         {collapsed && <div className="border-t border-neutral-200/60 my-2" />}
         <button
           onClick={() => onViewChange('today')}
@@ -305,6 +305,17 @@ export function Sidebar({
         >
           <Sun className="w-5 h-5 shrink-0" />
           {!collapsed && <span>Today</span>}
+        </button>
+
+        {/* This Week — the provisioning bench (streamlined vision Phase 1):
+            where the landed paper plan gets dressed with the context execution
+            needs. A surface with its own route, NOT a horizon rung. */}
+        <button
+          onClick={() => navigate('/week')}
+          className={navItemClass(location.pathname === '/week' || location.pathname.startsWith('/week/'))}
+        >
+          <CalendarRange className="w-5 h-5 shrink-0" />
+          {!collapsed && <span>This Week</span>}
         </button>
 
         {/* Routines sits under the ladder but NOT in it, separated by nothing

@@ -1,5 +1,6 @@
 import { useDraggable } from '@dnd-kit/core'
 import type { Task } from '@/types/task'
+import { hasExecutionContext } from '@/lib/week/readiness'
 
 interface WeekAllDayChipProps {
   task: Task
@@ -34,6 +35,12 @@ export function WeekAllDayChip({ task, onSelect }: WeekAllDayChipProps) {
         ${isDragging ? 'opacity-40' : ''}
       `}
     >
+      <span
+        data-testid={hasExecutionContext(task) ? 'readiness-ready' : 'readiness-bare'}
+        className={`inline-block w-1.5 h-1.5 rounded-full mr-1 mb-px align-middle ${
+          hasExecutionContext(task) ? 'bg-primary-500' : 'border border-neutral-400'
+        }`}
+      />
       {task.title}
     </button>
   )

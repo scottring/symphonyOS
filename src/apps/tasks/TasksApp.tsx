@@ -48,10 +48,13 @@ export function TasksApp() {
             <Route path="today" element={<HomeViewContainer />} />
             <Route path="inbox" element={<InboxViewContainer />} />
             <Route path="task/:taskId" element={<TaskViewRoute />} />
-            {/* Horizon pages de-navved 2026-08 (analog-planning pivot): old
+            {/* The Week BENCH (streamlined vision Phase 1): the provisioning
+                surface — HomeView pinned to its week grid at its own route.
+                Not a horizon rung; paper owns planning. */}
+            <Route path="week" element={<HomeViewContainer fixedView="week" />} />
+            {/* Remaining horizon pages stay de-navved (2026-08 pivot): old
                 links and muscle memory land on Today instead of 404ing. The
                 page components under horizons/ are parked, not deleted. */}
-            <Route path="week" element={<Navigate to="/today" replace />} />
             <Route path="month" element={<Navigate to="/today" replace />} />
             <Route path="season" element={<Navigate to="/today" replace />} />
             <Route path="year" element={<Navigate to="/today" replace />} />

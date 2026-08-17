@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
+import type { HomeViewType } from '@/types/homeView'
 import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
@@ -47,6 +48,10 @@ interface HomeViewProps {
   bothPanelsOpen?: boolean
   /** Opens the plan-from-paper flow (photo of a written plan → placed tasks). */
   onOpenPlanFromPaper?: () => void
+  /** Pin this mount to one sub-view, ignoring useHomeView. The Week bench
+   *  (`/week`) mounts HomeView with fixedView="week" — its own route, not a
+   *  switcher state (the D/W/M switcher died with the analog-planning pivot). */
+  fixedView?: HomeViewType
 }
 
 export function HomeView({
@@ -64,9 +69,11 @@ export function HomeView({
   currentUserMemberId,
   bothPanelsOpen,
   onOpenPlanFromPaper,
+  fixedView,
 }: HomeViewProps) {
   const ctx = useScheduleActionsContext()
-  const { currentView, setCurrentView } = useHomeView()
+  const { currentView: hookView, setCurrentView } = useHomeView()
+  const currentView = fixedView ?? hookView
   const isMobile = useMobile()
   const { currentAction, pushAction, executeUndo, dismiss } = useUndo()
   const { currentDomain } = useDomain()

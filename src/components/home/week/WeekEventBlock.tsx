@@ -1,6 +1,7 @@
 import { useDraggable } from '@dnd-kit/core'
 import type { PlacedItem } from './layoutLanes'
 import { colorFor } from '@/lib/weekColorMap'
+import { hasExecutionContext } from '@/lib/week/readiness'
 import { FIRST_HOUR, HOUR_ROW_HEIGHT, TIME_COL_WIDTH } from './WeekGrid'
 import { useBlockResize } from './useBlockResize'
 
@@ -140,7 +141,18 @@ export function WeekEventBlock({ placedItem, weekStart, dayCount = 7, onSelect, 
           />
         </>
       )}
-      <div className="truncate font-medium">{placedItem.item.title}</div>
+      <div className="truncate font-medium">
+        {placedItem.item.type === 'task' && (
+          <span
+            title={hasExecutionContext(placedItem.item) ? 'Has context — ready to execute' : 'No context yet — bare title'}
+            data-testid={hasExecutionContext(placedItem.item) ? 'readiness-ready' : 'readiness-bare'}
+            className={`inline-block w-1.5 h-1.5 rounded-full mr-1 mb-px align-middle ${
+              hasExecutionContext(placedItem.item) ? 'bg-current' : 'border border-current opacity-50'
+            }`}
+          />
+        )}
+        {placedItem.item.title}
+      </div>
     </div>
   )
 }

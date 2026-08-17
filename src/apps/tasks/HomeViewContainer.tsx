@@ -53,7 +53,7 @@ import { HomeView } from '@/components/home';
 import { useSelection } from '@/shell/providers/SelectionProvider';
 import { useMealEventsForDate } from '@/shell/providers/MealEventsProvider';
 
-export function HomeViewContainer() {
+export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' } = {}) {
   // Data hooks
   const { tasks, loading: tasksLoading, addTask, toggleTask, toggleWaiting, deleteTask, updateTask, pushTask, getLinkedTasks, refetch, updateTaskOrders } = useSupabaseTasks();
   const { isConnected, events, fetchEvents, isFetching: eventsFetching, updateEvent, createEvent, deleteEvent, removeEventLocal, restoreEventLocal } = useGoogleCalendar();
@@ -654,6 +654,7 @@ export function HomeViewContainer() {
         onDateChange={setViewedDate}
         currentUserMemberId={getCurrentUserMember()?.id}
         onOpenPlanFromPaper={() => setPlanFromPaperOpen(true)}
+        fixedView={fixedView}
       />
 
       {planFromPaperOpen && (
