@@ -120,12 +120,11 @@ describe('TodayView', () => {
     expect(screen.getByRole('button', { name: /filter by assignee/i })).toBeInTheDocument()
   })
 
-  it('moves "Plan today" into the overflow menu', async () => {
-    const onOpenPlanToday = vi.fn()
-    const { user } = renderView({ onOpenPlanToday })
+  it('offers no "Plan today" anywhere (guided sessions left with the analog-planning pivot)', async () => {
+    const { user } = renderView()
     expect(screen.queryByRole('button', { name: /plan today/i })).not.toBeInTheDocument()
     await openOverflow(user)
-    expect(screen.getByRole('button', { name: /plan today/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /plan today/i })).not.toBeInTheDocument()
   })
 
   it('no longer shows a standalone "Plan day" button (time-blocking moved into the Plan today flow)', () => {

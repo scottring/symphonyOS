@@ -15,10 +15,9 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
 import { useGoogleCalendar, CalendarReconnectError } from '@/hooks/useGoogleCalendar';
 import { showToast } from '@/hooks/useToast';
-import { PlanningSession, GuidedSessionContainer } from '@/components/lazy';
+import { PlanningSession } from '@/components/lazy';
 import { LoadingFallback } from '@/components/layout/LoadingFallback';
 import { isEverydayRoutine, scheduleRoutineOnDate } from '@/lib/routineUtils';
-import type { PlanningHorizon } from '@/hooks/usePlanningSession';
 import { parseRoutineTimelineId } from '@/lib/today/doseExpansion';
 import { groupItems, addToGroup, removeFromGroup, ungroupTasks } from '@/lib/today/groupTasks';
 import { useConvertTaskToProject } from '@/hooks/useConvertTaskToProject';
@@ -82,50 +81,15 @@ export function HomeViewContainer() {
 
   // UI state local to this container
   const [viewedDate, setViewedDate] = useState<Date>(() => new Date());
-  // Planning overlays. `planningOpen` drives the standalone time-block grid
-  // (a Today-only feature, untouched by the guided-session rewrite).
-  // `guidedHorizon` drives the one guided-session shell that now covers all
-  // five horizons (daily/weekly/monthly/seasonal/annual).
+  // Planning overlay. `planningOpen` drives the standalone time-block grid — a
+  // Today execution feature. The guided Five-Horizons sessions that also lived
+  // here (guidedHorizon / ?plan= deep link) left with the 2026-08
+  // analog-planning pivot; planning happens on paper now.
   const [planningOpen, setPlanningOpen] = useState(false);
-  const [guidedHorizon, setGuidedHorizon] = useState<PlanningHorizon | null>(null);
-
-  // Where "Finish" lands, per horizon (the rung's own one-pager; daily's
-  // page is Today itself).
-  const GUIDED_LANDING: Record<PlanningHorizon, string> = {
-    annual: 'year', seasonal: 'season', monthly: 'month', weekly: 'week', daily: 'today',
-  };
-
-  // Shared by abandon (X) and finish: drop the overlay and restore the viewed
-  // day's events — a session's own calendar fetches (e.g. the annual Jan–Dec
-  // scan) can replace the shared GoogleCalendarProvider cache with a range
-  // that doesn't include today.
-  const closeGuidedSession = useCallback(() => {
-    setGuidedHorizon(null);
-    if (isConnected) {
-      const startOfDay = new Date(viewedDate); startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date(viewedDate); endOfDay.setHours(23, 59, 59, 999);
-      fetchEvents(startOfDay, endOfDay);
-    }
-  }, [isConnected, viewedDate, fetchEvents]);
   const { selection, setSelection, clearSelection } = useSelection();
 
-  // "Plan the …" from a horizon rung (or the rhythm nudge) routes here with
-  // ?plan=week|month|season|year|today — open the matching guided session,
-  // then strip the param so a refresh doesn't re-open it.
   const [searchParams, setSearchParams] = useSearchParams();
   const navigate = useNavigate();
-  useEffect(() => {
-    const plan = searchParams.get('plan');
-    if (!plan) return;
-    const map: Record<string, PlanningHorizon> = {
-      year: 'annual', season: 'seasonal', month: 'monthly', week: 'weekly', today: 'daily',
-    };
-    const horizon = map[plan];
-    if (horizon) setGuidedHorizon(horizon);
-    const next = new URLSearchParams(searchParams);
-    next.delete('plan');
-    setSearchParams(next, { replace: true });
-  }, [searchParams, setSearchParams]);
 
   // ?date=YYYY-MM-DD (e.g. from search → "jump to this task's day") sets the
   // viewed day, then strips the param (keeps ?detail so the panel stays open).
@@ -664,8 +628,6 @@ export function HomeViewContainer() {
         viewedDate={viewedDate}
         onDateChange={setViewedDate}
         currentUserMemberId={getCurrentUserMember()?.id}
-        onOpenWeeklyPlanning={() => setGuidedHorizon('weekly')}
-        onOpenPlanToday={() => setGuidedHorizon('daily')}
       />
 
       {planningOpen && (
@@ -712,33 +674,6 @@ export function HomeViewContainer() {
             onPushTask={pushTask}
             familyMembers={familyMembers}
             eventNotesMap={eventNotesMap}
-          />
-        </Suspense>
-      )}
-
-      {/* Guided sessions (Five Horizons) — one ritual shell for all five
-          horizons. Mounted with `key={guidedHorizon}` so switching horizons
-          in place (e.g. book-next → daily) remounts cleanly instead of
-          resyncing stale notes into the new horizon's session. */}
-      {guidedHorizon && (
-        <Suspense fallback={<LoadingFallback />}>
-          <GuidedSessionContainer
-            key={guidedHorizon}
-            horizon={guidedHorizon}
-            onClose={closeGuidedSession}
-            onFinished={() => {
-              // Finishing (vs abandoning via X) lands on the finished
-              // horizon's own page — the "done" moment is seeing the list
-              // you just wrote. Capture the horizon before clearing state.
-              const page = guidedHorizon && GUIDED_LANDING[guidedHorizon];
-              closeGuidedSession();
-              if (page) navigate(`/${page}`);
-            }}
-            onChain={(next) => setGuidedHorizon(next)}
-            onScheduleRoutine={(routineId, date, time) => {
-              const routine = allRoutines.find(r => r.id === routineId);
-              if (routine) updateRoutine(routineId, scheduleRoutineOnDate(routine, date, time));
-            }}
           />
         </Suspense>
       )}

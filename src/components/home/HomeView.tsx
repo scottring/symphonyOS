@@ -1,5 +1,4 @@
 import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
 import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
@@ -31,8 +30,6 @@ import { TodayView } from '@/components/schedule/TodayView'
 import { UndoToast } from '@/components/undo/UndoToast'
 import { HomeHeader } from '@/components/home/HomeHeader'
 import { CalendarReconnectBanner } from '@/components/home/CalendarReconnectBanner'
-import { RhythmNudge } from '@/components/today/RhythmNudge'
-import { useCadenceConfig, getDueSession } from '@/lib/cadence/config'
 
 interface HomeViewProps {
   tasks: Task[]
@@ -48,8 +45,6 @@ interface HomeViewProps {
   onDateChange: (date: Date) => void
   currentUserMemberId?: string
   bothPanelsOpen?: boolean
-  onOpenWeeklyPlanning?: () => void
-  onOpenPlanToday?: () => void
 }
 
 export function HomeView({
@@ -66,16 +61,12 @@ export function HomeView({
   onDateChange,
   currentUserMemberId,
   bothPanelsOpen,
-  onOpenWeeklyPlanning,
-  onOpenPlanToday,
 }: HomeViewProps) {
   const ctx = useScheduleActionsContext()
   const { currentView, setCurrentView } = useHomeView()
   const isMobile = useMobile()
   const { currentAction, pushAction, executeUndo, dismiss } = useUndo()
   const { currentDomain } = useDomain()
-  const navigate = useNavigate()
-  const { config: cadenceConfig } = useCadenceConfig()
 
   // Filter tasks, routines, projects, and events by current domain.
   // Task scoping lives in filterTasksForDomainView (shared with the Time-block
@@ -86,9 +77,6 @@ export function HomeView({
   const filteredTasks = useMemo(
     () => filterTasksForDomainView(tasks, currentDomain, currentUserMemberId),
     [tasks, currentDomain, currentUserMemberId])
-
-  // W4 — Today landing: whether a planning rhythm nudge is due right now.
-  const dueSession = useMemo(() => getDueSession(cadenceConfig, new Date()), [cadenceConfig])
 
   const filteredRoutines = useMemo(
     () => filterRoutinesForDomain(routines, currentDomain),
@@ -409,7 +397,6 @@ export function HomeView({
         loading={loading}
         viewedDate={viewedDate}
         onDateChange={onDateChange}
-        onOpenPlanToday={onOpenPlanToday}
         projects={filteredProjects}
         selectedAssignees={selectedAssignees}
         onSelectAssignees={setSelectedAssignees}
@@ -450,7 +437,6 @@ export function HomeView({
             onWeekChange={setWeekStart}
             monthStart={monthStart}
             onMonthChange={setMonthStart}
-            onOpenWeeklyPlanning={onOpenWeeklyPlanning}
           />
         </div>
       )}
@@ -467,8 +453,7 @@ export function HomeView({
               onWeekChange={setWeekStart}
               monthStart={monthStart}
               onMonthChange={setMonthStart}
-              onOpenWeeklyPlanning={onOpenWeeklyPlanning}
-            />
+              />
           </div>
         )}
         {/* Surfaces an expired/revoked calendar connection so the empty event
@@ -477,14 +462,6 @@ export function HomeView({
         <div className="px-6 pt-4 empty:hidden">
           <CalendarReconnectBanner />
         </div>
-        {/* W4 — Today landing: a calm rhythm nudge (only on its day, dismissible).
-            The "coming up" sliver was removed (redundant with the rhythm spine
-            nav) and "Plan today" moved into TodayView's stats row. */}
-        {currentView === 'today' && (
-          <div className="max-w-[940px] w-full mx-auto px-4 md:px-8 pt-3 empty:hidden">
-            <RhythmNudge due={dueSession} onPlan={() => { if (dueSession) navigate(`/today?plan=${dueSession.kind}`) }} />
-          </div>
-        )}
         {renderContent()}
       </div>
 

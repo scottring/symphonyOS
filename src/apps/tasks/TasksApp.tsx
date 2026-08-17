@@ -9,7 +9,6 @@ import { useScratchpadHidden } from '@/hooks/useScratchpadHidden';
 import { HomeViewContainer } from './HomeViewContainer';
 import { InboxViewContainer } from './InboxViewContainer';
 import { TaskViewRoute } from './TaskViewRoute';
-import { WeekView, MonthView, SeasonView, YearView, SomedayView } from './HorizonView';
 
 // TasksApp is the index app at `/` (after the P4.8 cutover). Its inner
 // Routes handle both:
@@ -49,14 +48,14 @@ export function TasksApp() {
             <Route path="today" element={<HomeViewContainer />} />
             <Route path="inbox" element={<InboxViewContainer />} />
             <Route path="task/:taskId" element={<TaskViewRoute />} />
-            {/* Phase 2b — horizon rungs. Each renders ONLY its scoped pool +
-                carry-over (the anti-overwhelm invariant). Today keeps its rich
-                HomeView above. */}
-            <Route path="week" element={<WeekView />} />
-            <Route path="month" element={<MonthView />} />
-            <Route path="season" element={<SeasonView />} />
-            <Route path="year" element={<YearView />} />
-            <Route path="someday" element={<SomedayView />} />
+            {/* Horizon pages de-navved 2026-08 (analog-planning pivot): old
+                links and muscle memory land on Today instead of 404ing. The
+                page components under horizons/ are parked, not deleted. */}
+            <Route path="week" element={<Navigate to="/today" replace />} />
+            <Route path="month" element={<Navigate to="/today" replace />} />
+            <Route path="season" element={<Navigate to="/today" replace />} />
+            <Route path="year" element={<Navigate to="/today" replace />} />
+            <Route path="someday" element={<Navigate to="/today" replace />} />
             {/* Legacy parallel paths (always available; planned to remove in P5) */}
             <Route path="tasks-new" element={<Navigate to="/tasks-new/today" replace />} />
             <Route path="tasks-new/today" element={<HomeViewContainer />} />

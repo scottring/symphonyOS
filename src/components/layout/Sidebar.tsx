@@ -17,14 +17,8 @@ import type { Project } from '@/types/project'
 import type { Contact } from '@/types/contact'
 import type { Routine } from '@/types/routine'
 import { ConceptIcon } from '@/lib/conceptIcons'
-import { HORIZONS, type HorizonId } from '@/lib/today/horizons'
 import {
   Sun,
-  CalendarRange,
-  CalendarDays,
-  Leaf,
-  Trophy,
-  Moon,
   UtensilsCrossed,
   FolderKanban,
   Home,
@@ -33,25 +27,10 @@ import {
   List,
   FileText,
   Repeat,
-  Target,
   History,
   Settings,
   LogOut,
 } from 'lucide-react'
-
-// Icon + route for each rhythm rung, keyed by HorizonId. Labels come from
-// HORIZONS (single source of truth). Today routes to `/` (its rich HomeView);
-// the rest route to their dedicated horizon-scoped views.
-const HORIZON_NAV: Record<HorizonId, { icon: typeof Sun; route: string }> = {
-  today:   { icon: Sun,           route: '/today' },
-  week:    { icon: CalendarRange, route: '/week' },
-  month:   { icon: CalendarDays,  route: '/month' },
-  season:  { icon: Leaf,          route: '/season' },
-  year:    { icon: Trophy,        route: '/year' },
-  someday: { icon: Moon,          route: '/someday' },
-}
-
-const HOME_VIEW_STORAGE_KEY = 'symphony-home-view'
 
 // Feature flags for in-progress features
 const FEATURES = {
@@ -154,14 +133,10 @@ export function Sidebar({
     if (libraryActive) openGroup('library')
   }, [libraryActive, openGroup])
 
-  // Which rhythm rung is active, by pathname (legibility). Today is the rich
-  // HomeView at `/` or `/today`; the rest are their own horizon routes.
-  function isRungActive(id: HorizonId): boolean {
+  // Today is the rich HomeView at `/` or `/today` (plus its cutover aliases).
+  function isTodayActive(): boolean {
     const p = location.pathname
-    if (id === 'today') {
-      return p === '/' || p === '/today' || p === '/tasks-new' || p === '/tasks-new/today'
-    }
-    return p === HORIZON_NAV[id].route || p.startsWith(`${HORIZON_NAV[id].route}/`)
+    return p === '/' || p === '/today' || p === '/tasks-new' || p === '/tasks-new/today'
   }
 
   const homeAppActive = activeView === 'home-app'
@@ -297,8 +272,7 @@ export function Sidebar({
         />
       )}
 
-      {/* Navigation — the RHYTHM SPINE (Phase 2b).
-          Inbox · the horizon rungs (Today → Someday) · Library (collapsible). */}
+      {/* Navigation — Inbox · Today · Routines · Library (collapsible). */}
       <nav className="flex-1 px-3 mt-2 space-y-0.5 overflow-y-auto">
         <div className="border-t border-neutral-200/60 mb-1" />
 
@@ -320,42 +294,18 @@ export function Sidebar({
           )}
         </button>
 
-        {/* ── THE RHYTHM ── the horizon ladder you navigate by. */}
-        {!collapsed && (
-          <p className="px-3.5 pt-4 pb-1 text-[11px] font-medium text-neutral-400 uppercase tracking-wider">
-            The Rhythm
-          </p>
-        )}
+        {/* Today — the single commitment surface. The horizon ladder
+            (Week/Month/Season/Year/Someday) was de-navved 2026-08: planning
+            happens on paper and enters as data; the bucket/week_start model
+            and its readers (Up Next, Tend, dinner seeding) are unchanged. */}
         {collapsed && <div className="border-t border-neutral-200/60 my-2" />}
-
-        {HORIZONS.map((h) => {
-          const { icon: Icon, route } = HORIZON_NAV[h.id]
-          return (
-            <button
-              key={h.id}
-              onClick={() => {
-                if (h.id === 'today') {
-                  // Today rung also forces HomeView D/W/M back to 'today' so it
-                  // returns from a Week/Month sub-view, then routes to /today.
-                  try {
-                    localStorage.setItem(HOME_VIEW_STORAGE_KEY, 'today')
-                    window.dispatchEvent(new StorageEvent('storage', {
-                      key: HOME_VIEW_STORAGE_KEY,
-                      newValue: 'today',
-                    }))
-                  } catch { /* ignore — falls back to next-mount read */ }
-                  onViewChange('today')
-                  return
-                }
-                navigate(route)
-              }}
-              className={navItemClass(isRungActive(h.id))}
-            >
-              {createElement(Icon, { className: 'w-5 h-5 shrink-0' })}
-              {!collapsed && <span>{h.label}</span>}
-            </button>
-          )
-        })}
+        <button
+          onClick={() => onViewChange('today')}
+          className={`${navItemClass(isTodayActive())} ${collapsed ? '' : 'mt-1'}`}
+        >
+          <Sun className="w-5 h-5 shrink-0" />
+          {!collapsed && <span>Today</span>}
+        </button>
 
         {/* Routines sits under the ladder but NOT in it, separated by nothing
             more than its own spacing.
@@ -397,14 +347,8 @@ export function Sidebar({
             {!collapsed && <span>Projects</span>}
           </button>
 
-          {/* Goals */}
-          <button
-            onClick={() => navigate('/goals')}
-            className={navItemClass(location.pathname.startsWith('/goals'))}
-          >
-            {createElement(Target, { className: 'w-5 h-5 shrink-0' })}
-            {!collapsed && <span>Goals</span>}
-          </button>
+          {/* Goals is WITHHELD with the horizon ladder (2026-08 analog-planning
+              pivot) — route stays live at /goals, just not in daily nav. */}
 
           {/* Health (medications + symptoms) is WITHHELD, not deleted — the nav
               entry, the /meds route and the registry entry are the three seams

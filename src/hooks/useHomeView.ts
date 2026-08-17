@@ -1,53 +1,20 @@
-import { useState, useCallback, useEffect } from 'react'
 import type { HomeViewType } from '@/types/homeView'
-
-const STORAGE_KEY = 'symphony-home-view'
 
 interface UseHomeViewResult {
   currentView: HomeViewType
   setCurrentView: (view: HomeViewType) => void
 }
 
+const noop = () => {}
+
+// Pinned to 'today' since the 2026-08 analog-planning pivot: the D/W/M
+// sub-views were de-navved along with the horizon ladder. Pinning here (the
+// single source of the sub-view state, previously localStorage-backed) makes
+// Week/Month unreachable from every entry point — switcher, sidebar, stale
+// localStorage, cross-tab storage events — without touching their components.
 export function useHomeView(): UseHomeViewResult {
-  // Initialize from localStorage
-  const [currentView, setCurrentViewState] = useState<HomeViewType>(() => {
-    if (typeof window === 'undefined') return 'today'
-    const stored = localStorage.getItem(STORAGE_KEY)
-    // Migrate old 'today-context' and 'review' to 'today'
-    if (stored === 'today' || stored === 'today-context' || stored === 'review') {
-      return 'today'
-    }
-    if (stored === 'week') {
-      return 'week'
-    }
-    if (stored === 'month') {
-      return 'month'
-    }
-    return 'today'
-  })
-
-  // Persist view preference
-  const setCurrentView = useCallback((view: HomeViewType) => {
-    setCurrentViewState(view)
-    localStorage.setItem(STORAGE_KEY, view)
-  }, [])
-
-  // Sync with localStorage on mount (in case another tab changed it)
-  useEffect(() => {
-    const handleStorage = (e: StorageEvent) => {
-      if (e.key === STORAGE_KEY && e.newValue) {
-        if (e.newValue === 'today' || e.newValue === 'week' || e.newValue === 'month') {
-          setCurrentViewState(e.newValue)
-        }
-      }
-    }
-
-    window.addEventListener('storage', handleStorage)
-    return () => window.removeEventListener('storage', handleStorage)
-  }, [])
-
   return {
-    currentView,
-    setCurrentView,
+    currentView: 'today',
+    setCurrentView: noop,
   }
 }

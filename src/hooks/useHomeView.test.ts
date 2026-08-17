@@ -1,82 +1,41 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useHomeView } from './useHomeView'
 
+// Pinned to 'today' since the 2026-08 analog-planning pivot: these tests
+// assert the pin holds against every old entry point (stored preference,
+// setCurrentView), so a regression that resurrects the D/W/M sub-views fails
+// here first.
 describe('useHomeView', () => {
   const STORAGE_KEY = 'symphony-home-view'
 
   beforeEach(() => {
     localStorage.clear()
-    vi.clearAllMocks()
   })
 
   afterEach(() => {
     localStorage.clear()
   })
 
-  describe('initial state', () => {
-    it('defaults to "today" view when no localStorage value', () => {
-      const { result } = renderHook(() => useHomeView())
-      expect(result.current.currentView).toBe('today')
-    })
-
-    it('restores view from localStorage', () => {
-      localStorage.setItem(STORAGE_KEY, 'week')
-      const { result } = renderHook(() => useHomeView())
-      expect(result.current.currentView).toBe('week')
-    })
-
-    it('migrates today-context view to today', () => {
-      localStorage.setItem(STORAGE_KEY, 'today-context')
-      const { result } = renderHook(() => useHomeView())
-      expect(result.current.currentView).toBe('today')
-    })
-
-    it('defaults to "today" if localStorage has invalid value', () => {
-      localStorage.setItem(STORAGE_KEY, 'invalid-view')
-      const { result } = renderHook(() => useHomeView())
-      expect(result.current.currentView).toBe('today')
-    })
+  it('is always "today"', () => {
+    const { result } = renderHook(() => useHomeView())
+    expect(result.current.currentView).toBe('today')
   })
 
-  describe('setCurrentView', () => {
-    it('updates current view state', () => {
-      const { result } = renderHook(() => useHomeView())
+  it('ignores a stored "week"/"month" preference from before the pivot', () => {
+    localStorage.setItem(STORAGE_KEY, 'week')
+    const { result } = renderHook(() => useHomeView())
+    expect(result.current.currentView).toBe('today')
+  })
 
-      act(() => {
-        result.current.setCurrentView('week')
-      })
+  it('setCurrentView is a no-op and persists nothing', () => {
+    const { result } = renderHook(() => useHomeView())
 
-      expect(result.current.currentView).toBe('week')
+    act(() => {
+      result.current.setCurrentView('week')
     })
 
-    it('persists view to localStorage', () => {
-      const { result } = renderHook(() => useHomeView())
-
-      act(() => {
-        result.current.setCurrentView('week')
-      })
-
-      expect(localStorage.getItem(STORAGE_KEY)).toBe('week')
-    })
-
-    it('allows switching between both views', () => {
-      const { result } = renderHook(() => useHomeView())
-
-      act(() => {
-        result.current.setCurrentView('today')
-      })
-      expect(result.current.currentView).toBe('today')
-
-      act(() => {
-        result.current.setCurrentView('week')
-      })
-      expect(result.current.currentView).toBe('week')
-
-      act(() => {
-        result.current.setCurrentView('today')
-      })
-      expect(result.current.currentView).toBe('today')
-    })
+    expect(result.current.currentView).toBe('today')
+    expect(localStorage.getItem(STORAGE_KEY)).toBeNull()
   })
 })

@@ -89,8 +89,6 @@ interface TodayViewProps {
   loading?: boolean
   viewedDate: Date
   onDateChange: (date: Date) => void
-  /** Opens the optional "Plan today" daily-prep session (shown in the stats row). */
-  onOpenPlanToday?: () => void
   // Undo-wrapped handlers from HomeView
   onToggleTask: (taskId: string) => void
   onCompleteRoutine?: (routineId: string, completed: boolean, completedAt?: Date) => void
@@ -135,7 +133,6 @@ export function TodayView({
   loading,
   viewedDate,
   onDateChange,
-  onOpenPlanToday,
   selectedAssignees,
   onSelectAssignees,
   assigneesWithTasks,
@@ -368,7 +365,9 @@ export function TodayView({
     resolveFacts: resolveUnpromptedFacts,
     // Off means off, including the synthetic planning-cadence nudge, which is
     // generated client-side and would otherwise survive the toggle.
-    includeCadence: suggestionsEnabled,
+    // Planning-cadence suggestions retired with the 2026-08 analog-planning
+    // pivot (the guided sessions they pointed at are gone).
+    includeCadence: false,
   })
 
   // `?why=1` renders each suggestion's policy verdict — the thing that makes a
@@ -476,10 +475,10 @@ export function TodayView({
 
   const onClarityStep = useCallback((id: ClarityStepId) => {
     if (id === 'inbox') navigate('/inbox')
-    else if (id === 'carried') { if (onOpenPlanToday) onOpenPlanToday(); else navigate('/inbox') }
-    else if (id === 'plan') onOpenPlanToday?.()
-    // 'review' simply closes for now (no dedicated review flow yet).
-  }, [navigate, onOpenPlanToday])
+    else if (id === 'carried') navigate('/inbox')
+    // 'plan' and 'review' simply close — the guided daily-prep session they
+    // launched left with the 2026-08 analog-planning pivot.
+  }, [navigate])
 
   const clarityTrigger = (
     <button
@@ -847,17 +846,6 @@ export function TodayView({
         )}
 
         <TodayOverflowMenu>
-          {data.isToday && onOpenPlanToday && (
-            <button
-              type="button"
-              onClick={onOpenPlanToday}
-              title="Plan today — review carried-over and pull from the week"
-              className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[15px] text-neutral-600 transition-all hover:bg-neutral-100"
-            >
-              <Sun className="w-5 h-5" />
-              <span>Plan today</span>
-            </button>
-          )}
           <button
             type="button"
             onClick={toggleHideRoutines}
