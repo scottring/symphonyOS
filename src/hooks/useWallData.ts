@@ -55,7 +55,6 @@ export interface UseWallDataReturn {
   overdueTasks: TimelineItem[]
   /** Raw Task[] for surfaces (e.g. WallNow) that need real Task shape, not TimelineItem. */
   tasks: Task[]
-  inboxCount: number
   loading: boolean
   error: string | null
   lastRefresh: Date | null
@@ -98,7 +97,6 @@ export function useWallData(): UseWallDataReturn {
   const [screenTimeSummaries, setScreenTimeSummaries] = useState<ChildScreenTimeSummary[]>([])
   const [overdueTasks, setOverdueTasks] = useState<TimelineItem[]>([])
   const [allTasks, setAllTasks] = useState<Task[]>([])
-  const [inboxCount, setInboxCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null)
@@ -137,7 +135,6 @@ export function useWallData(): UseWallDataReturn {
         stEntriesRes,
         stAdjustmentsRes,
         overdueRes,
-        inboxCountRes,
         routineCompletionsRes,
       ] = await Promise.all([
         // 1. Family members
@@ -200,16 +197,15 @@ export function useWallData(): UseWallDataReturn {
           .eq('completed', false)
           .eq('context', 'family'),
 
-        // 12. Inbox count (unscheduled, not completed, not someday, family only)
-        supabase
-          .from('tasks')
-          .select('id', { count: 'exact', head: true })
-          .is('scheduled_for', null)
-          .eq('completed', false)
-          .or('is_someday.is.null,is_someday.eq.false')
-          .eq('context', 'family'),
+        // (An inbox-count query used to sit here. It filtered on `is_someday`,
+        //  a column that no longer exists — someday is `bucket = 'someday'`
+        //  now — so it returned 400 on EVERY poll. Nothing consumed the count
+        //  (ShellLayout and TodayView each derive their own from `bucket`),
+        //  but it was in the dataError reduction below, so its failure fed a
+        //  permanent error into the freshness signal. Deleted rather than
+        //  repaired: a query nobody reads shouldn't cost the wall egress.)
 
-        // 13. Most-recent completion per routine (no date filter — needed
+        // 12. Most-recent completion per routine (no date filter — needed
         // for 'since_last' recurrence which depends on history beyond the
         // 7-day wall window).
         supabase
@@ -230,7 +226,7 @@ export function useWallData(): UseWallDataReturn {
       const dataError = [
         membersRes, tasksRes, routinesRes, instancesRes, contactsRes,
         milestonesRes, stBudgetsRes, stEntriesRes, stAdjustmentsRes,
-        overdueRes, inboxCountRes, routineCompletionsRes,
+        overdueRes, routineCompletionsRes,
       ].find((r) => r.error)?.error?.message ?? null
 
       const members = (membersRes.data || []) as FamilyMember[]
@@ -426,7 +422,6 @@ export function useWallData(): UseWallDataReturn {
           setScreenTimeSummaries(stSummaries)
           setOverdueTasks(overdueItems)
           setAllTasks(tasks)
-          setInboxCount(inboxCountRes.count ?? 0)
         }
         setCalendarUnavailable(calendarFailed)
         setError(dataError)
@@ -470,5 +465,5 @@ export function useWallData(): UseWallDataReturn {
     }
   }, [fetchAllData])
 
-  return { days, familyMembers, calendarEvents: calendarEventsState, calendarUnavailable, screenTimeSummaries, overdueTasks, tasks: allTasks, inboxCount, loading, error, lastRefresh, refetch: fetchAllData }
+  return { days, familyMembers, calendarEvents: calendarEventsState, calendarUnavailable, screenTimeSummaries, overdueTasks, tasks: allTasks, loading, error, lastRefresh, refetch: fetchAllData }
 }

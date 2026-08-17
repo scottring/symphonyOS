@@ -9,7 +9,14 @@ vi.mock('@/lib/supabase', () => ({
 
 import { useTendWeek } from './useTendWeek'
 
-function task(id: string, title: string, createdAt = new Date(2026, 6, 20)): Task {
+// Age must be RELATIVE, not a pinned calendar date. `runPrepass` defaults its
+// `now` to the real clock and emits a `put_aside` for anything unfinished for
+// STALE_DAYS (21), so a fixed createdAt silently crosses that line as the
+// calendar moves: these fixtures were 19 days old on 2026-08-08 and passed, then
+// 28 days old on 2026-08-17 and produced an extra proposal each, breaking every
+// test that counts proposals. Three days keeps them comfortably fresh forever.
+const DAY = 24 * 60 * 60 * 1000
+function task(id: string, title: string, createdAt = new Date(Date.now() - 3 * DAY)): Task {
   return { id, title, completed: false, createdAt, updatedAt: createdAt } as Task
 }
 
