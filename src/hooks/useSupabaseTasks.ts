@@ -544,6 +544,10 @@ export function useSupabaseTasks() {
      *  can hit tasksRef before the temp→real id swap has rendered, and be
      *  silently dropped ("Task not found"). Ignored when scheduledFor is set. */
     bucket?: TaskBucket
+    /** Which week a bucket='week' creation belongs to (placement cascade: week
+     *  rows must say WHICH week). Rides the INSERT — same race rationale as
+     *  `bucket`. Ignored unless bucket is 'week'. */
+    weekStart?: Date
     /** Cascade lineage: the task this one is copied down from. */
     sourceId?: string
     /** Season pick: set when the created quarter item is immediately chosen as
@@ -593,6 +597,7 @@ export function useSupabaseTasks() {
       contactId,
       projectId,
       scheduledFor,
+      weekStart: !scheduledFor && options?.bucket === 'week' ? options?.weekStart : undefined,
       linkedTo: options?.linkedTo,
       linkType: options?.linkType,
       assignedTo: effectiveAssignedTo ?? undefined,
@@ -627,6 +632,8 @@ export function useSupabaseTasks() {
         contact_id: contactId ?? null,
         project_id: projectId ?? null,
         scheduled_for: scheduledFor?.toISOString() ?? null,
+        // `week_start` is a DATE column — localYmd, not toISOString (which shifts the day west of Greenwich).
+        week_start: !scheduledFor && options?.bucket === 'week' && options?.weekStart ? localYmd(options.weekStart) : null,
         linked_activity_type: options?.linkedTo?.type ?? null,
         linked_activity_id: options?.linkedTo?.id ?? null,
         link_type: options?.linkType ?? null,

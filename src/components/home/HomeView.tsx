@@ -45,6 +45,8 @@ interface HomeViewProps {
   onDateChange: (date: Date) => void
   currentUserMemberId?: string
   bothPanelsOpen?: boolean
+  /** Opens the plan-from-paper flow (photo of a written plan → placed tasks). */
+  onOpenPlanFromPaper?: () => void
 }
 
 export function HomeView({
@@ -61,6 +63,7 @@ export function HomeView({
   onDateChange,
   currentUserMemberId,
   bothPanelsOpen,
+  onOpenPlanFromPaper,
 }: HomeViewProps) {
   const ctx = useScheduleActionsContext()
   const { currentView, setCurrentView } = useHomeView()
@@ -405,6 +408,7 @@ export function HomeView({
         panelOpen={selectedItemId !== null}
         bothPanelsOpen={bothPanelsOpen}
         onClosePanel={() => onSelectItem(null)}
+        onOpenPlanFromPaper={onOpenPlanFromPaper}
         onUpdateTasksBulk={handleUpdateTasksBulk}
         currentHomeView={currentView}
         onHomeViewChange={handleViewChange}

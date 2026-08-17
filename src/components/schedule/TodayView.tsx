@@ -36,7 +36,7 @@ import { useRecurringEventDetection } from '@/hooks/useRecurringEventDetection'
 import { useTimelineInsert } from '@/hooks/useTimelineInsert'
 import { useDomain } from '@/hooks/useDomain'
 
-import { Eye, EyeOff, Repeat, Binoculars, Sun, Printer, GripVertical, CalendarClock, Moon, Sparkles } from 'lucide-react'
+import { Eye, EyeOff, Repeat, Binoculars, Sun, Printer, GripVertical, CalendarClock, Moon, Sparkles, NotebookPen } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { AssigneeFilter } from '@/components/home/AssigneeFilter'
 
@@ -102,6 +102,8 @@ interface TodayViewProps {
   panelOpen?: boolean
   bothPanelsOpen?: boolean
   onClosePanel?: () => void
+  /** Opens plan-from-paper (photo of the written plan → placed tasks). */
+  onOpenPlanFromPaper?: () => void
   // Bulk actions (managed by HomeView)
   onUpdateTasksBulk?: (taskIds: string[], updates: Partial<Task>) => Promise<void>
   // Timeline insert points — fall back to context
@@ -139,6 +141,7 @@ export function TodayView({
   hasUnassignedTasks,
   panelOpen,
   onClosePanel,
+  onOpenPlanFromPaper,
   onCreateNoteAt: onCreateNoteAtProp,
   onAppendNoteAt: onAppendNoteAtProp,
   onLinkNote: onLinkNoteProp,
@@ -846,6 +849,17 @@ export function TodayView({
         )}
 
         <TodayOverflowMenu>
+          {onOpenPlanFromPaper && (
+            <button
+              type="button"
+              onClick={onOpenPlanFromPaper}
+              title="Plan from paper — photograph your written plan and place its items"
+              className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[15px] text-neutral-600 transition-all hover:bg-neutral-100"
+            >
+              <NotebookPen className="w-5 h-5" />
+              <span>Plan from paper</span>
+            </button>
+          )}
           <button
             type="button"
             onClick={toggleHideRoutines}

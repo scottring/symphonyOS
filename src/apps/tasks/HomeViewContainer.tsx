@@ -18,6 +18,9 @@ import { showToast } from '@/hooks/useToast';
 import { PlanningSession } from '@/components/lazy';
 import { LoadingFallback } from '@/components/layout/LoadingFallback';
 import { isEverydayRoutine, scheduleRoutineOnDate } from '@/lib/routineUtils';
+import { PlanFromPaperFlow } from '@/components/capture/PlanFromPaperFlow';
+import { planItemToAddTaskArgs, type PlanItem } from '@/lib/planParse';
+import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config';
 import { parseRoutineTimelineId } from '@/lib/today/doseExpansion';
 import { groupItems, addToGroup, removeFromGroup, ungroupTasks } from '@/lib/today/groupTasks';
 import { useConvertTaskToProject } from '@/hooks/useConvertTaskToProject';
@@ -86,6 +89,9 @@ export function HomeViewContainer() {
   // here (guidedHorizon / ?plan= deep link) left with the 2026-08
   // analog-planning pivot; planning happens on paper now.
   const [planningOpen, setPlanningOpen] = useState(false);
+  // Plan-from-paper (analog-planning pivot): photograph the written plan page,
+  // review the parsed items, commit them as placed tasks.
+  const [planFromPaperOpen, setPlanFromPaperOpen] = useState(false);
   const { selection, setSelection, clearSelection } = useSelection();
 
   const [searchParams, setSearchParams] = useSearchParams();
@@ -613,6 +619,25 @@ export function HomeViewContainer() {
     ],
   );
 
+  // Commit the review sheet's confirmed items: ONE addTask INSERT each, with
+  // the placement riding the insert (bucket/weekStart/scheduledFor) — never a
+  // follow-up update. Unassigned lines default to the planner.
+  const handleCommitPlanItems = useCallback(async (items: PlanItem[]) => {
+    const commitCtx = {
+      currentWeekStart: weekStartAnchor(new Date(), readCadenceConfig().weekStartsOn),
+      context: currentDomain === 'universal' ? null : currentDomain,
+    };
+    const defaultAssigneeId = getCurrentUserMember()?.id;
+    for (const item of items) {
+      const args = planItemToAddTaskArgs(item, commitCtx);
+      await addTask(args.title, undefined, undefined, args.scheduledFor, {
+        ...args.options,
+        defaultAssigneeId,
+      });
+    }
+    showToast(`Added ${items.length} task${items.length === 1 ? '' : 's'} from your plan`, 'success', 4000);
+  }, [addTask, currentDomain, getCurrentUserMember]);
+
   return (
     <ScheduleActionsProvider value={scheduleActionsValue}>
       <HomeView
@@ -628,7 +653,16 @@ export function HomeViewContainer() {
         viewedDate={viewedDate}
         onDateChange={setViewedDate}
         currentUserMemberId={getCurrentUserMember()?.id}
+        onOpenPlanFromPaper={() => setPlanFromPaperOpen(true)}
       />
+
+      {planFromPaperOpen && (
+        <PlanFromPaperFlow
+          members={familyMembers}
+          onCommit={handleCommitPlanItems}
+          onClose={() => setPlanFromPaperOpen(false)}
+        />
+      )}
 
       {planningOpen && (
         <Suspense fallback={<LoadingFallback />}>
