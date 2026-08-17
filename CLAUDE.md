@@ -54,7 +54,7 @@ prod from exactly what's on `main`. Therefore:
 
 ## Personal memory lives in the vault, not here
 
-Scott Kaufman's life and work memory is in his Obsidian vault at `~/Documents/scotts-world`. That vault is the single source of truth across every project, every agent (Michael on Telegram, every Claude Code instance, this one), and every location (MacBook, Mac Mini, phone via Obsidian Mobile).
+Scott Kaufman's life and work memory is in his Obsidian vault at `~/Documents/scotts-world`. That vault is the single source of truth across every project, every agent (every Claude Code instance, including this one), and every location (MacBook, Mac Mini, phone via Obsidian Mobile).
 
 **When you learn anything about Scott's priorities, people, projects, or goals that extends beyond this codebase:**
 
