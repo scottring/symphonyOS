@@ -16,6 +16,34 @@ plan → plan-from-paper photo → **This Week** → provision (attach the conte
 execution needs) → **Today** → done or carried over, honestly → anything
 two-person routes through **Between Us**.
 
+## Planning cycles, wizard-free (added 2026-08-17, same day)
+
+The horizon CADENCE survives the pivot; only the wizard UI died. Paper decides
+at every altitude — year, season, month, week, day — and Symphony stores the
+decisions in the buckets/goals that never went away. The design rule that makes
+this work: **entered results must come back by delivery, not navigation.**
+
+- **Cadence lives in routines.** "Weekly planning — Sunday 7pm" (+ monthly,
+  seasonal, annual at their rhythms) as ordinary routines on Today and the
+  wall. No new UI.
+- **The review packet replaces the wizard.** Before each session, one
+  button (or auto-prepared) assembles the material: carried-over with ages,
+  the pool being planned, waiting-ons, next period's calendar, inbox count —
+  **and always the rung above**: the weekly packet shows month commitments,
+  the monthly packet shows season picks, the seasonal packet shows year goals.
+  That's the cascade, running through attention at planning time instead of
+  linked UI. On screen or printed (paper packet next to the paper plan).
+- **Plan-from-paper learns altitudes.** First question on snap: which page is
+  this — day/week/month/season/year? Parser + review sheet then offer that
+  altitude's placements (month bucket, quarter picks, year goals). Today it
+  knows only date/week/inbox.
+- **Optional: a read-only Horizons reference page in the Library** (year goals,
+  season picks, month commitments in one quiet scroll) — add ONLY if the
+  packets alone make the data feel invisible. Not a ladder, not navigation.
+
+The complete cycle: routine fires → packet (carrying the rung above) → paper →
+snap at its altitude → review sheet → placed. Zero wizard screens.
+
 ## Four surfaces — that's the whole app
 
 1. **Inbox** — where capture lands. Exists.
@@ -54,6 +82,10 @@ sharing.
 
 1. **This Week bench** — un-park WeekViewV2 behind a `/week` route + sidebar
    entry, panel provisioning polish, ready/bare indicator. Mostly proven code.
-2. **Between Us** — agenda + handoffs on the Us app, realtime, wall echo.
-3. **Glance polish** — collision hints, waiting-on both directions.
-4. **Today refinement pass.**
+2. **Planning cadence** — completes the core loop: the review packet (weekly
+   first, then monthly/seasonal variants), planning routines seeded, and
+   altitude-aware plan-from-paper (page-type question + month/quarter/goal
+   placements).
+3. **Between Us** — agenda + handoffs on the Us app, realtime, wall echo.
+4. **Glance polish** — collision hints, waiting-on both directions.
+5. **Today refinement pass.**
