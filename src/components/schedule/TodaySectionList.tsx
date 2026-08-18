@@ -46,6 +46,24 @@ function isMealItem(id: string, type: string, title: string): boolean {
   return String(id).startsWith('meal:') || (type === 'event' && MEAL_RE.test(title))
 }
 
+/**
+ * The "Up next" marker — replaces the UpNextHero card (2026-08-18). The next
+ * commitment stays IN the timeline where the eye expects it; this one small
+ * line plus a tinted row is the entire treatment. Lifting it into a hero left
+ * its home section rendering an empty heading labelled "· up next".
+ */
+function UpNextMarker({ status }: { status?: string }) {
+  return (
+    <div className="flex items-center gap-2 px-3 md:px-0 pt-1.5 pb-1" data-testid="up-next-marker">
+      <span className="text-[11px] uppercase tracking-wider font-bold text-amber-600">Up next</span>
+      {status && <span className="text-[12px] text-neutral-500">· {status}</span>}
+    </div>
+  )
+}
+
+/** Row tint for the up-next commitment — subtle, no layout shift. */
+const UP_NEXT_ROW_CLASS = 'rounded-xl bg-primary-50/60 ring-1 ring-primary-100'
+
 /** Locate a rendered timeline item by id across every section. */
 export function findTimelineItem(
   grouped: Record<DaySection, TimelineItem[]>,
@@ -64,8 +82,10 @@ export interface TodaySectionListProps {
   viewedDate: Date
   isMobile: boolean
   selectedItemId: string | null
-  /** The Up Next hero lifts its item out of its section. */
+  /** The next commitment, highlighted IN PLACE — never lifted out of the list. */
   upNextId: string | undefined
+  /** e.g. "starts in ~2.5 hr" — rendered on the up-next marker line. */
+  upNextStatus?: string
   firstSectionItemId: string | null
   collapsedKeys: Set<string>
   openedByUser: Set<string>
@@ -98,6 +118,7 @@ export function TodaySectionList({
   isMobile,
   selectedItemId,
   upNextId,
+  upNextStatus,
   firstSectionItemId,
   collapsedKeys,
   openedByUser,
@@ -165,11 +186,7 @@ export function TodaySectionList({
         // hidden either way.
         if (isEmpty && (!dragging || section === 'unscheduled')) return null
 
-        // The hero item is lifted out of its section.
-        const sectionItems = allSectionItems ?? []
-        const items = upNextId
-          ? sectionItems.filter((i) => i.id !== upNextId)
-          : sectionItems
+        const items = allSectionItems ?? []
         // The cap bounds what RENDERS. Every count below still comes from the
         // full `items` — the header is where the truth about the day lives.
         // Capped by GROUP, not by row: a group renders as one enclosed card
@@ -192,39 +209,45 @@ export function TodaySectionList({
         // from the same `items` the rows below would render, so it can't
         // drift from what's actually on screen.
         const anytimeSummary = section === 'unscheduled' ? countRoutineRowUnits(items) : undefined
-        // "Empty because the hero took it" is only true if the section HAD
-        // something. An empty band materialised mid-drag has nothing to lift,
-        // and labelling it "· up next" would be a lie the header tells.
-        const emptyBecauseHero = sectionItems.length > 0 && items.length === 0
         const key = sectionKey(section)
 
-        // Precedence: empty-because-hero always collapses; an explicit fold
-        // always wins; an explicit open overrides the auto rule; otherwise
-        // auto-collapse when everything remaining is done. `collapsedKeys` and
-        // `openedByUser` are independent facts — never derive one from the other.
-        const collapsed = emptyBecauseHero
-          ? true
-          : collapsedKeys.has(key)
+        // The flat agenda (2026-08-18): timed sections carry NO header and never
+        // collapse — the day reads as one time-ordered list, the way a paper
+        // plan does. The band structure itself stays, because bands are the
+        // drag targets; while a drag is live the headers reappear as labels so
+        // there is something to aim at. Only Anytime (unscheduled) keeps a
+        // permanent header: its collapsed "Anytime · M of N done" row is the
+        // fixed-budget summary of the untimed-routine slab, and folding it is
+        // the point. Precedence there: an explicit fold always wins; an
+        // explicit open overrides the auto rule; otherwise auto-collapse when
+        // everything is done. `collapsedKeys` and `openedByUser` are
+        // independent facts — never derive one from the other.
+        const collapsed = section === 'unscheduled'
+          ? collapsedKeys.has(key)
             ? true
             : openedByUser.has(key)
               ? false
               : restAllDone
+          : false
+        const showHeader = section === 'unscheduled' || dragging
 
         return (
           <section key={section}>
             <TodayBandDropZone section={section}>
-            <DaySectionHeader
-              section={section}
-              itemCount={items.length}
-              completedCount={completedCount}
-              collapsed={collapsed}
-              emptyBecauseHero={emptyBecauseHero}
-              onToggle={() => onToggleSection(section, collapsed)}
-              anytimeSummary={anytimeSummary}
-            />
+            {showHeader && (
+              <DaySectionHeader
+                section={section}
+                itemCount={items.length}
+                completedCount={completedCount}
+                collapsed={collapsed}
+                onToggle={() => onToggleSection(section, collapsed)}
+                anytimeSummary={anytimeSummary}
+              />
+            )}
             {!collapsed && (
               <div className="space-y-1 md:space-y-0.5">
                 {visible.map((item, itemIndex) => {
+                  const isUpNext = !!upNextId && item.id === upNextId
                   const taskId = item.id.startsWith('task-') ? item.id.replace('task-', '') : null
                   const contactName = item.contactId && contactsMap?.get(item.contactId)?.name || undefined
                   const projectName = item.projectId && projectsMap?.get(item.projectId)?.name || undefined
@@ -337,7 +360,9 @@ export function TodaySectionList({
                     return (
                       <div key={item.id} data-item-id={item.id}>
                         {showInsert && insertBefore}
+                        {isUpNext && <UpNextMarker status={upNextStatus} />}
                         <TodayDraggableRow itemId={item.id} disabled={dragRefused}>
+                        <div className={isUpNext ? UP_NEXT_ROW_CLASS : undefined}>
                         <RoutineCollectionRow
                           item={item}
                           onSelect={() => onSelectItem(item.id)}
@@ -372,6 +397,7 @@ export function TodaySectionList({
                             onUpdateRoutine(parentId, { visibility: 'reference' })
                           } : undefined}
                         />
+                        </div>
                         </TodayDraggableRow>
                       </div>
                     )
@@ -402,8 +428,12 @@ export function TodaySectionList({
                   return (
                     <div key={item.id} className={isGroupChild ? '-mt-1' : undefined}>
                     {showInsert && insertBefore}
+                    {isUpNext && <UpNextMarker status={upNextStatus} />}
                     <TodayDraggableRow itemId={item.id} disabled={dragRefused}>
-                    <div data-item-id={item.id} className={groupCardClass || undefined} {...(isFirstItem ? { 'data-today-first': '' } : {})}>
+                    {/* Group chrome wins over the up-next tint: stripping a
+                        parent's card top to tint it leaves the group's border
+                        broken. The marker line above still says "Up next". */}
+                    <div data-item-id={item.id} className={(groupCardClass || (isUpNext ? UP_NEXT_ROW_CLASS : '')) || undefined} {...(isFirstItem ? { 'data-today-first': '' } : {})}>
                     {(() => {
                       const { routineId: bareRoutineId, slot } = item.type === 'routine'
                         ? parseRoutineTimelineId(item.id)

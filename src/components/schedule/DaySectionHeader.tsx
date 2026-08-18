@@ -5,12 +5,9 @@ import { daySectionMeta } from '@/lib/daySectionMeta'
 
 export interface DaySectionHeaderProps {
   section: DaySection
-  /** Items remaining after the Up Next hero is lifted out. */
   itemCount: number
   completedCount: number
   collapsed: boolean
-  /** True when the section's only item was lifted into the hero. */
-  emptyBecauseHero: boolean
   onToggle: () => void
   /**
    * Unscheduled-only. The untimed-routine slab's own unit count (done/total,
@@ -32,14 +29,15 @@ export interface DaySectionHeaderProps {
 }
 
 /**
- * One section header for Today. Extracted from TodayView so the day list stops
- * carrying its own chrome.
+ * One section header for Today. Since the flat-agenda change (2026-08-18) the
+ * timed sections render this only while a drag is live — as a band label to
+ * aim a drop at — so its everyday appearance is the "Anytime" row.
  *
  * Collapsing must never hide completion state — the count and "N done" stay on
  * the row, same honesty rule as the page cap.
  */
 export function DaySectionHeader({
-  section, itemCount, completedCount, collapsed, emptyBecauseHero, onToggle, anytimeSummary,
+  section, itemCount, completedCount, collapsed, onToggle, anytimeSummary,
 }: DaySectionHeaderProps) {
   const meta = daySectionMeta(section)
   const allDone = itemCount > 0 && completedCount === itemCount
@@ -49,7 +47,7 @@ export function DaySectionHeader({
   // done" folded, "Unscheduled · 12" open — and the aria-label flipped between
   // "Expand Anytime" and "Collapse Unscheduled", so a screen-reader user
   // toggling one button heard two different sections.
-  const isAnytime = section === 'unscheduled' && !emptyBecauseHero && !!anytimeSummary
+  const isAnytime = section === 'unscheduled' && !!anytimeSummary
 
   // The SUMMARY is still collapsed-only, and that part was never the bug: the
   // folded row has to carry its own answer ("did I do my daily stuff") because
@@ -61,16 +59,13 @@ export function DaySectionHeader({
   return (
     <button
       type="button"
-      onClick={emptyBecauseHero ? undefined : onToggle}
-      disabled={emptyBecauseHero}
+      onClick={onToggle}
       aria-expanded={!collapsed}
       aria-label={`${collapsed ? 'Expand' : 'Collapse'} ${label}`}
       // mb-3 restores the desktop precedent: collapsing the two old headers into
       // one dropped their bottom margin, so every header sat flush against its
       // first row.
-      className={`w-full flex items-center gap-2 text-[11px] uppercase tracking-wider font-semibold text-neutral-400 px-3 md:px-0 py-0.5 mb-3 text-left ${
-        emptyBecauseHero ? 'cursor-default' : 'hover:text-neutral-600 transition-colors'
-      }`}
+      className="w-full flex items-center gap-2 text-[11px] uppercase tracking-wider font-semibold text-neutral-400 px-3 md:px-0 py-0.5 mb-3 text-left hover:text-neutral-600 transition-colors"
     >
       {createElement(meta.Icon, {
         className: `w-4 h-4 shrink-0 ${collapsed ? 'text-amber-500/60' : 'text-amber-500'}`,
@@ -80,9 +75,7 @@ export function DaySectionHeader({
         <span className="text-neutral-300 normal-case font-normal">{meta.range}</span>
       )}
 
-      {emptyBecauseHero ? (
-        <span className="text-primary-600/70 normal-case font-normal">· up next</span>
-      ) : showAnytime ? (
+      {showAnytime ? (
         <span className="text-neutral-400 normal-case font-normal tabular-nums">
           · {anytimeSummary.done} of {anytimeSummary.total} done
         </span>
@@ -96,11 +89,9 @@ export function DaySectionHeader({
         </span>
       )}
 
-      {!emptyBecauseHero && (
-        collapsed
-          ? <ChevronRight className="w-3.5 h-3.5 text-neutral-300" />
-          : <ChevronDown className="w-3.5 h-3.5 text-neutral-300" />
-      )}
+      {collapsed
+        ? <ChevronRight className="w-3.5 h-3.5 text-neutral-300" />
+        : <ChevronDown className="w-3.5 h-3.5 text-neutral-300" />}
     </button>
   )
 }

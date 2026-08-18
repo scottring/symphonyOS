@@ -73,12 +73,16 @@ describe('Today page cap', () => {
     expect(screen.getByRole('button', { name: `+${TOTAL - DEFAULT_SECTION_CAP} more today` })).toBeInTheDocument()
   })
 
-  it('the section header still reports the FULL count, not the visible one', async () => {
+  it('renders no section header in the flat agenda — the +N control carries the truth', async () => {
+    // Timed sections lost their everyday headers in the flat-agenda change
+    // (2026-08-18); they reappear only as drag-target labels, and DaySectionHeader
+    // still receives the FULL items.length when it does (its own tests pin the
+    // count display). Day-to-day, the honest count lives on the "+N more today"
+    // control asserted above — a cap that hides its own truncation is worse
+    // than a long page.
     renderView({ tasks: allDayTasks(TOTAL) as never })
     await screen.findAllByText(/^Capped task \d+$/)
-    // The header is where the truth about the day lives.
-    const header = screen.getByRole('button', { name: /collapse all day/i })
-    expect(header).toHaveTextContent(String(TOTAL))
+    expect(screen.queryByRole('button', { name: /collapse all day/i })).not.toBeInTheDocument()
   })
 
   it('expanding reveals the rest and retires the control', async () => {

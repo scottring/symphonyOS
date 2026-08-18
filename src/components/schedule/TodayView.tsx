@@ -45,8 +45,7 @@ import { TodaySectionList, findTimelineItem } from './TodaySectionList'
 import { TodayDragProvider } from './TodayDragProvider'
 import { resolveDrop, type DropIntent } from '@/lib/today/todayDrop'
 import { useCalendarPermissions } from '@/hooks/useCalendarPermissions'
-import { UpNextHero } from './UpNextHero'
-import { selectUpNext } from '@/lib/today/upNext'
+import { selectUpNext, formatUpNextStatus } from '@/lib/today/upNext'
 import { NeedsYourOK } from './NeedsYourOK'
 import { ClarityCurtain } from '@/components/clarity/ClarityCurtain'
 import { computeClaritySteps, type ClarityStepId } from '@/lib/clarity/claritySteps'
@@ -61,7 +60,7 @@ import { TodayOverflowMenu } from './TodayOverflowMenu'
 import { EndOfDayReview } from './EndOfDayReview'
 import { DayNavCluster } from './DayNavCluster'
 import { OverdueSection } from './OverdueSection'
-import { AttentionLine } from './AttentionLine'
+import { TodayBacklogFooter } from './TodayBacklogFooter'
 import { BulkActionToolbar } from './BulkActionToolbar'
 import { TimelineNoteComposer } from './TimelineNoteComposer'
 
@@ -302,13 +301,25 @@ export function TodayView({
 
   const data = useTodayData(todayInput)
 
-  // ── Up Next hero: the single next commitment, lifted out of its section ──
+  // ── Up Next: the single next commitment, highlighted in place. It used to
+  // be lifted out of its section into a hero card, which left its home
+  // section rendering an empty heading — the timeline read as disassembled.
   const upNext = useMemo(() => {
     if (!data.isToday) return null
     const allItems = data.sectionsOrder.flatMap((s) => data.grouped[s] ?? [])
     return selectUpNext(allItems, new Date(nowTick))
   }, [data, nowTick])
   const upNextId = upNext?.item.id
+  const upNextStatus = upNext ? formatUpNextStatus(upNext) : undefined
+
+  // ── Backlog footer state — the "N carried over" segment expands the
+  // OverdueSection list inline beneath the footer line. Incomplete count with
+  // a total fallback, same readout the old collapsed strip showed.
+  const [carriedExpanded, setCarriedExpanded] = useState(false)
+  const carriedCount = useMemo(() => {
+    const incomplete = data.overdueTasks.filter((t) => !t.completed).length
+    return incomplete || data.overdueTasks.length
+  }, [data.overdueTasks])
 
   // Which sections the user has folded shut. Persisted; Unscheduled starts
   // collapsed because it holds the untimed-routine slab. A section whose
@@ -755,20 +766,14 @@ export function TodayView({
   const listRef = useRef<HTMLDivElement>(null)
 
   // ── First-item marker (exactly one element gets data-today-first) ────────────
-  // Overdue section takes priority; otherwise the first item id of the first non-empty section.
-  const overdueWillRender = data.isToday && data.overdueTasks.length > 0
-  const firstSectionItemId: string | null = overdueWillRender
-    ? null
-    : (() => {
-        for (const section of data.sectionsOrder) {
-          const items = data.grouped[section]
-          // The Up Next hero lifts its item out of the section list, so the
-          // marker goes to the first item still rendered in a section.
-          const first = items?.find((i) => i.id !== upNextId)
-          if (first) return first.id
-        }
-        return null
-      })()
+  // The first item id of the first non-empty section.
+  const firstSectionItemId: string | null = (() => {
+    for (const section of data.sectionsOrder) {
+      const items = data.grouped[section]
+      if (items && items.length > 0) return items[0].id
+    }
+    return null
+  })()
 
   // ── Print: mount the compact list, then hand the page to the printer ──
   // The button sets state and an effect prints on the next commit, so the list
@@ -937,22 +942,8 @@ export function TodayView({
         </TodayOverflowMenu>
       </div>
 
-      {/* Up Next hero — the single next commitment, above everything else.
-          Its item is lifted out of its day section below. */}
-      {upNext && (
-        <div className="px-3 md:px-0">
-          <UpNextHero
-            selection={upNext}
-            onSelectItem={onSelectItem}
-            onToggleTask={onToggleTask}
-            projectsMap={ctx.projectsMap}
-          />
-        </div>
-      )}
-
-      {/* Assistant lines — the unprompted tier. Under the hero because it makes
-          the same kind of claim; above the add input, which is mechanics.
-          Deliberately calm lines, not a card: see UnpromptedLines.
+      {/* Assistant lines — the unprompted tier, one quiet collapsed line.
+          Above the add input, which is mechanics; see UnpromptedLines.
 
           Silenced wholesale by the suggestions preference (Today's ⋯ menu).
           Only this tier is gated: chips inside an item you opened are answers
@@ -1033,40 +1024,6 @@ export function TodayView({
           </div>
         ) : (
           <div className="space-y-6">
-            {/* Overdue section — gets data-today-first marker when it renders.
-                Shown on mobile too (OverdueSection has its own mobile layout). */}
-            {data.isToday && data.overdueTasks.length > 0 && (
-              <div data-today-first="">
-                <OverdueSection
-                  tasks={data.overdueTasks}
-                  selectedItemId={selectedItemId}
-                  onSelectTask={onSelectItem}
-                  onToggleTask={onToggleTask}
-                  onToggleWaiting={onToggleWaiting}
-                  onPushTask={ctx.onPushTask}
-                  onUpdateTask={ctx.onUpdateTask}
-                  contactsMap={ctx.contactsMap}
-                  projectsMap={ctx.projectsMap}
-                  familyMembers={ctx.familyMembers}
-                  onAssignTask={ctx.onAssignTask}
-                  onAssignTaskAll={ctx.onAssignTaskAll}
-                  bulkSelectedIds={overdueSelectedTaskIds}
-                  onToggleBulkSelect={(taskId) => toggleBulkSelect(`task-${taskId}`)}
-                  followUpTaskId={followUpTaskId}
-                  onToggleWithFollowUp={handleToggleTaskWithFollowUp}
-                  onFollowUpSubmit={onCreateFollowUp ? handleFollowUpSubmit : undefined}
-                  onFollowUpDismiss={handleFollowUpDismiss}
-                  panelOpen={panelOpen}
-                  onClosePanel={onClosePanel}
-                  onDeleteTask={ctx.onDeleteTask}
-                  suggestionsForTask={proactive.suggestionsForEntity}
-                  onActSuggestion={proactive.actOnSuggestion}
-                  onDismissSuggestion={proactive.dismissSuggestion}
-                  onOpenGuidedChat={onOpenGuidedChat}
-                />
-              </div>
-            )}
-
             {/* Sections — lifted into TodaySectionList so this file stops
                 carrying the whole day list (Stage 2b spec). */}
             <TodayDragProvider
@@ -1090,6 +1047,7 @@ export function TodayView({
               isMobile={isMobile}
               selectedItemId={selectedItemId}
               upNextId={upNextId}
+              upNextStatus={upNextStatus}
               firstSectionItemId={firstSectionItemId}
               collapsedKeys={collapsedKeys}
               openedByUser={openedByUser}
@@ -1115,28 +1073,58 @@ export function TodayView({
           </div>
         )}
 
-        {/* Attention line — deliberately OUTSIDE the totalItems ternary
-            above, and outside the carried-over guard within it.
-            `counts.totalItems` does not include this work, so a day whose
-            only remaining work needs attention renders "Your day is clear" —
-            with 35 items rotting invisibly behind it. That is exactly the
-            permanently-buried failure expiry must not cause, so the line
-            renders in BOTH branches whenever the set is non-empty.
+        {/* Backlog footer — ONE muted line merging carried-over and
+            needs-attention, deliberately OUTSIDE the totalItems ternary above.
+            `counts.totalItems` does not include this work, so a day whose only
+            remaining work is backlog renders "Your day is clear" — with 35
+            items rotting invisibly behind it. That is exactly the
+            permanently-buried failure expiry must not cause, so the footer
+            renders in BOTH branches whenever either set is non-empty.
 
-            This line is awareness only — it carries no list and no dismiss.
-            The affordance to actually act on the set lives on the horizon
-            rungs, which already draw these units, so Review is a plain
-            navigate with no `?review=` param.
-
-            The destination is computed rather than fixed: it used to always be
-            /week, but only two of the four reasons have a home there. A count
-            built from aging inbox capture sent you to a page reading
-            "Everything is placed on a day." See reviewDestination(). */}
+            Carried-over expands its list inline (those tasks have no other
+            home); the attention segment is awareness only — the affordance to
+            act on that set lives on the horizon rungs, which already draw
+            these units, so Review is a plain navigate with no `?review=`
+            param. The destination is computed rather than fixed: it used to
+            always be /week, but only two of the four reasons have a home
+            there. See reviewDestination(). */}
         {data.isToday && (
-          <AttentionLine
-            items={data.attentionItems}
+          <TodayBacklogFooter
+            carriedCount={carriedCount}
+            attentionItems={data.attentionItems}
+            carriedExpanded={carriedExpanded}
+            onToggleCarried={() => setCarriedExpanded((v) => !v)}
             onReview={() => navigate(reviewDestination(data.attentionItems))}
-          />
+          >
+            <OverdueSection
+              headerless
+              tasks={data.overdueTasks}
+              selectedItemId={selectedItemId}
+              onSelectTask={onSelectItem}
+              onToggleTask={onToggleTask}
+              onToggleWaiting={onToggleWaiting}
+              onPushTask={ctx.onPushTask}
+              onUpdateTask={ctx.onUpdateTask}
+              contactsMap={ctx.contactsMap}
+              projectsMap={ctx.projectsMap}
+              familyMembers={ctx.familyMembers}
+              onAssignTask={ctx.onAssignTask}
+              onAssignTaskAll={ctx.onAssignTaskAll}
+              bulkSelectedIds={overdueSelectedTaskIds}
+              onToggleBulkSelect={(taskId) => toggleBulkSelect(`task-${taskId}`)}
+              followUpTaskId={followUpTaskId}
+              onToggleWithFollowUp={handleToggleTaskWithFollowUp}
+              onFollowUpSubmit={onCreateFollowUp ? handleFollowUpSubmit : undefined}
+              onFollowUpDismiss={handleFollowUpDismiss}
+              panelOpen={panelOpen}
+              onClosePanel={onClosePanel}
+              onDeleteTask={ctx.onDeleteTask}
+              suggestionsForTask={proactive.suggestionsForEntity}
+              onActSuggestion={proactive.actOnSuggestion}
+              onDismissSuggestion={proactive.dismissSuggestion}
+              onOpenGuidedChat={onOpenGuidedChat}
+            />
+          </TodayBacklogFooter>
         )}
       </div>
 

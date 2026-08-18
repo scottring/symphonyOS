@@ -36,6 +36,12 @@ interface OverdueSectionProps {
   panelOpen?: boolean
   onClosePanel?: () => void
   onDeleteTask?: (taskId: string) => void
+  /**
+   * List-only mode for the backlog footer (2026-08-18): the parent renders the
+   * "N carried over" line and owns expansion, so this skips the collapsed
+   * strip and the section heading and renders just the task rows.
+   */
+  headerless?: boolean
   // Proactive suggestions
   suggestionsForTask?: (entityType: SuggestionEntityType, entityId: string) => ProactiveSuggestion[]
   onActSuggestion?: (suggestionId: string, detail?: string, outcome?: string) => void
@@ -68,6 +74,7 @@ export function OverdueSection({
   onActSuggestion,
   onDismissSuggestion,
   onOpenGuidedChat,
+  headerless = false,
 }: OverdueSectionProps) {
   const isMobile = useMobile()
   const [expanded, setExpanded] = useState(false)
@@ -124,7 +131,8 @@ export function OverdueSection({
 
   // Collapsed by default: carried-over items are obligations to review, not
   // the day's headline — one calm line keeps the timeline above the fold.
-  if (!expanded) {
+  // (Headerless mode: the footer owns that line, so go straight to the list.)
+  if (!headerless && !expanded) {
     return (
       <div role="region" aria-label="Carried over tasks">
         <button
@@ -153,20 +161,22 @@ export function OverdueSection({
     <div
       role="region"
       aria-label="Carried over tasks"
-      className="mb-10 animate-fade-in-up"
+      className={headerless ? 'animate-fade-in-up' : 'mb-10 animate-fade-in-up'}
     >
       {/* Section header — calm, plain. These are obligations, not emergencies. */}
-      <h3 className="time-group-header mb-4 flex items-center gap-2" style={{ color: 'hsl(220 9% 46%)' }}>
-        Carried over
-        <button
-          type="button"
-          onClick={() => setExpanded(false)}
-          aria-label="Collapse carried over"
-          className="inline-flex items-center text-neutral-400 hover:text-neutral-600 transition-colors"
-        >
-          <ChevronUp className="w-3.5 h-3.5" />
-        </button>
-      </h3>
+      {!headerless && (
+        <h3 className="time-group-header mb-4 flex items-center gap-2" style={{ color: 'hsl(220 9% 46%)' }}>
+          Carried over
+          <button
+            type="button"
+            onClick={() => setExpanded(false)}
+            aria-label="Collapse carried over"
+            className="inline-flex items-center text-neutral-400 hover:text-neutral-600 transition-colors"
+          >
+            <ChevronUp className="w-3.5 h-3.5" />
+          </button>
+        </h3>
+      )}
 
       <div className="timeline-group timeline-group--tight stagger-in">
         {sortedTasks.map((task, index) => {

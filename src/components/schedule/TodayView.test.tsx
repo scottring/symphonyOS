@@ -159,7 +159,7 @@ describe('TodayView', () => {
     )
   })
 
-  it('renders the rich OverdueSection (its own header) for overdue tasks', () => {
+  it('carried-over tasks live in the backlog footer: one line, expanding to the list', () => {
     // Build a past date 2 days before actual today so computeIsToday + selectOverdue both fire
     const past = new Date(TODAY)
     past.setDate(past.getDate() - 2)
@@ -177,12 +177,13 @@ describe('TodayView', () => {
         },
       ],
     } as never)
-    // OverdueSection renders a role="region" aria-label="Carried over tasks" wrapper,
-    // collapsed by default to a single calm line (count + first title).
-    expect(screen.getByRole('region', { name: /carried over tasks/i })).toBeInTheDocument()
+    // The footer line carries the count; the list itself stays off the page
+    // until asked for — backlog frames the day from the bottom, not the top.
     expect(screen.getByText(/1 carried over/i)).toBeInTheDocument()
-    // Expanding reveals the full rows
+    expect(screen.queryByText('Overdue task title')).not.toBeInTheDocument()
+    // Expanding reveals the full rows (headerless OverdueSection).
     fireEvent.click(screen.getByText(/1 carried over/i))
+    expect(screen.getByRole('region', { name: /carried over tasks/i })).toBeInTheDocument()
     expect(screen.getByText('Overdue task title')).toBeInTheDocument()
   })
 
@@ -208,13 +209,9 @@ describe('TodayView', () => {
       } as never,
       { onToggleWaiting },
     )
-    // CarriedOver (overdue) section renders with its aria-label region,
-    // collapsed by default — expand it to reach the wired rows.
-    expect(screen.getByRole('region', { name: /carried over tasks/i })).toBeInTheDocument()
+    // The footer line owns the count; expand it to reach the wired rows.
     fireEvent.click(screen.getByText(/1 carried over/i))
     expect(screen.getByText('Wired overdue task')).toBeInTheDocument()
-    // The "Carried over" h3 heading is present — rendered by OverdueSection
-    expect(screen.getByText('Carried over')).toBeInTheDocument()
     // onToggleWaiting was passed into context — ScheduleItem renders a waiting toggle
     // when onToggleWaiting is provided; verify it's reachable (no prop-threading crash)
     expect(screen.getByRole('region', { name: /carried over tasks/i })).toBeInTheDocument()
@@ -299,81 +296,63 @@ describe('TodayView', () => {
     expect(screen.getByLabelText(/clarity/i)).toBeInTheDocument()
   })
 
-  describe('Up Next hero', () => {
-    it('lifts the next incomplete timed item into the hero card (no duplicate row)', () => {
-      const heroTime = new Date()
-      heroTime.setMinutes(heroTime.getMinutes() - 30) // within the 2h grace window
-      if (heroTime.getDate() !== new Date().getDate()) {
+  describe('Up next (in place)', () => {
+    it('highlights the next incomplete timed item in its row — no hero card, no duplicate', () => {
+      const nextTime = new Date()
+      nextTime.setMinutes(nextTime.getMinutes() - 30) // within the 2h grace window
+      if (nextTime.getDate() !== new Date().getDate()) {
         // Test ran within 30 min of midnight — use an upcoming slot instead.
-        heroTime.setMinutes(heroTime.getMinutes() + 60)
+        nextTime.setMinutes(nextTime.getMinutes() + 60)
       }
       renderView({
         tasks: [
           {
-            id: 'hero-task',
+            id: 'next-task',
             title: 'Call the pediatrician',
             completed: false,
             createdAt: TODAY,
             updatedAt: TODAY,
             bucket: 'timed' as const,
-            scheduledFor: heroTime,
+            scheduledFor: nextTime,
           },
         ],
       } as never)
 
-      const hero = screen.getByTestId('up-next-hero')
-      expect(hero).toHaveTextContent('Call the pediatrician')
-      expect(hero).toHaveTextContent(/since|starts in|starting now/i)
-      // Completion uses the app's check circle, the same gesture every
-      // timeline row carries — not a hero-only "Done" pill.
-      expect(within(hero).getByLabelText(/mark complete/i)).toBeInTheDocument()
-      expect(screen.queryByRole('button', { name: /^done$/i })).not.toBeInTheDocument()
-      // The hero item is lifted OUT of its day section — it must not render twice
+      // The commitment stays IN the timeline; the marker line above the row
+      // is the entire treatment. Lifting it into a hero card left its home
+      // section rendering an empty "· up next" heading.
+      expect(screen.queryByTestId('up-next-hero')).toBeNull()
+      const marker = screen.getByTestId('up-next-marker')
+      expect(marker).toHaveTextContent(/up next/i)
+      expect(marker).toHaveTextContent(/since|starts in|starting now/i)
+      // Exactly one rendering of the item — nothing lifted, nothing doubled.
       expect(screen.getAllByText('Call the pediatrician')).toHaveLength(1)
     })
 
-    it('renders no hero when nothing qualifies', () => {
+    it('renders no marker when nothing qualifies', () => {
       renderView()
-      expect(screen.queryByTestId('up-next-hero')).toBeNull()
+      expect(screen.queryByTestId('up-next-marker')).toBeNull()
     })
 
-    it('hero task has a one-tap Reschedule — triaging out of Up Next must not require the panel', async () => {
-      const onPushTask = vi.fn()
-      const heroTime = new Date()
-      heroTime.setMinutes(heroTime.getMinutes() - 30)
-      if (heroTime.getDate() !== new Date().getDate()) {
-        heroTime.setMinutes(heroTime.getMinutes() + 60)
-      }
-      const { user } = renderView(
-        {
-          tasks: [
-            {
-              id: 'hero-task',
-              title: 'Call the pediatrician',
-              completed: false,
-              createdAt: TODAY,
-              updatedAt: TODAY,
-              bucket: 'timed' as const,
-              scheduledFor: heroTime,
-            },
-          ],
-        } as never,
-        { onPushTask },
-      )
-      await user.click(screen.getByRole('button', { name: /reschedule/i }))
-      await user.click(screen.getByRole('menuitem', { name: /tomorrow/i }))
-      expect(onPushTask).toHaveBeenCalledWith('hero-task', expect.any(Date))
-    })
+    // One-tap Reschedule on the up-next row needs no test here: the row is an
+    // ordinary ScheduleItem, whose desktop rail carries RescheduleButton
+    // (RowActionRail.test.tsx "holds Reschedule for an open task") and whose
+    // apply path is pinned by RescheduleButton.test.tsx. The hero used to need
+    // its own copy because it was a separate component; there is no separate
+    // component anymore — that is the point.
   })
 
-  it('renders the Morning section header once when items remain after the hero is lifted', () => {
-    // Create a task scheduled for the morning (8am) so the Morning section
-    // actually renders.
+  it('renders the flat agenda: no period headings, every timed item in one list', () => {
+    // Two items in different periods (8am / 2pm). The old layout wrapped each
+    // in an EARLY MORNING/MORNING/AFTERNOON band with a heading, count and
+    // chevron — more heading than content on a sparse day. The flat agenda
+    // renders the rows; times on the rows say when things are. The band
+    // structure survives underneath as drag targets only (headers reappear
+    // as labels while a drag is live — covered by the drop-zone machinery).
     const morningTime = new Date(TODAY)
     morningTime.setHours(8, 0, 0)
-
-    const morningTimeLater = new Date(morningTime)
-    morningTimeLater.setMinutes(5)
+    const afternoonTime = new Date(TODAY)
+    afternoonTime.setHours(14, 0, 0)
 
     renderView({
       tasks: [
@@ -386,44 +365,36 @@ describe('TodayView', () => {
           bucket: 'timed' as const,
           scheduledFor: morningTime,
         },
-        // Two morning tasks: whichever the Up Next hero lifts, the other keeps
-        // the Morning section header rendered.
         {
-          id: 'morning-task-2',
-          title: 'Second morning task',
+          id: 'afternoon-task',
+          title: 'Afternoon task',
           completed: false,
           createdAt: TODAY,
           updatedAt: TODAY,
           bucket: 'timed' as const,
-          scheduledFor: morningTimeLater,
+          scheduledFor: afternoonTime,
         },
       ],
     } as never)
 
-    // Task 6 lifted the header into DaySectionHeader — a single element
-    // rendered once, replacing the old desktop `<h3 className="hidden
-    // md:flex">` / mobile `<h3 className="md:hidden">` italic-serif pair
-    // that jsdom rendered both halves of. DaySectionHeader's own responsive
-    // and typography treatment is covered by DaySectionHeader.test.tsx.
-    expect(screen.getByText('Morning')).toBeInTheDocument()
+    expect(screen.getByText('Morning task')).toBeInTheDocument()
+    expect(screen.getByText('Afternoon task')).toBeInTheDocument()
+    expect(screen.queryByText('Morning')).not.toBeInTheDocument()
+    expect(screen.queryByText('Afternoon')).not.toBeInTheDocument()
   })
 
-  it('an auto-collapsed all-complete section opens on click and stays open, then closes again on the next click', async () => {
-    // Regression test for a collapse-state bug: `toggleSection` used to flip
-    // `collapsedKeys` and `openedByUser` together on every click. Because a
-    // never-touched, all-complete section starts with both sets false, and
-    // the two sets were always mutated in lockstep, the one combination that
-    // should render it OPEN (`collapsedKeys` false AND `openedByUser` true)
-    // was unreachable — the chevron and aria-expanded flipped, but the body
-    // never rendered. This test clicks through open -> closed and would have
-    // failed against that logic (verified below via reasoning, see the task
-    // report for the full trace).
+  it('completed timed items render in the flat list — no collapsed section hides them', () => {
+    // Timed sections used to auto-collapse when everything in them was done,
+    // hiding the row behind a header. The flat agenda has no headers to
+    // collapse behind: a done item renders checked, in place. (The
+    // fold/unfold machinery still runs the Anytime slab, whose collapsed
+    // summary row is covered by AnytimeRow.test.tsx.)
     localStorage.clear()
 
     const afternoonTime = new Date(TODAY)
     afternoonTime.setHours(14, 0, 0, 0)
 
-    const { user } = renderView({
+    renderView({
       tasks: [
         {
           id: 'afternoon-done',
@@ -437,20 +408,8 @@ describe('TodayView', () => {
       ],
     } as never)
 
-    // Auto-collapsed on first render: header exists, row does not.
-    const header = () => screen.getByRole('button', { name: /afternoon/i })
-    expect(header()).toHaveAttribute('aria-expanded', 'false')
-    expect(screen.queryByText('Afternoon task, already done')).not.toBeInTheDocument()
-
-    // Click opens it — this is the state the old lockstep toggle could never reach.
-    await user.click(header())
-    expect(header()).toHaveAttribute('aria-expanded', 'true')
     expect(screen.getByText('Afternoon task, already done')).toBeInTheDocument()
-
-    // Click again closes it.
-    await user.click(header())
-    expect(header()).toHaveAttribute('aria-expanded', 'false')
-    expect(screen.queryByText('Afternoon task, already done')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /afternoon/i })).not.toBeInTheDocument()
 
     localStorage.clear()
   })
@@ -540,7 +499,7 @@ describe('TodayView attention line', () => {
     const back = window.location.pathname + window.location.search
     try {
       renderView({ viewedDate: TODAY, tasks: [mk('s', 'slipped thing', 200)] } as never)
-      fireEvent.click(screen.getByText(/1 needs attention/))
+      fireEvent.click(screen.getByRole('button', { name: 'Review' }))
       expect(window.location.pathname).toBe('/week')
       expect(window.location.search).toBe('')
       expect(screen.queryByRole('region', { name: /needs attention review/i })).toBeNull()
