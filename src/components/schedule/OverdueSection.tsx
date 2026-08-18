@@ -1,5 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useReducer, useState } from 'react'
 import { CornerUpLeft, ChevronDown, ChevronUp } from 'lucide-react'
+import { ToBuyNudge } from './ToBuyNudge'
+import { isBuyish, isToBuyNudgeDismissed, dismissToBuyNudge } from '@/lib/lists/toBuy'
 import type { Task } from '@/types/task'
 import type { Contact } from '@/types/contact'
 import type { Project } from '@/types/project'
@@ -42,6 +44,8 @@ interface OverdueSectionProps {
    * strip and the section heading and renders just the task rows.
    */
   headerless?: boolean
+  /** Convert a buy-ish task to a "To buy" list item (the host owns the undo toast). */
+  onSendToBuy?: (taskId: string) => void
   // Proactive suggestions
   suggestionsForTask?: (entityType: SuggestionEntityType, entityId: string) => ProactiveSuggestion[]
   onActSuggestion?: (suggestionId: string, detail?: string, outcome?: string) => void
@@ -75,9 +79,14 @@ export function OverdueSection({
   onDismissSuggestion,
   onOpenGuidedChat,
   headerless = false,
+  onSendToBuy,
 }: OverdueSectionProps) {
   const isMobile = useMobile()
   const [expanded, setExpanded] = useState(false)
+
+  // Dismissing a To buy nudge writes localStorage, which React can't see —
+  // this tick exists purely to re-render so the dismissed nudge disappears.
+  const [, bumpToBuyDismissals] = useReducer((x: number) => x + 1, 0)
 
   // Sort: incomplete first (oldest at top), then completed at bottom — and then
   // pull every child up to sit directly beneath its own parent.
@@ -237,6 +246,12 @@ export function OverdueSection({
                     projectName={projectName || undefined}
                   />
                 )}
+                {onSendToBuy && !task.completed && isBuyish(task.title) && !isToBuyNudgeDismissed(taskId) && (
+                  <ToBuyNudge
+                    onSend={() => onSendToBuy(taskId)}
+                    onDismiss={() => { dismissToBuyNudge(taskId); bumpToBuyDismissals() }}
+                  />
+                )}
               </div>
             )
           }
@@ -302,6 +317,12 @@ export function OverdueSection({
                   onSubmit={(title) => onFollowUpSubmit(title, taskId)}
                   onDismiss={onFollowUpDismiss}
                   projectName={projectName || undefined}
+                />
+              )}
+              {onSendToBuy && !task.completed && isBuyish(task.title) && !isToBuyNudgeDismissed(taskId) && (
+                <ToBuyNudge
+                  onSend={() => onSendToBuy(taskId)}
+                  onDismiss={() => { dismissToBuyNudge(taskId); bumpToBuyDismissals() }}
                 />
               )}
             </OverdueCard>

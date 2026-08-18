@@ -1,4 +1,5 @@
-import { createContext, useContext, useState, useMemo, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useState, useMemo, type ReactNode } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useLists } from '@/hooks/useLists'
 import { useListItems } from '@/hooks/useListItems'
 import type { List, ListItem, ListCategory, ListVisibility } from '@/types/list'
@@ -26,6 +27,20 @@ const ListsContext = createContext<ListsContextValue | null>(null)
 
 export function ListsProvider({ children }: { children: ReactNode }) {
   const [selectedListId, setSelectedListId] = useState<string | null>(null)
+
+  // Deep link: /lists?list=<id> selects that list (Today's "To buy · N" line
+  // navigates this way). Reactive, not init-only — this provider mounts once
+  // at the shell and outlives every navigation. One-shot: the param is
+  // stripped after applying so back/refresh don't force the selection.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const listParam = searchParams.get('list')
+  useEffect(() => {
+    if (!listParam) return
+    setSelectedListId(listParam)
+    const next = new URLSearchParams(searchParams)
+    next.delete('list')
+    setSearchParams(next, { replace: true })
+  }, [listParam, searchParams, setSearchParams])
 
   const {
     lists,
@@ -81,4 +96,10 @@ export function useListsContext(): ListsContextValue {
   const ctx = useContext(ListsContext)
   if (!ctx) throw new Error('useListsContext must be used within ListsProvider')
   return ctx
+}
+
+/** For components that render on surfaces which may mount without the provider
+ *  (e.g. TodayView under test): null instead of a throw. */
+export function useListsContextOrNull(): ListsContextValue | null {
+  return useContext(ListsContext)
 }

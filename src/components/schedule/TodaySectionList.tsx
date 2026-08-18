@@ -10,7 +10,7 @@
  * handler props — it is the same context TodayView reads, and threading it
  * through would be a second copy of the same wiring.
  */
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo, useReducer, useState } from 'react'
 import type { Task } from '@/types/task'
 import type { TimelineItem } from '@/types/timeline'
 import type { DaySection } from '@/lib/timeUtils'
@@ -29,6 +29,8 @@ import { EveningMealCard } from './EveningMealCard'
 import { ScheduleItem } from './ScheduleItem'
 import { RoutineCollectionRow } from './RoutineCollectionRow'
 import { ShareToFamilyNudge } from './ShareToFamilyNudge'
+import { ToBuyNudge } from './ToBuyNudge'
+import { isBuyish, isToBuyNudgeDismissed, dismissToBuyNudge } from '@/lib/lists/toBuy'
 import { TodayBandDropZone, TodayGapDropZone } from './TodayDropZones'
 import { TodayDraggableRow } from './TodayDraggableRow'
 import { GroupNameInput } from './GroupNameInput'
@@ -109,6 +111,8 @@ export interface TodaySectionListProps {
   /** Raw task id of a just-created group, rendered as an inline name field. */
   renamingGroupId?: string | null
   onRenameGroupDone?: () => void
+  /** Convert a buy-ish task to a "To buy" list item (the host owns the undo toast). */
+  onSendToBuy?: (taskId: string) => void
 }
 
 export function TodaySectionList({
@@ -140,9 +144,14 @@ export function TodaySectionList({
   isReadOnlyEvent,
   renamingGroupId,
   onRenameGroupDone,
+  onSendToBuy,
 }: TodaySectionListProps) {
   const ctx = useScheduleActionsContext()
   const { dragging } = useTodayDragState()
+
+  // Dismissing a To buy nudge writes localStorage, which React can't see —
+  // this tick exists purely to re-render so the dismissed nudge disappears.
+  const [, bumpToBuyDismissals] = useReducer((x: number) => x + 1, 0)
 
   // Which sections the user has expanded past the cap. Not persisted: a cap is
   // about this reading of the page, not a standing preference.
@@ -557,6 +566,13 @@ export function TodaySectionList({
                         />
                       )
                     })()}
+                    {item.type === 'task' && taskId && onSendToBuy && !item.completed &&
+                      isBuyish(item.title) && !isToBuyNudgeDismissed(taskId) && (
+                      <ToBuyNudge
+                        onSend={() => onSendToBuy(taskId)}
+                        onDismiss={() => { dismissToBuyNudge(taskId); bumpToBuyDismissals() }}
+                      />
+                    )}
                         </>
                       )
                     })()}

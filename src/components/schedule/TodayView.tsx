@@ -61,6 +61,8 @@ import { EndOfDayReview } from './EndOfDayReview'
 import { DayNavCluster } from './DayNavCluster'
 import { OverdueSection } from './OverdueSection'
 import { TodayBacklogFooter } from './TodayBacklogFooter'
+import { ToBuyLine } from './ToBuyLine'
+import { InboxUndoToast } from './InboxUndoToast'
 import { BulkActionToolbar } from './BulkActionToolbar'
 import { TimelineNoteComposer } from './TimelineNoteComposer'
 
@@ -320,6 +322,15 @@ export function TodayView({
     const incomplete = data.overdueTasks.filter((t) => !t.completed).length
     return incomplete || data.overdueTasks.length
   }, [data.overdueTasks])
+
+  // ── "To buy" conversion toast — the page owns it because nudges fire from
+  // deep inside the row tree (sections + carried-over) and the undo must
+  // outlive the row that triggered it (the task is gone the moment it fires).
+  const [toBuyToast, setToBuyToast] = useState<{ message: string; undo: () => Promise<void> } | null>(null)
+  const handleSendToBuy = useCallback(async (taskId: string) => {
+    const result = await ctx.onSendTaskToBuy?.(taskId)
+    if (result) setToBuyToast({ message: `"${result.itemText}" moved to To buy`, undo: result.undo })
+  }, [ctx])
 
   // Which sections the user has folded shut. Persisted; Unscheduled starts
   // collapsed because it holds the untimed-routine slab. A section whose
@@ -942,41 +953,23 @@ export function TodayView({
         </TodayOverflowMenu>
       </div>
 
-      {/* Assistant lines — the unprompted tier, one quiet collapsed line.
-          Above the add input, which is mechanics; see UnpromptedLines.
+      {/* Task list — wrapped in a card on desktop; on mobile the rows go
+          full-width (no card, no border, no inner padding) to match the
+          compact list the pre-redesign mobile had.
 
-          Silenced wholesale by the suggestions preference (Today's ⋯ menu).
-          Only this tier is gated: chips inside an item you opened are answers
-          to a question you asked by opening it. */}
-      {suggestionsEnabled && (
-        <UnpromptedLines
-          items={unprompted.items}
-          onAct={handleUnpromptedAct}
-          onSnooze={unprompted.snooze}
-          decisions={unprompted.decisions}
-          showWhy={showWhyDebug}
-        />
-      )}
-
-      {/* Inline "Add to today" — today-only, when onCreateTask is wired.
-          Desktop: full-width add input. Mobile: same input but flanked by the
-          assignee + show-daily filters on the right, so the whole filter row
-          is folded into this one to save vertical space. */}
-      {data.isToday && (ctx.onCreateTaskParsed ?? ctx.onCreateTask) && (
-        <>
-          {/* Desktop: just the add input */}
-          <div className="hidden md:block mb-4">
-            <TodayAddInput
-              onAdd={ctx.onCreateTaskParsed!}
-              parserContext={ctx.parserContext!}
-              currentDomain={ctx.currentDomain ?? 'universal'}
-              resolver={ctx.resolverContext!}
-              getRecentTaskForContact={ctx.getRecentTaskForContact}
-            />
-          </div>
-          {/* Mobile: combined add + filters */}
-          <div className="md:hidden mb-2 px-3 flex items-center gap-2">
-            <div className="flex-1 min-w-0">
+          The add input and the assistant line live INSIDE the card, at its
+          top: floating between the masthead and the card they read as
+          orphaned chrome and cost a band of empty page ("hanging in mid
+          air" — Scott, 2026-08-18). Anchored here they are part of the day. */}
+      <div ref={listRef} className="md:card md:rounded-2xl md:border md:border-neutral-200/70 md:px-5 md:py-4">
+        {/* Inline "Add to today" — today-only, when onCreateTask is wired.
+            Desktop: full-width add input. Mobile: same input but flanked by the
+            assignee + show-daily filters on the right, so the whole filter row
+            is folded into this one to save vertical space. */}
+        {data.isToday && (ctx.onCreateTaskParsed ?? ctx.onCreateTask) && (
+          <>
+            {/* Desktop: just the add input */}
+            <div className="hidden md:block mb-3">
               <TodayAddInput
                 onAdd={ctx.onCreateTaskParsed!}
                 parserContext={ctx.parserContext!}
@@ -985,32 +978,53 @@ export function TodayView({
                 getRecentTaskForContact={ctx.getRecentTaskForContact}
               />
             </div>
-            {onSelectAssignees && ((assigneesWithTasks?.length ?? 0) > 0 || hasUnassignedTasks) && (
-              <AssigneeFilter
-                selectedAssignees={selectedAssignees ?? []}
-                onSelectAssignees={onSelectAssignees}
-                assigneesWithTasks={assigneesWithTasks ?? []}
-                hasUnassignedTasks={!!hasUnassignedTasks}
-              />
-            )}
-            <button
-              type="button"
-              onClick={toggleHideRoutines}
-              title={hideRoutines ? 'Show daily activities' : 'Hide daily activities'}
-              aria-label={hideRoutines ? 'Show daily activities' : 'Hide daily activities'}
-              aria-pressed={!hideRoutines}
-              className={`shrink-0 p-2 rounded-lg transition-colors ${hideRoutines ? 'text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100' : 'text-primary-600 hover:bg-primary-50'}`}
-            >
-              <Repeat className="w-4 h-4" />
-            </button>
-          </div>
-        </>
-      )}
+            {/* Mobile: combined add + filters */}
+            <div className="md:hidden mb-2 px-3 flex items-center gap-2">
+              <div className="flex-1 min-w-0">
+                <TodayAddInput
+                  onAdd={ctx.onCreateTaskParsed!}
+                  parserContext={ctx.parserContext!}
+                  currentDomain={ctx.currentDomain ?? 'universal'}
+                  resolver={ctx.resolverContext!}
+                  getRecentTaskForContact={ctx.getRecentTaskForContact}
+                />
+              </div>
+              {onSelectAssignees && ((assigneesWithTasks?.length ?? 0) > 0 || hasUnassignedTasks) && (
+                <AssigneeFilter
+                  selectedAssignees={selectedAssignees ?? []}
+                  onSelectAssignees={onSelectAssignees}
+                  assigneesWithTasks={assigneesWithTasks ?? []}
+                  hasUnassignedTasks={!!hasUnassignedTasks}
+                />
+              )}
+              <button
+                type="button"
+                onClick={toggleHideRoutines}
+                title={hideRoutines ? 'Show daily activities' : 'Hide daily activities'}
+                aria-label={hideRoutines ? 'Show daily activities' : 'Hide daily activities'}
+                aria-pressed={!hideRoutines}
+                className={`shrink-0 p-2 rounded-lg transition-colors ${hideRoutines ? 'text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100' : 'text-primary-600 hover:bg-primary-50'}`}
+              >
+                <Repeat className="w-4 h-4" />
+              </button>
+            </div>
+          </>
+        )}
 
-      {/* Task list — wrapped in a card on desktop; on mobile the rows go
-          full-width (no card, no border, no inner padding) to match the
-          compact list the pre-redesign mobile had. */}
-      <div ref={listRef} className="md:card md:rounded-2xl md:border md:border-neutral-200/70 md:px-5 md:py-4">
+        {/* Assistant line — the unprompted tier, one quiet collapsed line.
+            Silenced wholesale by the suggestions preference (Today's ⋯ menu).
+            Only this tier is gated: chips inside an item you opened are answers
+            to a question you asked by opening it. */}
+        {suggestionsEnabled && (
+          <UnpromptedLines
+            items={unprompted.items}
+            onAct={handleUnpromptedAct}
+            onSnooze={unprompted.snooze}
+            decisions={unprompted.decisions}
+            showWhy={showWhyDebug}
+          />
+        )}
+
         {data.counts.totalItems === 0 ? (
           <div className="text-center py-16">
             <p className="font-display text-xl text-neutral-700">
@@ -1068,6 +1082,7 @@ export function TodayView({
               onClosePanel={onClosePanel}
               renamingGroupId={renamingGroupId}
               onRenameGroupDone={() => setRenamingGroupId(null)}
+              onSendToBuy={ctx.onSendTaskToBuy ? handleSendToBuy : undefined}
             />
             </TodayDragProvider>
           </div>
@@ -1088,6 +1103,10 @@ export function TodayView({
             param. The destination is computed rather than fixed: it used to
             always be /week, but only two of the four reasons have a home
             there. See reviewDestination(). */}
+        {/* To buy — one fixed-budget line; the purchases live on the shared
+            native list, not scattered through the timeline. */}
+        {data.isToday && <ToBuyLine />}
+
         {data.isToday && (
           <TodayBacklogFooter
             carriedCount={carriedCount}
@@ -1123,8 +1142,19 @@ export function TodayView({
               onActSuggestion={proactive.actOnSuggestion}
               onDismissSuggestion={proactive.dismissSuggestion}
               onOpenGuidedChat={onOpenGuidedChat}
+              onSendToBuy={ctx.onSendTaskToBuy ? handleSendToBuy : undefined}
             />
           </TodayBacklogFooter>
+        )}
+
+        {/* Undo toast for a To buy conversion — the task was deleted, so this
+            is the only way back for ten seconds. */}
+        {toBuyToast && (
+          <InboxUndoToast
+            message={toBuyToast.message}
+            onUndo={() => { void toBuyToast.undo(); setToBuyToast(null) }}
+            onDismiss={() => setToBuyToast(null)}
+          />
         )}
       </div>
 

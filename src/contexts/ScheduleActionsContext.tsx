@@ -109,6 +109,9 @@ export interface ScheduleActionsValue {
 
   // List actions
   onSendToList?: (taskId: string, listId: string) => void
+  /** Convert a task into a "To buy" list item (task is deleted). Resolves with
+   *  the created item's text and an undo, or null on failure. */
+  onSendTaskToBuy?: (taskId: string) => Promise<{ itemText: string; undo: () => Promise<void> } | null>
   onCreateList?: (title: string, category: ListCategory) => Promise<string | null>
   // links/phoneNumber widen this so convertTaskToProject can carry a task's context onto the new project
   onAddProject?: (project: { name: string; notes?: string; context?: 'work' | 'family' | 'personal'; links?: TaskLink[]; phoneNumber?: string }) => Promise<Project | null>

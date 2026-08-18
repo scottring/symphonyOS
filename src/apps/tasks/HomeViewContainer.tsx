@@ -43,6 +43,8 @@ import { useDomain } from '@/hooks/useDomain';
 import { useCalendarDomainMappings } from '@/hooks/useCalendarDomainMappings';
 import { filterTasksForDomainView, filterRoutinesForDomain, filterEventsForDomain } from '@/lib/today/domainFilter';
 import { useListsContext } from '@/contexts/ListsContext';
+import { supabase, getAuthUser } from '@/lib/supabase';
+import { TO_BUY_LIST_TITLE, findToBuyList, buyItemText, announceToBuyChanged } from '@/lib/lists/toBuy';
 import { useNotesContext } from '@/contexts/NotesContext';
 import { ScheduleActionsProvider, type ScheduleActionsValue } from '@/contexts/ScheduleActionsContext';
 import { withDefaultEventAssignees } from '@/components/home/eventAssigneeDefaults';
@@ -76,7 +78,7 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
   const { members: familyMembers, getCurrentUserMember } = useFamilyMembers();
   const { isHidden: isEventHidden, hideEvent } = useHiddenCalendarEvents();
   const { getDomainForCalendar } = useCalendarDomainMappings();
-  const { lists, listsByCategory } = useListsContext();
+  const { lists, listsByCategory, addList } = useListsContext();
   const { addNote } = useNotesContext();
   const { currentDomain } = useDomain();
   const undo = useUndo();
@@ -529,6 +531,55 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
   // Expand a task into a new project (subtasks absorbed, parent task deleted).
   const handleConvertTaskToProject = useConvertTaskToProject(tasks, { addProject, updateTask, deleteTask });
 
+  // ── "To buy" conversion — task → list item, with undo ──────────────────────
+  // The task is DELETED (an item lives in exactly one place — same semantics as
+  // inbox send-to-calendar), so the undo path is what makes this acceptable:
+  // it removes the created list item and re-inserts the task through addTask,
+  // which keeps optimistic state + the local write bus honest. The list is
+  // created lazily, native and family-shared — never the Apple bridge.
+  const sendTaskToBuy = useCallback(async (taskId: string) => {
+    const task = tasks.find((t) => t.id === taskId);
+    if (!task) return null;
+    let list = findToBuyList(lists)
+      ?? (await addList({ title: TO_BUY_LIST_TITLE, category: 'shopping', visibility: 'family' }))
+      ?? undefined;
+    if (!list) return null;
+    const { data: { user } } = await getAuthUser();
+    if (!user) return null;
+    const { data: maxRows } = await supabase
+      .from('list_items').select('sort_order')
+      .eq('list_id', list.id).order('sort_order', { ascending: false }).limit(1);
+    const nextSort = ((maxRows?.[0]?.sort_order as number | undefined) ?? 0) + 1;
+    const { data: item, error } = await supabase
+      .from('list_items')
+      .insert({
+        user_id: user.id, list_id: list.id, text: buyItemText(task.title),
+        note: task.notes ?? null, sort_order: nextSort,
+      })
+      .select('id, text').single();
+    if (error || !item) return null;
+    await deleteTask(taskId);
+    announceToBuyChanged();
+    const snapshot = task;
+    return {
+      itemText: (item as { text: string }).text,
+      undo: async () => {
+        await supabase.from('list_items').delete().eq('id', (item as { id: string }).id);
+        await addTask(snapshot.title, snapshot.contactId, snapshot.projectId, snapshot.scheduledFor ?? undefined, {
+          context: snapshot.context ?? null,
+          assignedTo: snapshot.assignedTo ?? null,
+          assignedToAll: snapshot.assignedToAll,
+          bucket: snapshot.bucket,
+          weekStart: snapshot.weekStart,
+          isAllDay: snapshot.isAllDay,
+          phoneNumber: snapshot.phoneNumber,
+          email: snapshot.email,
+        });
+        announceToBuyChanged();
+      },
+    };
+  }, [tasks, lists, addList, deleteTask, addTask]);
+
   const scheduleActionsValue = useMemo<ScheduleActionsValue>(
     () => ({
       // Planning
@@ -557,6 +608,7 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
       onUngroup: handleUngroup,
       onReorderTasks: updateTaskOrders,
       onOpenTask: (taskId: string) => setSelection({ kind: 'task', id: taskId }),
+      onSendTaskToBuy: sendTaskToBuy,
       onOpenProject: (projectId: string) => navigate(`/projects/${projectId}`),
 
       // Assignment actions
@@ -611,7 +663,7 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
     [
       toggleTask, toggleWaiting, updateTask, pushTask, deleteTask, onCreateTaskFromValue, onCreateTaskParsed, parserContext, currentDomain, resolverContext, getRecentTaskForContact, onCreateTaskAt, onCreateEventAt, onCreateRoutineAt, handleCreateFollowUp, handleGroupItems, handleAddToGroup, handleRemoveFromGroup, handleUngroup, undo.pushAction, updateTaskOrders,
       setSelection, navigate,
-      scheduleActions, updateRoutine, updateEventContext, updateEventSharedWithFamily, dismissShareNudge, hideEvent, handleDeleteEvent,
+      scheduleActions, updateRoutine, updateEventContext, updateEventSharedWithFamily, dismissShareNudge, hideEvent, handleDeleteEvent, sendTaskToBuy,
       contactsMap, projectsMap, projects, contacts, familyMembers, lists, listsByCategory,
       eventNotesMapWithDefaults, eventContextOverrides,
       addProject, handleConvertTaskToProject, searchContacts, addContact, getDomainForCalendar,
