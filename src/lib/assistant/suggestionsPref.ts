@@ -19,12 +19,16 @@ const STORAGE_KEY = 'symphony.assistant.unprompted'
 /** Changed in this tab — `storage` only fires in OTHER tabs. */
 export const SUGGESTIONS_PREF_EVENT = 'symphony:assistant-unprompted-changed'
 
-/** On by default: a feature nobody has opted out of should still work. */
+/** OFF by default (2026-08-18): the unprompted tier is opt-in per device.
+ *  It used to default on, and on a sparse day the assistant's reasoning
+ *  paragraph out-shouted the schedule. The ⋯ menu's "Show suggestions · N"
+ *  toggle is the single control and carries the count, so the tier stays
+ *  discoverable without spending page space uninvited. */
 export function readSuggestionsEnabled(): boolean {
   try {
-    return localStorage.getItem(STORAGE_KEY) !== 'off'
+    return localStorage.getItem(STORAGE_KEY) === 'on'
   } catch {
-    return true
+    return false
   }
 }
 

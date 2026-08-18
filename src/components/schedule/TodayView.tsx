@@ -886,21 +886,26 @@ export function TodayView({
             {createElement(hideRoutines ? EyeOff : Eye, { className: 'w-5 h-5' })}
             <span>{hideRoutines ? 'Show daily' : 'Hide daily'}</span>
           </button>
-          {/* Silences the unprompted tier only — the assistant pane and the
-              chips inside an item you opened still work. Lives here, next to
-              "Hide daily", because both answer the same question: how much is
-              this page allowed to put in front of me. */}
+          {/* The unprompted tier's ONE control (2026-08-18): shows the pending
+              count, toggles the suggestions onto/off the page. Off by default —
+              the tier is opt-in. Only this tier is gated: the assistant pane
+              and the chips inside an item you opened still work. Lives here,
+              next to "Hide daily", because both answer the same question: how
+              much is this page allowed to put in front of me. */}
           <button
             type="button"
             onClick={() => setSuggestionsEnabled(!suggestionsEnabled)}
             title={suggestionsEnabled
               ? 'Stop the assistant suggesting things on this page'
-              : 'Let the assistant suggest things on this page again'}
-            aria-pressed={!suggestionsEnabled}
+              : 'Show what the assistant would suggest for this page'}
+            aria-pressed={suggestionsEnabled}
             className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[15px] text-neutral-600 transition-all hover:bg-neutral-100"
           >
             <Sparkles className={`w-5 h-5 ${suggestionsEnabled ? '' : 'opacity-40'}`} />
-            <span>{suggestionsEnabled ? 'Hide suggestions' : 'Show suggestions'}</span>
+            <span>
+              {suggestionsEnabled ? 'Hide suggestions' : 'Show suggestions'}
+              {unprompted.items.length > 0 && ` · ${unprompted.items.length}`}
+            </span>
           </button>
           {data.isToday && ctx.onOpenPlanning && (
             <button
@@ -962,59 +967,11 @@ export function TodayView({
           orphaned chrome and cost a band of empty page ("hanging in mid
           air" — Scott, 2026-08-18). Anchored here they are part of the day. */}
       <div ref={listRef} className="md:card md:rounded-2xl md:border md:border-neutral-200/70 md:px-5 md:py-4">
-        {/* Inline "Add to today" — today-only, when onCreateTask is wired.
-            Desktop: full-width add input. Mobile: same input but flanked by the
-            assignee + show-daily filters on the right, so the whole filter row
-            is folded into this one to save vertical space. */}
-        {data.isToday && (ctx.onCreateTaskParsed ?? ctx.onCreateTask) && (
-          <>
-            {/* Desktop: just the add input */}
-            <div className="hidden md:block mb-3">
-              <TodayAddInput
-                onAdd={ctx.onCreateTaskParsed!}
-                parserContext={ctx.parserContext!}
-                currentDomain={ctx.currentDomain ?? 'universal'}
-                resolver={ctx.resolverContext!}
-                getRecentTaskForContact={ctx.getRecentTaskForContact}
-              />
-            </div>
-            {/* Mobile: combined add + filters */}
-            <div className="md:hidden mb-2 px-3 flex items-center gap-2">
-              <div className="flex-1 min-w-0">
-                <TodayAddInput
-                  onAdd={ctx.onCreateTaskParsed!}
-                  parserContext={ctx.parserContext!}
-                  currentDomain={ctx.currentDomain ?? 'universal'}
-                  resolver={ctx.resolverContext!}
-                  getRecentTaskForContact={ctx.getRecentTaskForContact}
-                />
-              </div>
-              {onSelectAssignees && ((assigneesWithTasks?.length ?? 0) > 0 || hasUnassignedTasks) && (
-                <AssigneeFilter
-                  selectedAssignees={selectedAssignees ?? []}
-                  onSelectAssignees={onSelectAssignees}
-                  assigneesWithTasks={assigneesWithTasks ?? []}
-                  hasUnassignedTasks={!!hasUnassignedTasks}
-                />
-              )}
-              <button
-                type="button"
-                onClick={toggleHideRoutines}
-                title={hideRoutines ? 'Show daily activities' : 'Hide daily activities'}
-                aria-label={hideRoutines ? 'Show daily activities' : 'Hide daily activities'}
-                aria-pressed={!hideRoutines}
-                className={`shrink-0 p-2 rounded-lg transition-colors ${hideRoutines ? 'text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100' : 'text-primary-600 hover:bg-primary-50'}`}
-              >
-                <Repeat className="w-4 h-4" />
-              </button>
-            </div>
-          </>
-        )}
-
-        {/* Assistant line — the unprompted tier, one quiet collapsed line.
-            Silenced wholesale by the suggestions preference (Today's ⋯ menu).
-            Only this tier is gated: chips inside an item you opened are answers
-            to a question you asked by opening it. */}
+        {/* Assistant lines — the unprompted tier, rendered ONLY when the ⋯
+            menu's "Show suggestions" toggle is on (off by default; the menu
+            entry carries the pending count). Only this tier is gated: chips
+            inside an item you opened are answers to a question you asked by
+            opening it. */}
         {suggestionsEnabled && (
           <UnpromptedLines
             items={unprompted.items}
@@ -1103,6 +1060,57 @@ export function TodayView({
             param. The destination is computed rather than fixed: it used to
             always be /week, but only two of the four reasons have a home
             there. See reviewDestination(). */}
+        {/* Inline "Add to today" — BELOW the day's content (you add after
+            you've seen the day), above the meta lines. Today-only, when
+            onCreateTask is wired. Desktop: full-width add input. Mobile: same
+            input but flanked by the assignee + show-daily filters on the
+            right, so the whole filter row is folded into this one to save
+            vertical space. */}
+        {data.isToday && (ctx.onCreateTaskParsed ?? ctx.onCreateTask) && (
+          <>
+            {/* Desktop: just the add input */}
+            <div className="hidden md:block mt-3">
+              <TodayAddInput
+                onAdd={ctx.onCreateTaskParsed!}
+                parserContext={ctx.parserContext!}
+                currentDomain={ctx.currentDomain ?? 'universal'}
+                resolver={ctx.resolverContext!}
+                getRecentTaskForContact={ctx.getRecentTaskForContact}
+              />
+            </div>
+            {/* Mobile: combined add + filters */}
+            <div className="md:hidden mt-2 px-3 flex items-center gap-2">
+              <div className="flex-1 min-w-0">
+                <TodayAddInput
+                  onAdd={ctx.onCreateTaskParsed!}
+                  parserContext={ctx.parserContext!}
+                  currentDomain={ctx.currentDomain ?? 'universal'}
+                  resolver={ctx.resolverContext!}
+                  getRecentTaskForContact={ctx.getRecentTaskForContact}
+                />
+              </div>
+              {onSelectAssignees && ((assigneesWithTasks?.length ?? 0) > 0 || hasUnassignedTasks) && (
+                <AssigneeFilter
+                  selectedAssignees={selectedAssignees ?? []}
+                  onSelectAssignees={onSelectAssignees}
+                  assigneesWithTasks={assigneesWithTasks ?? []}
+                  hasUnassignedTasks={!!hasUnassignedTasks}
+                />
+              )}
+              <button
+                type="button"
+                onClick={toggleHideRoutines}
+                title={hideRoutines ? 'Show daily activities' : 'Hide daily activities'}
+                aria-label={hideRoutines ? 'Show daily activities' : 'Hide daily activities'}
+                aria-pressed={!hideRoutines}
+                className={`shrink-0 p-2 rounded-lg transition-colors ${hideRoutines ? 'text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100' : 'text-primary-600 hover:bg-primary-50'}`}
+              >
+                <Repeat className="w-4 h-4" />
+              </button>
+            </div>
+          </>
+        )}
+
         {/* To buy — one fixed-budget line; the purchases live on the shared
             native list, not scattered through the timeline. */}
         {data.isToday && <ToBuyLine />}

@@ -6,8 +6,8 @@ import {
 beforeEach(() => localStorage.clear())
 
 describe('suggestions preference', () => {
-  it('is on until turned off — a feature nobody opted out of still works', () => {
-    expect(readSuggestionsEnabled()).toBe(true)
+  it('is OFF until turned on — the unprompted tier is opt-in per device (2026-08-18)', () => {
+    expect(readSuggestionsEnabled()).toBe(false)
   })
 
   it('persists off, and back on', () => {
@@ -28,13 +28,13 @@ describe('suggestions preference', () => {
     expect(heard).toBe(1)
   })
 
-  it('treats an unreadable store as on rather than silently muting', () => {
+  it('treats an unreadable store as OFF — the quiet default, matching opt-in', () => {
     const original = Object.getOwnPropertyDescriptor(window, 'localStorage')!
     Object.defineProperty(window, 'localStorage', {
       configurable: true,
       get() { throw new Error('blocked') },
     })
-    expect(readSuggestionsEnabled()).toBe(true)
+    expect(readSuggestionsEnabled()).toBe(false)
     Object.defineProperty(window, 'localStorage', original)
   })
 })
