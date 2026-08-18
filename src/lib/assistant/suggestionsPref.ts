@@ -14,7 +14,11 @@ import { useEffect, useState } from 'react'
  * per-device preference about how much the app is allowed to talk to you, and
  * the phone and the wall want different answers.
  */
-const STORAGE_KEY = 'symphony.assistant.unprompted'
+// v2 (2026-08-18): key ROTATED when the default flipped to off. Devices that
+// had toggled the old key to 'on' under the on-by-default regime were opted in
+// by inertia, not intent — rotating the key makes hidden-by-default universal;
+// anyone who wants the tier re-enables it once from the ⋯ menu.
+const STORAGE_KEY = 'symphony.assistant.unprompted.v2'
 
 /** Changed in this tab — `storage` only fires in OTHER tabs. */
 export const SUGGESTIONS_PREF_EVENT = 'symphony:assistant-unprompted-changed'

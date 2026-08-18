@@ -51,13 +51,12 @@ import { ClarityCurtain } from '@/components/clarity/ClarityCurtain'
 import { computeClaritySteps, type ClarityStepId } from '@/lib/clarity/claritySteps'
 import { selectOverdue } from '@/lib/today/taskPools'
 import { selectHorizonPool } from '@/lib/today/horizons'
-import { reviewDestination } from '@/lib/today/attention'
 import { useSuggestionsEnabled } from '@/lib/assistant/suggestionsPref'
 import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
 import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
 import { getRoutinesForDatePure } from '@/lib/routineUtils'
 import { TodayOverflowMenu } from './TodayOverflowMenu'
-import { EndOfDayReview } from './EndOfDayReview'
+import { ReviewDrawer, type ReviewMode } from './ReviewDrawer'
 import { DayNavCluster } from './DayNavCluster'
 import { OverdueSection } from './OverdueSection'
 import { TodayBacklogFooter } from './TodayBacklogFooter'
@@ -169,7 +168,9 @@ export function TodayView({
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(() => new Set())
   // Raw task id of a group created by drag, held open on its name field.
   const [renamingGroupId, setRenamingGroupId] = useState<string | null>(null)
-  const [eodReviewOpen, setEodReviewOpen] = useState(false)
+  // Review drawer — one body, two entries: the backlog footer's "Review"
+  // opens the morning flavor; the ⋯ menu's "End of day review" the evening.
+  const [reviewMode, setReviewMode] = useState<ReviewMode | null>(null)
   const clearBulkSelection = useCallback(() => setSelectedKeys(new Set()), [])
   const toggleBulkSelect = useCallback((key: string) => {
     setSelectedKeys((prev) => {
@@ -930,7 +931,7 @@ export function TodayView({
           {data.isToday && (
             <button
               type="button"
-              onClick={() => setEodReviewOpen(true)}
+              onClick={() => setReviewMode('evening')}
               title="Reflect, prep for tomorrow, and close the day"
               className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[15px] text-neutral-600 transition-all hover:bg-neutral-100"
             >
@@ -1054,12 +1055,11 @@ export function TodayView({
             renders in BOTH branches whenever either set is non-empty.
 
             Carried-over expands its list inline (those tasks have no other
-            home); the attention segment is awareness only — the affordance to
-            act on that set lives on the horizon rungs, which already draw
-            these units, so Review is a plain navigate with no `?review=`
-            param. The destination is computed rather than fixed: it used to
-            always be /week, but only two of the four reasons have a home
-            there. See reviewDestination(). */}
+            home); Review opens the morning Review drawer — Scott asked for
+            ACTIVE management of this set from Today (2026-08-18), so the
+            passive navigate-to-/week gave way to a bounded triage ritual.
+            The page itself still spends only this one line: the drawer is a
+            modal you summon, not furniture. */}
         {/* Inline "Add to today" — BELOW the day's content (you add after
             you've seen the day), above the meta lines. Today-only, when
             onCreateTask is wired. Desktop: full-width add input. Mobile: same
@@ -1121,7 +1121,7 @@ export function TodayView({
             attentionItems={data.attentionItems}
             carriedExpanded={carriedExpanded}
             onToggleCarried={() => setCarriedExpanded((v) => !v)}
-            onReview={() => navigate(reviewDestination(data.attentionItems))}
+            onReview={() => setReviewMode('morning')}
           >
             <OverdueSection
               headerless
@@ -1166,14 +1166,21 @@ export function TodayView({
         )}
       </div>
 
-      {/* End of day review lives in the overflow menu now. It was a permanent
-          full-width card advertising a feature you use once a day at most. */}
-      <EndOfDayReview
-        isOpen={eodReviewOpen}
-        onClose={() => setEodReviewOpen(false)}
+      {/* Review drawer — evening from the ⋯ menu, morning from the backlog
+          footer's Review. Triage verdicts write through the same handlers the
+          page rows use. */}
+      <ReviewDrawer
+        isOpen={reviewMode !== null}
+        mode={reviewMode ?? 'evening'}
+        onClose={() => setReviewMode(null)}
         tasks={tasks}
+        attentionItems={data.attentionItems}
+        overdueTasks={data.overdueTasks}
         viewedDate={viewedDate}
+        currentWeekStart={currentWeekStart}
         onUpdateTask={(id, u) => onUpdateTask?.(id, u)}
+        onPushTask={ctx.onPushTask}
+        onDeleteTask={ctx.onDeleteTask}
       />
 
       {/* Clarity curtain — pulled down by the binoculars in the header. */}

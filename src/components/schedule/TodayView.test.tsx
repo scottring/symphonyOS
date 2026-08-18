@@ -489,21 +489,19 @@ describe('TodayView attention line', () => {
     expect(screen.getByText(/1 needs attention/)).toBeInTheDocument()
   })
 
-  it('sends Review to /week instead of opening a list on Today', () => {
-    // The review LIST is planning work and lives on /week, in PlanningShelf's
-    // carried-over pills — a surface that already existed. Today keeps the
-    // one-line signal and nothing else: no list may open here, or the
-    // commitment surface grows a triage surface again — the fusion this
-    // whole branch exists to undo. Plain navigate, no `?review=` param: the
-    // shelf shows this work unconditionally, it needs no seeding.
+  it('Review opens the morning Review drawer with the slipped item triageable', () => {
+    // Active management from Today (Scott, 2026-08-18): Review summons a
+    // bounded triage ritual as a MODAL — the page itself still spends one
+    // line, so the commitment-surface invariant holds. No navigation.
     const back = window.location.pathname + window.location.search
     try {
       renderView({ viewedDate: TODAY, tasks: [mk('s', 'slipped thing', 200)] } as never)
       fireEvent.click(screen.getByRole('button', { name: 'Review' }))
-      expect(window.location.pathname).toBe('/week')
-      expect(window.location.search).toBe('')
-      expect(screen.queryByRole('region', { name: /needs attention review/i })).toBeNull()
-      expect(screen.queryByText('slipped thing')).toBeNull()
+      expect(window.location.pathname).toBe(back.split('?')[0])
+      expect(screen.getByRole('dialog', { name: /start the day/i })).toBeInTheDocument()
+      // The slipped item appears INSIDE the drawer, with a fate on offer.
+      expect(screen.getByText('slipped thing')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Someday' })).toBeInTheDocument()
     } finally {
       window.history.replaceState({}, '', back)
     }
