@@ -22,6 +22,15 @@ export interface ScheduleActionsValue {
   onDeleteTask?: (id: string) => void
   /** Mark or clear "needed today". Pass null to clear. */
   onSetNeededToday?: (taskId: string, neededOn: Date | null) => void
+  /**
+   * The day Today is currently showing (drives date nav). "Needed today" is
+   * defined relative to THIS day, not the real calendar day — a mark expires
+   * by ceasing to match it (see src/lib/today/neededToday.ts). Consumers that
+   * check `neededOn` (the chip, the ⋯ menu) must compare against this, not
+   * `new Date()`, or they'll disagree with the note when browsing a past/future
+   * day.
+   */
+  viewedDate?: Date
   onCreateTask?: (title: string) => void
   onGroupTasks?: (
     taskIds: string[],

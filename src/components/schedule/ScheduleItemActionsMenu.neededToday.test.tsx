@@ -19,14 +19,17 @@ function taskItem(overrides: Partial<TimelineItem> & { id: string }): TimelineIt
 function renderMenu({
   item,
   onSetNeededToday,
+  viewedDate,
 }: {
   item: TimelineItem
   onSetNeededToday: (taskId: string, neededOn: Date | null) => void
+  viewedDate?: Date
 }) {
   const value = {
     onToggleTask: vi.fn(),
     projects: [], contacts: [], familyMembers: [], lists: [],
     onSetNeededToday,
+    viewedDate,
   } as unknown as ScheduleActionsValue
   render(
     <ScheduleActionsProvider value={value}>
@@ -46,9 +49,24 @@ describe('ScheduleItemActionsMenu — needed today', () => {
 
   it('offers to clear it when already marked', () => {
     const onSetNeededToday = vi.fn()
-    renderMenu({ item: taskItem({ id: 'a', neededOn: new Date() }), onSetNeededToday })
+    const today = new Date()
+    renderMenu({ item: taskItem({ id: 'a', neededOn: today }), onSetNeededToday, viewedDate: today })
     fireEvent.click(screen.getByLabelText('Item actions'))
     fireEvent.click(screen.getByText('Not needed today'))
     expect(onSetNeededToday).toHaveBeenCalledWith('a', null)
+  })
+
+  // A mark expires by ceasing to match the viewed day (see src/lib/today/neededToday.ts) —
+  // nothing ever clears the `neededOn` column. A stale mark from a different day must
+  // read as unmarked here too, or re-marking for today takes two clicks instead of one.
+  it('offers "Need today" (not "Not needed today") for a task marked on a DIFFERENT day', () => {
+    const onSetNeededToday = vi.fn()
+    const yesterday = new Date(2026, 7, 18)
+    const viewedDate = new Date(2026, 7, 19)
+    renderMenu({ item: taskItem({ id: 'a', neededOn: yesterday }), onSetNeededToday, viewedDate })
+    fireEvent.click(screen.getByLabelText('Item actions'))
+    expect(screen.queryByText('Not needed today')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByText('Need today'))
+    expect(onSetNeededToday).toHaveBeenCalledWith('a', expect.any(Date))
   })
 })
