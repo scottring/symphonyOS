@@ -388,8 +388,26 @@ export const ScheduleItem = memo(function ScheduleItem({
         </div>
 
         {/* Right cluster — project tag + assignee. Three-dot removed; swipe
-            now exposes the same actions (right→complete, left→edit). */}
+            now exposes the same actions (right→complete, left→edit). Needed
+            today is a TAP control here, not a third swipe — swipe already
+            means complete (right) / edit (left), and a third gesture would be
+            undiscoverable. Uses the same isSameDay-against-viewedDate
+            definition of "marked" as the desktop chip/menu — bare truthiness
+            of item.neededOn was a bug already fixed once there. */}
         <div className="flex items-center gap-1 shrink-0">
+          {isTask && onSetNeededToday && item.originalTask && (
+            <button
+              type="button"
+              aria-label={isNeededToday ? 'Not needed today' : 'Need today'}
+              onClick={(e) => {
+                e.stopPropagation()
+                onSetNeededToday(item.originalTask!.id, isNeededToday ? null : (viewedDate ?? new Date()))
+              }}
+              className="p-1.5 rounded-lg"
+            >
+              <AlertCircle className={`w-4 h-4 ${isNeededToday ? 'text-amber-500' : 'text-neutral-300'}`} />
+            </button>
+          )}
           {projectName && (
             <Tag className="w-4 h-4 text-orange-400" style={projectColor ? { color: projectColor } : undefined} />
           )}
