@@ -47,15 +47,16 @@ vi.mock('@/hooks/useDomain.tsx', async (importOriginal) => {
 vi.mock('@/hooks/useTimelineInsert', () => ({
   useTimelineInsert: () => ({ handlePick: vi.fn(), noteComposer: null, closeNoteComposer: vi.fn() }),
 }))
-// NeededTodayNote sources its own list data. useNeededListItems calls
-// getAuthUser() directly, which the global supabase mock (src/test/setup.ts)
-// does not export — leaving it unmocked throws. ListsContext is null-tolerant
-// on its own (no provider here), but mocked anyway for a stable `lists: []`.
-vi.mock('@/contexts/ListsContext', () => ({
-  useListsContextOrNull: () => ({ lists: [] }),
-}))
+// NeededTodayNote sources its own list data; this file is about Today's space
+// budget, so both are stubbed empty. Partial mock (importOriginal) rather than
+// a whole-module replacement — swapping out ListsContext wholesale is what once
+// hid a write path that never reached the database.
+vi.mock('@/contexts/ListsContext', async (importOriginal) => {
+  const actual = await importOriginal() as Record<string, unknown>
+  return { ...actual, useListsContextOrNull: () => ({ lists: [] }) }
+})
 vi.mock('@/hooks/useNeededListItems', () => ({
-  useNeededListItems: () => ({ items: [], refetch: vi.fn() }),
+  useNeededListItems: () => ({ items: [], refetch: vi.fn(), complete: vi.fn() }),
 }))
 
 function task(p: Partial<Task>): Task {

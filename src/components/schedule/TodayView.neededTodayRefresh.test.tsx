@@ -7,17 +7,24 @@ import { TodayView } from './TodayView'
 import type { DbListItem } from '@/types/list'
 
 /**
- * Regression guard for the Needed Today note's list-item checkbox.
+ * End-to-end guard for the Needed Today note's list-item checkbox.
  *
- * `handleToggleNeededListItem` in TodayView writes the completion through
- * ListsContext.updateItem, but useNeededListItems (the note's own data
- * source) only refetches on TO_BUY_CHANGED_EVENT — ListsContext.updateItem
- * never fires it. A test that only asserts `updateItem` was called would NOT
- * catch a missing announce: the write still happens, it's the on-screen
- * refresh that silently breaks. So this test uses the REAL useNeededListItems
- * hook (not mocked) against a controllable Supabase double, and asserts the
- * row actually disappears from the DOM after the checkbox click — which only
- * happens if something re-triggers the fetch.
+ * The bug this exists to catch: the completion was routed through
+ * ListsContext.updateItem, which opens with
+ * `const item = items.find(i => i.id === id); if (!item) return`. On Today
+ * `selectedListId` is always null, so `items` is [] and the call returned
+ * WITHOUT touching the database — while the uncontrolled checkbox ticked and
+ * the announce fired, making it look like it worked.
+ *
+ * So this test refuses two shortcuts that would let that pass:
+ *   1. It does NOT mock useNeededListItems — the real hook runs, including its
+ *      TO_BUY_CHANGED_EVENT listener, so the on-screen refresh is real.
+ *   2. Its Supabase double is driven by the ACTUAL WRITE, not by a fetch
+ *      counter: the row keeps coming back from `select` until an `update`
+ *      setting `completed: true` has landed on it. A test that scripted the
+ *      second fetch to return [] regardless would manufacture the
+ *      disappearance it claims to prove.
+ * Between them, "the checkbox writes nothing" fails here.
  */
 
 vi.mock('@/hooks/useMobile', () => ({ useMobile: () => true }))
@@ -38,19 +45,24 @@ vi.mock('@/hooks/useTimelineInsert', () => ({
   useTimelineInsert: () => ({ handlePick: vi.fn(), noteComposer: null, closeNoteComposer: vi.fn() }),
 }))
 
-// ListsContext: no lists (so the item reads as "urgent", not "buy" — kind
-// doesn't matter for this test), and an updateItem spy so the test can also
-// confirm the write happened, not JUST that the row disappeared.
-const mockUpdateItem = vi.fn().mockResolvedValue(undefined)
-vi.mock('@/contexts/ListsContext', () => ({
-  useListsContextOrNull: () => ({ lists: [], updateItem: mockUpdateItem }),
-}))
+// PARTIAL mock (same importOriginal pattern as useDomain above): the real
+// module stays, only the accessor the note reads is overridden. Replacing the
+// whole module is precisely what masked the broken write path — a wholesale
+// stub can never early-return the way the real implementation did.
+// One visible list, so the note's list-scoped read has somewhere to look.
+vi.mock('@/contexts/ListsContext', async (importOriginal) => {
+  const actual = await importOriginal() as Record<string, unknown>
+  return {
+    ...actual,
+    // Deliberately NOT titled "To buy": that name activates ToBuyLine, whose
+    // own count query would pull an unrelated chain shape into the double
+    // below. This test is about the note.
+    useListsContextOrNull: () => ({
+      lists: [{ id: 'list1', title: 'Shopping', category: 'shopping' }],
+    }),
+  }
+})
 
-// Deliberately NOT mocking '@/hooks/useNeededListItems' — this test needs the
-// real hook, including its TO_BUY_CHANGED_EVENT listener, to prove the note
-// actually refreshes. Stand in a controllable Supabase double instead: first
-// query returns the marked row, every query after returns none — modelling
-// the DB after the completion write.
 const NOW = new Date()
 const DAY = localYmd(NOW)
 
@@ -71,23 +83,28 @@ const row: DbListItem = {
   updated_at: DAY,
 }
 
-let fetchCount = 0
+// The double's single piece of state — flipped ONLY by a real update write.
+let rowCompleted = false
+const updates: Array<{ id: string; patch: Record<string, unknown> }> = []
+
 vi.mock('@/lib/supabase', () => ({
   supabase: {
     from: () => ({
+      // .select('*').in('list_id', ids).eq('needed_on', day).eq('completed', false)
       select: () => ({
-        eq: () => ({
+        in: () => ({
           eq: () => ({
-            eq: () => {
-              fetchCount += 1
-              // First fetch (mount): the marked row is still open. Every
-              // fetch after that: the row is gone, as it would be once
-              // `completed` flips to true and the `.eq('completed', false)`
-              // filter excludes it.
-              return Promise.resolve({ data: fetchCount === 1 ? [row] : [], error: null })
-            },
+            eq: () => Promise.resolve({ data: rowCompleted ? [] : [row], error: null }),
           }),
         }),
+      }),
+      // .update({ completed, completed_at }).eq('id', id)
+      update: (patch: Record<string, unknown>) => ({
+        eq: (_field: string, id: string) => {
+          updates.push({ id, patch })
+          if (patch.completed === true) rowCompleted = true
+          return Promise.resolve({ error: null })
+        },
       }),
     }),
     // Other hooks mounted alongside TodayView (e.g. useAuth, from
@@ -126,20 +143,22 @@ function renderToday() {
   )
 }
 
-describe('Needed Today note: list-item checkbox refresh', () => {
-  it('removes the row after ticking it — proves the note actually refetches, not just writes', async () => {
+describe('Needed Today note: list-item checkbox', () => {
+  it('writes the completion to the database and the row then leaves the note', async () => {
     renderToday()
 
     await waitFor(() => expect(screen.getByText('Buy diapers')).toBeInTheDocument())
 
     fireEvent.click(screen.getByRole('checkbox', { name: 'Buy diapers' }))
 
-    expect(mockUpdateItem).toHaveBeenCalledWith('li1', { completed: true })
+    // The write itself — against the pre-fix code (ListsContext.updateItem
+    // early-returning on Today) `updates` stays empty.
+    await waitFor(() => expect(updates).toHaveLength(1))
+    expect(updates[0].id).toBe('li1')
+    expect(updates[0].patch).toMatchObject({ completed: true })
 
-    // This is the assertion a "was updateItem called" test would miss: if
-    // nothing re-triggers useNeededListItems's fetch, the row (and its
-    // checkbox) stays on screen indefinitely even though the DB write
-    // succeeded.
+    // And the note agrees with the database it just wrote to: the refetch is
+    // answered by the double's real post-write state, not by a script.
     await waitFor(() => expect(screen.queryByText('Buy diapers')).not.toBeInTheDocument())
   })
 })
