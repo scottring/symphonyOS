@@ -154,6 +154,7 @@ export function InboxView({
         phoneNumber: snapshot.phoneNumber,
         needsDiscussion: snapshot.needsDiscussion,
         discussionNote: snapshot.discussionNote,
+        neededOn: snapshot.neededOn,
       },
     )
   }, [addTask])

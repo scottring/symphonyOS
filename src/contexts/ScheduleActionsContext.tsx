@@ -20,6 +20,8 @@ export interface ScheduleActionsValue {
   onUpdateTask?: (id: string, updates: Partial<Task>) => void
   onPushTask?: (id: string, target: Date | 'week' | 'month' | 'quarter') => void
   onDeleteTask?: (id: string) => void
+  /** Mark or clear "needed today". Pass null to clear. */
+  onSetNeededToday?: (taskId: string, neededOn: Date | null) => void
   onCreateTask?: (title: string) => void
   onGroupTasks?: (
     taskIds: string[],

@@ -34,6 +34,8 @@ export interface TimelineItem {
   waitingSince?: Date
   needsDiscussion?: boolean
   discussionNote?: string
+  /** The day this task was marked "needed today". Undefined = not marked. */
+  neededOn?: Date
   // Context (from tasks)
   notes?: string
   links?: TaskLink[]
@@ -89,6 +91,7 @@ export function taskToTimelineItem(task: Task): TimelineItem {
     waitingSince: task.waitingSince,
     needsDiscussion: task.needsDiscussion,
     discussionNote: task.discussionNote,
+    neededOn: task.neededOn,
     notes: task.notes,
     links: task.links,
     phoneNumber: task.phoneNumber,
