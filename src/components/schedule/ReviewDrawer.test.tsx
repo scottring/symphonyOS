@@ -97,18 +97,35 @@ describe('ReviewDrawer — morning goes straight to triage', () => {
       { bucket: 'someday', scheduledFor: undefined, isAllDay: undefined })
   })
 
-  it('shows the week and month pools with their own verdicts', () => {
+  it('shows the week pool with its own verdicts', () => {
     render(<ReviewDrawer {...base} mode="morning" tasks={[
       task({ id: 'w1', title: 'Week thing', bucket: 'week' }),
-      task({ id: 'm1', title: 'Month thing', bucket: 'month' }),
     ]} />)
     expect(screen.getByText(/This week · 1/)).toBeInTheDocument()
     expect(screen.getByText('Week thing')).toBeInTheDocument()
-    expect(screen.getByText(/This month · 1/)).toBeInTheDocument()
-    expect(screen.getByText('Month thing')).toBeInTheDocument()
     // The week pool never offers "This wk" — it is already there.
     const weekRow = screen.getByText('Week thing').closest('li')!
     expect(within(weekRow).queryByRole('button', { name: 'This wk' })).toBeNull()
+  })
+
+  it('keeps the month pool collapsed — a count you can open, not part of the review', async () => {
+    const { user } = render(<ReviewDrawer {...base} mode="morning" tasks={[
+      task({ id: 'm1', title: 'Month thing', bucket: 'month' }),
+      task({ id: 'm2', title: 'Other month thing', bucket: 'month' }),
+    ]} />)
+    // Collapsed by default: the count is visible, the rows are not.
+    const toggle = screen.getByRole('button', { name: /This month · 2/ })
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByText('Month thing')).not.toBeInTheDocument()
+    // Opening it reveals the rows, with their verdicts.
+    await user.click(toggle)
+    expect(toggle).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByText('Month thing')).toBeInTheDocument()
+    const row = screen.getByText('Month thing').closest('li')!
+    expect(within(row).getByRole('button', { name: 'Today' })).toBeInTheDocument()
+    // And it closes again.
+    await user.click(toggle)
+    expect(screen.queryByText('Month thing')).not.toBeInTheDocument()
   })
 
   it('offers Delete only when a delete handler exists', () => {

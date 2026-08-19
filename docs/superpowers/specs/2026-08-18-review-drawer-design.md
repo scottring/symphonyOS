@@ -33,7 +33,9 @@ handlers the page rows use — pushTask / updateTask / deleteTask):
    "Open week bench →". No "This wk" verb (it's already there).
 3. **This month · N** — the rung above, per the streamlined vision's
    review-packet rule (packets always carry the rung above; no month page is
-   resurrected). Verdicts include This wk.
+   resurrected). Verdicts include This wk. **2026-08-19 (Scott, after first
+   real morning use): the month pool is NOT part of the review — it renders
+   collapsed (chevron + count), opened on demand to look at and pick from.**
 
 Leaving an item alone is always a legitimate verdict. Resolved rows show
 "✓ <fate>" in place.
@@ -46,5 +48,6 @@ re-enables intentionally from the ⋯ menu ("Show suggestions · N").
 
 ## Known rough edge
 
-"This month · 48" renders all 48 rows (scrollable, last section). If that
-reads as endless in practice, cap it like the backlog.
+~~"This month · 48" renders all 48 rows (scrollable, last section). If that
+reads as endless in practice, cap it like the backlog.~~ Resolved 2026-08-19:
+the month section is collapsed by default; all rows render only when opened.

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Sparkles, Check, ArrowRight, Moon, Sun, X, Trash2 } from 'lucide-react'
+import { Sparkles, Check, ArrowRight, Moon, Sun, X, Trash2, ChevronRight } from 'lucide-react'
 import type { Task } from '@/types/task'
 import type { AttentionItem } from '@/lib/today/attention'
 import { selectHorizonPool } from '@/lib/today/horizons'
@@ -17,7 +17,9 @@ import { useEveningReflection } from '@/hooks/useEveningReflection'
  * couldn't provide, and they double as the review packet's carry-the-rung-
  * above rule: Backlog (carried-over + needs-attention, capped at
  * BACKLOG_SESSION_CAP oldest per session so it drains without any session
- * becoming a slog), This week (the current week's pool), This month. Each
+ * becoming a slog), This week (the current week's pool). This month is NOT
+ * part of the review — it renders collapsed, a count you can open to look
+ * at and pick from when you want to, never a list to wade through. Each
  * item gets a one-tap fate: Today / Tomorrow / This week / Someday / Delete.
  * Leaving an item alone is also a verdict — nothing is forced.
  *
@@ -109,6 +111,8 @@ export function ReviewDrawer({
   const [movedIds, setMovedIds] = useState<Set<string>>(() => new Set())
   // taskId → verdict label, for the resolved-state row rendering.
   const [verdicts, setVerdicts] = useState<Map<string, Verdict>>(() => new Map())
+  // The month pool is on-demand, not part of the review — closed each open.
+  const [monthOpen, setMonthOpen] = useState(false)
 
   const { completed, unfinished } = useMemo(() => {
     const onToday = tasks.filter((t) => sameDay(t.scheduledFor, viewedDate))
@@ -333,16 +337,27 @@ export function ReviewDrawer({
             </section>
           )}
 
-          {/* This month — the rung above, carried into the review. */}
+          {/* This month — the rung above, in view but not in the flow.
+              Collapsed by default: open it when you want to pick from it. */}
           {monthPool.length > 0 && (
             <section className="space-y-2">
-              <p className="text-sm font-medium text-neutral-700">This month · {monthPool.length}</p>
-              <ul className="space-y-1.5">
-                {monthPool.map((t) => (
-                  <TriageRow key={t.id} task={t} offer={['today', 'week', 'someday', 'deleted']}
-                    verdict={verdicts.get(t.id)} canDelete={!!onDeleteTask} onVerdict={apply} />
-                ))}
-              </ul>
+              <button
+                type="button"
+                onClick={() => setMonthOpen((v) => !v)}
+                aria-expanded={monthOpen}
+                className="w-full flex items-center gap-1.5 text-sm font-medium text-neutral-500 hover:text-neutral-700 transition-colors"
+              >
+                <ChevronRight className={`w-3.5 h-3.5 transition-transform ${monthOpen ? 'rotate-90' : ''}`} />
+                This month · {monthPool.length}
+              </button>
+              {monthOpen && (
+                <ul className="space-y-1.5">
+                  {monthPool.map((t) => (
+                    <TriageRow key={t.id} task={t} offer={['today', 'week', 'someday', 'deleted']}
+                      verdict={verdicts.get(t.id)} canDelete={!!onDeleteTask} onVerdict={apply} />
+                  ))}
+                </ul>
+              )}
             </section>
           )}
 
