@@ -3,6 +3,7 @@ import type { TimelineItem } from '@/types/timeline'
 import type { FamilyMember } from '@/types/family'
 import type { TaskContext } from '@/types/task'
 import { formatTimeLong, formatTimeRangeLong, inferMealTime } from '@/lib/timeUtils'
+import { isSameDay } from '@/lib/dateUtils'
 import { getProjectColor } from '@/lib/projectUtils'
 import { SchedulePopover, type ScheduleContextItem } from '@/components/triage'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
@@ -206,8 +207,13 @@ export const ScheduleItem = memo(function ScheduleItem({
 }: ScheduleItemProps) {
   const isMobile = useMobile()
   // Needed-today mark: STATE, so it lives with the title chips. The '...' menu
-  // (ScheduleItemActionsMenu) sets it via the same context handler.
-  const { onSetNeededToday } = useScheduleActionsContext()
+  // (ScheduleItemActionsMenu) sets it via the same context handler. A mark
+  // expires by ceasing to match the VIEWED day (src/lib/today/neededToday.ts),
+  // not the real calendar day — nothing ever clears `neededOn` — so compare
+  // against ctx.viewedDate. Fall back to "now" only when no provider supplies
+  // it (e.g. a test rendering ScheduleItem in isolation).
+  const { onSetNeededToday, viewedDate } = useScheduleActionsContext()
+  const isNeededToday = !!item.neededOn && isSameDay(item.neededOn, viewedDate ?? new Date())
   // Hover state powers the smooth expanding banner (location-only metadata row).
   // On mobile we never expand — preserves the pre-existing behavior where
   // these were never visible without hover.
@@ -633,7 +639,7 @@ export const ScheduleItem = memo(function ScheduleItem({
             {/* Needed today mark — STATE, so it belongs with the title chips,
                 not the action rail. The '...' menu sets/clears it; clicking the
                 chip itself is a shortcut to clear. */}
-            {item.neededOn && !item.completed && (
+            {isNeededToday && !item.completed && (
               <button
                 type="button"
                 title="Needed today — click to clear"

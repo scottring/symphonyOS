@@ -2,6 +2,7 @@ import { useState, useCallback, useRef } from 'react'
 import { MoreHorizontal, Redo2, Clock, Trash2, CalendarCog, Hourglass, FolderPlus, FolderOpen, MessageCircle, AlertCircle } from 'lucide-react'
 import type { TimelineItem } from '@/types/timeline'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
+import { isSameDay } from '@/lib/dateUtils'
 import { DiscussionPopover } from '@/components/triage'
 import { WaitingForPopover } from './WaitingForPopover'
 import { ConvertTaskModal } from './PromoteTaskToProjectButton'
@@ -65,6 +66,12 @@ export function ScheduleItemActionsMenu({ item, onOpenDetail, onUpdateDiscussion
     })
     setWaitingOpen(false)
   }, [ctx, taskId])
+
+  // A "needed today" mark expires by ceasing to match the VIEWED day
+  // (src/lib/today/neededToday.ts), not the real calendar day — nothing ever
+  // clears `neededOn`. Compare against ctx.viewedDate so a stale mark from a
+  // different day reads as unmarked here, matching the chip and the note.
+  const isNeededToday = !!item.neededOn && isSameDay(item.neededOn, ctx.viewedDate ?? new Date())
 
   const isTask = item.type === 'task'
   const isEvent = item.type === 'event'
@@ -238,12 +245,12 @@ export function ScheduleItemActionsMenu({ item, onOpenDetail, onUpdateDiscussion
                 type="button"
                 role="menuitem"
                 onClick={run(() =>
-                  ctx.onSetNeededToday!(item.originalTask!.id, item.neededOn ? null : new Date()),
+                  ctx.onSetNeededToday!(item.originalTask!.id, isNeededToday ? null : new Date()),
                 )}
                 className="flex w-full text-left items-center gap-2.5 px-3 py-2.5 text-sm text-neutral-700 hover:bg-neutral-50"
               >
-                <AlertCircle className={`w-4 h-4 ${item.neededOn ? 'text-amber-500' : 'text-neutral-400'}`} />
-                {item.neededOn ? 'Not needed today' : 'Need today'}
+                <AlertCircle className={`w-4 h-4 ${isNeededToday ? 'text-amber-500' : 'text-neutral-400'}`} />
+                {isNeededToday ? 'Not needed today' : 'Need today'}
               </button>
             )}
 

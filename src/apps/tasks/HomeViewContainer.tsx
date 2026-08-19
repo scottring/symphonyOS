@@ -612,6 +612,7 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
       onPushTask: pushTask,
       onDeleteTask: deleteTask,
       onSetNeededToday,
+      viewedDate,
       onCreateTask: onCreateTaskFromValue,
       onCreateTaskParsed,
       parserContext,
@@ -682,7 +683,7 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
       onUpdateEventProject: updateEventProject,
     }),
     [
-      toggleTask, toggleWaiting, updateTask, pushTask, deleteTask, onSetNeededToday, onCreateTaskFromValue, onCreateTaskParsed, parserContext, currentDomain, resolverContext, getRecentTaskForContact, onCreateTaskAt, onCreateEventAt, onCreateRoutineAt, handleCreateFollowUp, handleGroupItems, handleAddToGroup, handleRemoveFromGroup, handleUngroup, undo.pushAction, updateTaskOrders,
+      toggleTask, toggleWaiting, updateTask, pushTask, deleteTask, onSetNeededToday, viewedDate, onCreateTaskFromValue, onCreateTaskParsed, parserContext, currentDomain, resolverContext, getRecentTaskForContact, onCreateTaskAt, onCreateEventAt, onCreateRoutineAt, handleCreateFollowUp, handleGroupItems, handleAddToGroup, handleRemoveFromGroup, handleUngroup, undo.pushAction, updateTaskOrders,
       setSelection, navigate,
       scheduleActions, updateRoutine, updateEventContext, updateEventSharedWithFamily, dismissShareNudge, hideEvent, handleDeleteEvent, sendTaskToBuy,
       contactsMap, projectsMap, projects, contacts, familyMembers, lists, listsByCategory,
