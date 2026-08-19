@@ -65,6 +65,7 @@ function createMockDbListItem(overrides: Partial<DbListItem> = {}): DbListItem {
     external_source: null,
     completed: false,
     completed_at: null,
+    needed_on: null,
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-01T00:00:00Z',
     ...overrides,

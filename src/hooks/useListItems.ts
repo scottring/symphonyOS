@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
+import { localYmd, parseLocalYmd } from '@/lib/cadence/config'
 import type { ListItem, DbListItem } from '@/types/list'
 
 export function dbListItemToListItem(dbItem: DbListItem): ListItem {
@@ -15,6 +16,8 @@ export function dbListItemToListItem(dbItem: DbListItem): ListItem {
     completed: dbItem.completed,
     completedAt: dbItem.completed_at ? new Date(dbItem.completed_at) : undefined,
     parentItemId: dbItem.parent_item_id ?? undefined,
+    // Date-only column: parse as LOCAL midnight — see useSupabaseTasks.dbTaskToTask.
+    neededOn: dbItem.needed_on ? parseLocalYmd(dbItem.needed_on) : undefined,
     createdAt: new Date(dbItem.created_at),
     updatedAt: new Date(dbItem.updated_at),
   }
@@ -135,6 +138,8 @@ export function useListItems(listId: string | null) {
       dbUpdates.completed = updates.completed
       dbUpdates.completed_at = updates.completed ? new Date().toISOString() : null
     }
+    // `needed_on` is a DATE column — localYmd, not toISOString (see useSupabaseTasks).
+    if ('neededOn' in updates) dbUpdates.needed_on = updates.neededOn ? localYmd(updates.neededOn) : null
 
     const { error: updateError } = await supabase
       .from('list_items')

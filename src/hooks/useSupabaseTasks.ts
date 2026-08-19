@@ -79,6 +79,8 @@ export interface DbTask {
   waiting_for: string | null
   needs_discussion: boolean | null
   discussion_note: string | null
+  // Date-only column: which day this was marked "needed today".
+  needed_on: string | null
   week_deferred_at: string | null
   week_start: string | null
   picked_at: string | null
@@ -153,6 +155,10 @@ export function dbTaskToTask(dbTask: DbTask): Task {
     waitingFor: dbTask.waiting_for ?? undefined,
     needsDiscussion: dbTask.needs_discussion ?? undefined,
     discussionNote: dbTask.discussion_note ?? undefined,
+    // Date-only column: parse as LOCAL midnight. `new Date('2026-08-19')` parses
+    // as UTC and lands on the 18th in US timezones — the note would show the
+    // item a day early.
+    neededOn: dbTask.needed_on ? parseLocalYmd(dbTask.needed_on) : undefined,
     weekDeferredAt: dbTask.week_deferred_at ? new Date(dbTask.week_deferred_at) : undefined,
     // A `date` column — parse to LOCAL midnight, never `new Date(str)` (that's UTC).
     weekStart: dbTask.week_start ? parseLocalYmd(dbTask.week_start) : undefined,
@@ -1180,6 +1186,8 @@ export function useSupabaseTasks() {
     if ('waitingFor' in updates) dbUpdates.waiting_for = updates.waitingFor?.trim() || null
     if ('needsDiscussion' in updates) dbUpdates.needs_discussion = updates.needsDiscussion ?? false
     if ('discussionNote' in updates) dbUpdates.discussion_note = updates.discussionNote ?? null
+    // `needed_on` is a DATE column — localYmd, not toISOString (see week_start above).
+    if ('neededOn' in updates) dbUpdates.needed_on = updates.neededOn ? localYmd(updates.neededOn) : null
     if ('sourceId' in updates) dbUpdates.source_id = updates.sourceId ?? null
     if ('goalId' in updates) dbUpdates.goal_id = updates.goalId ?? null
     if ('isFun' in updates) dbUpdates.is_fun = updates.isFun ?? false
@@ -1327,6 +1335,8 @@ export function useSupabaseTasks() {
     if ('waitingFor' in updates) dbUpdates.waiting_for = updates.waitingFor?.trim() || null
     if ('needsDiscussion' in updates) dbUpdates.needs_discussion = updates.needsDiscussion ?? false
     if ('discussionNote' in updates) dbUpdates.discussion_note = updates.discussionNote ?? null
+    // `needed_on` is a DATE column — localYmd, not toISOString (see week_start above).
+    if ('neededOn' in updates) dbUpdates.needed_on = updates.neededOn ? localYmd(updates.neededOn) : null
     if ('sourceId' in updates) dbUpdates.source_id = updates.sourceId ?? null
     if ('goalId' in updates) dbUpdates.goal_id = updates.goalId ?? null
     if ('isFun' in updates) dbUpdates.is_fun = updates.isFun ?? false
