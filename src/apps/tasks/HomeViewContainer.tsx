@@ -41,6 +41,8 @@ import { useInstancesRealtime } from '@/hooks/useInstancesRealtime';
 import { useScheduleActions } from '@/hooks/useScheduleActions';
 import { useDomain } from '@/hooks/useDomain';
 import { useCalendarDomainMappings } from '@/hooks/useCalendarDomainMappings';
+import { useRefreshOnVisible } from '@/hooks/useRefreshOnVisible';
+import { useDayRollover } from '@/hooks/useDayRollover';
 import { filterTasksForDomainView, filterRoutinesForDomain, filterEventsForDomain } from '@/lib/today/domainFilter';
 import { useListsContext } from '@/contexts/ListsContext';
 import { supabase, getAuthUser } from '@/lib/supabase';
@@ -157,15 +159,28 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
     [setSelection, clearSelection],
   );
 
-  // Fetch calendar events for the viewed date
-  useEffect(() => {
+  // Fetch calendar events for the viewed date.
+  const refetchViewedDayEvents = useCallback(async () => {
     if (!isConnected) return;
     const startOfDay = new Date(viewedDate);
     startOfDay.setHours(0, 0, 0, 0);
     const endOfDay = new Date(viewedDate);
     endOfDay.setHours(23, 59, 59, 999);
-    fetchEvents(startOfDay, endOfDay);
+    await fetchEvents(startOfDay, endOfDay);
   }, [isConnected, viewedDate, fetchEvents]);
+
+  useEffect(() => {
+    void refetchViewedDayEvents();
+  }, [refetchViewedDayEvents]);
+
+  // Google events have no realtime channel and nothing polls them, so the fetch
+  // above was the ONLY one a tab ever did — an appointment added in Google after
+  // load stayed invisible until a manual reload. Refetch on return to the tab.
+  useRefreshOnVisible(refetchViewedDayEvents, { enabled: isConnected });
+
+  // Same one-shot problem on the date itself: `viewedDate` is seeded once at
+  // mount, so a tab open past midnight kept rendering yesterday.
+  useDayRollover(viewedDate, setViewedDate);
 
   // ── Meal-plan entries synthesized as CalendarEvent objects ──
   // Sourced from <MealEventsProvider> mounted in Shell. Legacy App.tsx still
@@ -388,11 +403,9 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
         allDay: !r.scheduledFor,
       });
       // Refresh the viewed day's events so the new one appears right away.
-      const startOfDay = new Date(viewedDate); startOfDay.setHours(0, 0, 0, 0);
-      const endOfDay = new Date(viewedDate); endOfDay.setHours(23, 59, 59, 999);
-      await fetchEvents(startOfDay, endOfDay);
+      await refetchViewedDayEvents();
     },
-    [createEvent, fetchEvents, viewedDate],
+    [createEvent, refetchViewedDayEvents, viewedDate],
   );
 
   // Inline timeline "+" create for the ROUTINE kind: a routine needs a

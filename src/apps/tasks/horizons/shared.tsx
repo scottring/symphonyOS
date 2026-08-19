@@ -19,6 +19,7 @@ import { Target, Plus, ChevronRight, Check } from 'lucide-react';
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
 import { useSharpenBet } from '@/hooks/useSharpenBet';
 import { useGoogleCalendar, type CalendarEvent } from '@/hooks/useGoogleCalendar';
+import { useRefreshOnVisible } from '@/hooks/useRefreshOnVisible';
 import { useEventNotes } from '@/hooks/useEventNotes';
 import { useContacts } from '@/hooks/useContacts';
 import { useProjects } from '@/hooks/useProjects';
@@ -153,17 +154,28 @@ export function useHorizonPageData(horizon: HorizonId, anchorDate?: Date) {
   // rung would be stranded on that empty snapshot forever — past weeks reading
   // "nothing claimed yet" while the calendar holds a trip. Same guard
   // CalendarStep uses, and the same reason.
-  useEffect(() => {
-    if (!guidedHorizon || !calendarConnected) return;
-    let cancelled = false;
+  const periodRequestRef = useRef(0);
+  const fetchPeriodEvents = useCallback(() => {
+    if (!guidedHorizon || !calendarConnected) return Promise.resolve();
     const { start, end } = guidedPeriod(guidedHorizon);
+    const requestId = ++periodRequestRef.current;
     // Promise.resolve wrap: fetchEvents returns [] synchronously when the
     // calendar isn't connected, and test doubles return undefined.
-    void Promise.resolve(fetchEvents(start, end)).then((result) => {
-      if (!cancelled && Array.isArray(result)) setPeriodEvents(result);
+    return Promise.resolve(fetchEvents(start, end)).then((result) => {
+      // Drop a response a newer request (horizon switch, visibility refresh)
+      // already superseded — otherwise it lands on the wrong period.
+      if (requestId !== periodRequestRef.current) return;
+      if (Array.isArray(result)) setPeriodEvents(result);
     });
-    return () => { cancelled = true; };
   }, [guidedHorizon, fetchEvents, calendarConnected]);
+
+  useEffect(() => {
+    void fetchPeriodEvents();
+  }, [fetchPeriodEvents]);
+
+  // Nothing polls Google events, so without this the rung stays pinned to the
+  // snapshot it took on mount — same staleness Today had.
+  useRefreshOnVisible(fetchPeriodEvents, { enabled: calendarConnected });
   const rungEvents = periodEvents ?? events;
   // Event ids opt in to auto-loaded, realtime event notes (see useEventNotes)
   const visibleEventIds = useMemo(() => rungEvents.map((e) => e.google_event_id || e.id), [rungEvents]);
