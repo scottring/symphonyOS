@@ -63,9 +63,22 @@ A date rather than a boolean because it expires without a job — the date simpl
 stops matching the viewed day — and because it leaves room to pin ahead later
 without a migration.
 
-The pin lives on the row rather than in a `pinned_items` join table: it is one
-column, it belongs to the thing, and it dies with the row. A join table would
-need polymorphic foreign keys and orphan cleanup for no gain.
+**A `pinned_items` table already exists — and this deliberately does not use it.**
+`src/types/pin.ts` + `usePinnedItems` implement a durable *shortcuts shelf*:
+`MAX_PINS = 7`, stale at 14 days, auto-unpin at 21, over entity types
+`task | project | contact | routine | list`. That is a different concept in every
+dimension that matters here — its lifetime is weeks, not one day; its cap is a
+shelf size, not a daily focus; and it has no `list_item` type, so To buy lines
+can't be expressed in it at all. Overloading it would force "needed today" to
+inherit an auto-unpin rule that contradicts daily expiry.
+
+So the mark lives as one column on the row: it belongs to the thing and dies with
+the row, with no polymorphic foreign keys or orphan cleanup.
+
+**Naming rule, to prevent collision with that existing system: nothing in this
+feature is called a "pin" in code.** The column is `needed_on`, the actions are
+`markNeededToday` / `clearNeededToday`, the hook is `useNeededToday`. "Pin" in
+this document is the conversational word only.
 
 A "conversation" is not a new entity. Tasks already carry `needsDiscussion` and
 `discussionNote` (see `src/lib/discussionItems.ts`), already capped at 5 and
