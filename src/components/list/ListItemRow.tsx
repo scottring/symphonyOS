@@ -1,5 +1,7 @@
 import { useState } from 'react'
+import { AlertCircle } from 'lucide-react'
 import type { ListItem } from '@/types/list'
+import { isSameDay } from '@/lib/dateUtils'
 
 interface ListItemRowProps {
   item: ListItem
@@ -117,6 +119,19 @@ export function ListItemRow({
     }
   }
 
+  // /lists has no "viewed date" concept — it isn't a day-scoped surface like
+  // Today, so the real current day is the only correct day to compare
+  // against and to stamp. isSameDay, never bare truthiness of item.neededOn
+  // — a mark from a prior day must read as unmarked (this bug has already
+  // been fixed twice elsewhere in this feature).
+  const isNeededToday = !!item.neededOn && isSameDay(item.neededOn, new Date())
+
+  const handleToggleNeededToday = () => {
+    if (onUpdate) {
+      onUpdate({ neededOn: isNeededToday ? undefined : new Date() })
+    }
+  }
+
   return (
     <div>
       <div
@@ -171,6 +186,21 @@ export function ListItemRow({
             </div>
           )}
         </div>
+
+        {/* Needed today — STATE, so unlike the actions below it stays
+            visible without hovering; the icon's own color is the marked/
+            unmarked signal, same treatment as the desktop chip and mobile
+            card AlertCircle control. */}
+        {onUpdate && (
+          <button
+            type="button"
+            aria-label={isNeededToday ? 'Not needed today' : 'Need today'}
+            onClick={handleToggleNeededToday}
+            className="flex-shrink-0 p-1.5 rounded-lg hover:bg-amber-50 transition-colors"
+          >
+            <AlertCircle className={`w-4 h-4 ${isNeededToday ? 'text-amber-500' : 'text-neutral-300'}`} />
+          </button>
+        )}
 
         {/* Actions */}
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">

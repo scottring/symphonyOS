@@ -1,7 +1,9 @@
-import { Suspense } from 'react'
+import { Suspense, useCallback } from 'react'
 import { ListsProvider, useListsContext } from '@/contexts/ListsContext'
 import { ListsList, ListView } from '@/components/lazy'
 import { LoadingFallback } from '@/components/layout/LoadingFallback'
+import { announceToBuyChanged } from '@/lib/lists/toBuy'
+import type { ListItem } from '@/types/list'
 
 /**
  * Lists surface, mounted by the Shell at /lists. Mirrors the legacy
@@ -31,6 +33,19 @@ function ListsInner() {
     reorderItems,
   } = useListsContext()
 
+  // useNeededListItems (feeding Today's note) only refetches on
+  // TO_BUY_CHANGED_EVENT — ListsContext.updateItem doesn't fire it itself
+  // (same reasoning as TodayView's handleToggleNeededListItem). Without this,
+  // marking/clearing here leaves the note showing stale state until reload.
+  const handleUpdateItem = useCallback((id: string, updates: Partial<ListItem>) => {
+    void (async () => {
+      await updateItem(id, updates)
+      if ('neededOn' in updates) {
+        announceToBuyChanged()
+      }
+    })()
+  }, [updateItem])
+
   return (
     <>
       {!selectedListId && (
@@ -53,7 +68,7 @@ function ListsInner() {
             onUpdateList={updateList}
             onDeleteList={deleteList}
             onAddItem={addItem}
-            onUpdateItem={updateItem}
+            onUpdateItem={handleUpdateItem}
             onDeleteItem={deleteItem}
             onClearCompleted={clearCompleted}
             onReorderItems={reorderItems}
