@@ -97,6 +97,12 @@ export interface Task {
   // Needs-discussion flag — surfaces on family kiosk's For Discussion list
   needsDiscussion?: boolean
   discussionNote?: string
+  /**
+   * The day this was marked "needed today". A DATE, not a flag: it expires by
+   * ceasing to match the viewed day, so no job has to clear it. Never called a
+   * "pin" — `pinned_items` is a different, durable system.
+   */
+  neededOn?: Date
   // ── Planning-cascade lineage (2026-07-15_task_lineage) ──
   /** The task this one was copied down from (season→month, month→week).
    *  Immediate cascade parent — distinct from parentTaskId (subtask nesting). */

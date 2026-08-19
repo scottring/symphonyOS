@@ -60,6 +60,7 @@ export interface DbListItem {
   completed: boolean
   completed_at: string | null
   parent_item_id: string | null
+  needed_on: string | null
   created_at: string
   updated_at: string
 }
@@ -76,6 +77,8 @@ export interface ListItem {
   completed: boolean
   completedAt?: Date
   parentItemId?: string
+  /** The day this was marked "needed today". See Task.neededOn. */
+  neededOn?: Date
   createdAt: Date
   updatedAt: Date
 }
