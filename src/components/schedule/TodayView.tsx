@@ -39,6 +39,8 @@ import { Eye, EyeOff, Repeat, Binoculars, Printer, GripVertical, CalendarClock, 
 import { useNavigate } from 'react-router-dom'
 import { AssigneeFilter } from '@/components/home/AssigneeFilter'
 
+import { useListsContextOrNull } from '@/contexts/ListsContext'
+import { NeededTodayNote } from './NeededTodayNote'
 import { TodayAddInput } from './TodayAddInput'
 import { TodaySectionList, findTimelineItem } from './TodaySectionList'
 import { TodayDragProvider } from './TodayDragProvider'
@@ -161,6 +163,14 @@ export function TodayView({
     contactsMap, familyMembers = [],
     eventNotesMap,
   } = ctx
+  // Shared ListsContext (not a private useLists()) — same reasoning as
+  // ToBuyLine: a lazily-created list is invisible to a private instance
+  // until reload. Null-tolerant so a provider-less mount renders the note's
+  // list-item toggle as a no-op instead of throwing.
+  const listsCtx = useListsContextOrNull()
+  const handleToggleNeededListItem = useCallback((id: string) => {
+    void listsCtx?.updateItem(id, { completed: true })
+  }, [listsCtx])
 
   // ── Bulk multi-select (hover checkbox on any row → bottom action bar) ──────
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(() => new Set())
@@ -969,6 +979,18 @@ export function TodayView({
           orphaned chrome and cost a band of empty page ("hanging in mid
           air" — Scott, 2026-08-18). Anchored here they are part of the day. */}
       <div ref={listRef} className="md:card md:rounded-2xl md:border md:border-neutral-200/70 md:px-5 md:py-4">
+        {/* Needed today — hand-curated, silent when empty. Placed first so a
+            marked item reads as the day's opening note, not buried under the
+            timeline. Safe at the top only because it renders nothing when
+            nothing is marked (see NeededTodayNote). */}
+        <NeededTodayNote
+          tasks={tasks}
+          viewedDate={viewedDate}
+          onToggleTask={onToggleTask}
+          onToggleListItem={handleToggleNeededListItem}
+          onOpenTask={(id) => handleSelectItem(`task-${id}`)}
+        />
+
         {/* Assistant lines — the unprompted tier, rendered ONLY when the ⋯
             menu's "Show suggestions" toggle is on (off by default; the menu
             entry carries the pending count). Only this tier is gated: chips

@@ -47,6 +47,16 @@ vi.mock('@/hooks/useDomain.tsx', async (importOriginal) => {
 vi.mock('@/hooks/useTimelineInsert', () => ({
   useTimelineInsert: () => ({ handlePick: vi.fn(), noteComposer: null, closeNoteComposer: vi.fn() }),
 }))
+// NeededTodayNote sources its own list data. useNeededListItems calls
+// getAuthUser() directly, which the global supabase mock (src/test/setup.ts)
+// does not export — leaving it unmocked throws. ListsContext is null-tolerant
+// on its own (no provider here), but mocked anyway for a stable `lists: []`.
+vi.mock('@/contexts/ListsContext', () => ({
+  useListsContextOrNull: () => ({ lists: [] }),
+}))
+vi.mock('@/hooks/useNeededListItems', () => ({
+  useNeededListItems: () => ({ items: [], refetch: vi.fn() }),
+}))
 
 function task(p: Partial<Task>): Task {
   return {
@@ -97,11 +107,15 @@ const ctxValue = {
   projects: [], contacts: [], familyMembers: [], lists: [],
 }
 
-function renderToday(tasks: Task[]) {
+// `extra` merges into `tasks` rather than replacing it — the Needed Today
+// case below needs a couple of genuinely marked tasks present ALONGSIDE the
+// backlog, at both backlog sizes, so the note has something to render in
+// both fixtures.
+function renderToday(tasks: Task[], extra: Task[] = []) {
   return render(
     <ScheduleActionsProvider value={ctxValue as never}>
       <TodayView
-        tasks={tasks} events={[]} routines={[]} dateInstances={[]}
+        tasks={[...tasks, ...extra]} events={[]} routines={[]} dateInstances={[]}
         selectedItemId={null} onSelectItem={vi.fn()} onToggleTask={vi.fn()}
         onCompleteRoutine={vi.fn()} onCompleteEvent={vi.fn()} loading={false}
         viewedDate={new Date()} onDateChange={vi.fn()}
@@ -144,6 +158,28 @@ describe('Today invariant: the PAGE does not grow with the backlog', () => {
     // at 5 items and at 500 alike.
     renderToday(backlog(500))
     expect(screen.getByRole('button', { name: 'Review' })).toBeInTheDocument()
+  })
+
+  it('the Needed Today note does not grow with backlog size', () => {
+    // Two genuinely marked items (neededOn = the viewed day), present in BOTH
+    // fixtures, so the note is non-empty at both backlog sizes — an empty
+    // note at both sizes would trivially satisfy an equality check without
+    // ever exercising the row-rendering path this guards.
+    const now = new Date()
+    const marked = [
+      task({ id: 'n1', title: 'Call plumber', neededOn: now }),
+      task({ id: 'n2', title: 'Buy diapers', neededOn: now }),
+    ]
+
+    const small = renderToday(backlog(5), marked)
+    const smallRows = small.queryAllByTestId('needed-today-row').length
+    expect(smallRows).toBe(2)
+    small.unmount()
+
+    const large = renderToday(backlog(500), marked)
+    const largeRows = large.queryAllByTestId('needed-today-row').length
+
+    expect(largeRows).toBe(smallRows)
   })
 })
 

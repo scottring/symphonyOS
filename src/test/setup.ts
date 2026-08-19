@@ -52,6 +52,15 @@ vi.mock('@/lib/supabase', () => {
         unsubscribe: vi.fn(),
       }),
     },
+    // Same shape as the real getAuthUser (src/lib/supabase.ts) — a cached-user
+    // read, not a network call. Defaults to no user, same as auth.getUser()
+    // above, so hooks that call this (e.g. useNeededListItems, now reached by
+    // every TodayView render via NeededTodayNote) short-circuit instead of
+    // throwing "no export defined on the mock". Tests that need a real user
+    // (useNeededListItems.test.ts, useRoutines.test.ts, ...) already override
+    // this whole module locally with their own vi.mock, which wins over this
+    // setup-level default.
+    getAuthUser: () => Promise.resolve({ data: { user: null }, error: null }),
   }
 })
 
