@@ -571,6 +571,8 @@ export function useSupabaseTasks() {
     links?: TaskLink[]
     needsDiscussion?: boolean
     discussionNote?: string
+    /** The day this task was marked "needed today". Carried on restore so undo doesn't drop the mark. */
+    neededOn?: Date
   }
 
   const addTask = useCallback(async (
@@ -625,6 +627,7 @@ export function useSupabaseTasks() {
       links: options?.links,
       needsDiscussion: options?.needsDiscussion,
       discussionNote: options?.discussionNote,
+      neededOn: options?.neededOn,
     }
     setTasks((prev) => [optimisticTask, ...prev])
 
@@ -662,6 +665,7 @@ export function useSupabaseTasks() {
         links: options?.links ?? null,
         needs_discussion: options?.needsDiscussion ?? false,
         discussion_note: options?.discussionNote ?? null,
+        needed_on: options?.neededOn ? localYmd(options.neededOn) : null,
       })
       .select()
       .single()

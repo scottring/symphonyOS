@@ -5,8 +5,9 @@ import type { TaskContext } from '@/types/task'
 import { formatTimeLong, formatTimeRangeLong, inferMealTime } from '@/lib/timeUtils'
 import { getProjectColor } from '@/lib/projectUtils'
 import { SchedulePopover, type ScheduleContextItem } from '@/components/triage'
+import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
 import { AssigneeDropdown, MultiAssigneeDropdown } from '@/components/family'
-import { Video, Tag, Check, Pencil, Hourglass, ListChecks, ChevronUp, ChevronDown, MessageCircle } from 'lucide-react'
+import { Video, Tag, Check, Pencil, Hourglass, ListChecks, ChevronUp, ChevronDown, MessageCircle, AlertCircle } from 'lucide-react'
 import { RowActionRail } from './RowActionRail'
 import { useMobile } from '@/hooks/useMobile'
 import { TaskCheckbox } from './TaskCheckbox'
@@ -204,6 +205,9 @@ export const ScheduleItem = memo(function ScheduleItem({
   belowTitleAccessory,
 }: ScheduleItemProps) {
   const isMobile = useMobile()
+  // Needed-today mark: STATE, so it lives with the title chips. The '...' menu
+  // (ScheduleItemActionsMenu) sets it via the same context handler.
+  const { onSetNeededToday } = useScheduleActionsContext()
   // Hover state powers the smooth expanding banner (location-only metadata row).
   // On mobile we never expand — preserves the pre-existing behavior where
   // these were never visible without hover.
@@ -625,6 +629,20 @@ export const ScheduleItem = memo(function ScheduleItem({
               >
                 <MessageCircle className="w-3.5 h-3.5" />
               </span>
+            )}
+            {/* Needed today mark — STATE, so it belongs with the title chips,
+                not the action rail. The '...' menu sets/clears it; clicking the
+                chip itself is a shortcut to clear. */}
+            {item.neededOn && !item.completed && (
+              <button
+                type="button"
+                title="Needed today — click to clear"
+                onClick={(e) => { e.stopPropagation(); onSetNeededToday?.(item.originalTask!.id, null) }}
+                className="hidden md:inline-flex shrink-0 items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-medium text-amber-700 bg-amber-100/70"
+              >
+                <AlertCircle className="w-3 h-3" aria-hidden />
+                Today
+              </button>
             )}
             {/* Subtask indicator — desktop only. A disclosure, not a label:
                 steps no longer earn their own Today rows (they used to inherit

@@ -593,6 +593,13 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
     };
   }, [tasks, lists, addList, deleteTask, addTask]);
 
+  const onSetNeededToday = useCallback(
+    (taskId: string, neededOn: Date | null) => {
+      void updateTask(taskId, { neededOn: neededOn ?? undefined });
+    },
+    [updateTask],
+  );
+
   const scheduleActionsValue = useMemo<ScheduleActionsValue>(
     () => ({
       // Planning
@@ -604,6 +611,7 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
       onUpdateTask: updateTask,
       onPushTask: pushTask,
       onDeleteTask: deleteTask,
+      onSetNeededToday,
       onCreateTask: onCreateTaskFromValue,
       onCreateTaskParsed,
       parserContext,
@@ -674,7 +682,7 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
       onUpdateEventProject: updateEventProject,
     }),
     [
-      toggleTask, toggleWaiting, updateTask, pushTask, deleteTask, onCreateTaskFromValue, onCreateTaskParsed, parserContext, currentDomain, resolverContext, getRecentTaskForContact, onCreateTaskAt, onCreateEventAt, onCreateRoutineAt, handleCreateFollowUp, handleGroupItems, handleAddToGroup, handleRemoveFromGroup, handleUngroup, undo.pushAction, updateTaskOrders,
+      toggleTask, toggleWaiting, updateTask, pushTask, deleteTask, onSetNeededToday, onCreateTaskFromValue, onCreateTaskParsed, parserContext, currentDomain, resolverContext, getRecentTaskForContact, onCreateTaskAt, onCreateEventAt, onCreateRoutineAt, handleCreateFollowUp, handleGroupItems, handleAddToGroup, handleRemoveFromGroup, handleUngroup, undo.pushAction, updateTaskOrders,
       setSelection, navigate,
       scheduleActions, updateRoutine, updateEventContext, updateEventSharedWithFamily, dismissShareNudge, hideEvent, handleDeleteEvent, sendTaskToBuy,
       contactsMap, projectsMap, projects, contacts, familyMembers, lists, listsByCategory,
