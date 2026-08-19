@@ -99,6 +99,9 @@ import { ErrorBoundary } from './components/ErrorBoundary'
 // Quick-capture window for the Mac shell (desktop/): a frameless Tauri window
 // loads /capture via the global hotkey. Lazy — browsers never fetch it.
 const CapturePage = lazy(() => import('./desktop/CapturePage').then((m) => ({ default: m.CapturePage })))
+// Design preview for the person-lane wall. Ungated like the kiosk routes so it
+// can be opened on the Pi without a session; carries no live data.
+const WallV2LanePreview = lazy(() => import('./components/wall-v2/WallV2LanePreview').then((m) => ({ default: m.WallV2LanePreview })))
 
 // P5 cutover (gated). /, /today, /inbox, /task/:id route to the new Shell-mounted
 // TasksApp when the flag is enabled, otherwise to legacy App.tsx. Both paths now
@@ -157,6 +160,7 @@ createRoot(document.getElementById('root')!).render(
               <Route path="/agent/*" element={cutoverShell} />
               <Route path="/wall/*" element={<Shell />} /> {/* wall kiosk: own auth, stays ungated */}
               <Route path="/wall-v2/*" element={<Shell />} />
+              <Route path="/wall-lanes" element={<Suspense fallback={null}><WallV2LanePreview /></Suspense>} />
               <Route path="/jobs/*" element={cutoverShell} />
               <Route path="/tasks-new/*" element={cutoverShell} />
               <Route path="/morning/*" element={cutoverShell} />
