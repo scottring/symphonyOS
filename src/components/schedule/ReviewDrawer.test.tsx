@@ -13,7 +13,6 @@ vi.mock('@/hooks/useEveningReflection', () => ({
 }))
 
 const today = new Date()
-const weekStart = new Date(today)
 
 const task = (p: Partial<Task>): Task => ({ id: 'x', title: 't', completed: false, ...p } as Task)
 const attn = (t: Task, ageDays: number): AttentionItem =>
@@ -23,7 +22,6 @@ const base = {
   isOpen: true as const,
   onClose: vi.fn(),
   viewedDate: today,
-  currentWeekStart: weekStart,
   onUpdateTask: vi.fn(),
   tasks: [] as Task[],
   attentionItems: [] as AttentionItem[],
@@ -97,35 +95,17 @@ describe('ReviewDrawer — morning goes straight to triage', () => {
       { bucket: 'someday', scheduledFor: undefined, isAllDay: undefined })
   })
 
-  it('shows the week pool with its own verdicts', () => {
+  it('never shows the week or month pools — those are header dropdowns, not review material', () => {
     render(<ReviewDrawer {...base} mode="morning" tasks={[
       task({ id: 'w1', title: 'Week thing', bucket: 'week' }),
-    ]} />)
-    expect(screen.getByText(/This week · 1/)).toBeInTheDocument()
-    expect(screen.getByText('Week thing')).toBeInTheDocument()
-    // The week pool never offers "This wk" — it is already there.
-    const weekRow = screen.getByText('Week thing').closest('li')!
-    expect(within(weekRow).queryByRole('button', { name: 'This wk' })).toBeNull()
-  })
-
-  it('keeps the month pool collapsed — a count you can open, not part of the review', async () => {
-    const { user } = render(<ReviewDrawer {...base} mode="morning" tasks={[
       task({ id: 'm1', title: 'Month thing', bucket: 'month' }),
-      task({ id: 'm2', title: 'Other month thing', bucket: 'month' }),
     ]} />)
-    // Collapsed by default: the count is visible, the rows are not.
-    const toggle = screen.getByRole('button', { name: /This month · 2/ })
-    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByText(/This week/)).not.toBeInTheDocument()
+    expect(screen.queryByText('Week thing')).not.toBeInTheDocument()
+    expect(screen.queryByText(/This month/)).not.toBeInTheDocument()
     expect(screen.queryByText('Month thing')).not.toBeInTheDocument()
-    // Opening it reveals the rows, with their verdicts.
-    await user.click(toggle)
-    expect(toggle).toHaveAttribute('aria-expanded', 'true')
-    expect(screen.getByText('Month thing')).toBeInTheDocument()
-    const row = screen.getByText('Month thing').closest('li')!
-    expect(within(row).getByRole('button', { name: 'Today' })).toBeInTheDocument()
-    // And it closes again.
-    await user.click(toggle)
-    expect(screen.queryByText('Month thing')).not.toBeInTheDocument()
+    // With no backlog either, the morning review is honestly empty.
+    expect(screen.getByText(/Nothing waiting/)).toBeInTheDocument()
   })
 
   it('offers Delete only when a delete handler exists', () => {

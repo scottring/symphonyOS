@@ -1,27 +1,28 @@
 import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { Sparkles, Check, ArrowRight, Moon, Sun, X, Trash2, ChevronRight } from 'lucide-react'
+import { Sparkles, Check, ArrowRight, Moon, Sun, X } from 'lucide-react'
 import type { Task } from '@/types/task'
 import type { AttentionItem } from '@/lib/today/attention'
-import { selectHorizonPool } from '@/lib/today/horizons'
 import { useEveningReflection } from '@/hooks/useEveningReflection'
+import { TriageRow, applyTriageVerdict, type Verdict } from './TriageRow'
 
 /**
  * The Review drawer — Today's planning ritual, in two flavors over one body.
  *
  *   evening ("End of day", ⋯ menu): celebrate wins, capture the highlight,
- *   sweep today's loose ends to tomorrow — then the shared triage sections.
+ *   sweep today's loose ends to tomorrow — then the backlog.
  *   morning ("Start the day", backlog footer → Review): straight to triage.
  *
- * The triage sections are the "active management" the passive footer line
- * couldn't provide, and they double as the review packet's carry-the-rung-
- * above rule: Backlog (carried-over + needs-attention, capped at
+ * The backlog section is the "active management" the passive footer line
+ * couldn't provide: carried-over + needs-attention, capped at
  * BACKLOG_SESSION_CAP oldest per session so it drains without any session
- * becoming a slog), This week (the current week's pool). This month is NOT
- * part of the review — it renders collapsed, a count you can open to look
- * at and pick from when you want to, never a list to wade through. Each
- * item gets a one-tap fate: Today / Tomorrow / This week / Someday / Delete.
- * Leaving an item alone is also a verdict — nothing is forced.
+ * becoming a slog. Each item gets a one-tap fate: Today / Tomorrow /
+ * This week / Someday / Delete. Leaving an item alone is also a verdict —
+ * nothing is forced.
+ *
+ * The week and month pools are NOT here. Scott, 2026-08-19: they must never
+ * be part of the daily review/planning session — they live as separate
+ * dropdowns in Today's controls strip (HorizonPoolDropdown), to look at and
+ * pick from only when desired.
  *
  * Verdicts write through the SAME handlers the page uses (pushTask /
  * updateTask / deleteTask), so drawer triage can't diverge from row triage.
@@ -41,7 +42,6 @@ interface ReviewDrawerProps {
   overdueTasks: Task[]
   /** The day being reviewed (usually today). */
   viewedDate: Date
-  currentWeekStart: Date
   onUpdateTask: (id: string, updates: Partial<Task>) => void
   onPushTask?: (id: string, target: Date | 'week' | 'month' | 'quarter') => void
   onDeleteTask?: (id: string) => void
@@ -53,66 +53,14 @@ function sameDay(a: Date | undefined, b: Date): boolean {
   return d.getFullYear() === b.getFullYear() && d.getMonth() === b.getMonth() && d.getDate() === b.getDate()
 }
 
-type Verdict = 'today' | 'tomorrow' | 'week' | 'someday' | 'deleted'
-
-const VERDICT_LABEL: Record<Verdict, string> = {
-  today: 'today', tomorrow: 'tomorrow', week: 'this week', someday: 'someday', deleted: 'deleted',
-}
-
-// One triage row, shared by every section. `offer` narrows the verbs: the week
-// pool doesn't offer "This week" (it's already there), etc. Module-level, not
-// defined inside the drawer — an inline component type is recreated every
-// render, so React remounts the whole list on each verdict.
-function TriageRow({ task, meta, offer, verdict, canDelete, onVerdict }: {
-  task: Task
-  meta?: string
-  offer: Verdict[]
-  verdict?: Verdict
-  canDelete: boolean
-  onVerdict: (task: Task, v: Verdict) => void
-}) {
-  return (
-    <li className="flex items-start gap-2 rounded-xl border border-neutral-100 bg-white px-3 py-2">
-      <span className={`flex-1 min-w-0 text-sm leading-snug ${verdict ? 'text-neutral-400' : 'text-neutral-700'}`}>
-        {task.title}
-        {meta && <span className="ml-2 text-xs text-neutral-400">{meta}</span>}
-      </span>
-      {verdict ? (
-        <span className="shrink-0 inline-flex items-center gap-1 text-xs text-primary-700">
-          <Check className="w-3 h-3" strokeWidth={3} /> {VERDICT_LABEL[verdict]}
-        </span>
-      ) : (
-        <span className="shrink-0 flex flex-wrap items-center justify-end gap-1">
-          {offer.map((v) => v === 'deleted' ? (
-            canDelete && (
-              <button key={v} type="button" onClick={() => onVerdict(task, v)} aria-label={`Delete "${task.title}"`}
-                className="p-1 rounded-md text-neutral-300 hover:text-red-600 hover:bg-red-50 transition-colors">
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
-            )
-          ) : (
-            <button key={v} type="button" onClick={() => onVerdict(task, v)}
-              className="text-xs font-medium px-2 py-1 rounded-md text-primary-700 bg-primary-50 hover:bg-primary-100 transition-colors">
-              {v === 'today' ? 'Today' : v === 'tomorrow' ? 'Tmrw' : v === 'week' ? 'This wk' : 'Someday'}
-            </button>
-          ))}
-        </span>
-      )}
-    </li>
-  )
-}
-
 export function ReviewDrawer({
   isOpen, mode, onClose, tasks, attentionItems, overdueTasks,
-  viewedDate, currentWeekStart, onUpdateTask, onPushTask, onDeleteTask,
+  viewedDate, onUpdateTask, onPushTask, onDeleteTask,
 }: ReviewDrawerProps) {
-  const navigate = useNavigate()
   const { highlight, setHighlight, notes, setNotes, save } = useEveningReflection(viewedDate)
   const [movedIds, setMovedIds] = useState<Set<string>>(() => new Set())
   // taskId → verdict label, for the resolved-state row rendering.
   const [verdicts, setVerdicts] = useState<Map<string, Verdict>>(() => new Map())
-  // The month pool is on-demand, not part of the review — closed each open.
-  const [monthOpen, setMonthOpen] = useState(false)
 
   const { completed, unfinished } = useMemo(() => {
     const onToday = tasks.filter((t) => sameDay(t.scheduledFor, viewedDate))
@@ -142,33 +90,10 @@ export function ReviewDrawer({
     return [...byId.values()].sort((x, y) => y.ageDays - x.ageDays)
   }, [overdueTasks, attentionItems, viewedDate])
 
-  const matchAll = useMemo(() => () => true, [])
-  const weekPool = useMemo(
-    () => selectHorizonPool(tasks, 'week', matchAll, currentWeekStart),
-    [tasks, matchAll, currentWeekStart],
-  )
-  const monthPool = useMemo(
-    () => selectHorizonPool(tasks, 'month', matchAll),
-    [tasks, matchAll],
-  )
-
   if (!isOpen) return null
 
   const apply = (t: Task, v: Verdict) => {
-    if (v === 'today') {
-      onPushTask?.(t.id, new Date(viewedDate))
-    } else if (v === 'tomorrow') {
-      const tomorrow = new Date(viewedDate)
-      tomorrow.setDate(tomorrow.getDate() + 1)
-      onPushTask?.(t.id, tomorrow)
-    } else if (v === 'week') {
-      onPushTask?.(t.id, 'week')
-    } else if (v === 'someday') {
-      // Same shape RescheduleButton writes — never a partial upsert.
-      onUpdateTask(t.id, { bucket: 'someday', scheduledFor: undefined, isAllDay: undefined })
-    } else {
-      onDeleteTask?.(t.id)
-    }
+    applyTriageVerdict(t, v, { viewedDate, onUpdateTask, onPushTask, onDeleteTask })
     setVerdicts((prev) => new Map(prev).set(t.id, v))
   }
 
@@ -318,51 +243,8 @@ export function ReviewDrawer({
             </section>
           )}
 
-          {/* This week — the current week's pool, seen and triageable. */}
-          {weekPool.length > 0 && (
-            <section className="space-y-2">
-              <div className="flex items-baseline justify-between">
-                <p className="text-sm font-medium text-neutral-700">This week · {weekPool.length}</p>
-                <button type="button" onClick={() => { void navigate('/week') }}
-                  className="text-xs text-primary-600 hover:text-primary-700">
-                  Open week bench →
-                </button>
-              </div>
-              <ul className="space-y-1.5">
-                {weekPool.map((t) => (
-                  <TriageRow key={t.id} task={t} offer={['today', 'tomorrow', 'someday', 'deleted']}
-                    verdict={verdicts.get(t.id)} canDelete={!!onDeleteTask} onVerdict={apply} />
-                ))}
-              </ul>
-            </section>
-          )}
-
-          {/* This month — the rung above, in view but not in the flow.
-              Collapsed by default: open it when you want to pick from it. */}
-          {monthPool.length > 0 && (
-            <section className="space-y-2">
-              <button
-                type="button"
-                onClick={() => setMonthOpen((v) => !v)}
-                aria-expanded={monthOpen}
-                className="w-full flex items-center gap-1.5 text-sm font-medium text-neutral-500 hover:text-neutral-700 transition-colors"
-              >
-                <ChevronRight className={`w-3.5 h-3.5 transition-transform ${monthOpen ? 'rotate-90' : ''}`} />
-                This month · {monthPool.length}
-              </button>
-              {monthOpen && (
-                <ul className="space-y-1.5">
-                  {monthPool.map((t) => (
-                    <TriageRow key={t.id} task={t} offer={['today', 'week', 'someday', 'deleted']}
-                      verdict={verdicts.get(t.id)} canDelete={!!onDeleteTask} onVerdict={apply} />
-                  ))}
-                </ul>
-              )}
-            </section>
-          )}
-
-          {backlogSlice.length === 0 && weekPool.length === 0 && monthPool.length === 0 && mode === 'morning' && (
-            <p className="text-sm text-neutral-500">Nothing waiting anywhere. Go live the day.</p>
+          {backlogSlice.length === 0 && mode === 'morning' && (
+            <p className="text-sm text-neutral-500">Nothing waiting. Go live the day.</p>
           )}
 
           {/* Close */}

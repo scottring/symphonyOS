@@ -57,6 +57,7 @@ import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
 import { getRoutinesForDatePure } from '@/lib/routineUtils'
 import { TodayOverflowMenu } from './TodayOverflowMenu'
 import { ReviewDrawer, type ReviewMode } from './ReviewDrawer'
+import { HorizonPoolDropdown } from './HorizonPoolDropdown'
 import { DayNavCluster } from './DayNavCluster'
 import { OverdueSection } from './OverdueSection'
 import { TodayBacklogFooter } from './TodayBacklogFooter'
@@ -303,6 +304,20 @@ export function TodayView({
       currentWeekStart, ctx.eventNotesMap, ctx.eventContextOverrides, ctx.getDomainForCalendar])
 
   const data = useTodayData(todayInput)
+
+  // The week/month pools for the header dropdowns — separate from the daily
+  // review by decree (Scott, 2026-08-19): look and pick from up here, never
+  // inside the review session. Unfiltered on purpose: the pools are a full
+  // census, not a view of the current assignee filter.
+  const poolMatchAll = useMemo(() => () => true, [])
+  const weekPool = useMemo(
+    () => selectHorizonPool(tasks, 'week', poolMatchAll, currentWeekStart),
+    [tasks, poolMatchAll, currentWeekStart],
+  )
+  const monthPool = useMemo(
+    () => selectHorizonPool(tasks, 'month', poolMatchAll),
+    [tasks, poolMatchAll],
+  )
 
   // ── Up Next: the single next commitment, highlighted in place. It used to
   // be lifted out of its section into a hero card, which left its home
@@ -856,6 +871,30 @@ export function TodayView({
         data-testid="today-controls"
         className="px-3 md:px-0 mb-3 md:-mt-5 hidden md:flex items-center justify-end gap-1"
       >
+        {/* The week/month pools — separate dropdowns, deliberately OUTSIDE
+            the review drawer. Always rendered (a place to look must always
+            be there); each opens to the same triage rows the drawer uses. */}
+        <HorizonPoolDropdown
+          label="Week"
+          tasks={weekPool}
+          offer={['today', 'tomorrow', 'someday', 'deleted']}
+          viewedDate={viewedDate}
+          onUpdateTask={(id, u) => onUpdateTask?.(id, u)}
+          onPushTask={ctx.onPushTask}
+          onDeleteTask={ctx.onDeleteTask}
+          benchRoute="/week"
+          benchLabel="Open week bench"
+        />
+        <HorizonPoolDropdown
+          label="Month"
+          tasks={monthPool}
+          offer={['today', 'week', 'someday', 'deleted']}
+          viewedDate={viewedDate}
+          onUpdateTask={(id, u) => onUpdateTask?.(id, u)}
+          onPushTask={ctx.onPushTask}
+          onDeleteTask={ctx.onDeleteTask}
+        />
+
         {onSelectAssignees && ((assigneesWithTasks?.length ?? 0) > 0 || hasUnassignedTasks) && (
           <AssigneeFilter
             selectedAssignees={selectedAssignees ?? []}
@@ -1177,7 +1216,6 @@ export function TodayView({
         attentionItems={data.attentionItems}
         overdueTasks={data.overdueTasks}
         viewedDate={viewedDate}
-        currentWeekStart={currentWeekStart}
         onUpdateTask={(id, u) => onUpdateTask?.(id, u)}
         onPushTask={ctx.onPushTask}
         onDeleteTask={ctx.onDeleteTask}

@@ -29,13 +29,14 @@ handlers the page rows use — pushTask / updateTask / deleteTask):
 1. **Backlog** — carried-over + attention, deduped, **oldest first, capped at
    5 per session** (`BACKLOG_SESSION_CAP`) with "+N more waiting". Oldest-first
    is the drain guarantee. Verdicts: Today · Tmrw · This wk · Someday · Delete.
-2. **This week · N** — `selectHorizonPool('week')` for the current week, plus
-   "Open week bench →". No "This wk" verb (it's already there).
-3. **This month · N** — the rung above, per the streamlined vision's
-   review-packet rule (packets always carry the rung above; no month page is
-   resurrected). Verdicts include This wk. **2026-08-19 (Scott, after first
-   real morning use): the month pool is NOT part of the review — it renders
-   collapsed (chevron + count), opened on demand to look at and pick from.**
+2. ~~This week · N~~ / ~~This month · N~~ — **REMOVED from the drawer
+   2026-08-19.** Scott, after first real morning use: the week and month
+   pools must NEVER be part of the daily review/planning session. They are
+   now separate dropdowns in Today's controls strip (`HorizonPoolDropdown`:
+   "Week · N" / "Month · N", next to the assignee filter and ⋯), opened on
+   demand to look at and pick from. Same triage rows (shared `TriageRow`),
+   same handler writes. Week offers no "This wk" verb; month does. The week
+   dropdown carries "Open week bench →".
 
 Leaving an item alone is always a legitimate verdict. Resolved rows show
 "✓ <fate>" in place.
@@ -50,4 +51,5 @@ re-enables intentionally from the ⋯ menu ("Show suggestions · N").
 
 ~~"This month · 48" renders all 48 rows (scrollable, last section). If that
 reads as endless in practice, cap it like the backlog.~~ Resolved 2026-08-19:
-the month section is collapsed by default; all rows render only when opened.
+the pools left the drawer entirely for the header dropdowns; rows render
+only inside an opened dropdown.
