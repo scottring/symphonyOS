@@ -75,9 +75,18 @@ Two properties drive this shape:
 
 ### Client
 
-`PlanItem` gains `existing: { taskId, currentLabel } | null`, where
-`currentLabel` is the matched task's present placement rendered for display —
-`"Inbox"`, `"This week"`, or a short date like `"Wed Aug 20"`.
+The edge function relays only what it read — `{ index, task_id, bucket,
+scheduled_for }`. All display and comparison logic lives client-side, where it is
+unit-testable without an edge runtime.
+
+`PlanItem` gains `existing: { taskId, label, placement } | null`:
+
+- `label` — the matched task's present placement rendered for display:
+  `"Inbox"`, `"This week"`, or a short date like `"Wed Aug 20"`.
+- `placement` — the same value as a `PlanPlacement`, so the sheet can compare it
+  against the row's target and detect the no-op case. It is `null` for `month`
+  and `quarter` buckets, which have no `PlanPlacement` equivalent; a null
+  placement never compares equal, so those always write.
 `validatePlanItems` merges the matches onto their items and re-validates
 client-side, as it already does for placement — a stale or hand-rolled response
 must not be able to move a task the user was never shown.
@@ -124,7 +133,8 @@ made.
 
 ## Testing
 
-**`planMatch.test.ts`** (Deno)
+**`planMatch.test.ts`** (vitest — `supabase/functions/**/*.test.ts` is in the
+vitest include, so edge modules are tested with the same runner as the client)
 - A returned id that was not in the candidate set is dropped.
 - Empty candidates short-circuit without making an API call.
 - Malformed JSON returns `[]` rather than throwing.
