@@ -78,6 +78,18 @@ describe('ScheduleItem — mobile needed today control', () => {
     expect(onSetNeededToday).toHaveBeenCalledWith('1', viewedDate)
   })
 
+  // The desktop chip has always carried `!item.completed`; the mobile control
+  // didn't, so a finished task kept a live amber marker on phones only.
+  it('hides the control once the task is completed', () => {
+    renderItem(
+      { completed: true, neededOn: new Date(2026, 7, 19) },
+      { viewedDate: new Date(2026, 7, 19) },
+    )
+
+    expect(screen.queryByLabelText('Not needed today')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Need today')).not.toBeInTheDocument()
+  })
+
   it('falls back to "now" when no viewedDate is supplied by the provider', () => {
     const { onSetNeededToday } = renderItem({ neededOn: undefined }, { viewedDate: undefined })
 

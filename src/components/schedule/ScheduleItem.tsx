@@ -395,7 +395,9 @@ export const ScheduleItem = memo(function ScheduleItem({
             definition of "marked" as the desktop chip/menu — bare truthiness
             of item.neededOn was a bug already fixed once there. */}
         <div className="flex items-center gap-1 shrink-0">
-          {isTask && onSetNeededToday && item.originalTask && (
+          {/* `!item.completed` matches the desktop chip: a done task is not
+              still "needed today", and an amber marker on it is a lie. */}
+          {isTask && onSetNeededToday && item.originalTask && !item.completed && (
             <button
               type="button"
               aria-label={isNeededToday ? 'Not needed today' : 'Need today'}

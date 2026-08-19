@@ -17,6 +17,13 @@ import { isSameDay } from '@/lib/dateUtils'
 /** Rows rendered before the note folds the rest behind "+N more". */
 export const NEEDED_TODAY_VISIBLE = 5
 
+/**
+ * Rows rendered once "+N more" is clicked. A bigger budget, not an unbounded
+ * one — Today is a fixed-space surface, and `Infinity` here would let a
+ * runaway marking session push the whole day below the fold.
+ */
+export const NEEDED_TODAY_EXPANDED_MAX = 20
+
 export type NeededKind = 'buy' | 'discuss' | 'urgent'
 
 export interface NeededItem {

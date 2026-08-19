@@ -39,8 +39,6 @@ import { Eye, EyeOff, Repeat, Binoculars, Printer, GripVertical, CalendarClock, 
 import { useNavigate } from 'react-router-dom'
 import { AssigneeFilter } from '@/components/home/AssigneeFilter'
 
-import { useListsContextOrNull } from '@/contexts/ListsContext'
-import { announceToBuyChanged } from '@/lib/lists/toBuy'
 import { NeededTodayNote } from './NeededTodayNote'
 import { TodayAddInput } from './TodayAddInput'
 import { TodaySectionList, findTimelineItem } from './TodaySectionList'
@@ -164,23 +162,10 @@ export function TodayView({
     contactsMap, familyMembers = [],
     eventNotesMap,
   } = ctx
-  // Shared ListsContext (not a private useLists()) — same reasoning as
-  // ToBuyLine: a lazily-created list is invisible to a private instance
-  // until reload. Null-tolerant so a provider-less mount renders the note's
-  // list-item toggle as a no-op instead of throwing.
-  const listsCtx = useListsContextOrNull()
-  const handleToggleNeededListItem = useCallback((id: string) => {
-    void (async () => {
-      await listsCtx?.updateItem(id, { completed: true })
-      // useNeededListItems fetches once on mount and otherwise only refetches
-      // on this event (see its own effect) — ListsContext.updateItem doesn't
-      // fire it. Without this the DB row completes but the note keeps
-      // showing the row with a checked, uncontrolled checkbox until remount.
-      // Same signal ToBuyLine's count and useNeededListItems's own list
-      // fetch already key off.
-      announceToBuyChanged()
-    })()
-  }, [listsCtx])
+  // NOTE: completing a Needed Today list-item row is NOT wired from here.
+  // It belongs to useNeededListItems (which the note owns), because
+  // ListsContext.updateItem early-returns on any row that isn't in the open
+  // list — and no list is ever open on Today.
 
   // ── Bulk multi-select (hover checkbox on any row → bottom action bar) ──────
   const [selectedKeys, setSelectedKeys] = useState<Set<string>>(() => new Set())
@@ -997,7 +982,6 @@ export function TodayView({
           tasks={tasks}
           viewedDate={viewedDate}
           onToggleTask={onToggleTask}
-          onToggleListItem={handleToggleNeededListItem}
           onOpenTask={(id) => handleSelectItem(`task-${id}`)}
         />
 

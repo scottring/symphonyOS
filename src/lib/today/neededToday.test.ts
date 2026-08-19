@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { neededToday, NEEDED_TODAY_VISIBLE } from './neededToday'
+import { neededToday, NEEDED_TODAY_VISIBLE, NEEDED_TODAY_EXPANDED_MAX } from './neededToday'
 import type { Task } from '@/types/task'
 import type { ListItem } from '@/types/list'
 
@@ -91,5 +91,17 @@ describe('neededToday', () => {
     const { items, overflow } = neededToday(many, [], DAY, SHOPPING, Infinity)
     expect(items).toHaveLength(8)
     expect(overflow).toBe(0)
+  })
+
+  // The expanded note is a bigger budget, not an unbounded one — Today is a
+  // fixed-space surface and the note must never be able to push the day off it.
+  it('still folds past the expanded cap', () => {
+    const many = Array.from(
+      { length: NEEDED_TODAY_EXPANDED_MAX + 4 },
+      (_, n) => task({ id: `t${n}`, neededOn: DAY }),
+    )
+    const { items, overflow } = neededToday(many, [], DAY, SHOPPING, NEEDED_TODAY_EXPANDED_MAX)
+    expect(items).toHaveLength(NEEDED_TODAY_EXPANDED_MAX)
+    expect(overflow).toBe(4)
   })
 })

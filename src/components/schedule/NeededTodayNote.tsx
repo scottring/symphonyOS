@@ -10,13 +10,13 @@ import { ShoppingBag, MessageCircle, AlertCircle } from 'lucide-react'
 import type { Task } from '@/types/task'
 import { useListsContextOrNull } from '@/contexts/ListsContext'
 import { useNeededListItems } from '@/hooks/useNeededListItems'
-import { neededToday, type NeededKind } from '@/lib/today/neededToday'
+import { localYmd } from '@/lib/cadence/config'
+import { neededToday, NEEDED_TODAY_EXPANDED_MAX, type NeededKind } from '@/lib/today/neededToday'
 
 interface NeededTodayNoteProps {
   tasks: Task[]
   viewedDate: Date
   onToggleTask: (id: string) => void
-  onToggleListItem: (id: string) => void
   onOpenTask: (id: string) => void
 }
 
@@ -27,9 +27,16 @@ const KIND_ICON: Record<NeededKind, typeof ShoppingBag> = {
 }
 
 export function NeededTodayNote({
-  tasks, viewedDate, onToggleTask, onToggleListItem, onOpenTask,
+  tasks, viewedDate, onToggleTask, onOpenTask,
 }: NeededTodayNoteProps) {
-  const [expanded, setExpanded] = useState(false)
+  // Expansion is scoped to the day it was opened on, not held across
+  // navigation: "+N more" is a decision about THIS day's note. Derived from
+  // render rather than reset in an effect — changing the date collapses the
+  // note in the same pass that redraws it, so Today's fixed-space invariant
+  // never briefly breaks on a different day's rows.
+  const day = localYmd(viewedDate)
+  const [expandedDay, setExpandedDay] = useState<string | null>(null)
+  const expanded = expandedDay === day
 
   // The SHARED context, not a private useLists(): a lazily-created list is
   // invisible to a private instance until reload. Null-tolerant so a
@@ -37,9 +44,14 @@ export function NeededTodayNote({
   const ctx = useListsContextOrNull()
   const lists = ctx?.lists
 
+  // The lists this user can see — the note's read scope, matching /lists.
+  // A family "To buy" list carries other members' items, and their marks
+  // belong on this note too. See useNeededListItems.
+  const listIds = useMemo(() => (lists ?? []).map((l) => l.id), [lists])
+
   // NOT ctx.listItems — those are scoped to the open list and are empty on
   // Today. See useNeededListItems.
-  const { items: listItems } = useNeededListItems(viewedDate)
+  const { items: listItems, complete: completeListItem } = useNeededListItems(viewedDate, listIds)
 
   // Memoised like every other derived-list computation on Today (see
   // ClarityIndicator, InboxView, OverdueSection, ReviewDrawer): a fresh Set
@@ -59,7 +71,10 @@ export function NeededTodayNote({
       listItems,
       viewedDate,
       shoppingListIds,
-      expanded ? Infinity : undefined,
+      // Expanded is a bigger budget, NOT an unbounded one: Today's whole
+      // premise is fixed space, and an uncapped note could push the day off
+      // screen. Anything past the cap stays behind the count.
+      expanded ? NEEDED_TODAY_EXPANDED_MAX : undefined,
     ),
     [tasks, listItems, viewedDate, shoppingListIds, expanded],
   )
@@ -85,30 +100,42 @@ export function NeededTodayNote({
                 aria-label={item.title}
                 className="w-3.5 h-3.5 rounded border-neutral-300"
                 onChange={() =>
-                  item.source === 'task' ? onToggleTask(item.id) : onToggleListItem(item.id)
+                  item.source === 'task' ? onToggleTask(item.id) : void completeListItem(item.id)
                 }
               />
               <Icon className="w-3.5 h-3.5 shrink-0 text-amber-600/70" aria-hidden />
-              <button
-                type="button"
-                className="text-left text-[13px] text-neutral-700 hover:text-neutral-900"
-                onClick={() => item.source === 'task' && onOpenTask(item.id)}
-              >
-                {item.title}
-              </button>
+              {/* A list item has no detail surface to open, so its title is
+                  plain text — a button with no handler still reads as
+                  clickable and rewards the tap with nothing. */}
+              {item.source === 'task' ? (
+                <button
+                  type="button"
+                  className="text-left text-[13px] text-neutral-700 hover:text-neutral-900"
+                  onClick={() => onOpenTask(item.id)}
+                >
+                  {item.title}
+                </button>
+              ) : (
+                <span className="text-left text-[13px] text-neutral-700">{item.title}</span>
+              )}
             </li>
           )
         })}
       </ul>
-      {overflow > 0 && !expanded && (
+      {/* Expanded still has a cap, so overflow can survive expansion. Say so
+          in plain text rather than dropping the count — a note that silently
+          omits rows is worse than one that admits it. */}
+      {overflow > 0 && (expanded ? (
+        <div className="mt-1 text-[12px] text-amber-700/70">+{overflow} more</div>
+      ) : (
         <button
           type="button"
-          onClick={() => setExpanded(true)}
+          onClick={() => setExpandedDay(day)}
           className="mt-1 text-[12px] text-amber-700/70 hover:text-amber-800"
         >
           +{overflow} more
         </button>
-      )}
+      ))}
     </div>
   )
 }
