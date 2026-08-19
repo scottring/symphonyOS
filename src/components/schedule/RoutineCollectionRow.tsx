@@ -25,6 +25,11 @@ function fmt(t: string | null): string {
   return `${hr}:${String(m).padStart(2, '0')} ${ampm}`
 }
 
+/** Same label from a Date, for the block's own slot. */
+function fmtAt(d: Date): string {
+  return fmt(`${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`)
+}
+
 /** Compact pill label, e.g. "7a", "10a", "1:30p". */
 function fmtShort(t: string | null): string {
   if (!t) return 'anytime'
@@ -42,6 +47,10 @@ export function RoutineCollectionRow({ item, onSelect, onSelectStep, onCompleteS
   const [menuTime, setMenuTime] = useState('')
   const p = item.collectionProgress ?? { done: 0, total: 0 }
   const nextUp = item.collectionNextUp
+  // Agenda gutter: the next unresolved dose, falling back to the block's own
+  // slot once everything is resolved. The time lives in the gutter like every
+  // other row rather than trailing the title.
+  const gutterLabel = nextUp?.time ? fmt(nextUp.time) : item.startTime ? fmtAt(new Date(item.startTime)) : ''
 
   /** A dose whose slot time has passed and is still unresolved. */
   const isPastDue = (dose: CollectionDose): boolean => {
@@ -75,19 +84,34 @@ export function RoutineCollectionRow({ item, onSelect, onSelectStep, onCompleteS
     onCompleteStep(dose.id, true)
   }
   return (
-    <div className={`${open ? 'rounded-xl' : 'rounded-full'} border border-neutral-200 bg-white`}>
-      {/* Collapsed: a single slim line — name · progress · next step — so the
-          routine reads as a pill on the timeline instead of a two-line card. */}
-      <div className="flex items-center min-w-0">
-        <button onClick={() => setOpen(o => !o)} className="flex-1 flex items-center gap-2 px-3 py-1.5 text-left min-w-0">
-          {open ? <ChevronDown className="w-4 h-4 text-neutral-400 shrink-0" /> : <ChevronRight className="w-4 h-4 text-neutral-400 shrink-0" />}
+    // Same wrapper a task/event row uses (px-3 + 1px transparent border), so
+    // the columns below line up with them to the pixel and the row picks up the
+    // identical hover tint instead of announcing itself with a card.
+    <div className="group rounded-xl border border-transparent px-3 py-2 md:py-1 transition-all duration-200 hover:bg-primary-50/50 hover:border-primary-100">
+      {/* Collapsed: a plain agenda row, not a card. The column widths mirror
+          ScheduleItem (pl-5 bulk gutter, w-16 time, w-5 control) so a routine
+          lines up with the tasks and events around it; the chevron sits where
+          their check circle does and is the only affordance saying "expands". */}
+      <div className="flex items-center gap-3 pl-5 min-w-0">
+        <div className="w-16 shrink-0 text-xs font-medium tabular-nums text-neutral-500">
+          {gutterLabel || <span className="text-neutral-300">—</span>}
+        </div>
+        <button
+          onClick={() => setOpen(o => !o)}
+          aria-expanded={open}
+          aria-label={open ? `Collapse ${item.title}` : `Expand ${item.title}`}
+          className="w-5 shrink-0 flex items-center justify-center text-neutral-400 hover:text-neutral-600 transition-colors"
+        >
+          {open ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+        </button>
+        <button onClick={() => setOpen(o => !o)} className="flex-1 flex items-center gap-2 py-1.5 text-left min-w-0">
           <span className="text-sm font-medium text-neutral-800 truncate shrink-0 max-w-[50%]">{item.title}</span>
           <span className="text-xs text-neutral-400 tabular-nums shrink-0">{p.done}/{p.total}</span>
           {item.completed
             ? <span className="text-xs text-neutral-400 truncate">· done</span>
             : nextUp && (
                 <span className="text-xs text-neutral-500 truncate min-w-0">
-                  · {fmt(nextUp.time)} {nextUp.stepName}
+                  · {nextUp.stepName}
                 </span>
               )}
         </button>
@@ -138,8 +162,11 @@ export function RoutineCollectionRow({ item, onSelect, onSelectStep, onCompleteS
           )}
         </div>
       </div>
+      {/* Expanded steps hang off the title column (ml-32 = pl-5 + w-16 + gap-3
+          + w-5 + gap-3) with a hairline rail, so they read as nested under the
+          routine without reintroducing a card. */}
       {open && (
-        <div className="border-t border-neutral-100 px-3 py-2 space-y-2.5">
+        <div className="ml-32 border-l border-neutral-200 pl-3 py-1 space-y-2.5">
           {/* Bulk resolve: complete or skip every remaining dose in one tap. */}
           {!item.completed && (item.collectionSteps ?? []).some(g => g.doses.some(d => !d.completed && !d.skipped)) && (
             <div className="flex justify-end gap-3">
@@ -239,7 +266,7 @@ export function RoutineCollectionRow({ item, onSelect, onSelectStep, onCompleteS
                                 ? 'bg-neutral-100 border-neutral-200 text-neutral-400 line-through'
                                 : pastDue
                                 ? 'bg-amber-50 border-amber-300 text-amber-700 hover:border-amber-400'
-                                : 'bg-white border-neutral-300 text-neutral-600 hover:border-primary-300'
+                                : 'bg-bg-base border-neutral-300 text-neutral-600 hover:border-primary-300'
                             }`}
                           >
                             {fmtShort(dose.time)}
