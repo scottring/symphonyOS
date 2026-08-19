@@ -26,13 +26,16 @@ interface HorizonPoolDropdownProps {
   onUpdateTask: (id: string, updates: Partial<Task>) => void
   onPushTask?: (id: string, target: Date | 'week' | 'month' | 'quarter') => void
   onDeleteTask?: (id: string) => void
+  /** Completes a pool item in place — the page's toggle handler, so
+   * completion side effects (linger, follow-ups) stay consistent. */
+  onCompleteTask?: (id: string) => void
   /** Route for the pool's full bench, e.g. '/week'. Renders an open link. */
   benchRoute?: string
   benchLabel?: string
 }
 
 export function HorizonPoolDropdown({
-  label, tasks, offer, viewedDate, onUpdateTask, onPushTask, onDeleteTask, benchRoute, benchLabel,
+  label, tasks, offer, viewedDate, onUpdateTask, onPushTask, onDeleteTask, onCompleteTask, benchRoute, benchLabel,
 }: HorizonPoolDropdownProps) {
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
@@ -45,6 +48,13 @@ export function HorizonPoolDropdown({
     applyTriageVerdict(t, v, { viewedDate, onUpdateTask, onPushTask, onDeleteTask })
     setVerdicts((prev) => new Map(prev).set(t.id, v))
   }
+
+  const onComplete = onCompleteTask
+    ? (t: Task) => {
+        onCompleteTask(t.id)
+        setVerdicts((prev) => new Map(prev).set(t.id, 'completed' as Verdict))
+      }
+    : undefined
 
   return (
     <div className="relative">
@@ -75,7 +85,8 @@ export function HorizonPoolDropdown({
               <ul className="space-y-1.5">
                 {tasks.map((t) => (
                   <TriageRow key={t.id} task={t} offer={offer}
-                    verdict={verdicts.get(t.id)} canDelete={!!onDeleteTask} onVerdict={onVerdict} />
+                    verdict={verdicts.get(t.id)} canDelete={!!onDeleteTask}
+                    onVerdict={onVerdict} onComplete={onComplete} />
                 ))}
               </ul>
             )}

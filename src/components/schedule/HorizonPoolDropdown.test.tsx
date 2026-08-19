@@ -54,6 +54,28 @@ describe('HorizonPoolDropdown — the pools live up here, never in the review', 
     expect(screen.getByRole('button', { name: 'This wk' })).toBeInTheDocument()
   })
 
+  it('the checkbox completes an item through the page toggle handler', async () => {
+    const onCompleteTask = vi.fn()
+    const { user } = render(<HorizonPoolDropdown {...base} label="Month"
+      offer={['today', 'week', 'someday', 'deleted']} onCompleteTask={onCompleteTask}
+      tasks={[task({ id: 'm1', title: 'Month thing', bucket: 'month' })]} />)
+    await user.click(screen.getByRole('button', { name: /Month · 1/ }))
+    const row = screen.getByText('Month thing').closest('li')!
+    await user.click(within(row).getByRole('button', { name: 'Complete "Month thing"' }))
+    expect(onCompleteTask).toHaveBeenCalledWith('m1')
+    expect(within(row).getByText('done')).toBeInTheDocument()
+    // Resolved rows offer no further fates.
+    expect(within(row).queryByRole('button', { name: 'Today' })).toBeNull()
+  })
+
+  it('without a complete handler there is no checkbox', async () => {
+    const { user } = render(<HorizonPoolDropdown {...base} label="Week"
+      offer={['today', 'tomorrow', 'someday', 'deleted']}
+      tasks={[task({ id: 'w1', title: 'Week thing', bucket: 'week' })]} />)
+    await user.click(screen.getByRole('button', { name: /Week · 1/ }))
+    expect(screen.queryByRole('button', { name: /Complete "Week thing"/ })).toBeNull()
+  })
+
   it('an empty pool still has a trigger — the place to look is always there', async () => {
     const { user } = render(<HorizonPoolDropdown {...base} label="Week"
       offer={['today', 'tomorrow', 'someday', 'deleted']} tasks={[]} />)

@@ -11,10 +11,11 @@ import type { Task } from '@/types/task'
  * render, so React remounts the whole list on each verdict.
  */
 
-export type Verdict = 'today' | 'tomorrow' | 'week' | 'someday' | 'deleted'
+export type Verdict = 'today' | 'tomorrow' | 'week' | 'someday' | 'deleted' | 'completed'
 
 export const VERDICT_LABEL: Record<Verdict, string> = {
   today: 'today', tomorrow: 'tomorrow', week: 'this week', someday: 'someday', deleted: 'deleted',
+  completed: 'done',
 }
 
 interface VerdictHandlers {
@@ -43,17 +44,37 @@ export function applyTriageVerdict(t: Task, v: Verdict, h: VerdictHandlers): voi
   }
 }
 
-export function TriageRow({ task, meta, offer, verdict, canDelete, onVerdict }: {
+export function TriageRow({ task, meta, offer, verdict, canDelete, onVerdict, onComplete }: {
   task: Task
   meta?: string
   offer: Verdict[]
   verdict?: Verdict
   canDelete: boolean
   onVerdict: (task: Task, v: Verdict) => void
+  /** When provided, the row leads with a complete checkbox — sometimes the
+   * right fate for a pool item is "actually, that's already done". */
+  onComplete?: (task: Task) => void
 }) {
   return (
     <li className="flex items-start gap-2 rounded-xl border border-neutral-100 bg-white px-3 py-2">
-      <span className={`flex-1 min-w-0 text-sm leading-snug ${verdict ? 'text-neutral-400' : 'text-neutral-700'}`}>
+      {onComplete && (
+        <button
+          type="button"
+          onClick={() => onComplete(task)}
+          disabled={!!verdict}
+          aria-label={`Complete "${task.title}"`}
+          className={`mt-0.5 shrink-0 w-4 h-4 rounded-full border-2 inline-flex items-center justify-center transition-colors ${
+            verdict === 'completed'
+              ? 'border-primary-500 bg-primary-500'
+              : verdict
+                ? 'border-neutral-200'
+                : 'border-neutral-300 hover:border-primary-500'
+          }`}
+        >
+          {verdict === 'completed' && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
+        </button>
+      )}
+      <span className={`flex-1 min-w-0 text-sm leading-snug ${verdict ? 'text-neutral-400' : 'text-neutral-700'} ${verdict === 'completed' ? 'line-through' : ''}`}>
         {task.title}
         {meta && <span className="ml-2 text-xs text-neutral-400">{meta}</span>}
       </span>

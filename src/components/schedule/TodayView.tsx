@@ -882,6 +882,7 @@ export function TodayView({
           onUpdateTask={(id, u) => onUpdateTask?.(id, u)}
           onPushTask={ctx.onPushTask}
           onDeleteTask={ctx.onDeleteTask}
+          onCompleteTask={onToggleTask}
           benchRoute="/week"
           benchLabel="Open week bench"
         />
@@ -893,6 +894,7 @@ export function TodayView({
           onUpdateTask={(id, u) => onUpdateTask?.(id, u)}
           onPushTask={ctx.onPushTask}
           onDeleteTask={ctx.onDeleteTask}
+          onCompleteTask={onToggleTask}
         />
 
         {onSelectAssignees && ((assigneesWithTasks?.length ?? 0) > 0 || hasUnassignedTasks) && (
