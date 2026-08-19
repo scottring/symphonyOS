@@ -13,13 +13,13 @@
 ## Re-deriving at a different size
 
 Master: `docs/superpowers/specs/assets/wall-portraits-source.jpg` — a 1254x1254
-2x2 grid (Iris TL, Scott TR, Ella BL, Kaleb BR) with a ~10px white gutter at
+2x2 grid (Iris TL, Scott TR, Kaleb BL, Ella BR) with a ~10px white gutter at
 x=627 / y=627. Tile crops that clear the gutter cleanly:
 
     magick source.jpg -crop 600x600+11+11   +repage iris.png
     magick source.jpg -crop 600x600+642+11  +repage scott.png
-    magick source.jpg -crop 600x600+11+642  +repage ella.png
-    magick source.jpg -crop 600x600+642+642 +repage kaleb.png
+    magick source.jpg -crop 600x600+11+642  +repage kaleb.png
+    magick source.jpg -crop 600x600+642+642 +repage ella.png
 
 600px is the ceiling this master supports. If the person-lane redesign needs
 larger, re-export from the original generation rather than upscaling.
