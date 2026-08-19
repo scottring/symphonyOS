@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { ScheduleActionsProvider, type ScheduleActionsValue } from '@/contexts/ScheduleActionsContext'
@@ -70,5 +71,43 @@ describe('ScheduleItem — needed today chip', () => {
     const viewedDate = new Date(2026, 7, 19)
     renderItem({ neededOn: new Date(2026, 7, 19), completed: true }, { viewedDate })
     expect(screen.queryByText('Today')).not.toBeInTheDocument()
+  })
+
+  // Regression: onSetNeededToday must stamp the VIEWED day, not the real
+  // current day. A write of `new Date()` while browsing a different day would
+  // disagree with the read side (isSameDay against viewedDate) — the click
+  // would produce a mark with zero visible feedback: no chip here, and the
+  // item would silently show up back on today's real page instead. This is a
+  // full round trip (menu write → chip read) against a viewedDate far from the
+  // real "now", so it fails on the pre-fix `new Date()` write regardless of
+  // what day the suite happens to run on.
+  it('marking via the menu while viewing a different day makes the chip appear on THAT day (not the real today)', () => {
+    function StatefulItem() {
+      const viewedDate = new Date(2026, 0, 5) // Jan 5, 2026 — not "real today"
+      const [neededOn, setNeededOn] = useState<Date | undefined>(undefined)
+      const value = {
+        onToggleTask: vi.fn(),
+        projects: [], contacts: [], familyMembers: [], lists: [],
+        onSetNeededToday: (_id: string, d: Date | null) => setNeededOn(d ?? undefined),
+        viewedDate,
+      } as unknown as ScheduleActionsValue
+      return (
+        <ScheduleActionsProvider value={value}>
+          <ScheduleItem
+            item={{ ...baseItem, neededOn } as TimelineItem}
+            onSelect={vi.fn()}
+            onToggleComplete={vi.fn()}
+          />
+        </ScheduleActionsProvider>
+      )
+    }
+
+    render(<StatefulItem />)
+    expect(screen.queryByText('Today')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByLabelText('Item actions'))
+    fireEvent.click(screen.getByText('Need today'))
+
+    expect(screen.getByText('Today')).toBeInTheDocument()
   })
 })
