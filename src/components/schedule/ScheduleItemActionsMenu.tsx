@@ -245,7 +245,12 @@ export function ScheduleItemActionsMenu({ item, onOpenDetail, onUpdateDiscussion
                 type="button"
                 role="menuitem"
                 onClick={run(() =>
-                  ctx.onSetNeededToday!(item.originalTask!.id, isNeededToday ? null : new Date()),
+                  // Stamp the VIEWED day, not the real day — a write of `new
+                  // Date()` while browsing a different day would disagree with
+                  // both read sites (chip, this menu), which compare against
+                  // `ctx.viewedDate`: the click would silently produce a mark
+                  // that shows up on a page the user isn't looking at.
+                  ctx.onSetNeededToday!(item.originalTask!.id, isNeededToday ? null : (ctx.viewedDate ?? new Date())),
                 )}
                 className="flex w-full text-left items-center gap-2.5 px-3 py-2.5 text-sm text-neutral-700 hover:bg-neutral-50"
               >

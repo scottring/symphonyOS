@@ -69,4 +69,21 @@ describe('ScheduleItemActionsMenu — needed today', () => {
     fireEvent.click(screen.getByText('Need today'))
     expect(onSetNeededToday).toHaveBeenCalledWith('a', expect.any(Date))
   })
+
+  // Regression: the write must stamp the VIEWED day, not the real current
+  // day — otherwise it disagrees with both read sites (this menu's own
+  // "Need today"/"Not needed today" label and the row's chip), which compare
+  // the mark against ctx.viewedDate. viewedDate here is deliberately far from
+  // whatever day the test happens to run on.
+  it('stamps the VIEWED day, not the real day, when marking', () => {
+    const onSetNeededToday = vi.fn()
+    const viewedDate = new Date(2026, 0, 5) // Jan 5, 2026
+    renderMenu({ item: taskItem({ id: 'a' }), onSetNeededToday, viewedDate })
+    fireEvent.click(screen.getByLabelText('Item actions'))
+    fireEvent.click(screen.getByText('Need today'))
+    const stamped = onSetNeededToday.mock.calls[0][1] as Date
+    expect(stamped.getFullYear()).toBe(2026)
+    expect(stamped.getMonth()).toBe(0)
+    expect(stamped.getDate()).toBe(5)
+  })
 })
