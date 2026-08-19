@@ -40,6 +40,7 @@ import { useNavigate } from 'react-router-dom'
 import { AssigneeFilter } from '@/components/home/AssigneeFilter'
 
 import { useListsContextOrNull } from '@/contexts/ListsContext'
+import { announceToBuyChanged } from '@/lib/lists/toBuy'
 import { NeededTodayNote } from './NeededTodayNote'
 import { TodayAddInput } from './TodayAddInput'
 import { TodaySectionList, findTimelineItem } from './TodaySectionList'
@@ -169,7 +170,16 @@ export function TodayView({
   // list-item toggle as a no-op instead of throwing.
   const listsCtx = useListsContextOrNull()
   const handleToggleNeededListItem = useCallback((id: string) => {
-    void listsCtx?.updateItem(id, { completed: true })
+    void (async () => {
+      await listsCtx?.updateItem(id, { completed: true })
+      // useNeededListItems fetches once on mount and otherwise only refetches
+      // on this event (see its own effect) — ListsContext.updateItem doesn't
+      // fire it. Without this the DB row completes but the note keeps
+      // showing the row with a checked, uncontrolled checkbox until remount.
+      // Same signal ToBuyLine's count and useNeededListItems's own list
+      // fetch already key off.
+      announceToBuyChanged()
+    })()
   }, [listsCtx])
 
   // ── Bulk multi-select (hover checkbox on any row → bottom action bar) ──────
