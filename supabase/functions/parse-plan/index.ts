@@ -9,6 +9,7 @@
 // weekday↔date calendar so the model never does date arithmetic.
 // Auth: user JWT (same pattern as analyze-capture / symphony-agent).
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { matchPlanItems, callHaiku, MAX_CANDIDATES, type MatchCandidate } from '../_shared/planMatch.ts'
 
 const MODEL = 'claude-sonnet-4-6'
 const MAX_ITEMS = 40
@@ -132,6 +133,28 @@ async function callVision(imageUrl: string, prompt: string, apiKey: string): Pro
   return text
 }
 
+interface OpenTaskRow {
+  id: string
+  title: string
+  bucket: string | null
+  scheduled_for: string | null
+}
+
+/** The user's open tasks, read through THEIR token so RLS applies. The
+ *  service-role client must never read user rows here — it bypasses RLS and
+ *  would surface other household members' tasks as match candidates. */
+async function fetchOpenTasks(url: string, anonKey: string, authHeader: string): Promise<OpenTaskRow[]> {
+  const asUser = createClient(url, anonKey, { global: { headers: { Authorization: authHeader } } })
+  const { data, error } = await asUser
+    .from('tasks')
+    .select('id, title, bucket, scheduled_for')
+    .eq('completed', false)
+    .order('created_at', { ascending: false })
+    .limit(MAX_CANDIDATES)
+  if (error) throw new Error(`Could not read open tasks: ${error.message}`)
+  return (data ?? []) as OpenTaskRow[]
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   if (req.method !== 'POST') return json({ error: 'POST only' }, 405)
@@ -142,7 +165,8 @@ Deno.serve(async (req) => {
   const apiKey = Deno.env.get('ANTHROPIC_API_KEY')
   const url = Deno.env.get('SUPABASE_URL')
   const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-  if (!apiKey || !url || !serviceKey) return json({ error: 'Missing server config' }, 500)
+  const anonKey = Deno.env.get('SUPABASE_ANON_KEY')
+  if (!apiKey || !url || !serviceKey || !anonKey) return json({ error: 'Missing server config' }, 500)
 
   const token = authHeader.slice('Bearer '.length)
   const service = createClient(url, serviceKey)
@@ -189,7 +213,25 @@ Deno.serve(async (req) => {
       new Set(members.map((m) => m.id)),
     )
 
-    return json({ ok: true, items })
+    // Matching runs AFTER transcription and is fully contained: any failure
+    // here returns an unflagged page rather than losing the parse.
+    let matches: { index: number; task_id: string; bucket: string | null; scheduled_for: string | null }[] = []
+    try {
+      const open = await fetchOpenTasks(url, anonKey, authHeader)
+      const candidates: MatchCandidate[] = open.map((t) => ({ id: t.id, title: t.title }))
+      const byId = new Map(open.map((t) => [t.id, t]))
+      matches = (await matchPlanItems(items.map((i) => i.title), candidates, callHaiku(apiKey)))
+        .flatMap((m) => {
+          const row = byId.get(m.taskId)
+          return row
+            ? [{ index: m.index, task_id: m.taskId, bucket: row.bucket, scheduled_for: row.scheduled_for }]
+            : []
+        })
+    } catch (e) {
+      console.error('parse-plan match step failed:', e instanceof Error ? e.message : String(e))
+    }
+
+    return json({ ok: true, items, matches })
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
     console.error('parse-plan failed:', message)
