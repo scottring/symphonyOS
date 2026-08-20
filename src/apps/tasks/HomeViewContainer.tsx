@@ -19,7 +19,8 @@ import { PlanningSession } from '@/components/lazy';
 import { LoadingFallback } from '@/components/layout/LoadingFallback';
 import { isEverydayRoutine, scheduleRoutineOnDate } from '@/lib/routineUtils';
 import { PlanFromPaperFlow } from '@/components/capture/PlanFromPaperFlow';
-import { planItemToAddTaskArgs, type PlanItem } from '@/lib/planParse';
+import type { PlanItem } from '@/lib/planParse';
+import { buildCommitPlan } from '@/lib/planCommit';
 import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config';
 import { parseRoutineTimelineId } from '@/lib/today/doseExpansion';
 import { groupItems, addToGroup, removeFromGroup, ungroupTasks } from '@/lib/today/groupTasks';
@@ -702,15 +703,35 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
       context: currentDomain === 'universal' ? null : currentDomain,
     };
     const defaultAssigneeId = getCurrentUserMember()?.id;
-    for (const item of items) {
-      const args = planItemToAddTaskArgs(item, commitCtx);
+    const plan = buildCommitPlan(items, commitCtx);
+
+    for (const args of plan.adds) {
       await addTask(args.title, undefined, undefined, args.scheduledFor, {
         ...args.options,
         defaultAssigneeId,
       });
     }
-    showToast(`Added ${items.length} task${items.length === 1 ? '' : 's'} from your plan`, 'success', 4000);
-  }, [addTask, currentDomain, getCurrentUserMember]);
+
+    // A move that is rejected (a shared task this user cannot write) must not
+    // abort the rest of the batch — count the failures and say so.
+    let failed = 0;
+    for (const move of plan.moves) {
+      try {
+        await updateTask(move.taskId, move.updates);
+      } catch (e) {
+        failed++;
+        console.error('[plan] could not move existing task', move.taskId, e);
+      }
+    }
+
+    const parts: string[] = [];
+    if (plan.adds.length) parts.push(`Added ${plan.adds.length} task${plan.adds.length === 1 ? '' : 's'}`);
+    const moved = plan.moves.length - failed;
+    if (moved > 0) parts.push(`moved ${moved}`);
+    if (plan.skipped) parts.push(`${plan.skipped} already in place`);
+    if (parts.length) showToast(`${parts.join(', ')} from your plan`, 'success', 4000);
+    if (failed) showToast(`Couldn't move ${failed} task${failed === 1 ? '' : 's'}`, 'error', 5000);
+  }, [addTask, updateTask, currentDomain, getCurrentUserMember]);
 
   return (
     <ScheduleActionsProvider value={scheduleActionsValue}>
