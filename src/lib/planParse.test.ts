@@ -15,6 +15,10 @@ import { localYmd } from '@/lib/cadence/config'
 const TODAY = new Date(2026, 7, 17) // Mon Aug 17 2026, local
 const WINDOW = planWindowDates(TODAY)
 const MEMBERS = new Set(['m-scott', 'm-iris'])
+// weekStartAnchor(TODAY, 'monday') — Aug 17 2026 is itself a Monday, so the
+// current week starts on TODAY. Matches the WINDOW[0] the tests already use.
+const CURRENT_WEEK_START = new Date(2026, 7, 17)
+const CURRENT_WEEK_YMD = '2026-08-17'
 
 describe('planWindowDates', () => {
   it('starts today and spans the window, as local dates', () => {
@@ -42,6 +46,7 @@ describe('validatePlanItems', () => {
       },
       WINDOW,
       MEMBERS,
+      CURRENT_WEEK_START,
     )
     expect(items).toEqual([
       { title: 'Call dentist', placement: { kind: 'date', date: '2026-08-18' }, assigneeId: null, note: '410-555-0100', existing: null },
@@ -55,6 +60,7 @@ describe('validatePlanItems', () => {
       { items: [{ title: 'Thing', day: '2026-09-15', assignee_id: null, note: null }] },
       WINDOW,
       MEMBERS,
+      CURRENT_WEEK_START,
     )
     expect(items[0].placement).toEqual({ kind: 'week' })
   })
@@ -64,14 +70,15 @@ describe('validatePlanItems', () => {
       { items: [{ title: 'Thing', day: 'inbox', assignee_id: 'm-stranger', note: null }] },
       WINDOW,
       MEMBERS,
+      CURRENT_WEEK_START,
     )
     expect(items[0].assigneeId).toBeNull()
   })
 
   it('skips rows without a usable title and tolerates a malformed response', () => {
-    expect(validatePlanItems({ items: [{ title: '   ', day: 'inbox' }, { day: 'week' }] }, WINDOW, MEMBERS)).toEqual([])
-    expect(validatePlanItems(null, WINDOW, MEMBERS)).toEqual([])
-    expect(validatePlanItems({ items: 'nope' }, WINDOW, MEMBERS)).toEqual([])
+    expect(validatePlanItems({ items: [{ title: '   ', day: 'inbox' }, { day: 'week' }] }, WINDOW, MEMBERS, CURRENT_WEEK_START)).toEqual([])
+    expect(validatePlanItems(null, WINDOW, MEMBERS, CURRENT_WEEK_START)).toEqual([])
+    expect(validatePlanItems({ items: 'nope' }, WINDOW, MEMBERS, CURRENT_WEEK_START)).toEqual([])
   })
 })
 
@@ -118,18 +125,45 @@ describe('describeExisting', () => {
     // but UTC. Noon UTC resolves to Aug 20 for every real-world offset
     // (-11..+11), so the test doesn't depend on where it runs. Do not "tidy"
     // this back to midnight.
-    const out = describeExisting('timed', '2026-08-20T12:00:00.000Z')
+    const out = describeExisting('timed', '2026-08-20T12:00:00.000Z', null, CURRENT_WEEK_YMD)
     expect(out.label).toMatch(/Aug 20/)
     expect(out.placement).toEqual({ kind: 'date', date: '2026-08-20' })
   })
 
-  it('labels the week bucket', () => {
-    expect(describeExisting('week', null)).toEqual({ label: 'This week', placement: { kind: 'week' } })
+  it('labels the week bucket when week_start matches the current week', () => {
+    expect(describeExisting('week', null, CURRENT_WEEK_YMD, CURRENT_WEEK_YMD)).toEqual({
+      label: 'This week',
+      placement: { kind: 'week' },
+    })
+  })
+
+  it('treats a null week_start as the current week (legacy unstamped rows)', () => {
+    expect(describeExisting('week', null, null, CURRENT_WEEK_YMD)).toEqual({
+      label: 'This week',
+      placement: { kind: 'week' },
+    })
+  })
+
+  it('C1 regression: a carried-over (earlier) week never compares as This week', () => {
+    // This is the headline scenario the bug broke: a task left behind from
+    // last week is exactly what a re-planned paper page re-writes. It must
+    // get a truthful label and a placement that can never be mistaken for a
+    // no-op — a null placement never compares equal (placementsEqual), so
+    // buildCommitPlan always sends it to `moves`, never `skipped`.
+    const out = describeExisting('week', null, '2026-08-10', CURRENT_WEEK_YMD)
+    expect(out.label).toBe('Last week')
+    expect(out.placement).toBeNull()
+  })
+
+  it('labels a week that has not started yet as A later week, also uncomparable', () => {
+    const out = describeExisting('week', null, '2026-08-24', CURRENT_WEEK_YMD)
+    expect(out.label).toBe('A later week')
+    expect(out.placement).toBeNull()
   })
 
   it('labels the inbox, including a null bucket', () => {
-    expect(describeExisting('inbox', null)).toEqual({ label: 'Inbox', placement: { kind: 'inbox' } })
-    expect(describeExisting(null, null)).toEqual({ label: 'Inbox', placement: { kind: 'inbox' } })
+    expect(describeExisting('inbox', null, null, CURRENT_WEEK_YMD)).toEqual({ label: 'Inbox', placement: { kind: 'inbox' } })
+    expect(describeExisting(null, null, null, CURRENT_WEEK_YMD)).toEqual({ label: 'Inbox', placement: { kind: 'inbox' } })
   })
 
   it('labels month, quarter, and someday with no comparable placement', () => {
@@ -139,13 +173,13 @@ describe('describeExisting', () => {
     // without its own branch it fell through to Inbox, which both mislabels
     // the match on screen and (via placementsEqual) lets a Someday task get
     // silently skipped as a false no-op against an inbox-bound line.
-    expect(describeExisting('month', null)).toEqual({ label: 'Month', placement: null })
-    expect(describeExisting('quarter', null)).toEqual({ label: 'Quarter', placement: null })
-    expect(describeExisting('someday', null)).toEqual({ label: 'Someday', placement: null })
+    expect(describeExisting('month', null, null, CURRENT_WEEK_YMD)).toEqual({ label: 'Month', placement: null })
+    expect(describeExisting('quarter', null, null, CURRENT_WEEK_YMD)).toEqual({ label: 'Quarter', placement: null })
+    expect(describeExisting('someday', null, null, CURRENT_WEEK_YMD)).toEqual({ label: 'Someday', placement: null })
   })
 
   it('falls back to Inbox when timed has no date', () => {
-    expect(describeExisting('timed', null)).toEqual({ label: 'Inbox', placement: { kind: 'inbox' } })
+    expect(describeExisting('timed', null, null, CURRENT_WEEK_YMD)).toEqual({ label: 'Inbox', placement: { kind: 'inbox' } })
   })
 })
 
@@ -170,7 +204,7 @@ describe('placementsEqual', () => {
     // Inbox default: a Someday task matched against a line the page places in
     // the inbox must NOT compare equal, or the re-place is silently skipped as
     // a false no-op and the task stays stranded in Someday.
-    const someday = describeExisting('someday', null)
+    const someday = describeExisting('someday', null, null, CURRENT_WEEK_YMD)
     expect(placementsEqual(someday.placement, { kind: 'inbox' })).toBe(false)
   })
 })
@@ -183,13 +217,15 @@ describe('validatePlanItems with matches', () => {
           { title: 'Call roofer', day: '2026-08-18', assignee_id: null, note: null },
           { title: 'Mulch beds', day: 'week', assignee_id: null, note: null },
         ],
-        matches: [{ index: 0, task_id: 't-roof', bucket: 'week', scheduled_for: null }],
+        matches: [{ index: 0, task_id: 't-roof', bucket: 'week', scheduled_for: null, week_start: CURRENT_WEEK_YMD, title: 'Call the roofer' }],
       },
       WINDOW,
       MEMBERS,
+      CURRENT_WEEK_START,
     )
     expect(items[0].existing).toEqual({
       taskId: 't-roof',
+      title: 'Call the roofer',
       label: 'This week',
       placement: { kind: 'week' },
     })
@@ -201,6 +237,7 @@ describe('validatePlanItems with matches', () => {
       { items: [{ title: 'Call roofer', day: 'week', assignee_id: null, note: null }] },
       WINDOW,
       MEMBERS,
+      CURRENT_WEEK_START,
     )
     expect(items[0].existing).toBeNull()
   })
@@ -209,10 +246,11 @@ describe('validatePlanItems with matches', () => {
     const items = validatePlanItems(
       {
         items: [{ title: 'Call roofer', day: 'week', assignee_id: null, note: null }],
-        matches: [{ index: 7, task_id: 't-roof', bucket: 'week', scheduled_for: null }],
+        matches: [{ index: 7, task_id: 't-roof', bucket: 'week', scheduled_for: null, week_start: CURRENT_WEEK_YMD, title: 'Call the roofer' }],
       },
       WINDOW,
       MEMBERS,
+      CURRENT_WEEK_START,
     )
     expect(items[0].existing).toBeNull()
   })
@@ -226,19 +264,44 @@ describe('validatePlanItems with matches', () => {
           { title: '   ', day: 'week', assignee_id: null, note: null },
           { title: 'Call roofer', day: 'week', assignee_id: null, note: null },
         ],
-        matches: [{ index: 1, task_id: 't-roof', bucket: 'inbox', scheduled_for: null }],
+        matches: [{ index: 1, task_id: 't-roof', bucket: 'inbox', scheduled_for: null, week_start: null, title: 'Call the roofer' }],
       },
       WINDOW,
       MEMBERS,
+      CURRENT_WEEK_START,
     )
     expect(items).toHaveLength(1)
     expect(items[0].existing?.taskId).toBe('t-roof')
+  })
+
+  it('C1 regression: a task carried over from last week is not treated as a no-op against a "this week" line', () => {
+    // The headline scenario: the user re-writes "mulch beds" under this week's
+    // heading, but the matched task is still stamped with LAST week's
+    // week_start (a carried-over row weekPlacementState would call
+    // 'left-behind'). Before the fix, week_start was never read, so this
+    // matched as { kind: 'week' } and looked identical to the target
+    // placement — buildCommitPlan would skip it and the move would silently
+    // never happen. It must come back with a null placement, an honest
+    // "Last week" label, and be able to compare UNEQUAL to a week target.
+    const items = validatePlanItems(
+      {
+        items: [{ title: 'Mulch beds', day: 'week', assignee_id: null, note: null }],
+        matches: [{ index: 0, task_id: 't-mulch', bucket: 'week', scheduled_for: null, week_start: '2026-08-10', title: 'Mulch the beds' }],
+      },
+      WINDOW,
+      MEMBERS,
+      CURRENT_WEEK_START,
+    )
+    const existing = items[0].existing
+    expect(existing?.label).toBe('Last week')
+    expect(existing?.placement).toBeNull()
+    expect(placementsEqual(existing?.placement ?? null, items[0].placement)).toBe(false)
   })
 })
 
 describe('planItemToUpdateArgs', () => {
   const ctx = { currentWeekStart: new Date(2026, 7, 16), context: 'family' as const }
-  const matched: ExistingMatch = { taskId: 't-1', label: 'Inbox', placement: { kind: 'inbox' } }
+  const matched: ExistingMatch = { taskId: 't-1', title: 'Existing task', label: 'Inbox', placement: { kind: 'inbox' } }
 
   it('moves a matched item to a date as an all-day timed task', () => {
     const updates = planItemToUpdateArgs(

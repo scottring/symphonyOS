@@ -124,8 +124,8 @@ export function PlanReviewSheet({ items, windowDates, members, committing, onCom
                   />
                   {row.note && <p className="text-[13px] text-neutral-500 truncate">{row.note}</p>}
                   {row.existing && (
-                    <p className="text-[13px] text-amber-700">
-                      already in Symphony ({row.existing.label})
+                    <p className="text-[13px] text-amber-700 truncate" title={row.existing.title}>
+                      already in Symphony as &ldquo;{row.existing.title}&rdquo; ({row.existing.label})
                       {placementsEqual(row.existing.placement, row.placement)
                         ? ' — no change'
                         : ` — will move to ${targetLabel(row.placement)}`}

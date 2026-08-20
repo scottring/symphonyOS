@@ -8,6 +8,10 @@ import type { FamilyMember } from '@/types/family'
 
 interface PlanFromPaperFlowProps {
   members: FamilyMember[]
+  /** The current week's start (weekStartAnchor), computed once by the caller
+   *  and shared with the commit step — see usePlanFromPaper for why this must
+   *  not be re-derived here. */
+  currentWeekStart: Date
   /** Creates the confirmed tasks (one INSERT each). Resolves when all are in. */
   onCommit: (items: PlanItem[]) => Promise<void>
   onClose: () => void
@@ -18,8 +22,8 @@ interface PlanFromPaperFlowProps {
  * Mounted by HomeViewContainer when the Today overflow item is chosen; every
  * exit path lands on onClose so the mount fully resets between runs.
  */
-export function PlanFromPaperFlow({ members, onCommit, onClose }: PlanFromPaperFlowProps) {
-  const { status, items, error, windowDates, parseFromBlob, retry, reset } = usePlanFromPaper(members)
+export function PlanFromPaperFlow({ members, currentWeekStart, onCommit, onClose }: PlanFromPaperFlowProps) {
+  const { status, items, error, windowDates, parseFromBlob, retry, reset } = usePlanFromPaper(members, currentWeekStart)
   const [camera, setCamera] = useState(true)
   const [committing, setCommitting] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)

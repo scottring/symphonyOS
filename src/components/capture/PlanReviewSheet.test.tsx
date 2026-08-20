@@ -80,7 +80,7 @@ const matchedItem: PlanItem = {
   placement: { kind: 'date', date: '2026-08-20' },
   assigneeId: null,
   note: null,
-  existing: { taskId: 't-roof', label: 'This week', placement: { kind: 'week' } },
+  existing: { taskId: 't-roof', title: 'Call roofer re: the gutter estimate', label: 'This week', placement: { kind: 'week' } },
 }
 const plainItem: PlanItem = {
   title: 'Pick up dry cleaning',
@@ -94,7 +94,7 @@ const noOpItem: PlanItem = {
   placement: { kind: 'week' },
   assigneeId: null,
   note: null,
-  existing: { taskId: 't-mulch', label: 'This week', placement: { kind: 'week' } },
+  existing: { taskId: 't-mulch', title: 'Mulch the beds', label: 'This week', placement: { kind: 'week' } },
 }
 
 describe('PlanReviewSheet duplicate flags', () => {
@@ -109,6 +109,14 @@ describe('PlanReviewSheet duplicate flags', () => {
   it('does not flag an unmatched row', () => {
     renderSheet({ items: [plainItem], windowDates: ['2026-08-21'] })
     expect(screen.queryByText(/already in Symphony/i)).not.toBeInTheDocument()
+  })
+
+  it('shows the matched task\'s own title, not just the placement label', () => {
+    // I2: without this, a user cannot tell whether the parsed line "call
+    // roofer" matched the right existing task or a wrong one with a similar
+    // name — the placement label alone ("This week") does not answer that.
+    renderSheet({ items: [matchedItem], windowDates: ['2026-08-20'] })
+    expect(screen.getByText(/Call roofer re: the gutter estimate/)).toBeInTheDocument()
   })
 
   it('counts adds and moves separately on the commit button', () => {

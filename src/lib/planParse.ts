@@ -18,11 +18,14 @@ export type PlanPlacement =
 
 /** A parsed line that already exists as a task. `placement` is the existing
  *  task's current position, so the review sheet can spot a move that would be a
- *  no-op; it is null for buckets with no PlanPlacement equivalent. */
+ *  no-op; it is null for buckets with no PlanPlacement equivalent. `title` is
+ *  the matched task's CURRENT title (not the parsed line's), so the review
+ *  sheet can show the user what they are about to move. */
 export interface ExistingMatch {
   taskId: string
   label: string
   placement: PlanPlacement | null
+  title: string
 }
 
 export interface PlanItem {
@@ -36,15 +39,41 @@ export interface PlanItem {
 const YMD = /^\d{4}-\d{2}-\d{2}$/
 
 /** Render a matched task's current position for display, and as a comparable
- *  placement where one exists. */
+ *  placement where one exists.
+ *
+ *  `weekStart`/`currentWeekStart` are both local YYYY-MM-DD strings (the raw
+ *  `week_start` DATE column value, and the caller's already-computed current
+ *  week anchor). A bucket='week' task carries the week it was placed on, and
+ *  that can be a WEEK OTHER THAN the one being planned into — most importantly
+ *  a carried-over item left behind from a prior week, which is exactly what a
+ *  re-planned paper page tends to contain (C1). Comparing week_start against
+ *  currentWeekStart, instead of assuming every 'week' row means "this week",
+ *  is what makes that case re-place instead of silently no-op.
+ */
 export function describeExisting(
   bucket: string | null,
   scheduledFor: string | null,
+  weekStart: string | null,
+  currentWeekStart: string,
 ): { label: string; placement: PlanPlacement | null } {
   if (bucket === 'month') return { label: 'Month', placement: null }
   if (bucket === 'quarter') return { label: 'Quarter', placement: null }
   if (bucket === 'someday') return { label: 'Someday', placement: null }
-  if (bucket === 'week') return { label: 'This week', placement: { kind: 'week' } }
+  if (bucket === 'week') {
+    // A null week_start is a legacy unstamped row — its old, implicit meaning
+    // was "the current week" (the same treatment belongsToWeek gives it), so
+    // it stays a real no-op candidate rather than always writing.
+    if (weekStart === null || weekStart === currentWeekStart) {
+      return { label: 'This week', placement: { kind: 'week' } }
+    }
+    // Any other week — earlier (carried-over) or later — must never compare
+    // equal to a 'week' target: a truthful label, and a placement of null so
+    // it always writes rather than being mistaken for a no-op.
+    return {
+      label: weekStart < currentWeekStart ? 'Last week' : 'A later week',
+      placement: null,
+    }
+  }
   if (bucket === 'timed' && scheduledFor) {
     const date = localYmd(new Date(scheduledFor))
     return {
@@ -66,6 +95,8 @@ interface RawMatch {
   task_id: string
   bucket: string | null
   scheduled_for: string | null
+  week_start: string | null
+  title: string
 }
 
 function readMatches(raw: unknown): Map<number, RawMatch> {
@@ -82,6 +113,8 @@ function readMatches(raw: unknown): Map<number, RawMatch> {
       task_id: m.task_id,
       bucket: typeof m.bucket === 'string' ? m.bucket : null,
       scheduled_for: typeof m.scheduled_for === 'string' ? m.scheduled_for : null,
+      week_start: typeof m.week_start === 'string' ? m.week_start : null,
+      title: typeof m.title === 'string' ? m.title : '',
     })
   }
   return out
@@ -102,16 +135,23 @@ export function planWindowDates(today: Date): string[] {
  * Validate the edge function's items into PlanItems. The function already
  * validates server-side; this repeats the cheap parts so a stale/hand-rolled
  * response can't write a placement outside the window the user was shown.
+ *
+ * `currentWeekStart` must come from the caller (whatever already computed
+ * `weekStartAnchor(new Date(), readCadenceConfig().weekStartsOn)` for this
+ * session) — re-deriving it here would be a second, independently-drifting
+ * copy of the same window.
  */
 export function validatePlanItems(
   raw: unknown,
   windowDates: string[],
   memberIds: Set<string>,
+  currentWeekStart: Date,
 ): PlanItem[] {
   const items = (raw as { items?: unknown } | null)?.items
   if (!Array.isArray(items)) return []
   const window = new Set(windowDates)
   const matches = readMatches(raw)
+  const currentWeekStartYmd = localYmd(currentWeekStart)
   const out: PlanItem[] = []
   for (const [rawIndex, entry] of items.entries()) {
     const e = entry as { title?: unknown; day?: unknown; assignee_id?: unknown; note?: unknown }
@@ -129,7 +169,11 @@ export function validatePlanItems(
       assigneeId: typeof e.assignee_id === 'string' && memberIds.has(e.assignee_id) ? e.assignee_id : null,
       note: typeof e.note === 'string' && e.note.trim() ? e.note.trim() : null,
       existing: match
-        ? { taskId: match.task_id, ...describeExisting(match.bucket, match.scheduled_for) }
+        ? {
+            taskId: match.task_id,
+            title: match.title,
+            ...describeExisting(match.bucket, match.scheduled_for, match.week_start, currentWeekStartYmd),
+          }
         : null,
     })
   }

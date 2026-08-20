@@ -32,8 +32,13 @@ async function toJpeg(blob: Blob): Promise<Blob> {
  * — the review sheet commits only what the user confirms.
  *
  * Retry re-invokes the function with the already-uploaded image (no re-upload).
+ *
+ * `currentWeekStart` is passed in rather than computed here — the caller
+ * already derives it (weekStartAnchor against the user's cadence config) for
+ * the commit step, and a second independent derivation is exactly the kind of
+ * drift that has bitten this codebase before.
  */
-export function usePlanFromPaper(members: FamilyMember[]) {
+export function usePlanFromPaper(members: FamilyMember[], currentWeekStart: Date) {
   const [status, setStatus] = useState<PlanParseStatus>('idle')
   const [items, setItems] = useState<PlanItem[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -55,9 +60,9 @@ export function usePlanFromPaper(members: FamilyMember[]) {
     })
     if (fnErr) throw new Error(fnErr.message)
     if (data?.error) throw new Error(String(data.error))
-    setItems(validatePlanItems(data, dates, new Set(members.map((m) => m.id))))
+    setItems(validatePlanItems(data, dates, new Set(members.map((m) => m.id)), currentWeekStart))
     setStatus('ready')
-  }, [members])
+  }, [members, currentWeekStart])
 
   const parseFromBlob = useCallback(async (blob: Blob) => {
     setStatus('parsing')

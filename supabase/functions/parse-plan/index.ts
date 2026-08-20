@@ -138,6 +138,7 @@ interface OpenTaskRow {
   title: string
   bucket: string | null
   scheduled_for: string | null
+  week_start: string | null
 }
 
 /** The user's open tasks, read through THEIR token so RLS applies. The
@@ -147,7 +148,7 @@ async function fetchOpenTasks(url: string, anonKey: string, authHeader: string):
   const asUser = createClient(url, anonKey, { global: { headers: { Authorization: authHeader } } })
   const { data, error } = await asUser
     .from('tasks')
-    .select('id, title, bucket, scheduled_for')
+    .select('id, title, bucket, scheduled_for, week_start')
     .eq('completed', false)
     .order('created_at', { ascending: false })
     .limit(MAX_CANDIDATES)
@@ -215,7 +216,14 @@ Deno.serve(async (req) => {
 
     // Matching runs AFTER transcription and is fully contained: any failure
     // here returns an unflagged page rather than losing the parse.
-    let matches: { index: number; task_id: string; bucket: string | null; scheduled_for: string | null }[] = []
+    let matches: {
+      index: number
+      task_id: string
+      bucket: string | null
+      scheduled_for: string | null
+      week_start: string | null
+      title: string
+    }[] = []
     try {
       const open = await fetchOpenTasks(url, anonKey, authHeader)
       const candidates: MatchCandidate[] = open.map((t) => ({ id: t.id, title: t.title }))
@@ -224,7 +232,14 @@ Deno.serve(async (req) => {
         .flatMap((m) => {
           const row = byId.get(m.taskId)
           return row
-            ? [{ index: m.index, task_id: m.taskId, bucket: row.bucket, scheduled_for: row.scheduled_for }]
+            ? [{
+                index: m.index,
+                task_id: m.taskId,
+                bucket: row.bucket,
+                scheduled_for: row.scheduled_for,
+                week_start: row.week_start,
+                title: row.title,
+              }]
             : []
         })
     } catch (e) {

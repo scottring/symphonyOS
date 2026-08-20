@@ -95,8 +95,18 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
   // analog-planning pivot; planning happens on paper now.
   const [planningOpen, setPlanningOpen] = useState(false);
   // Plan-from-paper (analog-planning pivot): photograph the written plan page,
-  // review the parsed items, commit them as placed tasks.
+  // review the parsed items, commit them as placed tasks. currentWeekStart is
+  // computed once here and shared by both the parse step (to tell "this week"
+  // apart from a carried-over week) and the commit step below — two
+  // independent derivations of the same week anchor is the kind of drift this
+  // codebase has been burned by before. Memoized for the session's lifetime,
+  // same as TodayView's own currentWeekStart — a week boundary crossed with
+  // the tab open is the same edge case a day boundary already is.
   const [planFromPaperOpen, setPlanFromPaperOpen] = useState(false);
+  const currentWeekStart = useMemo(
+    () => weekStartAnchor(new Date(), readCadenceConfig().weekStartsOn),
+    [],
+  );
   const { selection, setSelection, clearSelection } = useSelection();
 
   const [searchParams, setSearchParams] = useSearchParams();
@@ -699,7 +709,7 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
   // follow-up update. Unassigned lines default to the planner.
   const handleCommitPlanItems = useCallback(async (items: PlanItem[]) => {
     const commitCtx = {
-      currentWeekStart: weekStartAnchor(new Date(), readCadenceConfig().weekStartsOn),
+      currentWeekStart,
       context: currentDomain === 'universal' ? null : currentDomain,
     };
     const defaultAssigneeId = getCurrentUserMember()?.id;
@@ -735,7 +745,7 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
     });
     if (success) showToast(success, 'success', 4000);
     if (failure) showToast(failure, 'error', 5000);
-  }, [addTask, updateTask, currentDomain, getCurrentUserMember]);
+  }, [addTask, updateTask, currentDomain, getCurrentUserMember, currentWeekStart]);
 
   return (
     <ScheduleActionsProvider value={scheduleActionsValue}>
@@ -759,6 +769,7 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
       {planFromPaperOpen && (
         <PlanFromPaperFlow
           members={familyMembers}
+          currentWeekStart={currentWeekStart}
           onCommit={handleCommitPlanItems}
           onClose={() => setPlanFromPaperOpen(false)}
         />

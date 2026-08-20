@@ -17,14 +17,25 @@ const matchedMoving: PlanItem = {
   placement: { kind: 'date', date: '2026-08-20' },
   assigneeId: null,
   note: null,
-  existing: { taskId: 't-roof', label: 'This week', placement: { kind: 'week' } },
+  existing: { taskId: 't-roof', title: 'Call the roofer re: gutters', label: 'This week', placement: { kind: 'week' } },
 }
 const matchedNoOp: PlanItem = {
   title: 'Mulch beds',
   placement: { kind: 'week' },
   assigneeId: null,
   note: null,
-  existing: { taskId: 't-mulch', label: 'This week', placement: { kind: 'week' } },
+  existing: { taskId: 't-mulch', title: 'Mulch the beds', label: 'This week', placement: { kind: 'week' } },
+}
+// C1 regression: a task carried over from a PRIOR week (week_start earlier
+// than the week being planned into). describeExisting must give this a null
+// placement — see planParse.test.ts — so it can never compare equal to the
+// 'week' target the page writes and always reaches `moves`, never `skipped`.
+const matchedCarriedOver: PlanItem = {
+  title: 'Mulch beds',
+  placement: { kind: 'week' },
+  assigneeId: null,
+  note: null,
+  existing: { taskId: 't-mulch-old', title: 'Mulch the beds', label: 'Last week', placement: null },
 }
 
 describe('buildCommitPlan', () => {
@@ -48,6 +59,21 @@ describe('buildCommitPlan', () => {
     expect(plan.adds).toHaveLength(0)
     expect(plan.moves).toHaveLength(0)
     expect(plan.skipped).toBe(1)
+  })
+
+  it('C1 regression: a carried-over week task is NOT skipped as a no-op — it moves', () => {
+    // Before the fix, every bucket='week' match described as { kind: 'week' }
+    // regardless of WHICH week, so a task left behind from last week looked
+    // identical to the page's "this week" target and was silently skipped.
+    // This is the most important test in this wave: it is the difference
+    // between the feature's headline scenario working and doing nothing.
+    const plan = buildCommitPlan([matchedCarriedOver], ctx)
+    expect(plan.skipped).toBe(0)
+    expect(plan.adds).toHaveLength(0)
+    expect(plan.moves).toHaveLength(1)
+    expect(plan.moves[0].taskId).toBe('t-mulch-old')
+    expect(plan.moves[0].updates.bucket).toBe('week')
+    expect(plan.moves[0].updates.weekStart).toEqual(ctx.currentWeekStart)
   })
 
   it('splits a mixed batch', () => {
