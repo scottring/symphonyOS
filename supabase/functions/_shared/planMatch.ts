@@ -50,7 +50,10 @@ If nothing matches, return {"matches": []}.`
 }
 
 /** Validate the model's response. Every guard degrades to "no match" — an
- *  invented id or a stray index must never reach a write. */
+ *  invented id or a stray index must never reach a write. A repeated index
+ *  or a repeated task_id both keep only their first occurrence: two written
+ *  lines resolving to the same existing task is the same false-positive
+ *  class as an invented id, just reached through id confusion instead. */
 export function validateMatches(
   raw: unknown,
   candidateIds: Set<string>,
@@ -59,14 +62,17 @@ export function validateMatches(
   const matches = (raw as { matches?: unknown } | null)?.matches
   if (!Array.isArray(matches)) return []
   const out: PlanMatch[] = []
-  const claimed = new Set<number>()
+  const claimedIndexes = new Set<number>()
+  const claimedTaskIds = new Set<string>()
   for (const entry of matches) {
     const e = entry as { index?: unknown; task_id?: unknown }
     if (typeof e.index !== 'number' || !Number.isInteger(e.index)) continue
     if (e.index < 0 || e.index >= itemCount) continue
     if (typeof e.task_id !== 'string' || !candidateIds.has(e.task_id)) continue
-    if (claimed.has(e.index)) continue
-    claimed.add(e.index)
+    if (claimedIndexes.has(e.index)) continue
+    if (claimedTaskIds.has(e.task_id)) continue
+    claimedIndexes.add(e.index)
+    claimedTaskIds.add(e.task_id)
     out.push({ index: e.index, taskId: e.task_id })
   }
   return out
@@ -103,6 +109,12 @@ export function callHaiku(apiKey: string): ModelCaller {
         max_tokens: 1500,
         messages: [{ role: 'user', content: [{ type: 'text', text: prompt }] }],
       }),
+      // A hung upstream connection never rejects on its own — it just never
+      // resolves, stalling the caller instead of degrading to "no matches".
+      // A timeout turns that hang into a rejection matchPlanItems already
+      // catches. 20s stays well inside the edge function's own budget while
+      // leaving room for a slow-but-working call.
+      signal: AbortSignal.timeout(20_000),
     })
     if (!res.ok) throw new Error(`Anthropic returned ${res.status}: ${(await res.text()).slice(0, 200)}`)
     const data = (await res.json()) as { content?: { type: string; text?: string }[] }

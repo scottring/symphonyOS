@@ -1,8 +1,9 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import {
   validateMatches,
   buildMatchPrompt,
   matchPlanItems,
+  callHaiku,
   type MatchCandidate,
 } from './planMatch.ts'
 
@@ -31,6 +32,18 @@ describe('validateMatches', () => {
   it('keeps only the first match for a repeated index', () => {
     const out = validateMatches(
       { matches: [{ index: 0, task_id: 't-roof' }, { index: 0, task_id: 't-bank' }] },
+      IDS,
+      2,
+    )
+    expect(out).toEqual([{ index: 0, taskId: 't-roof' }])
+  })
+
+  it('keeps only the first match for a repeated task_id', () => {
+    // Two written lines both resolving to the same existing task is the same
+    // false-positive class as an invented id — one real line would silently
+    // never become a task.
+    const out = validateMatches(
+      { matches: [{ index: 0, task_id: 't-roof' }, { index: 1, task_id: 't-roof' }] },
       IDS,
       2,
     )
@@ -93,5 +106,29 @@ describe('matchPlanItems', () => {
   it('returns no matches when the model returns unparseable text', async () => {
     const call = vi.fn().mockResolvedValue('I could not determine any matches.')
     expect(await matchPlanItems(['Call roofer'], CANDIDATES, call)).toEqual([])
+  })
+})
+
+describe('callHaiku', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('attaches a timeout signal to the fetch call, so a hung connection rejects instead of hanging forever', async () => {
+    // A real hang can't be exercised without a real network call. Proving the
+    // request carries an abort signal is the closest cleanly-testable proxy:
+    // it's the mechanism that turns "never resolves" into "rejects", which is
+    // what lets matchPlanItems's existing try/catch degrade to no matches.
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ content: [{ type: 'text', text: '{"matches":[]}' }] }),
+    })
+    vi.stubGlobal('fetch', fetchMock)
+
+    await callHaiku('test-key')('a prompt')
+
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const [, init] = fetchMock.mock.calls[0]
+    expect(init.signal).toBeInstanceOf(AbortSignal)
   })
 })
