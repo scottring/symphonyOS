@@ -23,7 +23,7 @@ function AlignedBand({ lanes }: { lanes: WallLane[] }) {
     // announcing something — so the band takes the room the four lanes gave up
     // and centers, rather than sitting as a thin strip in a tall empty card.
     <div
-      className={`${WALL.dinnerCard} flex flex-col items-center justify-center gap-7 px-10 py-8 flex-1 min-h-0`}
+      className={`${WALL.dinnerCard} flex flex-col items-center justify-center gap-[3vh] px-10 py-8 flex-1 min-h-0 overflow-hidden`}
     >
       <div className="flex -space-x-6 shrink-0">
         {involved.map((l, i) => (
@@ -31,14 +31,14 @@ function AlignedBand({ lanes }: { lanes: WallLane[] }) {
             key={l.memberId}
             src={`/wall/portrait-${l.memberId}.png`}
             alt=""
-            className={`w-[132px] h-[132px] rounded-2xl border-4 border-[#FCF5E7] dark:border-[#332A1D] object-cover shadow-[0_2px_10px_rgba(90,75,55,.16)] ${personAccent(i)}`}
+            className={`w-[min(132px,18vh)] h-[min(132px,18vh)] rounded-2xl border-4 border-[#FCF5E7] dark:border-[#332A1D] object-cover shadow-[0_2px_10px_rgba(90,75,55,.16)] ${personAccent(i)}`}
           />
         ))}
       </div>
 
       <div className="text-center min-w-0 max-w-full">
         <div className={WALL.dinnerLabel}>Everyone</div>
-        <div className={`font-display text-[4.2rem] leading-tight truncate ${WALL.inkStrong}`}>
+        <div className={`font-display text-[clamp(1.8rem,6vh,4.2rem)] leading-tight truncate ${WALL.inkStrong}`}>
           {merged.label}
         </div>
       </div>
@@ -47,7 +47,7 @@ function AlignedBand({ lanes }: { lanes: WallLane[] }) {
         <div className="flex items-baseline gap-3 shrink-0">
           <WallV2Flap
             value={merged.time}
-            className={`font-display text-[5rem] leading-none tabular-nums ${WALL.inkStrong}`}
+            className={`font-display text-[clamp(2.2rem,7vh,5rem)] leading-none tabular-nums ${WALL.inkStrong}`}
           />
           <span className={`text-[1.8rem] font-bold ${WALL.muted}`}>{merged.meridiem}</span>
         </div>

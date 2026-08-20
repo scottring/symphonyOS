@@ -15,8 +15,13 @@ import type { WallLane } from './wallLanes';
 
 function Portrait({ memberId, name }: { memberId: string; name: string }) {
   const [failed, setFailed] = useState(false);
+  // Sized FROM the lane, not fixed: the lanes are flex-1 of whatever height the
+  // screen gives them, so a hard 128px portrait spills out of its card on any
+  // display shorter than the one it was designed against. self-stretch takes
+  // the lane's content height and aspect-square derives the width from it, with
+  // a cap so it doesn't become absurd on a very tall screen.
   const shell =
-    'w-[128px] h-[128px] shrink-0 rounded-2xl border-2 border-[#EEE1C7] dark:border-[#4A3D28]';
+    'self-stretch aspect-square max-h-[132px] shrink-0 rounded-2xl border-2 border-[#EEE1C7] dark:border-[#4A3D28]';
 
   // Same silent fallback the family strip uses: a bad id renders a monogram
   // rather than a broken image, so a missing face is a data bug, not a crash.
@@ -42,12 +47,12 @@ function Portrait({ memberId, name }: { memberId: string; name: string }) {
 export function WallV2PersonLane({ lane, index }: { lane: WallLane; index: number }) {
   return (
     <div
-      className={`${WALL.card} border-l-4 ${personAccent(index)} flex items-center gap-7 px-6 py-4 min-h-0 flex-1`}
+      className={`${WALL.card} border-l-4 ${personAccent(index)} flex items-center gap-7 px-6 py-4 min-h-0 flex-1 overflow-hidden`}
     >
       <Portrait memberId={lane.memberId} name={lane.name} />
 
       <div className="w-[190px] shrink-0">
-        <div className={`font-display text-[2.4rem] leading-tight truncate ${WALL.inkStrong}`}>
+        <div className={`font-display text-[clamp(1.3rem,3.4vh,2.4rem)] leading-tight truncate ${WALL.inkStrong}`}>
           {lane.name}
         </div>
       </div>
@@ -59,12 +64,12 @@ export function WallV2PersonLane({ lane, index }: { lane: WallLane; index: numbe
           <>
             <WallV2Flap
               value={lane.time}
-              className={`font-display text-[4rem] leading-none tabular-nums ${WALL.inkStrong}`}
+              className={`font-display text-[clamp(2rem,5.6vh,4rem)] leading-none tabular-nums ${WALL.inkStrong}`}
             />
             <span className={`text-[1.4rem] font-bold ${WALL.muted}`}>{lane.meridiem}</span>
           </>
         ) : (
-          <span className={`font-display text-[2.2rem] leading-none ${WALL.muted}`}>
+          <span className={`font-display text-[clamp(1.2rem,3.2vh,2.2rem)] leading-none ${WALL.muted}`}>
             {lane.isEmpty ? '—' : 'All day'}
           </span>
         )}
@@ -74,7 +79,7 @@ export function WallV2PersonLane({ lane, index }: { lane: WallLane; index: numbe
         {lane.isEmpty ? (
           // The resting state. "Nothing scheduled" is a real answer and reads
           // calm; a blank lane reads broken.
-          <div className={`text-[2.1rem] ${WALL.muted}`}>Nothing scheduled</div>
+          <div className={`text-[clamp(1.1rem,3vh,2.1rem)] ${WALL.muted}`}>Nothing scheduled</div>
         ) : (
           <div className="flex items-baseline gap-3 min-w-0">
             {/* A day qualifier only when the item isn't today — the rail already
@@ -86,7 +91,7 @@ export function WallV2PersonLane({ lane, index }: { lane: WallLane; index: numbe
                 {lane.dayLabel}
               </span>
             )}
-            <span className={`text-[2.4rem] leading-tight truncate ${WALL.ink}`}>
+            <span className={`text-[clamp(1.3rem,3.4vh,2.4rem)] leading-tight truncate ${WALL.ink}`}>
               {lane.label}
             </span>
           </div>
