@@ -136,10 +136,14 @@ describe('Today invariant: the PAGE does not grow with the backlog', () => {
     expect(screen.queryByText('backlog 499')).toBeNull()
   })
 
-  it('still reports the whole backlog in the one bounded line', () => {
-    // The budget is fixed, but nothing is hidden — the line names the size.
+  it('still points at the whole backlog from the one bounded line', () => {
+    // The line no longer names the size. A running tally of everything you
+    // have not done is not a commitment, and "oldest 250 days" read as an
+    // accusation rather than a pointer. What the invariant actually needs is
+    // the DOOR — a Review that opens the full backlog — and it must be there
+    // at 5 items and at 500 alike.
     renderToday(backlog(500))
-    expect(screen.getByText(/500 need attention/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Review' })).toBeInTheDocument()
   })
 })
 

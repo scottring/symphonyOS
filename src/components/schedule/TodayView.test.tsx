@@ -177,44 +177,14 @@ describe('TodayView', () => {
         },
       ],
     } as never)
-    // The footer line carries the count; the list itself stays off the page
-    // until asked for — backlog frames the day from the bottom, not the top.
-    expect(screen.getByText(/1 carried over/i)).toBeInTheDocument()
+    // Carried-over work stays off the page entirely — no count, no inline
+    // list. The footer spends one muted "Review", and the task is reachable
+    // through it, in the same bounded triage that owns the rest of the
+    // backlog.
+    expect(screen.queryByText(/carried over/i)).toBeNull()
     expect(screen.queryByText('Overdue task title')).not.toBeInTheDocument()
-    // Expanding reveals the full rows (headerless OverdueSection).
-    fireEvent.click(screen.getByText(/1 carried over/i))
-    expect(screen.getByRole('region', { name: /carried over tasks/i })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Review' }))
     expect(screen.getByText('Overdue task title')).toBeInTheDocument()
-  })
-
-  it('OverdueSection receives proactive + follow-up wiring (waiting toggle / suggestions present)', () => {
-    // Build a past date 2 days before actual today so selectOverdue picks it up
-    const past = new Date(TODAY)
-    past.setDate(past.getDate() - 2)
-    const onToggleWaiting = vi.fn()
-    renderView(
-      {
-        viewedDate: TODAY,
-        tasks: [
-          {
-            id: 'overdue-wired',
-            title: 'Wired overdue task',
-            completed: false,
-            createdAt: past,
-            updatedAt: past,
-            bucket: 'timed' as const,
-            scheduledFor: past,
-          },
-        ],
-      } as never,
-      { onToggleWaiting },
-    )
-    // The footer line owns the count; expand it to reach the wired rows.
-    fireEvent.click(screen.getByText(/1 carried over/i))
-    expect(screen.getByText('Wired overdue task')).toBeInTheDocument()
-    // onToggleWaiting was passed into context — ScheduleItem renders a waiting toggle
-    // when onToggleWaiting is provided; verify it's reachable (no prop-threading crash)
-    expect(screen.getByRole('region', { name: /carried over tasks/i })).toBeInTheDocument()
   })
 
   it('renders timeline insert (+) slots when create-at handlers are available', () => {
@@ -470,14 +440,16 @@ describe('TodayView attention line', () => {
     bucket: 'timed' as const, scheduledFor: daysAgo(n),
   })
 
-  it('keeps slipped rows off the page and points at them instead', () => {
+  it('keeps every slipped row off the page and points at them instead', () => {
     renderView({ viewedDate: TODAY, tasks: [mk('c', 'carried thing', 1), mk('s', 'slipped thing', 200)] } as never)
-    // OverdueSection is collapsed by default — expand it to see the rows.
-    fireEvent.click(screen.getByText(/1 carried over/i))
-    expect(screen.getByText('carried thing')).toBeInTheDocument()
+    // Neither population renders on the day — not the one-day-old carry-over,
+    // not the 200-day-old slip. The page spends one muted link on both.
+    expect(screen.queryByText('carried thing')).toBeNull()
     expect(screen.queryByText('slipped thing')).toBeNull()
-    expect(screen.getByText(/1 needs attention/)).toBeInTheDocument()
-    expect(screen.getByText(/oldest 200 days/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Review' })).toBeInTheDocument()
+    // No scoreboard: the footer names neither the size nor the age.
+    expect(screen.queryByText(/need attention/)).toBeNull()
+    expect(screen.queryByText(/oldest/)).toBeNull()
   })
 
   it('points at the queue even when the rest of the day is empty', () => {
@@ -486,7 +458,7 @@ describe('TodayView attention line', () => {
     // invisible exactly when it is all that is left.
     renderView({ viewedDate: TODAY, tasks: [mk('s', 'slipped thing', 200)] } as never)
     expect(screen.getByText(/Your day is clear/i)).toBeInTheDocument()
-    expect(screen.getByText(/1 needs attention/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Review' })).toBeInTheDocument()
   })
 
   it('Review opens the morning Review drawer with the slipped item triageable', () => {
@@ -509,12 +481,19 @@ describe('TodayView attention line', () => {
 
   it('still shows the pointer when the carried-over lane is empty', () => {
     renderView({ viewedDate: TODAY, tasks: [mk('s', 'slipped thing', 200)] } as never)
-    expect(screen.getByText(/1 needs attention/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Review' })).toBeInTheDocument()
   })
 
-  it('renders no pointer when nothing has slipped', () => {
+  it('still shows the pointer when only the carried-over lane has work', () => {
+    // Carried-over tasks have no other home on the page now that the inline
+    // list is gone, so the door must open for them too.
     renderView({ viewedDate: TODAY, tasks: [mk('c', 'carried thing', 1)] } as never)
-    expect(screen.queryByText(/needs attention/)).toBeNull()
+    expect(screen.getByRole('button', { name: 'Review' })).toBeInTheDocument()
+  })
+
+  it('renders no pointer when neither lane has work', () => {
+    renderView({ viewedDate: TODAY, tasks: [] } as never)
+    expect(screen.queryByRole('button', { name: 'Review' })).toBeNull()
   })
 })
 

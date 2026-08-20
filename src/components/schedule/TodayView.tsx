@@ -26,7 +26,6 @@ import { useTodayData } from '@/hooks/useTodayData'
 import { mergeAssignees } from '@/lib/today/bulkAssign'
 import { partitionSelection } from '@/lib/today/timelineKey'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
-import { useProactiveSuggestions } from '@/hooks/useProactiveSuggestions'
 import type { ProactiveSuggestion } from '@/types/proactiveSuggestion'
 import { useUnpromptedSuggestions, type UnpromptedItem } from '@/hooks/useUnpromptedSuggestions'
 import { UnpromptedLines } from '@/components/assistant/UnpromptedLines'
@@ -36,7 +35,7 @@ import { useRecurringEventDetection } from '@/hooks/useRecurringEventDetection'
 import { useTimelineInsert } from '@/hooks/useTimelineInsert'
 import { useDomain } from '@/hooks/useDomain'
 
-import { Eye, EyeOff, Repeat, Binoculars, Sun, Printer, GripVertical, CalendarClock, Moon, Sparkles, NotebookPen } from 'lucide-react'
+import { Eye, EyeOff, Repeat, Binoculars, Printer, GripVertical, CalendarClock, Moon, Sparkles, NotebookPen } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { AssigneeFilter } from '@/components/home/AssigneeFilter'
 
@@ -59,7 +58,6 @@ import { TodayOverflowMenu } from './TodayOverflowMenu'
 import { ReviewDrawer, type ReviewMode } from './ReviewDrawer'
 import { HorizonPoolDropdown } from './HorizonPoolDropdown'
 import { DayNavCluster } from './DayNavCluster'
-import { OverdueSection } from './OverdueSection'
 import { TodayBacklogFooter } from './TodayBacklogFooter'
 import { ToBuyLine } from './ToBuyLine'
 import { InboxUndoToast } from './InboxUndoToast'
@@ -155,11 +153,10 @@ export function TodayView({
   // Only what THIS file still uses. The row-level handlers moved with the
   // section loop into TodaySectionList, which reads the same context itself.
   const {
-    onToggleWaiting, onUpdateTask,
+    onUpdateTask,
     onGroupTasks, onGroupItems,
     onAssignTaskAll, onAssignEventAll,
     onPushRoutine, onPushEvent, onUpdateEventContext,
-    onOpenGuidedChat, onCreateFollowUp,
     onNotify,
     contactsMap, familyMembers = [],
     eventNotesMap,
@@ -236,16 +233,6 @@ export function TodayView({
     else if (onGroupTasks) await onGroupTasks(taskIds, name, date, isAllDay)
     clearBulkSelection()
   }, [selectedKeys, onGroupItems, onGroupTasks, clearBulkSelection])
-
-  // Derived set of raw task IDs from selectedKeys — needed by OverdueSection
-  // which operates on raw task IDs rather than timeline keys.
-  const overdueSelectedTaskIds = useMemo(() => {
-    const s = new Set<string>()
-    for (const k of selectedKeys) {
-      if (k.startsWith('task-')) s.add(k.slice(5))
-    }
-    return s
-  }, [selectedKeys])
 
   // ── Hide-routines toggle (localStorage parity) ────────────────────────────────
   const [hideRoutines, setHideRoutines] = useState<boolean>(() => readHideRoutines())
@@ -330,10 +317,10 @@ export function TodayView({
   const upNextId = upNext?.item.id
   const upNextStatus = upNext ? formatUpNextStatus(upNext) : undefined
 
-  // ── Backlog footer state — the "N carried over" segment expands the
-  // OverdueSection list inline beneath the footer line. Incomplete count with
-  // a total fallback, same readout the old collapsed strip showed.
-  const [carriedExpanded, setCarriedExpanded] = useState(false)
+  // ── Backlog footer gate. The footer shows only a "Review" link now, but it
+  // still has to know whether either backlog population is non-empty, so the
+  // carried-over count survives as the gate. Incomplete count with a total
+  // fallback, same readout the old collapsed strip showed.
   const carriedCount = useMemo(() => {
     const incomplete = data.overdueTasks.filter((t) => !t.completed).length
     return incomplete || data.overdueTasks.length
@@ -374,8 +361,6 @@ export function TodayView({
       })
     }
   }, [])
-
-  const proactive = useProactiveSuggestions()
 
   // ── Unprompted tier ────────────────────────────────────────────────────────
   // Live urgency facts, resolved from the tasks/events this view already has, so
@@ -760,31 +745,6 @@ export function TodayView({
     }
   }, [ctx, onUpdateTask, onPushRoutine, onGroupItems, onNotify, viewedDate, data.grouped])
 
-  // ── Follow-up task state: tracks which task just got completed → show follow-up input ──
-  const [followUpTaskId, setFollowUpTaskId] = useState<string | null>(null)
-
-  // Handle task toggle with follow-up support
-  const handleToggleTaskWithFollowUp = useCallback((taskId: string, wasCompleted: boolean) => {
-    onToggleTask(taskId)
-    // Only show follow-up when completing (not uncompleting)
-    if (!wasCompleted && onCreateFollowUp) {
-      setFollowUpTaskId(taskId)
-    }
-  }, [onToggleTask, onCreateFollowUp])
-
-  // Handle follow-up submission
-  const handleFollowUpSubmit = useCallback((title: string, sourceTaskId: string) => {
-    if (onCreateFollowUp) {
-      onCreateFollowUp(title, sourceTaskId)
-    }
-    setFollowUpTaskId(null)
-  }, [onCreateFollowUp])
-
-  // Dismiss follow-up input
-  const handleFollowUpDismiss = useCallback(() => {
-    setFollowUpTaskId(null)
-  }, [])
-
   // ── Handler stubs ─────────────────────────────────────────────────────────────
   const handleSelectItem = useCallback((id: string | null) => {
     onSelectItem(id)
@@ -1160,40 +1120,8 @@ export function TodayView({
           <TodayBacklogFooter
             carriedCount={carriedCount}
             attentionItems={data.attentionItems}
-            carriedExpanded={carriedExpanded}
-            onToggleCarried={() => setCarriedExpanded((v) => !v)}
             onReview={() => setReviewMode('morning')}
-          >
-            <OverdueSection
-              headerless
-              tasks={data.overdueTasks}
-              selectedItemId={selectedItemId}
-              onSelectTask={onSelectItem}
-              onToggleTask={onToggleTask}
-              onToggleWaiting={onToggleWaiting}
-              onPushTask={ctx.onPushTask}
-              onUpdateTask={ctx.onUpdateTask}
-              contactsMap={ctx.contactsMap}
-              projectsMap={ctx.projectsMap}
-              familyMembers={ctx.familyMembers}
-              onAssignTask={ctx.onAssignTask}
-              onAssignTaskAll={ctx.onAssignTaskAll}
-              bulkSelectedIds={overdueSelectedTaskIds}
-              onToggleBulkSelect={(taskId) => toggleBulkSelect(`task-${taskId}`)}
-              followUpTaskId={followUpTaskId}
-              onToggleWithFollowUp={handleToggleTaskWithFollowUp}
-              onFollowUpSubmit={onCreateFollowUp ? handleFollowUpSubmit : undefined}
-              onFollowUpDismiss={handleFollowUpDismiss}
-              panelOpen={panelOpen}
-              onClosePanel={onClosePanel}
-              onDeleteTask={ctx.onDeleteTask}
-              suggestionsForTask={proactive.suggestionsForEntity}
-              onActSuggestion={proactive.actOnSuggestion}
-              onDismissSuggestion={proactive.dismissSuggestion}
-              onOpenGuidedChat={onOpenGuidedChat}
-              onSendToBuy={ctx.onSendTaskToBuy ? handleSendToBuy : undefined}
-            />
-          </TodayBacklogFooter>
+          />
         )}
 
         {/* Undo toast for a To buy conversion — the task was deleted, so this
