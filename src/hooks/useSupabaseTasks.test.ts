@@ -18,11 +18,13 @@ vi.mock('@/hooks/useAuth', () => ({
 }))
 
 // useSupabaseTasks depends on useFamilyMembers (added after this suite was first
-// written, which is why the suite had been skipped). The hook only reads
-// `members`, so a minimal mock keeps the suite focused on task CRUD and avoids
-// useFamilyMembers' seed effect hitting the (unmocked) supabase.auth.getUser.
+// written, which is why the suite had been skipped). The hook reads `members`
+// and `getCurrentUserMember`, so a minimal mock keeps the suite focused on task
+// CRUD and avoids useFamilyMembers' seed effect hitting the (unmocked)
+// supabase.auth.getUser. An empty household means no assignment ever shares a
+// row — the sharing rule itself is covered in useSupabaseTasks.assignScope.test.ts.
 vi.mock('@/hooks/useFamilyMembers', () => ({
-  useFamilyMembers: () => ({ members: [] }),
+  useFamilyMembers: () => ({ members: [], getCurrentUserMember: () => undefined }),
 }))
 
 // Mock Supabase data storage - this needs to be in module scope for vi.mock

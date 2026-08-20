@@ -379,7 +379,7 @@ export function useSupabaseTasks() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const { members: familyMembers } = useFamilyMembers()
+  const { members: familyMembers, getCurrentUserMember } = useFamilyMembers()
 
   // Always-current mirror of `tasks` for lookups inside stored closures.
   // Mutation callbacks (updateTask, pushTask, …) get captured by UI that
@@ -1034,15 +1034,34 @@ export function useSupabaseTasks() {
       return
     }
 
-    // Auto-context: Assign to family member → auto-set context='family'
-    if ('assignedTo' in updates && updates.assignedTo) {
-      const isFamilyMember = familyMembers.some(m => m.id === updates.assignedTo)
-      if (isFamilyMember && !('context' in updates)) {
-        logger.debug('[updateTask] Auto-setting context to family for family member assignment')
-        updates = { ...updates, context: 'family' }
-
-        // Show toast notification
-        showToast('Set context to Family', 'info', 2500)
+    // Handing an item to someone answers WHO DOES IT. It does not say what part
+    // of life the item belongs to, and it is not a request to publish it.
+    //
+    // This used to stamp context='family' on any assignment to a household
+    // member — with no self-exclusion, so assigning your own item to yourself
+    // relabelled it, and scopeForContextChange then dragged scope to
+    // 'compound'. That is how a private "Reschedule colo" became a family-area
+    // row readable by the whole household, one tap after capture.
+    //
+    // What assignment genuinely requires is that the assignee can READ the row,
+    // and RLS grants that on scope alone (2026-06-07_scope_axis.sql:35 —
+    // `scope IN ('couple','compound')`). So raise a private item to 'couple',
+    // the minimum share, and leave the life area alone. 'couple' also keeps it
+    // off the kitchen wall, which needs compound. Assigning to yourself needs
+    // no share at all and changes nothing.
+    if ('assignedTo' in updates && updates.assignedTo && !('scope' in updates)) {
+      const assignee = familyMembers.find(m => m.id === updates.assignedTo)
+      const isSelf = updates.assignedTo === getCurrentUserMember()?.id
+      // Where the row's scope lands on its own. A context set in this same
+      // update carries its own coupling (family -> compound), and that wins —
+      // only step in when nothing else shared the row.
+      const scopeWithoutUs = 'context' in updates
+        ? scopeForContextChange(task.context, updates.context, task.scope) ?? task.scope
+        : task.scope
+      if (assignee && !isSelf && scopeWithoutUs === 'individual') {
+        logger.debug('[updateTask] Sharing with assignee (scope -> couple)')
+        updates = { ...updates, scope: 'couple' }
+        showToast(`Shared with ${assignee.name}`, 'info', 2500)
       }
     }
 
@@ -1231,7 +1250,7 @@ export function useSupabaseTasks() {
         }
       }
     }
-  }, [tasks, familyMembers, findTaskById, findParentOfSubtask])
+  }, [tasks, familyMembers, getCurrentUserMember, findTaskById, findParentOfSubtask])
 
   // Bulk update multiple tasks at once
   const updateTasksBulk = useCallback(async (taskIds: string[], updates: Partial<Task>) => {
