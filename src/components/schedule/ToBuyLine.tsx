@@ -55,7 +55,11 @@ export function ToBuyLine() {
       type="button"
       onClick={() => navigate(`/lists?list=${listId}`)}
       data-testid="to-buy-line"
-      className="w-full flex items-center gap-2 px-3 md:px-0 py-2 text-left text-[13px] text-neutral-500 hover:text-neutral-700 transition-colors"
+      // px-3 on BOTH breakpoints, not md:px-0: the inline "Add to today" pill
+      // directly above carries px-3, so a zero-padded desktop line starts 12px
+      // to its left and reads as falling off the card. The two lines close the
+      // day together — they have to share a left edge.
+      className="w-full flex items-center gap-2 px-3 py-2 text-left text-[13px] text-neutral-500 hover:text-neutral-700 transition-colors"
     >
       <ShoppingBag className="w-3.5 h-3.5 text-neutral-400 shrink-0" aria-hidden />
       <span className="font-medium text-neutral-600">To buy</span>

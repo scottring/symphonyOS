@@ -12,6 +12,7 @@ import { Toast, ConfirmationToast } from '@/components/toast';
 import { ChatPanel } from '@/components/chat/ChatPanel';
 import { NotesProvider } from '@/contexts/NotesContext';
 import { ListsProvider } from '@/contexts/ListsContext';
+import { PinsProvider } from '@/contexts/PinsContext';
 import { useAuth } from '@/hooks/useAuth';
 import { useMobile } from '@/hooks/useMobile';
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
@@ -498,7 +499,9 @@ export function ShellLayout({ children }: Props) {
   return (
     <ListsProvider>
       <NotesProvider>
-        <ShellLayoutInner>{children}</ShellLayoutInner>
+        <PinsProvider>
+          <ShellLayoutInner>{children}</ShellLayoutInner>
+        </PinsProvider>
       </NotesProvider>
     </ListsProvider>
   );

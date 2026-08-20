@@ -20,7 +20,7 @@ import { useFamilyMembers } from '@/hooks/useFamilyMembers';
 import { useGoogleCalendar } from '@/hooks/useGoogleCalendar';
 import { useCalendarDomainMappings } from '@/hooks/useCalendarDomainMappings';
 import { useDomain } from '@/hooks/useDomain';
-import { usePinnedItems } from '@/hooks/usePinnedItems';
+import { usePinsContext } from '@/contexts/PinsContext';
 import { useNotesContext } from '@/contexts/NotesContext';
 import { useListsContext } from '@/contexts/ListsContext';
 import { useToast } from '@/hooks/useToast';
@@ -55,7 +55,9 @@ export function useShellChrome() {
   const { isConnected, createEvent, fetchEvents } = useGoogleCalendar();
   const { getCalendarForDomain } = useCalendarDomainMappings();
   const { currentDomain } = useDomain();
-  const pinnedItems = usePinnedItems();
+  // The shell-wide instance, shared with whatever app is routed below —
+  // a private copy here would not see a pin made from /lists.
+  const pinnedItems = usePinsContext();
   const { addNote, activeTopics, addTopic } = useNotesContext();
   const { lists } = useListsContext();
   const { toast, showToast, dismissToast } = useToast();
