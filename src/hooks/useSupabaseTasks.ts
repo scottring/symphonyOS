@@ -1034,14 +1034,14 @@ export function useSupabaseTasks() {
     }
   }, [findTaskById, findParentOfSubtask])
 
-  const updateTask = useCallback(async (id: string, updates: Partial<Task>) => {
+  const updateTask = useCallback(async (id: string, updates: Partial<Task>): Promise<boolean> => {
     logger.debug('[updateTask] Called with:', { id, updates })
     const task = findTaskById(id)
     if (!task) {
       // Should be rare now that lookups read tasksRef — surface it loudly so a
       // dropped write is never silent again.
       console.warn('[updateTask] Task not found, write dropped:', id, updates)
-      return
+      return false
     }
 
     // Handing an item to someone answers WHO DOES IT. It does not say what part
@@ -1229,6 +1229,7 @@ export function useSupabaseTasks() {
         )
       }
       setError(updateError.message)
+      return false
     } else if (data && data.length > 0) {
       logger.debug('[updateTask] DB update successful, returned notes:', (data[0] as DbTask).notes)
       // Fan out to other instances. Announce the merged LOCAL object, not the
@@ -1262,6 +1263,7 @@ export function useSupabaseTasks() {
         }
       }
     }
+    return true
   }, [tasks, familyMembers, getCurrentUserMember, findTaskById, findParentOfSubtask])
 
   // Bulk update multiple tasks at once

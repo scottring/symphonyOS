@@ -738,6 +738,61 @@ describe('useSupabaseTasks', () => {
       // Should roll back to original
       expect(result.current.tasks[0].title).toBe('Original')
     })
+
+    // A commit-site caller (e.g. plan-from-paper's move path) needs a real
+    // success/failure signal to report honest counts — updateTask rolls back
+    // and toasts on its own, but it never throws, so the return value is the
+    // only way a caller can tell a write apart from a rejection.
+    it('resolves true when the write succeeds', async () => {
+      mockSupabaseData.push(createMockDbTask({ id: 'task-1', title: 'Original' }))
+
+      const { result } = renderHook(() => useSupabaseTasks())
+
+      await waitFor(() => {
+        expect(result.current.tasks).toHaveLength(1)
+      })
+
+      let ok: boolean | undefined
+      await act(async () => {
+        ok = await result.current.updateTask('task-1', { title: 'Updated' })
+      })
+
+      expect(ok).toBe(true)
+    })
+
+    it('resolves false when the DB update errors', async () => {
+      mockSupabaseData.push(createMockDbTask({ id: 'task-1', title: 'Original' }))
+
+      const { result } = renderHook(() => useSupabaseTasks())
+
+      await waitFor(() => {
+        expect(result.current.tasks).toHaveLength(1)
+      })
+
+      mockError = { message: 'Update failed' }
+
+      let ok: boolean | undefined
+      await act(async () => {
+        ok = await result.current.updateTask('task-1', { title: 'Will Fail' })
+      })
+
+      expect(ok).toBe(false)
+    })
+
+    it('resolves false when the task is not found (dropped write)', async () => {
+      const { result } = renderHook(() => useSupabaseTasks())
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false)
+      })
+
+      let ok: boolean | undefined
+      await act(async () => {
+        ok = await result.current.updateTask('non-existent', { title: 'Test' })
+      })
+
+      expect(ok).toBe(false)
+    })
   })
 
   describe('updateTasksBulk', () => {

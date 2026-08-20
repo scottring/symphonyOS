@@ -20,7 +20,7 @@ import { LoadingFallback } from '@/components/layout/LoadingFallback';
 import { isEverydayRoutine, scheduleRoutineOnDate } from '@/lib/routineUtils';
 import { PlanFromPaperFlow } from '@/components/capture/PlanFromPaperFlow';
 import type { PlanItem } from '@/lib/planParse';
-import { buildCommitPlan } from '@/lib/planCommit';
+import { buildCommitPlan, describeCommitOutcome } from '@/lib/planCommit';
 import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config';
 import { parseRoutineTimelineId } from '@/lib/today/doseExpansion';
 import { groupItems, addToGroup, removeFromGroup, ungroupTasks } from '@/lib/today/groupTasks';
@@ -705,32 +705,36 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
     const defaultAssigneeId = getCurrentUserMember()?.id;
     const plan = buildCommitPlan(items, commitCtx);
 
+    // Neither addTask nor updateTask throws on a DB rejection — both roll
+    // back, toast their own error, and resolve normally (addTask: undefined,
+    // updateTask: false). Counting real outcomes off the return value (not
+    // "did we attempt it") is what keeps this toast from claiming a write
+    // that the database rejected. One rejected write must not abort the rest
+    // of the batch.
+    let addsSucceeded = 0;
     for (const args of plan.adds) {
-      await addTask(args.title, undefined, undefined, args.scheduledFor, {
+      const id = await addTask(args.title, undefined, undefined, args.scheduledFor, {
         ...args.options,
         defaultAssigneeId,
       });
+      if (id) addsSucceeded++;
     }
 
-    // A move that is rejected (a shared task this user cannot write) must not
-    // abort the rest of the batch — count the failures and say so.
-    let failed = 0;
+    let movesSucceeded = 0;
     for (const move of plan.moves) {
-      try {
-        await updateTask(move.taskId, move.updates);
-      } catch (e) {
-        failed++;
-        console.error('[plan] could not move existing task', move.taskId, e);
-      }
+      const ok = await updateTask(move.taskId, move.updates);
+      if (ok) movesSucceeded++;
     }
 
-    const parts: string[] = [];
-    if (plan.adds.length) parts.push(`Added ${plan.adds.length} task${plan.adds.length === 1 ? '' : 's'}`);
-    const moved = plan.moves.length - failed;
-    if (moved > 0) parts.push(`moved ${moved}`);
-    if (plan.skipped) parts.push(`${plan.skipped} already in place`);
-    if (parts.length) showToast(`${parts.join(', ')} from your plan`, 'success', 4000);
-    if (failed) showToast(`Couldn't move ${failed} task${failed === 1 ? '' : 's'}`, 'error', 5000);
+    const { success, failure } = describeCommitOutcome({
+      addsAttempted: plan.adds.length,
+      addsSucceeded,
+      movesAttempted: plan.moves.length,
+      movesSucceeded,
+      skipped: plan.skipped,
+    });
+    if (success) showToast(success, 'success', 4000);
+    if (failure) showToast(failure, 'error', 5000);
   }, [addTask, updateTask, currentDomain, getCurrentUserMember]);
 
   return (

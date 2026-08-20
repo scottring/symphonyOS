@@ -10,7 +10,9 @@ export interface ConvertTaskToProjectDeps {
     links?: TaskLink[]
     phoneNumber?: string
   }) => Promise<Project | null>
-  updateTask: (id: string, updates: Partial<Task>) => Promise<void> | void
+  // useSupabaseTasks.updateTask now reports success as a boolean; this
+  // orchestrator ignores the return value, so the type just needs to admit it.
+  updateTask: (id: string, updates: Partial<Task>) => Promise<boolean> | Promise<void> | void
   deleteTask: (id: string) => Promise<void> | void
 }
 

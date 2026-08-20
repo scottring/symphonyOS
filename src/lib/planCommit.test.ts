@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildCommitPlan } from './planCommit'
+import { buildCommitPlan, describeCommitOutcome } from './planCommit'
 import type { PlanItem } from './planParse'
 import { localYmd } from '@/lib/cadence/config'
 
@@ -61,5 +61,83 @@ describe('buildCommitPlan', () => {
     const renamed: PlanItem = { ...matchedMoving, title: 'Totally different wording' }
     const plan = buildCommitPlan([renamed], ctx)
     expect('title' in plan.moves[0].updates).toBe(false)
+  })
+})
+
+// This is the composition the Critical review flagged: the toast must report
+// what actually landed, not what was attempted. `addTask` and `updateTask`
+// never throw on a DB rejection — they roll back and resolve normally — so a
+// try/catch around them counts zero failures no matter what the database did.
+// These tests pin the counts and wording off real per-write outcomes.
+describe('describeCommitOutcome', () => {
+  it('reports every write as successful when nothing failed', () => {
+    const { success, failure } = describeCommitOutcome({
+      addsAttempted: 2,
+      addsSucceeded: 2,
+      movesAttempted: 1,
+      movesSucceeded: 1,
+      skipped: 1,
+    })
+    expect(success).toBe('Added 2 tasks, moved 1, 1 already in place from your plan')
+    expect(failure).toBeNull()
+  })
+
+  it('does not count a rejected move as moved', () => {
+    const { success, failure } = describeCommitOutcome({
+      addsAttempted: 0,
+      addsSucceeded: 0,
+      movesAttempted: 2,
+      movesSucceeded: 1,
+      skipped: 0,
+    })
+    expect(success).toBe('moved 1 from your plan')
+    expect(failure).toBe("Couldn't move 1 task from your plan")
+  })
+
+  it('does not count a rejected add as added', () => {
+    const { success, failure } = describeCommitOutcome({
+      addsAttempted: 3,
+      addsSucceeded: 1,
+      movesAttempted: 0,
+      movesSucceeded: 0,
+      skipped: 0,
+    })
+    expect(success).toBe('Added 1 task from your plan')
+    expect(failure).toBe("Couldn't add 2 tasks from your plan")
+  })
+
+  it('reports both a failed add and a failed move in one failure message', () => {
+    const { failure } = describeCommitOutcome({
+      addsAttempted: 2,
+      addsSucceeded: 1,
+      movesAttempted: 2,
+      movesSucceeded: 1,
+      skipped: 0,
+    })
+    expect(failure).toBe("Couldn't add 1 or move 1 tasks from your plan")
+  })
+
+  it('reports nothing when the batch was empty', () => {
+    const { success, failure } = describeCommitOutcome({
+      addsAttempted: 0,
+      addsSucceeded: 0,
+      movesAttempted: 0,
+      movesSucceeded: 0,
+      skipped: 0,
+    })
+    expect(success).toBeNull()
+    expect(failure).toBeNull()
+  })
+
+  it('reports total failure with no success toast when every write is rejected', () => {
+    const { success, failure } = describeCommitOutcome({
+      addsAttempted: 0,
+      addsSucceeded: 0,
+      movesAttempted: 3,
+      movesSucceeded: 0,
+      skipped: 0,
+    })
+    expect(success).toBeNull()
+    expect(failure).toBe("Couldn't move 3 tasks from your plan")
   })
 })

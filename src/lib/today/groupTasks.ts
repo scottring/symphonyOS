@@ -15,7 +15,9 @@ export interface GroupTasksDeps {
     scheduledFor: Date | undefined,
     options: AddTaskOpts,
   ) => Promise<string | undefined>
-  updateTask: (id: string, updates: Partial<Task>) => Promise<void> | void
+  // useSupabaseTasks.updateTask now reports success as a boolean; this helper
+  // ignores the return value, so the type just needs to admit it.
+  updateTask: (id: string, updates: Partial<Task>) => Promise<boolean> | Promise<void> | void
   /**
    * Rebuild the task tree from the source of truth. Required for the group to
    * appear immediately: `updateTask`'s optimistic path patches a reparented
@@ -101,7 +103,7 @@ export async function groupItems(
   return wrapperId
 }
 
-type UpdateFn = (id: string, updates: Partial<Task>) => Promise<void> | void
+type UpdateFn = (id: string, updates: Partial<Task>) => Promise<boolean> | Promise<void> | void
 type DeleteFn = (id: string) => Promise<void> | void
 type RefetchFn = () => Promise<void> | void
 
