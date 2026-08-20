@@ -15,6 +15,8 @@
 - Node must be 22.14.0 before running tests. Run `node -v` first; if wrong, `export PATH="$HOME/.nvm/versions/node/v22.14.0/bin:/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:$PATH"`.
 - `npm test` is WATCH mode. Always use `npx vitest run <path>`.
 - Typecheck with `npx tsc --noEmit -p tsconfig.app.json`. At the repo root `npx tsc --noEmit` is a no-op.
+- That project **excludes test files** (`tsconfig.app.json:34`), so tsc never type-checks a `*.test.tsx`. Type errors in fixtures surface only when vitest compiles them — never conclude a fixture is sound because tsc was silent.
+- Date fixtures must not be UTC midnight. A `T00:00:00.000Z` literal reads back as the previous day in every timezone west of UTC, so a test asserting the date passes in CI and fails locally. Use noon UTC.
 - Edge-function modules are tested with **vitest**, not `deno test` — `supabase/functions/**/*.{test,spec}.ts` is in the vitest `include`.
 - Never use the service-role client to read user rows. Reads of `tasks` must go through a client carrying the caller's `Authorization` header so RLS applies.
 - Never partial-`upsert` the `tasks` table (guaranteed 23502). Writes go through the existing `updateTask` / `addTask` hooks.
@@ -756,7 +758,7 @@ Expected: PASS.
 - [ ] **Step 5: Typecheck**
 
 Run: `npx tsc --noEmit -p tsconfig.app.json`
-Expected: errors ONLY in `src/components/capture/PlanReviewSheet.test.tsx`, complaining that `existing` is missing from the `ITEMS` literals at lines 12-15. Task 5 migrates those. `usePlanFromPaper.ts` and `PlanReviewSheet.tsx` construct no `PlanItem` literals and must NOT error. If any other file errors, stop and report it.
+Expected: **no output, exit 0.** `tsconfig.app.json:34` excludes `src/**/*.test.*` and `src/**/*.spec.*`, so tsc cannot see the fixture breakage at all — the missing `existing` field on `PlanReviewSheet.test.tsx`'s `ITEMS` literals surfaces only when vitest compiles that file, which Task 5 fixes. If tsc reports an error in any PRODUCTION file, stop and report it: no production code constructs a `PlanItem` literal, so such an error means something unexpected.
 
 - [ ] **Step 6: Commit**
 
