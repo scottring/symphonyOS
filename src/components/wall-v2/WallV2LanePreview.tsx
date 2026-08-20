@@ -24,7 +24,7 @@ const KALEB = 'aa264b2e-c4ee-44a8-be07-9c0cbdaa7277';
 
 function lane(over: Partial<WallLane> & Pick<WallLane, 'memberId' | 'name'>): WallLane {
   return {
-    time: null, meridiem: null, dayLabel: null, label: null,
+    time: null, meridiem: null, dayLabel: null, label: null, then: null,
     isToday: true, allDay: false, isEmpty: false, itemId: null, type: 'event',
     ...over,
   };
@@ -33,9 +33,11 @@ function lane(over: Partial<WallLane> & Pick<WallLane, 'memberId' | 'name'>): Wa
 // Scene A — an ordinary weekday afternoon. Note Kaleb's lane falls forward to
 // Friday: the case that would have rendered as a blank lane.
 const SCENE_A: WallLane[] = [
-  lane({ memberId: SCOTT, name: 'Scott', time: '3:45', meridiem: 'PM', label: 'Soccer pickup', itemId: 'a1' }),
+  lane({ memberId: SCOTT, name: 'Scott', time: '3:45', meridiem: 'PM', label: 'Soccer pickup', itemId: 'a1',
+    then: { time: '6:30', meridiem: 'PM', dayLabel: null, label: 'Vestry call' } }),
   lane({ memberId: IRIS, name: 'Iris', time: '5:30', meridiem: 'PM', label: 'Call with the contractor', itemId: 'a2' }),
-  lane({ memberId: ELLA, name: 'Ella', time: '4:15', meridiem: 'PM', label: 'Piano', itemId: 'a3' }),
+  lane({ memberId: ELLA, name: 'Ella', time: '4:15', meridiem: 'PM', label: 'Piano', itemId: 'a3',
+    then: { time: '9:00', meridiem: 'AM', dayLabel: 'Sat', label: 'Swim meet' } }),
   lane({ memberId: KALEB, name: 'Kaleb', time: '10:30', meridiem: 'AM', label: 'Dentist', dayLabel: 'Fri', isToday: false, itemId: 'a4' }),
 ];
 

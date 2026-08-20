@@ -40,6 +40,8 @@ export interface WallLane {
   isToday: boolean;
   allDay: boolean;
   isEmpty: boolean;
+  /** The one after next, rendered small and dim. Null when there isn't one. */
+  then: { time: string | null; meridiem: string | null; dayLabel: string | null; label: string } | null;
   /** Identity of the underlying item, so the flap board only flips on real change. */
   itemId: string | null;
   type: TimelineItem['type'] | null;
@@ -87,31 +89,39 @@ function ownersOf(item: TimelineItem, members: FamilyMember[]): string[] {
   return item.assignedTo ? [item.assignedTo] : [HOUSEHOLD_ID];
 }
 
-function nextItemOnDay(
+/**
+ * Every item on the day that belongs to this member, in the order the lane
+ * should present them: timed items first by clock, all-day items after.
+ *
+ * (This used to return only the single best match. The lane now shows a second,
+ * dimmer item — with one commitment per person the wall read as sparse — and
+ * the ordering rule is the same either way, so it returns the whole ordered
+ * list and lets the caller take what it needs.)
+ */
+function itemsOnDay(
   day: WallDayData,
   memberId: string,
   cutoff: Date | null,
   members: FamilyMember[],
-): TimelineItem | null {
-  let best: TimelineItem | null = null;
-  let bestIsTimed = false;
-
+): TimelineItem[] {
+  const found: TimelineItem[] = [];
   for (const section of PREVIEW_SECTIONS) {
     for (const item of day.items[section] ?? []) {
       if (!ownersOf(item, members).includes(memberId)) continue;
       if (item.completed) continue;
       if (item.type === 'routine' && isEverydayRoutine(item.recurrencePattern)) continue;
       if (cutoff && item.startTime && item.startTime < cutoff) continue;
-
-      const isTimed = Boolean(item.startTime);
-      if (!best) { best = item; bestIsTimed = isTimed; continue; }
-      // A timed item outranks an all-day one; among timed items, earliest wins.
-      // All-day items only hold the slot when nothing timed is left.
-      if (isTimed && !bestIsTimed) { best = item; bestIsTimed = true; continue; }
-      if (isTimed && bestIsTimed && item.startTime! < best.startTime!) { best = item; }
+      found.push(item);
     }
   }
-  return best;
+  // A timed item outranks an all-day one; among timed items, earliest wins.
+  // All-day items only hold a slot when nothing timed is left.
+  return found.sort((a, b) => {
+    if (a.startTime && b.startTime) return a.startTime.getTime() - b.startTime.getTime();
+    if (a.startTime) return -1;
+    if (b.startTime) return 1;
+    return 0;
+  });
 }
 
 /**
@@ -129,33 +139,52 @@ export function adaptPersonLane(
     memberId: member.id, name: member.name,
     time: null, meridiem: null, dayLabel: null, label: null,
     isToday: false, allDay: false, isEmpty: true, itemId: null, type: null,
+    then: null,
   };
 
-  for (let i = 0; i < days.length; i++) {
+  // Walk forward through the week collecting the first two matches. Two is
+  // deliberate: it fills the lane's otherwise-dead right-hand space without
+  // turning a lane back into the list the lanes replaced.
+  const hits: { item: TimelineItem; isToday: boolean; date: Date }[] = [];
+  for (let i = 0; i < days.length && hits.length < 2; i++) {
     const day = days[i];
     const isToday = i === 0;
-    const found = nextItemOnDay(day, member.id, isToday ? now : null, members);
-    if (!found) continue;
-
-    const timed = found.startTime ? splitTime(found.startTime) : null;
-    return {
-      ...base,
-      time: timed?.time ?? null,
-      meridiem: timed?.meridiem ?? null,
-      // Today needs no qualifier — the wall's rail already says what day it is.
-      dayLabel: isToday
-        ? null
-        : day.date.toLocaleDateString('en-US', { weekday: 'short' }),
-      label: found.title,
-      isToday,
-      allDay: Boolean(found.allDay) || !found.startTime,
-      isEmpty: false,
-      itemId: found.id,
-      type: found.type,
-    };
+    for (const item of itemsOnDay(day, member.id, isToday ? now : null, members)) {
+      hits.push({ item, isToday, date: day.date });
+      if (hits.length === 2) break;
+    }
   }
 
-  return base;
+  if (hits.length === 0) return base;
+
+  const dayLabelFor = (h: { isToday: boolean; date: Date }) =>
+    // Today needs no qualifier — the wall's rail already says what day it is.
+    h.isToday ? null : h.date.toLocaleDateString('en-US', { weekday: 'short' });
+
+  const [first, second] = hits;
+  const timed = first.item.startTime ? splitTime(first.item.startTime) : null;
+  const secondTimed = second?.item.startTime ? splitTime(second.item.startTime) : null;
+
+  return {
+    ...base,
+    time: timed?.time ?? null,
+    meridiem: timed?.meridiem ?? null,
+    dayLabel: dayLabelFor(first),
+    label: first.item.title,
+    isToday: first.isToday,
+    allDay: Boolean(first.item.allDay) || !first.item.startTime,
+    isEmpty: false,
+    itemId: first.item.id,
+    type: first.item.type,
+    then: second
+      ? {
+          time: secondTimed?.time ?? null,
+          meridiem: secondTimed?.meridiem ?? null,
+          dayLabel: dayLabelFor(second),
+          label: second.item.title,
+        }
+      : null,
+  };
 }
 
 export function adaptLanes(

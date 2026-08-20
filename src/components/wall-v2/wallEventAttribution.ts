@@ -28,18 +28,16 @@ export const HOUSEHOLD_ID = '__household__';
 /**
  * Calendars whose events never belong on a kitchen wall.
  *
- * The three work calendars are the point of this list. The wall has no
- * calendar-visibility control, so it renders whatever the fetch returns —
- * which today means Scott's work meetings show up in the kitchen. Lanes make
- * that worse, not better, by giving them a person's name and the wall's
- * largest type.
+ * Deliberately short. Work calendars were briefly in here and are NOT any more
+ * (Scott, 2026-08-20): with only the shared calendar feeding it, the wall read
+ * as sparse, and a parent's working day is genuinely part of "where is everyone
+ * today". Work events now land in Scott's lane like anything else of his.
+ *
+ * What remains is duplication and noise, not privacy: national holidays, the
+ * Symphony dev-test calendar, and the meal calendar the dinner card already
+ * renders.
  */
 export const EXCLUDED_CALENDAR_IDS = new Set([
-  // Work
-  'scott.kaufman@stacksdata.com',
-  'o77ugme9pkoqpf30tng6a2rk6c@group.calendar.google.com',
-  'qp7j77662gcnat8hqn6gt512ms@group.calendar.google.com',
-  // Noise
   'en.usa#holiday@group.v.calendar.google.com',
   '38c2e0ff8268cc36fbc9b0d3b8829935269341aeed25428b42899fefaf1e75b7@group.calendar.google.com',
   // The meal calendar already drives the dinner card; a second rendering in a
@@ -59,8 +57,18 @@ export const EXCLUDED_CALENDAR_IDS = new Set([
  * Google account. Until it is, her lane draws only from name matches on the
  * shared calendar and from tasks assigned to her. Adding her is one line here.
  */
+const SCOTT = '4fd6259b-2246-4304-96c3-d93a12fd43ae';
+
 export const CALENDAR_OWNER: Record<string, string> = {
-  'smkaufman@gmail.com': '4fd6259b-2246-4304-96c3-d93a12fd43ae', // Scott — personal
+  'smkaufman@gmail.com': SCOTT,                                        // personal
+  'scott.kaufman@stacksdata.com': SCOTT,                               // work — primary
+  'o77ugme9pkoqpf30tng6a2rk6c@group.calendar.google.com': SCOTT,       // work — schedule/meetings
+  'qp7j77662gcnat8hqn6gt512ms@group.calendar.google.com': SCOTT,       // work — G Suite
+  // Named for Scott's personal address, so it goes to his lane rather than
+  // falling through to the household lane and mixing his events into
+  // everyone's. If something unexpected starts showing up under his name,
+  // this line is the first suspect.
+  'ifgsv9b9e40qndf103nb0ishc0@group.calendar.google.com': SCOTT,
 };
 
 /** Read whichever casing the event arrived in. */

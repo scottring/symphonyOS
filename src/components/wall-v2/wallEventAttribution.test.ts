@@ -39,15 +39,30 @@ describe('matchesName', () => {
 });
 
 describe('attributeEvent', () => {
-  it('keeps work off the wall entirely', () => {
-    expect(attributeEvent(ev('Quarterly review', WORK_CAL), MEMBERS)).toEqual([]);
+  // Work is ON the wall by Scott's call — a parent's working day is part of
+  // "where is everyone today", and without it the wall read as sparse.
+  it("puts work events in Scott's lane, not nobody's", () => {
+    expect(attributeEvent(ev('Quarterly review', WORK_CAL), MEMBERS)).toEqual([SCOTT_ID]);
   });
 
-  it('excludes every configured work calendar, not just the primary', () => {
+  it('attributes every work calendar to Scott, not just the primary', () => {
     for (const id of ['o77ugme9pkoqpf30tng6a2rk6c@group.calendar.google.com',
                       'qp7j77662gcnat8hqn6gt512ms@group.calendar.google.com']) {
-      expect(EXCLUDED_CALENDAR_IDS.has(id)).toBe(true);
-      expect(attributeEvent(ev('Standup', id), MEMBERS)).toEqual([]);
+      expect(EXCLUDED_CALENDAR_IDS.has(id)).toBe(false);
+      expect(attributeEvent(ev('Standup', id), MEMBERS)).toEqual([SCOTT_ID]);
+    }
+  });
+
+  // Work must not leak into the household lane — that would put a sales call
+  // in front of the whole family as a shared commitment.
+  it('never routes a work event to the household lane', () => {
+    expect(attributeEvent(ev('Standup', WORK_CAL), MEMBERS)).not.toContain(HOUSEHOLD_ID);
+  });
+
+  it('still excludes noise and the meal calendar', () => {
+    for (const id of ['en.usa#holiday@group.v.calendar.google.com',
+                      '0470dab98aa3026c64e2e4573c6e0541c5e75db530994667b0ab2b78173fe666@group.calendar.google.com']) {
+      expect(attributeEvent(ev('Anything', id), MEMBERS)).toEqual([]);
     }
   });
 
@@ -80,8 +95,8 @@ describe('attributeEvent', () => {
 
   it('lets an explicit assignment beat both calendar and title', () => {
     expect(attributeEvent(ev('Ella piano', FAMILY_CAL), MEMBERS, 'iris')).toEqual(['iris']);
-    // …but never resurrects an event from an excluded calendar by accident:
-    // an explicit assignee is a deliberate human act, so it wins outright.
+    // A work event handed to someone else follows the assignment, not the
+    // calendar's owner — an explicit assignee is a deliberate human act.
     expect(attributeEvent(ev('Offsite', WORK_CAL), MEMBERS, 'iris')).toEqual(['iris']);
   });
 

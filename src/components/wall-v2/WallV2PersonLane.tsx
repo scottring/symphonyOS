@@ -103,6 +103,17 @@ export function WallV2PersonLane({
             <span className={`text-[clamp(1.3rem,3.4vh,2.4rem)] leading-tight truncate ${WALL.ink}`}>
               {lane.label}
             </span>
+            {/* The one after next, in the lane's otherwise-dead right-hand
+                space. Dim and small on purpose: it must read as "and then",
+                never compete with the commitment the lane is actually about. */}
+            {lane.then && (
+              <span className={`ml-auto pl-6 shrink-0 truncate text-[clamp(.8rem,1.9vh,1.15rem)] ${WALL.muted}`}>
+                then{' '}
+                {lane.then.dayLabel ? `${lane.then.dayLabel} ` : ''}
+                {lane.then.time ? `${lane.then.time}${lane.then.meridiem === 'PM' ? 'p' : 'a'} ` : ''}
+                {lane.then.label}
+              </span>
+            )}
           </div>
         )}
       </div>

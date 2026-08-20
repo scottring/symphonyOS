@@ -130,6 +130,32 @@ describe('adaptPersonLane', () => {
   });
 });
 
+  it('carries the one after next as a dim secondary', () => {
+    const days = [day(0, {
+      afternoon: [item('a', at(0, 15), { assignedTo: 'm-scott', title: 'First' })],
+      evening: [item('b', at(0, 18), { assignedTo: 'm-scott', title: 'Second' })],
+    })];
+    const lane = adaptPersonLane(SCOTT, days, at(0, 9));
+    expect(lane.label).toBe('First');
+    expect(lane.then?.label).toBe('Second');
+    expect(lane.then?.time).toBe('6:00');
+  });
+
+  it('reaches into a later day for the secondary when today has only one left', () => {
+    const days = [
+      day(0, { evening: [item('a', at(0, 18), { assignedTo: 'm-scott', title: 'Tonight' })] }),
+      day(1, { morning: [item('b', at(1, 8), { assignedTo: 'm-scott', title: 'Tomorrow' })] }),
+    ];
+    const lane = adaptPersonLane(SCOTT, days, at(0, 9));
+    expect(lane.then?.label).toBe('Tomorrow');
+    expect(lane.then?.dayLabel).toBe('Thu');
+  });
+
+  it('has no secondary when the week holds only one thing', () => {
+    const days = [day(0, { evening: [item('a', at(0, 18), { assignedTo: 'm-scott', title: 'Only' })] })];
+    expect(adaptPersonLane(SCOTT, days, at(0, 9)).then).toBeNull();
+  });
+
 describe('mergeAlignedLanes', () => {
   const now = at(0, 9, 0);
 
