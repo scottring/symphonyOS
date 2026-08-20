@@ -756,7 +756,7 @@ Expected: PASS.
 - [ ] **Step 5: Typecheck**
 
 Run: `npx tsc --noEmit -p tsconfig.app.json`
-Expected: errors ONLY in `PlanReviewSheet.tsx` / `usePlanFromPaper.ts` complaining that `existing` is missing from `PlanItem` literals. Those are fixed in Tasks 4 and 5. If any other file errors, stop and report it.
+Expected: errors ONLY in `src/components/capture/PlanReviewSheet.test.tsx`, complaining that `existing` is missing from the `ITEMS` literals at lines 12-15. Task 5 migrates those. `usePlanFromPaper.ts` and `PlanReviewSheet.tsx` construct no `PlanItem` literals and must NOT error. If any other file errors, stop and report it.
 
 - [ ] **Step 6: Commit**
 
