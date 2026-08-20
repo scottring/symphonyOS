@@ -69,10 +69,16 @@ function splitTime(d: Date): { time: string; meridiem: string } {
  * Who an item belongs to.
  *
  * Events go through attribution (calendar ownership, then a name in the title)
- * because nothing upstream assigns them. Tasks and routines already carry an
- * assignee — but an UNASSIGNED one falls to the household lane rather than
- * disappearing: Keep Moving used to surface exactly those, and removing it
- * must not quietly drop them off the wall.
+ * because nothing upstream assigns them.
+ *
+ * Tasks and routines are honoured ONLY when they carry an assignee. An
+ * unassigned one used to fall to the household lane so that nothing was lost
+ * when Keep Moving went — but that put "clean the mould out of the washing
+ * machine" in the wall's largest type, speaking for the whole family. The
+ * household lane is for shared COMMITMENTS ("Dinner at Grandma's", "Trash
+ * day"), not for the chore backlog. Open tasks are still represented: the
+ * at-a-glance card counts them ("N tasks open — M due today"), which is the
+ * right altitude for a chore.
  */
 function ownersOf(item: TimelineItem, members: FamilyMember[]): string[] {
   if (item.type === 'event') {
@@ -86,7 +92,7 @@ function ownersOf(item: TimelineItem, members: FamilyMember[]): string[] {
       item.assignedTo,
     );
   }
-  return item.assignedTo ? [item.assignedTo] : [HOUSEHOLD_ID];
+  return item.assignedTo ? [item.assignedTo] : [];
 }
 
 /**

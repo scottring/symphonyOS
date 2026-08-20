@@ -199,18 +199,27 @@ describe('adaptLanes', () => {
     expect(lanes.map((l) => l.name)).toEqual(['Scott', 'Iris', 'Everyone']);
   });
 
-  // The content-loss guard: with Keep Moving and the timeline gone, an item
-  // belonging to nobody in particular has exactly one place left to appear.
-  it('collects unassigned items into the household lane', () => {
+  // The household lane is for shared COMMITMENTS, not the chore backlog. An
+  // unassigned task headlining "Everyone" put things like "clean the mould out
+  // of the washing machine" in the wall's largest type; at-a-glance counts
+  // open tasks instead, which is the right altitude for a chore.
+  it('keeps unassigned tasks out of the household lane', () => {
     const days = [day(0, {
-      evening: [item('trash', at(0, 18), { title: 'Trash day', type: 'task' })],
+      evening: [item('mould', at(0, 18), { title: 'Clean the washing machine', type: 'task' })],
+    })];
+    const lanes = adaptLanes([SCOTT], days, at(0, 9));
+    expect(lanes[lanes.length - 1].isEmpty).toBe(true);
+    expect(lanes[0].isEmpty).toBe(true);
+  });
+
+  it('still gives the household lane shared calendar events', () => {
+    const days = [day(0, {
+      evening: [item('gm', at(0, 17), { title: "Dinner at Grandma's", type: 'event' })],
     })];
     const lanes = adaptLanes([SCOTT], days, at(0, 9));
     const household = lanes[lanes.length - 1];
     expect(household.name).toBe('Everyone');
-    expect(household.label).toBe('Trash day');
-    // …and it must NOT also show up in a person's lane.
-    expect(lanes[0].isEmpty).toBe(true);
+    expect(household.label).toBe("Dinner at Grandma's");
   });
 
   it('is stable across days array identity — same data, same lane keys', () => {
