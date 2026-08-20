@@ -56,7 +56,12 @@ function AlignedBand({ lanes }: { lanes: WallLane[] }) {
   );
 }
 
-export function WallV2Lanes({ lanes }: { lanes: WallLane[] }) {
+export function WallV2Lanes({
+  lanes, onTapLane,
+}: {
+  lanes: WallLane[];
+  onTapLane?: (itemId: string | null, label: string | null) => void;
+}) {
   const merged = mergeAlignedLanes(lanes);
 
   // Aligned: one band, plus lanes for anyone not swept into it (a kid who
@@ -71,6 +76,7 @@ export function WallV2Lanes({ lanes }: { lanes: WallLane[] }) {
             key={lane.memberId}
             lane={lane}
             index={lanes.findIndex((l) => l.memberId === lane.memberId)}
+            onTap={onTapLane}
           />
         ))}
       </div>
@@ -80,7 +86,7 @@ export function WallV2Lanes({ lanes }: { lanes: WallLane[] }) {
   return (
     <div className="flex flex-col gap-3 min-h-0 flex-1">
       {lanes.map((lane, i) => (
-        <WallV2PersonLane key={lane.memberId} lane={lane} index={i} />
+        <WallV2PersonLane key={lane.memberId} lane={lane} index={i} onTap={onTapLane} />
       ))}
     </div>
   );

@@ -13,7 +13,8 @@
 // `/wall-design` preview (see `wallV2Mock.ts`).
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Sun } from 'lucide-react';
+import { Sun, Phone, Plus, MessagesSquare, ClipboardList, Settings } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { useActionableInstances } from '@/hooks/useActionableInstances';
 import { useBuildAutoReload } from '@/hooks/useBuildAutoReload';
 import { WallV2GuestScreen } from './WallV2GuestScreen';
@@ -27,8 +28,8 @@ import { TINTS } from './tints';
 import { WallV2DateColumn } from './WallV2DateColumn';
 import { WallV2StaleBanner } from './WallV2StaleBanner';
 import { computeFreshness } from './wallFreshness';
-import { WallV2NowNext } from './WallV2NowNext';
-import { WallV2Timeline } from './WallV2Timeline';
+import { WallV2Lanes } from './WallV2Lanes';
+import { adaptLanes } from './wallLanes';
 import { WallV2RightColumn } from './WallV2RightColumn';
 import { WallV2PinnedList } from './WallV2PinnedList';
 import { WallV2ListSheetContainer } from './WallV2ListSheetContainer';
@@ -39,20 +40,12 @@ import {
   togglePinnedList,
   onPinnedListsChange,
 } from '@/lib/wallPinnedLists';
-import { WallV2KeepMoving } from './WallV2KeepMoving';
-import { WallV2FamilyStrip, type WallDockActionId } from './WallV2FamilyStrip';
+import type { WallDockActionId } from './WallV2FamilyStrip';
 import { WallV2UtilitySheet } from './WallV2UtilitySheet';
 import { CallerIdTakeover } from './CallerIdTakeover';
 import { WallV2PhoneScreen } from './WallV2PhoneScreen';
-import { WallV2AssistantLine } from './WallV2AssistantLine';
-import { wallRevealTarget, type WallAction } from './wallAssistantAdapter';
-import { useUnpromptedSuggestions, type UnpromptedItem } from '@/hooks/useUnpromptedSuggestions';
-import {
-  adaptScheduleBand,
-  adaptTimelineSections,
-  adaptWeather,
-} from './wallV2Adapter';
-import { adaptTomorrowMorning, adaptAtAGlanceRollup } from './wallV2Rollups';
+import { adaptTimelineSections, adaptWeather } from './wallV2Adapter';
+import { adaptAtAGlanceRollup } from './wallV2Rollups';
 import { WALL } from './wallTheme';
 import { useWallData } from '@/hooks/useWallData';
 import { useWeather } from '@/hooks/useWeather';
@@ -71,7 +64,6 @@ import { useFamilyDiscussionItems, type DiscussionItem } from '@/hooks/useFamily
 import { QuickCapture } from '@/components/layout/QuickCapture';
 import { useAuth } from '@/hooks/useAuth';
 import { AuthForm } from '@/components/AuthForm';
-import { useDailyDiscussionPrompt } from '@/hooks/useDailyDiscussionPrompt';
 import { supabase } from '@/lib/supabase';
 import type { WallV2TimelineEvent } from './types';
 import type { Task } from '@/types/task';
@@ -130,6 +122,16 @@ function formatDate(d: Date): { weekday: string; fullDate: string } {
   });
   return { weekday, fullDate };
 }
+
+// The dock, relocated to the rail and demoted. 'phone' is deliberately NOT in
+// here — it gets its own full-width button above, because burying a kid's call
+// to Grandma one tap deeper is the one regression this redesign must not make.
+const RAIL_ACTIONS: { id: WallDockActionId; label: string; icon: LucideIcon }[] = [
+  { id: 'task', label: 'Add a task', icon: Plus },
+  { id: 'discuss', label: 'Discuss', icon: MessagesSquare },
+  { id: 'list', label: 'Lists', icon: ClipboardList },
+  { id: 'utilities', label: 'Utilities', icon: Settings },
+];
 
 const THEME_KEY = 'symphony-wall-theme';
 
@@ -269,11 +271,6 @@ export function WallV2Shell() {
   // Prioritized timed agenda (events + timed tasks) shown in its own band above
   // the rhythm sections. Dinner is promoted here, so adaptTimelineSections no
   // longer handles it.
-  const scheduleBand = useMemo(
-    () => adaptScheduleBand(todayData, wallData.familyMembers, now, dinnerEvent, breakfastEvent),
-    [todayData, wallData.familyMembers, now, dinnerEvent, breakfastEvent],
-  );
-
   // Weather has a sensible static fallback when the geolocation/API path
   // hasn't resolved yet — it would otherwise leave the entire hero blank.
   const weatherData = liveWeather ?? {
@@ -326,8 +323,6 @@ export function WallV2Shell() {
   }, []);
 
   const { items: discussionItems, unflagEvent, updateTask } = useFamilyDiscussionItems();
-  const { prompt: tonightPrompt, dismissed: tonightPromptDismissed } = useDailyDiscussionPrompt();
-  const tonightQuestion = tonightPromptDismissed ? null : tonightPrompt;
 
   const dinner = useMealCardData(dinnerEvent, 'Dinner');
   const breakfast = useMealCardData(breakfastEvent, 'Breakfast');
@@ -449,20 +444,10 @@ export function WallV2Shell() {
     };
   }, [recipeViewerMeal, selectedPlannedDay, viewerMeal, viewerEvent]);
 
-  const tomorrowRows = useMemo(
-    () => adaptTomorrowMorning(wallData.days, now),
-    [wallData.days, now],
-  );
   const glanceRows = useMemo(
     () => adaptAtAGlanceRollup(todayData, dinnerStartDate, dinnerEvent ? dinner.mealName : null, now),
     [todayData, dinnerStartDate, dinnerEvent, dinner.mealName, now],
   );
-  // Keep Moving = incomplete task-kind items from the timeline sections.
-  const keepMovingTasks = useMemo(
-    () => timeline.flatMap((s) => s.events).filter((e) => e.kind === 'task' && !e.completed),
-    [timeline],
-  );
-
   const handleMarkDiscussed = useCallback(async (item: DiscussionItem) => {
     if (item.kind === 'task') {
       await updateTask(item.id, { needsDiscussion: false, discussionNote: undefined });
@@ -536,45 +521,31 @@ export function WallV2Shell() {
   // and doesn't carry defer_count/waiting_since, so the engine's stored urgency
   // hint is the honest input here. It fails closed — a null hint reads as 0 and
   // never interrupts.
-  // includeCadence:false — "Plan the season" is not a kitchen-wall action. It has
-  // no timeline event to reveal, so "Show me" would be a dead tap, and nobody
-  // plans a season standing at a touchscreen from eight feet away. Cadence
-  // belongs to Today, where the guided session actually opens.
-  const wallUnprompted = useUnpromptedSuggestions('wall', { includeCadence: false });
 
-  const showWhyDebug = useMemo(
-    () => new URLSearchParams(window.location.search).get('why') === '1',
-    [],
+  // One lane per household member, resolved from the 7 days useWallData already
+  // holds. Members drive the order, so the lanes stay in a stable position on
+  // the wall rather than reshuffling as the day's items change.
+  const lanes = useMemo(
+    () => adaptLanes(wallData.familyMembers, wallData.days, now),
+    [wallData.familyMembers, wallData.days, now],
   );
 
-  const handleTapEvent = useCallback((id: string) => {
-    // Meal cards: open recipe viewer if a URL/stored recipe was detected,
-    // otherwise flash the meal name so the tap registers visibly.
-    if (id.startsWith('dinner-')) {
-      // A dinner row on the timeline is always tonight's, so it resets the day.
-      // (The face's dinner card has its own handler and keeps its paged day.)
-      if (dinner.recipeUrl || dinner.recipeContent) { setMealDayKey(null); setRecipeViewerMeal('dinner'); }
-      else showFlash(`Tonight: ${dinner.mealName}`);
-      return;
-    }
-    if (id.startsWith('breakfast-')) {
-      if (breakfast.recipeUrl || breakfast.recipeContent) { setMealDayKey(null); setRecipeViewerMeal('breakfast'); }
-      else showFlash(`Breakfast: ${breakfast.mealName}`);
-      return;
-    }
-    // Routine/event cards open the touch action sheet (Skip today / Mark done).
-    // Tasks (and anything else) just flash their title for now.
-    const tapped = timeline.flatMap((s) => s.events).find((e) => e.id === id);
-    if (!tapped) return;
-    // Tasks now open the action sheet too (task variant) — completion
-    // plus four push presets. Routines and events keep their existing
-    // routine / event branches inside the sheet.
-    if (tapped.kind === 'routine' || tapped.kind === 'event' || tapped.kind === 'task') {
+  // Tapping a lane opens the same action sheet the timeline used, so marking a
+  // thing done didn't leave the wall with the timeline. Timeline events carry
+  // the raw TimelineItem id, so the lane's itemId matches directly.
+  //
+  // A lane that has fallen forward to a later day has no match here — today's
+  // timeline doesn't contain it — so it flashes instead of dead-tapping. That's
+  // correct: you can't tick off Friday's dentist on Wednesday.
+  const handleTapLane = useCallback((itemId: string | null, label: string | null) => {
+    if (!itemId) return;
+    const tapped = timeline.flatMap((s) => s.events).find((e) => e.id === itemId);
+    if (tapped && (tapped.kind === 'routine' || tapped.kind === 'event' || tapped.kind === 'task')) {
       setActionSheetItem(tapped);
-    } else {
-      showFlash(tapped.title);
+      return;
     }
-  }, [dinner, breakfast, timeline, showFlash]);
+    if (label) showFlash(label);
+  }, [timeline, showFlash]);
 
   // The face's dinner card opens whatever day it's currently showing. A paged
   // day always has a body or a source URL (buildMealDayRecipes drops the ones
@@ -584,26 +555,6 @@ export function WallV2Shell() {
     if (dinner.recipeUrl || dinner.recipeContent) setRecipeViewerMeal('dinner');
     else showFlash(`Tonight: ${dinner.mealName}`);
   }, [selectedDinnerDay, dinner, showFlash]);
-
-  const handleAssistantAct = useCallback((action: WallAction, item: UnpromptedItem) => {
-    if (action.kind === 'wall_call') {
-      // The wall's own phone flow — never tel:, which is inert on the Pi.
-      setShowPhone(true);
-    } else {
-      // "Show me" — reveal the entity using the sheet the wall already has.
-      // handleTapEvent silently no-ops on an id it can't find, which on a
-      // wall-mounted screen reads as a broken button, so confirm the tap landed.
-      // Match on the prefixed timeline id, not the bare entity id — see
-      // wallRevealTarget.
-      const target = wallRevealTarget(
-        item.suggestion,
-        timeline.flatMap((s) => s.events).map((e) => e.id),
-      );
-      if (target) handleTapEvent(target);
-      else showFlash(item.suggestion.title);
-    }
-    void wallUnprompted.act(item.suggestion.id);
-  }, [handleTapEvent, wallUnprompted, timeline, showFlash]);
 
   const handleWallSkip = useCallback(async (id: string, kind: 'event' | 'routine') => {
     const entityType = kind === 'routine' ? 'routine' : 'calendar_event';
@@ -646,11 +597,6 @@ export function WallV2Shell() {
     showFlash(flash[preset]);
   }, [updateTask, wallData, showFlash]);
 
-  const handleTapFullDay = useCallback(() => {
-    // eslint-disable-next-line no-console
-    console.log('[wall-v2] view full day');
-  }, []);
-
   // Derive the discussion-overlay visibility so it auto-hides when the queue
   // drains (without an effect that lint flags for cascading renders).
   const discussionVisible = showDiscussion && discussionItems.length > 0;
@@ -687,9 +633,15 @@ export function WallV2Shell() {
           clipping — the grid below simply shrinks when the banner appears. */}
       <div className="h-full w-full p-4 flex flex-col">
       <WallV2StaleBanner freshness={freshness} />
-      <div className="flex-1 min-h-0 grid grid-cols-[220px_minmax(0,1fr)_264px] grid-rows-[minmax(0,1fr)_116px] gap-3">
-        {/* Row 1 — rail */}
-        <div className="row-span-1 col-start-1 min-h-0">
+      <div className="flex-1 min-h-0 grid grid-cols-[220px_minmax(0,1fr)_264px] grid-rows-[minmax(0,1fr)] gap-3">
+        {/* Row 1 — rail. The dock used to live in the family-strip band; when
+            that band went, the kid phone's only entry point went with it. The
+            phone is the one thing on this wall a child operates unaided, so it
+            gets a dedicated always-visible target here rather than a slot
+            behind the utility sheet. The rest of the dock rides below it,
+            deliberately subordinate. */}
+        <div className="row-span-1 col-start-1 min-h-0 flex flex-col gap-3">
+          <div className="min-h-0 flex-1">
           <WallV2DateColumn
             weekday={weekday}
             fullDate={fullDate}
@@ -703,31 +655,35 @@ export function WallV2Shell() {
             low={weatherData.low}
             freshness={freshness}
           />
+          </div>
+
+          <button
+            onClick={() => setShowPhone(true)}
+            className={`${WALL.card} shrink-0 flex items-center gap-3 px-4 py-4 active:scale-[.98] transition-transform`}
+          >
+            <Phone className="w-7 h-7 text-[#2E4638] dark:text-[#7FA893]" />
+            <span className={`font-display text-[1.5rem] leading-none ${WALL.inkStrong}`}>Call</span>
+          </button>
+
+          <div className="shrink-0 grid grid-cols-4 gap-2">
+            {RAIL_ACTIONS.map(({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                aria-label={label}
+                onClick={() => handleDockAction(id)}
+                className={`${WALL.cardInset} h-12 grid place-items-center active:scale-95 transition-transform`}
+              >
+                <Icon className={`w-5 h-5 ${WALL.muted}`} />
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* Row 1 — center: NOW + timeline + Keep Moving */}
+        {/* Row 1 — center: the person lanes.
+            Now/Next, the timeline and the family strip's per-member glance were
+            three renderings of the same data; the lanes are the one rendering. */}
         <div className="row-span-1 col-start-2 flex flex-col gap-3 min-h-0 min-w-0">
-          <WallV2NowNext today={todayData} familyMembers={wallData.familyMembers} now={now} />
-          <WallV2AssistantLine
-            item={wallUnprompted.items[0] ?? null}
-            onAct={handleAssistantAct}
-            onSnooze={(id) => void wallUnprompted.snooze(id, 'now')}
-            decisions={wallUnprompted.decisions}
-            showWhy={showWhyDebug}
-          />
-          <div className="min-h-0 flex-1">
-            <WallV2Timeline
-              band={scheduleBand}
-              calendarUnavailable={wallData.calendarUnavailable}
-              sections={timeline}
-              onTapEvent={handleTapEvent}
-              onToggleComplete={handleToggleComplete}
-              onTapFullDay={handleTapFullDay}
-            />
-          </div>
-          <div className="h-[104px] shrink-0">
-            <WallV2KeepMoving tasks={keepMovingTasks} onToggleComplete={handleToggleComplete} onTapTask={handleTapEvent} />
-          </div>
+          <WallV2Lanes lanes={lanes} onTapLane={handleTapLane} />
         </div>
 
         {/* Row 1 — right column */}
@@ -743,9 +699,9 @@ export function WallV2Shell() {
               onPrevDay: prevDinnerDay ? goToDay(prevDinnerDay) : null,
               onNextDay: nextDinnerDay ? goToDay(nextDinnerDay) : null,
             }}
-            tomorrowRows={tomorrowRows}
+            tomorrowRows={[]}
             glanceRows={glanceRows}
-            question={tonightQuestion}
+            question={null}
             pinnedLists={pinnedListIds.map((id) => {
               const list = familyLists.find((l) => l.id === id);
               if (!list) return null;
@@ -762,22 +718,20 @@ export function WallV2Shell() {
           />
         </div>
 
-        {/* Row 2 — family strip + dock cluster */}
-        <div className="row-start-2 col-span-3 relative min-h-0">
-          {flashMessage && (
-            <div
-              role="status"
-              // z-[60] clears the sheets (all `z-50`). This is the wall's only
-              // confirmation that a tap did anything, so it must never be the
-              // thing hidden behind whatever the tap came from.
-              className="animate-fade-in-up absolute -top-9 left-1/2 z-[60] -translate-x-1/2 px-4 py-2 rounded-full bg-stone-800/90 dark:bg-stone-200/90 text-white dark:text-stone-900 text-[0.85rem] font-bold shadow-lg backdrop-blur-md whitespace-nowrap"
-            >
-              {flashMessage}
-            </div>
-          )}
-          <WallV2FamilyStrip familyMembers={wallData.familyMembers} today={todayData} now={now} onDockAction={handleDockAction} />
-        </div>
       </div>
+
+      {/* The flash lost its home when the family-strip band went. It stays the
+          wall's only confirmation that a tap did anything, so it now floats
+          above the whole surface rather than riding a row that may not exist.
+          z-[60] still clears the sheets (all `z-50`). */}
+      {flashMessage && (
+        <div
+          role="status"
+          className="animate-fade-in-up fixed bottom-6 left-1/2 z-[60] -translate-x-1/2 px-4 py-2 rounded-full bg-stone-800/90 dark:bg-stone-200/90 text-white dark:text-stone-900 text-[0.85rem] font-bold shadow-lg backdrop-blur-md whitespace-nowrap"
+        >
+          {flashMessage}
+        </div>
+      )}
       </div>
 
       {showUtilities && (

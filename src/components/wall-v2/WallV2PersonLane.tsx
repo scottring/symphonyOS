@@ -44,10 +44,19 @@ function Portrait({ memberId, name }: { memberId: string; name: string }) {
   );
 }
 
-export function WallV2PersonLane({ lane, index }: { lane: WallLane; index: number }) {
+export function WallV2PersonLane({
+  lane, index, onTap,
+}: {
+  lane: WallLane;
+  index: number;
+  onTap?: (itemId: string | null, label: string | null) => void;
+}) {
   return (
-    <div
-      className={`${WALL.card} border-l-4 ${personAccent(index)} flex items-center gap-7 px-6 py-4 min-h-0 flex-1 overflow-hidden`}
+    <button
+      type="button"
+      disabled={lane.isEmpty}
+      onClick={() => onTap?.(lane.itemId, lane.label)}
+      className={`${WALL.card} border-l-4 ${personAccent(index)} flex items-center gap-7 px-6 py-4 min-h-0 flex-1 overflow-hidden text-left w-full disabled:cursor-default active:scale-[.995] transition-transform`}
     >
       <Portrait memberId={lane.memberId} name={lane.name} />
 
@@ -97,6 +106,6 @@ export function WallV2PersonLane({ lane, index }: { lane: WallLane; index: numbe
           </div>
         )}
       </div>
-    </div>
+    </button>
   );
 }
