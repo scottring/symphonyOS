@@ -132,11 +132,16 @@ describe('describeExisting', () => {
     expect(describeExisting(null, null)).toEqual({ label: 'Inbox', placement: { kind: 'inbox' } })
   })
 
-  it('labels month and quarter with no comparable placement', () => {
+  it('labels month, quarter, and someday with no comparable placement', () => {
     // No PlanPlacement equivalent — a null placement never compares equal, so
-    // these always write rather than being mistaken for a no-op.
+    // these always write rather than being mistaken for a no-op. Someday is a
+    // live bucket (TriageWhenMenu, InboxView, RescheduleGrid), not legacy —
+    // without its own branch it fell through to Inbox, which both mislabels
+    // the match on screen and (via placementsEqual) lets a Someday task get
+    // silently skipped as a false no-op against an inbox-bound line.
     expect(describeExisting('month', null)).toEqual({ label: 'Month', placement: null })
     expect(describeExisting('quarter', null)).toEqual({ label: 'Quarter', placement: null })
+    expect(describeExisting('someday', null)).toEqual({ label: 'Someday', placement: null })
   })
 
   it('falls back to Inbox when timed has no date', () => {
@@ -158,6 +163,15 @@ describe('placementsEqual', () => {
 
   it('never matches a null placement', () => {
     expect(placementsEqual(null, { kind: 'week' })).toBe(false)
+  })
+
+  it('never treats a Someday match as a no-op against an inbox target', () => {
+    // Regression for the bug where 'someday' fell through to describeExisting's
+    // Inbox default: a Someday task matched against a line the page places in
+    // the inbox must NOT compare equal, or the re-place is silently skipped as
+    // a false no-op and the task stays stranded in Someday.
+    const someday = describeExisting('someday', null)
+    expect(placementsEqual(someday.placement, { kind: 'inbox' })).toBe(false)
   })
 })
 

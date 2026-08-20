@@ -43,6 +43,7 @@ export function describeExisting(
 ): { label: string; placement: PlanPlacement | null } {
   if (bucket === 'month') return { label: 'Month', placement: null }
   if (bucket === 'quarter') return { label: 'Quarter', placement: null }
+  if (bucket === 'someday') return { label: 'Someday', placement: null }
   if (bucket === 'week') return { label: 'This week', placement: { kind: 'week' } }
   if (bucket === 'timed' && scheduledFor) {
     const date = localYmd(new Date(scheduledFor))
