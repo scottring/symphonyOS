@@ -168,9 +168,23 @@ describe('mergeAlignedLanes', () => {
 });
 
 describe('adaptLanes', () => {
-  it('returns one lane per member, in member order', () => {
+  it('returns one lane per member in member order, then the household lane', () => {
     const lanes = adaptLanes([SCOTT, IRIS], [day(0)], at(0, 9));
-    expect(lanes.map((l) => l.name)).toEqual(['Scott', 'Iris']);
+    expect(lanes.map((l) => l.name)).toEqual(['Scott', 'Iris', 'Everyone']);
+  });
+
+  // The content-loss guard: with Keep Moving and the timeline gone, an item
+  // belonging to nobody in particular has exactly one place left to appear.
+  it('collects unassigned items into the household lane', () => {
+    const days = [day(0, {
+      evening: [item('trash', at(0, 18), { title: 'Trash day', type: 'task' })],
+    })];
+    const lanes = adaptLanes([SCOTT], days, at(0, 9));
+    const household = lanes[lanes.length - 1];
+    expect(household.name).toBe('Everyone');
+    expect(household.label).toBe('Trash day');
+    // …and it must NOT also show up in a person's lane.
+    expect(lanes[0].isEmpty).toBe(true);
   });
 
   it('is stable across days array identity — same data, same lane keys', () => {

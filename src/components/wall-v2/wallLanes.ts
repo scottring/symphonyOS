@@ -26,6 +26,7 @@ import type { TimelineItem } from '@/types/timeline';
 import type { FamilyMember } from '@/types/family';
 import { isEverydayRoutine } from '@/lib/routineUtils';
 import { PREVIEW_SECTIONS } from '@/components/wall/today/tomorrowPreview';
+import { attributeEvent, HOUSEHOLD_ID, householdMember } from './wallEventAttribution';
 
 export interface WallLane {
   memberId: string;
@@ -62,17 +63,42 @@ function splitTime(d: Date): { time: string; meridiem: string } {
  * The member's next item on one day. `cutoff` is null for future days —
  * "already started" only makes sense against today's clock.
  */
+/**
+ * Who an item belongs to.
+ *
+ * Events go through attribution (calendar ownership, then a name in the title)
+ * because nothing upstream assigns them. Tasks and routines already carry an
+ * assignee — but an UNASSIGNED one falls to the household lane rather than
+ * disappearing: Keep Moving used to surface exactly those, and removing it
+ * must not quietly drop them off the wall.
+ */
+function ownersOf(item: TimelineItem, members: FamilyMember[]): string[] {
+  if (item.type === 'event') {
+    return attributeEvent(
+      {
+        title: item.title,
+        calendar_id: item.originalEvent?.calendar_id,
+        calendarId: item.originalEvent?.calendarId,
+      },
+      members,
+      item.assignedTo,
+    );
+  }
+  return item.assignedTo ? [item.assignedTo] : [HOUSEHOLD_ID];
+}
+
 function nextItemOnDay(
   day: WallDayData,
   memberId: string,
   cutoff: Date | null,
+  members: FamilyMember[],
 ): TimelineItem | null {
   let best: TimelineItem | null = null;
   let bestIsTimed = false;
 
   for (const section of PREVIEW_SECTIONS) {
     for (const item of day.items[section] ?? []) {
-      if (item.assignedTo !== memberId) continue;
+      if (!ownersOf(item, members).includes(memberId)) continue;
       if (item.completed) continue;
       if (item.type === 'routine' && isEverydayRoutine(item.recurrencePattern)) continue;
       if (cutoff && item.startTime && item.startTime < cutoff) continue;
@@ -97,6 +123,7 @@ export function adaptPersonLane(
   member: FamilyMember,
   days: WallDayData[],
   now: Date,
+  members: FamilyMember[] = [member],
 ): WallLane {
   const base: WallLane = {
     memberId: member.id, name: member.name,
@@ -107,7 +134,7 @@ export function adaptPersonLane(
   for (let i = 0; i < days.length; i++) {
     const day = days[i];
     const isToday = i === 0;
-    const found = nextItemOnDay(day, member.id, isToday ? now : null);
+    const found = nextItemOnDay(day, member.id, isToday ? now : null, members);
     if (!found) continue;
 
     const timed = found.startTime ? splitTime(found.startTime) : null;
@@ -136,7 +163,10 @@ export function adaptLanes(
   days: WallDayData[],
   now: Date,
 ): WallLane[] {
-  return members.map((m) => adaptPersonLane(m, days, now));
+  // The household lane rides last: shared commitments that belong to nobody in
+  // particular ("Dinner at Grandma's", "Trash day") would otherwise have no
+  // home on a person-shaped wall and would simply vanish.
+  return [...members, householdMember()].map((m) => adaptPersonLane(m, days, now, members));
 }
 
 export interface WallLaneAlignment {
