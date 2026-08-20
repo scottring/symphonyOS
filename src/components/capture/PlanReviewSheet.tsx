@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { X, NotebookPen } from 'lucide-react'
 import { parseLocalYmd } from '@/lib/cadence/config'
-import type { PlanItem, PlanPlacement } from '@/lib/planParse'
+import { placementsEqual, type PlanItem, type PlanPlacement } from '@/lib/planParse'
 import type { FamilyMember } from '@/types/family'
 
 interface PlanReviewSheetProps {
@@ -36,6 +36,12 @@ function dateLabel(ymd: string): string {
   return parseLocalYmd(ymd).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
 }
 
+function targetLabel(p: PlanPlacement): string {
+  if (p.kind === 'week') return 'This week'
+  if (p.kind === 'inbox') return 'Inbox'
+  return dateLabel(p.date)
+}
+
 /**
  * The review step of plan-from-paper: everything the parser read, editable,
  * nothing written until "Add". Handwriting parsing will misread sometimes —
@@ -43,7 +49,28 @@ function dateLabel(ymd: string): string {
  */
 export function PlanReviewSheet({ items, windowDates, members, committing, onCommit, onClose }: PlanReviewSheetProps) {
   const [rows, setRows] = useState<Row[]>(() => items.map((i) => ({ ...i, included: true })))
-  const includedCount = useMemo(() => rows.filter((r) => r.included).length, [rows])
+
+  /** A matched row already sitting where the page puts it is a no-op — it is
+   *  neither an add nor a move, and commit skips its write entirely. */
+  const counts = useMemo(() => {
+    let adds = 0
+    let moves = 0
+    for (const r of rows) {
+      if (!r.included || !r.title.trim()) continue
+      if (!r.existing) adds++
+      else if (!placementsEqual(r.existing.placement, r.placement)) moves++
+    }
+    return { adds, moves, total: adds + moves }
+  }, [rows])
+
+  const commitLabel = (() => {
+    const { adds, moves } = counts
+    const addPart = `Add ${adds} ${adds === 1 ? 'task' : 'tasks'}`
+    const movePart = `Move ${moves} ${moves === 1 ? 'task' : 'tasks'}`
+    if (adds && moves) return `Add ${adds}, move ${moves}`
+    if (moves) return movePart
+    return addPart
+  })()
 
   const update = (index: number, patch: Partial<Row>) =>
     setRows((prev) => prev.map((r, i) => (i === index ? { ...r, ...patch } : r)))
@@ -96,6 +123,14 @@ export function PlanReviewSheet({ items, windowDates, members, committing, onCom
                     className="w-full bg-transparent text-[15px] text-neutral-900 focus:outline-none"
                   />
                   {row.note && <p className="text-[13px] text-neutral-500 truncate">{row.note}</p>}
+                  {row.existing && (
+                    <p className="text-[13px] text-amber-700">
+                      already in Symphony ({row.existing.label})
+                      {placementsEqual(row.existing.placement, row.placement)
+                        ? ' — no change'
+                        : ` — will move to ${targetLabel(row.placement)}`}
+                    </p>
+                  )}
                 </div>
                 <select
                   value={placementValue(row.placement)}
@@ -133,10 +168,10 @@ export function PlanReviewSheet({ items, windowDates, members, committing, onCom
             <button
               type="button"
               onClick={commit}
-              disabled={committing || includedCount === 0}
+              disabled={committing || counts.total === 0}
               className="btn-primary px-4 py-2 rounded-lg text-[14px] disabled:opacity-50"
             >
-              {committing ? 'Adding…' : `Add ${includedCount} ${includedCount === 1 ? 'task' : 'tasks'}`}
+              {committing ? 'Adding…' : commitLabel}
             </button>
           )}
         </div>
