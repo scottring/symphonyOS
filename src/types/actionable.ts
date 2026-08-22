@@ -1,3 +1,5 @@
+import type { Scope } from '@/lib/scope'
+
 // Actionable Items System Types
 
 export type EntityType = 'calendar_event' | 'routine'
@@ -81,6 +83,11 @@ export interface Routine {
   show_on_timeline: boolean // Whether to display on Today view (default true)
   pin_to_timeline?: boolean // Always show on Today even when "hide daily routines" is on (tracked obligations, e.g. PT exercises)
   context?: 'work' | 'family' | 'personal' | null // Life domain for filtering
+  // WHO CAN SEE IT — orthogonal to `context`, and the only column routines RLS
+  // reads (2026-06-07_scope_axis.sql:44). A family-tagged routine left at the
+  // 'individual' column default is invisible to the rest of the household.
+  // The coupling lives in defaultScopeForArea/scopeForContextChange.
+  scope: Scope
   project_id?: string | null // Optional link to the program/project this routine belongs to
   parent_routine_id?: string | null // When set, this routine is a Step of that collection
   step_order?: number | null // Ordering within a parent collection; null sorts last

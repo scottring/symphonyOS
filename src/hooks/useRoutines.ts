@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase, getAuthUser } from '@/lib/supabase'
 import type { Routine, RecurrencePattern, RoutineVisibility, PrepFollowupTemplate } from '@/types/actionable'
 import { matchesRecurrenceForDate, type LastCompletionMap } from '@/lib/routineUtils'
+import { defaultScopeForArea, scopeForContextChange, type Scope } from '@/lib/scope'
 import { onRealtimeResumed } from '@/lib/realtime/keepAlive'
 
 // ── Same-tab sync ────────────────────────────────────────────────────────────
@@ -54,6 +55,8 @@ export interface CreateRoutineInput {
   prep_task_templates?: PrepFollowupTemplate[]
   followup_task_templates?: PrepFollowupTemplate[]
   context?: 'work' | 'family' | 'personal'
+  /** WHO can see it. Omit to follow the life area (family -> compound). */
+  scope?: Scope
   project_id?: string | null
   parent_routine_id?: string | null
   step_order?: number | null
@@ -75,6 +78,8 @@ export interface UpdateRoutineInput {
   assigned_to?: string | null
   assigned_to_all?: string[] | null
   context?: 'work' | 'family' | 'personal' | null
+  /** WHO can see it. Omit and a context change moves it for you. */
+  scope?: Scope
   raw_input?: string | null
   show_on_timeline?: boolean
   pin_to_timeline?: boolean // always show on Today, even when "hide daily" is on
@@ -89,6 +94,13 @@ export interface UpdateRoutineInput {
 
 export function useRoutines() {
   const [routines, setRoutines] = useState<Routine[]>([])
+  // updateRoutine needs the row's CURRENT context and scope to decide whether a
+  // context change should move the share, and it must stay dependency-free
+  // (every consumer passes it down as a handler prop). A ref gives it the live
+  // list without rebuilding the callback on each fetch — the same shape
+  // useSupabaseTasks' findTaskById uses.
+  const routinesRef = useRef<Routine[]>(routines)
+  routinesRef.current = routines
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [lastCompletionByRoutine, setLastCompletionByRoutine] = useState<LastCompletionMap>(() => new Map())
@@ -252,6 +264,11 @@ export function useRoutines() {
           prep_task_templates: input.prep_task_templates || [],
           followup_task_templates: input.followup_task_templates || [],
           context: input.context || null,
+          // RLS reads scope and nothing else, so a context written without one
+          // produces a routine that looks like household work and is readable
+          // only by its owner. 23 of Scott's family routines were in exactly
+          // that state — "Iris laundry and clothes processing" among them.
+          scope: input.scope ?? defaultScopeForArea(input.context),
           project_id: input.project_id ?? null,
           parent_routine_id: input.parent_routine_id ?? null,
           step_order: input.step_order ?? null,
@@ -292,6 +309,19 @@ export function useRoutines() {
       if (input.assigned_to !== undefined) updates.assigned_to = input.assigned_to
       if (input.assigned_to_all !== undefined) updates.assigned_to_all = input.assigned_to_all
       if (input.context !== undefined) updates.context = input.context
+      // Scope follows the life area unless the caller set one. Tagging a
+      // routine `family` in the panel used to write context alone, which left
+      // the row at the 'individual' column default — it showed up on every
+      // family surface for its owner and nowhere for the rest of the house.
+      // scopeForContextChange also walks the share BACK when a family routine
+      // is re-tagged private, and leaves a deliberately-chosen scope alone.
+      if (input.scope !== undefined) {
+        updates.scope = input.scope
+      } else if (input.context !== undefined) {
+        const current = routinesRef.current.find(r => r.id === id)
+        const nextScope = scopeForContextChange(current?.context, input.context, current?.scope)
+        if (nextScope) updates.scope = nextScope
+      }
       if (input.raw_input !== undefined) updates.raw_input = input.raw_input
       if (input.show_on_timeline !== undefined) updates.show_on_timeline = input.show_on_timeline
       if (input.location !== undefined) updates.location = input.location

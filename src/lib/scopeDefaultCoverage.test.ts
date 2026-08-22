@@ -34,8 +34,9 @@
 //   - a scope written as a non-literal whose runtime value is 'individual'.
 //     Only the KEY's presence is checked, never its value.
 //   - writes through an RPC or a database function rather than the JS client.
-//   - the UPDATE path (useSupabaseTasks' dbUpdates), which has its own
-//     context->scope coupling and its own tests.
+//   - the UPDATE path (useSupabaseTasks' dbUpdates and useRoutines'
+//     updateRoutine), which have their own context->scope coupling and their
+//     own tests (useSupabaseTasks.assignScope, useRoutines.scope).
 //   - untagged (context-null) rows, which are `individual` by design and are a
 //     triage question, not a bug — and which are the LARGER half of the
 //     real-world symptom this bug class produced.
@@ -72,12 +73,27 @@ function stripComments(text: string): string {
 /**
  * `.from('<scoped table>') … .insert({…})` or `.upsert({…})` with an inline
  * payload. The bounded `[\s\S]{0,400}?` lets `.select()`/`.eq()` and line breaks
- * sit between the two calls. Nested braces inside a payload (e.g. a jsonb
- * column) end the match early; that can only produce a FALSE POSITIVE (a scope
- * key after the cut), never a miss — the safe direction for a tripwire.
+ * sit between the two calls.
+ *
+ * The first version of this pattern matched a payload as `[^{}]*` and claimed a
+ * nested brace could only cause a FALSE POSITIVE. **That was wrong, and it let
+ * the real bug through.** `useRoutines.addRoutine` writes
+ * `recurrence_pattern: input.recurrence_pattern || { type: 'daily' }` five keys
+ * BEFORE `context:` — the payload capture ended at that inner brace, so the
+ * scan never saw a context to demand a scope beside. Every routine created
+ * since the scope migration landed at `scope='individual'`, invisible to the
+ * rest of the household however it was tagged. A cut payload is a MISS whenever
+ * the context sits after the cut.
+ *
+ * PAYLOAD below therefore balances braces two levels deep, which covers a jsonb
+ * default (`{ type: 'daily' }`) and a jsonb default holding an object. Three
+ * levels still cuts; if a payload ever needs it, deepen this rather than
+ * assuming the direction is safe.
  */
+const PAYLOAD = '(?:[^{}]|\\{(?:[^{}]|\\{[^{}]*\\})*\\})*'
+
 const SCOPED_WRITE = new RegExp(
-  `\\.from\\(\\s*'(${SCOPED_TABLES.join('|')})'\\s*\\)[\\s\\S]{0,400}?\\.(insert|upsert)\\(\\s*\\{([^{}]*)\\}`,
+  `\\.from\\(\\s*'(${SCOPED_TABLES.join('|')})'\\s*\\)[\\s\\S]{0,400}?\\.(insert|upsert)\\(\\s*\\{(${PAYLOAD})\\}`,
   'g',
 )
 

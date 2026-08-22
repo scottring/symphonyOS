@@ -1,0 +1,21 @@
+-- Family-tagged routines were never shared with the household.
+--
+-- Routines RLS reads `scope` and nothing else (2026-06-07_scope_axis.sql:44);
+-- `context` is a life area that no policy consults. Every routine write built
+-- its payload by hand and never named a scope, so the column sat at its
+-- `NOT NULL DEFAULT 'individual'`. The 2026-06-07 migration backfilled the
+-- family routines that existed THEN to 'compound'; every routine created or
+-- re-tagged family after it stayed private to its owner.
+--
+-- That is why Iris could see some family routines and not others: 23 of the 65
+-- were context='family' + scope='individual' — "Iris laundry and clothes
+-- processing", the whole "Camp Mornings" / "School AM Routine" step
+-- collections, "Kids clean rooms every weekend", "Food planning".
+--
+-- The code paths are fixed alongside this (useRoutines add/update, the
+-- symphony-agent routine tools, and the scope tripwire that was cutting
+-- payloads at the first nested brace and so never saw addRoutine's context).
+-- This statement repairs the rows already in that state. Applied to prod
+-- 2026-08-22 via the Management API; idempotent, safe to re-run.
+
+UPDATE routines SET scope = 'compound' WHERE context = 'family' AND scope = 'individual';

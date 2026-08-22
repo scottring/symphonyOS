@@ -757,6 +757,9 @@ async function runTool(
         if (row.pin_to_timeline == null && Array.isArray(row.times_per_day) && row.times_per_day.length > 0) {
           row.pin_to_timeline = true
         }
+        // Scope is the ONLY column routines RLS reads. Without this the agent
+        // creates a "family" routine that no one else in the household can see.
+        if (row.scope == null) row.scope = ctx === 'family' ? 'compound' : 'individual'
         const { data, error } = await db.from('routines').insert(row).select().single()
         if (error) throw error
         return JSON.stringify(data, null, 2)
@@ -774,6 +777,15 @@ async function runTool(
       case 'symphony_update_routine': {
         const { id, ...updates } = input as Record<string, unknown>
         if (!id) return 'Error: id is required'
+        // Same context->scope coupling as the client (src/lib/scope.ts): moving
+        // a routine into `family` shares it with the household, and moving one
+        // back out takes that share away again. A scope the caller set wins.
+        if (updates.scope == null && 'context' in updates) {
+          const { data: before } = await db.from('routines')
+            .select('context, scope').eq('id', id).single()
+          if (updates.context === 'family') updates.scope = 'compound'
+          else if (before?.context === 'family' && before?.scope === 'compound') updates.scope = 'individual'
+        }
         const { data, error } = await db.from('routines')
           .update(updates).eq('id', id).select().single()
         if (error) throw error
