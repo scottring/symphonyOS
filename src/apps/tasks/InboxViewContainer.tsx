@@ -184,7 +184,6 @@ export function InboxViewContainer() {
         onSelectItem={handleSelectItem}
         panelOpen={selection !== null}
         onClosePanel={clearSelection}
-        currentUserMemberId={getCurrentUserMember()?.id}
         loading={tasksLoading}
       />
     </ScheduleActionsProvider>

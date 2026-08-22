@@ -255,8 +255,8 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
   // passing the raw ones leaked e.g. a personal task and family routines into
   // the Family/Personal grid. Same helpers, same semantics as HomeView.
   const planningTasks = useMemo(
-    () => filterTasksForDomainView(tasks, currentDomain, getCurrentUserMember()?.id),
-    [tasks, currentDomain, getCurrentUserMember],
+    () => filterTasksForDomainView(tasks, currentDomain),
+    [tasks, currentDomain],
   );
   const planningRoutines = useMemo(
     () => filterRoutinesForDomain(filteredRoutines, currentDomain),
@@ -726,7 +726,6 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
         loading={tasksLoading || eventsFetching || routinesLoading}
         viewedDate={viewedDate}
         onDateChange={setViewedDate}
-        currentUserMemberId={getCurrentUserMember()?.id}
         onOpenPlanFromPaper={() => setPlanFromPaperOpen(true)}
         fixedView={fixedView}
       />

@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import type { HomeViewType } from '@/types/homeView'
 import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
@@ -44,7 +44,6 @@ interface HomeViewProps {
   loading?: boolean
   viewedDate: Date
   onDateChange: (date: Date) => void
-  currentUserMemberId?: string
   bothPanelsOpen?: boolean
   /** Opens the plan-from-paper flow (photo of a written plan → placed tasks). */
   onOpenPlanFromPaper?: () => void
@@ -66,7 +65,6 @@ export function HomeView({
   loading,
   viewedDate,
   onDateChange,
-  currentUserMemberId,
   bothPanelsOpen,
   onOpenPlanFromPaper,
   fixedView,
@@ -82,11 +80,11 @@ export function HomeView({
   // Task scoping lives in filterTasksForDomainView (shared with the Time-block
   // grid, which is launched from this page and must show the same day): a
   // specific domain isolates to its OWN items plus UNTAGGED ones (which get a
-  // pulsing tag glow rather than disappearing), and another member's
-  // work/personal tasks are private in every domain.
+  // pulsing tag glow rather than disappearing). Life area only — never who
+  // owns or is assigned the item; that is the assignee filter's job.
   const filteredTasks = useMemo(
-    () => filterTasksForDomainView(tasks, currentDomain, currentUserMemberId),
-    [tasks, currentDomain, currentUserMemberId])
+    () => filterTasksForDomainView(tasks, currentDomain),
+    [tasks, currentDomain])
 
   const filteredRoutines = useMemo(
     () => filterRoutinesForDomain(routines, currentDomain),
@@ -117,17 +115,26 @@ export function HomeView({
     }),
     [events, currentDomain, ctx.eventContextOverrides, ctx.getDomainForCalendar, ctx.eventNotesMap])
 
-  // Assignee filter state — persisted, and defaulted to the logged-in person
-  // ("my tasks") so each member sees their own world first and can tap to
-  // "Everyone". Persisting + defaulting means the selection survives view
-  // switches and reloads instead of resetting to "everyone" every time.
-  const ASSIGNEE_FILTER_KEY = 'symphony-assignee-filter'
-  const hadStoredAssigneeRef = useRef(false)
+  // Assignee filter state — persisted, and defaulting to EVERYONE.
+  //
+  // This used to seed `[currentUserMemberId]` on a first-ever load. Two people
+  // in one household therefore opened the same day and saw two different
+  // agendas: a family routine assigned to Ella was simply absent from Scott's
+  // Today, from a row he could already fetch. Worse, `makeAssigneeFilter(['me'])`
+  // returns false for an UNASSIGNED item (only the pseudo-id 'unassigned'
+  // matches those), so the default also swallowed every unclaimed household
+  // task and routine — the ones most likely to be dropped.
+  //
+  // The household's day is the default view; narrowing to one person is a lens
+  // you reach for. The key is rotated to -v2 so the browsers that already
+  // stored a self-filter under the old key adopt the new default once; an
+  // explicit choice made after that is stored and wins.
+  const ASSIGNEE_FILTER_KEY = 'symphony-assignee-filter-v2'
   const [selectedAssignees, setSelectedAssigneesState] = useState<string[]>(() => {
     if (typeof window === 'undefined') return []
     try {
       const raw = window.localStorage.getItem(ASSIGNEE_FILTER_KEY)
-      if (raw !== null) { hadStoredAssigneeRef.current = true; return JSON.parse(raw) as string[] }
+      if (raw !== null) return JSON.parse(raw) as string[]
     } catch { /* ignore */ }
     return []
   })
@@ -135,18 +142,6 @@ export function HomeView({
     setSelectedAssigneesState(next)
     try { window.localStorage.setItem(ASSIGNEE_FILTER_KEY, JSON.stringify(next)) } catch { /* ignore */ }
   }, [])
-
-  // First-ever load (no stored preference): default to the current user once we
-  // know who they are. An explicit later choice (including "Everyone" → []) is
-  // stored and wins on subsequent loads.
-  const didDefaultAssigneeRef = useRef(false)
-  useEffect(() => {
-    if (hadStoredAssigneeRef.current || didDefaultAssigneeRef.current) return
-    if (currentUserMemberId) {
-      didDefaultAssigneeRef.current = true
-      setSelectedAssignees([currentUserMemberId])
-    }
-  }, [currentUserMemberId, setSelectedAssignees])
 
   const showRiverView = useMemo(() => {
     const realMemberCount = selectedAssignees.filter(id => id !== 'unassigned').length

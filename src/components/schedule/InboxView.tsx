@@ -24,6 +24,8 @@ import { getBaseDate, getThisEvening, getNextWeekend, getWeekendAfterNext, getNe
 import { FocusInboxCard } from './FocusInboxCard'
 import { InboxModeToggle } from './InboxModeToggle'
 import { InboxUndoToast } from './InboxUndoToast'
+import { filterTasksForDomainView } from '@/lib/today/domainFilter'
+import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
 
 const INBOX_ACTIONS: QuickAction[] = [
   { kind: 'today' }, { kind: 'week' }, { kind: 'month' }, { kind: 'someday' }, { kind: 'note' }, { kind: 'delete' }
@@ -45,7 +47,6 @@ interface InboxViewProps {
   onSelectItem: (id: string | null) => void
   panelOpen: boolean
   onClosePanel: () => void
-  currentUserMemberId?: string
   /** True while the first task fetch is in flight — gates the empty state so the
    *  inbox shows "Loading…" instead of a false "Inbox zero" before items arrive. */
   loading?: boolean
@@ -53,7 +54,7 @@ interface InboxViewProps {
 
 export function InboxView({
   tasks, projects, selectedItemId: _selectedItemId, onSelectItem,
-  panelOpen: _panelOpen, onClosePanel: _onClosePanel, currentUserMemberId,
+  panelOpen: _panelOpen, onClosePanel: _onClosePanel,
   loading = false,
 }: InboxViewProps) {
   const {
@@ -284,36 +285,31 @@ export function InboxView({
     setNotePickerTaskId(null)
   }, [notes, updateNote, deleteNote, addNote, restoreTask, onDeleteTask, currentDomain])
 
-  // Domain + privacy filter
-  const filteredByDomain = useMemo(() => {
-    return tasks.filter((task) => {
-      if (currentUserMemberId && (task.context === 'work' || task.context === 'personal')) {
-        // Visible to anyone the task is assigned to — check the full set, not [0].
-        const assignees = task.assignedToAll && task.assignedToAll.length > 0
-          ? task.assignedToAll
-          : (task.assignedTo ? [task.assignedTo] : [])
-        if (assignees.length > 0 && !assignees.includes(currentUserMemberId)) return false
-      }
-      if (currentDomain === 'universal') return true
-      // UNTAGGED inbox items cross domains (pre-triage — tagging IS the work),
-      // but an item already tagged for another domain stays out of this one.
-      // Mirrors filterTasksForPlanning's untagged-inbox exception.
-      if (!task.context && task.bucket === 'inbox' && !task.completed) return true
-      return task.context === currentDomain
-    })
-  }, [tasks, currentDomain, currentUserMemberId])
+  // Domain filter — the SHARED helper, not a local copy.
+  //
+  // This was a hand-rolled duplicate of filterTasksForDomainView that had
+  // drifted from it: it carried the assignee-keyed "privacy" check that the
+  // shared rule has now dropped (RLS is the real gate — see domainFilter.ts),
+  // so the Inbox and Today could disagree about the same task. Untagged
+  // captures still cross every domain, which is what the inbox needs: tagging
+  // IS the triage work, and the render below narrows to bucket 'inbox'
+  // anyway.
+  const filteredByDomain = useMemo(
+    () => filterTasksForDomainView(tasks, currentDomain),
+    [tasks, currentDomain],
+  )
 
-  // Assignee filter
+  // Assignee filter — the shared matcher, defaulting to everyone.
+  //
+  // The local version returned early when 'unassigned' was among the
+  // selections, so picking "Iris + Unassigned" silently showed ONLY the
+  // unassigned items and dropped Iris's. makeAssigneeFilter ORs the pseudo-id
+  // in with the rest, which is what the chips imply.
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>([])
 
   const filteredTasks = useMemo(() => {
-    if (selectedAssignees.length === 0) return filteredByDomain
-    return filteredByDomain.filter((t) => {
-      if (selectedAssignees.includes('unassigned')) {
-        return !t.assignedTo && (!t.assignedToAll || t.assignedToAll.length === 0)
-      }
-      return selectedAssignees.some((id) => t.assignedTo === id || t.assignedToAll?.includes(id))
-    })
+    const match = makeAssigneeFilter(selectedAssignees)
+    return filteredByDomain.filter((t) => match(t.assignedTo, t.assignedToAll))
   }, [filteredByDomain, selectedAssignees])
 
   const hasUnassignedTasks = useMemo(() => {

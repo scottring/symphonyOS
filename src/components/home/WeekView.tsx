@@ -7,6 +7,7 @@ import type { DaySection } from '@/lib/timeUtils'
 import { daySectionMeta } from '@/lib/daySectionMeta'
 import { emptySections } from '@/lib/today/types'
 import { taskToTimelineItem, eventToTimelineItem, routineToTimelineItem } from '@/types/timeline'
+import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
 
 // Inline SVG icons
 function ChevronLeftIcon({ className }: { className?: string }) {
@@ -189,17 +190,11 @@ export function WeekView({
 }: WeekViewProps) {
   // Generate 7 days of the week
   const weekDays = useMemo(() => {
-    // Helper function to check if an item matches the assignee filter
-    const matchesAssigneeFilter = (
-      assignedTo: string | null | undefined,
-      assignedToAll?: readonly string[] | null,
-    ): boolean => {
-      if (selectedAssignee === null || selectedAssignee === undefined) return true // "All"
-      const hasMulti = Array.isArray(assignedToAll) && assignedToAll.length > 0
-      if (selectedAssignee === 'unassigned') return !assignedTo && !hasMulti
-      if (assignedTo === selectedAssignee) return true
-      return hasMulti && assignedToAll!.includes(selectedAssignee) // multi-member match
-    }
+    // The shared matcher — Today, Week, Month and the Inbox must agree about
+    // who an item belongs to. Each of these views used to carry its own copy
+    // of this predicate; makeAssigneeFilter(null) is "everyone", which is the
+    // default now.
+    const matchesAssigneeFilter = makeAssigneeFilter(selectedAssignee ?? null)
     const days: DayData[] = []
     const today = new Date()
     today.setHours(0, 0, 0, 0)

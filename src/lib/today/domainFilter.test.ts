@@ -71,7 +71,16 @@ describe('filterTasksForDomainView', () => {
     expect(filterTasksForDomainView(pool, 'family').map((t) => t.id)).toEqual(['f', 'n', 'ni'])
     expect(filterTasksForDomainView(pool, 'work').map((t) => t.id)).toEqual(['w', 'n', 'ni'])
   })
-  it("hides another member's work/personal tasks in every domain", () => {
+  // The domain chooser answers WHAT PART OF LIFE. It must never also answer
+  // WHO — that is the assignee filter's job, and it is opt-in.
+  //
+  // This used to drop any work/personal task whose assignees did not include
+  // you. It keyed on ASSIGNEE rather than owner, so it hid a task you OWN that
+  // you had handed to your partner, and it hid a `couple`-scoped item someone
+  // deliberately shared with you. RLS is the real privacy gate
+  // (2026-06-07_scope_axis.sql:34) and another user's private row never
+  // reaches the client at all.
+  it('never filters by assignee — a life area is not a person', () => {
     const mine = 'me'
     const priv = [
       task({ id: 'theirs', context: 'personal', assignedTo: 'someone-else' }),
@@ -80,8 +89,22 @@ describe('filterTasksForDomainView', () => {
       task({ id: 'unassigned', context: 'personal' }),
       task({ id: 'fam', context: 'family', assignedTo: 'someone-else' }),
     ]
-    expect(filterTasksForDomainView(priv, 'universal', mine).map((t) => t.id))
-      .toEqual(['mine', 'shared', 'unassigned', 'fam'])
+    expect(filterTasksForDomainView(priv, 'universal').map((t) => t.id))
+      .toEqual(['theirs', 'mine', 'shared', 'unassigned', 'fam'])
+  })
+
+  it("shows the household's family items whoever they belong to", () => {
+    // The reported bug: Scott and Iris each saw a different family agenda for
+    // the same day, from rows BOTH could already fetch.
+    const scott = 'member-scott'
+    const household = [
+      task({ id: 'feed-jax', context: 'family', assignedTo: 'member-ella' }),
+      task({ id: 'kitchen', context: 'family', assignedToAll: ['member-iris', 'member-kaleb'] }),
+      task({ id: 'mine', context: 'family', assignedTo: scott }),
+      task({ id: 'nobody', context: 'family' }),
+    ]
+    expect(filterTasksForDomainView(household, 'family').map((t) => t.id))
+      .toEqual(['feed-jax', 'kitchen', 'mine', 'nobody'])
   })
 })
 

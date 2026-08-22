@@ -38,26 +38,31 @@ export function filterTasksForPlanning(tasks: Task[], domain: PlanningDomain): T
   return tasks.filter((t) => t.context === domain || (!t.context && t.bucket === 'inbox'))
 }
 
-/** The Today/day-view task pool — the rule HomeView has always used, lifted
- *  here so every surface that shows "the day" scopes identically. Differs from
- *  filterTasksForPlanning in two ways: UNTAGGED tasks stay visible in every
- *  domain (they get a tag nudge rather than disappearing), and another
- *  member's work/personal tasks are hidden as private in ALL domains. */
+/** The Today/day-view task pool. Differs from filterTasksForPlanning in one
+ *  way: UNTAGGED tasks stay visible in every domain (they get a tag nudge
+ *  rather than disappearing).
+ *
+ *  **This filters by life area and NOTHING else — never by who owns or is
+ *  assigned an item.** It used to drop any work/personal task whose assignees
+ *  did not include you, as a privacy guard. That guard was both redundant and
+ *  wrong. Redundant because RLS is the real gate and it holds:
+ *  `scope IN ('couple','compound') AND users_share_household(...)`
+ *  (2026-06-07_scope_axis.sql:34) means another user's private row never
+ *  reaches the client to be filtered. Wrong because it keys on ASSIGNEE, not
+ *  owner — a task YOU own, tagged personal, handed to your partner failed the
+ *  check and vanished from your own view; and a `couple`-scoped personal item
+ *  someone deliberately shared with you stayed hidden unless they also
+ *  assigned it to you.
+ *
+ *  `context` answers what part of life. `scope` answers who can see it. They
+ *  are separate columns and this function only reads the first. Narrowing to a
+ *  person is the assignee filter's job, and it is opt-in. */
 export function filterTasksForDomainView(
   tasks: Task[],
   domain: PlanningDomain,
-  currentUserMemberId?: string,
 ): Task[] {
-  return tasks.filter((task) => {
-    if (currentUserMemberId && (task.context === 'work' || task.context === 'personal')) {
-      const assignees = task.assignedToAll && task.assignedToAll.length > 0
-        ? task.assignedToAll
-        : (task.assignedTo ? [task.assignedTo] : [])
-      if (assignees.length > 0 && !assignees.includes(currentUserMemberId)) return false
-    }
-    if (domain === 'universal') return true
-    return task.context === domain || task.context == null
-  })
+  if (domain === 'universal') return tasks
+  return tasks.filter((task) => task.context === domain || task.context == null)
 }
 
 /** Resolution inputs for event domain filtering. All optional — a caller that
