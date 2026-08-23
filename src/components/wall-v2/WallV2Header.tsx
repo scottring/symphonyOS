@@ -28,13 +28,15 @@ interface Props {
   high: number;
   low: number;
   freshness: Freshness;
-  /** Utility affordances (theme, refresh, capture…). Small on purpose. */
+  /** One line from the at-a-glance rollup — the card's slot went with the
+   *  right column, and the signal is worth more than the card was. */
+  glance?: string | null;
   actions?: React.ReactNode;
 }
 
 export function WallV2Header({
   weekday, fullDate, time, weatherIcon: WeatherIcon, weatherTint,
-  temp, condition, high, low, freshness, actions,
+  temp, condition, high, low, freshness, glance, actions,
 }: Props) {
   return (
     <header className={`${WALL.card} shrink-0 h-[92px] flex items-center gap-6 px-6 min-w-0`}>
@@ -48,6 +50,9 @@ export function WallV2Header({
         <div className="mt-1.5 flex items-center gap-3 min-w-0">
           <span className={`text-[1.05rem] font-bold tabular-nums ${WALL.muted}`}>{time}</span>
           <WallV2FreshnessLine freshness={freshness} />
+          {glance && (
+            <span className={`text-[1.05rem] truncate ${WALL.muted}`}>· {glance}</span>
+          )}
         </div>
       </div>
 

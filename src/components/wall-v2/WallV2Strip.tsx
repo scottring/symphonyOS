@@ -13,7 +13,7 @@
 // and left is the reachable corner, and it keeps the dedicated always-visible
 // one-tap target the phone is owed.
 
-import { Phone } from 'lucide-react';
+import { Phone, MessageCircle, UtensilsCrossed } from 'lucide-react';
 import { WALL } from './wallTheme';
 import type { MealRow, DueRow, ComingUpRow } from './wallStrip';
 
@@ -104,27 +104,100 @@ export function WallV2CallTile({ onTap }: { onTap: () => void }) {
   );
 }
 
-export function WallV2Strip({
-  due, comingUp, onCall,
+export function WallV2DinnerStripCard({
+  tonight, rows, onTap, onSelectDay,
 }: {
-  due: DueRow[];
+  tonight: string | null;
+  rows: MealRow[];
+  onTap?: () => void;
+  /** Opens another night's recipe — the prev/next arrows the hero used to carry. */
+  onSelectDay?: (dateKey: string) => void;
+}) {
+  const rest = rows.filter((r) => !r.isToday).slice(0, 3);
+  return (
+    <div className={`${WALL.dinnerCard} flex flex-col min-w-0 px-4 py-3 overflow-hidden`}>
+      <button type="button" onClick={onTap} className="text-left shrink-0 active:scale-[.99] transition-transform">
+        <div className={`${WALL.dinnerLabel} mb-1.5 flex items-center gap-1.5`}>
+          <UtensilsCrossed className="w-3.5 h-3.5" />
+          Tonight
+        </div>
+        <div className={`font-display text-[1.5rem] leading-tight truncate ${tonight ? WALL.inkStrong : WALL.warn}`}>
+          {tonight ?? 'Nothing planned'}
+        </div>
+      </button>
+      {/* Each night is its own tap target. This replaces the hero's prev/next
+          arrows: picking Tuesday directly beats stepping to it, and it keeps
+          every planned night one tap from its recipe. */}
+      <div className="mt-2 flex flex-col gap-1 min-h-0">
+        {rest.map((r) => (
+          <button
+            key={r.dateKey}
+            type="button"
+            onClick={() => onSelectDay?.(r.dateKey)}
+            disabled={r.isGap}
+            className="flex items-baseline gap-2 min-w-0 text-left disabled:cursor-default active:scale-[.99] transition-transform"
+          >
+            <span className={`${ROW_KEY} ${WALL.muted}`}>{r.dayLabel}</span>
+            <span className={`${ROW} ${r.isGap ? WALL.warn : WALL.ink}`}>
+              {r.isGap ? 'Nothing planned' : r.title}
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function WallV2QuestionStripCard({ question, onTap }: { question: string | null; onTap?: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onTap}
+      disabled={!question}
+      className={`${WALL.card} flex flex-col min-w-0 px-4 py-3 overflow-hidden text-left disabled:cursor-default active:scale-[.99] transition-transform`}
+    >
+      <div className={`${WALL.label} shrink-0 mb-2 flex items-center gap-1.5`}>
+        <MessageCircle className="w-3.5 h-3.5" />
+        Tonight's question
+      </div>
+      {question ? (
+        // The one place on this wall that is not a schedule. It gets the serif
+        // and room to wrap — it is meant to be read aloud, not glanced at.
+        <p className={`font-display italic text-[1.15rem] leading-snug line-clamp-4 ${WALL.ink}`}>
+          &ldquo;{question}&rdquo;
+        </p>
+      ) : (
+        <p className={`${ROW} ${WALL.muted}`}>No question today</p>
+      )}
+    </button>
+  );
+}
+
+export function WallV2Strip({
+  tonight, meals, comingUp, question, onCall, onTapDinner, onSelectDinnerDay, onTapQuestion,
+}: {
+  tonight: string | null;
+  meals: MealRow[];
   comingUp: ComingUpRow[];
+  question: string | null;
   onCall: () => void;
+  onTapDinner?: () => void;
+  onSelectDinnerDay?: (dateKey: string) => void;
+  onTapQuestion?: () => void;
 }) {
   return (
-    // Fixed height, not flex-1: the lanes above should absorb whatever the
-    // screen gives, and the strip should never grow into them.
+    // Fixed height so the board above absorbs whatever the screen gives.
     //
-    // Two content cards, not the mockup's four. At 1024 wide, four cards plus
-    // the phone leaves ~195px each — narrow enough that "Call Dr. Lewis about
-    // Ella's referral" truncates, which is the exact failure the mockup's own
-    // "Food shop…" labels demonstrate. Dinners moved to the right column, and
-    // family notes are not built here at all (they need a table, RLS and a
-    // phone write path — a fake one would be worse than none).
-    <div className="shrink-0 h-[164px] flex gap-3 min-w-0">
+    // Four cells, and the reason the board could take the full width: the
+    // right column's dinner hero and question moved down here, which is what
+    // buys the timeline its ~810px of track. At ~540px a one-hour bar was 90px
+    // and every label clipped to five characters — the mockup's failure,
+    // reproduced. Width is the whole ballgame for a Gantt.
+    <div className="shrink-0 h-[188px] flex gap-3 min-w-0">
       <WallV2CallTile onTap={onCall} />
-      <div className="flex-1 min-w-0 grid grid-cols-2 gap-3">
-        <WallV2DueTodayCard rows={due} />
+      <div className="flex-1 min-w-0 grid grid-cols-3 gap-3">
+        <WallV2DinnerStripCard tonight={tonight} rows={meals} onTap={onTapDinner} onSelectDay={onSelectDinnerDay} />
+        <WallV2QuestionStripCard question={question} onTap={onTapQuestion} />
         <WallV2ComingUpCard rows={comingUp} />
       </div>
     </div>

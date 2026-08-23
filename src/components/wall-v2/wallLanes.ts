@@ -80,7 +80,7 @@ function splitTime(d: Date): { time: string; meridiem: string } {
  * at-a-glance card counts them ("N tasks open — M due today"), which is the
  * right altitude for a chore.
  */
-function ownersOf(item: TimelineItem, members: FamilyMember[]): string[] {
+export function ownersOf(item: TimelineItem, members: FamilyMember[]): string[] {
   if (item.type === 'event') {
     return attributeEvent(
       {

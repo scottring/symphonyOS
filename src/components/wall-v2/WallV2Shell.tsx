@@ -27,13 +27,12 @@ import {
 import { TINTS } from './tints';
 import { WallV2StaleBanner } from './WallV2StaleBanner';
 import { computeFreshness } from './wallFreshness';
-import { WallV2Lanes } from './WallV2Lanes';
+import { useDailyDiscussionPrompt } from '@/hooks/useDailyDiscussionPrompt';
+import { WallV2Gantt } from './WallV2Gantt';
+import { adaptGanttBoard } from './wallGantt';
 import { WallV2Header } from './WallV2Header';
 import { WallV2Strip } from './WallV2Strip';
-import { adaptMealRows, adaptDueRows, adaptComingUpRows } from './wallStrip';
-import { adaptLanes } from './wallLanes';
-import { WallV2RightColumn } from './WallV2RightColumn';
-import { WallV2PinnedList } from './WallV2PinnedList';
+import { adaptMealRows, adaptComingUpRows } from './wallStrip';
 import { WallV2ListSheetContainer } from './WallV2ListSheetContainer';
 import { useLists } from '@/hooks/useLists';
 import { defaultScopeForArea } from '@/lib/scope';
@@ -297,7 +296,6 @@ export function WallV2Shell() {
   // up edits made in the sheet — the sheet and each card own separate
   // useListItems instances with no realtime channel or write bus between
   // them.
-  const [listRefreshKey, setListRefreshKey] = useState(0);
 
   // Pins are wall-local; subscribe so a pin made in the sheet updates the face.
   useEffect(() => onPinnedListsChange(setPinnedListIds), []);
@@ -366,7 +364,6 @@ export function WallV2Shell() {
   }, [todayKey, anchorDate, liveTodayName]);
 
   const navDays = useMemo(() => withLiveToday(plannedDays), [withLiveToday, plannedDays]);
-  const dinnerNavDays = useMemo(() => withLiveToday(dinnerDays), [withLiveToday, dinnerDays]);
 
   const selectedDayKey = mealDayKey ?? todayKey;
   const selectedPlannedDay = useMemo(
@@ -399,10 +396,6 @@ export function WallV2Shell() {
   const { prev: prevNavDay, next: nextNavDay } = useMemo(
     () => neighborDays(navDays, selectedDayKey),
     [navDays, selectedDayKey],
-  );
-  const { prev: prevDinnerDay, next: nextDinnerDay } = useMemo(
-    () => neighborDays(dinnerNavDays, selectedDayKey),
-    [dinnerNavDays, selectedDayKey],
   );
   const goToDay = useCallback(
     (day: MealDayRecipe | null) => () => {
@@ -446,16 +439,29 @@ export function WallV2Shell() {
     };
   }, [recipeViewerMeal, selectedPlannedDay, viewerMeal, viewerEvent]);
 
+  // Tonight's question — a deterministic daily rotation, dismissable, and the
+  // one thing on this wall that is not a schedule.
+  const {
+    prompt: discussionPrompt,
+    dismissed: discussionDismissed,
+    dismiss: dismissDiscussion,
+  } = useDailyDiscussionPrompt();
+
+  // ─── Timeline board ───
+  // Today only, from days[0] — a time axis across several days is a calendar,
+  // and the wall already has one of those. No new queries: same days array the
+  // lanes read.
+  const ganttBoard = useMemo(
+    () => adaptGanttBoard(wallData.familyMembers, wallData.days, now),
+    [wallData.familyMembers, wallData.days, now],
+  );
+
   // ─── Bottom strip ───
   // Three cheap projections over data the wall already holds: no new queries,
   // which matters on a display that polls all day (see the egress incident).
   const mealRows = useMemo(
     () => adaptMealRows(dinnerDays, todayKey),
     [dinnerDays, todayKey],
-  );
-  const dueRows = useMemo(
-    () => adaptDueRows(todayData, wallData.familyMembers),
-    [todayData, wallData.familyMembers],
   );
   const comingUpRows = useMemo(
     () => adaptComingUpRows(wallData.days),
@@ -540,14 +546,6 @@ export function WallV2Shell() {
   // hint is the honest input here. It fails closed — a null hint reads as 0 and
   // never interrupts.
 
-  // One lane per household member, resolved from the 7 days useWallData already
-  // holds. Members drive the order, so the lanes stay in a stable position on
-  // the wall rather than reshuffling as the day's items change.
-  const lanes = useMemo(
-    () => adaptLanes(wallData.familyMembers, wallData.days, now),
-    [wallData.familyMembers, wallData.days, now],
-  );
-
   // Tapping a lane opens the same action sheet the timeline used, so marking a
   // thing done didn't leave the wall with the timeline. Timeline events carry
   // the raw TimelineItem id, so the lane's itemId matches directly.
@@ -564,6 +562,12 @@ export function WallV2Shell() {
     }
     if (label) showFlash(label);
   }, [timeline, showFlash]);
+
+  // A bar on the board opens the same action sheet the lane did — tapping a
+  // commitment should do one thing on this wall, whatever is drawing it.
+  const handleTapGanttItem = useCallback((itemId: string) => {
+    handleTapLane(itemId, null);
+  }, [handleTapLane]);
 
   // The face's dinner card opens whatever day it's currently showing. A paged
   // day always has a body or a source URL (buildMealDayRecipes drops the ones
@@ -671,6 +675,7 @@ export function WallV2Shell() {
           high={weatherData.high}
           low={weatherData.low}
           freshness={freshness}
+          glance={glanceRows[0]?.text ?? null}
           actions={
             <div className="flex gap-2">
               {RAIL_ACTIONS.map(({ id, label, icon: Icon }) => (
@@ -687,55 +692,24 @@ export function WallV2Shell() {
           }
         />
 
-        {/* Lanes take the width the rail gave up; the right column stays — the
-            dinner hero, its recipe viewer and the pinned lists are shipped,
-            interactive surfaces, and the mockup's omission of them is the
-            mockup being a sketch, not a decision. */}
-        <div className="flex-1 min-h-0 flex gap-3">
-          <div className="flex-1 min-h-0 min-w-0 flex flex-col gap-3">
-            <WallV2Lanes lanes={lanes} onTapLane={handleTapLane} />
-          </div>
-
-          <div className="w-[248px] shrink-0 min-h-0">
-            <WallV2RightColumn
-              dinner={{
-                mealName: selectedDinnerDay ? selectedDinnerDay.title : (dinnerEvent ? dinner.mealName : null),
-                dinnerStart: selectedDinnerDay ? null : dinnerStartDate,
-                photoUrl: null,
-                onTap: handleTapDinnerCard,
-                dayLabel: selectedDinnerDay ? mealDayLabel(selectedDinnerDay.date, 'dinner', todayKey) : null,
-                onPrevDay: prevDinnerDay ? goToDay(prevDinnerDay) : null,
-                onNextDay: nextDinnerDay ? goToDay(nextDinnerDay) : null,
-              }}
-              /* The week of dinners, replacing a Tomorrow card that has been
-                 fed a hardcoded [] since it was written. Tonight is the hero
-                 above; this answers "and what about the rest of the week", and
-                 calls out the unplanned days, which is the one thing neither
-                 the hero nor the lanes can say. */
-              mealRows={mealRows}
-              glanceRows={glanceRows}
-              question={null}
-              pinnedLists={pinnedListIds.map((id) => {
-                const list = familyLists.find((l) => l.id === id);
-                if (!list) return null;
-                return (
-                  <WallV2PinnedList
-                    key={id}
-                    listId={id}
-                    title={list.title}
-                    refreshKey={listRefreshKey}
-                    onOpen={() => { setSheetListId(id); setShowListSheet(true); }}
-                  />
-                );
-              })}
-            />
-          </div>
+        {/* The board takes the FULL width. The right column's dinner hero and
+            question moved into the strip to make that possible: with a 248px
+            column the track was ~540px, a one-hour bar was 90px, and every
+            label clipped to five characters. Pinned lists keep their one-tap
+            route through the header's list action. */}
+        <div className="flex-1 min-h-0 min-w-0 flex flex-col gap-3">
+          <WallV2Gantt board={ganttBoard} onTapItem={handleTapGanttItem} />
         </div>
 
         <WallV2Strip
-          due={dueRows}
+          tonight={selectedDinnerDay ? selectedDinnerDay.title : (dinnerEvent ? dinner.mealName : null)}
+          meals={mealRows}
           comingUp={comingUpRows}
+          question={discussionDismissed ? null : discussionPrompt}
           onCall={() => setShowPhone(true)}
+          onTapDinner={handleTapDinnerCard}
+          onSelectDinnerDay={(key) => setMealDayKey(key === todayKey ? null : key)}
+          onTapQuestion={dismissDiscussion}
         />
       </div>
 
@@ -851,7 +825,7 @@ export function WallV2Shell() {
           pinnedIds={pinnedListIds}
           onTogglePin={(id) => setPinnedListIds(togglePinnedList(id))}
           onError={showFlash}
-          onClose={() => { setShowListSheet(false); setListRefreshKey((k) => k + 1); }}
+          onClose={() => setShowListSheet(false)}
         />
       )}
 
