@@ -9,8 +9,10 @@
 // extra field is a vote to go back to the board of cards this replaced.
 
 import { useState } from 'react';
+import { Home } from 'lucide-react';
 import { WALL, personAccent } from './wallTheme';
 import { WallV2Flap } from './WallV2Flap';
+import { HOUSEHOLD_ID } from './wallEventAttribution';
 import type { WallLane } from './wallLanes';
 
 function Portrait({ memberId, name }: { memberId: string; name: string }) {
@@ -25,6 +27,20 @@ function Portrait({ memberId, name }: { memberId: string; name: string }) {
 
   // Same silent fallback the family strip uses: a bad id renders a monogram
   // rather than a broken image, so a missing face is a data bug, not a crash.
+  // The household lane is not a person and has no portrait to load. Left as a
+  // monogram it renders the first letter of "Everyone" — an E sitting directly
+  // under Ella's E, which at eight feet are the same token. A house says what
+  // the lane actually means.
+  if (memberId === HOUSEHOLD_ID) {
+    return (
+      <div
+        className={`${shell} bg-[radial-gradient(circle_at_35%_28%,#EFE3CB,#D9C7A4)] dark:bg-[radial-gradient(circle_at_35%_28%,#463A28,#302A20)] grid place-items-center`}
+      >
+        <Home className="w-1/2 h-1/2 text-[#6E5A3A] dark:text-[#D8BC85]" />
+      </div>
+    );
+  }
+
   if (failed) {
     return (
       <div
@@ -56,19 +72,23 @@ export function WallV2PersonLane({
       type="button"
       disabled={lane.isEmpty}
       onClick={() => onTap?.(lane.itemId, lane.label)}
-      className={`${WALL.card} border-l-4 ${personAccent(index)} flex items-center gap-7 px-6 py-4 min-h-0 flex-1 overflow-hidden text-left w-full disabled:cursor-default active:scale-[.995] transition-transform`}
+      className={`${WALL.card} border-l-4 ${personAccent(index)} flex items-center gap-5 px-5 py-4 min-h-0 flex-1 overflow-hidden text-left w-full disabled:cursor-default active:scale-[.995] transition-transform`}
     >
       <Portrait memberId={lane.memberId} name={lane.name} />
 
-      <div className="w-[190px] shrink-0">
+      {/* Name and time stay a fixed COLUMN so the lanes align into one — but
+          the widths are a share of the lane, not absolutes. They were tuned
+          against a 516px lane; when the rail went and the lane grew to ~730px
+          the two fixed columns plus the portrait left ~54px for the
+          commitment itself, which rendered as "T..". Fixed px against one
+          viewport, again. */}
+      <div className="w-[16%] min-w-[110px] max-w-[190px] shrink-0">
         <div className={`font-display text-[clamp(1.3rem,3.4vh,2.4rem)] leading-tight truncate ${WALL.inkStrong}`}>
           {lane.name}
         </div>
       </div>
 
-      {/* The departure field. Fixed-width so four lanes align into a column
-          even when one person's time is "9:05" and another's is "11:30". */}
-      <div className="w-[268px] shrink-0 flex items-baseline gap-2">
+      <div className="w-[24%] min-w-[150px] max-w-[268px] shrink-0 flex items-baseline gap-2">
         {lane.time ? (
           <>
             <WallV2Flap
@@ -88,7 +108,9 @@ export function WallV2PersonLane({
         {lane.isEmpty ? (
           // The resting state. "Nothing scheduled" is a real answer and reads
           // calm; a blank lane reads broken.
-          <div className={`text-[clamp(1.1rem,3vh,2.1rem)] ${WALL.muted}`}>Nothing scheduled</div>
+          <div className={`text-[clamp(1.1rem,3vh,2.1rem)] whitespace-nowrap ${WALL.muted}`}>
+            Nothing scheduled
+          </div>
         ) : (
           <div className="flex items-baseline gap-3 min-w-0">
             {/* A day qualifier only when the item isn't today — the rail already

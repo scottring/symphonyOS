@@ -13,7 +13,7 @@
 // `/wall-design` preview (see `wallV2Mock.ts`).
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Sun, Phone, Plus, MessagesSquare, ClipboardList, Settings } from 'lucide-react';
+import { Sun, Plus, MessagesSquare, ClipboardList, Settings } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useActionableInstances } from '@/hooks/useActionableInstances';
 import { useBuildAutoReload } from '@/hooks/useBuildAutoReload';
@@ -25,10 +25,12 @@ import {
   onHideRoutinesChange,
 } from '@/lib/hideRoutinesSignal';
 import { TINTS } from './tints';
-import { WallV2DateColumn } from './WallV2DateColumn';
 import { WallV2StaleBanner } from './WallV2StaleBanner';
 import { computeFreshness } from './wallFreshness';
 import { WallV2Lanes } from './WallV2Lanes';
+import { WallV2Header } from './WallV2Header';
+import { WallV2Strip } from './WallV2Strip';
+import { adaptMealRows, adaptDueRows, adaptComingUpRows } from './wallStrip';
 import { adaptLanes } from './wallLanes';
 import { WallV2RightColumn } from './WallV2RightColumn';
 import { WallV2PinnedList } from './WallV2PinnedList';
@@ -444,6 +446,22 @@ export function WallV2Shell() {
     };
   }, [recipeViewerMeal, selectedPlannedDay, viewerMeal, viewerEvent]);
 
+  // ─── Bottom strip ───
+  // Three cheap projections over data the wall already holds: no new queries,
+  // which matters on a display that polls all day (see the egress incident).
+  const mealRows = useMemo(
+    () => adaptMealRows(dinnerDays, todayKey),
+    [dinnerDays, todayKey],
+  );
+  const dueRows = useMemo(
+    () => adaptDueRows(todayData, wallData.familyMembers),
+    [todayData, wallData.familyMembers],
+  );
+  const comingUpRows = useMemo(
+    () => adaptComingUpRows(wallData.days),
+    [wallData.days],
+  );
+
   const glanceRows = useMemo(
     () => adaptAtAGlanceRollup(todayData, dinnerStartDate, dinnerEvent ? dinner.mealName : null, now),
     [todayData, dinnerStartDate, dinnerEvent, dinner.mealName, now],
@@ -633,91 +651,92 @@ export function WallV2Shell() {
           clipping — the grid below simply shrinks when the banner appears. */}
       <div className="h-full w-full p-4 flex flex-col">
       <WallV2StaleBanner freshness={freshness} />
-      <div className="flex-1 min-h-0 grid grid-cols-[220px_minmax(0,1fr)_264px] grid-rows-[minmax(0,1fr)] gap-3">
-        {/* Row 1 — rail. The dock used to live in the family-strip band; when
-            that band went, the kid phone's only entry point went with it. The
-            phone is the one thing on this wall a child operates unaided, so it
-            gets a dedicated always-visible target here rather than a slot
-            behind the utility sheet. The rest of the dock rides below it,
-            deliberately subordinate. */}
-        <div className="row-span-1 col-start-1 min-h-0 flex flex-col gap-3">
-          <div className="min-h-0 flex-1">
-          <WallV2DateColumn
-            weekday={weekday}
-            fullDate={fullDate}
-            time={clock}
-            date={now}
-            weatherIcon={weatherData.icon ?? Sun}
-            weatherTint={{ bg: TINTS.honey.bg, fg: TINTS.honey.fg }}
-            temp={weatherData.temp}
-            condition={weatherData.condition}
-            high={weatherData.high}
-            low={weatherData.low}
-            freshness={freshness}
-          />
-          </div>
-
-          <button
-            onClick={() => setShowPhone(true)}
-            className={`${WALL.card} shrink-0 flex items-center gap-3 px-4 py-4 active:scale-[.98] transition-transform`}
-          >
-            <Phone className="w-7 h-7 text-[#2E4638] dark:text-[#7FA893]" />
-            <span className={`font-display text-[1.5rem] leading-none ${WALL.inkStrong}`}>Call</span>
-          </button>
-
-          <div className="shrink-0 grid grid-cols-4 gap-2">
-            {RAIL_ACTIONS.map(({ id, label, icon: Icon }) => (
-              <button
-                key={id}
-                aria-label={label}
-                onClick={() => handleDockAction(id)}
-                className={`${WALL.cardInset} h-12 grid place-items-center active:scale-95 transition-transform`}
-              >
-                <Icon className={`w-5 h-5 ${WALL.muted}`} />
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Row 1 — center: the person lanes.
-            Now/Next, the timeline and the family strip's per-member glance were
-            three renderings of the same data; the lanes are the one rendering. */}
-        <div className="row-span-1 col-start-2 flex flex-col gap-3 min-h-0 min-w-0">
-          <WallV2Lanes lanes={lanes} onTapLane={handleTapLane} />
-        </div>
-
-        {/* Row 1 — right column */}
-        <div className="row-span-1 col-start-3 min-h-0">
-          <WallV2RightColumn
-            dinner={{
-              mealName: selectedDinnerDay ? selectedDinnerDay.title : (dinnerEvent ? dinner.mealName : null),
-              // Another day has no prep countdown to run against tonight's clock.
-              dinnerStart: selectedDinnerDay ? null : dinnerStartDate,
-              photoUrl: null,
-              onTap: handleTapDinnerCard,
-              dayLabel: selectedDinnerDay ? mealDayLabel(selectedDinnerDay.date, 'dinner', todayKey) : null,
-              onPrevDay: prevDinnerDay ? goToDay(prevDinnerDay) : null,
-              onNextDay: nextDinnerDay ? goToDay(nextDinnerDay) : null,
-            }}
-            tomorrowRows={[]}
-            glanceRows={glanceRows}
-            question={null}
-            pinnedLists={pinnedListIds.map((id) => {
-              const list = familyLists.find((l) => l.id === id);
-              if (!list) return null;
-              return (
-                <WallV2PinnedList
+      {/* Three rows, not three columns.
+          The 220px rail + 264px right column consumed 47% of a 1024px screen,
+          leaving the lanes — the wall's primary structure, and horizontal by
+          nature — barely half the width. A header costs ~92px of height and
+          gives the lanes the full 1024. The strip below is a fixed 204px so
+          the lanes absorb whatever is left rather than the other way round.
+          Nothing scrolls: this display has no wheel and no scrollbar, so
+          anything past the fold is unreachable, not merely awkward. */}
+      <div className="flex-1 min-h-0 flex flex-col gap-3">
+        <WallV2Header
+          weekday={weekday}
+          fullDate={fullDate}
+          time={clock}
+          weatherIcon={weatherData.icon ?? Sun}
+          weatherTint={{ bg: TINTS.honey.bg, fg: TINTS.honey.fg }}
+          temp={weatherData.temp}
+          condition={weatherData.condition}
+          high={weatherData.high}
+          low={weatherData.low}
+          freshness={freshness}
+          actions={
+            <div className="flex gap-2">
+              {RAIL_ACTIONS.map(({ id, label, icon: Icon }) => (
+                <button
                   key={id}
-                  listId={id}
-                  title={list.title}
-                  refreshKey={listRefreshKey}
-                  onOpen={() => { setSheetListId(id); setShowListSheet(true); }}
-                />
-              );
-            })}
-          />
+                  aria-label={label}
+                  onClick={() => handleDockAction(id)}
+                  className={`${WALL.cardInset} w-14 h-14 grid place-items-center active:scale-95 transition-transform`}
+                >
+                  <Icon className={`w-6 h-6 ${WALL.muted}`} />
+                </button>
+              ))}
+            </div>
+          }
+        />
+
+        {/* Lanes take the width the rail gave up; the right column stays — the
+            dinner hero, its recipe viewer and the pinned lists are shipped,
+            interactive surfaces, and the mockup's omission of them is the
+            mockup being a sketch, not a decision. */}
+        <div className="flex-1 min-h-0 flex gap-3">
+          <div className="flex-1 min-h-0 min-w-0 flex flex-col gap-3">
+            <WallV2Lanes lanes={lanes} onTapLane={handleTapLane} />
+          </div>
+
+          <div className="w-[248px] shrink-0 min-h-0">
+            <WallV2RightColumn
+              dinner={{
+                mealName: selectedDinnerDay ? selectedDinnerDay.title : (dinnerEvent ? dinner.mealName : null),
+                dinnerStart: selectedDinnerDay ? null : dinnerStartDate,
+                photoUrl: null,
+                onTap: handleTapDinnerCard,
+                dayLabel: selectedDinnerDay ? mealDayLabel(selectedDinnerDay.date, 'dinner', todayKey) : null,
+                onPrevDay: prevDinnerDay ? goToDay(prevDinnerDay) : null,
+                onNextDay: nextDinnerDay ? goToDay(nextDinnerDay) : null,
+              }}
+              /* The week of dinners, replacing a Tomorrow card that has been
+                 fed a hardcoded [] since it was written. Tonight is the hero
+                 above; this answers "and what about the rest of the week", and
+                 calls out the unplanned days, which is the one thing neither
+                 the hero nor the lanes can say. */
+              mealRows={mealRows}
+              glanceRows={glanceRows}
+              question={null}
+              pinnedLists={pinnedListIds.map((id) => {
+                const list = familyLists.find((l) => l.id === id);
+                if (!list) return null;
+                return (
+                  <WallV2PinnedList
+                    key={id}
+                    listId={id}
+                    title={list.title}
+                    refreshKey={listRefreshKey}
+                    onOpen={() => { setSheetListId(id); setShowListSheet(true); }}
+                  />
+                );
+              })}
+            />
+          </div>
         </div>
 
+        <WallV2Strip
+          due={dueRows}
+          comingUp={comingUpRows}
+          onCall={() => setShowPhone(true)}
+        />
       </div>
 
       {/* The flash lost its home when the family-strip band went. It stays the

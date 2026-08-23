@@ -1,13 +1,19 @@
 // src/components/wall-v2/WallV2RightColumn.tsx
 //
-// Right column: dinner hero, tomorrow-morning preview, at-a-glance rollup,
+// Right column: dinner hero, the week's dinners, at-a-glance rollup,
 // tonight's question. Drag-scrolls when content exceeds the column.
+//
+// The tomorrow-morning preview that used to sit here was fed a hardcoded
+// empty array by the only caller, so it has been rendering nothing since it
+// was written. The week-of-dinners card takes the slot and actually earns it:
+// it is the one surface that can say a night has NO plan.
 // Phase 2 reserves the slot ABOVE the dinner card for "Symphony Noticed".
 
 import type { ReactNode } from 'react';
 import { useDragScroll } from '@/hooks/useDragScroll';
 import { WallV2DinnerCard } from './WallV2DinnerCard';
-import { WallV2TomorrowCard } from './WallV2TomorrowCard';
+import { WallV2MealsCard } from './WallV2Strip';
+import type { MealRow } from './wallStrip';
 import { WallV2GlanceRollupCard } from './WallV2GlanceRollupCard';
 import { WallV2QuestionCard } from './WallV2QuestionCard';
 import type { GlanceRollupRow } from './wallV2Rollups';
@@ -24,7 +30,8 @@ interface Props {
     onPrevDay?: (() => void) | null;
     onNextDay?: (() => void) | null;
   };
-  tomorrowRows: { id: string; time: string; title: string }[];
+  /** The week of dinners, gaps called out. Complements the hero above it. */
+  mealRows: MealRow[];
   glanceRows: GlanceRollupRow[];
   question: string | null;
   onTapQuestion?: () => void;
@@ -32,7 +39,7 @@ interface Props {
   pinnedLists?: ReactNode;
 }
 
-export function WallV2RightColumn({ dinner, tomorrowRows, glanceRows, question, onTapQuestion, pinnedLists }: Props) {
+export function WallV2RightColumn({ dinner, mealRows, glanceRows, question, onTapQuestion, pinnedLists }: Props) {
   const scrollRef = useDragScroll<HTMLDivElement>();
   return (
     <div ref={scrollRef} className="flex flex-col gap-3 h-full min-h-0 overflow-y-auto pr-1 -mr-1">
@@ -47,7 +54,7 @@ export function WallV2RightColumn({ dinner, tomorrowRows, glanceRows, question, 
         onNextDay={dinner.onNextDay}
       />
       {pinnedLists}
-      <WallV2TomorrowCard rows={tomorrowRows} />
+      <WallV2MealsCard rows={mealRows} />
       <WallV2GlanceRollupCard rows={glanceRows} />
       {question && <WallV2QuestionCard question={question} onTap={onTapQuestion} />}
     </div>
