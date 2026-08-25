@@ -7,6 +7,7 @@ import { parseWhatsAppExport } from './lib/whatsapp.ts'
 import { filterSince } from './lib/dedupe.ts'
 import { buildExtractPrompt, parseExtractResponse, type CandidateItem, type GapFlag } from './lib/extract.ts'
 import { chunkMessages } from './lib/chunk.ts'
+import { isTimestampedKind } from './lib/kinds.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -71,6 +72,9 @@ function candidateToTaskRow(
     category: c.category,
     completed: false,
     notes: notesLines.join('\n'),
+    // Which capture produced this candidate — the School pool selects on it,
+    // and it is how a triage row finds its source label.
+    capture_id: capture.id,
   }
 }
 
@@ -93,7 +97,7 @@ Deno.serve(async (req: Request) => {
     let newestIso: string | null = null
     let chunks: string[]
 
-    if (capture.kind === 'whatsapp_export' && capture.source_key) {
+    if (isTimestampedKind(capture.kind) && capture.source_key) {
       const { data: cp } = await supabase
         .from('capture_checkpoints')
         .select('last_processed_at')
@@ -154,7 +158,7 @@ Deno.serve(async (req: Request) => {
     })
     if (noteErr) throw new Error(`note insert failed: ${noteErr.message}`)
 
-    if (capture.kind === 'whatsapp_export' && capture.source_key && newestIso) {
+    if (isTimestampedKind(capture.kind) && capture.source_key && newestIso) {
       await supabase.from('capture_checkpoints').upsert({
         user_id: capture.user_id,
         source_key: capture.source_key,
