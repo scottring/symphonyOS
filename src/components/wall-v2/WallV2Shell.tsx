@@ -464,8 +464,8 @@ export function WallV2Shell() {
     [dinnerDays, todayKey],
   );
   const comingUpRows = useMemo(
-    () => adaptComingUpRows(wallData.days),
-    [wallData.days],
+    () => adaptComingUpRows(wallData.days, wallData.familyMembers),
+    [wallData.days, wallData.familyMembers],
   );
 
   const glanceRows = useMemo(

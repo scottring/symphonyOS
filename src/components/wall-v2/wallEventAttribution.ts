@@ -160,3 +160,26 @@ export function titleForMember(title: string, name: string): string {
   }
   return title;
 }
+
+/**
+ * A rotation title with its KIND prefix dropped: "Specials — Ella: Music ·
+ * Kaleb: Library" becomes "Ella: Music · Kaleb: Library".
+ *
+ * For places that show the whole line rather than one person's half — the
+ * wall's look-ahead card, which is ~36 characters wide. There the prefix cost
+ * eleven of them and said what the rest of the line already makes obvious,
+ * pushing the day's second item off the edge. Same convention `titleForMember`
+ * reads: a household first name followed by a colon. A title with no such
+ * segment ("School — Ella & Kaleb", "Iris call week") is left alone.
+ */
+export function withoutKindPrefix(title: string, members: FamilyMember[]): string {
+  let earliest = -1;
+  for (const m of members) {
+    const first = m.name.trim().split(/\s+/)[0];
+    if (!first) continue;
+    const escaped = first.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const at = title.search(new RegExp(`\\b${escaped}\\s*:`, 'i'));
+    if (at >= 0 && (earliest < 0 || at < earliest)) earliest = at;
+  }
+  return earliest > 0 ? title.slice(earliest) : title;
+}

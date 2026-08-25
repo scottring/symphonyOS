@@ -12,6 +12,7 @@ import type { MealDayRecipe } from '@/lib/mealDayRecipes';
 import type { WallDayData } from '@/hooks/useWallData';
 import type { TimelineItem } from '@/types/timeline';
 import type { FamilyMember } from '@/types/family';
+import { withoutKindPrefix } from './wallEventAttribution';
 
 /** Rows a 200px-tall card can show at eight feet without shrinking type. */
 export const STRIP_ROWS = 5;
@@ -90,30 +91,70 @@ export interface ComingUpRow {
   summary: string;
 }
 
+/** Days below which "shows up on most of them" is not a signal, just a run. */
+const BACKGROUND_MIN_DAYS = 3;
+
+/**
+ * Joins two items on one day.
+ *
+ * A middot cannot be used: family calendar titles already contain one
+ * ("Specials — Ella: Music · Kaleb: Library"), so joining with the same glyph
+ * made an item boundary indistinguishable from punctuation inside a title —
+ * the line read as one long run-on. The bullet is a rank above the middot
+ * both semantically and visually, which is exactly the relationship.
+ */
+const JOIN = ' • ';
+
+/** The day's candidate lines, deduped, in section order. */
+function titlesOf(day: WallDayData, members: FamilyMember[]): string[] {
+  const seen = new Set<string>();
+  for (const it of Object.values(day.items).flat()) {
+    if (it.completed || it.type === 'routine') continue;
+    const title = withoutKindPrefix(it.title.trim(), members);
+    if (title) seen.add(title);
+  }
+  return [...seen];
+}
+
 /**
  * The next few days, one line each. Not a second timeline: a day gets the
  * headline items joined by a separator, so the card answers "is this week
  * heavy?" at a glance and nothing more.
+ *
+ * Which is why the week's BACKGROUND is dropped. "School — Ella & Kaleb" ran
+ * on every weekday, so it took a slot in three of five rows and said nothing
+ * about what made any of them different — it crowded out the things that did.
+ * A title on more than half the summarised days is scenery, not news.
+ *
+ * A day whose only content IS the scenery keeps it rather than vanishing from
+ * the card: an absent Thursday reads as broken, where a repeated line only
+ * reads as a quiet day.
  */
 export function adaptComingUpRows(
   days: WallDayData[],
+  members: FamilyMember[] = [],
   limit = STRIP_ROWS,
   perDay = 2,
 ): ComingUpRow[] {
-  return days
-    .filter((d) => !d.isToday)
-    .slice(0, limit)
-    .map((d) => {
-      const items = Object.values(d.items).flat();
-      const headline = items
-        .filter((it) => !it.completed && it.type !== 'routine')
-        .slice(0, perDay)
-        .map((it) => it.title.trim())
-        .filter(Boolean);
+  const upcoming = days.filter((d) => !d.isToday).slice(0, limit);
+  const perDayTitles = upcoming.map((d) => titlesOf(d, members));
+
+  const runs = new Map<string, number>();
+  for (const titles of perDayTitles) {
+    for (const title of titles) runs.set(title, (runs.get(title) ?? 0) + 1);
+  }
+  const isBackground = (title: string) =>
+    upcoming.length >= BACKGROUND_MIN_DAYS && (runs.get(title) ?? 0) * 2 > upcoming.length;
+
+  return upcoming
+    .map((d, i) => {
+      const titles = perDayTitles[i];
+      const news = titles.filter((t) => !isBackground(t));
+      const headline = (news.length ? news : titles).slice(0, perDay);
       return {
         dateKey: `${d.date.getFullYear()}-${d.date.getMonth() + 1}-${d.date.getDate()}`,
         dayLabel: DAY_NAMES[d.date.getDay()],
-        summary: headline.join(' · '),
+        summary: headline.join(JOIN),
       };
     })
     .filter((r) => r.summary.length > 0);

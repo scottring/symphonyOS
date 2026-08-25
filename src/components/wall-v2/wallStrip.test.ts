@@ -103,7 +103,8 @@ describe('adaptComingUpRows', () => {
 
     expect(rows).toHaveLength(1)
     expect(rows[0].dayLabel).toBe('Mon')
-    expect(rows[0].summary).toBe('First day of school · Art / PE')
+    // Joined with a bullet, not a middot — see JOIN in wallStrip.ts.
+    expect(rows[0].summary).toBe('First day of school • Art / PE')
   })
 
   it('omits a day with nothing worth saying rather than printing an empty row', () => {
@@ -112,5 +113,78 @@ describe('adaptComingUpRows', () => {
       day(new Date(2026, 7, 25), false, [item({ title: 'Soccer practice' })]),
     ])
     expect(rows.map((r) => r.dayLabel)).toEqual(['Tue'])
+  })
+
+  // The wall's real Wednesday-to-Sunday: school ran every weekday and took a
+  // slot in three of five rows while saying nothing about any of them.
+  it("drops the week's background so the news gets the slot", () => {
+    const SCHOOL = 'School — Ella & Kaleb'
+    const rows = adaptComingUpRows([
+      day(new Date(2026, 7, 26), false, [
+        item({ title: 'Specials — Ella: Music · Kaleb: Library' }), item({ title: SCHOOL })]),
+      day(new Date(2026, 7, 27), false, [
+        item({ title: 'Specials — Ella: PE · Kaleb: Music' }), item({ title: SCHOOL })]),
+      day(new Date(2026, 7, 28), false, [
+        item({ title: 'Iris call week' }), item({ title: 'Specials — Ella: Art · Kaleb: PE' }),
+        item({ title: SCHOOL })]),
+      day(new Date(2026, 7, 29), false, [item({ title: 'Dance Center Open House' })]),
+      day(new Date(2026, 7, 30), false, [item({ title: 'Planning' })]),
+    ])
+
+    expect(rows.map((r) => r.dayLabel)).toEqual(['Wed', 'Thu', 'Fri', 'Sat', 'Sun'])
+    expect(rows.some((r) => r.summary.includes(SCHOOL))).toBe(false)
+    expect(rows[0].summary).toBe('Specials — Ella: Music · Kaleb: Library')
+    expect(rows[2].summary).toBe('Iris call week • Specials — Ella: Art · Kaleb: PE')
+  })
+
+  // Dropping the scenery must never drop the DAY — an absent Thursday reads
+  // as broken, a repeated line only reads as a quiet day.
+  it('keeps a day whose only content is that background', () => {
+    const SCHOOL = 'School — Ella & Kaleb'
+    const rows = adaptComingUpRows([
+      day(new Date(2026, 7, 26), false, [item({ title: SCHOOL }), item({ title: 'Dentist' })]),
+      day(new Date(2026, 7, 27), false, [item({ title: SCHOOL })]),
+      day(new Date(2026, 7, 28), false, [item({ title: SCHOOL }), item({ title: 'Piano' })]),
+    ])
+
+    expect(rows.map((r) => r.summary)).toEqual(['Dentist', SCHOOL, 'Piano'])
+  })
+
+  it('says a repeated title once, not twice on the same line', () => {
+    const rows = adaptComingUpRows([
+      day(new Date(2026, 7, 26), false, [item({ title: 'Swim' }), item({ title: 'Swim' })]),
+    ])
+    expect(rows[0].summary).toBe('Swim')
+  })
+
+  // The card is ~36 characters wide; "Specials — " cost eleven of them and
+  // pushed the day's second item off the edge.
+  it('drops the kind prefix from a per-person rotation', () => {
+    const rows = adaptComingUpRows(
+      [day(new Date(2026, 7, 26), false, [
+        item({ title: 'Specials — Ella: Music · Kaleb: Library' }),
+        item({ title: 'Ladies Track Night' }),
+      ])],
+      [member('ella', 'Ella'), member('kaleb', 'Kaleb')],
+    )
+    expect(rows[0].summary).toBe('Ella: Music · Kaleb: Library • Ladies Track Night')
+  })
+
+  it('leaves a title with no per-person segment whole', () => {
+    const rows = adaptComingUpRows(
+      [day(new Date(2026, 7, 26), false, [item({ title: 'School — Ella & Kaleb' })])],
+      [member('ella', 'Ella'), member('kaleb', 'Kaleb')],
+    )
+    expect(rows[0].summary).toBe('School — Ella & Kaleb')
+  })
+
+  // Two days is a coincidence, not a pattern — the rule must not fire and
+  // blank out a short look-ahead.
+  it('does not call something background on a window too short to tell', () => {
+    const rows = adaptComingUpRows([
+      day(new Date(2026, 7, 26), false, [item({ title: 'School' })]),
+      day(new Date(2026, 7, 27), false, [item({ title: 'School' })]),
+    ])
+    expect(rows.map((r) => r.summary)).toEqual(['School', 'School'])
   })
 })
