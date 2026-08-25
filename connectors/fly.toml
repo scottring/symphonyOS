@@ -1,0 +1,21 @@
+app = "symphony-connectors"
+primary_region = "ewr"
+
+[build]
+
+[env]
+  STATE_DIR = "/data"
+  HOUSEHOLD_TIMEZONE = "America/New_York"
+  FLUSH_HOURS_LOCAL = "12,20"
+
+[mounts]
+  source = "connector_state"
+  destination = "/data"
+
+# One machine only. Two would hold two WhatsApp sessions and double-deliver.
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
+
+[deploy]
+  strategy = "immediate"
