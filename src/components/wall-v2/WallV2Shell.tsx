@@ -452,8 +452,14 @@ export function WallV2Shell() {
   // and the wall already has one of those. No new queries: same days array the
   // lanes read.
   const ganttBoard = useMemo(
-    () => adaptGanttBoard(wallData.familyMembers, wallData.days, now),
-    [wallData.familyMembers, wallData.days, now],
+    // Overdue tasks are fetched into their own array, never into days[0], so
+    // the board could not see the household's standing workload at all. The
+    // query behind them is already scoped to context 'family' — a kitchen
+    // wall must never surface work or personal items.
+    () => adaptGanttBoard(wallData.familyMembers, wallData.days, now, {
+      backlog: wallData.overdueTasks,
+    }),
+    [wallData.familyMembers, wallData.days, now, wallData.overdueTasks],
   );
 
   // ─── Bottom strip ───

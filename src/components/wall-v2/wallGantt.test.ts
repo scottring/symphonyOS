@@ -325,3 +325,67 @@ describe('an everyday routine is words, not a bar', () => {
     expect((board.axis.endMin - board.axis.startMin) / 60).toBe(MIN_SPAN_H)
   })
 })
+
+describe('carried-over work — the volume the board could not see', () => {
+  const scott = member('s', 'Scott')
+  const members = [scott]
+  const last = (b: ReturnType<typeof adaptGanttBoard>) => b.tracks[b.tracks.length - 1]
+  const overdue = (title: string, o: Partial<TimelineItem> = {}) =>
+    item({ type: 'task', title, startTime: at(9), ...o })
+
+  it('puts an assigned carried task under its owner, not the house', () => {
+    const board = adaptGanttBoard(members, [day([])], at(17), {
+      backlog: [overdue('Send forms to Dr Rubin', { assignedTo: 's' })],
+    })
+    expect(board.tracks[0].backlog).toContain('Send forms to Dr Rubin')
+    expect(last(board).backlog).not.toContain('Send forms to Dr Rubin')
+  })
+
+  it('sends unassigned carried work to the household row', () => {
+    const board = adaptGanttBoard(members, [day([])], at(17), {
+      backlog: [overdue('Wash bookbags')],
+    })
+    expect(last(board).backlog).toContain('Wash bookbags')
+  })
+
+  it('floats anything marked needed today above the rest', () => {
+    const board = adaptGanttBoard(members, [day([])], at(17), {
+      backlog: [overdue('Older thing'), overdue('Needed', { neededOn: at(0) })],
+    })
+    expect(last(board).backlog[0]).toBe('Needed')
+  })
+
+  it('never lists a completed carried task', () => {
+    const board = adaptGanttBoard(members, [day([])], at(17), {
+      backlog: [overdue('Done already', { completed: true })],
+    })
+    expect(last(board).backlog).toHaveLength(0)
+  })
+
+  it('caps the row and counts the remainder rather than listing forever', () => {
+    const many = Array.from({ length: 10 }, (_, i) => overdue(`Task ${i}`))
+    const board = adaptGanttBoard(members, [day([])], at(17), { backlog: many })
+    expect(last(board).backlog).toHaveLength(6)
+    expect(last(board).backlogMore).toBe(4)
+  })
+
+  it('carried work never becomes a bar — it has no honest position', () => {
+    const board = adaptGanttBoard(members, [day([])], at(17), {
+      backlog: [overdue('Buy bread', { assignedTo: 's' })],
+    })
+    expect(board.tracks[0].blocks).toHaveLength(0)
+  })
+
+  it('reads the unscheduled section, which PREVIEW_SECTIONS leaves out', () => {
+    // An untimed task scheduled for today lives in 'unscheduled'. It can't be
+    // "the next thing" in a preview, but it is exactly what the board's
+    // untimed line is for.
+    const d = {
+      date: at(0), isToday: true,
+      items: { unscheduled: [item({ type: 'task', title: 'Finish the trip cleanup' })] },
+      birthdays: [], milestones: [],
+    } as unknown as WallDayData
+    const board = adaptGanttBoard(members, [d], at(17))
+    expect(last(board).anytime).toContain('Finish the trip cleanup')
+  })
+})
