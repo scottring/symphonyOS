@@ -26,15 +26,28 @@ import type { TimelineItem } from '@/types/timeline';
 import type { FamilyMember } from '@/types/family';
 import { isEverydayRoutine } from '@/lib/routineUtils';
 import { PREVIEW_SECTIONS } from '@/components/wall/today/tomorrowPreview';
-import { householdMember, titleForMember } from './wallEventAttribution';
+import { HOUSEHOLD_ID, householdMember, titleForMember } from './wallEventAttribution';
 import { ownersOf } from './wallLanes';
 
 /** Hours of track. Below this a quiet day stretches two items across the wall. */
 export const MIN_SPAN_H = 6;
-/** Above this, blocks get too narrow to label — the mockup's failure. */
-export const MAX_SPAN_H = 8;
+/**
+ * Hard cap on the window.
+ *
+ * This was 8, on the reasoning that a wider window makes blocks too narrow to
+ * label. Watching the real wall at 7:57am killed that: the window ran 6a-2p,
+ * and Scott's whole evening sat past the right edge as "+2 later" while his
+ * row read "Nothing scheduled". Hiding half the day is a worse failure than a
+ * narrow bar, and it is no longer the trade it was — a bar too narrow for its
+ * label now hands the label to the clear track beside it (see MIN_LABEL_PX),
+ * so width costs legibility far more slowly than it used to.
+ *
+ * 14 hours is a waking day. The window still only opens as far as the day's
+ * last item needs, so a genuinely short day still draws a tight board.
+ */
+export const MAX_SPAN_H = 14;
 /** Track width in px at 1024 wide, used to decide if a label fits inside. */
-export const TRACK_PX = 810;
+export const TRACK_PX = 780;
 /**
  * A bar narrower than this cannot hold readable type at eight feet.
  *
@@ -46,6 +59,18 @@ export const TRACK_PX = 810;
 export const MIN_LABEL_PX = 170;
 /** Default duration for an item with a start but no end. */
 const DEFAULT_DURATION_MIN = 60;
+
+/**
+ * True when an item cannot be drawn as a bar and belongs on the untimed line.
+ *
+ * Everyday routines are here rather than filtered out entirely: they ARE the
+ * shape of a weekday, and dropping them is what left 7a-9p looking bare. They
+ * just can't be bars — see GanttTrack.anytime.
+ */
+function isAnytimeItem(it: TimelineItem): boolean {
+  if (!it.startTime || it.allDay) return true;
+  return it.type === 'routine' && isEverydayRoutine(it.recurrencePattern);
+}
 
 export interface GanttBlock {
   id: string;
@@ -71,8 +96,16 @@ export interface GanttTrack {
   memberId: string;
   name: string;
   blocks: GanttBlock[];
-  /** Items with no clock time. They have no position, so they get a chip. */
-  allDay: string[];
+  /**
+   * What the row carries that cannot honestly be a bar, in time order.
+   *
+   * Two kinds land here. Items with no clock time, which have no position on
+   * an axis. And everyday routines, which have a nominal time but essentially
+   * no duration — measured on the real wall, "Brush teeth" came out THREE
+   * PIXELS wide and "Put dirty clothes in hamper" one, a row of confetti
+   * stacked at the same x. A rhythm is not a duration, so it gets words.
+   */
+  anytime: string[];
   /** Items that start after the window closes — counted, not dropped. */
   laterCount: number;
 }
@@ -133,15 +166,40 @@ export function computeAxis(itemStarts: number[], itemEnds: number[], now: Date)
   return { startMin, endMin, ticks, nowPct };
 }
 
+/**
+ * Which row draws an item.
+ *
+ * The lanes' rule (`ownersOf`) drops an unassigned task or routine on the
+ * floor, so that a chore can never headline a person in the wall's largest
+ * type. A board row is not a headline — every bar is the same size — so the
+ * rule that protects a lane just empties a board. Two differences here:
+ *
+ *  - An unassigned task or routine falls to the household row rather than
+ *    vanishing. An EVENT that matched nobody does not: `attributeEvent`
+ *    returns [] only for calendars deliberately kept off the wall (holidays,
+ *    the meal calendar the dinner card already draws), and resurrecting those
+ *    would undo a decision, not fix a gap.
+ *
+ *  - Everyday routines go to the household row instead of being dropped.
+ *    "Brush teeth" under a kid's face is noise, but the day's background
+ *    rhythm is exactly what stops 7a-9p reading as an empty track, and it
+ *    belongs to the house rather than to any one face.
+ */
+export function boardOwnersOf(item: TimelineItem, members: FamilyMember[]): string[] {
+  if (item.type === 'routine' && isEverydayRoutine(item.recurrencePattern)) {
+    return [HOUSEHOLD_ID];
+  }
+  const owners = ownersOf(item, members);
+  if (owners.length > 0) return owners;
+  return item.type === 'event' ? [] : [HOUSEHOLD_ID];
+}
+
 function itemsFor(day: WallDayData, memberId: string, members: FamilyMember[]): TimelineItem[] {
   const out: TimelineItem[] = [];
   for (const section of PREVIEW_SECTIONS) {
     for (const item of day.items[section] ?? []) {
-      if (!ownersOf(item, members).includes(memberId)) continue;
+      if (!boardOwnersOf(item, members).includes(memberId)) continue;
       if (item.completed) continue;
-      // Same policy the lanes enforce: "brush teeth" is the day's background
-      // rhythm, not a bar on the board.
-      if (item.type === 'routine' && isEverydayRoutine(item.recurrencePattern)) continue;
       out.push(item);
     }
   }
@@ -166,10 +224,10 @@ export function adaptGanttBoard(
   if (today) {
     for (const m of roster) {
       for (const it of itemsFor(today, m.id, members)) {
-        if (!it.startTime || it.allDay) continue;
-        starts.push(minutesOfDay(it.startTime));
+        if (isAnytimeItem(it)) continue;
+        starts.push(minutesOfDay(it.startTime!));
         ends.push(
-          it.endTime ? minutesOfDay(it.endTime) : minutesOfDay(it.startTime) + DEFAULT_DURATION_MIN,
+          it.endTime ? minutesOfDay(it.endTime) : minutesOfDay(it.startTime!) + DEFAULT_DURATION_MIN,
         );
       }
     }
@@ -181,7 +239,8 @@ export function adaptGanttBoard(
 
   const tracks: GanttTrack[] = roster.map((m) => {
     const blocks: GanttBlock[] = [];
-    const allDay: string[] = [];
+    /** Kept with its time so the line can read in the order the day happens. */
+    const anytimeItems: { title: string; at: number }[] = [];
     let laterCount = 0;
 
     for (const it of today ? itemsFor(today, m.id, members) : []) {
@@ -190,9 +249,19 @@ export function adaptGanttBoard(
       // kids' tracks; rendering the same string in both is what made it
       // useless. Each track shows only the words addressed to that person.
       const title = titleForMember(it.title, m.name);
-      if (!it.startTime || it.allDay) { allDay.push(title); continue; }
+      if (isAnytimeItem(it)) {
+        const at = it.startTime ? minutesOfDay(it.startTime) : Number.MAX_SAFE_INTEGER;
+        // A rhythm that has already happened is not information. At 8am the
+        // line read "Put dirty clothes in hamper · Straighten up room · Brush
+        // teeth" — three 6am routines — and hid the entire evening behind
+        // "+12". Routines look forward; a task keeps its place whether or not
+        // its hour has passed, because an unfinished task still stands.
+        if (it.type === 'routine' && at < nowMin) continue;
+        anytimeItems.push({ title, at });
+        continue;
+      }
 
-      const s = minutesOfDay(it.startTime);
+      const s = minutesOfDay(it.startTime!);
       const e = it.endTime ? minutesOfDay(it.endTime) : s + DEFAULT_DURATION_MIN;
 
       if (s >= axis.endMin) { laterCount++; continue; }
@@ -264,7 +333,14 @@ export function adaptGanttBoard(
       if (b.labelSide === 'right') b.labelRoomPct = roomIn(i + 1, claims[i + 1]);
       else if (b.labelSide === 'left') b.labelRoomPct = roomIn(i, claims[i]);
     }
-    return { memberId: m.id, name: m.name, blocks, allDay, laterCount };
+    // Untimed things still happen in an order — breakfast before bedtime —
+    // and the line reads as the day when it is sorted, as noise when it isn't.
+    anytimeItems.sort((a, b) => a.at - b.at);
+    return {
+      memberId: m.id, name: m.name, blocks,
+      anytime: anytimeItems.map((a) => a.title),
+      laterCount,
+    };
   });
 
   return { axis, tracks };

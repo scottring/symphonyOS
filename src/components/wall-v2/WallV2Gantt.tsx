@@ -28,9 +28,8 @@ const PAD_L = 16;     // pl-4
 const PAD_R = 12;     // pr-3
 const GAP = 16;       // gap-4
 const NAME_W = 168;   // portrait + name column
-/** Reserved gutter for all-day chips. Zero on a day with none, so a quiet
- *  wall keeps the full track and a busy one stays aligned. */
-const ALLDAY_W = 104;
+/** Untimed items shown in full before the row starts counting instead. */
+const ANYTIME_SHOWN = 4;
 
 /** Bar fills per person index, matching the lane accents. */
 const BAR_TINTS = [
@@ -85,7 +84,7 @@ function Bar({ block, index, onTap }: { block: GanttBlock; index: number; onTap?
       type="button"
       onClick={() => onTap?.(block.id)}
       style={{ left: `${block.leftPct}%`, width: `${block.widthPct}%` }}
-      className={`absolute top-1/2 -translate-y-1/2 h-[46px] rounded-lg ${tint} ${
+      className={`absolute top-1/2 -translate-y-1/2 h-[44px] rounded-lg ${tint} ${
         block.past ? 'opacity-40' : ''
       } active:scale-[.98] transition-transform`}
     >
@@ -118,8 +117,40 @@ function Bar({ block, index, onTap }: { block: GanttBlock; index: number; onTap?
   );
 }
 
-function Track({ track, index, gutter, onTapItem }: { track: GanttTrack; index: number; gutter: number; onTapItem?: (id: string) => void }) {
-  const empty = track.blocks.length === 0 && track.allDay.length === 0;
+/**
+ * The untimed line.
+ *
+ * A reserved side gutter solved the alignment half of this — every row's track
+ * starting at the same x — but it could only ever hold two clamped chips, and
+ * this line now carries the day's routines as well: "Feed Jax dinner · Walk
+ * Jax · Feed and water the dog · Clean kitchen after dinner". Below the bars
+ * instead, in space the row already reserved and was leaving blank, the labels
+ * get room to be words AND the track keeps its full width at a constant left
+ * edge — so the shared axis survives without the board paying 120px for it.
+ */
+function AnytimeLine({ titles, laterCount }: { titles: string[]; laterCount: number }) {
+  const shown = titles.slice(0, ANYTIME_SHOWN);
+  const overflow = titles.length - shown.length;
+  return (
+    <div className="flex items-center gap-1.5 min-w-0 overflow-hidden">
+      {shown.map((t) => (
+        <span key={t} className={`${WALL.prepChip} truncate max-w-[240px] shrink`}>{t}</span>
+      ))}
+      {overflow > 0 && (
+        <span className={`shrink-0 text-[0.9rem] font-bold ${WALL.muted}`}>+{overflow}</span>
+      )}
+      {laterCount > 0 && (
+        <span className={`shrink-0 text-[0.9rem] font-bold ${WALL.muted}`}>
+          +{laterCount} later
+        </span>
+      )}
+    </div>
+  );
+}
+
+function Track({ track, index, onTapItem }: { track: GanttTrack; index: number; onTapItem?: (id: string) => void }) {
+  const hasAnytime = track.anytime.length > 0 || track.laterCount > 0;
+  const empty = track.blocks.length === 0 && !hasAnytime;
   return (
     <div className={`${WALL.card} border-l-4 ${personAccent(index)} flex items-center gap-4 pl-4 pr-3 flex-1 min-h-0 overflow-hidden`}>
       <div style={{ width: NAME_W }} className="shrink-0 flex items-center gap-3 min-w-0">
@@ -129,42 +160,28 @@ function Track({ track, index, gutter, onTapItem }: { track: GanttTrack; index: 
         </span>
       </div>
 
-      {/* All-day items have no position on a clock, so they ride as chips
-          before the track rather than being stretched across the whole width
-          and pretending to be a duration. The gutter is reserved on EVERY row
-          — empty ones included — because a chip that changes where the track
-          starts pulls that person's whole day off the shared axis. */}
-      {gutter > 0 && (
-        <div style={{ width: gutter }} className="shrink-0 flex flex-col items-start gap-1 overflow-hidden">
-          {track.allDay.slice(0, 2).map((t) => (
-            <span key={t} className={`${WALL.prepChip} truncate max-w-full`}>{t}</span>
-          ))}
+      {/* Nothing variable-width sits between the person block and the track,
+          so every row's track starts at the same x and the ruler above them
+          means what it says. */}
+      <div className="relative flex-1 min-w-0 h-full flex flex-col justify-center gap-1.5 py-1">
+        <div className="relative h-[44px] shrink-0">
+          {empty ? (
+            <span className={`absolute left-0 top-1/2 -translate-y-1/2 text-[1.05rem] ${WALL.muted}`}>
+              Nothing scheduled
+            </span>
+          ) : (
+            track.blocks.map((b) => <Bar key={b.id} block={b} index={index} onTap={onTapItem} />)
+          )}
         </div>
-      )}
-
-      <div className="relative flex-1 min-w-0 h-full">
-        {empty ? (
-          <span className={`absolute left-0 top-1/2 -translate-y-1/2 text-[1.05rem] ${WALL.muted}`}>
-            Nothing scheduled
-          </span>
-        ) : (
-          track.blocks.map((b) => <Bar key={b.id} block={b} index={index} onTap={onTapItem} />)
-        )}
+        {hasAnytime && <AnytimeLine titles={track.anytime} laterCount={track.laterCount} />}
       </div>
-
-      {track.laterCount > 0 && (
-        <span className={`shrink-0 text-[0.95rem] font-bold ${WALL.muted}`}>
-          +{track.laterCount} later
-        </span>
-      )}
     </div>
   );
 }
 
 export function WallV2Gantt({ board, onTapItem }: { board: GanttBoard; onTapItem?: (id: string) => void }) {
   const { axis, tracks } = board;
-  const gutter = tracks.some((t) => t.allDay.length > 0) ? ALLDAY_W : 0;
-  const trackLeft = BORDER_L + PAD_L + NAME_W + GAP + (gutter ? gutter + GAP : 0);
+  const trackLeft = BORDER_L + PAD_L + NAME_W + GAP;
   return (
     <div className="flex flex-col gap-2 flex-1 min-h-0">
       {/* Axis header. The offset is computed from the same pieces the tracks
@@ -201,7 +218,7 @@ export function WallV2Gantt({ board, onTapItem }: { board: GanttBoard; onTapItem
         )}
 
         {tracks.map((t, i) => (
-          <Track key={t.memberId} track={t} index={i} gutter={gutter} onTapItem={onTapItem} />
+          <Track key={t.memberId} track={t} index={i} onTapItem={onTapItem} />
         ))}
       </div>
     </div>

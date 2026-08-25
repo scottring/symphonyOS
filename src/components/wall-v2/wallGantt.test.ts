@@ -36,11 +36,19 @@ describe('computeAxis — the window is what makes a Gantt legible', () => {
     expect(axis.startMin).toBe(mins(8))
   })
 
-  it('never opens wider than the labelling limit, however long the day', () => {
-    // The mockup's 7a-9p is 14h across ~810px: 58px/hour, five characters a
-    // block. Capping the span is the whole reason labels survive.
-    const axis = computeAxis([mins(9)], [mins(21)], at(9))
+  it('never opens wider than the cap, however long the day', () => {
+    // From an 8am floor, an item running to midnight needs 16 hours.
+    const axis = computeAxis([mins(9)], [mins(24)], at(9))
     expect((axis.endMin - axis.startMin) / 60).toBe(MAX_SPAN_H)
+  })
+
+  it('opens far enough to reach the evening, which the old 8h cap did not', () => {
+    // The regression this cap change exists for: at 7:57am the window ran
+    // 6a-2p, so an item at 4pm fell past the right edge and the row read
+    // "Nothing scheduled" while showing "+1 later".
+    const axis = computeAxis([mins(16)], [mins(17)], at(7, 57))
+    expect(axis.startMin).toBe(mins(6))
+    expect(axis.endMin).toBeGreaterThanOrEqual(mins(17))
   })
 
   it('never collapses narrower than the minimum on a quiet day', () => {
@@ -143,7 +151,7 @@ describe('adaptGanttBoard', () => {
     const board = adaptGanttBoard(members, [day([
       item({ id: 'ad', title: 'Book festival', assignedTo: 'm-scott', allDay: true, startTime: at(0) }),
     ])], at(9))
-    expect(board.tracks[0].allDay).toEqual(['Book festival'])
+    expect(board.tracks[0].anytime).toEqual(['Book festival'])
     expect(board.tracks[0].blocks).toEqual([])
   })
 
@@ -217,8 +225,8 @@ describe('a rotation written on one row still reads per person', () => {
       [day([item({ title: SPECIALS, allDay: true })])],
       at(9),
     )
-    expect(board.tracks[0].allDay).toEqual(['Visual Art'])
-    expect(board.tracks[1].allDay).toEqual(['PE'])
+    expect(board.tracks[0].anytime).toEqual(['Visual Art'])
+    expect(board.tracks[1].anytime).toEqual(['PE'])
   })
 
   it('leaves a genuinely shared commitment whole in both tracks', () => {
@@ -239,5 +247,81 @@ describe('a rotation written on one row still reads per person', () => {
     )
     expect(board.tracks[0].blocks[0].title).toBe('bus')
     expect(board.tracks[1].blocks[0].title).toBe('aftercare')
+  })
+})
+
+describe('what a row is allowed to draw', () => {
+  const scott = member('s', 'Scott')
+  const members = [scott]
+  const household = (b: ReturnType<typeof adaptGanttBoard>) => b.tracks[b.tracks.length - 1]
+
+  it('gives an unassigned task to the household row instead of dropping it', () => {
+    // The lanes drop it on purpose — a chore must not headline a person in the
+    // wall's largest type. A board row is not a headline.
+    const t = item({ type: 'task', title: 'Wash bookbags', allDay: true })
+    const board = adaptGanttBoard(members, [day([t])], at(9))
+    expect(household(board).anytime).toContain('Wash bookbags')
+    expect(board.tracks[0].anytime).not.toContain('Wash bookbags')
+  })
+
+  it('still drops an event that attribution deliberately excluded', () => {
+    const e = item({
+      type: 'event', title: 'Thanksgiving', allDay: true,
+      originalEvent: { calendar_id: 'en.usa#holiday@group.v.calendar.google.com' },
+    } as Partial<TimelineItem>)
+    const board = adaptGanttBoard(members, [day([e])], at(9))
+    for (const track of board.tracks) expect(track.anytime).not.toContain('Thanksgiving')
+  })
+
+  it('leaves an assigned one-off task under the person it belongs to', () => {
+    const t = item({ type: 'task', title: 'Reference calls', assignedTo: 's', allDay: true })
+    const board = adaptGanttBoard(members, [day([t])], at(9))
+    expect(board.tracks[0].anytime).toContain('Reference calls')
+    expect(household(board).anytime).not.toContain('Reference calls')
+  })
+})
+
+describe('an everyday routine is words, not a bar', () => {
+  const members = [member('s', 'Scott')]
+  const last = (b: ReturnType<typeof adaptGanttBoard>) => b.tracks[b.tracks.length - 1]
+  const routine = (title: string, h: number, m2 = 2) => item({
+    type: 'routine', title, startTime: at(h), endTime: at(h, m2),
+    recurrencePattern: { type: 'daily' },
+  } as Partial<TimelineItem>)
+
+  it('never draws one as a bar, however it is assigned', () => {
+    // Measured on the real wall: these carry a nominal time and almost no
+    // duration, so as bars they came out 1-3px wide, stacked at one x.
+    const r = item({
+      type: 'routine', title: 'Brush teeth', assignedTo: 's',
+      startTime: at(20), endTime: at(20, 2), recurrencePattern: { type: 'daily' },
+    } as Partial<TimelineItem>)
+    const board = adaptGanttBoard(members, [day([r])], at(19))
+    expect(last(board).anytime).toContain('Brush teeth')
+    expect(last(board).blocks).toHaveLength(0)
+    expect(board.tracks[0].anytime).not.toContain('Brush teeth')
+  })
+
+  it('reads the line in the order the day happens', () => {
+    // Before both, so this tests the ordering and not the looks-forward rule.
+    const board = adaptGanttBoard(members, [day([routine('Bedtime', 20), routine('Breakfast', 7)])], at(6))
+    expect(last(board).anytime).toEqual(['Breakfast', 'Bedtime'])
+  })
+
+  it('drops one whose hour has already passed', () => {
+    const board = adaptGanttBoard(members, [day([routine('Brush teeth', 6), routine('Bedtime', 20)])], at(8))
+    expect(last(board).anytime).toEqual(['Bedtime'])
+  })
+
+  it('keeps an untimed TASK regardless — an unfinished task still stands', () => {
+    const t = item({ type: 'task', title: 'Wash bookbags', allDay: true })
+    const board = adaptGanttBoard(members, [day([t])], at(20))
+    expect(last(board).anytime).toContain('Wash bookbags')
+  })
+
+  it('does not let an item that will never be drawn stretch the window', () => {
+    const real = item({ type: 'event', title: 'Dentist', startTime: at(9), endTime: at(10) })
+    const board = adaptGanttBoard(members, [day([routine('Bedtime', 21), real])], at(9))
+    expect((board.axis.endMin - board.axis.startMin) / 60).toBe(MIN_SPAN_H)
   })
 })

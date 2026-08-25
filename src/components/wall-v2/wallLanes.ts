@@ -26,7 +26,7 @@ import type { TimelineItem } from '@/types/timeline';
 import type { FamilyMember } from '@/types/family';
 import { isEverydayRoutine } from '@/lib/routineUtils';
 import { PREVIEW_SECTIONS } from '@/components/wall/today/tomorrowPreview';
-import { attributeEvent, HOUSEHOLD_ID, householdMember } from './wallEventAttribution';
+import { attributeEvent, householdMember } from './wallEventAttribution';
 
 export interface WallLane {
   memberId: string;
