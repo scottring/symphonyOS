@@ -1,4 +1,5 @@
 import makeWASocket, { useMultiFileAuthState, DisconnectReason } from '@whiskeysockets/baileys'
+import qrcode from 'qrcode-terminal'
 import { join } from 'node:path'
 import type { ConnectorMessage, WatchedSource } from '../types.ts'
 import type { MessageBuffer } from '../buffer.ts'
@@ -81,6 +82,20 @@ export function attachReceiver(
   })
 }
 
+
+/** One-time log of the groups this account is in, so their jids can be added
+ * to capture_sources. Metadata only: subject and jid, never message content,
+ * and never 1:1 chats. */
+async function listGroups(sock: { groupFetchAllParticipating: () => Promise<Record<string, { subject?: string }>> }): Promise<void> {
+  try {
+    const groups = await sock.groupFetchAllParticipating()
+    const rows = Object.entries(groups).map(([jid, g]) => `  whatsapp:${jid}  ${g.subject ?? '(no subject)'}`)
+    console.log(`\n=== groups visible to this device (${rows.length}) ===\n${rows.join('\n')}\n`)
+  } catch (e) {
+    console.error('group listing failed:', e)
+  }
+}
+
 /** Build the companion-device socket.
  *
  * markOnlineOnConnect: false is load-bearing — a linked device that marks
@@ -94,10 +109,25 @@ export async function makeReceiveOnlySocket(stateDir: string): Promise<SocketLik
     auth: state,
     markOnlineOnConnect: false,
     syncFullHistory: false,
-    printQRInTerminal: true,
   })
   sock.ev.on('creds.update', saveCreds)
-  sock.ev.on('connection.update', (u: { connection?: string; lastDisconnect?: { error?: unknown } }) => {
+  sock.ev.on('connection.update', (u: {
+    connection?: string
+    qr?: string
+    lastDisconnect?: { error?: unknown }
+  }) => {
+    // Baileys no longer prints the pairing QR itself, so we render it. It
+    // appears in `fly logs`, which is the only screen this headless box has.
+    if (u.qr) {
+      console.log('\n=== scan this with WhatsApp -> Linked Devices ===')
+      qrcode.generate(u.qr, { small: true })
+    }
+    if (u.connection === 'open') {
+      // Group discovery. Without this there is no way to learn a group's jid
+      // to put in capture_sources, and nothing can be watched. Read-only, and
+      // groups only — 1:1 conversations are never enumerated.
+      void listGroups(sock)
+    }
     if (u.connection === 'close') {
       const status = (u.lastDisconnect?.error as { output?: { statusCode?: number } })?.output?.statusCode
       // loggedOut means the phone unlinked this device — a human must re-scan
