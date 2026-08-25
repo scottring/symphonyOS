@@ -11,7 +11,29 @@ function required(env: Record<string, string | undefined>, name: string): string
   return v
 }
 
+// Values that are obviously copied out of documentation rather than filled
+// in. A placeholder email is not a harmless typo: it is a real address
+// belonging to someone else, and the connector will sit there attempting
+// logins against a stranger's account and reporting "incorrect password".
+const PLACEHOLDERS = [
+  'you@example.com', 'you@gmail.com', 'user@example.com',
+  'the-current-password', 'your-password', 'your-password-here', 'changeme',
+  '...', '<email>', '<password>',
+]
+
+function rejectPlaceholder(name: string, value: string | undefined): void {
+  if (value && PLACEHOLDERS.includes(value.trim().toLowerCase())) {
+    throw new Error(
+      `${name} is set to the placeholder "${value}" — replace it with the real value`,
+    )
+  }
+}
+
 export function loadConfig(env: Record<string, string | undefined>): Config {
+  rejectPlaceholder('CLASSDOJO_EMAIL', env.CLASSDOJO_EMAIL)
+  rejectPlaceholder('CLASSDOJO_PASSWORD', env.CLASSDOJO_PASSWORD)
+  rejectPlaceholder('CAPTURE_USER_EMAIL', env.CAPTURE_USER_EMAIL)
+
   return {
     supabaseUrl: required(env, 'SUPABASE_URL'),
     serviceRoleKey: required(env, 'SUPABASE_SERVICE_ROLE_KEY'),

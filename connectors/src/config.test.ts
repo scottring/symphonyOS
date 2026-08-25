@@ -44,3 +44,20 @@ describe('loadConfig', () => {
       .toThrow(/CAPTURE_SHARED_SECRET/)
   })
 })
+
+describe('placeholder guard', () => {
+  it('refuses a documentation placeholder email rather than logging in as a stranger', () => {
+    expect(() => loadConfig({ ...full, CLASSDOJO_EMAIL: 'you@gmail.com' }))
+      .toThrow(/CLASSDOJO_EMAIL is set to the placeholder/)
+  })
+
+  it('refuses a placeholder password', () => {
+    expect(() => loadConfig({ ...full, CLASSDOJO_PASSWORD: 'the-current-password' }))
+      .toThrow(/CLASSDOJO_PASSWORD is set to the placeholder/)
+  })
+
+  it('accepts a real-looking address', () => {
+    expect(loadConfig({ ...full, CLASSDOJO_EMAIL: 'someone@realdomain.com' }).classdojoEmail)
+      .toBe('someone@realdomain.com')
+  })
+})
