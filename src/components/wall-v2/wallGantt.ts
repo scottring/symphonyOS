@@ -69,9 +69,6 @@ export const MIN_LABEL_PX = 170;
  */
 const BOARD_SECTIONS: DaySection[] = [...PREVIEW_SECTIONS, 'unscheduled'];
 
-/** How much open backlog one row will name before it starts counting. */
-const BACKLOG_PER_ROW = 6;
-
 /** Default duration for an item with a start but no end. */
 const DEFAULT_DURATION_MIN = 60;
 
@@ -123,18 +120,6 @@ export interface GanttTrack {
   anytime: string[];
   /** Items that start after the window closes — counted, not dropped. */
   laterCount: number;
-  /**
-   * Open work carried over from before today, owned by this row.
-   *
-   * The board could not see this at all: `useWallData` fetches overdue tasks
-   * into their own array, never into `days[0].items`, so the household's
-   * entire standing workload — the thing there is most of — was invisible on
-   * the surface with the most empty space. Family context only; the query is
-   * scoped, and a kitchen wall must never show work or personal items.
-   */
-  backlog: string[];
-  /** Open work beyond what `backlog` names. */
-  backlogMore: number;
 }
 
 export interface GanttAxis {
@@ -241,10 +226,8 @@ export function adaptGanttBoard(
   members: FamilyMember[],
   days: WallDayData[],
   now: Date,
-  opts: { trackPx?: number; backlog?: TimelineItem[] } = {},
+  trackPx: number = TRACK_PX,
 ): GanttBoard {
-  const trackPx = opts.trackPx ?? TRACK_PX;
-  const backlogPool = opts.backlog ?? [];
   const today = days[0];
   const roster = [...members, householdMember()];
 
@@ -366,22 +349,9 @@ export function adaptGanttBoard(
     // and the line reads as the day when it is sorted, as noise when it isn't.
     anytimeItems.sort((a, b) => a.at - b.at);
 
-    // Carried-over work for this row. Arrives most-recent-first from
-    // useWallData, which is the useful order — a task that slipped yesterday
-    // is more actionable than one that slipped three weeks ago — so the only
-    // reordering is to float anything marked needed today.
-    const mine = backlogPool.filter(
-      (it) => !it.completed && boardOwnersOf(it, members).includes(m.id),
-    );
-    const needed = mine.filter((it) => it.neededOn);
-    const rest = mine.filter((it) => !it.neededOn);
-    const ordered = [...needed, ...rest];
-
     return {
       memberId: m.id, name: m.name, blocks,
       anytime: anytimeItems.map((a) => a.title),
-      backlog: ordered.slice(0, BACKLOG_PER_ROW).map((it) => titleForMember(it.title, m.name)),
-      backlogMore: Math.max(0, ordered.length - BACKLOG_PER_ROW),
       laterCount,
     };
   });
