@@ -56,6 +56,7 @@ export interface DbTask {
   scope: Scope | null
   category: string | null
   notes: string | null
+  capture_id: string | null
   links: (string | TaskLink)[] | null // Can be old string format or new object format
   phone_number: string | null
   email: string | null
@@ -127,6 +128,7 @@ export function dbTaskToTask(dbTask: DbTask): Task {
     scope: dbTask.scope ?? 'individual',
     category: (dbTask.category as TaskCategory) ?? 'task',
     notes: dbTask.notes ?? undefined,
+    captureId: dbTask.capture_id ?? undefined,
     links: normalizeLinks(dbTask.links),
     phoneNumber: dbTask.phone_number ?? undefined,
     email: dbTask.email ?? undefined,
