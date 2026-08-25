@@ -48,4 +48,19 @@ export default defineConfig([
       '@typescript-eslint/no-unused-vars': 'warn',
     },
   },
+  {
+    // The connectors worker is Node, not React. The React-hooks plugin reads
+    // any `useX()` call as a hook — Baileys' useMultiFileAuthState trips
+    // rules-of-hooks — and console IS the worker's only output channel,
+    // read through `fly logs`.
+    files: ['connectors/**/*.ts'],
+    languageOptions: {
+      globals: globals.node,
+    },
+    rules: {
+      'no-console': 'off',
+      'react-hooks/rules-of-hooks': 'off',
+      'react-refresh/only-export-components': 'off',
+    },
+  },
 ])
