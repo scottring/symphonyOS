@@ -11,47 +11,13 @@
 // which user's inbox to write to. O(1) lookup, no network calls.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { validateRequest, isExtractKind, type CaptureBody } from './lib/validate.ts'
+export { validateRequest } from './lib/validate.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-capture-secret',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-}
-
-interface CaptureBody {
-  user_email: string
-  title?: string                  // legacy quick-capture path
-  kind?: 'text' | 'whatsapp_export'
-  text?: string
-  source_key?: string
-  source_label?: string
-}
-
-type ValidationResult =
-  | { ok: true; body: CaptureBody }
-  | { ok: false; status: number; error: string }
-
-export function validateRequest(
-  headers: Headers,
-  body: Partial<CaptureBody>,
-  expectedSecret: string,
-): ValidationResult {
-  const provided = headers.get('x-capture-secret')
-  if (!provided || provided !== expectedSecret) {
-    return { ok: false, status: 401, error: 'invalid or missing capture secret' }
-  }
-  if (!body.user_email || typeof body.user_email !== 'string' || body.user_email.trim() === '') {
-    return { ok: false, status: 400, error: 'user_email required' }
-  }
-  const isExtract = body.kind === 'text' || body.kind === 'whatsapp_export'
-  if (isExtract) {
-    if (!body.text || typeof body.text !== 'string' || body.text.trim() === '') {
-      return { ok: false, status: 400, error: 'text required for kind=text|whatsapp_export' }
-    }
-  } else if (!body.title || typeof body.title !== 'string' || body.title.trim() === '') {
-    return { ok: false, status: 400, error: 'title required' }
-  }
-  return { ok: true, body: body as CaptureBody }
 }
 
 Deno.serve(async (req: Request) => {
@@ -100,7 +66,7 @@ Deno.serve(async (req: Request) => {
   const admin = createClient(supabaseUrl, serviceRoleKey)
 
   // New extract path: create a captures row and invoke extract-capture.
-  if (v.body.kind === 'text' || v.body.kind === 'whatsapp_export') {
+  if (isExtractKind(v.body.kind)) {
     const { data: cap, error: capErr } = await admin
       .from('captures')
       .insert({
