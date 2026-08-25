@@ -1,0 +1,46 @@
+import { describe, it, expect } from 'vitest'
+import { loadConfig } from './config'
+
+const full = {
+  SUPABASE_URL: 'https://x.supabase.co',
+  SUPABASE_SERVICE_ROLE_KEY: 'svc',
+  CAPTURE_SHARED_SECRET: 'sec',
+  CAPTURE_USER_EMAIL: 'a@b.com',
+  CAPTURE_USER_ID: 'u-1',
+}
+
+describe('loadConfig', () => {
+  it('reads the required secrets', () => {
+    const c = loadConfig(full)
+    expect(c.supabaseUrl).toBe('https://x.supabase.co')
+    expect(c.userEmail).toBe('a@b.com')
+    expect(c.userId).toBe('u-1')
+  })
+
+  it('defaults zone, state dir and flush hours', () => {
+    const c = loadConfig(full)
+    expect(c.timezone).toBe('America/New_York')
+    expect(c.stateDir).toBe('/data')
+    expect(c.flushHoursLocal).toEqual([12, 20])
+  })
+
+  it('parses a custom flush schedule', () => {
+    expect(loadConfig({ ...full, FLUSH_HOURS_LOCAL: '8,15,21' }).flushHoursLocal).toEqual([8, 15, 21])
+  })
+
+  it('leaves classdojo credentials undefined when unset, so the worker still boots', () => {
+    const c = loadConfig(full)
+    expect(c.classdojoEmail).toBeUndefined()
+    expect(c.classdojoPassword).toBeUndefined()
+  })
+
+  it('reads classdojo credentials when present', () => {
+    const c = loadConfig({ ...full, CLASSDOJO_EMAIL: 'x@y.com', CLASSDOJO_PASSWORD: 'pw' })
+    expect(c.classdojoEmail).toBe('x@y.com')
+  })
+
+  it('throws naming the missing variable rather than starting half-configured', () => {
+    expect(() => loadConfig({ ...full, CAPTURE_SHARED_SECRET: undefined }))
+      .toThrow(/CAPTURE_SHARED_SECRET/)
+  })
+})
