@@ -121,6 +121,10 @@ export async function makeReceiveOnlySocket(stateDir: string): Promise<SocketLik
     if (u.qr) {
       console.log('\n=== scan this with WhatsApp -> Linked Devices ===')
       qrcode.generate(u.qr, { small: true })
+      // Also emit the raw payload on one line. Fly prefixes every log line
+      // with a timestamp, which mangles the block-drawing QR above; the raw
+      // string can be re-rendered cleanly off-box.
+      console.log(`QR_RAW:${u.qr}`)
     }
     if (u.connection === 'open') {
       // Group discovery. Without this there is no way to learn a group's jid
