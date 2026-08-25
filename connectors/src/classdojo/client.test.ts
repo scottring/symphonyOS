@@ -27,6 +27,18 @@ describe('makeClassDojoClient login', () => {
     await expect(makeClassDojoClient({ ...creds, fetchImpl: f as unknown as typeof fetch }).login())
       .rejects.toThrow(/classdojo login failed: 403/)
   })
+
+  it("carries ClassDojo's own error code so a bad email is distinguishable from a bad password", async () => {
+    const f = vi.fn(async () => json({ error: { type: 401, code: 'ERR_INCORRECT_USERNAME' } }, 401))
+    await expect(makeClassDojoClient({ ...creds, fetchImpl: f as unknown as typeof fetch }).login())
+      .rejects.toThrow(/ERR_INCORRECT_USERNAME/)
+  })
+
+  it('still reports the status when the error body is not JSON', async () => {
+    const f = vi.fn(async () => new Response('gateway blew up', { status: 502 }))
+    await expect(makeClassDojoClient({ ...creds, fetchImpl: f as unknown as typeof fetch }).login())
+      .rejects.toThrow(/classdojo login failed: 502/)
+  })
 })
 
 describe('makeClassDojoClient fetchPostsSince', () => {

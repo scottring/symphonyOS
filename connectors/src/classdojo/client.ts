@@ -53,9 +53,19 @@ export function makeClassDojoClient({
       body: JSON.stringify({ login: email, password }),
     })
     if (!res.ok) {
-      // This string lands in connector_health.last_error and is what tells
-      // Scott what broke, so it names the step.
-      throw new Error(`classdojo login failed: ${res.status}`)
+      // This string lands in connector_health.last_error and is the only
+      // thing that will tell anyone what broke, so it carries ClassDojo's
+      // own error code — ERR_INCORRECT_USERNAME vs ERR_INCORRECT_PASSWORD
+      // is the difference between a typo in the email and a typo in the
+      // password, and guessing between them wastes a deploy each time.
+      let code = ''
+      try {
+        const body = (await res.json()) as { error?: { code?: string; detail?: string } }
+        code = body.error?.code ?? body.error?.detail ?? ''
+      } catch {
+        // Non-JSON error body; the status alone will have to do.
+      }
+      throw new Error(`classdojo login failed: ${res.status}${code ? ` (${code})` : ''}`)
     }
     remember(res)
     loggedIn = true
