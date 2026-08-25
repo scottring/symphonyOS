@@ -1,4 +1,5 @@
 import { toDojoPosts, type DojoPost, type FeedItem } from './map.ts'
+import { OtcRequiredError, type SessionStore } from './session.ts'
 
 // ClassDojo HTTP client. Endpoints and shapes are recorded in
 // connectors/docs/classdojo-api.md — observed from a live session, not guessed.
@@ -20,6 +21,11 @@ interface FeedResponse {
 
 export interface ClassDojoClient {
   login(): Promise<void>
+  /** Ask ClassDojo to email a one-time code. Used by the otcLogin script. */
+  requestCode(): Promise<void>
+  /** Complete an anomalous-location login with the emailed code and persist
+   * the resulting session. Used by the otcLogin script. */
+  loginWithCode(code: string): Promise<void>
   /** Every post newer than `since`, across all classes and the school.
    * The feed is combined; callers split on DojoPost.targetId. */
   fetchPostsSince(since: Date | null): Promise<DojoPost[]>
@@ -28,22 +34,64 @@ export interface ClassDojoClient {
 export function makeClassDojoClient({
   email,
   password,
+  sessionStore,
   fetchImpl = fetch,
 }: {
   email: string
   password: string
+  /** When given, a stored cookie is preferred over a password login and a
+   * successful login is written back. Omit in tests that exercise the
+   * password path directly. */
+  sessionStore?: SessionStore
   fetchImpl?: typeof fetch
 }): ClassDojoClient {
   // Cookie jar. The session cookie is the only credential the feed needs,
   // and it never leaves this process.
-  let cookie = ''
-  let loggedIn = false
+  let cookie = sessionStore?.get() ?? ''
+  let loggedIn = cookie !== ''
 
   function remember(res: Response): void {
     // Node exposes multiple Set-Cookie headers through getSetCookie().
     const raw = typeof res.headers.getSetCookie === 'function' ? res.headers.getSetCookie() : []
     const pairs = raw.map((c) => c.split(';')[0]).filter(Boolean)
     if (pairs.length > 0) cookie = pairs.join('; ')
+  }
+
+  async function errorCode(res: Response): Promise<string> {
+    try {
+      const body = (await res.json()) as { error?: { code?: string; detail?: string } }
+      return body.error?.code ?? body.error?.detail ?? ''
+    } catch {
+      return ''
+    }
+  }
+
+  /** Ask ClassDojo to email a one-time code for this account. */
+  async function requestCode(): Promise<void> {
+    const res = await fetchImpl(`${BASE}/api/oneTimeCode`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ login: email, password }),
+    })
+    if (!res.ok) {
+      throw new Error(`classdojo code request failed: ${res.status} (${await errorCode(res)})`)
+    }
+  }
+
+  /** Complete the login with the emailed code, and persist the session so
+   * this never has to happen again on this machine. */
+  async function loginWithCode(code: string): Promise<void> {
+    const res = await fetchImpl(`${BASE}/api/session`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ login: email, password, oneTimeCode: code }),
+    })
+    if (!res.ok) {
+      throw new Error(`classdojo code login failed: ${res.status} (${await errorCode(res)})`)
+    }
+    remember(res)
+    loggedIn = true
+    if (cookie && sessionStore) await sessionStore.set(cookie)
   }
 
   async function login(): Promise<void> {
@@ -58,17 +106,16 @@ export function makeClassDojoClient({
       // own error code — ERR_INCORRECT_USERNAME vs ERR_INCORRECT_PASSWORD
       // is the difference between a typo in the email and a typo in the
       // password, and guessing between them wastes a deploy each time.
-      let code = ''
-      try {
-        const body = (await res.json()) as { error?: { code?: string; detail?: string } }
-        code = body.error?.code ?? body.error?.detail ?? ''
-      } catch {
-        // Non-JSON error body; the status alone will have to do.
-      }
+      const code = await errorCode(res)
+      // A datacenter IP looks anomalous to ClassDojo, so it demands an
+      // emailed code. That is not a wrong secret and must not be reported
+      // as one — the fix is a human running the OTC flow once.
+      if (code.includes('OTC')) throw new OtcRequiredError()
       throw new Error(`classdojo login failed: ${res.status}${code ? ` (${code})` : ''}`)
     }
     remember(res)
     loggedIn = true
+    if (cookie && sessionStore) await sessionStore.set(cookie)
   }
 
   async function getFeed(url: string): Promise<Response> {
@@ -117,5 +164,5 @@ export function makeClassDojoClient({
     return collected
   }
 
-  return { login, fetchPostsSince }
+  return { login, requestCode, loginWithCode, fetchPostsSince }
 }

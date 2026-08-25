@@ -62,3 +62,20 @@ over notification delivery from the handset. Do not change it.
   timestamp means the feed is dead, not quiet.
 - `fly status` — one machine, always. Two machines would hold two WhatsApp
   sessions and deliver everything twice.
+
+## ClassDojo: the one-time code
+
+ClassDojo treats a login from a datacenter IP as anomalous and emails a
+one-time code, so the connector cannot log in with a password alone. Do this
+once per machine:
+
+```bash
+fly ssh console --app symphony-connectors
+cd /app && node --experimental-strip-types src/classdojo/otcLogin.ts
+```
+
+It requests the code, waits for you to paste it from your email, then writes
+the session cookie to `/data`. The connector reuses that across restarts and
+deploys, so it is genuinely one-time — until ClassDojo expires the session,
+at which point `connector_health.last_error` reads
+"awaiting one-time code" and you run it again.

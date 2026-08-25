@@ -111,3 +111,48 @@ describe('makeClassDojoClient fetchPostsSince', () => {
       .toEqual([])
   })
 })
+
+describe('one-time-code handling', () => {
+  it('raises OtcRequiredError, not a credentials error, when ClassDojo demands a code', async () => {
+    const f = vi.fn(async () => json({ error: { code: 'ERR_MUST_USE_OTC_ANOMALOUS_LOGIN' } }, 401))
+    await expect(makeClassDojoClient({ ...creds, fetchImpl: f as unknown as typeof fetch }).login())
+      .rejects.toThrow(/one-time code/)
+  })
+
+  it('requests a code from the oneTimeCode endpoint', async () => {
+    const f = vi.fn(async () => json({ ok: true }))
+    await makeClassDojoClient({ ...creds, fetchImpl: f as unknown as typeof fetch }).requestCode()
+    const [url, init] = f.mock.calls[0] as unknown as [string, RequestInit]
+    expect(url).toBe('https://home.classdojo.com/api/oneTimeCode')
+    expect(JSON.parse(init.body as string)).toEqual({ login: 'a@b.com', password: 'pw' })
+  })
+
+  it('sends the code alongside the credentials to complete the login', async () => {
+    const f = vi.fn(async () => json({ ok: true }))
+    await makeClassDojoClient({ ...creds, fetchImpl: f as unknown as typeof fetch }).loginWithCode('123456')
+    const [url, init] = f.mock.calls[0] as unknown as [string, RequestInit]
+    expect(url).toBe('https://home.classdojo.com/api/session')
+    expect(JSON.parse(init.body as string)).toEqual({ login: 'a@b.com', password: 'pw', oneTimeCode: '123456' })
+  })
+
+  it('reuses a stored session instead of logging in again', async () => {
+    const store = {
+      get: () => 'sess=abc',
+      set: vi.fn(async () => {}),
+      load: async () => {},
+      clear: async () => {},
+    }
+    const f = vi.fn(async (url: string) => {
+      if (url.includes('/api/session')) throw new Error('should not have logged in')
+      return json({ _items: [feedItem('p1', '2026-08-25T13:00:00Z')] })
+    })
+
+    const posts = await makeClassDojoClient({
+      ...creds, sessionStore: store as never, fetchImpl: f as unknown as typeof fetch,
+    }).fetchPostsSince(null)
+
+    expect(posts.map((p) => p.id)).toEqual(['p1'])
+    const [, init] = f.mock.calls[0] as unknown as [string, RequestInit]
+    expect((init.headers as Record<string, string>).cookie).toBe('sess=abc')
+  })
+})

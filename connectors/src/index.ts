@@ -7,6 +7,7 @@ import { dueNow, flushAll, localHour } from './scheduler.ts'
 import { recordHealth } from './health.ts'
 import { makeClassDojoClient } from './classdojo/client.ts'
 import { toConnectorMessages } from './classdojo/map.ts'
+import { SessionStore, OtcRequiredError } from './classdojo/session.ts'
 import { join } from 'node:path'
 import type { WatchedSource } from './types.ts'
 
@@ -17,6 +18,10 @@ async function main(): Promise<void> {
   const buffer = new MessageBuffer()
   const highWater = new HighWaterStore(join(config.stateDir, 'high-water.json'))
   await highWater.load()
+  // A stored ClassDojo session survives restarts, so the one-time-code dance
+  // stays one-time.
+  const dojoSession = new SessionStore(join(config.stateDir, 'classdojo-session.json'))
+  await dojoSession.load()
 
   let sources: WatchedSource[] = await loadWatchlist(config)
   console.log(`watching ${sources.length} source(s): ${sources.map((s) => s.sourceLabel).join(', ') || 'none'}`)
@@ -51,6 +56,7 @@ async function main(): Promise<void> {
           const client = makeClassDojoClient({
             email: config.classdojoEmail,
             password: config.classdojoPassword,
+            sessionStore: dojoSession,
           })
           // The feed is combined across classes, so it is fetched ONCE from the
           // oldest mark among the watched sources, then split by targetId.
@@ -76,8 +82,15 @@ async function main(): Promise<void> {
             dr.failed === 0 ? { ok: true } : { ok: false, error: `${dr.failed} source(s) failed` },
           )
         } catch (e) {
-          console.error('classdojo pull failed:', e)
-          await recordHealth(config, 'classdojo', { ok: false, error: String(e) })
+          // An OTC demand is not a broken connector — it is a connector
+          // waiting on a human. Say so plainly, because "login failed" would
+          // send someone hunting for a wrong password that isn't wrong.
+          const needsCode = e instanceof OtcRequiredError
+          console.error(needsCode ? `classdojo needs a one-time code: ${String(e)}` : `classdojo pull failed: ${String(e)}`)
+          await recordHealth(config, 'classdojo', {
+            ok: false,
+            error: needsCode ? 'awaiting one-time code — run otcLogin on the machine' : String(e),
+          })
         }
       }
     })()
