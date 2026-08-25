@@ -35,12 +35,18 @@ Most of this pipeline is built. The gaps are narrower than they look.
 | `tasks.capture_meta` jsonb — capture state + storage path | ships |
 | `pg_cron` + `pg_net` + Vault service key — server-side scheduled invoke | ships (`proactive_engine_warm`) |
 
-**No schema changes are required.** `captures.kind` already permits `'image'`;
-`captures.raw_text` (nullable text) holds the parse result as JSON;
+**No table or column changes are required.** `captures.kind` already permits
+`'image'`; `captures.raw_text` (nullable text) holds the parse result as JSON;
 `capture_checkpoints.last_processed_at` is exactly the Dropbox dedupe key we
-need; `notes.source` already permits `'import'`. The only SQL is Phase 2's
-`CREATE FUNCTION` + `cron.schedule`, which Scott must run by hand (the
-Management API curl is blocked by the classifier).
+need; `notes.source` already permits `'import'`.
+
+Two pieces of SQL are needed, both hand-run by Scott (the Management API curl
+is blocked by the request classifier):
+
+1. **One RLS policy.** `captures` ships with a SELECT policy only, so the
+   review sheet cannot delete a reviewed page:
+   `CREATE POLICY captures_owner_delete ON captures FOR DELETE USING (auth.uid() = user_id);`
+2. Phase 2's `CREATE FUNCTION` + `cron.schedule`.
 
 ## Two decisions the design rests on
 
@@ -177,7 +183,6 @@ The poller has no browser timezone. It uses a `SUPERNOTE_TZ` constant
 - The page image → one `attachments` row against the first created note (or the
   first task if there are no notes), so the original page is always reachable
   from whatever came off it.
-- Tasks carry `capture_meta = { status: 'done', storage_path, source: 'supernote' }`.
 
 ## Phase 2 — `dropbox-poll`
 
