@@ -51,6 +51,7 @@ import { ClarityCurtain } from '@/components/clarity/ClarityCurtain'
 import { computeClaritySteps, type ClarityStepId } from '@/lib/clarity/claritySteps'
 import { selectOverdue } from '@/lib/today/taskPools'
 import { selectHorizonPool } from '@/lib/today/horizons'
+import { selectSchoolPool, parseCaptureMeta, formatCaptureMeta } from '@/lib/today/schoolPool'
 import { useSuggestionsEnabled } from '@/lib/assistant/suggestionsPref'
 import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
 import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
@@ -309,6 +310,15 @@ export function TodayView({
   const monthPool = useMemo(
     () => selectHorizonPool(tasks, 'month', poolMatchAll),
     [tasks, poolMatchAll],
+  )
+
+  // Candidates the feed connectors extracted from ClassDojo and the parent
+  // WhatsApp groups. Same treatment as the week/month pools: a place to look,
+  // deliberately outside the review, and never on the day until triaged.
+  const schoolPool = useMemo(() => selectSchoolPool(tasks), [tasks])
+  const schoolMetaFor = useCallback(
+    (t: Task) => formatCaptureMeta(parseCaptureMeta(t.notes)),
+    [],
   )
 
   // ── Up Next: the single next commitment, highlighted in place. It used to
@@ -861,6 +871,24 @@ export function TodayView({
           onDeleteTask={ctx.onDeleteTask}
           onCompleteTask={onToggleTask}
         />
+
+        {/* The school feed. Gated on a non-empty pool, unlike Week and Month:
+            those are permanent rungs of the planning rhythm, while this is a
+            feed that may legitimately have nothing in it for days, and an
+            always-present "School · 0" would just be furniture. */}
+        {schoolPool.length > 0 && (
+          <HorizonPoolDropdown
+            label="School"
+            tasks={schoolPool}
+            offer={['today', 'tomorrow', 'week', 'someday', 'deleted']}
+            viewedDate={viewedDate}
+            onUpdateTask={(id, u) => onUpdateTask?.(id, u)}
+            onPushTask={ctx.onPushTask}
+            onDeleteTask={ctx.onDeleteTask}
+            onCompleteTask={onToggleTask}
+            metaFor={schoolMetaFor}
+          />
+        )}
 
         {onSelectAssignees && ((assigneesWithTasks?.length ?? 0) > 0 || hasUnassignedTasks) && (
           <AssigneeFilter

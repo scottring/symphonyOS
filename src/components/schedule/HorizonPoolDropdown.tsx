@@ -32,10 +32,14 @@ interface HorizonPoolDropdownProps {
   /** Route for the pool's full bench, e.g. '/week'. Renders an open link. */
   benchRoute?: string
   benchLabel?: string
+  /** Optional per-row label — the School pool uses it to say which feed a
+   * candidate came from and which child it is about. */
+  metaFor?: (task: Task) => string | undefined
 }
 
 export function HorizonPoolDropdown({
   label, tasks, offer, viewedDate, onUpdateTask, onPushTask, onDeleteTask, onCompleteTask, benchRoute, benchLabel,
+  metaFor,
 }: HorizonPoolDropdownProps) {
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
@@ -84,7 +88,7 @@ export function HorizonPoolDropdown({
             ) : (
               <ul className="space-y-1.5">
                 {tasks.map((t) => (
-                  <TriageRow key={t.id} task={t} offer={offer}
+                  <TriageRow key={t.id} task={t} offer={offer} meta={metaFor?.(t)}
                     verdict={verdicts.get(t.id)} canDelete={!!onDeleteTask}
                     onVerdict={onVerdict} onComplete={onComplete} />
                 ))}

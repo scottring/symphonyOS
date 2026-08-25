@@ -100,4 +100,23 @@ describe('HorizonPoolDropdown — the pools live up here, never in the review', 
     expect(within(freshRow).queryByText('today')).toBeNull()
     expect(within(freshRow).getByRole('button', { name: 'Today' })).toBeInTheDocument()
   })
+
+  it('labels each row when given metaFor — a pool row can say where it came from', async () => {
+    const { user } = render(<HorizonPoolDropdown {...base} label="School"
+      offer={['today', 'tomorrow', 'someday', 'deleted']}
+      tasks={[task({ id: 's1', title: 'Bring a white t-shirt', bucket: 'inbox' })]}
+      metaFor={(t) => (t.id === 's1' ? '3-01 Mr. Gorby · Kaleb' : undefined)}
+    />)
+    await user.click(screen.getByRole('button', { name: /School/ }))
+    expect(screen.getByText('3-01 Mr. Gorby · Kaleb')).toBeInTheDocument()
+  })
+
+  it('renders rows unlabelled when metaFor is not given', async () => {
+    const { user } = render(<HorizonPoolDropdown {...base} label="Week"
+      offer={['today']}
+      tasks={[task({ id: 'w1', title: 'Week thing', bucket: 'week' })]}
+    />)
+    await user.click(screen.getByRole('button', { name: /Week/ }))
+    expect(screen.getByText('Week thing')).toBeInTheDocument()
+  })
 })
