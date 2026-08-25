@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  attributeEvent, matchesName, HOUSEHOLD_ID, EXCLUDED_CALENDAR_IDS, CALENDAR_OWNER,
+  attributeEvent, matchesName, titleForMember, HOUSEHOLD_ID, EXCLUDED_CALENDAR_IDS, CALENDAR_OWNER,
 } from './wallEventAttribution';
 import type { FamilyMember } from '@/types/family';
 
@@ -107,5 +107,50 @@ describe('attributeEvent', () => {
 
   it('falls back to household when the calendar is unknown and nobody is named', () => {
     expect(attributeEvent(ev('Book club', 'someone-elses-cal'), MEMBERS)).toEqual([HOUSEHOLD_ID]);
+  });
+});
+
+describe('titleForMember', () => {
+  // The real event on the shared calendar, 2026-08-25. One row holds BOTH
+  // kids' rotation, so attribution hands the same string to both lanes and
+  // neither kid learns what their day holds.
+  const SPECIALS = 'Specials — Ella: Visual Art · Kaleb: PE';
+
+  it("gives each member only their own half of a shared rotation", () => {
+    expect(titleForMember(SPECIALS, 'Ella')).toBe('Visual Art');
+    expect(titleForMember(SPECIALS, 'Kaleb')).toBe('PE');
+  });
+
+  it('leaves a genuinely shared title alone', () => {
+    expect(titleForMember('School — Ella & Kaleb', 'Ella')).toBe('School — Ella & Kaleb');
+    expect(titleForMember('Ella piano', 'Ella')).toBe('Ella piano');
+  });
+
+  it('leaves the title alone when this member has no segment', () => {
+    expect(titleForMember(SPECIALS, 'Scott')).toBe(SPECIALS);
+  });
+
+  it('handles a single-person segment', () => {
+    expect(titleForMember('Ella: dentist', 'Ella')).toBe('dentist');
+  });
+
+  // Same failure mode matchesName guards: a substring hit hands over the
+  // wrong half of the line, which is worse than showing the whole thing.
+  it('does not match a name inside a longer word', () => {
+    expect(titleForMember('Stella: Art · Ella: PE', 'Ella')).toBe('PE');
+  });
+
+  it('reads the first name out of a full name', () => {
+    expect(titleForMember(SPECIALS, 'Kaleb Kaufman')).toBe('PE');
+  });
+
+  it('is not fooled by a colon that is a clock', () => {
+    expect(titleForMember('Pickup 3:30 · Ella: PE', 'Ella')).toBe('PE');
+    expect(titleForMember('Dinner: pizza', 'Ella')).toBe('Dinner: pizza');
+  });
+
+  it('falls back to the whole title rather than returning nothing', () => {
+    expect(titleForMember('Ella:', 'Ella')).toBe('Ella:');
+    expect(titleForMember('', 'Ella')).toBe('');
   });
 });

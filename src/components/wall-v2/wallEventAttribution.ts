@@ -121,3 +121,42 @@ export function attributeEvent(
 export function householdMember(): FamilyMember {
   return { id: HOUSEHOLD_ID, name: 'Everyone', initials: 'ALL' } as FamilyMember;
 }
+
+/**
+ * Separators a family actually types between one person's part and the next.
+ *
+ * A comma is deliberately absent: "Ella: PE, Art" is one person with two
+ * specials, and splitting there would hand Ella "PE" and lose the rest.
+ */
+const SEGMENT_SPLIT = /\s*[·|;]\s*/;
+
+/**
+ * The part of an event title that belongs to ONE member.
+ *
+ * A family keeps a rotation on a single calendar row — "Specials — Ella:
+ * Visual Art · Kaleb: PE" — because that is one thing to maintain instead of
+ * ten recurring series. `attributeEvent` already puts that event in both kids'
+ * rows, which is right; what was wrong is that both rows then rendered the
+ * SAME string, truncated to "Specials — El…", so neither kid learned what
+ * their own day held. Splitting the line per person is what puts a special on
+ * an individual timeline rather than beside it.
+ *
+ * The rule is narrow on purpose: only a word-bounded `Name:` segment counts.
+ * Anything else — "School — Ella & Kaleb", "Ella piano", "Dinner: pizza" —
+ * comes back untouched, because a title that isn't addressed to one person is
+ * genuinely shared and must keep its words.
+ */
+export function titleForMember(title: string, name: string): string {
+  const first = name.trim().split(/\s+/)[0];
+  if (!first || !title) return title;
+  const escaped = first.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  // The kind prefix ("Specials — ") rides in front of the first segment's
+  // name, so allow anything ahead of the word-bounded name. Word-bounded for
+  // the same reason `matchesName` is: "Stella: Art" must not answer for Ella.
+  const segment = new RegExp(`^.*?\\b${escaped}\\s*:\\s*(.+)$`, 'i');
+  for (const part of title.split(SEGMENT_SPLIT)) {
+    const value = part.match(segment)?.[1].trim();
+    if (value) return value;
+  }
+  return title;
+}

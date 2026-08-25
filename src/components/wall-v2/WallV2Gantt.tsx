@@ -17,6 +17,21 @@ import { WALL, personAccent } from './wallTheme';
 import { HOUSEHOLD_ID } from './wallEventAttribution';
 import type { GanttBoard, GanttBlock, GanttTrack } from './wallGantt';
 
+// Every row must start its track at the SAME x, or the shared axis — the only
+// thing that makes a Gantt worth its cost — is a lie. These are the pieces of
+// that offset, named once so the ruler, the tracks and the now line cannot
+// drift apart. (They did: an all-day chip rendered inline before the track,
+// so Ella's "Library" pushed her whole day ~90px to the right of the 9a tick
+// while Kaleb's shorter "Art" pushed his ~65px.)
+const BORDER_L = 4;   // border-l-4 on the track card
+const PAD_L = 16;     // pl-4
+const PAD_R = 12;     // pr-3
+const GAP = 16;       // gap-4
+const NAME_W = 168;   // portrait + name column
+/** Reserved gutter for all-day chips. Zero on a day with none, so a quiet
+ *  wall keeps the full track and a busy one stays aligned. */
+const ALLDAY_W = 104;
+
 /** Bar fills per person index, matching the lane accents. */
 const BAR_TINTS = [
   'bg-[#7A8E7E] dark:bg-[#4E7261]',
@@ -103,11 +118,11 @@ function Bar({ block, index, onTap }: { block: GanttBlock; index: number; onTap?
   );
 }
 
-function Track({ track, index, onTapItem }: { track: GanttTrack; index: number; onTapItem?: (id: string) => void }) {
+function Track({ track, index, gutter, onTapItem }: { track: GanttTrack; index: number; gutter: number; onTapItem?: (id: string) => void }) {
   const empty = track.blocks.length === 0 && track.allDay.length === 0;
   return (
     <div className={`${WALL.card} border-l-4 ${personAccent(index)} flex items-center gap-4 pl-4 pr-3 flex-1 min-h-0 overflow-hidden`}>
-      <div className="w-[168px] shrink-0 flex items-center gap-3 min-w-0">
+      <div style={{ width: NAME_W }} className="shrink-0 flex items-center gap-3 min-w-0">
         <Face memberId={track.memberId} name={track.name} index={index} />
         <span className={`font-display text-[1.35rem] leading-tight truncate ${WALL.inkStrong}`}>
           {track.name}
@@ -116,11 +131,13 @@ function Track({ track, index, onTapItem }: { track: GanttTrack; index: number; 
 
       {/* All-day items have no position on a clock, so they ride as chips
           before the track rather than being stretched across the whole width
-          and pretending to be a duration. */}
-      {track.allDay.length > 0 && (
-        <div className="shrink-0 flex gap-1.5 max-w-[200px]">
+          and pretending to be a duration. The gutter is reserved on EVERY row
+          — empty ones included — because a chip that changes where the track
+          starts pulls that person's whole day off the shared axis. */}
+      {gutter > 0 && (
+        <div style={{ width: gutter }} className="shrink-0 flex flex-col items-start gap-1 overflow-hidden">
           {track.allDay.slice(0, 2).map((t) => (
-            <span key={t} className={`${WALL.prepChip} truncate max-w-[96px]`}>{t}</span>
+            <span key={t} className={`${WALL.prepChip} truncate max-w-full`}>{t}</span>
           ))}
         </div>
       )}
@@ -146,15 +163,17 @@ function Track({ track, index, onTapItem }: { track: GanttTrack; index: number; 
 
 export function WallV2Gantt({ board, onTapItem }: { board: GanttBoard; onTapItem?: (id: string) => void }) {
   const { axis, tracks } = board;
+  const gutter = tracks.some((t) => t.allDay.length > 0) ? ALLDAY_W : 0;
+  const trackLeft = BORDER_L + PAD_L + NAME_W + GAP + (gutter ? gutter + GAP : 0);
   return (
     <div className="flex flex-col gap-2 flex-1 min-h-0">
-      {/* Axis header. The 168px offset lines the ruler up with the tracks
-          below it — the labels are useless if they don't sit over their bars. */}
-      <div className="shrink-0 flex items-end gap-4 pl-4 pr-3">
-        <div className="w-[168px] shrink-0">
+      {/* Axis header. The offset is computed from the same pieces the tracks
+          use — the labels are useless if they don't sit over their bars. */}
+      <div className="shrink-0 relative h-6">
+        <div style={{ left: BORDER_L + PAD_L }} className="absolute bottom-0">
           <span className={WALL.label}>Today</span>
         </div>
-        <div className="relative flex-1 min-w-0 h-6">
+        <div style={{ marginLeft: trackLeft, marginRight: PAD_R }} className="relative h-6">
           {axis.ticks.map((t) => (
             <span
               key={t.min}
@@ -174,7 +193,7 @@ export function WallV2Gantt({ board, onTapItem }: { board: GanttBoard; onTapItem
         {axis.nowPct !== null && (
           <div
             aria-hidden
-            style={{ left: `calc(168px + 16px + 12px + (100% - 168px - 16px - 12px - 12px) * ${axis.nowPct / 100})` }}
+            style={{ left: `calc(${trackLeft}px + (100% - ${trackLeft + PAD_R}px) * ${axis.nowPct / 100})` }}
             className="absolute top-0 bottom-0 w-[3px] bg-[#C2603A] dark:bg-[#E0895F] rounded-full z-10 pointer-events-none"
           >
             <span className="absolute -top-1 left-1/2 -translate-x-1/2 w-3 h-3 rounded-full bg-[#C2603A] dark:bg-[#E0895F]" />
@@ -182,7 +201,7 @@ export function WallV2Gantt({ board, onTapItem }: { board: GanttBoard; onTapItem
         )}
 
         {tracks.map((t, i) => (
-          <Track key={t.memberId} track={t} index={i} onTapItem={onTapItem} />
+          <Track key={t.memberId} track={t} index={i} gutter={gutter} onTapItem={onTapItem} />
         ))}
       </div>
     </div>

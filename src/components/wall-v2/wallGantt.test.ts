@@ -203,3 +203,41 @@ describe('a wide gap is shared rather than hogged', () => {
     expect((b.labelRoomPct / 100) * TRACK_PX).toBeGreaterThanOrEqual(MIN_LABEL_PX)
   })
 })
+
+describe('a rotation written on one row still reads per person', () => {
+  // The real shared-calendar event, 2026-08-25. Both kids are named, so
+  // attribution hands the SAME string to both tracks; without splitting it,
+  // each chip renders "Specials — El…" and neither kid learns their special.
+  const SPECIALS = 'Specials — Ella: Visual Art · Kaleb: PE'
+  const KIDS = [member('ella', 'Ella'), member('kaleb', 'Kaleb')]
+
+  it('gives each kid their own special, not the whole line', () => {
+    const board = adaptGanttBoard(
+      KIDS,
+      [day([item({ title: SPECIALS, allDay: true })])],
+      at(9),
+    )
+    expect(board.tracks[0].allDay).toEqual(['Visual Art'])
+    expect(board.tracks[1].allDay).toEqual(['PE'])
+  })
+
+  it('leaves a genuinely shared commitment whole in both tracks', () => {
+    const board = adaptGanttBoard(
+      KIDS,
+      [day([item({ title: 'School — Ella & Kaleb', startTime: at(9), endTime: at(14) })])],
+      at(9),
+    )
+    expect(board.tracks[0].blocks[0].title).toBe('School — Ella & Kaleb')
+    expect(board.tracks[1].blocks[0].title).toBe('School — Ella & Kaleb')
+  })
+
+  it('splits a timed block the same way', () => {
+    const board = adaptGanttBoard(
+      KIDS,
+      [day([item({ title: 'Pickup · Ella: bus · Kaleb: aftercare', startTime: at(15) })])],
+      at(14),
+    )
+    expect(board.tracks[0].blocks[0].title).toBe('bus')
+    expect(board.tracks[1].blocks[0].title).toBe('aftercare')
+  })
+})

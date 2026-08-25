@@ -26,7 +26,7 @@ import type { TimelineItem } from '@/types/timeline';
 import type { FamilyMember } from '@/types/family';
 import { isEverydayRoutine } from '@/lib/routineUtils';
 import { PREVIEW_SECTIONS } from '@/components/wall/today/tomorrowPreview';
-import { householdMember } from './wallEventAttribution';
+import { householdMember, titleForMember } from './wallEventAttribution';
 import { ownersOf } from './wallLanes';
 
 /** Hours of track. Below this a quiet day stretches two items across the wall. */
@@ -185,7 +185,12 @@ export function adaptGanttBoard(
     let laterCount = 0;
 
     for (const it of today ? itemsFor(today, m.id, members) : []) {
-      if (!it.startTime || it.allDay) { allDay.push(it.title); continue; }
+      // One calendar row can carry the whole family's rotation — "Specials —
+      // Ella: Visual Art · Kaleb: PE". Attribution rightly puts it in both
+      // kids' tracks; rendering the same string in both is what made it
+      // useless. Each track shows only the words addressed to that person.
+      const title = titleForMember(it.title, m.name);
+      if (!it.startTime || it.allDay) { allDay.push(title); continue; }
 
       const s = minutesOfDay(it.startTime);
       const e = it.endTime ? minutesOfDay(it.endTime) : s + DEFAULT_DURATION_MIN;
@@ -201,7 +206,7 @@ export function adaptGanttBoard(
 
       blocks.push({
         id: it.id,
-        title: it.title,
+        title,
         leftPct: ((cs - axis.startMin) / span) * 100,
         widthPct,
         labelSide: 'in',
