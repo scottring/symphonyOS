@@ -22,6 +22,12 @@ async function main(): Promise<void> {
   // stays one-time.
   const dojoSession = new SessionStore(join(config.stateDir, 'classdojo-session.json'))
   await dojoSession.load()
+  // A cookie supplied by secret wins over a stored one: it is how a human
+  // hands over a fresh session after the old one expires.
+  if (config.classdojoCookie && config.classdojoCookie !== dojoSession.get()) {
+    await dojoSession.set(config.classdojoCookie)
+    console.log('classdojo: seeded session from CLASSDOJO_COOKIE')
+  }
 
   let sources: WatchedSource[] = await loadWatchlist(config)
   console.log(`watching ${sources.length} source(s): ${sources.map((s) => s.sourceLabel).join(', ') || 'none'}`)

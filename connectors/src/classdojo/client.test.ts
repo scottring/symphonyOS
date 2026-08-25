@@ -113,10 +113,12 @@ describe('makeClassDojoClient fetchPostsSince', () => {
 })
 
 describe('one-time-code handling', () => {
-  it('raises OtcRequiredError, not a credentials error, when ClassDojo demands a code', async () => {
+  it('raises OtcRequiredError, not a credentials error, when ClassDojo refuses the login', async () => {
     const f = vi.fn(async () => json({ error: { code: 'ERR_MUST_USE_OTC_ANOMALOUS_LOGIN' } }, 401))
+    // The message must point at the actual fix — a fresh session cookie —
+    // not at a password, which is never what is wrong here.
     await expect(makeClassDojoClient({ ...creds, fetchImpl: f as unknown as typeof fetch }).login())
-      .rejects.toThrow(/one-time code/)
+      .rejects.toThrow(/CLASSDOJO_COOKIE/)
   })
 
   it('requests a code from the oneTimeCode endpoint', async () => {

@@ -48,5 +48,6 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
       .filter((n) => Number.isInteger(n) && n >= 0 && n <= 23),
     classdojoEmail: env.CLASSDOJO_EMAIL,
     classdojoPassword: env.CLASSDOJO_PASSWORD,
+    classdojoCookie: env.CLASSDOJO_COOKIE,
   }
 }

@@ -49,8 +49,10 @@ export class SessionStore {
 export class OtcRequiredError extends Error {
   constructor() {
     super(
-      'classdojo requires a one-time code (ERR_MUST_USE_OTC_ANOMALOUS_LOGIN). ' +
-      'Run: fly ssh console --app symphony-connectors -C "node --experimental-strip-types src/classdojo/otcLogin.ts"',
+      'classdojo session expired and it refuses scripted logins from this IP ' +
+      '(ERR_MUST_USE_OTC_ANOMALOUS_LOGIN). Capture a fresh session cookie from a ' +
+      'logged-in browser and run: fly secrets set CLASSDOJO_COOKIE=... — see ' +
+      'connectors/README.md.',
     )
     this.name = 'OtcRequiredError'
   }

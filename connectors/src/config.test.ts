@@ -61,3 +61,13 @@ describe('placeholder guard', () => {
       .toBe('someone@realdomain.com')
   })
 })
+
+describe('classdojo cookie', () => {
+  it('reads a supplied session cookie', () => {
+    expect(loadConfig({ ...full, CLASSDOJO_COOKIE: 'sess=abc' }).classdojoCookie).toBe('sess=abc')
+  })
+
+  it('is undefined when unset, so the password path still applies', () => {
+    expect(loadConfig(full).classdojoCookie).toBeUndefined()
+  })
+})

@@ -63,7 +63,27 @@ over notification delivery from the handset. Do not change it.
 - `fly status` — one machine, always. Two machines would hold two WhatsApp
   sessions and deliver everything twice.
 
-## ClassDojo: the one-time code
+## ClassDojo: the session cookie
+
+ClassDojo refuses scripted password logins from a datacenter IP — it answers
+`ERR_MUST_USE_OTC_ANOMALOUS_LOGIN` and emails a one-time code, and its
+code-completion path is entangled with a password reset and an SSO branch
+that a Google-linked account cannot satisfy. So the connector authenticates
+with a session cookie captured from a logged-in browser.
+
+To capture one:
+
+1. Log into https://home.classdojo.com in Chrome.
+2. DevTools -> Application -> Storage -> Cookies -> `https://home.classdojo.com`.
+3. Copy the value of the session cookie (the `httpOnly` one, typically
+   `dojo_login.sid` or similar — not `OptanonConsent`, not `dojo_log_session_id`).
+4. `fly secrets set CLASSDOJO_COOKIE='<name>=<value>' --app symphony-connectors`
+
+The worker writes it to `/data` on boot, so it survives restarts and deploys.
+When it eventually expires, `connector_health.last_error` reads "classdojo
+session expired..." and you repeat the four steps.
+
+## ClassDojo: the one-time code (does not currently work)
 
 ClassDojo treats a login from a datacenter IP as anomalous and emails a
 one-time code, so the connector cannot log in with a password alone. Do this

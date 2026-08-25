@@ -40,4 +40,8 @@ export interface Config {
    * WhatsApp alone if ClassDojo is unconfigured. */
   classdojoEmail?: string
   classdojoPassword?: string
+  /** A ClassDojo session cookie captured from a logged-in browser.
+   * ClassDojo refuses scripted password logins from a datacenter IP, so
+   * this is the working path. Seeds the persisted session on first boot. */
+  classdojoCookie?: string
 }
