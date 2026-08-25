@@ -7,8 +7,14 @@ import { dirname } from 'node:path'
  * The two together make delivery at-least-once and extraction exactly-once. */
 export class HighWaterStore {
   private marks = new Map<string, Date>()
+  private readonly filePath: string
 
-  constructor(private readonly filePath: string) {}
+  // Written out longhand rather than as a TS parameter property: Node's
+  // --experimental-strip-types cannot compile `constructor(private x: T)`,
+  // and tsc will not warn you, so it fails only at runtime on the server.
+  constructor(filePath: string) {
+    this.filePath = filePath
+  }
 
   async load(): Promise<void> {
     try {
