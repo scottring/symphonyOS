@@ -124,7 +124,8 @@ describe('one-time-code handling', () => {
     await makeClassDojoClient({ ...creds, fetchImpl: f as unknown as typeof fetch }).requestCode()
     const [url, init] = f.mock.calls[0] as unknown as [string, RequestInit]
     expect(url).toBe('https://home.classdojo.com/api/oneTimeCode')
-    expect(JSON.parse(init.body as string)).toEqual({ login: 'a@b.com', password: 'pw' })
+    // email ONLY — this endpoint does not take the login/password pair.
+    expect(JSON.parse(init.body as string)).toEqual({ email: 'a@b.com' })
   })
 
   it('sends the code alongside the credentials to complete the login', async () => {

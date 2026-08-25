@@ -66,12 +66,16 @@ export function makeClassDojoClient({
     }
   }
 
-  /** Ask ClassDojo to email a one-time code for this account. */
+  /** Ask ClassDojo to email a one-time code for this account.
+   *
+   * This endpoint takes `email` only — NOT the `login`/`password` pair that
+   * /api/session takes. Confirmed against the live schema validator, which
+   * answers an empty body with "Missing required property: `email`". */
   async function requestCode(): Promise<void> {
     const res = await fetchImpl(`${BASE}/api/oneTimeCode`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ login: email, password }),
+      body: JSON.stringify({ email }),
     })
     if (!res.ok) {
       throw new Error(`classdojo code request failed: ${res.status} (${await errorCode(res)})`)
