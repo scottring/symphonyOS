@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { Routine, RecurrencePattern } from '@/types/actionable'
-import { matchesRecurrenceForDate, getRoutinesForDatePure, isEverydayRoutine, weekdayKeyForDate, scheduleRoutineOnDate } from './routineUtils'
+import { matchesRecurrenceForDate, getRoutinesForDatePure, isEverydayRoutine, weekdayKeyForDate, scheduleRoutineOnDate, effectiveTimeOfDay } from './routineUtils'
 
 function makeRoutine(pattern: RecurrencePattern, overrides: Partial<Routine> = {}): Routine {
   return {
@@ -173,5 +173,38 @@ describe('scheduleRoutineOnDate', () => {
       recurrence_pattern: { type: 'weekly', days: ['wed'], day_of_month: 5, interval: 2 },
       time_of_day: '14:30',
     })
+  })
+})
+
+describe('effectiveTimeOfDay — a Step happens when its collection happens', () => {
+  it('inherits the parent collection time when the step has none', () => {
+    // The real shape that broke the wall: "Camp Mornings" carries 07:00 and is
+    // visibility:'reference'; its five Steps are active with time_of_day null.
+    const parent = makeRoutine({ type: 'daily' }, { id: 'p', name: 'Camp Mornings', time_of_day: '07:00:00' })
+    const step = makeRoutine({ type: 'daily' }, { id: 's', name: 'Eat breakfast', time_of_day: null, parent_routine_id: 'p' })
+    expect(effectiveTimeOfDay(step, new Map([['p', parent]]))).toBe('07:00:00')
+  })
+
+  it('keeps a step its own time when it has one', () => {
+    const parent = makeRoutine({ type: 'daily' }, { id: 'p', time_of_day: '07:00:00' })
+    const step = makeRoutine({ type: 'daily' }, { id: 's', time_of_day: '06:03:00', parent_routine_id: 'p' })
+    expect(effectiveTimeOfDay(step, new Map([['p', parent]]))).toBe('06:03:00')
+  })
+
+  it('stays null when neither the step nor its collection has a time', () => {
+    const parent = makeRoutine({ type: 'daily' }, { id: 'p', name: 'School AM Routine', time_of_day: null })
+    const step = makeRoutine({ type: 'daily' }, { id: 's', time_of_day: null, parent_routine_id: 'p' })
+    expect(effectiveTimeOfDay(step, new Map([['p', parent]]))).toBeNull()
+  })
+
+  it('stays null for a parentless routine, and when the parent is not loaded', () => {
+    const orphan = makeRoutine({ type: 'daily' }, { id: 's', time_of_day: null, parent_routine_id: 'missing' })
+    expect(effectiveTimeOfDay(makeRoutine({ type: 'daily' }, { time_of_day: null }), new Map())).toBeNull()
+    expect(effectiveTimeOfDay(orphan, new Map())).toBeNull()
+  })
+
+  it('does not loop forever on a routine that is its own parent', () => {
+    const self = makeRoutine({ type: 'daily' }, { id: 'x', time_of_day: null, parent_routine_id: 'x' })
+    expect(effectiveTimeOfDay(self, new Map([['x', self]]))).toBeNull()
   })
 })

@@ -51,6 +51,30 @@ export function isEverydayRoutine(rp?: RecurrencePattern | null): boolean {
 }
 
 /**
+ * When a routine actually happens, following a Step up to its collection.
+ *
+ * A routine collection carries the hour; its Steps carry the order. "Camp
+ * Mornings" is 07:00 and `visibility: 'reference'`, and its five Steps —
+ * "Wake, brush teeth, get dressed", "Eat breakfast", "Read", "Out the door",
+ * "Camp dropoff" — are active with `time_of_day: null`. Read a Step on its own
+ * and it looks like a habit with no hour, so every surface that asks "is this
+ * still ahead?" has to answer yes forever. On the kitchen wall that put the
+ * whole camp-morning checklist on the board at 7:33pm.
+ *
+ * One level only: a Step's parent is a collection, and a collection has no
+ * parent. Walking further would just be a place for a cycle to hide.
+ */
+export function effectiveTimeOfDay(
+  routine: Pick<Routine, 'id' | 'time_of_day' | 'parent_routine_id'>,
+  byId: Map<string, Pick<Routine, 'id' | 'time_of_day'>>,
+): string | null {
+  if (routine.time_of_day) return routine.time_of_day
+  const parentId = routine.parent_routine_id
+  if (!parentId || parentId === routine.id) return null
+  return byId.get(parentId)?.time_of_day ?? null
+}
+
+/**
  * Format a date as YYYY-MM-DD in local timezone.
  */
 function formatDateString(date: Date): string {

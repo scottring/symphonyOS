@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useGoogleCalendar } from '@/hooks/useGoogleCalendar'
 import { useAuth } from '@/hooks/useAuth'
-import { getRoutinesForDatePure, type LastCompletionMap } from '@/lib/routineUtils'
+import { getRoutinesForDatePure, effectiveTimeOfDay, type LastCompletionMap } from '@/lib/routineUtils'
 import {
   taskToTimelineItem,
   eventToTimelineItem,
@@ -148,11 +148,14 @@ export function useWallData(): UseWallDataReturn {
           .lte('scheduled_for', endDate.toISOString())
           .eq('context', 'family'),
 
-        // 3. Active routines
+        // 3. Routines. Deliberately NOT filtered to visibility 'active' in
+        // SQL: a routine collection is 'reference' (it never renders itself)
+        // but it carries the hour its Steps happen at, and without the parent
+        // row every Step looks untimed. Filtered to active below, after the
+        // parent times have been read off. 17 extra rows on this household.
         supabase
           .from('routines')
-          .select('*')
-          .eq('visibility', 'active'),
+          .select('*'),
 
         // 4. Actionable instances for date range
         supabase
@@ -255,7 +258,15 @@ export function useWallData(): UseWallDataReturn {
         locationPlaceId: t.location_place_id ?? undefined,
       }))
 
-      const routines = ((routinesRes.data || []) as Routine[]).filter(r => r.context === 'family')
+      // Every routine row, keyed by id — the lookup a Step uses to find the
+      // hour on its collection. Built before any filtering, because a parent
+      // is typically 'reference' and may carry a different context than its
+      // Steps ("After camp routine" is context null, its Steps are family).
+      const allRoutines = (routinesRes.data || []) as Routine[]
+      const routinesById = new Map(allRoutines.map(r => [r.id, r]))
+      const routines = allRoutines
+        .filter(r => r.visibility === 'active' && r.context === 'family')
+        .map(r => ({ ...r, time_of_day: effectiveTimeOfDay(r, routinesById) }))
       const instances = (instancesRes.data || []) as ActionableInstance[]
       const events = (calendarEvents || []) as CalendarEvent[]
       const contacts = (contactsRes.data || []) as { id: string; name: string; birthday: string }[]

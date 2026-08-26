@@ -5,6 +5,9 @@ import {
 import type { WallDayData } from '@/hooks/useWallData'
 import type { TimelineItem } from '@/types/timeline'
 import type { FamilyMember } from '@/types/family'
+import type { Routine } from '@/types/actionable'
+import { routineToTimelineItem } from '@/types/timeline'
+import { effectiveTimeOfDay } from '@/lib/routineUtils'
 
 const at = (h: number, m = 0) => new Date(2026, 7, 23, h, m)
 const mins = (h: number, m = 0) => h * 60 + m
@@ -319,10 +322,65 @@ describe('an everyday routine is words, not a bar', () => {
     expect(last(board).anytime).toContain('Wash bookbags')
   })
 
+  it('drops an everyday routine that carries no time at all', () => {
+    // The 7:33pm wall read "Eat breakfast · Read · Out the door · Camp
+    // dropoff" on the Everyone row. Those are Steps of a 7am collection whose
+    // own time_of_day is null, so the looks-forward rule below could never
+    // reach them: an untimed item sorts at MAX_SAFE_INTEGER, which is never
+    // "already passed". A daily habit with no hour cannot be still ahead of
+    // you, so it is not a tag.
+    const untimed = item({
+      type: 'routine', title: 'Pack bags', startTime: null,
+      recurrencePattern: { type: 'daily' },
+    } as Partial<TimelineItem>)
+    const board = adaptGanttBoard(members, [day([untimed])], at(19))
+    expect(last(board).anytime).not.toContain('Pack bags')
+  })
+
+  it('keeps an untimed routine that is NOT everyday — on its day it IS the day', () => {
+    // "Do kitchen Laundry", weekly:sat, no time. On a Saturday that is the
+    // day's distinguishing work, not background, and it stands all day.
+    const weekly = item({
+      type: 'routine', title: 'Do kitchen Laundry', startTime: null,
+      recurrencePattern: { type: 'weekly', days: ['sat'] },
+    } as Partial<TimelineItem>)
+    const board = adaptGanttBoard(members, [day([weekly])], at(19))
+    expect(last(board).anytime).toContain('Do kitchen Laundry')
+  })
+
   it('does not let an item that will never be drawn stretch the window', () => {
     const real = item({ type: 'event', title: 'Dentist', startTime: at(9), endTime: at(10) })
     const board = adaptGanttBoard(members, [day([routine('Bedtime', 21), real])], at(9))
     expect((board.axis.endMin - board.axis.startMin) / 60).toBe(MIN_SPAN_H)
+  })
+})
+
+describe('a Step of a routine collection, end to end', () => {
+  // The 7:33pm bug, reproduced through the three pieces that carry it:
+  // effectiveTimeOfDay reads the hour off the collection, routineToTimelineItem
+  // turns it into a startTime, and the board's looks-forward rule then works.
+  // Each piece is tested alone; this is the wiring between them, which is
+  // where the bug actually lived.
+  const members = [member('s', 'Scott')]
+  const last = (b: ReturnType<typeof adaptGanttBoard>) => b.tracks[b.tracks.length - 1]
+
+  const collection = { id: 'p', name: 'Camp Mornings', time_of_day: '07:00:00',
+    parent_routine_id: null } as unknown as Routine
+  const step = { id: 's1', name: 'Eat breakfast', time_of_day: null, parent_routine_id: 'p',
+    recurrence_pattern: { type: 'daily' }, context: 'family', assigned_to: null } as unknown as Routine
+
+  const boardAt = (now: Date) => {
+    const byId = new Map([[collection.id, collection]])
+    const resolved = { ...step, time_of_day: effectiveTimeOfDay(step, byId) }
+    return adaptGanttBoard(members, [day([routineToTimelineItem(resolved, at(0))])], now)
+  }
+
+  it('shows before its collection hour', () => {
+    expect(last(boardAt(at(6))).anytime).toContain('Eat breakfast')
+  })
+
+  it('is gone by the evening — the whole point of the fix', () => {
+    expect(last(boardAt(at(19, 33))).anytime).not.toContain('Eat breakfast')
   })
 })
 

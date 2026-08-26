@@ -269,6 +269,19 @@ export function adaptGanttBoard(
         // "+12". Routines look forward; a task keeps its place whether or not
         // its hour has passed, because an unfinished task still stands.
         if (it.type === 'routine' && at < nowMin) continue;
+        // The same rule, for a routine the clause above cannot reach. An
+        // untimed item sorts at MAX_SAFE_INTEGER, which is never "already
+        // passed", so at 7:33pm the Everyone row still read "Eat breakfast ·
+        // Read · Out the door · Camp dropoff". Most of those inherit an hour
+        // from their collection now (effectiveTimeOfDay) and this clause never
+        // sees them; what is left is a daily habit with no hour anywhere, and
+        // a thing that happens every day at no particular time can never be
+        // the thing still ahead of you.
+        //
+        // Deliberately narrow: a routine that is NOT everyday keeps its place.
+        // "Do kitchen Laundry", weekly on Saturday with no time, IS Saturday —
+        // background is what an everyday rhythm is, not what a weekly one is.
+        if (it.type === 'routine' && !it.startTime && isEverydayRoutine(it.recurrencePattern)) continue;
         anytimeItems.push({ title, at });
         continue;
       }
