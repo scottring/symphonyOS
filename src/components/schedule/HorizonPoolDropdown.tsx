@@ -32,9 +32,9 @@ interface HorizonPoolDropdownProps {
   /** Route for the pool's full bench, e.g. '/week'. Renders an open link. */
   benchRoute?: string
   benchLabel?: string
-  /** Optional per-row label — the School pool uses it to say which feed a
-   * candidate came from and which child it is about. */
-  metaFor?: (task: Task) => string | undefined
+  /** Optional per-row detail line — the School pool uses it to say what a
+   * candidate is asking of you, with the full source label as its tooltip. */
+  metaFor?: (task: Task) => { text: string; title?: string } | undefined
 }
 
 export function HorizonPoolDropdown({
@@ -88,7 +88,8 @@ export function HorizonPoolDropdown({
             ) : (
               <ul className="space-y-1.5">
                 {tasks.map((t) => (
-                  <TriageRow key={t.id} task={t} offer={offer} meta={metaFor?.(t)}
+                  <TriageRow key={t.id} task={t} offer={offer}
+                    meta={metaFor?.(t)?.text} metaTitle={metaFor?.(t)?.title}
                     verdict={verdicts.get(t.id)} canDelete={!!onDeleteTask}
                     onVerdict={onVerdict} onComplete={onComplete} />
                 ))}

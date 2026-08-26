@@ -51,7 +51,7 @@ import { ClarityCurtain } from '@/components/clarity/ClarityCurtain'
 import { computeClaritySteps, type ClarityStepId } from '@/lib/clarity/claritySteps'
 import { selectOverdue } from '@/lib/today/taskPools'
 import { selectHorizonPool } from '@/lib/today/horizons'
-import { selectSchoolPool, parseCaptureMeta, formatCaptureMeta } from '@/lib/today/schoolPool'
+import { selectSchoolPool, parseCaptureMeta, formatCaptureDetail } from '@/lib/today/schoolPool'
 import { useSuggestionsEnabled } from '@/lib/assistant/suggestionsPref'
 import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
 import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
@@ -316,9 +316,15 @@ export function TodayView({
   // WhatsApp groups. Same treatment as the week/month pools: a place to look,
   // deliberately outside the review, and never on the day until triaged.
   const schoolPool = useMemo(() => selectSchoolPool(tasks), [tasks])
+  // Relative to the day on screen, not the wall clock — the same rule the
+  // rest of Today follows when it says "Today".
   const schoolMetaFor = useCallback(
-    (t: Task) => formatCaptureMeta(parseCaptureMeta(t.notes)),
-    [],
+    (t: Task) => {
+      const meta = parseCaptureMeta(t.notes)
+      const text = formatCaptureDetail(meta, viewedDate)
+      return text ? { text, title: meta.source } : undefined
+    },
+    [viewedDate],
   )
 
   // ── Up Next: the single next commitment, highlighted in place. It used to

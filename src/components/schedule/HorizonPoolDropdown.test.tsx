@@ -101,14 +101,33 @@ describe('HorizonPoolDropdown — the pools live up here, never in the review', 
     expect(within(freshRow).getByRole('button', { name: 'Today' })).toBeInTheDocument()
   })
 
-  it('labels each row when given metaFor — a pool row can say where it came from', async () => {
+  it('labels each row when given metaFor — a pool row can say what it is asking of you', async () => {
     const { user } = render(<HorizonPoolDropdown {...base} label="School"
       offer={['today', 'tomorrow', 'someday', 'deleted']}
       tasks={[task({ id: 's1', title: 'Bring a white t-shirt', bucket: 'inbox' })]}
-      metaFor={(t) => (t.id === 's1' ? '3-01 Mr. Gorby · Kaleb' : undefined)}
+      metaFor={(t) => (t.id === 's1'
+        ? { text: 'Tomorrow 9a · gym · Kaleb', title: '3-01 Mr. Gorby / Ms. Rozanc' }
+        : undefined)}
     />)
     await user.click(screen.getByRole('button', { name: /School/ }))
-    expect(screen.getByText('3-01 Mr. Gorby · Kaleb')).toBeInTheDocument()
+    expect(screen.getByText('Tomorrow 9a · gym · Kaleb')).toBeInTheDocument()
+  })
+
+  it('keeps a long title and its detail on separate lines, neither truncated', async () => {
+    const title = 'Check Red Take Home Folder for papers and Family Letter about Reveal Math'
+    const detail = 'Today 7:40a · classroom · to school, by Today 7:30a, arrive on time · Kaleb'
+    const { user } = render(<HorizonPoolDropdown {...base} label="School"
+      offer={['today', 'someday', 'deleted']}
+      tasks={[task({ id: 's2', title, bucket: 'inbox' })]}
+      metaFor={() => ({ text: detail, title: '3-02 Ms. Rozanc / Mr. Gorby' })}
+    />)
+    await user.click(screen.getByRole('button', { name: /School/ }))
+    // Both render in full, and the detail is its own element rather than a
+    // span sharing the title's line.
+    const titleEl = screen.getByText(title)
+    const detailEl = screen.getByText(detail)
+    expect(titleEl).not.toContainElement(detailEl)
+    expect(detailEl).toHaveAttribute('title', '3-02 Ms. Rozanc / Mr. Gorby')
   })
 
   it('renders rows unlabelled when metaFor is not given', async () => {

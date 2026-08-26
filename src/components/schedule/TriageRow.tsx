@@ -44,9 +44,16 @@ export function applyTriageVerdict(t: Task, v: Verdict, h: VerdictHandlers): voi
   }
 }
 
-export function TriageRow({ task, meta, offer, verdict, canDelete, onVerdict, onComplete }: {
+export function TriageRow({ task, meta, metaTitle, offer, verdict, canDelete, onVerdict, onComplete }: {
   task: Task
+  /** A second line under the title. The School pool uses it for what a
+   * candidate is asking of you — when, where, the deadline, which child.
+   * Its own line rather than a trailing span: a school title and a school
+   * detail are both long, and sharing one line truncated both. */
   meta?: string
+  /** Tooltip for the meta line — the full source label, which is too long to
+   * earn a place in the line itself. */
+  metaTitle?: string
   offer: Verdict[]
   verdict?: Verdict
   canDelete: boolean
@@ -56,34 +63,50 @@ export function TriageRow({ task, meta, offer, verdict, canDelete, onVerdict, on
   onComplete?: (task: Task) => void
 }) {
   return (
-    <li className="flex items-start gap-2 rounded-xl border border-neutral-100 bg-white px-3 py-2">
-      {onComplete && (
-        <button
-          type="button"
-          onClick={() => onComplete(task)}
-          disabled={!!verdict}
-          aria-label={`Complete "${task.title}"`}
-          className={`mt-0.5 shrink-0 w-4 h-4 rounded-full border-2 inline-flex items-center justify-center transition-colors ${
-            verdict === 'completed'
-              ? 'border-primary-500 bg-primary-500'
-              : verdict
-                ? 'border-neutral-200'
-                : 'border-neutral-300 hover:border-primary-500'
-          }`}
-        >
-          {verdict === 'completed' && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
-        </button>
-      )}
-      <span className={`flex-1 min-w-0 text-sm leading-snug ${verdict ? 'text-neutral-400' : 'text-neutral-700'} ${verdict === 'completed' ? 'line-through' : ''}`}>
-        {task.title}
-        {meta && <span className="ml-2 text-xs text-neutral-400">{meta}</span>}
-      </span>
-      {verdict ? (
-        <span className="shrink-0 inline-flex items-center gap-1 text-xs text-primary-700">
-          <Check className="w-3 h-3" strokeWidth={3} /> {VERDICT_LABEL[verdict]}
+    <li className="rounded-xl border border-neutral-100 bg-white px-3 py-2">
+      {/* Title and verbs stack rather than share a line. Side by side, the
+          fate buttons hold a fixed ~250px and squeezed the title into ~105px
+          of a 411px row — a school candidate ("Check Red Take Home Folder for
+          papers and Family Letter about Reveal Math") wrapped to six lines
+          while most of the row sat empty. Stacked, the title gets the full
+          width and the verbs sit under it, right-aligned. */}
+      <div className="flex items-start gap-2">
+        {onComplete && (
+          <button
+            type="button"
+            onClick={() => onComplete(task)}
+            disabled={!!verdict}
+            aria-label={`Complete "${task.title}"`}
+            className={`mt-0.5 shrink-0 w-4 h-4 rounded-full border-2 inline-flex items-center justify-center transition-colors ${
+              verdict === 'completed'
+                ? 'border-primary-500 bg-primary-500'
+                : verdict
+                  ? 'border-neutral-200'
+                  : 'border-neutral-300 hover:border-primary-500'
+            }`}
+          >
+            {verdict === 'completed' && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
+          </button>
+        )}
+        <span className="flex-1 min-w-0">
+          <span className={`block text-sm leading-snug ${verdict ? 'text-neutral-400' : 'text-neutral-700'} ${verdict === 'completed' ? 'line-through' : ''}`}>
+            {task.title}
+          </span>
+          {meta && (
+            <span title={metaTitle} className="mt-0.5 block text-xs leading-snug text-neutral-400">
+              {meta}
+            </span>
+          )}
         </span>
-      ) : (
-        <span className="shrink-0 flex flex-wrap items-center justify-end gap-1">
+        {verdict && (
+          <span className="shrink-0 inline-flex items-center gap-1 text-xs text-primary-700">
+            <Check className="w-3 h-3" strokeWidth={3} /> {VERDICT_LABEL[verdict]}
+          </span>
+        )}
+      </div>
+
+      {!verdict && (
+        <span className="mt-1.5 flex flex-wrap items-center justify-end gap-1">
           {offer.map((v) => v === 'deleted' ? (
             canDelete && (
               <button key={v} type="button" onClick={() => onVerdict(task, v)} aria-label={`Delete "${task.title}"`}
