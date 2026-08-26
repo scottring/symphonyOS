@@ -1,13 +1,16 @@
 import { useCallback, useRef, useState } from 'react'
 import { supabase, getAuthUser } from '@/lib/supabase'
 import { localYmd } from '@/lib/cadence/config'
-import { planWindowDates, validatePlanItems, type PlanItem } from '@/lib/planParse'
+import { planWindowDates } from '@/lib/planParse'
+import { validatePageResult, type PageResult } from '@/lib/pageParse'
 import type { FamilyMember } from '@/types/family'
 
-export type PlanParseStatus = 'idle' | 'parsing' | 'ready' | 'error'
+export type PageParseStatus = 'idle' | 'parsing' | 'ready' | 'error'
 
 /** Longest side of the uploaded JPEG — plenty for vision, kind to egress. */
 const MAX_DIMENSION = 1600
+
+const EMPTY: PageResult = { items: [], notes: [], unclear: [], windowDates: [], storagePath: null }
 
 async function toJpeg(blob: Blob): Promise<Blob> {
   const bitmap = await createImageBitmap(blob)
@@ -27,24 +30,22 @@ async function toJpeg(blob: Blob): Promise<Blob> {
 }
 
 /**
- * Plan-from-paper: upload the photographed plan page and ask the `parse-plan`
- * edge function to read it into placeable items. No task rows are written here
- * — the review sheet commits only what the user confirms.
+ * Page-from-paper: upload the photographed (or scanned) page and ask the
+ * `parse-page` edge function to read it into placeable items, prose notes,
+ * and unclear lines. No rows are written here — the review sheet commits
+ * only what the user confirms.
  *
  * Retry re-invokes the function with the already-uploaded image (no re-upload).
  */
-export function usePlanFromPaper(members: FamilyMember[]) {
-  const [status, setStatus] = useState<PlanParseStatus>('idle')
-  const [items, setItems] = useState<PlanItem[]>([])
+export function usePageFromPaper(members: FamilyMember[]) {
+  const [status, setStatus] = useState<PageParseStatus>('idle')
+  const [result, setResult] = useState<PageResult>(EMPTY)
   const [error, setError] = useState<string | null>(null)
-  // The window shown to the model — the review sheet must offer the SAME dates.
-  const [windowDates, setWindowDates] = useState<string[]>([])
   const storagePathRef = useRef<string | null>(null)
 
   const invokeParse = useCallback(async (storagePath: string) => {
     const dates = planWindowDates(new Date())
-    setWindowDates(dates)
-    const { data, error: fnErr } = await supabase.functions.invoke('parse-plan', {
+    const { data, error: fnErr } = await supabase.functions.invoke('parse-page', {
       body: {
         storagePath,
         placeStart: dates[0],
@@ -55,7 +56,9 @@ export function usePlanFromPaper(members: FamilyMember[]) {
     })
     if (fnErr) throw new Error(fnErr.message)
     if (data?.error) throw new Error(String(data.error))
-    setItems(validatePlanItems(data, dates, new Set(members.map((m) => m.id))))
+    // `dates` is only the fallback — the response echoes the window it actually
+    // used, and that is what the review sheet must offer.
+    setResult(validatePageResult(data, new Set(members.map((m) => m.id)), dates))
     setStatus('ready')
   }, [members])
 
@@ -66,11 +69,12 @@ export function usePlanFromPaper(members: FamilyMember[]) {
       const { data: { user } } = await getAuthUser()
       if (!user) throw new Error('Not signed in')
 
-      const storagePath = `${user.id}/plan/${crypto.randomUUID()}.jpg`
-      const jpeg = await toJpeg(blob)
+      const ext = blob.type === 'application/pdf' ? 'pdf' : 'jpg'
+      const storagePath = `${user.id}/page/${crypto.randomUUID()}.${ext}`
+      const upload = blob.type === 'application/pdf' ? blob : await toJpeg(blob)
       const { error: uploadErr } = await supabase.storage
         .from('attachments')
-        .upload(storagePath, jpeg, { contentType: 'image/jpeg', upsert: true })
+        .upload(storagePath, upload, { contentType: blob.type === 'application/pdf' ? 'application/pdf' : 'image/jpeg', upsert: true })
       if (uploadErr) throw new Error(uploadErr.message)
 
       storagePathRef.current = storagePath
@@ -96,11 +100,10 @@ export function usePlanFromPaper(members: FamilyMember[]) {
 
   const reset = useCallback(() => {
     setStatus('idle')
-    setItems([])
+    setResult(EMPTY)
     setError(null)
-    setWindowDates([])
     storagePathRef.current = null
   }, [])
 
-  return { status, items, error, windowDates, parseFromBlob, retry, reset }
+  return { status, result, error, parseFromBlob, retry, reset }
 }

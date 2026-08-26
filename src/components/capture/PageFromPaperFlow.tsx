@@ -1,25 +1,24 @@
 import { useCallback, useRef, useState } from 'react'
 import { Loader2, RotateCcw, X } from 'lucide-react'
 import { CameraCaptureModal } from '@/components/capture/CameraCaptureModal'
-import { PlanReviewSheet } from '@/components/capture/PlanReviewSheet'
-import { usePlanFromPaper } from '@/hooks/usePlanFromPaper'
-import type { PlanItem } from '@/lib/planParse'
+import { PageReviewSheet, type PageReviewPayload } from '@/components/capture/PageReviewSheet'
+import { usePageFromPaper } from '@/hooks/usePageFromPaper'
 import type { FamilyMember } from '@/types/family'
 
-interface PlanFromPaperFlowProps {
+interface PageFromPaperFlowProps {
   members: FamilyMember[]
-  /** Creates the confirmed tasks (one INSERT each). Resolves when all are in. */
-  onCommit: (items: PlanItem[]) => Promise<void>
+  /** Creates the confirmed tasks and notes. Resolves when all are in. */
+  onCommit: (payload: PageReviewPayload, storagePath: string | null) => Promise<void>
   onClose: () => void
 }
 
 /**
- * Plan-from-paper, end to end: camera (or file) → parse → review → commit.
+ * Page-from-paper, end to end: camera (or file) → parse → review → commit.
  * Mounted by HomeViewContainer when the Today overflow item is chosen; every
  * exit path lands on onClose so the mount fully resets between runs.
  */
-export function PlanFromPaperFlow({ members, onCommit, onClose }: PlanFromPaperFlowProps) {
-  const { status, items, error, windowDates, parseFromBlob, retry, reset } = usePlanFromPaper(members)
+export function PageFromPaperFlow({ members, onCommit, onClose }: PageFromPaperFlowProps) {
+  const { status, result, error, parseFromBlob, retry, reset } = usePageFromPaper(members)
   const [camera, setCamera] = useState(true)
   const [committing, setCommitting] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -39,15 +38,15 @@ export function PlanFromPaperFlow({ members, onCommit, onClose }: PlanFromPaperF
     else close()
   }, [handleBlob, close])
 
-  const handleCommit = useCallback(async (confirmed: PlanItem[]) => {
+  const handleCommit = useCallback(async (payload: PageReviewPayload) => {
     setCommitting(true)
     try {
-      await onCommit(confirmed)
+      await onCommit(payload, result.storagePath)
       close()
     } finally {
       setCommitting(false)
     }
-  }, [onCommit, close])
+  }, [onCommit, close, result.storagePath])
 
   return (
     <>
@@ -55,7 +54,7 @@ export function PlanFromPaperFlow({ members, onCommit, onClose }: PlanFromPaperF
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/*"
+        accept="image/*,application/pdf"
         className="hidden"
         onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
       />
@@ -75,7 +74,7 @@ export function PlanFromPaperFlow({ members, onCommit, onClose }: PlanFromPaperF
         <div className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-4">
           <div className="bg-bg-elevated rounded-2xl shadow-2xl px-8 py-6 flex items-center gap-3">
             <Loader2 className="w-5 h-5 animate-spin text-primary-600" />
-            <span className="text-[15px] text-neutral-700">Reading your plan page…</span>
+            <span className="text-[15px] text-neutral-700">Reading your page…</span>
           </div>
         </div>
       )}
@@ -83,7 +82,7 @@ export function PlanFromPaperFlow({ members, onCommit, onClose }: PlanFromPaperF
       {status === 'error' && (
         <div className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-4" onClick={close}>
           <div className="bg-bg-elevated rounded-2xl shadow-2xl px-6 py-5 max-w-md w-full" onClick={(e) => e.stopPropagation()}>
-            <p className="text-[15px] text-neutral-800 mb-1">Couldn&rsquo;t read the plan page</p>
+            <p className="text-[15px] text-neutral-800 mb-1">Couldn&rsquo;t read the page</p>
             <p className="text-[13px] text-neutral-500 mb-4 break-words">{error}</p>
             <div className="flex justify-end gap-2">
               <button type="button" onClick={close} className="px-4 py-2 rounded-lg text-[14px] text-neutral-600 hover:bg-neutral-100 transition-colors">
@@ -98,12 +97,14 @@ export function PlanFromPaperFlow({ members, onCommit, onClose }: PlanFromPaperF
       )}
 
       {status === 'ready' && (
-        <PlanReviewSheet
-          items={items}
-          windowDates={windowDates}
+        <PageReviewSheet
+          items={result.items}
+          notes={result.notes}
+          unclear={result.unclear}
+          windowDates={result.windowDates}
           members={members}
           committing={committing}
-          onCommit={(confirmed) => void handleCommit(confirmed)}
+          onCommit={(payload) => void handleCommit(payload)}
           onClose={close}
         />
       )}

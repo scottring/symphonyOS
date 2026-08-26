@@ -18,9 +18,9 @@ import { showToast } from '@/hooks/useToast';
 import { PlanningSession } from '@/components/lazy';
 import { LoadingFallback } from '@/components/layout/LoadingFallback';
 import { isDraggableRoutine, resolveRoutine, scheduleRoutineOnDate } from '@/lib/routineUtils';
-import { PlanFromPaperFlow } from '@/components/capture/PlanFromPaperFlow';
-import { planItemToAddTaskArgs, type PlanItem } from '@/lib/planParse';
-import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config';
+import { PageFromPaperFlow } from '@/components/capture/PageFromPaperFlow';
+import { useCommitPage } from '@/hooks/useCommitPage';
+import type { PageReviewPayload } from '@/components/capture/PageReviewSheet';
 import { parseRoutineTimelineId } from '@/lib/today/doseExpansion';
 import { groupItems, addToGroup, removeFromGroup, ungroupTasks } from '@/lib/today/groupTasks';
 import { useConvertTaskToProject } from '@/hooks/useConvertTaskToProject';
@@ -83,6 +83,7 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
   const { lists, listsByCategory, addList } = useListsContext();
   const { addNote } = useNotesContext();
   const { currentDomain } = useDomain();
+  const { commitPage } = useCommitPage();
   const undo = useUndo();
   const { aliases, recordOutcome } = useResolutionLearning();
 
@@ -702,24 +703,12 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
     ],
   );
 
-  // Commit the review sheet's confirmed items: ONE addTask INSERT each, with
-  // the placement riding the insert (bucket/weekStart/scheduledFor) — never a
-  // follow-up update. Unassigned lines default to the planner.
-  const handleCommitPlanItems = useCallback(async (items: PlanItem[]) => {
-    const commitCtx = {
-      currentWeekStart: weekStartAnchor(new Date(), readCadenceConfig().weekStartsOn),
-      context: currentDomain === 'universal' ? null : currentDomain,
-    };
-    const defaultAssigneeId = getCurrentUserMember()?.id;
-    for (const item of items) {
-      const args = planItemToAddTaskArgs(item, commitCtx);
-      await addTask(args.title, undefined, undefined, args.scheduledFor, {
-        ...args.options,
-        defaultAssigneeId,
-      });
-    }
-    showToast(`Added ${items.length} task${items.length === 1 ? '' : 's'} from your plan`, 'success', 4000);
-  }, [addTask, currentDomain, getCurrentUserMember]);
+  const handleCommitPage = useCallback(
+    async (payload: PageReviewPayload, storagePath: string | null) => {
+      await commitPage({ ...payload, storagePath });
+    },
+    [commitPage],
+  );
 
   return (
     <ScheduleActionsProvider value={scheduleActionsValue}>
@@ -740,9 +729,9 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
       />
 
       {planFromPaperOpen && (
-        <PlanFromPaperFlow
+        <PageFromPaperFlow
           members={familyMembers}
-          onCommit={handleCommitPlanItems}
+          onCommit={handleCommitPage}
           onClose={() => setPlanFromPaperOpen(false)}
         />
       )}

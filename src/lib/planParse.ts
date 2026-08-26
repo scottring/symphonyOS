@@ -1,8 +1,8 @@
 // src/lib/planParse.ts
 //
-// Plan-from-paper: types + pure mapping between the parse-plan edge function's
-// response and addTask arguments. Kept out of the components so the placement
-// rules (the part that writes data) are unit-testable without a DOM.
+// Plan-from-paper: types + pure mapping between a parsed page's action items
+// and addTask arguments. Kept out of the components so the placement rules
+// (the part that writes data) are unit-testable without a DOM.
 
 import type { TaskBucket, TaskContext } from '@/types/task'
 import { localYmd, parseLocalYmd } from '@/lib/cadence/config'
