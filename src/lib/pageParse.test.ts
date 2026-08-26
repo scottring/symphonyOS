@@ -1,0 +1,56 @@
+import { describe, it, expect } from 'vitest'
+import { validatePageResult } from './pageParse'
+
+const MEMBERS = new Set(['m-iris'])
+const FALLBACK = ['2026-08-25', '2026-08-26']
+
+describe('validatePageResult', () => {
+  it('clamps items against the window the response echoed, not the fallback', () => {
+    const out = validatePageResult(
+      {
+        window: ['2026-09-01', '2026-09-02'],
+        items: [{ title: 'Call dentist', day: '2026-09-02', assignee_id: null, note: null }],
+      },
+      MEMBERS,
+      FALLBACK,
+    )
+    expect(out.windowDates).toEqual(['2026-09-01', '2026-09-02'])
+    expect(out.items[0].placement).toEqual({ kind: 'date', date: '2026-09-02' })
+  })
+
+  it('falls back to the caller window when the response echoes none', () => {
+    const out = validatePageResult(
+      { items: [{ title: 'Call dentist', day: '2026-08-26', assignee_id: null, note: null }] },
+      MEMBERS,
+      FALLBACK,
+    )
+    expect(out.windowDates).toEqual(FALLBACK)
+    expect(out.items[0].placement).toEqual({ kind: 'date', date: '2026-08-26' })
+  })
+
+  it('keeps notes with content and derives a missing title from the first line', () => {
+    const out = validatePageResult(
+      { notes: [{ content: 'Roof quote thinking\nGutters add 1200' }, { title: 'x', content: '   ' }] },
+      MEMBERS,
+      FALLBACK,
+    )
+    expect(out.notes).toEqual([
+      { title: 'Roof quote thinking', content: 'Roof quote thinking\nGutters add 1200' },
+    ])
+  })
+
+  it('trims unclear lines and drops the empty ones', () => {
+    const out = validatePageResult({ unclear: ['  call ??? re: fence  ', '', 42] }, MEMBERS, FALLBACK)
+    expect(out.unclear).toEqual(['call ??? re: fence'])
+  })
+
+  it('carries storagePath through and defaults it to null', () => {
+    expect(validatePageResult({ storagePath: 'u/1.png' }, MEMBERS, FALLBACK).storagePath).toBe('u/1.png')
+    expect(validatePageResult({}, MEMBERS, FALLBACK).storagePath).toBeNull()
+  })
+
+  it('returns an empty result for junk', () => {
+    const out = validatePageResult(null, MEMBERS, FALLBACK)
+    expect(out).toEqual({ items: [], notes: [], unclear: [], windowDates: FALLBACK, storagePath: null })
+  })
+})
