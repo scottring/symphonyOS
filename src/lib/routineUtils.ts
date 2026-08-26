@@ -1,4 +1,6 @@
 import type { Routine, RecurrencePattern } from '@/types/actionable'
+import type { PlanningDomain } from '@/lib/today/domainFilter'
+import type { AssigneeFilter } from '@/lib/today/types'
 
 const WEEKDAYS = ['mon', 'tue', 'wed', 'thu', 'fri'] as const
 
@@ -184,4 +186,99 @@ export function getRoutinesForDatePure(
   return routines.filter(r =>
     matchesRecurrenceForDate(r, date, lastCompletionByRoutine?.get(r.id) ?? null),
   )
+}
+
+/**
+ * Why a routine is or is not on screen. The rung that matched IS the reason,
+ * which is what lets the board (step B) explain a hidden routine in one line
+ * instead of listing everything that might be true of it.
+ */
+export type RoutineHideReason =
+  | 'shows'
+  | 'resting'        // rung 1 — visibility !== 'active'
+  | 'not-today'      // rung 2 — recurrence doesn't match the date
+  | 'off'            // rung 3 — show_on_timeline === false
+  | 'other-domain'   // rung 4 — fails the domain lens
+  | 'not-theirs'     // rung 5 — the selected member isn't an owner
+  | 'in-collection'  // rung 6 — it's a step; the collection renders it
+  | 'everyday'       // rung 7 — swept by "hide daily routines"
+
+export interface RoutinePrefs {
+  /** The "hide daily routines" toggle (rung 7). */
+  hideRoutines: boolean
+  /** The active domain lens (rung 4). 'universal' makes rung 4 a no-op. */
+  domain: PlanningDomain
+}
+
+export interface ResolveRoutineCtx {
+  date: Date
+  /** null/undefined/[] means "everyone" and skips rung 5. */
+  member?: AssigneeFilter
+  prefs: RoutinePrefs
+  /** Required only for 'since_last' recurrence; see matchesRecurrenceForDate. */
+  lastCompletedAt?: Date | null
+}
+
+export interface RoutineResolution {
+  shows: boolean
+  reason: RoutineHideReason
+  owners: string[]
+}
+
+/**
+ * Collapse the three assignment columns into one list. Read-side only — the
+ * columns stay as they are, and this is the single place that knows the order
+ * of preference.
+ */
+export function routineOwners(routine: Routine): string[] {
+  if (routine.assigned_to_all && routine.assigned_to_all.length > 0) {
+    return [...routine.assigned_to_all]
+  }
+  if (routine.assigned_to) return [routine.assigned_to]
+  if (routine.default_assignee) return [routine.default_assignee]
+  return []
+}
+
+/**
+ * A routine that survives the "hide daily routines" sweep. An explicit pin, or
+ * a dosed routine (N times per day) — the latter is a tracked obligation like
+ * PT exercises, not ambient habit noise.
+ */
+export function isPinnedToTimeline(routine: Routine): boolean {
+  return routine.pin_to_timeline === true || (routine.times_per_day?.length ?? 0) > 0
+}
+
+function matchesOwners(owners: string[], selected: AssigneeFilter): boolean {
+  const ids: string[] =
+    selected == null ? [] : Array.isArray(selected) ? selected.filter(Boolean) : [selected as string]
+  if (ids.length === 0) return true // "everyone"
+  return ids.some((id) => (id === 'unassigned' ? owners.length === 0 : owners.includes(id)))
+}
+
+/**
+ * The one rule for "should this routine show?". First match wins; the matching
+ * rung is the reason.
+ *
+ * Rung order runs cheapest-and-most-absolute first, so the reason a user is
+ * shown is the most fundamental one true of that routine — a resting routine
+ * that also doesn't recur today reads better as 'resting' than 'not-today'.
+ *
+ * Deliberately NOT here, because neither is a visibility question:
+ *   - isDraggable  — planning wants untimed routines only (!time_of_day)
+ *   - canHeadline  — the wall's glance-card ranking
+ */
+export function resolveRoutine(routine: Routine, ctx: ResolveRoutineCtx): RoutineResolution {
+  const owners = routineOwners(routine)
+  const hide = (reason: RoutineHideReason): RoutineResolution => ({ shows: false, reason, owners })
+
+  if (routine.visibility !== 'active') return hide('resting')
+  if (!matchesRecurrenceForDate(routine, ctx.date, ctx.lastCompletedAt ?? null)) return hide('not-today')
+  if (routine.show_on_timeline === false) return hide('off')
+  if (ctx.prefs.domain !== 'universal' && routine.context !== ctx.prefs.domain) return hide('other-domain')
+  if (!matchesOwners(owners, ctx.member)) return hide('not-theirs')
+  if (routine.parent_routine_id != null) return hide('in-collection')
+  if (ctx.prefs.hideRoutines && isEverydayRoutine(routine.recurrence_pattern) && !isPinnedToTimeline(routine)) {
+    return hide('everyday')
+  }
+  return { shows: true, reason: 'shows', owners }
 }

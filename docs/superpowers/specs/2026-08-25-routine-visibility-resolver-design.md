@@ -26,7 +26,7 @@ adoption changes what renders, that change is named explicitly (see
 ```ts
 resolveRoutine(
   routine: Routine,
-  ctx: { date: Date; member?: string; prefs: RoutinePrefs },
+  ctx: { date: Date; member?: AssigneeFilter; prefs: RoutinePrefs; lastCompletedAt?: Date | null },
 ): { shows: boolean; reason: RoutineHideReason; owners: string[] }
 ```
 
@@ -42,6 +42,10 @@ interface RoutinePrefs {
 `member` is optional: omit it and rung 5 is skipped, which is what a surface
 showing everyone's routines wants. `prefs.domain === 'universal'` makes rung 4 a
 no-op, matching `filterRoutinesForDomain`'s existing semantics.
+
+`lastCompletedAt` is required only for `since_last` recurrence, which rung 2
+cannot evaluate without it. `member` takes the multi-select `AssigneeFilter`
+the surfaces actually use, including the `'unassigned'` pseudo-id.
 
 Lives in `src/lib/routineUtils.ts`, alongside `matchesRecurrenceForDate` and
 `isEverydayRoutine`, which it calls.
