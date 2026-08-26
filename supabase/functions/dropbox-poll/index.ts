@@ -69,6 +69,18 @@ async function download(accessToken: string, path: string): Promise<Blob> {
   return await res.blob()
 }
 
+/**
+ * A real MIME type, not a guess from the extension: `parse-page` hands the
+ * signed storage URL straight to Anthropic's vision API, which trusts the
+ * stored Content-Type. "image/jpg" is not a registered type.
+ */
+function mimeTypeFor(ext: string): string {
+  if (ext === 'pdf') return 'application/pdf'
+  if (ext === 'jpg' || ext === 'jpeg') return 'image/jpeg'
+  if (ext === 'png') return 'image/png'
+  return `image/${ext}`
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
   if (req.method !== 'POST') return json({ error: 'POST only' }, 405)
@@ -129,12 +141,9 @@ Deno.serve(async (req) => {
       const storagePath = `${userId}/supernote/${crypto.randomUUID()}.${ext}`
       let captureId: string | null = null
       try {
-        const blob = await download(accessToken, entry.path_lower)
-        const { error: upErr } = await service.storage
-          .from('attachments')
-          .upload(storagePath, blob, { contentType: ext === 'pdf' ? 'application/pdf' : `image/${ext}`, upsert: true })
-        if (upErr) throw new Error(`Storage upload failed: ${upErr.message}`)
-
+        // The captures row is created FIRST, before any network I/O that can
+        // fail — every attempted file gets a row a human can see, even if the
+        // download or upload never completes.
         const { data: capture, error: capErr } = await service
           .from('captures')
           .insert({
@@ -148,6 +157,12 @@ Deno.serve(async (req) => {
           .single()
         if (capErr || !capture) throw new Error(`Capture insert failed: ${capErr?.message}`)
         captureId = capture.id
+
+        const blob = await download(accessToken, entry.path_lower)
+        const { error: upErr } = await service.storage
+          .from('attachments')
+          .upload(storagePath, blob, { contentType: mimeTypeFor(ext), upsert: true })
+        if (upErr) throw new Error(`Storage upload failed: ${upErr.message}`)
 
         const parseRes = await fetch(`${url}/functions/v1/parse-page`, {
           method: 'POST',
