@@ -16,6 +16,7 @@ import { SchedulePopover } from '@/components/triage'
 import { ConceptIcon } from '@/lib/conceptIcons'
 import { AssigneeFilter } from '@/components/home/AssigneeFilter'
 import { HomeNeedsDetailsSection } from '@/apps/home/inbox/HomeNeedsDetailsSection'
+import { SupernotePagesSection } from '@/components/capture/SupernotePagesSection'
 import { NotePicker, type NotePickerSelection } from '@/components/notes/NotePicker'
 import { formatInboxBullet } from '@/lib/inboxBullet'
 import { DenseInboxRow, type QuickAction } from './DenseInboxRow'
@@ -609,6 +610,8 @@ export function InboxView({
           )}
         </div>
       </header>
+
+      <SupernotePagesSection />
 
       <HomeNeedsDetailsSection />
 
