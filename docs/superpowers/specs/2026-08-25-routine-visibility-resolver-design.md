@@ -202,6 +202,25 @@ parity-test failure and a bug in the resolver.
    `assigned_to` only, so a routine assigned via `assigned_to_all` is invisible
    there today. `owners` fixes it.
 
+**Every surface, as it adopts rung 5:**
+
+6. **A routine reassigned through a detail panel stops showing for its
+   previous assignee.** `assigned_to_all` now wins outright over a stale
+   `assigned_to`, rather than the two columns being OR-combined the way
+   `makeAssigneeFilter` reads them today. Three of the five routine
+   assignment write paths write `assigned_to_all` alone and leave
+   `assigned_to` pointing at the old owner
+   (`src/components/routine/RhythmPage.tsx:396`,
+   `src/components/detail/DetailPanelRedesign.tsx:2187`,
+   `src/apps/tasks/TaskDetailPanel.tsx:367`) — so a routine reassigned from
+   Scott to Iris through nearly any panel keeps `assigned_to: 'scott'` stale
+   behind `assigned_to_all: ['iris']`, and `makeAssigneeFilter`'s OR-combine
+   kept showing it to Scott anyway. (`RoutineForm.tsx:281` and
+   `useScheduleActions.ts:87` write both columns together and are
+   unaffected.) This lands on every surface as it adopts rung 5; the
+   resolver's behavior is the one being kept — the legacy OR-combine is the
+   bug it replaces.
+
 ### The `show_on_timeline` conflict
 
 `useWallData.ts:299` carries an explicit comment: it skips `show_on_timeline` on
