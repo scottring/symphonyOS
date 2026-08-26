@@ -64,16 +64,17 @@ describe('routineOwners', () => {
 //       columns, so it still matches the old single assignee even after
 //       `assigned_to_all` has moved on. `routineOwners`/`resolveRoutine`
 //       treat a non-empty `assigned_to_all` as authoritative instead. This
-//       is not an edge case: FOUR of the five assignment write paths
+//       is not an edge case: Three of the five assignment write paths
 //       (src/components/routine/RhythmPage.tsx:396,
-//       src/components/routine/RoutineForm.tsx:281,
 //       src/components/detail/DetailPanelRedesign.tsx:2187,
 //       src/apps/tasks/TaskDetailPanel.tsx:367) write `assigned_to_all`
 //       alone and leave `assigned_to` stale behind it, so reassigning a
 //       routine from Scott to Iris through nearly any panel leaves
-//       `assigned_to: 'scott'` pointing at the old owner. The resolver is
-//       right to let the newer, multi-member column win outright — the
-//       legacy OR-combine is the bug this replaces, not a rule to preserve.
+//       `assigned_to: 'scott'` pointing at the old owner.
+//       (`RoutineForm.tsx:279` and `useScheduleActions.ts:87` write both
+//       columns together and are unaffected.) The resolver is right to let
+//       the newer, multi-member column win outright — the legacy
+//       OR-combine is the bug this replaces, not a rule to preserve.
 describe('rung 5 agrees with makeAssigneeFilter', () => {
   const selections = [null, 'scott', 'iris', ['scott', 'iris'], 'unassigned'] as const
   const routines = [
@@ -82,7 +83,7 @@ describe('rung 5 agrees with makeAssigneeFilter', () => {
     createMockRoutine({ assigned_to: 'iris', assigned_to_all: null }),
     createMockRoutine({ assigned_to: 'scott', assigned_to_all: ['scott', 'iris'] }),
     // Divergence (b): assigned_to_all=['iris'] wins outright over the stale
-    // assigned_to='scott' — the exact shape four of five write paths leave
+    // assigned_to='scott' — the exact shape three of five write paths leave
     // behind after a reassignment.
     createMockRoutine({ assigned_to: 'scott', assigned_to_all: ['iris'] }),
   ]
