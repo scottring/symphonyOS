@@ -4,8 +4,8 @@ import userEvent from '@testing-library/user-event'
 import { SupernotePagesSection } from './SupernotePagesSection'
 import type { PendingPage } from '@/hooks/usePendingPages'
 
-const dismiss = vi.fn()
-const commitPage = vi.fn().mockResolvedValue(undefined)
+const dismiss = vi.fn().mockResolvedValue(true)
+const commitPage = vi.fn()
 let pages: PendingPage[] = []
 
 vi.mock('@/hooks/usePendingPages', () => ({
@@ -33,7 +33,9 @@ const PAGE: PendingPage = {
 beforeEach(() => {
   pages = []
   dismiss.mockClear()
-  commitPage.mockClear()
+  dismiss.mockResolvedValue(true)
+  commitPage.mockReset()
+  commitPage.mockResolvedValue({ tasksCreated: 1, notesCreated: 0, failures: 0 })
 })
 
 describe('SupernotePagesSection', () => {
@@ -60,6 +62,19 @@ describe('SupernotePagesSection', () => {
       storagePath: 'u/supernote/a.png',
     })
     expect(dismiss).toHaveBeenCalledWith('c-1')
+  })
+
+  it('keeps the page when the commit reports a failure', async () => {
+    // dismiss HARD DELETES the capture row and a page cannot be re-parsed from
+    // Symphony, so a commit that lost anything must leave the row alone.
+    const user = userEvent.setup()
+    pages = [PAGE]
+    commitPage.mockResolvedValue({ tasksCreated: 0, notesCreated: 0, failures: 1 })
+    render(<SupernotePagesSection />)
+    await user.click(screen.getByRole('button', { name: /review page/i }))
+    await user.click(screen.getByRole('button', { name: /add 1 item/i }))
+    expect(commitPage).toHaveBeenCalled()
+    expect(dismiss).not.toHaveBeenCalled()
   })
 
   it('dismisses a page without committing anything', async () => {

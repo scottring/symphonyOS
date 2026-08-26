@@ -3,12 +3,11 @@ import { Loader2, RotateCcw, X } from 'lucide-react'
 import { CameraCaptureModal } from '@/components/capture/CameraCaptureModal'
 import { PageReviewSheet, type PageReviewPayload } from '@/components/capture/PageReviewSheet'
 import { usePageFromPaper } from '@/hooks/usePageFromPaper'
+import { useCommitPage } from '@/hooks/useCommitPage'
 import type { FamilyMember } from '@/types/family'
 
 interface PageFromPaperFlowProps {
   members: FamilyMember[]
-  /** Creates the confirmed tasks and notes. Resolves when all are in. */
-  onCommit: (payload: PageReviewPayload, storagePath: string | null) => Promise<void>
   onClose: () => void
 }
 
@@ -16,9 +15,17 @@ interface PageFromPaperFlowProps {
  * Page-from-paper, end to end: camera (or file) → parse → review → commit.
  * Mounted by HomeViewContainer when the Today overflow item is chosen; every
  * exit path lands on onClose so the mount fully resets between runs.
+ *
+ * Owns `useCommitPage()` rather than taking a commit callback. That hook drags
+ * in a fresh `useSupabaseTasks` (its own realtime channel plus a full task
+ * refetch), `useNotes`, and `useFamilyMembers` — held by HomeViewContainer it
+ * cost every Today load a duplicate channel and duplicate fetches for a flow
+ * that is open for a few seconds a week. This component mounts only while the
+ * flow is open, so those hooks instantiate only then.
  */
-export function PageFromPaperFlow({ members, onCommit, onClose }: PageFromPaperFlowProps) {
+export function PageFromPaperFlow({ members, onClose }: PageFromPaperFlowProps) {
   const { status, result, error, parseFromBlob, retry, reset } = usePageFromPaper(members)
+  const { commitPage } = useCommitPage()
   const [camera, setCamera] = useState(true)
   const [committing, setCommitting] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -41,12 +48,12 @@ export function PageFromPaperFlow({ members, onCommit, onClose }: PageFromPaperF
   const handleCommit = useCallback(async (payload: PageReviewPayload) => {
     setCommitting(true)
     try {
-      await onCommit(payload, result.storagePath)
+      await commitPage({ ...payload, storagePath: result.storagePath })
       close()
     } finally {
       setCommitting(false)
     }
-  }, [onCommit, close, result.storagePath])
+  }, [commitPage, close, result.storagePath])
 
   return (
     <>

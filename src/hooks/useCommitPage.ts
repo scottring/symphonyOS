@@ -4,6 +4,13 @@
 // note, and one attachments row pinning the page image to whatever came off it.
 // Shared by the manual upload flow and the inbox's pending-page section so the
 // two can never drift.
+//
+// It reports what ACTUALLY landed. Neither writer throws — `addTask` returns
+// undefined and `addNote` returns null on failure (each toasts on its own way
+// out) — so a caller that assumed "resolved means committed" would report
+// success over a page that wrote nothing. The inbox uses the returned
+// `failures` count to decide whether the staged capture row may be deleted:
+// a page deleted after a failed commit is unrecoverable.
 
 import { useCallback } from 'react'
 import { supabase, getAuthUser } from '@/lib/supabase'
@@ -23,13 +30,34 @@ export interface CommitPagePayload {
   storagePath: string | null
 }
 
+export interface CommitPageResult {
+  tasksCreated: number
+  notesCreated: number
+  /** Tasks + notes that did not make it. Non-zero means: do not delete the page. */
+  failures: number
+}
+
+/**
+ * MIME type for a page object from its storage path. Mirrors `mimeTypeFor` in
+ * `supabase/functions/dropbox-poll` — the poller stores `.png` exports with a
+ * real `image/png`, and the attachment row must describe the object that is
+ * actually in the bucket, not a guess.
+ */
+function pageMimeType(storagePath: string): string {
+  const ext = storagePath.toLowerCase().split('.').pop() ?? ''
+  if (ext === 'pdf') return 'application/pdf'
+  if (ext === 'jpg' || ext === 'jpeg') return 'image/jpeg'
+  if (ext === 'png') return 'image/png'
+  return ext ? `image/${ext}` : 'image/jpeg'
+}
+
 export function useCommitPage() {
   const { addTask } = useSupabaseTasks()
   const { addNote } = useNotes()
   const { getCurrentUserMember } = useFamilyMembers()
   const { currentDomain } = useDomain()
 
-  const commitPage = useCallback(async ({ items, notes, storagePath }: CommitPagePayload) => {
+  const commitPage = useCallback(async ({ items, notes, storagePath }: CommitPagePayload): Promise<CommitPageResult> => {
     const context = currentDomain === 'universal' ? null : currentDomain
     const commitCtx = {
       currentWeekStart: weekStartAnchor(new Date(), readCadenceConfig().weekStartsOn),
@@ -40,19 +68,27 @@ export function useCommitPage() {
     // Everything rides the INSERT — a follow-up update can be dropped before
     // the temp→real id swap lands (the addTask-then-setBucket race).
     let firstTaskId: string | undefined
+    let tasksCreated = 0
+    let failures = 0
     for (const item of items) {
       const args = planItemToAddTaskArgs(item, commitCtx)
       const id = await addTask(args.title, undefined, undefined, args.scheduledFor, {
         ...args.options,
         defaultAssigneeId,
       })
-      firstTaskId ??= id
+      if (id) {
+        tasksCreated += 1
+        firstTaskId ??= id
+      } else {
+        failures += 1
+      }
     }
 
     // type 'general', not 'quick_capture': useNotes dual-writes quick captures
     // to the Obsidian vault, and a page already captured into Symphony should
     // not also land there as a second copy.
     let firstNoteId: string | undefined
+    let notesCreated = 0
     for (const note of notes) {
       const created = await addNote({
         title: note.title,
@@ -61,7 +97,12 @@ export function useCommitPage() {
         source: 'import',
         context: context ?? undefined,
       })
-      firstNoteId ??= created?.id
+      if (created) {
+        notesCreated += 1
+        firstNoteId ??= created.id
+      } else {
+        failures += 1
+      }
     }
 
     // The page image is already in the bucket — this only files the row, so it
@@ -70,23 +111,41 @@ export function useCommitPage() {
     if (storagePath && entityId) {
       const { data: { user } } = await getAuthUser()
       if (user) {
-        await supabase.from('attachments').insert({
+        const { error } = await supabase.from('attachments').insert({
           user_id: user.id,
           entity_type: firstNoteId ? 'note' : 'task',
           entity_id: entityId,
           file_name: storagePath.split('/').pop() ?? 'page',
-          file_type: storagePath.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg',
+          file_type: pageMimeType(storagePath),
+          // The bytes were uploaded elsewhere (the poller, or the parse-page
+          // call) and only the path comes back here, so the size genuinely is
+          // not available at insert time. AttachmentList renders "0 Bytes".
           file_size: 0,
           storage_path: storagePath,
         })
+        // Not counted as a commit failure: the tasks and notes are in, and
+        // re-running the page to retry the image would duplicate them.
+        if (error) showToast('Saved, but the page image could not be attached', 'error', 4000)
       }
     }
 
     const parts = [
-      items.length ? `${items.length} task${items.length === 1 ? '' : 's'}` : '',
-      notes.length ? `${notes.length} note${notes.length === 1 ? '' : 's'}` : '',
+      tasksCreated ? `${tasksCreated} task${tasksCreated === 1 ? '' : 's'}` : '',
+      notesCreated ? `${notesCreated} note${notesCreated === 1 ? '' : 's'}` : '',
     ].filter(Boolean)
-    showToast(`Added ${parts.join(' and ')} from your page`, 'success', 4000)
+
+    if (failures > 0) {
+      const added = parts.length ? `Added ${parts.join(' and ')}, but ` : ''
+      showToast(
+        `${added}${failures} item${failures === 1 ? '' : 's'} could not be saved. The page is still in your inbox.`,
+        'error',
+        6000,
+      )
+    } else if (parts.length) {
+      showToast(`Added ${parts.join(' and ')} from your page`, 'success', 4000)
+    }
+
+    return { tasksCreated, notesCreated, failures }
   }, [addTask, addNote, currentDomain, getCurrentUserMember])
 
   return { commitPage }

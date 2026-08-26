@@ -73,7 +73,7 @@ export function SupernotePagesSection() {
 interface SupernotePageReviewProps {
   page: PendingPage
   members: FamilyMember[]
-  dismiss: (captureId: string) => Promise<void>
+  dismiss: (captureId: string) => Promise<boolean>
   onClose: () => void
 }
 
@@ -91,8 +91,13 @@ function SupernotePageReview({ page, members, dismiss, onClose }: SupernotePageR
   const handleCommit = async (payload: PageReviewPayload) => {
     setCommitting(true)
     try {
-      await commitPage({ ...payload, storagePath: page.result.storagePath })
-      await dismiss(page.captureId)
+      const { failures } = await commitPage({ ...payload, storagePath: page.result.storagePath })
+      // Dismiss HARD DELETES the capture row, and a page cannot be re-parsed
+      // from Symphony once it is gone — the only recovery is re-exporting from
+      // the tablet. So a page whose commit lost anything stays put. Retrying it
+      // may duplicate the items that did land, but a duplicate is visible and
+      // deletable where a deleted page is not.
+      if (failures === 0) await dismiss(page.captureId)
       onClose()
     } finally {
       setCommitting(false)

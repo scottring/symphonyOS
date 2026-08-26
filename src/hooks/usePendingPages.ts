@@ -7,6 +7,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { validatePageResult, type PageResult } from '@/lib/pageParse'
+import { useRefreshOnVisible } from '@/hooks/useRefreshOnVisible'
+import { showToast } from '@/hooks/useToast'
 
 export const SUPERNOTE_SOURCE_KEY = 'supernote:export'
 
@@ -61,9 +63,28 @@ export function usePendingPages(memberIds: Set<string>) {
 
   useEffect(() => { void refresh() }, [refresh])
 
-  const dismiss = useCallback(async (captureId: string) => {
-    await supabase.from('captures').delete().eq('id', captureId)
+  // The poller runs every 15 minutes, so a page can arrive while the Inbox is
+  // already open. Same house pattern as Today's calendar events: pick the new
+  // rows up when the tab comes back, not on a timer.
+  useRefreshOnVisible(() => { void refresh() })
+
+  /**
+   * Delete the staged capture row. Returns whether it actually went.
+   *
+   * The optimistic-only version was dangerous: a rejected DELETE (the RLS
+   * policy, an expired JWT) left the row alive in the DB while the UI called
+   * it done, so the next Inbox mount re-surfaced the page and re-reviewing it
+   * wrote a DUPLICATE set of tasks and notes. On failure the row stays put and
+   * the user is told.
+   */
+  const dismiss = useCallback(async (captureId: string): Promise<boolean> => {
+    const { error } = await supabase.from('captures').delete().eq('id', captureId)
+    if (error) {
+      showToast('Could not clear that page — it is still in your inbox', 'error', 5000)
+      return false
+    }
     setPages((prev) => prev.filter((p) => p.captureId !== captureId))
+    return true
   }, [])
 
   return { pages, loading, dismiss, refresh }
