@@ -704,6 +704,7 @@ The richest surface and the only one with a pure, fixtured core. It exercises al
 - Modify: `src/lib/today/routineCollections.ts:132`
 - Modify: `src/components/schedule/TodayView.tsx:289-296` (pass `domain` into the input)
 - Modify: `src/components/home/HomeView.tsx:90-97` and `src/apps/tasks/HomeViewContainer.tsx:262-270` (stop pre-filtering routines by domain)
+- Modify: `src/lib/today/statusMaps.test.ts:34-55` (five calls use the OLD two-argument signature and will not compile after Step 4)
 
 **Interfaces:**
 - Consumes: `resolveRoutine`, `RoutinePrefs`, `VISIBILITY_CORPUS` (Task 1); `TimelineItem.owners` (Task 3).
@@ -908,6 +909,8 @@ npx vitest run src/
 ```
 
 Expected: parity PASS with no change to the recorded ids, no type errors, full suite green.
+
+`src/lib/today/statusMaps.test.ts` will fail to compile until you update it: lines 34, 35, 41, 52 and 55 pass `hideRoutines` as a bare second argument. Rewrite each to pass a full ctx, e.g. `selectVisibleRoutines([daily, weekly, hidden], { date: DATE, prefs: { hideRoutines: false, domain: 'universal' } })`, with `const DATE = new Date(2026, 7, 24)` at the top. The expected id lists must NOT change — if one does, the resolver disagrees with the behavior that test pinned, and that is a finding to report, not an expectation to edit.
 
 If another test fails, read it before touching it. A failing `computeTodayData` or `TodayView` test usually means a fixture is missing the new required `domain` field — add `domain: 'universal'` to it. That is a fixture update, not a behavior change. A failing test that asserts on which routines render IS a behavior change and must be reported, not edited.
 
@@ -1343,10 +1346,11 @@ Last, because it is glanced at rather than clicked through and a bad render is n
 
 **Do not start this task until the audit file records the backfill as applied and re-verified.** Without it, the kids' morning and bedtime routines disappear from the wall.
 
-**Expected behavior changes, all three named in the spec:**
+**Expected behavior changes:**
 1. Collection steps stop rendering as loose rows (rung 6) — the largest visual delta.
 2. `pin_to_timeline` and dosed routines survive "hide daily routines" (rung 7's pin escape, which the wall never had).
 3. `canHeadline` becomes pref-aware: a glance card may headline an everyday routine when hide-daily is off.
+4. **Multi-assigned routines reach every owner's lane and glance card.** Added by the pre-flight scan: Task 3 produces `TimelineItem.owners` and no task in the original plan consumed it. Two places on the wall read the single `assignedTo` and therefore show a routine assigned to `['scott','iris']` in Scott's lane only — `wallLanes.ownersOf` (`:95`) and `adaptMemberGlance` (`:432`). Steps 6b and 6c fix both.
 
 - [ ] **Step 1: Confirm the backfill landed**
 
@@ -1422,10 +1426,15 @@ Replace `src/hooks/useWallData.ts:293-300`. The comment about deliberately skipp
 
 ```ts
         // One rule for routine visibility, shared with Today. The wall used to
-        // skip show_on_timeline on purpose, because the kids' morning and
-        // bedtime routines used that flag as a Today-declutter workaround.
-        // That data was fixed (see the show_on_timeline audit); the flag now
-        // means the same thing everywhere and the wall obeys it.
+        // skip the hide-from-timeline flag on purpose, because the kids'
+        // morning and bedtime routines used it as a Today-declutter
+        // workaround. That data was fixed (see the audit under
+        // docs/superpowers/specs/assets/); the flag now means the same thing
+        // everywhere and the wall obeys it.
+        //
+        // Do not name the column literally in this comment — Task 9's tripwire
+        // matches comments as well as code, deliberately: a comment naming the
+        // flag almost always sits beside logic that reads it.
         //
         // hideRoutines stays false here: the wall's own toggle is applied
         // downstream in wallV2Adapter, per section, not to the day's pool.
@@ -1477,6 +1486,53 @@ function canHeadline(item: TimelineItem, prefs: { hideRoutines: boolean }): bool
 ```
 
 Replace line 436 with `if (!canHeadline(item, { hideRoutines: hideDailyRoutines })) continue;` and thread `hideDailyRoutines` into `adaptMemberGlance`'s signature and its call site.
+
+- [ ] **Step 6b: Multi-assigned routines reach every lane**
+
+`src/components/wall-v2/wallLanes.ts:95` ends `ownersOf` with:
+
+```ts
+  return item.assignedTo ? [item.assignedTo] : [];
+```
+
+so a routine assigned to `['scott', 'iris']` lands in Scott's lane only. Replace it with:
+
+```ts
+  // Routine items carry every owner (routineToTimelineItem -> routineOwners).
+  // assignedTo is the legacy single column and stays the fallback for item
+  // types that do not populate owners yet.
+  if (item.owners && item.owners.length > 0) return [...item.owners];
+  return item.assignedTo ? [item.assignedTo] : [];
+```
+
+- [ ] **Step 6c: Multi-assigned routines reach every glance card**
+
+`src/components/wall-v2/wallV2Adapter.ts:432` reads:
+
+```ts
+      if (item.assignedTo !== member.id) continue;
+```
+
+Replace it with:
+
+```ts
+      const itemOwners = item.owners?.length ? item.owners : item.assignedTo ? [item.assignedTo] : [];
+      if (!itemOwners.includes(member.id)) continue;
+```
+
+Add this to `src/components/wall-v2/wallParity.test.ts`:
+
+```ts
+import { routineToTimelineItem } from '@/types/timeline'
+import { createMockRoutine } from '@/test/mocks/factories'
+
+describe('a multi-assigned routine reaches every owner', () => {
+  it('carries both owners onto the timeline item', () => {
+    const r = createMockRoutine({ assigned_to: 'scott', assigned_to_all: ['scott', 'iris'] })
+    expect(routineToTimelineItem(r, CORPUS_DATE).owners).toEqual(['scott', 'iris'])
+  })
+})
+```
 
 - [ ] **Step 7: Run everything**
 
@@ -1546,6 +1602,10 @@ Create `src/lib/routineVisibilityCoverage.test.ts`, modelled on `src/lib/scopeDe
 //   - a check written through a variable (`const flag = r.show_on_timeline`)
 //   - a check inside a .test.ts file (excluded on purpose — tests may assert
 //     on raw columns, and the parity tests must)
+//
+// It DOES match comments as well as code. Deliberate, not a bug: a comment
+// naming one of these flags almost always sits beside logic that reads it,
+// and the false positives are cheap to reword.
 //   - a check in supabase/functions or connectors, which do not render
 import { describe, it, expect } from 'vitest'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
@@ -1569,6 +1629,7 @@ const PRIMITIVES = [
 const ALLOWED = new Map<string, string>([
   ['lib/routineUtils.ts', 'the resolver itself — the one place the rule lives'],
   ['lib/routineVisibility.fixtures.ts', 'the conformance corpus builds raw routines'],
+  ['test/mocks/factories.ts', 'createMockRoutine sets the raw column defaults every fixture starts from'],
   ['types/actionable.ts', 'the column declarations'],
   ['hooks/useRoutines.ts', 'the WRITE path: create/update and the paused_until auto-resume'],
   ['components/routine/RoutineForm.tsx', 'the editor UI that toggles the flags'],
