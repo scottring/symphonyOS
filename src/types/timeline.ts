@@ -1,6 +1,7 @@
 import type { Task, TaskLink, TaskCategory } from './task'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine, RecurrencePattern } from './actionable'
+import { routineOwners } from '@/lib/routineUtils'
 export type TimelineItemType = 'task' | 'event' | 'routine' | 'routine-collection'
 
 /** One dose of a collection step (an exercise done N times/day). `id` is the slotted timeline id used for completion. */
@@ -44,6 +45,10 @@ export interface TimelineItem {
   projectId?: string // Linked project
   parentTaskId?: string // Parent task ID for subtasks
   assignedTo?: string | null // Family member assignment
+  /** Routine items only: every member who owns this, collapsed from the three
+   *  assignment columns by routineOwners(). `assignedTo` stays for callers that
+   *  have not migrated. */
+  owners?: string[]
   context?: 'work' | 'family' | 'personal' | null // Life domain for filtering
   category?: TaskCategory // Type of task: task, chore, errand, event, activity
   // Subtask support
@@ -165,6 +170,7 @@ export function routineToTimelineItem(routine: Routine, date: Date): TimelineIte
     context: routine.context,
     recurrencePattern: routine.recurrence_pattern,
     assignedTo: routine.assigned_to,
+    owners: routineOwners(routine),
     originalRoutine: routine,
   }
 }
