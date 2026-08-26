@@ -483,7 +483,7 @@ In `docs/superpowers/specs/2026-08-25-routine-visibility-resolver-design.md`, in
 > cannot evaluate without it. `member` takes the multi-select `AssigneeFilter`
 > the surfaces actually use, including the `'unassigned'` pseudo-id.
 
-- [ ] **Step 6: Commit and push**
+- [ ] **Step 6: Commit**
 
 ```bash
 git add src/lib/routineUtils.ts src/lib/routineVisibility.fixtures.ts \
@@ -497,7 +497,10 @@ it. Nothing calls it yet; this changes no behavior.
 Rung 5 is pinned against makeAssigneeFilter so adopting it cannot
 reshuffle who sees what — the default_assignee fallback is the only
 intended difference."
-git push origin HEAD:main
+# Do NOT push. The controller pushes after this task's review passes —
+# pushing to main auto-deploys to production, and unreviewed code must
+# never reach it. Centralising the push also keeps the rebase/retry race
+# with sibling sessions in one place.
 ```
 
 ---
@@ -578,7 +581,7 @@ where id in ( /* the category (ii) ids, one per line, each with a -- name commen
 
 Re-run the first audit query. The category (ii) ids must no longer appear. Record the confirmation in the file.
 
-- [ ] **Step 5: Commit and push**
+- [ ] **Step 5: Commit**
 
 ```bash
 git add docs/superpowers/specs/assets/2026-08-26-show-on-timeline-audit.md
@@ -587,7 +590,10 @@ git commit -m "docs(routines): show_on_timeline audit — findings and backfill
 Which routines were using the flag as a Today-declutter workaround,
 and the statement that moves them onto the assignee filter instead.
 Gates the wall's adoption of rung 3 (Task 8)."
-git push origin HEAD:main
+# Do NOT push. The controller pushes after this task's review passes —
+# pushing to main auto-deploys to production, and unreviewed code must
+# never reach it. Centralising the push also keeps the rebase/retry race
+# with sibling sessions in one place.
 ```
 
 ---
@@ -676,7 +682,7 @@ npx vitest run src/
 
 Expected: PASS, no type errors, and the full suite still green — this is an additive field, so nothing else should move.
 
-- [ ] **Step 5: Commit and push**
+- [ ] **Step 5: Commit**
 
 ```bash
 git add src/types/timeline.ts src/types/timeline.routineOwners.test.ts
@@ -685,7 +691,10 @@ git commit -m "feat(routines): TimelineItem carries owners
 routineToTimelineItem dropped assigned_to_all entirely, which is why a
 multi-assigned routine behaved differently on each surface. Additive:
 assignedTo stays for unmigrated callers."
-git push origin HEAD:main
+# Do NOT push. The controller pushes after this task's review passes —
+# pushing to main auto-deploys to production, and unreviewed code must
+# never reach it. Centralising the push also keeps the rebase/retry race
+# with sibling sessions in one place.
 ```
 
 ---
@@ -924,7 +933,7 @@ npm run dev
 
 Confirm, signed in as Scott: routines appear on Today; the "Hide daily" toggle still hides everyday routines and still keeps pinned ones; switching the domain lens (Work / Family / Personal / Universal) still narrows routines; the assignee filter still narrows them. Compare against the deployed app at app.symphony-os.com side by side.
 
-- [ ] **Step 9: Commit and push**
+- [ ] **Step 9: Commit**
 
 ```bash
 git add -A
@@ -935,7 +944,10 @@ HomeView, statusMaps, grouping and routineCollections. It is now one
 call at the computeTodayData entry point.
 
 Parity test unchanged and green: no routine changes visibility."
-git push origin HEAD:main
+# Do NOT push. The controller pushes after this task's review passes —
+# pushing to main auto-deploys to production, and unreviewed code must
+# never reach it. Centralising the push also keeps the rebase/retry race
+# with sibling sessions in one place.
 ```
 
 ---
@@ -1066,7 +1078,7 @@ Expected: all green.
 
 `npm run dev`, then open the Week and Month views. Confirm: collection steps no longer appear as loose blocks; the assignee filter now narrows routines on the week grid; pinned routines survive the hide-daily toggle; a Mon-Fri routine still does not render on Saturday.
 
-- [ ] **Step 7: Commit and push**
+- [ ] **Step 7: Commit**
 
 ```bash
 git add -A
@@ -1077,7 +1089,10 @@ Two intended behavior changes, both from rungs these views never applied:
  - the assignee filter now narrows routines on the week grid (rung 5)
 
 Nothing else moves; weekParity asserts the shape of the diff."
-git push origin HEAD:main
+# Do NOT push. The controller pushes after this task's review passes —
+# pushing to main auto-deploys to production, and unreviewed code must
+# never reach it. Centralising the push also keeps the rebase/retry race
+# with sibling sessions in one place.
 ```
 
 ---
@@ -1212,7 +1227,7 @@ Expected: all green.
 
 `npm run dev`, open a planning session. Confirm routines still appear on the day columns, collection steps no longer appear as loose rows, timed routines are still not draggable, and the hide-daily toggle still works.
 
-- [ ] **Step 9: Commit and push**
+- [ ] **Step 9: Commit**
 
 ```bash
 git add -A
@@ -1224,7 +1239,10 @@ deliberately outside the ladder: draggable is not a visibility question.
 
 A routine deferred INTO a day now passes the same ladder, so a resting
 routine can no longer arrive by the back door."
-git push origin HEAD:main
+# Do NOT push. The controller pushes after this task's review passes —
+# pushing to main auto-deploys to production, and unreviewed code must
+# never reach it. Centralising the push also keeps the rebase/retry race
+# with sibling sessions in one place.
 ```
 
 ---
@@ -1317,7 +1335,7 @@ npx vitest run src/
 
 `npm run dev`, open the river view. Confirm timed routines still appear at the right times and a routine assigned to several people now shows for each of them.
 
-- [ ] **Step 6: Commit and push**
+- [ ] **Step 6: Commit**
 
 ```bash
 git add -A
@@ -1326,7 +1344,10 @@ git commit -m "fix(river): multi-assigned routines were invisible
 CascadingRiverView read assigned_to only, so a routine assigned through
 assigned_to_all rendered for nobody. Adopting resolveRoutine fixes it
 via owners."
-git push origin HEAD:main
+# Do NOT push. The controller pushes after this task's review passes —
+# pushing to main auto-deploys to production, and unreviewed code must
+# never reach it. Centralising the push also keeps the rebase/retry race
+# with sibling sessions in one place.
 ```
 
 ---
@@ -1550,7 +1571,7 @@ Confirm: the kids' morning and bedtime routines are still on the wall (if they a
 
 Then screenshot the real Pi (see the Pi SSH + `grim` notes) and compare against the pre-change wall before pushing.
 
-- [ ] **Step 9: Commit and push**
+- [ ] **Step 9: Commit**
 
 ```bash
 git add -A
@@ -1564,7 +1585,10 @@ Three intended changes:
 
 The wall no longer skips show_on_timeline. The data that made that
 necessary was fixed first — see the show_on_timeline audit."
-git push origin HEAD:main
+# Do NOT push. The controller pushes after this task's review passes —
+# pushing to main auto-deploys to production, and unreviewed code must
+# never reach it. Centralising the push also keeps the rebase/retry race
+# with sibling sessions in one place.
 ```
 
 ---
@@ -1719,7 +1743,7 @@ npx tsc --noEmit -p tsconfig.app.json
 
 Expected: all green.
 
-- [ ] **Step 5: Commit and push**
+- [ ] **Step 5: Commit**
 
 ```bash
 git add -A
@@ -1732,7 +1756,10 @@ next exception is a decision rather than an accretion.
 
 Tend's opt-out is now stated at the source: it shows resting routines on
 purpose, which is the opposite of rung 1."
-git push origin HEAD:main
+# Do NOT push. The controller pushes after this task's review passes —
+# pushing to main auto-deploys to production, and unreviewed code must
+# never reach it. Centralising the push also keeps the rebase/retry race
+# with sibling sessions in one place.
 ```
 
 ---
