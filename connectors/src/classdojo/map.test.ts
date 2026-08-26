@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { toDojoPosts, toConnectorMessages, type FeedItem, type DojoPost } from './map'
+import { toDojoPosts, toConnectorMessages, discoverTargets, type FeedItem, type DojoPost } from './map'
 
 const item = (over: Partial<FeedItem> = {}): FeedItem => ({
   _id: 'p1',
@@ -19,6 +19,7 @@ const post = (over: Partial<DojoPost> = {}): DojoPost => ({
   author: 'Mr. Gorby',
   body: 'Picture day is Friday.',
   targetId: 'class-a',
+  targetLabel: '3-01 - Mr. Gorby',
   ...over,
 })
 
@@ -31,6 +32,7 @@ describe('toDojoPosts', () => {
       author: 'Mr. Gorby',
       body: 'Picture day is Friday. Wear school colors.',
       targetId: 'class-a',
+      targetLabel: '3-01 - Mr. Gorby',
     })
   })
 
@@ -82,5 +84,40 @@ describe('toConnectorMessages', () => {
       post({ id: 'a', createdAt: '2026-08-25T13:00:00Z', body: 'first' }),
     ]
     expect(toConnectorMessages(posts, null).map((m) => m.text)).toEqual(['first', 'second'])
+  })
+})
+
+
+describe('discoverTargets', () => {
+  // The storyFeed is combined across every class AND school a parent belongs
+  // to, and the worker keeps only the targets on the allowlist. Silently
+  // dropping the rest is how the school-wide channel carrying PTO notices
+  // went unread for a week — so what was dropped has to be reportable.
+  it('reports a target that is in the feed but not watched', () => {
+    const found = discoverTargets(
+      [post({ targetId: 'school-x', targetLabel: 'Hampden Elementary' })],
+      ['class-a'],
+    )
+    expect(found).toEqual([{ targetId: 'school-x', label: 'Hampden Elementary', posts: 1 }])
+  })
+
+  it('says nothing about targets already watched', () => {
+    expect(discoverTargets([post({ targetId: 'class-a' })], ['class-a'])).toEqual([])
+  })
+
+  it('counts the posts per unwatched target, so a busy channel stands out', () => {
+    const found = discoverTargets([
+      post({ id: '1', targetId: 'school-x', targetLabel: 'Hampden Elementary' }),
+      post({ id: '2', targetId: 'school-x', targetLabel: 'Hampden Elementary' }),
+      post({ id: '3', targetId: 'art-y', targetLabel: 'Art with Ms. Diaz' }),
+    ], ['class-a'])
+    expect(found).toEqual([
+      { targetId: 'school-x', label: 'Hampden Elementary', posts: 2 },
+      { targetId: 'art-y', label: 'Art with Ms. Diaz', posts: 1 },
+    ])
+  })
+
+  it('falls back to the target id when the feed carries no label', () => {
+    expect(discoverTargets([post({ targetId: 'z', targetLabel: '' })], [])[0]!.label).toBe('z')
   })
 })

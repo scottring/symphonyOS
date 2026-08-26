@@ -45,6 +45,7 @@ function candidateToTaskRow(
     c.giftsExpected ? `Gifts: ${c.giftsExpected}` : '',
     c.cost ? `Cost: ${c.cost}` : '',
     c.forWho ? `For: ${c.forWho}` : '',
+    c.from ? `From: ${c.from}` : '',
     `Source: ${capture.source_label ?? capture.source_key ?? 'capture'} (confidence ${c.confidence.toFixed(2)})`,
     `Proposed time: ${c.startTime ?? 'unknown'}`,
   ].filter(Boolean)
@@ -114,16 +115,21 @@ Deno.serve(async (req: Request) => {
 
     const apiKey = Deno.env.get('ANTHROPIC_API_KEY')!
     const label = capture.source_label ?? capture.source_key ?? 'capture'
-    const merged: { candidates: CandidateItem[]; summary: string[]; gaps: GapFlag[] } = { candidates: [], summary: [], gaps: [] }
+    const merged: { candidates: CandidateItem[]; summary: string[]; announcements: string[]; gaps: GapFlag[] } =
+      { candidates: [], summary: [], announcements: [], gaps: [] }
     for (const chunk of chunks) {
       const r = parseExtractResponse(await callAnthropic(buildExtractPrompt(chunk, label), apiKey))
       merged.candidates.push(...r.candidates)
       if (r.summary) merged.summary.push(r.summary)
+      merged.announcements.push(...r.announcements)
       merged.gaps.push(...r.gaps)
     }
     const result = {
       candidates: merged.candidates,
       summary: chunks.length === 0 ? `Nothing new since ${newestIso ?? 'last run'}.` : (merged.summary.join(' ') || 'No actionable items found.'),
+      // Deduped across chunks: a long thread split in two often repeats the
+      // same standing rule, and the note should say it once.
+      announcements: [...new Set(merged.announcements)],
       gaps: merged.gaps,
     }
 
@@ -132,6 +138,13 @@ Deno.serve(async (req: Request) => {
       const { error } = await supabase.from('tasks').insert(rows)
       if (error) throw new Error(`task insert failed: ${error.message}`)
     }
+
+    // Named, not compressed. These are the things that are not tasks but are
+    // also not noise — the attendance rule, the dismissal procedure. Folding
+    // them into the one-sentence summary is what made them disappear.
+    const announcementText = result.announcements.length
+      ? '\n\nGood to know:\n' + result.announcements.map((a) => `- ${a}`).join('\n')
+      : ''
 
     const gapText = result.gaps.length
       ? '\n\nNeeds another look:\n' + result.gaps.map((g) => `- ${g.note}`).join('\n')
@@ -150,7 +163,7 @@ Deno.serve(async (req: Request) => {
     const { error: noteErr } = await supabase.from('notes').insert({
       user_id: capture.user_id,
       title: `Capture: ${capture.source_label ?? capture.source_key ?? 'note'}`,
-      content: `${result.summary}${gapText}`,
+      content: `${result.summary}${announcementText}${gapText}`,
       context: 'family',
       scope: 'compound',
       source: 'import',
@@ -167,7 +180,7 @@ Deno.serve(async (req: Request) => {
       })
     }
     await supabase.from('captures').update({ status: 'extracted' }).eq('id', capture.id)
-    return json({ ok: true, candidates: result.candidates.length, gaps: result.gaps.length })
+    return json({ ok: true, candidates: result.candidates.length, announcements: result.announcements.length, gaps: result.gaps.length })
   } catch (e) {
     await supabase.from('captures').update({ status: 'failed', error: String(e) }).eq('id', capture.id)
     return json({ error: String(e) }, 500)

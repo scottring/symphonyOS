@@ -58,6 +58,12 @@ describe('parseCaptureMeta', () => {
     expect(parseCaptureMeta(notes).proposedTime).toBe('2026-08-28T09:00:00')
   })
 
+  it('pulls the sender, and does not confuse From with For', () => {
+    const meta = parseCaptureMeta('For: Kaleb\nFrom: Ms. Rozanc')
+    expect(meta.from).toBe('Ms. Rozanc')
+    expect(meta.forWho).toBe('Kaleb')
+  })
+
   it('pulls cost and gifts, which only some candidates carry', () => {
     const meta = parseCaptureMeta('Cost: $5\nGifts: no gifts please')
     expect(meta.cost).toBe('$5')
@@ -137,6 +143,16 @@ describe('formatCaptureDetail', () => {
   it('includes cost and gifts when a candidate carries them', () => {
     expect(formatCaptureDetail({ cost: '$5', gifts: 'no gifts please', forWho: 'Ella' }, REF))
       .toBe('$5 · no gifts please · Ella')
+  })
+
+  it('names the sender last — who is asking changes how a request reads', () => {
+    expect(formatCaptureDetail({ proposedTime: '2026-08-25', forWho: 'Ella', from: 'Ms. Rozanc' }, REF))
+      .toBe('Today · Ella · Ms. Rozanc')
+  })
+
+  it('shows the sender even when no child was named', () => {
+    expect(formatCaptureDetail({ source: 'HEMs Third Graders', from: 'Ariel' }, REF))
+      .toBe('HEMs Third Graders · Ariel')
   })
 
   it('falls back to the source when no child was named — a WhatsApp item', () => {

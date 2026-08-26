@@ -24,6 +24,9 @@ export interface DojoPost {
   author: string
   body: string
   targetId: string
+  /** The class or school this post belongs to, as the feed labels it. Carried
+   * so a target nobody is watching can be reported by name. */
+  targetLabel: string
 }
 
 export function toDojoPosts(items: FeedItem[]): DojoPost[] {
@@ -38,6 +41,7 @@ export function toDojoPosts(items: FeedItem[]): DojoPost[] {
       author: (i.senderName ?? i.headerText ?? 'ClassDojo').trim(),
       body: (i.contents?.body ?? '').trim(),
       targetId: i.targetId,
+      targetLabel: (i.headerSubtext ?? i.headerText ?? '').trim(),
     }))
     .filter((p) => p.body !== '')
 }
@@ -53,4 +57,29 @@ export function toConnectorMessages(posts: DojoPost[], since: Date | null): Conn
     })
     .sort((a, b) => a.at.getTime() - b.at.getTime())
     .map(({ p, at }) => ({ timestamp: at, sender: p.author, text: p.body }))
+}
+
+export interface DiscoveredTarget {
+  targetId: string
+  label: string
+  posts: number
+}
+
+/** Targets present in the feed that nobody has allowlisted.
+ *
+ * The storyFeed is combined across every class AND school a parent belongs to,
+ * and the poll keeps only the posts whose targetId is on the watchlist. That
+ * filter is the privacy boundary and it stays — but dropping the rest in
+ * silence is how the school-wide channel carrying PTO notices went unread.
+ * Reporting what was dropped turns an invisible gap into a visible choice. */
+export function discoverTargets(posts: DojoPost[], watchedTargetIds: string[]): DiscoveredTarget[] {
+  const watched = new Set(watchedTargetIds)
+  const found = new Map<string, DiscoveredTarget>()
+  for (const p of posts) {
+    if (watched.has(p.targetId)) continue
+    const seen = found.get(p.targetId)
+    if (seen) seen.posts += 1
+    else found.set(p.targetId, { targetId: p.targetId, label: p.targetLabel || p.targetId, posts: 1 })
+  }
+  return [...found.values()]
 }

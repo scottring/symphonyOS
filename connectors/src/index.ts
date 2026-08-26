@@ -1,12 +1,12 @@
 import { loadConfig } from './config.ts'
 import { MessageBuffer } from './buffer.ts'
 import { HighWaterStore } from './highWater.ts'
-import { loadWatchlist } from './watchlist.ts'
+import { loadWatchlist, registerDiscovered } from './watchlist.ts'
 import { attachReceiver, makeReceiveOnlySocket } from './whatsapp/adapter.ts'
 import { dueNow, flushAll, localHour } from './scheduler.ts'
 import { recordHealth } from './health.ts'
 import { makeClassDojoClient } from './classdojo/client.ts'
-import { toConnectorMessages } from './classdojo/map.ts'
+import { toConnectorMessages, discoverTargets } from './classdojo/map.ts'
 import { SessionStore, OtcRequiredError } from './classdojo/session.ts'
 import { join } from 'node:path'
 import type { WatchedSource } from './types.ts'
@@ -71,6 +71,17 @@ async function main(): Promise<void> {
             ? null
             : new Date(Math.min(...marks.map((m) => m!.getTime())))
           const posts = await client.fetchPostsSince(oldest)
+
+          // The feed carries every class AND school this parent belongs to.
+          // Anything not on the allowlist is about to be dropped, so name it
+          // first — an unread channel should be a visible choice, not silence.
+          const watchedTargetIds = dojoSources.map((s) => s.sourceKey.replace(/^classdojo:/, ''))
+          const undiscovered = discoverTargets(posts, watchedTargetIds)
+          if (undiscovered.length > 0) {
+            const listed = undiscovered.map((d) => `${d.label} (${d.posts})`).join(', ')
+            console.log(`classdojo: ${undiscovered.length} unwatched channel(s) in the feed: ${listed}`)
+            await registerDiscovered(config, undiscovered)
+          }
 
           for (const source of dojoSources) {
             const targetId = source.sourceKey.replace(/^classdojo:/, '')

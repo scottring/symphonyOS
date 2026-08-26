@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import type { Config, WatchedSource } from './types.ts'
+import type { DiscoveredTarget } from './classdojo/map.ts'
 
 export interface SourceRow {
   connector: string
@@ -49,4 +50,42 @@ export async function loadWatchlist(config: Config, client?: SupabaseLike): Prom
   // read this tick; returning everything would read chats nobody allowlisted.
   if (error || !data) return []
   return toWatchedSources(data)
+}
+
+type UpsertLike = {
+  from: (t: string) => {
+    upsert: (rows: unknown[], opts: unknown) => Promise<{ error: unknown }>
+  }
+}
+
+/** Record ClassDojo channels seen in the feed that nobody allowlisted.
+ *
+ * Written INACTIVE. `loadWatchlist` gates on `is_active`, so this never widens
+ * what the worker reads — it only makes the choice visible, because a channel
+ * dropped in silence is a channel nobody knows to turn on. That is exactly how
+ * the school-wide feed carrying PTO notices went unread while the two
+ * classroom feeds worked perfectly.
+ *
+ * `ignoreDuplicates` matters: the same channel is rediscovered on every poll,
+ * and an upsert that overwrote would flip a row a human had switched on back
+ * to inactive. Failures are reported, never thrown — discovery is a courtesy,
+ * and it must not be able to take a working poll down. */
+export async function registerDiscovered(
+  config: Config,
+  found: DiscoveredTarget[],
+  client?: UpsertLike,
+): Promise<boolean> {
+  if (found.length === 0) return true
+  const db = client ?? (createClient(config.supabaseUrl, config.serviceRoleKey) as unknown as UpsertLike)
+  const { error } = await db.from('capture_sources').upsert(
+    found.map((f) => ({
+      user_id: config.userId,
+      connector: 'classdojo',
+      source_key: `classdojo:${f.targetId}`,
+      source_label: f.label,
+      is_active: false,
+    })),
+    { onConflict: 'user_id,source_key', ignoreDuplicates: true },
+  )
+  return !error
 }

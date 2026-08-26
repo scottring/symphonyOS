@@ -33,7 +33,7 @@ describe('parseExtractResponse', () => {
 
   it('returns an empty result on malformed JSON', () => {
     const r = parseExtractResponse('not json')
-    expect(r).toEqual({ candidates: [], summary: '', gaps: [] })
+    expect(r).toEqual({ candidates: [], summary: '', announcements: [], gaps: [] })
   })
 
   it('drops candidates missing required fields', () => {
@@ -47,5 +47,60 @@ describe('parseExtractResponse', () => {
     const r = parseExtractResponse(raw)
     expect(r.candidates.map((c) => c.title)).toEqual(['ok'])
     expect(r.summary).toBe('s')
+  })
+})
+
+
+describe('announcements — what matters but cannot be done', () => {
+  // A school thread carries three kinds of content: things to do, things you
+  // must KNOW (attendance rules, dismissal procedure, curriculum changes),
+  // and chatter. Only the first should become a task. The second used to be
+  // compressed into the one-sentence noise summary and effectively vanished —
+  // which is how "students arriving after 7:36 a.m. will be marked late" went
+  // unseen. It now comes back named.
+  it('parses announcements out of the response', () => {
+    const out = parseExtractResponse(JSON.stringify({
+      candidates: [],
+      summary: 'Teachers shared classroom videos.',
+      announcements: [
+        'Students arriving after 7:36 a.m. are marked late.',
+        'Third graders meeting siblings dismiss out the front door.',
+      ],
+      gaps: [],
+    }))
+    expect(out.announcements).toEqual([
+      'Students arriving after 7:36 a.m. are marked late.',
+      'Third graders meeting siblings dismiss out the front door.',
+    ])
+  })
+
+  it('defaults to none when the model omits the field', () => {
+    expect(parseExtractResponse(JSON.stringify({ candidates: [], summary: 'x' })).announcements).toEqual([])
+  })
+
+  it('keeps only strings, so a malformed entry cannot reach the note', () => {
+    const out = parseExtractResponse(JSON.stringify({
+      candidates: [], summary: '', announcements: ['real', 42, null, { a: 1 }],
+    }))
+    expect(out.announcements).toEqual(['real'])
+  })
+
+  it('asks for announcements separately from the noise summary', () => {
+    const prompt = buildExtractPrompt('body', 'label')
+    expect(prompt).toMatch(/announcements/)
+  })
+})
+
+describe('who sent it', () => {
+  it('carries the sender through to the candidate', () => {
+    const out = parseExtractResponse(JSON.stringify({
+      candidates: [{ category: 'task', title: 'Bring a pouch', confidence: 0.9, from: 'Ms. Rozanc' }],
+      summary: '', gaps: [],
+    }))
+    expect(out.candidates[0]!.from).toBe('Ms. Rozanc')
+  })
+
+  it('asks the model who posted each item', () => {
+    expect(buildExtractPrompt('body', 'label')).toMatch(/who (posted|sent)/i)
   })
 })

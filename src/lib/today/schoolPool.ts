@@ -28,6 +28,10 @@ export interface CaptureMeta {
   rsvp?: string
   cost?: string
   gifts?: string
+  /** Who posted the message this came from. A school thread has many voices,
+   * and a request from the teacher reads differently from one a parent
+   * relayed in the group. */
+  from?: string
   /** Verbatim, as written: an ISO date, an ISO datetime, or absent. The
    * extractor writes "unknown" when it could not find one; that reads here
    * as no time at all, because printing "unknown" on a row is worse than
@@ -46,7 +50,7 @@ export function parseCaptureMeta(notes: string | undefined): CaptureMeta {
   if (source?.[1]) out.source = source[1].trim()
   for (const [key, label] of [
     ['forWho', 'For'], ['location', 'Location'], ['rsvp', 'RSVP'],
-    ['cost', 'Cost'], ['gifts', 'Gifts'],
+    ['cost', 'Cost'], ['gifts', 'Gifts'], ['from', 'From'],
   ] as const) {
     const m = LINE(label).exec(notes)
     if (m?.[1]) out[key] = m[1].trim()
@@ -100,7 +104,8 @@ function formatWhen(text: string, reference: Date, sameDayAs?: Date): string | u
  * Glance order — when, where, deadline, cost, who. The source label is the
  * longest and least useful segment (the child already implies the classroom),
  * so it appears only when no child was named, which is how WhatsApp items
- * keep their provenance. The full label lives in the row's tooltip. */
+ * keep their provenance. The full label lives in the row's tooltip. The
+ * sender comes last: useful, but never at the cost of the ask itself. */
 export function formatCaptureDetail(meta: CaptureMeta, reference: Date): string | undefined {
   const on = meta.proposedTime ? parseLocal(meta.proposedTime)?.date : undefined
   const when = meta.proposedTime ? formatWhen(meta.proposedTime, reference) : undefined
@@ -110,7 +115,7 @@ export function formatCaptureDetail(meta: CaptureMeta, reference: Date): string 
     new RegExp(ISO.source, 'g'),
     (stamp) => formatWhen(stamp, reference, on) ?? stamp
   ).replace(/\s+,/g, ',').trim()
-  const parts = [when, meta.location, rsvp, meta.cost, meta.gifts, meta.forWho ?? meta.source]
+  const parts = [when, meta.location, rsvp, meta.cost, meta.gifts, meta.forWho ?? meta.source, meta.from]
     .filter((p): p is string => !!p)
   return parts.length > 0 ? parts.join(' · ') : undefined
 }
