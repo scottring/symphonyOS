@@ -1170,12 +1170,30 @@ Replace the two `.filter(...)` chains at `src/components/planning/PlanningSessio
 And at line 479, replace `if (routine && routine.show_on_timeline !== false)` with:
 
 ```tsx
-          if (routine && resolveRoutine(routine, { date, prefs: { hideRoutines, domain: currentDomain } }).shows) {
+          if (
+            routine &&
+            resolveRoutine(routine, {
+              date,
+              prefs: { hideRoutines, domain: currentDomain },
+              deferredInto: deferredIntoIds,
+            }).shows
+          ) {
             deferredIn.push(routine)
           }
 ```
 
-Note the deliberate asymmetry: a routine *deferred into* this day is checked against the same ladder, so a resting or off-timeline routine cannot arrive by the back door. Add `currentDomain` to the dependency array at line 486.
+**`deferredInto` is mandatory here, and omitting it is a bug.** A routine deferred
+onto this day by definition does NOT recur on it, so rung 2 would veto every one
+of them and the whole deferred-in branch would become dead code. This exact
+regression already happened on Today and was caught in review; the resolver now
+takes `deferredInto?: ReadonlySet<string>` as an instance-level override of rung 2
+only. Build `deferredIntoIds` with the shared helper `deferredInRoutineIds` from
+`src/lib/today/deferredRoutines.ts` (created in Task 4) rather than deriving the
+set again here.
+
+Every OTHER rung still applies, which is the point: a routine deferred into this
+day that is resting, off-timeline, or someone else's stays hidden. It cannot
+arrive by the back door — it just is not vetoed for failing to recur. Add `currentDomain` to the dependency array at line 486.
 
 - [ ] **Step 6: Migrate GuidedSessionContainer**
 
