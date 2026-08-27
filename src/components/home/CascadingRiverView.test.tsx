@@ -78,19 +78,22 @@ describe('ownsIt — per-stream membership (unit, real predicate)', () => {
 })
 
 describe('CascadingRiverView — routine visibility (render)', () => {
-  // NOTE ON SCOPE: this suite proves the visibility GATE (resolveRoutine.shows)
-  // via real DOM — a multi-owner routine's card is present, a not-selected
-  // owner's card is absent, alongside a same-code-path positive control. It
-  // does NOT and cannot currently prove PER-STREAM attribution (that the
-  // multi-owner card visually belongs to both Scott's and Iris's streams):
-  // the "Event cards" render is a single flat pass over `timelineEvents`
-  // (one <EventCard> per event, keyed by prefixedId), not a per-stream pass,
-  // so a shared routine renders once, at one fallback position/colour,
-  // regardless of how many streams' `.events` arrays (see `ownsIt` above)
-  // claim it. That data-level per-stream membership is covered by the
-  // `ownsIt` unit tests above instead, since it has no DOM manifestation to
-  // assert on without restructuring that render loop (out of scope here —
-  // see the comments on `getCardX` in CascadingRiverView.tsx).
+  // NOTE ON SCOPE: this suite proves (1) the visibility GATE
+  // (resolveRoutine.shows) — a multi-owner routine's card is present, a
+  // not-selected owner's card is absent, alongside a same-code-path positive
+  // control — and (2) that a multi-owner routine attaches to its FIRST
+  // owner's stream (correct position), not the unattributed fallback. It
+  // does NOT and cannot currently prove attribution to EVERY owner's stream
+  // (that the multi-owner card visually belongs to both Scott's and Iris's
+  // streams at once): the "Event cards" render is a single flat pass over
+  // `timelineEvents` (one <EventCard> per event, keyed by prefixedId), not a
+  // per-stream pass, so a shared routine renders exactly once, under its
+  // first owner only, regardless of how many streams' `.events` arrays (see
+  // `ownsIt` above) claim it. That broader data-level per-stream membership
+  // is covered by the `ownsIt` unit tests above instead, since it has no DOM
+  // manifestation to assert on without restructuring that render loop (out
+  // of scope here — see the comments on `getCardX`/`streamConfigs` in
+  // CascadingRiverView.tsx).
   it('renders a multi-assigned routine (assigned_to_all) alongside a positive control, and excludes a routine owned by nobody selected', () => {
     const multi = createMockRoutine({
       name: 'Multi Owner Routine',
@@ -123,5 +126,54 @@ describe('CascadingRiverView — routine visibility (render)', () => {
     expect(screen.getByText('Scott Solo Routine')).toBeInTheDocument()
     expect(screen.getByText('Multi Owner Routine')).toBeInTheDocument()
     expect(screen.queryByText('Ella Only Routine')).not.toBeInTheDocument()
+  })
+
+  it('attributes a multi-owner routine to its FIRST owner\'s stream (correct position), not the unattributed fallback', () => {
+    // Positive control: a plain single-assignee routine, assigned to 'scott'
+    // via the singular column exactly as before.
+    const control = createMockRoutine({
+      name: 'Solo Control',
+      assigned_to: 'scott',
+      time_of_day: '10:00',
+    })
+    // First owner is 'scott' — should attach to the SAME stream position as
+    // the control above, rather than the unattributed fallback (x = 100,
+    // distinct from any real stream's baseX + 20 — confirmed by direct
+    // inspection during development: attached = translate(60, ...),
+    // fallback = translate(100, ...) under this test's fixed member count).
+    const multi = createMockRoutine({
+      name: 'Multi Owner',
+      assigned_to: null,
+      assigned_to_all: ['scott', 'iris'],
+      time_of_day: '09:00',
+    })
+
+    render(
+      <CascadingRiverView
+        {...BASE_PROPS}
+        routines={[multi, control]}
+      />
+    )
+
+    const getCardTransformX = (title: string): number => {
+      const node = screen.getByText(title)
+      const transform = node.closest('g[transform]')?.getAttribute('transform')
+      const match = transform?.match(/translate\(([-\d.]+),/)
+      if (!match) throw new Error(`no g[transform] ancestor found for "${title}" (got: ${transform})`)
+      return Number(match[1])
+    }
+
+    const controlX = getCardTransformX('Solo Control')
+    const multiX = getCardTransformX('Multi Owner')
+
+    // The control proves 60 (this fixture's attached-to-scott baseX + 20) is
+    // NOT the unattributed fallback (100) — i.e. this comparison is live,
+    // not vacuous.
+    expect(controlX).not.toBe(100)
+    // The real assertion: the multi-owner routine lands at the SAME x as the
+    // control, because both are now attributed to 'scott' (first owner) —
+    // not at the fallback x that an unattributed event renders at.
+    expect(multiX).toBe(controlX)
+    expect(multiX).not.toBe(100)
   })
 })

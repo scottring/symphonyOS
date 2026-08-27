@@ -709,6 +709,7 @@ export function CascadingRiverView({
       routineTime.setHours(hours, minutes, 0, 0)
 
       const instance = routineStatusMap.get(routine.id)
+      const owners = routineOwners(routine)
 
       result.push({
         id: routine.id,
@@ -717,8 +718,16 @@ export function CascadingRiverView({
         startTime: routineTime,
         isAllDay: false,
         type: 'routine',
-        assignedTo: routine.assigned_to,
-        owners: routineOwners(routine),
+        // First-owner degradation for the singular column, matching the
+        // write path (useScheduleActions.ts onAssignRoutineAll writes
+        // assigned_to: memberIds[0] ?? null alongside assigned_to_all) —
+        // a routine owned via assigned_to_all alone attaches to its first
+        // owner's stream (correct colour/position) rather than falling
+        // through to the unattributed fallback. `owners` (below) is the
+        // full list; the render pass that would attach it to EVERY
+        // owner's stream doesn't exist yet — see the note at getCardX.
+        assignedTo: owners[0] ?? null,
+        owners,
         completed: instance?.status === 'completed',
       })
     }
@@ -839,6 +848,16 @@ export function CascadingRiverView({
   }, [familyMembers, selectedAssignees])
 
   // Stream configurations
+  //
+  // NOTE: `events` below is owner-aware (via `ownsIt`) and therefore
+  // data-correct — a multi-owner routine legitimately appears in more than
+  // one member's `events` array here. But `StreamConfig.events` currently
+  // has NO consumer: `generateStreamPath` uses `convergenceZones`, not
+  // `events`, and the "Event cards" render (below) walks the flat
+  // `timelineEvents` array directly, not `streamConfigs[i].events`. So this
+  // multi-membership is correct but presently inert — don't assume it drives
+  // anything on screen. See the note at `getCardX` for what actually decides
+  // a card's stream today (the singular `assignedTo`, first-owner degraded).
   const streamConfigs = useMemo(() => {
     const usableWidth = svgWidth - 120
     const spacing = usableWidth / (selectedMembers.length + 1)
@@ -882,16 +901,22 @@ export function CascadingRiverView({
   }
 
   // Card placement: position cards next to their stream.
-  // KNOWN RESIDUAL: this keys off the legacy singular `assignedTo`, not
-  // `owners` — for a multi-owner routine (assignedTo null, owners: [a, b])
-  // this falls through to the `!config` branch and renders at a fixed
-  // fallback x rather than under either owner's stream. The "Event cards"
-  // render below is a single flat pass over `timelineEvents` (one card per
-  // event, keyed by `event.prefixedId`), not a per-stream pass — attaching
-  // a shared event correctly to each owning stream would mean rendering it
-  // once per owning stream instead, which is a restructure of that render
-  // loop, not a threading of a member id already in scope here. Left
-  // unrestructured on purpose; see CascadingRiverView.test.tsx.
+  // This keys off the singular `assignedTo`, which for a routine is now
+  // first-owner degraded (see the push site above) rather than the raw,
+  // possibly-null `assigned_to` column — so a multi-owner routine attaches
+  // to its FIRST owner's stream, with that owner's correct colour/position,
+  // instead of falling through to the `!config` fallback.
+  //
+  // NARROWED RESIDUAL: a routine owned by two people still renders in the
+  // FIRST owner's stream ONLY, not in both. The "Event cards" render below
+  // is a single flat pass over `timelineEvents` (one card per event, keyed
+  // by `event.prefixedId`), not a per-stream pass — showing it under EVERY
+  // owning stream would mean rendering it once per owning stream instead
+  // (e.g. iterating `streamConfigs[i].events`, which is owner-aware but
+  // currently unread — see the note on `streamConfigs` above), keyed by a
+  // compound id. That is a restructure of this render loop, not a
+  // threading of a member id already in scope here. Left unrestructured on
+  // purpose; see CascadingRiverView.test.tsx.
   const getCardX = (event: TimelineEvent): number => {
     const config = streamConfigs.find(c => c.memberId === event.assignedTo)
     if (!config) return 100
