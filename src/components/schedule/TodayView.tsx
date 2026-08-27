@@ -51,7 +51,8 @@ import { ClarityCurtain } from '@/components/clarity/ClarityCurtain'
 import { computeClaritySteps, type ClarityStepId } from '@/lib/clarity/claritySteps'
 import { selectOverdue } from '@/lib/today/taskPools'
 import { selectHorizonPool } from '@/lib/today/horizons'
-import { selectSchoolPool, parseCaptureMeta, formatCaptureDetail } from '@/lib/today/schoolPool'
+import { selectSchoolPool, parseCaptureMeta, formatCaptureDetail, isNewSince, countNewSince } from '@/lib/today/schoolPool'
+import { readSchoolSeenAt, writeSchoolSeenAt, onSchoolSeenChange } from '@/lib/today/schoolSeen'
 import { useSuggestionsEnabled } from '@/lib/assistant/suggestionsPref'
 import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
 import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
@@ -323,6 +324,25 @@ export function TodayView({
   // WhatsApp groups. Same treatment as the week/month pools: a place to look,
   // deliberately outside the review, and never on the day until triaged.
   const schoolPool = useMemo(() => selectSchoolPool(tasks), [tasks])
+  // When the School pool was last opened. Read into state so a second tab
+  // that clears the dot clears it here too.
+  const [schoolSeenAt, setSchoolSeenAt] = useState<Date | null>(() => readSchoolSeenAt())
+  useEffect(() => onSchoolSeenChange(setSchoolSeenAt), [])
+  const schoolHasNew = useMemo(
+    () => countNewSince(schoolPool, schoolSeenAt) > 0,
+    [schoolPool, schoolSeenAt],
+  )
+  // Marked against the mark as it stood BEFORE this open: the write happens on
+  // close, so the markers survive being looked at instead of vanishing on the
+  // way in.
+  const schoolIsNewFor = useCallback(
+    (t: Task) => isNewSince(t, schoolSeenAt),
+    [schoolSeenAt],
+  )
+  const onSchoolOpenChange = useCallback((open: boolean) => {
+    if (!open) writeSchoolSeenAt(new Date())
+  }, [])
+
   // Relative to the day on screen, not the wall clock — the same rule the
   // rest of Today follows when it says "Today".
   const schoolMetaFor = useCallback(
@@ -901,6 +921,9 @@ export function TodayView({
             onDeleteTask={ctx.onDeleteTask}
             onCompleteTask={onToggleTask}
             metaFor={schoolMetaFor}
+            isNewFor={schoolIsNewFor}
+            hasNew={schoolHasNew}
+            onOpenChange={onSchoolOpenChange}
           />
         )}
 

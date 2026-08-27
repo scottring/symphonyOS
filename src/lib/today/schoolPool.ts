@@ -119,3 +119,19 @@ export function formatCaptureDetail(meta: CaptureMeta, reference: Date): string 
     .filter((p): p is string => !!p)
   return parts.length > 0 ? parts.join(' · ') : undefined
 }
+
+/** Did this candidate arrive since the pool was last opened?
+ *
+ * `seenAt` null means never opened, so everything is new — honest on first
+ * run, and it clears itself the first time the pool is looked at. An item with
+ * no createdAt cannot be judged against a real mark, and is treated as already
+ * seen: a missed dot is a smaller failure than a dot that never clears. */
+export function isNewSince(task: Task, seenAt: Date | null): boolean {
+  if (seenAt === null) return true
+  const at = task.createdAt?.getTime()
+  return at !== undefined && at > seenAt.getTime()
+}
+
+export function countNewSince(tasks: Task[], seenAt: Date | null): number {
+  return tasks.reduce((n, t) => (isNewSince(t, seenAt) ? n + 1 : n), 0)
+}

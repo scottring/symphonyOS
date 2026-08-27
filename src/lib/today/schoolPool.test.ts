@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { selectSchoolPool, parseCaptureMeta, formatCaptureDetail } from './schoolPool'
+import { selectSchoolPool, parseCaptureMeta, formatCaptureDetail, isNewSince, countNewSince } from './schoolPool'
 import type { Task } from '@/types/task'
 
 const t = (p: Partial<Task>): Task => ({ id: 'x', title: 'thing', completed: false, ...p } as Task)
@@ -25,6 +25,36 @@ describe('selectSchoolPool', () => {
 
   it('is empty when nothing has been captured', () => {
     expect(selectSchoolPool([t({ bucket: 'inbox' })])).toEqual([])
+  })
+})
+
+describe('isNewSince / countNewSince', () => {
+  const at = (iso: string) => t({ bucket: 'inbox', captureId: 'c', createdAt: new Date(iso) })
+  const SEEN = new Date('2026-08-26T12:00:00Z')
+
+  it('counts everything as new before the pool has ever been opened', () => {
+    expect(countNewSince([at('2026-08-01T00:00:00Z'), at('2026-08-26T00:00:00Z')], null)).toBe(2)
+  })
+
+  it('counts only what arrived after the last look', () => {
+    expect(countNewSince([
+      at('2026-08-26T11:00:00Z'),  // before
+      at('2026-08-26T13:00:00Z'),  // after
+      at('2026-08-27T09:00:00Z'),  // after
+    ], SEEN)).toBe(2)
+  })
+
+  it('treats an item created exactly at the mark as already seen', () => {
+    expect(isNewSince(at('2026-08-26T12:00:00Z'), SEEN)).toBe(false)
+  })
+
+  it('does not call an item new when it has no creation time to judge by', () => {
+    // Better a missed dot than a dot that never clears.
+    expect(isNewSince(t({ bucket: 'inbox', captureId: 'c' }), SEEN)).toBe(false)
+  })
+
+  it('still counts an undated item as new when nothing has been seen yet', () => {
+    expect(isNewSince(t({ bucket: 'inbox', captureId: 'c' }), null)).toBe(true)
   })
 })
 

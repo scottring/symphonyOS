@@ -44,7 +44,7 @@ export function applyTriageVerdict(t: Task, v: Verdict, h: VerdictHandlers): voi
   }
 }
 
-export function TriageRow({ task, meta, metaTitle, offer, verdict, canDelete, onVerdict, onComplete }: {
+export function TriageRow({ task, meta, metaTitle, isNew, offer, verdict, canDelete, onVerdict, onComplete }: {
   task: Task
   /** A second line under the title. The School pool uses it for what a
    * candidate is asking of you — when, where, the deadline, which child.
@@ -54,6 +54,9 @@ export function TriageRow({ task, meta, metaTitle, offer, verdict, canDelete, on
   /** Tooltip for the meta line — the full source label, which is too long to
    * earn a place in the line itself. */
   metaTitle?: string
+  /** Arrived since this pool was last opened. A dot, not a word: the point is
+   * to find the two new rows among nine, not to add a label to read. */
+  isNew?: boolean
   offer: Verdict[]
   verdict?: Verdict
   canDelete: boolean
@@ -91,6 +94,11 @@ export function TriageRow({ task, meta, metaTitle, offer, verdict, canDelete, on
         <span className="flex-1 min-w-0">
           <span className={`block text-sm leading-snug ${verdict ? 'text-neutral-400' : 'text-neutral-700'} ${verdict === 'completed' ? 'line-through' : ''}`}>
             {task.title}
+            {isNew && !verdict && (
+              <span className="ml-1.5 inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-primary-500 align-middle">
+                <span className="sr-only">New since you last looked</span>
+              </span>
+            )}
           </span>
           {meta && (
             <span title={metaTitle} className="mt-0.5 block text-xs leading-snug text-neutral-400">

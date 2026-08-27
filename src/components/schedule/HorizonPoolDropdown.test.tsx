@@ -138,4 +138,45 @@ describe('HorizonPoolDropdown — the pools live up here, never in the review', 
     await user.click(screen.getByRole('button', { name: /Week/ }))
     expect(screen.getByText('Week thing')).toBeInTheDocument()
   })
+
+  it('puts a dot on the trigger when something arrived since the last look', async () => {
+    render(<HorizonPoolDropdown {...base} label="School" offer={['today']} hasNew
+      tasks={[task({ id: 's1', title: 'A thing', bucket: 'inbox' })]} />)
+    expect(await screen.findByLabelText('New in school')).toBeInTheDocument()
+  })
+
+  it('shows no dot when nothing is new — the quiet state is the common one', () => {
+    render(<HorizonPoolDropdown {...base} label="School" offer={['today']}
+      tasks={[task({ id: 's1', title: 'A thing', bucket: 'inbox' })]} />)
+    expect(screen.queryByLabelText('New in school')).toBeNull()
+  })
+
+  it('marks only the new rows, so two can be found among three', async () => {
+    const { user } = render(<HorizonPoolDropdown {...base} label="School" offer={['today']}
+      tasks={[
+        task({ id: 'old', title: 'Seen already', bucket: 'inbox' }),
+        task({ id: 'new1', title: 'Just arrived', bucket: 'inbox' }),
+        task({ id: 'new2', title: 'Also just arrived', bucket: 'inbox' }),
+      ]}
+      isNewFor={(t) => t.id !== 'old'}
+    />)
+    await user.click(screen.getByRole('button', { name: /School/ }))
+    expect(screen.getAllByText('New since you last looked')).toHaveLength(2)
+    expect(within(screen.getByText('Seen already').closest('li')!)
+      .queryByText('New since you last looked')).toBeNull()
+  })
+
+  it('reports opening and closing, which is how the host records the look', async () => {
+    const onOpenChange = vi.fn()
+    const { user } = render(<HorizonPoolDropdown {...base} label="School" offer={['today']}
+      tasks={[task({ id: 's1', title: 'A thing', bucket: 'inbox' })]}
+      onOpenChange={onOpenChange} />)
+    const trigger = screen.getByRole('button', { name: /School/ })
+    await user.click(trigger)
+    expect(onOpenChange).toHaveBeenLastCalledWith(true)
+    await user.click(trigger)
+    // Closed, not opened again — the mark is written on the way out so the
+    // row markers survive being looked at.
+    expect(onOpenChange).toHaveBeenLastCalledWith(false)
+  })
 })
