@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@/test/test-utils'
-import { CascadingRiverView } from './CascadingRiverView'
+import { CascadingRiverView, ownsIt } from './CascadingRiverView'
 import { createMockRoutine } from '@/test/mocks/factories'
 import type { Task } from '@/types/task'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
@@ -44,7 +44,53 @@ const BASE_PROPS = {
   selectedAssignees: ['scott', 'iris'],
 }
 
+/**
+ * Minimal object matching the (unexported) `TimelineEvent` shape `ownsIt`
+ * accepts. Only the fields `ownsIt` reads are meaningful; the rest are
+ * present so the object structurally satisfies the parameter type.
+ */
+function timelineEvent(overrides: { assignedTo?: string | null; owners?: string[] }) {
+  return {
+    id: 'e1',
+    prefixedId: 'routine-e1',
+    title: 'Event',
+    startTime: new Date(),
+    isAllDay: false,
+    type: 'routine' as const,
+    assignedTo: null as string | null,
+    ...overrides,
+  }
+}
+
+describe('ownsIt — per-stream membership (unit, real predicate)', () => {
+  it('a multi-owner routine event belongs to every owner\'s stream', () => {
+    const multiOwnerEvent = timelineEvent({ assignedTo: null, owners: ['scott', 'iris'] })
+    expect(ownsIt(multiOwnerEvent, 'scott')).toBe(true)
+    expect(ownsIt(multiOwnerEvent, 'iris')).toBe(true)
+    expect(ownsIt(multiOwnerEvent, 'ella')).toBe(false)
+  })
+
+  it('positive control: a single-assignee event still belongs to exactly one stream', () => {
+    const soloEvent = timelineEvent({ assignedTo: 'scott' })
+    expect(ownsIt(soloEvent, 'scott')).toBe(true)
+    expect(ownsIt(soloEvent, 'iris')).toBe(false)
+  })
+})
+
 describe('CascadingRiverView — routine visibility (render)', () => {
+  // NOTE ON SCOPE: this suite proves the visibility GATE (resolveRoutine.shows)
+  // via real DOM — a multi-owner routine's card is present, a not-selected
+  // owner's card is absent, alongside a same-code-path positive control. It
+  // does NOT and cannot currently prove PER-STREAM attribution (that the
+  // multi-owner card visually belongs to both Scott's and Iris's streams):
+  // the "Event cards" render is a single flat pass over `timelineEvents`
+  // (one <EventCard> per event, keyed by prefixedId), not a per-stream pass,
+  // so a shared routine renders once, at one fallback position/colour,
+  // regardless of how many streams' `.events` arrays (see `ownsIt` above)
+  // claim it. That data-level per-stream membership is covered by the
+  // `ownsIt` unit tests above instead, since it has no DOM manifestation to
+  // assert on without restructuring that render loop (out of scope here —
+  // see the comments on `getCardX` in CascadingRiverView.tsx).
   it('renders a multi-assigned routine (assigned_to_all) alongside a positive control, and excludes a routine owned by nobody selected', () => {
     const multi = createMockRoutine({
       name: 'Multi Owner Routine',

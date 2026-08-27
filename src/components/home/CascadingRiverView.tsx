@@ -10,7 +10,7 @@ import type { PlanningDomain } from '@/lib/today/domainFilter'
 import { FAMILY_COLORS, type FamilyMemberColor } from '@/types/family'
 import { DateNavigator } from '@/components/schedule/DateNavigator'
 import { AssigneeFilter } from './AssigneeFilter'
-import { resolveRoutine } from '@/lib/routineUtils'
+import { resolveRoutine, routineOwners } from '@/lib/routineUtils'
 
 // =============================================================================
 // TYPES
@@ -62,6 +62,9 @@ interface TimelineEvent {
   isAllDay: boolean
   type: 'task' | 'event' | 'routine'
   assignedTo?: string | null
+  /** Every member who owns this. `assignedTo` is the legacy singular column
+   *  and remains the fallback for item types that do not populate `owners`. */
+  owners?: string[]
   completed?: boolean
   projectId?: string | null
   contactId?: string | null
@@ -105,6 +108,21 @@ const STREAM_COLORS: Record<string, { stroke: string; glow: string; fill: string
 
 function getMinutesFromMidnight(date: Date): number {
   return date.getHours() * 60 + date.getMinutes()
+}
+
+/**
+ * Does this event belong to `memberId`'s stream? Prefers the collapsed
+ * `owners` list (multiple owners possible, e.g. a routine's assigned_to_all)
+ * and falls back to the legacy singular `assignedTo` column for item types
+ * that don't populate `owners` (tasks, calendar events).
+ *
+ * Exported for direct unit testing — the same event object can legitimately
+ * belong to more than one member's stream, which a DOM assertion on the
+ * current (unrestructured) single-pass card render cannot observe. See
+ * CascadingRiverView.test.tsx for the residual this leaves.
+ */
+export function ownsIt(e: TimelineEvent, memberId: string): boolean {
+  return e.owners && e.owners.length > 0 ? e.owners.includes(memberId) : e.assignedTo === memberId
 }
 
 function minutesToY(minutes: number): number {
@@ -700,6 +718,7 @@ export function CascadingRiverView({
         isAllDay: false,
         type: 'routine',
         assignedTo: routine.assigned_to,
+        owners: routineOwners(routine),
         completed: instance?.status === 'completed',
       })
     }
@@ -828,7 +847,7 @@ export function CascadingRiverView({
       memberId: member.id,
       color: member.color || 'blue',
       baseX: 80 + spacing * (i + 1),
-      events: timelineEvents.filter(e => e.assignedTo === member.id),
+      events: timelineEvents.filter(e => ownsIt(e, member.id)),
       convergenceZones,
     }))
   }, [selectedMembers, timelineEvents, convergenceZones, svgWidth])
@@ -862,7 +881,17 @@ export function CascadingRiverView({
     })
   }
 
-  // Card placement: position cards next to their stream
+  // Card placement: position cards next to their stream.
+  // KNOWN RESIDUAL: this keys off the legacy singular `assignedTo`, not
+  // `owners` — for a multi-owner routine (assignedTo null, owners: [a, b])
+  // this falls through to the `!config` branch and renders at a fixed
+  // fallback x rather than under either owner's stream. The "Event cards"
+  // render below is a single flat pass over `timelineEvents` (one card per
+  // event, keyed by `event.prefixedId`), not a per-stream pass — attaching
+  // a shared event correctly to each owning stream would mean rendering it
+  // once per owning stream instead, which is a restructure of that render
+  // loop, not a threading of a member id already in scope here. Left
+  // unrestructured on purpose; see CascadingRiverView.test.tsx.
   const getCardX = (event: TimelineEvent): number => {
     const config = streamConfigs.find(c => c.memberId === event.assignedTo)
     if (!config) return 100
@@ -995,7 +1024,9 @@ export function CascadingRiverView({
               )
             })}
 
-            {/* Event cards */}
+            {/* Event cards — one flat pass, one card per event. Colour/position
+                (`member`/`getCardX` above) key off the legacy singular
+                `assignedTo`; see the residual note on `getCardX`. */}
             {timelineEvents.map(event => {
               const y = minutesToY(getMinutesFromMidnight(event.startTime))
               const x = getCardX(event)
