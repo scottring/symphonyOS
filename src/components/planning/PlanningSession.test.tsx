@@ -1204,11 +1204,18 @@ describe('PlanningSession — resolveRoutine wiring (rendered)', () => {
 
   it('collection steps stop appearing even when they recur on the visible day', () => {
     const parent = createMockRoutine({ id: 'collection-parent', name: 'Camp Mornings', time_of_day: '07:00' })
+    // TIMED, not untimed: PlanningColumn positions a routine via
+    // resolveRoutineTime, which returns null for an untimed routine with no
+    // instance override — so an untimed step would be absent from the grid
+    // for that reason alone, whether or not rung 6 ran. `draggableRoutines`
+    // isn't passed either, so the drawer isn't a second path an untimed step
+    // could take. Only a real time_of_day gives this assertion a render path
+    // that rung 6 is actually the thing gating.
     const step = createMockRoutine({
       id: 'collection-step',
       name: 'Wake, brush teeth, get dressed',
       parent_routine_id: 'collection-parent',
-      time_of_day: null,
+      time_of_day: '08:00',
     })
 
     render(

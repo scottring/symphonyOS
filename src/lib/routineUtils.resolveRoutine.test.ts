@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { resolveRoutine, routineOwners, isPinnedToTimeline, isDraggableRoutine } from './routineUtils'
+import { resolveRoutine, routineOwners, isPinnedToTimeline, isDraggableRoutine, resolveRoutineEligible } from './routineUtils'
 import { VISIBILITY_CORPUS, CORPUS_DATE } from './routineVisibility.fixtures'
 import { makeAssigneeFilter } from './today/assigneeFilter'
 import { createMockRoutine } from '@/test/mocks/factories'
@@ -151,5 +151,27 @@ describe('isDraggableRoutine', () => {
   })
   it('is false for a timed routine', () => {
     expect(isDraggableRoutine(createMockRoutine({ time_of_day: '09:00' }))).toBe(false)
+  })
+})
+
+describe('resolveRoutineEligible', () => {
+  it('delegates to resolveRoutine with date: null — same verdict, nothing hand-rolled', () => {
+    const routine = createMockRoutine({ recurrence_pattern: { type: 'weekly', days: ['tue'] } })
+    const ctx = { prefs: { hideRoutines: false, domain: 'universal' as const } }
+    expect(resolveRoutineEligible(routine, ctx)).toEqual(resolveRoutine(routine, { ...ctx, date: null }))
+  })
+
+  it('skips rung 2 for a routine that recurs on no particular day', () => {
+    const routine = createMockRoutine({ recurrence_pattern: { type: 'weekly', days: ['tue'] } })
+    expect(
+      resolveRoutineEligible(routine, { prefs: { hideRoutines: false, domain: 'universal' } }),
+    ).toEqual({ shows: true, reason: 'shows', owners: [] })
+  })
+
+  it('still hides a resting routine — every other rung still applies', () => {
+    const routine = createMockRoutine({ visibility: 'reference' })
+    expect(
+      resolveRoutineEligible(routine, { prefs: { hideRoutines: false, domain: 'universal' } }).reason,
+    ).toBe('resting')
   })
 })

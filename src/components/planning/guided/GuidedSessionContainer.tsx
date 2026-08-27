@@ -16,7 +16,7 @@ import { useUpkeepList } from '@/hooks/useUpkeepList'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { useDomain, type Domain } from '@/hooks/useDomain'
 import { useCalendarDomainMappings } from '@/hooks/useCalendarDomainMappings'
-import { isDraggableRoutine, resolveRoutine } from '@/lib/routineUtils'
+import { isDraggableRoutine, resolveRoutineEligible } from '@/lib/routineUtils'
 import { filterTasksForPlanning, filterEventsForDomain, filterRoutinesForDomain } from '@/lib/today/domainFilter'
 import type { TaskBucket } from '@/types/task'
 import type { GoalStatus } from '@/types/goal'
@@ -165,17 +165,18 @@ export function GuidedSessionContainer({ horizon, onClose, onFinished, onChain, 
     // `!isEverydayRoutine` behavior: a guided session is for placing non-routine
     // work, so ambient everyday routines are never drag candidates.
     //
-    // `date: null` — this is a drag POOL, not a single day's list.
-    // `ScheduleGridStep` (the only consumer) spans up to 7 days; a routine
-    // that recurs only later in the week must still be offered, so rung 2
-    // (recurrence) is skipped entirely rather than gated on one day's date.
-    // Every other rung still applies (fix round 1: an earlier version of
-    // this line passed a single `sessionDate`, which made any routine not
-    // recurring on day one of the week silently vanish from the drawer).
+    // resolveRoutineEligible (not resolveRoutine + date: null) — this is a
+    // drag POOL, not a single day's list. `ScheduleGridStep` (the only
+    // consumer) spans up to 7 days; a routine that recurs only later in the
+    // week must still be offered, so rung 2 (recurrence) is skipped
+    // entirely rather than gated on one day's date. Every other rung still
+    // applies (fix round 1: an earlier version of this line passed a
+    // single `sessionDate`, which made any routine not recurring on day one
+    // of the week silently vanish from the drawer; fix round 2 named the
+    // date-agnostic question so this call site can't accidentally pass a
+    // real date and get the wrong rung-2 behavior with no type error).
     draggableRoutines: allRoutines.filter(
-      (r) =>
-        isDraggableRoutine(r) &&
-        resolveRoutine(r, { date: null, prefs: { hideRoutines: true, domain: currentDomain } }).shows,
+      (r) => isDraggableRoutine(r) && resolveRoutineEligible(r, { prefs: { hideRoutines: true, domain: currentDomain } }).shows,
     ),
     onScheduleRoutine,
     getRoutinesForDate: domainGetRoutinesForDate,

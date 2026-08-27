@@ -134,6 +134,35 @@ export const VISIBILITY_CORPUS: CorpusRow[] = [
     ctx: ctx({ date: null }),
     expected: 'in-collection',
   },
+  {
+    label: 'date: null still hides an other-domain routine — rung 4 is unaffected',
+    routine: base({ recurrence_pattern: { type: 'weekly', days: ['tue'] }, context: 'work' }),
+    ctx: ctx({ date: null, prefs: { hideRoutines: false, domain: 'family' } }),
+    expected: 'other-domain',
+  },
+  {
+    label: 'date: null still hides a not-theirs routine — rung 5 is unaffected',
+    routine: base({ recurrence_pattern: { type: 'weekly', days: ['tue'] }, assigned_to: 'iris' }),
+    ctx: ctx({ date: null, member: 'scott' }),
+    expected: 'not-theirs',
+  },
+  // rung 7 gets its own two rows, not folded into the four above: this is
+  // the ONE live production combination (GuidedSessionContainer.tsx passes
+  // date: null with hideRoutines: true for the guided weekly session's drag
+  // pool, so ambient everyday routines are never offered) and it was
+  // previously the only one of the seven non-rung-2 rungs left unpinned.
+  {
+    label: 'date: null with hideRoutines sweeps an everyday routine — rung 7 is unaffected',
+    routine: base({ recurrence_pattern: { type: 'daily' } }),
+    ctx: ctx({ date: null, prefs: { hideRoutines: true, domain: 'universal' } }),
+    expected: 'everyday',
+  },
+  {
+    label: 'date: null with hideRoutines still shows a pinned everyday routine — the rung 7 exemption holds',
+    routine: base({ recurrence_pattern: { type: 'daily' }, pin_to_timeline: true }),
+    ctx: ctx({ date: null, prefs: { hideRoutines: true, domain: 'universal' } }),
+    expected: 'shows',
+  },
 
   // --- rung 3: off ---
   { label: 'show_on_timeline false', routine: base({ show_on_timeline: false }), ctx: ctx(), expected: 'off' },

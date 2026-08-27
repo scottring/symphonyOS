@@ -214,7 +214,11 @@ export interface ResolveRoutineCtx {
   /** The day being asked about. `null` asks the DATE-AGNOSTIC question —
    *  "is this routine eligible at all?" — which skips rung 2 and only
    *  rung 2. Used by drag POOLS, which offer a routine for placement onto
-   *  any of several days and must not filter by a single day's recurrence. */
+   *  any of several days and must not filter by a single day's recurrence.
+   *  Prefer calling `resolveRoutineEligible` over passing `date: null` here
+   *  by hand — `Date` and `null` are mutually assignable, so a single-day
+   *  surface that means to pass a real date gets no type error if it
+   *  accidentally passes null instead. */
   date: Date | null
   /** null/undefined/[] means "everyone" and skips rung 5. */
   member?: AssigneeFilter
@@ -307,4 +311,18 @@ export function resolveRoutine(routine: Routine, ctx: ResolveRoutineCtx): Routin
  */
 export function isDraggableRoutine(routine: Routine): boolean {
   return routine.time_of_day == null
+}
+
+/**
+ * The date-agnostic question: is this routine eligible AT ALL, independent
+ * of any particular day? Runs the full ladder except rung 2. This is what a
+ * drag POOL asks — it offers a routine for placement onto any of several
+ * days, so a single day's recurrence must not filter it. Callers should use
+ * this rather than passing `date: null` by hand.
+ */
+export function resolveRoutineEligible(
+  routine: Routine,
+  ctx: Omit<ResolveRoutineCtx, 'date' | 'deferredInto' | 'lastCompletedAt'>,
+): RoutineResolution {
+  return resolveRoutine(routine, { ...ctx, date: null })
 }
