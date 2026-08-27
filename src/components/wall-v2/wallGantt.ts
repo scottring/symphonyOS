@@ -59,6 +59,24 @@ export const TRACK_PX = 780;
  */
 export const MIN_LABEL_PX = 170;
 /**
+ * How far ahead a household rhythm earns a tag.
+ *
+ * "Routines look forward" used to mean "anything left today", and at 7:53am
+ * that put the entire evening on the Everyone row — Feed Jax dinner, Walk Jax,
+ * Feed and water the dog, Clean kitchen after dinner, Put clothes in hamper,
+ * Get into bed for reading, all six scheduled 18:00-19:06, eleven hours early.
+ * None of it was actionable at breakfast and all of it crowded out the morning.
+ *
+ * The board's TRACK already rolls with now; its tag line did not. Three hours
+ * is roughly meal to meal: the dinner block appears mid-afternoon, in time to
+ * be useful, and the row stays quiet the rest of the day.
+ *
+ * Nothing is counted at the edge here, deliberately. `laterCount` exists for
+ * commitments that fall off the right of the axis; a rhythm is background, and
+ * "+6 later" on a row of chores is a scoreboard, not information.
+ */
+export const RHYTHM_HORIZON_MIN = 180;
+/**
  * The sections the board reads.
  *
  * PREVIEW_SECTIONS deliberately omits 'unscheduled', because an untimed item
@@ -268,15 +286,21 @@ export function adaptGanttBoard(
         // teeth" — three 6am routines — and hid the entire evening behind
         // "+12". Routines look forward; a task keeps its place whether or not
         // its hour has passed, because an unfinished task still stands.
-        if (it.type === 'routine' && at < nowMin) continue;
-        // The same rule, for a routine the clause above cannot reach. An
-        // untimed item sorts at MAX_SAFE_INTEGER, which is never "already
-        // passed", so at 7:33pm the Everyone row still read "Eat breakfast ·
-        // Read · Out the door · Camp dropoff". Most of those inherit an hour
-        // from their collection now (effectiveTimeOfDay) and this clause never
-        // sees them; what is left is a daily habit with no hour anywhere, and
-        // a thing that happens every day at no particular time can never be
-        // the thing still ahead of you.
+        // A rhythm that has already happened is not information, and one
+        // eleven hours out is not information YET. At 8am the line read "Put
+        // dirty clothes in hamper · Straighten up room · Brush teeth" — three
+        // 6am routines — and at 7:53am it read the whole 6-7pm chore block.
+        // A tag earns the row by being near. A task keeps its place whether or
+        // not its hour has passed, because an unfinished task still stands.
+        if (it.type === 'routine' && it.startTime
+            && (at < nowMin || at > nowMin + RHYTHM_HORIZON_MIN)) continue;
+        // A routine the clause above cannot reach, because it has no hour to
+        // compare: an untimed item sorts at MAX_SAFE_INTEGER, so at 7:33pm the
+        // Everyone row still read "Eat breakfast · Read · Out the door · Camp
+        // dropoff". Most of those inherit an hour from their collection now
+        // (effectiveTimeOfDay) and never arrive here; what is left is a daily
+        // habit with no hour anywhere, and a thing that happens every day at
+        // no particular time can never be the thing still ahead of you.
         //
         // Deliberately narrow: a routine that is NOT everyday keeps its place.
         // "Do kitchen Laundry", weekly on Saturday with no time, IS Saturday —
