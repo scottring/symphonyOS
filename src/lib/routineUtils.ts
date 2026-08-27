@@ -289,3 +289,12 @@ export function resolveRoutine(routine: Routine, ctx: ResolveRoutineCtx): Routin
   }
   return { shows: true, reason: 'shows', owners }
 }
+
+/**
+ * Caller-side, NOT a rung: planning surfaces accept only untimed routines as
+ * drag sources. A timed routine is visible but cannot be dragged, which is a
+ * different question from whether it shows.
+ */
+export function isDraggableRoutine(routine: Routine): boolean {
+  return routine.time_of_day == null
+}

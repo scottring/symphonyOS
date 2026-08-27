@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react'
 import { readHideRoutines, writeHideRoutines, onHideRoutinesChange } from '@/lib/hideRoutinesSignal'
-import { isEverydayRoutine } from '@/lib/routineUtils'
+import { resolveRoutine } from '@/lib/routineUtils'
+import { deferredInRoutineIds } from '@/lib/today/deferredRoutines'
 import {
   DndContext,
   DragOverlay,
@@ -451,10 +452,17 @@ export function PlanningSession({
     return byDate
   }, [dateInstances])
 
-  // Get routines for the date range. Mirrors the Week grid's routine visibility:
-  //   1. show_on_timeline === false → never render.
-  //   2. "Hide daily activities" toggle → drop everyday/weekday routines (the
-  //      noise); lower-frequency routines still show.
+  // Get routines for the date range. One resolver call per day replaces the
+  // old hand-rolled show_on_timeline/hideRoutines filter chain — see
+  // resolveRoutine in routineUtils.ts for the full 8-rung rule this now
+  // shares with Today and the week/month grids.
+  //
+  // domain stays 'universal' here: PlanningSession has no domain concept of
+  // its own — every current caller (HomeViewContainer, GuidedSessionContainer)
+  // already hands it a domain-scoped `routines`/`getRoutinesForDate`, exactly
+  // as it did before this migration. Making rung 4 a no-op here preserves
+  // that split instead of quietly re-deciding domain scope in a component
+  // that was never told what the active domain is.
   const routinesByDate = useMemo(() => {
     const map = new Map<string, Routine[]>()
 
@@ -462,28 +470,37 @@ export function PlanningSession({
       const dateKey = formatDateKey(date)
       // Use getRoutinesForDate if provided, otherwise use routines prop directly
       const routinesForDay = (getRoutinesForDate ? getRoutinesForDate(date) : routines)
-        .filter((r) => r.show_on_timeline !== false)
-        .filter((r) => !hideRoutines || !isEverydayRoutine(r.recurrence_pattern))
+        .filter((r) => resolveRoutine(r, { date, prefs: { hideRoutines, domain: 'universal' } }).shows)
 
       // A routine dragged INTO this day usually doesn't recur on it, so the
       // day's own list won't contain it. Pull it in from the full set, the same
-      // way useScheduleFiltering does for the Today rung.
-      const placed = routineInstancesByDate.get(dateKey)
+      // way useScheduleFiltering does for the Today rung — deferredInRoutineIds
+      // is the ONE shared rule for "was this placed here by a cross-day drag",
+      // and resolveRoutine's `deferredInto` is what lets rung 2 (recurrence)
+      // step aside for exactly those ids while every other rung still applies:
+      // a deferred-in routine that is resting, off-timeline, or someone else's
+      // still stays hidden.
+      const deferredIntoIds = deferredInRoutineIds(dateInstances ?? [], date)
       const deferredIn: Routine[] = []
-      if (placed) {
-        for (const [routineId, instance] of placed) {
-          if (instance.status !== 'deferred' || !instance.deferred_to) continue
-          if (formatDateKey(new Date(instance.deferred_to)) !== dateKey) continue
-          if (routinesForDay.some((r) => r.id === routineId)) continue
-          const routine = allRoutines?.find((r) => r.id === routineId)
-          if (routine && routine.show_on_timeline !== false) deferredIn.push(routine)
+      for (const routineId of deferredIntoIds) {
+        if (routinesForDay.some((r) => r.id === routineId)) continue
+        const routine = allRoutines?.find((r) => r.id === routineId)
+        if (
+          routine &&
+          resolveRoutine(routine, {
+            date,
+            prefs: { hideRoutines, domain: 'universal' },
+            deferredInto: deferredIntoIds,
+          }).shows
+        ) {
+          deferredIn.push(routine)
         }
       }
       map.set(dateKey, deferredIn.length ? [...routinesForDay, ...deferredIn] : routinesForDay)
     }
 
     return map
-  }, [dateRange, getRoutinesForDate, routines, hideRoutines, routineInstancesByDate, allRoutines])
+  }, [dateRange, getRoutinesForDate, routines, hideRoutines, dateInstances, allRoutines])
 
   // Get the currently dragged task
   const activeTask = useMemo(() => {

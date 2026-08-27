@@ -17,7 +17,7 @@ import { useGoogleCalendar, CalendarReconnectError } from '@/hooks/useGoogleCale
 import { showToast } from '@/hooks/useToast';
 import { PlanningSession } from '@/components/lazy';
 import { LoadingFallback } from '@/components/layout/LoadingFallback';
-import { isEverydayRoutine, scheduleRoutineOnDate } from '@/lib/routineUtils';
+import { isDraggableRoutine, resolveRoutine, scheduleRoutineOnDate } from '@/lib/routineUtils';
 import { PlanFromPaperFlow } from '@/components/capture/PlanFromPaperFlow';
 import { planItemToAddTaskArgs, type PlanItem } from '@/lib/planParse';
 import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config';
@@ -266,12 +266,21 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
     () => filterRoutinesForDomain(allRoutines, currentDomain),
     [allRoutines, currentDomain],
   );
+  // resolveRoutine replaces the hand-rolled visibility/everyday/timed check —
+  // same rungs (resting, everyday-sweep, timed) plus the ones the old
+  // predicate never asked (off-timeline, not-theirs, in-collection). Domain
+  // scoping now happens INSIDE the resolveRoutine call (rung 4), so this no
+  // longer needs the separate filterRoutinesForDomain wrapper the sibling
+  // pools above still use. `hideRoutines: true` preserves the old
+  // `!isEverydayRoutine` behavior — this grid is time-block Today, so ambient
+  // everyday routines are never drag candidates.
   const planningDraggableRoutines = useMemo(
-    () => filterRoutinesForDomain(
-      allRoutines.filter(r => r.visibility === 'active' && !isEverydayRoutine(r.recurrence_pattern) && !r.time_of_day),
-      currentDomain,
+    () => allRoutines.filter(
+      (r) =>
+        isDraggableRoutine(r) &&
+        resolveRoutine(r, { date: viewedDate, prefs: { hideRoutines: true, domain: currentDomain } }).shows,
     ),
-    [allRoutines, currentDomain],
+    [allRoutines, currentDomain, viewedDate],
   );
   const planningEvents = useMemo(
     () => filterEventsForDomain(filteredEvents, currentDomain, {

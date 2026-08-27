@@ -16,7 +16,8 @@ import { useUpkeepList } from '@/hooks/useUpkeepList'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { useDomain, type Domain } from '@/hooks/useDomain'
 import { useCalendarDomainMappings } from '@/hooks/useCalendarDomainMappings'
-import { isEverydayRoutine } from '@/lib/routineUtils'
+import { isDraggableRoutine, resolveRoutine } from '@/lib/routineUtils'
+import { resolveGuidedTarget } from './periods'
 import { filterTasksForPlanning, filterEventsForDomain, filterRoutinesForDomain } from '@/lib/today/domainFilter'
 import type { TaskBucket } from '@/types/task'
 import type { GoalStatus } from '@/types/goal'
@@ -89,11 +90,28 @@ export function GuidedSessionContainer({ horizon, onClose, onFinished, onChain, 
       filterEventsForDomain(await fetchEvents(start, end), currentDomain, { getDomainForCalendar }),
     [fetchEvents, currentDomain, getDomainForCalendar],
   )
+  // KEPT (not folded into resolveRoutine): these two feed `host.routines` /
+  // `host.getRoutinesForDate`, which reach PlanningSession directly.
+  // PlanningSession has no domain concept of its own — it hardcodes rung 4 to
+  // 'universal' (see PlanningSession.tsx) because every caller already hands
+  // it a domain-scoped pool. Deleting this pre-filter would remove domain
+  // scoping from the guided week grid entirely, not replace it — the exact
+  // "raw pool leaked a family routine into the Personal grid" bug HomeView-
+  // Container's own comments describe. Only `draggableRoutines` below moves
+  // to resolveRoutine, where the real `currentDomain` IS threaded through.
   const domainRoutines = useMemo(() => filterRoutinesForDomain(allRoutines, currentDomain), [allRoutines, currentDomain])
   const domainGetRoutinesForDate = useCallback(
     (date: Date) => filterRoutinesForDomain(getRoutinesForDate(date), currentDomain),
     [getRoutinesForDate, currentDomain],
   )
+  // The date the guided session is planning for — the resolver's rung 2
+  // (recurrence) needs a real date, and a wrong one silently changes which
+  // routines are offered. 'auto' mirrors GuidedSession.tsx's own default
+  // target (no header toggle has fired yet at mount); for a session that
+  // spans a range (weekly), its first day. Never `new Date()` — that would
+  // ignore the threshold rule (a late-in-period session targets the NEXT
+  // period) and offer routines for the wrong week entirely.
+  const sessionDate = useMemo(() => resolveGuidedTarget(horizon, 'auto').period.start, [horizon])
 
   // Untagged inbox items stay visible in a domain session (pre-triage — see
   // filterTasksForPlanning). Routing one from here also stamps the session's
@@ -149,11 +167,22 @@ export function GuidedSessionContainer({ horizon, onClose, onFinished, onChain, 
     updateGoalStatus: (id: string, status: GoalStatus) => updateGoal(id, { status }),
     carryGoal: (id: string) => updateGoal(id, { year: new Date().getFullYear(), status: 'active' }),
     routines: domainRoutines,
-    draggableRoutines: domainRoutines.filter((r) => r.visibility === 'active' && !isEverydayRoutine(r.recurrence_pattern) && !r.time_of_day),
+    // resolveRoutine replaces the hand-rolled visibility/everyday/timed check
+    // — same rungs (resting, everyday-sweep, timed) plus the ones the old
+    // predicate never asked (off-timeline, not-theirs, in-collection).
+    // `allRoutines` (not domainRoutines) because rung 4 does the domain scoping
+    // itself here. `hideRoutines: true` is intentional and preserves the old
+    // `!isEverydayRoutine` behavior: a guided session is for placing non-routine
+    // work, so ambient everyday routines are never drag candidates.
+    draggableRoutines: allRoutines.filter(
+      (r) =>
+        isDraggableRoutine(r) &&
+        resolveRoutine(r, { date: sessionDate, prefs: { hideRoutines: true, domain: currentDomain } }).shows,
+    ),
     onScheduleRoutine,
     getRoutinesForDate: domainGetRoutinesForDate,
     upkeepItems, upkeepLoading, ensureUpkeepList,
-  }), [domainTasks, tasksLoading, domainEvents, isConnected, calendarChecking, domainFetchEvents, createEvent, pushTaskStamped, setBucketStamped, toggleTask, deleteTask, updateTask, createTaskInBucket, createDatedTask, domainProjects, projectsMap, domainGoals, areas, addGoal, addArea, updateGoal, domainRoutines, onScheduleRoutine, domainGetRoutinesForDate, currentDomain, upkeepItems, upkeepLoading, ensureUpkeepList])
+  }), [domainTasks, tasksLoading, domainEvents, isConnected, calendarChecking, domainFetchEvents, createEvent, pushTaskStamped, setBucketStamped, toggleTask, deleteTask, updateTask, createTaskInBucket, createDatedTask, domainProjects, projectsMap, domainGoals, areas, addGoal, addArea, updateGoal, domainRoutines, allRoutines, sessionDate, onScheduleRoutine, domainGetRoutinesForDate, currentDomain, upkeepItems, upkeepLoading, ensureUpkeepList])
 
   return <GuidedSession horizon={horizon} domain={currentDomain} host={host} onClose={onClose} onFinished={onFinished} onChain={onChain} />
 }

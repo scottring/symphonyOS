@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@/test/test-utils'
 import { PlanningSession } from './PlanningSession'
 import { createMockTask, createMockRoutine, resetIdCounter } from '@/test/mocks/factories'
@@ -1092,5 +1092,138 @@ describe('hideHeader', () => {
       />,
     )
     expect(screen.getByText('Plan Your Time')).toBeInTheDocument()
+  })
+})
+
+// ── resolveRoutine wiring, rendered ─────────────────────────────────────────
+//
+// planningParity.test.ts characterizes the resolver's behavior over the
+// shared corpus but calls resolveRoutine directly — it would keep passing
+// even if PlanningSession stopped calling resolveRoutine at all. These tests
+// render the real component instead.
+describe('PlanningSession — resolveRoutine wiring (rendered)', () => {
+  const target = new Date(2026, 4, 18) // Monday
+  const targetKey = '2026-05-18'
+  const otherDay = '2026-05-16' // the prior Saturday — a real cross-day deferral
+
+  const deferralInstance = (entityId: string, overrides: Partial<import('@/types/actionable').ActionableInstance> = {}) => ({
+    id: `i-${entityId}`,
+    user_id: 'u1',
+    entity_type: 'routine' as const,
+    entity_id: entityId,
+    date: otherDay,
+    status: 'deferred' as const,
+    deferred_to: `${targetKey}T10:30:00.000Z`,
+    created_at: '',
+    updated_at: '',
+    ...overrides,
+  })
+
+  beforeEach(() => resetIdCounter())
+
+  it('THE MOST IMPORTANT CASE: a deferred-in routine that does not recur on the target day still appears there', () => {
+    // Saturdays only — does NOT recur on target (a Monday). Without
+    // `deferredInto` overriding rung 2, this routine would never render here
+    // and the whole deferred-in branch would be dead code — the exact
+    // regression already caught on Today.
+    const routine = createMockRoutine({
+      id: 'r-grocery',
+      name: 'Weekend grocery run',
+      recurrence_pattern: { type: 'weekly', days: ['sat'] },
+      time_of_day: null,
+    })
+
+    render(
+      <PlanningSession
+        tasks={[]}
+        events={[]}
+        routines={[]}
+        allRoutines={[routine]}
+        dateInstances={[deferralInstance(routine.id)]}
+        initialDate={target}
+        onUpdateTask={vi.fn()}
+        onPushTask={vi.fn()}
+        onClose={vi.fn()}
+      />
+    )
+
+    expect(screen.getByText('Weekend grocery run')).toBeInTheDocument()
+  })
+
+  it('a deferred-in routine still cannot arrive by the back door when it is resting', () => {
+    const routine = createMockRoutine({
+      id: 'r-resting',
+      name: 'Paused chore',
+      visibility: 'reference', // not 'active' — rung 1 must still win over deferredInto
+      recurrence_pattern: { type: 'weekly', days: ['sat'] },
+      time_of_day: null,
+    })
+
+    render(
+      <PlanningSession
+        tasks={[]}
+        events={[]}
+        routines={[]}
+        allRoutines={[routine]}
+        dateInstances={[deferralInstance(routine.id)]}
+        initialDate={target}
+        onUpdateTask={vi.fn()}
+        onPushTask={vi.fn()}
+        onClose={vi.fn()}
+      />
+    )
+
+    expect(screen.queryByText('Paused chore')).not.toBeInTheDocument()
+  })
+
+  it('a deferred-in routine still cannot arrive by the back door when it is off-timeline', () => {
+    const routine = createMockRoutine({
+      id: 'r-off',
+      name: 'Hidden chore',
+      show_on_timeline: false,
+      recurrence_pattern: { type: 'weekly', days: ['sat'] },
+      time_of_day: null,
+    })
+
+    render(
+      <PlanningSession
+        tasks={[]}
+        events={[]}
+        routines={[]}
+        allRoutines={[routine]}
+        dateInstances={[deferralInstance(routine.id)]}
+        initialDate={target}
+        onUpdateTask={vi.fn()}
+        onPushTask={vi.fn()}
+        onClose={vi.fn()}
+      />
+    )
+
+    expect(screen.queryByText('Hidden chore')).not.toBeInTheDocument()
+  })
+
+  it('collection steps stop appearing even when they recur on the visible day', () => {
+    const parent = createMockRoutine({ id: 'collection-parent', name: 'Camp Mornings', time_of_day: '07:00' })
+    const step = createMockRoutine({
+      id: 'collection-step',
+      name: 'Wake, brush teeth, get dressed',
+      parent_routine_id: 'collection-parent',
+      time_of_day: null,
+    })
+
+    render(
+      <PlanningSession
+        tasks={[]}
+        events={[]}
+        routines={[parent, step]}
+        onUpdateTask={vi.fn()}
+        onPushTask={vi.fn()}
+        onClose={vi.fn()}
+        initialDate={target}
+      />
+    )
+
+    expect(screen.getByText('Camp Mornings')).toBeInTheDocument()
+    expect(screen.queryByText('Wake, brush teeth, get dressed')).not.toBeInTheDocument()
   })
 })

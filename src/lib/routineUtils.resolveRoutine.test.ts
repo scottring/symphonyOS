@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { resolveRoutine, routineOwners, isPinnedToTimeline } from './routineUtils'
+import { resolveRoutine, routineOwners, isPinnedToTimeline, isDraggableRoutine } from './routineUtils'
 import { VISIBILITY_CORPUS, CORPUS_DATE } from './routineVisibility.fixtures'
 import { makeAssigneeFilter } from './today/assigneeFilter'
 import { createMockRoutine } from '@/test/mocks/factories'
@@ -142,5 +142,14 @@ describe('isPinnedToTimeline', () => {
   })
   it('is false otherwise', () => {
     expect(isPinnedToTimeline(createMockRoutine())).toBe(false)
+  })
+})
+
+describe('isDraggableRoutine', () => {
+  it('is true for an untimed routine', () => {
+    expect(isDraggableRoutine(createMockRoutine({ time_of_day: null }))).toBe(true)
+  })
+  it('is false for a timed routine', () => {
+    expect(isDraggableRoutine(createMockRoutine({ time_of_day: '09:00' }))).toBe(false)
   })
 })
