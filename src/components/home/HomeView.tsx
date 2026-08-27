@@ -86,6 +86,10 @@ export function HomeView({
     () => filterTasksForDomainView(tasks, currentDomain),
     [tasks, currentDomain])
 
+  // Neither TodayView nor CascadingRiverView consumes this for visibility any
+  // more — both apply domain scoping themselves via resolveRoutine (rung 4)
+  // against the raw `routines` prop. This memo survives only to feed
+  // `hasUnassignedTasks` below, which wants the current domain's routines.
   const filteredRoutines = useMemo(
     () => filterRoutinesForDomain(routines, currentDomain),
     [routines, currentDomain])
@@ -360,7 +364,13 @@ export function HomeView({
         <CascadingRiverView
           tasks={filteredTasks}
           events={filteredEvents}
-          routines={filteredRoutines}
+          // Domain-UNfiltered on purpose, same reasoning as TodayView below:
+          // the river now applies domain scoping itself via resolveRoutine
+          // (rung 4), threaded through as `currentDomain`. Passing the
+          // shared `filteredRoutines` memo here would double-filter (harmless,
+          // since both predicates agree) but re-couples this surface to a memo
+          // it no longer needs — pass the raw list so River owns its own rung 4.
+          routines={routines}
           dateInstances={dateInstances}
           selectedItemId={selectedItemId}
           onSelectItem={onSelectItem}
@@ -374,6 +384,7 @@ export function HomeView({
           contactsMap={ctx.contactsMap}
           projectsMap={ctx.projectsMap}
           eventNotesMap={ctx.eventNotesMap}
+          currentDomain={currentDomain}
           familyMembers={ctx.familyMembers}
           selectedAssignees={selectedAssignees}
           onSelectAssignees={setSelectedAssignees}
@@ -395,13 +406,12 @@ export function HomeView({
       <TodayView
         tasks={filteredTasks}
         events={filteredEvents}
-        // Domain-UNfiltered on purpose: TodayView's own pipeline now applies
+        // Domain-UNfiltered on purpose: TodayView's own pipeline applies
         // domain scoping via resolveRoutine (rung 4), threaded through as
-        // `domain: currentDomain`. Pre-filtering here would be harmless for
-        // Today (the filter is idempotent) but `filteredRoutines` is shared
-        // with CascadingRiverView below, which has NOT adopted the resolver
-        // yet — narrowing this shared memo instead of the prop passed here
-        // would have silently changed River's domain scoping too.
+        // `domain: currentDomain`. CascadingRiverView (above) now does the
+        // same, so `filteredRoutines` below is no longer shared for routine
+        // visibility by either surface — it survives only to compute
+        // `hasUnassignedTasks`.
         routines={routines}
         dateInstances={dateInstances}
         selectedItemId={selectedItemId}

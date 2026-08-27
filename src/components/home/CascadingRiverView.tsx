@@ -6,9 +6,11 @@ import type { FamilyMember } from '@/types/family'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine, ActionableInstance } from '@/types/actionable'
 import type { EventNote } from '@/hooks/useEventNotes'
+import type { PlanningDomain } from '@/lib/today/domainFilter'
 import { FAMILY_COLORS, type FamilyMemberColor } from '@/types/family'
 import { DateNavigator } from '@/components/schedule/DateNavigator'
 import { AssigneeFilter } from './AssigneeFilter'
+import { resolveRoutine } from '@/lib/routineUtils'
 
 // =============================================================================
 // TYPES
@@ -31,6 +33,10 @@ interface CascadingRiverViewProps {
   contactsMap?: Map<string, Contact>
   projectsMap?: Map<string, Project>
   eventNotesMap?: Map<string, EventNote>
+  /** The active domain lens (rung 4 of resolveRoutine). Defaults to
+   *  'universal', matching WeekView/MonthView for a caller that hasn't
+   *  wired a domain in. */
+  currentDomain?: PlanningDomain
   familyMembers: FamilyMember[]
   selectedAssignees: string[]
   /** Change the who-selection — surfaced in the river header so you can drop
@@ -550,6 +556,7 @@ export function CascadingRiverView({
   contactsMap,
   projectsMap,
   eventNotesMap,
+  currentDomain = 'universal',
   familyMembers,
   selectedAssignees,
   onSelectAssignees,
@@ -665,10 +672,18 @@ export function CascadingRiverView({
       })
     }
 
-    // Routines
+    // Routines — one rule for visibility, shared with Today/Week/Month/the wall.
+    // (rung 3 "off" and the domain/member rungs all live inside resolveRoutine now;
+    // the untimed check below stays here because it isn't a visibility rule at
+    // all — the river is a clock, and an untimed routine has no place on it.)
     for (const routine of routines) {
-      if (!routine.assigned_to || !selectedAssignees.includes(routine.assigned_to)) continue
-      if (routine.show_on_timeline === false) continue
+      if (
+        !resolveRoutine(routine, {
+          date: viewedDate,
+          member: selectedAssignees,
+          prefs: { hideRoutines: false, domain: currentDomain },
+        }).shows
+      ) continue
       if (!routine.time_of_day) continue
 
       const [hours, minutes] = routine.time_of_day.split(':').map(Number)
@@ -690,7 +705,7 @@ export function CascadingRiverView({
     }
 
     return result.sort((a, b) => a.startTime.getTime() - b.startTime.getTime())
-  }, [tasks, events, routines, viewedDate, selectedAssignees, eventNotesMap, routineStatusMap, eventStatusMap])
+  }, [tasks, events, routines, viewedDate, selectedAssignees, currentDomain, eventNotesMap, routineStatusMap, eventStatusMap])
 
   // Detect convergence zones - only for SHARED events (same event assigned to multiple people)
   // This creates the subway map effect where lines merge when family members are truly together
