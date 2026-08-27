@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@/test/test-utils'
+import { render, screen, within } from '@/test/test-utils'
 import { WeekView } from './WeekView'
+import { createMockRoutine } from '@/test/mocks/factories'
 import type { Task } from '@/types/task'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine } from '@/types/actionable'
@@ -194,6 +195,36 @@ describe('WeekView', () => {
 
       // Should show 1/2 for Monday
       expect(screen.getByText('1/2')).toBeInTheDocument()
+    })
+  })
+
+  describe('routines display', () => {
+    it('only renders a routine on the weekday it recurs on, not every day', () => {
+      // Regression test: the pre-migration filter had no per-date recurrence
+      // check at all for routines — every active, assignee-matching routine
+      // rendered in EVERY day's column regardless of recurrence_pattern.
+      const wednesday = new Date(monday)
+      wednesday.setDate(wednesday.getDate() + 2)
+
+      const routines = [
+        createMockRoutine({
+          name: 'Weekly Wednesday Routine',
+          recurrence_pattern: { type: 'weekly', days: ['wed'] },
+        }),
+      ]
+
+      render(<WeekView {...defaultProps} routines={routines} />)
+
+      // Renders exactly once across the whole week — on Wednesday only.
+      expect(screen.getAllByText(/Weekly Wednesday Routine/)).toHaveLength(1)
+
+      const wednesdayColumn = screen.getByText(wednesday.getDate().toString()).closest('button')
+      expect(wednesdayColumn).not.toBeNull()
+      expect(within(wednesdayColumn as HTMLElement).getByText(/Weekly Wednesday Routine/)).toBeInTheDocument()
+
+      const mondayColumn = screen.getByText(monday.getDate().toString()).closest('button')
+      expect(mondayColumn).not.toBeNull()
+      expect(within(mondayColumn as HTMLElement).queryByText(/Weekly Wednesday Routine/)).toBeNull()
     })
   })
 
