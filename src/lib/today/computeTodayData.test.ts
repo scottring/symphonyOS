@@ -14,7 +14,7 @@ function baseInput(over: Partial<TodayDataInput> = {}): TodayDataInput {
   return {
     tasks: [], events: [], routines: [], dateInstances: [],
     viewedDate,
-    selectedAssignee: null, hideRoutines: false,
+    selectedAssignee: null, hideRoutines: false, domain: 'universal',
     weekStart: sundayOfWeek(viewedDate),
     ...over,
   }
@@ -200,6 +200,44 @@ describe('computeTodayData — progress counts match the rendered timeline', () 
     expect(d.counts.completedCount).toBe(1)
     expect(d.counts.actionableCount).toBe(1)
     expect(d.counts.progressPercent).toBe(100)
+  })
+
+  it('a routine deferred onto today survives even though its own recurrence does not match', () => {
+    // A drag writes a one-day `deferred_to` override; the recurrence pattern
+    // itself is untouched (routineTime.ts's contract), so this routine's
+    // pattern still says "not today" — only the deferral should let it
+    // through. Pick a weekday the deferral fixture is NOT, so this is
+    // deterministic no matter which real day the suite runs on.
+    const notToday = (['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const)[(NOW.getDay() + 3) % 7]
+    const deferred = routine({
+      id: 'trash-day', name: 'Trash day', recurrence_pattern: { type: 'weekly', days: [notToday] },
+    })
+    const viewedDateStr = NOW.toISOString().split('T')[0]
+    const yesterday = new Date(NOW.getTime() - 1 * 864e5)
+    const deferralInstance: ActionableInstance = {
+      id: 'i-trash', user_id: 'u', entity_type: 'routine', entity_id: 'trash-day',
+      date: yesterday.toISOString().split('T')[0], status: 'deferred', assignee: null,
+      assigned_to_override: null, deferred_to: `${viewedDateStr}T12:00:00.000Z`,
+      completed_at: null, skipped_at: null, created_at: '', updated_at: '',
+    }
+    const d = computeTodayData(baseInput({ viewedDate: NOW, routines: [deferred], dateInstances: [deferralInstance] }))
+    const rows = renderedActionableRows(d)
+    // Assert the routine actually appears — not merely that some count moved.
+    expect(rows.some((r) => r.type === 'routine' && r.title === 'Trash day')).toBe(true)
+    expect(d.counts.actionableCount).toBe(1)
+  })
+
+  it('the same deferral-shaped routine, WITHOUT a matching deferral instance, still does not appear', () => {
+    // Negative control for the test above: proves the previous test's
+    // survival came from the deferral, not from some other accidental match.
+    const notToday = (['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const)[(NOW.getDay() + 3) % 7]
+    const notDeferred = routine({
+      id: 'trash-day-2', name: 'Trash day 2', recurrence_pattern: { type: 'weekly', days: [notToday] },
+    })
+    const d = computeTodayData(baseInput({ viewedDate: NOW, routines: [notDeferred], dateInstances: [] }))
+    const rows = renderedActionableRows(d)
+    expect(rows.some((r) => r.type === 'routine' && r.title === 'Trash day 2')).toBe(false)
+    expect(d.counts.actionableCount).toBe(0)
   })
 
   it('an orphan step — parent not on today — is rendered nowhere, so it is not counted', () => {

@@ -6,6 +6,7 @@ import { selectNeedsAttention } from './attention'
 import { buildRoutineStatusMap, buildEventStatusMap, selectVisibleRoutines } from './statusMaps'
 import { buildGroupedSections } from './grouping'
 import { countRoutineUnits } from './routineCollections'
+import { deferredInRoutineIds } from './deferredRoutines'
 import type { ResolveRoutineCtx } from '@/lib/routineUtils'
 
 function computeIsToday(viewedDate: Date): boolean {
@@ -50,6 +51,11 @@ export function computeTodayData(input: TodayDataInput): TodayData {
     date: input.viewedDate,
     member: input.selectedAssignee,
     prefs: { hideRoutines: input.hideRoutines, domain: input.domain },
+    // A routine dragged onto this date from another day keeps its own
+    // recurrence pattern (see routineTime.ts) — rung 2 would otherwise call
+    // it 'not-today' and drop it. deferredInRoutineIds is the same
+    // cross-day-only rule useScheduleFiltering.ts uses.
+    deferredInto: deferredInRoutineIds(input.dateInstances, input.viewedDate),
   }
   // selectVisibleRoutines keeps Steps (and their collection's parent row)
   // alongside independently-visible routines — see its own docstring —

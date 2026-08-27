@@ -83,6 +83,20 @@ interface KnownDivergence {
   reason: string
 }
 
+// Corpus rows are looked up by their (stable, human-written) label rather
+// than by their auto-generated `routine.id` — createMockRoutine's ids are
+// sequential counters, so a hardcoded 'routine-21' silently points at the
+// WRONG row the moment any row is added or reordered above it in the corpus
+// array. This bit once already (fix round 2): adding two module-level
+// fixtures shifted every subsequent id by two, and the hardcoded ids below
+// quietly started naming the wrong routines. Looking up by label is immune
+// to that.
+function corpusRoutineId(label: string): string {
+  const row = VISIBILITY_CORPUS.find((r) => r.label === label)
+  if (!row) throw new Error(`todayParity KNOWN_DIVERGENCES: no corpus row labeled "${label}"`)
+  return row.routine.id
+}
+
 // The only (routine, direction) pairs where before and after are EXPECTED to
 // disagree. Anything not listed here must agree — if it doesn't, the test
 // fails on that id specifically, not on a swallowed "some mismatch somewhere."
@@ -93,9 +107,13 @@ interface KnownDivergence {
 // `src/lib/routineUtils.resolveRoutine.test.ts` (Task 1's review round).
 // They surface here again because Today is the first surface to actually
 // adopt rung 5 — that is expected, not new.
+const DEFERRAL_OVERRIDE_ID = corpusRoutineId(
+  'a deferred-in routine survives rung 2 even though its recurrence does not match',
+)
+
 const KNOWN_DIVERGENCES: readonly KnownDivergence[] = [
   {
-    routineId: 'routine-21', // "assigned_to_all wins over assigned_to when both are set"
+    routineId: corpusRoutineId('assigned_to_all wins over assigned_to when both are set'),
     direction: 'onlyBefore',
     matchesScenario: (ctx) => ctx.member === 'scott' && ctx.prefs.hideRoutines === false,
     reason:
@@ -107,7 +125,7 @@ const KNOWN_DIVERGENCES: readonly KnownDivergence[] = [
       'not a rule to preserve.',
   },
   {
-    routineId: 'routine-20', // "default_assignee is an owner when nothing else is set"
+    routineId: corpusRoutineId('default_assignee is an owner when nothing else is set'),
     direction: 'onlyAfter',
     matchesScenario: (ctx) => ctx.member === 'kaleb' && ctx.prefs.hideRoutines === false,
     reason:
@@ -116,21 +134,42 @@ const KNOWN_DIVERGENCES: readonly KnownDivergence[] = [
       'Kaleb now owns it. makeAssigneeFilter has no default_assignee fallback, so legacy never ' +
       'matched him.',
   },
+  {
+    routineId: DEFERRAL_OVERRIDE_ID,
+    direction: 'onlyAfter',
+    // Scoped to the exact scenario whose deferredInto Set names THIS routine
+    // — the corpus has a second, unrelated deferredInto scenario (the
+    // resting-routine row) that must not accidentally match here too.
+    matchesScenario: (ctx) => ctx.deferredInto?.has(DEFERRAL_OVERRIDE_ID) ?? false,
+    reason:
+      'Fix round 2 CRITICAL: a routine dragged onto another day writes a one-day `deferred_to` ' +
+      'override rather than rewriting recurrence_pattern (routineTime.ts). The resolver\'s rung 2 ' +
+      'now honors `ctx.deferredInto` and lets the placement win; `todayPipelineBefore` is frozen ' +
+      'and models only getRoutinesForDatePure (no deferral awareness at all), so it still drops ' +
+      'this routine as not-today. This is the bug the coordinator flagged, now fixed in ' +
+      '`selectVisibleRoutines`/`resolveRoutine` — legacy behavior (before) is the one that was ' +
+      'wrong here, which is exactly why this is an onlyAfter divergence rather than a regression.',
+  },
 ]
 
 // NOT a divergence, despite two corpus rows looking like one at first glance:
-// 'routine-22' ("a collection step never renders on its own") and
-// 'routine-23' ("in-collection beats everyday — rung 6 wins") both have
-// parent_routine_id set. Neither legacy nor the migrated
-// `selectVisibleRoutines` drops a Step from the POOL — legacy never excluded
-// steps at all, and the migrated function deliberately retains any row whose
-// only resolveRoutine reason is 'in-collection' so grouping.ts/
-// routineCollections.ts can still reconstruct the collection downstream. So
-// before and after AGREE on both ids (both keep them) — there is nothing to
-// list here. They only looked like failures in an earlier, incorrect version
-// of this test that compared `before` against the corpus's `expected`
-// column, which encodes resolveRoutine's per-row verdict ('in-collection' =
-// not on its own), not pool membership.
+// 'a collection step never renders on its own' and 'in-collection beats
+// everyday — rung 6 wins' both have parent_routine_id set. Neither legacy
+// nor the migrated `selectVisibleRoutines` drops a Step from the POOL —
+// legacy never excluded steps at all, and the migrated function deliberately
+// retains any row whose only resolveRoutine reason is 'in-collection' so
+// grouping.ts/routineCollections.ts can still reconstruct the collection
+// downstream. So before and after AGREE on both ids (both keep them) — there
+// is nothing to list here. They only looked like failures in an earlier,
+// incorrect version of this test that compared `before` against the
+// corpus's `expected` column, which encodes resolveRoutine's per-row verdict
+// ('in-collection' = not on its own), not pool membership.
+//
+// Also not a divergence: 'the same routine, without the deferral recorded,
+// still fails rung 2' and 'a deferral does not leapfrog rung 1 — resting
+// still wins'. Both behave identically before and after — no deferredInto
+// membership means rung 2 runs unmodified (same as always), and rung 1
+// short-circuits before rung 2 is ever reached regardless of deferredInto.
 
 function isKnownDivergence(routineId: string, direction: Direction, ctx: ResolveRoutineCtx): boolean {
   return KNOWN_DIVERGENCES.some(

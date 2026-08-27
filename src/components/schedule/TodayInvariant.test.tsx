@@ -98,6 +98,7 @@ function baseInput(over: Partial<TodayDataInput> = {}): TodayDataInput {
     viewedDate,
     selectedAssignee: null,
     hideRoutines: false,
+    domain: 'universal',
     weekStart: sundayOfWeek(viewedDate),
     ...over,
   }

@@ -15,6 +15,10 @@ export function corpusScenarios(rows: readonly CorpusRow[]): Map<string, CorpusR
       member: row.ctx.member ?? null,
       prefs: row.ctx.prefs,
       lastCompletedAt: row.ctx.lastCompletedAt?.toISOString() ?? null,
+      // Which ids a deferral placed onto `date` is part of the scenario, not
+      // an incidental detail — two rows that differ only here are being
+      // asked different questions and must not share one representative ctx.
+      deferredInto: row.ctx.deferredInto ? [...row.ctx.deferredInto].sort() : null,
     })
     const arr = byCtx.get(key) ?? []
     arr.push(row)

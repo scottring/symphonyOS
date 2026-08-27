@@ -196,7 +196,7 @@ export function getRoutinesForDatePure(
 export type RoutineHideReason =
   | 'shows'
   | 'resting'        // rung 1 — visibility !== 'active'
-  | 'not-today'      // rung 2 — recurrence doesn't match the date
+  | 'not-today'      // rung 2 — recurrence doesn't match the date (unless deferred in)
   | 'off'            // rung 3 — show_on_timeline === false
   | 'other-domain'   // rung 4 — fails the domain lens
   | 'not-theirs'     // rung 5 — the selected member isn't an owner
@@ -217,6 +217,10 @@ export interface ResolveRoutineCtx {
   prefs: RoutinePrefs
   /** Required only for 'since_last' recurrence; see matchesRecurrenceForDate. */
   lastCompletedAt?: Date | null
+  /** Routine ids explicitly placed onto `date` by a deferral, regardless of
+   *  recurrence. An instance-level override of rung 2: the user put it here,
+   *  so the pattern does not get to veto it. */
+  deferredInto?: ReadonlySet<string>
 }
 
 export interface RoutineResolution {
@@ -272,7 +276,10 @@ export function resolveRoutine(routine: Routine, ctx: ResolveRoutineCtx): Routin
   const hide = (reason: RoutineHideReason): RoutineResolution => ({ shows: false, reason, owners })
 
   if (routine.visibility !== 'active') return hide('resting')
-  if (!matchesRecurrenceForDate(routine, ctx.date, ctx.lastCompletedAt ?? null)) return hide('not-today')
+  const isDeferredInToday = ctx.deferredInto?.has(routine.id) ?? false
+  if (!isDeferredInToday && !matchesRecurrenceForDate(routine, ctx.date, ctx.lastCompletedAt ?? null)) {
+    return hide('not-today')
+  }
   if (routine.show_on_timeline === false) return hide('off')
   if (ctx.prefs.domain !== 'universal' && routine.context !== ctx.prefs.domain) return hide('other-domain')
   if (!matchesOwners(owners, ctx.member)) return hide('not-theirs')

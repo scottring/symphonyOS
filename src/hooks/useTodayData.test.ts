@@ -8,7 +8,7 @@ function baseInput(over: Partial<TodayDataInput> = {}): TodayDataInput {
   const viewedDate = over.viewedDate ?? new Date()
   return {
     tasks: [], events: [], routines: [], dateInstances: [],
-    viewedDate, selectedAssignee: null, hideRoutines: false,
+    viewedDate, selectedAssignee: null, hideRoutines: false, domain: 'universal',
     weekStart: sundayOfWeek(viewedDate), ...over,
   }
 }

@@ -27,6 +27,14 @@ const ctx = (o: Partial<ResolveRoutineCtx> = {}): ResolveRoutineCtx => ({
   ...o,
 })
 
+// Fixed instances (not built inline) so a deferral row and its "same routine,
+// no deferral" counterpart below can both reference the identical id.
+const DEFERRED_ROUTINE = base({ recurrence_pattern: { type: 'weekly', days: ['fri'] } })
+const DEFERRED_RESTING_ROUTINE = base({
+  recurrence_pattern: { type: 'weekly', days: ['fri'] },
+  visibility: 'reference',
+})
+
 export const VISIBILITY_CORPUS: CorpusRow[] = [
   // --- rung 8: shows ---
   { label: 'plain active daily routine', routine: base(), ctx: ctx(), expected: 'shows' },
@@ -70,6 +78,30 @@ export const VISIBILITY_CORPUS: CorpusRow[] = [
     routine: base({ recurrence_pattern: { type: 'since_last', interval: 2, unit: 'weeks' } }),
     ctx: ctx({ lastCompletedAt: new Date(2026, 7, 23) }),
     expected: 'not-today',
+  },
+
+  // --- rung 2 override: a cross-day deferral (dragged onto CORPUS_DATE) ---
+  // A drag writes a one-day `deferred_to` override rather than rewriting
+  // `recurrence_pattern` (see routineTime.ts) — so `deferredInto` has to let
+  // the instance-level placement win over the pattern's own verdict, without
+  // reaching past rung 1.
+  {
+    label: 'a deferred-in routine survives rung 2 even though its recurrence does not match',
+    routine: DEFERRED_ROUTINE,
+    ctx: ctx({ deferredInto: new Set([DEFERRED_ROUTINE.id]) }),
+    expected: 'shows',
+  },
+  {
+    label: 'the same routine, without the deferral recorded, still fails rung 2',
+    routine: DEFERRED_ROUTINE,
+    ctx: ctx(),
+    expected: 'not-today',
+  },
+  {
+    label: 'a deferral does not leapfrog rung 1 — resting still wins',
+    routine: DEFERRED_RESTING_ROUTINE,
+    ctx: ctx({ deferredInto: new Set([DEFERRED_RESTING_ROUTINE.id]) }),
+    expected: 'resting',
   },
 
   // --- rung 3: off ---
