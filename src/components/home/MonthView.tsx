@@ -3,6 +3,8 @@ import type { Task } from '@/types/task'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine, ActionableInstance } from '@/types/actionable'
 import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
+import { resolveRoutine } from '@/lib/routineUtils'
+import type { PlanningDomain } from '@/lib/today/domainFilter'
 
 // Inline SVG icons
 function ChevronLeftIcon({ className }: { className?: string }) {
@@ -30,6 +32,8 @@ interface MonthViewProps {
   onMonthChange: (date: Date) => void
   onSelectDay: (date: Date) => void
   selectedAssignee?: string | null
+  /** The active domain lens (rung 4). Defaults to 'universal' (no-op). */
+  currentDomain?: PlanningDomain
   eventNotesMap?: Map<string, { assignedTo?: string | null }>
 }
 
@@ -107,6 +111,7 @@ export function MonthView({
   onMonthChange,
   onSelectDay,
   selectedAssignee,
+  currentDomain = 'universal',
   eventNotesMap,
 }: MonthViewProps) {
   // Generate calendar grid
@@ -160,25 +165,14 @@ export function MonthView({
         return eventDate >= date && eventDate < nextDate
       })
 
-      // Only active routines
-      const activeRoutines = routines.filter((r) =>
-        r.visibility === 'active' &&
-        r.show_on_timeline !== false &&
-        matchesAssigneeFilter(r.assigned_to, r.assigned_to_all)
-      )
-
-      // Count routines that apply to this day of week
-      const dayOfWeek = date.getDay()
-      const dayNames = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday']
-      const dayName = dayNames[dayOfWeek]
-
-      const dayRoutineCount = activeRoutines.filter((routine) => {
-        if (!routine.recurrence_pattern) return false
-        const pattern = routine.recurrence_pattern
-        if (pattern.type === 'daily') return true
-        if (pattern.type === 'weekly' && pattern.days?.includes(dayName)) return true
-        return false
-      }).length
+      // One rule for routine visibility, shared with Today and the wall.
+      const dayRoutineCount = routines.filter((r) =>
+        resolveRoutine(r, {
+          date,
+          member: selectedAssignee ?? null,
+          prefs: { hideRoutines: false, domain: currentDomain },
+        }).shows
+      ).length
 
       days.push({
         date,
@@ -194,7 +188,7 @@ export function MonthView({
     }
 
     return days
-  }, [monthStart, tasks, events, routines, dateInstances, selectedAssignee, eventNotesMap])
+  }, [monthStart, tasks, events, routines, dateInstances, selectedAssignee, currentDomain, eventNotesMap])
 
   // Format month label
   const monthLabel = useMemo(() => {

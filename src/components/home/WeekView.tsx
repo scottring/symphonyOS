@@ -8,6 +8,8 @@ import { daySectionMeta } from '@/lib/daySectionMeta'
 import { emptySections } from '@/lib/today/types'
 import { taskToTimelineItem, eventToTimelineItem, routineToTimelineItem } from '@/types/timeline'
 import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
+import { resolveRoutine } from '@/lib/routineUtils'
+import type { PlanningDomain } from '@/lib/today/domainFilter'
 
 // Inline SVG icons
 function ChevronLeftIcon({ className }: { className?: string }) {
@@ -35,6 +37,8 @@ interface WeekViewProps {
   onWeekChange: (date: Date) => void
   onSelectDay: (date: Date) => void
   selectedAssignee?: string | null  // null = "All", "unassigned" = unassigned only
+  /** The active domain lens (rung 4). Defaults to 'universal' (no-op). */
+  currentDomain?: PlanningDomain
   eventNotesMap?: Map<string, { assignedTo?: string | null }>
 }
 
@@ -186,6 +190,7 @@ export function WeekView({
   onWeekChange,
   onSelectDay,
   selectedAssignee,
+  currentDomain = 'universal',
   eventNotesMap,
 }: WeekViewProps) {
   // Generate 7 days of the week
@@ -234,11 +239,13 @@ export function WeekView({
         return eventDate >= date && eventDate < nextDate
       })
 
-      // Only active routines (visibility === 'active') and matching assignee filter
+      // One rule for routine visibility, shared with Today and the wall.
       const activeRoutines = routines.filter((r) =>
-        r.visibility === 'active' &&
-        r.show_on_timeline !== false &&
-        matchesAssigneeFilter(r.assigned_to, r.assigned_to_all)
+        resolveRoutine(r, {
+          date,
+          member: selectedAssignee ?? null,
+          prefs: { hideRoutines: false, domain: currentDomain },
+        }).shows
       )
 
       // Convert to timeline items and group by section
@@ -276,7 +283,7 @@ export function WeekView({
     }
 
     return days
-  }, [weekStart, tasks, events, routines, dateInstances, selectedAssignee, eventNotesMap])
+  }, [weekStart, tasks, events, routines, dateInstances, selectedAssignee, currentDomain, eventNotesMap])
 
   // Format week label
   const weekLabel = useMemo(() => {

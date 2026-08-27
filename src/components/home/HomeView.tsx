@@ -90,13 +90,6 @@ export function HomeView({
     () => filterRoutinesForDomain(routines, currentDomain),
     [routines, currentDomain])
 
-  // All active routines, domain-filtered — used by Week/Month which do their
-  // own per-day recurrence matching. filteredRoutines is today-filtered and
-  // unsuitable for multi-day views.
-  const filteredAllActiveRoutines = useMemo(
-    () => filterRoutinesForDomain(allActiveRoutines, currentDomain),
-    [allActiveRoutines, currentDomain])
-
   const filteredProjects = useMemo(() => {
     if (currentDomain === 'universal') return projects
     return projects.filter(project => project.context === currentDomain)
@@ -262,12 +255,13 @@ export function HomeView({
         <MonthView
           tasks={filteredTasks}
           events={filteredEvents}
-          routines={filteredAllActiveRoutines}
+          routines={allActiveRoutines}
           dateInstances={dateInstances}
           monthStart={monthStart}
           onMonthChange={setMonthStart}
           onSelectDay={handleSelectDay}
           selectedAssignee={selectedAssigneeForSchedule}
+          currentDomain={currentDomain}
           eventNotesMap={ctx.eventNotesMap}
         />
       )
@@ -284,12 +278,14 @@ export function HomeView({
           <WeekViewV2
             tasks={filteredTasks}
             events={filteredEvents}
-            routines={filteredAllActiveRoutines}
+            routines={allActiveRoutines}
             dateInstances={dateInstances}
             weekStart={mondayStart}
             dayCount={5}
             onWeekChange={(d) => setWeekStart(sundayOfWeek(d))}
             selectedAssignee={selectedAssigneeForSchedule}
+            selectedAssignees={selectedAssignees}
+            currentDomain={currentDomain}
             onSelectItem={onSelectItem}
             onUpdateTask={ctx.onUpdateTask ?? (() => {})}
             onUpdateRoutine={ctx.onUpdateRoutine ?? (() => {})}
@@ -299,9 +295,11 @@ export function HomeView({
           <WeekViewMobile
             tasks={filteredTasks}
             events={filteredEvents}
-            routines={filteredAllActiveRoutines}
+            routines={allActiveRoutines}
             weekStart={mondayStart}
             dayCount={5}
+            selectedAssignees={selectedAssignees}
+            currentDomain={currentDomain}
             onSelectItem={onSelectItem}
           />
         </>
@@ -315,12 +313,13 @@ export function HomeView({
           <WeekView
             tasks={filteredTasks}
             events={filteredEvents}
-            routines={filteredAllActiveRoutines}
+            routines={allActiveRoutines}
             dateInstances={dateInstances}
             weekStart={weekStart}
             onWeekChange={setWeekStart}
             onSelectDay={handleSelectDay}
             selectedAssignee={selectedAssigneeForSchedule}
+            currentDomain={currentDomain}
             eventNotesMap={ctx.eventNotesMap}
           />
         )
@@ -330,11 +329,13 @@ export function HomeView({
           <WeekViewV2
             tasks={filteredTasks}
             events={filteredEvents}
-            routines={filteredAllActiveRoutines}
+            routines={allActiveRoutines}
             dateInstances={dateInstances}
             weekStart={weekStart}
             onWeekChange={(d) => setWeekStart(sundayOfWeek(d))}
             selectedAssignee={selectedAssigneeForSchedule}
+            selectedAssignees={selectedAssignees}
+            currentDomain={currentDomain}
             onSelectItem={onSelectItem}
             onUpdateTask={ctx.onUpdateTask ?? (() => {})}
             onUpdateRoutine={ctx.onUpdateRoutine ?? (() => {})}
@@ -344,8 +345,10 @@ export function HomeView({
           <WeekViewMobile
             tasks={filteredTasks}
             events={filteredEvents}
-            routines={filteredAllActiveRoutines}
+            routines={allActiveRoutines}
             weekStart={weekStart}
+            selectedAssignees={selectedAssignees}
+            currentDomain={currentDomain}
             onSelectItem={onSelectItem}
           />
         </>

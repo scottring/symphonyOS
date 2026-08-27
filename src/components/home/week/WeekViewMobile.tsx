@@ -3,7 +3,9 @@ import type { Task } from '@/types/task'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine } from '@/types/actionable'
 import { readHideRoutines, onHideRoutinesChange } from '@/lib/hideRoutinesSignal'
-import { isEverydayRoutine, matchesRecurrenceForDate } from '@/lib/routineUtils'
+import { resolveRoutine } from '@/lib/routineUtils'
+import type { AssigneeFilter } from '@/lib/today/types'
+import type { PlanningDomain } from '@/lib/today/domainFilter'
 
 interface WeekViewMobileProps {
   tasks: Task[]
@@ -12,6 +14,10 @@ interface WeekViewMobileProps {
   weekStart: Date
   /** Number of day sections to render. Default 7. */
   dayCount?: 5 | 7
+  /** Multi-select assignee filter (rung 5). */
+  selectedAssignees?: AssigneeFilter
+  /** The active domain lens (rung 4). Defaults to 'universal' (no-op). */
+  currentDomain?: PlanningDomain
   onSelectItem: (id: string) => void
 }
 
@@ -29,6 +35,8 @@ export function WeekViewMobile({
   routines,
   weekStart,
   dayCount = 7,
+  selectedAssignees,
+  currentDomain = 'universal',
   onSelectItem,
 }: WeekViewMobileProps) {
   const weekEnd = useMemo(() => {
@@ -80,21 +88,15 @@ export function WeekViewMobile({
       }
     }
 
-    // Routines mirror Today's visibility rules:
-    //   1. show_on_timeline === false → never render.
-    //   2. "Hide daily" toggle drops everyday-ish routines (daily, weekdays,
-    //      weekly-covering-all-5). Lower-frequency routines always show.
-    //   3. For each day, only render when matchesRecurrenceForDate is true —
-    //      so a Mon–Fri routine doesn't appear on Sat/Sun.
-    const showable = routines.filter((r) => r.show_on_timeline !== false)
-    const visibleRoutines = hideRoutines
-      ? showable.filter((r) => !isEverydayRoutine(r.recurrence_pattern))
-      : showable
+    // One rule for routine visibility, shared with Today and the wall.
+    // Evaluated per day since rung 2 (recurrence) depends on the date.
     for (let i = 0; i < dayCount; i++) {
       const d = new Date(weekStartMidnight)
       d.setDate(d.getDate() + i)
-      for (const r of visibleRoutines) {
-        if (!matchesRecurrenceForDate(r, d)) continue
+      for (const r of routines) {
+        if (!resolveRoutine(r, { date: d, member: selectedAssignees, prefs: { hideRoutines, domain: currentDomain } }).shows) {
+          continue
+        }
         const time = r.time_of_day ?? null
         buckets[i].push({
           id: `routine-${r.id}-day${i}`,
@@ -117,7 +119,7 @@ export function WeekViewMobile({
 
     return buckets
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tasks, events, routines, weekStart, dayCount, hideRoutines])
+  }, [tasks, events, routines, weekStart, dayCount, hideRoutines, selectedAssignees, currentDomain])
 
   const dayName = (i: number) => {
     const d = new Date(weekStart)

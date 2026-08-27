@@ -23,7 +23,9 @@ import { useGridCreate } from './useGridCreate'
 import { SlotQuickCreatePopover, type CreateType } from './SlotQuickCreatePopover'
 import { Eye, EyeOff } from 'lucide-react'
 import { readHideRoutines, writeHideRoutines, onHideRoutinesChange } from '@/lib/hideRoutinesSignal'
-import { isEverydayRoutine, matchesRecurrenceForDate } from '@/lib/routineUtils'
+import { resolveRoutine } from '@/lib/routineUtils'
+import type { AssigneeFilter } from '@/lib/today/types'
+import type { PlanningDomain } from '@/lib/today/domainFilter'
 
 const EDGE_PX = 40
 
@@ -37,6 +39,11 @@ interface WeekViewV2Props {
   weekStart: Date
   onWeekChange: (d: Date) => void
   selectedAssignee?: string | null
+  /** Multi-select assignee filter (rung 5). Superset of `selectedAssignee`;
+   *  when provided it drives resolveRoutine directly. */
+  selectedAssignees?: AssigneeFilter
+  /** The active domain lens (rung 4). Defaults to 'universal' (no-op). */
+  currentDomain?: PlanningDomain
   onSelectItem: (id: string | null) => void
   onUpdateTask: (taskId: string, updates: Partial<Task>) => Promise<void> | void
   onUpdateEvent: (eventId: string, updates: { startTime: Date; endTime: Date }) => Promise<void> | void
@@ -54,6 +61,8 @@ export function WeekViewV2(props: WeekViewV2Props) {
     routines,
     weekStart,
     onWeekChange,
+    selectedAssignees,
+    currentDomain = 'universal',
     onSelectItem,
     onUpdateTask,
     onUpdateEvent,
@@ -224,23 +233,16 @@ export function WeekViewV2(props: WeekViewV2Props) {
   const allItems = useMemo(() => {
     const taskItems = scheduledTasks.map(taskToTimelineItem)
     const eventItems = weekEvents.map(eventToTimelineItem)
-    // Routine visibility on the week grid mirrors Today:
-    //   1. show_on_timeline === false → never render (parity with TodayView).
-    //   2. "Hide daily" toggle drops routines that effectively recur every
-    //      weekday (daily, weekdays, weekly-covering-all-5). Lower-frequency
-    //      routines (weekends, weekly, biweekly, monthly, etc.) always show.
-    //   3. For each day in the visible range, only emit a block when the
-    //      routine's recurrence_pattern actually matches that date — without
-    //      this, e.g. a Mon–Fri "Walk kids to school" also rendered Sat/Sun.
-    const showable = routines.filter((r) => r.show_on_timeline !== false)
-    const visibleRoutines = hideRoutines
-      ? showable.filter((r) => !isEverydayRoutine(r.recurrence_pattern))
-      : showable
-    const routineItems = visibleRoutines.flatMap((r) =>
+    // One rule for routine visibility, shared with Today and the wall. Rung 2
+    // is evaluated per day below, so the pool here is resolved per date rather
+    // than once for the week.
+    const routineItems = routines.flatMap((r) =>
       Array.from({ length: dayCount }, (_, i) => {
         const d = new Date(weekStart)
         d.setDate(d.getDate() + i)
-        if (!matchesRecurrenceForDate(r, d)) return null
+        if (!resolveRoutine(r, { date: d, member: selectedAssignees, prefs: { hideRoutines, domain: currentDomain } }).shows) {
+          return null
+        }
         return { ...routineToTimelineItem(r, d), id: `routine-${r.id}-day${i}` }
       }).filter((item): item is NonNullable<typeof item> => item !== null),
     )
@@ -277,7 +279,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
     }
 
     return blocks
-  }, [scheduledTasks, weekEvents, routines, weekStart, hideRoutines, dayCount, drag.activeDragId, tasks, events])
+  }, [scheduledTasks, weekEvents, routines, weekStart, hideRoutines, dayCount, drag.activeDragId, tasks, events, selectedAssignees, currentDomain])
 
   // Run the lane-placement pass over allItems. Items with a startTime outside
   // the visible week range are filtered out by layoutWeekLanes (dayIdx check).

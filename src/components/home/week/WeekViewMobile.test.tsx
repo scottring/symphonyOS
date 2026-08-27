@@ -62,7 +62,7 @@ describe('WeekViewMobile', () => {
       id: 'r-1',
       name: 'Morning meds',
       time_of_day: '08:00',
-      isActive: true,
+      visibility: 'active',
       recurrence_pattern: { type: 'daily' },
     }] as unknown as Routine[]
     const monday = new Date(2026, 4, 18)
