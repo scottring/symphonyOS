@@ -1,5 +1,5 @@
 import type { ActionableInstance, Routine } from '@/types/actionable'
-import { isEverydayRoutine } from '@/lib/routineUtils'
+import { resolveRoutine, type ResolveRoutineCtx } from '@/lib/routineUtils'
 
 /** Ports TodaySchedule.routineStatusMap (~782-799). */
 export function buildRoutineStatusMap(dateInstances: ActionableInstance[]): Map<string, ActionableInstance> {
@@ -28,24 +28,39 @@ export function buildEventStatusMap(dateInstances: ActionableInstance[]): Map<st
 }
 
 /**
- * A routine that is always kept on Today even when "hide daily routines" is on.
- * Pinned routines (an explicit per-routine override) and dosed routines (those
- * with an N-times-per-day schedule, which are tracked obligations like PT
- * exercises, not ambient habits) escape the everyday-hide sweep.
+ * The Today routine pool. resolveRoutine replaces what used to be five
+ * filters spread across useRoutines, useScheduleFiltering, HomeView, this
+ * file, and grouping.ts — with two additions layered on top, both needed to
+ * keep a routine collection (e.g. a PT-exercise checklist) intact:
+ *
+ * 1. A Step never independently "shows" — resolveRoutine's rung 6 always
+ *    calls it 'in-collection', because the collection renders it, not the
+ *    step standing alone. But grouping.ts/routineCollections.ts still need
+ *    the raw Step rows in this pool to reconstruct the collection, so a Step
+ *    is kept whenever it clears every OTHER rung (i.e. its reason is exactly
+ *    'in-collection', not an earlier one like 'not-theirs' or 'off').
+ * 2. The "hide daily routines" sweep (rung 7) is a per-row question for a
+ *    standalone routine, but a collection's own top-level row is often an
+ *    ordinary everyday routine with no pin/dose of its own — the markers
+ *    that earn an exemption ("PT exercises" dosed at 8am+6pm) usually live
+ *    on its Steps, not on the organizational parent row. So a row that
+ *    resolveRoutine would sweep as 'everyday' is kept anyway when it is
+ *    currently the parent of a Step that survived (1).
  */
-function isPinnedToTimeline(r: Routine): boolean {
-  return r.pin_to_timeline === true || (r.times_per_day?.length ?? 0) > 0
-}
+export function selectVisibleRoutines(routines: Routine[], ctx: ResolveRoutineCtx): Routine[] {
+  const resolved = routines.map((r) => ({ r, res: resolveRoutine(r, ctx) }))
 
-/** Ports TodaySchedule.visibleRoutines (~810-814). */
-export function selectVisibleRoutines(routines: Routine[], hideRoutines: boolean): Routine[] {
-  const showable = routines.filter(r => r.show_on_timeline !== false)
-  if (!hideRoutines) return showable
-  const parentIds = new Set(showable.filter(r => r.parent_routine_id).map(r => r.parent_routine_id))
-  return showable.filter(r =>
-    r.parent_routine_id != null ||           // a Step — the collection decides visibility
-    parentIds.has(r.id) ||                   // a collection parent — keep so its steps group
-    isPinnedToTimeline(r) ||
-    !isEverydayRoutine(r.recurrence_pattern),
+  const keptDirectly = resolved.filter(({ res }) => res.shows || res.reason === 'in-collection')
+  const parentIdsWithKeptSteps = new Set(
+    keptDirectly
+      .map(({ r }) => r.parent_routine_id)
+      .filter((id): id is string => id != null),
   )
+
+  return resolved
+    .filter(
+      ({ r, res }) =>
+        res.shows || res.reason === 'in-collection' || (res.reason === 'everyday' && parentIdsWithKeptSteps.has(r.id)),
+    )
+    .map(({ r }) => r)
 }

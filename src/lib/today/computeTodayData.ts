@@ -6,6 +6,7 @@ import { selectNeedsAttention } from './attention'
 import { buildRoutineStatusMap, buildEventStatusMap, selectVisibleRoutines } from './statusMaps'
 import { buildGroupedSections } from './grouping'
 import { countRoutineUnits } from './routineCollections'
+import type { ResolveRoutineCtx } from '@/lib/routineUtils'
 
 function computeIsToday(viewedDate: Date): boolean {
   const today = new Date()
@@ -45,7 +46,15 @@ export function computeTodayData(input: TodayDataInput): TodayData {
 
   const routineStatusMap = buildRoutineStatusMap(input.dateInstances)
   const eventStatusMap = buildEventStatusMap(input.dateInstances)
-  const visibleRoutines = selectVisibleRoutines(input.routines, input.hideRoutines)
+  const routineCtx: ResolveRoutineCtx = {
+    date: input.viewedDate,
+    member: input.selectedAssignee,
+    prefs: { hideRoutines: input.hideRoutines, domain: input.domain },
+  }
+  // selectVisibleRoutines keeps Steps (and their collection's parent row)
+  // alongside independently-visible routines — see its own docstring —
+  // so grouping/counting below can reconstruct collections correctly.
+  const visibleRoutines = selectVisibleRoutines(input.routines, routineCtx)
 
   // filteredEvents: viewed-date filter + dedupe (ports TodaySchedule ~752-777)
   const vY = input.viewedDate.getFullYear()

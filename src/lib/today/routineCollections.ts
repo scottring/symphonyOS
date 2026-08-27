@@ -129,8 +129,8 @@ export function countRoutineUnits(
   routineStatusMap: Map<string, ActionableInstance>,
   match: (assignedTo: string | null | undefined, assignedToAll?: readonly string[] | null) => boolean,
 ): { actionable: number; completed: number } {
-  const matched = routines.filter((r) => match(r.assigned_to, r.assigned_to_all))
-  const { collections, standalone } = groupRoutineSteps(matched)
+  // Assignee matching now happens upstream in selectVisibleRoutines (rung 5).
+  const { collections, standalone } = groupRoutineSteps(routines)
 
   let actionable = 0
   let completed = 0

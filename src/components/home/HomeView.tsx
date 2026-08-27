@@ -392,7 +392,14 @@ export function HomeView({
       <TodayView
         tasks={filteredTasks}
         events={filteredEvents}
-        routines={filteredRoutines}
+        // Domain-UNfiltered on purpose: TodayView's own pipeline now applies
+        // domain scoping via resolveRoutine (rung 4), threaded through as
+        // `domain: currentDomain`. Pre-filtering here would be harmless for
+        // Today (the filter is idempotent) but `filteredRoutines` is shared
+        // with CascadingRiverView below, which has NOT adopted the resolver
+        // yet — narrowing this shared memo instead of the prop passed here
+        // would have silently changed River's domain scoping too.
+        routines={routines}
         dateInstances={dateInstances}
         selectedItemId={selectedItemId}
         onSelectItem={onSelectItem}

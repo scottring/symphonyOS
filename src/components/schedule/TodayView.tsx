@@ -56,6 +56,7 @@ import { useSuggestionsEnabled } from '@/lib/assistant/suggestionsPref'
 import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
 import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
 import { getRoutinesForDatePure } from '@/lib/routineUtils'
+import { filterRoutinesForDomain } from '@/lib/today/domainFilter'
 import { TodayOverflowMenu } from './TodayOverflowMenu'
 import { ReviewDrawer, type ReviewMode } from './ReviewDrawer'
 import { HorizonPoolDropdown } from './HorizonPoolDropdown'
@@ -279,6 +280,11 @@ export function TodayView({
     () => weekStartAnchor(new Date(), readCadenceConfig().weekStartsOn),
     [],
   )
+  // Current life domain (work/family/personal/universal). Read here (rather
+  // than only where inline quick-capture needs it, below) so it can feed the
+  // resolver's rung 4 directly — routines no longer arrive pre-filtered by
+  // domain from HomeView.
+  const { currentDomain } = useDomain()
   const todayInput = useMemo(() => ({
     tasks,
     events,
@@ -287,13 +293,14 @@ export function TodayView({
     viewedDate,
     selectedAssignee: selectedAssignees ?? [],
     hideRoutines,
+    domain: currentDomain,
     completedLingerCutoff,
     weekStart: currentWeekStart,
     // Cast: EventNote.notes is string|null; TodayDataInput expects string|undefined — structurally compatible at runtime
     eventNotesMap: ctx.eventNotesMap as unknown as Map<string, { notes?: string; assignedTo?: string | null }> | undefined,
     eventContextOverrides: ctx.eventContextOverrides,
     getDomainForCalendar: ctx.getDomainForCalendar,
-  }), [tasks, events, routines, dateInstances, viewedDate, selectedAssignees, hideRoutines, completedLingerCutoff,
+  }), [tasks, events, routines, dateInstances, viewedDate, selectedAssignees, hideRoutines, currentDomain, completedLingerCutoff,
       currentWeekStart, ctx.eventNotesMap, ctx.eventContextOverrides, ctx.getDomainForCalendar])
 
   const data = useTodayData(todayInput)
@@ -467,9 +474,6 @@ export function TodayView({
   // are handled inline by TimelineInsertPoint via onCreate)
   const insert = useTimelineInsert()
 
-  // Current life domain (work/family/personal/universal) for inline quick-capture
-  const { currentDomain } = useDomain()
-
   // Referentially-stable parser context for inline timeline quick-capture.
   const parserContacts = useMemo(
     () => Array.from(contactsMap?.values() ?? []).map(c => ({ id: c.id, name: c.name })),
@@ -513,12 +517,16 @@ export function TodayView({
     const inboxCount = tasks.filter((t) => !t.completed && t.bucket === 'inbox').length
     const overdueCount = selectOverdue(tasks, true, matchAll).length
     const weekCount = selectHorizonPool(tasks, 'week', matchAll, currentWeekStart).length
-    const untimedRoutines = getRoutinesForDatePure(routines, viewedDate).filter(
+    // `routines` is no longer domain-pre-filtered upstream (HomeView passes it
+    // raw so the resolver can apply rung 4 itself) — scope this count to the
+    // current lens explicitly, or it would count every domain's untimed routines.
+    const domainRoutines = filterRoutinesForDomain(routines, currentDomain)
+    const untimedRoutines = getRoutinesForDatePure(domainRoutines, viewedDate).filter(
       (r) => r.recurrence_pattern?.type !== 'daily' && !r.time_of_day && r.visibility !== 'reference',
     ).length
     const isEvening = !!data.isToday && new Date().getHours() >= 17
     return computeClaritySteps({ inboxCount, overdueCount, placeableCount: weekCount + untimedRoutines, isEvening })
-  }, [tasks, routines, viewedDate, data.isToday, currentWeekStart])
+  }, [tasks, routines, viewedDate, data.isToday, currentWeekStart, currentDomain])
 
   const onClarityStep = useCallback((id: ClarityStepId) => {
     if (id === 'inbox') navigate('/inbox')

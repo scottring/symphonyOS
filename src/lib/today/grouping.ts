@@ -63,8 +63,8 @@ export function buildGroupedSections(input: GroupingInput): Record<DaySection, T
 
   // Partition by collection vs standalone; expand standalone per-dose (unchanged behavior);
   // collections become one routine-collection item via buildCollectionItem.
-  const matchedRoutines = routines.filter((routine) => match(routine.assigned_to, routine.assigned_to_all))
-  const { collections, standalone } = groupRoutineSteps(matchedRoutines)
+  // Assignee matching now happens upstream in selectVisibleRoutines (rung 5).
+  const { collections, standalone } = groupRoutineSteps(routines)
 
   const standaloneItems = standalone.flatMap((routine) =>
     expandRoutineDoses(routine).map((dose) => {

@@ -25,7 +25,7 @@ export const mixedDayInput: TodayDataInput = {
       completed: true, updatedAt: new Date() }),
   ],
   events: [], routines: [], dateInstances: [],
-  viewedDate: new Date(), selectedAssignee: null, hideRoutines: false,
+  viewedDate: new Date(), selectedAssignee: null, hideRoutines: false, domain: 'universal',
   weekStart: sundayOfWeek(TODAY),
 }
 
