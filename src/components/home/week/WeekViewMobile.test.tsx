@@ -79,6 +79,42 @@ describe('WeekViewMobile', () => {
     expect(matches).toHaveLength(7)  // default dayCount = 7
   })
 
+  it('narrows routines to the selected assignee (rung 5 wiring)', () => {
+    // Regression test for the prop-threading itself, not resolveRoutine's own
+    // member-narrowing logic (already exhaustively covered by
+    // routineUtils.resolveRoutine.test.ts). If WeekViewMobile stopped passing
+    // `member: selectedAssignees` into resolveRoutine's ctx — the exact bug
+    // this task fixed — Iris's routine would render again regardless of the
+    // selection, and this test would fail.
+    const routines = [
+      {
+        id: 'r-scott', name: 'Scott Routine', time_of_day: '08:00',
+        visibility: 'active', recurrence_pattern: { type: 'daily' },
+        assigned_to: 'scott',
+      },
+      {
+        id: 'r-iris', name: 'Iris Routine', time_of_day: '09:00',
+        visibility: 'active', recurrence_pattern: { type: 'daily' },
+        assigned_to: 'iris',
+      },
+    ] as unknown as Routine[]
+    const monday = new Date(2026, 4, 18)
+    render(
+      <WeekViewMobile
+        tasks={[]}
+        events={[]}
+        routines={routines}
+        weekStart={monday}
+        selectedAssignees={['scott']}
+        onSelectItem={() => {}}
+      />
+    )
+    // Scott's own routine still renders on every day...
+    expect(screen.getAllByText('Scott Routine')).toHaveLength(7)
+    // ...but Iris's routine — not owned by the selected member — is gone.
+    expect(screen.queryByText('Iris Routine')).toBeNull()
+  })
+
   it('renders only 5 day sections when dayCount=5', () => {
     const monday = new Date(2026, 4, 18)
     render(
