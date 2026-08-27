@@ -180,6 +180,14 @@ function isKnownDivergence(routineId: string, direction: Direction, ctx: Resolve
 describe('Today surface parity', () => {
   for (const [key, rows] of corpusScenarios(VISIBILITY_CORPUS)) {
     const ctx = rows[0].ctx
+    // date: null asks the date-AGNOSTIC question ("is this routine eligible
+    // at all"), added in Task 6 for Planning's drag pools. Today has no such
+    // mode — it always asks about one specific viewed day — and
+    // todayPipelineBefore (frozen since Step 3) calls getRoutinesForDatePure
+    // with a real Date, so it isn't meaningful to replay these scenarios
+    // through Today's pipeline at all; skip rather than teach the frozen
+    // "before" function a concept Today's real code never had.
+    if (ctx.date === null) continue
     it(`before and after agree for ${key}`, () => {
       const routines = rows.map((r) => r.routine)
       const before = recordVisible(routines, (rs) => todayPipelineBefore(rs, ctx), (r) => r.id)

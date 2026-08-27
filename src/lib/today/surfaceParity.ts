@@ -11,7 +11,7 @@ export function corpusScenarios(rows: readonly CorpusRow[]): Map<string, CorpusR
   const byCtx = new Map<string, CorpusRow[]>()
   for (const row of rows) {
     const key = JSON.stringify({
-      date: row.ctx.date.toISOString(),
+      date: row.ctx.date ? row.ctx.date.toISOString() : null,
       member: row.ctx.member ?? null,
       prefs: row.ctx.prefs,
       lastCompletedAt: row.ctx.lastCompletedAt?.toISOString() ?? null,

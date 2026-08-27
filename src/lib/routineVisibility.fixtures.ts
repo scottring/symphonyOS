@@ -104,6 +104,37 @@ export const VISIBILITY_CORPUS: CorpusRow[] = [
     expected: 'resting',
   },
 
+  // --- rung 2 override: date: null (the date-agnostic question) ---
+  // Drag POOLS (Planning's draggableRoutines) offer a routine for placement
+  // onto any of several visible days, not one specific day — a single-day
+  // recurrence check would make a routine that only recurs later in the
+  // range vanish from the pool entirely. `date: null` skips rung 2 and ONLY
+  // rung 2: every other rung still has to hide it when it should.
+  {
+    label: 'date: null skips rung 2 for a routine that recurs on no nearby day',
+    routine: base({ recurrence_pattern: { type: 'weekly', days: ['tue'] } }),
+    ctx: ctx({ date: null }),
+    expected: 'shows',
+  },
+  {
+    label: 'date: null still hides a resting routine — rung 1 is unaffected',
+    routine: base({ recurrence_pattern: { type: 'weekly', days: ['tue'] }, visibility: 'reference' }),
+    ctx: ctx({ date: null }),
+    expected: 'resting',
+  },
+  {
+    label: 'date: null still hides an off-timeline routine — rung 3 is unaffected',
+    routine: base({ recurrence_pattern: { type: 'weekly', days: ['tue'] }, show_on_timeline: false }),
+    ctx: ctx({ date: null }),
+    expected: 'off',
+  },
+  {
+    label: 'date: null still hides a collection step — rung 6 is unaffected',
+    routine: base({ recurrence_pattern: { type: 'weekly', days: ['tue'] }, parent_routine_id: 'some-parent' }),
+    ctx: ctx({ date: null }),
+    expected: 'in-collection',
+  },
+
   // --- rung 3: off ---
   { label: 'show_on_timeline false', routine: base({ show_on_timeline: false }), ctx: ctx(), expected: 'off' },
   {
