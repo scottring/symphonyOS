@@ -29,10 +29,26 @@
 //   - a check inside a .test.ts file (excluded on purpose — tests may assert
 //     on raw columns, and the parity tests must)
 //   - a check in supabase/functions or connectors, which do not render
+//   - anything inside a directory named `__fixtures__` (currently only
+//     `lib/today/__fixtures__`) — walked past entirely by `sourceFiles`, the
+//     same way `node_modules` is. No live evasion exists today; this is
+//     listed because the value of this list is being complete, not because
+//     anyone is using it that way.
 //
 // It DOES match comments as well as code. Deliberate, not a bug: a comment
 // naming one of these flags almost always sits beside logic that reads it,
 // and the false positives are cheap to reword.
+//
+// The bigger honesty gap: this guard only watches rungs 1, 3, and 7
+// (`visibility`, `show_on_timeline`, `isEverydayRoutine`). A new call site
+// can reimplement rung 6 via `parent_routine_id`, rung 2 via
+// `getRoutinesForDatePure`/`matchesRecurrenceForDate`, rung 4 via
+// `filterRoutinesForDomain`, or rung 5 via `makeAssigneeFilter`, and this
+// test will stay green. Those identifiers are deliberately NOT added to
+// PRIMITIVES — they are legitimately used all over the codebase for things
+// that have nothing to do with visibility, and watching them would make this
+// guard noisy enough that someone deletes it. Documenting the limit honestly
+// here is the correct trade-off, not a TODO.
 import { describe, it, expect } from 'vitest'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
@@ -83,9 +99,17 @@ const ALLOWED = new Map<string, string>([
   ['components/wall-v2/wallGantt.ts', 'bar sizing reads everyday-ness for density, not visibility'],
   [
     'hooks/useWallData.ts',
-    'TEMPORARY: pending Task 8b — the wall cannot adopt rung 3 until the ' +
-      'show_on_timeline data audit and backfill are done; remove this entry ' +
-      'when 8b lands.',
+    'TEMPORARY: pending Task 8b — useWallData adopts the ladder. It ' +
+      'currently hand-rolls FOUR of the ladder\'s questions itself: :268 is ' +
+      'a hand-rolled rung 1 (`visibility === \'active\'`) PLUS a hardcoded ' +
+      'rung 4 (`context === \'family\'`), and :313 (`getRoutinesForDatePure`) ' +
+      'is a hand-rolled rung 2; rungs 5/6/7 are answered downstream in ' +
+      'wallGantt/wallV2Adapter. Rung 3 (show_on_timeline) is the one it ' +
+      'cannot adopt yet — that is blocked on the show_on_timeline data ' +
+      'audit and backfill. Remove this entry only once the wall reads the ' +
+      'ladder for all of it; do not adopt any of this piecemeal without ' +
+      'auditing wall data first — a naive switch has deleted the kids\' ' +
+      'morning/bedtime routines from the kiosk before.',
   ],
 ])
 

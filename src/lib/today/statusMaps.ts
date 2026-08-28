@@ -40,12 +40,28 @@ export function buildEventStatusMap(dateInstances: ActionableInstance[]): Map<st
  *    is kept whenever it clears every OTHER rung (i.e. its reason is exactly
  *    'in-collection', not an earlier one like 'not-theirs' or 'off').
  * 2. The "hide daily routines" sweep (rung 7) is a per-row question for a
- *    standalone routine, but a collection's own top-level row is often an
- *    ordinary everyday routine with no pin/dose of its own — the markers
- *    that earn an exemption ("PT exercises" dosed at 8am+6pm) usually live
- *    on its Steps, not on the organizational parent row. So a row that
- *    resolveRoutine would sweep as 'everyday' is kept anyway when it is
- *    currently the parent of a Step that survived (1).
+ *    standalone routine. It also has to handle the case where a collection's
+ *    parent row is itself active and an ordinary everyday routine with no
+ *    pin/dose of its own — the markers that earn an exemption ("PT
+ *    exercises" dosed at 8am+6pm) usually live on its Steps, not on the
+ *    organizational parent row. So a row that resolveRoutine would sweep as
+ *    'everyday' is kept anyway when it is currently the parent of a Step
+ *    that survived (1).
+ *
+ *    This rescue is narrow, and does NOT cover the more common collection
+ *    shape: a parent that is resting (`visibility: 'reference'` — see
+ *    routineUtils.ts's `effectiveTimeOfDay` docstring and its "Camp
+ *    Mornings" example, which is the real shape, per useWallData.ts's own
+ *    comment that a collection parent "is typically 'reference'"). A
+ *    resting parent is hidden at rung 1, long before rung 7's sweep ever
+ *    runs, and this retention layer only ever rescues an 'everyday' reason
+ *    — never 'resting'. So a resting-parent collection is NOT rescued:
+ *    groupRoutineSteps never finds the parent row, its Steps are orphaned,
+ *    and the whole collection renders nothing on Today. That matches the
+ *    legacy pipeline (todayParity.test.ts's "before" recording also
+ *    filtered to only-active routines first) and is pinned by
+ *    computeTodayData.test.ts's orphan-step case — it is not a regression
+ *    from this refactor.
  */
 export function selectVisibleRoutines(routines: Routine[], ctx: ResolveRoutineCtx): Routine[] {
   const resolved = routines.map((r) => ({ r, res: resolveRoutine(r, ctx) }))

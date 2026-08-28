@@ -76,9 +76,23 @@ const laterInWeekRoutine = createMockRoutine({
   time_of_day: null,
 })
 
+// Negative control: this routine is date-agnostically INeligible — resting
+// (`visibility: 'reference'`, resolveRoutine's rung 1) — not merely absent
+// from one day's recurrence. It is otherwise identical to the routine above
+// (untimed, so it clears the isDraggableRoutine check) so the only thing
+// that can exclude it is resolveRoutineEligible's own verdict. Without this,
+// the test above only proves an included routine is present — swapping
+// `.shows` for `true` in the production filter would still pass it.
+const restingRoutine = createMockRoutine({
+  id: 'r-resting',
+  name: 'Resting routine',
+  visibility: 'reference',
+  time_of_day: null,
+})
+
 vi.mock('@/hooks/useRoutines', () => ({
   useRoutines: () => ({
-    routines: [laterInWeekRoutine],
+    routines: [laterInWeekRoutine, restingRoutine],
     getRoutinesForDate: () => [],
   }),
 }))
@@ -99,5 +113,20 @@ describe('GuidedSessionContainer — draggableRoutines is date-agnostic (fix rou
 
     expect(screen.getByText('Thursday-only errand')).toBeInTheDocument()
     expect(capturedDraggableRoutines.map((r) => r.id)).toContain('r-thursday-only')
+  })
+
+  it('excludes a resting routine from the drag pool (negative control)', () => {
+    resetIdCounter()
+    capturedDraggableRoutines = []
+    render(
+      <GuidedSessionContainer
+        horizon="weekly"
+        onClose={vi.fn()}
+        onScheduleRoutine={vi.fn()}
+      />
+    )
+
+    expect(screen.queryByText('Resting routine')).not.toBeInTheDocument()
+    expect(capturedDraggableRoutines.map((r) => r.id)).not.toContain('r-resting')
   })
 })

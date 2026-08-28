@@ -63,6 +63,18 @@ export function isEverydayRoutine(rp?: RecurrencePattern | null): boolean {
  * still ahead?" has to answer yes forever. On the kitchen wall that put the
  * whole camp-morning checklist on the board at 7:33pm.
  *
+ * A collection parent being resting (`visibility: 'reference'`) like this is
+ * the normal, unremarkable shape — see `useWallData.ts`'s own comment: "a
+ * routine collection is 'reference' (it never renders itself)". On Today,
+ * that means `resolveRoutine`'s rung 1 hides the parent outright, and
+ * `selectVisibleRoutines`'s retention layer (today/statusMaps.ts) does NOT
+ * rescue it — that layer only rescues a parent whose resolve reason is
+ * `'everyday'` (rung 7), never `'resting'` (rung 1). So a resting parent's
+ * Steps are orphaned: `groupRoutineSteps` never finds the parent row to
+ * attach them to, and the whole collection renders nothing on Today. That's
+ * expected, not a bug — this function exists for surfaces like the wall that
+ * need a routine's hour independent of whether Today would show it at all.
+ *
  * One level only: a Step's parent is a collection, and a collection has no
  * parent. Walking further would just be a place for a cycle to hide.
  */
