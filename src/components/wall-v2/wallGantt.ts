@@ -162,6 +162,13 @@ export interface GanttBoard {
  * bar draws with, but if that ever drifts out of sync again, this recovers a
  * human-readable label from the board data already on screen — so the tap
  * flashes the item's title instead of dead-ending silently.
+ *
+ * This already does real work today, not just defensively: adaptTimelineSections'
+ * dedupeRoutines collapses two same-title routines (e.g. two kids' "Get
+ * undressed") onto ONE id, but this board draws a bar per instance with no
+ * such dedupe — so the second kid's bar has an id `adaptTimelineSections`
+ * never carries, and this is what turns that tap into a title flash instead
+ * of a dead end.
  */
 export function titleForBlockId(board: GanttBoard, itemId: string): string | null {
   for (const track of board.tracks) {

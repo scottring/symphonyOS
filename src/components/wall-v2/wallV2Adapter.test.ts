@@ -19,6 +19,7 @@ import {
   adaptWeather,
   adaptOverdueSection,
 } from './wallV2Adapter';
+import { adaptGanttBoard } from './wallGantt';
 
 function makeItem(partial: Partial<TimelineItem>): TimelineItem {
   return {
@@ -480,6 +481,72 @@ describe('adaptTimelineSections — rhythm only', () => {
     const sections = adaptTimelineSections(day, [], now, null, false, []);
     const titles = sections.flatMap((s) => s.events.map((e) => e.title));
     expect(titles).toContain('Untimed chore');
+  });
+});
+
+describe('the tap-lookup join: every event/task bar the board draws must be findable in the tap lookup', () => {
+  // This is the actual failure mode the wall shipped with: two pure adapters
+  // (adaptGanttBoard, which draws the board's bars, and adaptTimelineSections,
+  // which WallV2Shell's handleTapLane searches by id) drifted out of id-space
+  // sync. The two tests above each verify one side in isolation — this test
+  // feeds ONE fixture to BOTH adapters and asserts the join, which is what
+  // would actually have caught the regression.
+  it('every event/task block id from adaptGanttBoard is present among adaptTimelineSections output ids', () => {
+    const now = new Date(2026, 4, 20, 9, 0);
+    const scott: FamilyMember = { id: 's', name: 'Scott', initials: 'SK', color: 'blue' } as FamilyMember;
+
+    const eventItem = makeItem({
+      id: 'join-event-1', type: 'event', title: 'Dentist', assignedTo: 's',
+      startTime: new Date(2026, 4, 20, 10, 0), endTime: new Date(2026, 4, 20, 11, 0),
+    });
+    const taskItem = makeItem({
+      id: 'join-task-1', type: 'task', title: 'Call plumber', assignedTo: 's',
+      startTime: new Date(2026, 4, 20, 12, 0), endTime: new Date(2026, 4, 20, 12, 30),
+    });
+    // Included in the fixture per the brief, but deliberately NOT asserted on
+    // below — see the comment ahead of the join assertion for why.
+    const routineItem = makeItem({
+      id: 'join-routine-1', type: 'routine', title: 'Brush teeth', assignedTo: 's',
+      startTime: new Date(2026, 4, 20, 8, 0),
+    });
+
+    const dayFixture = makeDay({
+      isToday: true,
+      items: {
+        allday: [],
+        morning: [eventItem, taskItem, routineItem],
+        afternoon: [], evening: [], unscheduled: [],
+      },
+    });
+
+    // Same fixture into BOTH pure adapters.
+    const board = adaptGanttBoard([scott], [dayFixture], now);
+    const sections = adaptTimelineSections(dayFixture, [scott], now, null, false, []);
+
+    const eventTaskBlockIds = board.tracks
+      .flatMap((t) => t.blocks)
+      .filter((b) => b.type === 'event' || b.type === 'task')
+      .map((b) => b.id);
+
+    // Positive control: the fixture actually produced event/task blocks, with
+    // the exact ids expected — a join assertion over an empty (or wrong)
+    // block list would pass vacuously, which is the shape this plan has been
+    // bitten by before.
+    expect(eventTaskBlockIds.sort()).toEqual(['join-event-1', 'join-task-1']);
+
+    // Scoped to event/task deliberately — routines legitimately diverge here.
+    // dedupeRoutines (inside adaptTimelineSections) merges same-title
+    // routines under ONE id, while the board draws a bar per routine
+    // instance (by design — see dedupeRoutines' own comment); the SECOND
+    // routine bar's tap is covered by WallV2Shell's titleForBlockId fallback,
+    // not by this array. A naive "every block id must appear in timeline"
+    // assertion would fail on that legitimate divergence and get weakened by
+    // whoever hits it next — so this encodes the real invariant (every
+    // event/timed-task bar, which the action sheet can actually act on via
+    // Skip/Mark done/Push, must be tap-findable), not the aspirational one.
+    const timelineIds = sections.flatMap((s) => s.events).map((e) => e.id);
+    const missing = eventTaskBlockIds.filter((id) => !timelineIds.includes(id));
+    expect(missing).toEqual([]);
   });
 });
 
