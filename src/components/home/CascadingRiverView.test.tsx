@@ -209,4 +209,40 @@ describe('CascadingRiverView responds to the "hide daily routines" toggle', () =
 
     expect(screen.getByText('Daily Routine')).toBeInTheDocument()
   })
+
+  // rung 7 of resolveRoutine (routineUtils.ts) has an explicit escape: a
+  // pinned (pin_to_timeline) or dosed (times_per_day) everyday routine must
+  // SURVIVE the "hide daily routines" sweep — that's how medication/PT
+  // tracking stays visible even with the toggle on. The plain routine
+  // disappearing is its own positive control here: it proves the sweep
+  // actually ran, so the pinned routine's survival can't be a false pass
+  // from the sweep simply never firing.
+  it('sweeps a plain everyday routine but keeps a pinned one, once the toggle is on', () => {
+    const plain = createMockRoutine({
+      name: 'Daily Routine',
+      assigned_to: 'scott',
+      time_of_day: '09:00',
+    }) // factory default recurrence: daily, unpinned
+    const pinned = createMockRoutine({
+      name: 'Pinned Med Routine',
+      assigned_to: 'scott',
+      time_of_day: '10:00',
+      pin_to_timeline: true,
+    })
+
+    render(<CascadingRiverView {...BASE_PROPS} routines={[plain, pinned]} />)
+
+    expect(screen.getByText('Daily Routine')).toBeInTheDocument()
+    expect(screen.getByText('Pinned Med Routine')).toBeInTheDocument()
+
+    act(() => writeHideRoutines(true))
+
+    expect(screen.queryByText('Daily Routine')).not.toBeInTheDocument()
+    expect(screen.getByText('Pinned Med Routine')).toBeInTheDocument()
+
+    act(() => writeHideRoutines(false))
+
+    expect(screen.getByText('Daily Routine')).toBeInTheDocument()
+    expect(screen.getByText('Pinned Med Routine')).toBeInTheDocument()
+  })
 })

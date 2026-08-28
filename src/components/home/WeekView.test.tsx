@@ -251,6 +251,36 @@ describe('WeekView', () => {
 
       expect(screen.getAllByText(/Daily Routine/).length).toBeGreaterThan(0)
     })
+
+    // rung 7 of resolveRoutine (routineUtils.ts) has an explicit escape: a
+    // pinned (pin_to_timeline) or dosed (times_per_day) everyday routine must
+    // SURVIVE the "hide daily routines" sweep — that's how medication/PT
+    // tracking stays visible even with the toggle on. The plain routine
+    // disappearing is its own positive control here: it proves the sweep
+    // actually ran, so the pinned routine's survival can't be a false pass
+    // from the sweep simply never firing. Names are chosen with no shared
+    // substring so the two regexes can't cross-match each other.
+    it('sweeps a plain everyday routine but keeps a pinned one, once the toggle is on', () => {
+      const routines = [
+        createMockRoutine({ name: 'Daily Routine' }), // factory default: daily, unpinned
+        createMockRoutine({ name: 'Pinned Med Routine', pin_to_timeline: true }),
+      ]
+
+      render(<WeekView {...defaultProps} routines={routines} />)
+
+      expect(screen.getAllByText(/Daily Routine/).length).toBeGreaterThan(0)
+      expect(screen.getAllByText(/Pinned Med Routine/).length).toBeGreaterThan(0)
+
+      act(() => writeHideRoutines(true))
+
+      expect(screen.queryByText(/Daily Routine/)).toBeNull()
+      expect(screen.getAllByText(/Pinned Med Routine/).length).toBeGreaterThan(0)
+
+      act(() => writeHideRoutines(false))
+
+      expect(screen.getAllByText(/Daily Routine/).length).toBeGreaterThan(0)
+      expect(screen.getAllByText(/Pinned Med Routine/).length).toBeGreaterThan(0)
+    })
   })
 
   describe('navigation', () => {

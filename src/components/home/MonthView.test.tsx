@@ -30,6 +30,14 @@ function routineDot(dayNum: string) {
   return within(button).queryByTitle(/routines?$/)
 }
 
+/** The routine dot's title text ("N routines"), or null if no dot. MonthView
+ *  renders one aggregated dot per day (a count), not one element per
+ *  routine, so distinguishing "routine A survived, routine B didn't" has to
+ *  go through this count rather than a per-routine query. */
+function routineCountTitle(dayNum: string): string | null {
+  return routineDot(dayNum)?.getAttribute('title') ?? null
+}
+
 describe('MonthView routine day-matching', () => {
   // Regression test for a real bug: the old hand-rolled day matcher compared
   // a FULL weekday name ('monday') against `recurrence_pattern.days`, which
@@ -85,5 +93,34 @@ describe('MonthView responds to the "hide daily routines" toggle', () => {
     act(() => writeHideRoutines(false))
 
     expect(routineDot('17')).not.toBeNull()
+  })
+
+  // rung 7 of resolveRoutine (routineUtils.ts) has an explicit escape: a
+  // pinned (pin_to_timeline) or dosed (times_per_day) everyday routine must
+  // SURVIVE the "hide daily routines" sweep — that's how medication/PT
+  // tracking stays visible even with the toggle on. MonthView renders one
+  // aggregated count-dot per day rather than one element per routine, so the
+  // proof here is the count dropping from 2 (both routines) to 1 (pinned
+  // only) — the drop-by-exactly-one is itself the positive control: it
+  // proves the sweep actually ran (the plain routine got swept), so the
+  // pinned routine's survival can't be a false pass from the sweep simply
+  // never firing.
+  it('sweeps a plain everyday routine but keeps a pinned one, once the toggle is on', () => {
+    const routines = [
+      createMockRoutine({ name: 'Daily Routine' }), // factory default: daily, unpinned
+      createMockRoutine({ name: 'Pinned Daily Routine', pin_to_timeline: true }),
+    ]
+
+    render(<MonthView {...defaultProps} routines={routines} />)
+
+    expect(routineCountTitle('17')).toBe('2 routines')
+
+    act(() => writeHideRoutines(true))
+
+    expect(routineCountTitle('17')).toBe('1 routines')
+
+    act(() => writeHideRoutines(false))
+
+    expect(routineCountTitle('17')).toBe('2 routines')
   })
 })
