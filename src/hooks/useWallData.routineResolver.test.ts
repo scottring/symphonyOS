@@ -130,7 +130,17 @@ describe('useWallData — resolveRoutine adoption (Task 8b)', () => {
     expect(names).toContain('Daily Control')
   })
 
-  it('a collection Step (parent_routine_id set) is absent (rung 6), its sibling non-Step is present', async () => {
+  // A rung-6 exception, not a rung-6 adoption: days[].items also feeds the
+  // live /morning and /bedtime kid checklists (MorningLaunchView,
+  // BedtimeView), which filter on assignedTo only — a collection's Steps are
+  // exactly what populates a kid's checklist there. Dropping Steps at this
+  // source would silently replace a kid's real checklist with the hardcoded
+  // DEFAULT_MORNING_STEPS/DEFAULT_BEDTIME_STEPS fallback, whose taps do not
+  // persist. So a Step MUST still reach day.items — the reference parent
+  // itself still does not (unchanged from before this migration: it was
+  // 'reference', filtered by the old hand-rolled rung 1, and still is by
+  // resolveRoutine's own rung 1).
+  it('a collection Step (parent_routine_id set) still reaches the wall; its reference parent does not', async () => {
     const parent = createMockRoutine({
       name: 'Camp Mornings',
       context: null,
@@ -148,8 +158,8 @@ describe('useWallData — resolveRoutine adoption (Task 8b)', () => {
       createMockRoutine({ name: 'Standalone Control', context: 'family' }),
     ]
     const names = routineNamesOnWall(await fetchDays())
-    expect(names).not.toContain('Pack Lunch')
-    expect(names).not.toContain('Camp Mornings') // reference parent never renders itself either
+    expect(names).toContain('Pack Lunch')
+    expect(names).not.toContain('Camp Mornings') // reference parent never renders itself
     expect(names).toContain('Standalone Control')
   })
 
@@ -171,7 +181,39 @@ describe('useWallData — resolveRoutine adoption (Task 8b)', () => {
     expect(names).toContain('On-Timeline Control')
   })
 
-  it('the one expected delta: a collection parent + Steps fixture drops ONLY the Steps, never a non-Step routine', async () => {
+  // The companion to the Step-still-reaches-the-wall test above, phrased as
+  // the actual consumer scenario a fix-round review found missing: a kid's
+  // assigned collection Step (the exact shape MorningLaunchView/BedtimeView
+  // read via item.assignedTo) must still reach day.items, with a sibling
+  // non-Step control from the same fetch.
+  it('a kid-assigned collection Step still reaches days[].items (feeds /morning and /bedtime)', async () => {
+    const parent = createMockRoutine({
+      name: 'Bedtime Collection',
+      context: null,
+      visibility: 'reference',
+      time_of_day: '19:30',
+    })
+    const kidStep = createMockRoutine({
+      name: 'Brush Teeth',
+      context: 'family',
+      parent_routine_id: parent.id,
+      assigned_to: 'kid-1',
+    })
+    const nonStep = createMockRoutine({ name: 'Take Out Trash', context: 'family' })
+    ROUTINES = [parent, kidStep, nonStep]
+
+    const days = await fetchDays()
+    const today = days[0]
+    const routineItems = (Object.values(today.items) as TimelineItem[])
+      .flat()
+      .filter((i) => i.type === 'routine')
+    const brushTeeth = routineItems.find((i) => i.title === 'Brush Teeth')
+    expect(brushTeeth).toBeDefined()
+    expect(brushTeeth?.assignedTo).toBe('kid-1')
+    expect(routineItems.map((i) => i.title)).toContain('Take Out Trash')
+  })
+
+  it('the one expected outcome: a collection parent + Steps fixture population is IDENTICAL to pre-migration — only the reference parent is absent', async () => {
     const parent = createMockRoutine({
       name: 'Bedtime Collection',
       context: null,
@@ -184,10 +226,9 @@ describe('useWallData — resolveRoutine adoption (Task 8b)', () => {
     ROUTINES = [parent, stepA, stepB, nonStep]
 
     const names = routineNamesOnWall(await fetchDays())
-    // Only the non-Step routine reaches day.items. The parent never rendered
-    // itself before this migration either (it was 'reference', filtered by
-    // the old hand-rolled rung 1), and the Steps are the one expected delta —
-    // dropped at the source now instead of downstream in wallGantt/wallV2Adapter.
-    expect(names).toEqual(['Take Out Trash'])
+    // Both Steps AND the non-Step routine reach day.items — the parent_routine_id
+    // override at the useWallData call site means rung 6 is excepted here, same
+    // as pre-migration. Only the 'reference' parent is absent (rung 1, unchanged).
+    expect(names.sort()).toEqual(['Brush Teeth', 'Read Book', 'Take Out Trash'])
   })
 })

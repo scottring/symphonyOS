@@ -5,11 +5,12 @@
 // flag's data audit (see task-8-brief.md's blocked Step 4, and
 // task-8a-report.md for the carve-out this task actually implemented).
 //
-// useWallData.ts is deliberately UNTOUCHED — it still calls
-// getRoutinesForDatePure directly, not resolveRoutine, because the kids'
-// morning/bedtime routines currently rely on the hide-from-timeline flag as a
-// Today-declutter workaround. These tests exercise wallV2Adapter.ts and
-// wallLanes.ts.
+// useWallData.ts itself is OUT OF SCOPE for this file (see Task 8b's report
+// for the resolver-adoption tests). As of Task 8b it calls resolveRoutine for
+// rungs 1/2/4, with two TEMPORARY overrides at that one call site
+// (show_on_timeline: true and parent_routine_id: null — see
+// routineVisibilityCoverage.test.ts's ALLOWED entry for both). These tests
+// exercise wallV2Adapter.ts and wallLanes.ts.
 //
 // IMPORTANT — this file alone is not the live coverage for change 2 or
 // change 4. The tap-lookup path (adaptTimelineSections/dedupeRoutines) tested

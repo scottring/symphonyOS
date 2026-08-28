@@ -99,17 +99,24 @@ const ALLOWED = new Map<string, string>([
   ['components/wall-v2/wallGantt.ts', 'bar sizing reads everyday-ness for density, not visibility'],
   [
     'hooks/useWallData.ts',
-    'TEMPORARY: pending Task 8b — useWallData adopts the ladder. It ' +
-      'currently hand-rolls FOUR of the ladder\'s questions itself: :268 is ' +
-      'a hand-rolled rung 1 (`visibility === \'active\'`) PLUS a hardcoded ' +
-      'rung 4 (`context === \'family\'`), and :313 (`getRoutinesForDatePure`) ' +
-      'is a hand-rolled rung 2; rungs 5/6/7 are answered downstream in ' +
-      'wallGantt/wallV2Adapter. Rung 3 (show_on_timeline) is the one it ' +
-      'cannot adopt yet — that is blocked on the show_on_timeline data ' +
-      'audit and backfill. Remove this entry only once the wall reads the ' +
-      'ladder for all of it; do not adopt any of this piecemeal without ' +
-      'auditing wall data first — a naive switch has deleted the kids\' ' +
-      'morning/bedtime routines from the kiosk before.',
+    'Task 8b landed: useWallData now calls resolveRoutine for rungs 1, 2, ' +
+      'and 4. Two TEMPORARY overrides remain at that one call site, each ' +
+      'shown by matching `show_on_timeline` (this file\'s guard, not ' +
+      'parent_routine_id — that primitive is deliberately not watched, see ' +
+      'the file header): ' +
+      '(1) `show_on_timeline: true` — rung 3 is blocked on the ' +
+      'show_on_timeline data audit; the kids\' morning/bedtime routines use ' +
+      'that flag as a Today-declutter workaround, so honouring rung 3 here ' +
+      'would delete them from the wall. Remove once the audit lands. ' +
+      '(2) `parent_routine_id: null` — rung 6 is excepted because ' +
+      'days[].items also feeds the live /morning and /bedtime kid ' +
+      'checklists (MorningLaunchView, BedtimeView), which filter on ' +
+      'assignedTo only and fall back to hardcoded default steps (whose taps ' +
+      'do not persist) when a kid\'s assigned items come back empty — a ' +
+      'kid\'s real checklist IS a collection\'s Steps. Remove once those two ' +
+      'screens read collections themselves instead of relying on Steps ' +
+      'reaching them unfiltered. Do not remove this entry until BOTH ' +
+      'overrides are gone.',
   ],
 ])
 

@@ -305,17 +305,30 @@ export function useWallData(): UseWallDataReturn {
           return toDateString(new Date(t.scheduledFor)) === dateStr
         })
 
-        // Get routines for this day.
+        // Get routines for this day. Two overrides at this ONE call site,
+        // both TEMPORARY:
+        //  - show_on_timeline: true — the kids' morning and bedtime routines
+        //    use that flag as a Today-declutter workaround, so honouring it
+        //    here would delete them from the wall. Comes out with the
+        //    show_on_timeline data audit — see
+        //    docs/superpowers/specs/assets/2026-08-26-show-on-timeline-audit.md
+        //  - parent_routine_id: null — days[].items also feeds the live
+        //    /morning and /bedtime kid checklists (MorningLaunchView,
+        //    BedtimeView), which filter on assignedTo only and fall back to
+        //    hardcoded default steps (whose taps do not persist) when a
+        //    kid's assigned items come back empty. A kid's real checklist IS
+        //    a collection's Steps, so dropping Steps at this source would
+        //    silently replace it with fake, non-persisting steps. The board
+        //    already filters Steps downstream (wallGantt.itemsFor,
+        //    wallV2Adapter.dedupeRoutines), so filtering here too buys
+        //    nothing and costs those two screens. Comes out once
+        //    MorningLaunchView/BedtimeView read collections themselves
+        //    (expanding a parent into its Steps) instead of relying on
+        //    Steps reaching them unfiltered.
         const dayRoutines = routines.filter(
           (r) =>
             resolveRoutine(
-              // The wall asks the ladder as if the hide-from-timeline flag were
-              // set. The kids' morning and bedtime routines use that flag as a
-              // Today-declutter workaround, so honouring it here would delete
-              // them from the wall. This override is TEMPORARY and comes out
-              // with the data audit — see
-              // docs/superpowers/specs/assets/2026-08-26-show-on-timeline-audit.md
-              { ...r, show_on_timeline: true },
+              { ...r, show_on_timeline: true, parent_routine_id: null },
               {
                 date,
                 prefs: { hideRoutines: false, domain: 'family' },
