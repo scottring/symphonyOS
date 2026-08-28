@@ -442,7 +442,13 @@ describe('adaptScheduleBand', () => {
 describe('adaptTimelineSections — rhythm only', () => {
   const now = new Date('2026-06-03T12:00:00');
 
-  it('excludes calendar events and timed tasks (they belong to the band)', () => {
+  it('includes calendar events and timed tasks by id — the board draws their bars and the tap handler must find them here', () => {
+    // The Schedule band (adaptScheduleBand) that events/timed-tasks used to be
+    // routed to is never mounted by WallV2Shell — WallV2Gantt draws board bars
+    // for every type instead, with no exclusion of its own. If this array
+    // dropped events/timed-tasks, WallV2Shell's handleTapLane (which searches
+    // exactly this output by id) could never find the tapped bar, and every
+    // event/timed-task bar on the wall would tap into nothing.
     const day = makeDay({
       isToday: true,
       items: {
@@ -456,10 +462,10 @@ describe('adaptTimelineSections — rhythm only', () => {
       },
     });
     const sections = adaptTimelineSections(day, [], now, null, false, []);
-    const titles = sections.flatMap((s) => s.events.map((e) => e.title));
-    expect(titles).toContain('Brush teeth'); // routine stays — even though it has a time
-    expect(titles).not.toContain('Dentist'); // event → band
-    expect(titles).not.toContain('Call plumber'); // timed task → band
+    const ids = sections.flatMap((s) => s.events.map((e) => e.id));
+    expect(ids).toContain('routine-1'); // positive control: always present
+    expect(ids).toContain('event-1');
+    expect(ids).toContain('task-1');
   });
 
   it('keeps untimed tasks in the rhythm zone', () => {

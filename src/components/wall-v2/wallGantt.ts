@@ -154,6 +154,23 @@ export interface GanttBoard {
   tracks: GanttTrack[];
 }
 
+/**
+ * Find a block's title by id, across every track.
+ *
+ * Belt-and-braces for WallV2Shell's tap handler: the primary lookup
+ * (adaptTimelineSections' output) should always carry the same id a board
+ * bar draws with, but if that ever drifts out of sync again, this recovers a
+ * human-readable label from the board data already on screen — so the tap
+ * flashes the item's title instead of dead-ending silently.
+ */
+export function titleForBlockId(board: GanttBoard, itemId: string): string | null {
+  for (const track of board.tracks) {
+    const block = track.blocks.find((b) => b.id === itemId);
+    if (block) return block.title;
+  }
+  return null;
+}
+
 function minutesOfDay(d: Date): number {
   return d.getHours() * 60 + d.getMinutes();
 }

@@ -29,7 +29,7 @@ import { WallV2StaleBanner } from './WallV2StaleBanner';
 import { computeFreshness } from './wallFreshness';
 import { useDailyDiscussionPrompt } from '@/hooks/useDailyDiscussionPrompt';
 import { WallV2Gantt } from './WallV2Gantt';
-import { adaptGanttBoard } from './wallGantt';
+import { adaptGanttBoard, titleForBlockId } from './wallGantt';
 import { WallV2Header } from './WallV2Header';
 import { WallV2Strip } from './WallV2Strip';
 import { adaptMealRows, adaptComingUpRows } from './wallStrip';
@@ -569,9 +569,13 @@ export function WallV2Shell() {
 
   // A bar on the board opens the same action sheet the lane did — tapping a
   // commitment should do one thing on this wall, whatever is drawing it.
+  // The label is belt-and-braces: `timeline`'s ids should always match the
+  // board's, but if that drifts again, this recovers the title from the same
+  // board data already in scope so the tap flashes something instead of
+  // dead-ending silently.
   const handleTapGanttItem = useCallback((itemId: string) => {
-    handleTapLane(itemId, null);
-  }, [handleTapLane]);
+    handleTapLane(itemId, titleForBlockId(ganttBoard, itemId));
+  }, [handleTapLane, ganttBoard]);
 
   // The face's dinner card opens whatever day it's currently showing. A paged
   // day always has a body or a source URL (buildMealDayRecipes drops the ones

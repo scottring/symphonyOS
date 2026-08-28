@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  computeAxis, adaptGanttBoard, MIN_SPAN_H, MAX_SPAN_H, MIN_LABEL_PX, TRACK_PX,
+  computeAxis, adaptGanttBoard, titleForBlockId, MIN_SPAN_H, MAX_SPAN_H, MIN_LABEL_PX, TRACK_PX,
 } from './wallGantt'
 import type { WallDayData } from '@/hooks/useWallData'
 import type { TimelineItem } from '@/types/timeline'
@@ -522,5 +522,26 @@ describe('the board is TODAY', () => {
     const titles = board.tracks.flatMap((t) => [...t.blocks.map((b) => b.title), ...t.anytime])
     expect(titles).toContain('Today thing')
     expect(titles).not.toContain('Tomorrow thing')
+  })
+})
+
+describe('titleForBlockId — the tap-handler fallback', () => {
+  const members = [member('s', 'Scott'), member('k', 'Kaleb')]
+
+  it('finds a block by id on another member\'s track, and returns null for an id no track carries', () => {
+    const d = day([
+      item({ id: 'dentist-1', title: 'Dentist', startTime: at(10), endTime: at(11), assignedTo: 's' }),
+      item({ id: 'game-1', title: 'Soccer game', startTime: at(14), endTime: at(15), assignedTo: 'k' }),
+    ])
+    const board = adaptGanttBoard(members, [d], at(9))
+
+    // Positive control on the SAME board: an id that is on the board is found
+    // regardless of which track it lives on.
+    expect(titleForBlockId(board, 'dentist-1')).toBe('Dentist')
+    expect(titleForBlockId(board, 'game-1')).toBe('Soccer game')
+
+    // An id nothing drew a bar for (the real-world case this fallback exists
+    // for) comes back null rather than throwing or matching the wrong block.
+    expect(titleForBlockId(board, 'no-such-id')).toBeNull()
   })
 })

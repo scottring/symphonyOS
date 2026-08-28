@@ -344,16 +344,20 @@ export function adaptTimelineSections(
   const overdueOnlyEarly = adaptOverdueSection(overdueTasks, members, now);
   if (!today) return overdueOnlyEarly ? [overdueOnlyEarly] : [];
 
-  // Rhythm zone = routines (always) + untimed/all-day tasks. Calendar events and
-  // timed tasks are pulled into the prioritized Schedule band (adaptScheduleBand),
-  // so drop them here to avoid showing a commitment in two places.
+  // Rhythm zone = every item type. adaptScheduleBand's Schedule band (built
+  // below in this file) is not rendered anywhere on the wall — WallV2Timeline,
+  // its one host, is never mounted by WallV2Shell, which draws the board
+  // (WallV2Gantt) instead. That board draws event and timed-task bars with no
+  // type exclusion of its own (see wallGantt's itemsFor), so this array is the
+  // ONLY place WallV2Shell's tap handler (handleTapLane) can find them by id —
+  // excluding them here used to leave every event/timed-task bar tapping into
+  // nothing. Keep this exhaustive across every type until the schedule band is
+  // either wired up or deleted for good.
   //
   // "Hide daily" then drops routines that effectively recur every weekday (daily +
   // weekday-only weeklies). One-off routines (since-last, monthly, etc.) stay
   // visible because they're never "noise."
   const isVisible = (i: TimelineItem) => {
-    if (i.type === 'event') return false;            // all events → band (timed or all-day strip)
-    if (isCommitment(i)) return false;               // timed tasks → band
     if (i.type !== 'routine') return true;
     if (!hideDailyRoutines) return true;
     // Rung 7's pin escape, which the wall never had: a pinned or dosed routine
