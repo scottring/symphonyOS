@@ -91,3 +91,46 @@ where id in (
 ## Confirmation
 
 _Pending. Re-run Query 1; the category (ii) ids must no longer appear._
+
+---
+
+## Scope of the follow-up task (8b) — corrected 2026-08-28
+
+The final whole-system review traced `src/hooks/useWallData.ts` and found the
+blocked work is larger than "adopt rung 3". That file answers the visibility
+question in three hand-rolled places, and the wall answers it in a fourth
+downstream:
+
+- `:268` — `visibility === 'active' && context === 'family'`: a hand-rolled
+  **rung 1** plus a **hardcoded rung 4**.
+- `:313` — `getRoutinesForDatePure(...)`: a hand-rolled **rung 2**.
+- rung 3 — deliberately skipped, which is what this audit unblocks.
+- rungs 5/6/7 — answered downstream in `wallGantt.ts` / `wallV2Adapter.ts`.
+
+**Task 8b is therefore "useWallData adopts the ladder", not "adopts rung 3".**
+The tripwire's allowlist entry for this file says so, and that entry must not be
+removed until all of the above are gone — otherwise three hand-rolled rungs stay
+behind an allowlist that claims the file is clean.
+
+Note `:152` and `:263`: a collection parent is deliberately `visibility:
+'reference'` and carries the hour its Steps happen at, so `useWallData` reads
+parent times BEFORE filtering to active. Any migration must preserve that
+ordering or every Step on the wall becomes untimed.
+
+## Two things discovered while this was blocked
+
+1. **A routine collection renders nothing on Today.** Its parent is resting by
+   design, rung 1 hides it, the retention layer rescues only `'everyday'`
+   parents, and `groupRoutineSteps` drops the orphaned Steps. The same
+   collection renders fine on the wall. Pre-existing — the legacy pipeline
+   filtered `visibility === 'active'` first too — and deliberately pinned by
+   `computeTodayData.test.ts:243-251`. A product question, not a bug to fix
+   blind.
+
+2. **Every event and timed-task bar on the wall is a dead tap.**
+   `wallV2Adapter.adaptTimelineSections` drops `type === 'event'` and
+   `isCommitment` items from `timeline`, which is the only array
+   `WallV2Shell.tsx:562` searches, while `wallGantt.itemsFor` draws them
+   anyway; `handleTapGanttItem` passes `label = null`, so the flash fallback
+   cannot fire either. Pre-existing. Likely one-line mitigation: pass the
+   item's title as `label`.
