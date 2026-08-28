@@ -453,7 +453,7 @@ export function PlanningSession({
   }, [dateInstances])
 
   // Get routines for the date range. One resolver call per day replaces the
-  // old hand-rolled show_on_timeline/hideRoutines filter chain — see
+  // old hand-rolled hide-from-timeline/hideRoutines filter chain — see
   // resolveRoutine in routineUtils.ts for the full 8-rung rule this now
   // shares with Today and the week/month grids.
   //

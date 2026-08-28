@@ -269,9 +269,9 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
   // predicate never asked (off-timeline, not-theirs, in-collection). Domain
   // scoping now happens INSIDE the resolveRoutine call (rung 4), so this no
   // longer needs the separate filterRoutinesForDomain wrapper the sibling
-  // pools above still use. `hideRoutines: true` preserves the old
-  // `!isEverydayRoutine` behavior — this grid is time-block Today, so ambient
-  // everyday routines are never drag candidates.
+  // pools above still use. `hideRoutines: true` preserves the old everyday-sweep
+  // exclusion — this grid is time-block Today, so ambient everyday routines
+  // are never drag candidates.
   const planningDraggableRoutines = useMemo(
     () => allRoutines.filter(
       (r) =>

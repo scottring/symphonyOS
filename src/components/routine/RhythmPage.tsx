@@ -193,6 +193,10 @@ export function RhythmPage(props: RhythmPageProps) {
   // like a step-less collection counts — folding in gives it its steps).
   const foldTargets = useMemo(
     () => routines
+      // Deliberately NOT resolveRoutine. Tend is a management surface: its job
+      // is to show RESTING routines so you can wake them, which is the exact
+      // opposite of rung 1. Filtering to `visibility === 'active'` here is the
+      // seasonal shelf's own rule, not a stale copy of the visibility ladder.
       .filter(r => !r.parent_routine_id && r.visibility === 'active')
       .map(r => ({ id: r.id, name: r.name })),
     [routines],

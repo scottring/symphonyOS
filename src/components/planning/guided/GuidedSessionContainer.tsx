@@ -162,7 +162,7 @@ export function GuidedSessionContainer({ horizon, onClose, onFinished, onChain, 
     // predicate never asked (off-timeline, not-theirs, in-collection).
     // `allRoutines` (not domainRoutines) because rung 4 does the domain scoping
     // itself here. `hideRoutines: true` is intentional and preserves the old
-    // `!isEverydayRoutine` behavior: a guided session is for placing non-routine
+    // everyday-sweep exclusion: a guided session is for placing non-routine
     // work, so ambient everyday routines are never drag candidates.
     //
     // resolveRoutineEligible (not resolveRoutine + date: null) — this is a

@@ -46,6 +46,10 @@ function sharedCount(a: string[], b: string[]): number {
 }
 
 export function findTend(routines: Routine[]): TendFinding[] {
+  // Deliberately NOT resolveRoutine. Tend is a management surface: its job
+  // is to show RESTING routines so you can wake them, which is the exact
+  // opposite of rung 1. Filtering to `visibility === 'active'` here is the
+  // seasonal shelf's own rule, not a stale copy of the visibility ladder.
   const eligible = routines.filter(r => !r.parent_routine_id && r.visibility === 'active')
 
   // Look-alikes: union-find over pairs sharing >=2 significant tokens.
