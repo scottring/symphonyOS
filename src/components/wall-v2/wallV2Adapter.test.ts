@@ -616,30 +616,43 @@ describe('adaptGlanceForMember', () => {
     return makeDay({ isToday: true, items: { [section]: items } });
   }
 
-  it("excludes everyday routines (>4×/week) — they're daily-rhythm noise, not a glance signal", () => {
+  it("excludes everyday routines (>4×/week) when hide-daily is on — they're daily-rhythm noise, not a glance signal", () => {
     const daily = makeItem({
       id: 'r-tidy', type: 'routine', title: 'Tidy room', assignedTo: 'm',
       startTime: new Date(2026, 4, 20, 9, 0), recurrencePattern: { type: 'daily' },
     });
-    expect(adaptGlanceForMember(member, dayWith([daily]), now)).toBeNull();
+    expect(adaptGlanceForMember(member, dayWith([daily]), now, true)).toBeNull();
   });
 
-  it('excludes weekday-only weeklies (Mon–Fri = 5×/week, still >4)', () => {
+  it('excludes weekday-only weeklies (Mon–Fri = 5×/week, still >4) when hide-daily is on', () => {
     const weekdays = makeItem({
       id: 'r-pack', type: 'routine', title: 'Pack lunch', assignedTo: 'm',
       startTime: new Date(2026, 4, 20, 9, 0),
       recurrencePattern: { type: 'weekly', days: ['mon', 'tue', 'wed', 'thu', 'fri'] },
     });
-    expect(adaptGlanceForMember(member, dayWith([weekdays]), now)).toBeNull();
+    expect(adaptGlanceForMember(member, dayWith([weekdays]), now, true)).toBeNull();
   });
 
-  it('keeps low-cadence routines (≤4×/week) — a weekly chore is still a real glance signal', () => {
+  it('canHeadline is pref-aware: an everyday routine MAY headline when hide-daily is off', () => {
+    // Positive control for the exclusion tests above: same fixture, same
+    // section, only the pref flips — proving the exclusion is actually gated
+    // on hideDailyRoutines and not some other property of the item.
+    const daily = makeItem({
+      id: 'r-tidy', type: 'routine', title: 'Tidy room', assignedTo: 'm',
+      startTime: new Date(2026, 4, 20, 9, 0), recurrencePattern: { type: 'daily' },
+    });
+    expect(adaptGlanceForMember(member, dayWith([daily]), now, true)).toBeNull(); // off with hide-daily on
+    const card = adaptGlanceForMember(member, dayWith([daily]), now, false);
+    expect(card?.primary).toBe('Tidy room'); // headlines with hide-daily off
+  });
+
+  it('keeps low-cadence routines (≤4×/week) — a weekly chore is still a real glance signal, even with hide-daily on', () => {
     const weekly = makeItem({
       id: 'r-meals', type: 'routine', title: 'Plan meals', assignedTo: 'm',
       startTime: new Date(2026, 4, 20, 9, 0),
       recurrencePattern: { type: 'weekly', days: ['wed'] },
     });
-    const card = adaptGlanceForMember(member, dayWith([weekly]), now);
+    const card = adaptGlanceForMember(member, dayWith([weekly]), now, true);
     expect(card?.primary).toBe('Plan meals');
   });
 
@@ -648,11 +661,11 @@ describe('adaptGlanceForMember', () => {
       id: 'e-soccer', type: 'event', title: 'Soccer', assignedTo: 'm',
       startTime: new Date(2026, 4, 20, 16, 0),
     });
-    const card = adaptGlanceForMember(member, dayWith([event]), now);
+    const card = adaptGlanceForMember(member, dayWith([event]), now, true);
     expect(card?.primary).toBe('Soccer');
   });
 
-  it('falls through to the next eligible item when an everyday routine would have been first', () => {
+  it('falls through to the next eligible item when an everyday routine would have been first (hide-daily on)', () => {
     const daily = makeItem({
       id: 'r-tidy', type: 'routine', title: 'Tidy room', assignedTo: 'm',
       startTime: new Date(2026, 4, 20, 9, 0), recurrencePattern: { type: 'daily' },
@@ -661,7 +674,7 @@ describe('adaptGlanceForMember', () => {
       id: 'e-soccer', type: 'event', title: 'Soccer', assignedTo: 'm',
       startTime: new Date(2026, 4, 20, 16, 0),
     });
-    const card = adaptGlanceForMember(member, dayWith([daily, event]), now);
+    const card = adaptGlanceForMember(member, dayWith([daily, event]), now, true);
     expect(card?.primary).toBe('Soccer');
   });
 
@@ -669,7 +682,21 @@ describe('adaptGlanceForMember', () => {
     const untriaged = makeItem({
       id: 't-someday', type: 'task', title: 'Someday task', assignedTo: 'm', startTime: null,
     });
-    expect(adaptGlanceForMember(member, dayWith([untriaged], 'unscheduled'), now)).toBeNull();
+    expect(adaptGlanceForMember(member, dayWith([untriaged], 'unscheduled'), now, true)).toBeNull();
+  });
+
+  it('a multi-owner routine headlines for either owner (owners[] takes priority over assignedTo)', () => {
+    // Positive control for the owners-array change: assignedTo alone (the
+    // legacy single column) points at neither of these two members, so this
+    // can only pass if adaptGlanceForMember actually reads `owners`.
+    const iris: FamilyMember = { id: 'iris', name: 'Iris', initials: 'IR', color: 'purple' } as FamilyMember;
+    const shared = makeItem({
+      id: 'r-shared', type: 'routine', title: 'Feed the dog', assignedTo: 'someone-else',
+      owners: ['m', 'iris'], startTime: new Date(2026, 4, 20, 9, 0),
+      recurrencePattern: { type: 'weekly', days: ['wed'] },
+    });
+    expect(adaptGlanceForMember(member, dayWith([shared]), now, true)?.primary).toBe('Feed the dog');
+    expect(adaptGlanceForMember(iris, dayWith([shared]), now, true)?.primary).toBe('Feed the dog');
   });
 });
 
@@ -742,12 +769,12 @@ describe('day-band coverage: the ends of the day survive every adapter', () => {
 
     const early = adaptGlanceForMember(
       member, makeDay({ isToday: true, items: { earlyMorning: [dawn] } }),
-      new Date(2026, 4, 20, 4, 0),
+      new Date(2026, 4, 20, 4, 0), false,
     );
     expect(early?.primary).toBe('Swim practice');
 
     const late = adaptGlanceForMember(
-      member, makeDay({ isToday: true, items: { night: [dusk] } }), now,
+      member, makeDay({ isToday: true, items: { night: [dusk] } }), now, false,
     );
     expect(late?.primary).toBe('Late pickup');
   });

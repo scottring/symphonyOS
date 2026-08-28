@@ -22,7 +22,7 @@ import type { FamilyMember } from '@/types/family';
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar';
 import type { WallDayData } from '@/hooks/useWallData';
 import { extractRecipeNameHint, resolveRecipeUrl } from '@/lib/recipeDetection';
-import { isEverydayRoutine } from '@/lib/routineUtils';
+import { isEverydayRoutine, isPinnedToTimeline } from '@/lib/routineUtils';
 import { SECTIONS_ORDER } from '@/lib/today/types';
 import { PREVIEW_SECTIONS } from '@/components/wall/today/tomorrowPreview';
 
@@ -198,6 +198,11 @@ function dedupeRoutines(
 
   for (const item of items) {
     const isRoutine = item.type === 'routine';
+    // A collection step (e.g. one exercise in "Camp Mornings") never renders
+    // as its own row — the collection carries it. useWallData does not filter
+    // this (out of scope pending the show_on_timeline audit), so the adapter
+    // is the only place left that knows parent_routine_id.
+    if (isRoutine && item.originalRoutine?.parent_routine_id != null) continue;
     const key = isRoutine ? item.title.trim().toLowerCase() : null;
 
     if (key !== null && routineIndex.has(key)) {
@@ -346,8 +351,11 @@ export function adaptTimelineSections(
   const isVisible = (i: TimelineItem) => {
     if (i.type === 'event') return false;            // all events → band (timed or all-day strip)
     if (isCommitment(i)) return false;               // timed tasks → band
-    if (!hideDailyRoutines) return true;
     if (i.type !== 'routine') return true;
+    if (!hideDailyRoutines) return true;
+    // Rung 7's pin escape, which the wall never had: a pinned or dosed routine
+    // is a tracked obligation (PT exercises), not ambient noise.
+    if (i.originalRoutine && isPinnedToTimeline(i.originalRoutine)) return true;
     return !isEverydayRoutine(i.recurrencePattern);
   };
 
@@ -413,6 +421,18 @@ export function adaptTimelineSections(
 // ────────────────────────────────────────────────────────────────────────────
 
 /**
+ * Whether an item may headline a member's glance card. Not a visibility
+ * question — a routine can be on the wall and still be the wrong thing to lead
+ * with. Everyday routines are the day's background rhythm ("brush teeth"), so
+ * they only headline when the user has chosen to see everyday routines at all.
+ */
+function canHeadline(item: TimelineItem, prefs: { hideRoutines: boolean }): boolean {
+  if (item.type !== 'routine') return true;
+  if (!isEverydayRoutine(item.recurrencePattern)) return true;
+  return !prefs.hideRoutines;
+}
+
+/**
  * Build a per-member "next thing today" glance card. Falls back to a generic
  * "All set" line if the member has no upcoming item.
  */
@@ -420,6 +440,7 @@ export function adaptGlanceForMember(
   member: FamilyMember,
   today: WallDayData | undefined,
   now: Date,
+  hideDailyRoutines: boolean,
 ) {
   if (!today) return null;
   let next: TimelineItem | null = null;
@@ -429,11 +450,12 @@ export function adaptGlanceForMember(
   // rhythm zone below.
   for (const section of PREVIEW_SECTIONS) {
     for (const item of today.items[section] ?? []) {
-      if (item.assignedTo !== member.id) continue;
-      // Skip high-frequency routines (>4×/week — daily, or weekday-only
-      // weeklies). They're the day's background rhythm ("brush teeth"), not a
-      // glance-worthy signal, so they shouldn't headline a member's card.
-      if (item.type === 'routine' && isEverydayRoutine(item.recurrencePattern)) continue;
+      // Routine items carry every owner (routineToTimelineItem -> routineOwners).
+      // assignedTo is the legacy single column and stays the fallback for item
+      // types that do not populate owners yet.
+      const itemOwners = item.owners?.length ? item.owners : item.assignedTo ? [item.assignedTo] : [];
+      if (!itemOwners.includes(member.id)) continue;
+      if (!canHeadline(item, { hideRoutines: hideDailyRoutines })) continue;
       if (item.startTime && item.startTime < now) continue;
       if (!next || (item.startTime && next.startTime && item.startTime < next.startTime)) {
         next = item;

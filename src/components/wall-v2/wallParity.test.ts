@@ -1,0 +1,134 @@
+// src/components/wall-v2/wallParity.test.ts
+//
+// Characterization tests for Task 8a's carve-out of "the wall adopts the
+// resolver": the four changes that do NOT depend on the show_on_timeline
+// data audit (see task-8-brief.md's blocked Step 4, and task-8a-report.md
+// for the carve-out this task actually implemented).
+//
+// useWallData.ts is deliberately UNTOUCHED — it still calls
+// getRoutinesForDatePure directly, not resolveRoutine, because the kids'
+// morning/bedtime routines currently rely on show_on_timeline=false as a
+// Today-declutter workaround. These tests exercise only the two files this
+// task was allowed to touch: wallV2Adapter.ts and wallLanes.ts.
+//
+// Each "is absent" assertion below is paired with a positive control in the
+// same test — proof the render path is live, not merely that the day was
+// empty.
+
+import { describe, it, expect } from 'vitest';
+import { adaptTimelineSections, adaptGlanceForMember } from './wallV2Adapter';
+import { ownersOf, adaptPersonLane } from './wallLanes';
+import { routineToTimelineItem } from '@/types/timeline';
+import { createMockRoutine } from '@/test/mocks/factories';
+import { emptySections } from '@/lib/today/types';
+import type { WallDayData } from '@/hooks/useWallData';
+import type { TimelineItem } from '@/types/timeline';
+import type { FamilyMember } from '@/types/family';
+import type { DaySection } from '@/lib/timeUtils';
+
+// Monday, matching the routineVisibility.fixtures.ts CORPUS_DATE weekday —
+// not load-bearing here (adaptTimelineSections does no recurrence matching
+// of its own), just keeps the fixture dates sane at a glance.
+const NOW = new Date(2026, 7, 24, 7, 0, 0);
+
+function dayWith(items: Partial<Record<DaySection, TimelineItem[]>>): WallDayData {
+  return {
+    date: NOW,
+    isToday: true,
+    items: { ...emptySections<TimelineItem>(), ...items },
+    birthdays: [],
+    milestones: [],
+  };
+}
+
+const SCOTT: FamilyMember = { id: 'scott', name: 'Scott', initials: 'SK', color: 'blue' } as FamilyMember;
+const IRIS: FamilyMember = { id: 'iris', name: 'Iris', initials: 'IK', color: 'purple' } as FamilyMember;
+
+describe('wall parity — the four in-scope changes', () => {
+  it('collection steps stop rendering as loose rows', () => {
+    const parent = createMockRoutine({ name: 'Camp Mornings', context: 'family' });
+    const step = createMockRoutine({
+      name: 'Brush teeth', context: 'family', parent_routine_id: parent.id,
+    });
+    // Positive control: a sibling routine with no parent, same section, same
+    // call — proves the section actually renders items via this path, so the
+    // step's absence below isn't just an empty day.
+    const sibling = createMockRoutine({ name: 'Read for 20 minutes', context: 'family' });
+
+    const day = dayWith({
+      morning: [routineToTimelineItem(step, NOW), routineToTimelineItem(sibling, NOW)],
+    });
+    const sections = adaptTimelineSections(day, [], NOW, null, false, []);
+    const titles = sections.flatMap((s) => s.events.map((e) => e.title));
+
+    expect(titles).toContain('Read for 20 minutes'); // positive control: the path is live
+    expect(titles).not.toContain('Brush teeth'); // the step: swallowed by the adapter
+  });
+
+  it('pinned and dosed routines survive "hide daily routines" (the pin escape the wall never had)', () => {
+    const plainDaily = createMockRoutine({
+      name: 'Make bed', context: 'family', recurrence_pattern: { type: 'daily' },
+    });
+    const pinnedDaily = createMockRoutine({
+      name: 'PT stretches', context: 'family', recurrence_pattern: { type: 'daily' }, pin_to_timeline: true,
+    });
+    const dosedDaily = createMockRoutine({
+      name: 'Take medication', context: 'family', recurrence_pattern: { type: 'daily' },
+      times_per_day: ['08:00', '20:00'],
+    });
+
+    const day = dayWith({
+      morning: [
+        routineToTimelineItem(plainDaily, NOW),
+        routineToTimelineItem(pinnedDaily, NOW),
+        routineToTimelineItem(dosedDaily, NOW),
+      ],
+    });
+    const sections = adaptTimelineSections(day, [], NOW, null, true, []); // hideDailyRoutines: true
+    const titles = sections.flatMap((s) => s.events.map((e) => e.title));
+
+    expect(titles).not.toContain('Make bed'); // negative control: swept, no escape — proves the sweep itself is live
+    expect(titles).toContain('PT stretches'); // pin escape (new)
+    expect(titles).toContain('Take medication'); // dose escape (new)
+  });
+
+  it('canHeadline is pref-aware: an everyday routine headlines only when hide-daily is off', () => {
+    const daily = createMockRoutine({
+      name: 'Tidy room', context: 'family', assigned_to: 'scott',
+      recurrence_pattern: { type: 'daily' },
+    });
+    const item = routineToTimelineItem(daily, NOW); // time_of_day defaults to 09:00, after NOW (07:00)
+
+    const day = dayWith({ morning: [item] });
+    expect(adaptGlanceForMember(SCOTT, day, NOW, true)).toBeNull(); // hide-daily on: still swept
+    expect(adaptGlanceForMember(SCOTT, day, NOW, false)?.primary).toBe('Tidy room'); // hide-daily off: now allowed
+  });
+
+  it("a multi-owner routine reaches every owner's lane and glance card", () => {
+    const shared = createMockRoutine({
+      name: 'Walk the dog', context: 'family',
+      assigned_to: 'scott', assigned_to_all: ['scott', 'iris'],
+      recurrence_pattern: { type: 'weekly', days: ['mon'] },
+    });
+    const item = routineToTimelineItem(shared, NOW);
+    expect(item.owners).toEqual(['scott', 'iris']); // routineToTimelineItem -> routineOwners populates it
+
+    // ownersOf is the exact function wallLanes.itemsOnDay filters lane
+    // membership on — proving both owners are reachable there, not just the
+    // legacy single-column assignedTo (which is 'scott' only).
+    expect(ownersOf(item, [SCOTT, IRIS])).toEqual(['scott', 'iris']);
+
+    // End-to-end: both members' lanes pick up the same routine. Before this
+    // task, item.assignedTo alone ('scott') could only ever satisfy one lane
+    // — this is the positive control proving Iris's lane isn't a fluke.
+    const day = dayWith({ morning: [item] });
+    const scottLane = adaptPersonLane(SCOTT, [day], NOW, [SCOTT, IRIS]);
+    const irisLane = adaptPersonLane(IRIS, [day], NOW, [SCOTT, IRIS]);
+    expect(scottLane.label).toBe('Walk the dog');
+    expect(irisLane.label).toBe('Walk the dog');
+
+    // And the glance card, for both owners.
+    expect(adaptGlanceForMember(SCOTT, day, NOW, false)?.primary).toBe('Walk the dog');
+    expect(adaptGlanceForMember(IRIS, day, NOW, false)?.primary).toBe('Walk the dog');
+  });
+});

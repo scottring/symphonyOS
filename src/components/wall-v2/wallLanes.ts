@@ -92,6 +92,10 @@ export function ownersOf(item: TimelineItem, members: FamilyMember[]): string[] 
       item.assignedTo,
     );
   }
+  // Routine items carry every owner (routineToTimelineItem -> routineOwners).
+  // assignedTo is the legacy single column and stays the fallback for item
+  // types that do not populate owners yet.
+  if (item.owners && item.owners.length > 0) return [...item.owners];
   return item.assignedTo ? [item.assignedTo] : [];
 }
 

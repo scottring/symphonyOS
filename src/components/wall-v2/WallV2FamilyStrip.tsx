@@ -46,13 +46,15 @@ interface Props {
   today: WallDayData | undefined;
   now: Date;
   onDockAction: (id: WallDockActionId) => void;
+  /** The wall's "hide daily routines" toggle — passed through to canHeadline. */
+  hideDailyRoutines: boolean;
 }
 
-export function WallV2FamilyStrip({ familyMembers, today, now, onDockAction }: Props) {
+export function WallV2FamilyStrip({ familyMembers, today, now, onDockAction, hideDailyRoutines }: Props) {
   return (
     <div className="h-full flex gap-2.5">
       {familyMembers.slice(0, 5).map((member, i) => {
-        const glance = adaptGlanceForMember(member, today, now);
+        const glance = adaptGlanceForMember(member, today, now, hideDailyRoutines);
         return (
           <div key={member.id} className={`${WALL.card} border-l-4 ${personAccent(i)} flex-1 min-w-0 flex items-center gap-2.5 px-3 py-2`}>
             <Portrait member={member} />
