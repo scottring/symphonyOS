@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useGoogleCalendar } from '@/hooks/useGoogleCalendar'
 import { useAuth } from '@/hooks/useAuth'
-import { getRoutinesForDatePure, effectiveTimeOfDay, type LastCompletionMap } from '@/lib/routineUtils'
+import { resolveRoutine, effectiveTimeOfDay, type LastCompletionMap } from '@/lib/routineUtils'
 import {
   taskToTimelineItem,
   eventToTimelineItem,
@@ -265,7 +265,6 @@ export function useWallData(): UseWallDataReturn {
       const allRoutines = (routinesRes.data || []) as Routine[]
       const routinesById = new Map(allRoutines.map(r => [r.id, r]))
       const routines = allRoutines
-        .filter(r => r.visibility === 'active' && r.context === 'family')
         .map(r => ({ ...r, time_of_day: effectiveTimeOfDay(r, routinesById) }))
       const instances = (instancesRes.data || []) as ActionableInstance[]
       const events = (calendarEvents || []) as CalendarEvent[]
@@ -306,11 +305,24 @@ export function useWallData(): UseWallDataReturn {
           return toDateString(new Date(t.scheduledFor)) === dateStr
         })
 
-        // Get routines for this day. The kiosk wall shows kid routines via
-        // morning/bedtime context views even when show_on_timeline=false (which
-        // is set to keep the today view in the app uncluttered), so don't
-        // filter them out here.
-        const dayRoutines = getRoutinesForDatePure(routines, date, lastCompletionByRoutine)
+        // Get routines for this day.
+        const dayRoutines = routines.filter(
+          (r) =>
+            resolveRoutine(
+              // The wall asks the ladder as if the hide-from-timeline flag were
+              // set. The kids' morning and bedtime routines use that flag as a
+              // Today-declutter workaround, so honouring it here would delete
+              // them from the wall. This override is TEMPORARY and comes out
+              // with the data audit — see
+              // docs/superpowers/specs/assets/2026-08-26-show-on-timeline-audit.md
+              { ...r, show_on_timeline: true },
+              {
+                date,
+                prefs: { hideRoutines: false, domain: 'family' },
+                lastCompletedAt: lastCompletionByRoutine.get(r.id) ?? null,
+              },
+            ).shows,
+        )
 
         // Filter events for this day
         const dayEvents = events.filter(event => {
