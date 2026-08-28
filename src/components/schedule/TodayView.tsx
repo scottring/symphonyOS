@@ -541,10 +541,13 @@ export function TodayView({
     // `routines` is no longer domain-pre-filtered upstream (HomeView passes it
     // raw so the resolver can apply rung 4 itself) — rung 4 (domain) is what
     // used to need the separate filterRoutinesForDomain call. `hideRoutines:
-    // true` reproduces the old `type !== 'daily'` intent: this count is about
-    // placeable work, not ambient everyday rhythm (rung 6, the fuller
-    // everyday-ness test, is a deliberate correction — see the migration note
-    // in the task report for the resulting count delta).
+    // true` sweeps ambient everyday routines (rung 7's fuller everyday-ness
+    // test is a deliberate widening of the old `type !== 'daily'` check — see
+    // the task report for the resulting count delta), but it deliberately does
+    // NOT sweep a pinned or dosed one (isPinnedToTimeline): a tracked
+    // obligation with no time slot yet — e.g. a med-tracker dose — is still
+    // placeable work, same as every other surface that honors the pin escape.
+    // Do not special-case it back out.
     const untimedRoutines = routines.filter(
       (r) =>
         isDraggableRoutine(r) &&

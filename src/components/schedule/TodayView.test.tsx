@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { screen, fireEvent, within } from '@testing-library/react'
 import { render } from '@/test/test-utils'
 import { ScheduleActionsProvider } from '@/contexts/ScheduleActionsContext'
+import { createMockRoutine } from '@/test/mocks/factories'
 import { TodayView } from './TodayView'
 
 // File-wide mock: every test in this file renders TodayView's mobile branch.
@@ -264,6 +265,41 @@ describe('TodayView', () => {
     const { user } = renderView()
     await openOverflow(user)
     expect(screen.getByLabelText(/clarity/i)).toBeInTheDocument()
+  })
+
+  // Pins the fix-round-2 widening: rung 7's everyday sweep has a pin/dose
+  // escape (isPinnedToTimeline) that the old hand-rolled `type !== 'daily'`
+  // check never had. A daily + untimed + pinned routine (the med-tracker
+  // shape) is placeable work and must be counted; the same routine unpinned
+  // must still be swept. This is the one seam that reaches the clarity
+  // count without a dedicated export — through the rendered curtain text.
+  describe('Clarity placeable count — pin/dose escape from the everyday sweep', () => {
+    it('counts a pinned untimed daily routine as placeable work', async () => {
+      const pinned = createMockRoutine({
+        recurrence_pattern: { type: 'daily' },
+        time_of_day: null,
+        pin_to_timeline: true,
+      })
+      const { user } = renderView({ routines: [pinned] })
+      await openOverflow(user)
+      await user.click(screen.getByLabelText(/clarity/i))
+      expect(await screen.findByText(/1 item to place/i)).toBeInTheDocument()
+    })
+
+    it('does not count the same routine unpinned — the everyday sweep still applies', async () => {
+      const unpinned = createMockRoutine({
+        recurrence_pattern: { type: 'daily' },
+        time_of_day: null,
+      })
+      const { user } = renderView({ routines: [unpinned] })
+      await openOverflow(user)
+      await user.click(screen.getByLabelText(/clarity/i))
+      await screen.findByRole('dialog', { name: /clarity/i })
+      // Depending on time of day the curtain shows either "You're clear" or
+      // the per-step "Your day is placed" line — neither contains "to place",
+      // so this holds regardless of when the suite runs.
+      expect(screen.queryByText(/to place/i)).not.toBeInTheDocument()
+    })
   })
 
   describe('Up next (in place)', () => {
