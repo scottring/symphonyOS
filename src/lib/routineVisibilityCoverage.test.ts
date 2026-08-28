@@ -9,8 +9,23 @@
 // the allowlist. If you are adding a legitimate exception, add it here
 // deliberately — that edit is the point.
 //
+// Both spellings of the resting check are watched — `visibility === 'active'`
+// / `!== 'active'` AND `visibility === 'reference'` / `!== 'reference'`.
+// `RoutineVisibility` is a strict two-value enum (types/actionable.ts), so
+// `=== 'reference'` is logically identical to `!== 'active'` (and vice
+// versa). A guard that watched only the 'active' spellings would let the
+// complementary literal answer the exact same question, unseen — which is
+// exactly how a live call site (TodayView's clarity count, fixed alongside
+// this comment) slipped through undetected.
+//
 // What this does NOT catch, verified against the tree rather than guessed:
-//   - a check written through a variable (`const flag = r.show_on_timeline`)
+//   - a check written through a variable (`const flag = r.show_on_timeline`,
+//     or `const resting = r.visibility !== 'active'` assigned once and read
+//     elsewhere)
+//   - the same rule expressed with no primitive in this list at all — e.g.
+//     reasoning from `parent_routine_id`, `times_per_day`, `paused_until`, or
+//     re-deriving `matchesRecurrenceForDate`'s logic by hand instead of
+//     calling it
 //   - a check inside a .test.ts file (excluded on purpose — tests may assert
 //     on raw columns, and the parity tests must)
 //   - a check in supabase/functions or connectors, which do not render
@@ -31,6 +46,8 @@ const PRIMITIVES = [
   'isEverydayRoutine',
   "visibility === 'active'",
   "visibility !== 'active'",
+  "visibility === 'reference'",
+  "visibility !== 'reference'",
 ]
 
 /**
@@ -48,9 +65,20 @@ const ALLOWED = new Map<string, string>([
   ['components/surface/TapRoutinePanel.tsx', 'the tap panel that toggles the flags'],
   ['components/routine/RhythmPage.tsx', 'Tend deliberately shows RESTING routines — opted out, see the comment there'],
   ['components/routine/rhythm/tendHeuristics.ts', 'same opt-out as RhythmPage'],
+  [
+    'components/routine/rhythm/rhythmModel.ts',
+    'the same Tend opt-out as RhythmPage/tendHeuristics, expressed via the ' +
+      "complementary literal — Tend deliberately surfaces resting routines.",
+  ],
   ['hooks/useSystemHealth.ts', 'diagnostics: counts unassigned ACTIVE routines'],
   ['components/layout/RecentlyUpdated.tsx', 'an activity log, not a schedule surface'],
-  ['components/wall-v2/wallV2Adapter.ts', 'canHeadline + the hide-daily section sweep — ranking, not visibility'],
+  [
+    'components/wall-v2/wallV2Adapter.ts',
+    "canHeadline + the hide-daily section sweep make a per-band visibility " +
+      'decision (an everyday unpinned routine can drop from the rhythm band ' +
+      'when hide-daily is on) — safe only because the Gantt board renders ' +
+      'everyday routines unconditionally, so nothing leaves the wall entirely.',
+  ],
   ['components/wall-v2/wallLanes.ts', 'lane packing reads everyday-ness for density, not visibility'],
   ['components/wall-v2/wallGantt.ts', 'bar sizing reads everyday-ness for density, not visibility'],
   [

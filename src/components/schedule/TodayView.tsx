@@ -56,8 +56,7 @@ import { readSchoolSeenAt, writeSchoolSeenAt, onSchoolSeenChange } from '@/lib/t
 import { useSuggestionsEnabled } from '@/lib/assistant/suggestionsPref'
 import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
 import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
-import { getRoutinesForDatePure } from '@/lib/routineUtils'
-import { filterRoutinesForDomain } from '@/lib/today/domainFilter'
+import { resolveRoutine, isDraggableRoutine } from '@/lib/routineUtils'
 import { TodayOverflowMenu } from './TodayOverflowMenu'
 import { ReviewDrawer, type ReviewMode } from './ReviewDrawer'
 import { HorizonPoolDropdown } from './HorizonPoolDropdown'
@@ -537,12 +536,22 @@ export function TodayView({
     const inboxCount = tasks.filter((t) => !t.completed && t.bucket === 'inbox').length
     const overdueCount = selectOverdue(tasks, true, matchAll).length
     const weekCount = selectHorizonPool(tasks, 'week', matchAll, currentWeekStart).length
+    // One resolver call per routine replaces the hand-rolled domain filter +
+    // date filter + `type !== 'daily'` everyday-approximation + resting check.
     // `routines` is no longer domain-pre-filtered upstream (HomeView passes it
-    // raw so the resolver can apply rung 4 itself) — scope this count to the
-    // current lens explicitly, or it would count every domain's untimed routines.
-    const domainRoutines = filterRoutinesForDomain(routines, currentDomain)
-    const untimedRoutines = getRoutinesForDatePure(domainRoutines, viewedDate).filter(
-      (r) => r.recurrence_pattern?.type !== 'daily' && !r.time_of_day && r.visibility !== 'reference',
+    // raw so the resolver can apply rung 4 itself) — rung 4 (domain) is what
+    // used to need the separate filterRoutinesForDomain call. `hideRoutines:
+    // true` reproduces the old `type !== 'daily'` intent: this count is about
+    // placeable work, not ambient everyday rhythm (rung 6, the fuller
+    // everyday-ness test, is a deliberate correction — see the migration note
+    // in the task report for the resulting count delta).
+    const untimedRoutines = routines.filter(
+      (r) =>
+        isDraggableRoutine(r) &&
+        resolveRoutine(r, {
+          date: viewedDate,
+          prefs: { hideRoutines: true, domain: currentDomain },
+        }).shows,
     ).length
     const isEvening = !!data.isToday && new Date().getHours() >= 17
     return computeClaritySteps({ inboxCount, overdueCount, placeableCount: weekCount + untimedRoutines, isEvening })
