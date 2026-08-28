@@ -1,9 +1,10 @@
-import { useMemo } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import type { Task } from '@/types/task'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine, ActionableInstance } from '@/types/actionable'
 import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
 import { resolveRoutine } from '@/lib/routineUtils'
+import { readHideRoutines, onHideRoutinesChange } from '@/lib/hideRoutinesSignal'
 import type { PlanningDomain } from '@/lib/today/domainFilter'
 
 // Inline SVG icons
@@ -114,6 +115,12 @@ export function MonthView({
   currentDomain = 'universal',
   eventNotesMap,
 }: MonthViewProps) {
+  // Respect the app-wide 'Hide daily activities' toggle (same localStorage key
+  // Today/Week use). Reactive via in-tab custom event + cross-tab storage event.
+  const [hideRoutines, setHideRoutines] = useState<boolean>(() => readHideRoutines())
+
+  useEffect(() => onHideRoutinesChange(setHideRoutines), [])
+
   // Generate calendar grid
   const calendarDays = useMemo(() => {
     // The shared matcher — Today, Week, Month and the Inbox must agree about
@@ -170,7 +177,7 @@ export function MonthView({
         resolveRoutine(r, {
           date,
           member: selectedAssignee ?? null,
-          prefs: { hideRoutines: false, domain: currentDomain },
+          prefs: { hideRoutines, domain: currentDomain },
         }).shows
       ).length
 
@@ -188,7 +195,7 @@ export function MonthView({
     }
 
     return days
-  }, [monthStart, tasks, events, routines, dateInstances, selectedAssignee, currentDomain, eventNotesMap])
+  }, [monthStart, tasks, events, routines, dateInstances, selectedAssignee, currentDomain, eventNotesMap, hideRoutines])
 
   // Format month label
   const monthLabel = useMemo(() => {

@@ -1,7 +1,8 @@
-import { describe, it, expect, vi } from 'vitest'
-import { render, screen, within } from '@/test/test-utils'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { render, screen, within, act } from '@/test/test-utils'
 import { MonthView } from './MonthView'
 import { createMockRoutine } from '@/test/mocks/factories'
+import { writeHideRoutines } from '@/lib/hideRoutinesSignal'
 import type { Task } from '@/types/task'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine } from '@/types/actionable'
@@ -56,5 +57,33 @@ describe('MonthView routine day-matching', () => {
 
     expect(routineDot('17')).not.toBeNull() // the 17th
     expect(routineDot('18')).toBeNull() // the 18th
+  })
+})
+
+describe('MonthView responds to the "hide daily routines" toggle', () => {
+  beforeEach(() => {
+    localStorage.clear()
+  })
+
+  // Regression test: MonthView used to hardcode `hideRoutines: false` at its
+  // resolveRoutine call site, so this app-wide toggle (symphony-hide-routines)
+  // silently did nothing here even though Today/Week already honored it. An
+  // everyday (daily, unpinned) routine must be visible with the toggle off
+  // and gone once it's flipped on — both assertions in play so neither can
+  // pass vacuously.
+  it('hides an everyday routine once the toggle is switched on, and shows it again when off', () => {
+    const routines = [createMockRoutine({ name: 'Daily Routine' })] // factory default: daily, unpinned
+
+    render(<MonthView {...defaultProps} routines={routines} />)
+
+    expect(routineDot('17')).not.toBeNull()
+
+    act(() => writeHideRoutines(true))
+
+    expect(routineDot('17')).toBeNull()
+
+    act(() => writeHideRoutines(false))
+
+    expect(routineDot('17')).not.toBeNull()
   })
 })

@@ -1,7 +1,8 @@
-import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@/test/test-utils'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { render, screen, act } from '@/test/test-utils'
 import { CascadingRiverView, ownsIt } from './CascadingRiverView'
 import { createMockRoutine } from '@/test/mocks/factories'
+import { writeHideRoutines } from '@/lib/hideRoutinesSignal'
 import type { Task } from '@/types/task'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { FamilyMember } from '@/types/family'
@@ -175,5 +176,37 @@ describe('CascadingRiverView — routine visibility (render)', () => {
     // not at the fallback x that an unattributed event renders at.
     expect(multiX).toBe(controlX)
     expect(multiX).not.toBe(100)
+  })
+})
+
+describe('CascadingRiverView responds to the "hide daily routines" toggle', () => {
+  beforeEach(() => {
+    localStorage.clear()
+  })
+
+  // Regression test: the river used to hardcode `hideRoutines: false` at its
+  // resolveRoutine call site, so the app-wide "hide daily routines" toggle
+  // (symphony-hide-routines) silently did nothing here even though Today/Week
+  // already honored it. An everyday (daily, unpinned) routine owned by a
+  // selected member must be visible with the toggle off and gone once it's
+  // flipped on — both assertions in play so neither can pass vacuously.
+  it('hides an everyday routine once the toggle is switched on, and shows it again when off', () => {
+    const routine = createMockRoutine({
+      name: 'Daily Routine',
+      assigned_to: 'scott',
+      time_of_day: '09:00',
+    }) // factory default recurrence: daily, unpinned
+
+    render(<CascadingRiverView {...BASE_PROPS} routines={[routine]} />)
+
+    expect(screen.getByText('Daily Routine')).toBeInTheDocument()
+
+    act(() => writeHideRoutines(true))
+
+    expect(screen.queryByText('Daily Routine')).not.toBeInTheDocument()
+
+    act(() => writeHideRoutines(false))
+
+    expect(screen.getByText('Daily Routine')).toBeInTheDocument()
   })
 })

@@ -11,6 +11,7 @@ import { FAMILY_COLORS, type FamilyMemberColor } from '@/types/family'
 import { DateNavigator } from '@/components/schedule/DateNavigator'
 import { AssigneeFilter } from './AssigneeFilter'
 import { resolveRoutine, routineOwners } from '@/lib/routineUtils'
+import { readHideRoutines, onHideRoutinesChange } from '@/lib/hideRoutinesSignal'
 
 // =============================================================================
 // TYPES
@@ -586,6 +587,12 @@ export function CascadingRiverView({
   const [svgWidth, setSvgWidth] = useState(800)
   const [isAnimating, setIsAnimating] = useState(true)
 
+  // Respect the app-wide 'Hide daily activities' toggle (same localStorage key
+  // Today/Week/Month use). Reactive via in-tab custom event + cross-tab storage event.
+  const [hideRoutines, setHideRoutines] = useState<boolean>(() => readHideRoutines())
+
+  useEffect(() => onHideRoutinesChange(setHideRoutines), [])
+
   // Track container width
   useEffect(() => {
     const updateWidth = () => {
@@ -699,7 +706,7 @@ export function CascadingRiverView({
         !resolveRoutine(routine, {
           date: viewedDate,
           member: selectedAssignees,
-          prefs: { hideRoutines: false, domain: currentDomain },
+          prefs: { hideRoutines, domain: currentDomain },
         }).shows
       ) continue
       if (!routine.time_of_day) continue
@@ -733,7 +740,7 @@ export function CascadingRiverView({
     }
 
     return result.sort((a, b) => a.startTime.getTime() - b.startTime.getTime())
-  }, [tasks, events, routines, viewedDate, selectedAssignees, currentDomain, eventNotesMap, routineStatusMap, eventStatusMap])
+  }, [tasks, events, routines, viewedDate, selectedAssignees, currentDomain, eventNotesMap, routineStatusMap, eventStatusMap, hideRoutines])
 
   // Detect convergence zones - only for SHARED events (same event assigned to multiple people)
   // This creates the subway map effect where lines merge when family members are truly together

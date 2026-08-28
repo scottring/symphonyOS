@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import type { Task } from '@/types/task'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine, ActionableInstance } from '@/types/actionable'
@@ -9,6 +9,7 @@ import { emptySections } from '@/lib/today/types'
 import { taskToTimelineItem, eventToTimelineItem, routineToTimelineItem } from '@/types/timeline'
 import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
 import { resolveRoutine } from '@/lib/routineUtils'
+import { readHideRoutines, onHideRoutinesChange } from '@/lib/hideRoutinesSignal'
 import type { PlanningDomain } from '@/lib/today/domainFilter'
 
 // Inline SVG icons
@@ -193,6 +194,12 @@ export function WeekView({
   currentDomain = 'universal',
   eventNotesMap,
 }: WeekViewProps) {
+  // Respect the app-wide 'Hide daily activities' toggle (same localStorage key
+  // Today/Month use). Reactive via in-tab custom event + cross-tab storage event.
+  const [hideRoutines, setHideRoutines] = useState<boolean>(() => readHideRoutines())
+
+  useEffect(() => onHideRoutinesChange(setHideRoutines), [])
+
   // Generate 7 days of the week
   const weekDays = useMemo(() => {
     // The shared matcher — Today, Week, Month and the Inbox must agree about
@@ -244,7 +251,7 @@ export function WeekView({
         resolveRoutine(r, {
           date,
           member: selectedAssignee ?? null,
-          prefs: { hideRoutines: false, domain: currentDomain },
+          prefs: { hideRoutines, domain: currentDomain },
         }).shows
       )
 
@@ -283,7 +290,7 @@ export function WeekView({
     }
 
     return days
-  }, [weekStart, tasks, events, routines, dateInstances, selectedAssignee, currentDomain, eventNotesMap])
+  }, [weekStart, tasks, events, routines, dateInstances, selectedAssignee, currentDomain, eventNotesMap, hideRoutines])
 
   // Format week label
   const weekLabel = useMemo(() => {

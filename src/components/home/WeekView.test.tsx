@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, within } from '@/test/test-utils'
+import { render, screen, within, act } from '@/test/test-utils'
 import { WeekView } from './WeekView'
 import { createMockRoutine } from '@/test/mocks/factories'
+import { writeHideRoutines } from '@/lib/hideRoutinesSignal'
 import type { Task } from '@/types/task'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine } from '@/types/actionable'
@@ -46,6 +47,7 @@ describe('WeekView', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    localStorage.clear()
   })
 
   describe('rendering', () => {
@@ -225,6 +227,29 @@ describe('WeekView', () => {
       const mondayColumn = screen.getByText(monday.getDate().toString()).closest('button')
       expect(mondayColumn).not.toBeNull()
       expect(within(mondayColumn as HTMLElement).queryByText(/Weekly Wednesday Routine/)).toBeNull()
+    })
+
+    // Regression test: WeekView (the legacy week view, distinct from
+    // WeekViewV2's grid) used to hardcode `hideRoutines: false` at its
+    // resolveRoutine call site, so the app-wide "hide daily routines" toggle
+    // (symphony-hide-routines) silently did nothing here. An everyday
+    // (daily, unpinned) routine must be visible with the toggle off and gone
+    // once it's flipped on — both assertions in play so neither can pass
+    // vacuously.
+    it('responds to the "hide daily routines" toggle', () => {
+      const routines = [createMockRoutine({ name: 'Daily Routine' })] // factory default: daily, unpinned
+
+      render(<WeekView {...defaultProps} routines={routines} />)
+
+      expect(screen.getAllByText(/Daily Routine/).length).toBeGreaterThan(0)
+
+      act(() => writeHideRoutines(true))
+
+      expect(screen.queryByText(/Daily Routine/)).toBeNull()
+
+      act(() => writeHideRoutines(false))
+
+      expect(screen.getAllByText(/Daily Routine/).length).toBeGreaterThan(0)
     })
   })
 
