@@ -2,6 +2,12 @@
 // asset exists at /wall/portrait-<id>.png, monogram medallion otherwise, name
 // in serif, their next thing today) + the 3×2 dock cluster on the right.
 // Replaces WallV2ActionDock and the old WallV2AtAGlance strip.
+//
+// NOT CURRENTLY MOUNTED: grep the repo for `<WallV2FamilyStrip` and the only
+// hit is this component's own test file. WallV2Shell.tsx imports just the
+// WallDockActionId type. It is still the one production call site of
+// adaptGlanceForMember, so its hideDailyRoutines plumbing below is correct —
+// but inert until something renders this component again.
 
 import { useState } from 'react';
 import { ClipboardList, MessagesSquare, Phone, Plus, Settings } from 'lucide-react';

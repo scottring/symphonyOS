@@ -1,15 +1,26 @@
 // src/components/wall-v2/wallParity.test.ts
 //
 // Characterization tests for Task 8a's carve-out of "the wall adopts the
-// resolver": the four changes that do NOT depend on the show_on_timeline
-// data audit (see task-8-brief.md's blocked Step 4, and task-8a-report.md
-// for the carve-out this task actually implemented).
+// resolver": the four changes that do NOT depend on the hide-from-timeline
+// flag's data audit (see task-8-brief.md's blocked Step 4, and
+// task-8a-report.md for the carve-out this task actually implemented).
 //
 // useWallData.ts is deliberately UNTOUCHED — it still calls
 // getRoutinesForDatePure directly, not resolveRoutine, because the kids'
-// morning/bedtime routines currently rely on show_on_timeline=false as a
-// Today-declutter workaround. These tests exercise only the two files this
-// task was allowed to touch: wallV2Adapter.ts and wallLanes.ts.
+// morning/bedtime routines currently rely on the hide-from-timeline flag as a
+// Today-declutter workaround. These tests exercise wallV2Adapter.ts and
+// wallLanes.ts.
+//
+// IMPORTANT — this file alone is not the live coverage for change 2 or
+// change 4. The tap-lookup path (adaptTimelineSections/dedupeRoutines) tested
+// below is real but is only HALF of change 2: the live board draws through
+// wallGantt.ts's itemsFor, which needed its own, separate fix (see
+// wallGantt.test.ts's "a Step never draws a bar or a chip" and "multi-owner
+// attribution" describe blocks — that file is the real coverage for the live
+// wall). Likewise, change 4's `adaptPersonLane`/`adaptLanes` assertions below
+// exercise a path with no production caller today (see the comment on that
+// test) — wallGantt.ts's boardOwnersOf is the one multi-owner path that is
+// actually live.
 //
 // Each "is absent" assertion below is paired with a positive control in the
 // same test — proof the render path is live, not merely that the day was
@@ -104,7 +115,15 @@ describe('wall parity — the four in-scope changes', () => {
     expect(adaptGlanceForMember(SCOTT, day, NOW, false)?.primary).toBe('Tidy room'); // hide-daily off: now allowed
   });
 
-  it("a multi-owner routine reaches every owner's lane and glance card", () => {
+  it("a multi-owner routine reaches ownersOf, and every owner's lane/glance IF those surfaces are ever wired up", () => {
+    // NOT the live coverage for change 4 — see wallGantt.test.ts's
+    // "multi-owner attribution" tests for the path that actually ships today
+    // (boardOwnersOf -> ownersOf). adaptPersonLane/adaptLanes here has no
+    // production caller (see the comment on adaptLanes in wallLanes.ts), and
+    // adaptGlanceForMember's one call site, WallV2FamilyStrip, is currently
+    // unmounted (see the comment at the top of that file). Both are kept
+    // because they are correct and will matter the moment either surface is
+    // wired back up — but neither is proof of anything on the wall today.
     const shared = createMockRoutine({
       name: 'Walk the dog', context: 'family',
       assigned_to: 'scott', assigned_to_all: ['scott', 'iris'],
@@ -113,21 +132,22 @@ describe('wall parity — the four in-scope changes', () => {
     const item = routineToTimelineItem(shared, NOW);
     expect(item.owners).toEqual(['scott', 'iris']); // routineToTimelineItem -> routineOwners populates it
 
-    // ownersOf is the exact function wallLanes.itemsOnDay filters lane
-    // membership on — proving both owners are reachable there, not just the
-    // legacy single-column assignedTo (which is 'scott' only).
+    // ownersOf itself IS live — wallGantt.ts's boardOwnersOf calls it
+    // directly, which is what the wallGantt.test.ts tests exercise.
     expect(ownersOf(item, [SCOTT, IRIS])).toEqual(['scott', 'iris']);
 
-    // End-to-end: both members' lanes pick up the same routine. Before this
-    // task, item.assignedTo alone ('scott') could only ever satisfy one lane
-    // — this is the positive control proving Iris's lane isn't a fluke.
+    // Dead path (no production caller today): both members' lanes still pick
+    // up the same routine correctly. Before this task, item.assignedTo alone
+    // ('scott') could only ever satisfy one lane — this is the positive
+    // control proving Iris's lane isn't a fluke, for whenever lanes ship.
     const day = dayWith({ morning: [item] });
     const scottLane = adaptPersonLane(SCOTT, [day], NOW, [SCOTT, IRIS]);
     const irisLane = adaptPersonLane(IRIS, [day], NOW, [SCOTT, IRIS]);
     expect(scottLane.label).toBe('Walk the dog');
     expect(irisLane.label).toBe('Walk the dog');
 
-    // And the glance card, for both owners.
+    // Dead path (WallV2FamilyStrip is currently unmounted): the glance card,
+    // for both owners.
     expect(adaptGlanceForMember(SCOTT, day, NOW, false)?.primary).toBe('Walk the dog');
     expect(adaptGlanceForMember(IRIS, day, NOW, false)?.primary).toBe('Walk the dog');
   });

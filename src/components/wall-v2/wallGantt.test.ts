@@ -390,11 +390,15 @@ describe('an everyday routine is words, not a bar', () => {
 })
 
 describe('a Step of a routine collection, end to end', () => {
-  // The 7:33pm bug, reproduced through the three pieces that carry it:
-  // effectiveTimeOfDay reads the hour off the collection, routineToTimelineItem
-  // turns it into a startTime, and the board's looks-forward rule then works.
-  // Each piece is tested alone; this is the wiring between them, which is
-  // where the bug actually lived.
+  // History: this originally tested a narrower fix for the 7:33pm bug — the
+  // step showed on the Everyone row's anytime line before its collection
+  // hour and disappeared after. Task 8a's fix round 1 superseded that: the
+  // wall has no collection renderer to hand a step to (buildCollectionItem /
+  // groupRoutineSteps are Today/RhythmPage-only), so itemsFor now drops any
+  // item whose originalRoutine.parent_routine_id is set, before the
+  // looks-forward rule ever runs. A step is DROPPED, not relocated — so it
+  // must never appear, at ANY hour, not just after its collection's hour has
+  // passed.
   const members = [member('s', 'Scott')]
   const last = (b: ReturnType<typeof adaptGanttBoard>) => b.tracks[b.tracks.length - 1]
 
@@ -409,14 +413,88 @@ describe('a Step of a routine collection, end to end', () => {
     return adaptGanttBoard(members, [day([routineToTimelineItem(resolved, at(0))])], now)
   }
 
-  it('shows before its collection hour', () => {
-    expect(last(boardAt(at(6))).anytime).toContain('Eat breakfast')
+  it('never appears before its collection hour either — dropped, not merely time-gated', () => {
+    expect(last(boardAt(at(6))).anytime).not.toContain('Eat breakfast')
   })
 
-  it('is gone by the evening — the whole point of the fix', () => {
+  it('never appears in the evening — still true, now for a different reason than before', () => {
     expect(last(boardAt(at(19, 33))).anytime).not.toContain('Eat breakfast')
   })
 })
+
+describe('collection steps never draw on the live board (Task 8a fix round 1)', () => {
+  // The bug this closes: itemsFor used to read day.items[section] directly
+  // and never checked parent_routine_id. A Step whose OWN recurrence is not
+  // "everyday" (e.g. inherited into a specific week, not daily) has a real
+  // startTime once effectiveTimeOfDay inherits its collection's hour, so it
+  // slipped past isAnytimeItem and drew as a genuine timed BAR — a step in
+  // the wall's most prominent surface, and a bar nobody could tap
+  // successfully (the tap-lookup array, built separately by
+  // adaptTimelineSections, already dropped it — see wallV2Adapter's
+  // dedupeRoutines — so a tap silently did nothing).
+  const scott = member('m-scott', 'Scott');
+  const members = [scott];
+
+  const parentRoutine = {
+    id: 'camp', name: 'Camp Mornings', time_of_day: '09:00:00', parent_routine_id: null,
+    recurrence_pattern: { type: 'weekly', days: ['mon'] }, context: 'family', assigned_to: 'm-scott',
+  } as unknown as Routine;
+  const stepRoutine = {
+    id: 'brush', name: 'Brush teeth', time_of_day: null, parent_routine_id: 'camp',
+    // Deliberately NOT 'daily' — this is the shape that used to slip past
+    // isAnytimeItem and draw as a bar. A daily step was already caught by
+    // the "everyday routine" anytime-line rule; this is the gap that rule
+    // could not close.
+    recurrence_pattern: { type: 'weekly', days: ['mon'] }, context: 'family', assigned_to: 'm-scott',
+  } as unknown as Routine;
+
+  it('a step never draws a bar or an anytime chip; its collection PARENT still draws', () => {
+    const byId = new Map([[parentRoutine.id, parentRoutine]]);
+    const resolvedStep = { ...stepRoutine, time_of_day: effectiveTimeOfDay(stepRoutine, byId) };
+    const stepItem = routineToTimelineItem(resolvedStep, at(0));
+    const parentItem = routineToTimelineItem(parentRoutine, at(0));
+
+    const board = adaptGanttBoard(members, [day([stepItem, parentItem])], at(9, 30));
+    const track = board.tracks[0];
+    const allTitles = board.tracks.flatMap((t) => [...t.blocks.map((b) => b.title), ...t.anytime]);
+
+    // Positive control: the parent (parent_routine_id: null) is unaffected by
+    // this fix and still draws — specifically as a BAR, proving the board
+    // still renders real timed routines through this exact path.
+    expect(track.blocks.map((b) => b.title)).toContain('Camp Mornings');
+    // The step: gone from bars AND the anytime line, not merely relocated.
+    expect(allTitles).not.toContain('Brush teeth');
+  });
+});
+
+describe('multi-owner attribution reaches every board row (Task 8a fix round 1)', () => {
+  // The live path for change 4: wallLanes.ownersOf, called through
+  // wallGantt.boardOwnersOf -> itemsFor. wallLanes.adaptPersonLane/adaptLanes
+  // (tested in wallParity.test.ts) has no production caller today — this is
+  // the coverage that actually protects the wall.
+  const scott = member('m-scott', 'Scott');
+  const iris = member('m-iris', 'Iris');
+  const members = [scott, iris];
+
+  it('a routine assigned to two people draws in BOTH their rows, not just the legacy single assignee', () => {
+    const shared = {
+      id: 'dog', name: 'Walk the dog', time_of_day: '09:00:00', parent_routine_id: null,
+      recurrence_pattern: { type: 'weekly', days: ['mon'] }, context: 'family',
+      assigned_to: 'm-scott', assigned_to_all: ['m-scott', 'm-iris'],
+    } as unknown as Routine;
+    const sharedItem = routineToTimelineItem(shared, at(0));
+    // Sanity check on the fixture itself, not the thing under test.
+    expect(sharedItem.owners).toEqual(['m-scott', 'm-iris']);
+
+    const board = adaptGanttBoard(members, [day([sharedItem])], at(9, 30));
+
+    // Positive control: assignedTo alone ('m-scott') would only ever satisfy
+    // Scott's row. Iris's row also drawing it proves boardOwnersOf reads
+    // `owners`, not just the legacy single-column assignedTo.
+    expect(board.tracks[0].blocks.map((b) => b.title)).toContain('Walk the dog');
+    expect(board.tracks[1].blocks.map((b) => b.title)).toContain('Walk the dog');
+  });
+});
 
 describe('the board is TODAY', () => {
   const members = [member('s', 'Scott')]

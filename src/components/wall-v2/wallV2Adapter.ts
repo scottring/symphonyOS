@@ -199,9 +199,12 @@ function dedupeRoutines(
   for (const item of items) {
     const isRoutine = item.type === 'routine';
     // A collection step (e.g. one exercise in "Camp Mornings") never renders
-    // as its own row — the collection carries it. useWallData does not filter
-    // this (out of scope pending the show_on_timeline audit), so the adapter
-    // is the only place left that knows parent_routine_id.
+    // as its own row here. The wall has no collection renderer to hand it to
+    // (buildCollectionItem/groupRoutineSteps are Today/RhythmPage-only), so a
+    // step is DROPPED, not relocated. useWallData does not filter this (out
+    // of scope pending the hide-from-timeline flag audit), so this tap-lookup
+    // adapter is one of two places left that has to know parent_routine_id —
+    // see wallGantt.ts's itemsFor for the other (the live board).
     if (isRoutine && item.originalRoutine?.parent_routine_id != null) continue;
     const key = isRoutine ? item.title.trim().toLowerCase() : null;
 

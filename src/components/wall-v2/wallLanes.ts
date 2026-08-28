@@ -197,6 +197,12 @@ export function adaptPersonLane(
   };
 }
 
+// NOT CURRENTLY LIVE: adaptLanes has no production caller. /wall-lanes
+// (main.tsx) renders WallV2Lanes against the static SCENES fixture, not this
+// function against real data. The live board is wallGantt.ts's
+// adaptGanttBoard, which reads ownersOf via its own boardOwnersOf wrapper.
+// The fixes below are correct — they just aren't reachable from the wall
+// today, and become live if lanes are ever wired up.
 export function adaptLanes(
   members: FamilyMember[],
   days: WallDayData[],

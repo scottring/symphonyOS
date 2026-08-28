@@ -228,6 +228,12 @@ function itemsFor(day: WallDayData, memberId: string, members: FamilyMember[]): 
   const out: TimelineItem[] = [];
   for (const section of BOARD_SECTIONS) {
     for (const item of day.items[section] ?? []) {
+      // A collection step (e.g. one exercise in "Camp Mornings") never draws
+      // its own bar or anytime chip. The wall has no collection renderer to
+      // hand it to, so a step is DROPPED here, not relocated to its parent —
+      // without this, a step whose own recurrence isn't "everyday" slips past
+      // isAnytimeItem and draws as a real timed bar.
+      if (item.type === 'routine' && item.originalRoutine?.parent_routine_id != null) continue;
       if (!boardOwnersOf(item, members).includes(memberId)) continue;
       if (item.completed) continue;
       out.push(item);
