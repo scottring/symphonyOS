@@ -6,6 +6,7 @@ import type { Task, TaskContext } from '@/types/task'
 import { mergeCaptureIntoTask } from '@/lib/captureMerge'
 import type { Project } from '@/types/project'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
+import { useAuth } from '@/hooks/useAuth'
 import { useDomain } from '@/hooks/useDomain'
 import { useInboxMode } from '@/hooks/useInboxMode'
 import { useNotes } from '@/hooks/useNotes'
@@ -27,6 +28,8 @@ import { InboxModeToggle } from './InboxModeToggle'
 import { InboxUndoToast } from './InboxUndoToast'
 import { filterTasksForLayers } from '@/lib/today/domainFilter'
 import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
+import { selectRefileRows } from '@/lib/today/refile'
+import { RefileStrip } from './RefileStrip'
 
 const INBOX_ACTIONS: QuickAction[] = [
   { kind: 'today' }, { kind: 'week' }, { kind: 'month' }, { kind: 'someday' }, { kind: 'note' }, { kind: 'delete' }
@@ -65,8 +68,16 @@ export function InboxView({
   } = useScheduleActionsContext()
   const { notes, addNote, updateNote, deleteNote } = useNotes()
   const { addTask } = useSupabaseTasks()
+  const { user } = useAuth()
 
   const { soleDomain, layers } = useDomain()
+
+  // Needs-re-filing strip: the UNFILTERED tasks prop, not filteredByDomain —
+  // a stranded row must show regardless of which layers are checked.
+  const refileRows = useMemo(
+    () => selectRefileRows(tasks, user?.id ?? null),
+    [tasks, user?.id],
+  )
 
   const [notePickerTaskId, setNotePickerTaskId] = useState<string | null>(null)
   const [mode, setMode] = useInboxMode()
@@ -615,6 +626,8 @@ export function InboxView({
       <SupernotePagesSection />
 
       <HomeNeedsDetailsSection />
+
+      <RefileStrip rows={refileRows} onFile={(t, context) => onUpdateTask?.(t.id, { context })} />
 
       {totalCount === 0 && loading ? (
         <div className="text-center py-16">

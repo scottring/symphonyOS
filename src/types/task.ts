@@ -52,6 +52,10 @@ export interface Task {
   completed: boolean
   createdAt: Date
   updatedAt: Date
+  /** Owner (`tasks.user_id`) — whose row this is, for "is this MINE" checks
+   *  (e.g. the Inbox re-filing strip). Distinct from assignedTo (who should
+   *  DO it) and contactId (who it's about). */
+  userId?: string
   bucket?: TaskBucket // inbox, week, month, quarter, or timed
   scheduledFor?: Date // When this task is scheduled (only set when bucket='timed')
   deferredUntil?: Date // Legacy — kept for backwards compat, prefer bucket
