@@ -535,19 +535,24 @@ export function useHorizonPageData(horizon: HorizonId, anchorDate?: Date) {
   }, [tasks, deleteTask, addTask, undo.pushAction]);
 
   // Iris's rule: any process on an Unsorted item has to involve giving it a
-  // domain. These five actions are the processes (see useGatedTaskActions);
-  // everything else goes to the raw hook handlers unchanged.
+  // domain. These six actions are the processes (see useGatedTaskActions);
+  // everything else goes to the raw hook handlers unchanged. `raw` is memoized
+  // on its own stable members (all useCallback-wrapped upstream) so `gated` —
+  // and therefore scheduleActionsValue below — keeps one identity across
+  // renders instead of forcing every ScheduleActions consumer to re-render.
   const findTaskById = useCallback((id: string) => tasks.find((t) => t.id === id), [tasks]);
-  const gated = useGatedTaskActions(
-    {
+  const gatedRaw = useMemo(
+    () => ({
       updateTask,
       pushTask,
       updateTasksBulk,
+      setBucket,
       onAssignTask: scheduleActions.onAssignTask,
       onAssignTaskAll: scheduleActions.onAssignTaskAll,
-    },
-    findTaskById,
+    }),
+    [updateTask, pushTask, updateTasksBulk, setBucket, scheduleActions.onAssignTask, scheduleActions.onAssignTaskAll],
   );
+  const gated = useGatedTaskActions(gatedRaw, findTaskById);
 
   const scheduleActionsValue = useMemo<ScheduleActionsValue>(
     () => ({
@@ -611,12 +616,14 @@ export function useHorizonPageData(horizon: HorizonId, anchorDate?: Date) {
   );
 
   // ── Inline triage: route a row to a specific WHEN via the shared mapper
-  // (dated whens → pushTask, pool whens → setBucket), identical everywhere. ──
+  // (dated whens → pushTask, pool whens → setBucket), identical everywhere.
+  // Gated: a pool item can be Unsorted, and triaging it here is exactly the
+  // "process" Iris's rule targets. ──
   const applyWhen = useCallback(
     (task: Task, when: TriageWhen) => {
-      applyTriageWhen(when, task.id, { onPushTask: pushTask, onSetBucket: setBucket });
+      applyTriageWhen(when, task.id, { onPushTask: gated.pushTask, onSetBucket: gated.setBucket! });
     },
-    [pushTask, setBucket],
+    [gated],
   );
 
   // Lineage lookups for breadcrumbs ("← Ship auth layer ← Firebase rebuild").
@@ -648,20 +655,20 @@ export function useHorizonPageData(horizon: HorizonId, anchorDate?: Date) {
           triageMenu={
             <TriageWhenMenu
               onPick={(when) => applyWhen(task, when)}
-              onPickDate={(date) => pushTask(task.id, date)}
+              onPickDate={(date) => gated.pushTask(task.id, date)}
               onDelete={() => deleteTask(task.id)}
             />
           }
           onToggleComplete={() => toggleTask(task.id)}
-          onUpdate={(updates) => updateTask(task.id, updates)}
+          onUpdate={(updates) => gated.updateTask(task.id, updates)}
           onSelect={() => handleSelect(task.id)}
-          onAssign={(memberIds) => scheduleActions.onAssignTaskAll(task.id, memberIds)}
+          onAssign={(memberIds) => gated.onAssignTaskAll!(task.id, memberIds)}
           onCreateProject={handleCreateProjectForTask(task.id)}
           onOpenProject={(projectId) => navigate(`/projects/${projectId}`)}
         />
       );
     },
-    [projects, familyMembers, applyWhen, pushTask, deleteTask, toggleTask, updateTask, handleSelect, scheduleActions, handleCreateProjectForTask, navigate, tasksById, goalsById],
+    [projects, familyMembers, applyWhen, gated, deleteTask, toggleTask, handleSelect, handleCreateProjectForTask, navigate, tasksById, goalsById],
   );
 
   // ── "Plan the [horizon]" — routes to the Today rung with a ?plan flag; the

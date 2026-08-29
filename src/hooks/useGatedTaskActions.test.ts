@@ -1,8 +1,20 @@
-import { describe, it, expect, vi } from 'vitest'
-import { needsDomain, gateUpdate } from './useGatedTaskActions'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { renderHook } from '@testing-library/react'
+import { needsDomain, gateUpdate, useGatedTaskActions } from './useGatedTaskActions'
+import type { Task } from '@/types/task'
 
 const unsorted = { id: 't', title: 'x', context: null } as never
 const tagged = { id: 't', title: 'x', context: 'work' } as never
+
+// useGatedTaskActions calls useDomainGate() itself, so the hook-level tests
+// below mock it directly rather than rendering a real DomainGateProvider +
+// clicking through the modal — DomainGate.test.tsx already covers the modal
+// UI; this file is about the gating LOGIC (what asks, what writes, what a
+// cancel skips) and the hook's referential stability.
+const mockRequireDomain = vi.fn()
+vi.mock('@/components/domain/DomainGate', () => ({
+  useDomainGate: () => ({ requireDomain: mockRequireDomain }),
+}))
 
 describe('needsDomain', () => {
   it('scheduling, bucketing, assigning, or projecting an Unsorted task needs a domain', () => {
@@ -26,5 +38,98 @@ describe('gateUpdate', () => {
     write.mockClear()
     await gateUpdate(unsorted, { bucket: 'week' }, async () => null, write)
     expect(write).not.toHaveBeenCalled()
+  })
+})
+
+describe('useGatedTaskActions setBucket', () => {
+  beforeEach(() => {
+    mockRequireDomain.mockReset()
+  })
+
+  function makeRaw() {
+    return {
+      updateTask: vi.fn(),
+      pushTask: vi.fn(),
+      updateTasksBulk: vi.fn(),
+      setBucket: vi.fn(),
+    }
+  }
+
+  it('asks when the task is untagged, writes the context, then calls raw setBucket', async () => {
+    mockRequireDomain.mockResolvedValue('family')
+    const raw = makeRaw()
+    const findTask = (id: string) => (id === 't' ? (unsorted as Task) : undefined)
+    const { result } = renderHook(() => useGatedTaskActions(raw, findTask))
+
+    await result.current.setBucket!('t', 'week', undefined, undefined)
+
+    expect(mockRequireDomain).toHaveBeenCalledWith(unsorted)
+    expect(raw.updateTask).toHaveBeenCalledWith('t', { context: 'family' })
+    expect(raw.setBucket).toHaveBeenCalledWith('t', 'week', undefined, undefined)
+    // Context write happens before the bucket write, not after.
+    const updateOrder = raw.updateTask.mock.invocationCallOrder[0]
+    const setBucketOrder = raw.setBucket.mock.invocationCallOrder[0]
+    expect(updateOrder).toBeLessThan(setBucketOrder)
+  })
+
+  it('cancel (ask resolves null) calls neither raw updateTask nor raw setBucket', async () => {
+    mockRequireDomain.mockResolvedValue(null)
+    const raw = makeRaw()
+    const findTask = (id: string) => (id === 't' ? (unsorted as Task) : undefined)
+    const { result } = renderHook(() => useGatedTaskActions(raw, findTask))
+
+    await result.current.setBucket!('t', 'week', undefined, undefined)
+
+    expect(mockRequireDomain).toHaveBeenCalled()
+    expect(raw.updateTask).not.toHaveBeenCalled()
+    expect(raw.setBucket).not.toHaveBeenCalled()
+  })
+
+  it('a tagged task never asks — setBucket runs straight through', async () => {
+    const raw = makeRaw()
+    const findTask = (id: string) => (id === 't' ? (tagged as Task) : undefined)
+    const { result } = renderHook(() => useGatedTaskActions(raw, findTask))
+
+    await result.current.setBucket!('t', 'month', new Date('2026-09-01'), true)
+
+    expect(mockRequireDomain).not.toHaveBeenCalled()
+    expect(raw.updateTask).not.toHaveBeenCalled()
+    expect(raw.setBucket).toHaveBeenCalledWith('t', 'month', new Date('2026-09-01'), true)
+  })
+})
+
+describe('useGatedTaskActions referential stability', () => {
+  it('returns the same gated object across re-renders when raw and findTask are unchanged', () => {
+    const raw = {
+      updateTask: vi.fn(),
+      pushTask: vi.fn(),
+      updateTasksBulk: vi.fn(),
+    }
+    const findTask = () => undefined
+    const { result, rerender } = renderHook(() => useGatedTaskActions(raw, findTask))
+
+    const first = result.current
+    rerender()
+    expect(result.current).toBe(first)
+
+    // A brand new (but equivalent) raw object is the real-world failure mode
+    // this guards against: an inline object literal at the call site recreates
+    // `raw` every render even though nothing meaningful changed.
+    rerender()
+    expect(result.current).toBe(first)
+  })
+
+  it('gets a NEW identity when raw is a fresh object each render (the bug this test catches)', () => {
+    const findTask = () => undefined
+    const { result, rerender } = renderHook(
+      () =>
+        useGatedTaskActions(
+          { updateTask: vi.fn(), pushTask: vi.fn(), updateTasksBulk: vi.fn() },
+          findTask,
+        ),
+    )
+    const first = result.current
+    rerender()
+    expect(result.current).not.toBe(first)
   })
 })

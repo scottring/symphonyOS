@@ -610,18 +610,22 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
 
   // Iris's rule: any process on an Unsorted item has to involve giving it a
   // domain. These five actions are the processes (see useGatedTaskActions);
-  // everything else goes to the raw hook handlers unchanged.
+  // everything else goes to the raw hook handlers unchanged. `raw` is memoized
+  // on its own stable (useCallback-wrapped) members so `gated` — and therefore
+  // scheduleActionsValue below — keeps one identity across renders instead of
+  // forcing every ScheduleActions consumer to re-render every time.
   const findTaskById = useCallback((id: string) => tasks.find((t) => t.id === id), [tasks]);
-  const gated = useGatedTaskActions(
-    {
+  const gatedRaw = useMemo(
+    () => ({
       updateTask,
       pushTask,
       updateTasksBulk,
       onAssignTask: scheduleActions.onAssignTask,
       onAssignTaskAll: scheduleActions.onAssignTaskAll,
-    },
-    findTaskById,
+    }),
+    [updateTask, pushTask, updateTasksBulk, scheduleActions.onAssignTask, scheduleActions.onAssignTaskAll],
   );
+  const gated = useGatedTaskActions(gatedRaw, findTaskById);
 
   const scheduleActionsValue = useMemo<ScheduleActionsValue>(
     () => ({

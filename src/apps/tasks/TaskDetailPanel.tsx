@@ -26,6 +26,7 @@ import { showToast } from '@/hooks/useToast';
 import { useSelection } from '@/shell/providers/SelectionProvider';
 import type { SelectionRef } from '@/shell/types';
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
+import { useGatedTaskActions } from '@/hooks/useGatedTaskActions';
 import { useContacts } from '@/hooks/useContacts';
 import { useProjects } from '@/hooks/useProjects';
 import { useGoals } from '@/hooks/useGoals';
@@ -146,7 +147,7 @@ function TaskPanelBody({ id }: { id: string }) {
   const { clearSelection } = useSelection();
   const navigate = useNavigate();
 
-  const { tasks, addSubtask, deleteTask, toggleTask, updateTask, refetch } = useSupabaseTasks();
+  const { tasks, addSubtask, deleteTask, toggleTask, updateTask: rawUpdateTask, updateTasksBulk, pushTask, setBucket, refetch } = useSupabaseTasks();
   const { contacts, addContact, searchContacts } = useContacts();
   const { projects } = useProjects();
   // Goals fetched via the hook directly (the global DetailPanel renders outside
@@ -155,6 +156,23 @@ function TaskPanelBody({ id }: { id: string }) {
   const { events } = useGoogleCalendar();
   const { members: familyMembers } = useFamilyMembers();
   const pinnedItems = usePinnedItems();
+
+  // Iris's rule: any process on an Unsorted item has to involve giving it a
+  // domain — this panel is the other global mutation surface besides
+  // Today/Inbox/the horizon pages, so it gets the same gate. `findTaskById`
+  // reuses `findTask` (below) so a subtask id resolves too (onRescheduleSubtask
+  // acts on children, which live one level down in `t.subtasks`, not in the
+  // top-level `tasks` array). `raw` is memoized on its own stable
+  // (useCallback-wrapped) members for referential stability. `updateTask` is
+  // shadowed to the gated version so every existing call site below — not
+  // just the four the gate was written for — goes through it uniformly.
+  const findTaskById = useCallback((tid: string) => findTask(tasks, tid) ?? undefined, [tasks]);
+  const gatedRaw = useMemo(
+    () => ({ updateTask: rawUpdateTask, pushTask, updateTasksBulk, setBucket }),
+    [rawUpdateTask, pushTask, updateTasksBulk, setBucket],
+  );
+  const gated = useGatedTaskActions(gatedRaw, findTaskById);
+  const updateTask = gated.updateTask;
 
   // Meal-plan entries synthesized as CalendarEvent objects, for linked-event
   // resolution (mirrors the legacy `eventsWithMeals`).
@@ -207,17 +225,11 @@ function TaskPanelBody({ id }: { id: string }) {
         showToast(`Moved to ${label}`, 'success');
       }}
       onReschedule={(when) => {
-        applyTriageWhen(when, task.id, {
-          onPushTask: (id, target) => {
-            if (target instanceof Date) {
-              const hasTime = target.getHours() !== 0 || target.getMinutes() !== 0
-              updateTask(id, { bucket: 'timed', scheduledFor: target, isAllDay: !hasTime })
-            } else {
-              updateTask(id, { bucket: target, scheduledFor: undefined })
-            }
-          },
-          onSetBucket: (id, bucket) => updateTask(id, { bucket, scheduledFor: undefined, isAllDay: undefined }),
-        });
+        // Gated pushTask/setBucket (not a hand-rolled bucket/scheduledFor
+        // write) — same reason as horizons/shared.tsx's applyWhen: this is
+        // the real hook logic (defer_count, weekStart, overdue time
+        // preservation), and an Unsorted task reschedule here asks first.
+        applyTriageWhen(when, task.id, { onPushTask: gated.pushTask, onSetBucket: gated.setBucket! });
         showToast(describeTriageWhen(when), 'success');
       }}
       onClearSchedule={() =>
@@ -247,17 +259,7 @@ function TaskPanelBody({ id }: { id: string }) {
         void removeFromGroup(sid, { updateTask, refetch });
       }}
       onRescheduleSubtask={(sid, when) => {
-        applyTriageWhen(when, sid, {
-          onPushTask: (id, target) => {
-            if (target instanceof Date) {
-              const hasTime = target.getHours() !== 0 || target.getMinutes() !== 0
-              updateTask(id, { bucket: 'timed', scheduledFor: target, isAllDay: !hasTime })
-            } else {
-              updateTask(id, { bucket: target, scheduledFor: undefined })
-            }
-          },
-          onSetBucket: (id, bucket) => updateTask(id, { bucket, scheduledFor: undefined, isAllDay: undefined }),
-        });
+        applyTriageWhen(when, sid, { onPushTask: gated.pushTask, onSetBucket: gated.setBucket! });
         showToast(describeTriageWhen(when), 'success');
       }}
       onScheduleSubtask={(sid, date, isAllDay) =>
