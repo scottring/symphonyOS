@@ -28,6 +28,7 @@ import { useActionableInstances } from '@/hooks/useActionableInstances';
 import { useFamilyMembers } from '@/hooks/useFamilyMembers';
 import { useHiddenCalendarEvents } from '@/hooks/useHiddenCalendarEvents';
 import { useScheduleActions } from '@/hooks/useScheduleActions';
+import { useGatedTaskActions } from '@/hooks/useGatedTaskActions';
 import { useDomain } from '@/hooks/useDomain';
 import { useCalendarDomainMappings } from '@/hooks/useCalendarDomainMappings';
 import { useListsContext } from '@/contexts/ListsContext';
@@ -533,20 +534,35 @@ export function useHorizonPageData(horizon: HorizonId, anchorDate?: Date) {
     });
   }, [tasks, deleteTask, addTask, undo.pushAction]);
 
+  // Iris's rule: any process on an Unsorted item has to involve giving it a
+  // domain. These five actions are the processes (see useGatedTaskActions);
+  // everything else goes to the raw hook handlers unchanged.
+  const findTaskById = useCallback((id: string) => tasks.find((t) => t.id === id), [tasks]);
+  const gated = useGatedTaskActions(
+    {
+      updateTask,
+      pushTask,
+      updateTasksBulk,
+      onAssignTask: scheduleActions.onAssignTask,
+      onAssignTaskAll: scheduleActions.onAssignTaskAll,
+    },
+    findTaskById,
+  );
+
   const scheduleActionsValue = useMemo<ScheduleActionsValue>(
     () => ({
       onToggleTask: toggleTask,
       onToggleWaiting: toggleWaiting,
-      onUpdateTask: updateTask,
-      onUpdateTasksBulk: updateTasksBulk,
-      onPushTask: pushTask,
+      onUpdateTask: gated.updateTask,
+      onUpdateTasksBulk: gated.updateTasksBulk,
+      onPushTask: gated.pushTask,
       onDeleteTask: deleteTask,
       onCreateTask: onCreateTaskFromValue,
       onOpenTask: (taskId: string) => setSelection({ kind: 'task', id: taskId }),
       onOpenProject: (projectId: string) => navigate(`/projects/${projectId}`),
 
-      onAssignTask: scheduleActions.onAssignTask,
-      onAssignTaskAll: scheduleActions.onAssignTaskAll,
+      onAssignTask: gated.onAssignTask,
+      onAssignTaskAll: gated.onAssignTaskAll,
       onAssignEvent: scheduleActions.onAssignEvent,
       onAssignEventAll: scheduleActions.onAssignEventAll,
       onAssignRoutine: scheduleActions.onAssignRoutine,
@@ -584,7 +600,7 @@ export function useHorizonPageData(horizon: HorizonId, anchorDate?: Date) {
       onUpdateEventProject: updateEventProject,
     }),
     [
-      toggleTask, toggleWaiting, updateTask, updateTasksBulk, pushTask, deleteTask, onCreateTaskFromValue,
+      toggleTask, toggleWaiting, gated, deleteTask, onCreateTaskFromValue,
       setSelection, navigate,
       scheduleActions, updateRoutine, updateEventContext, hideEvent,
       contactsMap, projectsMap, projects, contacts, familyMembers, lists, listsByCategory,

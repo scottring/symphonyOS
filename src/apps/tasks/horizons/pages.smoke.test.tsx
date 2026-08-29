@@ -11,6 +11,7 @@ import { render as rtlRender, fireEvent, within } from '@testing-library/react'
 import { MemoryRouter, useNavigate } from 'react-router-dom'
 import { PlaceProvider } from '@/hooks/usePlace'
 import { DomainProvider } from '@/hooks/useDomain'
+import { DomainGateProvider } from '@/components/domain/DomainGate'
 import { createMockTask } from '@/test/mocks/factories'
 import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
 import type { Task } from '@/types/task'
@@ -552,7 +553,9 @@ describe('horizon pages (smoke)', () => {
       <MemoryRouter initialEntries={['/week?start=2026-07-05']}>
         <PlaceProvider>
           <DomainProvider>
-            <WeekPage />
+            <DomainGateProvider>
+              <WeekPage />
+            </DomainGateProvider>
           </DomainProvider>
         </PlaceProvider>
       </MemoryRouter>
@@ -571,7 +574,9 @@ describe('horizon pages (smoke)', () => {
       <MemoryRouter initialEntries={[`/week?start=${localYmd(anchorWeekStart)}`]}>
         <PlaceProvider>
           <DomainProvider>
-            <WeekPage />
+            <DomainGateProvider>
+              <WeekPage />
+            </DomainGateProvider>
           </DomainProvider>
         </PlaceProvider>
       </MemoryRouter>
@@ -590,7 +595,9 @@ describe('horizon pages (smoke)', () => {
       <MemoryRouter initialEntries={['/week']}>
         <PlaceProvider>
           <DomainProvider>
-            <WeekPage />
+            <DomainGateProvider>
+              <WeekPage />
+            </DomainGateProvider>
           </DomainProvider>
         </PlaceProvider>
       </MemoryRouter>
@@ -642,8 +649,10 @@ describe('horizon pages (smoke)', () => {
       <MemoryRouter initialEntries={[`/week?start=${localYmd(anchorWeekStart)}`]}>
         <PlaceProvider>
           <DomainProvider>
-            <NavAway />
-            <WeekPage />
+            <DomainGateProvider>
+              <NavAway />
+              <WeekPage />
+            </DomainGateProvider>
           </DomainProvider>
         </PlaceProvider>
       </MemoryRouter>

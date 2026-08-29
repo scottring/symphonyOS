@@ -91,6 +91,7 @@ import { startRealtimeKeepAlive } from './lib/realtime/keepAlive'
 import { JoinHousehold } from './components/JoinHousehold'
 import { GoogleCalendarProvider } from './hooks/useGoogleCalendar'
 import { DomainProvider } from './hooks/useDomain'
+import { DomainGateProvider } from './components/domain/DomainGate'
 import { PlaceProvider } from './hooks/usePlace'
 import { Shell } from './shell/Shell'
 import { AuthGate } from './components/auth/AuthGate'
@@ -141,6 +142,7 @@ createRoot(document.getElementById('root')!).render(
     <ErrorBoundary>
       <PlaceProvider>
       <DomainProvider>
+      <DomainGateProvider>
         <BrowserRouter>
           <GoogleCalendarProvider>
             <Routes>
@@ -179,6 +181,7 @@ createRoot(document.getElementById('root')!).render(
             </Routes>
           </GoogleCalendarProvider>
         </BrowserRouter>
+      </DomainGateProvider>
       </DomainProvider>
       </PlaceProvider>
     </ErrorBoundary>

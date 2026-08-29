@@ -37,6 +37,7 @@ import { useHiddenCalendarEvents } from '@/hooks/useHiddenCalendarEvents';
 import { useScheduleFiltering } from '@/hooks/useScheduleFiltering';
 import { useInstancesRealtime } from '@/hooks/useInstancesRealtime';
 import { useScheduleActions } from '@/hooks/useScheduleActions';
+import { useGatedTaskActions } from '@/hooks/useGatedTaskActions';
 import { useDomain } from '@/hooks/useDomain';
 import { useCalendarDomainMappings } from '@/hooks/useCalendarDomainMappings';
 import { useRefreshOnVisible } from '@/hooks/useRefreshOnVisible';
@@ -57,7 +58,7 @@ import { useMealEventsForDate } from '@/shell/providers/MealEventsProvider';
 
 export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' } = {}) {
   // Data hooks
-  const { tasks, loading: tasksLoading, addTask, toggleTask, toggleWaiting, deleteTask, updateTask, pushTask, getLinkedTasks, refetch, updateTaskOrders } = useSupabaseTasks();
+  const { tasks, loading: tasksLoading, addTask, toggleTask, toggleWaiting, deleteTask, updateTask, updateTasksBulk, pushTask, getLinkedTasks, refetch, updateTaskOrders } = useSupabaseTasks();
   const { isConnected, events, fetchEvents, isFetching: eventsFetching, updateEvent, createEvent, deleteEvent, removeEventLocal, restoreEventLocal } = useGoogleCalendar();
   // Passing the visible event ids opts in to auto-loading notes (context
   // overrides, assignees, shared-with-family) + realtime — without it those
@@ -607,6 +608,21 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
     [updateTask],
   );
 
+  // Iris's rule: any process on an Unsorted item has to involve giving it a
+  // domain. These five actions are the processes (see useGatedTaskActions);
+  // everything else goes to the raw hook handlers unchanged.
+  const findTaskById = useCallback((id: string) => tasks.find((t) => t.id === id), [tasks]);
+  const gated = useGatedTaskActions(
+    {
+      updateTask,
+      pushTask,
+      updateTasksBulk,
+      onAssignTask: scheduleActions.onAssignTask,
+      onAssignTaskAll: scheduleActions.onAssignTaskAll,
+    },
+    findTaskById,
+  );
+
   const scheduleActionsValue = useMemo<ScheduleActionsValue>(
     () => ({
       // Planning
@@ -615,8 +631,9 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
       // Task actions
       onToggleTask: toggleTask,
       onToggleWaiting: toggleWaiting,
-      onUpdateTask: updateTask,
-      onPushTask: pushTask,
+      onUpdateTask: gated.updateTask,
+      onUpdateTasksBulk: gated.updateTasksBulk,
+      onPushTask: gated.pushTask,
       onDeleteTask: deleteTask,
       onSetNeededToday,
       viewedDate,
@@ -640,8 +657,8 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
       onOpenProject: (projectId: string) => navigate(`/projects/${projectId}`),
 
       // Assignment actions
-      onAssignTask: scheduleActions.onAssignTask,
-      onAssignTaskAll: scheduleActions.onAssignTaskAll,
+      onAssignTask: gated.onAssignTask,
+      onAssignTaskAll: gated.onAssignTaskAll,
       onAssignEvent: scheduleActions.onAssignEvent,
       onAssignEventAll: scheduleActions.onAssignEventAll,
       onAssignRoutine: scheduleActions.onAssignRoutine,
@@ -689,7 +706,7 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
       onUpdateEventProject: updateEventProject,
     }),
     [
-      toggleTask, toggleWaiting, updateTask, pushTask, deleteTask, onSetNeededToday, viewedDate, onCreateTaskFromValue, onCreateTaskParsed, parserContext, resolverContext, getRecentTaskForContact, onCreateTaskAt, onCreateEventAt, onCreateRoutineAt, handleCreateFollowUp, handleGroupItems, handleAddToGroup, handleRemoveFromGroup, handleUngroup, undo.pushAction, updateTaskOrders,
+      toggleTask, toggleWaiting, gated, deleteTask, onSetNeededToday, viewedDate, onCreateTaskFromValue, onCreateTaskParsed, parserContext, resolverContext, getRecentTaskForContact, onCreateTaskAt, onCreateEventAt, onCreateRoutineAt, handleCreateFollowUp, handleGroupItems, handleAddToGroup, handleRemoveFromGroup, handleUngroup, undo.pushAction, updateTaskOrders,
       setSelection, navigate,
       scheduleActions, updateRoutine, updateEventContext, updateEventSharedWithFamily, dismissShareNudge, hideEvent, handleDeleteEvent, sendTaskToBuy,
       contactsMap, projectsMap, projects, contacts, familyMembers, lists, listsByCategory,
