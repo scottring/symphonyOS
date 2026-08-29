@@ -178,18 +178,25 @@ describe('scope is derived from domain + assignees on every task write', () => {
     expect(rowWrites.at(-1)!.data).toMatchObject({ assigned_to: PARTNER.id, scope: 'compound' })
   })
 
-  it("a context written onto a step cannot narrow it past its parent's domain", async () => {
+  // `parentTaskId` also links a task into a Today GROUP wrapper (a Family task
+  // can sit under a Personal wrapper and keep its own domain — see
+  // useGatedTaskActions' `isStep`). A row that carries its OWN context is a
+  // tagged group child, not a step: it must derive from itself, never from
+  // the wrapper it happens to be nested under.
+  it("a grouped child's own context wins over its wrapper's domain", async () => {
     mockSupabaseData.push(
-      dbTask({ id: 'parent', context: 'family', scope: 'compound' }),
-      dbTask({ id: 'step', parent_task_id: 'parent', context: null, scope: 'compound' }),
+      dbTask({ id: 'wrapper', context: 'personal', scope: 'individual' }),
+      dbTask({ id: 'child', parent_task_id: 'wrapper', context: 'family', scope: 'compound' }),
     )
     const { result } = renderHook(() => useSupabaseTasks())
     await waitFor(() => expect(result.current.tasks).toHaveLength(1))
 
-    // Exactly what the old domain gate did to a step: stamp it 'work'.
-    await act(() => result.current.updateTask('step', { context: 'work' }))
+    await act(() => result.current.updateTask('child', { assignedTo: PARTNER.id }))
 
-    expect(rowWrites.at(-1)!.data.scope).toBe('compound')
+    // Still compound: the child's own 'family' context, not the wrapper's
+    // 'personal' one, drives the derivation. Before the fix this fell to
+    // 'individual' the moment the wrapper had any domain at all.
+    expect(rowWrites.at(-1)!.data).toMatchObject({ assigned_to: PARTNER.id, scope: 'compound' })
   })
 
   // -- who `self` is ----------------------------------------------------------

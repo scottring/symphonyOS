@@ -1097,8 +1097,16 @@ export function useSupabaseTasks() {
       // step's own null read every step of a family task as private: assigning
       // one, or answering the (now removed) domain gate, narrowed it to
       // 'individual' and the partner lost a step of a task they share.
+      //
+      // But `parentTaskId` also links a task into a Today GROUP wrapper
+      // (types/task.ts, groupTasks.ts) — nesting a Family task under a
+      // Personal wrapper is not the same as making it a step of it. Only fall
+      // back to the parent's domain when this row has NO context of its own
+      // (a real step, or an untagged task dragged into a group). A row that
+      // carries its own context — grouped or not — always derives from
+      // itself; the parent's domain never overrides a tag the row already has.
       const parent = task.parentTaskId ? findParentOfSubtask(id) : undefined
-      const domain = parent ? parent.context ?? null : next.context ?? null
+      const domain = (parent && next.context == null) ? (parent.context ?? null) : (next.context ?? null)
       const derived = scopeForDomain(
         domain,
         [next.assignedTo, ...(next.assignedToAll ?? [])],

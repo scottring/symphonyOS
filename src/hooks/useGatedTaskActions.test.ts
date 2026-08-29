@@ -1,12 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook } from '@testing-library/react'
-import { needsDomain, gateUpdate, useGatedTaskActions } from './useGatedTaskActions'
+import { needsDomain, gateUpdate, isStep, useGatedTaskActions } from './useGatedTaskActions'
 import type { Task } from '@/types/task'
 
 const unsorted = { id: 't', title: 'x', context: null } as never
 const tagged = { id: 't', title: 'x', context: 'work' } as never
 /** A step of a family task: context null on purpose, parent set. */
 const step = { id: 's', title: 'step', context: null, parentTaskId: 'parent' } as never
+/** A Today GROUP CHILD, not a step: it keeps its own context under a
+ *  wrapper's parentTaskId. `isStep` must say no — grouping under a wrapper of
+ *  a different domain must not narrow (or widen) this row's own domain. */
+const groupedChild = { id: 'g', title: 'grouped', context: 'family', parentTaskId: 'wrapper' } as never
 
 // useGatedTaskActions calls useDomainGate() itself, so the hook-level tests
 // below mock it directly rather than rendering a real DomainGateProvider +
@@ -41,6 +45,18 @@ describe('needsDomain', () => {
     expect(needsDomain(step, { bucket: 'week' })).toBe(false)
     expect(needsDomain(step, { assignedTo: 'member-partner' })).toBe(false)
     expect(needsDomain(step, { projectId: 'p' })).toBe(false)
+  })
+
+  // `parentTaskId` is ALSO how a task attaches to a Today group wrapper — not
+  // every parented row is a step. `isStep` is the discriminator: a row with
+  // its OWN context (grouped or not) is never a step, so it is gated exactly
+  // like `tagged` above, via the ordinary "already has a context" path — not
+  // because it has a parent.
+  it('a parentTaskId row WITH its own context is gated like any tagged task, never treated as a step', () => {
+    expect(isStep(groupedChild)).toBe(false)
+    expect(isStep(step)).toBe(true)
+    expect(needsDomain(groupedChild, { scheduledFor: new Date() })).toBe(false)
+    expect(needsDomain(groupedChild, { assignedTo: 'member-partner' })).toBe(false)
   })
 })
 
@@ -121,6 +137,18 @@ describe('useGatedTaskActions setBucket', () => {
     expect(mockRequireDomain).not.toHaveBeenCalled()
     expect(raw.updateTask).not.toHaveBeenCalled()
     expect(raw.setBucket).toHaveBeenCalledWith('t', 'month', new Date('2026-09-01'), true)
+  })
+
+  it('a grouped task with its own context never asks — parentTaskId alone is not the skip condition', async () => {
+    const raw = makeRaw()
+    const findTask = (id: string) => (id === 'g' ? (groupedChild as Task) : undefined)
+    const { result } = renderHook(() => useGatedTaskActions(raw, findTask))
+
+    await result.current.setBucket!('g', 'week', undefined, undefined)
+
+    expect(mockRequireDomain).not.toHaveBeenCalled()
+    expect(raw.updateTask).not.toHaveBeenCalled()
+    expect(raw.setBucket).toHaveBeenCalledWith('g', 'week', undefined, undefined)
   })
 })
 

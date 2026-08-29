@@ -8,19 +8,35 @@ type Ask = (task: Pick<Task, 'id' | 'title' | 'context'>) => Promise<DomainId | 
 /** A gated task, plus the one field that says it is a STEP rather than an item. */
 type Gatable = Pick<Task, 'id' | 'title' | 'context'> & Pick<Task, 'parentTaskId'>
 
+/** `parentTaskId` means two different things: a real step created by
+ *  `addSubtask` (which leaves `context` null on purpose — it is a step of its
+ *  parent, not a separate item on a domain surface), AND a Today group
+ *  wrapper attachment (groupTasks.ts, types/task.ts), which a TAGGED task can
+ *  sit under while keeping its own domain. `context == null` is what tells
+ *  them apart: a tagged row under a group wrapper is not a step and must not
+ *  be treated as one — grouping it under a Personal wrapper doesn't make a
+ *  Family task private. An untagged row under a wrapper (a step, or an
+ *  Unsorted task dragged into a group) IS treated as a step: it inherits the
+ *  parent's domain and is never gated for it — acceptable and consistent,
+ *  since it has no domain of its own to lose. */
+export function isStep(task: Pick<Task, 'context' | 'parentTaskId'>): boolean {
+  return task.parentTaskId != null && task.context == null
+}
+
 /** Iris's rule: any process on an Unsorted item has to involve giving it a
  *  domain. These are the processes. A bare title/notes edit is not one.
  *
- *  A SUBTASK is never one of them. addSubtask leaves a step's `context` null on
- *  purpose (it is a step of its parent, not a separate item on a domain
- *  surface), so the gate read every step as Unsorted: rescheduling any step of
- *  a family task popped "Where does this belong?", and answering Work stamped
- *  context='work' on the step → scopeForDomain → 'individual' → the partner
- *  lost a step of a task they share. A step inherits its parent; it is never
- *  asked, and its scope is derived from the parent's domain (useSupabaseTasks'
- *  updateTask). */
+ *  A STEP is never one of them (see `isStep`). addSubtask leaves a step's
+ *  `context` null on purpose, so the gate used to read every step as
+ *  Unsorted: rescheduling any step of a family task popped "Where does this
+ *  belong?", and answering Work stamped context='work' on the step →
+ *  scopeForDomain → 'individual' → the partner lost a step of a task they
+ *  share. A step inherits its parent; it is never asked, and its scope is
+ *  derived from the parent's domain (useSupabaseTasks' updateTask). A row
+ *  with its OWN context — grouped or not — is already tagged and skips the
+ *  gate for that reason, not because it has a parent. */
 export function needsDomain(task: Pick<Task, 'context' | 'parentTaskId'>, updates: Partial<Task>): boolean {
-  if (task.parentTaskId != null) return false
+  if (isStep(task)) return false
   if (task.context != null) return false
   if ('context' in updates && updates.context) return false
   return (
@@ -45,19 +61,20 @@ export async function gateUpdate(
   await write(task.id, { ...updates, context })
 }
 
-/** Push/setBucket/assign share one shape: if the task is untagged, ask first
- *  (unconditionally — unlike `needsDomain`, there's no "inbox" escape hatch
- *  for these, they're always a deliberate placement), stamp the context via
- *  `writeContext`, then run the actual write. Cancel (`ask` resolves null)
- *  runs nothing. A step (parentTaskId set) inherits its parent and is never
- *  asked — see needsDomain. */
+/** Push/setBucket/assign share one shape: if the task is untagged AND not a
+ *  step (see `isStep`), ask first (unconditionally — unlike `needsDomain`,
+ *  there's no "inbox" escape hatch for these, they're always a deliberate
+ *  placement), stamp the context via `writeContext`, then run the actual
+ *  write. Cancel (`ask` resolves null) runs nothing. A step, or a row that
+ *  already has its own context (grouped or not), is never asked — see
+ *  `isStep` and `needsDomain`. */
 async function gateThenCall(
   task: Gatable | undefined,
   ask: Ask,
   writeContext: (id: string, context: DomainId) => Promise<void> | void,
   call: () => Promise<void> | void,
 ): Promise<void> {
-  if (task && task.parentTaskId == null && task.context == null) {
+  if (task && task.context == null && !isStep(task)) {
     const context = await ask(task)
     if (!context) return
     await writeContext(task.id, context)
