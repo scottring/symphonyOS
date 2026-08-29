@@ -5,6 +5,8 @@ import type { Task } from '@/types/task'
 
 const unsorted = { id: 't', title: 'x', context: null } as never
 const tagged = { id: 't', title: 'x', context: 'work' } as never
+/** A step of a family task: context null on purpose, parent set. */
+const step = { id: 's', title: 'step', context: null, parentTaskId: 'parent' } as never
 
 // useGatedTaskActions calls useDomainGate() itself, so the hook-level tests
 // below mock it directly rather than rendering a real DomainGateProvider +
@@ -27,6 +29,18 @@ describe('needsDomain', () => {
     expect(needsDomain(tagged, { scheduledFor: new Date() })).toBe(false)
     expect(needsDomain(unsorted, { title: 'y' })).toBe(false)
     expect(needsDomain(unsorted, { scheduledFor: new Date(), context: 'family' })).toBe(false)
+  })
+
+  // A step's context is null BY DESIGN (addSubtask leaves it so — a step is
+  // part of its parent, not a separate item on a domain surface). Gating it
+  // asked "where does this belong?" for every reschedule of every step, and
+  // answering Work stamped context='work' onto the step, whose scope then
+  // derived to 'individual' — the partner lost a step of a task they share.
+  it('never fires for a SUBTASK, whatever its own context says', () => {
+    expect(needsDomain(step, { scheduledFor: new Date() })).toBe(false)
+    expect(needsDomain(step, { bucket: 'week' })).toBe(false)
+    expect(needsDomain(step, { assignedTo: 'member-partner' })).toBe(false)
+    expect(needsDomain(step, { projectId: 'p' })).toBe(false)
   })
 })
 
@@ -85,6 +99,18 @@ describe('useGatedTaskActions setBucket', () => {
     expect(raw.setBucket).not.toHaveBeenCalled()
   })
 
+  it('a SUBTASK never asks — setBucket runs straight through and writes no context', async () => {
+    const raw = makeRaw()
+    const findTask = (id: string) => (id === 's' ? (step as Task) : undefined)
+    const { result } = renderHook(() => useGatedTaskActions(raw, findTask))
+
+    await result.current.setBucket!('s', 'week', undefined, undefined)
+
+    expect(mockRequireDomain).not.toHaveBeenCalled()
+    expect(raw.updateTask).not.toHaveBeenCalled()
+    expect(raw.setBucket).toHaveBeenCalledWith('s', 'week', undefined, undefined)
+  })
+
   it('a tagged task never asks — setBucket runs straight through', async () => {
     const raw = makeRaw()
     const findTask = (id: string) => (id === 't' ? (tagged as Task) : undefined)
@@ -95,6 +121,73 @@ describe('useGatedTaskActions setBucket', () => {
     expect(mockRequireDomain).not.toHaveBeenCalled()
     expect(raw.updateTask).not.toHaveBeenCalled()
     expect(raw.setBucket).toHaveBeenCalledWith('t', 'month', new Date('2026-09-01'), true)
+  })
+})
+
+// The gate asks about the UNTAGGED half of a mixed selection. Stamping that
+// answer onto the whole selection re-tagged rows that already had an answer —
+// a Work item bulk-scheduled alongside Unsorted ones became Family, silently,
+// and its scope was rederived to match.
+describe('useGatedTaskActions updateTasksBulk', () => {
+  beforeEach(() => {
+    mockRequireDomain.mockReset()
+  })
+
+  const untagged = { id: 'u', title: 'untagged', context: null } as never
+  const work = { id: 'w', title: 'work item', context: 'work' } as never
+  const findMixed = (id: string) =>
+    (id === 'u' ? (untagged as Task) : id === 'w' ? (work as Task) : undefined)
+
+  it('stamps the chosen domain on the UNTAGGED rows only', async () => {
+    mockRequireDomain.mockResolvedValue('family')
+    const raw = {
+      updateTask: vi.fn(), pushTask: vi.fn(), updateTasksBulk: vi.fn().mockResolvedValue(undefined),
+    }
+    const { result } = renderHook(() => useGatedTaskActions(raw, findMixed))
+
+    await result.current.updateTasksBulk(['w', 'u'], { bucket: 'week' })
+
+    expect(raw.updateTasksBulk).toHaveBeenCalledTimes(2)
+    expect(raw.updateTasksBulk).toHaveBeenCalledWith(['w'], { bucket: 'week' })
+    expect(raw.updateTasksBulk).toHaveBeenCalledWith(['u'], { bucket: 'week', context: 'family' })
+  })
+
+  it('asks once, about the untagged count only', async () => {
+    mockRequireDomain.mockResolvedValue('family')
+    const raw = {
+      updateTask: vi.fn(), pushTask: vi.fn(), updateTasksBulk: vi.fn().mockResolvedValue(undefined),
+    }
+    const { result } = renderHook(() => useGatedTaskActions(raw, findMixed))
+
+    await result.current.updateTasksBulk(['w', 'u'], { bucket: 'week' })
+
+    expect(mockRequireDomain).toHaveBeenCalledTimes(1)
+    expect(mockRequireDomain).toHaveBeenCalledWith({ id: 'u', title: '1 items', context: null })
+  })
+
+  it('a selection with nothing untagged writes once, unchanged', async () => {
+    const raw = {
+      updateTask: vi.fn(), pushTask: vi.fn(), updateTasksBulk: vi.fn().mockResolvedValue(undefined),
+    }
+    const { result } = renderHook(() => useGatedTaskActions(raw, findMixed))
+
+    await result.current.updateTasksBulk(['w'], { bucket: 'week' })
+
+    expect(mockRequireDomain).not.toHaveBeenCalled()
+    expect(raw.updateTasksBulk).toHaveBeenCalledTimes(1)
+    expect(raw.updateTasksBulk).toHaveBeenCalledWith(['w'], { bucket: 'week' })
+  })
+
+  it('cancel writes nothing at all — not even the already-tagged rows', async () => {
+    mockRequireDomain.mockResolvedValue(null)
+    const raw = {
+      updateTask: vi.fn(), pushTask: vi.fn(), updateTasksBulk: vi.fn().mockResolvedValue(undefined),
+    }
+    const { result } = renderHook(() => useGatedTaskActions(raw, findMixed))
+
+    await result.current.updateTasksBulk(['w', 'u'], { bucket: 'week' })
+
+    expect(raw.updateTasksBulk).not.toHaveBeenCalled()
   })
 })
 

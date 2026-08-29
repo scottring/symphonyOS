@@ -5,9 +5,22 @@ import { useDomainGate } from '@/components/domain/DomainGate'
 
 type Ask = (task: Pick<Task, 'id' | 'title' | 'context'>) => Promise<DomainId | null>
 
+/** A gated task, plus the one field that says it is a STEP rather than an item. */
+type Gatable = Pick<Task, 'id' | 'title' | 'context'> & Pick<Task, 'parentTaskId'>
+
 /** Iris's rule: any process on an Unsorted item has to involve giving it a
- *  domain. These are the processes. A bare title/notes edit is not one. */
-export function needsDomain(task: Pick<Task, 'context'>, updates: Partial<Task>): boolean {
+ *  domain. These are the processes. A bare title/notes edit is not one.
+ *
+ *  A SUBTASK is never one of them. addSubtask leaves a step's `context` null on
+ *  purpose (it is a step of its parent, not a separate item on a domain
+ *  surface), so the gate read every step as Unsorted: rescheduling any step of
+ *  a family task popped "Where does this belong?", and answering Work stamped
+ *  context='work' on the step → scopeForDomain → 'individual' → the partner
+ *  lost a step of a task they share. A step inherits its parent; it is never
+ *  asked, and its scope is derived from the parent's domain (useSupabaseTasks'
+ *  updateTask). */
+export function needsDomain(task: Pick<Task, 'context' | 'parentTaskId'>, updates: Partial<Task>): boolean {
+  if (task.parentTaskId != null) return false
   if (task.context != null) return false
   if ('context' in updates && updates.context) return false
   return (
@@ -21,7 +34,7 @@ export function needsDomain(task: Pick<Task, 'context'>, updates: Partial<Task>)
 }
 
 export async function gateUpdate(
-  task: Pick<Task, 'id' | 'title' | 'context'>,
+  task: Gatable,
   updates: Partial<Task>,
   ask: Ask,
   write: (id: string, u: Partial<Task>) => Promise<void> | void,
@@ -36,14 +49,15 @@ export async function gateUpdate(
  *  (unconditionally — unlike `needsDomain`, there's no "inbox" escape hatch
  *  for these, they're always a deliberate placement), stamp the context via
  *  `writeContext`, then run the actual write. Cancel (`ask` resolves null)
- *  runs nothing. */
+ *  runs nothing. A step (parentTaskId set) inherits its parent and is never
+ *  asked — see needsDomain. */
 async function gateThenCall(
-  task: Pick<Task, 'id' | 'title' | 'context'> | undefined,
+  task: Gatable | undefined,
   ask: Ask,
   writeContext: (id: string, context: DomainId) => Promise<void> | void,
   call: () => Promise<void> | void,
 ): Promise<void> {
-  if (task && task.context == null) {
+  if (task && task.parentTaskId == null && task.context == null) {
     const context = await ask(task)
     if (!context) return
     await writeContext(task.id, context)
@@ -75,11 +89,21 @@ export function useGatedTaskActions<R extends {
         () => raw.pushTask(id, target),
       ),
     updateTasksBulk: async (ids: string[], updates: Partial<Task>) => {
-      const untagged = ids.map(findTask).filter((t): t is Task => !!t && needsDomain(t, updates))
-      if (untagged.length === 0) return raw.updateTasksBulk(ids, updates)
-      const context = await requireDomain({ id: untagged[0].id, title: `${untagged.length} items`, context: null })
+      const untaggedIds = ids.filter((id) => {
+        const t = findTask(id)
+        return !!t && needsDomain(t, updates)
+      })
+      if (untaggedIds.length === 0) return raw.updateTasksBulk(ids, updates)
+      const context = await requireDomain({ id: untaggedIds[0], title: `${untaggedIds.length} items`, context: null })
       if (!context) return
-      await raw.updateTasksBulk(ids, { ...updates, context })
+      // Only the UNTAGGED rows get the chosen domain. The gate asks about the
+      // untagged half of a mixed selection, so stamping the answer onto the
+      // whole selection re-tagged rows that already had an answer — a Work item
+      // in a selection bulk-scheduled as Family became Family, silently, and
+      // its scope was rederived to match.
+      const taggedIds = ids.filter((id) => !untaggedIds.includes(id))
+      if (taggedIds.length > 0) await raw.updateTasksBulk(taggedIds, updates)
+      await raw.updateTasksBulk(untaggedIds, { ...updates, context })
     },
     setBucket: raw.setBucket && ((id: string, bucket: TaskBucket, scheduledFor?: Date, isAllDay?: boolean) =>
       gateThenCall(

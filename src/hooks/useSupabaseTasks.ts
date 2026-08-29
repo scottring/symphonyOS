@@ -6,7 +6,7 @@ import { showToast } from './useToast'
 import { logger } from '@/lib/logger'
 import type { Task, TaskBucket, TaskLink, TaskContext, TaskCategory, TaskCaptureMeta, LinkedActivity, LinkType, LinkedActivityType, GroupMemberRef } from '@/types/task'
 import type { TaskDirections } from '@/types/directions'
-import { scopeForDomain, type Scope } from '@/lib/scope'
+import { scopeForDomain, memberForAuthUser, type Scope } from '@/lib/scope'
 import { localYmd, parseLocalYmd, weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
 import { weekStartForBucket } from '@/lib/today/weekPlacement'
 import { onRealtimeResumed } from '@/lib/realtime/keepAlive'
@@ -818,6 +818,26 @@ export function useSupabaseTasks() {
     return tasksRef.current.find((t) => t.subtasks?.some((s) => s.id === subtaskId))
   }, [])
 
+  /**
+   * The `self` scopeForDomain must exclude: the row's OWNER, never the editor.
+   *
+   * Iris opens Scott's personal task that he assigned to her (scope 'couple')
+   * and re-tags it. With the editor as self, her own id filters out of the
+   * assignee list, others=[] → 'individual', and she deletes her own access —
+   * narrowing only, and silent. Resolve the owner from `tasks.user_id` instead.
+   *
+   * When the owner is not a member row we can see, fall back to the current
+   * user only if the row IS the current user's (or predates `userId`); for
+   * someone else's row answer undefined, which excludes nobody and can only
+   * widen ('couple' rather than 'individual'). Over-share beats lock-out.
+   */
+  const selfMemberIdForOwner = useCallback((ownerUserId: string | undefined): string | undefined => {
+    const owner = memberForAuthUser(familyMembers, ownerUserId)
+    if (owner) return owner.id
+    if (!ownerUserId || ownerUserId === user?.id) return getCurrentUserMember()?.id
+    return undefined
+  }, [familyMembers, getCurrentUserMember, user?.id])
+
   const toggleTask = useCallback(async (id: string) => {
     const task = findTaskById(id)
     if (!task) return
@@ -1072,10 +1092,17 @@ export function useSupabaseTasks() {
     // access to medical and job-search items every surface now called private.
     if ('context' in updates || 'assignedTo' in updates || 'assignedToAll' in updates || 'scope' in updates) {
       const next = { ...task, ...updates }
+      // A STEP has no domain of its own — addSubtask leaves its context null on
+      // purpose — so its scope follows its PARENT's domain. Deriving from the
+      // step's own null read every step of a family task as private: assigning
+      // one, or answering the (now removed) domain gate, narrowed it to
+      // 'individual' and the partner lost a step of a task they share.
+      const parent = task.parentTaskId ? findParentOfSubtask(id) : undefined
+      const domain = parent ? parent.context ?? null : next.context ?? null
       const derived = scopeForDomain(
-        next.context ?? null,
+        domain,
         [next.assignedTo, ...(next.assignedToAll ?? [])],
-        getCurrentUserMember()?.id,
+        selfMemberIdForOwner(task.userId),
       )
       if (derived === 'couple' && task.scope !== 'couple') {
         const assignee = familyMembers.find((m) => m.id === next.assignedTo)
@@ -1263,7 +1290,7 @@ export function useSupabaseTasks() {
         }
       }
     }
-  }, [tasks, familyMembers, getCurrentUserMember, findTaskById, findParentOfSubtask])
+  }, [tasks, familyMembers, findTaskById, findParentOfSubtask, selfMemberIdForOwner])
 
   // Bulk update multiple tasks at once
   const updateTasksBulk = useCallback(async (taskIds: string[], updates: Partial<Task>) => {
@@ -1292,15 +1319,15 @@ export function useSupabaseTasks() {
     // in updateTask.
     const derivesScope =
       'context' in updates || 'assignedTo' in updates || 'assignedToAll' in updates || 'scope' in updates
-    const selfMemberId = getCurrentUserMember()?.id
     const scopeById = new Map<string, Scope>()
     if (derivesScope) {
       for (const t of tasksToUpdate) {
         const next = { ...t, ...updates }
+        // Per row, `self` is that row's OWNER — see selfMemberIdForOwner.
         scopeById.set(t.id, scopeForDomain(
           next.context ?? null,
           [next.assignedTo, ...(next.assignedToAll ?? [])],
-          selfMemberId,
+          selfMemberIdForOwner(t.userId),
         ))
       }
     }
@@ -1425,7 +1452,7 @@ export function useSupabaseTasks() {
     for (const t of tasksToUpdate) {
       announceLocalWrite({ kind: 'update', task: merged(t) })
     }
-  }, [tasks, getCurrentUserMember])
+  }, [tasks, selfMemberIdForOwner])
 
   /**
    * Write a different sort_order to each of several tasks. `updateTasksBulk`

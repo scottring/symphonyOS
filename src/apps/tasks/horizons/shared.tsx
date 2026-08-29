@@ -488,7 +488,16 @@ export function useHorizonPageData(horizon: HorizonId, anchorDate?: Date) {
     (taskId: string) => async (name: string, context: TaskContext | null) => {
       const project = await addProject({ name, context: context ?? undefined });
       if (!project) return;
-      await updateTask(taskId, { projectId: project.id });
+      // The row's own picker already answered "where does this belong" for the
+      // project — carry that answer to the TASK too, or an Unsorted task lands
+      // in a Family project still tagged nothing and still scoped
+      // 'individual': filed, invisible to the household, and never asked again
+      // (a projectId write is one of the gated processes, and this path
+      // supplies its own context, so nothing else will ever ask).
+      // Only when the picker actually gave one — `context: undefined` is a
+      // WRITE of null here (useSupabaseTasks:1189), which would clear a domain
+      // rather than leave it alone.
+      await updateTask(taskId, context ? { projectId: project.id, context } : { projectId: project.id });
     },
     [addProject, updateTask],
   );

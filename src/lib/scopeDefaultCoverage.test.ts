@@ -160,6 +160,27 @@ describe('a written context implies a written scope', () => {
     expect(agent, 'symphony-agent must call its local scopeFor mirror').toMatch(/scopeFor\(/)
   })
 
+  // The agent's project and contact writers spread `{...input}` / `{...updates}`
+  // into the payload, so the inline scan above can see no `context:` key to
+  // demand a scope beside — every one of them shipped with NO derivation at
+  // all. `projects` and `contacts` carry a scope column and their RLS reads
+  // scope alone, so "make a family project" produced context='family' +
+  // scope='individual': on every family surface for its owner, invisible to
+  // the rest of the household. Pinned by name, on the CALL.
+  it('the agent derives a scope on every project and contact write', () => {
+    const text = stripComments(readFileSync(join(FUNCTIONS, 'symphony-agent/index.ts'), 'utf8'))
+    for (const tool of [
+      'symphony_create_project', 'symphony_update_project',
+      'symphony_create_contact', 'symphony_update_contact',
+    ]) {
+      const start = text.indexOf(`case '${tool}':`)
+      expect(start, `${tool} case not found`).toBeGreaterThan(-1)
+      const nextCase = text.indexOf("      case '", start + 10)
+      const body = text.slice(start, nextCase === -1 ? undefined : nextCase)
+      expect(body, `${tool} must derive its scope through scopeFor`).toMatch(/scopeFor\(/)
+    }
+  })
+
   // The tripwire that makes scope a DERIVATION rather than a convention: no
   // file but scope.ts may name a scope value at a `scope:` key. The edge
   // functions' local `scopeFor` mirrors `return '…'` rather than `scope: '…'`,

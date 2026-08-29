@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase, getAuthUser } from '@/lib/supabase'
 import type { Routine, RecurrencePattern, RoutineVisibility, PrepFollowupTemplate } from '@/types/actionable'
 import { matchesRecurrenceForDate, type LastCompletionMap } from '@/lib/routineUtils'
-import { scopeForDomain } from '@/lib/scope'
+import { scopeForDomain, memberForAuthUser } from '@/lib/scope'
 import { onRealtimeResumed } from '@/lib/realtime/keepAlive'
 
 // ── Same-tab sync ────────────────────────────────────────────────────────────
@@ -54,49 +54,86 @@ const byName = (a: Routine, b: Routine) => a.name.localeCompare(b.name)
  * would then be written 'couple', which shares more than it must but never
  * less — so a failure is never cached.
  */
-let selfMemberCache: { userId: string; memberId: string } | null = null
-let selfMemberInFlight: { userId: string; promise: Promise<string | null> } | null = null
+type MemberRow = { id: string; user_id: string | null; auth_user_id: string | null }
 
-async function currentMemberId(): Promise<string | null> {
+let memberRowsCache: { userId: string; rows: MemberRow[] } | null = null
+let memberRowsInFlight: { userId: string; promise: Promise<MemberRow[] | null> } | null = null
+
+/** The household as the signed-in user can read it, fetched at most once. */
+async function householdMembers(): Promise<{ authUserId: string; rows: MemberRow[] } | null> {
   const { data: { user } } = await getAuthUser().catch(() => ({ data: { user: null } }))
   if (!user) return null
-  if (selfMemberCache?.userId === user.id) return selfMemberCache.memberId
+  if (memberRowsCache?.userId === user.id) return { authUserId: user.id, rows: memberRowsCache.rows }
   // A different user than the cache holds: drop it rather than answer stale.
-  if (selfMemberCache && selfMemberCache.userId !== user.id) selfMemberCache = null
-  if (selfMemberInFlight?.userId === user.id) return selfMemberInFlight.promise
+  if (memberRowsCache && memberRowsCache.userId !== user.id) memberRowsCache = null
 
-  const promise = (async () => {
-    try {
-      // No filter: RLS already limits this to the household, and the self row
-      // matches on auth_user_id (a joined member) or user_id (the creator).
-      const { data } = await supabase
-        .from('family_members')
-        .select('id, user_id, auth_user_id, is_full_user')
-      const rows = (data ?? []) as Array<{
-        id: string; user_id: string | null; auth_user_id: string | null; is_full_user: boolean | null
-      }>
-      const id = rows.find(m => m.auth_user_id === user.id)?.id
-        ?? rows.find(m => m.user_id === user.id)?.id
-        ?? rows.find(m => m.is_full_user)?.id
-        ?? null
-      // Cache only a successful answer; a failure must be retried on the next
-      // write rather than pinned for the life of the tab.
-      if (id) selfMemberCache = { userId: user.id, memberId: id }
-      return id
-    } catch {
-      return null
-    } finally {
-      if (selfMemberInFlight?.userId === user.id) selfMemberInFlight = null
-    }
-  })()
-  selfMemberInFlight = { userId: user.id, promise }
-  return promise
+  if (memberRowsInFlight?.userId !== user.id) {
+    const promise = (async () => {
+      try {
+        // No filter: RLS already limits this to the household, and a person is
+        // identified by auth_user_id (a joined member) or user_id (the creator).
+        const { data } = await supabase
+          .from('family_members')
+          .select('id, user_id, auth_user_id')
+        const rows = (data ?? []) as MemberRow[]
+        // Cache only a successful answer; a failure must be retried on the next
+        // write rather than pinned for the life of the tab.
+        if (rows.length > 0) memberRowsCache = { userId: user.id, rows }
+        return rows.length > 0 ? rows : null
+      } catch {
+        return null
+      } finally {
+        if (memberRowsInFlight?.userId === user.id) memberRowsInFlight = null
+      }
+    })()
+    memberRowsInFlight = { userId: user.id, promise }
+  }
+  const rows = await memberRowsInFlight!.promise
+  return rows ? { authUserId: user.id, rows } : null
 }
 
-/** Test seam: forget the resolved self member (mirrors __resetTasksCache). */
+/**
+ * The signed-in user's own family-member id — the `self` for a routine THEY
+ * own. Resolution goes through memberForAuthUser, which matches on
+ * `auth_user_id` or the creator's own seed row and nothing else.
+ *
+ * It used to fall back to "the first row with is_full_user" when neither
+ * matched. In a two-adult house that row is as likely to be the PARTNER: a
+ * routine assigned to the partner then read as "assigned to myself", landed
+ * 'individual', and was invisible to the very person it was handed to. Null is
+ * the safe answer here — it costs the self-exclusion only, and over-sharing
+ * ('couple' for something assigned to yourself) never locks anybody out.
+ */
+async function currentMemberId(): Promise<string | null> {
+  const house = await householdMembers()
+  if (!house) return null
+  return memberForAuthUser(house.rows, house.authUserId)?.id ?? null
+}
+
+/**
+ * The `self` an EXISTING routine's scope must be derived against: the member
+ * who OWNS the row (`routines.user_id`), not whoever is editing it.
+ *
+ * Deriving against the editor lets a partner narrow a routine that was shared
+ * WITH her: her id filters out of the assignee list, others=[] → 'individual',
+ * and she deletes her own access without a word on screen. Falls back to the
+ * signed-in user only when the row is theirs (or its owner is unknown).
+ */
+async function ownerMemberId(ownerUserId: string | null | undefined): Promise<string | null> {
+  const house = await householdMembers()
+  if (!house) return null
+  const owner = memberForAuthUser(house.rows, ownerUserId)
+  if (owner) return owner.id
+  if (!ownerUserId || ownerUserId === house.authUserId) {
+    return memberForAuthUser(house.rows, house.authUserId)?.id ?? null
+  }
+  return null
+}
+
+/** Test seam: forget the resolved household (mirrors __resetTasksCache). */
 export function __resetSelfMemberCache() {
-  selfMemberCache = null
-  selfMemberInFlight = null
+  memberRowsCache = null
+  memberRowsInFlight = null
 }
 
 /** Insert-or-replace, keeping the name ordering every consumer assumes. */
@@ -392,7 +429,8 @@ export function useRoutines() {
           updates.scope = scopeForDomain(
             next.context ?? null,
             [next.assigned_to, ...(next.assigned_to_all ?? [])],
-            await currentMemberId(),
+            // The row's OWNER, not the editor — see ownerMemberId.
+            await ownerMemberId(current?.user_id),
           )
         }
       }

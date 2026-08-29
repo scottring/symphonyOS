@@ -728,8 +728,16 @@ async function runTool(
         return `${(data || []).length} projects:\n${JSON.stringify(data, null, 2)}`
       }
       case 'symphony_create_project': {
+        // Scope is DERIVED, never defaulted. `projects` carries a scope column
+        // and projects RLS reads scope ALONE, so "make a family project" with
+        // no scope wrote context='family' beside the 'individual' column
+        // default: on every family surface for its owner, invisible to the
+        // rest of the household. Projects have no assignee, so the domain
+        // decides on its own.
+        const row = { ...(input as Record<string, unknown>), user_id: userId }
+        row.scope = scopeFor(row.context as string | null, [], null)
         const { data, error } = await db.from('projects')
-          .insert({ ...input, user_id: userId }).select().single()
+          .insert(row).select().single()
         if (error) throw error
         return JSON.stringify(data, null, 2)
       }
@@ -853,20 +861,49 @@ async function runTool(
       case 'symphony_update_project': {
         const { id, ...updates } = input as Record<string, unknown>
         if (!id) return 'Error: id is required'
+        // Scope is DERIVED — never a value the model may set (see
+        // symphony_update_task). Drop it, then recompute when the domain moves,
+        // in BOTH directions: a family project re-tagged personal must lose the
+        // household share, not keep it.
+        delete updates.scope
+        if ('context' in updates) {
+          const { data: before } = await db.from('projects')
+            .select('context').eq('id', id).single()
+          // Only when the row was actually readable: deriving from the update
+          // alone would read a family row's missing context as null and narrow
+          // it. An explicit move into `family` decides the scope by itself.
+          if (before || updates.context === 'family') {
+            const next = { ...(before ?? {}), ...updates }
+            updates.scope = scopeFor(next.context as string | null, [], null)
+          }
+        }
         const { data, error } = await db.from('projects')
           .update({ ...updates, updated_at: now() }).eq('id', id).select().single()
         if (error) throw error
         return JSON.stringify(data, null, 2)
       }
       case 'symphony_create_contact': {
+        // `contacts` carries a scope column too, and its RLS reads scope alone
+        // — same derivation as projects above.
+        const row = { ...(input as Record<string, unknown>), user_id: userId }
+        row.scope = scopeFor(row.context as string | null, [], null)
         const { data, error } = await db.from('contacts')
-          .insert({ ...input, user_id: userId }).select().single()
+          .insert(row).select().single()
         if (error) throw error
         return JSON.stringify(data, null, 2)
       }
       case 'symphony_update_contact': {
         const { id, ...updates } = input as Record<string, unknown>
         if (!id) return 'Error: id is required'
+        delete updates.scope
+        if ('context' in updates) {
+          const { data: before } = await db.from('contacts')
+            .select('context').eq('id', id).single()
+          if (before || updates.context === 'family') {
+            const next = { ...(before ?? {}), ...updates }
+            updates.scope = scopeFor(next.context as string | null, [], null)
+          }
+        }
         const { data, error } = await db.from('contacts')
           .update({ ...updates, updated_at: now() }).eq('id', id).select().single()
         if (error) throw error

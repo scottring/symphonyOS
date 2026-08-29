@@ -158,6 +158,70 @@ describe('scope is derived from domain + assignees on every task write', () => {
     expect(rowWrites.at(-1)!.data.scope).toBe('compound')
   })
 
+  // -- subtasks --------------------------------------------------------------
+  // A step's `context` is null BY DESIGN (addSubtask leaves it so — a step is
+  // part of its parent, not a separate item on a domain surface). Deriving its
+  // scope from that null read every step of a family task as private: touching
+  // one narrowed it out of the household and the partner lost a step of a task
+  // they share. A step inherits its PARENT's domain.
+
+  it('assigning a step of a family task keeps it household-visible', async () => {
+    mockSupabaseData.push(
+      dbTask({ id: 'parent', context: 'family', scope: 'compound' }),
+      dbTask({ id: 'step', parent_task_id: 'parent', context: null, scope: 'compound' }),
+    )
+    const { result } = renderHook(() => useSupabaseTasks())
+    await waitFor(() => expect(result.current.tasks).toHaveLength(1))
+
+    await act(() => result.current.updateTask('step', { assignedTo: PARTNER.id }))
+
+    expect(rowWrites.at(-1)!.data).toMatchObject({ assigned_to: PARTNER.id, scope: 'compound' })
+  })
+
+  it("a context written onto a step cannot narrow it past its parent's domain", async () => {
+    mockSupabaseData.push(
+      dbTask({ id: 'parent', context: 'family', scope: 'compound' }),
+      dbTask({ id: 'step', parent_task_id: 'parent', context: null, scope: 'compound' }),
+    )
+    const { result } = renderHook(() => useSupabaseTasks())
+    await waitFor(() => expect(result.current.tasks).toHaveLength(1))
+
+    // Exactly what the old domain gate did to a step: stamp it 'work'.
+    await act(() => result.current.updateTask('step', { context: 'work' }))
+
+    expect(rowWrites.at(-1)!.data.scope).toBe('compound')
+  })
+
+  // -- who `self` is ----------------------------------------------------------
+  // scopeForDomain's self-exclusion answers "is this assignee someone OTHER
+  // than the person whose item this is". `self` is therefore the row's OWNER,
+  // never the editor: Iris opening Scott's task that he handed to HER and
+  // re-tagging it computed others=[] -> 'individual' and silently deleted her
+  // own access. Narrowing only, and nothing on screen says so.
+
+  it('a non-owner re-tagging a task shared WITH them keeps the share', async () => {
+    mockSupabaseData.push(dbTask({
+      user_id: 'other-user-id', context: 'personal', scope: 'couple', assigned_to: ME.id,
+    }))
+    const { result } = renderHook(() => useSupabaseTasks())
+    await waitFor(() => expect(result.current.tasks).toHaveLength(1))
+
+    await act(() => result.current.updateTask('task-x', { context: 'work' }))
+
+    expect(rowWrites.at(-1)!.data).toMatchObject({ context: 'work', scope: 'couple' })
+  })
+
+  it('the owner assigning to themselves is still not a share', async () => {
+    // The mirror case: self-resolution must not have simply stopped excluding.
+    mockSupabaseData.push(dbTask({ user_id: 'test-user-id', context: 'personal' }))
+    const { result } = renderHook(() => useSupabaseTasks())
+    await waitFor(() => expect(result.current.tasks).toHaveLength(1))
+
+    await act(() => result.current.updateTask('task-x', { assignedTo: ME.id }))
+
+    expect(rowWrites.at(-1)!.data.scope).toBe('individual')
+  })
+
   // -- updateTasksBulk -------------------------------------------------------
   // One payload cannot carry a per-row scope, so the bulk write splits into one
   // UPDATE per derived scope.
