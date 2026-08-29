@@ -10,6 +10,7 @@ import type { Task, TaskContext } from '@/types/task'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import { resolveEventContext } from './eventContext'
 import { isEventVisibleToFamily } from './eventVisibility'
+import { layerOf, type Layer } from '@/lib/domains'
 
 /** Mirrors useDomain's Domain, kept here so pure lib code and tests don't
  *  import from a hook module. */
@@ -111,4 +112,45 @@ export function filterRoutinesForDomain<T extends { context?: TaskContext | null
  *  bare token, so every pre-existing row remains the universal session. */
 export function domainSessionToken(baseToken: string, domain: PlanningDomain): string {
   return domain === 'universal' ? baseToken : `${baseToken}|${domain}`
+}
+
+// ---------------------------------------------------------------------------
+// Layer-set filtering (new model). A layer set is a checklist of layers
+// (work/family/personal/unsorted) rather than a single selected domain — an
+// item shows iff the layer its context maps to is checked. `context IS NULL`
+// is the Unsorted layer, a real layer, not "everywhere" the way `universal`
+// was above. These live alongside the domain-based helpers above; a later
+// task deletes the old ones once every caller has migrated.
+
+/** Layer-set rule: an item shows iff the layer its context maps to is checked.
+ *  `context IS NULL` is the Unsorted layer — a real layer, not "everywhere". */
+export function matchesLayers(context: TaskContext | null | undefined, layers: ReadonlySet<Layer>): boolean {
+  return layers.has(layerOf(context))
+}
+
+export function filterByLayers<T extends { context?: TaskContext | null }>(items: T[], layers: ReadonlySet<Layer>): T[] {
+  return items.filter((i) => matchesLayers(i.context, layers))
+}
+
+export function filterTasksForLayers(tasks: Task[], layers: ReadonlySet<Layer>): Task[] {
+  return filterByLayers(tasks, layers)
+}
+
+export function filterRoutinesForLayers<T extends { context?: TaskContext | null }>(routines: T[], layers: ReadonlySet<Layer>): T[] {
+  return filterByLayers(routines, layers)
+}
+
+/** Events: override → calendar mapping → Unsorted. An unmapped calendar used to
+ *  leak into every domain; now it sits in Unsorted, which is the nudge to map it.
+ *  Family additionally shows a private event explicitly shared with family. */
+export function filterEventsForLayers(events: CalendarEvent[], layers: ReadonlySet<Layer>, deps: EventDomainDeps = {}): CalendarEvent[] {
+  return events.filter((event) => {
+    const resolved = resolveEventContext(event, deps.eventContextOverrides, deps.getDomainForCalendar)
+    if (matchesLayers(resolved, layers)) return true
+    if (layers.has('family')) {
+      const note = deps.eventNotesMap?.get(event.google_event_id || event.id)
+      return !!note?.sharedWithFamily
+    }
+    return false
+  })
 }

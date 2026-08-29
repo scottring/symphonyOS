@@ -6,10 +6,17 @@ import {
   filterEventsForDomain,
   filterRoutinesForDomain,
   domainSessionToken,
+  matchesLayers,
+  filterTasksForLayers,
+  filterEventsForLayers,
+  filterRoutinesForLayers,
 } from './domainFilter'
+import { ALL_LAYERS, UNSORTED, type Layer } from '@/lib/domains'
 import type { Task, TaskContext } from '@/types/task'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine } from '@/types/actionable'
+
+const L = (...xs: Layer[]) => new Set<Layer>(xs)
 
 const task = (overrides: Partial<Task>): Task => ({
   id: Math.random().toString(36).slice(2),
@@ -186,5 +193,56 @@ describe('domainSessionToken', () => {
   it('domain sessions suffix the token', () => {
     expect(domainSessionToken('2026-W29', 'work')).toBe('2026-W29|work')
     expect(domainSessionToken('2026-7', 'personal')).toBe('2026-7|personal')
+  })
+})
+
+describe('matchesLayers', () => {
+  it('a context matches when its layer is checked; null matches Unsorted', () => {
+    expect(matchesLayers('work', L('work'))).toBe(true)
+    expect(matchesLayers('work', L('family'))).toBe(false)
+    expect(matchesLayers(null, L(UNSORTED))).toBe(true)
+    expect(matchesLayers(null, L('work', 'family', 'personal'))).toBe(false)
+    expect(matchesLayers(undefined, ALL_LAYERS)).toBe(true)
+  })
+})
+
+describe('filterTasksForLayers', () => {
+  it('returns the union of checked layers and nothing else', () => {
+    const ts = [task({ id: 'w', context: 'work' }), task({ id: 'f', context: 'family' }), task({ id: 'u', context: null })]
+    expect(filterTasksForLayers(ts, L('work', UNSORTED)).map((t) => t.id)).toEqual(['w', 'u'])
+    expect(filterTasksForLayers(ts, ALL_LAYERS)).toHaveLength(3)
+  })
+})
+
+describe('filterRoutinesForLayers', () => {
+  it('an untagged routine is Unsorted, not universal', () => {
+    const rs = [{ id: 'a', context: null }, { id: 'b', context: 'family' as const }]
+    expect(filterRoutinesForLayers(rs, L('family')).map((r) => r.id)).toEqual(['b'])
+    expect(filterRoutinesForLayers(rs, L(UNSORTED)).map((r) => r.id)).toEqual(['a'])
+  })
+})
+
+describe('filterEventsForLayers', () => {
+  const ev = (id: string, calendar_id: string) => ({ id, google_event_id: id, calendar_id, title: id } as unknown as CalendarEvent)
+  const getDomainForCalendar = (calendarId?: string) => (calendarId === 'work-cal' ? 'work' : calendarId === 'fam-cal' ? 'family' : null)
+
+  it('an unmapped calendar is Unsorted', () => {
+    const evs = [ev('w', 'work-cal'), ev('x', 'mystery-cal')]
+    expect(filterEventsForLayers(evs, L('work'), { getDomainForCalendar }).map((e) => e.id)).toEqual(['w'])
+    expect(filterEventsForLayers(evs, L(UNSORTED), { getDomainForCalendar }).map((e) => e.id)).toEqual(['x'])
+  })
+
+  it('a per-event override beats the calendar mapping', () => {
+    const evs = [ev('w', 'work-cal')]
+    const eventContextOverrides = new Map([['w', 'personal' as const]])
+    expect(filterEventsForLayers(evs, L('personal'), { getDomainForCalendar, eventContextOverrides })).toHaveLength(1)
+    expect(filterEventsForLayers(evs, L('work'), { getDomainForCalendar, eventContextOverrides })).toHaveLength(0)
+  })
+
+  it('family also shows a private event explicitly shared with family', () => {
+    const evs = [ev('w', 'work-cal')]
+    const eventNotesMap = new Map([['w', { sharedWithFamily: true }]])
+    expect(filterEventsForLayers(evs, L('family'), { getDomainForCalendar, eventNotesMap })).toHaveLength(1)
+    expect(filterEventsForLayers(evs, L('personal'), { getDomainForCalendar, eventNotesMap })).toHaveLength(0)
   })
 })
