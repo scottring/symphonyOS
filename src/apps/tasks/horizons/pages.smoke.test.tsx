@@ -7,7 +7,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@/test/test-utils'
-import { render as rtlRender, fireEvent, within } from '@testing-library/react'
+import { render as rtlRender, fireEvent, within, waitFor } from '@testing-library/react'
 import { MemoryRouter, useNavigate } from 'react-router-dom'
 import { PlaceProvider } from '@/hooks/usePlace'
 import { DomainProvider } from '@/hooks/useDomain'
@@ -232,7 +232,7 @@ describe('horizon pages (smoke)', () => {
     const lastWeek = new Date(currentWeekStart)
     lastWeek.setDate(lastWeek.getDate() - 7)
     mockTasks.push(createMockTask({
-      id: 'stranded', title: 'Order the vanity', bucket: 'week', weekStart: lastWeek,
+      id: 'stranded', title: 'Order the vanity', bucket: 'week', weekStart: lastWeek, context: 'work',
     }) satisfies Task)
 
     render(<WeekPage />)
@@ -321,7 +321,7 @@ describe('horizon pages (smoke)', () => {
       id: 'season-1', title: 'Living room upgrades', bucket: 'quarter', pickedAt: new Date(),
     }) satisfies Task)
     for (const [id, title] of [['a', 'Rug'], ['b', 'Lamp'], ['c', 'Shelving']]) {
-      mockTasks.push(createMockTask({ id, title, bucket: 'month', sourceId: 'season-1' }) satisfies Task)
+      mockTasks.push(createMockTask({ id, title, bucket: 'month', sourceId: 'season-1', context: 'work' }) satisfies Task)
     }
 
     const { container } = render(<MonthPage />)
@@ -361,7 +361,7 @@ describe('horizon pages (smoke)', () => {
       id: 'season-1', title: 'Living room upgrades', bucket: 'quarter', pickedAt: new Date(),
     }) satisfies Task)
     for (const [id, title] of [['a', 'Rug'], ['b', 'Lamp'], ['c', 'Shelving']]) {
-      mockTasks.push(createMockTask({ id, title, bucket: 'month', sourceId: 'season-1' }) satisfies Task)
+      mockTasks.push(createMockTask({ id, title, bucket: 'month', sourceId: 'season-1', context: 'work' }) satisfies Task)
     }
 
     const { container } = render(<MonthPage />)
@@ -404,6 +404,7 @@ describe('horizon pages (smoke)', () => {
       title: 'Fresh rock',
       bucket: 'month',
       scheduledFor: undefined,
+      context: 'work',
     }) satisfies Task)
     const { container } = render(<MonthPage />)
     const cell = todayGridCell(container)
@@ -413,6 +414,38 @@ describe('horizon pages (smoke)', () => {
     expect(call![1].bucket).toBe('week')
     expect(localYmd(call![1].weekStart as Date)).toBe(localYmd(currentWeekStart))
     expect(call![1].scheduledFor).toBeUndefined()
+  })
+
+  // Iris's rule, at the drop itself: dragging an UNSORTED (untagged) rock
+  // onto the month grid must ask which domain it belongs to before writing
+  // anything — this is what makes useHorizonPageData returning `gated.*`
+  // (not the raw useSupabaseTasks handlers) to the page load-bearing, not
+  // just plumbing. See useGatedTaskActions.ts / DomainGate.tsx.
+  it('dropping an UNSORTED rock asks for a domain first, then writes it with the placement', async () => {
+    mockTasks.push(createMockTask({
+      id: 'unsorted-rock',
+      title: 'Untagged rock',
+      bucket: 'month',
+      scheduledFor: undefined,
+      context: null,
+    }) satisfies Task)
+    const { container } = render(<MonthPage />)
+    const cell = todayGridCell(container)
+    fireEvent.drop(cell, { dataTransfer: { getData: () => 'unsorted-rock' } })
+
+    // The write is gated on the domain choice — nothing lands until then.
+    expect(mockUpdateTask.mock.calls.find(([id]) => id === 'unsorted-rock')).toBeUndefined()
+    const dialog = screen.getByRole('dialog', { name: 'Which domain?' })
+    expect(within(dialog).getByText('Untagged rock')).toBeInTheDocument()
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Work' }))
+
+    await waitFor(() => {
+      const call = mockUpdateTask.mock.calls.find(([id]) => id === 'unsorted-rock')
+      expect(call).toBeDefined()
+      expect(call![1]).toMatchObject({ bucket: 'week', scheduledFor: undefined, context: 'work' })
+    })
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
   // An already-dated item dragged onto a row loses its date on purpose — the
@@ -427,6 +460,7 @@ describe('horizon pages (smoke)', () => {
       title: 'Timed item',
       bucket: 'timed',
       scheduledFor: timedDate,
+      context: 'work',
     }) satisfies Task)
     const { container } = render(<MonthPage />)
     const cell = todayGridCell(container)
@@ -446,6 +480,7 @@ describe('horizon pages (smoke)', () => {
       bucket: 'month',
       sourceId: 'season-pick-1',
       goalId: 'goal-1',
+      context: 'work',
     }) satisfies Task)
     const { container } = render(<MonthPage />)
     fireEvent.drop(todayGridCell(container), { dataTransfer: { getData: () => 'threaded' } })

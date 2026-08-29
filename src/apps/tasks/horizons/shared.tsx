@@ -824,7 +824,17 @@ export function useHorizonPageData(horizon: HorizonId, anchorDate?: Date) {
 
   return {
     navigate, def, horizon,
-    tasks, addTask, toggleTask, toggleWaiting, deleteTask, updateTask, updateTasksBulk, pushTask, setBucket,
+    // Gated versions, not the raw hook handlers: every horizon page
+    // (Week/Month/Season grids — drag-drop placement, Tend restore, season-
+    // pick promotion) destructures these by these exact names, so routing
+    // them through `gated.*` here is what makes "drag an Unsorted row onto
+    // Week/Month first opens the domain chooser" true without touching any
+    // page component. `addTask`/`deleteTask`/`toggleTask` stay raw — a
+    // create has no existing row to gate, and delete/complete don't place
+    // anything (see useGatedTaskActions's `needsDomain`).
+    tasks, addTask, toggleTask, toggleWaiting, deleteTask,
+    updateTask: gated.updateTask, updateTasksBulk: gated.updateTasksBulk,
+    pushTask: gated.pushTask, setBucket: gated.setBucket!,
     events,
     eventNotesMap, updateEventAssignment, updateEventAssignmentAll, updateEventContext, updateEventProject,
     contacts, contactsMap, addContact, searchContacts,
