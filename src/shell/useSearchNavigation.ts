@@ -32,6 +32,9 @@ export function useSearchNavigation(): (result: SearchResult, tasks: Task[]) => 
       case 'project': navigate(`/projects/${result.id}`); break;
       case 'contact': navigate(`/contacts/${result.id}`); break;
       case 'list': navigate('/lists'); break;
+      // The stream owns note opening: `?note=` is read by NotesApp, so a
+      // result stays linkable and survives a reload.
+      case 'note': navigate(`/notes?note=${result.id}`); break;
     }
   }, [navigate, setSelection]);
 }

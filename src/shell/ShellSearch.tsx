@@ -10,6 +10,7 @@ import { useProjects } from '@/hooks/useProjects';
 import { useContacts } from '@/hooks/useContacts';
 import { useRoutines } from '@/hooks/useRoutines';
 import { useListsContext } from '@/contexts/ListsContext';
+import { useNotes } from '@/hooks/useNotes';
 import { useSearch, type SearchResult } from '@/hooks/useSearch';
 import { SearchModal } from '@/components/search';
 import { useSearchNavigation } from './useSearchNavigation';
@@ -20,10 +21,13 @@ export function ShellSearch({ onClose }: { onClose: () => void }) {
   const { contacts } = useContacts();
   const { routines } = useRoutines();
   const { lists } = useListsContext();
+  // useSearch has always had a note fuse and a Notes section in the modal;
+  // nothing ever passed it any notes, so the whole register was unfindable.
+  const { notes } = useNotes();
   const openResult = useSearchNavigation();
 
   const { query, setQuery, results, totalResults, isSearching, clearSearch, intent } = useSearch({
-    tasks, projects, contacts, routines, lists,
+    tasks, projects, contacts, routines, lists, notes,
   });
 
   const close = () => { clearSearch(); onClose(); };

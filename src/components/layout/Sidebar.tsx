@@ -26,6 +26,7 @@ import {
   Users2,
   List,
   FileText,
+  NotebookPen,
   Repeat,
   History,
   Settings,
@@ -124,7 +125,8 @@ export function Sidebar({
     location.pathname.startsWith('/goals') || location.pathname.startsWith('/meals') ||
     location.pathname.startsWith('/lists') || location.pathname.startsWith('/contacts') ||
     location.pathname.startsWith('/history') || location.pathname.startsWith('/home') ||
-    location.pathname.startsWith('/jobs') || location.pathname.startsWith('/documents')
+    location.pathname.startsWith('/jobs') || location.pathname.startsWith('/documents') ||
+    location.pathname.startsWith('/notes')
 
   useEffect(() => {
     if (libraryActive) openGroup('library')
@@ -400,6 +402,17 @@ export function Sidebar({
           >
             {createElement(FileText, { className: 'w-5 h-5 shrink-0' })}
             {!collapsed && <span>Documents</span>}
+          </button>
+
+          {/* Notes — the stream. Every other notes editor in the app is reached
+              through the thing the note hangs off; this is the only way to a
+              note you don't already know where to find. */}
+          <button
+            onClick={() => navigate('/notes')}
+            className={navItemClass(location.pathname.startsWith('/notes'))}
+          >
+            {createElement(NotebookPen, { className: 'w-5 h-5 shrink-0' })}
+            {!collapsed && <span>Notes</span>}
           </button>
 
           {/* Lists */}
