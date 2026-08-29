@@ -54,3 +54,23 @@ export function scopeForContextChange(
 
   return null
 }
+
+/**
+ * THE scope a row must carry, computed from what it is and who does it.
+ * Nothing else may produce a scope value. No history, no "leave it alone":
+ * the row's scope is always exactly what its current domain + assignees say.
+ *
+ * - family → compound (the household layer; every member subscribes)
+ * - anything else handed to another member → couple (the minimum RLS share,
+ *   and it keeps the item off the kitchen wall, which needs compound)
+ * - otherwise → individual
+ */
+export function scopeForDomain(
+  context: TaskContext | null | undefined,
+  assignees: readonly (string | null | undefined)[] | null | undefined,
+  selfMemberId: string | null | undefined,
+): Scope {
+  if (context === 'family') return 'compound'
+  const others = (assignees ?? []).filter((id): id is string => !!id && id !== selfMemberId)
+  return others.length > 0 ? 'couple' : 'individual'
+}
