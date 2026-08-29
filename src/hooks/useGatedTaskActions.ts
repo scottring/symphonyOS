@@ -95,17 +95,18 @@ async function gateThenCall(
   return true
 }
 
-/** The four processes Iris's rule gates, re-typed to say what they actually
+/** The six processes Iris's rule gates, re-typed to say what they actually
  *  resolve now: `false` means the gate was cancelled and nothing was
  *  written, so a caller MUST check it before showing a success toast or
  *  recording an undo entry (see `wasWritten`). Everything else on `R`
- *  (onAssignTask, onAssignTaskAll, reference data, …) passes through
- *  unchanged. */
+ *  (reference data, …) passes through unchanged. */
 export interface GatedTaskActions {
   updateTask: (id: string, u: Partial<Task>) => Promise<boolean>
   pushTask: (id: string, target: Date | 'week' | 'month' | 'quarter') => Promise<boolean>
   updateTasksBulk: (ids: string[], u: Partial<Task>) => Promise<boolean>
   setBucket?: (id: string, bucket: TaskBucket, scheduledFor?: Date, isAllDay?: boolean) => Promise<boolean>
+  onAssignTask?: (id: string, memberId: string | null) => Promise<boolean>
+  onAssignTaskAll?: (id: string, memberIds: string[]) => Promise<boolean>
 }
 
 export function useGatedTaskActions<R extends {

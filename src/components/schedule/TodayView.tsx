@@ -43,7 +43,7 @@ import { NeededTodayNote } from './NeededTodayNote'
 import { TodayAddInput } from './TodayAddInput'
 import { TodaySectionList, findTimelineItem } from './TodaySectionList'
 import { TodayDragProvider } from './TodayDragProvider'
-import { resolveDrop, type DropIntent } from '@/lib/today/todayDrop'
+import { resolveDrop, writeMoveAndRegisterUndo, type DropIntent } from '@/lib/today/todayDrop'
 import { useCalendarPermissions } from '@/hooks/useCalendarPermissions'
 import { selectUpNext, formatUpNextStatus } from '@/lib/today/upNext'
 import { NeedsYourOK } from './NeedsYourOK'
@@ -656,19 +656,18 @@ export function TodayView({
           if (intent.itemId.startsWith('task-')) {
             const taskId = intent.itemId.replace('task-', '')
             const before = tasks.find((t) => t.id === taskId)
-            onUpdateTask?.(taskId, {
-              bucket: 'timed', scheduledFor: intent.when, isAllDay: false,
-            })
-            // A drag is the easiest action in the app to do by accident.
-            if (before) {
-              ctx.onRegisterUndo?.(`Moved "${before.title}"`, () => {
-                onUpdateTask?.(taskId, {
-                  bucket: before.bucket,
-                  scheduledFor: before.scheduledFor,
-                  isAllDay: before.isAllDay,
-                })
-              })
-            }
+            // A drag is the easiest action in the app to do by accident — but
+            // a cancelled domain gate (the row is Unsorted, the DomainGate
+            // dialog is up) writes nothing, so writeMoveAndRegisterUndo skips
+            // the "Moved · Undo" toast for a move that didn't happen.
+            await writeMoveAndRegisterUndo(
+              onUpdateTask,
+              taskId,
+              { bucket: 'timed', scheduledFor: intent.when, isAllDay: false },
+              before && { bucket: before.bucket, scheduledFor: before.scheduledFor, isAllDay: before.isAllDay },
+              `Moved "${before?.title}"`,
+              ctx.onRegisterUndo,
+            )
           } else if (intent.itemId.startsWith('routine-')) {
             const { routineId, slot } = parseRoutineTimelineId(intent.itemId)
             // Dosed steps are refused upstream; this is belt-and-braces.
@@ -701,18 +700,16 @@ export function TodayView({
           midnight.setHours(0, 0, 0, 0)
           const allDayId = intent.itemId.replace('task-', '')
           const wasTimed = tasks.find((t) => t.id === allDayId)
-          onUpdateTask?.(allDayId, {
-            bucket: 'timed', scheduledFor: midnight, isAllDay: true,
-          })
-          if (wasTimed) {
-            ctx.onRegisterUndo?.(`Moved "${wasTimed.title}" to All day`, () => {
-              onUpdateTask?.(allDayId, {
-                bucket: wasTimed.bucket,
-                scheduledFor: wasTimed.scheduledFor,
-                isAllDay: wasTimed.isAllDay,
-              })
-            })
-          }
+          // A cancelled domain gate writes nothing — writeMoveAndRegisterUndo
+          // skips the "Moved · Undo" toast for a move that didn't happen.
+          await writeMoveAndRegisterUndo(
+            onUpdateTask,
+            allDayId,
+            { bucket: 'timed', scheduledFor: midnight, isAllDay: true },
+            wasTimed && { bucket: wasTimed.bucket, scheduledFor: wasTimed.scheduledFor, isAllDay: wasTimed.isAllDay },
+            `Moved "${wasTimed?.title}" to All day`,
+            ctx.onRegisterUndo,
+          )
           break
         }
 

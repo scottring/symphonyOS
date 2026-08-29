@@ -1,9 +1,10 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import type { TimelineItem } from '@/types/timeline'
 import { emptySections } from '@/lib/today/types'
 import {
   resolveDrop, refusalFor, computeBandDropTime,
   bandDropId, gapDropId, rowDropId, NEW_GROUP_NAME,
+  writeMoveAndRegisterUndo,
   type DropContext,
 } from './todayDrop'
 
@@ -484,5 +485,52 @@ describe('drop id helpers round-trip', () => {
     expect(rowDropId('routine-r1#2')).toBe('today-row-routine-r1#2')
     expect(gapDropId('allday', 12)).toBe('today-gap-allday:12')
     expect(bandDropId('earlyMorning')).toBe('today-band-earlyMorning')
+  })
+})
+
+// TodayView's applyIntents 'set-time'/'make-all-day' branches call
+// onUpdateTask — the GATED handler — then decide whether to show a
+// "Moved · Undo" toast. The bug this guards against: dragging an Unsorted
+// task onto the timeline used to register the undo (and its toast)
+// synchronously, before/regardless of the DomainGate dialog's answer.
+describe('writeMoveAndRegisterUndo', () => {
+  const next = { bucket: 'timed' as const, scheduledFor: DAY, isAllDay: false }
+  const previous = { bucket: 'inbox' as const, scheduledFor: undefined, isAllDay: undefined }
+
+  it('registers no undo when the gate is cancelled (onUpdateTask resolves false)', async () => {
+    const onUpdateTask = vi.fn().mockResolvedValue(false)
+    const registerUndo = vi.fn()
+
+    const ok = await writeMoveAndRegisterUndo(onUpdateTask, 't1', next, previous, 'Moved "x"', registerUndo)
+
+    expect(ok).toBe(false)
+    expect(onUpdateTask).toHaveBeenCalledWith('t1', next)
+    expect(registerUndo).not.toHaveBeenCalled()
+  })
+
+  it('registers the undo when the write goes through (resolves true, or a raw void handler)', async () => {
+    const onUpdateTask = vi.fn().mockResolvedValue(true)
+    const registerUndo = vi.fn()
+
+    const ok = await writeMoveAndRegisterUndo(onUpdateTask, 't1', next, previous, 'Moved "x"', registerUndo)
+
+    expect(ok).toBe(true)
+    expect(registerUndo).toHaveBeenCalledWith('Moved "x"', expect.any(Function))
+
+    // The undo entry itself writes the captured previous state.
+    const undoFn = registerUndo.mock.calls[0][1] as () => void
+    onUpdateTask.mockClear()
+    undoFn()
+    expect(onUpdateTask).toHaveBeenCalledWith('t1', previous)
+  })
+
+  it('registers no undo when there is no previous state to restore, even on a successful write', async () => {
+    const onUpdateTask = vi.fn().mockResolvedValue(true)
+    const registerUndo = vi.fn()
+
+    const ok = await writeMoveAndRegisterUndo(onUpdateTask, 't1', next, undefined, 'Moved "x"', registerUndo)
+
+    expect(ok).toBe(true)
+    expect(registerUndo).not.toHaveBeenCalled()
   })
 })

@@ -1,8 +1,9 @@
 import type { TimelineItem } from '@/types/timeline'
-import type { GroupMemberRef } from '@/types/task'
+import type { GroupMemberRef, Task } from '@/types/task'
 import type { DaySection } from '@/lib/timeUtils'
 import { DAY_SECTION_BOUNDS } from '@/lib/timeUtils'
 import { reorderTasksToIndex, type OrderWrite } from './taskOrdering'
+import { wasWritten } from '@/hooks/useGatedTaskActions'
 
 /**
  * Today's drop rules, as pure functions.
@@ -344,4 +345,33 @@ export function resolveDrop(ctx: DropContext): DropIntent[] {
   }
 
   return []
+}
+
+/**
+ * Write a drop-intent's move (a 'set-time' or 'make-all-day' drag onto the
+ * timeline), then register the undo ONLY if the write actually happened.
+ *
+ * `onUpdateTask` is the GATED handler: an Unsorted task's move first pops the
+ * DomainGate dialog ("Where does this belong?"), and a cancelled gate
+ * resolves `false` — nothing was written. Registering the undo (and the
+ * "Moved · Undo" toast it drives) unconditionally, before/regardless of the
+ * gate's answer, is exactly the bug this guards against: dragging an
+ * Unsorted task claimed a move that never happened, and its undo would have
+ * written stale "previous" values back over whatever the gate dialog
+ * produced. Shared by TodayView's 'set-time' and 'make-all-day' applyIntents
+ * branches so they can't diverge.
+ */
+export async function writeMoveAndRegisterUndo(
+  onUpdateTask: ((id: string, u: Partial<Task>) => void | Promise<void | boolean>) | undefined,
+  taskId: string,
+  next: Partial<Task>,
+  previous: Partial<Task> | undefined,
+  message: string,
+  registerUndo: ((message: string, undo: () => void) => void) | undefined,
+): Promise<boolean> {
+  const ok = await wasWritten(onUpdateTask?.(taskId, next))
+  if (ok && previous) {
+    registerUndo?.(message, () => { onUpdateTask?.(taskId, previous) })
+  }
+  return ok
 }

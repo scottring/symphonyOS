@@ -88,8 +88,11 @@ export interface ScheduleActionsValue {
   onOpenTask?: (taskId: string) => void
 
   // Assignment actions
-  onAssignTask?: (taskId: string, memberId: string | null) => void
-  onAssignTaskAll?: (taskId: string, memberIds: string[]) => void
+  /** `false` means a domain gate was cancelled — nothing was written. A raw
+   *  (non-gated) sync handler still type-checks here since void is a member
+   *  of the union. */
+  onAssignTask?: (taskId: string, memberId: string | null) => void | Promise<void | boolean>
+  onAssignTaskAll?: (taskId: string, memberIds: string[]) => void | Promise<void | boolean>
   onAssignEvent?: (eventId: string, memberId: string | null) => void
   onAssignEventAll?: (eventId: string, memberIds: string[]) => void
   onAssignRoutine?: (routineId: string, memberId: string | null) => void
