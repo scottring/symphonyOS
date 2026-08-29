@@ -1,5 +1,6 @@
 import { Check, Trash2 } from 'lucide-react'
 import type { Task } from '@/types/task'
+import { wasWritten } from '@/hooks/useGatedTaskActions'
 
 /**
  * One triage row — a task title plus one-tap fate buttons — shared by the
@@ -20,27 +21,34 @@ export const VERDICT_LABEL: Record<Verdict, string> = {
 
 interface VerdictHandlers {
   viewedDate: Date
-  onUpdateTask: (id: string, updates: Partial<Task>) => void
-  onPushTask?: (id: string, target: Date | 'week' | 'month' | 'quarter') => void
+  /** `false` means a domain gate was cancelled — nothing was written. A raw
+   *  (non-gated) sync handler still type-checks here since void is a member
+   *  of the union. */
+  onUpdateTask: (id: string, updates: Partial<Task>) => void | Promise<void | boolean>
+  onPushTask?: (id: string, target: Date | 'week' | 'month' | 'quarter') => void | Promise<void | boolean>
   onDeleteTask?: (id: string) => void
 }
 
 /** Write a verdict through the SAME handlers the page rows use — drawer and
- * dropdown triage can never diverge from row triage. */
-export function applyTriageVerdict(t: Task, v: Verdict, h: VerdictHandlers): void {
+ * dropdown triage can never diverge from row triage. Resolves `false` when a
+ * domain gate was cancelled — nothing was written, so the caller must not
+ * mark the row resolved (see ReviewDrawer's `apply`, HorizonPoolDropdown's
+ * `onVerdict`). */
+export async function applyTriageVerdict(t: Task, v: Verdict, h: VerdictHandlers): Promise<boolean> {
   if (v === 'today') {
-    h.onPushTask?.(t.id, new Date(h.viewedDate))
+    return wasWritten(h.onPushTask?.(t.id, new Date(h.viewedDate)))
   } else if (v === 'tomorrow') {
     const tomorrow = new Date(h.viewedDate)
     tomorrow.setDate(tomorrow.getDate() + 1)
-    h.onPushTask?.(t.id, tomorrow)
+    return wasWritten(h.onPushTask?.(t.id, tomorrow))
   } else if (v === 'week') {
-    h.onPushTask?.(t.id, 'week')
+    return wasWritten(h.onPushTask?.(t.id, 'week'))
   } else if (v === 'someday') {
     // Same shape RescheduleButton writes — never a partial upsert.
-    h.onUpdateTask(t.id, { bucket: 'someday', scheduledFor: undefined, isAllDay: undefined })
+    return wasWritten(h.onUpdateTask(t.id, { bucket: 'someday', scheduledFor: undefined, isAllDay: undefined }))
   } else {
     h.onDeleteTask?.(t.id)
+    return true
   }
 }
 

@@ -12,7 +12,7 @@ export async function mergeCaptureIntoTask(
   capture: Task,
   target: Task,
   deps: {
-    updateTask: (id: string, updates: Partial<Task>) => Promise<void> | void
+    updateTask: (id: string, updates: Partial<Task>) => Promise<void | boolean> | void
     deleteTask: (id: string) => Promise<void> | void
   },
 ): Promise<boolean> {

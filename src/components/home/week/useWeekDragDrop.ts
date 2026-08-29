@@ -11,7 +11,7 @@ type TaskUpdates = Partial<Task> & { endTime?: Date }
 interface UseWeekDragDropArgs {
   weekStart: Date
   onWeekChange: (newWeekStart: Date) => void
-  onUpdateTask: (taskId: string, updates: TaskUpdates) => Promise<void> | void
+  onUpdateTask: (taskId: string, updates: TaskUpdates) => Promise<void | boolean> | void
   onUpdateEvent: (eventId: string, updates: { startTime: Date; endTime: Date }) => Promise<void> | void
   onUpdateRoutine: (routineId: string, updates: Partial<Routine>) => Promise<void> | void
   tasks: (Task & { endTime?: Date })[]

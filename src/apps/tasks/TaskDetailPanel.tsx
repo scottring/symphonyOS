@@ -216,21 +216,26 @@ function TaskPanelBody({ id }: { id: string }) {
       // onSaveNoteToVault intentionally omitted (vault integration removed)
       onToggleComplete={() => toggleTask(task.id)}
       onSchedule={(date, isAllDay) => {
-        updateTask(task.id, { bucket: 'timed', scheduledFor: date, isAllDay });
-        // Same confirmation the card-level RescheduleButton gives — without it
-        // a reschedule from the panel has no visible acknowledgment at all.
-        const label = isAllDay
-          ? formatDateLabel(date)
-          : `${formatDateLabel(date)}, ${date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
-        showToast(`Moved to ${label}`, 'success');
+        void (async () => {
+          const result = await updateTask(task.id, { bucket: 'timed', scheduledFor: date, isAllDay });
+          // A cancelled domain gate writes nothing — no confirmation for a
+          // move that didn't happen.
+          if (result === false) return;
+          const label = isAllDay
+            ? formatDateLabel(date)
+            : `${formatDateLabel(date)}, ${date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`;
+          showToast(`Moved to ${label}`, 'success');
+        })();
       }}
       onReschedule={(when) => {
         // Gated pushTask/setBucket (not a hand-rolled bucket/scheduledFor
         // write) — same reason as horizons/shared.tsx's applyWhen: this is
         // the real hook logic (defer_count, weekStart, overdue time
         // preservation), and an Unsorted task reschedule here asks first.
-        applyTriageWhen(when, task.id, { onPushTask: gated.pushTask, onSetBucket: gated.setBucket! });
-        showToast(describeTriageWhen(when), 'success');
+        void (async () => {
+          const ok = await applyTriageWhen(when, task.id, { onPushTask: gated.pushTask, onSetBucket: gated.setBucket! });
+          if (ok) showToast(describeTriageWhen(when), 'success');
+        })();
       }}
       onClearSchedule={() =>
         updateTask(task.id, { bucket: 'inbox', scheduledFor: undefined, isAllDay: undefined })
@@ -259,8 +264,10 @@ function TaskPanelBody({ id }: { id: string }) {
         void removeFromGroup(sid, { updateTask, refetch });
       }}
       onRescheduleSubtask={(sid, when) => {
-        applyTriageWhen(when, sid, { onPushTask: gated.pushTask, onSetBucket: gated.setBucket! });
-        showToast(describeTriageWhen(when), 'success');
+        void (async () => {
+          const ok = await applyTriageWhen(when, sid, { onPushTask: gated.pushTask, onSetBucket: gated.setBucket! });
+          if (ok) showToast(describeTriageWhen(when), 'success');
+        })();
       }}
       onScheduleSubtask={(sid, date, isAllDay) =>
         updateTask(sid, { bucket: 'timed', scheduledFor: date, isAllDay })

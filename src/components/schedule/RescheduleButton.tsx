@@ -24,12 +24,15 @@ export function RescheduleButton({ item }: { item: TimelineItem }) {
   const reschedule = useCallback((when: TriageWhen) => {
     const taskId = item.originalTask?.id
     if (taskId) {
-      applyTriageWhen(when, taskId, {
-        onPushTask: (id, target) => ctx.onPushTask?.(id, target),
-        onSetBucket: (id, bucket) => ctx.onUpdateTask?.(id, { bucket, scheduledFor: undefined, isAllDay: undefined }),
-      })
-      // Confirm where it landed — the dated label removes any "which weekend?" doubt.
-      showToast(describeTriageWhen(when), 'success')
+      void (async () => {
+        const ok = await applyTriageWhen(when, taskId, {
+          onPushTask: (id, target) => ctx.onPushTask?.(id, target),
+          onSetBucket: (id, bucket) => ctx.onUpdateTask?.(id, { bucket, scheduledFor: undefined, isAllDay: undefined }),
+        })
+        // A cancelled domain gate writes nothing — no confirmation for a move
+        // that didn't happen.
+        if (ok) showToast(describeTriageWhen(when), 'success')
+      })()
     }
     setOpen(false)
   }, [item.originalTask, ctx])
@@ -37,11 +40,14 @@ export function RescheduleButton({ item }: { item: TimelineItem }) {
   const rescheduleToDate = useCallback((date: Date, isAllDay: boolean) => {
     const taskId = item.originalTask?.id
     if (taskId) {
-      ctx.onUpdateTask?.(taskId, { bucket: 'timed', scheduledFor: date, isAllDay })
-      const label = isAllDay
-        ? formatDateLabel(date)
-        : `${formatDateLabel(date)}, ${date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
-      showToast(`Moved to ${label}`, 'success')
+      void (async () => {
+        const result = await ctx.onUpdateTask?.(taskId, { bucket: 'timed', scheduledFor: date, isAllDay })
+        if (result === false) return
+        const label = isAllDay
+          ? formatDateLabel(date)
+          : `${formatDateLabel(date)}, ${date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`
+        showToast(`Moved to ${label}`, 'success')
+      })()
     }
     setOpen(false)
   }, [item.originalTask, ctx])

@@ -23,8 +23,8 @@ interface HorizonPoolDropdownProps {
   /** Verbs each row offers — the week pool doesn't offer "This wk". */
   offer: Verdict[]
   viewedDate: Date
-  onUpdateTask: (id: string, updates: Partial<Task>) => void
-  onPushTask?: (id: string, target: Date | 'week' | 'month' | 'quarter') => void
+  onUpdateTask: (id: string, updates: Partial<Task>) => void | Promise<void | boolean>
+  onPushTask?: (id: string, target: Date | 'week' | 'month' | 'quarter') => void | Promise<void | boolean>
   onDeleteTask?: (id: string) => void
   /** Completes a pool item in place — the page's toggle handler, so
    * completion side effects (linger, follow-ups) stay consistent. */
@@ -63,8 +63,11 @@ export function HorizonPoolDropdown({
   const openUp = useCallback(() => { setOpen(true); onOpenChange?.(true) }, [onOpenChange])
 
   const onVerdict = (t: Task, v: Verdict) => {
-    applyTriageVerdict(t, v, { viewedDate, onUpdateTask, onPushTask, onDeleteTask })
-    setVerdicts((prev) => new Map(prev).set(t.id, v))
+    void (async () => {
+      // A cancelled domain gate writes nothing — don't mark the row resolved.
+      const ok = await applyTriageVerdict(t, v, { viewedDate, onUpdateTask, onPushTask, onDeleteTask })
+      if (ok) setVerdicts((prev) => new Map(prev).set(t.id, v))
+    })()
   }
 
   const onComplete = onCompleteTask

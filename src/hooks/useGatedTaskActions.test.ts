@@ -69,6 +69,14 @@ describe('gateUpdate', () => {
     await gateUpdate(unsorted, { bucket: 'week' }, async () => null, write)
     expect(write).not.toHaveBeenCalled()
   })
+
+  // The InboxView "Today" bug: a fire-and-forget caller has no way to tell a
+  // cancelled gate from a successful write unless the resolved value says so.
+  it('resolves false on cancel, true on a real write', async () => {
+    const write = vi.fn()
+    await expect(gateUpdate(unsorted, { bucket: 'week' }, async () => null, write)).resolves.toBe(false)
+    await expect(gateUpdate(unsorted, { bucket: 'week' }, async () => 'family', write)).resolves.toBe(true)
+  })
 })
 
 describe('useGatedTaskActions setBucket', () => {
@@ -149,6 +157,40 @@ describe('useGatedTaskActions setBucket', () => {
     expect(mockRequireDomain).not.toHaveBeenCalled()
     expect(raw.updateTask).not.toHaveBeenCalled()
     expect(raw.setBucket).toHaveBeenCalledWith('g', 'week', undefined, undefined)
+  })
+
+  // The bug this whole change fixes: InboxView fired a "Sent to Today" toast
+  // and an undo entry the instant it called the gated handler, before the
+  // DomainGate dialog had even resolved. A caller MUST be able to tell a
+  // cancelled gate apart from a real write via the resolved value.
+  it('pushTask resolves false when the gate is cancelled, true for a tagged pass-through', async () => {
+    mockRequireDomain.mockResolvedValue(null)
+    const rawCancelled = makeRaw()
+    const findUnsorted = (id: string) => (id === 't' ? (unsorted as Task) : undefined)
+    const { result: cancelled } = renderHook(() => useGatedTaskActions(rawCancelled, findUnsorted))
+    await expect(cancelled.current.pushTask('t', new Date())).resolves.toBe(false)
+    expect(rawCancelled.pushTask).not.toHaveBeenCalled()
+
+    const rawTagged = makeRaw()
+    const findTagged = (id: string) => (id === 't' ? (tagged as Task) : undefined)
+    const { result: taggedResult } = renderHook(() => useGatedTaskActions(rawTagged, findTagged))
+    await expect(taggedResult.current.pushTask('t', new Date())).resolves.toBe(true)
+    expect(rawTagged.pushTask).toHaveBeenCalled()
+  })
+
+  it('updateTask resolves false when the gate is cancelled, true for a tagged pass-through', async () => {
+    mockRequireDomain.mockResolvedValue(null)
+    const rawCancelled = makeRaw()
+    const findUnsorted = (id: string) => (id === 't' ? (unsorted as Task) : undefined)
+    const { result: cancelled } = renderHook(() => useGatedTaskActions(rawCancelled, findUnsorted))
+    await expect(cancelled.current.updateTask('t', { bucket: 'week' })).resolves.toBe(false)
+    expect(rawCancelled.updateTask).not.toHaveBeenCalled()
+
+    const rawTagged = makeRaw()
+    const findTagged = (id: string) => (id === 't' ? (tagged as Task) : undefined)
+    const { result: taggedResult } = renderHook(() => useGatedTaskActions(rawTagged, findTagged))
+    await expect(taggedResult.current.updateTask('t', { bucket: 'week' })).resolves.toBe(true)
+    expect(rawTagged.updateTask).toHaveBeenCalledWith('t', { bucket: 'week' })
   })
 })
 

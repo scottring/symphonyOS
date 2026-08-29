@@ -42,8 +42,8 @@ interface ReviewDrawerProps {
   overdueTasks: Task[]
   /** The day being reviewed (usually today). */
   viewedDate: Date
-  onUpdateTask: (id: string, updates: Partial<Task>) => void
-  onPushTask?: (id: string, target: Date | 'week' | 'month' | 'quarter') => void
+  onUpdateTask: (id: string, updates: Partial<Task>) => void | Promise<void | boolean>
+  onPushTask?: (id: string, target: Date | 'week' | 'month' | 'quarter') => void | Promise<void | boolean>
   onDeleteTask?: (id: string) => void
 }
 
@@ -93,8 +93,11 @@ export function ReviewDrawer({
   if (!isOpen) return null
 
   const apply = (t: Task, v: Verdict) => {
-    applyTriageVerdict(t, v, { viewedDate, onUpdateTask, onPushTask, onDeleteTask })
-    setVerdicts((prev) => new Map(prev).set(t.id, v))
+    void (async () => {
+      // A cancelled domain gate writes nothing — don't mark the row resolved.
+      const ok = await applyTriageVerdict(t, v, { viewedDate, onUpdateTask, onPushTask, onDeleteTask })
+      if (ok) setVerdicts((prev) => new Map(prev).set(t.id, v))
+    })()
   }
 
   const pushToTomorrow = (t: Task) => {

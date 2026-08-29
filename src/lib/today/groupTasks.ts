@@ -101,7 +101,7 @@ export async function groupItems(
   return wrapperId
 }
 
-type UpdateFn = (id: string, updates: Partial<Task>) => Promise<void> | void
+type UpdateFn = (id: string, updates: Partial<Task>) => Promise<void | boolean> | void
 type DeleteFn = (id: string) => Promise<void> | void
 type RefetchFn = () => Promise<void> | void
 

@@ -9,6 +9,7 @@
 import { getBaseDate, getThisEvening, getNextWeekend, getWeekendAfterNext, getNextMonday, formatShortDate } from '@/lib/dateHelpers'
 import type { TriageWhen } from '@/components/schedule/TriageWhenMenu'
 import type { TaskBucket } from '@/types/task'
+import { wasWritten } from '@/hooks/useGatedTaskActions'
 
 /** First day of next month at midnight (the "Next month" target). */
 export function firstOfNextMonth(): Date {
@@ -17,8 +18,11 @@ export function firstOfNextMonth(): Date {
 }
 
 export interface TriageHandlers {
-  onPushTask: (id: string, target: Date | 'week' | 'month' | 'quarter') => void
-  onSetBucket: (id: string, bucket: TaskBucket) => void
+  /** `false` means a domain gate was cancelled — nothing was written. A raw
+   *  (non-gated) sync handler still type-checks here since void is a member
+   *  of the union. */
+  onPushTask: (id: string, target: Date | 'week' | 'month' | 'quarter') => void | Promise<void | boolean>
+  onSetBucket: (id: string, bucket: TaskBucket) => void | Promise<void | boolean>
 }
 
 /**
@@ -43,18 +47,21 @@ export function describeTriageWhen(when: TriageWhen): string {
   }
 }
 
-export function applyTriageWhen(when: TriageWhen, taskId: string, h: TriageHandlers): void {
+/** Resolves `false` when a domain gate was cancelled — nothing was written.
+ *  Callers that show a success toast or record an undo entry MUST await this
+ *  and skip both when it resolves `false`. */
+export async function applyTriageWhen(when: TriageWhen, taskId: string, h: TriageHandlers): Promise<boolean> {
   switch (when) {
-    case 'today': h.onPushTask(taskId, getBaseDate(0)); break
-    case 'tonight': h.onPushTask(taskId, getThisEvening()); break
-    case 'tomorrow': h.onPushTask(taskId, getBaseDate(1)); break
-    case 'this-week': h.onSetBucket(taskId, 'week'); break
-    case 'next-week': h.onPushTask(taskId, getNextMonday()); break
-    case 'this-weekend': h.onPushTask(taskId, getNextWeekend()); break
-    case 'next-weekend': h.onPushTask(taskId, getWeekendAfterNext()); break
-    case 'this-month': h.onSetBucket(taskId, 'month'); break
-    case 'next-month': h.onPushTask(taskId, firstOfNextMonth()); break
-    case 'this-season': h.onSetBucket(taskId, 'quarter'); break
-    case 'someday': h.onSetBucket(taskId, 'someday'); break
+    case 'today': return wasWritten(h.onPushTask(taskId, getBaseDate(0)))
+    case 'tonight': return wasWritten(h.onPushTask(taskId, getThisEvening()))
+    case 'tomorrow': return wasWritten(h.onPushTask(taskId, getBaseDate(1)))
+    case 'this-week': return wasWritten(h.onSetBucket(taskId, 'week'))
+    case 'next-week': return wasWritten(h.onPushTask(taskId, getNextMonday()))
+    case 'this-weekend': return wasWritten(h.onPushTask(taskId, getNextWeekend()))
+    case 'next-weekend': return wasWritten(h.onPushTask(taskId, getWeekendAfterNext()))
+    case 'this-month': return wasWritten(h.onSetBucket(taskId, 'month'))
+    case 'next-month': return wasWritten(h.onPushTask(taskId, firstOfNextMonth()))
+    case 'this-season': return wasWritten(h.onSetBucket(taskId, 'quarter'))
+    case 'someday': return wasWritten(h.onSetBucket(taskId, 'someday'))
   }
 }

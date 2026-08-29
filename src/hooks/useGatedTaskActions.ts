@@ -49,16 +49,28 @@ export function needsDomain(task: Pick<Task, 'context' | 'parentTaskId'>, update
   )
 }
 
+/** Normalize a gated write's result: `false` (the gate was cancelled — nothing
+ *  written) is the only signal that means "did not happen". `void`/`true`
+ *  (not gated, or the gate was answered) both mean "went through". Callers
+ *  that fire-and-forget a gated handler and then show a success toast /
+ *  record an undo MUST await this first — see InboxView, RescheduleButton,
+ *  TriageRow's applyTriageVerdict, TaskDetailPanel. */
+export async function wasWritten(result: void | Promise<void | boolean>): Promise<boolean> {
+  const r = await result
+  return r !== false
+}
+
 export async function gateUpdate(
   task: Gatable,
   updates: Partial<Task>,
   ask: Ask,
   write: (id: string, u: Partial<Task>) => Promise<void> | void,
-): Promise<void> {
-  if (!needsDomain(task, updates)) { await write(task.id, updates); return }
+): Promise<boolean> {
+  if (!needsDomain(task, updates)) { await write(task.id, updates); return true }
   const context = await ask(task)
-  if (!context) return
+  if (!context) return false
   await write(task.id, { ...updates, context })
+  return true
 }
 
 /** Push/setBucket/assign share one shape: if the task is untagged AND not a
@@ -73,13 +85,27 @@ async function gateThenCall(
   ask: Ask,
   writeContext: (id: string, context: DomainId) => Promise<void> | void,
   call: () => Promise<void> | void,
-): Promise<void> {
+): Promise<boolean> {
   if (task && task.context == null && !isStep(task)) {
     const context = await ask(task)
-    if (!context) return
+    if (!context) return false
     await writeContext(task.id, context)
   }
   await call()
+  return true
+}
+
+/** The four processes Iris's rule gates, re-typed to say what they actually
+ *  resolve now: `false` means the gate was cancelled and nothing was
+ *  written, so a caller MUST check it before showing a success toast or
+ *  recording an undo entry (see `wasWritten`). Everything else on `R`
+ *  (onAssignTask, onAssignTaskAll, reference data, …) passes through
+ *  unchanged. */
+export interface GatedTaskActions {
+  updateTask: (id: string, u: Partial<Task>) => Promise<boolean>
+  pushTask: (id: string, target: Date | 'week' | 'month' | 'quarter') => Promise<boolean>
+  updateTasksBulk: (ids: string[], u: Partial<Task>) => Promise<boolean>
+  setBucket?: (id: string, bucket: TaskBucket, scheduledFor?: Date, isAllDay?: boolean) => Promise<boolean>
 }
 
 export function useGatedTaskActions<R extends {
@@ -89,13 +115,13 @@ export function useGatedTaskActions<R extends {
   setBucket?: (id: string, bucket: TaskBucket, scheduledFor?: Date, isAllDay?: boolean) => Promise<void> | void
   onAssignTask?: (id: string, memberId: string | null) => void
   onAssignTaskAll?: (id: string, ids: string[]) => void
-}>(raw: R, findTask: (id: string) => Task | undefined): R {
+}>(raw: R, findTask: (id: string) => Task | undefined): Omit<R, keyof GatedTaskActions> & GatedTaskActions {
   const { requireDomain } = useDomainGate()
   return useMemo(() => ({
     ...raw,
     updateTask: async (id: string, updates: Partial<Task>) => {
       const t = findTask(id)
-      if (!t) return raw.updateTask(id, updates)
+      if (!t) { await raw.updateTask(id, updates); return true }
       return gateUpdate(t, updates, requireDomain, raw.updateTask)
     },
     pushTask: async (id: string, target: Date | 'week' | 'month' | 'quarter') =>
@@ -110,9 +136,9 @@ export function useGatedTaskActions<R extends {
         const t = findTask(id)
         return !!t && needsDomain(t, updates)
       })
-      if (untaggedIds.length === 0) return raw.updateTasksBulk(ids, updates)
+      if (untaggedIds.length === 0) { await raw.updateTasksBulk(ids, updates); return true }
       const context = await requireDomain({ id: untaggedIds[0], title: `${untaggedIds.length} items`, context: null })
-      if (!context) return
+      if (!context) return false
       // Only the UNTAGGED rows get the chosen domain. The gate asks about the
       // untagged half of a mixed selection, so stamping the answer onto the
       // whole selection re-tagged rows that already had an answer — a Work item
@@ -121,6 +147,7 @@ export function useGatedTaskActions<R extends {
       const taggedIds = ids.filter((id) => !untaggedIds.includes(id))
       if (taggedIds.length > 0) await raw.updateTasksBulk(taggedIds, updates)
       await raw.updateTasksBulk(untaggedIds, { ...updates, context })
+      return true
     },
     setBucket: raw.setBucket && ((id: string, bucket: TaskBucket, scheduledFor?: Date, isAllDay?: boolean) =>
       gateThenCall(
@@ -143,5 +170,5 @@ export function useGatedTaskActions<R extends {
         (tid, context) => raw.updateTask(tid, { context }),
         () => raw.onAssignTaskAll!(id, memberIds),
       )),
-  }) as R, [raw, findTask, requireDomain])
+  }) as Omit<R, keyof GatedTaskActions> & GatedTaskActions, [raw, findTask, requireDomain])
 }

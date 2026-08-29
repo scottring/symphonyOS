@@ -630,7 +630,7 @@ export function useHorizonPageData(horizon: HorizonId, anchorDate?: Date) {
   // "process" Iris's rule targets. ──
   const applyWhen = useCallback(
     (task: Task, when: TriageWhen) => {
-      applyTriageWhen(when, task.id, { onPushTask: gated.pushTask, onSetBucket: gated.setBucket! });
+      void applyTriageWhen(when, task.id, { onPushTask: gated.pushTask, onSetBucket: gated.setBucket! });
     },
     [gated],
   );

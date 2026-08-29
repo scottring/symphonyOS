@@ -17,8 +17,13 @@ export interface ScheduleActionsValue {
   // Task actions
   onToggleTask: (taskId: string) => void
   onToggleWaiting?: (taskId: string) => void
-  onUpdateTask?: (id: string, updates: Partial<Task>) => void
-  onPushTask?: (id: string, target: Date | 'week' | 'month' | 'quarter') => void
+  /** `false` means a domain gate was cancelled — nothing was written. A
+   *  raw (non-gated) handler still type-checks here since it returns void,
+   *  which is a member of the union; a caller that shows a success toast or
+   *  records an undo MUST await and check for `false` (see wasWritten in
+   *  useGatedTaskActions). */
+  onUpdateTask?: (id: string, updates: Partial<Task>) => void | Promise<void | boolean>
+  onPushTask?: (id: string, target: Date | 'week' | 'month' | 'quarter') => void | Promise<void | boolean>
   onDeleteTask?: (id: string) => void
   /** Mark or clear "needed today". Pass null to clear. */
   onSetNeededToday?: (taskId: string, neededOn: Date | null) => void
@@ -79,7 +84,7 @@ export interface ScheduleActionsValue {
   onAppendNoteAt?: (id: string, block: string, anchor: Date | null) => void
   onLinkNote?: (id: string) => void
   timelineNotes?: { id: string; title?: string; content: string; timelineAt?: Date }[]
-  onUpdateTasksBulk?: (taskIds: string[], updates: Partial<Task>) => Promise<void>
+  onUpdateTasksBulk?: (taskIds: string[], updates: Partial<Task>) => Promise<void | boolean>
   onOpenTask?: (taskId: string) => void
 
   // Assignment actions

@@ -23,6 +23,7 @@ import { formatInboxBullet } from '@/lib/inboxBullet'
 import { DenseInboxRow, type QuickAction } from './DenseInboxRow'
 import { TriageWhenMenu, type TriageWhen } from './TriageWhenMenu'
 import { getBaseDate, getThisEvening, getNextWeekend, getWeekendAfterNext, getNextMonday } from '@/lib/dateHelpers'
+import { wasWritten } from '@/hooks/useGatedTaskActions'
 import { FocusInboxCard } from './FocusInboxCard'
 import { InboxModeToggle } from './InboxModeToggle'
 import { InboxUndoToast } from './InboxUndoToast'
@@ -363,29 +364,36 @@ export function InboxView({
     setLeavingIds((s) => new Set(s).add(task.id))
 
     setTimeout(() => {
-      let message = ''
-      if (action.kind === 'today') {
-        const today = new Date()
-        today.setHours(0, 0, 0, 0)
-        if (onPushTask) onPushTask(task.id, today)
-        message = 'Sent to Today'
-      } else if (action.kind === 'week' || action.kind === 'month') {
-        if (onPushTask) onPushTask(task.id, action.kind)
-        message = action.kind === 'week' ? 'Sent to This Week' : 'Sent to This Month'
-      } else if (action.kind === 'someday') {
-        // Real someday bucket — the old code sent "Someday" to quarter/season.
-        if (onUpdateTask) onUpdateTask(task.id, { bucket: 'someday', scheduledFor: undefined })
-        message = 'Sent to Someday'
-      } else if (action.kind === 'complete') {
-        if (onUpdateTask) onUpdateTask(task.id, { completed: true })
-        message = 'Completed'
-      } else if (action.kind === 'delete') {
-        if (onDeleteTask) onDeleteTask(task.id)
-        message = 'Deleted'
-      }
+      void (async () => {
+        let message = ''
+        // A cancelled domain gate (the row is Unsorted, the DomainGate dialog
+        // is up) writes nothing — no toast, no undo entry for a move that
+        // didn't happen. Defaults true: a handler-less action (no
+        // onPushTask/onUpdateTask wired) is a no-op, not a cancel.
+        let ok = true
+        if (action.kind === 'today') {
+          const today = new Date()
+          today.setHours(0, 0, 0, 0)
+          if (onPushTask) ok = await wasWritten(onPushTask(task.id, today))
+          message = 'Sent to Today'
+        } else if (action.kind === 'week' || action.kind === 'month') {
+          if (onPushTask) ok = await wasWritten(onPushTask(task.id, action.kind))
+          message = action.kind === 'week' ? 'Sent to This Week' : 'Sent to This Month'
+        } else if (action.kind === 'someday') {
+          // Real someday bucket — the old code sent "Someday" to quarter/season.
+          if (onUpdateTask) ok = await wasWritten(onUpdateTask(task.id, { bucket: 'someday', scheduledFor: undefined }))
+          message = 'Sent to Someday'
+        } else if (action.kind === 'complete') {
+          if (onUpdateTask) ok = await wasWritten(onUpdateTask(task.id, { completed: true }))
+          message = 'Completed'
+        } else if (action.kind === 'delete') {
+          if (onDeleteTask) onDeleteTask(task.id)
+          message = 'Deleted'
+        }
 
-      setLeavingIds((s) => { const next = new Set(s); next.delete(task.id); return next })
-      setUndo({ taskId: task.id, message, previous, undoable: action.kind !== 'delete' })
+        setLeavingIds((s) => { const next = new Set(s); next.delete(task.id); return next })
+        if (ok) setUndo({ taskId: task.id, message, previous, undoable: action.kind !== 'delete' })
+      })()
     }, 220)
   }, [onPushTask, onDeleteTask, onUpdateTask])
 
@@ -402,25 +410,31 @@ export function InboxView({
     }
     setLeavingIds((s) => new Set(s).add(task.id))
     setTimeout(() => {
-      let message = ''
-      const firstOfNextMonth = () => {
-        const d = new Date()
-        return new Date(d.getFullYear(), d.getMonth() + 1, 1, 0, 0, 0, 0)
-      }
-      switch (when) {
-        case 'today': onPushTask?.(task.id, getBaseDate(0)); message = 'Sent to Today'; break
-        case 'tonight': onPushTask?.(task.id, getThisEvening()); message = 'Sent to Tonight'; break
-        case 'tomorrow': onPushTask?.(task.id, getBaseDate(1)); message = 'Sent to Tomorrow'; break
-        case 'this-week': onPushTask?.(task.id, 'week'); message = 'Sent to This Week'; break
-        case 'next-week': onPushTask?.(task.id, getNextMonday()); message = 'Sent to Next Week'; break
-        case 'this-weekend': onPushTask?.(task.id, getNextWeekend()); message = 'Sent to This Weekend'; break
-        case 'next-weekend': onPushTask?.(task.id, getWeekendAfterNext()); message = 'Sent to Next Weekend'; break
-        case 'this-month': onPushTask?.(task.id, 'month'); message = 'Sent to This Month'; break
-        case 'next-month': onPushTask?.(task.id, firstOfNextMonth()); message = 'Sent to Next Month'; break
-        case 'someday': onUpdateTask?.(task.id, { bucket: 'someday', scheduledFor: undefined }); message = 'Sent to Someday'; break
-      }
-      setLeavingIds((s) => { const next = new Set(s); next.delete(task.id); return next })
-      setUndo({ taskId: task.id, message, previous, undoable: true })
+      void (async () => {
+        let message = ''
+        // A cancelled domain gate writes nothing — no toast, no undo entry
+        // for a move that didn't happen. Defaults true: a handler-less case
+        // (no onPushTask/onUpdateTask wired) is a no-op, not a cancel.
+        let ok = true
+        const firstOfNextMonth = () => {
+          const d = new Date()
+          return new Date(d.getFullYear(), d.getMonth() + 1, 1, 0, 0, 0, 0)
+        }
+        switch (when) {
+          case 'today': message = 'Sent to Today'; if (onPushTask) ok = await wasWritten(onPushTask(task.id, getBaseDate(0))); break
+          case 'tonight': message = 'Sent to Tonight'; if (onPushTask) ok = await wasWritten(onPushTask(task.id, getThisEvening())); break
+          case 'tomorrow': message = 'Sent to Tomorrow'; if (onPushTask) ok = await wasWritten(onPushTask(task.id, getBaseDate(1))); break
+          case 'this-week': message = 'Sent to This Week'; if (onPushTask) ok = await wasWritten(onPushTask(task.id, 'week')); break
+          case 'next-week': message = 'Sent to Next Week'; if (onPushTask) ok = await wasWritten(onPushTask(task.id, getNextMonday())); break
+          case 'this-weekend': message = 'Sent to This Weekend'; if (onPushTask) ok = await wasWritten(onPushTask(task.id, getNextWeekend())); break
+          case 'next-weekend': message = 'Sent to Next Weekend'; if (onPushTask) ok = await wasWritten(onPushTask(task.id, getWeekendAfterNext())); break
+          case 'this-month': message = 'Sent to This Month'; if (onPushTask) ok = await wasWritten(onPushTask(task.id, 'month')); break
+          case 'next-month': message = 'Sent to Next Month'; if (onPushTask) ok = await wasWritten(onPushTask(task.id, firstOfNextMonth())); break
+          case 'someday': message = 'Sent to Someday'; if (onUpdateTask) ok = await wasWritten(onUpdateTask(task.id, { bucket: 'someday', scheduledFor: undefined })); break
+        }
+        setLeavingIds((s) => { const next = new Set(s); next.delete(task.id); return next })
+        if (ok) setUndo({ taskId: task.id, message, previous, undoable: true })
+      })()
     }, 220)
   }, [onPushTask, onUpdateTask])
 
@@ -429,9 +443,11 @@ export function InboxView({
     const previous: Partial<Task> = { bucket: task.bucket, scheduledFor: task.scheduledFor, isAllDay: task.isAllDay }
     setLeavingIds((s) => new Set(s).add(task.id))
     setTimeout(() => {
-      onPushTask?.(task.id, date)
-      setLeavingIds((s) => { const next = new Set(s); next.delete(task.id); return next })
-      setUndo({ taskId: task.id, message: 'Scheduled', previous, undoable: true })
+      void (async () => {
+        const ok = onPushTask ? await wasWritten(onPushTask(task.id, date)) : true
+        setLeavingIds((s) => { const next = new Set(s); next.delete(task.id); return next })
+        if (ok) setUndo({ taskId: task.id, message: 'Scheduled', previous, undoable: true })
+      })()
     }, 220)
   }, [onPushTask])
 
