@@ -59,6 +59,8 @@ interface MockDbTask {
 const mockSupabaseData: MockDbTask[] = []
 /** Every `.update(...).eq('id', ...)` — the single-row write we assert on. */
 const rowWrites: Array<{ id: string; data: Record<string, unknown> }> = []
+/** Every `.update(...).in('id', [...])` — updateTasksBulk's per-scope groups. */
+const bulkWrites: Array<{ ids: string[]; data: Record<string, unknown> }> = []
 
 function dbTask(over: Partial<MockDbTask> = {}): MockDbTask {
   return {
@@ -98,7 +100,10 @@ vi.mock('@/lib/supabase', () => ({
             select: () => Promise.resolve({ data: [dbTask({ id: value })], error: null }),
           }
         },
-        in: () => Promise.resolve({ error: null }),
+        in: (_field: string, values: string[]) => {
+          bulkWrites.push({ ids: values, data })
+          return Promise.resolve({ error: null })
+        },
       }),
     }),
   },
@@ -110,6 +115,7 @@ describe('scope is derived from domain + assignees on every task write', () => {
     vi.clearAllMocks()
     mockSupabaseData.length = 0
     rowWrites.length = 0
+    bulkWrites.length = 0
   })
 
   it('assigning a private task to a partner shares it as couple', async () => {
@@ -150,5 +156,55 @@ describe('scope is derived from domain + assignees on every task write', () => {
     await waitFor(() => expect(result.current.tasks).toHaveLength(1))
     await act(() => result.current.updateTask('task-x', { context: 'family', scope: 'individual' }))
     expect(rowWrites.at(-1)!.data.scope).toBe('compound')
+  })
+
+  // -- updateTasksBulk -------------------------------------------------------
+  // One payload cannot carry a per-row scope, so the bulk write splits into one
+  // UPDATE per derived scope.
+
+  it('splits a bulk assign into one write per derived scope', async () => {
+    mockSupabaseData.push(
+      dbTask({ id: 'mine', context: 'personal' }),
+      dbTask({ id: 'theirs', context: 'family' }),
+    )
+    const { result } = renderHook(() => useSupabaseTasks())
+    await waitFor(() => expect(result.current.tasks).toHaveLength(2))
+
+    await act(() => result.current.updateTasksBulk(['mine', 'theirs'], { assignedTo: PARTNER.id }))
+
+    const byScope = new Map(bulkWrites.map((w) => [w.data.scope, w.ids]))
+    // The personal row is shared with the partner; the family row is already
+    // household-visible and must not be narrowed to 'couple'.
+    expect(byScope.get('couple')).toEqual(['mine'])
+    expect(byScope.get('compound')).toEqual(['theirs'])
+  })
+
+  it('tags an id it does not hold family AND shares it with the household', async () => {
+    // `tasks` is the top-level list only - a bulk id can be a subtask, or a row
+    // this instance has not fetched. It used to fall into the scope-less group,
+    // so the write set context='family' beside an untouched scope='individual':
+    // on every family surface for its owner, unreadable by the household.
+    mockSupabaseData.push(dbTask({ id: 'known', context: 'personal' }))
+    const { result } = renderHook(() => useSupabaseTasks())
+    await waitFor(() => expect(result.current.tasks).toHaveLength(1))
+
+    await act(() => result.current.updateTasksBulk(['known', 'not-in-my-list'], { context: 'family' }))
+
+    const unknown = bulkWrites.find((w) => w.ids.includes('not-in-my-list'))
+    expect(unknown, 'the unknown id must still be written').toBeDefined()
+    expect(unknown!.data).toMatchObject({ context: 'family', scope: 'compound' })
+    // And every write in this call names a scope - none is left scope-less.
+    for (const w of bulkWrites) expect(w.data.scope).toBe('compound')
+  })
+
+  it('leaves scope out of a bulk write that touches neither domain nor assignees', async () => {
+    mockSupabaseData.push(dbTask({ id: 'a' }), dbTask({ id: 'b' }))
+    const { result } = renderHook(() => useSupabaseTasks())
+    await waitFor(() => expect(result.current.tasks).toHaveLength(2))
+
+    await act(() => result.current.updateTasksBulk(['a', 'b'], { completed: true }))
+
+    expect(bulkWrites).toHaveLength(1)
+    expect(bulkWrites[0].data).not.toHaveProperty('scope')
   })
 })

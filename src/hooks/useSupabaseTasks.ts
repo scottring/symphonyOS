@@ -1384,7 +1384,14 @@ export function useSupabaseTasks() {
     if (derivesScope) {
       const known = new Set(tasksToUpdate.map(t => t.id))
       for (const t of tasksToUpdate) push(scopeById.get(t.id)!, t.id)
-      for (const id of taskIds) if (!known.has(id)) push(null, id)
+      // An id this instance doesn't hold (`tasks` is the top-level list only)
+      // still gets the domain half of the derivation, because `family` decides
+      // the scope by itself and needs nothing from the row. Leaving it in the
+      // scope-less group is the original bug: context='family' written beside
+      // an untouched scope='individual' — on every family surface for its
+      // owner, unreadable by the rest of the household.
+      const unknownScope: Scope | null = updates.context === 'family' ? 'compound' : null
+      for (const id of taskIds) if (!known.has(id)) push(unknownScope, id)
     } else {
       groups.set(null, taskIds)
     }

@@ -41,17 +41,32 @@ const byName = (a: Routine, b: Routine) => a.name.localeCompare(b.name)
  *
  * This hook has no family-member context of its own (callers hand it a
  * `defaultFallbackAssignee`), and mounting useFamilyMembers here would give
- * every consumer a second members fetch. Resolve it once per tab instead, and
- * cache only a successful answer. A null answer costs the self-exclusion only —
- * an item assigned to yourself would then be written 'couple', which shares
- * more than it must but never less.
+ * every consumer a second members fetch. Resolve it once per user instead.
+ *
+ * KEYED BY AUTH USER, like tasksCache in useSupabaseTasks. Module state keyed
+ * by nothing survives a sign-out/sign-in in the same tab: the next user would
+ * derive scopes against the PREVIOUS member's id, so a routine B assigns to A
+ * reads as "assigned to myself" and lands 'individual' — invisible to A. The
+ * whole point of this resolver is the self-exclusion, so it has to know whose
+ * self it is.
+ *
+ * A null answer costs the self-exclusion only — an item assigned to yourself
+ * would then be written 'couple', which shares more than it must but never
+ * less — so a failure is never cached.
  */
-let selfMemberIdOnce: Promise<string | null> | null = null
-function currentMemberId(): Promise<string | null> {
-  selfMemberIdOnce ??= (async () => {
+let selfMemberCache: { userId: string; memberId: string } | null = null
+let selfMemberInFlight: { userId: string; promise: Promise<string | null> } | null = null
+
+async function currentMemberId(): Promise<string | null> {
+  const { data: { user } } = await getAuthUser().catch(() => ({ data: { user: null } }))
+  if (!user) return null
+  if (selfMemberCache?.userId === user.id) return selfMemberCache.memberId
+  // A different user than the cache holds: drop it rather than answer stale.
+  if (selfMemberCache && selfMemberCache.userId !== user.id) selfMemberCache = null
+  if (selfMemberInFlight?.userId === user.id) return selfMemberInFlight.promise
+
+  const promise = (async () => {
     try {
-      const { data: { user } } = await getAuthUser()
-      if (!user) return null
       // No filter: RLS already limits this to the household, and the self row
       // matches on auth_user_id (a joined member) or user_id (the creator).
       const { data } = await supabase
@@ -60,19 +75,28 @@ function currentMemberId(): Promise<string | null> {
       const rows = (data ?? []) as Array<{
         id: string; user_id: string | null; auth_user_id: string | null; is_full_user: boolean | null
       }>
-      return rows.find(m => m.auth_user_id === user.id)?.id
+      const id = rows.find(m => m.auth_user_id === user.id)?.id
         ?? rows.find(m => m.user_id === user.id)?.id
         ?? rows.find(m => m.is_full_user)?.id
         ?? null
+      // Cache only a successful answer; a failure must be retried on the next
+      // write rather than pinned for the life of the tab.
+      if (id) selfMemberCache = { userId: user.id, memberId: id }
+      return id
     } catch {
       return null
+    } finally {
+      if (selfMemberInFlight?.userId === user.id) selfMemberInFlight = null
     }
-  })().then((id) => {
-    // Don't cache a failure — the next write should try again.
-    if (id === null) selfMemberIdOnce = null
-    return id
-  })
-  return selfMemberIdOnce
+  })()
+  selfMemberInFlight = { userId: user.id, promise }
+  return promise
+}
+
+/** Test seam: forget the resolved self member (mirrors __resetTasksCache). */
+export function __resetSelfMemberCache() {
+  selfMemberCache = null
+  selfMemberInFlight = null
 }
 
 /** Insert-or-replace, keeping the name ordering every consumer assumes. */

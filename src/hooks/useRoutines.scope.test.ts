@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, waitFor, act } from '@testing-library/react'
-import { useRoutines } from './useRoutines'
+import { useRoutines, __resetSelfMemberCache } from './useRoutines'
 
 // Scope is DERIVED from the routine's domain + its assignees (scopeForDomain
 // in src/lib/scope.ts) on every routine write — never passed in.
@@ -18,7 +18,14 @@ import { useRoutines } from './useRoutines'
 // "Iris laundry and clothes processing" and the whole "Camp Mornings"
 // collection, were context='family' + scope='individual' in prod.
 
-const mockUser = { id: 'test-user-id', email: 'test@example.com' }
+let mockUser: { id: string; email: string } = { id: 'test-user-id', email: 'test@example.com' }
+
+/** The household as the DB holds it. `test-user-id` matches nothing, so the
+ *  self-exclusion is off for every test that doesn't switch users. */
+const familyMemberRows = [
+  { id: 'member-a', user_id: 'user-a', auth_user_id: null, is_full_user: false },
+  { id: 'member-b', user_id: 'user-a', auth_user_id: 'user-b', is_full_user: false },
+]
 
 interface MockDbRoutine {
   id: string
@@ -69,6 +76,10 @@ vi.mock('@/lib/supabase', () => ({
     }),
     from: (table: string) => ({
       select: () => ({
+        // family_members is awaited directly (no .eq/.order), so the object the
+        // mock returns has to be a thenable resolving to { data }.
+        then: (resolve: (v: { data: unknown; error: null }) => unknown) =>
+          resolve({ data: table === 'family_members' ? familyMemberRows : [], error: null }),
         // actionable_instances (last-completion map)
         eq: () => ({ eq: () => ({ order: () => Promise.resolve({ data: [], error: null }) }) }),
         // routines
@@ -107,6 +118,8 @@ async function mountLoaded() {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  mockUser = { id: 'test-user-id', email: 'test@example.com' }
+  __resetSelfMemberCache()
   mockRoutines.length = 0
   inserts.length = 0
   rowWrites.length = 0
@@ -229,5 +242,31 @@ describe('updateRoutine — tagging a routine family actually shares it', () => 
     })
 
     expect(writeFor('camp').scope).toBe('individual')
+  })
+})
+
+// The self member id is module state, so it MUST be keyed by the auth user.
+// Cached by nothing, a sign-out/sign-in in the same tab left the next user
+// deriving scopes against the PREVIOUS member's id: a routine B assigns to A
+// reads as "assigned to myself" and lands 'individual' — invisible to A.
+describe('the self member id follows the signed-in user', () => {
+  it('re-resolves when a different user signs in to the same tab', async () => {
+    mockUser = { id: 'user-a', email: 'a@example.com' }
+    const first = await mountLoaded()
+    await act(async () => {
+      await first.result.current.addRoutine({ name: 'PT exercises', assigned_to: 'member-a' })
+    })
+    // A assigning to A is not a share.
+    expect(inserts[0].scope).toBe('individual')
+
+    // Same tab, same module state, different user.
+    mockUser = { id: 'user-b', email: 'b@example.com' }
+    const second = await mountLoaded()
+    await act(async () => {
+      await second.result.current.addRoutine({ name: 'Trash night', assigned_to: 'member-a' })
+    })
+    // B assigning to A IS a share — and would have read as 'individual' while
+    // the cache still held A's member id.
+    expect(inserts[1].scope).toBe('couple')
   })
 })

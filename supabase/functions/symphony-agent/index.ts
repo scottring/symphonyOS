@@ -626,9 +626,14 @@ async function runTool(
       case 'symphony_update_task': {
         const { id, ...updates } = input as Record<string, unknown>
         if (!id) return 'Error: id is required'
-        // Scope is DERIVED — recompute it whenever the domain or the assignees
-        // move. This path had no coupling at all, so an agent re-tagging a
-        // family task `personal` left it household-readable (the August leak).
+        // Scope is DERIVED — never a value the model may set. Drop anything the
+        // caller sent BEFORE the guard: `{id, scope}` on its own would
+        // otherwise reach .update(updates) verbatim and hand the agent the
+        // sharing decision the whole rule exists to take away from it.
+        delete updates.scope
+        // Recompute it whenever the domain or the assignees move. This path had
+        // no coupling at all, so an agent re-tagging a family task `personal`
+        // left it household-readable (the August leak).
         if ('context' in updates || 'assigned_to' in updates || 'assigned_to_all' in updates) {
           const { data: before } = await db.from('tasks')
             .select('context, assigned_to, assigned_to_all').eq('id', id).single()
@@ -813,9 +818,12 @@ async function runTool(
       case 'symphony_update_routine': {
         const { id, ...updates } = input as Record<string, unknown>
         if (!id) return 'Error: id is required'
+        // A scope the caller passed is not a choice — drop it before the guard,
+        // or `{id, scope}` on its own reaches .update(updates) verbatim.
+        delete updates.scope
         // Same derivation as the client (src/lib/scope.ts): recompute scope
         // from the row as it will BE, whenever the domain or the assignees
-        // move. A scope the caller passed is ignored — it is not a choice.
+        // move.
         if ('context' in updates || 'assigned_to' in updates || 'assigned_to_all' in updates) {
           const { data: before } = await db.from('routines')
             .select('context, assigned_to, assigned_to_all').eq('id', id).single()

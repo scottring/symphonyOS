@@ -148,10 +148,16 @@ describe('a written context implies a written scope', () => {
   // cannot see (vault-sync's variable) or would catch only by accident. What
   // they must show now is the DERIVATION, not a pinned literal.
   it('the edge functions derive every scope they write', () => {
+    // These four write a scope through an inline `scope:` key.
     for (const fn of ['extract-capture', 'vault-sync', 'meal-planner-chat']) {
       const text = stripComments(readFileSync(join(FUNCTIONS, fn, 'index.ts'), 'utf8'))
       expect(text, `${fn} must call its local scopeFor mirror`).toMatch(/scope:\s*scopeFor\(/)
     }
+    // symphony-agent assigns onto a payload it built (`row.scope = scopeFor(`,
+    // `updates.scope = scopeFor(`) as well as writing one inline key, so it is
+    // pinned on the CALL rather than on the key shape.
+    const agent = stripComments(readFileSync(join(FUNCTIONS, 'symphony-agent/index.ts'), 'utf8'))
+    expect(agent, 'symphony-agent must call its local scopeFor mirror').toMatch(/scopeFor\(/)
   })
 
   // The tripwire that makes scope a DERIVATION rather than a convention: no
