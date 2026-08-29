@@ -1,10 +1,6 @@
 import { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react'
 import type { ReactNode } from 'react'
-import type { TaskContext } from '@/types/task'
 import { ALL_LAYERS, DOMAINS, UNSORTED, type DomainId, type Layer } from '@/lib/domains'
-
-/** @deprecated transitional; the single-lens value. Removed once every consumer reads `layers`. */
-export type Domain = TaskContext | 'universal'
 
 interface DomainContextType {
   /** The checked layers. Never empty. */
@@ -15,8 +11,6 @@ interface DomainContextType {
   all: () => void
   /** Exactly one real domain checked (Unsorted may ride along) → that domain. */
   soleDomain: DomainId | null
-  /** @deprecated */ currentDomain: Domain
-  /** @deprecated */ setDomain: (domain: Domain) => void
 }
 
 const DomainContext = createContext<DomainContextType | undefined>(undefined)
@@ -66,11 +60,7 @@ export function DomainProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<DomainContextType>(() => {
     const soleDomain = soleDomainOf(layers)
-    return {
-      layers, setLayers, toggle, only, all, soleDomain,
-      currentDomain: soleDomain ?? 'universal',
-      setDomain: (d) => (d === 'universal' ? all() : only(d)),
-    }
+    return { layers, setLayers, toggle, only, all, soleDomain }
   }, [layers, setLayers, toggle, only, all])
 
   return <DomainContext.Provider value={value}>{children}</DomainContext.Provider>

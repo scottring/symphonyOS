@@ -1,7 +1,6 @@
 import { useEffect, createElement } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { PinnedSection } from '@/components/pins'
-import { useDomain } from '@/hooks/useDomain'
 import { appRegistry } from '@/shell/appRegistry'
 import { SidebarGroup } from './SidebarGroup'
 import { useSidebarGroupState } from '@/hooks/useSidebarGroupState'
@@ -104,9 +103,6 @@ export function Sidebar({
 }: SidebarProps) {
   const navigate = useNavigate()
   const location = useLocation()
-  const { currentDomain } = useDomain()
-  // currentDomain used for future domain-aware logic; suppress unused warning
-  void currentDomain
 
   const { state: groupState, toggle: toggleGroup, setOpen: openGroup } = useSidebarGroupState()
 

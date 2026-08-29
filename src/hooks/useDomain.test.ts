@@ -51,14 +51,4 @@ describe('useDomain', () => {
     act(() => result.current.toggle('work'))
     expect(result.current.soleDomain).toBeNull()
   })
-
-  it('transitional currentDomain mirrors soleDomain', () => {
-    const { result } = renderHook(() => useDomain(), { wrapper })
-    expect(result.current.currentDomain).toBe('universal')
-    act(() => result.current.setDomain('work'))
-    expect(result.current.currentDomain).toBe('work')
-    expect([...result.current.layers]).toEqual(['work'])
-    act(() => result.current.setDomain('universal'))
-    expect(result.current.layers).toEqual(ALL_LAYERS)
-  })
 })

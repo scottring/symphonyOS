@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { Note } from '@/types/note'
 import type { Task } from '@/types/task'
-import type { Domain } from '@/hooks/useDomain'
+import type { DomainId } from '@/lib/domains'
 
 export interface NoteSuggestion {
   best_match: { id: string; confidence: number } | null
@@ -12,7 +12,7 @@ export interface NoteSuggestion {
 interface UseNoteSuggestionArgs {
   task: Pick<Task, 'id' | 'title' | 'notes'>
   candidateNotes: Note[]
-  domain: Domain
+  domain: DomainId | 'universal'
   /** Gates the fetch — typically `true` only when the picker is open. */
   enabled: boolean
 }
