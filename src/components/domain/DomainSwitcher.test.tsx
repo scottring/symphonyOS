@@ -1,63 +1,66 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { DomainProvider } from '@/hooks/useDomain'
+import { DomainProvider, LAYERS_KEY } from '@/hooks/useDomain'
 import { DomainSwitcher } from './DomainSwitcher'
 
 function renderSwitcher() {
-  return render(
-    <DomainProvider>
-      <DomainSwitcher />
-    </DomainProvider>,
-  )
+  return render(<DomainProvider><DomainSwitcher /></DomainProvider>)
 }
 
 describe('DomainSwitcher', () => {
-  beforeEach(() => {
-    localStorage.clear()
-  })
+  beforeEach(() => localStorage.clear())
 
-  it('shows the active domain on a single trigger, with the others hidden until asked for', () => {
+  it('starts with every layer on and the menu closed', () => {
     renderSwitcher()
-
-    expect(screen.getByRole('button', { name: /domain: universal/i })).toBeInTheDocument()
-    expect(screen.queryByRole('menuitem', { name: 'Work' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Layers: All' })).toBeInTheDocument()
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
   })
 
-  it('opens on click — no hover required — and switches the domain', async () => {
+  it('unchecking a layer keeps the menu open and persists the set', async () => {
     const user = userEvent.setup()
     renderSwitcher()
-
-    await user.click(screen.getByRole('button', { name: /domain: universal/i }))
-    await user.click(screen.getByRole('menuitem', { name: 'Work' }))
-
-    expect(screen.getByRole('button', { name: /domain: work/i })).toBeInTheDocument()
-    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
-    expect(localStorage.getItem('symphony-current-domain')).toBe('work')
+    await user.click(screen.getByRole('button', { name: 'Layers: All' }))
+    await user.click(screen.getByRole('menuitemcheckbox', { name: 'Work' }))
+    expect(screen.getByRole('menuitemcheckbox', { name: 'Work' })).toHaveAttribute('aria-checked', 'false')
+    expect(screen.getByRole('menu')).toBeInTheDocument()
+    expect(JSON.parse(localStorage.getItem(LAYERS_KEY)!).sort()).toEqual(['family', 'personal', 'unsorted'])
+    expect(screen.getByRole('button', { name: 'Layers: Family, Personal, Unsorted' })).toBeInTheDocument()
   })
 
-  // The bug this replaced: expanding in-flow widened the control 51px → 189px,
-  // which re-wrapped the header row and yanked the control out from under the
-  // cursor before a click could land. A portalled menu cannot move its trigger.
-  it('renders the menu outside its own subtree so opening it never reflows the header', async () => {
+  it('"Only" narrows to one layer and "All" restores everything', async () => {
+    const user = userEvent.setup()
+    renderSwitcher()
+    await user.click(screen.getByRole('button', { name: 'Layers: All' }))
+    await user.click(screen.getByRole('button', { name: 'Only Family' }))
+    expect(screen.getByRole('button', { name: 'Layers: Family' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'All' }))
+    expect(screen.getByRole('button', { name: 'Layers: All' })).toBeInTheDocument()
+  })
+
+  it('the last checked layer cannot be unchecked', async () => {
+    const user = userEvent.setup()
+    renderSwitcher()
+    await user.click(screen.getByRole('button', { name: 'Layers: All' }))
+    await user.click(screen.getByRole('button', { name: 'Only Work' }))
+    const work = screen.getByRole('menuitemcheckbox', { name: 'Work' })
+    expect(work).toBeDisabled()
+  })
+
+  // The bug this component replaced: expanding in-flow re-wrapped the header
+  // and yanked the control out from under the cursor. A portalled menu can't.
+  it('renders the menu outside its own subtree', async () => {
     const user = userEvent.setup()
     const { container } = renderSwitcher()
-
-    await user.click(screen.getByRole('button', { name: /domain: universal/i }))
-
-    const menu = screen.getByRole('menu')
-    expect(menu).toBeInTheDocument()
-    expect(container.contains(menu)).toBe(false)
+    await user.click(screen.getByRole('button', { name: 'Layers: All' }))
+    expect(container.contains(screen.getByRole('menu'))).toBe(false)
   })
 
-  it('closes on Escape without changing the domain', async () => {
+  it('closes on Escape', async () => {
     const user = userEvent.setup()
     renderSwitcher()
-
-    await user.click(screen.getByRole('button', { name: /domain: universal/i }))
+    await user.click(screen.getByRole('button', { name: 'Layers: All' }))
     await user.keyboard('{Escape}')
-
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /domain: universal/i })).toBeInTheDocument()
   })
 })
