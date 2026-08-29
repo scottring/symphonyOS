@@ -8,8 +8,6 @@ import { useAssistantLauncher } from '@/contexts/AssistantLaunchContext'
 import type { ResolutionAction } from '@/hooks/useResolutionLearning'
 import type { TaskCategory } from '@/types/task'
 
-type Domain = 'work' | 'family' | 'personal' | 'universal'
-
 export type CaptureDestination = 'today' | 'inbox' | 'note'
 
 export interface TodayCaptureResult {
@@ -33,7 +31,6 @@ export interface TodayCaptureResult {
 interface TodayAddInputProps {
   onAdd: (r: TodayCaptureResult) => void
   parserContext: ParserContext
-  currentDomain: Domain
   resolver: ResolverContext
   getRecentTaskForContact?: (contactId: string) => { title: string; date: Date } | null
 }
@@ -54,7 +51,7 @@ const DESTINATIONS: { key: CaptureDestination; label: string; placeholder: strin
   { key: 'note', label: 'Note', placeholder: 'Jot a note...' },
 ]
 
-export function TodayAddInput({ onAdd, parserContext, currentDomain, resolver, getRecentTaskForContact }: TodayAddInputProps) {
+export function TodayAddInput({ onAdd, parserContext, resolver, getRecentTaskForContact }: TodayAddInputProps) {
   const [expanded, setExpanded] = useState(false)
   const [value, setValue] = useState('')
   const [destination, setDestination] = useState<CaptureDestination>('today')
@@ -69,7 +66,7 @@ export function TodayAddInput({ onAdd, parserContext, currentDomain, resolver, g
   )
 
   const debouncedValue = useDebouncedValue(value, 150)
-  const qp = useQuickParse(debouncedValue, ctx, currentDomain, resolver)
+  const qp = useQuickParse(debouncedValue, ctx, resolver)
   const { suggestion, suggestionState, suggestionApplied } = qp
 
   const recentTask = useMemo(

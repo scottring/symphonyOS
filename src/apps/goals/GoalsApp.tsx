@@ -24,7 +24,7 @@ import { LoadingFallback } from '@/components/layout/LoadingFallback'
  */
 function GoalsIndex() {
   const navigate = useNavigate()
-  const { currentDomain, layers } = useDomain()
+  const { soleDomain, layers } = useDomain()
   const {
     areas, goals, loading, getCurrentQuarter,
     addArea, updateArea, deleteArea, addGoal, updateGoal,
@@ -43,7 +43,7 @@ function GoalsIndex() {
         onSelectGoal={(id) => navigate(`/goals/${id}`)}
         onAddArea={addArea}
         onRenameArea={(areaId, name) => updateArea(areaId, { name })}
-        onAddGoal={(areaId, name) => addGoal(areaId, name, currentDomain !== 'universal' ? currentDomain : undefined)}
+        onAddGoal={(areaId, name) => addGoal(areaId, name, soleDomain ?? undefined)}
         onUpdateGoal={(goalId, updates) => { void updateGoal(goalId, updates) }}
         onDeleteArea={deleteArea}
       />

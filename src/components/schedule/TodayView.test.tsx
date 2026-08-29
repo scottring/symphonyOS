@@ -46,7 +46,6 @@ const ctxValue = {
   // Smart-capture context fields — provided but undefined by default so the
   // "Add to today" row doesn't render unless a test explicitly passes them.
   parserContext: { projects: [], contacts: [], familyMembers: [] } as import('@/lib/quickInputParser').ParserContext,
-  currentDomain: 'personal' as const,
   resolverContext: { contacts: [], aliases: [] } as import('@/lib/entityResolver').ResolverContext,
   getRecentTaskForContact: () => null,
 }

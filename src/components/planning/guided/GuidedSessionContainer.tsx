@@ -14,7 +14,8 @@ import { useProjects } from '@/hooks/useProjects'
 import { useRoutines } from '@/hooks/useRoutines'
 import { useUpkeepList } from '@/hooks/useUpkeepList'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
-import { useDomain, type Domain } from '@/hooks/useDomain'
+import { useDomain } from '@/hooks/useDomain'
+import type { DomainId } from '@/lib/domains'
 import { useCalendarDomainMappings } from '@/hooks/useCalendarDomainMappings'
 import { isDraggableRoutine, resolveRoutineEligible } from '@/lib/routineUtils'
 import { filterTasksForLayers, filterEventsForLayers, filterRoutinesForLayers, filterByLayers } from '@/lib/today/domainFilter'
@@ -37,7 +38,7 @@ interface Props {
 export function buildAddTaskOptions(
   bucket: TaskBucket,
   opts: { projectId?: string; sourceId?: string; goalId?: string; pickedAt?: Date; isFun?: boolean } | undefined,
-  currentDomain: Domain,
+  soleDomain: DomainId | null,
 ) {
   return {
     bucket,
@@ -48,7 +49,7 @@ export function buildAddTaskOptions(
     // Fun is set when the thing is WRITTEN — "build the fun on purpose" means
     // adding one, not auditing thirty afterwards.
     isFun: opts?.isFun,
-    context: currentDomain !== 'universal' ? currentDomain : undefined,
+    context: soleDomain ?? undefined,
   }
 }
 
@@ -60,7 +61,7 @@ export function GuidedSessionContainer({ horizon, onClose, onFinished, onChain, 
   const { routines: allRoutines, getRoutinesForDate } = useRoutines()
   const { upkeepItems, upkeepLoading, ensureUpkeepList } = useUpkeepList()
   const { getCurrentUserMember } = useFamilyMembers()
-  const { currentDomain, layers, soleDomain } = useDomain()
+  const { layers, soleDomain } = useDomain()
   const { getDomainForCalendar } = useCalendarDomainMappings()
 
   // Layer scoping — the ONE place the session pool narrows. Every step reads
@@ -125,18 +126,18 @@ export function GuidedSessionContainer({ horizon, onClose, onFinished, onChain, 
     // sourceId, goalId, pickedAt, context — ride in AddTaskOptions. assignedTo
     // is merged here (not part of the pure mapping) so the creator owns the item.
     await addTask(title, undefined, opts?.projectId, undefined, {
-      ...buildAddTaskOptions(bucket, opts, currentDomain),
+      ...buildAddTaskOptions(bucket, opts, soleDomain),
       assignedTo: getCurrentUserMember()?.id,
     })
-  }, [addTask, getCurrentUserMember, currentDomain])
+  }, [addTask, getCurrentUserMember, soleDomain])
 
   const createDatedTask = useCallback(async (title: string, date: Date) => {
     await addTask(title, undefined, undefined, date, {
       assignedTo: getCurrentUserMember()?.id,
-      context: currentDomain !== 'universal' ? currentDomain : undefined,
+      context: soleDomain ?? undefined,
       isAllDay: true,
     })
-  }, [addTask, getCurrentUserMember, currentDomain])
+  }, [addTask, getCurrentUserMember, soleDomain])
 
   const host = useMemo<GuidedHost>(() => ({
     tasks: domainTasks, tasksLoading,
@@ -148,7 +149,7 @@ export function GuidedSessionContainer({ horizon, onClose, onFinished, onChain, 
     // domain task may live in an untagged project.
     projects: domainProjects, projectsMap,
     goals: domainGoals, goalAreas: areas,
-    addGoal: (areaId: string, name: string) => addGoal(areaId, name, currentDomain !== 'universal' ? currentDomain : undefined),
+    addGoal: (areaId: string, name: string) => addGoal(areaId, name, soleDomain ?? undefined),
     addArea: (name: string) => addArea(name),
     updateGoalStatus: (id: string, status: GoalStatus) => updateGoal(id, { status }),
     carryGoal: (id: string) => updateGoal(id, { year: new Date().getFullYear(), status: 'active' }),
@@ -177,7 +178,7 @@ export function GuidedSessionContainer({ horizon, onClose, onFinished, onChain, 
     onScheduleRoutine,
     getRoutinesForDate: domainGetRoutinesForDate,
     upkeepItems, upkeepLoading, ensureUpkeepList,
-  }), [domainTasks, tasksLoading, domainEvents, isConnected, calendarChecking, domainFetchEvents, createEvent, pushTaskStamped, setBucketStamped, toggleTask, deleteTask, updateTask, createTaskInBucket, createDatedTask, domainProjects, projectsMap, domainGoals, areas, addGoal, addArea, updateGoal, domainRoutines, allRoutines, onScheduleRoutine, domainGetRoutinesForDate, currentDomain, layers, upkeepItems, upkeepLoading, ensureUpkeepList])
+  }), [domainTasks, tasksLoading, domainEvents, isConnected, calendarChecking, domainFetchEvents, createEvent, pushTaskStamped, setBucketStamped, toggleTask, deleteTask, updateTask, createTaskInBucket, createDatedTask, domainProjects, projectsMap, domainGoals, areas, addGoal, addArea, updateGoal, domainRoutines, allRoutines, onScheduleRoutine, domainGetRoutinesForDate, soleDomain, layers, upkeepItems, upkeepLoading, ensureUpkeepList])
 
   return <GuidedSession horizon={horizon} domain={soleDomain} host={host} onClose={onClose} onFinished={onFinished} onChain={onChain} />
 }

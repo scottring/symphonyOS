@@ -66,7 +66,7 @@ export function InboxView({
   const { notes, addNote, updateNote, deleteNote } = useNotes()
   const { addTask } = useSupabaseTasks()
 
-  const { currentDomain, layers } = useDomain()
+  const { soleDomain, layers } = useDomain()
 
   const [notePickerTaskId, setNotePickerTaskId] = useState<string | null>(null)
   const [mode, setMode] = useInboxMode()
@@ -261,7 +261,7 @@ export function InboxView({
           content: bullet,
           type: 'general',
           source: 'inbox_triage',
-          context: taskSnapshot.context ?? (currentDomain !== 'universal' ? currentDomain : undefined),
+          context: taskSnapshot.context ?? undefined,
         })
       } catch (err) {
         console.error('Failed to create note:', err)
@@ -284,7 +284,7 @@ export function InboxView({
       })
     }
     setNotePickerTaskId(null)
-  }, [notes, updateNote, deleteNote, addNote, restoreTask, onDeleteTask, currentDomain])
+  }, [notes, updateNote, deleteNote, addNote, restoreTask, onDeleteTask])
 
   // Layer filter — the SHARED helper, not a local copy.
   //
@@ -569,7 +569,7 @@ export function InboxView({
             task={task}
             notes={notes}
             layers={layers}
-            domain={currentDomain}
+            soleDomain={soleDomain}
             onSelect={(sel) => handleNoteSelect(task, sel)}
             onClose={() => setNotePickerTaskId(null)}
           />

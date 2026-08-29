@@ -3,8 +3,6 @@ import { parseQuickInput, hasParsedFields, type ParsedQuickInput, type ParserCon
 import { resolveContact, type ResolverContext, type ContactSuggestion } from '@/lib/entityResolver'
 import type { TaskCategory, TaskContext } from '@/types/task'
 
-type Domain = 'work' | 'family' | 'personal' | 'universal'
-
 /**
  * Parsed quick-input merged with per-field user overrides. Adds `context`
  * (auto-applied domain context) on top of the raw parser result.
@@ -38,7 +36,7 @@ export type SuggestionState = 'none' | 'accepted' | 'dismissed'
  * when no explicit @mention syntax matched. When omitted, behavior is identical
  * to before — no suggestion is surfaced.
  */
-export function useQuickParse(title: string, ctx: ParserContext, currentDomain: Domain, resolver?: ResolverContext) {
+export function useQuickParse(title: string, ctx: ParserContext, resolver?: ResolverContext) {
   const [overrides, setOverrides] = useState<Overrides>({})
   const [suggestionState, setSuggestionState] = useState<SuggestionState>('none')
 
@@ -74,9 +72,11 @@ export function useQuickParse(title: string, ctx: ParserContext, currentDomain: 
     dueDate: overrides.dueDate === null ? undefined : (overrides.dueDate ?? parsed.dueDate),
     durationMinutes: overrides.durationMinutes === null ? undefined : (overrides.durationMinutes ?? parsed.durationMinutes),
     category: overrides.category === null ? undefined : (overrides.category ?? parsed.category),
-    context: overrides.context === null ? undefined : (overrides.context ?? (currentDomain !== 'universal' ? currentDomain as TaskContext : undefined)),
+    // No lens-driven default: captures land Unsorted unless the user explicitly
+    // applies a context (the "Add to X?" chip, or a future explicit-syntax token).
+    context: overrides.context === null ? undefined : overrides.context,
     assignedMemberIds: overrides.assignedMemberIds === null ? undefined : (overrides.assignedMemberIds ?? parsed.assignedMemberIds),
-  }), [parsed, overrides, currentDomain, suggestionApplied, suggestion])
+  }), [parsed, overrides, suggestionApplied, suggestion])
 
   const hasFields = hasParsedFields(effectiveParsed) || !!effectiveParsed.context
 

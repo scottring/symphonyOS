@@ -155,7 +155,6 @@ export interface ScheduleActionsValue {
   onCreateTaskParsed?: (r: TodayCaptureResult) => void | Promise<void>
   /** Stable parser context for parse-aware inputs. */
   parserContext?: ParserContext
-  currentDomain?: 'work' | 'family' | 'personal' | 'universal'
   /** Resolver inputs for implicit entity resolution. */
   resolverContext?: ResolverContext
   getRecentTaskForContact?: (contactId: string) => { title: string; date: Date } | null

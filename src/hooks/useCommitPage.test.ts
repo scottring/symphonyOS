@@ -18,7 +18,6 @@ vi.mock('@/hooks/useNotes', () => ({ useNotes: () => ({ addNote: mocks.addNote }
 vi.mock('@/hooks/useFamilyMembers', () => ({
   useFamilyMembers: () => ({ getCurrentUserMember: () => ({ id: 'member-1' }) }),
 }))
-vi.mock('@/hooks/useDomain', () => ({ useDomain: () => ({ currentDomain: 'family' }) }))
 vi.mock('@/hooks/useToast', () => ({ showToast: mocks.showToast }))
 
 import { useCommitPage } from './useCommitPage'
@@ -82,7 +81,7 @@ describe('useCommitPage', () => {
     expect(successToasts()[0][0]).toBe('Added 1 task and 1 note from your page')
   })
 
-  it('creates notes as general/import so the Obsidian dual-write never fires', async () => {
+  it('creates notes as general/import — a page commit is a capture, so it never stamps a context', async () => {
     await commit()({
       items: [],
       notes: [{ title: 'Fence quote', content: 'Ask about cedar' }],
@@ -90,7 +89,7 @@ describe('useCommitPage', () => {
     })
 
     expect(mocks.addNote).toHaveBeenCalledWith(
-      expect.objectContaining({ type: 'general', source: 'import', context: 'family' }),
+      expect.objectContaining({ type: 'general', source: 'import', context: undefined }),
     )
   })
 

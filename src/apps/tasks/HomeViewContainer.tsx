@@ -80,7 +80,7 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
   const { getDomainForCalendar } = useCalendarDomainMappings();
   const { lists, listsByCategory, addList } = useListsContext();
   const { addNote } = useNotesContext();
-  const { currentDomain, layers } = useDomain();
+  const { layers } = useDomain();
   const undo = useUndo();
   const { aliases, recordOutcome } = useResolutionLearning();
 
@@ -303,13 +303,13 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
       await addTask(parsed.title || raw, parsed.contactId, parsed.projectId, scheduledFor, {
         assignedTo: parsed.assignedMemberIds?.[0] ?? getCurrentUserMember()?.id,
         assignedToAll: parsed.assignedMemberIds,
-        context: currentDomain !== 'universal' ? currentDomain : undefined,
+        context: undefined,
         category: parsed.category,
         // A parsed time means a specific time-of-day → not all-day.
         isAllDay: parsed.dueDate ? false : true,
       });
     },
-    [addTask, getCurrentUserMember, currentDomain, projects, contacts, familyMembers],
+    [addTask, getCurrentUserMember, projects, contacts, familyMembers],
   );
 
   const parserContext = useMemo<ParserContext>(
@@ -341,7 +341,7 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
       if (r.destination === 'note') {
         const note = await addNote({
           content: r.title,
-          context: currentDomain !== 'universal' ? currentDomain : undefined,
+          context: undefined,
         });
         showToast(note ? 'Note saved' : 'Could not save the note', note ? 'success' : 'error');
         return;
@@ -359,7 +359,7 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
         {
           assignedTo: r.assignedMemberIds?.[0] ?? getCurrentUserMember()?.id,
           assignedToAll: r.assignedMemberIds,
-          context: currentDomain !== 'universal' ? currentDomain : undefined,
+          context: undefined,
           category: r.category,
           isAllDay: toInbox ? undefined : r.scheduledFor ? false : true,
           phoneNumber: r.phoneNumber,
@@ -375,7 +375,7 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
         });
       }
     },
-    [addTask, addNote, getCurrentUserMember, currentDomain, recordOutcome],
+    [addTask, addNote, getCurrentUserMember, recordOutcome],
   );
 
   // Inline timeline "+" create: the TimelineInsertPoint quick-input captures a
@@ -388,12 +388,12 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
       await addTask(r.title, r.contactId, r.projectId, r.scheduledFor ?? undefined, {
         assignedTo: getCurrentUserMember()?.id,
         assignedToAll: r.assignedMemberIds,
-        context: currentDomain !== 'universal' ? currentDomain : undefined,
+        context: undefined,
         // A timed anchor means a specific time-of-day, so it is not all-day.
         isAllDay: r.scheduledFor ? false : undefined,
       });
     },
-    [addTask, getCurrentUserMember, currentDomain],
+    [addTask, getCurrentUserMember],
   );
 
   // Inline timeline "+" create for the EVENT kind: make a real calendar event
@@ -623,7 +623,6 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
       onCreateTask: onCreateTaskFromValue,
       onCreateTaskParsed,
       parserContext,
-      currentDomain,
       resolverContext,
       getRecentTaskForContact,
       onCreateTaskAt,
@@ -690,7 +689,7 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
       onUpdateEventProject: updateEventProject,
     }),
     [
-      toggleTask, toggleWaiting, updateTask, pushTask, deleteTask, onSetNeededToday, viewedDate, onCreateTaskFromValue, onCreateTaskParsed, parserContext, currentDomain, resolverContext, getRecentTaskForContact, onCreateTaskAt, onCreateEventAt, onCreateRoutineAt, handleCreateFollowUp, handleGroupItems, handleAddToGroup, handleRemoveFromGroup, handleUngroup, undo.pushAction, updateTaskOrders,
+      toggleTask, toggleWaiting, updateTask, pushTask, deleteTask, onSetNeededToday, viewedDate, onCreateTaskFromValue, onCreateTaskParsed, parserContext, resolverContext, getRecentTaskForContact, onCreateTaskAt, onCreateEventAt, onCreateRoutineAt, handleCreateFollowUp, handleGroupItems, handleAddToGroup, handleRemoveFromGroup, handleUngroup, undo.pushAction, updateTaskOrders,
       setSelection, navigate,
       scheduleActions, updateRoutine, updateEventContext, updateEventSharedWithFamily, dismissShareNudge, hideEvent, handleDeleteEvent, sendTaskToBuy,
       contactsMap, projectsMap, projects, contacts, familyMembers, lists, listsByCategory,

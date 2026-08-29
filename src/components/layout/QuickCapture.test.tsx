@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, waitFor, act } from '@/test/test-utils'
 import { QuickCapture } from './QuickCapture'
+import { LAYERS_KEY } from '@/hooks/useDomain'
 
 describe('QuickCapture', () => {
   describe('FAB button', () => {
@@ -168,6 +169,63 @@ describe('QuickCapture', () => {
       await user.click(screen.getByRole('button', { name: 'Add to My Inbox' }))
 
       expect(onAdd).toHaveBeenCalledWith('My task')
+    })
+  })
+
+  describe('capture lands Unsorted (no lens stamp)', () => {
+    // A quick capture must never inherit the active domain lens — a stale
+    // filter checkbox (left on "Work" from browsing) can't silently mislabel
+    // a new item. With only('work') checked, "Buy milk" has no parsed fields
+    // and no context, so it takes the plain onAdd(title) path exactly as it
+    // would with every layer checked — proving nothing about the lens
+    // leaked into the write.
+    it('a submitted capture carries no context even with a single domain checked', async () => {
+      localStorage.setItem(LAYERS_KEY, JSON.stringify(['work']))
+      try {
+        const onAdd = vi.fn()
+        const onAddRich = vi.fn()
+        const { user } = render(
+          <QuickCapture onAdd={onAdd} onAddRich={onAddRich} isOpen={true} showFab={false} />
+        )
+
+        const input = screen.getByPlaceholderText('Try "call the vet tomorrow 2pm"')
+        await user.type(input, 'Buy milk')
+        await user.click(screen.getByRole('button', { name: 'Add to My Inbox' }))
+
+        expect(onAdd).toHaveBeenCalledWith('Buy milk')
+        expect(onAddRich).not.toHaveBeenCalled()
+      } finally {
+        localStorage.removeItem(LAYERS_KEY)
+      }
+    })
+
+    it('the "Add to Work?" chip is offered but not applied — tapping it is the only way in', async () => {
+      localStorage.setItem(LAYERS_KEY, JSON.stringify(['work']))
+      try {
+        const onAddRich = vi.fn()
+        const { user } = render(
+          <QuickCapture
+            onAdd={vi.fn()}
+            onAddRich={onAddRich}
+            isOpen={true}
+            showFab={false}
+            projects={[{ id: 'p1', name: 'Montreal Trip' }]}
+          />
+        )
+
+        const input = screen.getByPlaceholderText('Try "call the vet tomorrow 2pm"')
+        await user.type(input, 'book flights #montreal tomorrow')
+
+        const chip = screen.getByRole('button', { name: /Add to Work\?/i })
+        await user.click(chip)
+        await user.click(screen.getByRole('button', { name: 'Schedule Task' }))
+
+        expect(onAddRich).toHaveBeenCalledWith(
+          expect.objectContaining({ context: 'work' }),
+        )
+      } finally {
+        localStorage.removeItem(LAYERS_KEY)
+      }
     })
   })
 

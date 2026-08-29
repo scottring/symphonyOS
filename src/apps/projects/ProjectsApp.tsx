@@ -26,7 +26,7 @@ import { LoadingFallback } from '@/components/layout/LoadingFallback'
  */
 function ProjectsIndex() {
   const navigate = useNavigate()
-  const { currentDomain, layers } = useDomain()
+  const { soleDomain, layers } = useDomain()
   const { projects, addProject, loading } = useProjects()
   const { tasks } = useSupabaseTasks()
 
@@ -42,7 +42,7 @@ function ProjectsIndex() {
         onAddProject={(project) =>
           addProject({
             ...project,
-            context: currentDomain !== 'universal' ? currentDomain : undefined,
+            context: soleDomain ?? undefined,
           })
         }
       />

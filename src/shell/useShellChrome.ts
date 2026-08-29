@@ -19,7 +19,6 @@ import { useRoutines } from '@/hooks/useRoutines';
 import { useFamilyMembers } from '@/hooks/useFamilyMembers';
 import { useGoogleCalendar } from '@/hooks/useGoogleCalendar';
 import { useCalendarDomainMappings } from '@/hooks/useCalendarDomainMappings';
-import { useDomain } from '@/hooks/useDomain';
 import { usePinsContext } from '@/contexts/PinsContext';
 import { useNotesContext } from '@/contexts/NotesContext';
 import { useListsContext } from '@/contexts/ListsContext';
@@ -54,7 +53,6 @@ export function useShellChrome() {
   const { members: familyMembers, getCurrentUserMember } = useFamilyMembers();
   const { isConnected, createEvent, fetchEvents } = useGoogleCalendar();
   const { getCalendarForDomain } = useCalendarDomainMappings();
-  const { currentDomain } = useDomain();
   // The shell-wide instance, shared with whatever app is routed below —
   // a private copy here would not see a pin made from /lists.
   const pinnedItems = usePinsContext();
@@ -104,11 +102,11 @@ export function useShellChrome() {
     async (title: string) => {
       const taskId = await addTask(title, undefined, undefined, undefined, {
         assignedTo: getCurrentUserMember()?.id,
-        context: currentDomain !== 'universal' ? currentDomain : undefined,
+        context: undefined,
       });
       if (taskId) showCaptureConfirmation(taskId);
     },
-    [addTask, getCurrentUserMember, currentDomain, showCaptureConfirmation],
+    [addTask, getCurrentUserMember, showCaptureConfirmation],
   );
 
   const onQuickAddRich = useCallback(
@@ -119,9 +117,7 @@ export function useShellChrome() {
           const startTime = new Date(data.scheduledFor);
           const endTime = new Date(startTime.getTime() + (data.durationMinutes ?? 60) * 60000);
 
-          const explicitContext =
-            data.context ?? (currentDomain !== 'universal' ? currentDomain : undefined);
-          const targetCalendar = getCalendarForDomain(explicitContext ?? null);
+          const targetCalendar = getCalendarForDomain(data.context ?? null);
 
           await createEvent({
             title: data.title,
@@ -163,7 +159,7 @@ export function useShellChrome() {
         else showCaptureConfirmation(taskId);
       }
     },
-    [addTask, isConnected, createEvent, fetchEvents, getCalendarForDomain, getCurrentUserMember, currentDomain, showToast, showCaptureConfirmation],
+    [addTask, isConnected, createEvent, fetchEvents, getCalendarForDomain, getCurrentUserMember, showToast, showCaptureConfirmation],
   );
 
   const onQuickAddNote = useCallback(

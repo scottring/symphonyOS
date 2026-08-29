@@ -40,7 +40,7 @@ describe('NotePicker', () => {
         task={{ id: 't1', title: 'Bike storage', notes: undefined }}
         notes={[note('n1', 'Backyard reno'), note('n2', 'Vendors')]}
         layers={ALL_LAYERS}
-        domain="family"
+        soleDomain="family"
         onSelect={vi.fn()}
         onClose={vi.fn()}
       />,
@@ -60,7 +60,7 @@ describe('NotePicker', () => {
         task={{ id: 't2-low-confidence', title: 'X', notes: undefined }}
         notes={[note('n1', 'Foo')]}
         layers={ALL_LAYERS}
-        domain="universal"
+        soleDomain={null}
         onSelect={vi.fn()}
         onClose={vi.fn()}
       />,
@@ -78,7 +78,7 @@ describe('NotePicker', () => {
           note('n3', 'BACKYARD FENCE', ''),
         ]}
         layers={ALL_LAYERS}
-        domain="universal"
+        soleDomain={null}
         onSelect={vi.fn()}
         onClose={vi.fn()}
       />,
@@ -96,7 +96,7 @@ describe('NotePicker', () => {
         task={{ id: 't1', title: 'X', notes: undefined }}
         notes={[note('n1', 'Editable note', '', false), note('n2', 'Vault note', '', true)]}
         layers={ALL_LAYERS}
-        domain="universal"
+        soleDomain={null}
         onSelect={vi.fn()}
         onClose={vi.fn()}
       />,
@@ -116,7 +116,7 @@ describe('NotePicker', () => {
         task={{ id: 't1', title: 'X', notes: undefined }}
         notes={notes}
         layers={L('family')}
-        domain="family"
+        soleDomain="family"
         onSelect={vi.fn()}
         onClose={vi.fn()}
       />,
@@ -132,7 +132,7 @@ describe('NotePicker', () => {
         task={{ id: 't1', title: 'X', notes: undefined }}
         notes={notes}
         layers={L('family', UNSORTED)}
-        domain="family"
+        soleDomain="family"
         onSelect={vi.fn()}
         onClose={vi.fn()}
       />,
@@ -147,7 +147,7 @@ describe('NotePicker', () => {
         task={{ id: 't1', title: 'X', notes: undefined }}
         notes={[note('n1', 'Backyard reno')]}
         layers={ALL_LAYERS}
-        domain="universal"
+        soleDomain={null}
         onSelect={onSelect}
         onClose={vi.fn()}
       />,
@@ -163,7 +163,7 @@ describe('NotePicker', () => {
         task={{ id: 't1', title: 'My idea', notes: undefined }}
         notes={[]}
         layers={ALL_LAYERS}
-        domain="universal"
+        soleDomain={null}
         onSelect={onSelect}
         onClose={vi.fn()}
       />,

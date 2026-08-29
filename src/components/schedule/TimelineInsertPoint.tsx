@@ -18,7 +18,6 @@ interface Props {
   quickInput: {
     anchorTime: Date | null
     parserContext: ParserContext
-    currentDomain: 'work' | 'family' | 'personal' | 'universal'
   }
 }
 
@@ -78,7 +77,6 @@ export function TimelineInsertPoint({ onPick, onCreate, quickInput }: Props) {
           kind={inputKind}
           anchorTime={quickInput.anchorTime}
           parserContext={quickInput.parserContext}
-          currentDomain={quickInput.currentDomain}
           onSubmit={(r) => { setMode('closed'); onCreate(inputKind, r) }}
           onCancel={() => setMode('closed')}
         />

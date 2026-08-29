@@ -16,7 +16,6 @@ import { useActionableInstances } from '@/hooks/useActionableInstances';
 import { useFamilyMembers } from '@/hooks/useFamilyMembers';
 import { useHiddenCalendarEvents } from '@/hooks/useHiddenCalendarEvents';
 import { useScheduleActions } from '@/hooks/useScheduleActions';
-import { useDomain } from '@/hooks/useDomain';
 import { useCalendarDomainMappings } from '@/hooks/useCalendarDomainMappings';
 import { useListsContext } from '@/contexts/ListsContext';
 import { ScheduleActionsProvider, type ScheduleActionsValue } from '@/contexts/ScheduleActionsContext';
@@ -40,7 +39,6 @@ export function InboxViewContainer() {
   const { hideEvent } = useHiddenCalendarEvents();
   const { getDomainForCalendar } = useCalendarDomainMappings();
   const { lists, listsByCategory } = useListsContext();
-  const { currentDomain } = useDomain();
   const undo = useUndo();
 
   const { selection, setSelection, clearSelection } = useSelection();
@@ -103,11 +101,11 @@ export function InboxViewContainer() {
       today.setHours(0, 0, 0, 0);
       await addTask(title, undefined, undefined, today, {
         assignedTo: getCurrentUserMember()?.id,
-        context: currentDomain !== 'universal' ? currentDomain : undefined,
+        context: undefined,
         isAllDay: true,
       });
     },
-    [addTask, getCurrentUserMember, currentDomain],
+    [addTask, getCurrentUserMember],
   );
 
   // Expand a task into a new project (subtasks absorbed, parent task deleted).

@@ -5,7 +5,6 @@ import { TimelineInsertPoint } from './TimelineInsertPoint'
 const defaultQuickInput = {
   anchorTime: null,
   parserContext: { projects: [], contacts: [], familyMembers: [] },
-  currentDomain: 'universal' as const,
 }
 
 describe('TimelineInsertPoint', () => {
@@ -30,7 +29,7 @@ describe('TimelineInsertPoint', () => {
   })
   it('note pick still bubbles via onPick and closes', () => {
     const onPick = vi.fn()
-    render(<TimelineInsertPoint onPick={onPick} onCreate={vi.fn()} quickInput={{ anchorTime: null, parserContext: { projects: [], contacts: [], familyMembers: [] }, currentDomain: 'universal' }} />)
+    render(<TimelineInsertPoint onPick={onPick} onCreate={vi.fn()} quickInput={{ anchorTime: null, parserContext: { projects: [], contacts: [], familyMembers: [] } }} />)
     fireEvent.click(screen.getByRole('button', { name: /add between items/i }))
     fireEvent.click(screen.getByRole('button', { name: /^note$/i }))
     expect(onPick).toHaveBeenCalledWith('note')
@@ -38,7 +37,7 @@ describe('TimelineInsertPoint', () => {
   })
   it('task pick opens the inline input (no immediate create); submit fires onCreate', () => {
     const onCreate = vi.fn(); const onPick = vi.fn()
-    render(<TimelineInsertPoint onPick={onPick} onCreate={onCreate} quickInput={{ anchorTime: new Date(2026,4,19,18,15), parserContext: { projects: [], contacts: [], familyMembers: [] }, currentDomain: 'universal' }} />)
+    render(<TimelineInsertPoint onPick={onPick} onCreate={onCreate} quickInput={{ anchorTime: new Date(2026,4,19,18,15), parserContext: { projects: [], contacts: [], familyMembers: [] } }} />)
     fireEvent.click(screen.getByRole('button', { name: /add between items/i }))
     fireEvent.click(screen.getByRole('button', { name: /^task$/i }))
     expect(onPick).not.toHaveBeenCalled()

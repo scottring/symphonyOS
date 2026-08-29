@@ -5,6 +5,7 @@ import { CameraCaptureModal } from '@/components/capture/CameraCaptureModal'
 import { hasParsedFields } from '@/lib/quickInputParser'
 import type { TaskCategory, TaskContext } from '@/types/task'
 import { useDomain } from '@/hooks/useDomain'
+import { domainById } from '@/lib/domains'
 import { useQuickParse } from '@/hooks/useQuickParse'
 import { ParsedFieldChips } from '@/components/capture/ParsedFieldChips'
 import { ConceptIcon } from '@/lib/conceptIcons'
@@ -72,8 +73,9 @@ export function QuickCapture({
   const [isEntering, setIsEntering] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
 
-  // Get current domain for smart context defaulting
-  const { currentDomain } = useDomain()
+  // The sole checked domain, if exactly one — drives the "Add to X?" chip only.
+  // Captures never stamp context from the lens.
+  const { soleDomain } = useDomain()
 
   // Photo-first capture: live camera → AI-enriched inbox task. On macOS,
   // Continuity Camera lists the iPhone as a camera device, making the phone
@@ -84,9 +86,8 @@ export function QuickCapture({
   const cameraSupported = typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia
   const handlePhotoPicked = async (file: Blob | undefined) => {
     if (!file) return
-    const ctx = currentDomain !== 'universal' ? (currentDomain as TaskContext) : null
     const named = file instanceof File ? file : new File([file], 'camera.jpg', { type: 'image/jpeg' })
-    const ok = await photo.captureFromFile(named, ctx)
+    const ok = await photo.captureFromFile(named, null)
     if (ok) {
       // Fire-and-forget: the enriched item lands in the inbox via realtime.
       setTimeout(() => { photo.reset(); handleClose() }, 1600)
@@ -100,7 +101,7 @@ export function QuickCapture({
   )
 
   // Parsing + override state lives in useQuickParse
-  const qp = useQuickParse(title, parserCtx, currentDomain)
+  const qp = useQuickParse(title, parserCtx)
   const {
     effectiveParsed,
     projectName,
@@ -204,7 +205,9 @@ export function QuickCapture({
       // Plain inbox add (current behavior)
       onAdd(trimmed)
     } else if (onAddRich) {
-      // Rich add with parsed fields + auto-applied domain context
+      // Rich add with parsed fields. context is undefined unless the user
+      // explicitly applied one (the "Add to X?" chip, or clearContext/applyContext) —
+      // captures never inherit the domain lens.
       onAddRich({
         title: effectiveParsed.title,
         projectId: effectiveParsed.projectId,
@@ -492,22 +495,24 @@ export function QuickCapture({
                     </div>
                   )}
 
-                  {/* Suggested context chip - show when in a domain and context not yet applied */}
-                  {!effectiveParsed.isNote && currentDomain !== 'universal' && !effectiveParsed.context && (
+                  {/* Suggested context chip - the user's explicit choice to stamp the
+                      capture with the sole checked domain; shown only when exactly
+                      one real domain is checked and context isn't already set. */}
+                  {!effectiveParsed.isNote && soleDomain && !effectiveParsed.context && (
                     <div className="flex items-center gap-2">
                       <span className="text-base"><ConceptIcon name="context" size={18} decorative /></span>
                       <button
                         type="button"
-                        onClick={() => applyContext(currentDomain as TaskContext)}
+                        onClick={() => applyContext(soleDomain)}
                         className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
-                          currentDomain === 'work'
+                          soleDomain === 'work'
                             ? 'bg-blue-50/50 text-blue-600 border-blue-200 hover:bg-blue-50 hover:border-blue-300'
-                            : currentDomain === 'family'
+                            : soleDomain === 'family'
                             ? 'bg-amber-50/50 text-amber-600 border-amber-200 hover:bg-amber-50 hover:border-amber-300'
                             : 'bg-purple-50/50 text-purple-600 border-purple-200 hover:bg-purple-50 hover:border-purple-300'
                         }`}
                       >
-                        + Add to {currentDomain.charAt(0).toUpperCase() + currentDomain.slice(1)}?
+                        + Add to {domainById(soleDomain).label}?
                       </button>
                     </div>
                   )}

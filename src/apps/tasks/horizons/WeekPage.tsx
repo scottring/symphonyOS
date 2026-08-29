@@ -69,7 +69,7 @@ export function WeekPage() {
     draft, setDraft, submitDraft,
     scheduleActionsValue, undo,
     setBucket, deleteTaskWithUndo, projectsMap, tasksById, weekAnchor,
-    addTask, deleteTask, toggleTask, getCurrentUserMember, currentDomain,
+    addTask, deleteTask, toggleTask, getCurrentUserMember,
   } = useHorizonPageData(horizon, anchoredWeekStart ?? undefined);
 
   const gridStart = anchoredWeekStart ?? weekAnchor;
@@ -220,9 +220,9 @@ export function WeekPage() {
     void addTask(title, undefined, undefined, scheduledFor, {
       isAllDay: true,
       assignedTo: getCurrentUserMember()?.id,
-      context: currentDomain !== 'universal' ? currentDomain : undefined,
+      context: undefined,
     });
-  }, [addTask, getCurrentUserMember, currentDomain]);
+  }, [addTask, getCurrentUserMember]);
 
   const shelf = useMemo(() => ({
     carryOverIds, staleWeekIds, onBringForward, projectsMap, tasksById,

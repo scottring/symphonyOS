@@ -39,17 +39,15 @@ export interface TimelineCaptureResult {
   assignedMemberIds?: string[]
 }
 
-type Domain = 'work' | 'family' | 'personal' | 'universal'
 interface Props {
   kind: 'task' | 'event' | 'routine'
   anchorTime: Date | null
   parserContext: ParserContext
-  currentDomain: Domain
   onSubmit: (r: TimelineCaptureResult) => void
   onCancel: () => void
 }
 
-export function TimelineQuickInput({ kind, anchorTime, parserContext, currentDomain, onSubmit, onCancel }: Props) {
+export function TimelineQuickInput({ kind, anchorTime, parserContext, onSubmit, onCancel }: Props) {
   const [title, setTitle] = useState('')
   const ref = useRef<HTMLInputElement>(null)
   useEffect(() => { ref.current?.focus() }, [])
@@ -60,7 +58,7 @@ export function TimelineQuickInput({ kind, anchorTime, parserContext, currentDom
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [parserContext.projects, parserContext.contacts, parserContext.familyMembers],
   )
-  const qp = useQuickParse(title, ctx, currentDomain)
+  const qp = useQuickParse(title, ctx)
   const p = qp.effectiveParsed
 
   // Safety net: when a typed date would move the task OFF the slot the user

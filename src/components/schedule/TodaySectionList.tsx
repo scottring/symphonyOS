@@ -97,7 +97,6 @@ export interface TodaySectionListProps {
   tasksMap: Map<string, Task>
   shareNudgeByEventId: Map<string, { eventId: string; context: string }>
   parserContext: ParserContext
-  currentDomain: 'work' | 'family' | 'personal' | 'universal'
   insert: ReturnType<typeof useTimelineInsert>
   isPromotionSuggested: (eventId: string) => boolean
   onSelectItem: (id: string | null) => void
@@ -132,7 +131,6 @@ export function TodaySectionList({
   tasksMap,
   shareNudgeByEventId,
   parserContext,
-  currentDomain,
   insert,
   isPromotionSuggested,
   onSelectItem,
@@ -313,7 +311,6 @@ export function TodaySectionList({
                       quickInput={{
                         anchorTime: computeAnchorTime(insertCtxBefore),
                         parserContext,
-                        currentDomain,
                       }}
                     />
                     </TodayGapDropZone>
@@ -601,7 +598,6 @@ export function TodaySectionList({
                       quickInput={{
                         anchorTime: computeAnchorTime(insertCtxTrailing),
                         parserContext,
-                        currentDomain,
                       }}
                     />
                     </TodayGapDropZone>

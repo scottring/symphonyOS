@@ -26,7 +26,7 @@ export function RoutineBuilderModal({ onClose, onCreated }: {
 }) {
   const { addRoutine } = useRoutines()
   const { uploadAttachment } = useAttachments()
-  const { currentDomain } = useDomain()
+  const { soleDomain } = useDomain()
   const fileRef = useRef<HTMLInputElement>(null)
 
   const [text, setText] = useState('')
@@ -65,8 +65,7 @@ export function RoutineBuilderModal({ onClose, onCreated }: {
   const create = useCallback(async () => {
     if (!proposal || proposal.steps.length === 0) return
     setPhase('creating'); setError(null)
-    const ctx = currentDomain !== 'universal' ? currentDomain : undefined
-    const parentId = await createFromProposal(proposal, addRoutine, ctx)
+    const parentId = await createFromProposal(proposal, addRoutine, soleDomain ?? undefined)
     if (!parentId) {
       setError('Creating the routine failed — nothing was saved.')
       setPhase('preview')
@@ -75,7 +74,7 @@ export function RoutineBuilderModal({ onClose, onCreated }: {
     // Source document rides along on the parent, where the panels show it.
     if (file) await uploadAttachment('routine', parentId, file)
     onCreated(parentId)
-  }, [proposal, currentDomain, addRoutine, file, uploadAttachment, onCreated])
+  }, [proposal, soleDomain, addRoutine, file, uploadAttachment, onCreated])
 
   const patchStep = (i: number, name: string) =>
     setProposal((p) => p && { ...p, steps: p.steps.map((s, j) => (j === i ? { ...s, name } : s)) })

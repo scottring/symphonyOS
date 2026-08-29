@@ -31,12 +31,12 @@ const RoutineBuilderModal = lazy(() =>
  *   :routineId   -> RoutineForm (edit)
  *
  * Mirrors the legacy ViewRouter `routines` branch. The list + create are domain
- * filtered/tagged using useDomain (the legacy `currentDomain` prop). The new
- * routine create reads the `?initial=` query param like ViewRouter did.
+ * filtered/tagged using useDomain (`soleDomain` pre-fills deliberate creates).
+ * The new routine create reads the `?initial=` query param like ViewRouter did.
  */
 function RoutinesIndex() {
   const navigate = useNavigate()
-  const { currentDomain, layers } = useDomain()
+  const { soleDomain, layers } = useDomain()
   const { routines, addRoutine, updateRoutine, deleteRoutine, loading } = useRoutines()
   const { contacts } = useContacts()
   const { members: familyMembers } = useFamilyMembers()
@@ -92,8 +92,8 @@ function RoutinesIndex() {
   // invisible in a domain-filtered list the instant it's created — the
   // "New routine button does nothing" bug (it worked; the lens hid it).
   const handleCreateCollection = useCallback(async (name: string) => {
-    return addRoutine({ name, context: currentDomain !== 'universal' ? currentDomain : undefined })
-  }, [addRoutine, currentDomain])
+    return addRoutine({ name, context: soleDomain ?? undefined })
+  }, [addRoutine, soleDomain])
 
   const handleGroupIntoCollection = useCallback(async (
     name: string,
@@ -102,13 +102,13 @@ function RoutinesIndex() {
   ) => {
     const parent = await addRoutine({
       name,
-      context: currentDomain !== 'universal' ? currentDomain : undefined,
+      context: soleDomain ?? undefined,
       time_of_day: opts?.time_of_day,
       recurrence_pattern: opts?.recurrence_pattern,
     })
     if (!parent) return
     await Promise.all(ids.map((id, i) => updateRoutine(id, { parent_routine_id: parent.id, step_order: i })))
-  }, [addRoutine, updateRoutine, currentDomain])
+  }, [addRoutine, updateRoutine, soleDomain])
 
   // Fold existing routines into an existing routine as steps, appended after
   // any steps it already has.
@@ -155,7 +155,7 @@ function RoutinesIndex() {
 function RoutineCreate() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { currentDomain } = useDomain()
+  const { soleDomain } = useDomain()
   const { contacts } = useContacts()
   const { addRoutine } = useRoutines()
 
@@ -185,7 +185,7 @@ function RoutineCreate() {
             onSave={async (input) => {
               await addRoutine({
                 ...input,
-                context: currentDomain !== 'universal' ? currentDomain : undefined,
+                context: soleDomain ?? undefined,
               })
               navigate('/routines')
             }}

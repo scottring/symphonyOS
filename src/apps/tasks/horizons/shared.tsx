@@ -188,7 +188,7 @@ export function useHorizonPageData(horizon: HorizonId, anchorDate?: Date) {
   const { hideEvent } = useHiddenCalendarEvents();
   const { getDomainForCalendar } = useCalendarDomainMappings();
   const { lists, listsByCategory } = useListsContext();
-  const { currentDomain, layers, soleDomain } = useDomain();
+  const { layers, soleDomain } = useDomain();
   const undo = useUndo();
 
   const { setSelection } = useSelection();
@@ -440,14 +440,14 @@ export function useHorizonPageData(horizon: HorizonId, anchorDate?: Date) {
           : undefined;
       await addTask(title, undefined, undefined, undefined, {
         assignedTo: getCurrentUserMember()?.id,
-        context: currentDomain !== 'universal' ? currentDomain : undefined,
+        context: undefined,
         bucket: horizonBucket ?? undefined,
         sourceId: lineage?.sourceId,
         goalId: lineage?.goalId,
         pickedAt: autoPick,
       });
     },
-    [addTask, getCurrentUserMember, currentDomain, horizonBucket, horizon],
+    [addTask, getCurrentUserMember, horizonBucket, horizon],
   );
 
   // Inline add-a-task draft for the pool section.
@@ -811,7 +811,7 @@ export function useHorizonPageData(horizon: HorizonId, anchorDate?: Date) {
     hideEvent,
     getDomainForCalendar,
     lists, listsByCategory,
-    currentDomain,
+    soleDomain,
     layers,
     undo,
     match,

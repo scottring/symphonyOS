@@ -278,11 +278,9 @@ export function TodayView({
     () => weekStartAnchor(new Date(), readCadenceConfig().weekStartsOn),
     [],
   )
-  // Current life domain (work/family/personal/universal). Read here (rather
-  // than only where inline quick-capture needs it, below) so it can feed the
-  // resolver's rung 4 directly — routines no longer arrive pre-filtered by
-  // domain from HomeView.
-  const { currentDomain, layers } = useDomain()
+  // The checked layer set — feeds the resolver's rung 4 directly (routines no
+  // longer arrive pre-filtered by domain from HomeView).
+  const { layers } = useDomain()
   const todayInput = useMemo(() => ({
     tasks,
     events,
@@ -1066,7 +1064,6 @@ export function TodayView({
               tasksMap={tasksMap}
               shareNudgeByEventId={shareNudgeByEventId}
               parserContext={parserContext}
-              currentDomain={currentDomain}
               insert={insert}
               isPromotionSuggested={isPromotionSuggested}
               onSelectItem={handleSelectItem}
@@ -1110,7 +1107,6 @@ export function TodayView({
               <TodayAddInput
                 onAdd={ctx.onCreateTaskParsed!}
                 parserContext={ctx.parserContext!}
-                currentDomain={ctx.currentDomain ?? 'universal'}
                 resolver={ctx.resolverContext!}
                 getRecentTaskForContact={ctx.getRecentTaskForContact}
               />
@@ -1121,7 +1117,6 @@ export function TodayView({
                 <TodayAddInput
                   onAdd={ctx.onCreateTaskParsed!}
                   parserContext={ctx.parserContext!}
-                  currentDomain={ctx.currentDomain ?? 'universal'}
                   resolver={ctx.resolverContext!}
                   getRecentTaskForContact={ctx.getRecentTaskForContact}
                 />

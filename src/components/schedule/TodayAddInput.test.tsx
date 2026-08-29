@@ -24,7 +24,6 @@ function setup(onAdd = vi.fn<(r: TodayCaptureResult) => void>()) {
     <TodayAddInput
       onAdd={onAdd}
       parserContext={parserContext}
-      currentDomain="personal"
       resolver={resolver}
       getRecentTaskForContact={(id) =>
         id === 'c1' ? { title: 'guitar repair follow-up', date: new Date('2026-05-26') } : null}

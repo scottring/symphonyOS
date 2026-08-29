@@ -32,7 +32,7 @@ export function SeasonPage() {
     planDisabled, handlePlan, rungName, isCascadeRung, hasExplainer,
     explainerOpen, setExplainerOpen, label, renderRow,
     seasonNotes, patchSeasonNotes, composerRef, draft, setDraft, submitDraft,
-    sharpenBet, sharpenBetLoading, goals, currentDomain, layers, areas, addGoal,
+    sharpenBet, sharpenBetLoading, goals, soleDomain, layers, areas, addGoal,
     handleLetGo, referenceFold,
     setRefOpen, setTranslatingRefId, setRefDraft,
     scheduleActionsValue, undo, domainEvents,
@@ -267,7 +267,7 @@ export function SeasonPage() {
                 // life area (movable on /goals); context follows the domain.
                 const area = [...areas].sort((a, b) => a.sortOrder - b.sortOrder)[0];
                 if (!area) return null;
-                const created = await addGoal(area.id, title, currentDomain !== 'universal' ? currentDomain : undefined);
+                const created = await addGoal(area.id, title, soleDomain ?? undefined);
                 if (!created) return null;
                 // Stamp the task↔goal link immediately — the task's fate
                 // (first move vs. shelved) is still pending, but the link

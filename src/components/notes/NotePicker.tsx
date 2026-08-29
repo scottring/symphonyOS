@@ -1,8 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from 'react'
 import type { Note } from '@/types/note'
 import type { Task } from '@/types/task'
-import type { Domain } from '@/hooks/useDomain'
-import type { Layer } from '@/lib/domains'
+import type { DomainId, Layer } from '@/lib/domains'
 import { matchesLayers } from '@/lib/today/domainFilter'
 import { useNoteSuggestion } from '@/hooks/useNoteSuggestion'
 
@@ -14,16 +13,17 @@ interface NotePickerProps {
   task: Pick<Task, 'id' | 'title' | 'notes'>
   notes: Note[]
   layers: ReadonlySet<Layer>
-  /** Deprecated shim — only used to give useNoteSuggestion's edge-function call
-   *  a single life-area label. Not used for filtering; that's `layers`. */
-  domain: Domain
+  /** The single checked domain, if exactly one — only used to give
+   *  useNoteSuggestion's edge-function call a single life-area label ('universal'
+   *  when zero-or-many are checked). Not used for filtering; that's `layers`. */
+  soleDomain: DomainId | null
   onSelect: (sel: NotePickerSelection) => void
   onClose: () => void
 }
 
 const CONFIDENCE_THRESHOLD = 0.6
 
-export function NotePicker({ task, notes, layers, domain, onSelect, onClose }: NotePickerProps) {
+export function NotePicker({ task, notes, layers, soleDomain, onSelect, onClose }: NotePickerProps) {
   const [query, setQuery] = useState('')
   const [creating, setCreating] = useState(false)
   const [newTitle, setNewTitle] = useState('')
@@ -42,7 +42,7 @@ export function NotePicker({ task, notes, layers, domain, onSelect, onClose }: N
   const { suggestion, loading } = useNoteSuggestion({
     task,
     candidateNotes: visibleNotes,
-    domain,
+    domain: soleDomain ?? 'universal',
     enabled: true,
   })
 

@@ -20,7 +20,6 @@ import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
 import { useNotes } from '@/hooks/useNotes'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
-import { useDomain } from '@/hooks/useDomain'
 import { showToast } from '@/hooks/useToast'
 
 export interface CommitPagePayload {
@@ -55,10 +54,11 @@ export function useCommitPage() {
   const { addTask } = useSupabaseTasks()
   const { addNote } = useNotes()
   const { getCurrentUserMember } = useFamilyMembers()
-  const { currentDomain } = useDomain()
 
   const commitPage = useCallback(async ({ items, notes, storagePath }: CommitPagePayload): Promise<CommitPageResult> => {
-    const context = currentDomain === 'universal' ? null : currentDomain
+    // A committed page is a capture, not a deliberate create — it never
+    // stamps the lens onto what it writes.
+    const context = null
     const commitCtx = {
       currentWeekStart: weekStartAnchor(new Date(), readCadenceConfig().weekStartsOn),
       context,
@@ -146,7 +146,7 @@ export function useCommitPage() {
     }
 
     return { tasksCreated, notesCreated, failures }
-  }, [addTask, addNote, currentDomain, getCurrentUserMember])
+  }, [addTask, addNote, getCurrentUserMember])
 
   return { commitPage }
 }
