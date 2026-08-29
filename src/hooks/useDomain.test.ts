@@ -1,47 +1,64 @@
-import { describe, it, expect } from 'vitest'
-import { resolveInitialDomain, localDayKey } from './useDomain'
+import { describe, it, expect, beforeEach } from 'vitest'
+import { renderHook, act } from '@testing-library/react'
+import { DomainProvider, useDomain, resolveInitialLayers, LAYERS_KEY } from './useDomain'
+import { ALL_LAYERS, UNSORTED } from '@/lib/domains'
 
-// The domain switcher is a LENS, but quick capture reads it as a WRITE default
-// (`context: currentDomain`, useShellChrome.ts:107). Persisting the lens
-// forever therefore silently labels weeks of captures with a choice made once
-// and forgotten — how a household routine ("Weekdays after camp: kids unpack
-// bags") ended up tagged `personal`, and so `scope: 'individual'`, invisible
-// to everyone else in the house.
+// The lens is persisted FOREVER, like a Google Calendar checkbox. That used to
+// be unsafe because quick capture stamped the lens onto new rows; captures now
+// land Unsorted, so a stale lens can't mislabel anything.
 
-describe('resolveInitialDomain', () => {
-  const TODAY = '2026-08-22'
-
-  it('keeps the lens you chose earlier the same day', () => {
-    expect(resolveInitialDomain('family', TODAY, TODAY)).toBe('family')
-    expect(resolveInitialDomain('work', TODAY, TODAY)).toBe('work')
+describe('resolveInitialLayers', () => {
+  it('defaults to every layer with nothing stored', () => {
+    expect(resolveInitialLayers(null)).toEqual(ALL_LAYERS)
   })
-
-  it('resets to universal on a new day', () => {
-    expect(resolveInitialDomain('personal', '2026-08-21', TODAY)).toBe('universal')
-    expect(resolveInitialDomain('personal', '2026-07-04', TODAY)).toBe('universal')
+  it('restores a stored subset', () => {
+    expect([...resolveInitialLayers('["work","unsorted"]')].sort()).toEqual(['unsorted', 'work'])
   })
-
-  it('resets when the day was never stamped — the pre-fix stored value', () => {
-    // Every existing install has a domain and no day. Those are exactly the
-    // stale lenses this fix exists to clear, so they must NOT be trusted.
-    expect(resolveInitialDomain('personal', null, TODAY)).toBe('universal')
-  })
-
-  it('defaults to universal with nothing stored', () => {
-    expect(resolveInitialDomain(null, null, TODAY)).toBe('universal')
-    expect(resolveInitialDomain(null, TODAY, TODAY)).toBe('universal')
+  it('falls back to all on garbage, an empty set, or unknown ids', () => {
+    expect(resolveInitialLayers('nope')).toEqual(ALL_LAYERS)
+    expect(resolveInitialLayers('[]')).toEqual(ALL_LAYERS)
+    expect(resolveInitialLayers('["bogus"]')).toEqual(ALL_LAYERS)
   })
 })
 
-describe('localDayKey', () => {
-  it('uses the LOCAL calendar day, not UTC', () => {
-    // 2026-08-22 20:30 in a UTC-5 zone is 2026-08-23 in UTC. The lens should
-    // turn over when the user's day does, not when UTC's does.
-    const evening = new Date(2026, 7, 22, 20, 30)
-    expect(localDayKey(evening)).toBe('2026-08-22')
+describe('useDomain', () => {
+  beforeEach(() => localStorage.clear())
+  const wrapper = DomainProvider
+
+  it('toggle removes and re-adds a layer, and persists', () => {
+    const { result } = renderHook(() => useDomain(), { wrapper })
+    act(() => result.current.toggle('work'))
+    expect(result.current.layers.has('work')).toBe(false)
+    expect(JSON.parse(localStorage.getItem(LAYERS_KEY)!)).not.toContain('work')
+    act(() => result.current.toggle('work'))
+    expect(result.current.layers.has('work')).toBe(true)
   })
 
-  it('zero-pads month and day', () => {
-    expect(localDayKey(new Date(2026, 0, 5))).toBe('2026-01-05')
+  it('refuses to uncheck the last layer', () => {
+    const { result } = renderHook(() => useDomain(), { wrapper })
+    act(() => result.current.only('family'))
+    act(() => result.current.toggle('family'))
+    expect([...result.current.layers]).toEqual(['family'])
+  })
+
+  it('soleDomain is the single real domain checked; unsorted does not count', () => {
+    const { result } = renderHook(() => useDomain(), { wrapper })
+    expect(result.current.soleDomain).toBeNull()
+    act(() => result.current.only('personal'))
+    expect(result.current.soleDomain).toBe('personal')
+    act(() => result.current.toggle(UNSORTED))
+    expect(result.current.soleDomain).toBe('personal')
+    act(() => result.current.toggle('work'))
+    expect(result.current.soleDomain).toBeNull()
+  })
+
+  it('transitional currentDomain mirrors soleDomain', () => {
+    const { result } = renderHook(() => useDomain(), { wrapper })
+    expect(result.current.currentDomain).toBe('universal')
+    act(() => result.current.setDomain('work'))
+    expect(result.current.currentDomain).toBe('work')
+    expect([...result.current.layers]).toEqual(['work'])
+    act(() => result.current.setDomain('universal'))
+    expect(result.current.layers).toEqual(ALL_LAYERS)
   })
 })

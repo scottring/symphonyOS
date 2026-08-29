@@ -1,88 +1,85 @@
-import { createContext, useContext, useState, useEffect } from 'react'
+import { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react'
 import type { ReactNode } from 'react'
 import type { TaskContext } from '@/types/task'
+import { ALL_LAYERS, DOMAINS, UNSORTED, type DomainId, type Layer } from '@/lib/domains'
 
+/** @deprecated transitional; the single-lens value. Removed once every consumer reads `layers`. */
 export type Domain = TaskContext | 'universal'
 
 interface DomainContextType {
-  currentDomain: Domain
-  setDomain: (domain: Domain) => void
+  /** The checked layers. Never empty. */
+  layers: ReadonlySet<Layer>
+  setLayers: (next: ReadonlySet<Layer>) => void
+  toggle: (layer: Layer) => void
+  only: (layer: Layer) => void
+  all: () => void
+  /** Exactly one real domain checked (Unsorted may ride along) → that domain. */
+  soleDomain: DomainId | null
+  /** @deprecated */ currentDomain: Domain
+  /** @deprecated */ setDomain: (domain: Domain) => void
 }
 
 const DomainContext = createContext<DomainContextType | undefined>(undefined)
 
-interface DomainProviderProps {
-  children: ReactNode
+export const LAYERS_KEY = 'symphony-layers'
+
+/** Layers persist forever, like a calendar checkbox. Anything unreadable, empty,
+ *  or unknown falls back to everything — the only default that hides nothing. */
+export function resolveInitialLayers(stored: string | null): ReadonlySet<Layer> {
+  if (!stored) return ALL_LAYERS
+  try {
+    const parsed: unknown = JSON.parse(stored)
+    if (!Array.isArray(parsed)) return ALL_LAYERS
+    const valid = parsed.filter((x): x is Layer => ALL_LAYERS.has(x as Layer))
+    return valid.length > 0 ? new Set(valid) : ALL_LAYERS
+  } catch {
+    return ALL_LAYERS
+  }
 }
 
-const DOMAIN_KEY = 'symphony-current-domain'
-const DOMAIN_DAY_KEY = 'symphony-current-domain-day'
-
-/** Local calendar day, not UTC — the lens should reset when YOUR day turns. */
-export function localDayKey(now: Date): string {
-  const y = now.getFullYear()
-  const m = String(now.getMonth() + 1).padStart(2, '0')
-  const d = String(now.getDate()).padStart(2, '0')
-  return `${y}-${m}-${d}`
+export function soleDomainOf(layers: ReadonlySet<Layer>): DomainId | null {
+  const real = DOMAINS.map((d) => d.id).filter((id) => layers.has(id))
+  return real.length === 1 ? real[0] : null
 }
 
-/**
- * The domain the app should open with.
- *
- * The lens used to persist forever. That is fine as a VIEW — but quick capture
- * stamps `context: currentDomain` onto whatever you type
- * (useShellChrome.ts:107), so a lens left on Personal three weeks ago quietly
- * labels every capture since as personal. That is how "Weekdays after camp:
- * kids unpack bags" — a household routine — ended up tagged `personal` and
- * therefore `scope: 'individual'`, invisible to the rest of the house.
- *
- * A choice is worth remembering for the rest of the day you made it in and no
- * longer. Come back tomorrow and you are looking at your whole life again,
- * which is the only default that cannot silently mislabel anything.
- */
-export function resolveInitialDomain(
-  stored: string | null,
-  storedDay: string | null,
-  today: string,
-): Domain {
-  if (!stored) return 'universal'
-  if (storedDay !== today) return 'universal'
-  return stored as Domain
-}
-
-export function DomainProvider({ children }: DomainProviderProps) {
-  const [currentDomain, setCurrentDomain] = useState<Domain>(() => {
-    try {
-      return resolveInitialDomain(
-        localStorage.getItem(DOMAIN_KEY),
-        localStorage.getItem(DOMAIN_DAY_KEY),
-        localDayKey(new Date()),
-      )
-    } catch {
-      return 'universal'
-    }
+export function DomainProvider({ children }: { children: ReactNode }) {
+  const [layers, setLayersState] = useState<ReadonlySet<Layer>>(() => {
+    try { return resolveInitialLayers(localStorage.getItem(LAYERS_KEY)) } catch { return ALL_LAYERS }
   })
 
   useEffect(() => {
-    // Stamp the day alongside the choice, so tomorrow's load can tell that
-    // this was yesterday's lens rather than a fresh one.
-    try {
-      localStorage.setItem(DOMAIN_KEY, currentDomain)
-      localStorage.setItem(DOMAIN_DAY_KEY, localDayKey(new Date()))
-    } catch { /* ignore */ }
-  }, [currentDomain])
+    try { localStorage.setItem(LAYERS_KEY, JSON.stringify([...layers])) } catch { /* ignore */ }
+  }, [layers])
 
-  return (
-    <DomainContext.Provider value={{ currentDomain, setDomain: setCurrentDomain }}>
-      {children}
-    </DomainContext.Provider>
-  )
+  const setLayers = useCallback((next: ReadonlySet<Layer>) => {
+    if (next.size > 0) setLayersState(new Set(next))
+  }, [])
+  const toggle = useCallback((layer: Layer) => {
+    setLayersState((prev) => {
+      const next = new Set(prev)
+      if (next.has(layer)) { if (next.size === 1) return prev; next.delete(layer) } else next.add(layer)
+      return next
+    })
+  }, [])
+  const only = useCallback((layer: Layer) => setLayersState(new Set([layer])), [])
+  const all = useCallback(() => setLayersState(ALL_LAYERS), [])
+
+  const value = useMemo<DomainContextType>(() => {
+    const soleDomain = soleDomainOf(layers)
+    return {
+      layers, setLayers, toggle, only, all, soleDomain,
+      currentDomain: soleDomain ?? 'universal',
+      setDomain: (d) => (d === 'universal' ? all() : only(d)),
+    }
+  }, [layers, setLayers, toggle, only, all])
+
+  return <DomainContext.Provider value={value}>{children}</DomainContext.Provider>
 }
 
 export function useDomain() {
   const context = useContext(DomainContext)
-  if (!context) {
-    throw new Error('useDomain must be used within DomainProvider')
-  }
+  if (!context) throw new Error('useDomain must be used within DomainProvider')
   return context
 }
+
+export { UNSORTED }
