@@ -5,6 +5,7 @@
 import { createMockRoutine } from '@/test/mocks/factories'
 import type { Routine } from '@/types/actionable'
 import type { ResolveRoutineCtx, RoutineHideReason } from '@/lib/routineUtils'
+import { ALL_LAYERS } from '@/lib/domains'
 
 /** Monday 2026-08-24. Fixed so the corpus never rots on the wall clock. */
 export const CORPUS_DATE = new Date(2026, 7, 24, 9, 0, 0)
@@ -19,7 +20,7 @@ export interface CorpusRow {
   expected: RoutineHideReason
 }
 
-const DEFAULT_PREFS = { hideRoutines: false, domain: 'universal' as const }
+const DEFAULT_PREFS = { hideRoutines: false, layers: ALL_LAYERS }
 const base = (o: Partial<Routine> = {}) => createMockRoutine({ context: 'family', ...o })
 const ctx = (o: Partial<ResolveRoutineCtx> = {}): ResolveRoutineCtx => ({
   date: CORPUS_DATE,
@@ -137,7 +138,7 @@ export const VISIBILITY_CORPUS: CorpusRow[] = [
   {
     label: 'date: null still hides an other-domain routine — rung 4 is unaffected',
     routine: base({ recurrence_pattern: { type: 'weekly', days: ['tue'] }, context: 'work' }),
-    ctx: ctx({ date: null, prefs: { hideRoutines: false, domain: 'family' } }),
+    ctx: ctx({ date: null, prefs: { hideRoutines: false, layers: new Set(['family']) } }),
     expected: 'other-domain',
   },
   {
@@ -154,13 +155,13 @@ export const VISIBILITY_CORPUS: CorpusRow[] = [
   {
     label: 'date: null with hideRoutines sweeps an everyday routine — rung 7 is unaffected',
     routine: base({ recurrence_pattern: { type: 'daily' } }),
-    ctx: ctx({ date: null, prefs: { hideRoutines: true, domain: 'universal' } }),
+    ctx: ctx({ date: null, prefs: { hideRoutines: true, layers: ALL_LAYERS } }),
     expected: 'everyday',
   },
   {
     label: 'date: null with hideRoutines still shows a pinned everyday routine — the rung 7 exemption holds',
     routine: base({ recurrence_pattern: { type: 'daily' }, pin_to_timeline: true }),
-    ctx: ctx({ date: null, prefs: { hideRoutines: true, domain: 'universal' } }),
+    ctx: ctx({ date: null, prefs: { hideRoutines: true, layers: ALL_LAYERS } }),
     expected: 'shows',
   },
 
@@ -169,7 +170,7 @@ export const VISIBILITY_CORPUS: CorpusRow[] = [
   {
     label: 'off beats other-domain — rung 3 wins',
     routine: base({ show_on_timeline: false, context: 'work' }),
-    ctx: ctx({ prefs: { hideRoutines: false, domain: 'family' } }),
+    ctx: ctx({ prefs: { hideRoutines: false, layers: new Set(['family']) } }),
     expected: 'off',
   },
 
@@ -177,13 +178,13 @@ export const VISIBILITY_CORPUS: CorpusRow[] = [
   {
     label: 'work routine under the family lens',
     routine: base({ context: 'work' }),
-    ctx: ctx({ prefs: { hideRoutines: false, domain: 'family' } }),
+    ctx: ctx({ prefs: { hideRoutines: false, layers: new Set(['family']) } }),
     expected: 'other-domain',
   },
   {
     label: 'untagged routine under a specific lens — exact match only',
     routine: base({ context: null }),
-    ctx: ctx({ prefs: { hideRoutines: false, domain: 'family' } }),
+    ctx: ctx({ prefs: { hideRoutines: false, layers: new Set(['family']) } }),
     expected: 'other-domain',
   },
   {
@@ -253,7 +254,7 @@ export const VISIBILITY_CORPUS: CorpusRow[] = [
   {
     label: 'in-collection beats everyday — rung 6 wins',
     routine: base({ parent_routine_id: 'parent-1', recurrence_pattern: { type: 'daily' } }),
-    ctx: ctx({ prefs: { hideRoutines: true, domain: 'universal' } }),
+    ctx: ctx({ prefs: { hideRoutines: true, layers: ALL_LAYERS } }),
     expected: 'in-collection',
   },
 
@@ -261,31 +262,31 @@ export const VISIBILITY_CORPUS: CorpusRow[] = [
   {
     label: 'daily routine swept by hide-daily',
     routine: base({ recurrence_pattern: { type: 'daily' } }),
-    ctx: ctx({ prefs: { hideRoutines: true, domain: 'universal' } }),
+    ctx: ctx({ prefs: { hideRoutines: true, layers: ALL_LAYERS } }),
     expected: 'everyday',
   },
   {
     label: 'weekday-only weekly counts as everyday',
     routine: base({ recurrence_pattern: { type: 'weekly', days: ['mon', 'tue', 'wed', 'thu', 'fri'] } }),
-    ctx: ctx({ prefs: { hideRoutines: true, domain: 'universal' } }),
+    ctx: ctx({ prefs: { hideRoutines: true, layers: ALL_LAYERS } }),
     expected: 'everyday',
   },
   {
     label: 'pin_to_timeline survives hide-daily',
     routine: base({ recurrence_pattern: { type: 'daily' }, pin_to_timeline: true }),
-    ctx: ctx({ prefs: { hideRoutines: true, domain: 'universal' } }),
+    ctx: ctx({ prefs: { hideRoutines: true, layers: ALL_LAYERS } }),
     expected: 'shows',
   },
   {
     label: 'a dosed routine survives hide-daily',
     routine: base({ recurrence_pattern: { type: 'daily' }, times_per_day: ['08:00', '20:00'] }),
-    ctx: ctx({ prefs: { hideRoutines: true, domain: 'universal' } }),
+    ctx: ctx({ prefs: { hideRoutines: true, layers: ALL_LAYERS } }),
     expected: 'shows',
   },
   {
     label: 'a low-frequency routine is never swept',
     routine: base({ recurrence_pattern: { type: 'weekly', days: ['mon'] } }),
-    ctx: ctx({ prefs: { hideRoutines: true, domain: 'universal' } }),
+    ctx: ctx({ prefs: { hideRoutines: true, layers: ALL_LAYERS } }),
     expected: 'shows',
   },
   {

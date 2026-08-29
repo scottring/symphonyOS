@@ -1,5 +1,6 @@
 import type { Routine, RecurrencePattern } from '@/types/actionable'
-import type { PlanningDomain } from '@/lib/today/domainFilter'
+import { matchesLayers } from '@/lib/today/domainFilter'
+import type { Layer } from '@/lib/domains'
 import type { AssigneeFilter } from '@/lib/today/types'
 
 const WEEKDAYS = ['mon', 'tue', 'wed', 'thu', 'fri'] as const
@@ -218,8 +219,8 @@ export type RoutineHideReason =
 export interface RoutinePrefs {
   /** The "hide daily routines" toggle (rung 7). */
   hideRoutines: boolean
-  /** The active domain lens (rung 4). 'universal' makes rung 4 a no-op. */
-  domain: PlanningDomain
+  /** The checked layers (rung 4). Unsorted is a layer, not a wildcard. */
+  layers: ReadonlySet<Layer>
 }
 
 export interface ResolveRoutineCtx {
@@ -307,7 +308,7 @@ export function resolveRoutine(routine: Routine, ctx: ResolveRoutineCtx): Routin
     return hide('not-today')
   }
   if (routine.show_on_timeline === false) return hide('off')
-  if (ctx.prefs.domain !== 'universal' && routine.context !== ctx.prefs.domain) return hide('other-domain')
+  if (!matchesLayers(routine.context, ctx.prefs.layers)) return hide('other-domain')
   if (!matchesOwners(owners, ctx.member)) return hide('not-theirs')
   if (routine.parent_routine_id != null) return hide('in-collection')
   if (ctx.prefs.hideRoutines && isEverydayRoutine(routine.recurrence_pattern) && !isPinnedToTimeline(routine)) {

@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { useGoogleCalendar } from '@/hooks/useGoogleCalendar'
 import { useAuth } from '@/hooks/useAuth'
 import { resolveRoutine, effectiveTimeOfDay, type LastCompletionMap } from '@/lib/routineUtils'
+import type { Layer } from '@/lib/domains'
 import {
   taskToTimelineItem,
   eventToTimelineItem,
@@ -20,6 +21,10 @@ import type { FamilyMember } from '@/types/family'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 
 export const WALL_POLL_INTERVAL_MS = 12 * 60 * 1000 // 12 minutes — wall is glanceable, not live
+
+// The wall shows only the Family layer — it has no domain-lens UI of its own
+// (see resolveRoutine's rung 4 call below).
+const FAMILY_LAYER: ReadonlySet<Layer> = new Set(['family'])
 
 // Only the columns the wall actually renders. Avoids `select('*')`, which pulls
 // heavy/unused columns (links jsonb, codes, etc.) on every poll and dominates egress.
@@ -331,7 +336,7 @@ export function useWallData(): UseWallDataReturn {
               { ...r, show_on_timeline: true, parent_routine_id: null },
               {
                 date,
-                prefs: { hideRoutines: false, domain: 'family' },
+                prefs: { hideRoutines: false, layers: FAMILY_LAYER },
                 lastCompletedAt: lastCompletionByRoutine.get(r.id) ?? null,
               },
             ).shows,

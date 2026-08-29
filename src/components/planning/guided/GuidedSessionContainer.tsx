@@ -60,7 +60,7 @@ export function GuidedSessionContainer({ horizon, onClose, onFinished, onChain, 
   const { routines: allRoutines, getRoutinesForDate } = useRoutines()
   const { upkeepItems, upkeepLoading, ensureUpkeepList } = useUpkeepList()
   const { getCurrentUserMember } = useFamilyMembers()
-  const { currentDomain } = useDomain()
+  const { currentDomain, layers } = useDomain()
   const { getDomainForCalendar } = useCalendarDomainMappings()
 
   // Domain scoping — the ONE place the session pool narrows. Every step reads
@@ -176,12 +176,12 @@ export function GuidedSessionContainer({ horizon, onClose, onFinished, onChain, 
     // date-agnostic question so this call site can't accidentally pass a
     // real date and get the wrong rung-2 behavior with no type error).
     draggableRoutines: allRoutines.filter(
-      (r) => isDraggableRoutine(r) && resolveRoutineEligible(r, { prefs: { hideRoutines: true, domain: currentDomain } }).shows,
+      (r) => isDraggableRoutine(r) && resolveRoutineEligible(r, { prefs: { hideRoutines: true, layers } }).shows,
     ),
     onScheduleRoutine,
     getRoutinesForDate: domainGetRoutinesForDate,
     upkeepItems, upkeepLoading, ensureUpkeepList,
-  }), [domainTasks, tasksLoading, domainEvents, isConnected, calendarChecking, domainFetchEvents, createEvent, pushTaskStamped, setBucketStamped, toggleTask, deleteTask, updateTask, createTaskInBucket, createDatedTask, domainProjects, projectsMap, domainGoals, areas, addGoal, addArea, updateGoal, domainRoutines, allRoutines, onScheduleRoutine, domainGetRoutinesForDate, currentDomain, upkeepItems, upkeepLoading, ensureUpkeepList])
+  }), [domainTasks, tasksLoading, domainEvents, isConnected, calendarChecking, domainFetchEvents, createEvent, pushTaskStamped, setBucketStamped, toggleTask, deleteTask, updateTask, createTaskInBucket, createDatedTask, domainProjects, projectsMap, domainGoals, areas, addGoal, addArea, updateGoal, domainRoutines, allRoutines, onScheduleRoutine, domainGetRoutinesForDate, currentDomain, layers, upkeepItems, upkeepLoading, ensureUpkeepList])
 
   return <GuidedSession horizon={horizon} domain={currentDomain} host={host} onClose={onClose} onFinished={onFinished} onChain={onChain} />
 }

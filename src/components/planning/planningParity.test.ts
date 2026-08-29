@@ -3,6 +3,7 @@ import { VISIBILITY_CORPUS, CORPUS_DATE } from '@/lib/routineVisibility.fixtures
 import { recordVisible } from '@/lib/today/surfaceParity'
 import { isEverydayRoutine, matchesRecurrenceForDate, resolveRoutine } from '@/lib/routineUtils'
 import type { Routine } from '@/types/actionable'
+import { ALL_LAYERS } from '@/lib/domains'
 
 // WHAT THIS FILE PROVES, AND WHAT IT DOES NOT.
 //
@@ -21,7 +22,7 @@ import type { Routine } from '@/types/actionable'
 // instead, under "PlanningSession — resolveRoutine wiring (rendered)".
 
 const ROUTINES = VISIBILITY_CORPUS.map((r) => r.routine)
-const PREFS = { hideRoutines: false, domain: 'universal' as const }
+const PREFS = { hideRoutines: false, layers: ALL_LAYERS }
 
 /**
  * PlanningSession's `routinesByDate` filter chain as it existed before this

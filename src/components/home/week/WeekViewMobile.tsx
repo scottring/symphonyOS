@@ -5,7 +5,7 @@ import type { Routine } from '@/types/actionable'
 import { readHideRoutines, onHideRoutinesChange } from '@/lib/hideRoutinesSignal'
 import { resolveRoutine } from '@/lib/routineUtils'
 import type { AssigneeFilter } from '@/lib/today/types'
-import type { PlanningDomain } from '@/lib/today/domainFilter'
+import type { Layer } from '@/lib/domains'
 
 interface WeekViewMobileProps {
   tasks: Task[]
@@ -16,8 +16,8 @@ interface WeekViewMobileProps {
   dayCount?: 5 | 7
   /** Multi-select assignee filter (rung 5). */
   selectedAssignees?: AssigneeFilter
-  /** The active domain lens (rung 4). Defaults to 'universal' (no-op). */
-  currentDomain?: PlanningDomain
+  /** The checked layers (rung 4). Unsorted is a layer, not a wildcard. */
+  layers: ReadonlySet<Layer>
   onSelectItem: (id: string) => void
 }
 
@@ -36,7 +36,7 @@ export function WeekViewMobile({
   weekStart,
   dayCount = 7,
   selectedAssignees,
-  currentDomain = 'universal',
+  layers,
   onSelectItem,
 }: WeekViewMobileProps) {
   const weekEnd = useMemo(() => {
@@ -94,7 +94,7 @@ export function WeekViewMobile({
       const d = new Date(weekStartMidnight)
       d.setDate(d.getDate() + i)
       for (const r of routines) {
-        if (!resolveRoutine(r, { date: d, member: selectedAssignees, prefs: { hideRoutines, domain: currentDomain } }).shows) {
+        if (!resolveRoutine(r, { date: d, member: selectedAssignees, prefs: { hideRoutines, layers } }).shows) {
           continue
         }
         const time = r.time_of_day ?? null
@@ -119,7 +119,7 @@ export function WeekViewMobile({
 
     return buckets
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tasks, events, routines, weekStart, dayCount, hideRoutines, selectedAssignees, currentDomain])
+  }, [tasks, events, routines, weekStart, dayCount, hideRoutines, selectedAssignees, layers])
 
   const dayName = (i: number) => {
     const d = new Date(weekStart)

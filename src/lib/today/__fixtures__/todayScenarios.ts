@@ -3,6 +3,7 @@ import type { Task } from '@/types/task'
 import type { TodayDataInput } from '../types'
 import type { DaySection } from '@/lib/timeUtils'
 import { sundayOfWeek } from '@/lib/weekHelpers'
+import { ALL_LAYERS } from '@/lib/domains'
 
 const TODAY = new Date()
 TODAY.setHours(0, 0, 0, 0)
@@ -25,7 +26,7 @@ export const mixedDayInput: TodayDataInput = {
       completed: true, updatedAt: new Date() }),
   ],
   events: [], routines: [], dateInstances: [],
-  viewedDate: new Date(), selectedAssignee: null, hideRoutines: false, domain: 'universal',
+  viewedDate: new Date(), selectedAssignee: null, hideRoutines: false, layers: ALL_LAYERS,
   weekStart: sundayOfWeek(TODAY),
 }
 

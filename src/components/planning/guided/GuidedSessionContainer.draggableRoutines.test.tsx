@@ -3,6 +3,7 @@ import { render, screen } from '@/test/test-utils'
 import type { ReactNode } from 'react'
 import { createMockRoutine, resetIdCounter } from '@/test/mocks/factories'
 import type { Routine } from '@/types/actionable'
+import { ALL_LAYERS } from '@/lib/domains'
 
 // GuidedSessionContainer.pickedAt.test.tsx already notes the container is
 // hard to mount whole (it wires ~9 app-level hooks and a multi-step wizard),
@@ -56,7 +57,7 @@ vi.mock('@/hooks/useDomain', () => ({
   // test-utils.tsx's AllTheProviders wraps every render in the real
   // DomainProvider, so the mock has to keep providing one too.
   DomainProvider: ({ children }: { children: ReactNode }) => children,
-  useDomain: () => ({ currentDomain: 'universal' }),
+  useDomain: () => ({ currentDomain: 'universal', layers: ALL_LAYERS }),
 }))
 vi.mock('@/hooks/useCalendarDomainMappings', () => ({
   useCalendarDomainMappings: () => ({ getDomainForCalendar: () => null }),

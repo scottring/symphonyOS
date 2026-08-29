@@ -50,7 +50,7 @@ export function computeTodayData(input: TodayDataInput): TodayData {
   const routineCtx: ResolveRoutineCtx = {
     date: input.viewedDate,
     member: input.selectedAssignee,
-    prefs: { hideRoutines: input.hideRoutines, domain: input.domain },
+    prefs: { hideRoutines: input.hideRoutines, layers: input.layers },
     // A routine dragged onto this date from another day keeps its own
     // recurrence pattern (see routineTime.ts) — rung 2 would otherwise call
     // it 'not-today' and drop it. deferredInRoutineIds is the same

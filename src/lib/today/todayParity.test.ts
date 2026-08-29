@@ -7,6 +7,8 @@ import { getRoutinesForDatePure, isEverydayRoutine } from '@/lib/routineUtils'
 import { selectVisibleRoutines } from './statusMaps'
 import type { Routine } from '@/types/actionable'
 import type { ResolveRoutineCtx } from '@/lib/routineUtils'
+import { ALL_LAYERS, DOMAINS, type Layer } from '@/lib/domains'
+import type { PlanningDomain } from './domainFilter'
 
 // WHAT THIS TEST PROVES, AND WHAT IT DOES NOT.
 //
@@ -30,6 +32,19 @@ import type { ResolveRoutineCtx } from '@/lib/routineUtils'
 // divergences and two of which were artifacts of comparing the wrong two
 // things — see KNOWN_DIVERGENCES and the note below it.)
 
+// Domain-layers Task 6 replaced ResolveRoutineCtx.prefs.domain with
+// prefs.layers, so the frozen legacy pipeline below (which still calls the
+// OLD single-domain filterRoutinesForDomain) needs a bridge back to
+// PlanningDomain. This is a type-only adapter, not a pipeline-logic change —
+// every corpus row's layers value is either ALL_LAYERS (universal) or a
+// single checked domain, both of which round-trip losslessly.
+function legacyDomainOf(layers: ReadonlySet<Layer>): PlanningDomain {
+  if (layers.size === ALL_LAYERS.size) return 'universal'
+  const domain = DOMAINS.map((d) => d.id).find((id) => layers.has(id))
+  if (!domain) throw new Error('legacyDomainOf: no domain in layer set')
+  return domain
+}
+
 // The Today pipeline as it exists BEFORE migration, reassembled here from the
 // six files it is spread across.
 //
@@ -49,7 +64,7 @@ function todayPipelineBefore(routines: Routine[], ctx: ResolveRoutineCtx): Routi
   const forDate = getRoutinesForDatePure(active, ctx.date, lastMap)
 
   // HomeView.filteredRoutines
-  const domained = filterRoutinesForDomain(forDate, ctx.prefs.domain)
+  const domained = filterRoutinesForDomain(forDate, legacyDomainOf(ctx.prefs.layers))
 
   // statusMaps.selectVisibleRoutines, inlined as of 2026-08-26
   const showable = domained.filter((r) => r.show_on_timeline !== false)

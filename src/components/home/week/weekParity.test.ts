@@ -3,9 +3,10 @@ import { VISIBILITY_CORPUS, CORPUS_DATE } from '@/lib/routineVisibility.fixtures
 import { recordVisible } from '@/lib/today/surfaceParity'
 import { isEverydayRoutine, matchesRecurrenceForDate, resolveRoutine } from '@/lib/routineUtils'
 import type { Routine } from '@/types/actionable'
+import { ALL_LAYERS } from '@/lib/domains'
 
 const ROUTINES = VISIBILITY_CORPUS.map((r) => r.routine)
-const PREFS = { hideRoutines: false, domain: 'universal' as const }
+const PREFS = { hideRoutines: false, layers: ALL_LAYERS }
 
 /** WeekViewV2's routine filter as it exists before migration. */
 function weekGridBefore(routines: Routine[], hideRoutines: boolean): Routine[] {

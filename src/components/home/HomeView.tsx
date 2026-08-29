@@ -74,7 +74,7 @@ export function HomeView({
   const currentView = fixedView ?? hookView
   const isMobile = useMobile()
   const { currentAction, pushAction, executeUndo, dismiss } = useUndo()
-  const { currentDomain } = useDomain()
+  const { currentDomain, layers } = useDomain()
 
   // Filter tasks, routines, projects, and events by current domain.
   // Task scoping lives in filterTasksForDomainView (shared with the Time-block
@@ -265,7 +265,7 @@ export function HomeView({
           onMonthChange={setMonthStart}
           onSelectDay={handleSelectDay}
           selectedAssignee={selectedAssigneeForSchedule}
-          currentDomain={currentDomain}
+          layers={layers}
           eventNotesMap={ctx.eventNotesMap}
         />
       )
@@ -289,7 +289,7 @@ export function HomeView({
             onWeekChange={(d) => setWeekStart(sundayOfWeek(d))}
             selectedAssignee={selectedAssigneeForSchedule}
             selectedAssignees={selectedAssignees}
-            currentDomain={currentDomain}
+            layers={layers}
             onSelectItem={onSelectItem}
             onUpdateTask={ctx.onUpdateTask ?? (() => {})}
             onUpdateRoutine={ctx.onUpdateRoutine ?? (() => {})}
@@ -303,7 +303,7 @@ export function HomeView({
             weekStart={mondayStart}
             dayCount={5}
             selectedAssignees={selectedAssignees}
-            currentDomain={currentDomain}
+            layers={layers}
             onSelectItem={onSelectItem}
           />
         </>
@@ -323,7 +323,7 @@ export function HomeView({
             onWeekChange={setWeekStart}
             onSelectDay={handleSelectDay}
             selectedAssignee={selectedAssigneeForSchedule}
-            currentDomain={currentDomain}
+            layers={layers}
             eventNotesMap={ctx.eventNotesMap}
           />
         )
@@ -339,7 +339,7 @@ export function HomeView({
             onWeekChange={(d) => setWeekStart(sundayOfWeek(d))}
             selectedAssignee={selectedAssigneeForSchedule}
             selectedAssignees={selectedAssignees}
-            currentDomain={currentDomain}
+            layers={layers}
             onSelectItem={onSelectItem}
             onUpdateTask={ctx.onUpdateTask ?? (() => {})}
             onUpdateRoutine={ctx.onUpdateRoutine ?? (() => {})}
@@ -352,7 +352,7 @@ export function HomeView({
             routines={allActiveRoutines}
             weekStart={weekStart}
             selectedAssignees={selectedAssignees}
-            currentDomain={currentDomain}
+            layers={layers}
             onSelectItem={onSelectItem}
           />
         </>
@@ -384,7 +384,7 @@ export function HomeView({
           contactsMap={ctx.contactsMap}
           projectsMap={ctx.projectsMap}
           eventNotesMap={ctx.eventNotesMap}
-          currentDomain={currentDomain}
+          layers={layers}
           familyMembers={ctx.familyMembers}
           selectedAssignees={selectedAssignees}
           onSelectAssignees={setSelectedAssignees}

@@ -10,7 +10,7 @@ import { taskToTimelineItem, eventToTimelineItem, routineToTimelineItem } from '
 import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
 import { resolveRoutine } from '@/lib/routineUtils'
 import { readHideRoutines, onHideRoutinesChange } from '@/lib/hideRoutinesSignal'
-import type { PlanningDomain } from '@/lib/today/domainFilter'
+import type { Layer } from '@/lib/domains'
 
 // Inline SVG icons
 function ChevronLeftIcon({ className }: { className?: string }) {
@@ -38,8 +38,8 @@ interface WeekViewProps {
   onWeekChange: (date: Date) => void
   onSelectDay: (date: Date) => void
   selectedAssignee?: string | null  // null = "All", "unassigned" = unassigned only
-  /** The active domain lens (rung 4). Defaults to 'universal' (no-op). */
-  currentDomain?: PlanningDomain
+  /** The checked layers (rung 4). Unsorted is a layer, not a wildcard. */
+  layers: ReadonlySet<Layer>
   eventNotesMap?: Map<string, { assignedTo?: string | null }>
 }
 
@@ -191,7 +191,7 @@ export function WeekView({
   onWeekChange,
   onSelectDay,
   selectedAssignee,
-  currentDomain = 'universal',
+  layers,
   eventNotesMap,
 }: WeekViewProps) {
   // Respect the app-wide 'Hide daily activities' toggle (same localStorage key
@@ -251,7 +251,7 @@ export function WeekView({
         resolveRoutine(r, {
           date,
           member: selectedAssignee ?? null,
-          prefs: { hideRoutines, domain: currentDomain },
+          prefs: { hideRoutines, layers },
         }).shows
       )
 
@@ -290,7 +290,7 @@ export function WeekView({
     }
 
     return days
-  }, [weekStart, tasks, events, routines, dateInstances, selectedAssignee, currentDomain, eventNotesMap, hideRoutines])
+  }, [weekStart, tasks, events, routines, dateInstances, selectedAssignee, layers, eventNotesMap, hideRoutines])
 
   // Format week label
   const weekLabel = useMemo(() => {

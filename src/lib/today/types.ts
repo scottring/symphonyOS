@@ -5,7 +5,7 @@ import type { TimelineItem } from '@/types/timeline'
 import type { DaySection } from '@/lib/timeUtils'
 import type { Contact } from '@/types/contact'
 import type { AttentionItem } from './attention'
-import type { PlanningDomain } from './domainFilter'
+import type { Layer } from '@/lib/domains'
 
 // A single selected id, an array of selected ids (multi-select / union), or
 // null/undefined/[] meaning "everyone". The pseudo-id 'unassigned' is allowed.
@@ -19,8 +19,8 @@ export interface TodayDataInput {
   viewedDate: Date
   selectedAssignee: AssigneeFilter
   hideRoutines: boolean
-  /** The active domain lens. Universal shows every life area. */
-  domain: PlanningDomain
+  /** The checked layers. Unsorted is a layer, not a wildcard. */
+  layers: ReadonlySet<Layer>
   eventNotesMap?: Map<string, { notes?: string; assignedTo?: string | null }>
   eventContextOverrides?: Map<string, 'work' | 'family' | 'personal'>
   getDomainForCalendar?: (calendarId?: string, calendarName?: string) => 'work' | 'family' | 'personal' | null

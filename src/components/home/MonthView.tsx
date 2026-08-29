@@ -5,7 +5,7 @@ import type { Routine, ActionableInstance } from '@/types/actionable'
 import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
 import { resolveRoutine } from '@/lib/routineUtils'
 import { readHideRoutines, onHideRoutinesChange } from '@/lib/hideRoutinesSignal'
-import type { PlanningDomain } from '@/lib/today/domainFilter'
+import type { Layer } from '@/lib/domains'
 
 // Inline SVG icons
 function ChevronLeftIcon({ className }: { className?: string }) {
@@ -33,8 +33,8 @@ interface MonthViewProps {
   onMonthChange: (date: Date) => void
   onSelectDay: (date: Date) => void
   selectedAssignee?: string | null
-  /** The active domain lens (rung 4). Defaults to 'universal' (no-op). */
-  currentDomain?: PlanningDomain
+  /** The checked layers (rung 4). Unsorted is a layer, not a wildcard. */
+  layers: ReadonlySet<Layer>
   eventNotesMap?: Map<string, { assignedTo?: string | null }>
 }
 
@@ -112,7 +112,7 @@ export function MonthView({
   onMonthChange,
   onSelectDay,
   selectedAssignee,
-  currentDomain = 'universal',
+  layers,
   eventNotesMap,
 }: MonthViewProps) {
   // Respect the app-wide 'Hide daily activities' toggle (same localStorage key
@@ -177,7 +177,7 @@ export function MonthView({
         resolveRoutine(r, {
           date,
           member: selectedAssignee ?? null,
-          prefs: { hideRoutines, domain: currentDomain },
+          prefs: { hideRoutines, layers },
         }).shows
       ).length
 
@@ -195,7 +195,7 @@ export function MonthView({
     }
 
     return days
-  }, [monthStart, tasks, events, routines, dateInstances, selectedAssignee, currentDomain, eventNotesMap, hideRoutines])
+  }, [monthStart, tasks, events, routines, dateInstances, selectedAssignee, layers, eventNotesMap, hideRoutines])
 
   // Format month label
   const monthLabel = useMemo(() => {

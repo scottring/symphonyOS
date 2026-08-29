@@ -4,6 +4,7 @@ import { render } from '@/test/test-utils'
 import { WeekViewMobile } from './WeekViewMobile'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine } from '@/types/actionable'
+import { ALL_LAYERS } from '@/lib/domains'
 
 const baseProps = {
   tasks: [],
@@ -11,6 +12,7 @@ const baseProps = {
   routines: [],
   weekStart: new Date(2026, 4, 17),
   onSelectItem: vi.fn(),
+  layers: ALL_LAYERS,
 }
 
 describe('WeekViewMobile', () => {
@@ -52,6 +54,7 @@ describe('WeekViewMobile', () => {
         routines={[]}
         weekStart={monday}
         onSelectItem={() => {}}
+        layers={ALL_LAYERS}
       />
     )
     expect(screen.getByText('Standup')).toBeInTheDocument()
@@ -73,6 +76,7 @@ describe('WeekViewMobile', () => {
         routines={routines}
         weekStart={monday}
         onSelectItem={() => {}}
+        layers={ALL_LAYERS}
       />
     )
     const matches = screen.getAllByText('Morning meds')
@@ -107,6 +111,7 @@ describe('WeekViewMobile', () => {
         weekStart={monday}
         selectedAssignees={['scott']}
         onSelectItem={() => {}}
+        layers={ALL_LAYERS}
       />
     )
     // Scott's own routine still renders on every day...
@@ -125,6 +130,7 @@ describe('WeekViewMobile', () => {
         weekStart={monday}
         dayCount={5}
         onSelectItem={() => {}}
+        layers={ALL_LAYERS}
       />
     )
     // Sat (May 23) and Sun (May 24) should not appear

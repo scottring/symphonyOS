@@ -25,7 +25,7 @@ import { Eye, EyeOff } from 'lucide-react'
 import { readHideRoutines, writeHideRoutines, onHideRoutinesChange } from '@/lib/hideRoutinesSignal'
 import { resolveRoutine } from '@/lib/routineUtils'
 import type { AssigneeFilter } from '@/lib/today/types'
-import type { PlanningDomain } from '@/lib/today/domainFilter'
+import type { Layer } from '@/lib/domains'
 
 const EDGE_PX = 40
 
@@ -42,8 +42,8 @@ interface WeekViewV2Props {
   /** Multi-select assignee filter (rung 5). Superset of `selectedAssignee`;
    *  when provided it drives resolveRoutine directly. */
   selectedAssignees?: AssigneeFilter
-  /** The active domain lens (rung 4). Defaults to 'universal' (no-op). */
-  currentDomain?: PlanningDomain
+  /** The checked layers (rung 4). Unsorted is a layer, not a wildcard. */
+  layers: ReadonlySet<Layer>
   onSelectItem: (id: string | null) => void
   onUpdateTask: (taskId: string, updates: Partial<Task>) => Promise<void> | void
   onUpdateEvent: (eventId: string, updates: { startTime: Date; endTime: Date }) => Promise<void> | void
@@ -62,7 +62,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
     weekStart,
     onWeekChange,
     selectedAssignees,
-    currentDomain = 'universal',
+    layers,
     onSelectItem,
     onUpdateTask,
     onUpdateEvent,
@@ -240,7 +240,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
       Array.from({ length: dayCount }, (_, i) => {
         const d = new Date(weekStart)
         d.setDate(d.getDate() + i)
-        if (!resolveRoutine(r, { date: d, member: selectedAssignees, prefs: { hideRoutines, domain: currentDomain } }).shows) {
+        if (!resolveRoutine(r, { date: d, member: selectedAssignees, prefs: { hideRoutines, layers } }).shows) {
           return null
         }
         return { ...routineToTimelineItem(r, d), id: `routine-${r.id}-day${i}` }
@@ -279,7 +279,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
     }
 
     return blocks
-  }, [scheduledTasks, weekEvents, routines, weekStart, hideRoutines, dayCount, drag.activeDragId, tasks, events, selectedAssignees, currentDomain])
+  }, [scheduledTasks, weekEvents, routines, weekStart, hideRoutines, dayCount, drag.activeDragId, tasks, events, selectedAssignees, layers])
 
   // Run the lane-placement pass over allItems. Items with a startTime outside
   // the visible week range are filtered out by layoutWeekLanes (dayIdx check).

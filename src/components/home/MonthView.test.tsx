@@ -6,6 +6,7 @@ import { writeHideRoutines } from '@/lib/hideRoutinesSignal'
 import type { Task } from '@/types/task'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine } from '@/types/actionable'
+import { ALL_LAYERS } from '@/lib/domains'
 
 // August 2026: the 42-cell grid runs Mon Jul 27 - Sun Sep 6, so day-of-month
 // 17 (Mon Aug 17) and 18 (Tue Aug 18) each appear exactly once — no adjacent-
@@ -21,6 +22,7 @@ const defaultProps = {
   monthStart,
   onMonthChange: vi.fn(),
   onSelectDay: vi.fn(),
+  layers: ALL_LAYERS,
 }
 
 /** The routine dot for a given day number, if any ("N routines" title). */

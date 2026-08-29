@@ -6,6 +6,7 @@ import { writeHideRoutines } from '@/lib/hideRoutinesSignal'
 import type { Task } from '@/types/task'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { FamilyMember } from '@/types/family'
+import { ALL_LAYERS } from '@/lib/domains'
 
 // A fixed date whose weekday doesn't matter — every routine here recurs
 // 'daily' (the factory default), so any date matches rung 2.
@@ -43,6 +44,7 @@ const BASE_PROPS = {
   onDateChange: vi.fn(),
   familyMembers: FAMILY_MEMBERS,
   selectedAssignees: ['scott', 'iris'],
+  layers: ALL_LAYERS,
 }
 
 /**

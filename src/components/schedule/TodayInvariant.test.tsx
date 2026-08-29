@@ -7,6 +7,7 @@ import { TodayView } from './TodayView'
 import type { Task } from '@/types/task'
 import type { TodayDataInput } from '@/lib/today/types'
 import { sundayOfWeek } from '@/lib/weekHelpers'
+import { ALL_LAYERS } from '@/lib/domains'
 
 /**
  * The invariant the redesign rests on: anything on Today that is not a
@@ -42,7 +43,7 @@ vi.mock('@/hooks/usePinnedItems', () => ({ usePinnedItems: () => ({ isPinned: ()
 vi.mock('@/hooks/useActionQueue', () => ({ useActionQueue: () => ({ actions: [], loading: false, approveAction: vi.fn(), rejectAction: vi.fn(), pendingCount: 0, refetch: vi.fn() }) }))
 vi.mock('@/hooks/useDomain.tsx', async (importOriginal) => {
   const actual = await importOriginal() as Record<string, unknown>
-  return { ...actual, useDomain: () => ({ currentDomain: 'universal', setDomain: vi.fn() }) }
+  return { ...actual, useDomain: () => ({ currentDomain: 'universal', layers: ALL_LAYERS, setDomain: vi.fn() }) }
 })
 vi.mock('@/hooks/useTimelineInsert', () => ({
   useTimelineInsert: () => ({ handlePick: vi.fn(), noteComposer: null, closeNoteComposer: vi.fn() }),
@@ -98,7 +99,7 @@ function baseInput(over: Partial<TodayDataInput> = {}): TodayDataInput {
     viewedDate,
     selectedAssignee: null,
     hideRoutines: false,
-    domain: 'universal',
+    layers: ALL_LAYERS,
     weekStart: sundayOfWeek(viewedDate),
     ...over,
   }

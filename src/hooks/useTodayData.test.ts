@@ -3,12 +3,13 @@ import { renderHook } from '@testing-library/react'
 import { useTodayData } from './useTodayData'
 import type { TodayDataInput } from '@/lib/today/types'
 import { sundayOfWeek } from '@/lib/weekHelpers'
+import { ALL_LAYERS } from '@/lib/domains'
 
 function baseInput(over: Partial<TodayDataInput> = {}): TodayDataInput {
   const viewedDate = over.viewedDate ?? new Date()
   return {
     tasks: [], events: [], routines: [], dateInstances: [],
-    viewedDate, selectedAssignee: null, hideRoutines: false, domain: 'universal',
+    viewedDate, selectedAssignee: null, hideRoutines: false, layers: ALL_LAYERS,
     weekStart: sundayOfWeek(viewedDate), ...over,
   }
 }

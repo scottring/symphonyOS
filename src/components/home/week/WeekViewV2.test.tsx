@@ -4,6 +4,7 @@ import { WeekViewV2 } from './WeekViewV2'
 import { createMockRoutine } from '@/test/mocks/factories'
 import type { Task } from '@/types/task'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
+import { ALL_LAYERS } from '@/lib/domains'
 
 const monday = new Date(2026, 4, 18) // Monday
 
@@ -17,6 +18,7 @@ const defaultProps = {
   onUpdateTask: vi.fn(),
   onUpdateEvent: vi.fn(),
   onUpdateRoutine: vi.fn(),
+  layers: ALL_LAYERS,
 }
 
 describe('WeekViewV2 routine visibility', () => {

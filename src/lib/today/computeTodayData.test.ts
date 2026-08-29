@@ -4,6 +4,7 @@ import type { TodayDataInput } from './types'
 import type { Task } from '@/types/task'
 import type { ActionableInstance, ActionableStatus, Routine } from '@/types/actionable'
 import { sundayOfWeek } from '@/lib/weekHelpers'
+import { ALL_LAYERS } from '@/lib/domains'
 
 function task(p: Partial<Task>): Task {
   return { id: 'id', title: 't', completed: false, bucket: 'timed', scheduledFor: null, assignedTo: null,
@@ -14,7 +15,7 @@ function baseInput(over: Partial<TodayDataInput> = {}): TodayDataInput {
   return {
     tasks: [], events: [], routines: [], dateInstances: [],
     viewedDate,
-    selectedAssignee: null, hideRoutines: false, domain: 'universal',
+    selectedAssignee: null, hideRoutines: false, layers: ALL_LAYERS,
     weekStart: sundayOfWeek(viewedDate),
     ...over,
   }

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
+import { ALL_LAYERS } from '@/lib/domains'
 import { screen, fireEvent, waitFor } from '@testing-library/react'
 import { render } from '@/test/test-utils'
 import { ScheduleActionsProvider } from '@/contexts/ScheduleActionsContext'
@@ -39,7 +40,7 @@ vi.mock('@/hooks/usePinnedItems', () => ({ usePinnedItems: () => ({ isPinned: ()
 vi.mock('@/hooks/useActionQueue', () => ({ useActionQueue: () => ({ actions: [], loading: false, approveAction: vi.fn(), rejectAction: vi.fn(), pendingCount: 0, refetch: vi.fn() }) }))
 vi.mock('@/hooks/useDomain.tsx', async (importOriginal) => {
   const actual = await importOriginal() as Record<string, unknown>
-  return { ...actual, useDomain: () => ({ currentDomain: 'universal', setDomain: vi.fn() }) }
+  return { ...actual, useDomain: () => ({ currentDomain: 'universal', layers: ALL_LAYERS, setDomain: vi.fn() }) }
 })
 vi.mock('@/hooks/useTimelineInsert', () => ({
   useTimelineInsert: () => ({ handlePick: vi.fn(), noteComposer: null, closeNoteComposer: vi.fn() }),

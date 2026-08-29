@@ -1,9 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import { resolveRoutine } from '@/lib/routineUtils'
 import { createMockRoutine } from '@/test/mocks/factories'
+import { ALL_LAYERS } from '@/lib/domains'
 
 const DATE = new Date(2026, 7, 24, 9, 0, 0)
-const PREFS = { hideRoutines: false, domain: 'universal' as const }
+const PREFS = { hideRoutines: false, layers: ALL_LAYERS }
 
 /** The river's filter before migration: assigned_to only. */
 function riverBefore(r: import('@/types/actionable').Routine, selected: string[]): boolean {

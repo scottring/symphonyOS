@@ -3,6 +3,7 @@ import { resolveRoutine, routineOwners, isPinnedToTimeline, isDraggableRoutine, 
 import { VISIBILITY_CORPUS, CORPUS_DATE } from './routineVisibility.fixtures'
 import { makeAssigneeFilter } from './today/assigneeFilter'
 import { createMockRoutine } from '@/test/mocks/factories'
+import { ALL_LAYERS } from '@/lib/domains'
 
 describe('resolveRoutine — conformance corpus', () => {
   for (const row of VISIBILITY_CORPUS) {
@@ -19,6 +20,12 @@ describe('resolveRoutine — conformance corpus', () => {
       'everyday', 'in-collection', 'not-theirs', 'not-today',
       'off', 'other-domain', 'resting', 'shows',
     ])
+  })
+
+  it('rung 4: an untagged routine is Unsorted — hidden unless Unsorted is checked', () => {
+    const r = createMockRoutine({ context: null })
+    expect(resolveRoutine(r, { date: null, member: null, prefs: { hideRoutines: false, layers: new Set(['family']) } }).reason).toBe('other-domain')
+    expect(resolveRoutine(r, { date: null, member: null, prefs: { hideRoutines: false, layers: new Set(['unsorted']) } }).shows).toBe(true)
   })
 })
 
@@ -117,7 +124,7 @@ describe('rung 5 agrees with makeAssigneeFilter', () => {
         const resolved = resolveRoutine(routine, {
           date: CORPUS_DATE,
           member: selected,
-          prefs: { hideRoutines: false, domain: 'universal' },
+          prefs: { hideRoutines: false, layers: ALL_LAYERS },
         })
         const agree = (resolved.reason === 'not-theirs') === !legacy
         if (isKnownDivergence(selected, routine)) {
@@ -157,21 +164,21 @@ describe('isDraggableRoutine', () => {
 describe('resolveRoutineEligible', () => {
   it('delegates to resolveRoutine with date: null — same verdict, nothing hand-rolled', () => {
     const routine = createMockRoutine({ recurrence_pattern: { type: 'weekly', days: ['tue'] } })
-    const ctx = { prefs: { hideRoutines: false, domain: 'universal' as const } }
+    const ctx = { prefs: { hideRoutines: false, layers: ALL_LAYERS } }
     expect(resolveRoutineEligible(routine, ctx)).toEqual(resolveRoutine(routine, { ...ctx, date: null }))
   })
 
   it('skips rung 2 for a routine that recurs on no particular day', () => {
     const routine = createMockRoutine({ recurrence_pattern: { type: 'weekly', days: ['tue'] } })
     expect(
-      resolveRoutineEligible(routine, { prefs: { hideRoutines: false, domain: 'universal' } }),
+      resolveRoutineEligible(routine, { prefs: { hideRoutines: false, layers: ALL_LAYERS } }),
     ).toEqual({ shows: true, reason: 'shows', owners: [] })
   })
 
   it('still hides a resting routine — every other rung still applies', () => {
     const routine = createMockRoutine({ visibility: 'reference' })
     expect(
-      resolveRoutineEligible(routine, { prefs: { hideRoutines: false, domain: 'universal' } }).reason,
+      resolveRoutineEligible(routine, { prefs: { hideRoutines: false, layers: ALL_LAYERS } }).reason,
     ).toBe('resting')
   })
 })

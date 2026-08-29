@@ -80,7 +80,7 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
   const { getDomainForCalendar } = useCalendarDomainMappings();
   const { lists, listsByCategory, addList } = useListsContext();
   const { addNote } = useNotesContext();
-  const { currentDomain } = useDomain();
+  const { currentDomain, layers } = useDomain();
   const undo = useUndo();
   const { aliases, recordOutcome } = useResolutionLearning();
 
@@ -276,9 +276,9 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
     () => allRoutines.filter(
       (r) =>
         isDraggableRoutine(r) &&
-        resolveRoutine(r, { date: viewedDate, prefs: { hideRoutines: true, domain: currentDomain } }).shows,
+        resolveRoutine(r, { date: viewedDate, prefs: { hideRoutines: true, layers } }).shows,
     ),
-    [allRoutines, currentDomain, viewedDate],
+    [allRoutines, layers, viewedDate],
   );
   const planningEvents = useMemo(
     () => filterEventsForDomain(filteredEvents, currentDomain, {

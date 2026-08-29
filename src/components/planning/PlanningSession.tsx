@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback, useEffect } from 'react'
 import { readHideRoutines, writeHideRoutines, onHideRoutinesChange } from '@/lib/hideRoutinesSignal'
 import { resolveRoutine } from '@/lib/routineUtils'
 import { deferredInRoutineIds } from '@/lib/today/deferredRoutines'
+import { ALL_LAYERS } from '@/lib/domains'
 import {
   DndContext,
   DragOverlay,
@@ -470,7 +471,7 @@ export function PlanningSession({
       const dateKey = formatDateKey(date)
       // Use getRoutinesForDate if provided, otherwise use routines prop directly
       const routinesForDay = (getRoutinesForDate ? getRoutinesForDate(date) : routines)
-        .filter((r) => resolveRoutine(r, { date, prefs: { hideRoutines, domain: 'universal' } }).shows)
+        .filter((r) => resolveRoutine(r, { date, prefs: { hideRoutines, layers: ALL_LAYERS } }).shows)
 
       // A routine dragged INTO this day usually doesn't recur on it, so the
       // day's own list won't contain it. Pull it in from the full set, the same
@@ -489,7 +490,7 @@ export function PlanningSession({
           routine &&
           resolveRoutine(routine, {
             date,
-            prefs: { hideRoutines, domain: 'universal' },
+            prefs: { hideRoutines, layers: ALL_LAYERS },
             deferredInto: deferredIntoIds,
           }).shows
         ) {

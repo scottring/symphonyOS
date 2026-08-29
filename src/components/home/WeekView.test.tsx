@@ -6,6 +6,7 @@ import { writeHideRoutines } from '@/lib/hideRoutinesSignal'
 import type { Task } from '@/types/task'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine } from '@/types/actionable'
+import { ALL_LAYERS } from '@/lib/domains'
 
 // Helper to create a Monday at midnight
 function getMonday(date: Date = new Date()): Date {
@@ -43,6 +44,7 @@ describe('WeekView', () => {
     weekStart: monday,
     onWeekChange: mockOnWeekChange,
     onSelectDay: mockOnSelectDay,
+    layers: ALL_LAYERS,
   }
 
   beforeEach(() => {

@@ -6,7 +6,7 @@ import type { FamilyMember } from '@/types/family'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine, ActionableInstance } from '@/types/actionable'
 import type { EventNote } from '@/hooks/useEventNotes'
-import type { PlanningDomain } from '@/lib/today/domainFilter'
+import type { Layer } from '@/lib/domains'
 import { FAMILY_COLORS, type FamilyMemberColor } from '@/types/family'
 import { DateNavigator } from '@/components/schedule/DateNavigator'
 import { AssigneeFilter } from './AssigneeFilter'
@@ -34,10 +34,8 @@ interface CascadingRiverViewProps {
   contactsMap?: Map<string, Contact>
   projectsMap?: Map<string, Project>
   eventNotesMap?: Map<string, EventNote>
-  /** The active domain lens (rung 4 of resolveRoutine). Defaults to
-   *  'universal', matching WeekView/MonthView for a caller that hasn't
-   *  wired a domain in. */
-  currentDomain?: PlanningDomain
+  /** The checked layers (rung 4 of resolveRoutine). Unsorted is a layer, not a wildcard. */
+  layers: ReadonlySet<Layer>
   familyMembers: FamilyMember[]
   selectedAssignees: string[]
   /** Change the who-selection — surfaced in the river header so you can drop
@@ -575,7 +573,7 @@ export function CascadingRiverView({
   contactsMap,
   projectsMap,
   eventNotesMap,
-  currentDomain = 'universal',
+  layers,
   familyMembers,
   selectedAssignees,
   onSelectAssignees,
@@ -706,7 +704,7 @@ export function CascadingRiverView({
         !resolveRoutine(routine, {
           date: viewedDate,
           member: selectedAssignees,
-          prefs: { hideRoutines, domain: currentDomain },
+          prefs: { hideRoutines, layers },
         }).shows
       ) continue
       if (!routine.time_of_day) continue
@@ -740,7 +738,7 @@ export function CascadingRiverView({
     }
 
     return result.sort((a, b) => a.startTime.getTime() - b.startTime.getTime())
-  }, [tasks, events, routines, viewedDate, selectedAssignees, currentDomain, eventNotesMap, routineStatusMap, eventStatusMap, hideRoutines])
+  }, [tasks, events, routines, viewedDate, selectedAssignees, layers, eventNotesMap, routineStatusMap, eventStatusMap, hideRoutines])
 
   // Detect convergence zones - only for SHARED events (same event assigned to multiple people)
   // This creates the subway map effect where lines merge when family members are truly together
