@@ -624,7 +624,12 @@ describe('useSupabaseTasks', () => {
       })
 
       expect(result.current.tasks[0].assignedTo).toBe('family-member-1')
-      expect(mockUpdate).toHaveBeenCalledWith({ assigned_to: 'family-member-1' })
+      // Scope rides along, derived: handing an untagged task to someone who is
+      // not you shares it with them (scopeForDomain -> 'couple').
+      expect(mockUpdate).toHaveBeenCalledWith({
+        assigned_to: 'family-member-1',
+        scope: 'couple',
+      })
     })
 
     it('updates multiple fields at once', async () => {

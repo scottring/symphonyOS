@@ -5,6 +5,18 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-hub-signature-256',
 }
 
+// Mirror of src/lib/scope.ts scopeForDomain — the app's single scope rule.
+// (Deno; an edge function cannot import from src/.) Scope is DERIVED from what
+// the row IS plus who it was handed to. Nothing may write a literal scope.
+function scopeFor(
+  context: string | null | undefined,
+  assignees: (string | null | undefined)[],
+  self: string | null,
+): 'individual' | 'couple' | 'compound' {
+  if (context === 'family') return 'compound'
+  return assignees.some((a) => a && a !== self) ? 'couple' : 'individual'
+}
+
 // Map vault domain → Symphony context
 function domainToContext(domain: string | undefined): string | null {
   if (!domain) return null
@@ -317,8 +329,6 @@ async function syncFile(
   // (2026-06-07_scope_axis.sql:67) and the column is NOT NULL DEFAULT
   // 'individual', so a family-domain note written without it is visible to its
   // owner on every family surface and unreadable by the rest of the household.
-  // Mirrors defaultScopeForArea() in src/lib/scope.ts, which this Deno function
-  // cannot import from src/.
   const noteData: Record<string, unknown> = {
     user_id: userId,
     title,
@@ -330,7 +340,7 @@ async function syncFile(
     vault_frontmatter: frontmatter,
     vault_last_commit_sha: commitSha,
     context: context,
-    scope: context === 'family' ? 'compound' : 'individual',
+    scope: scopeFor(context, [], null),
     external_id: filePath,
     external_url: `https://github.com/${repoFullName}/blob/main/${filePath}`,
   }

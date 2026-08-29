@@ -3,7 +3,7 @@
 // scope from area) without mounting that hook — the capture window idles for
 // days and must not hold a task fetch or realtime subscription.
 import { supabase } from '@/lib/supabase'
-import { defaultScopeForArea } from '@/lib/scope'
+import { scopeForDomain } from '@/lib/scope'
 
 export async function insertInboxTask(userId: string, title: string): Promise<boolean> {
   const { error } = await supabase.from('tasks').insert({
@@ -14,7 +14,7 @@ export async function insertInboxTask(userId: string, title: string): Promise<bo
     scheduled_for: null,
     category: 'task',
     context: null,
-    scope: defaultScopeForArea(null),
+    scope: scopeForDomain(null, [], null),
   })
   return !error
 }

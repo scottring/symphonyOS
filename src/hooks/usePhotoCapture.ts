@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react'
 import { supabase, getAuthUser } from '@/lib/supabase'
 import type { TaskContext } from '@/types/task'
-import { defaultScopeForArea } from '@/lib/scope'
+import { scopeForDomain } from '@/lib/scope'
 
 export type PhotoCaptureStatus = 'idle' | 'working' | 'started' | 'error'
 
@@ -62,10 +62,11 @@ export function usePhotoCapture() {
         title: 'Analyzing photo…',
         bucket: 'inbox',
         context: context ?? null,
-        // Same coupling as addTask: a family photo-capture has to be readable
-        // by the household, not just its owner. Found by the scope tripwire
-        // once it stopped cutting payloads at the first nested brace.
-        scope: defaultScopeForArea(context),
+        // Same rule as addTask: a family photo-capture has to be readable by
+        // the household, not just its owner. Found by the scope tripwire once
+        // it stopped cutting payloads at the first nested brace. The capture is
+        // unassigned, so the domain alone decides.
+        scope: scopeForDomain(context ?? null, [], null),
         capture_meta: { status: 'pending', storage_path: storagePath },
       })
       if (insertErr) throw new Error(insertErr.message)

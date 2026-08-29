@@ -286,7 +286,6 @@ function TaskPanelBody({ id }: { id: string }) {
         updateTask(task.id, { location: undefined, locationPlaceId: undefined })
       }
       onContextChange={(ctx) => updateTask(task.id, { context: ctx ?? null })}
-      onScopeChange={(scope) => updateTask(task.id, { scope })}
       onAssigneesChange={(ids) =>
         updateTask(task.id, { assignedToAll: ids.length > 0 ? ids : undefined })
       }

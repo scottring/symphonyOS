@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase, getAuthUser } from '@/lib/supabase'
+import { scopeForDomain } from '@/lib/scope'
 
 const PREFS_TITLE = 'Household Meal Preferences'
 
@@ -15,7 +16,7 @@ export interface UseMealPreferencesResult {
 /**
  * The household's meal "master prompt" — the canonical `Household Meal
  * Preferences` note that both AI surfaces read as their standing instructions.
- * There is one shared (couple-scoped) note per household; we always resolve the
+ * There is one shared (household-scoped) note per household; we always resolve the
  * OLDEST such note (matching the edge functions' resolver) so every reader and
  * writer touches the same row. Household RLS lets either partner read + edit it.
  */
@@ -54,12 +55,20 @@ export function useMealPreferences(): UseMealPreferencesResult {
           .eq('id', noteId)
         if (err) { setError(err.message); return false }
       } else {
-        // No note yet — create it couple-scoped so the partner sees it too.
+        // No note yet — create it as what it is: a household note. `family`
+        // is its domain, and scope is derived from that (compound), so the
+        // whole household reads the same master prompt. It used to be written
+        // `couple` by hand; both grant the household read under the notes RLS
+        // policy, and scope is no longer a value any caller picks.
         const { data: { user } } = await getAuthUser()
         if (!user) { setError('not signed in'); return false }
         const { data, error: err } = await supabase
           .from('notes')
-          .insert({ title: PREFS_TITLE, content: next, type: 'general', scope: 'couple', user_id: user.id })
+          .insert({
+            title: PREFS_TITLE, content: next, type: 'general',
+            context: 'family', scope: scopeForDomain('family', [], null),
+            user_id: user.id,
+          })
           .select('id').single()
         if (err) { setError(err.message); return false }
         setNoteId(data?.id ?? null)

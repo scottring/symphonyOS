@@ -17,6 +17,18 @@ const corsHeaders = {
 const json = (b: unknown, status = 200) =>
   new Response(JSON.stringify(b), { status, headers: { ...corsHeaders, 'content-type': 'application/json' } })
 
+// Mirror of src/lib/scope.ts scopeForDomain — the app's single scope rule.
+// (Deno; an edge function cannot import from src/.) Scope is DERIVED from what
+// the row IS plus who it was handed to. Nothing may write a literal scope.
+function scopeFor(
+  context: string | null | undefined,
+  assignees: (string | null | undefined)[],
+  self: string | null,
+): 'individual' | 'couple' | 'compound' {
+  if (context === 'family') return 'compound'
+  return assignees.some((a) => a && a !== self) ? 'couple' : 'individual'
+}
+
 async function callAnthropic(prompt: string, apiKey: string): Promise<string> {
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -63,13 +75,15 @@ function candidateToTaskRow(
   // scope MUST be set explicitly. RLS shares on scope, not context, so a
   // family-context row left at the 'individual' default is visible to its owner
   // on the family view but unreadable by the rest of the household — the row
-  // looks shared and isn't. Mirrors defaultScopeForArea() in src/lib/scope.ts.
+  // looks shared and isn't. Derived by scopeFor above (mirror of scopeForDomain).
   return {
     user_id: userId,
     title: c.title,
     bucket: 'inbox',
+    // Household feed ingest (school/activity announcements) — family by
+    // construction, like the kitchen wall. Scope is derived from that.
     context: 'family',
-    scope: 'compound',
+    scope: scopeFor('family', [], null),
     category: c.category,
     completed: false,
     notes: notesLines.join('\n'),
@@ -165,7 +179,7 @@ Deno.serve(async (req: Request) => {
       title: `Capture: ${capture.source_label ?? capture.source_key ?? 'note'}`,
       content: `${result.summary}${announcementText}${gapText}`,
       context: 'family',
-      scope: 'compound',
+      scope: scopeFor('family', [], null),
       source: 'import',
       type: 'general',
     })

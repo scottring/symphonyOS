@@ -25,6 +25,18 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Mirror of src/lib/scope.ts scopeForDomain — the app's single scope rule.
+// (Deno; an edge function cannot import from src/.) Scope is DERIVED from what
+// the row IS plus who it was handed to. Nothing may write a literal scope.
+function scopeFor(
+  context: string | null | undefined,
+  assignees: (string | null | undefined)[],
+  self: string | null,
+): 'individual' | 'couple' | 'compound' {
+  if (context === 'family') return 'compound'
+  return assignees.some((a) => a && a !== self) ? 'couple' : 'individual'
+}
+
 const MODEL = 'claude-sonnet-4-6'
 const MAX_TURNS = 14
 
@@ -598,11 +610,13 @@ async function runTool(
           row.assigned_to = currentMemberId
           row.assigned_to_all = [currentMemberId]
         }
-        // Scope defaults from the life domain (defaultScopeForArea in the app):
-        // family items are household-visible, everything else stays private.
-        if (row.scope == null) {
-          row.scope = row.context === 'family' ? 'compound' : 'individual'
-        }
+        // Scope is DERIVED, not defaulted: whatever the caller sent is
+        // replaced by what the row's domain + assignees actually say.
+        row.scope = scopeFor(
+          row.context as string | null,
+          [row.assigned_to as string | null, ...((row.assigned_to_all as string[] | null) ?? [])],
+          currentMemberId,
+        )
         const { data, error } = await db.from('tasks')
           .insert(row)
           .select().single()
@@ -612,6 +626,24 @@ async function runTool(
       case 'symphony_update_task': {
         const { id, ...updates } = input as Record<string, unknown>
         if (!id) return 'Error: id is required'
+        // Scope is DERIVED — recompute it whenever the domain or the assignees
+        // move. This path had no coupling at all, so an agent re-tagging a
+        // family task `personal` left it household-readable (the August leak).
+        if ('context' in updates || 'assigned_to' in updates || 'assigned_to_all' in updates) {
+          const { data: before } = await db.from('tasks')
+            .select('context, assigned_to, assigned_to_all').eq('id', id).single()
+          // Only when the row was actually readable: deriving from the update
+          // alone would read a family row's missing context as null and narrow
+          // it. An explicit move into `family` decides the scope by itself.
+          if (before || updates.context === 'family') {
+            const next = { ...(before ?? {}), ...updates }
+            updates.scope = scopeFor(
+              next.context as string | null,
+              [next.assigned_to as string | null, ...((next.assigned_to_all as string[] | null) ?? [])],
+              currentMemberId,
+            )
+          }
+        }
         // Normalize a (re)schedule the same way create does.
         if ('scheduled_for' in updates) {
           const sched = normalizeSchedule(updates.scheduled_for, updates.is_all_day)
@@ -757,9 +789,13 @@ async function runTool(
         if (row.pin_to_timeline == null && Array.isArray(row.times_per_day) && row.times_per_day.length > 0) {
           row.pin_to_timeline = true
         }
-        // Scope is the ONLY column routines RLS reads. Without this the agent
-        // creates a "family" routine that no one else in the household can see.
-        if (row.scope == null) row.scope = ctx === 'family' ? 'compound' : 'individual'
+        // Scope is the ONLY column routines RLS reads, and it is DERIVED:
+        // without it the agent creates a "family" routine no one else can see.
+        row.scope = scopeFor(
+          ctx as string | null,
+          [row.assigned_to as string | null, ...((row.assigned_to_all as string[] | null) ?? [])],
+          currentMemberId,
+        )
         const { data, error } = await db.from('routines').insert(row).select().single()
         if (error) throw error
         return JSON.stringify(data, null, 2)
@@ -777,14 +813,23 @@ async function runTool(
       case 'symphony_update_routine': {
         const { id, ...updates } = input as Record<string, unknown>
         if (!id) return 'Error: id is required'
-        // Same context->scope coupling as the client (src/lib/scope.ts): moving
-        // a routine into `family` shares it with the household, and moving one
-        // back out takes that share away again. A scope the caller set wins.
-        if (updates.scope == null && 'context' in updates) {
+        // Same derivation as the client (src/lib/scope.ts): recompute scope
+        // from the row as it will BE, whenever the domain or the assignees
+        // move. A scope the caller passed is ignored — it is not a choice.
+        if ('context' in updates || 'assigned_to' in updates || 'assigned_to_all' in updates) {
           const { data: before } = await db.from('routines')
-            .select('context, scope').eq('id', id).single()
-          if (updates.context === 'family') updates.scope = 'compound'
-          else if (before?.context === 'family' && before?.scope === 'compound') updates.scope = 'individual'
+            .select('context, assigned_to, assigned_to_all').eq('id', id).single()
+          // Only when the row was actually readable: deriving from the update
+          // alone would read a family row's missing context as null and narrow
+          // it. An explicit move into `family` decides the scope by itself.
+          if (before || updates.context === 'family') {
+            const next = { ...(before ?? {}), ...updates }
+            updates.scope = scopeFor(
+              next.context as string | null,
+              [next.assigned_to as string | null, ...((next.assigned_to_all as string[] | null) ?? [])],
+              currentMemberId,
+            )
+          }
         }
         const { data, error } = await db.from('routines')
           .update(updates).eq('id', id).select().single()
@@ -875,9 +920,9 @@ async function runTool(
             content: input.content,
             type: input.type ?? 'quick_capture',
             context: input.context ?? null,
-            // Same coupling the task path already applies below: notes RLS
-            // shares on scope, so a family note without this stays private.
-            scope: input.context === 'family' ? 'compound' : 'individual',
+            // Notes RLS shares on scope, so a family note without this stays
+            // private. Notes carry no assignee — the domain alone decides.
+            scope: scopeFor(input.context as string | null, [], null),
             source: 'assistant',
             user_id: userId,
           })

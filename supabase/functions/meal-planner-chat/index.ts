@@ -33,6 +33,18 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Mirror of src/lib/scope.ts scopeForDomain — the app's single scope rule.
+// (Deno; an edge function cannot import from src/.) Scope is DERIVED from what
+// the row IS plus who it was handed to. Nothing may write a literal scope.
+function scopeFor(
+  context: string | null | undefined,
+  assignees: (string | null | undefined)[],
+  self: string | null,
+): 'individual' | 'couple' | 'compound' {
+  if (context === 'family') return 'compound'
+  return assignees.some((a) => a && a !== self) ? 'couple' : 'individual'
+}
+
 const MODEL = 'claude-sonnet-4-6'
 const MAX_TURNS = 12
 
@@ -513,8 +525,8 @@ async function runTool(
         const content = typeof input.content === 'string' ? input.content : ''
         if (!content.trim()) return 'Error: content is required.'
         // Edit the ONE canonical household note (resolved in loadContext), so
-        // Scott and Iris always change the same master prompt. Scope is left as
-        // it is (couple) — never downgraded.
+        // Scott and Iris always change the same master prompt. Scope is not
+        // touched on an edit — nothing about who can see it changed.
         if (prefsNoteId) {
           const { error } = await db.from('notes')
             .update({ content, updated_at: new Date().toISOString() })
@@ -522,12 +534,16 @@ async function runTool(
           if (error) throw error
           return 'Updated your standing meal preferences.'
         }
-        // None exists yet — create it couple-scoped so the partner sees it too.
+        // None exists yet — create it as what it is: a household note. Its
+        // domain is `family`, and scope is derived from that (compound), so the
+        // whole household reads the same master prompt. Mirrors
+        // src/hooks/useMealPreferences.ts, which writes the same shape.
         const { error } = await db.from('notes').insert({
           title: 'Household Meal Preferences',
           content,
           type: 'general',
-          scope: 'couple',
+          context: 'family',
+          scope: scopeFor('family', [], null),
           user_id: userId,
         })
         if (error) throw error

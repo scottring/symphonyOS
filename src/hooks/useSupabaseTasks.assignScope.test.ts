@@ -2,19 +2,23 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, waitFor, act } from '@testing-library/react'
 import { useSupabaseTasks, __resetTasksCache } from './useSupabaseTasks'
 
-// Assignment answers WHO DOES IT. Context answers WHAT PART OF LIFE this is.
-// Scope answers WHO CAN SEE IT. The old auto-context rule collapsed all three:
-// assigning a task to any household member stamped context='family', which
-// then dragged scope to 'compound' via scopeForContextChange. Assigning a task
-// to YOURSELF tripped it too — there was no self-exclusion — so Iris's own
-// medical items ("Reschedule colo", "Call cvs re my clean out meds") became
-// family-area and household-readable one tap after capture. 57 of her rows are
-// in that state.
+// Scope answers WHO CAN SEE IT, and it is DERIVED — never chosen. Every task
+// write recomputes it from the row's domain plus its assignees
+// (scopeForDomain in src/lib/scope.ts):
 //
-// What assignment actually requires is visibility for the assignee, which RLS
-// grants on scope alone (2026-06-07_scope_axis.sql:35 — `scope IN
-// ('couple','compound')`). 'couple' is the minimum that satisfies it, and it
-// keeps the item off the kitchen wall, which needs compound.
+//   family                       -> compound (the household layer)
+//   handed to another member     -> couple   (the minimum RLS share)
+//   otherwise                    -> individual
+//
+// Both halves matter. The old rule only ever widened: assigning a task stamped
+// context='family' (with no self-exclusion, so assigning to YOURSELF tripped
+// it) and a family row re-tagged private kept scope='compound'. That is how
+// Iris's own medical items ("Reschedule colo") became household-readable one
+// tap after capture, and how re-tagging a family task `personal` left the
+// partner still able to read it — the August leak.
+//
+// RLS reads scope and nothing else (2026-06-07_scope_axis.sql:35 — `scope IN
+// ('couple','compound')`), so these writes ARE the sharing decision.
 
 const mockUser = { id: 'test-user-id', email: 'test@example.com' }
 
@@ -100,14 +104,7 @@ vi.mock('@/lib/supabase', () => ({
   },
 }))
 
-/** The write the hook actually sent for `id`. */
-function writeFor(id: string): Record<string, unknown> {
-  const write = rowWrites.find((w) => w.id === id)
-  expect(write, `no row write for ${id}`).toBeDefined()
-  return write!.data
-}
-
-describe('updateTask — assignment shares an item, it does not relabel it', () => {
+describe('scope is derived from domain + assignees on every task write', () => {
   beforeEach(() => {
     __resetTasksCache()
     vi.clearAllMocks()
@@ -115,86 +112,43 @@ describe('updateTask — assignment shares an item, it does not relabel it', () 
     rowWrites.length = 0
   })
 
-  it('leaves a private task private when you assign it to yourself', async () => {
-    mockSupabaseData.push(dbTask({ id: 'colo' }))
+  it('assigning a private task to a partner shares it as couple', async () => {
+    mockSupabaseData.push(dbTask({ context: 'personal', scope: 'individual' }))
     const { result } = renderHook(() => useSupabaseTasks())
-    await waitFor(() => expect(result.current.loading).toBe(false))
-
-    await act(async () => {
-      await result.current.updateTask('colo', { assignedTo: ME.id })
-    })
-
-    const write = writeFor('colo')
-    expect(write.assigned_to).toBe(ME.id)
-    expect(write).not.toHaveProperty('context')
-    expect(write).not.toHaveProperty('scope')
-    expect(result.current.tasks.find((t) => t.id === 'colo')?.context).toBeNull()
+    await waitFor(() => expect(result.current.tasks).toHaveLength(1))
+    await act(() => result.current.updateTask('task-x', { assignedTo: PARTNER.id }))
+    expect(rowWrites.at(-1)!.data).toMatchObject({ assigned_to: PARTNER.id, scope: 'couple' })
   })
 
-  it('shares with the assignee without changing the life area', async () => {
-    mockSupabaseData.push(dbTask({ id: 'derm', title: 'Schedule derm', context: 'personal' }))
+  it('assigning to yourself changes nothing about sharing', async () => {
+    mockSupabaseData.push(dbTask({ context: 'personal', scope: 'individual' }))
     const { result } = renderHook(() => useSupabaseTasks())
-    await waitFor(() => expect(result.current.loading).toBe(false))
-
-    await act(async () => {
-      await result.current.updateTask('derm', { assignedTo: PARTNER.id })
-    })
-
-    const write = writeFor('derm')
-    expect(write.assigned_to).toBe(PARTNER.id)
-    expect(write.scope).toBe('couple')
-    expect(write).not.toHaveProperty('context')
-    expect(result.current.tasks.find((t) => t.id === 'derm')?.context).toBe('personal')
+    await waitFor(() => expect(result.current.tasks).toHaveLength(1))
+    await act(() => result.current.updateTask('task-x', { assignedTo: ME.id }))
+    expect(rowWrites.at(-1)!.data.scope).toBe('individual')
   })
 
-  it('does not walk a household item back off the wall when it is reassigned', async () => {
-    // Already compound (it belongs to the household and shows on the wall).
-    // Handing it to someone must not narrow who can see it.
-    mockSupabaseData.push(
-      dbTask({ id: 'trash', title: 'Take out the trash', context: 'family', scope: 'compound' }),
-    )
+  it('un-assigning takes the share back', async () => {
+    mockSupabaseData.push(dbTask({ context: 'personal', scope: 'couple', assigned_to: PARTNER.id }))
     const { result } = renderHook(() => useSupabaseTasks())
-    await waitFor(() => expect(result.current.loading).toBe(false))
-
-    await act(async () => {
-      await result.current.updateTask('trash', { assignedTo: PARTNER.id })
-    })
-
-    const write = writeFor('trash')
-    expect(write.assigned_to).toBe(PARTNER.id)
-    expect(write).not.toHaveProperty('scope')
-    expect(write).not.toHaveProperty('context')
+    await waitFor(() => expect(result.current.tasks).toHaveLength(1))
+    await act(() => result.current.updateTask('task-x', { assignedTo: undefined, assignedToAll: undefined }))
+    expect(rowWrites.at(-1)!.data.scope).toBe('individual')
   })
 
-  it('still honours a context the caller set explicitly alongside the assignment', async () => {
-    mockSupabaseData.push(dbTask({ id: 'baseball', title: 'Sign Kaleb up for baseball' }))
+  it('re-tagging family -> personal on a compound row makes it private (the August leak)', async () => {
+    mockSupabaseData.push(dbTask({ context: 'family', scope: 'compound' }))
     const { result } = renderHook(() => useSupabaseTasks())
-    await waitFor(() => expect(result.current.loading).toBe(false))
-
-    await act(async () => {
-      await result.current.updateTask('baseball', { assignedTo: PARTNER.id, context: 'family' })
-    })
-
-    const write = writeFor('baseball')
-    expect(write.context).toBe('family')
-    // context -> family still shares with the whole household, as it always has.
-    expect(write.scope).toBe('compound')
+    await waitFor(() => expect(result.current.tasks).toHaveLength(1))
+    await act(() => result.current.updateTask('task-x', { context: 'personal' }))
+    expect(rowWrites.at(-1)!.data).toMatchObject({ context: 'personal', scope: 'individual' })
   })
 
-  it('clearing the assignee touches neither the life area nor the scope', async () => {
-    mockSupabaseData.push(
-      dbTask({ id: 'colo', assigned_to: PARTNER.id, scope: 'couple' }),
-    )
+  it('tagging family shares with the household even if the caller passed a scope', async () => {
+    mockSupabaseData.push(dbTask({ context: null, scope: 'individual' }))
     const { result } = renderHook(() => useSupabaseTasks())
-    await waitFor(() => expect(result.current.loading).toBe(false))
-
-    await act(async () => {
-      await result.current.updateTask('colo', { assignedTo: null })
-    })
-
-    const write = writeFor('colo')
-    expect(write.assigned_to).toBeNull()
-    expect(write).not.toHaveProperty('context')
-    expect(write).not.toHaveProperty('scope')
+    await waitFor(() => expect(result.current.tasks).toHaveLength(1))
+    await act(() => result.current.updateTask('task-x', { context: 'family', scope: 'individual' }))
+    expect(rowWrites.at(-1)!.data.scope).toBe('compound')
   })
 })

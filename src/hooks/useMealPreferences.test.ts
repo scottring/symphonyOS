@@ -77,7 +77,7 @@ describe('useMealPreferences', () => {
     expect(result.current.content).toBe('new master prompt')
   })
 
-  it('save() inserts a couple-scoped note when none exists', async () => {
+  it('save() inserts a household-scoped note when none exists', async () => {
     db.selectRows = [] // no note yet
     const { result } = renderHook(() => useMealPreferences())
     await waitFor(() => expect(result.current.loading).toBe(false))
@@ -85,7 +85,8 @@ describe('useMealPreferences', () => {
     await act(async () => { await result.current.save('first prompt') })
     expect(db.inserts).toHaveLength(1)
     expect(db.inserts[0]).toEqual(expect.objectContaining({
-      title: 'Household Meal Preferences', content: 'first prompt', scope: 'couple', user_id: 'u1',
+      title: 'Household Meal Preferences', content: 'first prompt',
+      context: 'family', scope: 'compound', user_id: 'u1',
     }))
   })
 })

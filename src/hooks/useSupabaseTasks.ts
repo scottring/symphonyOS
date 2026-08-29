@@ -6,7 +6,7 @@ import { showToast } from './useToast'
 import { logger } from '@/lib/logger'
 import type { Task, TaskBucket, TaskLink, TaskContext, TaskCategory, TaskCaptureMeta, LinkedActivity, LinkType, LinkedActivityType, GroupMemberRef } from '@/types/task'
 import type { TaskDirections } from '@/types/directions'
-import { defaultScopeForArea, scopeForContextChange, type Scope } from '@/lib/scope'
+import { scopeForDomain, type Scope } from '@/lib/scope'
 import { localYmd, parseLocalYmd, weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
 import { weekStartForBucket } from '@/lib/today/weekPlacement'
 import { onRealtimeResumed } from '@/lib/realtime/keepAlive'
@@ -539,7 +539,6 @@ export function useSupabaseTasks() {
     assignedToAll?: string[]  // Multiple family member IDs (for shared tasks)
     category?: TaskCategory  // What kind of family item
     context?: TaskContext | null  // Life domain for filtering (null = private/untagged)
-    scope?: Scope  // Who can see it (individual/couple/compound); defaults from area
     location?: string  // Address or place name
     locationPlaceId?: string  // Google Place ID for precise directions
     defaultAssigneeId?: string  // Default assignee if assignedTo is undefined
@@ -614,7 +613,11 @@ export function useSupabaseTasks() {
       assignedToAll: options?.assignedToAll,
       category: options?.category ?? 'task',
       context: options?.context ?? null,
-      scope: options?.scope ?? defaultScopeForArea(options?.context ?? null),
+      scope: scopeForDomain(
+        options?.context ?? null,
+        [effectiveAssignedTo, ...(options?.assignedToAll ?? [])],
+        getCurrentUserMember()?.id,
+      ),
       location: options?.location,
       locationPlaceId: options?.locationPlaceId,
       isAllDay: options?.isAllDay,
@@ -652,7 +655,13 @@ export function useSupabaseTasks() {
         assigned_to_all: options?.assignedToAll ?? null,
         category: options?.category ?? 'task',
         context: options?.context ?? null,
-        scope: options?.scope ?? defaultScopeForArea(options?.context ?? null),
+        // Scope is DERIVED, never passed in: what the row is (its domain) plus
+        // who it was handed to says exactly who may read it. See scopeForDomain.
+        scope: scopeForDomain(
+          options?.context ?? null,
+          [effectiveAssignedTo, ...(options?.assignedToAll ?? [])],
+          getCurrentUserMember()?.id,
+        ),
         location: options?.location ?? null,
         location_place_id: options?.locationPlaceId ?? null,
         is_all_day: options?.isAllDay ?? null,
@@ -694,7 +703,7 @@ export function useSupabaseTasks() {
     announceLocalWrite({ kind: 'insert', task: createdTask })
 
     return createdTask.id
-  }, [user])
+  }, [user, getCurrentUserMember])
 
   // Add a subtask to a parent task
   const addSubtask = useCallback(async (
@@ -745,6 +754,11 @@ export function useSupabaseTasks() {
         project_id: parent.projectId ?? null,
         contact_id: parent.contactId ?? null,
         assigned_to: effectiveAssignedTo,
+        // A step inherits its parent's assignee, and RLS reads scope alone — so
+        // derive it from the parent's domain + that assignee, or the person the
+        // step was handed to cannot see it. The step's own `context` stays null:
+        // it is a step of the parent, not a separate item on a domain surface.
+        scope: scopeForDomain(parent.context ?? null, [effectiveAssignedTo], getCurrentUserMember()?.id),
       })
       .select()
       .single()
@@ -783,7 +797,7 @@ export function useSupabaseTasks() {
     announceLocalWrite({ kind: 'insert', task: createdSubtask })
 
     return createdSubtask.id
-  }, [user, tasks])
+  }, [user, tasks, getCurrentUserMember])
 
   // Helper to find a task by id, including in subtasks
   const findTaskById = useCallback((id: string): Task | undefined => {
@@ -1046,35 +1060,26 @@ export function useSupabaseTasks() {
       return
     }
 
-    // Handing an item to someone answers WHO DOES IT. It does not say what part
-    // of life the item belongs to, and it is not a request to publish it.
+    // Scope is DERIVED. Recompute whenever anything it depends on moves; a
+    // caller-supplied `scope` is ignored on purpose (it is not a choice — the
+    // row's domain and its assignees say exactly who may read it).
     //
-    // This used to stamp context='family' on any assignment to a household
-    // member — with no self-exclusion, so assigning your own item to yourself
-    // relabelled it, and scopeForContextChange then dragged scope to
-    // 'compound'. That is how a private "Reschedule colo" became a family-area
-    // row readable by the whole household, one tap after capture.
-    //
-    // What assignment genuinely requires is that the assignee can READ the row,
-    // and RLS grants that on scope alone (2026-06-07_scope_axis.sql:35 —
-    // `scope IN ('couple','compound')`). So raise a private item to 'couple',
-    // the minimum share, and leave the life area alone. 'couple' also keeps it
-    // off the kitchen wall, which needs compound. Assigning to yourself needs
-    // no share at all and changes nothing.
-    if ('assignedTo' in updates && updates.assignedTo && !('scope' in updates)) {
-      const assignee = familyMembers.find(m => m.id === updates.assignedTo)
-      const isSelf = updates.assignedTo === getCurrentUserMember()?.id
-      // Where the row's scope lands on its own. A context set in this same
-      // update carries its own coupling (family -> compound), and that wins —
-      // only step in when nothing else shared the row.
-      const scopeWithoutUs = 'context' in updates
-        ? scopeForContextChange(task.context, updates.context, task.scope) ?? task.scope
-        : task.scope
-      if (assignee && !isSelf && scopeWithoutUs === 'individual') {
-        logger.debug('[updateTask] Sharing with assignee (scope -> couple)')
-        updates = { ...updates, scope: 'couple' }
-        showToast(`Shared with ${assignee.name}`, 'info', 2500)
+    // Both directions matter. The old rule only ever widened: assignment
+    // pushed a row to 'couple' and nothing walked it back, and a family row
+    // re-tagged `personal` kept scope='compound' — so a partner kept read
+    // access to medical and job-search items every surface now called private.
+    if ('context' in updates || 'assignedTo' in updates || 'assignedToAll' in updates || 'scope' in updates) {
+      const next = { ...task, ...updates }
+      const derived = scopeForDomain(
+        next.context ?? null,
+        [next.assignedTo, ...(next.assignedToAll ?? [])],
+        getCurrentUserMember()?.id,
+      )
+      if (derived === 'couple' && task.scope !== 'couple') {
+        const assignee = familyMembers.find((m) => m.id === next.assignedTo)
+        if (assignee) showToast(`Shared with ${assignee.name}`, 'info', 2500)
       }
+      updates = { ...updates, scope: derived }
     }
 
     // Invariant: bucket 'timed' requires a scheduled date (the timed pool only
@@ -1153,17 +1158,9 @@ export function useSupabaseTasks() {
     if ('isAllDay' in updates) dbUpdates.is_all_day = updates.isAllDay ?? null
     if ('isSomeday' in updates) dbUpdates.is_someday = updates.isSomeday ?? false
     if ('context' in updates) dbUpdates.context = updates.context ?? null
-    // Scope follows area unless explicitly set (default-coupling). This used to
-    // run one way only — family made a row compound and nothing ever walked it
-    // back — which leaked: re-tagging a shared household task as `personal`
-    // left scope='compound', so a partner kept read access to items every
-    // surface now called private. scopeForContextChange applies both halves and
-    // leaves a deliberately-chosen scope (e.g. `couple`) alone.
-    if ('scope' in updates) dbUpdates.scope = updates.scope ?? 'individual'
-    else if ('context' in updates) {
-      const nextScope = scopeForContextChange(task.context, updates.context, task.scope)
-      if (nextScope) dbUpdates.scope = nextScope
-    }
+    // Whatever `scope` is on `updates` by now is scopeForDomain's answer (see
+    // the recompute above), never a caller's.
+    if ('scope' in updates) dbUpdates.scope = updates.scope
     if ('category' in updates) dbUpdates.category = updates.category ?? 'task'
     if ('notes' in updates) dbUpdates.notes = updates.notes ?? null
     if ('links' in updates) dbUpdates.links = updates.links ?? null
@@ -1286,9 +1283,34 @@ export function useSupabaseTasks() {
 
     logger.debug('[updateTasksBulk] Tasks to update:', tasksToUpdate.length)
 
+    // Scope is DERIVED per ROW, so one bulk payload cannot express it: two rows
+    // in the same selection can have different assignees and land on different
+    // scopes. Compute each row's scope up front, then write one UPDATE per
+    // distinct answer (below). A caller-supplied `scope` is ignored, exactly as
+    // in updateTask.
+    const derivesScope =
+      'context' in updates || 'assignedTo' in updates || 'assignedToAll' in updates || 'scope' in updates
+    const selfMemberId = getCurrentUserMember()?.id
+    const scopeById = new Map<string, Scope>()
+    if (derivesScope) {
+      for (const t of tasksToUpdate) {
+        const next = { ...t, ...updates }
+        scopeById.set(t.id, scopeForDomain(
+          next.context ?? null,
+          [next.assignedTo, ...(next.assignedToAll ?? [])],
+          selfMemberId,
+        ))
+      }
+    }
+    /** The row as it will be after this write, scope included. */
+    const merged = (t: Task): Task => {
+      const scope = scopeById.get(t.id)
+      return scope ? { ...t, ...updates, scope } : { ...t, ...updates }
+    }
+
     // Optimistic update
     setTasks(prev => prev.map(t =>
-      taskIds.includes(t.id) ? { ...t, ...updates } : t
+      taskIds.includes(t.id) ? merged(t) : t
     ))
 
     // Convert Task updates to DB format (same logic as updateTask)
@@ -1308,11 +1330,7 @@ export function useSupabaseTasks() {
     if ('isAllDay' in updates) dbUpdates.is_all_day = updates.isAllDay ?? null
     if ('isSomeday' in updates) dbUpdates.is_someday = updates.isSomeday ?? false
     if ('context' in updates) dbUpdates.context = updates.context ?? null
-    // Scope follows area unless explicitly set (default-coupling). Bulk writes
-    // one payload for many rows, so the per-row unshare (see updateTask) can't
-    // be expressed here — a second, narrower update below handles it.
-    if ('scope' in updates) dbUpdates.scope = updates.scope ?? 'individual'
-    else if ('context' in updates && updates.context === 'family') dbUpdates.scope = 'compound'
+    // `scope` is NOT set here — it rides each per-scope UPDATE below.
     if ('category' in updates) dbUpdates.category = updates.category ?? 'task'
     if ('notes' in updates) dbUpdates.notes = updates.notes ?? null
     if ('links' in updates) dbUpdates.links = updates.links ?? null
@@ -1354,11 +1372,35 @@ export function useSupabaseTasks() {
 
     logger.debug('[updateTasksBulk] Sending to DB:', { taskIds, dbUpdates })
 
-    // Bulk update with .in()
-    const { error: updateError } = await supabase
-      .from('tasks')
-      .update(dbUpdates)
-      .in('id', taskIds)
+    // One `.in()` UPDATE per distinct derived scope. Rows this hook has never
+    // seen (not in `tasks`) still get the non-scope half of the payload — they
+    // were covered by the old single bulk write and must not silently drop out.
+    const groups = new Map<Scope | null, string[]>()
+    const push = (scope: Scope | null, id: string) => {
+      const ids = groups.get(scope)
+      if (ids) ids.push(id)
+      else groups.set(scope, [id])
+    }
+    if (derivesScope) {
+      const known = new Set(tasksToUpdate.map(t => t.id))
+      for (const t of tasksToUpdate) push(scopeById.get(t.id)!, t.id)
+      for (const id of taskIds) if (!known.has(id)) push(null, id)
+    } else {
+      groups.set(null, taskIds)
+    }
+
+    // Never `upsert`: PostgREST compiles it to INSERT … ON CONFLICT, and a
+    // partial row fails tasks' NOT NULL columns (see updateTaskOrders).
+    let updateError: { message: string } | null = null
+    for (const [scope, ids] of groups) {
+      if (ids.length === 0) continue
+      const payload = scope === null ? dbUpdates : { ...dbUpdates, scope }
+      const { error } = await supabase
+        .from('tasks')
+        .update(payload)
+        .in('id', ids)
+      if (error) { updateError = error; break }
+    }
 
     logger.debug('[updateTasksBulk] DB response:', { error: updateError?.message })
 
@@ -1371,32 +1413,10 @@ export function useSupabaseTasks() {
       throw updateError
     }
 
-    // The unshare half of the coupling, which one bulk payload can't express:
-    // only the rows that were family+compound lose the share, and only when
-    // the new area is a private one. Bulk-tagging a mixed selection `personal`
-    // otherwise leaves the previously-family rows readable by the household.
-    if (!('scope' in updates) && 'context' in updates && updates.context !== 'family') {
-      const toUnshare = tasksToUpdate
-        .filter((t) => scopeForContextChange(t.context, updates.context, t.scope) === 'individual')
-        .map((t) => t.id)
-      if (toUnshare.length > 0) {
-        const { error: unshareError } = await supabase
-          .from('tasks')
-          .update({ scope: 'individual' })
-          .in('id', toUnshare)
-        if (unshareError) {
-          // The area change already landed; report rather than roll back, so a
-          // still-shared row is visible instead of silent.
-          console.error('[updateTasksBulk] unshare failed:', unshareError.message)
-          showToast('Updated, but some items may still be shared', 'error', 4000)
-        }
-      }
-    }
-
     for (const t of tasksToUpdate) {
-      announceLocalWrite({ kind: 'update', task: { ...t, ...updates } })
+      announceLocalWrite({ kind: 'update', task: merged(t) })
     }
-  }, [tasks])
+  }, [tasks, getCurrentUserMember])
 
   /**
    * Write a different sort_order to each of several tasks. `updateTasksBulk`

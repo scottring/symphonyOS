@@ -86,7 +86,7 @@ export interface Routine {
   // WHO CAN SEE IT — orthogonal to `context`, and the only column routines RLS
   // reads (2026-06-07_scope_axis.sql:44). A family-tagged routine left at the
   // 'individual' column default is invisible to the rest of the household.
-  // The coupling lives in defaultScopeForArea/scopeForContextChange.
+  // DERIVED, never chosen: the rule lives in scopeForDomain (src/lib/scope.ts).
   scope: Scope
   project_id?: string | null // Optional link to the program/project this routine belongs to
   parent_routine_id?: string | null // When set, this routine is a Step of that collection

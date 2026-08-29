@@ -11,7 +11,7 @@
 // for its OWNER and is unreadable by the rest of the household. It looks shared
 // and isn't, and nothing on screen says so.
 //
-// addTask() gets this right via defaultScopeForArea() (src/lib/scope.ts).
+// addTask() gets this right via scopeForDomain() (src/lib/scope.ts).
 // THREE call sites built the payload by hand instead and did not:
 //   - the wall's quick capture (WallV2Shell)
 //   - extract-capture (task rows + triage note)
@@ -41,13 +41,21 @@
 //     triage question, not a bug — and which are the LARGER half of the
 //     real-world symptom this bug class produced.
 //
+// Since 2026-08-29 scope is DERIVED, not defaulted: scopeForDomain is the only
+// thing allowed to produce a scope value, and the third test below enforces
+// that by scanning for a literal at any `scope:` key outside scope.ts. That
+// closes most of the gaps listed above — a payload built in a variable, or a
+// write through a path nobody pinned by name, still cannot name a scope.
+// What remains open: a scope written as a non-literal whose runtime value is
+// wrong, and writes that go through an RPC or a database function.
+//
 // Bottom line: a tripwire for a scoped-table write that names a context and
-// forgets the scope, plus three named files pinned by explicit assertion.
+// forgets the scope, plus one that forbids naming a scope by hand at all.
 
 import { describe, it, expect } from 'vitest'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
-import { defaultScopeForArea } from './scope'
+import { scopeForDomain } from './scope'
 
 const SRC = join(process.cwd(), 'src')
 const FUNCTIONS = join(process.cwd(), 'supabase/functions')
@@ -108,9 +116,9 @@ const ALLOWED: Record<string, string> = {
 }
 
 describe('a written context implies a written scope', () => {
-  it('defaultScopeForArea is the single definition of the coupling', () => {
-    // If this flips, every hardcoded 'compound' beside a family context is stale.
-    expect(defaultScopeForArea('family')).toBe('compound')
+  it('scopeForDomain is the single definition of the coupling', () => {
+    // If this flips, every scope derived beside a family context is stale.
+    expect(scopeForDomain('family', [], null)).toBe('compound')
   })
 
   it('no inline insert/upsert to a scoped table names a context without a scope', () => {
@@ -132,29 +140,35 @@ describe('a written context implies a written scope', () => {
       offenders,
       'These writes set a life-area context but leave scope at its ' +
         "'individual' default, so the row is invisible to the rest of the " +
-        'household. Add scope beside the context (see defaultScopeForArea).',
+        'household. Add scope beside the context (see scopeForDomain).',
     ).toEqual([])
   })
 
   // Pinned by name: these build their payload in a way the scan above either
-  // cannot see (vault-sync's variable) or would catch only by accident.
-  it('extract-capture sets a scope on both of its family-context writes', () => {
-    const text = stripComments(
-      readFileSync(join(FUNCTIONS, 'extract-capture/index.ts'), 'utf8'),
-    )
-    // Two known writers: the task row (buildTaskRow) and the triage note.
-    // A third should fail this count and force a look rather than sliding in.
-    expect(text.match(/context:\s*'family'/g) ?? []).toHaveLength(2)
-    expect(text.match(/scope:\s*'compound'/g) ?? []).toHaveLength(2)
+  // cannot see (vault-sync's variable) or would catch only by accident. What
+  // they must show now is the DERIVATION, not a pinned literal.
+  it('the edge functions derive every scope they write', () => {
+    for (const fn of ['extract-capture', 'vault-sync', 'meal-planner-chat']) {
+      const text = stripComments(readFileSync(join(FUNCTIONS, fn, 'index.ts'), 'utf8'))
+      expect(text, `${fn} must call its local scopeFor mirror`).toMatch(/scope:\s*scopeFor\(/)
+    }
   })
 
-  it('vault-sync couples scope to the mapped context on its note upsert', () => {
-    const text = stripComments(
-      readFileSync(join(FUNCTIONS, 'vault-sync/index.ts'), 'utf8'),
-    )
-    // The payload is a variable, so assert the coupling expression itself.
-    expect(text).toMatch(
-      /scope:\s*context === 'family' \? 'compound' : 'individual'/,
-    )
+  // The tripwire that makes scope a DERIVATION rather than a convention: no
+  // file but scope.ts may name a scope value at a `scope:` key. The edge
+  // functions' local `scopeFor` mirrors `return '…'` rather than `scope: '…'`,
+  // so they pass; UsView's reads compare with `===`, so it passes too.
+  it('no source file outside scope.ts writes a literal scope value', () => {
+    const offenders: string[] = []
+    for (const file of [...sourceFiles(SRC), ...sourceFiles(FUNCTIONS)]) {
+      const rel = file.replace(process.cwd() + '/', '')
+      if (rel === 'src/lib/scope.ts') continue
+      // Test fixtures under src/test/ describe rows that already exist; they
+      // are not write paths.
+      if (rel.startsWith('src/test/')) continue
+      const text = stripComments(readFileSync(file, 'utf8'))
+      if (/\bscope:\s*'(individual|couple|compound)'/.test(text)) offenders.push(rel)
+    }
+    expect(offenders, 'scope is derived by scopeForDomain — never written as a literal').toEqual([])
   })
 })

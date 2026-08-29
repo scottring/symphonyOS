@@ -26,24 +26,7 @@ describe('PanelClassify', () => {
     expect(onContextChange).toHaveBeenCalledWith('family')
   })
 
-  it('shows the scope control and reports scope changes when onScopeChange is given', () => {
-    const onScopeChange = vi.fn()
-    render(
-      <PanelClassify
-        context={undefined}
-        onContextChange={vi.fn()}
-        members={members}
-        selectedAssigneeIds={[]}
-        onAssigneesChange={vi.fn()}
-        scope="individual"
-        onScopeChange={onScopeChange}
-      />,
-    )
-    fireEvent.click(screen.getByRole('button', { name: 'Us' }))
-    expect(onScopeChange).toHaveBeenCalledWith('couple')
-  })
-
-  it('hides the scope control when onScopeChange is omitted', () => {
+  it('never renders a scope control — scope is derived, not chosen', () => {
     render(
       <PanelClassify
         context={undefined}
@@ -54,6 +37,7 @@ describe('PanelClassify', () => {
       />,
     )
     expect(screen.queryByRole('group', { name: /who can see this/i })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Us' })).toBeNull()
   })
 
   it('reflects the current assignee selection in the trigger label', () => {

@@ -2,6 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, waitFor, act } from '@testing-library/react'
 import { useRoutines } from './useRoutines'
 
+// Scope is DERIVED from the routine's domain + its assignees (scopeForDomain
+// in src/lib/scope.ts) on every routine write — never passed in.
+//
 // Routines share on `scope`, and ONLY on scope: the routines RLS read policy is
 // `auth.uid() = user_id OR (scope IN ('couple','compound') AND
 // users_share_household(...))` (2026-06-07_scope_axis.sql:44). `context` is a
@@ -142,11 +145,13 @@ describe('addRoutine — a created routine names who can see it', () => {
     expect(inserts[0].scope).toBe('individual')
   })
 
-  it('honours a scope the caller chose over the life area default', async () => {
+  it('shares a personal routine with the member it is handed to', async () => {
     const { result } = await mountLoaded()
 
     await act(async () => {
-      await result.current.addRoutine({ name: 'Monthly Financial Review', context: 'family', scope: 'couple' })
+      await result.current.addRoutine({
+        name: 'Monthly Financial Review', context: 'personal', assigned_to: 'member-partner',
+      })
     })
 
     expect(inserts[0].scope).toBe('couple')
@@ -178,9 +183,9 @@ describe('updateRoutine — tagging a routine family actually shares it', () => 
     expect(writeFor('review').scope).toBe('individual')
   })
 
-  it('leaves a deliberately chosen scope alone', async () => {
-    // `couple` on a personal routine is a choice the family tag never made, so
-    // moving to another private area must not silently undo it.
+  it('recomputes a hand-set scope rather than preserving it', async () => {
+    // Scope is not a choice any more: an unassigned private routine is
+    // individual, whatever the column happened to hold.
     mockRoutines.push(dbRoutine({ id: 'meds', context: 'personal', scope: 'couple' }))
     const { result } = await mountLoaded()
 
@@ -188,7 +193,7 @@ describe('updateRoutine — tagging a routine family actually shares it', () => 
       await result.current.updateRoutine('meds', { context: 'work' })
     })
 
-    expect(writeFor('meds')).not.toHaveProperty('scope')
+    expect(writeFor('meds').scope).toBe('individual')
   })
 
   it('does not touch scope on an update that leaves the life area alone', async () => {
@@ -202,14 +207,27 @@ describe('updateRoutine — tagging a routine family actually shares it', () => 
     expect(writeFor('plants')).not.toHaveProperty('scope')
   })
 
-  it('honours an explicit scope over the context coupling', async () => {
-    mockRoutines.push(dbRoutine({ id: 'camp' }))
+  it('shares a routine handed to another member, without touching its area', async () => {
+    mockRoutines.push(dbRoutine({ id: 'camp', context: 'personal' }))
     const { result } = await mountLoaded()
 
     await act(async () => {
-      await result.current.updateRoutine('camp', { context: 'family', scope: 'couple' })
+      await result.current.updateRoutine('camp', { assigned_to: 'member-partner' })
     })
 
-    expect(writeFor('camp').scope).toBe('couple')
+    const write = writeFor('camp')
+    expect(write.scope).toBe('couple')
+    expect(write).not.toHaveProperty('context')
+  })
+
+  it('takes the share back when the assignee is cleared', async () => {
+    mockRoutines.push(dbRoutine({ id: 'camp', context: 'personal', scope: 'couple' }))
+    const { result } = await mountLoaded()
+
+    await act(async () => {
+      await result.current.updateRoutine('camp', { assigned_to: null })
+    })
+
+    expect(writeFor('camp').scope).toBe('individual')
   })
 })
