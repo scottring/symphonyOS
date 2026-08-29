@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
-import { filterTasksForDomainView } from './domainFilter'
+import { filterTasksForLayers } from './domainFilter'
 import { makeAssigneeFilter } from './assigneeFilter'
+import { UNSORTED, type Layer } from '@/lib/domains'
 import type { Task } from '@/types/task'
 
 // The reported bug: Scott and Iris opened the same day and saw two different
@@ -37,57 +38,72 @@ const household = [
   task({ id: 'untagged', context: null }),
 ]
 
-/** What a surface renders: domain filter, then the assignee lens. */
-function visible(domain: 'family' | 'work' | 'personal' | 'universal', assignees: string[]) {
+/** What a surface renders: the layer filter, then the assignee lens. */
+function visible(layers: ReadonlySet<Layer>, assignees: string[]) {
   const match = makeAssigneeFilter(assignees)
-  return filterTasksForDomainView(household, domain)
+  return filterTasksForLayers(household, layers)
     .filter((t) => match(t.assignedTo, t.assignedToAll))
     .map((t) => t.id)
 }
 
-describe('the family chooser shows the whole household', () => {
+const L = (...xs: Layer[]) => new Set<Layer>(xs)
+
+describe('the family layer shows the whole household', () => {
   it('shows every family item regardless of who it belongs to', () => {
-    // Default filter is everyone — [] — for both people.
-    expect(visible('family', [])).toEqual(['feed-jax', 'kitchen', 'laundry', 'mold', 'untagged'])
+    // Default filter is everyone — [] — for both people. Unsorted is checked
+    // too, matching the app default (every layer checked).
+    expect(visible(L('family', UNSORTED), [])).toEqual(['feed-jax', 'kitchen', 'laundry', 'mold', 'untagged'])
   })
 
   it('gives two members of one household the SAME family day', () => {
-    expect(visible('family', [])).toEqual(visible('family', []))
+    expect(visible(L('family'), [])).toEqual(visible(L('family'), []))
     // The bug in one line: seeded to [me], each saw a different subset.
-    expect(visible('family', [SCOTT])).not.toEqual(visible('family', [IRIS]))
+    expect(visible(L('family'), [SCOTT])).not.toEqual(visible(L('family'), [IRIS]))
   })
 
   it('keeps unassigned household work visible — it is the easiest to drop', () => {
-    // makeAssigneeFilter([me]) returns false for an unassigned item, so the old
-    // default hid every unclaimed chore.
-    expect(visible('family', [])).toContain('mold')
+    expect(visible(L('family'), [])).toContain('mold')
   })
 })
 
 describe('narrowing to a person stays available', () => {
   it('is an opt-in lens, not the default', () => {
-    expect(visible('family', [ELLA])).toEqual(['feed-jax', 'kitchen'])
-    expect(visible('family', [SCOTT])).toEqual(['laundry'])
+    expect(visible(L('family'), [ELLA])).toEqual(['feed-jax', 'kitchen'])
+    expect(visible(L('family'), [SCOTT])).toEqual(['laundry'])
   })
 
   it('ORs "unassigned" with the named members instead of replacing them', () => {
     // The Inbox's old local copy returned early on 'unassigned' and dropped
     // every named member from the selection.
-    // 'untagged' is unassigned too, and untagged items show in every domain.
-    expect(visible('family', [ELLA, 'unassigned']))
+    expect(visible(L('family', UNSORTED), [ELLA, 'unassigned']))
       .toEqual(['feed-jax', 'kitchen', 'mold', 'untagged'])
   })
 })
 
-describe('other contexts behave the same way — RLS is the privacy gate', () => {
+describe('other layers behave the same way — RLS is the privacy gate', () => {
   it('does not hide an item just because someone else is assigned', () => {
     // 'her-shared-personal' only reached this client because its scope is
     // couple/compound — she chose to share it. The view must not re-hide it.
-    expect(visible('personal', [])).toEqual(['her-shared-personal', 'untagged'])
-    expect(visible('work', [])).toEqual(['my-work', 'untagged'])
+    expect(visible(L('personal'), [])).toEqual(['her-shared-personal'])
+    expect(visible(L('work'), [])).toEqual(['my-work'])
   })
 
-  it('universal shows the lot', () => {
-    expect(visible('universal', [])).toHaveLength(household.length)
+  it('every layer checked shows the lot', () => {
+    expect(visible(L('work', 'family', 'personal', UNSORTED), [])).toHaveLength(household.length)
+  })
+})
+
+// The layer rule (replaces the old single-domain "untagged shows in every
+// domain" rule): untagged is the Unsorted layer, a real layer like any other —
+// it shows iff Unsorted is checked, and is hidden otherwise.
+describe('untagged items are the Unsorted layer, not "everywhere"', () => {
+  it('untagged is hidden from a domain when Unsorted is unchecked', () => {
+    expect(visible(L('family'), [])).not.toContain('untagged')
+    expect(visible(L('personal'), [])).not.toContain('untagged')
+  })
+
+  it('untagged shows once Unsorted is checked, alongside whatever else is checked', () => {
+    expect(visible(L(UNSORTED), [])).toEqual(['untagged'])
+    expect(visible(L('family', UNSORTED), [])).toContain('untagged')
   })
 })

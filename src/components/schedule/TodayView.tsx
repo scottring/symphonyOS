@@ -504,7 +504,7 @@ export function TodayView({
     // date filter + `type !== 'daily'` everyday-approximation + resting check.
     // `routines` is no longer domain-pre-filtered upstream (HomeView passes it
     // raw so the resolver can apply rung 4 itself) — rung 4 (domain) is what
-    // used to need the separate filterRoutinesForDomain call. `hideRoutines:
+    // used to need the separate filterRoutinesForLayers call. `hideRoutines:
     // true` sweeps ambient everyday routines (rung 7's fuller everyday-ness
     // test is a deliberate widening of the old `type !== 'daily'` check — see
     // the task report for the resulting count delta), but it deliberately does

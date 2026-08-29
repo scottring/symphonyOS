@@ -40,7 +40,7 @@ import { selectOverdue } from '@/lib/today/taskPools';
 import { selectHorizonPool, selectPlacedInWeek, selectStaleWeekPlacements, HORIZONS, type HorizonId } from '@/lib/today/horizons';
 import { belongsToWeek } from '@/lib/today/weekPlacement';
 import { readCadenceConfig, weekStartAnchor } from '@/lib/cadence/config';
-import { matchesDomain, filterEventsForDomain, domainSessionToken } from '@/lib/today/domainFilter';
+import { matchesLayers, filterEventsForLayers, domainSessionToken } from '@/lib/today/domainFilter';
 import { makeAssigneeFilter } from '@/lib/today/assigneeFilter';
 import { useConvertTaskToProject } from '@/hooks/useConvertTaskToProject';
 import { applyTriageWhen } from '@/lib/triage/applyWhen';
@@ -188,7 +188,7 @@ export function useHorizonPageData(horizon: HorizonId, anchorDate?: Date) {
   const { hideEvent } = useHiddenCalendarEvents();
   const { getDomainForCalendar } = useCalendarDomainMappings();
   const { lists, listsByCategory } = useListsContext();
-  const { currentDomain } = useDomain();
+  const { currentDomain, layers, soleDomain } = useDomain();
   const undo = useUndo();
 
   const { setSelection } = useSelection();
@@ -198,13 +198,14 @@ export function useHorizonPageData(horizon: HorizonId, anchorDate?: Date) {
   // it later is a one-line change. ──
   const match = useMemo(() => makeAssigneeFilter([]), []);
 
-  // ── Domain lens: the horizon pages follow the app's domain switcher like
-  // the rest of the app. Universal = everything; a domain shows only its own
-  // items (untagged live at the whole-life level). Filtered ONCE here so the
-  // pool, carry-over, rail counts and reference panel all agree. ──
+  // ── Layer lens: the horizon pages follow the app's layer checklist like
+  // the rest of the app. An item shows iff the layer its context maps to is
+  // checked; untagged items are the Unsorted layer, not "everywhere". Filtered
+  // ONCE here so the pool, carry-over, rail counts and reference panel all
+  // agree. ──
   const domainTasks = useMemo(
-    () => (currentDomain === 'universal' ? tasks : tasks.filter((t) => matchesDomain(t.context, currentDomain))),
-    [tasks, currentDomain],
+    () => tasks.filter((t) => matchesLayers(t.context, layers)),
+    [tasks, layers],
   );
 
   // ── Which week this page is looking at. Declared before the pool and the
@@ -311,7 +312,7 @@ export function useHorizonPageData(horizon: HorizonId, anchorDate?: Date) {
   const seasonToken = useMemo(() => guidedPeriod('seasonal').token, []);
   const { notes: seasonNotes, patchNotes: patchSeasonNotes } = usePlanningSession(
     'seasonal',
-    domainSessionToken(seasonToken, currentDomain),
+    domainSessionToken(seasonToken, soleDomain),
   );
   // Reference rows carry their lineage payload so "Copy down" threads the
   // cascade: a month copy records its season source; a season line created
@@ -326,11 +327,11 @@ export function useHorizonPageData(horizon: HorizonId, anchorDate?: Date) {
     }
     if (horizon === 'season') {
       return goals
-        .filter((g) => g.status === 'active' && matchesDomain(g.context, currentDomain))
+        .filter((g) => g.status === 'active' && matchesLayers(g.context, layers))
         .map((g) => ({ id: g.id, title: g.name, goalId: g.id, lineage: { goalId: g.id } }));
     }
     return [];
-  }, [horizon, domainTasks, match, goals, currentDomain]);
+  }, [horizon, domainTasks, match, goals, layers]);
   const referenceLabel = horizon === 'month' ? `Your ${periodLabel('season')?.split(' ')[0]} picks` : `Your ${new Date().getFullYear()} goals`;
   // "on this list" reads the lineage thread first (a copy renamed later still
   // counts); title equality is the pre-lineage fallback.
@@ -409,11 +410,11 @@ export function useHorizonPageData(horizon: HorizonId, anchorDate?: Date) {
     return overrides;
   }, [eventNotesMap]);
 
-  // Events on the month/year calendar grids scope to the current domain just
+  // Events on the month/year calendar grids scope to the checked layers just
   // like tasks — otherwise work-calendar events leak into Family/Personal.
   const domainEvents = useMemo(
-    () => filterEventsForDomain(rungEvents, currentDomain, { eventContextOverrides, getDomainForCalendar, eventNotesMap }),
-    [rungEvents, currentDomain, eventContextOverrides, getDomainForCalendar, eventNotesMap],
+    () => filterEventsForLayers(rungEvents, layers, { eventContextOverrides, getDomainForCalendar, eventNotesMap }),
+    [rungEvents, layers, eventContextOverrides, getDomainForCalendar, eventNotesMap],
   );
 
   // Fresh domain tasks for the add callback's auto-pick count (a plain dep
@@ -811,6 +812,7 @@ export function useHorizonPageData(horizon: HorizonId, anchorDate?: Date) {
     getDomainForCalendar,
     lists, listsByCategory,
     currentDomain,
+    layers,
     undo,
     match,
     domainTasks,

@@ -8,7 +8,7 @@ export function ReflectStep() {
   const { step, notes, patchNotes, domain } = useGuided()
   const key = step.props?.notesKey
   if (!key) return null
-  const variant = domain !== 'universal' ? step.byDomain?.[domain] : undefined
+  const variant = domain ? step.byDomain?.[domain] : undefined
   return (
     <textarea
       value={(notes[key] as string) ?? ''}

@@ -1,10 +1,5 @@
 import { describe, it, expect } from 'vitest'
 import {
-  matchesDomain,
-  filterTasksForPlanning,
-  filterTasksForDomainView,
-  filterEventsForDomain,
-  filterRoutinesForDomain,
   domainSessionToken,
   matchesLayers,
   filterTasksForLayers,
@@ -12,7 +7,7 @@ import {
   filterRoutinesForLayers,
 } from './domainFilter'
 import { ALL_LAYERS, UNSORTED, type Layer } from '@/lib/domains'
-import type { Task, TaskContext } from '@/types/task'
+import type { Task } from '@/types/task'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine } from '@/types/actionable'
 
@@ -27,170 +22,11 @@ const task = (overrides: Partial<Task>): Task => ({
   ...overrides,
 } as Task)
 
-describe('matchesDomain', () => {
-  it('universal matches everything, including untagged', () => {
-    expect(matchesDomain('work', 'universal')).toBe(true)
-    expect(matchesDomain(null, 'universal')).toBe(true)
-    expect(matchesDomain(undefined, 'universal')).toBe(true)
-  })
-  it('a domain matches only its exact context', () => {
-    expect(matchesDomain('work', 'work')).toBe(true)
-    expect(matchesDomain('family', 'work')).toBe(false)
-    expect(matchesDomain(null, 'work')).toBe(false)
-    expect(matchesDomain(undefined, 'personal')).toBe(false)
-  })
-})
-
-describe('filterTasksForPlanning', () => {
-  const pool = [
-    task({ id: 'w', context: 'work', bucket: 'week' }),
-    task({ id: 'f', context: 'family', bucket: 'week' }),
-    task({ id: 'n', context: null, bucket: 'week' }),
-    task({ id: 'ni', context: null, bucket: 'inbox' }),
-    task({ id: 'wi', context: 'work', bucket: 'inbox' }),
-  ]
-  it('universal returns the pool untouched', () => {
-    expect(filterTasksForPlanning(pool, 'universal')).toEqual(pool)
-  })
-  it('domain sessions see their own items plus UNTAGGED inbox only', () => {
-    const ids = filterTasksForPlanning(pool, 'work').map((t) => t.id)
-    expect(ids).toEqual(['w', 'ni', 'wi'])
-  })
-  it('untagged bucketed (non-inbox) items are hidden from domain sessions', () => {
-    const ids = filterTasksForPlanning(pool, 'family').map((t) => t.id)
-    expect(ids).toEqual(['f', 'ni'])
-  })
-})
-
-describe('filterTasksForDomainView', () => {
-  const pool = [
-    task({ id: 'w', context: 'work', bucket: 'week' }),
-    task({ id: 'f', context: 'family', bucket: 'week' }),
-    task({ id: 'p', context: 'personal', bucket: 'week' }),
-    task({ id: 'n', context: null, bucket: 'week' }),
-    task({ id: 'ni', context: null, bucket: 'inbox' }),
-  ]
-  it('universal returns the pool untouched', () => {
-    expect(filterTasksForDomainView(pool, 'universal')).toEqual(pool)
-  })
-  it('a domain shows its own items plus UNTAGGED ones, whatever the bucket', () => {
-    // The Time-block grid's leak: a personal week-bucket task showing in Family.
-    expect(filterTasksForDomainView(pool, 'family').map((t) => t.id)).toEqual(['f', 'n', 'ni'])
-    expect(filterTasksForDomainView(pool, 'work').map((t) => t.id)).toEqual(['w', 'n', 'ni'])
-  })
-  // The domain chooser answers WHAT PART OF LIFE. It must never also answer
-  // WHO — that is the assignee filter's job, and it is opt-in.
-  //
-  // This used to drop any work/personal task whose assignees did not include
-  // you. It keyed on ASSIGNEE rather than owner, so it hid a task you OWN that
-  // you had handed to your partner, and it hid a `couple`-scoped item someone
-  // deliberately shared with you. RLS is the real privacy gate
-  // (2026-06-07_scope_axis.sql:34) and another user's private row never
-  // reaches the client at all.
-  it('never filters by assignee — a life area is not a person', () => {
-    const mine = 'me'
-    const priv = [
-      task({ id: 'theirs', context: 'personal', assignedTo: 'someone-else' }),
-      task({ id: 'mine', context: 'personal', assignedTo: mine }),
-      task({ id: 'shared', context: 'work', assignedToAll: ['someone-else', mine] }),
-      task({ id: 'unassigned', context: 'personal' }),
-      task({ id: 'fam', context: 'family', assignedTo: 'someone-else' }),
-    ]
-    expect(filterTasksForDomainView(priv, 'universal').map((t) => t.id))
-      .toEqual(['theirs', 'mine', 'shared', 'unassigned', 'fam'])
-  })
-
-  it("shows the household's family items whoever they belong to", () => {
-    // The reported bug: Scott and Iris each saw a different family agenda for
-    // the same day, from rows BOTH could already fetch.
-    const scott = 'member-scott'
-    const household = [
-      task({ id: 'feed-jax', context: 'family', assignedTo: 'member-ella' }),
-      task({ id: 'kitchen', context: 'family', assignedToAll: ['member-iris', 'member-kaleb'] }),
-      task({ id: 'mine', context: 'family', assignedTo: scott }),
-      task({ id: 'nobody', context: 'family' }),
-    ]
-    expect(filterTasksForDomainView(household, 'family').map((t) => t.id))
-      .toEqual(['feed-jax', 'kitchen', 'mine', 'nobody'])
-  })
-})
-
-describe('filterEventsForDomain', () => {
-  const event = (overrides: Partial<CalendarEvent>): CalendarEvent =>
-    ({ id: Math.random().toString(36).slice(2), ...overrides }) as CalendarEvent
-
-  // calendar_id → domain mapping used by every test below
-  const byCalendar = (calendarId?: string): TaskContext | null =>
-    calendarId === 'cal-work' ? 'work' : calendarId === 'cal-family' ? 'family' : null
-
-  const pool = [
-    event({ id: 'w', calendar_id: 'cal-work' }),
-    event({ id: 'f', calendar_id: 'cal-family' }),
-    event({ id: 'u', calendar_id: 'cal-unmapped' }),
-  ]
-
-  it('universal shows everything', () => {
-    expect(filterEventsForDomain(pool, 'universal')).toEqual(pool)
-  })
-
-  it('a domain shows its own events plus untagged (unmapped calendars)', () => {
-    const ids = filterEventsForDomain(pool, 'work', { getDomainForCalendar: byCalendar }).map((e) => e.id)
-    expect(ids).toEqual(['w', 'u'])
-  })
-
-  it('other domains are hidden from a specific domain', () => {
-    const ids = filterEventsForDomain(pool, 'personal', { getDomainForCalendar: byCalendar }).map((e) => e.id)
-    expect(ids).toEqual(['u'])
-  })
-
-  it('a per-event override beats the calendar mapping', () => {
-    const overrides = new Map<string, TaskContext>([['w', 'personal']])
-    const ids = filterEventsForDomain(pool, 'personal', {
-      getDomainForCalendar: byCalendar,
-      eventContextOverrides: overrides,
-    }).map((e) => e.id)
-    expect(ids).toEqual(['w', 'u'])
-  })
-
-  it('family also shows private events explicitly shared with family', () => {
-    const notes = new Map([['w', { sharedWithFamily: true }]])
-    const ids = filterEventsForDomain(pool, 'family', {
-      getDomainForCalendar: byCalendar,
-      eventNotesMap: notes,
-    }).map((e) => e.id)
-    expect(ids).toEqual(['w', 'f', 'u'])
-  })
-
-  it('family hides private events that are not shared', () => {
-    const ids = filterEventsForDomain(pool, 'family', { getDomainForCalendar: byCalendar }).map((e) => e.id)
-    expect(ids).toEqual(['f', 'u'])
-  })
-})
-
-describe('filterRoutinesForDomain', () => {
-  const routine = (overrides: Partial<Routine>): Routine =>
-    ({ id: Math.random().toString(36).slice(2), name: 'r', ...overrides }) as Routine
-  const pool = [
-    routine({ id: 'w', context: 'work' }),
-    routine({ id: 'f', context: 'family' }),
-    routine({ id: 'u', context: null }),
-  ]
-
-  it('universal shows everything', () => {
-    expect(filterRoutinesForDomain(pool, 'universal')).toEqual(pool)
-  })
-
-  it('a domain shows only exact-context routines (untagged stay universal-only, mirroring HomeView)', () => {
-    expect(filterRoutinesForDomain(pool, 'work').map((r) => r.id)).toEqual(['w'])
-    expect(filterRoutinesForDomain(pool, 'family').map((r) => r.id)).toEqual(['f'])
-  })
-})
-
 describe('domainSessionToken', () => {
-  it('universal keeps the bare token (pre-existing rows stay valid)', () => {
-    expect(domainSessionToken('2026-W29', 'universal')).toBe('2026-W29')
+  it('null (whole-life session) keeps the bare token (pre-existing rows stay valid)', () => {
+    expect(domainSessionToken('2026-W29', null)).toBe('2026-W29')
   })
-  it('domain sessions suffix the token', () => {
+  it('a sole domain suffixes the token', () => {
     expect(domainSessionToken('2026-W29', 'work')).toBe('2026-W29|work')
     expect(domainSessionToken('2026-7', 'personal')).toBe('2026-7|personal')
   })
@@ -212,6 +48,35 @@ describe('filterTasksForLayers', () => {
     expect(filterTasksForLayers(ts, L('work', UNSORTED)).map((t) => t.id)).toEqual(['w', 'u'])
     expect(filterTasksForLayers(ts, ALL_LAYERS)).toHaveLength(3)
   })
+
+  // The context chooser answers WHAT PART OF LIFE. It must never also answer
+  // WHO — that is the assignee filter's job, and it is opt-in.
+  it('never filters by assignee — a life area is not a person', () => {
+    const mine = 'me'
+    const priv = [
+      task({ id: 'theirs', context: 'personal', assignedTo: 'someone-else' }),
+      task({ id: 'mine', context: 'personal', assignedTo: mine }),
+      task({ id: 'shared', context: 'work', assignedToAll: ['someone-else', mine] }),
+      task({ id: 'unassigned', context: 'personal' }),
+      task({ id: 'fam', context: 'family', assignedTo: 'someone-else' }),
+    ]
+    expect(filterTasksForLayers(priv, ALL_LAYERS).map((t) => t.id))
+      .toEqual(['theirs', 'mine', 'shared', 'unassigned', 'fam'])
+  })
+
+  it("shows the household's family items whoever they belong to", () => {
+    // The reported bug: Scott and Iris each saw a different family agenda for
+    // the same day, from rows BOTH could already fetch.
+    const scott = 'member-scott'
+    const household = [
+      task({ id: 'feed-jax', context: 'family', assignedTo: 'member-ella' }),
+      task({ id: 'kitchen', context: 'family', assignedToAll: ['member-iris', 'member-kaleb'] }),
+      task({ id: 'mine', context: 'family', assignedTo: scott }),
+      task({ id: 'nobody', context: 'family' }),
+    ]
+    expect(filterTasksForLayers(household, L('family')).map((t) => t.id))
+      .toEqual(['feed-jax', 'kitchen', 'mine', 'nobody'])
+  })
 })
 
 describe('filterRoutinesForLayers', () => {
@@ -219,6 +84,19 @@ describe('filterRoutinesForLayers', () => {
     const rs = [{ id: 'a', context: null }, { id: 'b', context: 'family' as const }]
     expect(filterRoutinesForLayers(rs, L('family')).map((r) => r.id)).toEqual(['b'])
     expect(filterRoutinesForLayers(rs, L(UNSORTED)).map((r) => r.id)).toEqual(['a'])
+  })
+
+  it('a single checked layer shows only its exact context (untagged needs Unsorted checked too)', () => {
+    const routine = (overrides: Partial<Routine>): Routine =>
+      ({ id: Math.random().toString(36).slice(2), name: 'r', ...overrides }) as Routine
+    const pool = [
+      routine({ id: 'w', context: 'work' }),
+      routine({ id: 'f', context: 'family' }),
+      routine({ id: 'u', context: null }),
+    ]
+    expect(filterRoutinesForLayers(pool, L('work')).map((r) => r.id)).toEqual(['w'])
+    expect(filterRoutinesForLayers(pool, L('family')).map((r) => r.id)).toEqual(['f'])
+    expect(filterRoutinesForLayers(pool, ALL_LAYERS).map((r) => r.id)).toEqual(['w', 'f', 'u'])
   })
 })
 
@@ -244,5 +122,11 @@ describe('filterEventsForLayers', () => {
     const eventNotesMap = new Map([['w', { sharedWithFamily: true }]])
     expect(filterEventsForLayers(evs, L('family'), { getDomainForCalendar, eventNotesMap })).toHaveLength(1)
     expect(filterEventsForLayers(evs, L('personal'), { getDomainForCalendar, eventNotesMap })).toHaveLength(0)
+  })
+
+  it('ALL_LAYERS shows everything, including unmapped calendars', () => {
+    const evs = [ev('w', 'work-cal'), ev('f', 'fam-cal'), ev('u', 'mystery-cal')]
+    expect(filterEventsForLayers(evs, ALL_LAYERS, { getDomainForCalendar }).map((e) => e.id))
+      .toEqual(['w', 'f', 'u'])
   })
 })

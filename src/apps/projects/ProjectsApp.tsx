@@ -7,6 +7,7 @@ import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { usePinnedItems } from '@/hooks/usePinnedItems'
 import { useEventNotes, type EventNote } from '@/hooks/useEventNotes'
 import { useDomain } from '@/hooks/useDomain'
+import { matchesLayers } from '@/lib/today/domainFilter'
 import { ProjectsList, ProjectView } from '@/components/lazy'
 import { LoadingFallback } from '@/components/layout/LoadingFallback'
 
@@ -25,14 +26,11 @@ import { LoadingFallback } from '@/components/layout/LoadingFallback'
  */
 function ProjectsIndex() {
   const navigate = useNavigate()
-  const { currentDomain } = useDomain()
+  const { currentDomain, layers } = useDomain()
   const { projects, addProject, loading } = useProjects()
   const { tasks } = useSupabaseTasks()
 
-  const filtered =
-    currentDomain === 'universal'
-      ? projects
-      : projects.filter((p) => p.context === currentDomain)
+  const filtered = projects.filter((p) => matchesLayers(p.context, layers))
 
   return (
     <Suspense fallback={<LoadingFallback />}>

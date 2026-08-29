@@ -8,7 +8,8 @@ import { useMemo, useState, useCallback, useEffect, useRef, type ComponentType }
 import { X, ArrowLeft, ArrowRight, Volume2, VolumeX, Check, Briefcase, Users, User } from 'lucide-react'
 import { usePlanningSession } from '@/hooks/usePlanningSession'
 import type { PlanningHorizon } from '@/hooks/usePlanningSession'
-import { domainSessionToken, DOMAIN_LABELS, type PlanningDomain } from '@/lib/today/domainFilter'
+import { domainSessionToken } from '@/lib/today/domainFilter'
+import { domainById, type DomainId } from '@/lib/domains'
 import { getDueSession, readCadenceConfig, dismissNudgeForToken } from '@/lib/cadence/config'
 import { SESSIONS } from './sessions'
 import { composeSession, deriveSessionState } from '@/lib/planning/composeSession'
@@ -55,11 +56,11 @@ const DOMAIN_ICONS = { work: Briefcase, family: Users, personal: User } as const
 
 interface Props {
   horizon: PlanningHorizon
-  /** Which domain this session runs in. 'universal' = the whole-life session
+  /** The sole domain this session runs in, or null for the whole-life session
    *  (bare period token — all pre-existing sessions). A domain gets its own
    *  planning_sessions row via the suffixed token, so Work and Family can
    *  plan the same week independently. */
-  domain: PlanningDomain
+  domain: DomainId | null
   host: GuidedHost
   /** Abandon (the header X): close the overlay, stay where you were. */
   onClose: () => void
@@ -195,11 +196,11 @@ export function GuidedSession({ horizon, domain, host, onClose, onFinished, onCh
   // Domain sessions may override a step's whole-life wording. Variant text
   // misses the narration manifest's exact-text match and displays silently —
   // that fallback is the design until variant audio is generated.
-  const variant = domain !== 'universal' ? step.byDomain?.[domain] : undefined
+  const variant = domain ? step.byDomain?.[domain] : undefined
   const narrationText = variant?.narration ?? step.narration
   const clipUrl = loading ? null : narrationClip(horizon, step.id, narrationText)
   const { muted, toggleMuted } = useNarrationPlayer(horizon, clipUrl)
-  const DomainIcon = domain !== 'universal' ? DOMAIN_ICONS[domain] : null
+  const DomainIcon = domain ? DOMAIN_ICONS[domain] : null
 
   const Body = REGISTRY[step.type]
   // Terrain-review and schedule steps need room — a calendar/grid crammed into
@@ -226,9 +227,9 @@ export function GuidedSession({ horizon, domain, host, onClose, onFinished, onCh
         <div>
           <div className="flex items-center gap-2.5">
             <h1 className="font-display text-2xl text-neutral-800">{config.title}</h1>
-            {DomainIcon && domain !== 'universal' && (
+            {DomainIcon && domain && (
               <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-full border border-primary-200 bg-primary-50 text-primary-700">
-                <DomainIcon className="w-3 h-3" /> {DOMAIN_LABELS[domain]}
+                <DomainIcon className="w-3 h-3" /> {domainById(domain).label}
               </span>
             )}
           </div>

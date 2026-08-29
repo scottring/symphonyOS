@@ -2,6 +2,8 @@ import { useState, useMemo, useEffect, useRef } from 'react'
 import type { Note } from '@/types/note'
 import type { Task } from '@/types/task'
 import type { Domain } from '@/hooks/useDomain'
+import type { Layer } from '@/lib/domains'
+import { matchesLayers } from '@/lib/today/domainFilter'
 import { useNoteSuggestion } from '@/hooks/useNoteSuggestion'
 
 export type NotePickerSelection =
@@ -11,6 +13,9 @@ export type NotePickerSelection =
 interface NotePickerProps {
   task: Pick<Task, 'id' | 'title' | 'notes'>
   notes: Note[]
+  layers: ReadonlySet<Layer>
+  /** Deprecated shim — only used to give useNoteSuggestion's edge-function call
+   *  a single life-area label. Not used for filtering; that's `layers`. */
   domain: Domain
   onSelect: (sel: NotePickerSelection) => void
   onClose: () => void
@@ -18,7 +23,7 @@ interface NotePickerProps {
 
 const CONFIDENCE_THRESHOLD = 0.6
 
-export function NotePicker({ task, notes, domain, onSelect, onClose }: NotePickerProps) {
+export function NotePicker({ task, notes, layers, domain, onSelect, onClose }: NotePickerProps) {
   const [query, setQuery] = useState('')
   const [creating, setCreating] = useState(false)
   const [newTitle, setNewTitle] = useState('')
@@ -28,13 +33,10 @@ export function NotePicker({ task, notes, domain, onSelect, onClose }: NotePicke
   const visibleNotes = useMemo(() => {
     return notes.filter((n) => {
       if (n.readonly) return false
-      // Domain filter: universal shows all; otherwise show matching + no-context
-      if (domain !== 'universal') {
-        if (n.context && n.context !== domain) return false
-      }
+      if (!matchesLayers(n.context, layers)) return false
       return true
     })
-  }, [notes, domain])
+  }, [notes, layers])
 
   // AI suggestion
   const { suggestion, loading } = useNoteSuggestion({

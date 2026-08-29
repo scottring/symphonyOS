@@ -35,7 +35,7 @@ export function renderStep(
     notes = {},
     patchNotes = vi.fn(),
     horizon = 'monthly' as const,
-    domain = 'universal' as const,
+    domain = null,
     goNext = vi.fn(),
     periodStart = new Date(2026, 6, 1),
     periodEnd = new Date(2026, 6, 31, 23, 59, 59),

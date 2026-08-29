@@ -2,6 +2,7 @@ import { Suspense } from 'react'
 import { Routes, Route, useNavigate, useParams, Navigate } from 'react-router-dom'
 import { GoalsProvider, useGoalsContext } from '@/contexts/GoalsContext'
 import { useDomain } from '@/hooks/useDomain'
+import { matchesLayers } from '@/lib/today/domainFilter'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
 import { GoalsList, GoalView } from '@/components/lazy'
 import { LoadingFallback } from '@/components/layout/LoadingFallback'
@@ -23,14 +24,13 @@ import { LoadingFallback } from '@/components/layout/LoadingFallback'
  */
 function GoalsIndex() {
   const navigate = useNavigate()
-  const { currentDomain } = useDomain()
+  const { currentDomain, layers } = useDomain()
   const {
     areas, goals, loading, getCurrentQuarter,
     addArea, updateArea, deleteArea, addGoal, updateGoal,
   } = useGoalsContext()
 
-  const filteredGoals =
-    currentDomain === 'universal' ? goals : goals.filter((g) => g.context === currentDomain)
+  const filteredGoals = goals.filter((g) => matchesLayers(g.context, layers))
 
   return (
     <Suspense fallback={<LoadingFallback />}>

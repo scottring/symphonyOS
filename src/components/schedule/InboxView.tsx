@@ -25,7 +25,7 @@ import { getBaseDate, getThisEvening, getNextWeekend, getWeekendAfterNext, getNe
 import { FocusInboxCard } from './FocusInboxCard'
 import { InboxModeToggle } from './InboxModeToggle'
 import { InboxUndoToast } from './InboxUndoToast'
-import { filterTasksForDomainView } from '@/lib/today/domainFilter'
+import { filterTasksForLayers } from '@/lib/today/domainFilter'
 import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
 
 const INBOX_ACTIONS: QuickAction[] = [
@@ -66,7 +66,7 @@ export function InboxView({
   const { notes, addNote, updateNote, deleteNote } = useNotes()
   const { addTask } = useSupabaseTasks()
 
-  const { currentDomain } = useDomain()
+  const { currentDomain, layers } = useDomain()
 
   const [notePickerTaskId, setNotePickerTaskId] = useState<string | null>(null)
   const [mode, setMode] = useInboxMode()
@@ -286,18 +286,18 @@ export function InboxView({
     setNotePickerTaskId(null)
   }, [notes, updateNote, deleteNote, addNote, restoreTask, onDeleteTask, currentDomain])
 
-  // Domain filter — the SHARED helper, not a local copy.
+  // Layer filter — the SHARED helper, not a local copy.
   //
-  // This was a hand-rolled duplicate of filterTasksForDomainView that had
+  // This was a hand-rolled duplicate of filterTasksForLayers that had
   // drifted from it: it carried the assignee-keyed "privacy" check that the
   // shared rule has now dropped (RLS is the real gate — see domainFilter.ts),
   // so the Inbox and Today could disagree about the same task. Untagged
-  // captures still cross every domain, which is what the inbox needs: tagging
-  // IS the triage work, and the render below narrows to bucket 'inbox'
+  // captures are the Unsorted layer — they show iff Unsorted is checked,
+  // same as every other layer; the render below narrows to bucket 'inbox'
   // anyway.
   const filteredByDomain = useMemo(
-    () => filterTasksForDomainView(tasks, currentDomain),
-    [tasks, currentDomain],
+    () => filterTasksForLayers(tasks, layers),
+    [tasks, layers],
   )
 
   // Assignee filter — the shared matcher, defaulting to everyone.
@@ -568,6 +568,7 @@ export function InboxView({
           <NotePicker
             task={task}
             notes={notes}
+            layers={layers}
             domain={currentDomain}
             onSelect={(sel) => handleNoteSelect(task, sel)}
             onClose={() => setNotePickerTaskId(null)}

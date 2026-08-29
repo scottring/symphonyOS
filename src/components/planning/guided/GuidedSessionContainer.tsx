@@ -17,7 +17,7 @@ import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { useDomain, type Domain } from '@/hooks/useDomain'
 import { useCalendarDomainMappings } from '@/hooks/useCalendarDomainMappings'
 import { isDraggableRoutine, resolveRoutineEligible } from '@/lib/routineUtils'
-import { filterTasksForPlanning, filterEventsForDomain, filterRoutinesForDomain } from '@/lib/today/domainFilter'
+import { filterTasksForLayers, filterEventsForLayers, filterRoutinesForLayers, filterByLayers } from '@/lib/today/domainFilter'
 import type { TaskBucket } from '@/types/task'
 import type { GoalStatus } from '@/types/goal'
 
@@ -60,59 +60,55 @@ export function GuidedSessionContainer({ horizon, onClose, onFinished, onChain, 
   const { routines: allRoutines, getRoutinesForDate } = useRoutines()
   const { upkeepItems, upkeepLoading, ensureUpkeepList } = useUpkeepList()
   const { getCurrentUserMember } = useFamilyMembers()
-  const { currentDomain, layers } = useDomain()
+  const { currentDomain, layers, soleDomain } = useDomain()
   const { getDomainForCalendar } = useCalendarDomainMappings()
 
-  // Domain scoping — the ONE place the session pool narrows. Every step reads
+  // Layer scoping — the ONE place the session pool narrows. Every step reads
   // host.tasks/projects/goals/events/routines, so filtering here scopes review,
   // write-list, look-above, the grid, someday and overdue without per-step
-  // changes. Universal passes everything through (the whole-life session).
-  const domainTasks = useMemo(() => filterTasksForPlanning(tasks, currentDomain), [tasks, currentDomain])
-  const domainProjects = useMemo(
-    () => (currentDomain === 'universal' ? projects : projects.filter((p) => p.context === currentDomain)),
-    [projects, currentDomain],
-  )
-  const domainGoals = useMemo(
-    () => (currentDomain === 'universal' ? goals : goals.filter((g) => g.context === currentDomain)),
-    [goals, currentDomain],
-  )
+  // changes. An item shows iff the layer its context maps to is checked;
+  // untagged items are the Unsorted layer — visible whenever Unsorted is
+  // checked, same as the whole-life session used to show them.
+  const domainTasks = useMemo(() => filterTasksForLayers(tasks, layers), [tasks, layers])
+  const domainProjects = useMemo(() => filterByLayers(projects, layers), [projects, layers])
+  const domainGoals = useMemo(() => filterByLayers(goals, layers), [goals, layers])
   // Events scope at the calendar→domain level (this container doesn't load
   // event notes, so per-event overrides/family shares don't refine it here).
   const domainEvents = useMemo(
-    () => filterEventsForDomain(events, currentDomain, { getDomainForCalendar }),
-    [events, currentDomain, getDomainForCalendar],
+    () => filterEventsForLayers(events, layers, { getDomainForCalendar }),
+    [events, layers, getDomainForCalendar],
   )
   // CalendarStep reads fetchEvents' RETURN value (not host.events), so the
-  // range fetch must come back already domain-scoped too.
+  // range fetch must come back already layer-scoped too.
   const domainFetchEvents = useCallback(
     async (start: Date, end: Date) =>
-      filterEventsForDomain(await fetchEvents(start, end), currentDomain, { getDomainForCalendar }),
-    [fetchEvents, currentDomain, getDomainForCalendar],
+      filterEventsForLayers(await fetchEvents(start, end), layers, { getDomainForCalendar }),
+    [fetchEvents, layers, getDomainForCalendar],
   )
   // KEPT (not folded into resolveRoutine): these two feed `host.routines` /
   // `host.getRoutinesForDate`, which reach PlanningSession directly.
-  // PlanningSession has no domain concept of its own — it hardcodes rung 4 to
-  // 'universal' (see PlanningSession.tsx) because every caller already hands
-  // it a domain-scoped pool. Deleting this pre-filter would remove domain
+  // PlanningSession has no layer concept of its own — it hardcodes rung 4 to
+  // "show everything" (see PlanningSession.tsx) because every caller already
+  // hands it a layer-scoped pool. Deleting this pre-filter would remove layer
   // scoping from the guided week grid entirely, not replace it — the exact
   // "raw pool leaked a family routine into the Personal grid" bug HomeView-
   // Container's own comments describe. Only `draggableRoutines` below moves
-  // to resolveRoutine, where the real `currentDomain` IS threaded through.
-  const domainRoutines = useMemo(() => filterRoutinesForDomain(allRoutines, currentDomain), [allRoutines, currentDomain])
+  // to resolveRoutine, where the real `layers` IS threaded through.
+  const domainRoutines = useMemo(() => filterRoutinesForLayers(allRoutines, layers), [allRoutines, layers])
   const domainGetRoutinesForDate = useCallback(
-    (date: Date) => filterRoutinesForDomain(getRoutinesForDate(date), currentDomain),
-    [getRoutinesForDate, currentDomain],
+    (date: Date) => filterRoutinesForLayers(getRoutinesForDate(date), layers),
+    [getRoutinesForDate, layers],
   )
-  // Untagged inbox items stay visible in a domain session (pre-triage — see
-  // filterTasksForPlanning). Routing one from here also stamps the session's
-  // domain first, otherwise it would land on a list this session hides.
-  // Sequential awaits: updateTask writes only the supplied columns, so the
-  // stamp and the route never clobber each other.
+  // Untagged inbox items stay visible whenever Unsorted is checked — pre-triage,
+  // tagging IS the work. Routing one from here also stamps the session's sole
+  // domain first (when the session IS a single domain), otherwise it would land
+  // on a list this session hides. Sequential awaits: updateTask writes only the
+  // supplied columns, so the stamp and the route never clobber each other.
   const stampDomain = useCallback(async (id: string) => {
-    if (currentDomain === 'universal') return
+    if (!soleDomain) return
     const t = tasks.find((x) => x.id === id)
-    if (t && !t.context) await updateTask(id, { context: currentDomain })
-  }, [currentDomain, tasks, updateTask])
+    if (t && !t.context) await updateTask(id, { context: soleDomain })
+  }, [soleDomain, tasks, updateTask])
   const pushTaskStamped = useCallback((id: string, target: Date | 'week' | 'month' | 'quarter') => {
     void stampDomain(id).then(() => pushTask(id, target))
   }, [stampDomain, pushTask])
@@ -183,5 +179,5 @@ export function GuidedSessionContainer({ horizon, onClose, onFinished, onChain, 
     upkeepItems, upkeepLoading, ensureUpkeepList,
   }), [domainTasks, tasksLoading, domainEvents, isConnected, calendarChecking, domainFetchEvents, createEvent, pushTaskStamped, setBucketStamped, toggleTask, deleteTask, updateTask, createTaskInBucket, createDatedTask, domainProjects, projectsMap, domainGoals, areas, addGoal, addArea, updateGoal, domainRoutines, allRoutines, onScheduleRoutine, domainGetRoutinesForDate, currentDomain, layers, upkeepItems, upkeepLoading, ensureUpkeepList])
 
-  return <GuidedSession horizon={horizon} domain={currentDomain} host={host} onClose={onClose} onFinished={onFinished} onChain={onChain} />
+  return <GuidedSession horizon={horizon} domain={soleDomain} host={host} onClose={onClose} onFinished={onFinished} onChain={onChain} />
 }

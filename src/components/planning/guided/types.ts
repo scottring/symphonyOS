@@ -6,7 +6,7 @@
 
 import type { PlanningHorizon, PlanningNotes } from '@/hooks/usePlanningSession'
 import type { TaskBucket, TaskContext } from '@/types/task'
-import type { PlanningDomain } from '@/lib/today/domainFilter'
+import type { DomainId } from '@/lib/domains'
 
 export type StepType =
   | 'narration'      // instruction moment, Continue
@@ -92,8 +92,9 @@ export interface GuidedSessionConfig {
 /** Everything a step component receives. Passed via GuidedContext. */
 export interface GuidedStepRenderContext {
   horizon: PlanningHorizon
-  /** The domain this session runs in. 'universal' = whole-life (default). */
-  domain: PlanningDomain
+  /** The sole domain this session runs in, or null for a whole-life
+   *  (multi-layer) session. */
+  domain: DomainId | null
   periodToken: string
   periodLabel: string
   periodStart: Date

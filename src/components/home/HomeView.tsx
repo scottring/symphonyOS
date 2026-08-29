@@ -5,11 +5,12 @@ import type { Project } from '@/types/project'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine, ActionableInstance } from '@/types/actionable'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
-import { filterEventsForDomain, filterRoutinesForDomain, filterTasksForDomainView } from '@/lib/today/domainFilter'
+import { filterEventsForLayers, filterRoutinesForLayers, filterTasksForLayers, filterByLayers } from '@/lib/today/domainFilter'
+import { domainById } from '@/lib/domains'
 import { useHomeView } from '@/hooks/useHomeView'
 import { useMobile } from '@/hooks/useMobile'
 import { useUndo } from '@/hooks/useUndo'
-import { useDomain, type Domain } from '@/hooks/useDomain'
+import { useDomain } from '@/hooks/useDomain'
 import { WeekView } from './WeekView'
 import { WeekViewV2 } from './week/WeekViewV2'
 import { WeekViewMobile } from './week/WeekViewMobile'
@@ -74,43 +75,40 @@ export function HomeView({
   const currentView = fixedView ?? hookView
   const isMobile = useMobile()
   const { currentAction, pushAction, executeUndo, dismiss } = useUndo()
-  const { currentDomain, layers } = useDomain()
+  const { layers, soleDomain } = useDomain()
 
-  // Filter tasks, routines, projects, and events by current domain.
-  // Task scoping lives in filterTasksForDomainView (shared with the Time-block
-  // grid, which is launched from this page and must show the same day): a
-  // specific domain isolates to its OWN items plus UNTAGGED ones (which get a
-  // pulsing tag glow rather than disappearing). Life area only — never who
+  // Filter tasks, routines, projects, and events by the checked layer set.
+  // Task scoping lives in filterTasksForLayers (shared with the Time-block
+  // grid, which is launched from this page and must show the same day): an
+  // item shows iff the layer its context maps to is checked — untagged items
+  // are the Unsorted layer, not "everywhere". Life area only — never who
   // owns or is assigned the item; that is the assignee filter's job.
   const filteredTasks = useMemo(
-    () => filterTasksForDomainView(tasks, currentDomain),
-    [tasks, currentDomain])
+    () => filterTasksForLayers(tasks, layers),
+    [tasks, layers])
 
   // Neither TodayView nor CascadingRiverView consumes this for visibility any
-  // more — both apply domain scoping themselves via resolveRoutine (rung 4)
+  // more — both apply layer scoping themselves via resolveRoutine (rung 4)
   // against the raw `routines` prop. This memo survives only to feed
-  // `hasUnassignedTasks` below, which wants the current domain's routines.
+  // `hasUnassignedTasks` below, which wants the checked layers' routines.
   const filteredRoutines = useMemo(
-    () => filterRoutinesForDomain(routines, currentDomain),
-    [routines, currentDomain])
+    () => filterRoutinesForLayers(routines, layers),
+    [routines, layers])
 
-  const filteredProjects = useMemo(() => {
-    if (currentDomain === 'universal') return projects
-    return projects.filter(project => project.context === currentDomain)
-  }, [projects, currentDomain])
+  const filteredProjects = useMemo(() => filterByLayers(projects, layers), [projects, layers])
 
-  // Calendar events are domain-filtered like tasks. An event's context is
-  // resolved (manual override → calendar→domain mapping → null). A specific
-  // domain shows its own events PLUS untagged ones (calendars with no domain
-  // mapping stay visible everywhere until mapped); Universal shows all. This
-  // stops e.g. work-calendar events leaking into the Family/Personal views.
+  // Calendar events are layer-filtered like tasks. An event's context is
+  // resolved (manual override → calendar→domain mapping → Unsorted). The
+  // checked layers show their own events; an unmapped calendar sits in
+  // Unsorted until mapped. This stops e.g. work-calendar events leaking into
+  // the Family/Personal views.
   const filteredEvents = useMemo(
-    () => filterEventsForDomain(events, currentDomain, {
+    () => filterEventsForLayers(events, layers, {
       eventContextOverrides: ctx.eventContextOverrides,
       getDomainForCalendar: ctx.getDomainForCalendar,
       eventNotesMap: ctx.eventNotesMap,
     }),
-    [events, currentDomain, ctx.eventContextOverrides, ctx.getDomainForCalendar, ctx.eventNotesMap])
+    [events, layers, ctx.eventContextOverrides, ctx.getDomainForCalendar, ctx.eventNotesMap])
 
   // Assignee filter state — persisted, and defaulting to EVERYONE.
   //
@@ -365,8 +363,8 @@ export function HomeView({
           tasks={filteredTasks}
           events={filteredEvents}
           // Domain-UNfiltered on purpose, same reasoning as TodayView below:
-          // the river now applies domain scoping itself via resolveRoutine
-          // (rung 4), threaded through as `currentDomain`. Passing the
+          // the river now applies layer scoping itself via resolveRoutine
+          // (rung 4), reading `layers` from useDomain() itself. Passing the
           // shared `filteredRoutines` memo here would double-filter (harmless,
           // since both predicates agree) but re-couples this surface to a memo
           // it no longer needs — pass the raw list so River owns its own rung 4.
@@ -407,8 +405,8 @@ export function HomeView({
         tasks={filteredTasks}
         events={filteredEvents}
         // Domain-UNfiltered on purpose: TodayView's own pipeline applies
-        // domain scoping via resolveRoutine (rung 4), threaded through as
-        // `domain: currentDomain`. CascadingRiverView (above) now does the
+        // layer scoping via resolveRoutine (rung 4), reading `layers` from
+        // useDomain() itself. CascadingRiverView (above) now does the
         // same, so `filteredRoutines` below is no longer shared for routine
         // visibility by either surface — it survives only to compute
         // `hasUnassignedTasks`.
@@ -438,16 +436,11 @@ export function HomeView({
     )
   }
 
-  // Subtle domain background tint
-  const DOMAIN_BG: Record<Domain, string> = {
-    universal: '',
-    work: 'bg-blue-50/20',
-    family: 'bg-amber-50/20',
-    personal: 'bg-purple-50/20',
-  }
+  // Subtle domain background tint — only when exactly one real domain is checked.
+  const tint = soleDomain ? domainById(soleDomain).bgClass : ''
 
   return (
-    <div className={`relative flex flex-col h-full transition-colors duration-500 ${DOMAIN_BG[currentDomain]}`}>
+    <div className={`relative flex flex-col h-full transition-colors duration-500 ${tint}`}>
       {/* Today header is rendered INSIDE the scroll container so it shares
           the exact same max-w/px column as TodayView's content, keeping the
           date label and controls left/right-aligned with the task rows.

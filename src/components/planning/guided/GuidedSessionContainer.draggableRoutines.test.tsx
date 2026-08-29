@@ -57,7 +57,7 @@ vi.mock('@/hooks/useDomain', () => ({
   // test-utils.tsx's AllTheProviders wraps every render in the real
   // DomainProvider, so the mock has to keep providing one too.
   DomainProvider: ({ children }: { children: ReactNode }) => children,
-  useDomain: () => ({ currentDomain: 'universal', layers: ALL_LAYERS }),
+  useDomain: () => ({ currentDomain: 'universal', layers: ALL_LAYERS, soleDomain: null }),
 }))
 vi.mock('@/hooks/useCalendarDomainMappings', () => ({
   useCalendarDomainMappings: () => ({ getDomainForCalendar: () => null }),

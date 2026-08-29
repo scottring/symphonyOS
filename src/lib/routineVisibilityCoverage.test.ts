@@ -43,7 +43,7 @@
 // (`visibility`, `show_on_timeline`, `isEverydayRoutine`). A new call site
 // can reimplement rung 6 via `parent_routine_id`, rung 2 via
 // `getRoutinesForDatePure`/`matchesRecurrenceForDate`, rung 4 via
-// `filterRoutinesForDomain`, or rung 5 via `makeAssigneeFilter`, and this
+// `filterRoutinesForLayers`, or rung 5 via `makeAssigneeFilter`, and this
 // test will stay green. Those identifiers are deliberately NOT added to
 // PRIMITIVES — they are legitimately used all over the codebase for things
 // that have nothing to do with visibility, and watching them would make this

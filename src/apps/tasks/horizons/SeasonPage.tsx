@@ -18,7 +18,7 @@ import { BetsGrid } from '@/components/planning/season/BetsGrid';
 import { OverflowTray } from '@/components/planning/season/OverflowTray';
 import { SeasonMonthStrips } from '@/components/planning/season/SeasonMonthStrips';
 import { FocusLine } from '@/components/planning/season/FocusLine';
-import { matchesDomain } from '@/lib/today/domainFilter';
+import { matchesLayers } from '@/lib/today/domainFilter';
 import { seasonStart } from '@/lib/cadence/periods';
 import { partitionSeason, PICK_CAP } from '@/lib/planning/betPulse';
 import { looksLikeActivity } from '@/lib/planning/outcomeCoach';
@@ -32,7 +32,7 @@ export function SeasonPage() {
     planDisabled, handlePlan, rungName, isCascadeRung, hasExplainer,
     explainerOpen, setExplainerOpen, label, renderRow,
     seasonNotes, patchSeasonNotes, composerRef, draft, setDraft, submitDraft,
-    sharpenBet, sharpenBetLoading, goals, currentDomain, areas, addGoal,
+    sharpenBet, sharpenBetLoading, goals, currentDomain, layers, areas, addGoal,
     handleLetGo, referenceFold,
     setRefOpen, setTranslatingRefId, setRefDraft,
     scheduleActionsValue, undo, domainEvents,
@@ -51,7 +51,7 @@ export function SeasonPage() {
   // surfaces on the Family season page.
   const pickedGoalIds = new Set(picks.map((p) => p.goalId).filter(Boolean));
   const uncovered = goals.filter(
-    (g) => matchesDomain(g.context, currentDomain) && g.status === 'active' && !pickedGoalIds.has(g.id),
+    (g) => matchesLayers(g.context, layers) && g.status === 'active' && !pickedGoalIds.has(g.id),
   );
 
   return (
@@ -191,7 +191,7 @@ export function SeasonPage() {
                   <div className="mt-3">
                     <ListSuggestions
                       bucket="quarter"
-                      aboveItems={goals.filter((g) => g.status === 'active' && matchesDomain(g.context, currentDomain)).map((g) => g.name)}
+                      aboveItems={goals.filter((g) => g.status === 'active' && matchesLayers(g.context, layers)).map((g) => g.name)}
                       aboveLabel="your year goals"
                       existingItems={domainTasks.filter((t) => t.bucket === 'quarter').map((t) => t.title)}
                       onPick={(t) => { setDraft(t); composerRef.current?.focus(); }}
@@ -252,7 +252,7 @@ export function SeasonPage() {
               items={shelf}
               picks={picks}
               onPick={(id) => updateTask(id, { pickedAt: new Date() })}
-              goals={goals.filter((g) => g.status === 'active' && matchesDomain(g.context, currentDomain)).map((g) => ({ id: g.id, name: g.name }))}
+              goals={goals.filter((g) => g.status === 'active' && matchesLayers(g.context, layers)).map((g) => ({ id: g.id, name: g.name }))}
               onFileUnder={(id, goalId) => updateTask(id, { pickedAt: new Date(), goalId })}
               onSwap={(shelfId, replacedPickId) => {
                 void updateTask(replacedPickId, { pickedAt: undefined });

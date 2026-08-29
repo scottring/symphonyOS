@@ -41,7 +41,7 @@ import { useDomain } from '@/hooks/useDomain';
 import { useCalendarDomainMappings } from '@/hooks/useCalendarDomainMappings';
 import { useRefreshOnVisible } from '@/hooks/useRefreshOnVisible';
 import { useDayRollover } from '@/hooks/useDayRollover';
-import { filterTasksForDomainView, filterRoutinesForDomain, filterEventsForDomain } from '@/lib/today/domainFilter';
+import { filterTasksForLayers, filterRoutinesForLayers, filterEventsForLayers } from '@/lib/today/domainFilter';
 import { useListsContext } from '@/contexts/ListsContext';
 import { supabase, getAuthUser } from '@/lib/supabase';
 import { TO_BUY_LIST_TITLE, findToBuyList, buyItemText, announceToBuyChanged } from '@/lib/lists/toBuy';
@@ -246,29 +246,29 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
     return overrides;
   }, [eventNotesMap]);
 
-  // ── Domain-scoped pools for the time-block grid ──
+  // ── Layer-scoped pools for the time-block grid ──
   // useScheduleFiltering only narrows to the VIEWED DATE — HomeView applies the
-  // domain scope itself, on its own copy of these props. PlanningSession has no
+  // layer scope itself, on its own copy of these props. PlanningSession has no
   // such internal filter, so the container has to hand it already-scoped pools;
   // passing the raw ones leaked e.g. a personal task and family routines into
-  // the Family/Personal grid. Same helpers, same semantics as HomeView.
+  // a single-domain grid. Same helpers, same semantics as HomeView.
   const planningTasks = useMemo(
-    () => filterTasksForDomainView(tasks, currentDomain),
-    [tasks, currentDomain],
+    () => filterTasksForLayers(tasks, layers),
+    [tasks, layers],
   );
   const planningRoutines = useMemo(
-    () => filterRoutinesForDomain(filteredRoutines, currentDomain),
-    [filteredRoutines, currentDomain],
+    () => filterRoutinesForLayers(filteredRoutines, layers),
+    [filteredRoutines, layers],
   );
   const planningAllRoutines = useMemo(
-    () => filterRoutinesForDomain(allRoutines, currentDomain),
-    [allRoutines, currentDomain],
+    () => filterRoutinesForLayers(allRoutines, layers),
+    [allRoutines, layers],
   );
   // resolveRoutine replaces the hand-rolled visibility/everyday/timed check —
   // same rungs (resting, everyday-sweep, timed) plus the ones the old
-  // predicate never asked (off-timeline, not-theirs, in-collection). Domain
+  // predicate never asked (off-timeline, not-theirs, in-collection). Layer
   // scoping now happens INSIDE the resolveRoutine call (rung 4), so this no
-  // longer needs the separate filterRoutinesForDomain wrapper the sibling
+  // longer needs the separate filterRoutinesForLayers wrapper the sibling
   // pools above still use. `hideRoutines: true` preserves the old everyday-sweep
   // exclusion — this grid is time-block Today, so ambient everyday routines
   // are never drag candidates.
@@ -281,12 +281,12 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
     [allRoutines, layers, viewedDate],
   );
   const planningEvents = useMemo(
-    () => filterEventsForDomain(filteredEvents, currentDomain, {
+    () => filterEventsForLayers(filteredEvents, layers, {
       eventContextOverrides,
       getDomainForCalendar,
       eventNotesMap: eventNotesMapWithDefaults,
     }),
-    [filteredEvents, currentDomain, eventContextOverrides, getDomainForCalendar, eventNotesMapWithDefaults],
+    [filteredEvents, layers, eventContextOverrides, getDomainForCalendar, eventNotesMapWithDefaults],
   );
 
   const onCreateTaskFromValue = useCallback(

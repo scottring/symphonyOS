@@ -13,6 +13,7 @@ import { useContacts } from '@/hooks/useContacts'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { usePinnedItems } from '@/hooks/usePinnedItems'
 import { useDomain } from '@/hooks/useDomain'
+import { matchesLayers } from '@/lib/today/domainFilter'
 import { RoutinesList, RoutineForm, RoutineInput } from '@/components/lazy'
 import { groupRoutineSteps } from '@/lib/today/routineCollections'
 import { nextStepOrder } from '@/lib/today/stepOrdering'
@@ -35,23 +36,23 @@ const RoutineBuilderModal = lazy(() =>
  */
 function RoutinesIndex() {
   const navigate = useNavigate()
-  const { currentDomain } = useDomain()
+  const { currentDomain, layers } = useDomain()
   const { routines, addRoutine, updateRoutine, deleteRoutine, loading } = useRoutines()
   const { contacts } = useContacts()
   const { members: familyMembers } = useFamilyMembers()
   const [builderOpen, setBuilderOpen] = useState(false)
 
-  // Steps travel with their parent through the domain lens — an unstamped
-  // step must not strip a matching collection down to a bare routine.
+  // Steps travel with their parent through the layer lens — a Step inherits
+  // its collection's layer, so an unstamped step must not strip a matching
+  // collection down to a bare routine.
   const filtered = useMemo(() => {
-    if (currentDomain === 'universal') return routines
     const byId = new Map(routines.map((r) => [r.id, r]))
     return routines.filter((r) => {
-      if (r.context === currentDomain) return true
+      if (matchesLayers(r.context, layers)) return true
       const parent = r.parent_routine_id ? byId.get(r.parent_routine_id) : undefined
-      return parent?.context === currentDomain
+      return !!parent && matchesLayers(parent.context, layers)
     })
-  }, [routines, currentDomain])
+  }, [routines, layers])
 
   const handleAddStep = useCallback(async (collectionId: string, name: string) => {
     const { collections } = groupRoutineSteps(routines)
