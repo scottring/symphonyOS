@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react'
 import { supabase, getAuthUser } from '@/lib/supabase'
 import { emitInstancesChanged } from '@/lib/instancesChangedSignal'
+import { applyProgressDelta, applyProgressExact } from '@/lib/wall/targetProgress'
 import type {
   ActionableInstance,
   InstanceNote,
@@ -221,6 +222,52 @@ export function useActionableInstances() {
       setIsLoading(false)
     }
   }, [findInstanceForDate, getOrCreateInstance])
+
+  // Add to (or set) the day's progress toward a target routine's goal.
+  // Completion is derived: progress >= target flips status to completed,
+  // and an exact correction below target flips it back to pending.
+  const writeProgress = useCallback(async (
+    entityType: EntityType,
+    entityId: string,
+    date: Date,
+    compute: (current: number | null) => ReturnType<typeof applyProgressDelta>
+  ): Promise<boolean> => {
+    setIsLoading(true)
+    setError(null)
+    try {
+      let instance = await findInstanceForDate(entityType, entityId, date)
+      if (!instance) instance = await getOrCreateInstance(entityType, entityId, date)
+      if (!instance) throw new Error('Failed to get instance')
+
+      const p = compute(instance.progress ?? null)
+      const { error: updateError } = await supabase
+        .from('actionable_instances')
+        .update({ progress: p.progress, status: p.status, completed_at: p.completed_at })
+        .eq('id', instance.id)
+      if (updateError) throw updateError
+      emitInstancesChanged()
+      return true
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to log progress'
+      setError(message)
+      console.error('writeProgress error:', err)
+      return false
+    } finally {
+      setIsLoading(false)
+    }
+  }, [findInstanceForDate, getOrCreateInstance])
+
+  const addProgress = useCallback(
+    (entityType: EntityType, entityId: string, date: Date, amount: number, target: number | null) =>
+      writeProgress(entityType, entityId, date, (cur) => applyProgressDelta(cur, amount, target, new Date())),
+    [writeProgress]
+  )
+
+  const setProgress = useCallback(
+    (entityType: EntityType, entityId: string, date: Date, value: number, target: number | null) =>
+      writeProgress(entityType, entityId, date, () => applyProgressExact(value, target, new Date())),
+    [writeProgress]
+  )
 
   // Undo done (back to pending, or back to deferred if it was a deferred instance)
   const undoDone = useCallback(async (
@@ -617,6 +664,8 @@ export function useActionableInstances() {
     skip,
     defer,
     reschedule,
+    addProgress,
+    setProgress,
     // Notes
     getNotes,
     addNote,
