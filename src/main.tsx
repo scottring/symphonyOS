@@ -165,8 +165,12 @@ createRoot(document.getElementById('root')!).render(
               <Route path="/wall-lanes" element={<Suspense fallback={null}><WallV2LanePreview /></Suspense>} />
               <Route path="/jobs/*" element={cutoverShell} />
               <Route path="/tasks-new/*" element={cutoverShell} />
-              <Route path="/morning/*" element={cutoverShell} />
-              <Route path="/bedtime/*" element={cutoverShell} />
+              {/* /morning and /bedtime retired — KidDayView (opened from the
+                  wall board) replaced them. Redirected rather than deleted:
+                  the Pi or old bookmarks may still hit these paths, and a
+                  404'd kiosk is worse than a redirect. */}
+              <Route path="/morning/*" element={<Navigate to="/wall-v2" replace />} />
+              <Route path="/bedtime/*" element={<Navigate to="/wall-v2" replace />} />
               <Route path="/meals/*" element={cutoverShell} />
               <Route path="/home/*" element={cutoverShell} />
               <Route path="/settings/*" element={cutoverShell} />

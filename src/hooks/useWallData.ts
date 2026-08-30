@@ -330,19 +330,18 @@ export function useWallData(): UseWallDataReturn {
         //    here would delete them from the wall. Comes out with the
         //    show_on_timeline data audit — see
         //    docs/superpowers/specs/assets/2026-08-26-show-on-timeline-audit.md
-        //  - parent_routine_id: null — days[].items also feeds the live
-        //    /morning and /bedtime kid checklists (MorningLaunchView,
-        //    BedtimeView), which filter on assignedTo only and fall back to
-        //    hardcoded default steps (whose taps do not persist) when a
-        //    kid's assigned items come back empty. A kid's real checklist IS
-        //    a collection's Steps, so dropping Steps at this source would
-        //    silently replace it with fake, non-persisting steps. The board
-        //    already filters Steps downstream (wallGantt.itemsFor,
-        //    wallV2Adapter.dedupeRoutines), so filtering here too buys
-        //    nothing and costs those two screens. Comes out once
-        //    MorningLaunchView/BedtimeView read collections themselves
-        //    (expanding a parent into its Steps) instead of relying on
-        //    Steps reaching them unfiltered.
+        //  - parent_routine_id: null — days[].items still needs to carry
+        //    routine Steps for the board's own downstream filters
+        //    (wallGantt.itemsFor, wallV2Adapter.dedupeRoutines), which
+        //    already de-dupe/collapse them there; filtering here too buys
+        //    nothing and costs those two screens. (The original kid-checklist
+        //    consumer this override was written for — a pair of retired
+        //    per-ritual kiosk routes that read Steps off days[].items via an
+        //    assignedTo filter — has since been replaced by KidDayView,
+        //    which reads collections directly off the raw `routines` array
+        //    instead. KidDayView only reads days[].items for plain assigned
+        //    tasks, filtering out
+        //    routine-type items, so it no longer depends on this override.)
         const dayRoutines = routines.filter(
           (r) =>
             resolveRoutine(

@@ -105,25 +105,28 @@ const ALLOWED = new Map<string, string>([
       'parent_routine_id — that primitive is deliberately not watched, see ' +
       'the file header): ' +
       '(1) `show_on_timeline: true` — rung 3 is blocked on the ' +
-      'show_on_timeline data audit; the kids\' morning/bedtime routines use ' +
-      'that flag as a Today-declutter workaround, so honouring rung 3 here ' +
-      'would delete them from the wall. Remove once the audit lands. ' +
+      'show_on_timeline data audit; the kids\' morning and bedtime routines ' +
+      'use that flag as a Today-declutter workaround, so honouring rung 3 ' +
+      'here would delete them from the wall. Remove once the audit lands. ' +
       '(2) `parent_routine_id: null` — rung 6 is excepted because ' +
-      'days[].items also feeds the live /morning and /bedtime kid ' +
-      'checklists (MorningLaunchView, BedtimeView), which filter on ' +
-      'assignedTo only and fall back to hardcoded default steps (whose taps ' +
-      'do not persist) when a kid\'s assigned items come back empty — a ' +
-      'kid\'s real checklist IS a collection\'s Steps. Remove once those two ' +
-      'screens read collections themselves instead of relying on Steps ' +
-      'reaching them unfiltered. Do not remove this entry until BOTH ' +
-      'overrides are gone.',
+      'days[].items still needs to carry a collection\'s Steps for the ' +
+      'wall board\'s own downstream filters (wallGantt.itemsFor, ' +
+      'wallV2Adapter.dedupeRoutines), which de-dupe/collapse them there. ' +
+      '(This override was originally written for a pair of retired ' +
+      'per-ritual kiosk routes\' kid checklists, which read Steps off ' +
+      'days[].items via an assignedTo filter and fell back to hardcoded ' +
+      'default steps, whose taps did not persist, when a kid\'s assigned ' +
+      'items came back empty. Those two routes were retired in favor of ' +
+      'KidDayView, which reads collections directly off the raw routines ' +
+      'array instead, so it no longer depends on this override.) Do not ' +
+      'remove this entry until BOTH overrides are gone.',
   ],
   [
     'lib/wall/kidDayModel.ts',
     "Two deliberate hits, both spec'd by the kid-day-view task brief, not " +
       'ad-hoc reasoning: (1) `show_on_timeline: true` on the loose-routine ' +
       'resolveRoutine call — the exact same sanctioned declutter-hack copy ' +
-      "as useWallData.ts's entry above (kids' morning/bedtime routines use " +
+      "as useWallData.ts's entry above (kids' morning and bedtime routines use " +
       'that flag to stay off Today; this page must still show them). ' +
       "(2) `visibility === 'active'` on a collection STEP, not a routine — " +
       "this is Rule 3's per-step applicability gate for rows already inside " +

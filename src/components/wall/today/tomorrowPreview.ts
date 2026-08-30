@@ -25,16 +25,3 @@ export function pickFirstPreviewItem(
   }
   return null
 }
-
-/** Up to `limit` non-skipped items across a day's sections, in preview order. */
-export function pickPreviewItems(
-  sections: Record<DaySection, TimelineItem[]> | undefined,
-  limit: number,
-): TimelineItem[] {
-  if (!sections) return []
-  const items: TimelineItem[] = []
-  for (const section of PREVIEW_SECTIONS) {
-    items.push(...(sections[section] || []))
-  }
-  return items.filter((i) => !i.skipped).slice(0, limit)
-}

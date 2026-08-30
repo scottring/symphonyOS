@@ -64,8 +64,6 @@ export function deriveActiveView(pathname: string): ViewType {
   if (pathname.startsWith('/meals')) return 'meals';
   if (pathname.startsWith('/agent')) return 'agent';
   if (pathname.startsWith('/us')) return 'us';
-  if (pathname === '/morning') return 'morning';
-  if (pathname === '/bedtime') return 'bedtime';
   if (pathname === '/inbox' || pathname.endsWith('/tasks-new/inbox')) return 'inbox';
   if (pathname.startsWith('/home')) return 'home-app';
   // /, /today, /tasks-new/today, /tasks-new and /task/:id all live under "today"
@@ -190,12 +188,6 @@ function ShellLayoutInner({ children }: Props) {
           return;
         case 'meals':
           navigate('/meals/plan');
-          return;
-        case 'morning':
-          navigate('/morning');
-          return;
-        case 'bedtime':
-          navigate('/bedtime');
           return;
         case 'lists':
           navigate('/lists');

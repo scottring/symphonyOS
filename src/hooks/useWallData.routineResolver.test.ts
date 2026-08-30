@@ -130,15 +130,16 @@ describe('useWallData — resolveRoutine adoption (Task 8b)', () => {
     expect(names).toContain('Daily Control')
   })
 
-  // A rung-6 exception, not a rung-6 adoption: days[].items also feeds the
-  // live /morning and /bedtime kid checklists (MorningLaunchView,
-  // BedtimeView), which filter on assignedTo only — a collection's Steps are
-  // exactly what populates a kid's checklist there. Dropping Steps at this
-  // source would silently replace a kid's real checklist with the hardcoded
-  // DEFAULT_MORNING_STEPS/DEFAULT_BEDTIME_STEPS fallback, whose taps do not
-  // persist. So a Step MUST still reach day.items — the reference parent
-  // itself still does not (unchanged from before this migration: it was
-  // 'reference', filtered by the old hand-rolled rung 1, and still is by
+  // A rung-6 exception, not a rung-6 adoption: days[].items still needs to
+  // carry a collection's Steps for the board's own downstream consumers
+  // (wallGantt.itemsFor, wallV2Adapter.dedupeRoutines), which de-dupe/
+  // collapse them there. (The kid-checklist consumer this exception was
+  // originally written for — a pair of retired per-ritual kiosk routes —
+  // has since been replaced by KidDayView, which reads collections directly
+  // off the raw routines array instead of off days[].items.) So a Step MUST
+  // still reach day.items — the reference
+  // parent itself still does not (unchanged from before this migration: it
+  // was 'reference', filtered by the old hand-rolled rung 1, and still is by
   // resolveRoutine's own rung 1).
   it('a collection Step (parent_routine_id set) still reaches the wall; its reference parent does not', async () => {
     const parent = createMockRoutine({
@@ -183,10 +184,10 @@ describe('useWallData — resolveRoutine adoption (Task 8b)', () => {
 
   // The companion to the Step-still-reaches-the-wall test above, phrased as
   // the actual consumer scenario a fix-round review found missing: a kid's
-  // assigned collection Step (the exact shape MorningLaunchView/BedtimeView
-  // read via item.assignedTo) must still reach day.items, with a sibling
-  // non-Step control from the same fetch.
-  it('a kid-assigned collection Step still reaches days[].items (feeds /morning and /bedtime)', async () => {
+  // assigned collection Step (the exact shape the wall board's downstream
+  // filters read via item.assignedTo) must still reach day.items, with a
+  // sibling non-Step control from the same fetch.
+  it('a kid-assigned collection Step still reaches days[].items (feeds the wall board)', async () => {
     const parent = createMockRoutine({
       name: 'Bedtime Collection',
       context: null,

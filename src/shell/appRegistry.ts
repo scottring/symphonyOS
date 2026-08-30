@@ -3,8 +3,6 @@ import type { AppDef } from './types';
 import { wallV2AppDef } from '@/apps/wall-v2';
 import { jobPipelineAppDef } from '@/apps/job-pipeline';
 import { tasksAppDef } from '@/apps/tasks';
-import { morningAppDef } from '@/apps/morning';
-import { bedtimeAppDef } from '@/apps/bedtime';
 import { homeAppDef } from '@/apps/home';
 import { mealsAppDef } from '@/apps/meals';
 import { settingsAppDef } from '@/apps/settings';
@@ -70,8 +68,6 @@ export const appRegistry: AppRegistry = createRegistry([
   wallV2AppDef,
   jobPipelineAppDef,
   tasksAppDef,
-  morningAppDef,
-  bedtimeAppDef,
   homeAppDef,
   mealsAppDef,
   settingsAppDef,

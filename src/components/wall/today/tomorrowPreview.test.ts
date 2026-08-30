@@ -1,5 +1,5 @@
-// Regression coverage for the "first/next item" preview pickers
-// (WallCalendar's tomorrowPreview, BedtimeView's tomorrowItems).
+// Regression coverage for the "first/next item" preview picker
+// (WallCalendar's tomorrowPreview).
 //
 // SECTIONS_ORDER lists 'allday' FIRST, which is right for rendering a whole
 // day top-to-bottom but wrong for "what's the next thing": all-day events
@@ -8,7 +8,7 @@
 // ("School run"). This is the test that would have caught that defect.
 
 import { describe, it, expect } from 'vitest'
-import { pickFirstPreviewItem, pickPreviewItems, PREVIEW_SECTIONS } from './tomorrowPreview'
+import { pickFirstPreviewItem, PREVIEW_SECTIONS } from './tomorrowPreview'
 import type { TimelineItem } from '@/types/timeline'
 import type { DaySection } from '@/lib/timeUtils'
 import { emptySections } from '@/lib/today/types'
@@ -69,47 +69,5 @@ describe('pickFirstPreviewItem', () => {
 
   it('returns null for undefined sections', () => {
     expect(pickFirstPreviewItem(undefined)).toBeNull()
-  })
-})
-
-describe('pickPreviewItems', () => {
-  it('orders the timed morning item before the all-day event', () => {
-    const allDayEvent = mkItem({
-      id: 'trash', title: 'Trash day', type: 'event', allDay: true,
-      startTime: new Date('2026-07-26T00:00:00'),
-    })
-    const timedMorning = mkItem({
-      id: 'school-run', title: 'School run',
-      startTime: new Date('2026-07-26T07:00:00'),
-    })
-    const result = pickPreviewItems(
-      sections({ allday: [allDayEvent], morning: [timedMorning] }),
-      5,
-    )
-    expect(result.map((i) => i.title)).toEqual(['School run', 'Trash day'])
-  })
-
-  it('excludes unscheduled items and respects the limit', () => {
-    const untriaged = mkItem({ id: 'someday', title: 'Someday task' })
-    const timed = [1, 2, 3].map((n) =>
-      mkItem({ id: `t${n}`, title: `Item ${n}`, startTime: new Date(`2026-07-26T0${n}:00:00`) }),
-    )
-    const result = pickPreviewItems(
-      sections({ unscheduled: [untriaged], morning: timed }),
-      2,
-    )
-    expect(result).toHaveLength(2)
-    expect(result.every((i) => i.title !== 'Someday task')).toBe(true)
-  })
-
-  it('drops skipped items', () => {
-    const skipped = mkItem({ id: 'skip', title: 'Skipped', skipped: true })
-    const kept = mkItem({ id: 'keep', title: 'Kept' })
-    const result = pickPreviewItems(sections({ morning: [skipped, kept] }), 5)
-    expect(result.map((i) => i.title)).toEqual(['Kept'])
-  })
-
-  it('returns [] for undefined sections', () => {
-    expect(pickPreviewItems(undefined, 5)).toEqual([])
   })
 })
