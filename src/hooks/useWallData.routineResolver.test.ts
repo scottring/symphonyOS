@@ -213,6 +213,42 @@ describe('useWallData — resolveRoutine adoption (Task 8b)', () => {
     expect(routineItems.map((i) => i.title)).toContain('Take Out Trash')
   })
 
+  // Task 4: useWallData exposes the RAW routine rows (result.current.routines)
+  // for a future per-member wall page to resolve parents/steps itself. "Raw"
+  // means BEFORE the wall's own effectiveTimeOfDay remap (which fills a
+  // Step's null time_of_day from its collection parent) and before the two
+  // shallow overrides at the dayRoutines call site. A Step's raw row must
+  // still carry time_of_day: null even though its collection carries the
+  // hour — proving `routines` is the unremapped fetch, not the derived
+  // `days[].items` array.
+  it('exposes raw routine rows on result.current.routines — a Step keeps time_of_day: null, not its collection hour', async () => {
+    const parent = createMockRoutine({
+      name: 'Bedtime Collection',
+      context: null,
+      visibility: 'reference',
+      time_of_day: '19:30',
+    })
+    const step = createMockRoutine({
+      name: 'Brush Teeth',
+      context: 'family',
+      parent_routine_id: parent.id,
+      time_of_day: null,
+    })
+    ROUTINES = [parent, step]
+
+    const { result } = renderHook(() => useWallData())
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    expect(result.current.routines).toBeDefined()
+    const rawStep = result.current.routines.find((r) => r.id === step.id)
+    expect(rawStep).toBeDefined()
+    expect(rawStep?.time_of_day).toBeNull()
+
+    const rawParent = result.current.routines.find((r) => r.id === parent.id)
+    expect(rawParent).toBeDefined()
+    expect(rawParent?.time_of_day).toBe('19:30')
+  })
+
   it('the one expected outcome: a collection parent + Steps fixture population is IDENTICAL to pre-migration — only the reference parent is absent', async () => {
     const parent = createMockRoutine({
       name: 'Bedtime Collection',

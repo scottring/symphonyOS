@@ -60,6 +60,15 @@ export interface UseWallDataReturn {
   overdueTasks: TimelineItem[]
   /** Raw Task[] for surfaces (e.g. WallNow) that need real Task shape, not TimelineItem. */
   tasks: Task[]
+  /**
+   * Raw fetched routine rows — BEFORE the wall's effectiveTimeOfDay remap
+   * (a Step's time_of_day stays null here, not filled from its collection
+   * parent) and before the two shallow overrides applied at the dayRoutines
+   * call site. For consumers (e.g. a per-member wall page) that need to
+   * resolve parents/steps themselves rather than consume the wall's own
+   * derived days[].items.
+   */
+  routines: Routine[]
   loading: boolean
   error: string | null
   lastRefresh: Date | null
@@ -102,6 +111,7 @@ export function useWallData(): UseWallDataReturn {
   const [screenTimeSummaries, setScreenTimeSummaries] = useState<ChildScreenTimeSummary[]>([])
   const [overdueTasks, setOverdueTasks] = useState<TimelineItem[]>([])
   const [allTasks, setAllTasks] = useState<Task[]>([])
+  const [rawRoutines, setRawRoutines] = useState<Routine[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null)
@@ -268,6 +278,7 @@ export function useWallData(): UseWallDataReturn {
       // is typically 'reference' and may carry a different context than its
       // Steps ("After camp routine" is context null, its Steps are family).
       const allRoutines = (routinesRes.data || []) as Routine[]
+      setRawRoutines(allRoutines)
       const routinesById = new Map(allRoutines.map(r => [r.id, r]))
       const routines = allRoutines
         .map(r => ({ ...r, time_of_day: effectiveTimeOfDay(r, routinesById) }))
@@ -506,5 +517,5 @@ export function useWallData(): UseWallDataReturn {
     }
   }, [fetchAllData])
 
-  return { days, familyMembers, calendarEvents: calendarEventsState, calendarUnavailable, screenTimeSummaries, overdueTasks, tasks: allTasks, loading, error, lastRefresh, refetch: fetchAllData }
+  return { days, familyMembers, calendarEvents: calendarEventsState, calendarUnavailable, screenTimeSummaries, overdueTasks, tasks: allTasks, routines: rawRoutines, loading, error, lastRefresh, refetch: fetchAllData }
 }
