@@ -170,17 +170,34 @@ function AnytimeArea({ track, roomy }: { track: GanttTrack; roomy: boolean }) {
   );
 }
 
-function Track({ track, index, onTapItem }: { track: GanttTrack; index: number; onTapItem?: (id: string) => void }) {
+function Track({ track, index, onTapItem, onTapMember }: { track: GanttTrack; index: number; onTapItem?: (id: string) => void; onTapMember?: (memberId: string) => void }) {
   const hasBars = track.blocks.length > 0;
   const hasChips = track.anytime.length > 0 || track.laterCount > 0;
+  const nameColumn = (
+    <>
+      <Face memberId={track.memberId} name={track.name} index={index} />
+      <span className={`font-display text-[1.35rem] leading-tight truncate ${WALL.inkStrong}`}>
+        {track.name}
+      </span>
+    </>
+  );
   return (
     <div className={`${WALL.card} border-l-4 ${personAccent(index)} flex items-center gap-4 pl-4 pr-3 flex-1 min-h-0 overflow-hidden`}>
-      <div style={{ width: NAME_W }} className="shrink-0 flex items-center gap-3 min-w-0">
-        <Face memberId={track.memberId} name={track.name} index={index} />
-        <span className={`font-display text-[1.35rem] leading-tight truncate ${WALL.inkStrong}`}>
-          {track.name}
-        </span>
-      </div>
+      {onTapMember && track.memberId !== HOUSEHOLD_ID ? (
+        <button
+          type="button"
+          onClick={() => onTapMember(track.memberId)}
+          style={{ width: NAME_W }}
+          aria-label={`Open ${track.name}'s day`}
+          className="shrink-0 flex items-center gap-3 min-w-0 text-left"
+        >
+          {nameColumn}
+        </button>
+      ) : (
+        <div style={{ width: NAME_W }} className="shrink-0 flex items-center gap-3 min-w-0">
+          {nameColumn}
+        </div>
+      )}
 
       {/* Nothing variable-width sits between the person block and the track,
           so every row's track starts at the same x and the ruler above them
@@ -204,7 +221,7 @@ function Track({ track, index, onTapItem }: { track: GanttTrack; index: number; 
   );
 }
 
-export function WallV2Gantt({ board, onTapItem }: { board: GanttBoard; onTapItem?: (id: string) => void }) {
+export function WallV2Gantt({ board, onTapItem, onTapMember }: { board: GanttBoard; onTapItem?: (id: string) => void; onTapMember?: (memberId: string) => void }) {
   const { axis, tracks } = board;
   const trackLeft = BORDER_L + PAD_L + NAME_W + GAP;
   return (
@@ -243,7 +260,7 @@ export function WallV2Gantt({ board, onTapItem }: { board: GanttBoard; onTapItem
         )}
 
         {tracks.map((t, i) => (
-          <Track key={t.memberId} track={t} index={i} onTapItem={onTapItem} />
+          <Track key={t.memberId} track={t} index={i} onTapItem={onTapItem} onTapMember={onTapMember} />
         ))}
       </div>
     </div>

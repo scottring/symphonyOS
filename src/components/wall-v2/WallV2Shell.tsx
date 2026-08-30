@@ -30,6 +30,10 @@ import { computeFreshness } from './wallFreshness';
 import { useDailyDiscussionPrompt } from '@/hooks/useDailyDiscussionPrompt';
 import { WallV2Gantt } from './WallV2Gantt';
 import { adaptGanttBoard, titleForBlockId } from './wallGantt';
+import { KidDayView } from './KidDayView';
+import { emptySections } from '@/lib/today/types';
+import type { TimelineItem } from '@/types/timeline';
+import type { FamilyMember } from '@/types/family';
 import { WallV2Header } from './WallV2Header';
 import { WallV2Strip } from './WallV2Strip';
 import { adaptMealRows, adaptComingUpRows } from './wallStrip';
@@ -283,6 +287,10 @@ export function WallV2Shell() {
   // behind a full-screen ambient clock/weather screen.
   const [guestMode, setGuestMode] = useState(false);
   const [recipeViewerMeal, setRecipeViewerMeal] = useState<'dinner' | 'breakfast' | null>(null);
+  // Portrait tap on the board — a member's full-screen day page. Wrapped
+  // handlers below (useCallback) so a parent re-render doesn't recreate
+  // onClose/onTapMember and restart KidDayView's idle-close timer.
+  const [kidViewMember, setKidViewMember] = useState<FamilyMember | null>(null);
   // Which dinner day the wall is looking at — shared by the face's dinner card
   // and the recipe viewer, so tapping a paged card opens that same day.
   // null = today.
@@ -577,6 +585,19 @@ export function WallV2Shell() {
     handleTapLane(itemId, titleForBlockId(ganttBoard, itemId));
   }, [handleTapLane, ganttBoard]);
 
+  // Portrait tap opens the member's full-screen day page. Both handlers are
+  // memoized: KidDayView's idle-close effect depends on `onClose`, and an
+  // unstable identity here would restart that timer on every Shell re-render.
+  const handleTapGanttMember = useCallback((id: string) => {
+    const m = wallData.familyMembers.find((fm) => fm.id === id);
+    if (m) setKidViewMember(m);
+  }, [wallData.familyMembers]);
+
+  const handleCloseKidView = useCallback(() => {
+    setKidViewMember(null);
+    void wallData.refetch();
+  }, [wallData.refetch]);
+
   // The face's dinner card opens whatever day it's currently showing. A paged
   // day always has a body or a source URL (buildMealDayRecipes drops the ones
   // that don't), so it can open without the tonight-only recipe check.
@@ -706,7 +727,7 @@ export function WallV2Shell() {
             label clipped to five characters. Pinned lists keep their one-tap
             route through the header's list action. */}
         <div className="flex-1 min-h-0 min-w-0 flex flex-col gap-3">
-          <WallV2Gantt board={ganttBoard} onTapItem={handleTapGanttItem} />
+          <WallV2Gantt board={ganttBoard} onTapItem={handleTapGanttItem} onTapMember={handleTapGanttMember} />
         </div>
 
         <WallV2Strip
@@ -785,6 +806,16 @@ export function WallV2Shell() {
           onPrevDay={goToDay(prevNavDay)}
           onNextDay={goToDay(nextNavDay)}
           onClose={() => setRecipeViewerMeal(null)}
+        />
+      )}
+
+      {kidViewMember && (
+        <KidDayView
+          member={kidViewMember}
+          routines={wallData.routines}
+          todayItems={(wallData.days.find((d) => d.isToday) ?? wallData.days[0])?.items ?? emptySections<TimelineItem>()}
+          onToggleTask={handleToggleComplete}
+          onClose={handleCloseKidView}
         />
       )}
 
