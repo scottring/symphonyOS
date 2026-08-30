@@ -19,6 +19,9 @@ import type { DaySection } from '@/lib/timeUtils'
 /** How long the page sits idle before it auto-returns to the wall. */
 export const KID_VIEW_IDLE_MS = 120_000
 
+// These are KidBandKeys (kidDayModel's own total re-partition of the day —
+// see bandForTime), NOT DaySections. Do not confuse this with a hand-rolled
+// DaySection sweep; see sectionCoverage.test.ts's ALLOWED entry for this file.
 const BAND_ORDER: KidBandKey[] = ['morning', 'afternoon', 'evening', 'anytime']
 const BAND_LABELS: Record<KidBandKey, string> = {
   morning: 'Morning',

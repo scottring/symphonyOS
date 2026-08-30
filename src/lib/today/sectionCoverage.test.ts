@@ -86,6 +86,16 @@ const ALLOWED: Record<string, string> = {
     'Local 3-valued picker — emits a concrete hour, never a section string (see M5 note there).',
   'src/components/triage/TimePickerPopover.tsx':
     'Local 3-valued picker — emits a concrete hour, never a section string (see M5 note there).',
+  'src/components/wall-v2/KidDayView.tsx':
+    "BAND_ORDER is the kid page's own KidBandKey partition (morning/" +
+    'afternoon/evening/anytime), not a DaySection list. It is total over ' +
+    'the day via kidDayModel.bandForTime (hour<12 morning, hour<17 ' +
+    'afternoon, else evening; null → anytime — boundaries pinned by ' +
+    'kidDayModel.test.ts), and tasks are mapped DaySection→band ' +
+    'exhaustively by kidDayModel.sectionBand (a switch over all 7 ' +
+    'DaySection cases). It never indexes a Record<DaySection, ' +
+    'TimelineItem[]> — days[].items is read only through that exhaustive ' +
+    'mapping — so it cannot drop an item off the surface.',
 }
 
 describe('day-section coverage', () => {
