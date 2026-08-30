@@ -60,8 +60,8 @@ interface TapRoutinePanelProps {
   /** Existing routines this one can be tucked into as a step (standalone routines only). */
   moveTargets?: { id: string; name: string }[]
   onMoveInto?: (targetId: string) => void
-  /** Persist a daily quantity target (null clears it). Rendered only for standalone routines
-   *  (no Steps section) — a target belongs on the atom, never on a collection parent. */
+  /** Persist a daily quantity target (null clears it). Rendered only when the routine has
+   *  zero steps — a target belongs on the atom, never on a collection parent. */
   onTargetChange?: (t: { amount: number; unit: TargetUnit } | null) => void
 }
 
@@ -75,9 +75,6 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
   const [showDirections, setShowDirections] = useState(false)
   const [assistOpen, setAssistOpen] = useState(false)
   const onTimeline = routine.visibility === 'active'
-  // Steps section renders only when all four are provided (see `details` below) — a
-  // target belongs on the atom, never on a collection parent, so it's gated the same way.
-  const hasStepsSection = !!(props.steps && props.onSelectStep && props.onAddStep && props.onReorderSteps)
 
   // Today-completion checklist for the steps — same instance keys as the
   // Today collection row, so checking here updates its progress too.
@@ -201,7 +198,10 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
           </div>
         )}
 
-        {props.onTargetChange && !hasStepsSection && (
+        {/* A zero-step routine IS the atom — even RhythmPage's always-visible
+            "add first step" Steps section counts as zero steps. Once real steps
+            exist the target hides; a target belongs on the atom, never a parent. */}
+        {props.onTargetChange && (props.steps?.length ?? 0) === 0 && (
           <TargetSection
             amount={routine.target_amount ?? null}
             unit={routine.target_unit ?? null}

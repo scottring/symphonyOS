@@ -166,4 +166,31 @@ describe('TapRoutinePanel', () => {
     fireEvent.change(screen.getByLabelText(/make this a step of/i), { target: { value: 'bed' } })
     expect(onMoveInto).toHaveBeenCalledWith('bed')
   })
+
+  // RhythmPage passes steps/onSelectStep/onAddStep/onReorderSteps UNCONDITIONALLY —
+  // standalone routines arrive as `{ ...r, steps: [] }` (the "add first step"
+  // affordance is always visible there). A zero-step routine is still the atom, so
+  // Target must render in that exact shape.
+  it('renders the Target section when steps is an empty array (RhythmPage-shaped standalone routine)', () => {
+    render(
+      <TapRoutinePanel
+        routine={routine} onClose={vi.fn()} onNotesChange={vi.fn()} onContextChange={vi.fn()} onVisibilityChange={vi.fn()}
+        steps={[]} onSelectStep={vi.fn()} onAddStep={vi.fn()} onReorderSteps={vi.fn()}
+        onTargetChange={vi.fn()}
+      />,
+    )
+    expect(screen.getByRole('button', { name: /add a daily target/i })).toBeInTheDocument()
+  })
+
+  it('does NOT render the Target section once the routine has real steps', () => {
+    const steps = [{ ...routine, id: 'st1', name: 'Chin tuck', parent_routine_id: routine.id } as Routine]
+    render(
+      <TapRoutinePanel
+        routine={routine} onClose={vi.fn()} onNotesChange={vi.fn()} onContextChange={vi.fn()} onVisibilityChange={vi.fn()}
+        steps={steps} onSelectStep={vi.fn()} onAddStep={vi.fn()} onReorderSteps={vi.fn()}
+        onTargetChange={vi.fn()}
+      />,
+    )
+    expect(screen.queryByRole('button', { name: /add a daily target/i })).not.toBeInTheDocument()
+  })
 })
