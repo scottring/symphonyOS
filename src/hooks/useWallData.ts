@@ -66,7 +66,10 @@ export interface UseWallDataReturn {
    * parent) and before the two shallow overrides applied at the dayRoutines
    * call site. For consumers (e.g. a per-member wall page) that need to
    * resolve parents/steps themselves rather than consume the wall's own
-   * derived days[].items.
+   * derived days[].items. Committed alongside `days`/`tasks` (gated behind
+   * the same commitData check) so a failed poll freezes this array too,
+   * instead of a consumer joining it against a frozen `days[].items` seeing
+   * ids that resolve against a wiped-out routines list.
    */
   routines: Routine[]
   loading: boolean
@@ -278,7 +281,6 @@ export function useWallData(): UseWallDataReturn {
       // is typically 'reference' and may carry a different context than its
       // Steps ("After camp routine" is context null, its Steps are family).
       const allRoutines = (routinesRes.data || []) as Routine[]
-      setRawRoutines(allRoutines)
       const routinesById = new Map(allRoutines.map(r => [r.id, r]))
       const routines = allRoutines
         .map(r => ({ ...r, time_of_day: effectiveTimeOfDay(r, routinesById) }))
@@ -474,6 +476,7 @@ export function useWallData(): UseWallDataReturn {
           setScreenTimeSummaries(stSummaries)
           setOverdueTasks(overdueItems)
           setAllTasks(tasks)
+          setRawRoutines(allRoutines)
         }
         setCalendarUnavailable(calendarFailed)
         setError(dataError)
