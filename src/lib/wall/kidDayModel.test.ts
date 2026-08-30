@@ -138,6 +138,8 @@ describe('buildMemberDayModel', () => {
   })
 
   it('assigned tasks band by section and never target', () => {
+    // ids use the real adapter shape (taskToTimelineItem's `task-${task.id}`)
+    // — the model must strip that prefix, so assertions check the raw id.
     const earlyTask = taskItem({ id: 'task-early' })
     const afternoonTask = taskItem({ id: 'task-aft' })
     const nightTask = taskItem({ id: 'task-night', completed: true })
@@ -150,13 +152,20 @@ describe('buildMemberDayModel', () => {
       unscheduled: [unscheduledTask],
       morning: [othersTask],
     })
-    expect(model.bands.morning.map((r) => r.id)).toEqual(['task-early'])
-    expect(model.bands.afternoon.map((r) => r.id)).toEqual(['task-aft'])
-    expect(model.bands.evening.map((r) => r.id)).toEqual(['task-night'])
-    expect(model.bands.anytime.map((r) => r.id)).toEqual(['task-unsched'])
-    expect(model.bands.evening.find((r) => r.id === 'task-night')?.done).toBe(true)
-    expect(model.bands.morning.find((r) => r.id === 'task-early')?.target).toBeNull()
-    expect(model.bands.morning.some((r) => r.id === 'task-other')).toBe(false)
+    expect(model.bands.morning.map((r) => r.id)).toEqual(['early'])
+    expect(model.bands.afternoon.map((r) => r.id)).toEqual(['aft'])
+    expect(model.bands.evening.map((r) => r.id)).toEqual(['night'])
+    expect(model.bands.anytime.map((r) => r.id)).toEqual(['unsched'])
+    expect(model.bands.evening.find((r) => r.id === 'night')?.done).toBe(true)
+    expect(model.bands.morning.find((r) => r.id === 'early')?.target).toBeNull()
+    expect(model.bands.morning.some((r) => r.id === 'other')).toBe(false)
+  })
+
+  it('strips the task- adapter prefix so KidRow.id is the raw task uuid', () => {
+    const task = taskItem({ id: 'task-abc' })
+    const model = build([], [], { morning: [task] })
+    expect(model.bands.morning).toHaveLength(1)
+    expect(model.bands.morning[0].id).toBe('abc')
   })
 
   it('isEmpty when nothing applies', () => {

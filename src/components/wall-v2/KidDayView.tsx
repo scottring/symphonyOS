@@ -47,19 +47,29 @@ function targetText(amount: number, unit: 'minutes' | 'count', progress: number)
   return unit === 'minutes' ? `${progress} of ${amount} min` : `${progress} of ${amount}`
 }
 
+/** doneOverlay key for a row — namespaced by entityType so a task and a
+ *  routine that happen to share a raw uuid can't clobber each other's
+ *  optimistic state. */
+function overlayKey(row: KidRow): string {
+  return `${row.entityType}:${row.id}`
+}
+
 export function KidDayView({ member, routines, todayItems, onToggleTask, onClose }: KidDayViewProps) {
   const { markDone, undoDone, addProgress, setProgress } = useActionableInstances()
   const { history } = useMemberInstanceHistory()
 
   // Optimistic overlays: applied over the model's derived state, so a tap
-  // reads instantly instead of waiting on the write + history refresh.
-  // Cleared whenever history refreshes (a new array from the fetch).
+  // reads instantly instead of waiting on the write + refetch. doneOverlay
+  // covers both plain routine rows and task rows (keyed by entityType:id so
+  // the two entity kinds can't collide on the same raw uuid). Cleared
+  // whenever history refreshes (routine writes) or todayItems gets a new
+  // identity (the Shell's post-toggle refetch — the task write's signal).
   const [progressOverlay, setProgressOverlay] = useState<Map<string, number>>(new Map())
   const [doneOverlay, setDoneOverlay] = useState<Map<string, boolean>>(new Map())
   useEffect(() => {
     setProgressOverlay(new Map())
     setDoneOverlay(new Map())
-  }, [history])
+  }, [history, todayItems])
 
   // Which target rows are expanded, and whether they're in "Exact…" mode.
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
@@ -92,16 +102,21 @@ export function KidDayView({ member, routines, todayItems, onToggleTask, onClose
   }, [])
 
   const handlePlainRoutineTap = useCallback((row: KidRow) => {
-    const current = doneOverlay.has(row.id) ? doneOverlay.get(row.id)! : row.done
+    const key = overlayKey(row)
+    const current = doneOverlay.has(key) ? doneOverlay.get(key)! : row.done
     const next = !current
-    setDoneOverlay((prev) => new Map(prev).set(row.id, next))
+    setDoneOverlay((prev) => new Map(prev).set(key, next))
     if (next) void markDone('routine', row.id, new Date())
     else void undoDone('routine', row.id, new Date())
   }, [doneOverlay, markDone, undoDone])
 
   const handleTaskTap = useCallback((row: KidRow) => {
-    onToggleTask(`task-${row.id}`, !row.done)
-  }, [onToggleTask])
+    const key = overlayKey(row)
+    const current = doneOverlay.has(key) ? doneOverlay.get(key)! : row.done
+    const next = !current
+    setDoneOverlay((prev) => new Map(prev).set(key, next))
+    onToggleTask(`task-${row.id}`, next)
+  }, [doneOverlay, onToggleTask])
 
   const handleChipAdd = useCallback((row: KidRow, amount: number) => {
     if (!row.target) return
@@ -134,7 +149,8 @@ export function KidDayView({ member, routines, todayItems, onToggleTask, onClose
       const progress = progressOverlay.has(row.id) ? progressOverlay.get(row.id)! : row.target.progress
       return { ...row, target: { ...row.target, progress } }
     }
-    const done = doneOverlay.has(row.id) ? doneOverlay.get(row.id)! : row.done
+    const key = overlayKey(row)
+    const done = doneOverlay.has(key) ? doneOverlay.get(key)! : row.done
     return { ...row, done }
   }
 

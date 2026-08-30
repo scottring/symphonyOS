@@ -183,18 +183,29 @@ describe('KidDayView', () => {
     expect(screen.queryByText(/days in a row/)).not.toBeInTheDocument()
   })
 
-  it('task row tap calls onToggleTask(taskId, true/false)', () => {
+  it('task row tap calls onToggleTask(taskId, true/false) with a single task- prefix', () => {
+    // id is in the real adapter shape (taskToTimelineItem's `task-${task.id}`)
+    // — the model strips it and the view re-prefixes exactly once.
     const undone = taskItem({ id: 'task-uuid-1', title: 'Pack bag', completed: false })
     const { onToggleTask } = renderView({ todayItems: { morning: [undone] } })
     fireEvent.click(screen.getByText('Pack bag'))
-    expect(onToggleTask).toHaveBeenCalledWith('task-task-uuid-1', true)
+    expect(onToggleTask).toHaveBeenCalledWith('task-uuid-1', true)
   })
 
   it('task row tap calls onToggleTask with false when already done', () => {
     const done = taskItem({ id: 'task-uuid-2', title: 'Feed fish', completed: true })
     const { onToggleTask } = renderView({ todayItems: { morning: [done] } })
     fireEvent.click(screen.getByText('Feed fish'))
-    expect(onToggleTask).toHaveBeenCalledWith('task-task-uuid-2', false)
+    expect(onToggleTask).toHaveBeenCalledWith('task-uuid-2', false)
+  })
+
+  it('tapping a task row shows it done immediately (optimistic), before any refetch', () => {
+    const undone = taskItem({ id: 'task-uuid-3', title: 'Walk dog', completed: false })
+    renderView({ todayItems: { morning: [undone] } })
+    const title = screen.getByText('Walk dog')
+    expect(title.className).not.toContain('line-through')
+    fireEvent.click(title)
+    expect(screen.getByText('Walk dog').className).toContain('line-through')
   })
 
   it('renders empty-state copy when the model is empty', () => {

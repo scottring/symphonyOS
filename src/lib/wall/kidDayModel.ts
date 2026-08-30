@@ -216,7 +216,11 @@ export function buildMemberDayModel(input: {
       if (item.assignedTo !== member.id) continue
       const row: KidRow = {
         entityType: 'task',
-        id: item.id,
+        // taskToTimelineItem prefixes the timeline id (`task-${task.id}`) —
+        // strip it back off so KidRow.id honors its "raw entity uuid, no
+        // prefix" contract for task rows too. The view re-prefixes once when
+        // it calls onToggleTask.
+        id: item.id.replace(/^task-/, ''),
         title: item.title,
         done: item.completed,
         timeOfDay: item.startTime ? formatHHMM(item.startTime) : null,
