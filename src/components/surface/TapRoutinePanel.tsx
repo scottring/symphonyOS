@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Trash2 } from 'lucide-react'
 import type { Routine, RoutineVisibility, RecurrencePattern } from '@/types/routine'
+import type { TargetUnit } from '@/types/actionable'
 import type { TaskContext } from '@/types/task'
 import type { FamilyMember } from '@/types/family'
 import { PanelShell } from './PanelShell'
@@ -9,6 +10,7 @@ import { PanelMedia } from './sections/PanelMedia'
 import { PanelNotes } from './sections/PanelNotes'
 import { PanelLocation } from './sections/PanelLocation'
 import { PanelFooter } from './sections/PanelFooter'
+import { TargetSection } from './sections/TargetSection'
 import { ContextPicker } from '@/components/triage/ContextPicker'
 import { MultiAssigneeDropdown } from '@/components/family'
 import { RoutineScheduleEditor } from '@/components/routine/RoutineScheduleEditor'
@@ -58,6 +60,9 @@ interface TapRoutinePanelProps {
   /** Existing routines this one can be tucked into as a step (standalone routines only). */
   moveTargets?: { id: string; name: string }[]
   onMoveInto?: (targetId: string) => void
+  /** Persist a daily quantity target (null clears it). Rendered only for standalone routines
+   *  (no Steps section) — a target belongs on the atom, never on a collection parent. */
+  onTargetChange?: (t: { amount: number; unit: TargetUnit } | null) => void
 }
 
 export function TapRoutinePanel(props: TapRoutinePanelProps) {
@@ -70,6 +75,9 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
   const [showDirections, setShowDirections] = useState(false)
   const [assistOpen, setAssistOpen] = useState(false)
   const onTimeline = routine.visibility === 'active'
+  // Steps section renders only when all four are provided (see `details` below) — a
+  // target belongs on the atom, never on a collection parent, so it's gated the same way.
+  const hasStepsSection = !!(props.steps && props.onSelectStep && props.onAddStep && props.onReorderSteps)
 
   // Today-completion checklist for the steps — same instance keys as the
   // Today collection row, so checking here updates its progress too.
@@ -191,6 +199,14 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
               </button>
             )}
           </div>
+        )}
+
+        {props.onTargetChange && !hasStepsSection && (
+          <TargetSection
+            amount={routine.target_amount ?? null}
+            unit={routine.target_unit ?? null}
+            onChange={props.onTargetChange}
+          />
         )}
       </section>
       }

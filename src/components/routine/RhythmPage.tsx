@@ -401,6 +401,7 @@ export function RhythmPage(props: RhythmPageProps) {
                 onScheduleChange={(pattern, timeOfDay) =>
                   onUpdateRoutine(openRoutineItem.id, { recurrence_pattern: pattern, time_of_day: timeOfDay || null })}
                 onNotesChange={description => onUpdateRoutine(openRoutineItem.id, { description })}
+                onTargetChange={t => onUpdateRoutine(openRoutineItem.id, { target_amount: t?.amount ?? null, target_unit: t?.unit ?? null })}
                 onDelete={onDelete ? () => { onDelete(openRoutineItem.id); setOpen(null) } : undefined}
                 onAddSteps={props.onAddSteps ? steps => props.onAddSteps!(openRoutineItem.id, steps) : undefined}
                 steps={openRoutineItem.steps}
@@ -427,6 +428,7 @@ export function RhythmPage(props: RhythmPageProps) {
                 onTimeChange={timeOfDay => onUpdateRoutine(openStep.id, { time_of_day: timeOfDay })}
                 onNotesChange={description => onUpdateRoutine(openStep.id, { description })}
                 onScheduleChange={pattern => onUpdateRoutine(openStep.id, { recurrence_pattern: pattern })}
+                onTargetChange={t => onUpdateRoutine(openStep.id, { target_amount: t?.amount ?? null, target_unit: t?.unit ?? null })}
                 onPromote={() => { props.onPromoteStep(openStep.id); setOpen({ kind: 'routine', id: parentOfOpenStep.id }) }}
                 onDelete={props.onDeleteStep ? () => { props.onDeleteStep!(openStep.id); setOpen({ kind: 'routine', id: parentOfOpenStep.id }) } : undefined}
               />

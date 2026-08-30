@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { Link2Off, Trash2 } from 'lucide-react'
-import type { Routine, RecurrencePattern } from '@/types/actionable'
+import type { Routine, RecurrencePattern, TargetUnit } from '@/types/actionable'
 import { WEEKDAY_KEYS } from '@/lib/routineUtils'
 import { PanelHeader } from './sections/PanelHeader'
 import { PanelNotes } from './sections/PanelNotes'
 import { PanelAttachments } from './sections/PanelAttachments'
 import { DosePills } from './sections/DosePills'
+import { TargetSection } from './sections/TargetSection'
 
 interface TapStepPanelProps {
   step: Routine
@@ -21,6 +22,8 @@ interface TapStepPanelProps {
   onTimeChange?: (timeOfDay: string | null) => void
   /** Delete the step routine entirely (swap-out). Rendered only when provided. */
   onDelete?: () => void
+  /** Persist a daily quantity target (null clears it). Rendered only when provided — a step IS the atom. */
+  onTargetChange?: (t: { amount: number; unit: TargetUnit } | null) => void
 }
 
 export function TapStepPanel(props: TapStepPanelProps) {
@@ -58,6 +61,14 @@ export function TapStepPanel(props: TapStepPanelProps) {
               : `No set time — flows in ${parentName}'s order.`}
           </p>
         </section>
+      )}
+
+      {props.onTargetChange && (
+        <TargetSection
+          amount={step.target_amount ?? null}
+          unit={step.target_unit ?? null}
+          onChange={props.onTargetChange}
+        />
       )}
 
       <section className="pb-4 mb-4 border-b border-neutral-200">
