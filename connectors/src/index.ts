@@ -31,6 +31,7 @@ async function main(): Promise<void> {
 
   let sources: WatchedSource[] = await loadWatchlist(config)
   console.log(`watching ${sources.length} source(s): ${sources.map((s) => s.sourceLabel).join(', ') || 'none'}`)
+  console.log(`digest at local hour(s) ${config.flushHoursLocal.join(',')} → ${config.digestTo.join(', ') || 'the sending account'}`)
 
   const sock = await makeReceiveOnlySocket(config.stateDir)
   attachReceiver(sock, { buffer, sources: () => sources })
@@ -41,22 +42,16 @@ async function main(): Promise<void> {
     void (async () => {
       const now = new Date()
       if (!dueNow(now, config.timezone, config.flushHoursLocal, lastFiredHour)) return
-      lastFiredHour = localHour(now, config.timezone)
 
       // Re-read the allowlist each flush so adding a thread needs no restart.
       sources = await loadWatchlist(config)
-      const whatsappSources = sources.filter((s) => s.connector === 'whatsapp')
-      const r = await flushAll({ buffer, sources: whatsappSources, config, highWater })
-      console.log(`whatsapp flush: ${r.delivered} delivered, ${r.failed} failed`)
-      await recordHealth(
-        config,
-        'whatsapp',
-        r.failed === 0 ? { ok: true } : { ok: false, error: `${r.failed} source(s) failed` },
-      )
 
-      // ClassDojo polls on the same tick rather than holding a socket. Wrapped
-      // whole: a ClassDojo failure must never take WhatsApp down with it.
+      // ClassDojo polls on the flush tick rather than holding a socket, so its
+      // day is pulled into the buffer right before the digest goes out.
+      // Wrapped whole: a ClassDojo failure must never cost the WhatsApp half
+      // of the email.
       const dojoSources = sources.filter((s) => s.connector === 'classdojo')
+      let dojoOk = dojoSources.length === 0
       if (dojoSources.length > 0 && config.classdojoEmail && config.classdojoPassword) {
         try {
           const client = makeClassDojoClient({
@@ -90,14 +85,7 @@ async function main(): Promise<void> {
               buffer.add(source.sourceKey, m)
             }
           }
-
-          const dr = await flushAll({ buffer, sources: dojoSources, config, highWater })
-          console.log(`classdojo flush: ${dr.delivered} delivered, ${dr.failed} failed`)
-          await recordHealth(
-            config,
-            'classdojo',
-            dr.failed === 0 ? { ok: true } : { ok: false, error: `${dr.failed} source(s) failed` },
-          )
+          dojoOk = true
         } catch (e) {
           // An OTC demand is not a broken connector — it is a connector
           // waiting on a human. Say so plainly, because "login failed" would
@@ -110,6 +98,21 @@ async function main(): Promise<void> {
           })
         }
       }
+
+      // One email for everything buffered today, across both feeds.
+      const r = await flushAll({ buffer, sources, config, highWater })
+      console.log(`digest: ${r.delivered} source(s) sent, ${r.failed} failed`)
+
+      if (r.failed > 0) {
+        // Leave lastFiredHour alone: the batches are back in the buffer and
+        // the next tick retries within the same hour.
+        await recordHealth(config, 'whatsapp', { ok: false, error: 'digest send failed' })
+        if (dojoOk) await recordHealth(config, 'classdojo', { ok: false, error: 'digest send failed' })
+        return
+      }
+      lastFiredHour = localHour(now, config.timezone)
+      await recordHealth(config, 'whatsapp', { ok: true })
+      if (dojoOk && dojoSources.length > 0) await recordHealth(config, 'classdojo', { ok: true })
     })()
   }, TICK_MS)
 }

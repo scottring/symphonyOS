@@ -13,13 +13,13 @@ export interface WatchedSource {
   sourceLabel: string
 }
 
-/** The body posted to capture-to-inbox. Mirrors that function's CaptureBody. */
-export interface FlushPayload {
-  user_email: string
-  kind: 'whatsapp_export' | 'classdojo_thread'
-  source_key: string
-  source_label: string
-  text: string
+/** The body posted to school-digest. Mirrors that function's Body. */
+export interface DigestPayload {
+  user_id: string
+  timezone: string
+  /** Recipients. Empty = the sending Gmail account's own address. */
+  to: string[]
+  sources: { label: string; text: string }[]
 }
 
 export interface Config {
@@ -34,8 +34,11 @@ export interface Config {
   timezone: string
   /** Volume mount path for WhatsApp auth state and high-water marks. */
   stateDir: string
-  /** Local hours at which a flush runs. */
+  /** Local hours at which the buffer is flushed into a digest email. One
+   * hour = one email a day. */
   flushHoursLocal: number[]
+  /** Who receives the digest. Empty means the Gmail account itself. */
+  digestTo: string[]
   /** ClassDojo credentials. Optional: the worker must still boot with
    * WhatsApp alone if ClassDojo is unconfigured. */
   classdojoEmail?: string

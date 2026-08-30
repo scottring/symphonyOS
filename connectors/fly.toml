@@ -6,7 +6,7 @@ primary_region = "ewr"
 [env]
   STATE_DIR = "/data"
   HOUSEHOLD_TIMEZONE = "America/New_York"
-  FLUSH_HOURS_LOCAL = "12,20"
+  FLUSH_HOURS_LOCAL = "17"
 
 [mounts]
   source = "connector_state"

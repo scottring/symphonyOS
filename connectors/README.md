@@ -1,16 +1,25 @@
 # Symphony Connectors
 
-An always-on worker that reads two family feeds and posts them to Symphony's
-capture pipeline. It **never writes** to either service — see
-`src/whatsapp/adapter.ts` for why that is enforced rather than assumed.
+An always-on worker that reads two family feeds and turns them into **one
+daily email digest**. It **never writes** to either service — see
+`src/whatsapp/adapter.ts` for why that is enforced rather than assumed — and
+it never writes to Symphony either: no tasks, no notes, no inbox rows. The
+email is the whole product.
 
 ## What it does
 
-Buffers new messages from allowlisted threads, renders them into the
-transcript format `extract-capture` parses, and POSTs them to
-`capture-to-inbox` at the configured local hours (default noon and 8pm).
-Candidates land in Symphony's inbox and surface in the "School" dropdown on
-Today.
+Buffers new messages from allowlisted threads all day. At the configured
+local hour (default 5pm, `FLUSH_HOURS_LOCAL`), it pulls the day's ClassDojo
+posts, renders every source's transcript, and POSTs them all in one request
+to the `school-digest` edge function. That function asks Claude for a short
+digest (to-do / good to know / chatter, per source) and sends it as an email
+from the user's own Gmail (the Google connection Symphony already holds, with
+the `gmail.send` scope) to `DIGEST_TO` — or, if that is unset, to the Gmail
+account itself.
+
+If the send fails, every batch goes back in the buffer and the next 5-minute
+tick retries within the same hour. Nothing is delivered twice: the per-source
+high-water marks advance only on a 2xx.
 
 ## Which threads it reads
 
@@ -18,6 +27,8 @@ Only rows in the `capture_sources` table with `is_active = true`. Anything
 absent is never buffered, read, or transmitted. To add a WhatsApp group,
 insert a row with `source_key = 'whatsapp:<jid>'` — the jid is printed in the
 worker log the first time a message arrives from a group you are in.
+ClassDojo channels the feed carries but you are not watching are written to
+`capture_sources` as inactive; flip `is_active` to start reading one.
 
 ## First deploy
 
@@ -30,10 +41,16 @@ fly secrets set \
   SUPABASE_SERVICE_ROLE_KEY=... \
   CAPTURE_SHARED_SECRET=... \
   CAPTURE_USER_EMAIL=smkaufman@gmail.com \
-  CAPTURE_USER_ID=...
+  CAPTURE_USER_ID=... \
+  DIGEST_TO=smkaufman@gmail.com,partner@example.com
 
 fly deploy
 ```
+
+`school-digest` needs `ANTHROPIC_API_KEY`, `GOOGLE_CLIENT_ID/SECRET`,
+`CAPTURE_SHARED_SECRET` and the service role key as Supabase secrets — all
+already present for the other functions. Deploy it with
+`supabase functions deploy school-digest`.
 
 ## Linking WhatsApp (one time)
 
@@ -57,11 +74,12 @@ over notification delivery from the handset. Do not change it.
 
 ## Operational checks
 
-- `fly logs` — flush lines report delivered/failed counts per tick.
+- `fly logs` — one `digest: N source(s) sent` line per day.
 - `connector_health` in Supabase — `last_ok_at` per connector. A stale
-  timestamp means the feed is dead, not quiet.
+  timestamp means the feed is dead, not quiet. `last_error = 'digest send
+  failed'` means the email leg is broken (usually the Google token).
 - `fly status` — one machine, always. Two machines would hold two WhatsApp
-  sessions and deliver everything twice.
+  sessions and send the digest twice.
 
 ## ClassDojo: the session cookie
 

@@ -261,6 +261,10 @@ inspector_port = 8083
 [functions.capture-to-inbox]
 verify_jwt = false
 
+# Called by the Fly connectors worker with the shared secret, not a JWT.
+[functions.school-digest]
+verify_jwt = false
+
 # Internal: authenticated via x-capture-secret shared secret, not JWT.
 [functions.extract-capture]
 verify_jwt = false

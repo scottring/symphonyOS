@@ -72,8 +72,8 @@ export interface Task {
   scope?: Scope // Who can SEE it: individual (private) | couple | compound (household)
   category?: TaskCategory // What kind of family item (default: 'task')
   notes?: string
-  /** Set when this task was extracted from a capture (WhatsApp/ClassDojo feed).
-   * Drives the School pool and its source chip. */
+  /** Set when this task was extracted from a capture (a Supernote page, or a
+   * text sent through capture-to-inbox). Links the row back to its source. */
   captureId?: string
   links?: TaskLink[]
   phoneNumber?: string

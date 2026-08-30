@@ -1,7 +1,7 @@
 import type { Config, WatchedSource } from './types.ts'
 import type { MessageBuffer } from './buffer.ts'
 import type { HighWaterStore } from './highWater.ts'
-import { deliver } from './capture.ts'
+import { sendDigest } from './digest.ts'
 
 /** Local hour in the household's zone. */
 export function localHour(now: Date, timeZone: string): number {
@@ -25,38 +25,34 @@ export function dueNow(
   return lastFiredHour !== hour
 }
 
+/** Drain every source into ONE digest email. All-or-nothing: the marks
+ * advance together on success, and on failure every batch goes back so
+ * the next tick re-sends the same day. */
 export async function flushAll({
   buffer,
   sources,
   config,
   highWater,
-  deliverImpl = deliver,
+  sendImpl = sendDigest,
 }: {
   buffer: MessageBuffer
   sources: WatchedSource[]
   config: Config
   highWater: HighWaterStore
-  deliverImpl?: typeof deliver
+  sendImpl?: typeof sendDigest
 }): Promise<{ delivered: number; failed: number }> {
-  let delivered = 0
-  let failed = 0
+  const batches = sources
+    .map((source) => ({ source, messages: buffer.drain(source.sourceKey) }))
+    .filter((b) => b.messages.length > 0)
+  if (batches.length === 0) return { delivered: 0, failed: 0 }
 
-  for (const source of sources) {
-    const messages = buffer.drain(source.sourceKey)
-    if (messages.length === 0) continue
-
-    const result = await deliverImpl({ source, messages, config })
-    if (result.delivered && result.newest) {
-      await highWater.set(source.sourceKey, result.newest)
-      delivered += 1
-    } else if (!result.delivered) {
-      // Put it back, mark unmoved. Next tick re-sends; capture_checkpoints
-      // makes the duplicate harmless.
-      buffer.restore(source.sourceKey, messages)
-      failed += 1
-      console.error(`flush failed for ${source.sourceKey}: ${result.error ?? 'unknown'}`)
-    }
+  const result = await sendImpl({ batches, config })
+  if (result.delivered) {
+    for (const [sourceKey, newest] of result.newest) await highWater.set(sourceKey, newest)
+    return { delivered: batches.length, failed: 0 }
   }
 
-  return { delivered, failed }
+  for (const b of batches) buffer.restore(b.source.sourceKey, b.messages)
+  console.error(`digest failed for ${batches.length} source(s): ${result.error ?? 'unknown'}`)
+  return { delivered: 0, failed: batches.length }
 }

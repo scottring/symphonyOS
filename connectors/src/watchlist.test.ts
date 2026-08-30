@@ -11,7 +11,7 @@ const rows: SourceRow[] = [
 const config: Config = {
   supabaseUrl: 'https://x.supabase.co', serviceRoleKey: 'svc', captureSecret: 'sec',
   userEmail: 'a@b.com', userId: 'u-1', timezone: 'America/New_York',
-  stateDir: '/tmp', flushHoursLocal: [12, 20],
+  stateDir: '/tmp', flushHoursLocal: [17], digestTo: [],
 }
 
 describe('toWatchedSources', () => {

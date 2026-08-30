@@ -42,10 +42,14 @@ export function loadConfig(env: Record<string, string | undefined>): Config {
     userId: required(env, 'CAPTURE_USER_ID'),
     timezone: env.HOUSEHOLD_TIMEZONE ?? 'America/New_York',
     stateDir: env.STATE_DIR ?? '/data',
-    flushHoursLocal: (env.FLUSH_HOURS_LOCAL ?? '12,20')
+    flushHoursLocal: (env.FLUSH_HOURS_LOCAL ?? '17')
       .split(',')
       .map((s) => parseInt(s.trim(), 10))
       .filter((n) => Number.isInteger(n) && n >= 0 && n <= 23),
+    digestTo: (env.DIGEST_TO ?? '')
+      .split(',')
+      .map((s) => s.trim())
+      .filter((s) => s.includes('@')),
     classdojoEmail: env.CLASSDOJO_EMAIL,
     classdojoPassword: env.CLASSDOJO_PASSWORD,
     classdojoCookie: env.CLASSDOJO_COOKIE,

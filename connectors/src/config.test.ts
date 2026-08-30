@@ -21,11 +21,16 @@ describe('loadConfig', () => {
     const c = loadConfig(full)
     expect(c.timezone).toBe('America/New_York')
     expect(c.stateDir).toBe('/data')
-    expect(c.flushHoursLocal).toEqual([12, 20])
+    expect(c.flushHoursLocal).toEqual([17])
+    expect(c.digestTo).toEqual([])
   })
 
   it('parses a custom flush schedule', () => {
     expect(loadConfig({ ...full, FLUSH_HOURS_LOCAL: '8,15,21' }).flushHoursLocal).toEqual([8, 15, 21])
+  })
+
+  it('parses digest recipients, dropping anything that is not an address', () => {
+    expect(loadConfig({ ...full, DIGEST_TO: 'a@b.com, c@d.com ,nope' }).digestTo).toEqual(['a@b.com', 'c@d.com'])
   })
 
   it('leaves classdojo credentials undefined when unset, so the worker still boots', () => {
