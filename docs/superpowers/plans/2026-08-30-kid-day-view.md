@@ -471,7 +471,9 @@ git add src/hooks/useWallData.ts src/hooks/useWallData.routineResolver.test.ts
 git commit -m "feat(wall): expose raw routine rows from useWallData"
 ```
 
----### Task 5: `KidDayView` component
+---
+
+### Task 5: `KidDayView` component
 
 **Files:**
 - Create: `src/components/wall-v2/KidDayView.tsx`
