@@ -6,6 +6,7 @@ export type EntityType = 'calendar_event' | 'routine'
 export type ActionableStatus = 'pending' | 'completed' | 'skipped' | 'deferred'
 export type CoverageStatus = 'pending' | 'accepted' | 'declined'
 export type RoutineVisibility = 'active' | 'reference'
+export type TargetUnit = 'minutes' | 'count'
 
 // Recurrence pattern types
 export type RecurrenceType = 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly' | 'specific_days' | 'since_last'
@@ -36,6 +37,8 @@ export interface ActionableInstance {
   deferred_to: string | null // ISO timestamp
   completed_at: string | null
   skipped_at: string | null
+  /** Running total toward the routine's target for this date, in target_unit. Null = untracked. */
+  progress: number | null
   created_at: string
   updated_at: string
 }
@@ -82,6 +85,9 @@ export interface Routine {
   raw_input: string | null // Original natural language input
   show_on_timeline: boolean // Whether to display on Today view (default true)
   pin_to_timeline?: boolean // Always show on Today even when "hide daily routines" is on (tracked obligations, e.g. PT exercises)
+  /** Daily quantity goal — "read 20 minutes" = 20/'minutes'. Both null = plain checkbox step. */
+  target_amount?: number | null
+  target_unit?: TargetUnit | null
   context?: 'work' | 'family' | 'personal' | null // Life domain for filtering
   // WHO CAN SEE IT — orthogonal to `context`, and the only column routines RLS
   // reads (2026-06-07_scope_axis.sql:44). A family-tagged routine left at the

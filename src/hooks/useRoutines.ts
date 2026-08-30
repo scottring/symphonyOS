@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase, getAuthUser } from '@/lib/supabase'
-import type { Routine, RecurrencePattern, RoutineVisibility, PrepFollowupTemplate } from '@/types/actionable'
+import type { Routine, RecurrencePattern, RoutineVisibility, PrepFollowupTemplate, TargetUnit } from '@/types/actionable'
 import { matchesRecurrenceForDate, type LastCompletionMap } from '@/lib/routineUtils'
 import { scopeForDomain, memberForAuthUser } from '@/lib/scope'
 import { onRealtimeResumed } from '@/lib/realtime/keepAlive'
@@ -160,6 +160,8 @@ export interface CreateRoutineInput {
   parent_routine_id?: string | null
   step_order?: number | null
   pin_to_timeline?: boolean // always show on Today, even when "hide daily" is on
+  target_amount?: number | null
+  target_unit?: TargetUnit | null
   // Fallback assignee if assigned_to is undefined (not null)
   defaultFallbackAssignee?: string
 }
@@ -180,6 +182,8 @@ export interface UpdateRoutineInput {
   raw_input?: string | null
   show_on_timeline?: boolean
   pin_to_timeline?: boolean // always show on Today, even when "hide daily" is on
+  target_amount?: number | null
+  target_unit?: TargetUnit | null
   location?: string | null
   location_place_id?: string | null
   prep_task_templates?: PrepFollowupTemplate[]
@@ -371,6 +375,8 @@ export function useRoutines() {
           parent_routine_id: input.parent_routine_id ?? null,
           step_order: input.step_order ?? null,
           pin_to_timeline: input.pin_to_timeline ?? false,
+          target_amount: input.target_amount ?? null,
+          target_unit: input.target_unit ?? null,
         })
         .select()
         .single()
@@ -444,6 +450,8 @@ export function useRoutines() {
       if (input.parent_routine_id !== undefined) updates.parent_routine_id = input.parent_routine_id
       if (input.step_order !== undefined) updates.step_order = input.step_order
       if (input.pin_to_timeline !== undefined) updates.pin_to_timeline = input.pin_to_timeline
+      if (input.target_amount !== undefined) updates.target_amount = input.target_amount
+      if (input.target_unit !== undefined) updates.target_unit = input.target_unit
 
       const { error: updateError } = await supabase
         .from('routines')

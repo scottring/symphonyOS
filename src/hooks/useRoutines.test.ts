@@ -558,6 +558,25 @@ describe('useRoutines', () => {
       expect(result.current.routines[0].name).toBe('New Name')
       expect(result.current.routines[0].description).toBe('Desc')
     })
+
+    it('passes target fields through to the update', async () => {
+      const { result } = renderHook(() => useRoutines())
+      await waitFor(() => expect(result.current.loading).toBe(false))
+
+      await act(async () => {
+        await result.current.updateRoutine('1', { target_amount: 20, target_unit: 'minutes' })
+      })
+      expect(mockUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ target_amount: 20, target_unit: 'minutes' })
+      )
+
+      await act(async () => {
+        await result.current.updateRoutine('1', { target_amount: null, target_unit: null })
+      })
+      expect(mockUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ target_amount: null, target_unit: null })
+      )
+    })
   })
 
   describe('deleteRoutine', () => {
