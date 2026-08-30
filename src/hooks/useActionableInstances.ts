@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react'
 import { supabase, getAuthUser } from '@/lib/supabase'
 import { emitInstancesChanged } from '@/lib/instancesChangedSignal'
 import { applyProgressDelta, applyProgressExact } from '@/lib/wall/targetProgress'
+import { chainPerKey } from '@/lib/wall/chainPerKey'
 import type {
   ActionableInstance,
   InstanceNote,
@@ -17,6 +18,12 @@ function toDateString(date: Date): string {
   const day = String(date.getDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
 }
+
+// Serializes writeProgress per entity (module-level so it holds across every
+// mounted instance of this hook touching the same row). Without this, two
+// rapid taps both read the same pre-write `instance.progress` and the second
+// write clobbers the first (lost update) — see writeProgress below.
+const progressWriteChains = new Map<string, Promise<unknown>>()
 
 export function useActionableInstances() {
   const [isLoading, setIsLoading] = useState(false)
@@ -226,35 +233,40 @@ export function useActionableInstances() {
   // Add to (or set) the day's progress toward a target routine's goal.
   // Completion is derived: progress >= target flips status to completed,
   // and an exact correction below target flips it back to pending.
-  const writeProgress = useCallback(async (
+  const writeProgress = useCallback((
     entityType: EntityType,
     entityId: string,
     date: Date,
     compute: (current: number | null) => ReturnType<typeof applyProgressDelta>
   ): Promise<boolean> => {
-    setIsLoading(true)
-    setError(null)
-    try {
-      let instance = await findInstanceForDate(entityType, entityId, date)
-      if (!instance) instance = await getOrCreateInstance(entityType, entityId, date)
-      if (!instance) throw new Error('Failed to get instance')
+    // Serialized per entity: two rapid taps (+5, +5) must not both read the
+    // same pre-write progress and race to write it back — the second call's
+    // read has to happen after the first call's write lands.
+    return chainPerKey(progressWriteChains, `${entityType}:${entityId}`, async () => {
+      setIsLoading(true)
+      setError(null)
+      try {
+        let instance = await findInstanceForDate(entityType, entityId, date)
+        if (!instance) instance = await getOrCreateInstance(entityType, entityId, date)
+        if (!instance) throw new Error('Failed to get instance')
 
-      const p = compute(instance.progress ?? null)
-      const { error: updateError } = await supabase
-        .from('actionable_instances')
-        .update({ progress: p.progress, status: p.status, completed_at: p.completed_at })
-        .eq('id', instance.id)
-      if (updateError) throw updateError
-      emitInstancesChanged()
-      return true
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to log progress'
-      setError(message)
-      console.error('writeProgress error:', err)
-      return false
-    } finally {
-      setIsLoading(false)
-    }
+        const p = compute(instance.progress ?? null)
+        const { error: updateError } = await supabase
+          .from('actionable_instances')
+          .update({ progress: p.progress, status: p.status, completed_at: p.completed_at })
+          .eq('id', instance.id)
+        if (updateError) throw updateError
+        emitInstancesChanged()
+        return true
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Failed to log progress'
+        setError(message)
+        console.error('writeProgress error:', err)
+        return false
+      } finally {
+        setIsLoading(false)
+      }
+    })
   }, [findInstanceForDate, getOrCreateInstance])
 
   const addProgress = useCallback(
