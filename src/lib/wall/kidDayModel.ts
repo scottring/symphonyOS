@@ -1,0 +1,233 @@
+// Pure page model for a family member's wall day page. Turns raw routines,
+// today's timeline items, and recent actionable-instance history into what
+// a kid's day looks like: standalone routines banded by time-of-day,
+// collections (parent + steps) rendered as their own titled cards, and
+// assigned tasks bucketed by their timeline section.
+//
+// PURE: no React, no Supabase, no hidden clock reads — everything derives
+// from the `date` argument passed in.
+
+import type { Routine, ActionableInstance, TargetUnit } from '@/types/actionable'
+import type { TimelineItem } from '@/types/timeline'
+import type { DaySection } from '@/lib/timeUtils'
+import type { FamilyMember } from '@/types/family'
+import type { Layer } from '@/lib/domains'
+import { resolveRoutine, routineOwners, effectiveTimeOfDay, matchesRecurrenceForDate } from '@/lib/routineUtils'
+import { groupRoutineSteps } from '@/lib/today/routineCollections'
+import { stepAppliesOnDate } from '@/lib/today/stepSchedule'
+
+export type KidBandKey = 'morning' | 'afternoon' | 'evening' | 'anytime'
+
+export interface KidRowTarget {
+  amount: number
+  unit: TargetUnit
+  progress: number
+  streak: number
+}
+
+export interface KidRow {
+  entityType: 'routine' | 'task'
+  id: string // raw entity uuid (no prefix)
+  title: string
+  done: boolean
+  timeOfDay: string | null // 'HH:MM' or null
+  target: KidRowTarget | null // null = plain checkbox row
+}
+
+export interface KidCollection {
+  id: string
+  title: string
+  timeOfDay: string | null
+  rows: KidRow[]
+}
+
+export interface MemberDayModel {
+  collections: KidCollection[]
+  bands: Record<KidBandKey, KidRow[]>
+  isEmpty: boolean
+}
+
+// The wall's no-lens domain settings, copied verbatim from useWallData.ts's
+// resolveRoutine call site (only the hide-daily field differs — false here so
+// everyday routines always show on this page). Rung 4 is a practical no-op:
+// every routine reaching this page is already family-context.
+const FAMILY_LAYER: ReadonlySet<Layer> = new Set(['family'])
+
+function toDateStr(date: Date): string {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+function formatHHMM(date: Date): string {
+  const h = String(date.getHours()).padStart(2, '0')
+  const m = String(date.getMinutes()).padStart(2, '0')
+  return `${h}:${m}`
+}
+
+/** Rule 4: null → anytime; hour < 12 → morning; hour < 17 → afternoon; else → evening. */
+export function bandForTime(timeOfDay: string | null): KidBandKey {
+  if (timeOfDay == null) return 'anytime'
+  const hour = Number(timeOfDay.slice(0, 2))
+  if (hour < 12) return 'morning'
+  if (hour < 17) return 'afternoon'
+  return 'evening'
+}
+
+/**
+ * Rule 8: walk back day by day from `today` (capped at 30 days total,
+ * including skipped days). A day where the routine doesn't recur
+ * (`matchesRecurrenceForDate` false) is skipped — it neither counts nor
+ * breaks the streak. A recurring day counts when its instance is "met"
+ * (target routines: progress >= target_amount OR status === 'completed';
+ * plain routines: status === 'completed'). Today itself counts if met, but
+ * an unmet today is skipped rather than breaking the streak — the day isn't
+ * over yet. The first unmet PAST recurring day ends the walk.
+ */
+export function streakFor(routine: Routine, history: ActionableInstance[], today: Date): number {
+  const target = routine.target_amount ?? null
+  let streak = 0
+  for (let i = 0; i < 30; i++) {
+    const day = new Date(today)
+    day.setDate(day.getDate() - i)
+    if (!matchesRecurrenceForDate(routine, day, null)) continue // non-recurring day: skip, don't break
+
+    const dateStr = toDateStr(day)
+    const dayInstance = history.find((h) => h.entity_id === routine.id && h.date === dateStr)
+    const met =
+      target != null
+        ? (dayInstance?.progress ?? 0) >= target || dayInstance?.status === 'completed'
+        : dayInstance?.status === 'completed'
+
+    if (met) {
+      streak += 1
+      continue
+    }
+    if (i === 0) continue // today unmet: the day isn't over, doesn't break
+    break // first unmet past recurring day ends the walk
+  }
+  return streak
+}
+
+function instanceFor(routineId: string, dateStr: string, history: ActionableInstance[]): ActionableInstance | undefined {
+  return history.find((h) => h.entity_id === routineId && h.date === dateStr)
+}
+
+function buildRow(
+  routine: Routine,
+  byId: Map<string, Pick<Routine, 'id' | 'time_of_day'>>,
+  date: Date,
+  todayStr: string,
+  history: ActionableInstance[],
+): KidRow {
+  const dayInstance = instanceFor(routine.id, todayStr, history)
+  let target: KidRowTarget | null = null
+  if (routine.target_amount != null && routine.target_unit != null) {
+    target = {
+      amount: routine.target_amount,
+      unit: routine.target_unit,
+      progress: dayInstance?.progress ?? 0,
+      streak: streakFor(routine, history, date),
+    }
+  }
+  return {
+    entityType: 'routine',
+    id: routine.id,
+    title: routine.name,
+    done: dayInstance?.status === 'completed',
+    timeOfDay: effectiveTimeOfDay(routine, byId),
+    target,
+  }
+}
+
+/** Rule 5: which band a task's timeline section rolls into. */
+function sectionBand(section: DaySection): KidBandKey {
+  switch (section) {
+    case 'allday':
+    case 'unscheduled':
+      return 'anytime'
+    case 'earlyMorning':
+    case 'morning':
+      return 'morning'
+    case 'afternoon':
+      return 'afternoon'
+    case 'evening':
+    case 'night':
+      return 'evening'
+  }
+}
+
+export function buildMemberDayModel(input: {
+  member: FamilyMember
+  date: Date
+  routines: Routine[]
+  todayItems: Record<DaySection, TimelineItem[]>
+  history: ActionableInstance[]
+}): MemberDayModel {
+  const { member, date, routines, todayItems, history } = input
+  const todayStr = toDateStr(date)
+  const byId = new Map<string, Pick<Routine, 'id' | 'time_of_day'>>(routines.map((r) => [r.id, r]))
+
+  const bands: Record<KidBandKey, KidRow[]> = { morning: [], afternoon: [], evening: [], anytime: [] }
+
+  // Rules 1 + 2: loose (parentless) routines — membership by owner, then the
+  // full resolver ladder with the show_on_timeline declutter-hack override.
+  const { collections: rawCollections, standalone } = groupRoutineSteps(routines)
+  for (const r of standalone) {
+    if (!routineOwners(r).includes(member.id)) continue
+    const resolution = resolveRoutine(
+      { ...r, show_on_timeline: true },
+      { date, member: [member.id], prefs: { hideRoutines: false, layers: FAMILY_LAYER } },
+    )
+    if (!resolution.shows) continue
+    const row = buildRow(r, byId, date, todayStr, history)
+    bands[bandForTime(row.timeOfDay)].push(row)
+  }
+
+  // Rule 3: collections — parent owners + recurrence, parent visibility
+  // check deliberately skipped (collection parents are 'reference' on
+  // purpose), at least one step must apply today.
+  const collections: KidCollection[] = []
+  for (const c of rawCollections) {
+    if (!routineOwners(c).includes(member.id)) continue
+    if (!matchesRecurrenceForDate(c, date, null)) continue
+    const applicableSteps = c.steps.filter((s) => s.visibility === 'active' && stepAppliesOnDate(s, date))
+    if (applicableSteps.length === 0) continue
+    collections.push({
+      id: c.id,
+      title: c.name,
+      timeOfDay: c.time_of_day,
+      rows: applicableSteps.map((s) => buildRow(s, byId, date, todayStr, history)),
+    })
+  }
+  // Rule 4: collections are NOT banded — ordered by timeOfDay, nulls last.
+  collections.sort((a, b) => {
+    if (a.timeOfDay == null && b.timeOfDay == null) return 0
+    if (a.timeOfDay == null) return 1
+    if (b.timeOfDay == null) return -1
+    return a.timeOfDay < b.timeOfDay ? -1 : a.timeOfDay > b.timeOfDay ? 1 : 0
+  })
+
+  // Rule 5: assigned tasks, banded by their timeline section. Never targets.
+  for (const section of Object.keys(todayItems) as DaySection[]) {
+    for (const item of todayItems[section]) {
+      if (item.type !== 'task') continue
+      if (item.assignedTo !== member.id) continue
+      const row: KidRow = {
+        entityType: 'task',
+        id: item.id,
+        title: item.title,
+        done: item.completed,
+        timeOfDay: item.startTime ? formatHHMM(item.startTime) : null,
+        target: null,
+      }
+      bands[sectionBand(section)].push(row)
+    }
+  }
+
+  // Rule 9
+  const isEmpty = collections.length === 0 && Object.values(bands).every((rows) => rows.length === 0)
+
+  return { collections, bands, isEmpty }
+}

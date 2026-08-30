@@ -118,6 +118,21 @@ const ALLOWED = new Map<string, string>([
       'reaching them unfiltered. Do not remove this entry until BOTH ' +
       'overrides are gone.',
   ],
+  [
+    'lib/wall/kidDayModel.ts',
+    "Two deliberate hits, both spec'd by the kid-day-view task brief, not " +
+      'ad-hoc reasoning: (1) `show_on_timeline: true` on the loose-routine ' +
+      'resolveRoutine call — the exact same sanctioned declutter-hack copy ' +
+      "as useWallData.ts's entry above (kids' morning/bedtime routines use " +
+      'that flag to stay off Today; this page must still show them). ' +
+      "(2) `visibility === 'active'` on a collection STEP, not a routine — " +
+      "this is Rule 3's per-step applicability gate for rows already inside " +
+      "a collection (the parent's own visibility check is separately and " +
+      "deliberately SKIPPED, since collection parents are always " +
+      "'reference' by design). Steps never reach resolveRoutine at all " +
+      '(rung 6 hands parented routines to the collection), so there is no ' +
+      'resolver call this could instead be routed through.',
+  ],
 ])
 
 function sourceFiles(dir: string): string[] {

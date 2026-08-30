@@ -1,0 +1,227 @@
+import { describe, it, expect } from 'vitest'
+import { buildMemberDayModel, streakFor, bandForTime } from './kidDayModel'
+import type { Routine, ActionableInstance } from '@/types/actionable'
+import type { FamilyMember } from '@/types/family'
+import { emptySections } from '@/lib/today/types'
+import type { TimelineItem } from '@/types/timeline'
+
+const KID = { id: 'kid-1', name: 'Kaleb' } as FamilyMember
+const TODAY = new Date('2026-08-30T10:00:00') // a Sunday
+
+let seq = 0
+function routine(over: Partial<Routine> = {}): Routine {
+  return {
+    id: `r-${++seq}`, user_id: 'u', name: 'Routine', description: null,
+    default_assignee: null, assigned_to: KID.id, assigned_to_all: null,
+    visibility: 'active', paused_until: null,
+    recurrence_pattern: { type: 'daily' }, time_of_day: null,
+    raw_input: null, show_on_timeline: true, scope: 'individual',
+    // Every routine on this page is family-context in practice — kid
+    // routines land here already filtered to the family layer (rule 2's
+    // "rung-4-no-op" prefs). Set explicitly so each test isolates the rule
+    // it's actually checking instead of tripping the domain-lens rung.
+    context: 'family',
+    created_at: '', updated_at: '',
+    ...over,
+  } as Routine
+}
+function inst(over: Partial<ActionableInstance> = {}): ActionableInstance {
+  return {
+    id: `i-${++seq}`, user_id: 'u', entity_type: 'routine', entity_id: 'r-1',
+    date: '2026-08-30', status: 'pending', assignee: null,
+    assigned_to_override: null, deferred_to: null, completed_at: null,
+    skipped_at: null, progress: null, created_at: '', updated_at: '',
+    ...over,
+  } as ActionableInstance
+}
+function taskItem(over: Partial<TimelineItem> = {}): TimelineItem {
+  return {
+    id: `t-${++seq}`, type: 'task', title: 'Task', startTime: null, endTime: null,
+    completed: false, assignedTo: KID.id,
+    ...over,
+  } as TimelineItem
+}
+function build(
+  routines: Routine[],
+  history: ActionableInstance[] = [],
+  items: Partial<Record<string, TimelineItem[]>> = {},
+) {
+  return buildMemberDayModel({
+    member: KID,
+    date: TODAY,
+    routines,
+    history,
+    todayItems: { ...emptySections<TimelineItem>(), ...items },
+  })
+}
+
+describe('buildMemberDayModel', () => {
+  it('bands loose routines by effective time', () => {
+    const morning = routine({ time_of_day: '07:30' })
+    const afternoon = routine({ time_of_day: '14:00' })
+    const evening = routine({ time_of_day: '19:00' })
+    const anytime = routine({ time_of_day: null })
+    const model = build([morning, afternoon, evening, anytime])
+    expect(model.bands.morning.map((r) => r.id)).toEqual([morning.id])
+    expect(model.bands.afternoon.map((r) => r.id)).toEqual([afternoon.id])
+    expect(model.bands.evening.map((r) => r.id)).toEqual([evening.id])
+    expect(model.bands.anytime.map((r) => r.id)).toEqual([anytime.id])
+  })
+
+  it('excludes routines owned by someone else', () => {
+    const other = routine({ assigned_to: 'other-parent' })
+    const model = build([other])
+    expect(model.isEmpty).toBe(true)
+    expect(model.bands.anytime).toEqual([])
+  })
+
+  it('shows a kid routine hidden by show_on_timeline=false', () => {
+    const hidden = routine({ show_on_timeline: false, time_of_day: null })
+    const model = build([hidden])
+    expect(model.bands.anytime.map((r) => r.id)).toEqual([hidden.id])
+  })
+
+  it('hides resting and not-today routines', () => {
+    const resting = routine({ visibility: 'reference' })
+    const notToday = routine({ recurrence_pattern: { type: 'weekly', days: ['mon'] } })
+    const model = build([resting, notToday])
+    expect(model.isEmpty).toBe(true)
+  })
+
+  it('renders a collection with its applicable steps despite reference parent', () => {
+    const parent = routine({ name: 'Morning Steps', visibility: 'reference', time_of_day: '07:00' })
+    const step1 = routine({ name: 'Brush teeth', parent_routine_id: parent.id, time_of_day: null })
+    const step2 = routine({ name: 'Get dressed', parent_routine_id: parent.id, time_of_day: null })
+    const model = build([parent, step1, step2])
+    expect(model.collections).toHaveLength(1)
+    expect(model.collections[0]).toMatchObject({ id: parent.id, title: 'Morning Steps', timeOfDay: '07:00' })
+    expect(model.collections[0].rows.map((r) => r.id).sort()).toEqual([step1.id, step2.id].sort())
+    expect(model.collections[0].rows.every((r) => r.timeOfDay === '07:00')).toBe(true)
+  })
+
+  it('drops a collection whose steps none apply today', () => {
+    const parent = routine({ name: 'Weekday Routine', visibility: 'reference', time_of_day: '07:00' })
+    const step = routine({
+      name: 'Only Mondays',
+      parent_routine_id: parent.id,
+      time_of_day: null,
+      recurrence_pattern: { type: 'weekly', days: ['mon'] },
+    })
+    const model = build([parent, step])
+    expect(model.collections).toHaveLength(0)
+    expect(model.isEmpty).toBe(true)
+  })
+
+  it('marks done from today instance', () => {
+    const done = routine({ name: 'Done Thing' })
+    const pending = routine({ name: 'Pending Thing' })
+    const history = [
+      inst({ entity_id: done.id, date: '2026-08-30', status: 'completed' }),
+      inst({ entity_id: pending.id, date: '2026-08-30', status: 'pending' }),
+    ]
+    const model = build([done, pending], history)
+    expect(model.bands.anytime.find((r) => r.id === done.id)?.done).toBe(true)
+    expect(model.bands.anytime.find((r) => r.id === pending.id)?.done).toBe(false)
+  })
+
+  it('builds target rows with progress from today instance', () => {
+    const r = routine({ name: 'Read', target_amount: 20, target_unit: 'minutes' })
+    const history = [inst({ entity_id: r.id, date: '2026-08-30', status: 'pending', progress: 12 })]
+    const model = build([r], history)
+    const row = model.bands.anytime.find((x) => x.id === r.id)
+    expect(row?.target).toEqual({
+      amount: 20,
+      unit: 'minutes',
+      progress: 12,
+      streak: streakFor(r, history, TODAY),
+    })
+  })
+
+  it('assigned tasks band by section and never target', () => {
+    const earlyTask = taskItem({ id: 'task-early' })
+    const afternoonTask = taskItem({ id: 'task-aft' })
+    const nightTask = taskItem({ id: 'task-night', completed: true })
+    const unscheduledTask = taskItem({ id: 'task-unsched' })
+    const othersTask = taskItem({ id: 'task-other', assignedTo: 'someone-else' })
+    const model = build([], [], {
+      earlyMorning: [earlyTask],
+      afternoon: [afternoonTask],
+      night: [nightTask],
+      unscheduled: [unscheduledTask],
+      morning: [othersTask],
+    })
+    expect(model.bands.morning.map((r) => r.id)).toEqual(['task-early'])
+    expect(model.bands.afternoon.map((r) => r.id)).toEqual(['task-aft'])
+    expect(model.bands.evening.map((r) => r.id)).toEqual(['task-night'])
+    expect(model.bands.anytime.map((r) => r.id)).toEqual(['task-unsched'])
+    expect(model.bands.evening.find((r) => r.id === 'task-night')?.done).toBe(true)
+    expect(model.bands.morning.find((r) => r.id === 'task-early')?.target).toBeNull()
+    expect(model.bands.morning.some((r) => r.id === 'task-other')).toBe(false)
+  })
+
+  it('isEmpty when nothing applies', () => {
+    const model = build([])
+    expect(model.isEmpty).toBe(true)
+    expect(model.collections).toEqual([])
+    expect(model.bands).toEqual({ morning: [], afternoon: [], evening: [], anytime: [] })
+  })
+})
+
+describe('bandForTime', () => {
+  it('null time of day is anytime', () => {
+    expect(bandForTime(null)).toBe('anytime')
+  })
+  it('before noon is morning', () => {
+    expect(bandForTime('11:59')).toBe('morning')
+  })
+  it('noon lands in afternoon', () => {
+    expect(bandForTime('12:00')).toBe('afternoon')
+  })
+  it('just before 17:00 is still afternoon', () => {
+    expect(bandForTime('16:59')).toBe('afternoon')
+  })
+  it('17:00 and later is evening', () => {
+    expect(bandForTime('17:00')).toBe('evening')
+  })
+})
+
+describe('streakFor', () => {
+  const WEEKLY = { type: 'weekly' as const, days: ['sat', 'sun'] }
+
+  it('counts consecutive met recurring days, skipping non-recurring days between them', () => {
+    const r = routine({ recurrence_pattern: WEEKLY })
+    const history = [
+      inst({ entity_id: r.id, date: '2026-08-30', status: 'completed' }), // today, Sun
+      inst({ entity_id: r.id, date: '2026-08-29', status: 'completed' }), // yesterday, Sat
+    ]
+    expect(streakFor(r, history, TODAY)).toBe(2)
+  })
+
+  it('an unmet today does not break the streak (the day is not over)', () => {
+    const r = routine({ recurrence_pattern: WEEKLY })
+    const history = [
+      inst({ entity_id: r.id, date: '2026-08-29', status: 'completed' }), // yesterday, Sat
+    ]
+    expect(streakFor(r, history, TODAY)).toBe(1)
+  })
+
+  it('an unmet past recurring day breaks the streak', () => {
+    const r = routine({ recurrence_pattern: WEEKLY })
+    const history = [
+      inst({ entity_id: r.id, date: '2026-08-30', status: 'completed' }), // today, met
+      // 2026-08-29 (Sat) has no instance -> unmet -> breaks the walk here
+      inst({ entity_id: r.id, date: '2026-08-23', status: 'completed' }), // older Sun, unreachable
+    ]
+    expect(streakFor(r, history, TODAY)).toBe(1)
+  })
+
+  it('non-recurring days between recurring ones are skipped, not counted or breaking', () => {
+    const r = routine({ recurrence_pattern: WEEKLY })
+    const history = [
+      inst({ entity_id: r.id, date: '2026-08-30', status: 'completed' }),
+      inst({ entity_id: r.id, date: '2026-08-29', status: 'completed' }),
+      inst({ entity_id: r.id, date: '2026-08-28', status: 'pending' }), // Friday, not a recurring day
+    ]
+    expect(streakFor(r, history, TODAY)).toBe(2)
+  })
+})
