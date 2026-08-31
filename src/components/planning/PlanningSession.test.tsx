@@ -206,7 +206,9 @@ describe('PlanningSession', () => {
         onClose={vi.fn()}
       />
     )
-    expect(screen.getByText('Routines')).toBeInTheDocument()
+    // The drawer's group heading — distinct from the header's Routines
+    // visibility switch, which also carries the word.
+    expect(screen.getByText('Routines', { selector: 'p' })).toBeInTheDocument()
     expect(screen.getByText('Food shopping')).toBeInTheDocument()
   })
 

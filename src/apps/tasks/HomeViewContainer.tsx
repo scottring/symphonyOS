@@ -13,7 +13,8 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
-import { useGoogleCalendar, CalendarReconnectError } from '@/hooks/useGoogleCalendar';
+import { useGoogleCalendar, CalendarReconnectError, type GoogleCalendarInfo } from '@/hooks/useGoogleCalendar';
+import { makeCanMoveEvent } from '@/lib/planning/calendarWriteAccess';
 import { showToast } from '@/hooks/useToast';
 import { PlanningSession } from '@/components/lazy';
 import { LoadingFallback } from '@/components/layout/LoadingFallback';
@@ -60,7 +61,7 @@ import { useMealEventsForDate } from '@/shell/providers/MealEventsProvider';
 export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' } = {}) {
   // Data hooks
   const { tasks, loading: tasksLoading, addTask, toggleTask, toggleWaiting, deleteTask, updateTask, updateTasksBulk, pushTask, getLinkedTasks, refetch, updateTaskOrders } = useSupabaseTasks();
-  const { isConnected, events, fetchEvents, isFetching: eventsFetching, updateEvent, createEvent, deleteEvent, removeEventLocal, restoreEventLocal } = useGoogleCalendar();
+  const { isConnected, events, fetchEvents, fetchCalendarList, isFetching: eventsFetching, updateEvent, createEvent, deleteEvent, removeEventLocal, restoreEventLocal } = useGoogleCalendar();
   // Passing the visible event ids opts in to auto-loading notes (context
   // overrides, assignees, shared-with-family) + realtime — without it those
   // persist to the DB but render stale on every fresh window.
@@ -93,6 +94,17 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
   // here (guidedHorizon / ?plan= deep link) left with the 2026-08
   // analog-planning pivot; planning happens on paper now.
   const [planningOpen, setPlanningOpen] = useState(false);
+  // Calendar roles for the overlay grid: an event on a reader-role share must
+  // not look movable (Google 403s the write). Fetched only when the overlay
+  // opens — the roles gate a drag affordance nothing else here uses.
+  const [calendars, setCalendars] = useState<GoogleCalendarInfo[]>([]);
+  useEffect(() => {
+    if (!planningOpen) return;
+    let cancelled = false;
+    fetchCalendarList().then((cals) => { if (!cancelled) setCalendars(cals); });
+    return () => { cancelled = true; };
+  }, [planningOpen, fetchCalendarList]);
+  const canMoveEvent = useMemo(() => makeCanMoveEvent(calendars), [calendars]);
   // Plan-from-paper (analog-planning pivot): photograph the written plan page,
   // review the parsed items, commit them as placed tasks.
   const [planFromPaperOpen, setPlanFromPaperOpen] = useState(false);
@@ -276,6 +288,14 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
   const planningAllRoutines = useMemo(
     () => filterRoutinesForLayers(allRoutines, layers),
     [allRoutines, layers],
+  );
+  // Per-day routine lookup for the overlay grid. Passing only the viewed
+  // date's `routines` starved every ADDED day — a 3-day grid rendered day 1's
+  // routines in all three columns' resolver calls. Same layer scoping as the
+  // sibling pools.
+  const planningGetRoutinesForDate = useCallback(
+    (date: Date) => filterRoutinesForLayers(getRoutinesForDate(date), layers),
+    [getRoutinesForDate, layers],
   );
   // resolveRoutine replaces the hand-rolled visibility/everyday/timed check —
   // same rungs (resting, everyday-sweep, timed) plus the ones the old
@@ -801,6 +821,8 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
             // otherwise a family routine deferred to today reappears on the
             // Personal grid through the back door.
             allRoutines={planningAllRoutines}
+            getRoutinesForDate={planningGetRoutinesForDate}
+            canMoveEvent={canMoveEvent}
             onScheduleRoutine={(routineId, date, time) => {
               const routine = allRoutines.find(r => r.id === routineId);
               if (routine) updateRoutine(routineId, scheduleRoutineOnDate(routine, date, time));
