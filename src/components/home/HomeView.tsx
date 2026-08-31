@@ -6,6 +6,7 @@ import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine, ActionableInstance } from '@/types/actionable'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
 import { filterEventsForLayers, filterRoutinesForLayers, filterTasksForLayers, filterByLayers } from '@/lib/today/domainFilter'
+import { dedupeCalendarEvents } from '@/lib/calendar/dedupeEvents'
 import { domainById } from '@/lib/domains'
 import { useHomeView } from '@/hooks/useHomeView'
 import { useMobile } from '@/hooks/useMobile'
@@ -102,8 +103,14 @@ export function HomeView({
   // checked layers show their own events; an unmapped calendar sits in
   // Unsorted until mapped. This stops e.g. work-calendar events leaking into
   // the Family/Personal views.
+  // dedupe FIRST, then filter by layer: the same meeting synced to two
+  // calendars arrives twice, and every surface fed by `filteredEvents`
+  // (Today, This Week, Month, the river) would otherwise have to remember to
+  // collapse it. computeTodayData did remember, which is why the duplicates
+  // stayed invisible until /week rendered the same data without it and showed
+  // every school day and every dinner twice in overlapping lanes.
   const filteredEvents = useMemo(
-    () => filterEventsForLayers(events, layers, {
+    () => filterEventsForLayers(dedupeCalendarEvents(events), layers, {
       eventContextOverrides: ctx.eventContextOverrides,
       getDomainForCalendar: ctx.getDomainForCalendar,
       eventNotesMap: ctx.eventNotesMap,
