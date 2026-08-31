@@ -23,7 +23,6 @@ import { useGridCreate } from './useGridCreate'
 import { SlotQuickCreatePopover, type CreateType } from './SlotQuickCreatePopover'
 import { RoutinesToggle } from '@/components/planning/RoutinesToggle'
 import { WeekPoolLane } from './WeekPoolLane'
-import { PlacedContextPrompt } from '@/components/planning/PlacedContextPrompt'
 import { suggestSlots, type BusyInterval } from '@/lib/planning/dropSmarts'
 import { FIRST_HOUR, LAST_HOUR } from './WeekGrid'
 import { readHideRoutines, writeHideRoutines, onHideRoutinesChange } from '@/lib/hideRoutinesSignal'
@@ -129,25 +128,10 @@ export function WeekViewV2(props: WeekViewV2Props) {
     [addTask, deleteTask, createEvent, deleteEvent, navigate, gridCreate, pushAction],
   )
 
-  // Domain-on-drop: a context-less task just landed from the pool/all-day
-  // strip — ask Work/Family/Personal (same menu as everywhere else).
-  const [contextPrompt, setContextPrompt] = useState<{
-    taskId: string
-    position: { left: number; top: number }
-  } | null>(null)
-  const handleChipPlaced = useCallback(
-    (taskId: string, position: { left: number; top: number } | null) => {
-      const t = tasks.find((x) => x.id === taskId)
-      if (!t || t.context) return
-      setContextPrompt({
-        taskId,
-        position: position ?? { left: window.innerWidth / 2, top: 120 },
-      })
-    },
-    [tasks],
-  )
-
-  // Drag-drop wiring
+  // Drag-drop wiring. Domain-on-drop needs nothing here: onUpdateTask is the
+  // GATED update (ctx.onUpdateTask = useGatedTaskActions), so scheduling a
+  // context-less task opens the DomainGate modal before the write — Iris's
+  // rule, enforced in one place.
   const drag = useWeekDragDrop({
     weekStart,
     onWeekChange,
@@ -159,7 +143,6 @@ export function WeekViewV2(props: WeekViewV2Props) {
     routines,
     dayCount,
     pushAction,
-    onChipPlaced: handleChipPlaced,
     onPushRoutine,
   })
 
@@ -421,19 +404,6 @@ export function WeekViewV2(props: WeekViewV2Props) {
       <div className="flex items-center justify-end mb-2">
         <RoutinesToggle hidden={hideRoutines} onToggle={() => writeHideRoutines(!hideRoutines)} />
       </div>
-
-      {/* Domain-on-drop prompt — writes through onUpdateTask so scope
-          derivation (work/personal = private to the owner) rides along. */}
-      {contextPrompt && (
-        <PlacedContextPrompt
-          position={contextPrompt.position}
-          onPick={(ctx) => {
-            void onUpdateTask(contextPrompt.taskId, { context: ctx })
-            setContextPrompt(null)
-          }}
-          onDismiss={() => setContextPrompt(null)}
-        />
-      )}
 
       <DndContext
         sensors={sensors}

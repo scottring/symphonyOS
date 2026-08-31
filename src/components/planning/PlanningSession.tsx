@@ -31,7 +31,6 @@ import { PlanningEventBlock, PLACED_EVENT_DRAG_PREFIX } from './PlanningEventBlo
 import { PlanningRoutineBlock, PLACED_ROUTINE_DRAG_PREFIX } from './PlanningRoutineBlock'
 import { computeEventReschedule, parseAllDayDropForEvent } from './planningReschedule'
 import { PlanningSlotQuickCreate } from './PlanningSlotQuickCreate'
-import { PlacedContextPrompt } from './PlacedContextPrompt'
 import { readCadenceConfig } from '@/lib/cadence/config'
 import { resolveRoutineTime } from '@/lib/today/routineTime'
 import {
@@ -184,14 +183,6 @@ export function PlanningSession({
 
   // Active drag state
   const [activeId, setActiveId] = useState<string | null>(null)
-
-  // Domain-on-drop: a context-less task just landed — ask Work/Family/Personal
-  // with the same menu used everywhere else, anchored at the drop. Dismiss =
-  // placed but untagged, exactly like skipping triage.
-  const [contextPrompt, setContextPrompt] = useState<{
-    taskId: string
-    position: { left: number; top: number }
-  } | null>(null)
 
   // Transient refusal notice (a past-day drop, or a past-day slot click) —
   // auto-clears.
@@ -625,23 +616,6 @@ export function PlanningSession({
     [dayGrain, onScheduleRoutine, onScheduleRoutineToday],
   )
 
-  // After a task drop lands: if the task has no domain yet, open the picker
-  // anchored under the block's final rect (falls back to center-top when the
-  // rect is unavailable, e.g. under test).
-  const maybePromptContext = useCallback(
-    (taskId: string, rect: { left: number; top: number; height: number } | null) => {
-      const dropped = tasks.find((t) => t.id === taskId)
-      if (!dropped || dropped.context) return
-      setContextPrompt({
-        taskId,
-        position: rect
-          ? { left: rect.left, top: rect.top + rect.height }
-          : { left: window.innerWidth / 2, top: 120 },
-      })
-    },
-    [tasks],
-  )
-
   // Handle drag end
   const handleDragEnd = useCallback(
     (event: DragEndEvent) => {
@@ -739,7 +713,6 @@ export function PlanningSession({
           }
         }
         onUpdateTask(activeId, { bucket: 'timed', scheduledFor: day, isAllDay: true })
-        maybePromptContext(activeId, active.rect.current.translated)
         return
       }
 
@@ -790,10 +763,9 @@ export function PlanningSession({
           scheduledFor,
           isAllDay: dayGrain,
         })
-        maybePromptContext(activeId, active.rect.current.translated)
       }
     },
-    [onUpdateTask, tasks, scheduleRoutineFromSlot, onRescheduleEvent, events, minDropDate, dayGrain, maybePromptContext]
+    [onUpdateTask, tasks, scheduleRoutineFromSlot, onRescheduleEvent, events, minDropDate, dayGrain]
   )
 
   return (
@@ -817,20 +789,6 @@ export function PlanningSession({
         <div role="status" className="absolute left-1/2 -translate-x-1/2 top-16 z-20 rounded-lg bg-neutral-800/90 text-white text-sm px-4 py-2 shadow-lg pointer-events-none">
           {dropNotice}
         </div>
-      )}
-
-      {/* Domain-on-drop prompt — the same Work/Family/Personal menu as
-          everywhere else; writes through onUpdateTask so scope derivation
-          (work/personal = private to the owner) rides along. */}
-      {contextPrompt && (
-        <PlacedContextPrompt
-          position={contextPrompt.position}
-          onPick={(ctx) => {
-            onUpdateTask(contextPrompt.taskId, { context: ctx })
-            setContextPrompt(null)
-          }}
-          onDismiss={() => setContextPrompt(null)}
-        />
       )}
 
       {/* Click-to-create popover — anchored to the clicked empty slot */}

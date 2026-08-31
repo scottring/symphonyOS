@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import type { TaskContext } from '@/types/task'
-import { ContextMenuPanel, CONTEXTS } from './ContextMenuPanel'
 
 interface ContextPickerProps {
   value?: TaskContext | null
@@ -13,6 +12,12 @@ interface ContextPickerProps {
    */
   size?: 'sm' | 'md'
 }
+
+const CONTEXTS: { value: TaskContext; label: string; color: string }[] = [
+  { value: 'work', label: 'Work', color: 'rgb(37 99 235)' },      // Blue-600 (matches domain switcher)
+  { value: 'family', label: 'Family', color: 'rgb(217 119 6)' },  // Amber-600 (matches domain switcher)
+  { value: 'personal', label: 'Personal', color: 'rgb(147 51 234)' }, // Purple-600 (matches domain switcher)
+]
 
 export function ContextPicker({ value, onChange, size = 'md' }: ContextPickerProps) {
   const [isOpen, setIsOpen] = useState(false)
@@ -87,7 +92,33 @@ export function ContextPicker({ value, onChange, size = 'md' }: ContextPickerPro
         right: menuPosition.right,
       }}
     >
-      <ContextMenuPanel value={value} onSelect={handleSelect} />
+      <div className="space-y-1">
+        {CONTEXTS.map(({ value: ctxValue, label, color }) => (
+          <button
+            key={ctxValue}
+            onClick={() => handleSelect(ctxValue)}
+            className={`w-full px-3 py-1.5 text-sm text-left rounded-lg flex items-center gap-2 ${
+              value === ctxValue
+                ? 'bg-primary-50 text-primary-700'
+                : 'hover:bg-neutral-50 text-neutral-700'
+            }`}
+          >
+            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
+            {label}
+          </button>
+        ))}
+        {hasValue && (
+          <>
+            <div className="border-t border-neutral-100 my-1" />
+            <button
+              onClick={() => handleSelect(undefined)}
+              className="w-full px-3 py-1.5 text-sm text-left rounded-lg hover:bg-red-50 text-red-600"
+            >
+              Clear
+            </button>
+          </>
+        )}
+      </div>
     </div>
   ) : null
 

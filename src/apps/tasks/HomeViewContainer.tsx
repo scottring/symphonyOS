@@ -843,7 +843,10 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
             }
             initialDate={viewedDate}
             onClose={() => setPlanningOpen(false)}
-            onUpdateTask={updateTask}
+            // GATED update: dropping a context-less task on the grid opens the
+            // DomainGate modal (Iris's rule — same as /week and every other
+            // process); the pick rides the schedule write, cancel refuses it.
+            onUpdateTask={gated.updateTask}
             onPushTask={pushTask}
             familyMembers={familyMembers}
             eventNotesMap={eventNotesMap}

@@ -21,10 +21,6 @@ interface UseWeekDragDropArgs {
   dayCount?: number
   /** Optional. Called after a successful drag mutation to surface an undo toast. */
   pushAction?: (message: string, undo: () => void) => void
-  /** Optional. Fires after a chip (pool pill / all-day chip) lands on the
-   *  grid, with the block's final viewport position — the host uses it to
-   *  anchor the domain-on-drop prompt. Null when the rect is unavailable. */
-  onChipPlaced?: (taskId: string, position: { left: number; top: number } | null) => void
   /** Optional. Pin a routine to a time on ONE day (a deferral/override write),
    *  leaving its recurrence rule alone — the same grain rule as the Today
    *  overlay's routine drop. Omitted = routine blocks don't move. */
@@ -63,13 +59,6 @@ export function useWeekDragDrop(args: UseWeekDragDropArgs): UseWeekDragDropResul
     const activeData = e.active.data.current as
       | { kind?: string; taskId?: string; itemId?: string }
       | undefined
-
-    // Final viewport rect of the dragged node — anchor for the after-drop
-    // domain prompt.
-    const droppedRect = e.active.rect?.current?.translated ?? null
-    const droppedPosition = droppedRect
-      ? { left: droppedRect.left, top: droppedRect.top + droppedRect.height }
-      : null
     const overData = e.over.data.current as
       | { kind?: string; dayIso?: string; hour?: number; minute?: number }
       | undefined
@@ -105,7 +94,6 @@ export function useWeekDragDrop(args: UseWeekDragDropArgs): UseWeekDragDropResul
           bucket: prevBucket,
         })
       })
-      args.onChipPlaced?.(taskId, droppedPosition)
       return
     }
 
@@ -136,7 +124,6 @@ export function useWeekDragDrop(args: UseWeekDragDropArgs): UseWeekDragDropResul
           bucket: prevBucket,
         })
       })
-      args.onChipPlaced?.(activeData.taskId, droppedPosition)
       return
     }
 
