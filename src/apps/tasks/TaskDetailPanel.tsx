@@ -573,6 +573,18 @@ function EventPanelBody({ id }: { id: string }) {
           showToast(eventUpdateErrorMessage(err), 'error', 4000);
         }
       }}
+      onRenameEvent={async (nextTitle) => {
+        try {
+          await updateEvent({
+            eventId: event.google_event_id ?? event.id,
+            title: nextTitle,
+            calendarId: event.calendar_id ?? event.calendarId,
+          });
+          showToast('Event renamed', 'success');
+        } catch (err) {
+          showToast(eventUpdateErrorMessage(err), 'error', 4000);
+        }
+      }}
       onReschedule={async (startTime, endTime) => {
         try {
           await updateEvent({

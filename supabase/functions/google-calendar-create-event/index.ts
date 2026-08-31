@@ -74,6 +74,7 @@ interface CreateEventRequest {
 
 interface UpdateEventRequest {
   eventId: string  // Google Calendar event ID
+  title?: string  // New event title (Google `summary`)
   location?: string | null  // null to remove location
   startTime?: string  // ISO 8601 datetime string
   endTime?: string    // ISO 8601 datetime string
@@ -109,7 +110,7 @@ serve(async (req) => {
     if (isUpdate) {
       // Handle update request
       const updateBody: UpdateEventRequest = body
-      const { eventId, location, startTime, endTime, timeZone, calendarId = 'primary' } = updateBody
+      const { eventId, title, location, startTime, endTime, timeZone, calendarId = 'primary' } = updateBody
 
       if (!eventId) {
         return new Response(JSON.stringify({ error: 'Missing required field: eventId' }), {
@@ -164,6 +165,9 @@ serve(async (req) => {
 
       // Build the patch body conditionally — only include fields that were provided
       const updatePatchBody: Record<string, unknown> = {}
+      if (title !== undefined && title.trim() !== '') {
+        updatePatchBody.summary = title.trim()
+      }
       if (location !== undefined) {
         updatePatchBody.location = location === null ? '' : location
       }

@@ -81,6 +81,8 @@ export interface DeleteEventParams {
 
 export interface UpdateEventParams {
   eventId: string
+  /** New event title (Google `summary`). */
+  title?: string
   location?: string | null
   startTime?: Date
   endTime?: Date
@@ -461,6 +463,7 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
     const { data, error } = await supabase.functions.invoke('google-calendar-create-event', {
       body: {
         eventId: params.eventId,
+        title: params.title,
         location: params.location,
         startTime: params.startTime?.toISOString(),
         endTime: params.endTime?.toISOString(),
@@ -513,6 +516,7 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
         patched.endTime = params.endTime.toISOString()
       }
       if (params.location !== undefined) patched.location = params.location ?? undefined
+      if (params.title !== undefined) patched.title = params.title
       return patched
     }))
   }, [isConnected])

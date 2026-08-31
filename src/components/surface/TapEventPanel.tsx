@@ -47,6 +47,12 @@ interface TapEventPanelProps {
   /** Set/change/clear the event's location, syncing back to Google Calendar. */
   onUpdateEventLocation?: (googleEventId: string, location: string | null, calendarId?: string) => void
   /**
+   * Rename the event, syncing back to Google Calendar (this instance only for
+   * a recurring series). When omitted — or the calendar is read-only — the
+   * title stays read-only and an edit attempt reverts.
+   */
+  onRenameEvent?: (nextTitle: string) => void
+  /**
    * Move the event to a new start, keeping its original duration. Pushes back to
    * Google Calendar (this instance only for a recurring series). When omitted,
    * the Reschedule control is hidden.
@@ -292,7 +298,14 @@ export function TapEventPanel(props: TapEventPanelProps) {
         <div>
         <PanelHeader
           title={event.title}
-          onTitleChange={() => { /* event title is read-only from gcal */ }}
+          // Renames write through to Google, so they're only offered where
+          // Google will accept the write; on a view-only calendar (or a host
+          // that didn't wire renames) the edit reverts, matching the pill.
+          onTitleChange={
+            props.onRenameEvent && !readOnlyCalendar
+              ? props.onRenameEvent
+              : () => { /* event title is read-only */ }
+          }
           onClose={props.onClose}
         />
 

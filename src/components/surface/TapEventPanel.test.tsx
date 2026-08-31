@@ -281,4 +281,35 @@ describe('TapEventPanel', () => {
       expect(onMoveToCalendar).toHaveBeenCalledWith('meals@group.calendar.google.com')
     })
   })
+
+  describe('renaming', () => {
+    it('commits a title edit through onRenameEvent on Enter', async () => {
+      const onRenameEvent = vi.fn()
+      const { user } = render(<TapEventPanel
+        event={mockEvent} notes={undefined} allTasks={[]} {...baseHandlers}
+        onRenameEvent={onRenameEvent}
+        calendarAccess={{ name: 'Family', readOnly: false }}
+      />)
+      await user.click(screen.getByText('Annual physical'))
+      const input = screen.getByDisplayValue('Annual physical')
+      await user.clear(input)
+      await user.type(input, 'PT appointment{Enter}')
+      expect(onRenameEvent).toHaveBeenCalledWith('PT appointment')
+    })
+
+    it('does not rename on a read-only calendar — the edit reverts', async () => {
+      const onRenameEvent = vi.fn()
+      const { user } = render(<TapEventPanel
+        event={mockEvent} notes={undefined} allTasks={[]} {...baseHandlers}
+        onRenameEvent={onRenameEvent}
+        calendarAccess={{ name: 'Work', readOnly: true }}
+      />)
+      await user.click(screen.getByText('Annual physical'))
+      const input = screen.getByDisplayValue('Annual physical')
+      await user.clear(input)
+      await user.type(input, 'Nope{Enter}')
+      expect(onRenameEvent).not.toHaveBeenCalled()
+      expect(screen.getByText('Annual physical')).toBeInTheDocument()
+    })
+  })
 })
