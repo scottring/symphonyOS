@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { sundayOfWeek, dayLabelFor, isToday, formatDateMonthDay, activeDayRange } from './weekHelpers'
+import { sundayOfWeek, dayLabelFor, isToday, formatDateMonthDay, activeDayRange, weekEventSpan } from './weekHelpers'
 
 describe('weekHelpers', () => {
   it('sundayOfWeek returns Sunday at the start of the week', () => {
@@ -53,5 +53,23 @@ describe('activeDayRange', () => {
 
   it('collapses an inverted range instead of going negative', () => {
     expect(activeDayRange(weekStart, '2026-07-16', '2026-07-14')).toEqual({ firstDay: 4, lastDay: 4 })
+  })
+})
+
+describe('weekEventSpan', () => {
+  it('covers the whole week containing the date, under both week anchors', () => {
+    // Mon Aug 31 2026 — the Week bench grid shows Aug 31–Sep 6 (Monday
+    // anchor); nav normalizes to a Sunday anchor. The span must cover both.
+    const { start, end } = weekEventSpan(new Date(2026, 7, 31, 14, 30))
+    expect(start).toEqual(new Date(2026, 7, 30, 0, 0, 0, 0))
+    expect(end).toEqual(new Date(2026, 8, 6, 23, 59, 59, 999))
+    // The PT appointment that started all this: Wed Sep 2, 9:15 AM.
+    const wed = new Date(2026, 8, 2, 9, 15)
+    expect(wed >= start && wed <= end).toBe(true)
+  })
+
+  it('starts on the Sunday of the given week at local midnight', () => {
+    const { start } = weekEventSpan(new Date(2026, 8, 6, 8, 0)) // Sun Sep 6
+    expect(start).toEqual(new Date(2026, 8, 6, 0, 0, 0, 0))
   })
 })

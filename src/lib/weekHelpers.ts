@@ -66,3 +66,16 @@ export function toIsoDate(d: Date): string {
   const day = d.getDate().toString().padStart(2, '0')
   return `${y}-${m}-${day}`
 }
+
+/** Calendar-fetch span for the Week bench (`/week`): the whole week containing
+ *  `d`, wide enough for either anchor in play — HomeView seeds `weekStart` to
+ *  Monday, week nav normalizes it to Sunday. Sunday 00:00 through the following
+ *  Sunday 23:59 covers both. A day of slack is harmless: every week surface
+ *  re-filters events to its own visible days. */
+export function weekEventSpan(d: Date): { start: Date; end: Date } {
+  const start = sundayOfWeek(d)
+  const end = new Date(start)
+  end.setDate(end.getDate() + 7)
+  end.setHours(23, 59, 59, 999)
+  return { start, end }
+}

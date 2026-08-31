@@ -284,7 +284,7 @@ export function HomeView({
             dateInstances={dateInstances}
             weekStart={mondayStart}
             dayCount={5}
-            onWeekChange={(d) => setWeekStart(sundayOfWeek(d))}
+            onWeekChange={(d) => { setWeekStart(sundayOfWeek(d)); onDateChange(d) }}
             selectedAssignee={selectedAssigneeForSchedule}
             selectedAssignees={selectedAssignees}
             layers={layers}
@@ -318,7 +318,7 @@ export function HomeView({
             routines={allActiveRoutines}
             dateInstances={dateInstances}
             weekStart={weekStart}
-            onWeekChange={setWeekStart}
+            onWeekChange={(d) => { setWeekStart(d); onDateChange(d) }}
             onSelectDay={handleSelectDay}
             selectedAssignee={selectedAssigneeForSchedule}
             layers={layers}
@@ -334,7 +334,7 @@ export function HomeView({
             routines={allActiveRoutines}
             dateInstances={dateInstances}
             weekStart={weekStart}
-            onWeekChange={(d) => setWeekStart(sundayOfWeek(d))}
+            onWeekChange={(d) => { setWeekStart(sundayOfWeek(d)); onDateChange(d) }}
             selectedAssignee={selectedAssigneeForSchedule}
             selectedAssignees={selectedAssignees}
             layers={layers}
@@ -453,7 +453,10 @@ export function HomeView({
             viewedDate={viewedDate}
             onDateChange={onDateChange}
             weekStart={weekStart}
-            onWeekChange={setWeekStart}
+            // Week nav must carry `viewedDate` along with the grid: the
+            // container fetches events for the week containing viewedDate,
+            // so a week viewedDate isn't in would render without its events.
+            onWeekChange={(d) => { setWeekStart(d); onDateChange(d) }}
             monthStart={monthStart}
             onMonthChange={setMonthStart}
           />

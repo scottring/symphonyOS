@@ -18,6 +18,7 @@ import { showToast } from '@/hooks/useToast';
 import { PlanningSession } from '@/components/lazy';
 import { LoadingFallback } from '@/components/layout/LoadingFallback';
 import { isDraggableRoutine, resolveRoutine, scheduleRoutineOnDate } from '@/lib/routineUtils';
+import { weekEventSpan } from '@/lib/weekHelpers';
 import { PageFromPaperFlow } from '@/components/capture/PageFromPaperFlow';
 import { parseRoutineTimelineId } from '@/lib/today/doseExpansion';
 import { groupItems, addToGroup, removeFromGroup, ungroupTasks } from '@/lib/today/groupTasks';
@@ -158,15 +159,26 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
     [setSelection, clearSelection],
   );
 
-  // Fetch calendar events for the viewed date.
+  // Fetch calendar events for the viewed range. Today/Day want the viewed
+  // date, but the Week bench (`/week` mounts this container with
+  // fixedView="week") renders a 7-day grid from this same fetch — a
+  // day-scoped fetch left every column except today empty (a Wednesday
+  // appointment never reached the client at all). Week nav keeps
+  // `viewedDate` inside the shown week (see HomeView's onWeekChange), so
+  // the span follows the grid.
   const refetchViewedDayEvents = useCallback(async () => {
     if (!isConnected) return;
+    if (fixedView === 'week') {
+      const { start, end } = weekEventSpan(viewedDate);
+      await fetchEvents(start, end);
+      return;
+    }
     const startOfDay = new Date(viewedDate);
     startOfDay.setHours(0, 0, 0, 0);
     const endOfDay = new Date(viewedDate);
     endOfDay.setHours(23, 59, 59, 999);
     await fetchEvents(startOfDay, endOfDay);
-  }, [isConnected, viewedDate, fetchEvents]);
+  }, [isConnected, viewedDate, fetchEvents, fixedView]);
 
   useEffect(() => {
     void refetchViewedDayEvents();
