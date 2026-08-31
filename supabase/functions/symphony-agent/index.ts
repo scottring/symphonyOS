@@ -1,4 +1,5 @@
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { buildDraftPayload, clampMaxResults } from '../_shared/gmail-tools.ts'
 import { assembleContext } from '../_shared/context-graph/assemble.ts'
 import { renderBundleForPrompt } from '../_shared/context-graph/build.ts'
 import {
@@ -43,7 +44,7 @@ const MAX_TURNS = 14
 const SYSTEM_PROMPT = `You are the assistant inside Symphony, Scott's task, project, and routine manager. You help manage tasks, projects, and contacts using the tools available to you.
 
 Rules:
-- You operate within Symphony. You have no access to email and you cannot edit the vault. You CAN search and read the web (see Web access below). And you CAN search Scott's knowledge base — his notes synced from his vault (people, projects, job search, meetings, daily logs, research, context) — with symphony_search_notes. If asked to do something none of your tools cover, say so plainly and stop.
+- You operate within Symphony. You cannot edit the vault. You CAN search and read Scott's connected Gmail mailbox, and draft (never send) mail from it — see Email below. You CAN search and read the web (see Web access below). And you CAN search Scott's knowledge base — his notes synced from his vault (people, projects, job search, meetings, daily logs, research, context) — with symphony_search_notes. If asked to do something none of your tools cover, say so plainly and stop.
 - No em dashes. No AI cliches. No sycophancy. Be direct and action-oriented.
 - Just do it; don't narrate what you are about to do. After acting, confirm briefly.
 
@@ -54,6 +55,14 @@ Grounding and verification (important):
 - A dated occasion someone ATTENDS (a show, appointment, party, pickup, reservation) belongs on the real calendar: use symphony_create_calendar_event, never symphony_create_task, for it. Tasks are to-dos someone DOES. Family occasions go on the family calendar (domain "family").
 - After ANY write (create / update / complete / delete / add / check), VERIFY before you claim success: read the affected item back with the matching list_/get_ tool and confirm the fields you intended actually changed. If the change did not take or a value looks wrong, say so and retry or ask. Never report a change you have not verified.
 - When updating an item, change only the fields the user asked about. Do not modify unrelated fields (schedule, time, name, context) as a side effect.
+
+Email:
+- Scott's Gmail is connected and searchable. When he asks you to check his email, look something up in it, or find a message, USE symphony_search_email. Never reply that you have no access to email.
+- Work in two steps: symphony_search_email returns subjects, senders and snippets; symphony_read_email_thread returns the full bodies of ONE thread. Search broadly, then read only the thread that actually looks right. Do not read every hit — bodies are long.
+- Query syntax is Gmail's: bare words match anywhere, and from:, to:, subject:, newer_than:30d, has:attachment, label:, in:sent narrow it. If a specific query finds nothing, retry once with something broader before concluding it isn't there.
+- Symphony is connected to exactly ONE Google account. Search results name the mailbox that was searched — say which one, and say it especially when you found nothing, since the message may be sitting in an account Symphony isn't connected to. "I didn't find it in <mailbox>" is honest; "you have no such email" is not.
+- symphony_draft_email creates a DRAFT and never sends. Say so plainly every time: the draft is waiting in Drafts for him to review and send. Never say or imply that mail has gone out. You have no way to send email, and should not offer to.
+- Email is for reading and drafting. When something in an email needs doing, turn it into the right Symphony object — a task, or a calendar event for a dated occasion.
 
 Symphony domain model:
 - Tasks have a context: work, family, or personal. An unscheduled task (bucket "inbox") needs triage; a scheduled task has bucket "timed" and a scheduled_for date.
@@ -449,6 +458,46 @@ const TOOLS = [
       type: 'object',
       properties: { id: { type: 'string' } },
       required: ['id'],
+    },
+  },
+  {
+    name: 'symphony_search_email',
+    description:
+      "Search the user's connected Gmail mailbox. Read-only. Use this whenever they ask you to check, look in, or find something in their email. Takes a Gmail search query — the same syntax as the Gmail search box: bare words match anywhere (\"potluck\"), and operators narrow it (from:, to:, subject:, newer_than:30d, older_than:, has:attachment, label:, in:sent). Prefer a broad query with a recency bound, e.g. \"potluck newer_than:30d\". Returns one entry per thread — subject, sender, date, and a short snippet — NOT full message bodies. When a snippet looks like the right thread but does not contain the detail you need, call symphony_read_email_thread on its thread_id. Always tell the user which mailbox was searched, especially when nothing was found — they may be thinking of a different account.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Gmail query, e.g. "potluck newer_than:30d" or "from:school subject:trip"' },
+        max_results: { type: 'number', description: 'threads to return, 1-25; defaults to 10' },
+      },
+      required: ['query'],
+    },
+  },
+  {
+    name: 'symphony_read_email_thread',
+    description:
+      'Read every message in one email thread, with full bodies. Read-only. Call this after symphony_search_email when you need details that a snippet does not show — a time, an address, what to bring, an amount. Takes the thread_id from a search result. Bodies are long, so read one thread at a time rather than every search hit.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        thread_id: { type: 'string', description: 'threadId from a symphony_search_email result' },
+      },
+      required: ['thread_id'],
+    },
+  },
+  {
+    name: 'symphony_draft_email',
+    description:
+      "Create a Gmail DRAFT in the user's mailbox. This never sends — it leaves the draft in their Drafts folder for them to review, edit, and send themselves. Use it when they ask you to write, draft, or reply to an email. Say clearly afterward that it is a draft awaiting their review, and never imply the mail went out. To reply within an existing conversation, pass the thread_id from a search or read result so the draft threads correctly.",
+    input_schema: {
+      type: 'object',
+      properties: {
+        to: { type: 'string', description: 'recipient address; comma-separate multiple' },
+        subject: { type: 'string' },
+        body: { type: 'string', description: 'plain text body' },
+        thread_id: { type: 'string', description: 'optional; reply inside this existing thread' },
+      },
+      required: ['to', 'subject', 'body'],
     },
   },
   {
@@ -1055,6 +1104,69 @@ async function runTool(
         const { error } = await db.from('routines').delete().eq('id', input.id)
         if (error) throw error
         return `Routine ${input.id} deleted.`
+      }
+      case 'symphony_search_email': {
+        const query = typeof input.query === 'string' ? input.query.trim() : ''
+        if (!query) return 'Error: query is required'
+        const res = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/gmail-event-threads`, {
+          method: 'POST',
+          headers: { Authorization: authHeader, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            query,
+            maxResults: clampMaxResults(input.max_results, 10),
+          }),
+        })
+        const text = await res.text()
+        if (!res.ok) {
+          if (res.status === 403) {
+            return 'Error: Gmail access is not authorized. The user needs to disconnect and reconnect Google in Settings to grant email permissions.'
+          }
+          return `Error searching email (${res.status}): ${text.slice(0, 300)}`
+        }
+        const parsed = JSON.parse(text) as {
+          threads?: Array<Record<string, unknown>>
+          mailbox?: string | null
+        }
+        const threads = parsed.threads ?? []
+        // Naming the mailbox matters most when the search comes up empty —
+        // "nothing found" is misleading if the user meant another account.
+        const where = parsed.mailbox ? ` in ${parsed.mailbox}` : ''
+        if (threads.length === 0) {
+          return `No email threads${where} matched "${query}". This mailbox is the only one Symphony is connected to — if the user expects mail in a different account, say so rather than concluding it does not exist.`
+        }
+        return `${threads.length} thread(s)${where} matching "${query}". Snippets only — call symphony_read_email_thread for full bodies:\n${JSON.stringify(threads, null, 2)}`
+      }
+      case 'symphony_read_email_thread': {
+        const threadId = typeof input.thread_id === 'string' ? input.thread_id.trim() : ''
+        if (!threadId) return 'Error: thread_id is required'
+        const res = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/gmail-event-threads`, {
+          method: 'POST',
+          headers: { Authorization: authHeader, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ threadId }),
+        })
+        const text = await res.text()
+        if (!res.ok) {
+          if (res.status === 403) {
+            return 'Error: Gmail access is not authorized. The user needs to disconnect and reconnect Google in Settings to grant email permissions.'
+          }
+          return `Error reading email thread (${res.status}): ${text.slice(0, 300)}`
+        }
+        return `Email thread ${threadId}:\n${text.slice(0, 20000)}`
+      }
+      case 'symphony_draft_email': {
+        // buildDraftPayload pins mode:'draft'. gmail-send treats any other
+        // mode as a real send, so the send path stays unreachable from the
+        // assistant: it can compose, the user sends.
+        const payload = buildDraftPayload(input as Record<string, unknown>)
+        if ('error' in payload) return `Error: ${payload.error}`
+        const res = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/gmail-send`, {
+          method: 'POST',
+          headers: { Authorization: authHeader, 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
+        const text = await res.text()
+        if (!res.ok) return `Error creating draft (${res.status}): ${text.slice(0, 300)}`
+        return `Draft created in the user's Gmail Drafts folder — NOT sent. They need to review and send it themselves. ${text.slice(0, 300)}`
       }
       case 'symphony_attach_source': {
         if (!attachment) return 'Error: No document was attached to this message.'

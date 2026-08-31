@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { buildSearchQueries, clampMaxResults } from '../_shared/gmail-tools.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -9,9 +10,16 @@ const corsHeaders = {
 // GMAIL EVENT THREADS — Fetches email threads related to calendar
 // event attendees, enabling contextual email display on events.
 //
-// Two modes:
-//   1. Search: POST { attendeeEmails: string[] } → threads list
-//   2. Detail: POST { threadId: string } → full thread with bodies
+// Three modes:
+//   1. Search by attendee: POST { attendeeEmails: string[] } → threads
+//   2. Search by query:    POST { query: string } → threads
+//        A raw Gmail query ("potluck newer_than:30d"). Used by the
+//        assistant's symphony_search_email tool.
+//   3. Detail: POST { threadId: string } → full thread with bodies
+//
+// Both search modes also return `mailbox` — the address actually
+// searched — so a caller can never report "nothing found" without
+// saying which account it looked in.
 //
 // Auth: Requires user JWT via Authorization header.
 //
@@ -184,6 +192,23 @@ async function resolveUserId(
   return { userId: user.id }
 }
 
+// The address of the mailbox these tokens belong to. Symphony holds exactly
+// one Google connection per user (calendar_connections is UNIQUE on
+// user_id+provider), so "which inbox did you search?" has one answer — and
+// callers must be able to state it.
+async function fetchMailboxAddress(accessToken: string): Promise<string | null> {
+  try {
+    const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/profile', {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    })
+    const data = await res.json()
+    return data?.emailAddress ?? null
+  } catch (err) {
+    console.error('Gmail profile fetch failed:', err)
+    return null
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -277,22 +302,24 @@ Deno.serve(async (req) => {
       })
     }
 
-    // ── Mode 1: Search threads by attendee emails ───────────────
-    const attendeeEmails: string[] = body.attendeeEmails || []
-    const maxResults = body.maxResults || 5
+    // ── Modes 1 & 2: Search threads ─────────────────────────────
+    // A raw Gmail query wins when present; otherwise attendee addresses are
+    // expanded into from:/to: queries (the original calendar-event behavior).
+    const maxResults = clampMaxResults(body.maxResults)
+    const queries = buildSearchQueries(body)
 
-    if (attendeeEmails.length === 0) {
-      return new Response(JSON.stringify({ threads: [] }), {
+    const mailbox = await fetchMailboxAddress(accessToken)
+
+    if (queries.length === 0) {
+      return new Response(JSON.stringify({ threads: [], mailbox }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
 
-    // Search Gmail for threads involving each attendee email
     const seenThreadIds = new Set<string>()
     const allThreads: ThreadMetadata[] = []
 
-    for (const email of attendeeEmails) {
-      const query = `from:${email} OR to:${email}`
+    for (const query of queries) {
       const searchUrl = `https://gmail.googleapis.com/gmail/v1/users/me/threads?q=${encodeURIComponent(query)}&maxResults=${maxResults}`
       const searchRes = await fetch(searchUrl, {
         headers: { Authorization: `Bearer ${accessToken}` },
@@ -308,7 +335,7 @@ Deno.serve(async (req) => {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           })
         }
-        console.error(`Gmail search failed for ${email}:`, searchData.error)
+        console.error(`Gmail search failed for query "${query}":`, searchData.error)
         continue
       }
 
@@ -355,7 +382,7 @@ Deno.serve(async (req) => {
       return dateB - dateA
     })
 
-    return new Response(JSON.stringify({ threads: allThreads }), {
+    return new Response(JSON.stringify({ threads: allThreads, mailbox }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (err) {
