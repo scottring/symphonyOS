@@ -39,7 +39,14 @@ export interface LaneLayout {
  */
 export function layoutLanes(items: LaneInput[], maxColumns = 4): LaneLayout {
   const cap = Math.max(2, maxColumns)
-  const sorted = [...items].sort((a, b) => a.startMinutes - b.startMinutes)
+  // Dedupe by id first. The layout is keyed by id (lanes is a Map), so a
+  // duplicate input (the same event fed twice) can't get two lanes anyway —
+  // but it DID inflate the group count past the cap, collapsing real items
+  // into a "+N" chip beside visually empty lanes (all the duplicate "lanes"
+  // rendered as one block).
+  const seen = new Set<string>()
+  const unique = items.filter((it) => (seen.has(it.id) ? false : (seen.add(it.id), true)))
+  const sorted = [...unique].sort((a, b) => a.startMinutes - b.startMinutes)
   const lanes = new Map<string, Lane>()
   const chips: OverflowChip[] = []
   const processed = new Set<number>()

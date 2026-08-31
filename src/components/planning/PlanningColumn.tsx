@@ -8,7 +8,7 @@ import type { FamilyMember } from '@/types/family'
 import { PlanningTimeSlot } from './PlanningTimeSlot'
 import { PlanningTaskCard } from './PlanningTaskCard'
 import { PlanningEventBlock, PLACED_EVENT_DRAG_PREFIX } from './PlanningEventBlock'
-import { PlanningRoutineBlock } from './PlanningRoutineBlock'
+import { PlanningRoutineBlock, PLACED_ROUTINE_DRAG_PREFIX } from './PlanningRoutineBlock'
 import { layoutLanes, type Lane } from './overlapLanes'
 import { resolveRoutineTime } from '@/lib/today/routineTime'
 import type { ActionableInstance } from '@/types/actionable'
@@ -84,6 +84,9 @@ interface PlanningColumnProps {
   /** Day grain: the week rung places into a DAY, so no hour axis is drawn and
    *  the column itself is the unit. See PlanningSession's placementGrain. */
   dayGrain?: boolean
+  /** Side-by-side lane cap before overlapping items collapse into a "+N"
+   *  chip. Wide columns (few days on the grid) can afford more. */
+  maxLanes?: number
 }
 
 export function PlanningColumn({
@@ -103,6 +106,7 @@ export function PlanningColumn({
   onOpenDay,
   onSlotClick,
   dayGrain = false,
+  maxLanes = MAX_LANES,
 }: PlanningColumnProps) {
   // Helper to find family member by ID
   const getMember = useCallback((id: string | null | undefined) => {
@@ -226,17 +230,30 @@ export function PlanningColumn({
       ...placedTasks.map((p) => ({ id: p.task.id, startMinutes: p.startMinutes, endMinutes: p.endMinutes })),
       ...placedEvents.map((p) => ({ id: p.event.id, startMinutes: p.startMinutes, endMinutes: p.endMinutes })),
       ...placedRoutines.map((p) => ({ id: p.routine.id, startMinutes: p.startMinutes, endMinutes: p.endMinutes })),
-    ], MAX_LANES)
-  }, [placedTasks, placedEvents, placedRoutines])
+    ], maxLanes)
+  }, [placedTasks, placedEvents, placedRoutines, maxLanes])
 
-  // Look up a hidden item's label + time so the "+N" popover can list them.
+  // Look up a hidden item's label + time so the "+N" popover can list them —
+  // plus the drag id its full-size block would use, so a popover row is
+  // draggable through the SAME drop branches (bare task id / event- /
+  // placed-routine- prefixes; null = not draggable, e.g. a reader-role event).
   const itemInfo = useMemo(() => {
-    const m = new Map<string, { title: string; time: string }>()
-    for (const { task, startMinutes } of placedTasks) m.set(task.id, { title: task.title, time: minutesToLabel(startMinutes, dayStartHour) })
-    for (const { event, startMinutes } of placedEvents) m.set(event.id, { title: event.title, time: minutesToLabel(startMinutes, dayStartHour) })
-    for (const { routine, startMinutes } of placedRoutines) m.set(routine.id, { title: routine.name, time: minutesToLabel(startMinutes, dayStartHour) })
+    const m = new Map<string, { title: string; time: string; dragId: string | null }>()
+    for (const { task, startMinutes } of placedTasks) {
+      m.set(task.id, { title: task.title, time: minutesToLabel(startMinutes, dayStartHour), dragId: task.id })
+    }
+    for (const { event, startMinutes } of placedEvents) {
+      m.set(event.id, {
+        title: event.title,
+        time: minutesToLabel(startMinutes, dayStartHour),
+        dragId: (canMoveEvent ? canMoveEvent(event) : true) ? `${PLACED_EVENT_DRAG_PREFIX}${event.id}` : null,
+      })
+    }
+    for (const { routine, startMinutes } of placedRoutines) {
+      m.set(routine.id, { title: routine.name, time: minutesToLabel(startMinutes, dayStartHour), dragId: `${PLACED_ROUTINE_DRAG_PREFIX}${routine.id}` })
+    }
     return m
-  }, [placedTasks, placedEvents, placedRoutines, dayStartHour])
+  }, [placedTasks, placedEvents, placedRoutines, dayStartHour, canMoveEvent])
 
   // Which "+N" chip's reveal popover is open.
   const [openChipId, setOpenChipId] = useState<string | null>(null)
@@ -389,7 +406,12 @@ export function PlanningColumn({
               className="absolute cursor-pointer"
               style={laneStyle(layout.lanes.get(event.id), top, height, raisedId === event.id)}
             >
-              <PlanningEventBlock event={event} height={height} assignee={eventAssignee} />
+              <PlanningEventBlock
+                event={event}
+                height={height}
+                assignee={eventAssignee}
+                movable={canMoveEvent ? canMoveEvent(event) : true}
+              />
             </div>
           )
         })}
@@ -436,10 +458,12 @@ export function PlanningColumn({
                     {chip.itemIds.map((id) => {
                       const info = itemInfo.get(id)
                       return (
-                        <div key={id} className="flex items-center justify-between gap-2 px-2 py-1.5 rounded-md hover:bg-neutral-50">
-                          <span className="text-sm text-neutral-800 truncate">{info?.title ?? 'Untitled'}</span>
-                          <span className="text-[10px] text-neutral-400 shrink-0">{info?.time ?? ''}</span>
-                        </div>
+                        <OverflowRow
+                          key={id}
+                          dragId={info?.dragId ?? null}
+                          title={info?.title ?? 'Untitled'}
+                          time={info?.time ?? ''}
+                        />
                       )
                     })}
                   </div>
@@ -451,6 +475,31 @@ export function PlanningColumn({
       </div>
       </>
       )}
+    </div>
+  )
+}
+
+// One row inside the "+N" reveal popover. Draggable with the SAME id its
+// full-size block would use, so PlanningSession's existing drop branches
+// (task / event- / placed-routine-) place it with zero new handling — an item
+// hidden behind the cap is still rearrangeable. dragId null = display-only
+// (e.g. an event on a calendar Google won't let us write).
+function OverflowRow({ dragId, title, time }: { dragId: string | null; title: string; time: string }) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: dragId ?? `overflow-static-${title}`,
+    disabled: !dragId,
+  })
+  return (
+    <div
+      ref={setNodeRef}
+      {...attributes}
+      {...(dragId ? listeners : {})}
+      className={`flex items-center justify-between gap-2 px-2 py-1.5 rounded-md hover:bg-neutral-50 ${
+        dragId ? 'cursor-grab active:cursor-grabbing touch-none' : ''
+      } ${isDragging ? 'opacity-40' : ''}`}
+    >
+      <span className="text-sm text-neutral-800 truncate">{title}</span>
+      <span className="text-[10px] text-neutral-400 shrink-0">{time}</span>
     </div>
   )
 }

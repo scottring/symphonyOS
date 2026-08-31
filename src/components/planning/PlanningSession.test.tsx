@@ -386,7 +386,9 @@ describe('PlanningSession', () => {
     const today = new Date()
     today.setHours(9, 0, 0, 0)
     const end = new Date(today.getTime() + 60 * 60000)
-    const events = Array.from({ length: 6 }, (_, i) =>
+    // A ≤3-day grid caps at 6 lanes (wide columns), so 8 items are needed to
+    // overflow: 5 visible + a "+3" chip.
+    const events = Array.from({ length: 8 }, (_, i) =>
       createMockCalendarEvent({ id: `ov${i}`, title: `E${i}`, start_time: today.toISOString(), end_time: end.toISOString() })
     )
 
@@ -402,10 +404,21 @@ describe('PlanningSession', () => {
       />
     )
 
-    // Cap is 4 → 3 events rendered as cards, the other 3 behind a "+3" chip.
+    // Cap is 6 on a wide grid → 5 events rendered as cards, 3 behind a chip.
     const renderedCards = events.filter((e) => screen.queryByTestId(`placed-${e.id}`))
-    expect(renderedCards.length).toBe(3)
-    expect(screen.getByRole('button', { name: /3 more overlapping items/i })).toBeInTheDocument()
+    expect(renderedCards.length).toBe(5)
+    const chip = screen.getByRole('button', { name: /3 more overlapping items/i })
+
+    // The reveal popover's rows are DRAGGABLE (dnd-kit stamps
+    // aria-roledescription) — an item hidden behind the cap must still be
+    // rearrangeable, not a dead label.
+    fireEvent.click(chip)
+    const hidden = events.filter((e) => !screen.queryByTestId(`placed-${e.id}`))
+    expect(hidden.length).toBe(3)
+    for (const e of hidden) {
+      const row = screen.getByText(e.title).closest('[aria-roledescription="draggable"]')
+      expect(row).not.toBeNull()
+    }
   })
 
   it('renders the shelf above the grid instead of the drawer when shelf prop is set', () => {

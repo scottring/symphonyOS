@@ -50,4 +50,35 @@ describe('layoutLanes', () => {
     expect([...lanes.keys()].length).toBe(4)
     expect(chips).toEqual([])
   })
+
+  // The screenshot bug (2026-08-31): one visible block + a "+2" chip beside
+  // empty column width. A long spanning event plus two short items is only a
+  // 3-group — it must never chip at cap 4.
+  it('a spanning event with two short overlappers lanes fully — no chip', () => {
+    const { lanes, chips } = layoutLanes([
+      { id: 'school', startMinutes: 90, endMinutes: 480 },  // 7:30–14:00 from 6am
+      { id: 'a', startMinutes: 240, endMinutes: 270 },       // 10:00–10:30
+      { id: 'b', startMinutes: 240, endMinutes: 270 },
+    ], 4)
+    expect([...lanes.keys()].sort()).toEqual(['a', 'b', 'school'])
+    expect(chips).toEqual([])
+  })
+
+  // Duplicate ids (the same event fed twice — e.g. one row per calendar it
+  // syncs from) inflated the group count past the cap while the duplicates
+  // rendered as ONE block: 3×'school' + 2 real items = a 5-group → 3 "visible"
+  // lanes all keyed 'school' (Map collapses them) + a "+2" chip holding the
+  // two real, now-undraggable items. Layout is keyed by id, so dedupe first.
+  it('dedupes duplicate ids before grouping', () => {
+    const { lanes, chips } = layoutLanes([
+      { id: 'school', startMinutes: 90, endMinutes: 480 },
+      { id: 'school', startMinutes: 90, endMinutes: 480 },
+      { id: 'school', startMinutes: 90, endMinutes: 480 },
+      { id: 'a', startMinutes: 240, endMinutes: 270 },
+      { id: 'b', startMinutes: 240, endMinutes: 270 },
+    ], 4)
+    expect([...lanes.keys()].sort()).toEqual(['a', 'b', 'school'])
+    expect(lanes.get('school')!.totalColumns).toBe(3)
+    expect(chips).toEqual([])
+  })
 })

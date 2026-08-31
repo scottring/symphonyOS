@@ -156,6 +156,9 @@ export function PlanningGrid({
               onOpenDay={onOpenDay}
               onSlotClick={onSlotClick}
               dayGrain={dayGrain}
+              // Wide columns (≤3 days on the grid) can afford more side-by-side
+              // lanes before collapsing into a "+N" chip.
+              maxLanes={dateRange.length <= 3 ? 6 : 4}
             />
           )
         })}

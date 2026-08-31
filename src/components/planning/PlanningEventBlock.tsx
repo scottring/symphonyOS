@@ -11,12 +11,16 @@ interface PlanningEventBlockProps {
   assignee?: FamilyMember
   /** When true (DragOverlay preview), skip the draggable wiring. */
   isOverlay?: boolean
+  /** Does this event's calendar accept writes? False disables the drag —
+   *  Google 403s a move on a reader-role share, so it must not look movable.
+   *  Default true preserves callers that predate the role check. */
+  movable?: boolean
 }
 
-export function PlanningEventBlock({ event, height, assignee, isOverlay }: PlanningEventBlockProps) {
+export function PlanningEventBlock({ event, height, assignee, isOverlay, movable = true }: PlanningEventBlockProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: `${PLACED_EVENT_DRAG_PREFIX}${event.id}`,
-    disabled: isOverlay,
+    disabled: isOverlay || !movable,
   })
 
   // Get colors based on assignee, fallback to neutral (event default)
@@ -62,7 +66,7 @@ export function PlanningEventBlock({ event, height, assignee, isOverlay }: Plann
       {...(isOverlay ? {} : attributes)}
       {...(isOverlay ? {} : listeners)}
       className={`h-full px-2 py-1 rounded-lg ${bgClass} border ${borderClass} overflow-hidden touch-none ${
-        isOverlay ? 'cursor-grabbing shadow-lg' : 'cursor-grab active:cursor-grabbing'
+        isOverlay ? 'cursor-grabbing shadow-lg' : movable ? 'cursor-grab active:cursor-grabbing' : ''
       }`}
     >
       <div className="flex items-start gap-1.5">
