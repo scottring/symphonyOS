@@ -9,6 +9,9 @@ interface PlanningTimeSlotProps {
    *  spec). Placed cards are absolutely-positioned siblings, not children, of
    *  this div, so there's no bubbling conflict with card clicks. */
   onSlotClick?: (e: React.MouseEvent<HTMLDivElement>) => void
+  /** Tint as a suggested drop target during a drag (dropSmarts). Paint only —
+   *  a drop lands anywhere as before. */
+  suggested?: boolean
 }
 
 export function PlanningTimeSlot({
@@ -17,6 +20,7 @@ export function PlanningTimeSlot({
   minute,
   height,
   onSlotClick,
+  suggested = false,
 }: PlanningTimeSlotProps) {
   const slotId = `slot-${dateKey}-${hour}-${minute}`
 
@@ -35,6 +39,8 @@ export function PlanningTimeSlot({
       className={`transition-colors box-border ${onSlotClick ? 'cursor-pointer hover:bg-primary-50/60' : ''} ${
         isOver
           ? 'bg-primary-100 border-2 border-primary-400 border-dashed'
+          : suggested
+          ? `bg-primary-50/80 ring-1 ring-inset ring-primary-200 ${isHourStart ? 'border-t border-neutral-200' : 'border-t border-neutral-100'}`
           : isHourStart
           ? 'border-t border-neutral-200'
           : 'border-t border-neutral-100'

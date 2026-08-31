@@ -38,6 +38,7 @@ import {
   unscheduledPool, applyPoolView, orderPool, groupPool,
   readPoolView, writePoolView, type PoolView,
 } from '@/lib/planning/poolViews'
+import { suggestSlots, busyIntervals, type BusyInterval } from '@/lib/planning/dropSmarts'
 
 interface PlanningSessionProps {
   tasks: Task[]
@@ -478,6 +479,37 @@ export function PlanningSession({
     return tasks.find((t) => t.id === activeId) ?? null
   }, [activeId, tasks])
 
+  // Suggested open slots for the task being dragged — rules-based paint
+  // (dropSmarts). Time grain only: at day grain the hour axis isn't drawn.
+  const suggestedSlots = useMemo(() => {
+    if (!activeTask || dayGrain) return null
+    const busyByDate = new Map<string, BusyInterval[]>()
+    for (const date of dateRange) {
+      const dateKey = formatDateKey(date)
+      busyByDate.set(dateKey, busyIntervals({
+        tasks: scheduledTasksByDate.get(dateKey) ?? [],
+        events: (eventsByDate.get(dateKey) ?? []).flatMap((e) => {
+          const startStr = e.start_time || e.startTime
+          if (!startStr) return []
+          const start = new Date(startStr)
+          const endStr = e.end_time || e.endTime
+          return [{ start, end: endStr ? new Date(endStr) : new Date(start.getTime() + 30 * 60000) }]
+        }),
+        routineStarts: (routinesByDate.get(dateKey) ?? [])
+          .map((r) => resolveRoutineTime(r, routineInstancesByDate.get(dateKey)?.get(r.id), date))
+          .filter((d): d is Date => d !== null),
+      }))
+    }
+    const list = suggestSlots(activeTask, busyByDate, {
+      dates: dateRange,
+      dayStartHour: DAY_START_HOUR,
+      dayEndHour: DAY_END_HOUR,
+      slotMinutes: SLOT_DURATION,
+      now: new Date(),
+    })
+    return new Set(list.map((s) => `slot-${s.dateKey}-${s.hour}-${s.minute}`))
+  }, [activeTask, dayGrain, dateRange, scheduledTasksByDate, eventsByDate, routinesByDate, routineInstancesByDate])
+
   // Drawer contents: the draggable routines that aren't already ON the grid.
   //
   // Every drawer routine is untimed, so the only way it gets a time is a drop.
@@ -868,6 +900,7 @@ export function PlanningSession({
                 onSlotClick={onCreateTaskAt ? handleSlotClick : undefined}
                 dayGrain={dayGrain}
                 canMoveEvent={canMoveEvent}
+                suggestedSlots={suggestedSlots}
               />
             </div>
           ) : (
@@ -887,6 +920,7 @@ export function PlanningSession({
               onSlotClick={onCreateTaskAt ? handleSlotClick : undefined}
               dayGrain={dayGrain}
               canMoveEvent={canMoveEvent}
+              suggestedSlots={suggestedSlots}
             />
           )}
 

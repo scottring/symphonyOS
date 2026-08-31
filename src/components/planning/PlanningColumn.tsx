@@ -87,6 +87,8 @@ interface PlanningColumnProps {
   /** Side-by-side lane cap before overlapping items collapse into a "+N"
    *  chip. Wide columns (few days on the grid) can afford more. */
   maxLanes?: number
+  /** Slot ids to tint as suggested drop targets during a task drag. */
+  suggestedSlots?: Set<string> | null
 }
 
 export function PlanningColumn({
@@ -107,6 +109,7 @@ export function PlanningColumn({
   onSlotClick,
   dayGrain = false,
   maxLanes = MAX_LANES,
+  suggestedSlots,
 }: PlanningColumnProps) {
   // Helper to find family member by ID
   const getMember = useCallback((id: string | null | undefined) => {
@@ -377,6 +380,7 @@ export function PlanningColumn({
             minute={minute}
             height={slotHeight}
             onSlotClick={onSlotClick ? (e) => onSlotClick(dateKey, hour, minute, e.currentTarget) : undefined}
+            suggested={suggestedSlots?.has(`slot-${dateKey}-${hour}-${minute}`) ?? false}
           />
         ))}
 

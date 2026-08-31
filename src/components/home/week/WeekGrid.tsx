@@ -29,9 +29,12 @@ interface WeekGridProps {
   suppressCreate?: boolean
   /** Render a day's all-day chips into that day's all-day cell. */
   renderAllDay?: (day: Date) => ReactNode
+  /** Sub-slot ids to tint as suggested drop targets while a pool-pill drag is
+   *  active (dropSmarts). Paint only — never captures the drop. */
+  suggestedSlotIds?: Set<string> | null
 }
 
-export function WeekGrid({ weekStart, dayCount = 7, children, onCreateGesture, suppressCreate, renderAllDay }: WeekGridProps) {
+export function WeekGrid({ weekStart, dayCount = 7, children, onCreateGesture, suppressCreate, renderAllDay, suggestedSlotIds }: WeekGridProps) {
   const days = Array.from({ length: dayCount }, (_, i) => {
     const d = new Date(weekStart)
     d.setDate(d.getDate() + i)
@@ -87,6 +90,7 @@ export function WeekGrid({ weekStart, dayCount = 7, children, onCreateGesture, s
                   hour={hour}
                   onCreateGesture={onCreateGesture}
                   suppressCreate={suppressCreate}
+                  suggestedSlotIds={suggestedSlotIds}
                 />
               ))}
             </div>
@@ -134,9 +138,10 @@ interface HourCellProps {
   hour: number
   onCreateGesture?: CreateGestureHandlers
   suppressCreate?: boolean
+  suggestedSlotIds?: Set<string> | null
 }
 
-function HourCell({ day, hour, onCreateGesture, suppressCreate }: HourCellProps) {
+function HourCell({ day, hour, onCreateGesture, suppressCreate, suggestedSlotIds }: HourCellProps) {
   // Four droppable sub-slots inside one hour cell.
   return (
     <div className="border-l border-neutral-200/60 grid grid-rows-4">
@@ -148,6 +153,7 @@ function HourCell({ day, hour, onCreateGesture, suppressCreate }: HourCellProps)
           minute={i * 15}
           onCreateGesture={onCreateGesture}
           suppressCreate={suppressCreate}
+          suggestedSlotIds={suggestedSlotIds}
         />
       ))}
     </div>
@@ -160,9 +166,10 @@ interface SubSlotProps {
   minute: number
   onCreateGesture?: CreateGestureHandlers
   suppressCreate?: boolean
+  suggestedSlotIds?: Set<string> | null
 }
 
-function SubSlot({ day, hour, minute, onCreateGesture, suppressCreate }: SubSlotProps) {
+function SubSlot({ day, hour, minute, onCreateGesture, suppressCreate, suggestedSlotIds }: SubSlotProps) {
   const id = `slot:${dayKey(day)}:${pad(hour)}:${pad(minute)}`
   const { setNodeRef, isOver } = useDroppable({
     id,
@@ -192,7 +199,13 @@ function SubSlot({ day, hour, minute, onCreateGesture, suppressCreate }: SubSlot
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
-      className={`${isOver ? 'bg-primary-50/60' : 'hover:bg-neutral-50/40'} ${onCreateGesture && !suppressCreate ? 'cursor-cell' : ''}`}
+      className={`${
+        isOver
+          ? 'bg-primary-50/60'
+          : suggestedSlotIds?.has(id)
+          ? 'bg-primary-50/80 ring-1 ring-inset ring-primary-200'
+          : 'hover:bg-neutral-50/40'
+      } ${onCreateGesture && !suppressCreate ? 'cursor-cell' : ''}`}
     />
   )
 }

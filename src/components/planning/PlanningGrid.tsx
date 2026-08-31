@@ -33,6 +33,9 @@ interface PlanningGridProps {
    *  at all. Everything in this mode is written isAllDay, so the columns hold
    *  the day's items directly. */
   dayGrain?: boolean
+  /** Slot ids to tint as suggested drop targets while a task drag is active
+   *  (dropSmarts). Paint only — never captures the drop. */
+  suggestedSlots?: Set<string> | null
 }
 
 export function PlanningGrid({
@@ -51,6 +54,7 @@ export function PlanningGrid({
   onOpenDay,
   onSlotClick,
   dayGrain = false,
+  suggestedSlots,
 }: PlanningGridProps) {
   // Generate time labels
   const timeLabels = useMemo(() => {
@@ -156,6 +160,7 @@ export function PlanningGrid({
               onOpenDay={onOpenDay}
               onSlotClick={onSlotClick}
               dayGrain={dayGrain}
+              suggestedSlots={suggestedSlots}
               // Wide columns (≤3 days on the grid) can afford more side-by-side
               // lanes before collapsing into a "+N" chip.
               maxLanes={dateRange.length <= 3 ? 6 : 4}

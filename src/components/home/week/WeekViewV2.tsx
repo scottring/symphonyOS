@@ -24,6 +24,8 @@ import { SlotQuickCreatePopover, type CreateType } from './SlotQuickCreatePopove
 import { RoutinesToggle } from '@/components/planning/RoutinesToggle'
 import { WeekPoolLane } from './WeekPoolLane'
 import { PlacedContextPrompt } from '@/components/planning/PlacedContextPrompt'
+import { suggestSlots, type BusyInterval } from '@/lib/planning/dropSmarts'
+import { FIRST_HOUR, LAST_HOUR } from './WeekGrid'
 import { readHideRoutines, writeHideRoutines, onHideRoutinesChange } from '@/lib/hideRoutinesSignal'
 import { resolveRoutine } from '@/lib/routineUtils'
 import type { AssigneeFilter } from '@/lib/today/types'
@@ -337,6 +339,43 @@ export function WeekViewV2(props: WeekViewV2Props) {
     return placed
   }, [allItems, weekStart, dayCount, drag.activeDragId])
 
+  // Suggested open slots while a POOL pill drags — rules-based paint
+  // (dropSmarts); never captures the drop. Only pool pills: an already-placed
+  // block being moved knows where it's going.
+  const suggestedSlotIds = useMemo(() => {
+    const activeId = drag.activeDragId
+    if (!activeId || !activeId.startsWith('pool:')) return null
+    const task = tasks.find((t) => t.id === activeId.slice('pool:'.length))
+    if (!task) return null
+    const busyByDate = new Map<string, BusyInterval[]>()
+    for (const item of allItems) {
+      if (!item.startTime) continue
+      const key = dayKey(item.startTime)
+      const startMinutes = item.startTime.getHours() * 60 + item.startTime.getMinutes()
+      const endMinutes = item.endTime
+        ? item.endTime.getHours() * 60 + item.endTime.getMinutes()
+        : startMinutes + 30
+      const list = busyByDate.get(key) ?? []
+      list.push({ startMinutes, endMinutes })
+      busyByDate.set(key, list)
+    }
+    const dates = Array.from({ length: dayCount }, (_, i) => {
+      const d = new Date(weekStart)
+      d.setDate(d.getDate() + i)
+      return d
+    })
+    const pad = (n: number) => String(n).padStart(2, '0')
+    return new Set(
+      suggestSlots(task, busyByDate, {
+        dates,
+        dayStartHour: FIRST_HOUR,
+        dayEndHour: LAST_HOUR,
+        slotMinutes: 30,
+        now: new Date(),
+      }).map((s) => `slot:${s.dateKey}:${pad(s.hour)}:${pad(s.minute)}`),
+    )
+  }, [drag.activeDragId, tasks, allItems, weekStart, dayCount])
+
   // WeekEventBlock.onSelect expects (id: string), but onSelectItem is
   // (id: string | null). Narrow here so TypeScript is satisfied; passing null
   // is only needed for deselection, which happens elsewhere.
@@ -424,6 +463,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
                 }
           }
           suppressCreate={!!drag.activeDragId}
+          suggestedSlotIds={suggestedSlotIds}
         >
           {placedItems.map((p) => (
             <WeekEventBlock
