@@ -25,6 +25,10 @@ interface UseWeekDragDropArgs {
    *  grid, with the block's final viewport position — the host uses it to
    *  anchor the domain-on-drop prompt. Null when the rect is unavailable. */
   onChipPlaced?: (taskId: string, position: { left: number; top: number } | null) => void
+  /** Optional. Pin a routine to a time on ONE day (a deferral/override write),
+   *  leaving its recurrence rule alone — the same grain rule as the Today
+   *  overlay's routine drop. Omitted = routine blocks don't move. */
+  onPushRoutine?: (routineId: string, when: Date) => void
 }
 
 interface UseWeekDragDropResult {
@@ -141,6 +145,14 @@ export function useWeekDragDrop(args: UseWeekDragDropArgs): UseWeekDragDropResul
       // Strip the type prefix to get the raw DB id, then route to the correct
       // mutator. TimelineItem.id is prefixed ('task-xyz', 'event-xyz', etc.);
       // the DB update functions expect the raw uuid.
+      if (itemId.startsWith('routine-')) {
+        // Strip the '-dayN' render suffix to recover the DB id (same rule as
+        // WeekViewV2.handleSelectBlock). One-day override, never a rule
+        // rewrite — one drag must not move every future occurrence.
+        const routineId = itemId.slice('routine-'.length).replace(/-day\d+$/, '')
+        args.onPushRoutine?.(routineId, newStart)
+        return
+      }
       if (itemId.startsWith('task-')) {
         const taskId = itemId.slice('task-'.length)
         const task = tasks.find((t) => t.id === taskId)

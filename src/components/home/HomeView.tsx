@@ -299,6 +299,7 @@ export function HomeView({
             onUpdateTask={ctx.onUpdateTask ?? (() => {})}
             onUpdateRoutine={ctx.onUpdateRoutine ?? (() => {})}
             onUpdateEvent={ctx.onUpdateEvent ?? (() => {})}
+            onPushRoutine={ctx.onPushRoutine}
             pushAction={pushAction}
           />
           <WeekViewMobile
@@ -349,6 +350,7 @@ export function HomeView({
             onUpdateTask={ctx.onUpdateTask ?? (() => {})}
             onUpdateRoutine={ctx.onUpdateRoutine ?? (() => {})}
             onUpdateEvent={ctx.onUpdateEvent ?? (() => {})}
+            onPushRoutine={ctx.onPushRoutine}
             pushAction={pushAction}
           />
           <WeekViewMobile

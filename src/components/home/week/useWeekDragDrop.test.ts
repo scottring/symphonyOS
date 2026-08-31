@@ -123,6 +123,34 @@ describe('useWeekDragDrop', () => {
     expect(onUpdateTask.mock.calls[1][1].bucket).toBe('week')
   })
 
+  it('routine block drop pins ONE day via onPushRoutine — never a rule rewrite', async () => {
+    const onUpdateRoutine = vi.fn()
+    const onPushRoutine = vi.fn()
+    const { result } = renderHook(() => useWeekDragDrop({
+      weekStart: new Date(2026, 4, 17),
+      onWeekChange: vi.fn(),
+      onUpdateTask: vi.fn(),
+      onUpdateEvent: vi.fn(),
+      onUpdateRoutine,
+      onPushRoutine,
+      tasks: [], events: [], routines: [],
+    }))
+
+    await act(async () => {
+      result.current.dndHandlers.onDragEnd({
+        active: { id: 'block-routine:routine-r1-day2', data: { current: { kind: 'block', itemId: 'routine-r1-day2' } } },
+        over: { id: 'slot:2026-05-19:09:00', data: { current: { kind: 'timed', dayIso: '2026-05-19', hour: 9, minute: 0 } } },
+      } as never)
+    })
+
+    expect(onPushRoutine).toHaveBeenCalledTimes(1)
+    const [routineId, when] = onPushRoutine.mock.calls[0]
+    expect(routineId).toBe('r1')
+    expect((when as Date).getDate()).toBe(19)
+    expect((when as Date).getHours()).toBe(9)
+    expect(onUpdateRoutine).not.toHaveBeenCalled()
+  })
+
   it('onDragCancel produces no mutation', async () => {
     const onUpdateTask = vi.fn()
     const { result } = renderHook(() => useWeekDragDrop({

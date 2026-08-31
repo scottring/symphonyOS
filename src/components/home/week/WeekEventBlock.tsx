@@ -28,10 +28,15 @@ interface WeekEventBlockProps {
   dayCount?: number  // defaults to 7 for full Week view
   onSelect: (id: string) => void
   onResizeCommit?: (itemId: string, updates: { scheduledFor: Date; endTime: Date }) => void
+  /** Can routine blocks be dragged? True only when the host wires a one-day
+   *  override writer (onPushRoutine) — a drag with nowhere to land must not
+   *  look movable. */
+  routinesMovable?: boolean
 }
 
-export function WeekEventBlock({ placedItem, weekStart, dayCount = 7, onSelect, onResizeCommit }: WeekEventBlockProps) {
+export function WeekEventBlock({ placedItem, weekStart, dayCount = 7, onSelect, onResizeCommit, routinesMovable = false }: WeekEventBlockProps) {
   const isRoutine = placedItem.item.type === 'routine'
+  const dragDisabled = isRoutine && !routinesMovable
 
   const resize = useBlockResize({
     startTime: placedItem.item.startTime ?? new Date(),
@@ -44,8 +49,9 @@ export function WeekEventBlock({ placedItem, weekStart, dayCount = 7, onSelect, 
 
   const isResizing = !!resize.preview
 
-  // Routines are render-only (no drag). Use a distinct id prefix so dnd-kit
-  // never confuses them with draggable task/event blocks.
+  // Routines keep a distinct id prefix; the drop handler routes on the
+  // itemId's own 'routine-' prefix. Draggable only when the host wired a
+  // one-day override writer (routinesMovable).
   const dragId = isRoutine ? `block-routine:${placedItem.item.id}` : `block:${placedItem.item.id}`
   // Click vs drag is disambiguated at the DndContext level via PointerSensor
   // activationConstraint: { distance: 8 }. With the constraint active:
@@ -57,7 +63,7 @@ export function WeekEventBlock({ placedItem, weekStart, dayCount = 7, onSelect, 
   // opening the detail panel immediately after every successful move.
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: dragId,
-    disabled: isRoutine || isResizing,
+    disabled: dragDisabled || isResizing,
     data: { kind: 'block', itemId: placedItem.item.id, originStartIso: placedItem.item.startTime?.toISOString() },
   })
 
@@ -73,7 +79,7 @@ export function WeekEventBlock({ placedItem, weekStart, dayCount = 7, onSelect, 
       return (
         <div
           ref={setNodeRef}
-          {...(isRoutine ? {} : { ...attributes, ...listeners })}
+          {...(dragDisabled ? {} : { ...attributes, ...listeners })}
           aria-hidden="true"
           style={{
             position: 'absolute',
@@ -99,8 +105,8 @@ export function WeekEventBlock({ placedItem, weekStart, dayCount = 7, onSelect, 
   return (
     <div
       ref={setNodeRef}
-      {...(isRoutine ? {} : { ...attributes, ...listeners })}
-      aria-label={isRoutine ? `Routine — view only: ${placedItem.item.title}` : placedItem.item.title}
+      {...(dragDisabled ? {} : { ...attributes, ...listeners })}
+      aria-label={dragDisabled ? `Routine — view only: ${placedItem.item.title}` : placedItem.item.title}
       role="button"
       tabIndex={0}
       onClick={(e) => { e.stopPropagation(); onSelect(placedItem.item.id) }}
@@ -113,7 +119,7 @@ export function WeekEventBlock({ placedItem, weekStart, dayCount = 7, onSelect, 
         color.ring,
         'px-2 py-1 text-[12px] leading-tight overflow-hidden cursor-pointer',
         isDragging ? 'opacity-40' : '',
-        isRoutine ? 'cursor-default' : '',
+        dragDisabled ? 'cursor-default' : '',
       ].filter(Boolean).join(' ')}
       style={{
         top: top + previewTopOffset,

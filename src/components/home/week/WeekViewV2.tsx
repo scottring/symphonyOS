@@ -52,6 +52,9 @@ interface WeekViewV2Props {
   onUpdateTask: (taskId: string, updates: Partial<Task>) => Promise<void | boolean> | void
   onUpdateEvent: (eventId: string, updates: { startTime: Date; endTime: Date }) => Promise<void> | void
   onUpdateRoutine: (routineId: string, updates: Partial<Routine>) => Promise<void> | void
+  /** Pin a routine to a time on ONE day (override write, recurrence rule
+   *  untouched). Present = routine blocks become draggable. */
+  onPushRoutine?: (routineId: string, when: Date) => void
   /** Number of day columns. 5 = workweek (Mon-Fri), 7 = full week. Default 7. */
   dayCount?: 5 | 7
   /** From HomeView's useUndo. Called after successful mutations to surface an undo toast. */
@@ -71,6 +74,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
     onUpdateTask,
     onUpdateEvent,
     onUpdateRoutine,
+    onPushRoutine,
     dayCount = 7,
     pushAction,
   } = props
@@ -156,6 +160,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
     dayCount,
     pushAction,
     onChipPlaced: handleChipPlaced,
+    onPushRoutine,
   })
 
   // Sensor with activation constraint — disambiguates click vs drag.
@@ -472,6 +477,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
               weekStart={weekStart}
               dayCount={dayCount}
               onSelect={handleSelectBlock}
+              routinesMovable={!!onPushRoutine}
               onResizeCommit={(itemId, updates) => {
                 // itemId from WeekEventBlock is the TimelineItem.id (prefixed).
                 // Strip before persisting so the DB update targets the real uuid.
