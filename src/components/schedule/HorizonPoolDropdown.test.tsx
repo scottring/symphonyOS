@@ -19,7 +19,7 @@ describe('HorizonPoolDropdown — the pools live up here, never in the review', 
         task({ id: 'm1', title: 'Month thing', bucket: 'month' }),
         task({ id: 'm2', title: 'Other month thing', bucket: 'month' }),
       ]} />)
-    const trigger = screen.getByRole('button', { name: /Month · 2/ })
+    const trigger = screen.getByRole('button', { name: /Month/ })
     expect(trigger).toHaveAttribute('aria-expanded', 'false')
     expect(screen.queryByText('Month thing')).not.toBeInTheDocument()
     await user.click(trigger)
@@ -33,7 +33,7 @@ describe('HorizonPoolDropdown — the pools live up here, never in the review', 
     const { user } = render(<HorizonPoolDropdown {...base} label="Week"
       offer={['today', 'tomorrow', 'someday', 'deleted']} onPushTask={onPushTask}
       tasks={[task({ id: 'w1', title: 'Week thing', bucket: 'week' })]} />)
-    await user.click(screen.getByRole('button', { name: /Week · 1/ }))
+    await user.click(screen.getByRole('button', { name: /Week/ }))
     const row = screen.getByText('Week thing').closest('li')!
     await user.click(within(row).getByRole('button', { name: 'Today' }))
     expect(onPushTask).toHaveBeenCalledWith('w1', expect.any(Date))
@@ -44,13 +44,13 @@ describe('HorizonPoolDropdown — the pools live up here, never in the review', 
     const week = render(<HorizonPoolDropdown {...base} label="Week"
       offer={['today', 'tomorrow', 'someday', 'deleted']}
       tasks={[task({ id: 'w1', title: 'Week thing', bucket: 'week' })]} />)
-    await week.user.click(screen.getByRole('button', { name: /Week · 1/ }))
+    await week.user.click(screen.getByRole('button', { name: /Week/ }))
     expect(screen.queryByRole('button', { name: 'This wk' })).toBeNull()
     week.unmount()
     const month = render(<HorizonPoolDropdown {...base} label="Month"
       offer={['today', 'week', 'someday', 'deleted']}
       tasks={[task({ id: 'm1', title: 'Month thing', bucket: 'month' })]} />)
-    await month.user.click(screen.getByRole('button', { name: /Month · 1/ }))
+    await month.user.click(screen.getByRole('button', { name: /Month/ }))
     expect(screen.getByRole('button', { name: 'This wk' })).toBeInTheDocument()
   })
 
@@ -59,7 +59,7 @@ describe('HorizonPoolDropdown — the pools live up here, never in the review', 
     const { user } = render(<HorizonPoolDropdown {...base} label="Month"
       offer={['today', 'week', 'someday', 'deleted']} onCompleteTask={onCompleteTask}
       tasks={[task({ id: 'm1', title: 'Month thing', bucket: 'month' })]} />)
-    await user.click(screen.getByRole('button', { name: /Month · 1/ }))
+    await user.click(screen.getByRole('button', { name: /Month/ }))
     const row = screen.getByText('Month thing').closest('li')!
     await user.click(within(row).getByRole('button', { name: 'Complete "Month thing"' }))
     expect(onCompleteTask).toHaveBeenCalledWith('m1')
@@ -72,14 +72,14 @@ describe('HorizonPoolDropdown — the pools live up here, never in the review', 
     const { user } = render(<HorizonPoolDropdown {...base} label="Week"
       offer={['today', 'tomorrow', 'someday', 'deleted']}
       tasks={[task({ id: 'w1', title: 'Week thing', bucket: 'week' })]} />)
-    await user.click(screen.getByRole('button', { name: /Week · 1/ }))
+    await user.click(screen.getByRole('button', { name: /Week/ }))
     expect(screen.queryByRole('button', { name: /Complete "Week thing"/ })).toBeNull()
   })
 
   it('an empty pool still has a trigger — the place to look is always there', async () => {
     const { user } = render(<HorizonPoolDropdown {...base} label="Week"
       offer={['today', 'tomorrow', 'someday', 'deleted']} tasks={[]} />)
-    const trigger = screen.getByRole('button', { name: /Week · 0/ })
+    const trigger = screen.getByRole('button', { name: /Week/ })
     await user.click(trigger)
     expect(screen.getByText('Nothing here right now.')).toBeInTheDocument()
   })
@@ -89,7 +89,7 @@ describe('HorizonPoolDropdown — the pools live up here, never in the review', 
     const { user } = render(<HorizonPoolDropdown {...base} label="Week"
       offer={['today', 'tomorrow', 'someday', 'deleted']} onPushTask={onPushTask}
       tasks={[task({ id: 'w1', title: 'Week thing', bucket: 'week' })]} />)
-    const trigger = screen.getByRole('button', { name: /Week · 1/ })
+    const trigger = screen.getByRole('button', { name: /Week/ })
     await user.click(trigger)
     const row = screen.getByText('Week thing').closest('li')!
     await user.click(within(row).getByRole('button', { name: 'Today' }))

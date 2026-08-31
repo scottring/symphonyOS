@@ -11,7 +11,8 @@ export interface DinerAvatar {
 interface EveningMealCardProps {
   title: string
   sides?: string
-  timeLabel: string
+  /** Omitted when the row grid's time gutter already carries it. */
+  timeLabel?: string
   recipeUrl?: string
   imageUrl?: string
   /** When set, renders a "Serves N" pill in the metadata row. */
@@ -67,13 +68,15 @@ export function EveningMealCard({
       <div className="min-w-0 flex-1">
         {/* One eyebrow carries the whole metadata row the card used to spend a
             line of chips on. */}
-        <p className="text-[11px] font-medium uppercase tracking-wide text-[hsl(14_40%_45%)]">
-          Dinner at <span>{timeLabel}</span>
-          {hasMeta && <span className="text-[hsl(14_25%_60%)]">
-            {fromPlan && ' · Meal plan'}
-            {servesCount != null && ` · Serves ${servesCount}`}
-          </span>}
-        </p>
+        {(timeLabel || hasMeta) && (
+          <p className="text-[11px] font-medium uppercase tracking-wide text-[hsl(14_40%_45%)]">
+            {timeLabel ? <>Dinner at <span>{timeLabel}</span></> : 'Dinner'}
+            {hasMeta && <span className="text-[hsl(14_25%_60%)]">
+              {fromPlan && ' · Meal plan'}
+              {servesCount != null && ` · Serves ${servesCount}`}
+            </span>}
+          </p>
+        )}
         <p className="font-display text-base text-neutral-800 leading-tight truncate">{title}</p>
         {sides && <p className="text-[13px] text-neutral-500 truncate">{sides}</p>}
       </div>

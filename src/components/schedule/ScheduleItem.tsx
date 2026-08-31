@@ -16,6 +16,7 @@ import { ExpandingPanel } from './ExpandingPanel'
 import { MobileTypeTile } from './MobileTypeTile'
 import { DOMAIN_COLORS } from '@/lib/domainColors'
 import { rowSubtitle } from '@/lib/rowSubtitle'
+import { TimelineSpine } from './TimelineSpine'
 import { locationLink } from '@/lib/locationLink'
 
 // Nordic Journal calendar icon - minimal, elegant design
@@ -145,6 +146,10 @@ interface ScheduleItemProps {
   variant?: 'full' | 'minimal'
   // Hide time label (for same-time grouping) — preserves column space
   hideTime?: boolean
+  /** Draw the timeline spine reaching UP from this row's marker to the row above. */
+  spineAbove?: boolean
+  /** Draw the timeline spine reaching DOWN from this row's marker to the row below. */
+  spineBelow?: boolean
   /**
    * Rendered directly BENEATH the title, inside the title's own column — so it
    * left-aligns with the title text automatically, whatever the row's leading
@@ -203,6 +208,8 @@ export const ScheduleItem = memo(function ScheduleItem({
   isSuggestedPromotion,
   variant = 'full',
   hideTime,
+  spineAbove,
+  spineBelow,
   belowTitleAccessory,
 }: ScheduleItemProps) {
   const isMobile = useMobile()
@@ -499,6 +506,8 @@ export const ScheduleItem = memo(function ScheduleItem({
           time (which the gutterless version did). Every Today row is
           bulk-selectable, so they all reserve the gutter and stay aligned. */}
       <div className={`relative flex items-center gap-3 ${bulkSelectable ? 'pl-5' : ''}`}>
+        <TimelineSpine above={spineAbove} below={spineBelow} hasBulkGutter={!!bulkSelectable} />
+
         {/* Time column - fixed width for alignment */}
         {hideTime ? (
           <div className="w-16 shrink-0" />

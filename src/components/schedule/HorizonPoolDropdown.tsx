@@ -5,8 +5,8 @@ import type { Task } from '@/types/task'
 import { TriageRow, applyTriageVerdict, type Verdict } from './TriageRow'
 
 /**
- * A horizon pool as a header dropdown — "Week · N" / "Month · N" in Today's
- * controls strip. Scott, 2026-08-19: these pools must NEVER be part of the
+ * A horizon pool as a header dropdown — "Week" / "Month" in Today's controls
+ * strip. Scott, 2026-08-19: these pools must NEVER be part of the
  * daily review/planning session; they are separate drop-downs "up here",
  * available to look at and pick from when desired. So the ReviewDrawer knows
  * nothing about them — this is their only home on Today.
@@ -17,7 +17,7 @@ import { TriageRow, applyTriageVerdict, type Verdict } from './TriageRow'
  */
 
 interface HorizonPoolDropdownProps {
-  /** Trigger text, e.g. "Week" / "Month". The count is appended. */
+  /** Trigger text, e.g. "Week" / "Month". */
   label: string
   tasks: Task[]
   /** Verbs each row offers — the week pool doesn't offer "This wk". */
@@ -83,10 +83,23 @@ export function HorizonPoolDropdown({
         type="button"
         onClick={() => (open ? close() : openUp())}
         aria-expanded={open}
+        // Named "<label> pool", not just "<label>". Dropping the count from
+        // the visible label left this button's accessible name as the bare
+        // word "Week", which is what a Day/Week/Month VIEW switcher would also
+        // be called — ambiguous to a screen reader, and it collided with the
+        // TodayView guard that asserts no view switcher lives on this page.
+        aria-label={`${label} pool`}
         title={`The ${label.toLowerCase()} pool — look and pick, whenever you want`}
         className="flex items-center gap-1 rounded-lg px-2 py-1.5 text-[13px] text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700"
       >
-        {label} · {tasks.length}
+        {/* The bare label, no count (2026-08-31). "Month · 48" was the
+            loudest number on Today and the one nobody could act on — a tally
+            of everything not yet done, sitting in the header of a page whose
+            whole claim is that it shows only what you have committed to. The
+            dot beside it already answers the question worth asking here: is
+            there anything I haven't looked at? This component argued the same
+            point for `hasNew` and then contradicted itself two lines later. */}
+        {label}
         {hasNew && (
           <span
             aria-label={`New in ${label.toLowerCase()}`}
