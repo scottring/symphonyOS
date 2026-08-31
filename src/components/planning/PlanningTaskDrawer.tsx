@@ -19,6 +19,8 @@ interface PlanningTaskDrawerProps {
   mealTasks?: Task[]
   routines?: Routine[]
   onPushTask: (id: string, target: Date | 'week' | 'month' | 'quarter') => void
+  onComplete?: (id: string) => void
+  onNotThisWeek?: (id: string) => void
   view: PoolView
   onViewChange: (v: PoolView) => void
 }
@@ -28,6 +30,8 @@ export function PlanningTaskDrawer({
   mealTasks = [],
   routines = [],
   onPushTask,
+  onComplete,
+  onNotThisWeek,
   view,
   onViewChange,
 }: PlanningTaskDrawerProps) {
@@ -114,7 +118,7 @@ export function PlanningTaskDrawer({
                 {mealsOpen && (
                   <div className="space-y-2 mt-1">
                     {mealTasks.map((t) => (
-                      <PlanningTaskCard key={t.id} task={t} onPushTask={onPushTask} />
+                      <PlanningTaskCard key={t.id} task={t} onPushTask={onPushTask} onComplete={onComplete} onNotThisWeek={onNotThisWeek} />
                     ))}
                   </div>
                 )}
@@ -125,6 +129,8 @@ export function PlanningTaskDrawer({
                 key={task.id}
                 task={task}
                 onPushTask={onPushTask}
+                onComplete={onComplete}
+                onNotThisWeek={onNotThisWeek}
               />
             ))}
             {looseOverflow > 0 && (

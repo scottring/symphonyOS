@@ -31,7 +31,7 @@ import { PlanningEventBlock, PLACED_EVENT_DRAG_PREFIX } from './PlanningEventBlo
 import { PlanningRoutineBlock, PLACED_ROUTINE_DRAG_PREFIX } from './PlanningRoutineBlock'
 import { computeEventReschedule, parseAllDayDropForEvent } from './planningReschedule'
 import { PlanningSlotQuickCreate } from './PlanningSlotQuickCreate'
-import { readCadenceConfig } from '@/lib/cadence/config'
+import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
 import { resolveRoutineTime } from '@/lib/today/routineTime'
 import {
   unscheduledPool, applyPoolView, orderPool, groupPool,
@@ -85,6 +85,9 @@ interface PlanningSessionProps {
   eventNotesMap?: Map<string, EventNote>
   onUpdateTask: (id: string, updates: Partial<Task>) => void
   onPushTask: (id: string, target: Date | 'week' | 'month' | 'quarter') => void
+  /** Mark a task complete from the grid or the pool. Omitted = no complete
+   *  affordance (e.g. hosts that surface completion elsewhere). */
+  onCompleteTask?: (id: string) => void
   /** Click-to-create (week-grid-click spec): create a task at the clicked
    *  empty slot's local date/time. Undefined = slots are not clickable (no-op),
    *  keeping other mount sites (e.g. the wizard drawer) unaffected until wired. */
@@ -155,6 +158,7 @@ export function PlanningSession({
   eventNotesMap,
   onUpdateTask,
   onPushTask,
+  onCompleteTask,
   onCreateTaskAt,
   onClose,
   initialDate,
@@ -278,6 +282,16 @@ export function PlanningSession({
     setPoolView(v)
     writePoolView(poolSurface, v)
   }, [poolSurface])
+
+  // "Not this week": unschedule + place on NEXT week's plan — nothing gets
+  // lost, it resurfaces when next week is planned. Rides onUpdateTask, so a
+  // context-less task still passes the DomainGate first.
+  const handleNotThisWeek = useCallback((id: string) => {
+    const currentWeek = weekStartAnchor(new Date(), readCadenceConfig().weekStartsOn)
+    const nextWeek = new Date(currentWeek)
+    nextWeek.setDate(nextWeek.getDate() + 7)
+    onUpdateTask(id, { bucket: 'week', scheduledFor: undefined, isAllDay: false, weekStart: nextWeek })
+  }, [onUpdateTask])
 
   const poolCtx = useMemo(() => ({
     today: new Date(),
@@ -834,6 +848,8 @@ export function PlanningSession({
               mealTasks={mealTasks}
               routines={unplacedRoutines}
               onPushTask={onPushTask}
+              onComplete={onCompleteTask}
+              onNotThisWeek={handleNotThisWeek}
               view={poolView}
               onViewChange={handleViewChange}
             />
@@ -859,6 +875,8 @@ export function PlanningSession({
                 dayGrain={dayGrain}
                 canMoveEvent={canMoveEvent}
                 suggestedSlots={suggestedSlots}
+                onCompleteTask={onCompleteTask}
+                onNotThisWeek={handleNotThisWeek}
               />
             </div>
           ) : (
@@ -879,6 +897,8 @@ export function PlanningSession({
               dayGrain={dayGrain}
               canMoveEvent={canMoveEvent}
               suggestedSlots={suggestedSlots}
+              onCompleteTask={onCompleteTask}
+              onNotThisWeek={handleNotThisWeek}
             />
           )}
 

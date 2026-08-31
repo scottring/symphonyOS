@@ -139,6 +139,36 @@ describe('updateTask — a group moves as a unit', () => {
     }
   })
 
+  it('carries the children when the parent is UNSCHEDULED (drawer-drop shape)', async () => {
+    // Found live 2026-08-31: dragging a group parent back to the planning
+    // drawer cleared the parent but left a scheduled child stranded on the
+    // grid at a stale time. The unschedule must cascade exactly like the
+    // schedule does. The drawer-drop write shape is
+    // { bucket:'week', scheduledFor: undefined, isAllDay: false }.
+    seedGroup()
+    const { result } = renderHook(() => useSupabaseTasks())
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    await act(async () => {
+      await result.current.updateTask('yard', {
+        bucket: 'week', scheduledFor: undefined, isAllDay: false,
+      })
+    })
+
+    expect(bulkWrites).toHaveLength(1)
+    expect(bulkWrites[0].ids.sort()).toEqual(['umbrella', 'weed'])
+    expect(bulkWrites[0].data.scheduled_for).toBeNull()
+    expect(bulkWrites[0].data.is_all_day).toBe(false)
+    expect(bulkWrites[0].data.bucket).toBe('week')
+
+    // Local state follows too.
+    const parent = result.current.tasks.find((t) => t.id === 'yard')
+    for (const child of parent!.subtasks!) {
+      expect(child.scheduledFor).toBeUndefined()
+      expect(child.bucket).toBe('week')
+    }
+  })
+
   it('leaves the children alone when the edit is not a reschedule', async () => {
     // A rename, a context change, a completion — none of those are a move, and
     // rewriting a child's row for one would be an unasked-for side effect.

@@ -89,6 +89,8 @@ interface PlanningColumnProps {
   maxLanes?: number
   /** Slot ids to tint as suggested drop targets during a task drag. */
   suggestedSlots?: Set<string> | null
+  onCompleteTask?: (id: string) => void
+  onNotThisWeek?: (id: string) => void
 }
 
 export function PlanningColumn({
@@ -110,6 +112,8 @@ export function PlanningColumn({
   dayGrain = false,
   maxLanes = MAX_LANES,
   suggestedSlots,
+  onCompleteTask,
+  onNotThisWeek,
 }: PlanningColumnProps) {
   // Helper to find family member by ID
   const getMember = useCallback((id: string | null | undefined) => {
@@ -393,7 +397,13 @@ export function PlanningColumn({
             className="absolute"
             style={laneStyle(layout.lanes.get(task.id), top, height, raisedId === task.id)}
           >
-            <PlanningTaskCard task={task} isPlaced assignee={getMember(task.assignedTo)} />
+            <PlanningTaskCard
+              task={task}
+              isPlaced
+              assignee={getMember(task.assignedTo)}
+              onComplete={onCompleteTask}
+              onNotThisWeek={onNotThisWeek}
+            />
           </div>
         ))}
 

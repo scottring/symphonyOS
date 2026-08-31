@@ -439,6 +439,23 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
     [addTask, getCurrentUserMember],
   );
 
+  // Click-to-create on the planning overlay's empty slots. One atomic addTask
+  // (never addTask-then-setBucket): scheduledFor rides the INSERT, which also
+  // stamps bucket:'timed'. When exactly ONE domain lens is active, the new
+  // task is stamped with it — a context-less creation would land in Unsorted
+  // and not render on the very grid that was clicked (invisible-new-item trap).
+  const onPlanningCreateTaskAt = useCallback(
+    async (title: string, scheduledFor: Date) => {
+      const domains = [...layers].filter((l): l is Exclude<typeof l, 'unsorted'> => l !== 'unsorted');
+      await addTask(title, undefined, undefined, scheduledFor, {
+        assignedTo: getCurrentUserMember()?.id,
+        context: domains.length === 1 ? domains[0] : undefined,
+        isAllDay: false,
+      });
+    },
+    [addTask, getCurrentUserMember, layers],
+  );
+
   const onCreateTaskAt = useCallback(
     async (r: TimelineCaptureResult) => {
       await addTask(r.title, r.contactId, r.projectId, r.scheduledFor ?? undefined, {
@@ -848,6 +865,8 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
             // process); the pick rides the schedule write, cancel refuses it.
             onUpdateTask={gated.updateTask}
             onPushTask={pushTask}
+            onCompleteTask={toggleTask}
+            onCreateTaskAt={onPlanningCreateTaskAt}
             familyMembers={familyMembers}
             eventNotesMap={eventNotesMap}
           />

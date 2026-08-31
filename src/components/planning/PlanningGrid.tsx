@@ -36,6 +36,8 @@ interface PlanningGridProps {
   /** Slot ids to tint as suggested drop targets while a task drag is active
    *  (dropSmarts). Paint only — never captures the drop. */
   suggestedSlots?: Set<string> | null
+  onCompleteTask?: (id: string) => void
+  onNotThisWeek?: (id: string) => void
 }
 
 export function PlanningGrid({
@@ -55,6 +57,8 @@ export function PlanningGrid({
   onSlotClick,
   dayGrain = false,
   suggestedSlots,
+  onCompleteTask,
+  onNotThisWeek,
 }: PlanningGridProps) {
   // Generate time labels
   const timeLabels = useMemo(() => {
@@ -161,6 +165,8 @@ export function PlanningGrid({
               onSlotClick={onSlotClick}
               dayGrain={dayGrain}
               suggestedSlots={suggestedSlots}
+              onCompleteTask={onCompleteTask}
+              onNotThisWeek={onNotThisWeek}
               // Wide columns (≤3 days on the grid) can afford more side-by-side
               // lanes before collapsing into a "+N" chip.
               maxLanes={dateRange.length <= 3 ? 6 : 4}
