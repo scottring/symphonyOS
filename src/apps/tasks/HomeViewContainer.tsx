@@ -401,11 +401,20 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
   // completing the task check the item off (see useSupabaseTasks.toggleTask).
   const onScheduleListItemAsTask = useCallback(
     async (item: { id: string; title: string }, date: Date, isAllDay: boolean) => {
-      await addTask(item.title, undefined, undefined, date, {
+      const id = await addTask(item.title, undefined, undefined, date, {
         assignedTo: getCurrentUserMember()?.id,
         isAllDay,
         linkedTo: { type: 'list_item', id: item.id },
       });
+      // addTask swallows insert failures (rolls back and resolves undefined) —
+      // a caller that clears state on resolve would eat the mark on a failed
+      // spawn. That EXACTLY happened: the tasks_linked_activity_type_check
+      // constraint predated 'list_item', every insert bounced, and the note
+      // still dropped the row. Throw so the note keeps the mark, and say why.
+      if (!id) {
+        showToast("Couldn't schedule that item", 'error', 4000);
+        throw new Error('list-item task spawn failed');
+      }
     },
     [addTask, getCurrentUserMember],
   );
