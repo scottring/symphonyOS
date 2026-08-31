@@ -8,6 +8,7 @@ import { buildGroupedSections } from './grouping'
 import { countRoutineUnits } from './routineCollections'
 import { deferredInRoutineIds } from './deferredRoutines'
 import type { ResolveRoutineCtx } from '@/lib/routineUtils'
+import { dedupeCalendarEvents } from '@/lib/calendar/dedupeEvents'
 
 function computeIsToday(viewedDate: Date): boolean {
   const today = new Date()
@@ -72,17 +73,10 @@ export function computeTodayData(input: TodayDataInput): TodayData {
     const es = new Date(s)
     return es.getFullYear() === vY && es.getMonth() === vM && es.getDate() === vD
   })
-  // Key on the parsed instant, not the raw string: the same meeting synced to
-  // two calendars can report identical times in different forms (e.g.
-  // "09:00:00-04:00" on the primary vs "13:00:00Z" on a group calendar).
-  const seen = new Set<string>()
-  const filteredEvents = eventsForDay.filter((event) => {
-    const s = event.start_time || event.startTime
-    const key = `${event.title}|${new Date(s!).getTime()}`
-    if (seen.has(key)) return false
-    seen.add(key)
-    return true
-  })
+  // Kept even though HomeView now dedupes at the source: Today is reached by
+  // callers other than HomeView (tests, the mobile shell), and this function
+  // promising its own output is deduped costs one pass over a day's events.
+  const filteredEvents = dedupeCalendarEvents(eventsForDay)
 
   const grouped = buildGroupedSections({
     timedTasks: displayTimedTasks,

@@ -53,8 +53,17 @@ function ProjectControl({ project, projects, onOpenProject, onAssign, onClear, o
   }
 
   if (project) {
+    // shrink + min-w-0, NOT shrink-0. Every other child of an inbox row is
+    // shrink-0 (drag handle, checkbox, context dot, assignee, the four triage
+    // pills, note, calendar, delete) and the title carries min-w-[6rem], so a
+    // chip that also refuses to shrink makes the row's minimum width larger
+    // than the row itself — the card visibly overshoots its container and the
+    // title collapses into a 6rem column that wraps a short phrase over five
+    // lines. The inner spans already truncate, so letting the chip shrink
+    // degrades it gracefully instead; max-w-[220px] still caps it when there
+    // IS room.
     return (
-      <span className="hidden md:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs max-w-[220px] shrink-0 mt-0.5">
+      <span className="hidden md:inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-xs max-w-[220px] shrink min-w-0 mt-0.5">
         {onOpenProject ? (
           <button type="button" onClick={() => onOpenProject(project.id)} className="truncate hover:underline">
             {project.name}
