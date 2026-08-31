@@ -6,7 +6,7 @@
 // PlanningSession).
 import type { Task } from '@/types/task'
 import { belongsToWeek, isStaleWeekPlacement } from '@/lib/today/weekPlacement'
-import { weekStartAnchor } from '@/lib/cadence/config'
+import { weekStartAnchor, type WeekStart } from '@/lib/cadence/config'
 
 export type PoolView = 'week' | 'month' | 'all'
 
@@ -15,7 +15,7 @@ export interface PoolCtx {
   /** Bounds of the days visible on the grid (null = single-day/no range). */
   rangeStart: Date | null
   rangeEnd: Date | null
-  weekStartsOn: number
+  weekStartsOn: WeekStart
 }
 
 /** The base pool: candidate tasks that are not placed on a visible day.

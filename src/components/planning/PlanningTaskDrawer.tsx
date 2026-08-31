@@ -1,35 +1,57 @@
+import { useState } from 'react'
 import { useDroppable } from '@dnd-kit/core'
+import { ChevronDown, ChevronRight, CookingPot } from 'lucide-react'
 import type { Task } from '@/types/task'
 import type { Routine } from '@/types/actionable'
+import type { PoolView } from '@/lib/planning/poolViews'
+import { PoolViewSwitcher } from './PoolViewSwitcher'
 import { PlanningTaskCard } from './PlanningTaskCard'
 import { PlanningRoutineDragCard } from './PlanningRoutineDragCard'
 
+// Loose tasks visible before the "N more" expander — the pool must read as a
+// short list of real candidates, never a 65-item wall.
+const POOL_CAP = 15
+
 interface PlanningTaskDrawerProps {
+  /** Loose (non-meal) pool tasks, already view-filtered and ordered. */
   tasks: Task[]
+  /** Weekly-dinner-seeded chores, rolled into one collapsible group. */
+  mealTasks?: Task[]
   routines?: Routine[]
   onPushTask: (id: string, target: Date | 'week' | 'month' | 'quarter') => void
-  /** Backlog items hidden behind the default today-relevant filter. */
-  hiddenCount?: number
-  showingAll?: boolean
-  onToggleShowAll?: () => void
+  view: PoolView
+  onViewChange: (v: PoolView) => void
 }
 
-export function PlanningTaskDrawer({ tasks, routines = [], onPushTask, hiddenCount = 0, showingAll = false, onToggleShowAll }: PlanningTaskDrawerProps) {
+export function PlanningTaskDrawer({
+  tasks,
+  mealTasks = [],
+  routines = [],
+  onPushTask,
+  view,
+  onViewChange,
+}: PlanningTaskDrawerProps) {
   const { isOver, setNodeRef } = useDroppable({
     id: 'unscheduled-drawer',
   })
 
+  const [mealsOpen, setMealsOpen] = useState(false)
+  const [showAllLoose, setShowAllLoose] = useState(false)
+  const visibleTasks = showAllLoose ? tasks : tasks.slice(0, POOL_CAP)
+  const looseOverflow = tasks.length - visibleTasks.length
+  const total = tasks.length + mealTasks.length
+
   return (
     <div
       ref={setNodeRef}
-      className={`w-64 shrink-0 border-r flex flex-col transition-colors ${
+      className={`w-80 shrink-0 border-r flex flex-col transition-colors ${
         isOver
           ? 'bg-primary-100 border-primary-300'
           : 'bg-neutral-50 border-neutral-200'
       }`}
     >
       {/* Header */}
-      <div className="p-4 border-b border-neutral-200">
+      <div className="p-4 pb-3 border-b border-neutral-200">
         <h2 className="font-medium text-neutral-700 flex items-center gap-2">
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -40,20 +62,21 @@ export function PlanningTaskDrawer({ tasks, routines = [], onPushTask, hiddenCou
             <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM14 11a1 1 0 011 1v1h1a1 1 0 110 2h-1v1a1 1 0 11-2 0v-1h-1a1 1 0 110-2h1v-1a1 1 0 011-1z" />
           </svg>
           Unscheduled
-          {tasks.length > 0 && (
+          {total > 0 && (
             <span className="ml-auto text-sm text-neutral-500 bg-neutral-200 px-2 py-0.5 rounded-full">
-              {tasks.length}
+              {total}
             </span>
           )}
         </h2>
-        <p className="text-xs text-neutral-500 mt-1">
+        <p className="text-xs text-neutral-500 mt-1 mb-2">
           Drag to schedule
         </p>
+        <PoolViewSwitcher view={view} onChange={onViewChange} />
       </div>
 
       {/* Task list - overflow-x-clip allows dropdown to show while y scrolls */}
       <div className="flex-1 overflow-y-auto overflow-x-clip p-3 space-y-2">
-        {tasks.length === 0 && routines.length === 0 ? (
+        {total === 0 && routines.length === 0 ? (
           <div className={`text-center py-8 ${isOver ? 'opacity-50' : ''}`}>
             <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-neutral-100 flex items-center justify-center">
               <svg
@@ -77,13 +100,42 @@ export function PlanningTaskDrawer({ tasks, routines = [], onPushTask, hiddenCou
           </div>
         ) : (
           <>
-            {tasks.map((task) => (
+            {mealTasks.length > 0 && (
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setMealsOpen((v) => !v)}
+                  className="w-full flex items-center gap-1.5 px-1 py-1.5 text-xs font-semibold uppercase tracking-wide text-neutral-500 hover:text-neutral-700 transition-colors"
+                >
+                  {mealsOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                  <CookingPot className="w-3.5 h-3.5" />
+                  Meals · {mealTasks.length}
+                </button>
+                {mealsOpen && (
+                  <div className="space-y-2 mt-1">
+                    {mealTasks.map((t) => (
+                      <PlanningTaskCard key={t.id} task={t} onPushTask={onPushTask} />
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            {visibleTasks.map((task) => (
               <PlanningTaskCard
                 key={task.id}
                 task={task}
                 onPushTask={onPushTask}
               />
             ))}
+            {looseOverflow > 0 && (
+              <button
+                type="button"
+                onClick={() => setShowAllLoose(true)}
+                className="w-full text-center text-xs text-neutral-500 hover:text-neutral-700 py-2 transition-colors"
+              >
+                {looseOverflow} more
+              </button>
+            )}
             {routines.length > 0 && (
               <div className="pt-1 space-y-2">
                 <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-600/70 px-1">
@@ -95,15 +147,6 @@ export function PlanningTaskDrawer({ tasks, routines = [], onPushTask, hiddenCou
               </div>
             )}
           </>
-        )}
-        {onToggleShowAll && (hiddenCount > 0 || showingAll) && (
-          <button
-            type="button"
-            onClick={onToggleShowAll}
-            className="w-full text-center text-xs text-neutral-500 hover:text-neutral-700 py-2 transition-colors"
-          >
-            {showingAll ? 'Show today-relevant only' : `Show ${hiddenCount} more from the backlog`}
-          </button>
         )}
       </div>
 

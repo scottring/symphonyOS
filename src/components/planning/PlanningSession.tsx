@@ -31,9 +31,12 @@ import { PlanningEventBlock, PLACED_EVENT_DRAG_PREFIX } from './PlanningEventBlo
 import { PlanningRoutineBlock, PLACED_ROUTINE_DRAG_PREFIX } from './PlanningRoutineBlock'
 import { computeEventReschedule, parseAllDayDropForEvent } from './planningReschedule'
 import { PlanningSlotQuickCreate } from './PlanningSlotQuickCreate'
-import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
-import { belongsToWeek, isStaleWeekPlacement } from '@/lib/today/weekPlacement'
+import { readCadenceConfig } from '@/lib/cadence/config'
 import { resolveRoutineTime } from '@/lib/today/routineTime'
+import {
+  unscheduledPool, applyPoolView, orderPool, groupPool,
+  readPoolView, writePoolView, type PoolView,
+} from '@/lib/planning/poolViews'
 
 interface PlanningSessionProps {
   tasks: Task[]
@@ -106,6 +109,9 @@ interface PlanningSessionProps {
   /** Shelf mode: render the pool as a full-width lane above the grid instead
    *  of the side drawer. The session supplies tasks + backlog toggle. */
   shelf?: Omit<PlanningShelfProps, 'tasks' | 'hiddenCount' | 'showingAll' | 'onToggleShowAll'>
+  /** localStorage key suffix for the pool-view choice — each mount surface
+   *  remembers its own view. */
+  poolSurface?: string
   /**
    * How much a placement on this surface decides.
    *
@@ -158,6 +164,7 @@ export function PlanningSession({
   hideHeader = false,
   onOpenDay,
   shelf,
+  poolSurface = 'overlay',
   placementGrain = 'time',
 }: PlanningSessionProps) {
   const dayGrain = placementGrain === 'day'
@@ -262,87 +269,40 @@ export function PlanningSession({
     })
   )
 
-  // Get unscheduled tasks (no scheduledFor or in the past, and not deferred to future)
-  const allUnscheduledTasks = useMemo(() => {
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    // Bounds of the days currently on the grid. A task scheduled onto one of
-    // these days is PLACED — it belongs on the grid, not also in the unscheduled
-    // rail — even if that day is earlier this week (the week-planning grid spans
-    // past + future days, so "past" alone can't mean "unscheduled" here). For
-    // the single-day Today view this is a no-op: a same-day task was already
-    // excluded, and genuinely-overdue tasks fall before the range and still
-    // resurface.
-    const rangeStart = dateRange.length ? new Date(dateRange[0]) : null
-    rangeStart?.setHours(0, 0, 0, 0)
-    const rangeEnd = dateRange.length ? new Date(dateRange[dateRange.length - 1]) : null
-    rangeEnd?.setHours(23, 59, 59, 999)
+  // The pool, decided by poolViews (one derivation shared with /week's lane):
+  // base = tasks not placed on a visible day; the chosen official view filters
+  // it; orderPool ranks by actionability; groupPool rolls up the meal noise.
+  const [poolView, setPoolView] = useState<PoolView>(() => readPoolView(poolSurface))
+  const handleViewChange = useCallback((v: PoolView) => {
+    setPoolView(v)
+    writePoolView(poolSurface, v)
+  }, [poolSurface])
 
-    return tasks.filter((task) => {
-      if (task.completed) return false
+  const poolCtx = useMemo(() => ({
+    today: new Date(),
+    rangeStart: dateRange.length ? dateRange[0] : null,
+    rangeEnd: dateRange.length ? dateRange[dateRange.length - 1] : null,
+    weekStartsOn: readCadenceConfig().weekStartsOn,
+  }), [dateRange])
 
-      // Exclude tasks deferred to a future date
-      if (task.deferredUntil) {
-        const deferDate = new Date(task.deferredUntil)
-        deferDate.setHours(0, 0, 0, 0)
-        if (deferDate > today) return false
-      }
-
-      // All-day tasks: a date inside the visible grid range means it renders
-      // in that day's all-day lane, not the unscheduled pool. Without a date,
-      // or with a date outside the range, it stays in the pool as before
-      // (so it can be time-blocked or dragged onto the visible range).
-      if (task.isAllDay) {
-        if (!task.scheduledFor) return true
-        const allDayDate = new Date(task.scheduledFor)
-        if (rangeStart && rangeEnd && allDayDate >= rangeStart && allDayDate <= rangeEnd) return false
-        return true
-      }
-
-      if (!task.scheduledFor) return true
-      const taskDate = new Date(task.scheduledFor)
-      // Placed on a day shown on the grid → it's on the grid, not unscheduled.
-      if (rangeStart && rangeEnd && taskDate >= rangeStart && taskDate <= rangeEnd) return false
-      // Otherwise, past-scheduled tasks resurface so they can be rescheduled.
-      const taskDay = new Date(taskDate)
-      taskDay.setHours(0, 0, 0, 0)
-      return taskDay < today
-    })
-  }, [tasks, dateRange])
-
-  // The rail defaults to today-relevant candidates — carried-over, all-day, and
-  // this-week tasks. Dumping the whole backlog (inbox/month/someday) made the
-  // rail a 29-item wall of project sub-steps; those stay behind "Show more".
-  const [showAllUnscheduled, setShowAllUnscheduled] = useState(false)
-  const { relevantUnscheduled, backlogCount } = useMemo(() => {
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
-    const currentWeek = weekStartAnchor(today, readCadenceConfig().weekStartsOn)
-    const isRelevant = (task: Task) => {
-      if (task.isAllDay) return true
-      // This week's items, plus anything left behind by an earlier week — a
-      // stranded placement is the MOST relevant thing here, and burying it
-      // behind "Show more" is how it stays stranded. Only a move placed on a
-      // week still ahead is filtered out.
-      if (task.bucket === 'week') return belongsToWeek(task, currentWeek) || isStaleWeekPlacement(task, currentWeek)
-      if (task.scheduledFor) {
-        const d = new Date(task.scheduledFor)
-        d.setHours(0, 0, 0, 0)
-        if (d < today) return true // carried over
-      }
-      return false
-    }
-    const relevant = allUnscheduledTasks.filter(isRelevant)
-    return { relevantUnscheduled: relevant, backlogCount: allUnscheduledTasks.length - relevant.length }
-  }, [allUnscheduledTasks])
-
-  const unscheduledTasks = showAllUnscheduled ? allUnscheduledTasks : relevantUnscheduled
+  const allUnscheduledTasks = useMemo(
+    () => unscheduledPool(tasks, poolCtx),
+    [tasks, poolCtx],
+  )
+  const viewFiltered = useMemo(
+    () => orderPool(applyPoolView(allUnscheduledTasks, poolView, poolCtx), poolCtx),
+    [allUnscheduledTasks, poolView, poolCtx],
+  )
+  const { meals: mealTasks, loose: unscheduledTasks } = useMemo(
+    () => groupPool(viewFiltered),
+    [viewFiltered],
+  )
 
   // Tell the host what the shelf is showing, so its masthead can mirror the
   // rendered population instead of guessing at it.
   useEffect(() => {
-    onShelfCount?.(unscheduledTasks.length)
-  }, [unscheduledTasks.length, onShelfCount])
+    onShelfCount?.(viewFiltered.length)
+  }, [viewFiltered.length, onShelfCount])
 
   // Get scheduled tasks for the date range
   const scheduledTasksByDate = useMemo(() => {
@@ -824,23 +784,26 @@ export function PlanningSession({
           onDragCancel={() => setActiveId(null)}
         >
           {shelf ? (
-            /* Full-width pool lane above the grid — shelf mode replaces the drawer */
+            /* Full-width pool lane above the grid — shelf mode replaces the
+               drawer. The shelf keeps its old backlog-toggle vocabulary, so
+               map the official views onto it: showingAll = 'all', and the
+               toggle flips between 'all' and the default 'week' view. */
             <PlanningShelf
               {...shelf}
-              tasks={unscheduledTasks}
-              hiddenCount={showAllUnscheduled ? 0 : backlogCount}
-              showingAll={showAllUnscheduled}
-              onToggleShowAll={backlogCount > 0 || showAllUnscheduled ? () => setShowAllUnscheduled((v) => !v) : undefined}
+              tasks={viewFiltered}
+              hiddenCount={allUnscheduledTasks.length - viewFiltered.length}
+              showingAll={poolView === 'all'}
+              onToggleShowAll={() => handleViewChange(poolView === 'all' ? 'week' : 'all')}
             />
           ) : (
             /* Task drawer (sidebar) */
             <PlanningTaskDrawer
               tasks={unscheduledTasks}
+              mealTasks={mealTasks}
               routines={unplacedRoutines}
               onPushTask={onPushTask}
-              hiddenCount={showAllUnscheduled ? 0 : backlogCount}
-              showingAll={showAllUnscheduled}
-              onToggleShowAll={backlogCount > 0 || showAllUnscheduled ? () => setShowAllUnscheduled((v) => !v) : undefined}
+              view={poolView}
+              onViewChange={handleViewChange}
             />
           )}
 

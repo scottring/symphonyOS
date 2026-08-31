@@ -56,7 +56,7 @@ describe('PlanningSession', () => {
     expect(screen.getByText('Unscheduled')).toBeInTheDocument()
   })
 
-  it('keeps backlog (inbox) tasks behind the Show-more expander', () => {
+  it('keeps backlog (inbox) tasks out of the default view, in Everything', () => {
     const relevant = createMockTask({ id: 'rel', title: 'Week task', bucket: 'week' })
     const backlog = createMockTask({ id: 'back', title: 'Someday side quest' })
 
@@ -74,10 +74,10 @@ describe('PlanningSession', () => {
     expect(screen.getByText('Week task')).toBeInTheDocument()
     expect(screen.queryByText('Someday side quest')).not.toBeInTheDocument()
 
-    fireEvent.click(screen.getByText(/show 1 more from the backlog/i))
+    fireEvent.click(screen.getByRole('button', { name: 'Everything' }))
     expect(screen.getByText('Someday side quest')).toBeInTheDocument()
 
-    fireEvent.click(screen.getByText(/show today-relevant only/i))
+    fireEvent.click(screen.getByRole('button', { name: 'This week' }))
     expect(screen.queryByText('Someday side quest')).not.toBeInTheDocument()
   })
 
