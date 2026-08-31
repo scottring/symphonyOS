@@ -241,7 +241,17 @@ function applyInsert(rows: Task[], newTask: Task): Task[] {
 
 function applyUpdate(rows: Task[], updatedTask: Task): Task[] {
   const updated = rows.map((t) => {
-    if (t.id === updatedTask.id) return updatedTask
+    // A realtime UPDATE arrives as a FLAT row. Replacing a parent with it
+    // wiped `subtasks`, so the parent's NEXT reschedule found no children to
+    // carry ("a group moves as a unit") and stranded them at a stale time —
+    // found live 2026-08-31. The incoming row's own fields win; the nesting
+    // this list already holds survives the swap (same principle as the
+    // post-updateTask swap, which announces the merged local object).
+    if (t.id === updatedTask.id) {
+      return updatedTask.subtasks || !t.subtasks?.length
+        ? updatedTask
+        : { ...updatedTask, subtasks: t.subtasks }
+    }
     if (t.subtasks) {
       const updatedSubtasks = t.subtasks.map((st) =>
         st.id === updatedTask.id ? updatedTask : st

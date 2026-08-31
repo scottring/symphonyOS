@@ -194,4 +194,27 @@ describe('useSupabaseTasks - realtime dedup', () => {
     })
     expect(result.current.tasks.find((t) => t.id === 'parent-1')?.subtasks).toHaveLength(2)
   })
+
+  it("realtime UPDATE of a parent keeps its nested subtasks (flat row must not strip them)", async () => {
+    // Found live 2026-08-31: after any parent write, the realtime echo (a FLAT
+    // row) replaced the parent object, wiping `subtasks`. The NEXT reschedule
+    // of the parent then found no children to carry ("a group moves as a
+    // unit"), stranding a scheduled child at a stale time.
+    mockSupabaseData.push(
+      dbRow({ id: 'parent-1', title: 'Parent' }),
+      dbRow({ id: 'sub-1', title: 'Child', parent_task_id: 'parent-1' })
+    )
+    const { result } = await renderLoaded()
+    expect(result.current.tasks.find((t) => t.id === 'parent-1')?.subtasks).toHaveLength(1)
+
+    // The echo of a parent write: same row, flat, new title to prove the
+    // update itself still applies.
+    act(() => {
+      realtimeHandler!({ eventType: 'UPDATE', new: dbRow({ id: 'parent-1', title: 'Parent renamed' }) })
+    })
+
+    const parent = result.current.tasks.find((t) => t.id === 'parent-1')
+    expect(parent?.title).toBe('Parent renamed')
+    expect(parent?.subtasks?.map((s) => s.id)).toEqual(['sub-1'])
+  })
 })
