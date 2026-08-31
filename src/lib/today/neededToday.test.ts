@@ -30,6 +30,28 @@ describe('neededToday', () => {
     expect(items.map(i => i.id)).toEqual(['a'])
   })
 
+  // A task scheduled ON the viewed day is already in the day's agenda (timed
+  // row or all-day section) — the note lists only the UNTIMED needs, so the
+  // same item never shows twice on Today. Unscheduling drops it back in.
+  it('excludes a marked task that is scheduled on the viewed day', () => {
+    const { items } = neededToday(
+      [
+        task({ id: 'timed', neededOn: DAY, scheduledFor: new Date(2026, 7, 19, 14, 0) }),
+        task({ id: 'allday', neededOn: DAY, scheduledFor: DAY, isAllDay: true }),
+      ],
+      [], DAY, SHOPPING,
+    )
+    expect(items).toEqual([])
+  })
+
+  it('keeps a marked task scheduled on a DIFFERENT day in the note', () => {
+    const { items } = neededToday(
+      [task({ id: 'a', neededOn: DAY, scheduledFor: new Date(2026, 7, 21, 9, 0) })],
+      [], DAY, SHOPPING,
+    )
+    expect(items.map(i => i.id)).toEqual(['a'])
+  })
+
   it('matches by calendar day, ignoring time of day', () => {
     const { items } = neededToday([task({ id: 'a', neededOn: new Date(2026, 7, 19, 23, 30) })], [], DAY, SHOPPING)
     expect(items).toHaveLength(1)

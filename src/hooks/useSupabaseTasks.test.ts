@@ -1032,6 +1032,49 @@ describe('useSupabaseTasks', () => {
       expect(mockUpdate).toHaveBeenCalledWith({ completed: false })
     })
 
+    // One-way sync: completing a task spawned FROM a list item (Needed Today
+    // scheduling) also checks the item off its list. Never the reverse, and
+    // never on un-complete.
+    it('checks the linked list item off when completing a list_item-linked task', async () => {
+      mockSupabaseData.push(createMockDbTask({
+        id: 'task-1', completed: false,
+        linked_activity_type: 'list_item', linked_activity_id: 'li-9',
+      } as never))
+
+      const { result } = renderHook(() => useSupabaseTasks())
+      await waitFor(() => expect(result.current.tasks).toHaveLength(1))
+
+      await act(async () => {
+        await result.current.toggleTask('task-1')
+      })
+
+      await waitFor(() => {
+        expect(mockUpdateEq).toHaveBeenCalledWith(
+          expect.objectContaining({ completed: true, completed_at: expect.any(String) }),
+          'id', 'li-9',
+        )
+      })
+    })
+
+    it('does not touch the list item when un-completing', async () => {
+      mockSupabaseData.push(createMockDbTask({
+        id: 'task-1', completed: true,
+        linked_activity_type: 'list_item', linked_activity_id: 'li-9',
+      } as never))
+
+      const { result } = renderHook(() => useSupabaseTasks())
+      await waitFor(() => expect(result.current.tasks).toHaveLength(1))
+
+      await act(async () => {
+        await result.current.toggleTask('task-1')
+      })
+
+      expect(mockUpdateEq).not.toHaveBeenCalledWith(
+        expect.objectContaining({ completed_at: expect.any(String) }),
+        'id', 'li-9',
+      )
+    })
+
     it('rolls back on server error', async () => {
       mockSupabaseData.push(createMockDbTask({ id: 'task-1', completed: false }))
 

@@ -76,6 +76,11 @@ export interface ScheduleActionsValue {
   onNotify?: (message: string) => void
   onCreateFollowUp?: (title: string, sourceTaskId: string) => void
 
+  /** Needed Today "schedule a buy item": spawn a timed task linked to the
+   *  list item (linkedTo type 'list_item'), so completing the task checks
+   *  the item off its list. The item itself stays on the list. */
+  onScheduleListItemAsTask?: (item: { id: string; title: string }, date: Date, isAllDay: boolean) => Promise<void>
+
   // Timeline insert-point create flows (radial wheel picks)
   onCreateTaskAt?: (r: TimelineCaptureResult) => void
   onCreateEventAt?: (r: TimelineCaptureResult) => void

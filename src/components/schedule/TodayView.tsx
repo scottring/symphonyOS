@@ -60,7 +60,6 @@ import { ReviewDrawer, type ReviewMode } from './ReviewDrawer'
 import { HorizonPoolDropdown } from './HorizonPoolDropdown'
 import { DayNavCluster } from './DayNavCluster'
 import { TodayBacklogFooter } from './TodayBacklogFooter'
-import { ToBuyLine } from './ToBuyLine'
 import { InboxUndoToast } from './InboxUndoToast'
 import { BulkActionToolbar } from './BulkActionToolbar'
 import { TimelineNoteComposer } from './TimelineNoteComposer'
@@ -998,6 +997,11 @@ export function TodayView({
           viewedDate={viewedDate}
           onToggleTask={onToggleTask}
           onOpenTask={(id) => handleSelectItem(`task-${id}`)}
+          // Into the temporal flow: same write shape as the bulk scheduler
+          // above — scheduled_for implies bucket 'timed', and isAllDay is
+          // always a real boolean (the invariant pair).
+          onScheduleTask={(id, date, isAllDay) => onUpdateTask?.(id, { bucket: 'timed', scheduledFor: date, isAllDay })}
+          onScheduleListItem={ctx.onScheduleListItemAsTask}
         />
 
         {/* Assistant lines — the unprompted tier, rendered ONLY when the ⋯
@@ -1140,10 +1144,6 @@ export function TodayView({
             </div>
           </>
         )}
-
-        {/* To buy — one fixed-budget line; the purchases live on the shared
-            native list, not scattered through the timeline. */}
-        {data.isToday && <ToBuyLine />}
 
         {data.isToday && (
           <TodayBacklogFooter

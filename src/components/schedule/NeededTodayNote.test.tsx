@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { screen, fireEvent } from '@testing-library/react'
 import { render } from '@/test/test-utils'
 import { NeededTodayNote } from './NeededTodayNote'
@@ -18,9 +18,10 @@ vi.mock('@/contexts/ListsContext', async (importOriginal) => {
 })
 
 const mockComplete = vi.fn()
+const mockClearMark = vi.fn()
 let mockListItems: ListItem[] = []
 vi.mock('@/hooks/useNeededListItems', () => ({
-  useNeededListItems: () => ({ items: mockListItems, refetch: vi.fn(), complete: mockComplete }),
+  useNeededListItems: () => ({ items: mockListItems, refetch: vi.fn(), complete: mockComplete, clearMark: mockClearMark }),
 }))
 
 function task(over: Partial<Task>): Task {
@@ -102,6 +103,84 @@ describe('NeededTodayNote', () => {
       } finally {
         mockListItems = []
       }
+    })
+  })
+
+  // ── Into the temporal flow: every row can be given a time. ──
+  describe('scheduling', () => {
+    beforeEach(() => {
+      mockClearMark.mockClear()
+    })
+
+    it('schedules a task row into the day at the picked time', () => {
+      const onScheduleTask = vi.fn()
+      render(
+        <NeededTodayNote
+          tasks={[task({ id: 'a', title: 'Call plumber', neededOn: DAY })]}
+          viewedDate={DAY} {...noop} onScheduleTask={onScheduleTask}
+        />,
+      )
+      fireEvent.click(screen.getByRole('button', { name: /schedule.*call plumber/i }))
+      // skipToTime + viewedDate: the popover opens straight on time presets.
+      fireEvent.click(screen.getByRole('button', { name: '2pm' }))
+      expect(onScheduleTask).toHaveBeenCalledTimes(1)
+      const [id, date, isAllDay] = onScheduleTask.mock.calls[0]
+      expect(id).toBe('a')
+      expect(date.getHours()).toBe(14)
+      expect(date.getDate()).toBe(DAY.getDate())
+      expect(isAllDay).toBe(false)
+    })
+
+    it('spawns a task for a list item, then clears its mark', async () => {
+      const onScheduleListItem = vi.fn().mockResolvedValue(undefined)
+      mockListItems = [listItem({})]
+      try {
+        render(
+          <NeededTodayNote
+            tasks={[]} viewedDate={DAY} {...noop} onScheduleListItem={onScheduleListItem}
+          />,
+        )
+        fireEvent.click(screen.getByRole('button', { name: /schedule.*pull-ups/i }))
+        fireEvent.click(screen.getByRole('button', { name: '2pm' }))
+        await vi.waitFor(() => expect(mockClearMark).toHaveBeenCalledWith('i1'))
+        const [item, date, isAllDay] = onScheduleListItem.mock.calls[0]
+        expect(item).toEqual({ id: 'i1', title: 'Pull-ups' })
+        expect(date.getHours()).toBe(14)
+        expect(isAllDay).toBe(false)
+      } finally {
+        mockListItems = []
+      }
+    })
+
+    // A failed spawn must not eat the mark — the row stays on the note.
+    it('keeps the mark when the spawn fails', async () => {
+      const onScheduleListItem = vi.fn().mockRejectedValue(new Error('offline'))
+      mockListItems = [listItem({})]
+      try {
+        render(
+          <NeededTodayNote
+            tasks={[]} viewedDate={DAY} {...noop} onScheduleListItem={onScheduleListItem}
+          />,
+        )
+        fireEvent.click(screen.getByRole('button', { name: /schedule.*pull-ups/i }))
+        fireEvent.click(screen.getByRole('button', { name: '2pm' }))
+        await vi.waitFor(() => expect(onScheduleListItem).toHaveBeenCalled())
+        expect(mockClearMark).not.toHaveBeenCalled()
+      } finally {
+        mockListItems = []
+      }
+    })
+
+    // Handlers are optional — a mount without them (tests, older callers)
+    // simply offers no clock.
+    it('offers no clock when no schedule handler is wired', () => {
+      render(
+        <NeededTodayNote
+          tasks={[task({ id: 'a', title: 'Call plumber', neededOn: DAY })]}
+          viewedDate={DAY} {...noop}
+        />,
+      )
+      expect(screen.queryByRole('button', { name: /schedule/i })).not.toBeInTheDocument()
     })
   })
 

@@ -10,6 +10,7 @@ import { scopeForDomain, memberForAuthUser, type Scope } from '@/lib/scope'
 import { localYmd, parseLocalYmd, weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
 import { weekStartForBucket } from '@/lib/today/weekPlacement'
 import { onRealtimeResumed } from '@/lib/realtime/keepAlive'
+import { announceToBuyChanged } from '@/lib/lists/toBuy'
 // `import type` on purpose: erased at compile time, so it does NOT drag
 // taskOrdering's @dnd-kit/sortable dependency into this hook's runtime bundle.
 import type { OrderWrite } from '@/lib/today/taskOrdering'
@@ -938,6 +939,22 @@ export function useSupabaseTasks() {
         setError(updateError.message)
         showToast('Failed to update task', 'error', 4000)
         return
+      }
+
+      // One-way sync for a task spawned FROM a list item (Needed Today's
+      // "schedule a buy item" flow): completing the errand checks the item
+      // off its list too. Deliberately only this direction, and only on
+      // complete — un-completing the task never un-checks the item, and
+      // checking the item at the store never touches the task. Fire and
+      // forget: a failed list write must not fail the toggle.
+      if (newCompleted && task.linkedTo?.type === 'list_item') {
+        void supabase
+          .from('list_items')
+          .update({ completed: true, completed_at: new Date().toISOString() })
+          .eq('id', task.linkedTo.id)
+          .then(({ error }) => {
+            if (!error) announceToBuyChanged()
+          })
       }
 
       // Mirror the optimistic state for other instances.

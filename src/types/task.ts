@@ -28,7 +28,7 @@ export type TaskCategory = 'task' | 'chore' | 'errand' | 'event' | 'activity'
 // Prep/Follow-up task linking
 export type LinkType = 'prep' | 'followup'
 
-export type LinkedActivityType = 'task' | 'routine_instance' | 'calendar_event'
+export type LinkedActivityType = 'task' | 'routine_instance' | 'calendar_event' | 'list_item'
 
 export interface LinkedActivity {
   type: LinkedActivityType

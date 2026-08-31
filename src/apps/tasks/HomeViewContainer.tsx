@@ -396,6 +396,20 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
   // 'timed' whenever scheduledFor is set, so it lands on the timeline rather
   // than vanishing). Without this handler wired through context the inline add
   // was a silent no-op.
+  // Needed Today's "schedule a buy item": the purchase stays on its list; a
+  // timed task linked to it carries it into the day's agenda. The link makes
+  // completing the task check the item off (see useSupabaseTasks.toggleTask).
+  const onScheduleListItemAsTask = useCallback(
+    async (item: { id: string; title: string }, date: Date, isAllDay: boolean) => {
+      await addTask(item.title, undefined, undefined, date, {
+        assignedTo: getCurrentUserMember()?.id,
+        isAllDay,
+        linkedTo: { type: 'list_item', id: item.id },
+      });
+    },
+    [addTask, getCurrentUserMember],
+  );
+
   const onCreateTaskAt = useCallback(
     async (r: TimelineCaptureResult) => {
       await addTask(r.title, r.contactId, r.projectId, r.scheduledFor ?? undefined, {
@@ -573,7 +587,7 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
   const sendTaskToBuy = useCallback(async (taskId: string) => {
     const task = tasks.find((t) => t.id === taskId);
     if (!task) return null;
-    let list = findToBuyList(lists)
+    const list = findToBuyList(lists)
       ?? (await addList({ title: TO_BUY_LIST_TITLE, category: 'shopping', visibility: 'family' }))
       ?? undefined;
     if (!list) return null;
@@ -658,6 +672,7 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
       parserContext,
       resolverContext,
       getRecentTaskForContact,
+      onScheduleListItemAsTask,
       onCreateTaskAt,
       onCreateEventAt,
       onCreateRoutineAt,
@@ -722,7 +737,7 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
       onUpdateEventProject: updateEventProject,
     }),
     [
-      toggleTask, toggleWaiting, gated, deleteTask, onSetNeededToday, viewedDate, onCreateTaskFromValue, onCreateTaskParsed, parserContext, resolverContext, getRecentTaskForContact, onCreateTaskAt, onCreateEventAt, onCreateRoutineAt, handleCreateFollowUp, handleGroupItems, handleAddToGroup, handleRemoveFromGroup, handleUngroup, undo.pushAction, updateTaskOrders,
+      toggleTask, toggleWaiting, gated, deleteTask, onSetNeededToday, viewedDate, onCreateTaskFromValue, onCreateTaskParsed, parserContext, resolverContext, getRecentTaskForContact, onScheduleListItemAsTask, onCreateTaskAt, onCreateEventAt, onCreateRoutineAt, handleCreateFollowUp, handleGroupItems, handleAddToGroup, handleRemoveFromGroup, handleUngroup, undo.pushAction, updateTaskOrders,
       setSelection, navigate,
       scheduleActions, updateRoutine, updateEventContext, updateEventSharedWithFamily, dismissShareNudge, hideEvent, handleDeleteEvent, sendTaskToBuy,
       contactsMap, projectsMap, projects, contacts, familyMembers, lists, listsByCategory,

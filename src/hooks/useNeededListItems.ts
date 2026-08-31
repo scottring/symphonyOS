@@ -97,5 +97,26 @@ export function useNeededListItems(viewedDate: Date, listIds: string[]) {
     announceToBuyChanged()
   }, [fetchItems])
 
-  return { items, refetch: fetchItems, complete }
+  /**
+   * Un-mark a row without completing it — used when scheduling spawns a timed
+   * task for the item: the purchase stays on its list, but the note's job for
+   * it is done. Same direct-write rationale as `complete` above.
+   */
+  const clearMark = useCallback(async (id: string) => {
+    setItems((prev) => prev.filter((i) => i.id !== id))
+
+    const { error } = await supabase
+      .from('list_items')
+      .update({ needed_on: null })
+      .eq('id', id)
+
+    if (error) {
+      void fetchItems()
+      return
+    }
+
+    announceToBuyChanged()
+  }, [fetchItems])
+
+  return { items, refetch: fetchItems, complete, clearMark }
 }

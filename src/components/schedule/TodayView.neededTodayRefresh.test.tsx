@@ -55,9 +55,8 @@ vi.mock('@/contexts/ListsContext', async (importOriginal) => {
   const actual = await importOriginal() as Record<string, unknown>
   return {
     ...actual,
-    // Deliberately NOT titled "To buy": that name activates ToBuyLine, whose
-    // own count query would pull an unrelated chain shape into the double
-    // below. This test is about the note.
+    // (Historically not titled "To buy" — that name activated the since-
+    // deleted ToBuyLine and its count query. Kept generic anyway.)
     useListsContextOrNull: () => ({
       lists: [{ id: 'list1', title: 'Shopping', category: 'shopping' }],
     }),

@@ -6,11 +6,12 @@
 // furniture at the top of Today has been deleted twice (UpNextHero,
 // AttentionLine); this earns its place by being silent by default.
 import { useMemo, useState } from 'react'
-import { ShoppingBag, MessageCircle, AlertCircle } from 'lucide-react'
+import { ShoppingBag, MessageCircle, AlertCircle, Clock } from 'lucide-react'
 import type { Task } from '@/types/task'
 import { useListsContextOrNull } from '@/contexts/ListsContext'
 import { useNeededListItems } from '@/hooks/useNeededListItems'
 import { localYmd } from '@/lib/cadence/config'
+import { SchedulePopover } from '@/components/triage'
 import { neededToday, NEEDED_TODAY_EXPANDED_MAX, type NeededKind } from '@/lib/today/neededToday'
 
 interface NeededTodayNoteProps {
@@ -18,6 +19,12 @@ interface NeededTodayNoteProps {
   viewedDate: Date
   onToggleTask: (id: string) => void
   onOpenTask: (id: string) => void
+  /** Give a task row a time — it moves into the day's agenda and (because the
+   *  selector excludes same-day-scheduled tasks) leaves this note. */
+  onScheduleTask?: (id: string, date: Date, isAllDay: boolean) => void
+  /** Give a list-item row a time by spawning a linked task at it. The item
+   *  itself stays on its list; on success the note clears its mark. */
+  onScheduleListItem?: (item: { id: string; title: string }, date: Date, isAllDay: boolean) => Promise<void> | void
 }
 
 const KIND_ICON: Record<NeededKind, typeof ShoppingBag> = {
@@ -27,7 +34,7 @@ const KIND_ICON: Record<NeededKind, typeof ShoppingBag> = {
 }
 
 export function NeededTodayNote({
-  tasks, viewedDate, onToggleTask, onOpenTask,
+  tasks, viewedDate, onToggleTask, onOpenTask, onScheduleTask, onScheduleListItem,
 }: NeededTodayNoteProps) {
   // Expansion is scoped to the day it was opened on, not held across
   // navigation: "+N more" is a decision about THIS day's note. Derived from
@@ -51,7 +58,7 @@ export function NeededTodayNote({
 
   // NOT ctx.listItems — those are scoped to the open list and are empty on
   // Today. See useNeededListItems.
-  const { items: listItems, complete: completeListItem } = useNeededListItems(viewedDate, listIds)
+  const { items: listItems, complete: completeListItem, clearMark } = useNeededListItems(viewedDate, listIds)
 
   // Memoised like every other derived-list computation on Today (see
   // ClarityIndicator, InboxView, OverdueSection, ReviewDrawer): a fresh Set
@@ -129,6 +136,44 @@ export function NeededTodayNote({
                 </button>
               ) : (
                 <span className="text-left text-[13px] text-neutral-700">{item.title}</span>
+              )}
+              {/* Into the temporal flow: pick a time and the row becomes a
+                  timed agenda entry — a task moves, a list item spawns a
+                  linked task (the purchase stays on its list). skipToTime +
+                  the viewed day means one tap lands on time presets. */}
+              {(item.source === 'task' ? onScheduleTask : onScheduleListItem) && (
+                <span className="ml-auto">
+                  <SchedulePopover
+                    value={viewedDate}
+                    skipToTime
+                    itemTitle={item.title}
+                    onSchedule={(date, isAllDay) => {
+                      if (item.source === 'task') {
+                        onScheduleTask?.(item.id, date, isAllDay)
+                        return
+                      }
+                      void (async () => {
+                        try {
+                          await onScheduleListItem?.({ id: item.id, title: item.title }, date, isAllDay)
+                        } catch {
+                          // Spawn failed — keep the mark so the row survives.
+                          return
+                        }
+                        await clearMark(item.id)
+                      })()
+                    }}
+                    trigger={
+                      <button
+                        type="button"
+                        aria-label={`Schedule "${item.title}"`}
+                        title="Give this a time today"
+                        className="p-1 rounded text-amber-600/50 hover:text-amber-700 hover:bg-amber-100/60"
+                      >
+                        <Clock className="w-3.5 h-3.5" aria-hidden />
+                      </button>
+                    }
+                  />
+                </span>
               )}
             </li>
           )

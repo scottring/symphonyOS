@@ -47,7 +47,10 @@ export function neededToday(
   const marked = (d: Date | undefined) => !!d && isSameDay(d, viewedDate)
 
   const fromTasks: NeededItem[] = tasks
-    .filter((t) => !t.completed && marked(t.neededOn))
+    // A task scheduled ON the viewed day is already in the day's agenda —
+    // the note lists only the untimed needs, so nothing shows twice on
+    // Today. The mark itself stays: unscheduling returns the task here.
+    .filter((t) => !t.completed && marked(t.neededOn) && !marked(t.scheduledFor ?? undefined))
     .map((t) => ({
       id: t.id,
       source: 'task' as const,
