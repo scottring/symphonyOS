@@ -43,6 +43,24 @@ const SLOT = 'w-7 h-7 flex items-center justify-center'
  */
 const WHO_SLOT = 'w-[4.5rem] h-7 flex items-center justify-end'
 
+/**
+ * Controls are quiet until you reach for them.
+ *
+ * Individually each rail glyph is defensible; collectively, four of them on
+ * every row of the day is what stops the page reading as text. So the default
+ * state is editorial — the title, the time and who it involves — and the
+ * things you ACT with fade in on hover or keyboard focus.
+ *
+ * Reserved widths are what make this safe: the cell keeps its box whether or
+ * not its contents are painted, so revealing the rail moves nothing. Hiding a
+ * control by unmounting it would reintroduce exactly the jitter this rail was
+ * built to kill.
+ *
+ * md: only — a touch device has no hover to reveal anything with, so mobile
+ * keeps every control painted.
+ */
+const QUIET = 'transition-opacity md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100'
+
 // Start Meeting button - uses context to avoid prop drilling
 function StartMeetingButton({ item }: { item: TimelineItem }) {
   const ctx = useScheduleActionsContext()
@@ -163,16 +181,14 @@ export function RowActionRail({
     )
     : null
 
-  // Context stays hover-revealed while unset (the tag-needs-context nudge).
-  // With fixed cells that no longer shifts anything, so the behaviour is
-  // preserved exactly as it was.
+  // Context is hover-revealed in BOTH states now. It was already hidden while
+  // unset (the tag-needs-context nudge); the set state is a small coloured
+  // diamond that reads as decoration at a glance and costs a row of noise, and
+  // the domain a row belongs to is answered far better by the layer lens than
+  // by squinting at a 12px chip.
   const context = onContextChange ? (
     <div
-      className={
-        isEvent || item.context
-          ? 'transition-opacity'
-          : 'opacity-0 group-hover:opacity-100 transition-opacity'
-      }
+      className={QUIET}
       onClick={(e) => e.stopPropagation()}
     >
       <ContextPicker
@@ -205,17 +221,20 @@ export function RowActionRail({
   ) : null
 
   // assignee | context | verb | overflow — see the slot-order note above.
-  const cells: Array<{ node: React.ReactNode; className: string }> = [
+  // `who` is the one cell that stays lit: who a thing involves is household
+  // INFORMATION, not a control, and it is half the reason to look at the row
+  // at all. Everything after it is something you do, not something you read.
+  const cells: Array<{ node: React.ReactNode; className: string; quiet?: boolean }> = [
     { node: who, className: WHO_SLOT },
     { node: context, className: SLOT },
-    { node: verb, className: SLOT },
-    { node: menu, className: SLOT },
+    { node: verb, className: SLOT, quiet: true },
+    { node: menu, className: SLOT, quiet: true },
   ]
 
   return (
     <div className="shrink-0 flex items-center gap-1">
       {cells.map((cell, i) => (
-        <div key={i} data-rail-slot className={cell.className}>
+        <div key={i} data-rail-slot className={`${cell.className}${cell.quiet ? ` ${QUIET}` : ''}`}>
           {cell.node}
         </div>
       ))}
