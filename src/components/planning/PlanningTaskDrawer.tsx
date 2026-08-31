@@ -4,6 +4,7 @@ import { ChevronDown, ChevronRight, CookingPot } from 'lucide-react'
 import type { Task } from '@/types/task'
 import type { Routine } from '@/types/actionable'
 import type { PoolView } from '@/lib/planning/poolViews'
+import { routineTemporalLabel } from '@/lib/planning/routineTemporal'
 import { PoolViewSwitcher } from './PoolViewSwitcher'
 import { PlanningTaskCard } from './PlanningTaskCard'
 import { PlanningRoutineDragCard } from './PlanningRoutineDragCard'
@@ -41,9 +42,10 @@ export function PlanningTaskDrawer({
 
   const [mealsOpen, setMealsOpen] = useState(false)
   const [showAllLoose, setShowAllLoose] = useState(false)
+  const routinesView = view === 'routines'
   const visibleTasks = showAllLoose ? tasks : tasks.slice(0, POOL_CAP)
   const looseOverflow = tasks.length - visibleTasks.length
-  const total = tasks.length + mealTasks.length
+  const total = routinesView ? routines.length : tasks.length + mealTasks.length
 
   return (
     <div
@@ -75,12 +77,28 @@ export function PlanningTaskDrawer({
         <p className="text-xs text-neutral-500 mt-1 mb-2">
           Drag to schedule
         </p>
-        <PoolViewSwitcher view={view} onChange={onViewChange} />
+        <PoolViewSwitcher view={view} onChange={onViewChange} includeRoutines />
       </div>
 
       {/* Task list - overflow-x-clip allows dropdown to show while y scrolls */}
       <div className="flex-1 overflow-y-auto overflow-x-clip p-3 space-y-2">
-        {total === 0 && routines.length === 0 ? (
+        {routinesView ? (
+          routines.length === 0 ? (
+            <p className="text-center text-sm text-neutral-500 py-8">
+              No routines waiting for a time — every active routine is placed.
+            </p>
+          ) : (
+            <>
+              {routines.map((routine) => (
+                <PlanningRoutineDragCard
+                  key={routine.id}
+                  routine={routine}
+                  temporalLabel={routineTemporalLabel(routine)}
+                />
+              ))}
+            </>
+          )
+        ) : total === 0 ? (
           <div className={`text-center py-8 ${isOver ? 'opacity-50' : ''}`}>
             <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-neutral-100 flex items-center justify-center">
               <svg
@@ -141,16 +159,6 @@ export function PlanningTaskDrawer({
               >
                 {looseOverflow} more
               </button>
-            )}
-            {routines.length > 0 && (
-              <div className="pt-1 space-y-2">
-                <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-600/70 px-1">
-                  Routines
-                </p>
-                {routines.map((routine) => (
-                  <PlanningRoutineDragCard key={routine.id} routine={routine} />
-                ))}
-              </div>
             )}
           </>
         )}

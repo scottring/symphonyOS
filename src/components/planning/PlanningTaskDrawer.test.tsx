@@ -41,6 +41,34 @@ describe('PlanningTaskDrawer', () => {
     expect(screen.getByText('Cook Monday dinner')).toBeInTheDocument()
   })
 
+  it('Routines tab lists draggable routines with their temporal parameters', () => {
+    const routine = {
+      id: 'r1',
+      name: 'Food shopping',
+      recurrence_pattern: { type: 'weekly', days: ['sat'] },
+      time_of_day: null,
+      is_active: true,
+    } as never
+    renderDrawer({ view: 'routines', routines: [routine], mealTasks: [] })
+    expect(screen.getByText('Food shopping')).toBeInTheDocument()
+    expect(screen.getByText('Weekly · Sat · no set time')).toBeInTheDocument()
+    // Task pool stays out of the Routines tab
+    expect(screen.queryByText('Call VW')).not.toBeInTheDocument()
+  })
+
+  it('keeps routines out of the task views (they live on their own tab now)', () => {
+    const routine = {
+      id: 'r1',
+      name: 'Food shopping',
+      recurrence_pattern: { type: 'weekly', days: ['sat'] },
+      time_of_day: null,
+      is_active: true,
+    } as never
+    renderDrawer({ view: 'week', routines: [routine] })
+    expect(screen.queryByText('Food shopping')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Routines' })).toBeInTheDocument()
+  })
+
   it('caps loose tasks at 15 behind an expander', () => {
     const many = Array.from({ length: 20 }, (_, i) => task(`t${i}`, `Loose ${i}`))
     renderDrawer({ tasks: many, mealTasks: [] })

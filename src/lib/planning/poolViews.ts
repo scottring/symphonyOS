@@ -8,7 +8,7 @@ import type { Task } from '@/types/task'
 import { belongsToWeek, isStaleWeekPlacement } from '@/lib/today/weekPlacement'
 import { weekStartAnchor, type WeekStart } from '@/lib/cadence/config'
 
-export type PoolView = 'week' | 'month' | 'all'
+export type PoolView = 'week' | 'month' | 'all' | 'routines'
 
 export interface PoolCtx {
   today: Date
@@ -66,6 +66,8 @@ export function unscheduledPool(tasks: Task[], ctx: PoolCtx): Task[] {
  *  placements, carried-over, all-day); 'month' is the month bucket; 'all'
  *  absorbs the old "Show more from the backlog" toggle. */
 export function applyPoolView(pool: Task[], view: PoolView, ctx: PoolCtx): Task[] {
+  // The Routines tab shows routines, not tasks — the task pool is empty there.
+  if (view === 'routines') return []
   if (view === 'all') return pool
   if (view === 'month') return pool.filter((t) => t.bucket === 'month')
   const today = new Date(ctx.today)
@@ -131,7 +133,7 @@ const KEY_PREFIX = 'symphony-pool-view:'
 export function readPoolView(surface: string): PoolView {
   try {
     const v = localStorage.getItem(KEY_PREFIX + surface)
-    return v === 'month' || v === 'all' ? v : 'week'
+    return v === 'month' || v === 'all' || v === 'routines' ? v : 'week'
   } catch {
     return 'week'
   }

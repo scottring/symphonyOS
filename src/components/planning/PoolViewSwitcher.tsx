@@ -6,12 +6,22 @@ const VIEWS: { value: PoolView; label: string }[] = [
   { value: 'all', label: 'Everything' },
 ]
 
+const ROUTINES_VIEW: { value: PoolView; label: string } = { value: 'routines', label: 'Routines' }
+
 /** The official pool views, as a segmented control. Shared by the overlay
- *  drawer and /week's pool lane so the vocabulary stays identical. */
-export function PoolViewSwitcher({ view, onChange }: { view: PoolView; onChange: (v: PoolView) => void }) {
+ *  drawer and /week's pool lane so the vocabulary stays identical.
+ *  `includeRoutines` adds the Routines tab — only where a host can actually
+ *  offer draggable routines (the overlay; /week has no routine-drop protocol
+ *  from the pool yet). */
+export function PoolViewSwitcher({ view, onChange, includeRoutines = false }: {
+  view: PoolView
+  onChange: (v: PoolView) => void
+  includeRoutines?: boolean
+}) {
+  const views = includeRoutines ? [...VIEWS, ROUTINES_VIEW] : VIEWS
   return (
     <div role="group" aria-label="Pool view" className="flex rounded-lg bg-neutral-100 p-0.5 gap-0.5">
-      {VIEWS.map(({ value, label }) => (
+      {views.map(({ value, label }) => (
         <button
           key={value}
           type="button"

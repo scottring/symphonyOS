@@ -1,6 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@/test/test-utils'
 import { PlanningSession } from './PlanningSession'
+
+// The pool-view choice persists per surface; a test that switches tabs must
+// not leak its choice into the next test's initial render.
+beforeEach(() => {
+  localStorage.removeItem('symphony-pool-view:overlay')
+})
 import { createMockTask, createMockRoutine, resetIdCounter } from '@/test/mocks/factories'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 
@@ -206,9 +212,8 @@ describe('PlanningSession', () => {
         onClose={vi.fn()}
       />
     )
-    // The drawer's group heading — distinct from the header's Routines
-    // visibility switch, which also carries the word.
-    expect(screen.getByText('Routines', { selector: 'p' })).toBeInTheDocument()
+    // Routines live on their own pool tab now.
+    fireEvent.click(screen.getByRole('button', { name: 'Routines' }))
     expect(screen.getByText('Food shopping')).toBeInTheDocument()
   })
 
@@ -1034,6 +1039,7 @@ describe('PlanningSession — drawer drops placed routines', () => {
         onUpdateTask={vi.fn()} onPushTask={vi.fn()} onClose={vi.fn()}
       />
     )
+    fireEvent.click(screen.getByRole('button', { name: 'Routines' }))
     expect(screen.getByText('Not yet placed')).toBeInTheDocument()
   })
 })
