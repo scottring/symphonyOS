@@ -32,16 +32,25 @@ describe('rowSubtitle', () => {
     expect(rowSubtitle(baseItem({ type: 'task', category: 'chore' }))).toBe('Chore')
   })
 
-  it('returns "Routine" for a routine row', () => {
-    expect(rowSubtitle(baseItem({ type: 'routine' }))).toBe('Routine')
+  it('says nothing for a routine row — the row already reads as one', () => {
+    expect(rowSubtitle(baseItem({ type: 'routine' }))).toBe('')
   })
 
-  it('returns "Event · 60 min" for a 1-hour event', () => {
+  it('returns just the duration for a 1-hour event', () => {
     const start = new Date(2026, 4, 20, 13, 0)
     const end = new Date(2026, 4, 20, 14, 0)
     expect(
       rowSubtitle(baseItem({ type: 'event', startTime: start, endTime: end })),
-    ).toBe('Event · 60 min')
+    ).toBe('60 min')
+  })
+
+  it('writes a long event in hours, not raw minutes', () => {
+    // A 7:30 AM–2:10 PM school day used to read "Event · 400 min".
+    const start = new Date(2026, 4, 20, 7, 30)
+    const end = new Date(2026, 4, 20, 14, 10)
+    expect(
+      rowSubtitle(baseItem({ type: 'event', startTime: start, endTime: end })),
+    ).toBe('6 hr 40 min')
   })
 
   it('returns "Errand · 20 min" combining category + duration', () => {
@@ -52,9 +61,9 @@ describe('rowSubtitle', () => {
     ).toBe('Errand · 20 min')
   })
 
-  it('returns "Event" for an all-day event (no duration shown)', () => {
+  it('says nothing for an all-day event', () => {
     expect(
       rowSubtitle(baseItem({ type: 'event', allDay: true })),
-    ).toBe('Event')
+    ).toBe('')
   })
 })
