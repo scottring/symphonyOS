@@ -77,12 +77,17 @@ export function useWeekDragDrop(args: UseWeekDragDropArgs): UseWeekDragDropResul
       const prevScheduledFor = task?.scheduledFor ?? null
       const prevIsAllDay = task?.isAllDay ?? false
       const prevEndTime = task?.endTime
-      void onUpdateTask(taskId, { isAllDay: true, scheduledFor: newDay })
+      // bucket:'timed' rides along — a pool pill may start in week/month/inbox,
+      // and a scheduled task must never sit in another bucket (timed-bucket
+      // invariant). No-op for already-placed chips.
+      const prevBucket = task?.bucket
+      void onUpdateTask(taskId, { isAllDay: true, scheduledFor: newDay, bucket: 'timed' })
       args.pushAction?.(`Moved "${task?.title ?? 'task'}"`, () => {
         void onUpdateTask(taskId, {
           isAllDay: prevIsAllDay,
           scheduledFor: prevScheduledFor as Date,
           endTime: prevEndTime,
+          bucket: prevBucket,
         })
       })
       return
@@ -97,16 +102,22 @@ export function useWeekDragDrop(args: UseWeekDragDropArgs): UseWeekDragDropResul
       const prevScheduledFor = task?.scheduledFor ?? null
       const prevIsAllDay = task?.isAllDay ?? false
       const prevEndTime = task?.endTime
+      // bucket:'timed' rides along — a pool pill may start in week/month/inbox,
+      // and a scheduled task must never sit in another bucket (timed-bucket
+      // invariant). No-op for already-placed chips.
+      const prevBucket = task?.bucket
       void onUpdateTask(activeData.taskId, {
         isAllDay: false,
         scheduledFor: newStart,
         endTime: new Date(newStart.getTime() + DEFAULT_DURATION_MS),
+        bucket: 'timed',
       })
       args.pushAction?.(`Scheduled "${task?.title ?? 'task'}"`, () => {
         void onUpdateTask(activeData.taskId!, {
           isAllDay: prevIsAllDay,
           scheduledFor: prevScheduledFor as Date,
           endTime: prevEndTime,
+          bucket: prevBucket,
         })
       })
       return

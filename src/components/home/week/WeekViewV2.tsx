@@ -22,6 +22,7 @@ import { useWeekDragDrop } from './useWeekDragDrop'
 import { useGridCreate } from './useGridCreate'
 import { SlotQuickCreatePopover, type CreateType } from './SlotQuickCreatePopover'
 import { RoutinesToggle } from '@/components/planning/RoutinesToggle'
+import { WeekPoolLane } from './WeekPoolLane'
 import { readHideRoutines, writeHideRoutines, onHideRoutinesChange } from '@/lib/hideRoutinesSignal'
 import { resolveRoutine } from '@/lib/routineUtils'
 import type { AssigneeFilter } from '@/lib/today/types'
@@ -364,6 +365,14 @@ export function WeekViewV2(props: WeekViewV2Props) {
         onDragCancel={drag.dndHandlers.onDragCancel}
         onDragMove={handleDragMove}
       >
+        {/* Unscheduled pool — inside the DndContext so its pills' useDraggable
+            registers; drops ride the existing chip branches in useWeekDragDrop. */}
+        <WeekPoolLane
+          tasks={tasks}
+          weekStart={weekStart}
+          dayCount={dayCount}
+          onSelectItem={onSelectItem}
+        />
         <WeekGrid
           weekStart={weekStart}
           dayCount={dayCount}

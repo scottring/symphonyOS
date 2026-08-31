@@ -98,6 +98,31 @@ describe('useWeekDragDrop', () => {
     expect((updates.scheduledFor as Date).getHours()).toBe(0)
   })
 
+  it('chip drops write bucket: timed (pool pills may start in week/month/inbox) and undo restores it', async () => {
+    const onUpdateTask = vi.fn().mockResolvedValue(undefined)
+    const pushAction = vi.fn()
+    const { result } = renderHook(() => useWeekDragDrop({
+      weekStart: new Date(2026, 4, 17),
+      onWeekChange: vi.fn(),
+      onUpdateTask,
+      onUpdateEvent: vi.fn(),
+      onUpdateRoutine: vi.fn(),
+      tasks: [{ id: 't1', title: 'X', bucket: 'week' } as never],
+      events: [], routines: [],
+      pushAction,
+    }))
+
+    await act(async () => {
+      result.current.dndHandlers.onDragEnd(mkOver('slot:2026-05-20:13:30') as never)
+    })
+
+    expect(onUpdateTask.mock.calls[0][1].bucket).toBe('timed')
+
+    // Undo restores the pre-drop bucket, not a re-toggle.
+    await act(async () => { pushAction.mock.calls[0][1]() })
+    expect(onUpdateTask.mock.calls[1][1].bucket).toBe('week')
+  })
+
   it('onDragCancel produces no mutation', async () => {
     const onUpdateTask = vi.fn()
     const { result } = renderHook(() => useWeekDragDrop({
