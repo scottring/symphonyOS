@@ -34,3 +34,14 @@ describe('PlanningHeader close affordances', () => {
     expect(screen.getByText(/Aug 2/)).toBeInTheDocument()
   })
 })
+
+describe('PlanningHeader routines toggle', () => {
+  it('shows a labeled Routines switch reflecting hidden state', () => {
+    const onToggle = vi.fn()
+    render(<PlanningHeader {...props({ hideRoutines: true, onToggleRoutines: onToggle })} />)
+    const toggle = screen.getByRole('switch', { name: 'Routines' })
+    expect(toggle).toHaveAttribute('aria-checked', 'false') // hidden → off
+    toggle.click()
+    expect(onToggle).toHaveBeenCalled()
+  })
+})

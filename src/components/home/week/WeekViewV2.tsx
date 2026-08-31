@@ -21,7 +21,7 @@ import { layoutWeekLanes, type PlacedItem } from './layoutLanes'
 import { useWeekDragDrop } from './useWeekDragDrop'
 import { useGridCreate } from './useGridCreate'
 import { SlotQuickCreatePopover, type CreateType } from './SlotQuickCreatePopover'
-import { Eye, EyeOff } from 'lucide-react'
+import { RoutinesToggle } from '@/components/planning/RoutinesToggle'
 import { readHideRoutines, writeHideRoutines, onHideRoutinesChange } from '@/lib/hideRoutinesSignal'
 import { resolveRoutine } from '@/lib/routineUtils'
 import type { AssigneeFilter } from '@/lib/today/types'
@@ -354,15 +354,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
   return (
     <div data-week-bounds className="hidden lg:block relative">
       <div className="flex items-center justify-end mb-2">
-        <button
-          type="button"
-          onClick={() => writeHideRoutines(!hideRoutines)}
-          title={hideRoutines ? 'Show daily activities' : 'Hide daily activities'}
-          aria-label={hideRoutines ? 'Show daily' : 'Hide daily'}
-          className="p-1.5 rounded-md hover:bg-neutral-100 text-neutral-500"
-        >
-          {hideRoutines ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-        </button>
+        <RoutinesToggle hidden={hideRoutines} onToggle={() => writeHideRoutines(!hideRoutines)} />
       </div>
 
       <DndContext

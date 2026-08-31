@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Eye, EyeOff } from 'lucide-react'
+import { RoutinesToggle } from './RoutinesToggle'
 
 interface PlanningHeaderProps {
   dateRange: Date[]
@@ -157,14 +157,7 @@ export function PlanningHeader({
             something — see showClose). */}
         <div className="flex items-center gap-2">
           {onToggleRoutines && (
-            <button
-              onClick={onToggleRoutines}
-              title={hideRoutines ? 'Show daily activities' : 'Hide daily activities'}
-              aria-label={hideRoutines ? 'Show daily activities' : 'Hide daily activities'}
-              className="p-2 rounded-lg text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100 transition-colors"
-            >
-              {hideRoutines ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-            </button>
+            <RoutinesToggle hidden={hideRoutines} onToggle={onToggleRoutines} />
           )}
           {showClose && (
             <button
