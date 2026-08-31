@@ -38,9 +38,10 @@ import { useTodayDragState } from './TodayDragProvider'
 import { refusalFor } from '@/lib/today/todayDrop'
 import { DEFAULT_SECTION_CAP } from '@/lib/today/pageCap'
 import { curateUnits } from '@/lib/today/curate'
-import { computeOpenSpans } from '@/lib/today/openSpace'
+import { computeOpenSpans, computeSpine } from '@/lib/today/openSpace'
 import { effectiveStartTime } from '@/lib/timeUtils'
 import { OpenSpaceLine } from './OpenSpaceLine'
+import { TimelineSpine } from './TimelineSpine'
 import { countRoutineRowUnits } from '@/lib/today/routineCollections'
 
 // ─── Meal detection ────────────────────────────────────────────────────────────
@@ -202,6 +203,14 @@ export function TodaySectionList({
     [sectionsOrder, grouped, now, viewedDate],
   )
 
+  // Same population, same order as the spans above — the spine has to agree
+  // with the gaps or the line will run straight through a hole it just said
+  // was open.
+  const spine = useMemo(
+    () => computeSpine(sectionsOrder.flatMap((s) => grouped[s] ?? []), openSpans),
+    [sectionsOrder, grouped, openSpans],
+  )
+
   return (
     <>
       {sectionsOrder.map((section) => {
@@ -313,6 +322,7 @@ export function TodaySectionList({
 
                   // The free run that ends where this item begins, if any.
                   const openSpan = openSpans.get(item.id)
+                  const spineSegments = spine.get(item.id)
 
                   // Insert point before this item
                   const prevItemForInsert = itemIndex > 0 ? visible[itemIndex - 1] : null
@@ -376,16 +386,41 @@ export function TodaySectionList({
                         {showInsert && insertBefore}
                         <TodayDraggableRow itemId={item.id} disabled={dragRefused}>
                         <div {...(isFirstItem ? { 'data-today-first': '' } : {})}>
-                          <EveningMealCard
-                            title={parsed.title}
-                            sides={parsed.sides}
-                            timeLabel={timeLabel}
-                            recipeUrl={recipeUrl}
-                            fromPlan={fromPlan}
-                            servesCount={servesCount}
-                            diners={diners}
-                            onSelect={() => onSelectItem(item.id)}
-                          />
+                          {/* The meal sits on the agenda's row grid like
+                              everything else — px-3 wrapper, pl-5 gutter, w-16
+                              time, w-5 marker — so the spine runs through
+                              dinner instead of breaking at it. Before this the
+                              card started flush at the card's left edge, a
+                              misalignment that was merely untidy without a
+                              spine and reads as a bug with one. The time moves
+                              to the gutter where every other row keeps it, so
+                              the card's own eyebrow carries only what the
+                              gutter can't say. */}
+                          <div className="rounded-xl border border-transparent px-3 py-2 md:py-1">
+                            <div className="relative flex items-center gap-3 pl-5">
+                              <TimelineSpine above={spineSegments?.above} below={spineSegments?.below} />
+                              <div className="w-16 shrink-0 text-xs font-medium tabular-nums text-neutral-500">
+                                {timeLabel}
+                              </div>
+                              <div className="w-5 shrink-0 flex items-center justify-center relative z-[1]">
+                                <span
+                                  aria-hidden
+                                  className="w-[18px] h-[18px] rounded-full border-2 border-[hsl(14_45%_62%)]"
+                                />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <EveningMealCard
+                                  title={parsed.title}
+                                  sides={parsed.sides}
+                                  recipeUrl={recipeUrl}
+                                  fromPlan={fromPlan}
+                                  servesCount={servesCount}
+                                  diners={diners}
+                                  onSelect={() => onSelectItem(item.id)}
+                                />
+                              </div>
+                            </div>
+                          </div>
                         </div>
                         </TodayDraggableRow>
                       </div>
@@ -482,6 +517,8 @@ export function TodaySectionList({
                       return (
                         <>
                     <ScheduleItem
+                      spineAbove={spineSegments?.above}
+                      spineBelow={spineSegments?.below}
                       item={item}
                       selected={selectedItemId === item.id}
                       bulkSelectable={true}

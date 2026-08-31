@@ -131,3 +131,45 @@ export function computeOpenSpans(
 
   return spans
 }
+
+export interface SpineSegments {
+  /** Reach up from this row's marker toward the row above. */
+  above: boolean
+  /** Reach down from this row's marker toward the row below. */
+  below: boolean
+}
+
+/**
+ * Which rows draw which half of the timeline spine.
+ *
+ * The spine is the day's through-line, so it runs only between rows that
+ * actually sit on the clock — all-day rows and the Anytime slab are not
+ * moments and get no segment. The first timed row has nothing above it and
+ * the last has nothing below, or the line would dangle into whitespace at
+ * both ends of the day.
+ *
+ * And it BREAKS across open space. A gap the size of an afternoon is the one
+ * thing on Today that is genuinely discontinuous, so the line stops and the
+ * open-space caption takes over — the day's shape is drawn, not just listed.
+ * That is the whole reason the spine earns its pixel: it makes "you have four
+ * hours" something you can see without reading.
+ */
+export function computeSpine(
+  items: TimelineItem[],
+  openSpans: Map<string, OpenSpan>,
+): Map<string, SpineSegments> {
+  const ordered = items
+    .map((item) => ({ item, start: effectiveStartTime(item) }))
+    .filter((x): x is { item: TimelineItem; start: Date } => x.start !== null)
+    .sort((a, b) => a.start.getTime() - b.start.getTime())
+
+  const out = new Map<string, SpineSegments>()
+  ordered.forEach(({ item }, i) => {
+    const next = ordered[i + 1]
+    out.set(item.id, {
+      above: i > 0 && !openSpans.has(item.id),
+      below: !!next && !openSpans.has(next.item.id),
+    })
+  })
+  return out
+}

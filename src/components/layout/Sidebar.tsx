@@ -259,47 +259,24 @@ export function Sidebar({
         )}
       </div>
 
-      {/* Pinned Section */}
-      {pins.length > 0 && entities && onPinNavigate && onPinMarkAccessed && onPinRefreshStale && (
-        <PinnedSection
-          pins={pins}
-          entities={entities}
-          collapsed={collapsed}
-          onNavigate={onPinNavigate}
-          onMarkAccessed={onPinMarkAccessed}
-          onRefreshStale={onPinRefreshStale}
-        />
-      )}
-
-      {/* Navigation — Inbox · Today · Routines · Library (collapsible). */}
+      {/* Navigation — the rhythm (Today · This Week · Routines), then
+          Household (Inbox · pins), then Library (collapsible). */}
       <nav className="flex-1 px-3 mt-2 space-y-0.5 overflow-y-auto">
         <div className="border-t border-neutral-200/60 mb-1" />
 
-        {/* Inbox — capture catch-all, above the rhythm. */}
-        <button
-          onClick={() => onViewChange('inbox')}
-          className={`${navItemClass(activeView === 'inbox')} mt-2`}
-        >
-          {createElement(Inbox, { className: 'w-5 h-5 shrink-0' })}
-          {!collapsed && (
-            <>
-              <span className="flex-1 text-left">Inbox</span>
-              {typeof inboxCount === 'number' && inboxCount > 0 && (
-                <span className="text-[11px] tabular-nums px-1.5 py-0.5 rounded-md bg-neutral-200/70 text-neutral-600">
-                  {inboxCount}
-                </span>
-              )}
-            </>
-          )}
-        </button>
+        {/* Today — the execution surface, and now the FIRST thing in the nav.
+            Inbox used to sit above it as the "capture catch-all". That put a
+            holding pen for unsorted stuff at the top of the app, above the
+            three surfaces the product is actually for, and read as a claim
+            that processing the pile ranks with living the day. Today · This
+            Week · Routines are the conceptual core; capture and lists are
+            household plumbing and now sit under their own heading below.
 
-        {/* Today — the execution surface. The horizon ladder was de-navved
-            2026-08 (analog-planning pivot); planning happens on paper and
-            enters as data. */}
-        {collapsed && <div className="border-t border-neutral-200/60 my-2" />}
+            The horizon ladder was de-navved 2026-08 (analog-planning pivot);
+            planning happens on paper and enters as data. */}
         <button
           onClick={() => onViewChange('today')}
-          className={`${navItemClass(isTodayActive())} ${collapsed ? '' : 'mt-1'}`}
+          className={`${navItemClass(isTodayActive())} mt-2`}
         >
           <Sun className="w-5 h-5 shrink-0" />
           {!collapsed && <span>Today</span>}
@@ -337,6 +314,43 @@ export function Sidebar({
           {createElement(Repeat, { className: 'w-5 h-5 shrink-0' })}
           {!collapsed && <span>Routines</span>}
         </button>
+
+        {/* ── Household ── the plumbing under the rhythm: what came in, and
+            what's pinned to hand. Below Today/This Week/Routines on purpose —
+            these are things you keep, not surfaces you live in. */}
+        {!collapsed && (
+          <div className="px-3.5 pt-4 pb-1 text-[11px] font-medium text-neutral-400 uppercase tracking-wider">
+            Household
+          </div>
+        )}
+        {collapsed && <div className="border-t border-neutral-200/60 my-2" />}
+        <button
+          onClick={() => onViewChange('inbox')}
+          className={navItemClass(activeView === 'inbox')}
+        >
+          {createElement(Inbox, { className: 'w-5 h-5 shrink-0' })}
+          {!collapsed && (
+            <>
+              <span className="flex-1 text-left">Inbox</span>
+              {typeof inboxCount === 'number' && inboxCount > 0 && (
+                <span className="text-[11px] tabular-nums px-1.5 py-0.5 rounded-md bg-neutral-200/70 text-neutral-600">
+                  {inboxCount}
+                </span>
+              )}
+            </>
+          )}
+        </button>
+
+        {pins.length > 0 && entities && onPinNavigate && onPinMarkAccessed && onPinRefreshStale && (
+          <PinnedSection
+            pins={pins}
+            entities={entities}
+            collapsed={collapsed}
+            onNavigate={onPinNavigate}
+            onMarkAccessed={onPinMarkAccessed}
+            onRefreshStale={onPinRefreshStale}
+          />
+        )}
 
         {/* ── Library ── the non-horizon surfaces, collapsible (not daily clutter). */}
         <div className="border-t border-neutral-200/60 my-2" />
