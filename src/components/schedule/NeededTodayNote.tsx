@@ -82,19 +82,25 @@ export function NeededTodayNote({
   // The whole reason top-of-card placement is safe.
   if (items.length === 0) return null
 
+  // A strip, not a card (2026-08-31). As a filled amber box with a stacked
+  // list, three small errands took more vertical space and more colour than
+  // the day's actual commitments, and the eye answered "what needs my
+  // attention?" with "buy bread". It is an ATTENTION QUEUE, so it reads as one
+  // line of queue: label, then items flowing inline. The amber survives as
+  // ink, not as a container.
   return (
     <div
       data-testid="needed-today-note"
-      className="mb-3 rounded-xl border border-amber-200/70 bg-amber-50/50 px-3 py-2"
+      className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 px-3 md:px-0 py-1"
     >
-      <div className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-amber-700/80">
+      <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wide text-amber-700/80">
         Needed today
-      </div>
-      <ul className="space-y-0.5">
+      </span>
+      <ul className="flex flex-wrap items-center gap-x-3 gap-y-1">
         {items.map((item) => {
           const Icon = KIND_ICON[item.kind]
           return (
-            <li key={`${item.source}-${item.id}`} data-testid="needed-today-row" className="flex items-center gap-2">
+            <li key={`${item.source}-${item.id}`} data-testid="needed-today-row" className="flex items-center gap-1.5">
               <input
                 type="checkbox"
                 aria-label={item.title}
@@ -103,7 +109,13 @@ export function NeededTodayNote({
                   item.source === 'task' ? onToggleTask(item.id) : void completeListItem(item.id)
                 }
               />
-              <Icon className="w-3.5 h-3.5 shrink-0 text-amber-600/70" aria-hidden />
+              {/* The kind icon only where it DISAMBIGUATES. Nearly everything
+                  on this note is something to buy, so a shopping bag beside
+                  every row is a fact repeated until it stops being read;
+                  "discuss" and "urgent" are the ones worth a glyph. */}
+              {item.kind !== 'buy' && (
+                <Icon className="w-3.5 h-3.5 shrink-0 text-amber-600/70" aria-hidden />
+              )}
               {/* A list item has no detail surface to open, so its title is
                   plain text — a button with no handler still reads as
                   clickable and rewards the tap with nothing. */}
@@ -126,12 +138,12 @@ export function NeededTodayNote({
           in plain text rather than dropping the count — a note that silently
           omits rows is worse than one that admits it. */}
       {overflow > 0 && (expanded ? (
-        <div className="mt-1 text-[12px] text-amber-700/70">+{overflow} more</div>
+        <div className="text-[12px] text-amber-700/70">+{overflow} more</div>
       ) : (
         <button
           type="button"
           onClick={() => setExpandedDay(day)}
-          className="mt-1 text-[12px] text-amber-700/70 hover:text-amber-800"
+          className="text-[12px] text-amber-700/70 hover:text-amber-800"
         >
           +{overflow} more
         </button>
