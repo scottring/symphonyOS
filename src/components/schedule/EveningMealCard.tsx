@@ -25,9 +25,17 @@ interface EveningMealCardProps {
 
 /**
  * Evening dinner card. The intentional "atmosphere-first" surface on the Today
- * timeline — warm peach background, serif title, image affordance, optional
- * recipe link. Phase 2 added meta chips (serves count, "Meal plan") and a
- * stacked avatar cluster for diners.
+ * timeline — warm peach ground, serif title, image affordance, optional recipe
+ * link.
+ *
+ * Sized down a notch (2026-08-31) because atmosphere had turned into rank. At
+ * a 56px thumbnail, an 18px serif title and a row of boxed chips, the meal was
+ * the largest object on the page — it outweighed a 7:30-to-2:10 school day
+ * rendered as a plain line, and the eye read the day's biggest commitment as
+ * subordinate to what's for dinner. The card keeps every distinguishing move
+ * (the ground, the serif, the image, the diners); what it gives up is the
+ * extra size and the chip row, with serves-count folded into the eyebrow it
+ * was already sitting under. Warmest thing on Today, no longer the loudest.
  */
 export function EveningMealCard({
   title,
@@ -49,33 +57,25 @@ export function EveningMealCard({
       tabIndex={0}
       onClick={onSelect}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect() } }}
-      className="flex items-center gap-4 px-4 py-3 rounded-xl bg-[hsl(28_55%_94%)] cursor-pointer hover:bg-[hsl(28_55%_92%)] transition-colors"
+      className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-[hsl(28_55%_95%)] cursor-pointer hover:bg-[hsl(28_55%_92%)] transition-colors"
     >
-      <span className="shrink-0 w-14 h-14 rounded-lg overflow-hidden bg-[hsl(28_45%_86%)] flex items-center justify-center">
+      <span className="shrink-0 w-10 h-10 rounded-lg overflow-hidden bg-[hsl(28_45%_88%)] flex items-center justify-center">
         {imageUrl
           ? <img src={imageUrl} alt="" className="w-full h-full object-cover" />
-          : <UtensilsCrossed className="w-6 h-6 text-[hsl(14_45%_50%)]" />}
+          : <UtensilsCrossed className="w-[18px] h-[18px] text-[hsl(14_45%_50%)]" />}
       </span>
       <div className="min-w-0 flex-1">
+        {/* One eyebrow carries the whole metadata row the card used to spend a
+            line of chips on. */}
         <p className="text-[11px] font-medium uppercase tracking-wide text-[hsl(14_40%_45%)]">
           Dinner at <span>{timeLabel}</span>
+          {hasMeta && <span className="text-[hsl(14_25%_60%)]">
+            {fromPlan && ' · Meal plan'}
+            {servesCount != null && ` · Serves ${servesCount}`}
+          </span>}
         </p>
-        <p className="font-display text-lg text-neutral-800 leading-tight truncate">{title}</p>
+        <p className="font-display text-base text-neutral-800 leading-tight truncate">{title}</p>
         {sides && <p className="text-[13px] text-neutral-500 truncate">{sides}</p>}
-        {hasMeta && (
-          <div className="mt-1 flex items-center gap-1.5 flex-wrap">
-            {fromPlan && (
-              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wide bg-white/70 text-[hsl(14_40%_40%)]">
-                Meal plan
-              </span>
-            )}
-            {servesCount != null && (
-              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium uppercase tracking-wide bg-white/70 text-[hsl(14_40%_40%)]">
-                Serves {servesCount}
-              </span>
-            )}
-          </div>
-        )}
       </div>
 
       {hasDiners && (

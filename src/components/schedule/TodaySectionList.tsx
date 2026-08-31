@@ -38,6 +38,9 @@ import { useTodayDragState } from './TodayDragProvider'
 import { refusalFor } from '@/lib/today/todayDrop'
 import { DEFAULT_SECTION_CAP } from '@/lib/today/pageCap'
 import { curateUnits } from '@/lib/today/curate'
+import { computeOpenSpans } from '@/lib/today/openSpace'
+import { effectiveStartTime } from '@/lib/timeUtils'
+import { OpenSpaceLine } from './OpenSpaceLine'
 import { countRoutineRowUnits } from '@/lib/today/routineCollections'
 
 // ─── Meal detection ────────────────────────────────────────────────────────────
@@ -88,6 +91,8 @@ export interface TodaySectionListProps {
   upNextId: string | undefined
   /** e.g. "starts in ~2.5 hr" — rendered on the up-next marker line. */
   upNextStatus?: string
+  /** Wall clock used to measure open space. Injected so tests are deterministic. */
+  now?: Date
   firstSectionItemId: string | null
   collapsedKeys: Set<string>
   openedByUser: Set<string>
@@ -122,6 +127,7 @@ export function TodaySectionList({
   selectedItemId,
   upNextId,
   upNextStatus,
+  now,
   firstSectionItemId,
   collapsedKeys,
   openedByUser,
@@ -181,6 +187,20 @@ export function TodaySectionList({
       servesCount: coreMembers.length > 0 ? coreMembers.length : undefined,
     }
   }, [familyMembers])
+
+  // Open space is a property of the whole day, not of one band: the gap that
+  // matters most on a light day runs from a morning routine clear through to
+  // dinner. Computed over every timed item in render order across all
+  // sections, INCLUDING any the section cap will hide — a hidden commitment
+  // still occupies its hour, and a span that ignored it would overstate the
+  // room by exactly that much.
+  const openSpans = useMemo(
+    () => computeOpenSpans(
+      sectionsOrder.flatMap((s) => grouped[s] ?? []),
+      { now: now ?? new Date(), viewedDate },
+    ),
+    [sectionsOrder, grouped, now, viewedDate],
+  )
 
   return (
     <>
@@ -291,6 +311,9 @@ export function TodaySectionList({
                   // children — a task added there wouldn't be in the group.
                   const showInsert = !isGroupChild
 
+                  // The free run that ends where this item begins, if any.
+                  const openSpan = openSpans.get(item.id)
+
                   // Insert point before this item
                   const prevItemForInsert = itemIndex > 0 ? visible[itemIndex - 1] : null
                   const insertCtxBefore = {
@@ -326,8 +349,15 @@ export function TodaySectionList({
                     (section === 'evening' || section === 'night') &&
                     isMealItem(item.id, item.type, item.title)
                   ) {
-                    const timeLabel = item.startTime
-                      ? new Date(item.startTime).toLocaleTimeString('en-US', {
+                    // effectiveStartTime, not startTime: an all-day "Dinner:
+                    // ..." event lands in this branch via the same meal
+                    // inference that filed it under evening, but its stored
+                    // start is the all-day instant — printing that verbatim
+                    // is what made the evening card announce "Dinner at
+                    // 8:00 AM".
+                    const mealStart = effectiveStartTime(item)
+                    const timeLabel = mealStart
+                      ? mealStart.toLocaleTimeString('en-US', {
                           hour: 'numeric',
                           minute: '2-digit',
                         })
@@ -342,6 +372,7 @@ export function TodaySectionList({
                     const fromPlan = String(item.id).startsWith('meal:')
                     return (
                       <div key={item.id}>
+                        {openSpan && <OpenSpaceLine span={openSpan} />}
                         {showInsert && insertBefore}
                         <TodayDraggableRow itemId={item.id} disabled={dragRefused}>
                         <div {...(isFirstItem ? { 'data-today-first': '' } : {})}>
@@ -365,6 +396,7 @@ export function TodaySectionList({
                   if (item.type === 'routine-collection') {
                     return (
                       <div key={item.id} data-item-id={item.id}>
+                        {openSpan && <OpenSpaceLine span={openSpan} />}
                         {showInsert && insertBefore}
                         {isUpNext && <UpNextMarker status={upNextStatus} />}
                         <TodayDraggableRow itemId={item.id} disabled={dragRefused}>
@@ -415,6 +447,7 @@ export function TodaySectionList({
                   if (taskId && taskId === renamingGroupId) {
                     return (
                       <div key={item.id}>
+                        {openSpan && <OpenSpaceLine span={openSpan} />}
                         {showInsert && insertBefore}
                         <div data-item-id={item.id} className={groupCardClass || undefined}>
                           <GroupNameInput
@@ -433,6 +466,7 @@ export function TodaySectionList({
                   // Standard schedule item
                   return (
                     <div key={item.id} className={isGroupChild ? '-mt-1' : undefined}>
+                    {openSpan && <OpenSpaceLine span={openSpan} />}
                     {showInsert && insertBefore}
                     {isUpNext && <UpNextMarker status={upNextStatus} />}
                     <TodayDraggableRow itemId={item.id} disabled={dragRefused}>

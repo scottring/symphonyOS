@@ -1052,6 +1052,7 @@ export function TodayView({
               selectedItemId={selectedItemId}
               upNextId={upNextId}
               upNextStatus={upNextStatus}
+              now={new Date(nowTick)}
               firstSectionItemId={firstSectionItemId}
               collapsedKeys={collapsedKeys}
               openedByUser={openedByUser}

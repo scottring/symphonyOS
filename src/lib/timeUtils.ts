@@ -323,6 +323,41 @@ export function inferMealTime(title: string): { section: TimeOfDay; hour: number
 }
 
 /**
+ * A span of minutes, written the way a person says it: "45 min", "90 min",
+ * "2 hr", "6 hr 40 min". Stays in minutes below two hours, where minutes are
+ * still the unit people think in; above that the raw figure stops being
+ * readable ("400 min" is a number you have to do arithmetic on).
+ */
+export function formatDurationMinutes(minutes: number): string {
+  if (minutes < 120) return `${minutes} min`
+  const hours = Math.floor(minutes / 60)
+  const rest = minutes % 60
+  return rest === 0 ? `${hours} hr` : `${hours} hr ${rest} min`
+}
+
+/**
+ * The clock time an item actually reads at, as opposed to the one it stores.
+ *
+ * An all-day calendar event titled "Dinner: ..." carries a meaningless start
+ * (whatever midnight-ish instant the all-day span materialized to) and yet
+ * getDaySection already files it under evening via inferMealTime. Anything
+ * that prints or measures its time has to make the same inference, or the row
+ * ends up sorted into the evening while announcing "Dinner at 8:00 AM".
+ *
+ * Returns null for an all-day item with no meal to infer from — those bound
+ * nothing on the clock and should not be given a time they do not have.
+ */
+export function effectiveStartTime(item: TimelineItem): Date | null {
+  if (!item.startTime) return null
+  if (!item.allDay) return item.startTime
+  const inferred = inferMealTime(item.title)
+  if (!inferred) return null
+  const d = new Date(item.startTime)
+  d.setHours(inferred.hour, inferred.minute, 0, 0)
+  return d
+}
+
+/**
  * Get the day section for a timeline item.
  * For all-day events with meal keywords (dinner, lunch, breakfast),
  * places them in the appropriate time section instead of "All Day".
