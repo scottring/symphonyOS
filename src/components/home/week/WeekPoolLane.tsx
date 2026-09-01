@@ -53,7 +53,10 @@ function PoolPill({ task, onSelect, onCompleteTask, onNotThisWeek, onPushTask }:
       ref={setNodeRef}
       {...attributes}
       {...listeners}
-      onClick={() => onSelect(task.id)}
+      // Prefixed, like every other selectable id on this grid: the host parses
+      // "<kind>-<id>" and drops anything it can't classify, so a bare uuid
+      // opened no panel at all.
+      onClick={() => onSelect(`task-${task.id}`)}
       title={task.title}
       className={`group inline-flex max-w-[280px] items-center gap-1.5 rounded-lg border border-neutral-200 bg-white pl-2 pr-1.5 py-1.5 text-[13px] text-neutral-700 touch-none cursor-grab active:cursor-grabbing hover:border-neutral-300 hover:shadow-sm transition-all ${
         isDragging ? 'opacity-40' : ''

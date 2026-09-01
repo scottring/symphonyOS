@@ -106,7 +106,7 @@ export interface ScheduleActionsValue {
   // Routine actions
   onCompleteRoutine?: (routineId: string, completed: boolean, completedAt?: Date) => void
   onSkipRoutine?: (routineId: string) => void
-  onPushRoutine?: (routineId: string, date: Date) => void
+  onPushRoutine?: (routineId: string, date: Date, fromDate?: Date) => void
   onUpdateRoutine?: (id: string, updates: Partial<Routine>) => void
   onDeleteRoutine?: (routineId: string) => void
 

@@ -77,7 +77,7 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
     updateRoutine,
     deleteRoutine,
   } = useRoutines();
-  const { getInstancesForDate, markDone, undoDone, skip, reschedule } = useActionableInstances();
+  const { getInstancesForDate, markDone, undoDone, skip, reschedule, undoReschedule } = useActionableInstances();
   const { members: familyMembers, getCurrentUserMember } = useFamilyMembers();
   const { isHidden: isEventHidden, hideEvent } = useHiddenCalendarEvents();
   const { getDomainForCalendar } = useCalendarDomainMappings();
@@ -259,6 +259,7 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
     undoDone,
     skip,
     reschedule,
+    undoReschedule,
     refreshDateInstances,
     pushAction: undo.pushAction,
   });

@@ -172,11 +172,40 @@ describe('useWeekDragDrop', () => {
     })
 
     expect(onPushRoutine).toHaveBeenCalledTimes(1)
-    const [routineId, when] = onPushRoutine.mock.calls[0]
+    const [routineId, when, fromDate] = onPushRoutine.mock.calls[0]
     expect(routineId).toBe('r1')
     expect((when as Date).getDate()).toBe(19)
     expect((when as Date).getHours()).toBe(9)
+    // The '-day2' suffix is the only record of which column the block came
+    // from. Reporting it wrongly writes the override onto the day the app
+    // happens to be viewing — the block then never moves.
+    expect((fromDate as Date).getDate()).toBe(19) // weekStart Sun 5/17 + 2
     expect(onUpdateRoutine).not.toHaveBeenCalled()
+  })
+
+  it('reports the column a routine was dragged FROM, not the one it landed on', async () => {
+    const onPushRoutine = vi.fn()
+    const { result } = renderHook(() => useWeekDragDrop({
+      weekStart: new Date(2026, 4, 17),
+      onWeekChange: vi.fn(),
+      onUpdateTask: vi.fn(),
+      onUpdateEvent: vi.fn(),
+      onUpdateRoutine: vi.fn(),
+      onPushRoutine,
+      tasks: [], events: [], routines: [],
+    }))
+
+    await act(async () => {
+      result.current.dndHandlers.onDragEnd({
+        // Rendered on Thursday (day4), dropped on Saturday (day6).
+        active: { id: 'block-routine:routine-r1-day4', data: { current: { kind: 'block', itemId: 'routine-r1-day4' } } },
+        over: { id: 'slot:2026-05-23:07:00', data: { current: { kind: 'timed', dayIso: '2026-05-23', hour: 7, minute: 0 } } },
+      } as never)
+    })
+
+    const [, when, fromDate] = onPushRoutine.mock.calls[0]
+    expect((fromDate as Date).getDate()).toBe(21) // Thursday 5/21
+    expect((when as Date).getDate()).toBe(23) // Saturday 5/23
   })
 
   it('onDragCancel produces no mutation', async () => {

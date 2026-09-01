@@ -24,7 +24,7 @@ interface UseWeekDragDropArgs {
   /** Optional. Pin a routine to a time on ONE day (a deferral/override write),
    *  leaving its recurrence rule alone — the same grain rule as the Today
    *  overlay's routine drop. Omitted = routine blocks don't move. */
-  onPushRoutine?: (routineId: string, when: Date) => void
+  onPushRoutine?: (routineId: string, when: Date, fromDate: Date) => void
   /** Optional. A shelf routine pill dropped on a slot ASKS before writing —
    *  the host opens the place-scope popover ("every Thursday" vs "just this
    *  Thursday"). The hook never writes routines on this path itself. */
@@ -147,8 +147,16 @@ export function useWeekDragDrop(args: UseWeekDragDropArgs): UseWeekDragDropResul
         // Strip the '-dayN' render suffix to recover the DB id (same rule as
         // WeekViewV2.handleSelectBlock). One-day override, never a rule
         // rewrite — one drag must not move every future occurrence.
-        const routineId = itemId.slice('routine-'.length).replace(/-day\d+$/, '')
-        args.onPushRoutine?.(routineId, newStart)
+        const rendered = itemId.slice('routine-'.length)
+        const dayMatch = rendered.match(/-day(\d+)$/)
+        const routineId = rendered.replace(/-day\d+$/, '')
+        // The suffix is also the only record of which column the block was
+        // dragged FROM. Without it the override lands on whatever day the rest
+        // of the app happens to be viewing, which is how a drag on Thursday
+        // silently rewrote Monday.
+        const fromDate = new Date(args.weekStart)
+        fromDate.setDate(fromDate.getDate() + (dayMatch ? Number(dayMatch[1]) : 0))
+        args.onPushRoutine?.(routineId, newStart, fromDate)
         return
       }
       if (itemId.startsWith('task-')) {

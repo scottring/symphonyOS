@@ -41,6 +41,24 @@ describe('WeekPoolLane', () => {
     expect(screen.queryByText('Placed')).not.toBeInTheDocument()
   })
 
+  it('emits a prefixed id so a pill click opens the task panel', () => {
+    // The host parses "<kind>-<id>" and ignores anything else, so a bare uuid
+    // was a click that did nothing at all.
+    const onSelectItem = vi.fn()
+    render(
+      <DndContext>
+        <WeekPoolLane
+          weekStart={weekStart}
+          dayCount={5}
+          onSelectItem={onSelectItem}
+          tasks={[task({ id: 'a', title: 'Call VW', bucket: 'week' })]}
+        />
+      </DndContext>,
+    )
+    fireEvent.click(screen.getByText('Call VW'))
+    expect(onSelectItem).toHaveBeenCalledWith('task-a')
+  })
+
   it('collapses to a header count and expands on click', () => {
     render(
       <DndContext>

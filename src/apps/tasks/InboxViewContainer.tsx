@@ -35,7 +35,7 @@ export function InboxViewContainer() {
   const { contacts, contactsMap, addContact, searchContacts } = useContacts();
   const { projects, projectsMap, addProject, deleteProject } = useProjects();
   const { routines: allRoutines, updateRoutine, deleteRoutine } = useRoutines();
-  const { markDone, undoDone, skip, reschedule } = useActionableInstances();
+  const { markDone, undoDone, skip, reschedule, undoReschedule } = useActionableInstances();
   const { members: familyMembers, getCurrentUserMember } = useFamilyMembers();
   const { hideEvent } = useHiddenCalendarEvents();
   const { getDomainForCalendar } = useCalendarDomainMappings();
@@ -84,6 +84,7 @@ export function InboxViewContainer() {
     undoDone,
     skip,
     reschedule,
+    undoReschedule,
     refreshDateInstances: () => {},
     pushAction: undo.pushAction,
   });

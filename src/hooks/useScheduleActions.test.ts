@@ -70,6 +70,12 @@ function makeEvent(overrides: Partial<CalendarEvent> = {}): CalendarEvent {
 // Shared mock factory
 // ---------------------------------------------------------------------------
 
+const RESCHEDULE_RESULT = {
+  instanceId: 'instance-1',
+  previousStatus: 'pending' as const,
+  previousDeferredTo: null,
+}
+
 function createMocks() {
   return {
     updateTask: vi.fn(),
@@ -80,7 +86,10 @@ function createMocks() {
     markDone: vi.fn().mockResolvedValue(true),
     undoDone: vi.fn().mockResolvedValue(true),
     skip: vi.fn().mockResolvedValue(true),
-    reschedule: vi.fn().mockResolvedValue(true),
+    // reschedule hands back the instance's PRE-write state so undo can restore
+    // it; null means the write failed.
+    reschedule: vi.fn().mockResolvedValue(RESCHEDULE_RESULT),
+    undoReschedule: vi.fn().mockResolvedValue(true),
     refreshDateInstances: vi.fn(),
     pushAction: vi.fn(),
   }
@@ -115,6 +124,7 @@ function renderActions(
     undoDone: merged.undoDone,
     skip: merged.skip,
     reschedule: merged.reschedule,
+    undoReschedule: merged.undoReschedule,
     refreshDateInstances: merged.refreshDateInstances,
     pushAction: merged.pushAction,
   }
@@ -535,24 +545,51 @@ describe('useScheduleActions', () => {
       expect(mocks.refreshDateInstances).toHaveBeenCalled()
     })
 
-    it('undo calls undoDone and refreshDateInstances', async () => {
-      const viewedDate = new Date('2026-02-19')
-      const { result, mocks } = renderActions({ viewedDate })
+    it('undo restores the instance the reschedule found, not just its status', async () => {
+      // undoDone only resets status, and a same-day retime leaves the status
+      // 'pending' either way — so undoing through it left deferred_to in place
+      // and the routine stayed where the drag put it.
+      const { result, mocks } = renderActions()
 
       await act(async () => {
         await result.current.onPushRoutine('routine-1', new Date('2026-02-21'))
       })
 
       const undoFn = mocks.pushAction.mock.calls[0][1]
-      mocks.undoDone.mockClear()
       mocks.refreshDateInstances.mockClear()
 
       await act(async () => {
         await undoFn()
       })
 
-      expect(mocks.undoDone).toHaveBeenCalledWith('routine', 'routine-1', viewedDate)
+      expect(mocks.undoReschedule).toHaveBeenCalledWith(RESCHEDULE_RESULT)
       expect(mocks.refreshDateInstances).toHaveBeenCalled()
+    })
+
+    it('reschedules off the given fromDate, not the viewed date', async () => {
+      // The week grid drags a block that lives in some other column. Falling
+      // back to viewedDate wrote the override onto the day in view instead.
+      const viewedDate = new Date('2026-02-19')
+      const fromDate = new Date('2026-02-22')
+      const targetDate = new Date('2026-02-22T16:30:00')
+      const { result, mocks } = renderActions({ viewedDate })
+
+      await act(async () => {
+        await result.current.onPushRoutine('routine-1', targetDate, fromDate)
+      })
+
+      expect(mocks.reschedule).toHaveBeenCalledWith('routine', 'routine-1', fromDate, targetDate)
+    })
+
+    it('does not toast or offer undo when the write failed', async () => {
+      const reschedule = vi.fn().mockResolvedValue(null)
+      const { result, mocks } = renderActions({ reschedule })
+
+      await act(async () => {
+        await result.current.onPushRoutine('routine-1', new Date('2026-02-21'))
+      })
+
+      expect(mocks.pushAction).not.toHaveBeenCalled()
     })
   })
 
@@ -734,23 +771,21 @@ describe('useScheduleActions', () => {
       expect(mocks.refreshDateInstances).toHaveBeenCalled()
     })
 
-    it('undo calls undoDone with calendar_event and refreshDateInstances', async () => {
-      const viewedDate = new Date('2026-02-19')
-      const { result, mocks } = renderActions({ viewedDate })
+    it('undo restores the instance the reschedule found', async () => {
+      const { result, mocks } = renderActions()
 
       await act(async () => {
         await result.current.onPushEvent('event-1', new Date('2026-02-21'))
       })
 
       const undoFn = mocks.pushAction.mock.calls[0][1]
-      mocks.undoDone.mockClear()
       mocks.refreshDateInstances.mockClear()
 
       await act(async () => {
         await undoFn()
       })
 
-      expect(mocks.undoDone).toHaveBeenCalledWith('calendar_event', 'event-1', viewedDate)
+      expect(mocks.undoReschedule).toHaveBeenCalledWith(RESCHEDULE_RESULT)
       expect(mocks.refreshDateInstances).toHaveBeenCalled()
     })
   })

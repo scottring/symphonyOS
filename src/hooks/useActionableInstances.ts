@@ -11,6 +11,17 @@ import type {
   ActionableStatus,
 } from '@/types/actionable'
 
+/**
+ * What an instance looked like before a reschedule, so the undo toast can put
+ * it back. Returned instead of a bare boolean because callers were toasting
+ * "Rescheduled" whether or not the write landed.
+ */
+export interface RescheduleResult {
+  instanceId: string
+  previousStatus: ActionableStatus
+  previousDeferredTo: string | null
+}
+
 // Helper to format date as YYYY-MM-DD in local timezone
 function toDateString(date: Date): string {
   const year = date.getFullYear()
@@ -150,6 +161,60 @@ export function useActionableInstances() {
       return Array.from(instanceMap.values())
     } catch (err) {
       console.error('Failed to get instances for date:', err)
+      return []
+    }
+  }, [])
+
+  // Get every instance touching a date range (for the week grid).
+  //
+  // Same two-query shape as getInstancesForDate, widened to a span: a grid that
+  // fetches one day's instances can only honor overrides in one of its seven
+  // columns, so a drag on any other day appears to do nothing.
+  const getInstancesForRange = useCallback(async (
+    start: Date,
+    end: Date
+  ): Promise<ActionableInstance[]> => {
+    try {
+      const { data: { user } } = await getAuthUser()
+      if (!user) return []
+
+      const rangeStart = new Date(start)
+      rangeStart.setHours(0, 0, 0, 0)
+      const rangeEnd = new Date(end)
+      rangeEnd.setHours(23, 59, 59, 999)
+
+      // Query 1: instances originally scheduled inside the range
+      const { data: originalInstances, error: fetchError } = await supabase
+        .from('actionable_instances')
+        .select('*')
+        .gte('date', toDateString(rangeStart))
+        .lte('date', toDateString(rangeEnd))
+
+      if (fetchError) throw fetchError
+
+      // Query 2: instances deferred INTO the range from outside it — a routine
+      // pushed from last Sunday onto this Tuesday belongs to this week now.
+      const { data: deferredInstances, error: deferredError } = await supabase
+        .from('actionable_instances')
+        .select('*')
+        .gte('deferred_to', rangeStart.toISOString())
+        .lte('deferred_to', rangeEnd.toISOString())
+
+      if (deferredError) throw deferredError
+
+      const instanceMap = new Map<string, ActionableInstance>()
+      for (const instance of (originalInstances || [])) {
+        instanceMap.set(instance.id, instance as ActionableInstance)
+      }
+      for (const instance of (deferredInstances || [])) {
+        if (!instanceMap.has(instance.id)) {
+          instanceMap.set(instance.id, instance as ActionableInstance)
+        }
+      }
+
+      return Array.from(instanceMap.values())
+    } catch (err) {
+      console.error('Failed to get instances for range:', err)
       return []
     }
   }, [])
@@ -402,7 +467,7 @@ export function useActionableInstances() {
     entityId: string,
     fromDate: Date,
     toDateTime: Date
-  ): Promise<boolean> => {
+  ): Promise<RescheduleResult | null> => {
     setIsLoading(true)
     setError(null)
 
@@ -438,6 +503,15 @@ export function useActionableInstances() {
 
       if (!instance) throw new Error('Failed to get instance')
 
+      // Captured BEFORE the write so undo can put the instance back exactly as
+      // it was. Resetting status alone is not an undo: a same-day retime leaves
+      // status 'pending' either way, so only deferred_to carries the change.
+      const previous: RescheduleResult = {
+        instanceId: instance.id,
+        previousStatus: instance.status,
+        previousDeferredTo: instance.deferred_to,
+      }
+
       // Determine if we're moving back to the instance's original date
       const toDateStr = toDateString(toDateTime)
       const originalDateStr = instance.date as string
@@ -467,16 +541,37 @@ export function useActionableInstances() {
       }
 
       emitInstancesChanged()
-      return true
+      return previous
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to reschedule'
       setError(message)
       console.error('reschedule error:', err)
-      return false
+      return null
     } finally {
       setIsLoading(false)
     }
   }, [getInstance, getOrCreateInstance])
+
+  // Put an instance back the way reschedule found it. Undo for onPushRoutine /
+  // onPushEvent — see RescheduleResult.
+  const undoReschedule = useCallback(async (previous: RescheduleResult): Promise<boolean> => {
+    try {
+      const { error: updateError } = await supabase
+        .from('actionable_instances')
+        .update({
+          status: previous.previousStatus,
+          deferred_to: previous.previousDeferredTo,
+        })
+        .eq('id', previous.instanceId)
+
+      if (updateError) throw updateError
+      emitInstancesChanged()
+      return true
+    } catch (err) {
+      console.error('undoReschedule error:', err)
+      return false
+    }
+  }, [])
 
   // ============================================================================
   // NOTES
@@ -670,12 +765,14 @@ export function useActionableInstances() {
     getInstance,
     getOrCreateInstance,
     getInstancesForDate,
+    getInstancesForRange,
     // Actions
     markDone,
     undoDone,
     skip,
     defer,
     reschedule,
+    undoReschedule,
     addProgress,
     setProgress,
     // Notes

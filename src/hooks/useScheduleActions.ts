@@ -3,6 +3,7 @@ import type { Task } from '@/types/task'
 import type { FamilyMember } from '@/types/family'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine } from '@/types/actionable'
+import type { RescheduleResult } from '@/hooks/useActionableInstances'
 
 interface UseScheduleActionsDeps {
   tasks: Task[]
@@ -18,7 +19,8 @@ interface UseScheduleActionsDeps {
   markDone: (entityType: 'routine' | 'calendar_event', entityId: string, date: Date, completedAt?: Date) => Promise<boolean>
   undoDone: (entityType: 'routine' | 'calendar_event', entityId: string, date: Date) => Promise<boolean>
   skip: (entityType: 'routine' | 'calendar_event', entityId: string, date: Date) => Promise<boolean>
-  reschedule: (entityType: 'routine' | 'calendar_event', entityId: string, fromDate: Date, toDate: Date) => Promise<boolean>
+  reschedule: (entityType: 'routine' | 'calendar_event', entityId: string, fromDate: Date, toDate: Date) => Promise<RescheduleResult | null>
+  undoReschedule: (previous: RescheduleResult) => Promise<boolean>
   refreshDateInstances: () => void
   pushAction: (message: string, undoFn: () => void) => void
 }
@@ -38,6 +40,7 @@ export function useScheduleActions({
   undoDone,
   skip,
   reschedule,
+  undoReschedule,
   refreshDateInstances,
   pushAction,
 }: UseScheduleActionsDeps) {
@@ -117,17 +120,27 @@ export function useScheduleActions({
     refreshDateInstances()
   }, [allRoutines, viewedDate, skip, undoDone, refreshDateInstances, pushAction])
 
-  const onPushRoutine = useCallback(async (routineId: string, date: Date) => {
-    const routine = allRoutines.find(r => r.id === routineId)
+  /**
+   * Pin a routine to a time on ONE day. `fromDate` is the day the routine is
+   * moving OFF — the week grid knows it from the dragged block's column, and
+   * only a single-day surface can fall back to `viewedDate`. Getting this wrong
+   * writes the override onto whatever day happened to be in view.
+   */
+  const onPushRoutine = useCallback(async (routineId: string, date: Date, fromDate?: Date) => {
+    const bareId = routineId.split('#')[0]
+    const routine = allRoutines.find(r => r.id === bareId)
     const routineName = routine?.name || 'Routine'
 
-    await reschedule('routine', routineId, viewedDate, date)
+    const previous = await reschedule('routine', routineId, fromDate ?? viewedDate, date)
+    // No toast and no undo when the write failed — "Rescheduled" over an
+    // unchanged grid is worse than no feedback at all.
+    if (!previous) return
     pushAction(`Rescheduled "${routineName}"`, async () => {
-      await undoDone('routine', routineId, viewedDate)
+      await undoReschedule(previous)
       refreshDateInstances()
     })
     refreshDateInstances()
-  }, [allRoutines, viewedDate, reschedule, undoDone, refreshDateInstances, pushAction])
+  }, [allRoutines, viewedDate, reschedule, undoReschedule, refreshDateInstances, pushAction])
 
   const onDeleteRoutine = useCallback(async (routineId: string) => {
     await deleteRoutine(routineId)
@@ -161,17 +174,18 @@ export function useScheduleActions({
     refreshDateInstances()
   }, [events, viewedDate, skip, undoDone, refreshDateInstances, pushAction])
 
-  const onPushEvent = useCallback(async (eventId: string, date: Date) => {
+  const onPushEvent = useCallback(async (eventId: string, date: Date, fromDate?: Date) => {
     const event = events.find(e => (e.google_event_id || e.id) === eventId)
     const eventName = event?.title || 'Event'
 
-    await reschedule('calendar_event', eventId, viewedDate, date)
+    const previous = await reschedule('calendar_event', eventId, fromDate ?? viewedDate, date)
+    if (!previous) return
     pushAction(`Rescheduled "${eventName}"`, async () => {
-      await undoDone('calendar_event', eventId, viewedDate)
+      await undoReschedule(previous)
       refreshDateInstances()
     })
     refreshDateInstances()
-  }, [events, viewedDate, reschedule, undoDone, refreshDateInstances, pushAction])
+  }, [events, viewedDate, reschedule, undoReschedule, refreshDateInstances, pushAction])
 
   return {
     onAssignTask,

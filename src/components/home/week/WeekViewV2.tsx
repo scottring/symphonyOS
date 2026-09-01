@@ -13,7 +13,7 @@ import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import { useGoogleCalendar } from '@/hooks/useGoogleCalendar'
 import type { Routine, ActionableInstance } from '@/types/actionable'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
-import { taskToTimelineItem, eventToTimelineItem, routineToTimelineItem } from '@/types/timeline'
+import { taskToTimelineItem, eventToTimelineItem } from '@/types/timeline'
 import { WeekGrid, dayKey } from './WeekGrid'
 import { WeekAllDayChip } from './WeekAllDayChip'
 import { WeekEventBlock } from './WeekEventBlock'
@@ -31,7 +31,8 @@ import { useGatedTaskActions } from '@/hooks/useGatedTaskActions'
 import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
 import { partitionWeekExtras } from '@/lib/week/weekExtras'
 import { unhomedRoutines } from '@/lib/week/unhomedRoutines'
-import { resolveRoutine } from '@/lib/routineUtils'
+import { buildWeekRoutineItems } from './weekRoutineItems'
+import { useWeekInstances } from './useWeekInstances'
 import type { AssigneeFilter } from '@/lib/today/types'
 import type { Layer } from '@/lib/domains'
 
@@ -58,7 +59,7 @@ interface WeekViewV2Props {
   onUpdateRoutine: (routineId: string, updates: Partial<Routine>) => Promise<void> | void
   /** Pin a routine to a time on ONE day (override write, recurrence rule
    *  untouched). Present = routine blocks become draggable. */
-  onPushRoutine?: (routineId: string, when: Date) => void
+  onPushRoutine?: (routineId: string, when: Date, fromDate: Date) => void
   /** Number of day columns. 5 = workweek (Mon-Fri), 7 = full week. Default 7. */
   dayCount?: 5 | 7
   /** From HomeView's useUndo. Called after successful mutations to surface an undo toast. */
@@ -125,7 +126,9 @@ export function WeekViewV2(props: WeekViewV2Props) {
     setRoutinePlace(null)
     if (!routine) return
     if (scope === 'once') {
-      onPushRoutine?.(routine.id, routinePlace.when)
+      // A shelf pill isn't leaving another day — it's landing on this one, so
+      // the day it moves off IS the drop day (a same-day time override).
+      onPushRoutine?.(routine.id, routinePlace.when, routinePlace.when)
       return
     }
     const when = routinePlace.when
@@ -296,12 +299,13 @@ export function WeekViewV2(props: WeekViewV2Props) {
 
   useEffect(() => onHideRoutinesChange(setHideRoutines), [])
 
-  // Convert to TimelineItems for grid rendering.
-  // Routines are expanded into 7 day-instances (render-only; WeekEventBlock
-  // sets disabled:true for isRoutine so they never become drag sources).
-  // Keys for routine day-instances are suffixed with the day-index to avoid
-  // duplicate-key warnings from routineToTimelineItem returning the same id
-  // for every day.
+  // Instance-level overrides for the whole visible week — what a drag on this
+  // grid writes. The container's `dateInstances` covers one column only.
+  const weekInstances = useWeekInstances(weekStart, dayCount)
+
+  // Convert to TimelineItems for grid rendering. Routine expansion (one item
+  // per day column, with any instance-level override applied) lives in
+  // buildWeekRoutineItems.
   // Dinner + Specials events leave the time grid (This Week redesign):
   // dinners render in the grid's dinner row, specials fold into the same
   // day's School block subtitle (or stay grid material without one).
@@ -325,19 +329,14 @@ export function WeekViewV2(props: WeekViewV2Props) {
         eventItems.push(...entries.map((e) => eventToTimelineItem(e.event)))
       }
     }
-    // One rule for routine visibility, shared with Today and the wall. Rung 2
-    // is evaluated per day below, so the pool here is resolved per date rather
-    // than once for the week.
-    const routineItems = routines.flatMap((r) =>
-      Array.from({ length: dayCount }, (_, i) => {
-        const d = new Date(weekStart)
-        d.setDate(d.getDate() + i)
-        if (!resolveRoutine(r, { date: d, member: selectedAssignees, prefs: { hideRoutines, layers } }).shows) {
-          return null
-        }
-        return { ...routineToTimelineItem(r, d), id: `routine-${r.id}-day${i}` }
-      }).filter((item): item is NonNullable<typeof item> => item !== null),
-    )
+    const routineItems = buildWeekRoutineItems({
+      routines,
+      weekStart,
+      dayCount,
+      instances: weekInstances,
+      member: selectedAssignees,
+      prefs: { hideRoutines, layers },
+    })
 
     const blocks = [...taskItems, ...eventItems, ...routineItems]
 
@@ -371,7 +370,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
     }
 
     return blocks
-  }, [scheduledTasks, extras, routines, weekStart, hideRoutines, dayCount, drag.activeDragId, tasks, events, selectedAssignees, layers])
+  }, [scheduledTasks, extras, routines, weekStart, weekInstances, hideRoutines, dayCount, drag.activeDragId, tasks, events, selectedAssignees, layers])
 
   // Run the lane-placement pass over allItems. Items with a startTime outside
   // the visible week range are filtered out by layoutWeekLanes (dayIdx check).

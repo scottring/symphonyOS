@@ -46,7 +46,7 @@ interface CascadingRiverViewProps {
   onAssignRoutine?: (routineId: string, memberId: string | null) => void
   onCompleteRoutine?: (routineId: string, completed: boolean) => void
   onSkipRoutine?: (routineId: string) => void
-  onPushRoutine?: (routineId: string, date: Date) => void
+  onPushRoutine?: (routineId: string, date: Date, fromDate?: Date) => void
   onCompleteEvent?: (eventId: string, completed: boolean) => void
   onSkipEvent?: (eventId: string) => void
   onPushEvent?: (eventId: string, date: Date) => void
