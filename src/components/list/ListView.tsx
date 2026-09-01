@@ -110,7 +110,7 @@ export function ListView({
           </div>
 
           {isEditing ? (
-            <div className="bg-purple-50 rounded-xl p-4 border border-purple-100">
+            <div className="bg-primary-50 rounded-xl p-4 border border-primary-100">
               <div className="space-y-3">
                 <div className="flex gap-3">
                   <div className="flex-1">
@@ -120,7 +120,7 @@ export function ListView({
                       value={editTitle}
                       onChange={(e) => setEditTitle(e.target.value)}
                       className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-200 bg-white
-                                 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                       autoFocus
                     />
                   </div>
@@ -132,7 +132,7 @@ export function ListView({
                       onChange={(e) => setEditIcon(e.target.value)}
                       placeholder={getCategoryIcon(editCategory)}
                       className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-200 bg-white text-center
-                                 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                                 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                     />
                   </div>
                 </div>
@@ -147,7 +147,7 @@ export function ListView({
                         onClick={() => setEditCategory(category)}
                         className={`px-3 py-1 text-xs rounded-lg transition-colors ${
                           editCategory === category
-                            ? 'bg-purple-100 text-purple-700 font-medium'
+                            ? 'bg-primary-100 text-primary-700 font-medium'
                             : 'bg-white text-neutral-600 hover:bg-neutral-100 border border-neutral-200'
                         }`}
                       >
@@ -176,7 +176,7 @@ export function ListView({
                       onClick={() => setEditVisibility('family')}
                       className={`flex-1 py-2 px-3 text-sm font-medium border-l border-neutral-200 transition-colors
                         ${editVisibility === 'family'
-                          ? 'bg-purple-100 text-purple-700'
+                          ? 'bg-primary-100 text-primary-700'
                           : 'bg-white text-neutral-500 hover:bg-neutral-50'
                         }`}
                     >
@@ -195,7 +195,7 @@ export function ListView({
                   <button
                     onClick={handleSave}
                     disabled={!editTitle.trim()}
-                    className="flex-1 py-2 px-3 text-sm font-medium text-white bg-purple-500 rounded-lg hover:bg-purple-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex-1 py-2 px-3 text-sm font-medium text-white bg-primary-500 rounded-lg hover:bg-primary-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Save
                   </button>
@@ -205,13 +205,13 @@ export function ListView({
           ) : (
             <div className="flex items-start justify-between">
               <div className="flex items-start gap-3">
-                <div className="w-12 h-12 rounded-full bg-purple-100 flex items-center justify-center text-2xl flex-shrink-0">
+                <div className="w-12 h-12 rounded-full bg-primary-100 flex items-center justify-center text-2xl flex-shrink-0">
                   {list.icon || getCategoryIcon(list.category)}
                 </div>
                 <div>
                   <h1 className="text-xl font-semibold text-neutral-800">{list.title}</h1>
                   <div className="flex items-center gap-2 mt-1">
-                    <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-purple-100 text-purple-700">
+                    <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium rounded-full bg-primary-100 text-primary-700">
                       {getCategoryLabel(list.category)}
                     </span>
                     {list.visibility === 'family' && (
@@ -251,7 +251,7 @@ export function ListView({
                 )}
                 <button
                   onClick={handleEdit}
-                  className="p-2 text-neutral-400 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                  className="p-2 text-neutral-400 hover:text-primary-600 hover:bg-primary-50 rounded-lg transition-colors"
                   aria-label="Edit list"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
@@ -304,7 +304,7 @@ export function ListView({
           {/* Add item input */}
           {onAddItem && (
             <form onSubmit={handleAddItem} className="mb-4">
-              <div className="flex items-center gap-2 pl-3 pr-4 py-2 rounded-xl border border-dashed border-neutral-200 bg-neutral-50/50 hover:border-neutral-300 focus-within:border-purple-300 focus-within:bg-white transition-colors">
+              <div className="flex items-center gap-2 pl-3 pr-4 py-2 rounded-xl border border-dashed border-neutral-200 bg-neutral-50/50 hover:border-neutral-300 focus-within:border-primary-300 focus-within:bg-white transition-colors">
                 <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-neutral-300" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
                 </svg>
@@ -318,7 +318,7 @@ export function ListView({
                 {newItemText.trim() && (
                   <button
                     type="submit"
-                    className="px-3 py-1 text-xs font-medium text-white bg-purple-500 rounded-lg hover:bg-purple-600 transition-colors"
+                    className="px-3 py-1 text-xs font-medium text-white bg-primary-500 rounded-lg hover:bg-primary-600 transition-colors"
                   >
                     Add
                   </button>

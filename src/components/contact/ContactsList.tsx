@@ -1,11 +1,14 @@
 import { useState, useMemo } from 'react'
 import { PAGE_COLUMN } from '@/components/layout/pageLayout'
+import { PageMasthead, QuietAction } from '@/components/layout/PageMasthead'
+import { Plus } from 'lucide-react'
 import type { Contact, ContactCategory } from '@/types/contact'
 
 interface ContactsListProps {
   contacts: Contact[]
   onSelectContact: (contactId: string) => void
-  onBack: () => void
+  /** Kept for call-site compatibility; the masthead no longer renders a back arrow. */
+  onBack?: () => void
   onAddContact: (data: { name: string; category?: ContactCategory }) => Promise<Contact | null>
   onDeleteContact: (id: string) => Promise<void>
 }
@@ -22,7 +25,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 const CATEGORY_ORDER = ['family', 'friend', 'professional', 'school', 'medical', 'service_provider', 'other']
 
-export function ContactsList({ contacts, onSelectContact, onBack, onAddContact }: ContactsListProps) {
+export function ContactsList({ contacts, onSelectContact, onAddContact }: ContactsListProps) {
   const [search, setSearch] = useState('')
   const [adding, setAdding] = useState(false)
   const [newName, setNewName] = useState('')
@@ -58,27 +61,13 @@ export function ContactsList({ contacts, onSelectContact, onBack, onAddContact }
 
   return (
     <div className={PAGE_COLUMN}>
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={onBack}
-            className="p-1.5 rounded-lg hover:bg-neutral-100 text-neutral-500 transition-colors"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
-            </svg>
-          </button>
-          <h1 className="text-2xl font-display font-bold text-neutral-900">Contacts</h1>
-          <span className="text-sm text-neutral-400 font-medium">{contacts.length}</span>
-        </div>
-        <button
-          onClick={() => setAdding(true)}
-          className="btn-primary px-3 py-1.5 text-sm rounded-lg"
-        >
-          + Add
-        </button>
-      </div>
+      {/* Header — shared Library masthead (design-unification 2026-09-01).
+          The back arrow died with it: Contacts is a page, not a drill-in. */}
+      <PageMasthead
+        title="Contacts"
+        description={`${contacts.length} people and places the household calls on`}
+        actions={<QuietAction icon={Plus} label="Add" ariaLabel="Add a contact" onClick={() => setAdding(true)} />}
+      />
 
       {/* Add form */}
       {adding && (

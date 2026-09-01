@@ -273,8 +273,8 @@ export function RhythmPage(props: RhythmPageProps) {
                 const created = await onCreateCollection('New routine')
                 if (created) setOpen({ kind: 'standalone-step', id: created.id })
               }}
-              className="flex items-center gap-2 rounded-xl bg-amber-500 px-4 py-2.5 font-medium text-white
-                         shadow-sm hover:bg-amber-600 active:bg-amber-700 transition-colors">
+              className="flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 font-medium text-white
+                         shadow-sm hover:bg-primary-700 active:bg-primary-800 transition-colors">
               <Plus className="w-5 h-5" />
               New routine
             </button>
@@ -321,7 +321,7 @@ export function RhythmPage(props: RhythmPageProps) {
                 const created = await onCreateCollection('New routine')
                 if (created) setOpen({ kind: 'standalone-step', id: created.id })
               }}
-              className="inline-flex items-center gap-2 rounded-xl bg-amber-500 px-5 py-2.5 font-medium text-white
+              className="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-5 py-2.5 font-medium text-white
                          shadow-sm hover:bg-amber-600 transition-colors">
               <Plus className="h-5 w-5" />
               Create your first routine

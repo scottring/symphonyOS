@@ -1,3 +1,4 @@
+import { PageMasthead } from '@/components/layout/PageMasthead'
 import { useState, useMemo } from 'react'
 import type { Task } from '@/types/task'
 import type { Contact } from '@/types/contact'
@@ -8,7 +9,8 @@ interface CompletedTasksViewProps {
   contactsMap: Map<string, Contact>
   projectsMap: Map<string, Project>
   onSelectTask: (taskId: string) => void
-  onBack: () => void
+  /** Kept for call-site compatibility; the masthead no longer renders Back. */
+  onBack?: () => void
 }
 
 // Group tasks by month
@@ -59,7 +61,6 @@ export function CompletedTasksView({
   contactsMap,
   projectsMap,
   onSelectTask,
-  onBack,
 }: CompletedTasksViewProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [visibleMonths, setVisibleMonths] = useState(3)
@@ -104,34 +105,12 @@ export function CompletedTasksView({
   return (
     <div className="h-full overflow-auto">
       <div className="p-6 max-w-2xl mx-auto">
-        {/* Header */}
-        <div className="mb-6">
-          <div className="flex items-center gap-2 mb-4">
-            <button
-              onClick={onBack}
-              className="flex items-center gap-1 text-sm text-neutral-500 hover:text-neutral-700 transition-colors"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
-              </svg>
-              Back
-            </button>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-primary-100 flex items-center justify-center text-primary-600">
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
-              </svg>
-            </div>
-            <div>
-              <h1 className="font-display text-2xl font-semibold text-neutral-900">History</h1>
-              <p className="text-sm text-neutral-500">
-                {completedTasks.length} completed task{completedTasks.length !== 1 ? 's' : ''}
-              </p>
-            </div>
-          </div>
-        </div>
+        {/* Header — shared Library masthead (design-unification 2026-09-01).
+            The Back link and icon medallion died with it: History is a page. */}
+        <PageMasthead
+          title="History"
+          description={`${completedTasks.length} completed task${completedTasks.length !== 1 ? 's' : ''}`}
+        />
 
         {/* Search */}
         <div className="mb-6">

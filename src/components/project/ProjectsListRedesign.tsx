@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { PAGE_COLUMN } from '@/components/layout/pageLayout'
+import { PageMasthead, QuietAction } from '@/components/layout/PageMasthead'
+import { Plus } from 'lucide-react'
 import type { Project } from '@/types/project'
 import type { Task } from '@/types/task'
 
@@ -197,35 +199,16 @@ export function ProjectsListRedesign({ projects, loading = false, tasks = [], on
       <div className="absolute top-0 left-0 right-0 h-48 bg-gradient-to-b from-primary-50/50 to-transparent pointer-events-none" />
 
       <div className={`relative ${PAGE_COLUMN}`}>
-        {/* Header */}
-        <div className="flex items-start justify-between mb-8">
-          <div>
-            <h1 className="font-display text-3xl font-semibold text-neutral-800 tracking-tight">
-              Projects
-            </h1>
-            <p className="text-sm text-neutral-500 mt-1">
-              {projects.length} project{projects.length !== 1 ? 's' : ''}
-            </p>
-          </div>
-
-          {!isCreating && (
-            <div className="flex gap-2">
-              {onAddProject && (
-                <button
-                  onClick={() => setIsCreating(true)}
-                  className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl font-medium
-                             hover:from-primary-600 hover:to-primary-700 active:from-primary-700 active:to-primary-800 transition-all shadow-sm
-                             hover:shadow-md"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
-                  </svg>
-                  New Project
-                </button>
-              )}
-            </div>
-          )}
-        </div>
+        {/* Header — the shared Library masthead (design-unification 2026-09-01) */}
+        <PageMasthead
+          title="Projects"
+          description={`${projects.length} project${projects.length !== 1 ? 's' : ''}`}
+          actions={
+            !isCreating && onAddProject ? (
+              <QuietAction icon={Plus} label="New" ariaLabel="New project" onClick={() => setIsCreating(true)} />
+            ) : undefined
+          }
+        />
 
         {/* Inline project creation form */}
         {isCreating && (
