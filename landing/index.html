@@ -4,12 +4,11 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Symphony — The operating system for your household</title>
-<meta name="description" content="Symphony knows what's happening in your household, what needs to happen, and who needs to do it — so nobody has to be the messenger.">
+<meta name="description" content="What to do, when to do it, what you need to do it, how to do it — Symphony holds all of it, for the whole household.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,wght@0,400;0,600;0,700;1,400&family=Source+Sans+3:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,wght@0,400;0,600;1,400&family=Source+Sans+3:wght@400;500;600;700&display=swap">
 <style>
   :root {
-    /* Lifted from the app itself (src/index.css) — the landing IS the product's face. */
     --bg: hsl(45 25% 96%);
     --bg-elevated: hsl(48 35% 99%);
     --ink: hsl(25 18% 15%);
@@ -19,252 +18,226 @@
     --line: hsl(40 18% 88%);
     --primary: hsl(168 45% 30%);
     --primary-deep: hsl(168 50% 24%);
-    --primary-wash: hsl(168 30% 96%);
-    --primary-soft: hsl(168 28% 90%);
-    --accent: hsl(18 55% 45%);
-    --cream-band: hsl(45 65% 92%);
-    --lavender: hsl(271 60% 92%);
-    --lavender-ink: hsl(271 50% 30%);
-    --meal: hsl(28 55% 90%);
-    --meal-ink: hsl(14 45% 35%);
+    --board: hsl(168 50% 12%);
+    --card: hsl(168 40% 18%);
+    --card-lit: hsl(45 60% 92%);
     --serif: 'Source Serif 4', Georgia, serif;
     --sans: 'Source Sans 3', system-ui, -apple-system, sans-serif;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { background: var(--bg); color: var(--ink); font-family: var(--sans); font-size: 17px; line-height: 1.6; -webkit-font-smoothing: antialiased; }
-  .container { max-width: 880px; margin: 0 auto; padding: 0 24px; }
-  section { padding: 72px 0; }
-  h1, h2, h3 { font-family: var(--serif); font-weight: 600; color: var(--ink); line-height: 1.15; }
-  a { color: var(--primary-deep); }
+  .container { max-width: 1060px; margin: 0 auto; padding: 0 24px; }
 
-  /* ---- Hero ---- */
-  .hero { padding: 96px 0 64px; text-align: center; }
-  .badge { display: inline-block; font-size: 13px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--primary-deep); background: var(--primary-soft); border-radius: 999px; padding: 6px 14px; margin-bottom: 28px; }
-  .hero h1 { font-size: clamp(38px, 6vw, 58px); max-width: 720px; margin: 0 auto 20px; }
-  .hero h1 em { font-style: italic; font-weight: 400; }
-  .hero .sub { font-size: 20px; color: var(--ink-soft); max-width: 620px; margin: 0 auto 36px; }
-  .cta-row { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
-  .btn { display: inline-flex; align-items: center; gap: 8px; border-radius: 12px; padding: 13px 24px; font-size: 16px; font-weight: 600; text-decoration: none; transition: all .15s; }
-  .btn-primary { background: var(--primary-deep); color: #fff; box-shadow: 0 1px 3px hsl(22 22% 10% / .15); }
-  .btn-primary:hover { background: var(--primary); }
-  .btn-quiet { color: var(--primary-deep); }
-  .btn-quiet:hover { background: var(--primary-wash); }
-  .hero .fine { font-size: 13.5px; color: var(--faint); margin-top: 18px; }
+  .top { display: flex; align-items: center; justify-content: space-between; padding: 20px 0; }
+  .wordmark { font-family: var(--serif); font-weight: 600; font-size: 21px; }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: 12px; padding: 12px 22px; font-size: 15.5px; font-weight: 600; text-decoration: none; background: var(--primary-deep); color: #fff; transition: background .15s; }
+  .btn:hover { background: var(--primary); }
 
-  /* ---- Problem ---- */
-  .problem { border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); background: var(--bg-elevated); text-align: center; padding: 56px 0; }
-  .problem p { font-family: var(--serif); font-size: clamp(21px, 3vw, 27px); line-height: 1.45; color: var(--ink-soft); max-width: 700px; margin: 0 auto; }
-  .problem strong { color: var(--ink); font-weight: 600; }
+  /* ---------- Split-flap board ---------- */
+  .hero { text-align: center; padding: 52px 0 0; }
+  .board-wrap { display: flex; justify-content: center; overflow-x: auto; }
+  .board { background: var(--board); border-radius: 14px; padding: 22px 22px 18px; box-shadow: 0 14px 50px hsl(168 50% 12% / .35), inset 0 1px 0 hsl(168 30% 30%); }
+  .row { display: flex; gap: 4px; justify-content: center; }
+  .flap {
+    position: relative; width: 34px; height: 48px; border-radius: 5px;
+    background: linear-gradient(hsl(168 38% 21%), var(--card) 48%, hsl(168 44% 15%) 52%, hsl(168 42% 17%));
+    color: var(--card-lit);
+    font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+    font-size: 27px; font-weight: 700; line-height: 48px; text-align: center;
+    overflow: hidden;
+  }
+  .flap::after { content: ''; position: absolute; left: 0; right: 0; top: 50%; height: 1.5px; background: hsl(168 55% 8%); }
+  .flap.blank { color: transparent; }
+  .flap.frozen {
+    background: linear-gradient(hsl(45 65% 95%), var(--card-lit) 48%, hsl(45 45% 82%) 52%, hsl(45 55% 88%));
+    color: var(--primary-deep);
+  }
+  .flap.frozen::after { background: hsl(40 30% 70%); }
+  .flap.tick { animation: tick 90ms ease-in; }
+  @keyframes tick { 0% { transform: scaleY(1); } 50% { transform: scaleY(.15); filter: brightness(1.5); } 100% { transform: scaleY(1); } }
+  @media (prefers-reduced-motion: reduce) { .flap.tick { animation: none; } }
+  @media (max-width: 900px) {
+    .flap { width: 22px; height: 32px; font-size: 17px; line-height: 32px; border-radius: 4px; }
+    .board { padding: 14px; }
+  }
 
-  /* ---- Loop steps ---- */
-  .kicker { font-size: 12.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); margin-bottom: 10px; }
-  .loop h2 { font-size: clamp(28px, 4vw, 38px); margin-bottom: 40px; }
-  .steps { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 20px; }
-  @media (max-width: 760px) { .steps { grid-template-columns: 1fr; } }
-  .step { background: var(--bg-elevated); border: 1px solid var(--line); border-radius: 16px; padding: 26px 24px; }
-  .step .num { font-family: var(--serif); font-style: italic; font-size: 15px; color: var(--faint); }
-  .step h3 { font-size: 21px; margin: 6px 0 10px; }
-  .step p { font-size: 15.5px; color: var(--muted); }
+  .hero .sub { font-size: 20px; color: var(--ink-soft); margin: 30px auto 26px; max-width: 560px; }
+  .hero .sub strong { color: var(--ink); }
+  .fine { font-size: 13.5px; color: var(--faint); margin-top: 14px; }
 
-  /* ---- Week vignette ---- */
-  .vignette { background: var(--bg-elevated); border: 1px solid var(--line); border-radius: 16px; padding: 18px; margin-top: 44px; box-shadow: 0 8px 30px hsl(22 22% 10% / .06); overflow-x: auto; }
-  .v-cap { font-size: 13px; color: var(--faint); text-align: center; margin-top: 14px; }
-  .v-grid { min-width: 620px; display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
-  .v-day { font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); text-align: center; padding-bottom: 6px; }
-  .v-col { display: flex; flex-direction: column; gap: 6px; }
-  .v-dinner { background: hsl(28 55% 90% / .4); color: var(--meal-ink); font-size: 12px; border-radius: 8px; padding: 5px 9px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .v-school { background: var(--lavender); color: var(--lavender-ink); border-radius: 10px; padding: 7px 10px 26px; font-size: 12.5px; font-weight: 600; }
-  .v-school small { display: block; font-weight: 400; opacity: .75; font-size: 11px; }
-  .v-task { background: #fff; border: 1px solid hsl(142 30% 78%); color: hsl(142 50% 25%); font-weight: 600; font-size: 12px; border-radius: 8px; padding: 5px 9px; }
-  .v-quiet { background: hsl(45 65% 92% / .75); color: hsl(38 25% 42%); font-size: 11.5px; border-radius: 7px; padding: 4px 9px; }
-  .v-event { background: var(--lavender); color: var(--lavender-ink); font-size: 12px; font-weight: 600; border-radius: 8px; padding: 5px 9px; }
+  /* ---------- The screen ---------- */
+  .stage { padding: 64px 0 40px; }
+  .tv { background: hsl(20 15% 10%); border-radius: 18px; padding: 16px; box-shadow: 0 30px 90px hsl(22 22% 10% / .3); }
+  .tv-screen { background: var(--bg); border-radius: 8px; padding: 22px 26px; }
+  .tv-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 16px; }
+  .tv-head .date { font-family: var(--serif); font-weight: 600; font-size: 24px; }
+  .tv-head .wx { font-size: 13px; color: var(--muted); }
+  .lane { background: var(--bg-elevated); border-radius: 12px; padding: 11px 16px; display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; border-left: 4px solid var(--primary); }
+  .lane .who { font-weight: 700; font-size: 15.5px; }
+  .lane .what { font-size: 14.5px; color: var(--ink-soft); }
+  .lane.l2 { border-left-color: hsl(18 55% 45%); }
+  .lane.l3 { border-left-color: hsl(271 50% 55%); }
+  .lane.l4 { border-left-color: hsl(200 50% 45%); }
+  .lane.meal { border-left-color: transparent; background: hsl(28 55% 90% / .5); }
+  .lane.meal .who, .lane.meal .what { color: hsl(14 45% 35%); }
+  .stage .cap { text-align: center; font-size: 13.5px; color: var(--faint); margin-top: 18px; }
 
-  /* ---- Principles ---- */
-  .principles { background: var(--bg-elevated); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
-  .principles h2 { font-size: clamp(28px, 4vw, 38px); margin-bottom: 40px; }
-  .prin { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 28px; }
-  @media (max-width: 760px) { .prin { grid-template-columns: 1fr; } }
-  .prin h3 { font-size: 20px; margin-bottom: 8px; }
-  .prin p { font-size: 15.5px; color: var(--muted); }
-
-  /* ---- Founding ---- */
-  .founding { text-align: center; }
-  .founding h2 { font-size: clamp(28px, 4vw, 38px); margin-bottom: 14px; }
-  .founding .sub { color: var(--ink-soft); max-width: 640px; margin: 0 auto 34px; }
-  .offer { background: var(--bg-elevated); border: 1px solid var(--line); border-radius: 20px; max-width: 520px; margin: 0 auto; padding: 34px 30px; box-shadow: 0 8px 30px hsl(22 22% 10% / .06); }
-  .offer .price { font-family: var(--serif); font-size: 44px; font-weight: 600; }
-  .offer .price small { font-size: 17px; color: var(--muted); font-family: var(--sans); font-weight: 500; }
-  .offer ul { list-style: none; text-align: left; margin: 22px 0 26px; }
-  .offer li { padding: 7px 0 7px 28px; position: relative; font-size: 15.5px; color: var(--ink-soft); }
-  .offer li::before { content: ''; position: absolute; left: 4px; top: 14px; width: 7px; height: 7px; border-radius: 99px; background: var(--primary); }
-  .founding .fine { font-size: 13.5px; color: var(--faint); margin-top: 20px; }
-  .maple { margin-top: 40px; font-size: 15px; color: var(--muted); }
-
-  footer { border-top: 1px solid var(--line); padding: 36px 0 48px; text-align: center; font-size: 13.5px; color: var(--faint); }
-  footer p + p { margin-top: 6px; }
+  /* ---------- Founding ---------- */
+  .founding { text-align: center; padding: 56px 0 72px; border-top: 1px solid var(--line); margin-top: 40px; }
+  .founding h2 { font-family: var(--serif); font-weight: 600; font-size: 30px; margin-bottom: 10px; }
+  .founding p { color: var(--ink-soft); max-width: 520px; margin: 0 auto 24px; }
+  footer { border-top: 1px solid var(--line); padding: 30px 0 42px; text-align: center; font-size: 13.5px; color: var(--faint); }
 </style>
 </head>
 <body>
 
+<div class="container">
+  <div class="top">
+    <div class="wordmark">Symphony</div>
+    <a class="btn" href="mailto:hello@symphony-os.com?subject=Founding%20household">Become a founding household</a>
+  </div>
+</div>
+
 <section class="hero">
   <div class="container">
-    <div class="badge">Founding households now onboarding</div>
-    <h1>The operating system<br>for your <em>household.</em></h1>
-    <p class="sub">
-      Symphony knows what's happening, what needs to happen, and who needs
-      to do it — so the school emails get read, the week assembles itself,
-      and nobody has to be the one who reminds.
-    </p>
-    <div class="cta-row">
-      <a class="btn btn-primary" href="mailto:hello@symphony-os.com?subject=Founding%20household">Become a founding household</a>
-      <a class="btn btn-quiet" href="#how">See how it works</a>
+    <div class="board-wrap">
+      <div class="board" id="board" aria-label="What to do, when to do it, what you need to do it, how to do it"></div>
     </div>
-    <p class="fine">Hand-onboarded, one household at a time.</p>
+    <p class="sub">Symphony holds all of it — <strong>for the whole household.</strong></p>
+    <a class="btn" href="mailto:hello@symphony-os.com?subject=Founding%20household">Become a founding household</a>
+    <p class="fine">Ten households. Hand-onboarded. $25/mo, locked for life.</p>
   </div>
 </section>
 
-<section class="problem">
+<section class="stage">
   <div class="container">
-    <p>
-      You already pay for the calendar, the chore app, the grocery list, the
-      meal planner — and you're still the one turning <strong>400 school
-      emails and twelve apps</strong> into who-does-what. The tools hold
-      information. <strong>Somebody still has to run it.</strong>
-    </p>
+    <div class="tv">
+      <div class="tv-screen">
+        <div class="tv-head">
+          <div class="date">Tuesday, March 3</div>
+          <div class="wx">72° Clear · Updated just now</div>
+        </div>
+        <div class="lane"><span class="who">Sam</span><span class="what">Pickup 3:15 · soccer gear in the car</span></div>
+        <div class="lane l2"><span class="who">Jess</span><span class="what">Track night 6:30 · Sam covers bedtime</span></div>
+        <div class="lane l3"><span class="who">Liam</span><span class="what">Library day · piano 4:00</span></div>
+        <div class="lane l4"><span class="who">Mia</span><span class="what">Picture day — payment in backpack</span></div>
+        <div class="lane meal"><span class="who">Dinner</span><span class="what">Salmon, potatoes, broccoli — pan's on the list</span></div>
+      </div>
+    </div>
+    <p class="cap">The kitchen wall: everyone's day, the dinner, the things to bring — nobody has to ask.</p>
   </div>
 </section>
 
-<section class="loop" id="how">
+<section class="founding">
   <div class="container">
-    <div class="kicker">How it works</div>
-    <h2>Everything in. One picture out.<br>The whole house on the same page.</h2>
-    <div class="steps">
-      <div class="step">
-        <div class="num">i.</div>
-        <h3>It gathers</h3>
-        <p>Forward the school email. Snap a photo of the paper plan on the
-           counter. Connect the calendars. Say it out loud. Symphony reads
-           all of it — nothing gets retyped.</p>
-      </div>
-      <div class="step">
-        <div class="num">ii.</div>
-        <h3>It assembles</h3>
-        <p>The week builds itself: dinners on their own row, school specials
-           folded into the school day, routines as quiet rhythm — so the
-           things that actually need a decision stand out.</p>
-      </div>
-      <div class="step">
-        <div class="num">iii.</div>
-        <h3>Everyone executes</h3>
-        <p>Today on every phone, the week on the kitchen wall. Information
-           stops traveling person-to-person — the house itself knows, so
-           nobody has to be the messenger.</p>
-      </div>
-    </div>
-
-    <div class="vignette" aria-label="A sample of Symphony's week view">
-      <div class="v-grid">
-        <div>
-          <div class="v-day">Mon</div>
-          <div class="v-col">
-            <div class="v-dinner">Salmon + potatoes</div>
-            <div class="v-school">School — Liam &amp; Mia<small>Liam: Library · Mia: Art</small></div>
-            <div class="v-task">RSVP: birthday party</div>
-            <div class="v-quiet">Kitchen reset</div>
-          </div>
-        </div>
-        <div>
-          <div class="v-day">Tue</div>
-          <div class="v-col">
-            <div class="v-dinner">Grilled cheese night</div>
-            <div class="v-school">School — Liam &amp; Mia<small>Liam: PE · Mia: Music</small></div>
-            <div class="v-event">Piano — Mia</div>
-            <div class="v-quiet">Kids shower routine</div>
-          </div>
-        </div>
-        <div>
-          <div class="v-day">Wed</div>
-          <div class="v-col">
-            <div class="v-dinner">Tacos</div>
-            <div class="v-school">School — Liam &amp; Mia<small>Picture day — bring payment</small></div>
-            <div class="v-task">Pack picture-day outfit</div>
-            <div class="v-quiet">Kitchen reset</div>
-          </div>
-        </div>
-        <div>
-          <div class="v-day">Thu</div>
-          <div class="v-col">
-            <div class="v-dinner">Pasta night</div>
-            <div class="v-school">School — Liam &amp; Mia<small>Liam: Music · Mia: Gym</small></div>
-            <div class="v-event">Soccer — Liam</div>
-            <div class="v-quiet">Trash &amp; recycling</div>
-          </div>
-        </div>
-      </div>
-      <p class="v-cap">The week, assembled: meals on their row, school details where they belong, routines quiet, decisions loud. Sample data.</p>
-    </div>
-  </div>
-</section>
-
-<section class="principles">
-  <div class="container">
-    <div class="kicker">Built different</div>
-    <h2>Three things we refuse to build.</h2>
-    <div class="prin">
-      <div>
-        <h3>No household manager</h3>
-        <p>Most family apps quietly assume one person holds the plan and
-           distributes it. Symphony is built for two adults with equal
-           responsibility — nothing routes through a person, and there are
-           no scoreboards keeping count.</p>
-      </div>
-      <div>
-        <h3>No fake autopilot</h3>
-        <p>We won't pretend software should decide your family's priorities.
-           The clerical work — reading, retyping, reminding — goes to zero.
-           The Sunday sit-down stays, and finally has everything it needs in
-           one place.</p>
-      </div>
-      <div>
-        <h3>No feature museum</h3>
-        <p>Not another everything-app for families. One promise — Symphony
-           knows what's going on in your household — and every screen exists
-           to make that true.</p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<section class="founding" id="founding">
-  <div class="container">
-    <div class="kicker">Limited to ten households</div>
-    <h2>Become a founding household.</h2>
-    <p class="sub">
-      We set Symphony up with you, around how your household actually runs —
-      your calendars, your school's emails, your Sunday ritual. You get a
-      direct line to the people building it.
-    </p>
-    <div class="offer">
-      <div class="price">$25<small>/month, founding rate — locked for life</small></div>
-      <ul>
-        <li>Hand-onboarded: we set up your calendars, school email digest, routines and meals with you</li>
-        <li>One price for the whole household — never per person</li>
-        <li>Every phone, plus an always-on kitchen display if you want one</li>
-        <li>Your requests shape what gets built next</li>
-      </ul>
-      <a class="btn btn-primary" href="mailto:hello@symphony-os.com?subject=Founding%20household" style="width:100%; justify-content:center;">Email us to start</a>
-    </div>
-    <p class="fine">Standard pricing will be $99/year when doors open.</p>
-    <p class="maple">Coming from <strong>Maple</strong> before it shuts down? We'll move your household over with you — mention it in your note.</p>
+    <h2>Founding households, now onboarding.</h2>
+    <p>We set it up with you — your calendars, your school's emails, your week. Coming from Maple? We'll move you over.</p>
+    <a class="btn" href="mailto:hello@symphony-os.com?subject=Founding%20household">hello@symphony-os.com</a>
   </div>
 </section>
 
 <footer>
   <div class="container">
-    <p>&copy; 2026 Symphony. Everything in its right place.</p>
-    <p>Your household's data belongs to your household — private by default, shared only with the people you invite.</p>
+    <p>&copy; 2026 Symphony. Your household's data belongs to your household.</p>
   </div>
 </footer>
+
+<script>
+// Split-flap departure board. "TO-DO" is frozen in cream; the fields around
+// it flap through the phrases and settle, like a platform board finding its
+// destination. One rAF engine drives every cell — no timer storms.
+(function () {
+  var PRE_W = 13, SUF_W = 2;
+  var FROZEN = 'TO-DO';
+  var PHRASES = [
+    { pre: '',              suf: ''   },
+    { pre: 'WHEN',          suf: 'IT' },
+    { pre: 'WHAT YOU NEED', suf: 'IT' },
+    { pre: 'WHERE',         suf: 'IT' },
+    { pre: 'HOW',           suf: 'IT' },
+  ];
+  var CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  var board = document.getElementById('board');
+  var row = document.createElement('div');
+  row.className = 'row';
+  board.appendChild(row);
+
+  function makeCell(frozenChar) {
+    var el = document.createElement('span');
+    el.className = 'flap' + (frozenChar ? ' frozen' : ' blank');
+    el.textContent = frozenChar || ' ';
+    row.appendChild(el);
+    return el;
+  }
+
+  var cells = [];                     // dynamic cells only, in board order
+  function dyn() { var el = makeCell(null); cells.push({ el: el, target: ' ', left: 0, nextAt: 0 }); }
+  for (var i = 0; i < PRE_W; i++) dyn();
+  makeCell(null);                     // permanent gap
+  for (var f = 0; f < FROZEN.length; f++) makeCell(FROZEN[f]);
+  makeCell(null);                     // permanent gap
+  for (var j = 0; j < SUF_W; j++) dyn();
+
+  var reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function apply(el, ch) {
+    el.textContent = ch;
+    el.classList.toggle('blank', ch === ' ');
+  }
+
+  function setPhrase(phrase) {
+    var padded = (new Array(PRE_W + 1).join(' ') + phrase.pre).slice(-PRE_W);
+    var suffix = (phrase.suf + new Array(SUF_W + 1).join(' ')).slice(0, SUF_W);
+    var line = padded + suffix;
+    var now = performance.now();
+    for (var i = 0; i < cells.length; i++) {
+      var c = cells[i];
+      c.target = line[i];
+      if (c.el.textContent !== c.target) {
+        if (reduced) { apply(c.el, c.target); c.left = 0; }
+        else { c.left = 3 + Math.floor(Math.random() * 5); c.nextAt = now + i * 28; }
+      } else {
+        c.left = 0;
+      }
+    }
+  }
+
+  function frame(now) {
+    for (var i = 0; i < cells.length; i++) {
+      var c = cells[i];
+      if (c.left <= 0) continue;
+      if (now < c.nextAt) continue;
+      // Throttled tab (backgrounded/occluded): timers clamp to ~1Hz and the
+      // shuffle can't outrun the phrase clock — snap straight to the target
+      // so a returning viewer never sees leftover garbage.
+      if (now - c.nextAt > 600) { apply(c.el, c.target); c.left = 0; continue; }
+      c.left--;
+      if (c.left === 0) {
+        apply(c.el, c.target);
+      } else {
+        apply(c.el, CHARS[Math.floor(Math.random() * CHARS.length)]);
+        c.nextAt = now + 70 + Math.random() * 40;
+      }
+      c.el.classList.remove('tick');
+      void c.el.offsetWidth;
+      c.el.classList.add('tick');
+    }
+  }
+  // A plain interval, not requestAnimationFrame: rAF pauses in occluded or
+  // backgrounded windows while the phrase timer keeps advancing, leaving the
+  // board stuck mid-shuffle. A timer keeps the state machine honest anywhere.
+  setInterval(function () { frame(performance.now()); }, 60);
+
+  window.__flapCells = cells;  // debug hook
+  var idx = 0;
+  setPhrase(PHRASES[idx]);
+  setInterval(function () {
+    idx = (idx + 1) % PHRASES.length;
+    window.__flapIdx = idx; window.__flapAt = performance.now();  // debug hooks
+    setPhrase(PHRASES[idx]);
+  }, 3400);
+})();
+</script>
 
 </body>
 </html>
