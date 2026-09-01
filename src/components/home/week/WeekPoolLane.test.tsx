@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { DndContext } from '@dnd-kit/core'
 import { WeekPoolLane } from './WeekPoolLane'
+import { createMockRoutine } from '@/test/mocks/factories'
 import type { Task } from '@/types/task'
 
 function task(over: Partial<Task>): Task {
@@ -121,6 +122,25 @@ describe('WeekPoolLane', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Push task' }))
     fireEvent.click(screen.getByRole('button', { name: 'This Month' }))
     expect(onPushTask).toHaveBeenCalledWith('a', 'month')
+  })
+
+  it('offers a Routines view listing routines that need a home', () => {
+    // The host pre-filters through unhomedRoutines(); the lane only renders.
+    const routines = [createMockRoutine({ name: 'Trash night', time_of_day: null })]
+    render(
+      <DndContext>
+        <WeekPoolLane
+          weekStart={weekStart}
+          dayCount={5}
+          onSelectItem={() => {}}
+          tasks={[]}
+          routines={routines}
+        />
+      </DndContext>,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Routines' }))
+    expect(screen.getByText('Trash night')).toBeInTheDocument()
+    expect(screen.getByText(/no set time/)).toBeInTheDocument()
   })
 
   it('offers the official view switcher', () => {

@@ -27,6 +27,10 @@ export function laneCalcStrings(dayIdx: number, laneIdx: number, laneCount: numb
 // Horizontal breathing room for a card nested inside a container block.
 const EMBED_INSET_PX = 6
 
+// Readability floor: nothing renders shorter than one full text line
+// (This Week redesign) — a 15-min event gets 24px, not a clipped sliver.
+const MIN_BLOCK_PX = 24
+
 interface WeekEventBlockProps {
   placedItem: PlacedItem
   weekStart: Date
@@ -130,7 +134,10 @@ export function WeekEventBlock({ placedItem, weekStart, dayCount = 7, onSelect, 
         // tasks already carry one; give borderless fills a white edge.
         color.border ?? (elevated ? 'border border-white/80' : ''),
         elevated ? 'shadow-sm' : '',
-        'px-2 py-1 text-[12px] leading-tight overflow-hidden cursor-pointer',
+        // Routines are quiet rhythm bands: smaller, lighter, unbolded.
+        isRoutine
+          ? 'px-2 py-0.5 text-[11.5px] leading-tight overflow-hidden cursor-pointer'
+          : 'px-2 py-1 text-[12px] leading-tight overflow-hidden cursor-pointer',
         isDragging ? 'opacity-40' : '',
         dragDisabled ? 'cursor-default' : '',
       ].filter(Boolean).join(' ')}
@@ -144,7 +151,7 @@ export function WeekEventBlock({ placedItem, weekStart, dayCount = 7, onSelect, 
         return {
           top: top + previewTopOffset + clearancePx,
           ...laneCalcStrings(dayIdx, laneIdx, laneCount, dayCount, embedded ? EMBED_INSET_PX : 0),
-          height: Math.max(HOUR_ROW_HEIGHT / 4, height - clearancePx - previewTopOffset + previewBottomOffset),
+          height: Math.max(MIN_BLOCK_PX, height - clearancePx - previewTopOffset + previewBottomOffset),
           zIndex: elevated ? 2 : 1,
         }
       })()}
@@ -169,7 +176,7 @@ export function WeekEventBlock({ placedItem, weekStart, dayCount = 7, onSelect, 
           />
         </>
       )}
-      <div className="truncate font-medium">
+      <div className={isRoutine ? 'truncate font-normal' : 'truncate font-medium'}>
         {placedItem.item.type === 'task' && (
           <span
             title={hasExecutionContext(placedItem.item) ? 'Has context — ready to execute' : 'No context yet — bare title'}
@@ -181,6 +188,9 @@ export function WeekEventBlock({ placedItem, weekStart, dayCount = 7, onSelect, 
         )}
         {placedItem.item.title}
       </div>
+      {placedItem.item.subtitle && (
+        <div className="truncate text-[11px] opacity-75">{placedItem.item.subtitle}</div>
+      )}
     </div>
   )
 }
@@ -208,7 +218,7 @@ function computePlacementFromLane(placedItem: PlacedItem, weekStart: Date): Plac
   const pxPerMin = HOUR_ROW_HEIGHT / 60
 
   const top = Math.max(0, (startMins - firstMinute) * pxPerMin)
-  const height = Math.max(HOUR_ROW_HEIGHT / 4, (endMins - startMins) * pxPerMin)
+  const height = Math.max(MIN_BLOCK_PX, (endMins - startMins) * pxPerMin)
 
   return {
     dayIdx,

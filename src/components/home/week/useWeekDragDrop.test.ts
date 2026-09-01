@@ -15,6 +15,34 @@ const mkBlockOver = (slotId: string) => ({
 })
 
 describe('useWeekDragDrop', () => {
+  it('routine-chip drop asks for placement instead of writing', async () => {
+    const onUpdateRoutine = vi.fn()
+    const onRoutinePlaceRequest = vi.fn()
+    const { result } = renderHook(() => useWeekDragDrop({
+      weekStart: new Date(2026, 4, 17),
+      onWeekChange: vi.fn(),
+      onUpdateTask: vi.fn(),
+      onUpdateEvent: vi.fn(),
+      onUpdateRoutine,
+      onRoutinePlaceRequest,
+      tasks: [], events: [], routines: [],
+    }))
+
+    await act(async () => {
+      result.current.dndHandlers.onDragEnd({
+        active: { id: 'poolroutine:r1', data: { current: { kind: 'routineChip', routineId: 'r1' } } },
+        over: { id: 'slot:2026-05-21:17:00', data: { current: { kind: 'timed', dayIso: '2026-05-21', hour: 17, minute: 0 } } },
+      } as never)
+    })
+
+    expect(onUpdateRoutine).not.toHaveBeenCalled()
+    expect(onRoutinePlaceRequest).toHaveBeenCalledTimes(1)
+    const req = onRoutinePlaceRequest.mock.calls[0][0]
+    expect(req.routineId).toBe('r1')
+    expect(req.when).toBeInstanceOf(Date)
+    expect(req.when.getHours()).toBe(17)
+  })
+
   it('chip drop on timed slot calls onUpdateTask with the new start + 30-min duration', async () => {
     const onUpdateTask = vi.fn().mockResolvedValue(undefined)
     const { result } = renderHook(() => useWeekDragDrop({

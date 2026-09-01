@@ -29,12 +29,15 @@ interface WeekGridProps {
   suppressCreate?: boolean
   /** Render a day's all-day chips into that day's all-day cell. */
   renderAllDay?: (day: Date) => ReactNode
+  /** Render a day's dinner cell — meal events leave the time grid into this
+   *  row (This Week redesign). Omitted = no dinner row. */
+  renderDinner?: (day: Date) => ReactNode
   /** Sub-slot ids to tint as suggested drop targets while a pool-pill drag is
    *  active (dropSmarts). Paint only — never captures the drop. */
   suggestedSlotIds?: Set<string> | null
 }
 
-export function WeekGrid({ weekStart, dayCount = 7, children, onCreateGesture, suppressCreate, renderAllDay, suggestedSlotIds }: WeekGridProps) {
+export function WeekGrid({ weekStart, dayCount = 7, children, onCreateGesture, suppressCreate, renderAllDay, renderDinner, suggestedSlotIds }: WeekGridProps) {
   const days = Array.from({ length: dayCount }, (_, i) => {
     const d = new Date(weekStart)
     d.setDate(d.getDate() + i)
@@ -86,6 +89,21 @@ export function WeekGrid({ weekStart, dayCount = 7, children, onCreateGesture, s
           <AllDaySlot key={i} day={d}>{renderAllDay?.(d)}</AllDaySlot>
         ))}
       </div>
+
+      {/* Dinner row — meal events out of the time grid */}
+      {renderDinner && (
+        <div
+          className="grid border-b border-neutral-200 bg-[hsl(28_55%_90%/0.28)]"
+          style={{ gridTemplateColumns: `${TIME_COL_WIDTH}px repeat(${dayCount}, 1fr)`, minHeight: 30 }}
+        >
+          <div className="px-2 py-2 text-[10px] uppercase tracking-wide text-[hsl(14_45%_35%/0.8)]">dinner</div>
+          {days.map((d, i) => (
+            <div key={i} className="border-l border-neutral-200/60 px-2 py-1 min-w-0 overflow-hidden flex items-center">
+              {renderDinner(d)}
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Hour rows — FIRST_HOUR through LAST_HOUR-1, 13 rows total */}
       <div className="relative">

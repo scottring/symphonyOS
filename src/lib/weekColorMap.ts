@@ -21,9 +21,11 @@ const CREAM: BlockColor = {
   ring: '',
 }
 
+// Routines read as QUIET rhythm bands (This Week redesign, 2026-09-01):
+// muted cream, muted text — repetition recedes so one-off commitments pop.
 const YELLOW: BlockColor = {
-  bg: 'bg-[hsl(45_75%_90%)]',
-  text: 'text-[hsl(40_60%_30%)]',
+  bg: 'bg-[hsl(45_65%_92%/0.75)]',
+  text: 'text-[hsl(38_25%_42%)]',
   ring: '',
 }
 

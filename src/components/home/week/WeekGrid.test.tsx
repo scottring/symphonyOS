@@ -17,6 +17,23 @@ describe('WeekGrid', () => {
     expect(screen.getByText(/23/)).toBeInTheDocument()
   })
 
+  it('renders a dinner row only when renderDinner is provided', () => {
+    const { rerender } = renderWithDnd(<WeekGrid weekStart={weekStart} children={null} />)
+    expect(screen.queryByText(/dinner/i)).not.toBeInTheDocument()
+    rerender(
+      <DndContext>
+        <WeekGrid
+          weekStart={weekStart}
+          children={null}
+          renderDinner={(day) => <span>Meal for {day.getDate()}</span>}
+        />
+      </DndContext>,
+    )
+    expect(screen.getByText(/^dinner$/i)).toBeInTheDocument()
+    expect(screen.getByText('Meal for 17')).toBeInTheDocument()
+    expect(screen.getByText('Meal for 23')).toBeInTheDocument()
+  })
+
   it('badges the current day and only the current day', () => {
     const today = new Date()
     today.setHours(0, 0, 0, 0)

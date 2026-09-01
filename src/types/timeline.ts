@@ -25,6 +25,9 @@ export interface TimelineItem {
   id: string
   type: TimelineItemType
   title: string
+  /** Second line under the title (e.g. the day's Specials folded into the
+   *  School block on /week). Render-only. */
+  subtitle?: string
   startTime: Date | null // null for unscheduled tasks
   endTime: Date | null
   completed: boolean

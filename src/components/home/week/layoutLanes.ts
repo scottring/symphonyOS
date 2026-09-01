@@ -41,7 +41,9 @@ export interface PlacedItem {
 
 // A block whose top lands within this many minutes of a container's top
 // would cover the container's title — floor it at the clearance line.
+// A container carrying a subtitle (School's specials) owns a taller band.
 const TITLE_CLEARANCE_MIN = 20
+const SUBTITLE_CLEARANCE_MIN = 34
 
 /**
  * Compute side-by-side lane placement for items in a week grid.
@@ -118,9 +120,10 @@ export function layoutWeekLanes(
         const c = dayItems[j]
         if (!isContainerPre[j] || c === it) continue
         const cv = vis(c)
+        const clearance = c.item.subtitle ? SUBTITLE_CLEARANCE_MIN : TITLE_CLEARANCE_MIN
         const overlaps = v.start < cv.end && v.end > cv.start
-        if (overlaps && v.start < cv.start + TITLE_CLEARANCE_MIN) {
-          floor = Math.max(floor, cv.start + TITLE_CLEARANCE_MIN)
+        if (overlaps && v.start < cv.start + clearance) {
+          floor = Math.max(floor, cv.start + clearance)
         }
       }
       return floor

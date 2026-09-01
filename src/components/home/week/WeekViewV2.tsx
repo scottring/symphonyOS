@@ -21,6 +21,7 @@ import { layoutWeekLanes, type PlacedItem } from './layoutLanes'
 import { useWeekDragDrop } from './useWeekDragDrop'
 import { useGridCreate } from './useGridCreate'
 import { SlotQuickCreatePopover, type CreateType } from './SlotQuickCreatePopover'
+import { RoutinePlacePopover } from './RoutinePlacePopover'
 import { RoutinesToggle } from '@/components/planning/RoutinesToggle'
 import { WeekPoolLane } from './WeekPoolLane'
 import { suggestSlots, type BusyInterval } from '@/lib/planning/dropSmarts'
@@ -28,6 +29,8 @@ import { FIRST_HOUR, LAST_HOUR } from './WeekGrid'
 import { readHideRoutines, writeHideRoutines, onHideRoutinesChange } from '@/lib/hideRoutinesSignal'
 import { useGatedTaskActions } from '@/hooks/useGatedTaskActions'
 import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
+import { partitionWeekExtras } from '@/lib/week/weekExtras'
+import { unhomedRoutines } from '@/lib/week/unhomedRoutines'
 import { resolveRoutine } from '@/lib/routineUtils'
 import type { AssigneeFilter } from '@/lib/today/types'
 import type { Layer } from '@/lib/domains'
@@ -101,6 +104,46 @@ export function WeekViewV2(props: WeekViewV2Props) {
     void onUpdateTask(id, { bucket: 'week', scheduledFor: undefined, isAllDay: false, weekStart: nextWeek })
   }, [onUpdateTask])
 
+  // Shelf Routines view: eligible-but-homeless routines, through the one
+  // resolver ladder (date-agnostic). hideRoutines is a GRID preference — the
+  // shelf still offers homes while the grid hides bands — so it's not passed.
+  const shelfRoutines = useMemo(
+    () => unhomedRoutines(routines, { member: selectedAssignees, prefs: { hideRoutines: false, layers } }),
+    [routines, selectedAssignees, layers],
+  )
+
+  // A shelf routine pill dropped on a slot asks the place-scope question
+  // before anything is written: the rule ("every Thursday at 5:00" — its new
+  // home) or just this week (the existing one-day override).
+  const [routinePlace, setRoutinePlace] = useState<{ routineId: string; when: Date } | null>(null)
+  const placingRoutine = routinePlace
+    ? routines.find((r) => r.id === routinePlace.routineId) ?? null
+    : null
+  const confirmRoutinePlace = useCallback((scope: 'rule' | 'once') => {
+    if (!routinePlace) return
+    const routine = routines.find((r) => r.id === routinePlace.routineId)
+    setRoutinePlace(null)
+    if (!routine) return
+    if (scope === 'once') {
+      onPushRoutine?.(routine.id, routinePlace.when)
+      return
+    }
+    const when = routinePlace.when
+    const weekdayKey = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][when.getDay()]
+    const prevTime = routine.time_of_day
+    const prevPattern = routine.recurrence_pattern
+    const updates: Partial<Routine> = {
+      time_of_day: `${String(when.getHours()).padStart(2, '0')}:${String(when.getMinutes()).padStart(2, '0')}:00`,
+    }
+    if (prevPattern.type === 'weekly') {
+      updates.recurrence_pattern = { ...prevPattern, days: [weekdayKey] }
+    }
+    void onUpdateRoutine(routine.id, updates)
+    pushAction?.(`Placed "${routine.name}"`, () => {
+      void onUpdateRoutine(routine.id, { time_of_day: prevTime, recurrence_pattern: prevPattern })
+    })
+  }, [routinePlace, routines, onPushRoutine, onUpdateRoutine, pushAction])
+
   const handleCreate = useCallback(
     async (params: { type: CreateType; title: string; startTime: Date; endTime: Date }) => {
       if (params.type === 'task') {
@@ -161,6 +204,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
     dayCount,
     pushAction,
     onPushRoutine,
+    onRoutinePlaceRequest: setRoutinePlace,
   })
 
   // Sensor with activation constraint — disambiguates click vs drag.
@@ -258,9 +302,29 @@ export function WeekViewV2(props: WeekViewV2Props) {
   // Keys for routine day-instances are suffixed with the day-index to avoid
   // duplicate-key warnings from routineToTimelineItem returning the same id
   // for every day.
+  // Dinner + Specials events leave the time grid (This Week redesign):
+  // dinners render in the grid's dinner row, specials fold into the same
+  // day's School block subtitle (or stay grid material without one).
+  const extras = useMemo(() => partitionWeekExtras(weekEvents), [weekEvents])
+
   const allItems = useMemo(() => {
     const taskItems = scheduledTasks.map(taskToTimelineItem)
-    const eventItems = weekEvents.map(eventToTimelineItem)
+    const eventItems = extras.rest.map(eventToTimelineItem)
+    const schoolByDay = new Map<string, (typeof eventItems)[number]>()
+    for (const item of eventItems) {
+      if (item.startTime && /^school\b/i.test(item.title)) {
+        const key = dayKey(item.startTime)
+        if (!schoolByDay.has(key)) schoolByDay.set(key, item)
+      }
+    }
+    for (const [key, entries] of extras.specialsByDay) {
+      const school = schoolByDay.get(key)
+      if (school) {
+        school.subtitle = entries.map((e) => e.label).join(' · ')
+      } else {
+        eventItems.push(...entries.map((e) => eventToTimelineItem(e.event)))
+      }
+    }
     // One rule for routine visibility, shared with Today and the wall. Rung 2
     // is evaluated per day below, so the pool here is resolved per date rather
     // than once for the week.
@@ -307,7 +371,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
     }
 
     return blocks
-  }, [scheduledTasks, weekEvents, routines, weekStart, hideRoutines, dayCount, drag.activeDragId, tasks, events, selectedAssignees, layers])
+  }, [scheduledTasks, extras, routines, weekStart, hideRoutines, dayCount, drag.activeDragId, tasks, events, selectedAssignees, layers])
 
   // Run the lane-placement pass over allItems. Items with a startTime outside
   // the visible week range are filtered out by layoutWeekLanes (dayIdx check).
@@ -433,6 +497,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
             registers; drops ride the existing chip branches in useWeekDragDrop. */}
         <WeekPoolLane
           tasks={tasks}
+          routines={shelfRoutines}
           weekStart={weekStart}
           dayCount={dayCount}
           onSelectItem={onSelectItem}
@@ -447,6 +512,22 @@ export function WeekViewV2(props: WeekViewV2Props) {
             (allDayByDay.get(dayKey(day)) ?? []).map((t) => (
               <WeekAllDayChip key={t.id} task={t} onSelect={onSelectItem} />
             ))
+          }
+          renderDinner={
+            extras.dinnersByDay.size === 0
+              ? undefined
+              : (day) =>
+                  (extras.dinnersByDay.get(dayKey(day)) ?? []).map(({ event, label }) => (
+                    <button
+                      key={event.id}
+                      type="button"
+                      title={label}
+                      onClick={() => onSelectItem(`event-${event.google_event_id || event.id}`)}
+                      className="block w-full min-w-0 text-left text-[11.5px] leading-tight text-[hsl(14_45%_35%)] truncate hover:underline cursor-pointer"
+                    >
+                      {label}
+                    </button>
+                  ))
           }
           onCreateGesture={
             drag.activeDragId
@@ -479,6 +560,16 @@ export function WeekViewV2(props: WeekViewV2Props) {
             />
           ))}
         </WeekGrid>
+
+        {placingRoutine && routinePlace && (
+          <RoutinePlacePopover
+            routine={placingRoutine}
+            when={routinePlace.when}
+            canOnce={!!onPushRoutine}
+            onConfirm={confirmRoutinePlace}
+            onCancel={() => setRoutinePlace(null)}
+          />
+        )}
 
         {gridCreate.state && (() => {
           const { startTime, endTime } = gridCreate.toTimes(gridCreate.state)

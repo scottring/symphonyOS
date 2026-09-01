@@ -10,8 +10,10 @@
 // expander so a deep backlog never buries the grid.
 import { useMemo, useState } from 'react'
 import { useDraggable } from '@dnd-kit/core'
-import { Check, ChevronDown, ChevronRight, ChevronsRight, CookingPot } from 'lucide-react'
+import { Check, ChevronDown, ChevronRight, ChevronsRight, CookingPot, GripVertical } from 'lucide-react'
 import type { Task } from '@/types/task'
+import type { Routine } from '@/types/actionable'
+import { routineTemporalLabel } from '@/lib/planning/routineTemporal'
 import {
   unscheduledPool, applyPoolView, orderPool, groupPool,
   readPoolView, writePoolView, type PoolView,
@@ -96,10 +98,39 @@ function PoolPill({ task, onSelect, onCompleteTask, onNotThisWeek, onPushTask }:
   )
 }
 
+// A routine that needs a home — cream so it reads as routine material, with
+// its temporal gap spelled out. Drags with its own protocol; drops open the
+// place-scope popover instead of writing directly.
+function RoutinePill({ routine, onSelect }: { routine: Routine; onSelect: (id: string) => void }) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: `poolroutine:${routine.id}`,
+    data: { kind: 'routineChip', routineId: routine.id },
+  })
+  return (
+    <div
+      ref={setNodeRef}
+      {...attributes}
+      {...listeners}
+      onClick={() => onSelect(`routine-${routine.id}`)}
+      title={routine.name}
+      className={`inline-flex max-w-[320px] items-center gap-1.5 rounded-lg border border-[hsl(42_50%_80%)] bg-[hsl(45_75%_90%)] pl-1.5 pr-2.5 py-1.5 touch-none cursor-grab active:cursor-grabbing hover:shadow-sm transition-all ${
+        isDragging ? 'opacity-40' : ''
+      }`}
+    >
+      <GripVertical className="w-3.5 h-3.5 shrink-0 text-[hsl(40_30%_60%)]" />
+      <span className="min-w-0 truncate text-[12.5px] font-semibold text-[hsl(40_60%_30%)]">{routine.name}</span>
+      <span className="shrink-0 text-[11px] text-[hsl(38_25%_45%)]">{routineTemporalLabel(routine)}</span>
+    </div>
+  )
+}
+
 export function WeekPoolLane({
-  tasks, weekStart, dayCount, onSelectItem, onCompleteTask, onNotThisWeek, onPushTask,
+  tasks, routines = [], weekStart, dayCount, onSelectItem, onCompleteTask, onNotThisWeek, onPushTask,
 }: {
   tasks: Task[]
+  /** Routines that need a home — ALREADY filtered by the host through
+   *  unhomedRoutines() (eligibility runs the one resolver ladder there). */
+  routines?: Routine[]
   weekStart: Date
   dayCount: number
   onSelectItem: (id: string) => void
@@ -129,7 +160,10 @@ export function WeekPoolLane({
     return groupPool(orderPool(applyPoolView(unscheduledPool(tasks, ctx), view, ctx), ctx))
   }, [tasks, weekStart, dayCount, view, meId])
 
-  const total = pool.meals.length + pool.loose.length
+  const needsHome = routines
+  const routinesView = view === 'routines'
+
+  const total = routinesView ? needsHome.length : pool.meals.length + pool.loose.length
   const visibleLoose = showAll ? pool.loose : pool.loose.slice(0, STRIP_CAP)
   const overflow = pool.loose.length - visibleLoose.length
 
@@ -146,11 +180,39 @@ export function WeekPoolLane({
           {open ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
           Unscheduled · {total}
         </button>
-        <div className="ml-auto w-72">
-          <PoolViewSwitcher view={view} onChange={(v) => { setView(v); writePoolView(SURFACE, v) }} />
+        <div className="ml-auto w-96">
+          <PoolViewSwitcher view={view} onChange={(v) => { setView(v); writePoolView(SURFACE, v) }} includeRoutines />
         </div>
       </div>
-      {open && (
+      {open && routinesView && (
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          {(showAll ? needsHome : needsHome.slice(0, STRIP_CAP)).map((r) => (
+            <RoutinePill key={r.id} routine={r} onSelect={onSelectItem} />
+          ))}
+          {!showAll && needsHome.length > STRIP_CAP && (
+            <button
+              type="button"
+              onClick={() => setShowAll(true)}
+              className="inline-flex items-center rounded-lg border border-dashed border-neutral-300 bg-neutral-50 px-3 py-1.5 text-[13px] text-neutral-500 hover:bg-neutral-100 hover:text-neutral-700 transition-colors"
+            >
+              +{needsHome.length - STRIP_CAP} more
+            </button>
+          )}
+          {showAll && needsHome.length > STRIP_CAP && (
+            <button
+              type="button"
+              onClick={() => setShowAll(false)}
+              className="inline-flex items-center rounded-lg px-2 py-1.5 text-[13px] text-neutral-400 hover:text-neutral-600 transition-colors"
+            >
+              Show less
+            </button>
+          )}
+          {needsHome.length === 0 && (
+            <span className="text-sm text-neutral-400">Every routine has a home.</span>
+          )}
+        </div>
+      )}
+      {open && !routinesView && (
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
           {pool.meals.length > 0 && (
             <button

@@ -278,6 +278,23 @@ describe('layoutWeekLanes — embedded blocks', () => {
     expect(p.school.clearedTopMin).toBeUndefined()
   })
 
+  it('floors deeper below a container that carries a subtitle', () => {
+    const school = {
+      ...makeItem({
+        id: 'school', type: 'event',
+        start: new Date('2026-05-18T08:00:00'), end: new Date('2026-05-18T15:00:00'),
+      }),
+      subtitle: 'Ella: Library · Kaleb: Music',
+    }
+    const feed = makeItem({
+      id: 'feed', type: 'routine',
+      start: new Date('2026-05-18T08:00:00'), end: new Date('2026-05-18T08:30:00'),
+    })
+    const placed = layoutWeekLanes([school, feed], weekStart, 7)
+    const p = Object.fromEntries(placed.map((x) => [x.item.id, x]))
+    expect(p.feed.clearedTopMin).toBe(8 * 60 + 34)
+  })
+
   it('floors a pre-grid item that only overlaps the container after top-clamping', () => {
     const school = makeItem({
       id: 'school', type: 'event',

@@ -25,6 +25,10 @@ interface UseWeekDragDropArgs {
    *  leaving its recurrence rule alone — the same grain rule as the Today
    *  overlay's routine drop. Omitted = routine blocks don't move. */
   onPushRoutine?: (routineId: string, when: Date) => void
+  /** Optional. A shelf routine pill dropped on a slot ASKS before writing —
+   *  the host opens the place-scope popover ("every Thursday" vs "just this
+   *  Thursday"). The hook never writes routines on this path itself. */
+  onRoutinePlaceRequest?: (req: { routineId: string; when: Date }) => void
 }
 
 interface UseWeekDragDropResult {
@@ -57,7 +61,7 @@ export function useWeekDragDrop(args: UseWeekDragDropArgs): UseWeekDragDropResul
     if (!e.over) return
 
     const activeData = e.active.data.current as
-      | { kind?: string; taskId?: string; itemId?: string }
+      | { kind?: string; taskId?: string; itemId?: string; routineId?: string }
       | undefined
     const overData = e.over.data.current as
       | { kind?: string; dayIso?: string; hour?: number; minute?: number }
@@ -100,6 +104,13 @@ export function useWeekDragDrop(args: UseWeekDragDropArgs): UseWeekDragDropResul
     if (overData.kind !== 'timed' || !overData.dayIso) return
 
     const newStart = parseSlotTime(overData.dayIso, overData.hour ?? 0, overData.minute ?? 0)
+
+    // Shelf routine pill: the drop only ASKS — scope (rule vs one week) is
+    // the host's popover decision, never an implicit write.
+    if (activeData.kind === 'routineChip' && activeData.routineId) {
+      args.onRoutinePlaceRequest?.({ routineId: activeData.routineId, when: newStart })
+      return
+    }
 
     if (activeData.kind === 'chip' && activeData.taskId) {
       const task = tasks.find((t) => t.id === activeData.taskId)
