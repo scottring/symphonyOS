@@ -1,7 +1,6 @@
 // src/shell/appRegistry.ts
 import type { AppDef } from './types';
 import { wallV2AppDef } from '@/apps/wall-v2';
-import { jobPipelineAppDef } from '@/apps/job-pipeline';
 import { tasksAppDef } from '@/apps/tasks';
 import { homeAppDef } from '@/apps/home';
 import { mealsAppDef } from '@/apps/meals';
@@ -17,7 +16,6 @@ import { projectsAppDef } from '@/apps/projects';
 import { goalsAppDef } from '@/apps/goals';
 import { familyAppDef } from '@/apps/family';
 import { agentAppDef } from '@/apps/agent';
-import { usAppDef } from '@/apps/us';
 
 export type AppRegistry = ReadonlyArray<AppDef>;
 
@@ -67,7 +65,6 @@ export function resolveAppForSelection(
 // Live registry — populated phase-by-phase. Wall added in P2, Job Pipeline in P3, Tasks in P4.
 export const appRegistry: AppRegistry = createRegistry([
   wallV2AppDef,
-  jobPipelineAppDef,
   tasksAppDef,
   homeAppDef,
   mealsAppDef,
@@ -84,5 +81,4 @@ export const appRegistry: AppRegistry = createRegistry([
   goalsAppDef,
   familyAppDef,
   agentAppDef,
-  usAppDef,
 ]);

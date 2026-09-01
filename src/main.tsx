@@ -163,7 +163,12 @@ createRoot(document.getElementById('root')!).render(
               <Route path="/wall/*" element={<Shell />} /> {/* wall kiosk: own auth, stays ungated */}
               <Route path="/wall-v2/*" element={<Shell />} />
               <Route path="/wall-lanes" element={<Suspense fallback={null}><WallV2LanePreview /></Suspense>} />
-              <Route path="/jobs/*" element={cutoverShell} />
+              {/* /jobs and /us retired (pare-down 2026-09-01): the job pipeline
+                  moved out of Symphony (the vault owns job search) and the Us
+                  surface was axed. Redirect, don't 404 — stale bookmarks and
+                  the Mac shell's restored routes may still land here. */}
+              <Route path="/jobs/*" element={<Navigate to="/today" replace />} />
+              <Route path="/us/*" element={<Navigate to="/today" replace />} />
               <Route path="/tasks-new/*" element={cutoverShell} />
               {/* /morning and /bedtime retired — KidDayView (opened from the
                   wall board) replaced them. Redirected rather than deleted:

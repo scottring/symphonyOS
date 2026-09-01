@@ -63,7 +63,6 @@ export function deriveActiveView(pathname: string): ViewType {
   if (pathname.startsWith('/contacts/')) return 'contact-detail';
   if (pathname.startsWith('/meals')) return 'meals';
   if (pathname.startsWith('/agent')) return 'agent';
-  if (pathname.startsWith('/us')) return 'us';
   if (pathname === '/inbox' || pathname.endsWith('/tasks-new/inbox')) return 'inbox';
   if (pathname.startsWith('/home')) return 'home-app';
   // /, /today, /tasks-new/today, /tasks-new and /task/:id all live under "today"
@@ -198,20 +197,11 @@ function ShellLayoutInner({ children }: Props) {
         case 'settings':
           navigate('/settings');
           return;
-        case 'us':
-          navigate('/us');
-          return;
         default:
           navigate('/');
       }
     },
     [navigate],
-  );
-
-  const onPinNavigate = useCallback(
-    (entityType: Parameters<typeof chrome.handlePinNavigate>[0], entityId: string) =>
-      chrome.handlePinNavigate(entityType, entityId, navigate),
-    [chrome, navigate],
   );
 
   // The AI rail is shared with main content margin so content isn't covered.
@@ -243,11 +233,6 @@ function ShellLayoutInner({ children }: Props) {
           onViewChange={handleViewChange}
           onOpenSearch={() => setQuickAddOpen(true)}
           inboxCount={inboxCount}
-          pins={chrome.pins}
-          entities={chrome.pinnedEntities}
-          onPinNavigate={onPinNavigate}
-          onPinMarkAccessed={chrome.markAccessed}
-          onPinRefreshStale={chrome.refreshStale}
         />
       )}
 
