@@ -1,5 +1,6 @@
 import { useState, useMemo, useCallback, useEffect } from 'react'
 import { readHideRoutines, writeHideRoutines, onHideRoutinesChange } from '@/lib/hideRoutinesSignal'
+import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { resolveRoutine } from '@/lib/routineUtils'
 import { deferredInRoutineIds } from '@/lib/today/deferredRoutines'
 import { ALL_LAYERS } from '@/lib/domains'
@@ -293,12 +294,18 @@ export function PlanningSession({
     onUpdateTask(id, { bucket: 'week', scheduledFor: undefined, isAllDay: false, weekStart: nextWeek })
   }, [onUpdateTask])
 
+  // The pool plans MY time — scope its candidates to the current member
+  // (assigned to me, shared with me, or unassigned; see PoolCtx.meId).
+  const { getCurrentUserMember } = useFamilyMembers()
+  const meId = getCurrentUserMember()?.id ?? null
+
   const poolCtx = useMemo(() => ({
     today: new Date(),
     rangeStart: dateRange.length ? dateRange[0] : null,
     rangeEnd: dateRange.length ? dateRange[dateRange.length - 1] : null,
     weekStartsOn: readCadenceConfig().weekStartsOn,
-  }), [dateRange])
+    meId,
+  }), [dateRange, meId])
 
   const allUnscheduledTasks = useMemo(
     () => unscheduledPool(tasks, poolCtx),

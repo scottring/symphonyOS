@@ -12,6 +12,7 @@ import {
   readPoolView, writePoolView, type PoolView,
 } from '@/lib/planning/poolViews'
 import { PoolViewSwitcher } from '@/components/planning/PoolViewSwitcher'
+import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { readCadenceConfig } from '@/lib/cadence/config'
 
 const SURFACE = 'weekbench'
@@ -46,6 +47,10 @@ export function WeekPoolLane({ tasks, weekStart, dayCount, onSelectItem }: {
   const [open, setOpen] = useState(true)
   const [mealsOpen, setMealsOpen] = useState(false)
 
+  // The pool plans MY time — scope candidates to the current member.
+  const { getCurrentUserMember } = useFamilyMembers()
+  const meId = getCurrentUserMember()?.id ?? null
+
   const pool = useMemo(() => {
     const rangeEnd = new Date(weekStart)
     rangeEnd.setDate(rangeEnd.getDate() + dayCount - 1)
@@ -54,9 +59,10 @@ export function WeekPoolLane({ tasks, weekStart, dayCount, onSelectItem }: {
       rangeStart: weekStart,
       rangeEnd,
       weekStartsOn: readCadenceConfig().weekStartsOn,
+      meId,
     }
     return groupPool(orderPool(applyPoolView(unscheduledPool(tasks, ctx), view, ctx), ctx))
-  }, [tasks, weekStart, dayCount, view])
+  }, [tasks, weekStart, dayCount, view, meId])
 
   const total = pool.meals.length + pool.loose.length
 

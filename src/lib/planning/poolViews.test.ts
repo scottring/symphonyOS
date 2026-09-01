@@ -52,6 +52,25 @@ describe('unscheduledPool', () => {
   })
 })
 
+describe('unscheduledPool — assignee scoping', () => {
+  // "Pick out an outfit or two for Boston" (context family, assigned to Iris)
+  // sat in Scott's planning pool: shared context rightly makes it VISIBLE, but
+  // planning MY time must only offer tasks I could actually do.
+  it("excludes tasks assigned exclusively to someone else when meId is given", () => {
+    const mine = task({ assignedTo: 'me' })
+    const shared = task({ assignedTo: 'iris', assignedToAll: ['iris', 'me'] })
+    const unassigned = task({})
+    const hers = task({ assignedTo: 'iris' })
+    const pool = unscheduledPool([mine, shared, unassigned, hers], { ...ctx, meId: 'me' })
+    expect(pool.map((t) => t.id).sort()).toEqual([mine.id, shared.id, unassigned.id].sort())
+  })
+
+  it('keeps everything when meId is not provided', () => {
+    const hers = task({ assignedTo: 'iris' })
+    expect(unscheduledPool([hers], ctx).map((t) => t.id)).toEqual([hers.id])
+  })
+})
+
 describe('applyPoolView', () => {
   const carried = task({ scheduledFor: new Date(2026, 7, 20, 9) })
   const thisWeek = task({ bucket: 'week', weekStart: new Date(2026, 7, 30) })

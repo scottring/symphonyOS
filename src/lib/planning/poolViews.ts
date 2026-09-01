@@ -16,6 +16,20 @@ export interface PoolCtx {
   rangeStart: Date | null
   rangeEnd: Date | null
   weekStartsOn: WeekStart
+  /** The planning member's id. When set, the pool only offers tasks this
+   *  person could actually DO: assigned to them, shared with them, or
+   *  unassigned. A shared-context task assigned exclusively to someone else
+   *  is rightly VISIBLE elsewhere but is not a candidate for MY time blocks
+   *  ("Pick out an outfit for Boston", family context, assigned to Iris, sat
+   *  in Scott's pool). Omitted = no assignee scoping (legacy callers). */
+  meId?: string | null
+}
+
+/** Is this task doable by `meId`? Unassigned counts; an assignee set that
+ *  excludes me does not. */
+function doableBy(t: Task, meId: string): boolean {
+  const assignees = t.assignedToAll?.length ? t.assignedToAll : t.assignedTo ? [t.assignedTo] : []
+  return assignees.length === 0 || assignees.includes(meId)
 }
 
 /** The base pool: candidate tasks that are not placed on a visible day.
@@ -33,6 +47,9 @@ export function unscheduledPool(tasks: Task[], ctx: PoolCtx): Task[] {
 
   return tasks.filter((task) => {
     if (task.completed) return false
+
+    // Only tasks the planning member could actually do (see PoolCtx.meId).
+    if (ctx.meId && !doableBy(task, ctx.meId)) return false
 
     // Exclude tasks deferred to a future date
     if (task.deferredUntil) {
