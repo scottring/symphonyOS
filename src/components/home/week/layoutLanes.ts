@@ -28,7 +28,20 @@ export interface PlacedItem {
   dayIdx: number
   laneIdx: number
   laneCount: number
+  /** This block's interval strictly contains ≥1 other item's — it renders
+   *  full-width as a background container (mockup 2026-09-01). */
+  isContainer?: boolean
+  /** This block sits fully inside a container's interval — it renders on top,
+   *  inset, as a card. laneIdx/laneCount are computed among non-containers. */
+  embedded?: boolean
+  /** Absolute minute-of-day this block's VISUAL top must not rise above, so
+   *  it clears an overlapping container's title line. Render-only nudge. */
+  clearedTopMin?: number
 }
+
+// A block whose top lands within this many minutes of a container's top
+// would cover the container's title — floor it at the clearance line.
+const TITLE_CLEARANCE_MIN = 20
 
 /**
  * Compute side-by-side lane placement for items in a week grid.
@@ -47,6 +60,10 @@ export function layoutWeekLanes(
   items: TimelineItem[],
   weekStart: Date,
   dayCount: number,
+  /** Minute-of-day where the visible grid starts (e.g. 8*60). When given,
+   *  title clearance uses CLAMPED visual positions, so a pre-grid item that
+   *  the renderer pins to the top edge still clears a container's title. */
+  gridStartMin?: number,
 ): PlacedItem[] {
   const weekStartMidnight = new Date(weekStart)
   weekStartMidnight.setHours(0, 0, 0, 0)
@@ -72,18 +89,65 @@ export function layoutWeekLanes(
     // Sort by (startMin asc, endMin desc) so ties are broken by longer-first.
     dayItems.sort((a, b) => a.startMin - b.startMin || b.endMin - a.endMin)
 
-    // Sweep to form clusters; assign lanes within each cluster.
+    // Containment pass (mockup 2026-09-01): a block that strictly contains
+    // another renders full-width as a background container; contained blocks
+    // render on top as inset cards. Containers are excluded from lane math so
+    // a long School block never squeezes the day into slivers.
+    const contains = (a: { startMin: number; endMin: number }, b: { startMin: number; endMin: number }) =>
+      a.startMin <= b.startMin && a.endMin >= b.endMin &&
+      (a.endMin - a.startMin) > (b.endMin - b.startMin)
+    const embedded = dayItems.map((it) => dayItems.some((other) => other !== it && contains(other, it)))
+    const isContainerPre = dayItems.map((it, i) =>
+      !embedded[i] && dayItems.some((other, j) => j !== i && contains(it, other)),
+    )
+    // Floor any non-container block that overlaps a container's title band
+    // below the title line (lowest container line wins across containers).
+    // Covers both contained items starting at the container top AND early
+    // items the grid clamps to the top edge.
+    // Visual position after the renderer's top-clamp (WeekEventBlock pins
+    // pre-grid starts to the grid top with a min height).
+    const vis = (x: { startMin: number; endMin: number }) => {
+      const start = gridStartMin != null ? Math.max(x.startMin, gridStartMin) : x.startMin
+      return { start, end: Math.max(x.endMin, start + ZERO_LENGTH_FLOOR_MIN) }
+    }
+    const clearedTop = dayItems.map((it, i) => {
+      if (isContainerPre[i]) return 0
+      const v = vis(it)
+      let floor = 0
+      for (let j = 0; j < dayItems.length; j++) {
+        const c = dayItems[j]
+        if (!isContainerPre[j] || c === it) continue
+        const cv = vis(c)
+        const overlaps = v.start < cv.end && v.end > cv.start
+        if (overlaps && v.start < cv.start + TITLE_CLEARANCE_MIN) {
+          floor = Math.max(floor, cv.start + TITLE_CLEARANCE_MIN)
+        }
+      }
+      return floor
+    })
+    const isContainer = isContainerPre
+
+    for (let i = 0; i < dayItems.length; i++) {
+      if (!isContainer[i]) continue
+      placed.push({ item: dayItems[i].item, dayIdx, laneIdx: 0, laneCount: 1, isContainer: true })
+    }
+
+    // Sweep the remaining (non-container) items to form clusters; assign
+    // lanes within each cluster.
+    const laneItems = dayItems.filter((_, i) => !isContainer[i])
+    const laneEmbedded = embedded.filter((_, i) => !isContainer[i])
+    const laneClearedTop = clearedTop.filter((_, i) => !isContainer[i])
     let clusterStart = 0
     let clusterMaxEnd = -Infinity
-    for (let i = 0; i <= dayItems.length; i++) {
-      const cur = dayItems[i]
-      if (i < dayItems.length && (clusterMaxEnd === -Infinity || cur.startMin < clusterMaxEnd)) {
+    for (let i = 0; i <= laneItems.length; i++) {
+      const cur = laneItems[i]
+      if (i < laneItems.length && (clusterMaxEnd === -Infinity || cur.startMin < clusterMaxEnd)) {
         // Extend (or open) current cluster.
         clusterMaxEnd = Math.max(clusterMaxEnd, cur.endMin)
         continue
       }
       // Close cluster [clusterStart, i): assign lanes.
-      const cluster = dayItems.slice(clusterStart, i)
+      const cluster = laneItems.slice(clusterStart, i)
       const laneEnds: number[] = []
       const laneIdxByItem: number[] = []
       for (const entry of cluster) {
@@ -103,6 +167,8 @@ export function layoutWeekLanes(
           dayIdx,
           laneIdx: laneIdxByItem[j],
           laneCount,
+          ...(laneEmbedded[clusterStart + j] ? { embedded: true } : {}),
+          ...(laneClearedTop[clusterStart + j] > 0 ? { clearedTopMin: laneClearedTop[clusterStart + j] } : {}),
         })
       }
       // Open next cluster starting at i.

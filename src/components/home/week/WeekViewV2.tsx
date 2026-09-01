@@ -325,7 +325,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
   // (isDragging → 1×1 invisible div). This is exactly the mounting behaviour
   // the original allBlocks code relied on.
   const placedItems = useMemo<PlacedItem[]>(() => {
-    const placed = layoutWeekLanes(allItems, weekStart, dayCount)
+    const placed = layoutWeekLanes(allItems, weekStart, dayCount, FIRST_HOUR * 60)
 
     const activeId = drag.activeDragId
     if (activeId && activeId.startsWith('block:')) {

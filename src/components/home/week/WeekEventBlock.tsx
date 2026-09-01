@@ -14,13 +14,18 @@ const RESIZE_ENABLED = import.meta.env.VITE_WEEK_RESIZE_ENABLED === 'true'
 
 const LANE_GAP_PX = 2
 
-/** Exported for unit testing — computes the lane-aware left/width calc strings. */
-export function laneCalcStrings(dayIdx: number, laneIdx: number, laneCount: number, dayCount = 7): { left: string; width: string } {
+/** Exported for unit testing — computes the lane-aware left/width calc strings.
+ *  `insetPx` shrinks the block symmetrically inside its lane — embedded cards
+ *  sit visibly INSIDE their container block (embedded-blocks design). */
+export function laneCalcStrings(dayIdx: number, laneIdx: number, laneCount: number, dayCount = 7, insetPx = 0): { left: string; width: string } {
   return {
-    left: `calc(${TIME_COL_WIDTH}px + (100% - ${TIME_COL_WIDTH}px) * ${dayIdx} / ${dayCount} + ((100% - ${TIME_COL_WIDTH}px) / ${dayCount} - 4px) * ${laneIdx} / ${laneCount})`,
-    width: `calc(((100% - ${TIME_COL_WIDTH}px) / ${dayCount} - 4px) / ${laneCount} - ${LANE_GAP_PX}px)`,
+    left: `calc(${TIME_COL_WIDTH}px + (100% - ${TIME_COL_WIDTH}px) * ${dayIdx} / ${dayCount} + ((100% - ${TIME_COL_WIDTH}px) / ${dayCount} - 4px) * ${laneIdx} / ${laneCount} + ${insetPx}px)`,
+    width: `calc(((100% - ${TIME_COL_WIDTH}px) / ${dayCount} - 4px) / ${laneCount} - ${LANE_GAP_PX}px - ${insetPx * 2}px)`,
   }
 }
+
+// Horizontal breathing room for a card nested inside a container block.
+const EMBED_INSET_PX = 6
 
 interface WeekEventBlockProps {
   placedItem: PlacedItem
@@ -98,6 +103,10 @@ export function WeekEventBlock({ placedItem, weekStart, dayCount = 7, onSelect, 
 
   const { dayIdx, laneIdx, laneCount, top, height } = placement
   const color = colorFor(placedItem.item)
+  const embedded = !!placedItem.embedded
+  // Anything drawn over a container's fill needs an edge and elevation —
+  // embedded cards, and title-cleared items pinned into the container's area.
+  const elevated = embedded || placedItem.clearedTopMin != null
 
   const previewTopOffset = (resize.preview?.topDelta ?? 0) * (HOUR_ROW_HEIGHT / 60)
   const previewBottomOffset = (resize.preview?.bottomDelta ?? 0) * (HOUR_ROW_HEIGHT / 60)
@@ -117,16 +126,28 @@ export function WeekEventBlock({ placedItem, weekStart, dayCount = 7, onSelect, 
         color.bg,
         color.text,
         color.ring,
-        color.border ?? '',
+        // An embedded card needs an edge to pop off its container's fill —
+        // tasks already carry one; give borderless fills a white edge.
+        color.border ?? (elevated ? 'border border-white/80' : ''),
+        elevated ? 'shadow-sm' : '',
         'px-2 py-1 text-[12px] leading-tight overflow-hidden cursor-pointer',
         isDragging ? 'opacity-40' : '',
         dragDisabled ? 'cursor-default' : '',
       ].filter(Boolean).join(' ')}
-      style={{
-        top: top + previewTopOffset,
-        ...laneCalcStrings(dayIdx, laneIdx, laneCount, dayCount),
-        height: Math.max(HOUR_ROW_HEIGHT / 4, height - previewTopOffset + previewBottomOffset),
-      }}
+      style={(() => {
+        // Visual-only nudge below the container's title line; keeps the
+        // block's bottom edge in place so time fidelity mostly holds.
+        const floorPx = placedItem.clearedTopMin != null
+          ? Math.max(0, (placedItem.clearedTopMin - FIRST_HOUR * 60) * (HOUR_ROW_HEIGHT / 60))
+          : 0
+        const clearancePx = Math.max(0, floorPx - top)
+        return {
+          top: top + previewTopOffset + clearancePx,
+          ...laneCalcStrings(dayIdx, laneIdx, laneCount, dayCount, embedded ? EMBED_INSET_PX : 0),
+          height: Math.max(HOUR_ROW_HEIGHT / 4, height - clearancePx - previewTopOffset + previewBottomOffset),
+          zIndex: elevated ? 2 : 1,
+        }
+      })()}
     >
       {RESIZE_ENABLED && !isRoutine && (
         <>
