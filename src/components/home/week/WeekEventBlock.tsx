@@ -113,10 +113,11 @@ export function WeekEventBlock({ placedItem, weekStart, dayCount = 7, onSelect, 
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect(placedItem.item.id) } }}
       className={[
         'absolute pointer-events-auto',
-        'rounded-md',
+        'rounded-lg',
         color.bg,
         color.text,
         color.ring,
+        color.border ?? '',
         'px-2 py-1 text-[12px] leading-tight overflow-hidden cursor-pointer',
         isDragging ? 'opacity-40' : '',
         dragDisabled ? 'cursor-default' : '',

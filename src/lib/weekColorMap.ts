@@ -4,6 +4,9 @@ export interface BlockColor {
   bg: string
   text: string
   ring: string
+  /** Optional border/edge treatment. Tasks read as bordered cards on the
+   *  week grid (mockup 2026-09-01); filled blocks leave this empty. */
+  border?: string
 }
 
 const PURPLE: BlockColor = {
@@ -31,9 +34,10 @@ const PEACH: BlockColor = {
 }
 
 const GREEN: BlockColor = {
-  bg: 'bg-[hsl(142_30%_90%)]',
+  bg: 'bg-[hsl(142_30%_96%)]',
   text: 'text-[hsl(142_50%_25%)]',
   ring: '',
+  border: 'border border-[hsl(142_30%_80%)]',
 }
 
 /**

@@ -26,6 +26,8 @@ import { WeekPoolLane } from './WeekPoolLane'
 import { suggestSlots, type BusyInterval } from '@/lib/planning/dropSmarts'
 import { FIRST_HOUR, LAST_HOUR } from './WeekGrid'
 import { readHideRoutines, writeHideRoutines, onHideRoutinesChange } from '@/lib/hideRoutinesSignal'
+import { useGatedTaskActions } from '@/hooks/useGatedTaskActions'
+import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
 import { resolveRoutine } from '@/lib/routineUtils'
 import type { AssigneeFilter } from '@/lib/today/types'
 import type { Layer } from '@/lib/domains'
@@ -80,9 +82,24 @@ export function WeekViewV2(props: WeekViewV2Props) {
 
   // Create-gesture wiring
   const navigate = useNavigate()
-  const { addTask, deleteTask } = useSupabaseTasks()
+  const { addTask, deleteTask, toggleTask, updateTask, updateTasksBulk, pushTask } = useSupabaseTasks()
   const { createEvent, deleteEvent } = useGoogleCalendar()
   const gridCreate = useGridCreate()
+
+  // Pool-pill triage. Defers run through the DomainGate (a context-less task
+  // asks "Where does this belong?" before the write — Iris's rule); "not this
+  // week" rides the already-gated onUpdateTask prop with the same write the
+  // Plan-Your-Time overlay makes.
+  const gated = useGatedTaskActions(
+    { updateTask, pushTask, updateTasksBulk },
+    (id) => tasks.find((t) => t.id === id),
+  )
+  const handleNotThisWeek = useCallback((id: string) => {
+    const currentWeek = weekStartAnchor(new Date(), readCadenceConfig().weekStartsOn)
+    const nextWeek = new Date(currentWeek)
+    nextWeek.setDate(nextWeek.getDate() + 7)
+    void onUpdateTask(id, { bucket: 'week', scheduledFor: undefined, isAllDay: false, weekStart: nextWeek })
+  }, [onUpdateTask])
 
   const handleCreate = useCallback(
     async (params: { type: CreateType; title: string; startTime: Date; endTime: Date }) => {
@@ -419,6 +436,9 @@ export function WeekViewV2(props: WeekViewV2Props) {
           weekStart={weekStart}
           dayCount={dayCount}
           onSelectItem={onSelectItem}
+          onCompleteTask={(id) => { void toggleTask(id) }}
+          onNotThisWeek={handleNotThisWeek}
+          onPushTask={(id, target) => { void gated.pushTask(id, target) }}
         />
         <WeekGrid
           weekStart={weekStart}

@@ -49,14 +49,31 @@ export function WeekGrid({ weekStart, dayCount = 7, children, onCreateGesture, s
         style={{ gridTemplateColumns: `${TIME_COL_WIDTH}px repeat(${dayCount}, 1fr)` }}
       >
         <div className="px-2 py-2 text-[10px] uppercase tracking-wide text-neutral-400">Time</div>
-        {days.map((d, i) => (
-          <div key={i} className="px-2 py-2 text-center border-l border-neutral-200/60">
-            <div className="text-[10px] uppercase tracking-wide text-neutral-500">
-              {d.toLocaleDateString('en-US', { weekday: 'short' })}
+        {days.map((d, i) => {
+          const today = isToday(d)
+          return (
+            <div key={i} className="px-2 py-1.5 text-center border-l border-neutral-200/60">
+              {today ? (
+                <div
+                  data-testid="day-today"
+                  className="mx-auto w-fit min-w-[38px] rounded-full bg-primary-600 px-2 py-0.5 text-white"
+                >
+                  <div className="text-[9px] uppercase tracking-wide leading-tight opacity-90">
+                    {d.toLocaleDateString('en-US', { weekday: 'short' })}
+                  </div>
+                  <div className="text-[13px] font-semibold leading-tight">{d.getDate()}</div>
+                </div>
+              ) : (
+                <>
+                  <div className="text-[10px] uppercase tracking-wide text-neutral-500">
+                    {d.toLocaleDateString('en-US', { weekday: 'short' })}
+                  </div>
+                  <div className="text-[13px] font-medium text-neutral-800">{d.getDate()}</div>
+                </>
+              )}
             </div>
-            <div className="text-[13px] font-medium text-neutral-800">{d.getDate()}</div>
-          </div>
-        ))}
+          )
+        })}
       </div>
 
       {/* All-day row */}
@@ -208,6 +225,11 @@ function SubSlot({ day, hour, minute, onCreateGesture, suppressCreate, suggested
       } ${onCreateGesture && !suppressCreate ? 'cursor-cell' : ''}`}
     />
   )
+}
+
+function isToday(d: Date): boolean {
+  const now = new Date()
+  return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate()
 }
 
 export function dayKey(d: Date): string {

@@ -17,6 +17,22 @@ describe('WeekGrid', () => {
     expect(screen.getByText(/23/)).toBeInTheDocument()
   })
 
+  it('badges the current day and only the current day', () => {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const start = new Date(today)
+    start.setDate(start.getDate() - 2) // today is the 3rd column
+    renderWithDnd(<WeekGrid weekStart={start} children={null} />)
+    const badges = screen.getAllByTestId('day-today')
+    expect(badges).toHaveLength(1)
+    expect(badges[0]).toHaveTextContent(String(today.getDate()))
+  })
+
+  it('badges no day when the visible week excludes today', () => {
+    renderWithDnd(<WeekGrid weekStart={weekStart} children={null} />)
+    expect(screen.queryByTestId('day-today')).not.toBeInTheDocument()
+  })
+
   it('renders hour labels from 8 AM to 9 PM', () => {
     renderWithDnd(<WeekGrid weekStart={weekStart} children={null} />)
     expect(screen.getByText(/8 AM/)).toBeInTheDocument()
