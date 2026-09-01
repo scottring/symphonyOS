@@ -87,7 +87,6 @@ const ALLOWED = new Map<string, string>([
       "complementary literal — Tend deliberately surfaces resting routines.",
   ],
   ['hooks/useSystemHealth.ts', 'diagnostics: counts unassigned ACTIVE routines'],
-  ['components/layout/RecentlyUpdated.tsx', 'an activity log, not a schedule surface'],
   [
     'components/wall-v2/wallV2Adapter.ts',
     "canHeadline + the hide-daily section sweep make a per-band visibility " +

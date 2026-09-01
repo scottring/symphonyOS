@@ -1,6 +1,0 @@
-export { TapContextPanel } from './TapContextPanel'
-export { TapContactPanel } from './TapContactPanel'
-export { TapProjectPanel } from './TapProjectPanel'
-export { TapEventPanel } from './TapEventPanel'
-export { TapMealPanel } from './TapMealPanel'
-export { TapRoutinePanel } from './TapRoutinePanel'

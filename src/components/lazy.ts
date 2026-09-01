@@ -70,13 +70,8 @@ export const PlanningSession = lazy(() =>
   import('./planning/PlanningSession').then(m => ({ default: m.PlanningSession }))
 )
 
-// Guided sessions (Five Horizons) — one ritual shell, five horizons. Replaces
-// the per-cadence sessions that used to live here (weekly/daily/monthly/
-// seasonal/annual) — removed in Task 13 once GuidedSessionContainer took
-// over the mount point.
-export const GuidedSessionContainer = lazy(() =>
-  import('./planning/guided/GuidedSessionContainer').then(m => ({ default: m.GuidedSessionContainer }))
-)
+// Guided sessions (Five Horizons) were deleted in the 2026-09-01 pare-down —
+// the wizard era stays dead (docs/vision-streamlined.md); paper owns thinking.
 
 // Detail panel (only renders when an item is selected)
 export const DetailPanelRedesign = lazy(() =>
