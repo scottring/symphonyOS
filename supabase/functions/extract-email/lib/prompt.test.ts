@@ -38,7 +38,7 @@ describe('parseEmailExtraction', () => {
     expect(r.events).toHaveLength(1)
     expect(r.events[0].items[0].needed).toBe('night_before')
     expect(r.todos[0].due).toBe('2026-09-15')
-    expect(r.good_to_know).toEqual(['Early dismissal Friday'])
+    expect(r.good_to_know).toEqual([{ text: 'Early dismissal Friday', for: 'everyone' }])
   })
   it('drops an event without a valid date and an item without text', () => {
     const r = parseEmailExtraction(JSON.stringify({
@@ -69,5 +69,34 @@ describe('parseEmailExtraction', () => {
   })
   it('returns an empty extraction on garbage', () => {
     expect(parseEmailExtraction('not json at all')).toEqual({ events: [], todos: [], good_to_know: [], gaps: [] })
+  })
+})
+
+describe('parseEmailExtraction — homework, detail, addressed good_to_know', () => {
+  it('reads kind and detail on todos and items; unknown kind is a todo', () => {
+    const r = parseEmailExtraction(JSON.stringify({
+      events: [{ title: 'Field trip', date: '2026-09-10', for: 'everyone',
+        items: [{ text: 'Return permission slip', for: ['Liam'], needed: 'night_before', kind: 'homework', detail: 'Aquarium, $12' },
+                { text: 'Pack lunch', for: 'everyone', needed: 'day_of', kind: 'what' }],
+        source_quote: 'q', confidence: 0.9 }],
+      todos: [{ title: 'Reading log', kind: 'homework', detail: 'omit', source_quote: 'q', confidence: 0.8 },
+              { title: 'Pay fee', source_quote: 'q', confidence: 0.8 }],
+      good_to_know: [], gaps: [],
+    }))
+    expect(r.events[0].items.map((i) => [i.kind, i.detail])).toEqual([['homework', 'Aquarium, $12'], ['todo', undefined]])
+    expect(r.todos.map((t) => [t.kind, t.detail])).toEqual([['homework', undefined], ['todo', undefined]])
+  })
+
+  it('good_to_know accepts strings (everyone) and addressed objects', () => {
+    const r = parseEmailExtraction(JSON.stringify({ events: [], todos: [], gaps: [],
+      good_to_know: ['Early dismissal Friday', { text: 'PE is Tue/Thu', for: ['Liam'] }, { text: '' }, 7] }))
+    expect(r.good_to_know).toEqual([{ text: 'Early dismissal Friday', for: 'everyone' }, { text: 'PE is Tue/Thu', for: ['Liam'] }])
+  })
+
+  it('the prompt asks for kind, detail and addressed good_to_know', () => {
+    const p = buildEmailPrompt({ subject: 's', sender: 'x', body: 'b', members, todayYmd: '2026-09-02' })
+    expect(p).toContain('"kind":"homework|todo"')
+    expect(p).toContain('"detail":"...|omit"')
+    expect(p).toContain('"good_to_know":[{"text":"...","for":["Name"]|"everyone"}]')
   })
 })
