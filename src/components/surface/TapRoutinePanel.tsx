@@ -118,7 +118,7 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
               onClick={() => setAssistOpen(true)}
               className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-sm font-medium bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition-colors"
             >
-              <ConceptIcon name="ai" size={14} decorative /> Help me plan
+              <ConceptIcon name="ai" size={14} decorative /> Discuss
             </button>
           )}
         </div>
@@ -351,6 +351,8 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
             kind: 'routine',
             notes: routine.description ?? null,
           }}
+          // A routine already carries the derived scope on its row.
+          discuss={{ type: 'routine', id: routine.id, title: routine.name, scope: routine.scope }}
           onClose={() => setAssistOpen(false)}
           onMutate={props.onAssistMutate}
         />

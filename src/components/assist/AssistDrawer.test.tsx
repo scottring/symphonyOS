@@ -14,8 +14,47 @@ vi.mock('@/hooks/useSymphonyAssistant', () => ({
       toolActivity: [],
       sendMessage,
       resetSession: vi.fn(),
+      sessions: [],
+      sessionsLoading: false,
+      loadSession: vi.fn(),
+      deleteSession: vi.fn(),
+      activeSessionId: null,
     }
   },
+}))
+
+const discussSend = vi.fn()
+const discussSpy = vi.fn()
+const discussState = vi.hoisted(() => ({
+  threadId: 'thr-1' as string | null,
+  error: null as string | null,
+  messages: [] as Array<Record<string, unknown>>,
+  participants: [] as string[],
+}))
+
+vi.mock('@/hooks/useDiscussThread', () => ({
+  DISCUSS_UNAVAILABLE: "Discussion isn't available yet",
+  useDiscussThread: (entity: unknown, opts: unknown) => {
+    discussSpy(entity, opts)
+    return {
+      threadId: discussState.threadId,
+      messages: discussState.messages,
+      loading: false,
+      sending: false,
+      error: discussState.error,
+      toolActivity: [],
+      send: discussSend,
+      participants: discussState.participants,
+      reload: vi.fn(),
+    }
+  },
+}))
+
+vi.mock('@/hooks/useFamilyMembers', () => ({
+  useFamilyMembers: () => ({
+    members: [],
+    getCurrentUserMember: () => ({ id: 'm1', name: 'Scott', auth_user_id: 'u1' }),
+  }),
 }))
 
 vi.mock('@/hooks/useAuth', () => ({
@@ -25,9 +64,16 @@ vi.mock('@/hooks/useAuth', () => ({
 import { AssistDrawer } from './AssistDrawer'
 
 const task = { id: 't1', title: 'Replace kitchen light bulbs', notes: null, projectName: null }
+const discuss = { type: 'task' as const, id: 't1', title: 'Replace kitchen light bulbs', scope: 'compound' as const }
 
 describe('AssistDrawer', () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => {
+    vi.clearAllMocks()
+    discussState.threadId = 'thr-1'
+    discussState.error = null
+    discussState.messages = []
+    discussState.participants = []
+  })
 
   it('scopes the assistant to the item and shows its title', () => {
     const onMutate = vi.fn()
@@ -53,5 +99,48 @@ describe('AssistDrawer', () => {
     render(<AssistDrawer item={task} onClose={onClose} />)
     fireEvent.click(screen.getByRole('button', { name: 'Close planning assistant' }))
     expect(onClose).toHaveBeenCalled()
+  })
+
+  describe('Discuss mode', () => {
+    it('opens the item shared thread with the scope it was handed', () => {
+      render(<AssistDrawer item={task} onClose={vi.fn()} discuss={discuss} />)
+      expect(discussSpy).toHaveBeenCalledWith(discuss, expect.objectContaining({ taskContext: task }))
+      expect(screen.getByRole('dialog', { name: 'Discuss Replace kitchen light bulbs' })).toBeInTheDocument()
+      expect(screen.getByRole('heading', { name: 'Discussion' })).toBeInTheDocument()
+    })
+
+    it('sends into the shared thread, not the solo assistant', () => {
+      render(<AssistDrawer item={task} onClose={vi.fn()} discuss={discuss} />)
+      fireEvent.click(screen.getByRole('button', { name: 'Break this into doable steps' }))
+      expect(discussSend).toHaveBeenCalledWith('Break this into doable steps')
+      expect(sendMessage).not.toHaveBeenCalled()
+    })
+
+    it("says the discussion isn't available yet when the ensure RPC failed", () => {
+      discussState.threadId = null
+      discussState.error = "Discussion isn't available yet"
+      render(<AssistDrawer item={task} onClose={vi.fn()} discuss={discuss} />)
+      expect(screen.getByText("Discussion isn't available yet")).toBeInTheDocument()
+      // No chat surface behind it — a broken chat is worse than a clear notice.
+      expect(screen.queryByRole('heading', { name: 'Discussion' })).toBeNull()
+    })
+
+    it('renders the shared thread with its authors and participants', () => {
+      discussState.participants = ['Scott', 'Iris']
+      discussState.messages = [{
+        id: 'm-0', role: 'user', content: 'Can you grab bulbs?', timestamp: new Date(),
+        author: { id: 'u2', name: 'Iris', kind: 'member' },
+      }]
+      render(<AssistDrawer item={task} onClose={vi.fn()} discuss={discuss} />)
+      expect(screen.getByText('Can you grab bulbs?')).toBeInTheDocument()
+      expect(screen.getByText('Iris')).toBeInTheDocument()
+      expect(screen.getByLabelText('Participants').textContent).toBe('SI')
+    })
+
+    it('keeps the solo planning label when no discuss entity is given', () => {
+      render(<AssistDrawer item={task} onClose={vi.fn()} />)
+      expect(screen.getByRole('dialog', { name: 'Plan Replace kitchen light bulbs' })).toBeInTheDocument()
+      expect(discussSpy).toHaveBeenCalledWith(null, expect.anything())
+    })
   })
 })

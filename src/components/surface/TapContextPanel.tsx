@@ -28,6 +28,8 @@ import { PanelFooter } from './sections/PanelFooter'
 import { useLinkedEntities } from './hooks/useLinkedEntities'
 import { useMightBeRelevant } from './hooks/useMightBeRelevant'
 import { AssistDrawer } from '@/components/assist/AssistDrawer'
+import { useFamilyMembers } from '@/hooks/useFamilyMembers'
+import { scopeForDomain } from '@/lib/scope'
 import type { MightBeRelevantItem } from './types'
 
 interface TapContextPanelProps {
@@ -99,6 +101,18 @@ export function TapContextPanel(props: TapContextPanelProps) {
 
   const [showDirections, setShowDirections] = useState(false)
   const [assistOpen, setAssistOpen] = useState(false)
+
+  // The Discuss thread is shared exactly as widely as the task is: its scope is
+  // DERIVED from the task's domain + assignees, never picked. Self is whoever
+  // OWNS the task, so a partner opening a task handed to her doesn't compute
+  // "no other assignees" and silently narrow the thread to individual.
+  const { getCurrentUserMember } = useFamilyMembers()
+  const selfMemberId = getCurrentUserMember()?.id ?? null
+  const discussScope = scopeForDomain(
+    task.context,
+    [task.assignedTo, ...(task.assignedToAll ?? [])],
+    selfMemberId,
+  )
 
   // Which empty fields the user asked to fill in. Cleared when the panel
   // switches tasks — revealing Notes on one task shouldn't open it on the next.
@@ -193,7 +207,7 @@ export function TapContextPanel(props: TapContextPanelProps) {
     ...(props.onAssistMutate
       ? [{
           id: 'assist',
-          label: 'Help me plan',
+          label: 'Discuss',
           icon: 'ai' as const,
           onClick: () => setAssistOpen(true),
         }]
@@ -353,6 +367,7 @@ export function TapContextPanel(props: TapContextPanelProps) {
             notes: task.notes ?? null,
             projectName: linked.project?.name ?? null,
           }}
+          discuss={{ type: 'task', id: task.id, title: task.title, scope: discussScope }}
           onClose={() => setAssistOpen(false)}
           onMutate={props.onAssistMutate}
         />

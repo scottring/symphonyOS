@@ -7,6 +7,7 @@ interface StoredMessage {
   role: 'user' | 'assistant'
   content: string
   timestamp?: string
+  author?: { name?: string; kind?: string }
 }
 
 interface TaskConversation {
@@ -14,6 +15,8 @@ interface TaskConversation {
   title: string
   updatedAt: Date
   messages: StoredMessage[]
+  /** The item's one shared thread. Listed first, always titled "Discussion". */
+  isDiscussion: boolean
 }
 
 interface PanelConversationsProps {
@@ -35,17 +38,30 @@ export function PanelConversations({ taskId }: PanelConversationsProps) {
     ;(async () => {
       const { data } = await supabase
         .from('chat_sessions')
-        .select('id, title, messages, updated_at')
+        .select('id, title, messages, mode, updated_at')
         .eq('entity_id', taskId)
         .order('updated_at', { ascending: false })
         .limit(10)
       if (cancelled || !data) return
-      setConversations(data.map((row) => ({
-        id: row.id,
-        title: row.title,
-        updatedAt: new Date(row.updated_at),
-        messages: Array.isArray(row.messages) ? (row.messages as StoredMessage[]) : [],
-      })))
+      const rows: TaskConversation[] = data.map((row) => {
+        const isDiscussion = row.mode === 'discuss'
+        return {
+          id: row.id,
+          // The shared thread is the item's conversation — it never inherits
+          // the first message as a title the way an ad-hoc chat does.
+          title: isDiscussion ? 'Discussion' : row.title,
+          updatedAt: new Date(row.updated_at),
+          messages: Array.isArray(row.messages) ? (row.messages as StoredMessage[]) : [],
+          isDiscussion,
+        }
+      })
+      // Discussion first, then the older chats in recency order. An untouched
+      // thread (created the moment the drawer opened) is not a conversation.
+      const withContent = rows.filter((r) => r.messages.length > 0)
+      setConversations([
+        ...withContent.filter((r) => r.isDiscussion),
+        ...withContent.filter((r) => !r.isDiscussion),
+      ])
     })()
     return () => { cancelled = true }
   }, [taskId])
@@ -82,6 +98,13 @@ export function PanelConversations({ taskId }: PanelConversationsProps) {
                           : 'bg-neutral-50 text-neutral-700 mr-2'
                       }`}
                     >
+                      {/* In a shared thread the speaker isn't obvious from the
+                          side of the bubble — say who it was. */}
+                      {c.isDiscussion && m.author?.name && (
+                        <span className="block text-[10px] font-medium uppercase tracking-wide opacity-60 mb-0.5">
+                          {m.author.name}
+                        </span>
+                      )}
                       {m.content}
                     </div>
                   ))}

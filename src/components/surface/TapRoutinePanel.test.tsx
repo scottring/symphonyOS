@@ -10,6 +10,14 @@ vi.mock('@/hooks/useRoutineStepChecklist', () => ({
   useRoutineStepChecklist: () => ({ checkedByStep: new Map(), toggleStep: vi.fn() }),
 }))
 
+const drawerProps = vi.fn()
+vi.mock('@/components/assist/AssistDrawer', () => ({
+  AssistDrawer: (props: Record<string, unknown>) => {
+    drawerProps(props)
+    return <div data-testid="assist-drawer" />
+  },
+}))
+
 // useAttachments needs auth/supabase; mock it out for render-only tests.
 vi.mock('@/hooks/useAttachments', () => ({
   useAttachments: () => ({
@@ -192,5 +200,27 @@ describe('TapRoutinePanel', () => {
       />,
     )
     expect(screen.queryByRole('button', { name: /add a daily target/i })).not.toBeInTheDocument()
+  })
+})
+
+describe('TapRoutinePanel Discuss action', () => {
+  it('labels the action Discuss and hands the drawer the routine own scope', () => {
+    const shared = { ...routine, scope: 'compound' as const }
+    render(
+      <TapRoutinePanel
+        routine={shared}
+        onClose={vi.fn()}
+        onNotesChange={vi.fn()}
+        onContextChange={vi.fn()}
+        onVisibilityChange={vi.fn()}
+        onAssistMutate={vi.fn()}
+      />,
+    )
+    const button = screen.getByRole('button', { name: 'Discuss' })
+    expect(screen.queryByRole('button', { name: 'Help me plan' })).toBeNull()
+    fireEvent.click(button)
+    expect(drawerProps).toHaveBeenCalledWith(expect.objectContaining({
+      discuss: { type: 'routine', id: 'r1', title: 'Trash night', scope: 'compound' },
+    }))
   })
 })
