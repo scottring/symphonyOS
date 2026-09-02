@@ -50,11 +50,10 @@ begin
     raise exception 'not a member of this household';
   end if;
 
-  select inbound_token into v_token from households where id = p_household;
-  if v_token is null then
-    v_token := substr(encode(gen_random_bytes(12), 'hex'), 1, 16);
-    update households set inbound_token = v_token where id = p_household;
-  end if;
+  update households
+     set inbound_token = coalesce(inbound_token, encode(gen_random_bytes(8), 'hex'))
+   where id = p_household
+   returning inbound_token into v_token;
   return v_token;
 end;
 $$;

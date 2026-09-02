@@ -28,23 +28,26 @@ Deno.serve(async (req: Request) => {
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!
   const admin = createClient(supabaseUrl, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
 
-  const { data: hh } = await admin.from('households').select('id').eq('inbound_token', body.token).maybeSingle()
+  const { data: hh, error: hhError } = await admin.from('households').select('id').eq('inbound_token', body.token).maybeSingle()
+  if (hhError) return json({ error: `db: ${hhError.message}` }, 500)
   if (!hh) return json({ error: 'unknown token' }, 404)
 
   // Owner first, else the earliest active member. The capture's user_id is
   // who the rows are written FOR; the household read policy shares them.
-  const { data: members } = await admin
+  const { data: members, error: membersError } = await admin
     .from('household_members')
     .select('user_id, role, created_at')
     .eq('household_id', hh.id)
     .eq('status', 'active')
     .order('created_at', { ascending: true })
+  if (membersError) return json({ error: `db: ${membersError.message}` }, 500)
   const owner = members?.find((m) => m.role === 'owner') ?? members?.[0]
   if (!owner) return json({ error: 'household has no active members' }, 404)
 
   const sourceKey = sourceKeyFor(body)
-  const { data: existing } = await admin
+  const { data: existing, error: existingError } = await admin
     .from('captures').select('id').eq('kind', 'email').eq('source_key', sourceKey).maybeSingle()
+  if (existingError) return json({ error: `db: ${existingError.message}` }, 500)
   if (existing) return json({ ok: true, capture_id: existing.id, duplicate: true }, 200)
 
   const rawText = `Subject: ${body.subject}\nFrom: ${body.from}\n\n${body.text}`
