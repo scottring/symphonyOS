@@ -29,7 +29,7 @@ export interface TaskRow {
   notes: string | null
   capture_id: string
   assigned_to: string | null
-  assigned_to_all: boolean
+  assigned_to_all: string[] | null
   parent_task_id: string | null
   needed_on: string | null
 }

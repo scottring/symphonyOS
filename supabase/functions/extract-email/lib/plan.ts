@@ -48,7 +48,7 @@ function baseRow(i: PlanInput, title: string): TaskRow {
   return {
     user_id: i.capture.user_id, title, completed: false, bucket: 'inbox', ...FAMILY, category: 'task',
     scheduled_for: null, is_all_day: null, location: null, notes: null, capture_id: i.capture.id,
-    assigned_to: null, assigned_to_all: false, parent_task_id: null, needed_on: null,
+    assigned_to: null, assigned_to_all: null, parent_task_id: null, needed_on: null,
   }
 }
 
@@ -106,7 +106,7 @@ export function planWrites(i: PlanInput): WritePlan {
       ...baseRow(i, ev.title), bucket: 'timed', category: 'event',
       scheduled_for: zonedIso(ev.date, ev.time ?? null, i.tz), is_all_day: !ev.time,
       location: ev.location ?? null, notes: sourceNote(i.capture, ev.source_quote),
-      assigned_to: single, assigned_to_all: ev.for === 'everyone',
+      assigned_to: single, assigned_to_all: ev.for === 'everyone' ? matched.map((m) => m.id) : null,
     }
     events.push({ parent: { row }, children: childrenFor(i, ev, []) })
   }

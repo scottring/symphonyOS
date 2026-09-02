@@ -32,7 +32,7 @@ describe('planWrites — a dated event', () => {
     expect(parent.row).toMatchObject({
       user_id: 'u1', title: 'School Picture Day', bucket: 'timed', category: 'event',
       context: 'family', scope: 'compound', is_all_day: true, capture_id: 'cap1',
-      assigned_to: null, assigned_to_all: true, parent_task_id: null, needed_on: null,
+      assigned_to: null, assigned_to_all: ['k1', 'k2'], parent_task_id: null, needed_on: null,
     })
     expect(parent.row.scheduled_for).toBe('2026-09-10T04:00:00.000Z')
     expect(parent.row.notes).toContain('From Hillside Elementary · Weekly Update')
@@ -53,14 +53,14 @@ describe('planWrites — a dated event', () => {
       ['Wear school colors', 'k1', '2026-09-10'],
       ['Wear school colors', 'k2', '2026-09-10'],
     ])
-    for (const c of kids) expect(c).toMatchObject({ bucket: 'inbox', category: 'task', context: 'family', scope: 'compound', capture_id: 'cap1', assigned_to_all: false })
+    for (const c of kids) expect(c).toMatchObject({ bucket: 'inbox', category: 'task', context: 'family', scope: 'compound', capture_id: 'cap1', assigned_to_all: null })
   })
   it('a single named child becomes the parent assignee', () => {
     const p = planWrites({ ...base, extraction: { ...empty, events: [pictureDay({ for: ['Mia'], items: [] })] } })
     const parent = p.events[0].parent
     if (!('row' in parent)) throw new Error('expected new row')
     expect(parent.row.assigned_to).toBe('k2')
-    expect(parent.row.assigned_to_all).toBe(false)
+    expect(parent.row.assigned_to_all).toBeNull()
   })
   it('an unmatched name stays in the item text, unassigned', () => {
     const ev = pictureDay({ items: [{ text: 'Bring a snack', for: ["Ms. Reyes' class"], needed: 'day_of' }] })
