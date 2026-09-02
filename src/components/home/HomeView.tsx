@@ -27,6 +27,7 @@ function isWeekV2Enabled(): boolean {
   return localStorage.getItem(WEEK_V2_FLAG) !== 'off'
 }
 import { mondayOfWeek } from '@/lib/workweekHelpers'
+import { findTaskById } from '@/lib/findTaskById'
 import { sundayOfWeek } from '@/lib/weekHelpers'
 import { CascadingRiverView } from './CascadingRiverView'
 import { TodayView } from '@/components/schedule/TodayView'
@@ -216,8 +217,11 @@ export function HomeView({
   const handleToggleTaskWithUndo = useCallback((taskId: string) => {
     // Read the prior state from the FULL task list, not `filteredTasks`:
     // carried-over / overdue items are excluded from the today list, so looking
-    // them up there returned undefined and mislabeled the toast.
-    const task = tasks.find(t => t.id === taskId)
+    // them up there returned undefined and mislabeled the toast. And through
+    // the shared nested lookup, not a flat `.find` — per-person items are
+    // SUBTASKS, so a flat scan missed them exactly the same way, and `toggleTask`
+    // (which this has to agree with) has always walked the nesting.
+    const task = findTaskById(tasks, taskId)
     const wasCompleted = task?.completed ?? false
     ctx.onToggleTask(taskId)
     // Undo sets the EXPLICIT prior state via updateTask — it must NOT call

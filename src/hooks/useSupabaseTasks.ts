@@ -4,6 +4,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useFamilyMembers } from './useFamilyMembers'
 import { showToast } from './useToast'
 import { logger } from '@/lib/logger'
+import { findTaskById as lookupTaskById } from '@/lib/findTaskById'
 import type { Task, TaskBucket, TaskLink, TaskContext, TaskCategory, TaskCaptureMeta, LinkedActivity, LinkType, LinkedActivityType, GroupMemberRef } from '@/types/task'
 import type { TaskDirections } from '@/types/directions'
 import { scopeForDomain, memberForAuthUser, type Scope } from '@/lib/scope'
@@ -812,17 +813,13 @@ export function useSupabaseTasks() {
     return createdSubtask.id
   }, [user, tasks, getCurrentUserMember])
 
-  // Helper to find a task by id, including in subtasks
-  const findTaskById = useCallback((id: string): Task | undefined => {
-    for (const task of tasksRef.current) {
-      if (task.id === id) return task
-      if (task.subtasks) {
-        const subtask = task.subtasks.find((s) => s.id === id)
-        if (subtask) return subtask
-      }
-    }
-    return undefined
-  }, [])
+  // Helper to find a task by id, including in subtasks. The walk itself lives
+  // in @/lib/findTaskById so callers outside this hook (HomeView's undo toast)
+  // can agree with it about a subtask instead of scanning the list flat.
+  const findTaskById = useCallback(
+    (id: string): Task | undefined => lookupTaskById(tasksRef.current, id),
+    [],
+  )
 
   // Helper to find parent of a subtask
   const findParentOfSubtask = useCallback((subtaskId: string): Task | undefined => {
