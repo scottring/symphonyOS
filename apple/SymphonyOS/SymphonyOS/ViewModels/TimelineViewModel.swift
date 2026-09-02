@@ -34,7 +34,8 @@ final class TimelineViewModel {
         date: Date,
         domainFilter: DomainFilter,
         showCoaching: Bool,
-        eventItems: [TimelineItem] = []
+        eventItems: [TimelineItem] = [],
+        eventNotes: [EventNote] = []
     ) {
         var items: [TimelineItem] = []
         var inbox: [SymphonyTask] = []
@@ -43,6 +44,14 @@ final class TimelineViewModel {
         let cal = Calendar.current
         let startOfDay = cal.startOfDay(for: date)
         let isToday = cal.isDateInToday(date)
+
+        // Subtasks attach to their parent's card. Not filtered by domain — they
+        // inherit the parent's placement. Orphans (parent not on this day) are
+        // excluded, the same stance as before.
+        var childrenByParent: [UUID: [SymphonyTask]] = [:]
+        for task in tasks {
+            if let pid = task.parentTaskId { childrenByParent[pid, default: []].append(task) }
+        }
 
         // Tasks scheduled for this date
         for task in tasks {
@@ -74,6 +83,10 @@ final class TimelineViewModel {
                 continue
             }
 
+            let kids = (childrenByParent[task.id] ?? [])
+                .sorted { $0.createdAt < $1.createdAt }
+                .map { TimelineItem.ChildItem(id: $0.id, title: $0.title, completed: $0.completed,
+                                              assignedTo: $0.assignedToAll ?? ($0.assignedTo.map { [$0] } ?? [])) }
             items.append(TimelineItem(
                 id: "task-\(task.id.uuidString)",
                 type: .task,
@@ -84,7 +97,13 @@ final class TimelineViewModel {
                 context: task.context,
                 entityId: task.id,
                 assignedTo: task.assignedToAll ?? (task.assignedTo.map { [$0] } ?? []),
-                location: task.location
+                location: task.location,
+                notes: task.notes,
+                links: task.links ?? [],
+                phoneNumber: task.phoneNumber,
+                locationPlaceId: task.locationPlaceId,
+                source: Self.source(type: .task, captureId: task.captureId, scope: task.scope),
+                children: kids
             ))
         }
 
@@ -166,7 +185,12 @@ final class TimelineViewModel {
                     cal.isDate($0.date, inSameDayAs: date)
                 }?.status
                 event.completed = status == "completed" || status == "skipped"
+                if let note = eventNotes.first(where: { $0.googleEventId == key }) {
+                    event.notes = note.notes
+                    event.links = note.links ?? []
+                }
             }
+            event.source = Self.source(type: .event, captureId: nil, scope: nil)
             items.append(event)
         }
 
@@ -185,6 +209,15 @@ final class TimelineViewModel {
         self.carriedOverTasks = carried.sorted {
             ($0.scheduledFor ?? .distantPast) < ($1.scheduledFor ?? .distantPast)
         }
+    }
+
+    /// Source pill rule (spec §3): event → calendar; capture → email;
+    /// couple/compound scope → shared; otherwise none.
+    static func source(type: TimelineItem.ItemType, captureId: UUID?, scope: String?) -> TimelineItem.Source? {
+        if type == .event { return .calendar }
+        if captureId != nil { return .email }
+        if scope == "couple" || scope == "compound" { return .shared }
+        return nil
     }
 
     func section(for item: TimelineItem) -> TimeSection {
@@ -259,11 +292,61 @@ struct TimelineItem: Identifiable {
     /// (matches the web: entity_id = google_event_id).
     var eventKey: String? = nil
 
+    // Context that surfaces on the card (landing: "every block carries everything you need")
+    var notes: String? = nil
+    var links: [TaskLink] = []
+    var phoneNumber: String? = nil
+    var locationPlaceId: String? = nil
+    var source: Source? = nil
+    var children: [ChildItem] = []
+
     enum ItemType: String {
         case task
         case routine
         case event
         case playbook
+    }
+
+    /// Where a block came from — the pill in its top-right corner.
+    enum Source: String {
+        case email, calendar, shared
+
+        var label: String {
+            switch self {
+            case .email:    return "From an email"
+            case .calendar: return "From the calendar"
+            case .shared:   return "Shared"
+            }
+        }
+    }
+
+    /// A subtask rendered as a check-circle row under its parent.
+    struct ChildItem: Identifiable, Equatable {
+        let id: UUID
+        let title: String
+        var completed: Bool
+        let assignedTo: [UUID]
+    }
+
+    /// Block (rich card) vs plain row. A bare calendar event is a plain row —
+    /// the calendar pill only shows once the event carries something else.
+    var isBlock: Bool {
+        noteLine != nil
+            || !links.isEmpty
+            || phoneNumber != nil
+            || location != nil
+            || !children.isEmpty
+            || source == .email
+            || source == .shared
+    }
+
+    /// First non-empty line of `notes`, for the italic serif line.
+    var noteLine: String? {
+        guard let notes else { return nil }
+        return notes
+            .split(separator: "\n", omittingEmptySubsequences: true)
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .first { !$0.isEmpty }
     }
 
     var timeString: String? {

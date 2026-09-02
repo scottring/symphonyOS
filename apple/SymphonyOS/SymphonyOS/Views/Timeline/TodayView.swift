@@ -19,6 +19,7 @@ struct TodayView: View {
     @Query private var instances: [ActionableInstance]
     @Query private var playbookBlocks: [PlaybookBlock]
     @Query private var playbookInstances: [PlaybookInstance]
+    @Query private var eventNotes: [EventNote]
 
     var body: some View {
         ZStack {
@@ -331,7 +332,8 @@ struct TodayView: View {
             // Playbook "coaching" blocks (Solo Morning, Get Ready Relay, …) are
             // relics — keep them off the timeline.
             showCoaching: false,
-            eventItems: calendar.eventItems
+            eventItems: calendar.eventItems,
+            eventNotes: eventNotes
         )
         NotificationManager.reconcile(allTasks)
     }

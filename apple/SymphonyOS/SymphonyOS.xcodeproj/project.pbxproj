@@ -84,6 +84,7 @@
 		F08C7F7216940A46A570861A /* ScanReviewSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AFD8CF30E6FA1E8858E08894 /* ScanReviewSheet.swift */; };
 		F13311D96ED0C89151D9A8B7 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F95E01EADA6CAD09DF1A9B0A /* SettingsView.swift */; };
 		F6622C0BA431BC0127286CC5 /* SymphonyOSTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5FB4D96D411C7D7D86349E97 /* SymphonyOSTests.swift */; };
+		F90FEBB07169AAE26DA4DC6F /* TimelineEnrichmentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4E6747A78170172B1525262 /* TimelineEnrichmentTests.swift */; };
 		FB97C68042921BA69DA1E83A /* FamilyMember.swift in Sources */ = {isa = PBXBuildFile; fileRef = B03612661785F1EE17B02E03 /* FamilyMember.swift */; };
 /* End PBXBuildFile section */
 
@@ -172,6 +173,7 @@
 		BC121327DD5EAA34D4F0F0CA /* TaskAttachmentsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TaskAttachmentsSection.swift; sourceTree = "<group>"; };
 		BE9B63396EED51B4EA9EE15E /* SymphonyOS.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = SymphonyOS.entitlements; sourceTree = "<group>"; };
 		C1A8120C9CE4FA0B9EF5ED68 /* InboxView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InboxView.swift; sourceTree = "<group>"; };
+		C4E6747A78170172B1525262 /* TimelineEnrichmentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelineEnrichmentTests.swift; sourceTree = "<group>"; };
 		C70125BB35B8D28477A4D891 /* PlaybookInstance.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybookInstance.swift; sourceTree = "<group>"; };
 		C98347D43F09BA622FEB4503 /* DomainSwitcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DomainSwitcher.swift; sourceTree = "<group>"; };
 		CBF0FC1CF6088ADE5D739EB5 /* EventNote.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EventNote.swift; sourceTree = "<group>"; };
@@ -487,6 +489,7 @@
 				FDA21FA32A236A44EDB99EE6 /* DesignSystemTests.swift */,
 				5FB4D96D411C7D7D86349E97 /* SymphonyOSTests.swift */,
 				91980E464779ADF9B4FE89A3 /* SyncSerializationTests.swift */,
+				C4E6747A78170172B1525262 /* TimelineEnrichmentTests.swift */,
 			);
 			path = SymphonyOSTests;
 			sourceTree = "<group>";
@@ -649,6 +652,7 @@
 				6FA7A8C0F8DCA3F3F9D2293F /* DesignSystemTests.swift in Sources */,
 				F6622C0BA431BC0127286CC5 /* SymphonyOSTests.swift in Sources */,
 				02E7F7BF8E5CF9DB0592F619 /* SyncSerializationTests.swift in Sources */,
+				F90FEBB07169AAE26DA4DC6F /* TimelineEnrichmentTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
