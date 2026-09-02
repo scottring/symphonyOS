@@ -28,7 +28,7 @@ import { partitionSelection } from '@/lib/today/timelineKey'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
 import type { ProactiveSuggestion } from '@/types/proactiveSuggestion'
 import { useUnpromptedSuggestions, type UnpromptedItem } from '@/hooks/useUnpromptedSuggestions'
-import { isEventFree } from '@/lib/today/eventFree'
+import { suggestionIsForFreeEvent } from '@/lib/today/eventFree'
 import { UnpromptedLines } from '@/components/assistant/UnpromptedLines'
 import { resolveSuggestionAction, revealItemId } from '@/lib/assistant/suggestionAction'
 import { useSystemHealth, getHealthTextClasses } from '@/hooks/useSystemHealth'
@@ -456,12 +456,9 @@ export function TodayView({
   // (e.g. "leave by…") never surface, even if the engine generated one before
   // the flag was set.
   const visibleUnpromptedItems = useMemo(() => {
-    return unprompted.items.filter((item) => {
-      if (item.suggestion.entityType !== 'calendar_event') return true
-      const event = events.find((e) => (e.google_event_id || e.id) === item.suggestion.entityId)
-      if (!event) return true
-      return !isEventFree(event, ctx.eventNotesMap)
-    })
+    return unprompted.items.filter(
+      (item) => !suggestionIsForFreeEvent(item.suggestion, events, ctx.eventNotesMap),
+    )
   }, [unprompted.items, events, ctx.eventNotesMap])
 
   // `?why=1` renders each suggestion's policy verdict — the thing that makes a

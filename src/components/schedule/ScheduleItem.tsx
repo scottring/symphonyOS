@@ -437,10 +437,17 @@ export const ScheduleItem = memo(function ScheduleItem({
           <div className={`text-[15px] font-semibold leading-tight line-clamp-2 break-words ${item.completed || item.skipped ? 'line-through text-neutral-400' : 'text-neutral-800'}`}>
             {item.title}
           </div>
-          {contextLabel && (
+          {(contextLabel || isFree) && (
             <div className="flex items-center gap-1.5 text-[12px] text-neutral-500 mt-0.5 truncate">
+              {/* Free chip — a dimmed mobile row needs its own explanation;
+                  there's no hover state on a phone to reveal one. */}
+              {isFree && (
+                <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-neutral-500 bg-neutral-100 rounded px-1.5 py-0.5">
+                  Free
+                </span>
+              )}
               {dotColor && <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: dotColor }} />}
-              <span className="truncate">{contextLabel}</span>
+              {contextLabel && <span className="truncate">{contextLabel}</span>}
             </div>
           )}
           {fromEmail && (
