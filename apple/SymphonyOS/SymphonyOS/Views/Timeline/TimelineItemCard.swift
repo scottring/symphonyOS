@@ -36,7 +36,8 @@ struct TimelineItemCard: View {
 
     var body: some View {
         SlideRow(
-            onComplete: {
+            // A free event carries no expectation — no swipe-to-complete.
+            onComplete: item.isFree ? nil : {
                 withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) { isCompleted.toggle() }
                 toggleCompletion()
             },
@@ -71,6 +72,7 @@ struct TimelineItemCard: View {
                         eventTitle: item.title,
                         eventStart: item.startTime,
                         eventLocation: item.location,
+                        recurringEventId: item.recurringEventId,
                         date: date,
                         userId: userId
                     )
@@ -159,19 +161,25 @@ struct TimelineItemCard: View {
                     .lineLimit(2)
             }
 
+            if item.isFree { FreePill() }
+
             Spacer(minLength: 0)
 
             AssigneeAvatars(memberIds: item.assignedTo, members: familyMembers, size: 20)
 
-            CheckCircle(checked: isCompleted) {
-                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) { isCompleted.toggle() }
-                toggleCompletion()
+            // A free event is informational only — nothing for a parent to
+            // check off.
+            if !item.isFree {
+                CheckCircle(checked: isCompleted) {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) { isCompleted.toggle() }
+                    toggleCompletion()
+                }
             }
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
         .background(Color.bgSurface, in: RoundedRectangle(cornerRadius: 10))
-        .opacity(isCompleted ? 0.7 : 1.0)
+        .opacity(item.isFree ? 0.6 : (isCompleted ? 0.7 : 1.0))
     }
 
     // MARK: Block — rail · time + pill · serif title · note line · children · context row
@@ -188,6 +196,7 @@ struct TimelineItemCard: View {
                         .font(.captionText)
                         .foregroundStyle(Color.textTertiary)
                     Spacer()
+                    if item.isFree { FreePill() }
                     if let source = item.source { SourcePill(source: source) }
                 }
 
@@ -228,7 +237,7 @@ struct TimelineItemCard: View {
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Color.cardBorder, lineWidth: 1))
         .shadow(color: Color.cardShadow, radius: 8, x: 0, y: 2)
-        .opacity(isCompleted ? 0.7 : 1.0)
+        .opacity(item.isFree ? 0.6 : (isCompleted ? 0.7 : 1.0))
         .sheet(item: $safariURL) { url in SafariView(url: url) }
     }
 
@@ -384,6 +393,19 @@ struct SourcePill: View {
 
     private var foreground: Color { source == .calendar ? .infoBlue : .primaryTint }
     private var background: Color { source == .calendar ? .infoBlueBg : .accentBg }
+}
+
+// MARK: - Free pill ("the kids just show up" — informational, no expectation)
+
+struct FreePill: View {
+    var body: some View {
+        Text("Free")
+            .font(.captionBold)
+            .foregroundStyle(Color.textTertiary)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(Color.bgSurface, in: RoundedRectangle(cornerRadius: 6))
+    }
 }
 
 // MARK: - Check circle (plain rows + child rows)

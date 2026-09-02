@@ -103,6 +103,10 @@ struct GoogleCalendarEvent: Decodable {
     let startTime: String
     let allDay: Bool?
     let location: String?
+    /// The series id for a recurring instance — where the "Free" flag lives
+    /// (`event_notes` keyed by this instead of the instance id). Nil for a
+    /// one-off event.
+    let recurringEventId: String?
 
     enum CodingKeys: String, CodingKey {
         case googleEventId = "google_event_id"
@@ -110,6 +114,7 @@ struct GoogleCalendarEvent: Decodable {
         case startTime = "start_time"
         case allDay = "all_day"
         case location
+        case recurringEventId = "recurring_event_id"
     }
 
     func toTimelineItem() -> TimelineItem {
@@ -125,7 +130,8 @@ struct GoogleCalendarEvent: Decodable {
             context: nil,
             entityId: UUID(),          // Google events have no Symphony UUID
             location: location,
-            eventKey: googleEventId
+            eventKey: googleEventId,
+            recurringEventId: recurringEventId
         )
     }
 

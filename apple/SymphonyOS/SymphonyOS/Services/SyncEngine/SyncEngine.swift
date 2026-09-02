@@ -611,6 +611,7 @@ actor SyncEngine {
             "assigned_to_all": us(n.assignedToAll),
             "recipe_url": s(n.recipeUrl),
             "project_id": u(n.projectId),
+            "is_free": .bool(n.isFree),
             "created_at": .string(isoOut.string(from: n.createdAt)),
             "updated_at": .string(isoOut.string(from: Date())),
         ]

@@ -162,12 +162,13 @@ struct SyncSerializationTests {
         let prodColumns: Set<String> = [
             "id", "user_id", "google_event_id", "notes", "links", "event_title",
             "event_start_time", "context", "shared_with_family", "share_nudge_dismissed",
-            "assigned_to", "assigned_to_all", "recipe_url", "project_id",
+            "assigned_to", "assigned_to_all", "recipe_url", "project_id", "is_free",
             "created_at", "updated_at",
         ]
         #expect(Set(row.keys).isSubset(of: prodColumns))
         #expect(row["google_event_id"]?.stringValue == "abc123googleid")
         #expect(row["notes"]?.stringValue == "Bring insurance card")
+        #expect(row["is_free"]?.boolValue == false)
     }
 
     @Test func eventNoteInsertUpsertsOnNaturalKey() throws {

@@ -154,6 +154,7 @@ final class TimelineViewModel {
                     event.links = note.links ?? []
                 }
             }
+            event.isFree = Self.isEventFree(eventKey: event.eventKey, seriesKey: event.recurringEventId, notes: eventNotes)
             event.source = Self.source(type: .event, captureId: nil, scope: nil)
             items.append(event)
         }
@@ -173,6 +174,16 @@ final class TimelineViewModel {
         self.carriedOverTasks = carried.sorted {
             ($0.scheduledFor ?? .distantPast) < ($1.scheduledFor ?? .distantPast)
         }
+    }
+
+    /// "Free" resolution — mirrors the web's `isEventFree` in
+    /// `src/lib/today/eventFree.ts` exactly: instance OR series, plain OR,
+    /// no per-occurrence opt-out (an instance note that exists but was never
+    /// marked free must not defeat a flagged series).
+    static func isEventFree(eventKey: String?, seriesKey: String?, notes: [EventNote]) -> Bool {
+        let instanceFree = eventKey.flatMap { key in notes.first { $0.googleEventId == key } }?.isFree ?? false
+        let seriesFree = seriesKey.flatMap { key in notes.first { $0.googleEventId == key } }?.isFree ?? false
+        return instanceFree || seriesFree
     }
 
     /// Source pill rule (spec §3): event → calendar; capture → email;
@@ -262,6 +273,13 @@ struct TimelineItem: Identifiable {
     var locationPlaceId: String? = nil
     var source: Source? = nil
     var children: [ChildItem] = []
+    /// The series id for a recurring calendar event (from
+    /// `GoogleCalendarEvent.recurringEventId`) — where the "Free" flag's
+    /// series note is keyed. Nil for tasks/routines and one-off events.
+    var recurringEventId: String? = nil
+    /// Resolved by `TimelineViewModel.isEventFree` (instance note OR series
+    /// note). Free events render dimmed, unactionable, no check circle.
+    var isFree: Bool = false
 
     enum ItemType: String {
         case task

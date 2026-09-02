@@ -235,6 +235,7 @@ enum RowMapper {
         note.assignedToAll = row.uuidArray("assigned_to_all")
         note.recipeUrl = row.string("recipe_url")
         note.projectId = row.uuid("project_id")
+        note.isFree = row.bool("is_free") ?? false
         note.lastSyncedAt = Date()
         note.createdAt = row.date("created_at") ?? Date()
         note.updatedAt = row.date("updated_at") ?? Date()

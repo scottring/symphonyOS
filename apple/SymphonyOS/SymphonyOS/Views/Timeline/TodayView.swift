@@ -327,7 +327,9 @@ struct TodayView: View {
     }
 
     /// Same idea for EventNote content — notes/links typed in the event detail
-    /// sheet must flip a plain event row into a block card without leaving Today.
+    /// sheet must flip a plain event row into a block card without leaving Today,
+    /// and toggling Free (which may write a SERIES note, not the instance note
+    /// any particular event row already held) must redim/undim it the same way.
     private var eventNotesRevision: Int {
         var hasher = Hasher()
         hasher.combine(eventNotes.count)
@@ -335,6 +337,7 @@ struct TodayView: View {
             hasher.combine(note.id)
             hasher.combine(note.notes)
             hasher.combine(note.links?.count)
+            hasher.combine(note.isFree)
         }
         return hasher.finalize()
     }

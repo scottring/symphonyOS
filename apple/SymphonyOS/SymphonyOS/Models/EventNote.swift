@@ -26,6 +26,13 @@ final class EventNote {
     var assignedToAll: [UUID]?
     var recipeUrl: String?
     var projectId: UUID?
+    /// "Free" event: informational only, no prep/handoff, dimmed and
+    /// unactionable on Today (spec docs/superpowers/specs/2026-09-02-event-free-flag-design.md).
+    /// For a recurring series this lives on a note keyed by the series id
+    /// (`recurring_event_id`), not the instance id — see `TimelineViewModel.isEventFree`.
+    /// Inline default (not just in `init`) so SwiftData's lightweight migration
+    /// can add this column to an existing on-device store without a value.
+    var isFree: Bool = false
 
     // Sync
     var syncStatus: SyncStatus
@@ -53,6 +60,7 @@ final class EventNote {
         self.assignedToAll = nil
         self.recipeUrl = nil
         self.projectId = nil
+        self.isFree = false
         self.syncStatus = syncStatus
         self.lastSyncedAt = nil
         self.createdAt = Date()

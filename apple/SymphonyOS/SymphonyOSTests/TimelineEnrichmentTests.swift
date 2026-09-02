@@ -19,6 +19,12 @@ private func build(_ tasks: [SymphonyTask]) -> [TimelineItem] {
     return vm.timelineItems
 }
 
+private func eventNote(_ googleEventId: String, isFree: Bool) -> EventNote {
+    let note = EventNote(userId: UUID(), googleEventId: googleEventId)
+    note.isFree = isFree
+    return note
+}
+
 struct TimelineEnrichmentTests {
     @Test func subtasksAttachToTheirOnDayParentInCreatedOrder() {
         let parent = task("School — Picture Day")
@@ -80,5 +86,30 @@ struct TimelineEnrichmentTests {
         let event = TimelineItem(id: "gcal-1", type: .event, title: "Team standup", startTime: Date(), isAllDay: false,
                                  completed: false, context: nil, entityId: UUID(), eventKey: "1", source: .calendar)
         #expect(event.isBlock == false)
+    }
+
+    // "Free" resolution — mirrors src/lib/today/eventFree.test.ts precedence.
+    @Test func freeIsFalseWithNoNotes() {
+        #expect(TimelineViewModel.isEventFree(eventKey: "a", seriesKey: nil, notes: []) == false)
+    }
+
+    @Test func freeReadsTheInstanceNote() {
+        #expect(TimelineViewModel.isEventFree(eventKey: "a", seriesKey: nil, notes: [eventNote("a", isFree: true)]) == true)
+    }
+
+    @Test func freeFallsBackToTheSeriesNote() {
+        #expect(TimelineViewModel.isEventFree(eventKey: "a_1", seriesKey: "a", notes: [eventNote("a", isFree: true)]) == true)
+    }
+
+    @Test func freeIsAnOrEvenWhenTheInstanceNoteIsUnflagged() {
+        // Plain OR, no per-occurrence opt-out: an instance note that exists but
+        // was never marked free must not defeat a flagged series.
+        let notes = [eventNote("a", isFree: true), eventNote("a_1", isFree: false)]
+        #expect(TimelineViewModel.isEventFree(eventKey: "a_1", seriesKey: "a", notes: notes) == true)
+    }
+
+    @Test func freeIsFalseWhenNeitherInstanceNorSeriesIsFlagged() {
+        let notes = [eventNote("a", isFree: false), eventNote("b", isFree: false)]
+        #expect(TimelineViewModel.isEventFree(eventKey: "a", seriesKey: "b", notes: notes) == false)
     }
 }

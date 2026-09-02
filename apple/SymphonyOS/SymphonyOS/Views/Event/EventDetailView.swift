@@ -15,6 +15,10 @@ struct EventDetailView: View {
     let eventTitle: String
     let eventStart: Date?
     let eventLocation: String?
+    /// The series id for a recurring event — the "Free" toggle writes the
+    /// note keyed by this (a series note applies to every occurrence) instead
+    /// of `googleEventId`. Nil for a one-off event.
+    let recurringEventId: String?
     /// The day this card was opened for — the Skip action attaches to it.
     let date: Date
     let userId: UUID
@@ -28,11 +32,17 @@ struct EventDetailView: View {
     @State private var showAddLink = false
     @State private var newLinkURL = ""
     @State private var newLinkTitle = ""
+    @State private var isFree = false
+
+    /// Where the Free flag is written: the series when recurring, else the
+    /// instance — mirrors the web's `freeKeyFor`.
+    private var freeNoteKey: String { recurringEventId ?? googleEventId }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
                 header
+                freeSection
                 Divider()
                 notesSection
                 AttachmentsSection(entityType: "event_note", entityId: googleEventId)
@@ -84,6 +94,29 @@ struct EventDetailView: View {
         let f = DateFormatter()
         f.dateFormat = "EEEE, MMM d · h:mm a"
         return f.string(from: start)
+    }
+
+    // MARK: - Free ("the kids just show up" — informational only)
+
+    private var freeSection: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Toggle(isOn: Binding(
+                get: { isFree },
+                set: { setFree($0) }
+            )) {
+                Text("Free")
+                    .font(.bodyMedium)
+                    .foregroundStyle(Color.textPrimary)
+            }
+            Text(freeCaption)
+                .font(.captionText)
+                .foregroundStyle(Color.textTertiary)
+        }
+    }
+
+    private var freeCaption: String {
+        let base = "The kids just show up — no prep, no handoff, nothing for a parent to do."
+        return recurringEventId != nil ? base + " Applies to every occurrence." : base
     }
 
     // MARK: - Notes
@@ -214,25 +247,33 @@ struct EventDetailView: View {
     private func loadIfNeeded() {
         guard !loaded else { return }
         loaded = true
-        if let note = existingNote() {
+        let allNotes = (try? modelContext.fetch(FetchDescriptor<EventNote>())) ?? []
+        if let note = allNotes.first(where: { $0.googleEventId == googleEventId }) {
             // Notes are stored as Tiptap HTML (or markdown-style text — the
             // web's `notesToHtml` accepts either); the editor here only ever
             // shows/edits markdown-style text.
             notesText = NotesHTML.toMarkdown(note.notes ?? "")
             links = note.links ?? []
         }
+        isFree = TimelineViewModel.isEventFree(eventKey: googleEventId, seriesKey: recurringEventId, notes: allNotes)
     }
 
-    private func existingNote() -> EventNote? {
+    /// `key` defaults to the instance id (`googleEventId`) — notes/links stay
+    /// per-instance. The Free toggle passes `freeNoteKey` (the series id when
+    /// recurring) so it reads/writes the series-level note.
+    private func existingNote(for key: String? = nil) -> EventNote? {
+        let targetKey = key ?? googleEventId
         let all = (try? modelContext.fetch(FetchDescriptor<EventNote>())) ?? []
-        return all.first { $0.googleEventId == googleEventId }
+        return all.first { $0.googleEventId == targetKey }
     }
 
-    /// The EventNote for this event, created (and queued as an insert) on first
-    /// edit so merely opening a card never writes an empty row.
-    private func ensureNote() -> EventNote {
-        if let note = existingNote() { return note }
-        let note = EventNote(userId: userId, googleEventId: googleEventId)
+    /// The EventNote for `key` (default the instance id), created (and queued
+    /// as an insert) on first edit so merely opening a card never writes an
+    /// empty row.
+    private func ensureNote(for key: String? = nil) -> EventNote {
+        let targetKey = key ?? googleEventId
+        if let note = existingNote(for: targetKey) { return note }
+        let note = EventNote(userId: userId, googleEventId: targetKey)
         note.eventTitle = eventTitle
         note.eventStartTime = eventStart
         modelContext.insert(note)
@@ -250,6 +291,13 @@ struct EventDetailView: View {
     private func saveNotes(_ text: String) {
         let note = ensureNote()
         note.notes = text.isEmpty ? nil : text
+        persist(note)
+    }
+
+    private func setFree(_ free: Bool) {
+        isFree = free
+        let note = ensureNote(for: freeNoteKey)
+        note.isFree = free
         persist(note)
     }
 

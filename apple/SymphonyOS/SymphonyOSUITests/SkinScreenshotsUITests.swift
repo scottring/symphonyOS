@@ -203,6 +203,61 @@ final class SkinScreenshotsUITests: XCTestCase {
         app.buttons["Done"].firstMatch.tap()
     }
 
+    // MARK: - "Free" events live check (Task 5, event-free-flag)
+
+    /// Opens the seeded recurring "Monthly planning session" event, flips the
+    /// Free toggle, dismisses, and screenshots Today with the row dimmed and
+    /// showing the "Free" pill with no check circle — visual evidence the
+    /// resolver + toggle + row rendering actually work end to end on device,
+    /// not just in the unit suite.
+    @MainActor
+    func testFreeEventTogglesRowToDimmedNoCheckCircle() throws {
+        let app = XCUIApplication()
+        app.launch()
+        installSystemAlertMonitor(app)
+        signIn(app)
+
+        let today = app.staticTexts["Today"]
+        XCTAssertTrue(today.waitForExistence(timeout: 30), "never reached Today")
+
+        let event = app.staticTexts["Monthly planning session"].firstMatch
+        XCTAssertTrue(event.waitForExistence(timeout: 20), "no 'Monthly planning session' event on Today")
+        // The row can exist in the tree below the fold — scroll it into view
+        // before dragging, or the coordinate-offset drag below lands on
+        // whatever's actually on screen.
+        var scrollAttempts = 0
+        while !event.isHittable, scrollAttempts < 8 {
+            app.swipeUp()
+            scrollAttempts += 1
+        }
+        XCTAssertTrue(event.isHittable, "'Monthly planning session' never scrolled into view")
+        attach(name: "free-01-today-before")
+
+        // Events only expose "Details"/"Skip" via the row's slide actions —
+        // there is no direct tap-to-open.
+        revealSlideActions(event)
+        let detailsAction = app.buttons["Details"]
+        XCTAssertTrue(detailsAction.waitForExistence(timeout: 5), "event row action panel never revealed")
+        detailsAction.tap()
+
+        let freeToggle = app.switches["Free"]
+        XCTAssertTrue(freeToggle.waitForExistence(timeout: 10), "event detail sheet never showed the Free toggle")
+        attach(name: "free-02-detail-before")
+
+        freeToggle.tap()
+        // The write is an optimistic local model edit + queued sync — no new
+        // element to wait on, so a short settle sleep covers the toggle
+        // animation the same way the check-circle tap test does above.
+        Thread.sleep(forTimeInterval: 1)
+        attach(name: "free-03-detail-after")
+
+        app.buttons["Done"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["Monthly planning session"].firstMatch.waitForExistence(timeout: 10),
+                      "never returned to Today after dismissing the event sheet")
+        Thread.sleep(forTimeInterval: 1)
+        attach(name: "free-04-today-after")
+    }
+
     // MARK: - Helpers
 
     private func installSystemAlertMonitor(_ app: XCUIApplication) {
