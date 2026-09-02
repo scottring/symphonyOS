@@ -165,6 +165,19 @@ export function AuthForm() {
                 </>
               )}
             </p>
+            {isSignUp && (
+              <p className="mt-3 text-xs text-neutral-400">
+                By creating an account you agree to how Symphony handles your data, described in the{' '}
+                <a
+                  href="https://www.symphony-os.com/privacy"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-neutral-500 underline hover:text-neutral-700"
+                >
+                  privacy page
+                </a>.
+              </p>
+            )}
           </div>
         </div>
       </div>
