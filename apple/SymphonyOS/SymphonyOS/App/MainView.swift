@@ -23,18 +23,36 @@ struct iOSMainView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var showCapture = false
 
+    private var dock: some View {
+        @Bindable var state = appState
+        return SymphonyDock(activeTab: $state.activeTab) { showCapture = true }
+    }
+
     var body: some View {
         @Bindable var state = appState
         Group {
+            // The dock's `.safeAreaInset` is attached to each NavigationStack's
+            // OWN content (inside the stack), not to the `Group` wrapping the
+            // switch. A NavigationStack hosts its content in its own UIKit view
+            // controller, which does not forward a safe-area inset added by an
+            // ancestor OUTSIDE the stack down to that content — so a sibling
+            // `VStack { Spacer(); QuickCaptureBar() }` inside TodayView/InboxView
+            // never saw the reserved space and rendered behind the dock.
+            // Attaching the inset to each destination view directly — INSIDE the
+            // NavigationStack initializer, not wrapping the stack from outside —
+            // keeps it inside the same view-controller boundary that Today/Inbox
+            // actually measure against (an inset attached to `NavigationStack { … }`
+            // from outside the braces still doesn't propagate down).
             switch state.activeTab {
-            case .today:    NavigationStack { TodayView() }
-            case .inbox:    NavigationStack { InboxView() }
-            case .projects: NavigationStack { ProjectListView() }
-            case .more:     NavigationStack { MoreView() }
+            case .today:
+                NavigationStack { TodayView().safeAreaInset(edge: .bottom, spacing: 0) { dock } }
+            case .inbox:
+                NavigationStack { InboxView().safeAreaInset(edge: .bottom, spacing: 0) { dock } }
+            case .projects:
+                NavigationStack { ProjectListView().safeAreaInset(edge: .bottom, spacing: 0) { dock } }
+            case .more:
+                NavigationStack { MoreView().safeAreaInset(edge: .bottom, spacing: 0) { dock } }
             }
-        }
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            SymphonyDock(activeTab: $state.activeTab) { showCapture = true }
         }
         .sheet(isPresented: $showCapture) {
             if let userId = auth.currentUser?.id {
