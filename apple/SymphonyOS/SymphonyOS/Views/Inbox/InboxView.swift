@@ -101,13 +101,13 @@ struct InboxTaskRow: View {
                 TaskViewModel(modelContext: modelContext).toggleComplete(task)
             },
             actions: [
-                SlideAction(label: "Today", systemImage: "sun.max", tint: Self.todayAmber) {
+                SlideAction(label: "Today", systemImage: "sun.max", tint: Color.primaryTint) {
                     viewModel.schedule(task, for: Calendar.current.startOfDay(for: Date()), isAllDay: true)
                 },
-                SlideAction(label: "When", systemImage: "calendar", tint: .blue) {
+                SlideAction(label: "When", systemImage: "calendar", tint: Color.infoBlue) {
                     showWhenDialog = true
                 },
-                SlideAction(label: "More", systemImage: "ellipsis", tint: Self.neutralSlate) {
+                SlideAction(label: "More", systemImage: "ellipsis", tint: Color.textSecondary) {
                     showDetail = true
                 },
             ]
@@ -219,9 +219,6 @@ struct InboxTaskRow: View {
         let descriptor = FetchDescriptor<SymphonyTask>(predicate: #Predicate { $0.id == targetId && !$0.completed })
         return try? modelContext.fetch(descriptor).first
     }
-
-    private static let todayAmber = Color(red: 0.88, green: 0.64, blue: 0.23)
-    private static let neutralSlate = Color(red: 0.42, green: 0.40, blue: 0.36)
 
     private var contextColor: Color {
         switch task.context {

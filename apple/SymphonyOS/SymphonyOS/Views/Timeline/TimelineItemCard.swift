@@ -91,31 +91,31 @@ struct TimelineItemCard: View {
         switch item.type {
         case .task:
             return [
-                SlideAction(label: "Push", systemImage: "arrow.right", tint: Self.pushAmber) {
+                SlideAction(label: "Push", systemImage: "arrow.right", tint: Color.primaryTint) {
                     if let task = fetchTask() {
                         TaskViewModel(modelContext: modelContext).schedule(task, for: Date().addingDays(1))
                     }
                 },
-                SlideAction(label: "Context", systemImage: "tag", tint: Self.neutralSlate) {
+                SlideAction(label: "Context", systemImage: "tag", tint: Color.textSecondary) {
                     showContextPicker = true
                 },
-                SlideAction(label: "More", systemImage: "ellipsis", tint: .blue) {
+                SlideAction(label: "More", systemImage: "ellipsis", tint: Color.infoBlue) {
                     showDetail = true
                 },
             ]
         case .routine:
             return [
-                SlideAction(label: "Skip", systemImage: "arrow.uturn.forward", tint: Self.neutralSlate) {
+                SlideAction(label: "Skip", systemImage: "arrow.uturn.forward", tint: Color.textSecondary) {
                     setInstanceStatus(entityType: "routine", entityId: item.entityId.uuidString, status: "skipped")
                 },
             ]
         case .event:
             guard let key = item.eventKey else { return [] }
             return [
-                SlideAction(label: "Details", systemImage: "ellipsis", tint: .blue) {
+                SlideAction(label: "Details", systemImage: "ellipsis", tint: Color.infoBlue) {
                     showEventDetail = true
                 },
-                SlideAction(label: "Skip", systemImage: "arrow.uturn.forward", tint: Self.neutralSlate) {
+                SlideAction(label: "Skip", systemImage: "arrow.uturn.forward", tint: Color.textSecondary) {
                     setInstanceStatus(entityType: "calendar_event", entityId: key, status: "skipped")
                 },
             ]
@@ -129,9 +129,6 @@ struct TimelineItemCard: View {
         let descriptor = FetchDescriptor<SymphonyTask>()
         return (try? modelContext.fetch(descriptor))?.first { $0.id == item.entityId }
     }
-
-    private static let pushAmber = Color(red: 0.88, green: 0.64, blue: 0.23)
-    private static let neutralSlate = Color(red: 0.42, green: 0.40, blue: 0.36)
 
     private var cardContent: some View {
         HStack(spacing: 0) {

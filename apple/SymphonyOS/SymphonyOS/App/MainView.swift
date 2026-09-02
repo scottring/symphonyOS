@@ -69,7 +69,7 @@ private struct SymphonyDock: View {
         .background(
             Color.bgBase.opacity(0.97)
                 .overlay(alignment: .top) {
-                    Rectangle().fill(Color.textTertiary.opacity(0.12)).frame(height: 0.5)
+                    Rectangle().fill(Color.cardBorder).frame(height: 1)
                 }
                 .ignoresSafeArea(edges: .bottom)
         )
@@ -80,10 +80,10 @@ private struct SymphonyDock: View {
             activeTab = t
         } label: {
             VStack(spacing: 3) {
-                Image(systemName: icon).font(.system(size: 20))
-                Text(label).font(.system(size: 10, weight: .semibold))
+                Image(systemName: icon).font(.system(size: 20, weight: activeTab == t ? .semibold : .regular))
+                Text(label).font(.captionBold)
             }
-            .foregroundStyle(activeTab == t ? Color.primaryTint : Color.textTertiary)
+            .foregroundStyle(activeTab == t ? Color.ink : Color.textTertiary)
             .frame(maxWidth: .infinity)
             .contentShape(Rectangle())
         }
@@ -95,11 +95,11 @@ private struct SymphonyDock: View {
     private var addSlot: some View {
         Button(action: onAdd) {
             Image(systemName: "plus")
-                .font(.system(size: 26, weight: .bold))
+                .font(.system(size: 24, weight: .semibold))
                 .foregroundStyle(.white)
                 .frame(width: 56, height: 56)
-                .background(Circle().fill(Color.primaryTint))
-                .shadow(color: Color.primaryTint.opacity(0.35), radius: 6, y: 3)
+                .background(Circle().fill(Color.ink))
+                .shadow(color: Color.cardShadow, radius: 8, y: 3)
         }
         .buttonStyle(.plain)
         .frame(maxWidth: .infinity)

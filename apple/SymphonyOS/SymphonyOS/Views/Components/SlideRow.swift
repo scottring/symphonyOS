@@ -55,7 +55,7 @@ struct SlideRow<Content: View>: View {
     private var panelWidth: CGFloat { CGFloat(actions.count) * buttonWidth }
 
     // hsl(152 50% 32%) — same completion green as the web SwipeableCard
-    private let completeGreen = Color(red: 0.16, green: 0.48, blue: 0.33)
+    private let completeGreen = Color.successGreen
 
     @State private var translateX: CGFloat = 0
     @State private var showActions = false
@@ -97,7 +97,7 @@ struct SlideRow<Content: View>: View {
                                 Image(systemName: action.systemImage)
                                     .font(.system(size: 18, weight: .medium))
                                 Text(action.label)
-                                    .font(.system(size: 11, weight: .semibold))
+                                    .font(.captionBold)
                             }
                             .foregroundStyle(.white)
                             .frame(width: buttonWidth)

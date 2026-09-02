@@ -148,8 +148,9 @@ struct TodayView: View {
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(showSearch ? Color.primaryTint : Color.textTertiary)
                         .frame(width: 32, height: 32)
-                        .background(Color.bgSurface.opacity(0.6))
+                        .background(Color.bgSurface)
                         .clipShape(Circle())
+                        .overlay(Circle().strokeBorder(Color.cardBorder, lineWidth: 1))
                 }
                 .buttonStyle(.plain)
 
@@ -162,8 +163,9 @@ struct TodayView: View {
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(Color.textTertiary)
                         .frame(width: 32, height: 32)
-                        .background(Color.bgSurface.opacity(0.6))
+                        .background(Color.bgSurface)
                         .clipShape(Circle())
+                        .overlay(Circle().strokeBorder(Color.cardBorder, lineWidth: 1))
                 }
                 .buttonStyle(.plain)
 
@@ -175,11 +177,12 @@ struct TodayView: View {
                     } label: {
                         Text("Today")
                             .font(.captionBold)
-                            .foregroundStyle(Color.primaryTint)
+                            .foregroundStyle(Color.ink)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 6)
-                            .background(Color.primaryTint.opacity(0.1))
+                            .background(Color.bgWarm)
                             .clipShape(Capsule())
+                            .overlay(Capsule().strokeBorder(Color.cardBorder, lineWidth: 1))
                     }
                     .buttonStyle(.plain)
                 }
@@ -193,8 +196,9 @@ struct TodayView: View {
                         .font(.system(size: 14, weight: .semibold))
                         .foregroundStyle(Color.textTertiary)
                         .frame(width: 32, height: 32)
-                        .background(Color.bgSurface.opacity(0.6))
+                        .background(Color.bgSurface)
                         .clipShape(Circle())
+                        .overlay(Circle().strokeBorder(Color.cardBorder, lineWidth: 1))
                 }
                 .buttonStyle(.plain)
             }
@@ -237,7 +241,8 @@ struct TodayView: View {
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
-        .background(Color.bgSurface, in: RoundedRectangle(cornerRadius: 12))
+        .background(Color.bgElevated, in: RoundedRectangle(cornerRadius: 12))
+        .overlay(RoundedRectangle(cornerRadius: 12).strokeBorder(Color.cardBorder, lineWidth: 1))
     }
 
     @ViewBuilder
@@ -277,7 +282,7 @@ struct TodayView: View {
                 )
 
             Text("Your day is clear")
-                .font(.displaySmall)
+                .font(.displayMedium)
                 .foregroundStyle(Color.textSecondary)
 
             Text("Add a task below to get started")
@@ -376,10 +381,7 @@ struct TimelineSectionView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
-                .font(.captionBold)
-                .foregroundStyle(Color.primaryTint.opacity(0.6))
-                .textCase(.uppercase)
-                .kerning(1.2)
+                .eyebrowStyle()
                 .padding(.horizontal, 20)
                 .padding(.top, 24)
                 .padding(.bottom, 2)
@@ -421,7 +423,7 @@ struct CarriedOverSection: View {
                 Button { withAnimation(.easeInOut(duration: 0.2)) { expanded = false } } label: {
                     HStack(spacing: 4) {
                         Image(systemName: "chevron.up")
-                            .font(.system(size: 10, weight: .semibold))
+                            .font(.captionBold)
                         Text("Collapse")
                             .font(.captionText)
                     }
@@ -436,7 +438,7 @@ struct CarriedOverSection: View {
             Button { withAnimation(.easeInOut(duration: 0.2)) { expanded = true } } label: {
                 HStack(spacing: 6) {
                     Image(systemName: "arrow.uturn.left")
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.captionBold)
                         .foregroundStyle(Color.feedbackAmber)
 
                     Text("\(tasks.count) carried over")
@@ -455,7 +457,7 @@ struct CarriedOverSection: View {
                     Spacer(minLength: 4)
 
                     Image(systemName: "chevron.down")
-                        .font(.system(size: 10, weight: .semibold))
+                        .font(.captionBold)
                         .foregroundStyle(Color.textTertiary)
                 }
                 .padding(.horizontal, 20)
@@ -487,19 +489,16 @@ struct InboxSectionView: View {
         VStack(alignment: .leading, spacing: 6) {
             HStack(alignment: .center) {
                 Text(title)
-                    .font(.captionBold)
-                    .foregroundStyle(Color.primaryTint.opacity(0.6))
-                    .textCase(.uppercase)
-                    .kerning(1.2)
+                    .eyebrowStyle()
 
                 Spacer()
 
                 Text("\(tasks.count)")
                     .font(.captionBold)
-                    .foregroundStyle(Color.primaryTint)
+                    .foregroundStyle(Color.textSecondary)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
-                    .background(Color.primaryTint.opacity(0.1))
+                    .background(Color.bgSurface)
                     .clipShape(Capsule())
             }
             .padding(.horizontal, 20)

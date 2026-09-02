@@ -17,7 +17,7 @@ struct QuickCaptureBar: View {
             // Plus icon
             Image(systemName: "plus.circle.fill")
                 .font(.system(size: 26))
-                .foregroundStyle(Color.primaryTint)
+                .foregroundStyle(Color.textTertiary)
                 .symbolRenderingMode(.hierarchical)
 
             // Text field
@@ -34,7 +34,7 @@ struct QuickCaptureBar: View {
                 } label: {
                     Image(systemName: "arrow.up.circle.fill")
                         .font(.system(size: 30))
-                        .foregroundStyle(Color.primaryTint)
+                        .foregroundStyle(Color.ink)
                         .symbolRenderingMode(.hierarchical)
                 }
                 .buttonStyle(.plain)
@@ -50,7 +50,7 @@ struct QuickCaptureBar: View {
                 } label: {
                     Image(systemName: "camera.fill")
                         .font(.system(size: 22))
-                        .foregroundStyle(Color.primaryTint)
+                        .foregroundStyle(Color.textSecondary)
                         .symbolRenderingMode(.hierarchical)
                 }
                 .buttonStyle(.plain)
@@ -58,29 +58,13 @@ struct QuickCaptureBar: View {
             }
             #endif
         }
-        .padding(.horizontal, 20)
-        .padding(.vertical, 14)
-        .background(
-            // Frosted glass with warm tint
-            ZStack {
-                Rectangle()
-                    .fill(.ultraThinMaterial)
-                Rectangle()
-                    .fill(Color.bgBase.opacity(0.5))
-            }
-        )
-        .overlay(alignment: .top) {
-            // Top separator — subtle, warm
-            Rectangle()
-                .fill(
-                    LinearGradient(
-                        colors: [Color.textTertiary.opacity(0.15), Color.textTertiary.opacity(0.05)],
-                        startPoint: .leading,
-                        endPoint: .trailing
-                    )
-                )
-                .frame(height: 0.5)
-        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .background(Color.bgElevated, in: RoundedRectangle(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Color.cardBorder, lineWidth: 1))
+        .shadow(color: Color.cardShadow, radius: 12, x: 0, y: 4)
+        .padding(.horizontal, 16)
+        .padding(.bottom, 8)
         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: !title.isEmpty)
         #if os(iOS)
         .fullScreenCover(isPresented: $showCamera) {
