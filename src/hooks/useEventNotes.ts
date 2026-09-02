@@ -19,6 +19,7 @@ export interface EventNote {
   context?: TaskContext | null // Domain context override (work/family/personal)
   sharedWithFamily?: boolean // Surfaced on the shared family timeline
   shareNudgeDismissed?: boolean // "Share to family" nudge dismissed for this event
+  isFree?: boolean // Informational-only: no prep/handoff expected (see docs/superpowers/specs/2026-09-02-event-free-flag-design.md)
   createdAt: Date
   updatedAt: Date
 }
@@ -38,6 +39,7 @@ interface DbEventNote {
   context: string | null
   shared_with_family: boolean
   share_nudge_dismissed: boolean
+  is_free: boolean
   created_at: string
   updated_at: string
 }
@@ -57,6 +59,7 @@ function dbNoteToEventNote(dbNote: DbEventNote): EventNote {
     context: dbNote.context as TaskContext | null,
     sharedWithFamily: dbNote.shared_with_family ?? false,
     shareNudgeDismissed: dbNote.share_nudge_dismissed ?? false,
+    isFree: dbNote.is_free ?? false,
     createdAt: new Date(dbNote.created_at),
     updatedAt: new Date(dbNote.updated_at),
   }
@@ -711,6 +714,39 @@ export function useEventNotes(eventIds?: string[]) {
     }
   }, [user, notes])
 
+  // Set/clear whether an event (or, for a recurring series, the series note
+  // keyed by the recurring_event_id) is "free" — no prep/handoff expected.
+  const updateEventFree = useCallback(async (key: string, free: boolean) => {
+    if (!user) return
+    const existingNote = notes.get(key)
+    const optimistic: EventNote = existingNote
+      ? { ...existingNote, isFree: free, updatedAt: new Date() }
+      : {
+          id: '', googleEventId: key, notes: null, assignedToAll: [],
+          isFree: free, createdAt: new Date(), updatedAt: new Date(),
+        }
+    setNotes((prev) => new Map(prev).set(key, optimistic))
+
+    const { data, error: upsertError } = await supabase
+      .from('event_notes')
+      .upsert(
+        { user_id: user.id, google_event_id: key, is_free: free },
+        { onConflict: 'user_id,google_event_id' },
+      )
+      .select()
+      .single()
+
+    if (upsertError) {
+      if (existingNote) setNotes((prev) => new Map(prev).set(key, existingNote))
+      setError(upsertError.message)
+      return
+    }
+    if (data) {
+      const realNote = dbNoteToEventNote(data as DbEventNote)
+      setNotes((prev) => new Map(prev).set(key, realNote))
+    }
+  }, [user, notes])
+
   // Mark the "share to family" nudge dismissed for an event (so it won't re-nag)
   const dismissShareNudge = useCallback(async (googleEventId: string) => {
     if (!user) return
@@ -792,6 +828,7 @@ export function useEventNotes(eventIds?: string[]) {
     getEventNotesForProject,
     updateEventContext,
     updateEventSharedWithFamily,
+    updateEventFree,
     dismissShareNudge,
   }
 }
