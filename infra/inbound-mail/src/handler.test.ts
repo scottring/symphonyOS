@@ -43,6 +43,13 @@ describe('buildPayload', () => {
     )
     expect(p?.text).toBe('Thursday’s update — bring a hat & water')
   })
+  it('leaves an out-of-range numeric entity as-is instead of throwing', () => {
+    const p = buildPayload(
+      { ...parsed, text: undefined, html: '<p>Bad &#9999999; entity &#xD800; here</p>' },
+      'a1b2c3d4e5f60718@symphony-os.com', new Date(0),
+    )
+    expect(p?.text).toBe('Bad &#9999999; entity &#xD800; here')
+  })
 })
 
 describe('deliver', () => {

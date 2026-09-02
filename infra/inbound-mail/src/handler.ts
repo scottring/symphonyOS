@@ -28,7 +28,9 @@ function decodeEntities(s: string): string {
   return s.replace(/&(#x[0-9a-f]+|#\d+|[a-z0-9]+);/gi, (match, ent: string) => {
     if (ent[0] === '#') {
       const codePoint = ent[1] === 'x' || ent[1] === 'X' ? parseInt(ent.slice(2), 16) : parseInt(ent.slice(1), 10)
-      return Number.isNaN(codePoint) ? match : String.fromCodePoint(codePoint)
+      const isValid = Number.isInteger(codePoint) && codePoint >= 0 && codePoint <= 0x10ffff
+        && !(codePoint >= 0xd800 && codePoint <= 0xdfff)
+      return isValid ? String.fromCodePoint(codePoint) : match
     }
     const key = ent.toLowerCase()
     return key in NAMED_ENTITIES ? NAMED_ENTITIES[key] : match
