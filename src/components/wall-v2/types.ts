@@ -66,6 +66,9 @@ export interface WallV2TimelineEvent {
   recipeUrl?: string | null;
   /** Completion state (drives the touch checkbox on the wall). */
   completed?: boolean;
+  /** Informational-only: no prep/handoff expected — dims the card, hides the
+   *  touch checkbox, and shows a "Free" chip instead. */
+  free?: boolean;
   /** Formatted clock time ("2:00 PM") for the Schedule band's left gutter. Only set by adaptScheduleBand. */
   time?: string;
   /** Source item type, so the wall action sheet can pick the right entity/actions. */

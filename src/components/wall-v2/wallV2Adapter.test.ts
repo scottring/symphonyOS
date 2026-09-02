@@ -208,6 +208,18 @@ describe('adaptTimelineSections', () => {
     expect(result.find((s) => s.label === 'Morning')!.events[0].completed).toBe(true);
   });
 
+  it('carries isFree through as `free`', () => {
+    const today = makeDay({
+      isToday: true,
+      items: {
+        allday: [], morning: [makeItem({ id: 'event-ffg', type: 'event', title: 'FFG', isFree: true, startTime: new Date(2026, 4, 20, 9, 0) })],
+        afternoon: [], evening: [], unscheduled: [],
+      },
+    });
+    const result = adaptTimelineSections(today, members, now, null, false, []);
+    expect(result.find((s) => s.label === 'Morning')!.events[0].free).toBe(true);
+  });
+
   it('shows earlier-today items (whole day, not forward-only)', () => {
     const today = makeDay({
       isToday: true,

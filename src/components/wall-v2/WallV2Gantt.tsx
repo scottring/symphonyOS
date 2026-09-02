@@ -87,7 +87,7 @@ function Bar({ block, index, onTap }: { block: GanttBlock; index: number; onTap?
       onClick={() => onTap?.(block.id)}
       style={{ left: `${block.leftPct}%`, width: `${block.widthPct}%` }}
       className={`absolute top-1/2 -translate-y-1/2 h-[44px] rounded-lg ${tint} ${
-        block.past ? 'opacity-40' : ''
+        block.past || block.free ? 'opacity-40' : ''
       } active:scale-[.98] transition-transform`}
     >
       {/* A bar wide enough carries its own label. A narrow one hands the label
@@ -95,8 +95,11 @@ function Bar({ block, index, onTap }: { block: GanttBlock; index: number; onTap?
           duration stays honest and the words stay readable, rather than
           trading one for the other and getting "Food shop…". */}
       {block.labelSide === 'in' && (
-        <span className="absolute inset-0 flex items-center px-3 text-[1.05rem] font-bold text-white truncate text-left">
+        <span className="absolute inset-0 flex items-center gap-1.5 px-3 text-[1.05rem] font-bold text-white truncate text-left">
           {block.title}
+          {block.free && (
+            <span className="shrink-0 text-[0.75rem] font-semibold uppercase tracking-wide opacity-90">Free</span>
+          )}
         </span>
       )}
       {block.labelSide === 'right' && (

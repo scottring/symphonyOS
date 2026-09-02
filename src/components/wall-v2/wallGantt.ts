@@ -119,6 +119,8 @@ export interface GanttBlock {
   labelRoomPct: number;
   /** Already finished — drawn dimmer, because it is context, not a commitment. */
   past: boolean;
+  /** Informational-only: no prep/handoff expected — drawn dimmer with a "Free" label. */
+  free?: boolean;
   type: TimelineItem['type'];
 }
 
@@ -360,6 +362,7 @@ export function adaptGanttBoard(
         labelSide: 'in',
         labelRoomPct: 0,
         past: e <= nowMin,
+        free: it.isFree,
         type: it.type,
       });
     }

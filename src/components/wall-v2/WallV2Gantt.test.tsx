@@ -80,3 +80,21 @@ describe('WallV2Gantt portrait tap', () => {
     expect(screen.queryByRole('button', { name: /Open .*'s day/i })).not.toBeInTheDocument()
   })
 })
+
+describe('WallV2Gantt free events', () => {
+  it('dims a free bar and shows a Free label', () => {
+    const b = board([track({ blocks: [block({ title: 'FFG', free: true })] })])
+    render(<WallV2Gantt board={b} />)
+    const bar = screen.getByRole('button', { name: /FFG/i })
+    expect(bar.className).toContain('opacity-40')
+    expect(screen.getByText('Free')).toBeInTheDocument()
+  })
+
+  it('does not dim or label a non-free bar', () => {
+    const b = board([track({ blocks: [block({ title: 'Reading', free: false })] })])
+    render(<WallV2Gantt board={b} />)
+    const bar = screen.getByRole('button', { name: 'Reading' })
+    expect(bar.className).not.toContain('opacity-40')
+    expect(screen.queryByText('Free')).not.toBeInTheDocument()
+  })
+})

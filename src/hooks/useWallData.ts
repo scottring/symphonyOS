@@ -15,6 +15,7 @@ import { graceFloor } from '@/lib/today/taskPools'
 import { localYmd, parseLocalYmd } from '@/lib/cadence/config'
 import { addDays } from '@/lib/dateUtils'
 import { resolveFetchOutcome } from '@/hooks/wallDataCommit'
+import { instanceKey, seriesKey } from '@/lib/today/eventFree'
 import { computeScreenTimeSummaries, type ChildScreenTimeSummary } from '@/hooks/useScreenTime'
 import type { TimelineItem } from '@/types/timeline'
 import type { Task } from '@/types/task'
@@ -195,6 +196,7 @@ export function useWallData(): UseWallDataReturn {
         overdueRes,
         routineCompletionsRes,
         neededRes,
+        freeEventNotesRes,
       ] = await Promise.all([
         // 1. Family members
         supabase.from('family_members').select('*').order('display_order'),
@@ -288,6 +290,13 @@ export function useWallData(): UseWallDataReturn {
           .eq('completed', false)
           .eq('context', 'family')
           .in('needed_on', [todayStr, localYmd(addDays(new Date(), 1))]),
+
+        // 14. "Free" events (informational-only — no prep/handoff). event_notes
+        // is shared within the household, so this reads every member's flags,
+        // not just the kiosk account's own. A recurring series' flag lives on a
+        // note keyed by recurring_event_id, so this key can be an instance OR a
+        // series id — resolved below alongside the instance id per event.
+        supabase.from('event_notes').select('google_event_id').eq('is_free', true),
       ])
 
       if (!mountedRef.current) return
@@ -300,7 +309,7 @@ export function useWallData(): UseWallDataReturn {
       const dataError = [
         membersRes, tasksRes, routinesRes, instancesRes, contactsRes,
         milestonesRes, stBudgetsRes, stEntriesRes, stAdjustmentsRes,
-        overdueRes, routineCompletionsRes, neededRes,
+        overdueRes, routineCompletionsRes, neededRes, freeEventNotesRes,
       ].find((r) => r.error)?.error?.message ?? null
 
       const members = (membersRes.data || []) as FamilyMember[]
@@ -321,6 +330,11 @@ export function useWallData(): UseWallDataReturn {
       const instances = (instancesRes.data || []) as ActionableInstance[]
       const events = (calendarEvents || []) as CalendarEvent[]
       const contacts = (contactsRes.data || []) as { id: string; name: string; birthday: string }[]
+
+      // "Free" flags — a key can be an instance id OR a series (recurring_event_id) id.
+      const freeKeys = new Set(
+        ((freeEventNotesRes.data || []) as { google_event_id: string }[]).map((r) => r.google_event_id),
+      )
 
       // Supabase !inner join returns goals as object or array depending on version
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -418,6 +432,10 @@ export function useWallData(): UseWallDataReturn {
               item.completed = inst.status === 'completed'
               item.skipped = inst.status === 'skipped'
             }
+            // "Free" resolves instance-then-series, same precedence as Today.
+            const ev = item.originalEvent
+            const series = seriesKey(ev)
+            item.isFree = freeKeys.has(instanceKey(ev)) || (series ? freeKeys.has(series) : false)
           }
         }
 

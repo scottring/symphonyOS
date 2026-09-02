@@ -174,6 +174,7 @@ export function adaptTimelineEvent(
     meta: durationMeta(item),
     members: memberBubbles,
     completed: item.completed,
+    free: item.isFree,
     // Carry the rich context through so the tap action sheet can surface it.
     // (Events keep their read-only Google description as the notes fallback.)
     phoneNumber: item.phoneNumber,

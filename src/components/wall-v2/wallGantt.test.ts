@@ -165,6 +165,13 @@ describe('adaptGanttBoard', () => {
     expect(board.tracks[0].blocks[0].past).toBe(true)
   })
 
+  it('carries isFree through to the block as `free`', () => {
+    const board = adaptGanttBoard(members, [day([
+      item({ id: 'ffg', title: 'FFG', assignedTo: 'm-scott', isFree: true, startTime: at(15), endTime: at(16) }),
+    ])], at(9, 30))
+    expect(board.tracks[0].blocks[0].free).toBe(true)
+  })
+
   it('always ends with the household track, so shared items have a home', () => {
     const board = adaptGanttBoard(members, [day([])], at(9))
     expect(board.tracks.map((t) => t.name)).toEqual(['Scott', 'Everyone'])
