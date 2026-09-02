@@ -92,6 +92,9 @@ export function planWrites(i: PlanInput): WritePlan {
 
     const match = i.existing.find((b) => b.ymd === ev.date && titlesMatch(b.title, ev.title))
     if (match) {
+      // Attach only items not already on the existing block. If every item is
+      // already there, this event yields no new rows on purpose — the
+      // household already has it, and there is nothing new to write.
       const children = childrenFor(i, ev, match.childTitles)
       if (children.length) events.push({ parent: { existingId: match.id }, children })
       continue

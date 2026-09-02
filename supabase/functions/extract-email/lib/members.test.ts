@@ -31,4 +31,15 @@ describe('matchMembers', () => {
     const r = matchMembers(['Liam Parker', 'Liam'], M)
     expect(r.matched.map((m) => m.id)).toEqual(['k1'])
   })
+  it('a first name shared by two members matches nobody', () => {
+    const twins: Member[] = [...M, { id: 'k3', name: 'Sam Lee', isChild: true }]
+    const r = matchMembers(['Sam'], twins)
+    expect(r.matched).toEqual([])
+    expect(r.unmatched).toEqual(['Sam'])
+  })
+  it('a full name still resolves a shared first name', () => {
+    const twins: Member[] = [...M, { id: 'k3', name: 'Sam Lee', isChild: true }]
+    expect(matchMembers(['Sam Lee'], twins).matched.map((m) => m.id)).toEqual(['k3'])
+    expect(matchMembers(['Sam Parker'], twins).matched).toEqual([])   // no member has that full name; p2 is just "Sam"
+  })
 })
