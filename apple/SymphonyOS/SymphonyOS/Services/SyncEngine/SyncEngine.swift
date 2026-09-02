@@ -473,6 +473,11 @@ actor SyncEngine {
                 suggested_task_id: t.captureSuggestedTaskId?.uuidString
             ))
         }
+        // Only when set: a blanket null would wipe a week placement made on the
+        // web. DATE column → local yyyy-MM-dd (dateOnly), never ISO.
+        if let ws = t.weekStart {
+            row["week_start"] = dateOnly(ws)
+        }
         return row
     }
 

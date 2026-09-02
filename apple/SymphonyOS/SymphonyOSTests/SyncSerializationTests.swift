@@ -130,7 +130,7 @@ struct SyncSerializationTests {
             "linked_activity_type", "linked_activity_id", "category", "google_event_id",
             "assigned_to_all", "is_waiting", "waiting_since", "bucket", "needs_discussion",
             "discussion_note", "week_deferred_at", "group_members", "scope", "directions",
-            "capture_meta",
+            "capture_meta", "week_start", "capture_id",
         ]
         #expect(Set(row.keys).isSubset(of: prodColumns))
         // Non-capture tasks must NOT send capture_meta — a null would wipe the
@@ -205,5 +205,40 @@ struct SyncSerializationTests {
     @Test func unsupportedTableSerializesToNil() throws {
         let context = try makeContext()
         #expect(SyncEngine.serializeRow(table: "weekly_templates", id: UUID(), context: context) == nil)
+    }
+
+    @Test func taskRowSendsWeekStartAsLocalDateOnlyWhenSet() throws {
+        let context = try makeContext()
+        let task = SymphonyTask(userId: UUID(), title: "Plan the week")
+        task.bucket = "week"
+        // 23:30 local — ISO/UTC would land on the wrong day west of Greenwich.
+        task.weekStart = Calendar.current.date(
+            bySettingHour: 23, minute: 30, second: 0,
+            of: Calendar.current.startOfDay(for: Date())
+        )!
+        context.insert(task)
+        try context.save()
+
+        let row = try #require(SyncEngine.serializeRow(table: "tasks", id: task.id, context: context))
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        f.locale = Locale(identifier: "en_US_POSIX")
+        #expect(row["week_start"]?.stringValue == f.string(from: task.weekStart!))
+    }
+
+    @Test func taskRowOmitsWeekStartScopeAndCaptureIdByDefault() throws {
+        let context = try makeContext()
+        let task = SymphonyTask(userId: UUID(), title: "Call plumber")
+        task.scope = "compound"
+        task.captureId = UUID()
+        context.insert(task)
+        try context.save()
+
+        let row = try #require(SyncEngine.serializeRow(table: "tasks", id: task.id, context: context))
+        // A blanket null would wipe a week placement made on the web; scope and
+        // capture_id are server/web-owned and the phone never writes them.
+        #expect(row["week_start"] == nil)
+        #expect(row["scope"] == nil)
+        #expect(row["capture_id"] == nil)
     }
 }

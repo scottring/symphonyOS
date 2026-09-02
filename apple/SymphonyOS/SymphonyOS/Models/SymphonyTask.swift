@@ -59,6 +59,15 @@ final class SymphonyTask {
     var assignedToAll: [UUID]? // multi-member assignment
     var projectId: UUID?
     var parentTaskId: UUID?
+    /// Who can SEE it: "individual" | "couple" | "compound". Read-only on the
+    /// phone — the web derives it (scopeForDomain) and the phone never writes it.
+    var scope: String?
+    /// Set when this task was extracted from a capture (school email, paper
+    /// page). Read-only on the phone; drives the "From an email" source pill.
+    var captureId: UUID?
+    /// Which week a bucket=="week" row belongs to (placement cascade). Local
+    /// midnight. Sent as a DATE column — see `SyncEngine.taskRow`.
+    var weekStart: Date?
 
     // Linked activity
     var linkedTo: LinkedActivity?
@@ -107,6 +116,9 @@ final class SymphonyTask {
         self.assignedToAll = nil
         self.projectId = nil
         self.parentTaskId = nil
+        self.scope = nil
+        self.captureId = nil
+        self.weekStart = nil
         self.linkedTo = nil
         self.linkType = nil
         self.captureStatus = nil
@@ -148,6 +160,9 @@ extension SymphonyTask {
         "assignedToAll": "assigned_to_all",
         "projectId": "project_id",
         "parentTaskId": "parent_task_id",
+        "scope": "scope",
+        "captureId": "capture_id",
+        "weekStart": "week_start",
         "linkedTo": "linked_to",
         "linkType": "link_type",
         "createdAt": "created_at",
