@@ -7,6 +7,7 @@ struct TaskDetailView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
     @FocusState private var titleFocused: Bool
+    @FocusState private var notesFocused: Bool
 
     @Query private var projects: [Project]
     @Query private var familyMembers: [FamilyMember]
@@ -18,6 +19,16 @@ struct TaskDetailView: View {
     @State private var showAddLink = false
     @State private var newLinkURL = ""
     @State private var newLinkTitle = ""
+
+    // Notes are stored as Tiptap HTML (or markdown-style text — the web's
+    // `notesToHtml` accepts either). The editor here only ever shows/edits
+    // markdown-style text: `notesDraft` is the text on screen, `notesBaseline`
+    // is the markdown form of whatever `task.notes` currently holds. A change
+    // to `notesDraft` only writes back when it differs from `notesBaseline` —
+    // that's what keeps the initial HTML → markdown conversion (and any
+    // realtime pull from the model) from echoing straight back out as a write.
+    @State private var notesDraft: String = ""
+    @State private var notesBaseline: String = ""
 
     private var viewModel: TaskViewModel { TaskViewModel(modelContext: modelContext) }
 
@@ -184,21 +195,32 @@ struct TaskDetailView: View {
                     Label("Notes", systemImage: "note.text")
                         .eyebrowStyle()
 
-                    TextEditor(text: Binding(
-                        get: { task.notes ?? "" },
-                        set: { task.notes = $0.isEmpty ? nil : $0; markDirty() }
-                    ))
-                    .font(.bodyMedium)
-                    .foregroundStyle(Color.textPrimary)
-                    .scrollContentBackground(.hidden)   // let our bgElevated show (TextEditor draws its own otherwise)
-                    .frame(minHeight: 100)
-                    .padding(8)
-                    .background(Color.bgElevated)
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .strokeBorder(Color.textTertiary.opacity(0.2), lineWidth: 1)
-                    )
+                    TextEditor(text: $notesDraft)
+                        .focused($notesFocused)
+                        .font(.bodyMedium)
+                        .foregroundStyle(Color.textPrimary)
+                        .scrollContentBackground(.hidden)   // let our bgElevated show (TextEditor draws its own otherwise)
+                        .frame(minHeight: 100)
+                        .padding(8)
+                        .background(Color.bgElevated)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .strokeBorder(Color.textTertiary.opacity(0.2), lineWidth: 1)
+                        )
+                        .onChange(of: notesDraft) { _, newValue in
+                            guard newValue != notesBaseline else { return }
+                            notesBaseline = newValue
+                            task.notes = newValue.isEmpty ? nil : newValue
+                            markDirty()
+                        }
+                        .onChange(of: task.notes) { _, newValue in
+                            guard !notesFocused else { return }
+                            let converted = NotesHTML.toMarkdown(newValue ?? "")
+                            guard converted != notesDraft else { return }
+                            notesBaseline = converted
+                            notesDraft = converted
+                        }
                 }
 
                 // Photos — attachments (e.g. the photo behind a photo capture)
@@ -419,6 +441,11 @@ struct TaskDetailView: View {
         #if os(iOS)
         .navigationBarTitleDisplayMode(.inline)
         #endif
+        .onAppear {
+            let converted = NotesHTML.toMarkdown(task.notes ?? "")
+            notesBaseline = converted
+            notesDraft = converted
+        }
         .sheet(isPresented: $showScheduleSheet) {
             SchedulePickerSheet(
                 initialDate: task.scheduledFor ?? Calendar.current.startOfDay(for: Date()),

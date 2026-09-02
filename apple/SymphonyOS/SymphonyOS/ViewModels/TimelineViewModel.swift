@@ -302,13 +302,12 @@ struct TimelineItem: Identifiable {
             || source == .shared
     }
 
-    /// First non-empty line of `notes`, for the italic serif line.
+    /// First non-empty line of `notes`, for the italic serif line. `notes` may
+    /// be Tiptap HTML — `NotesHTML.firstLine` renders it (or markdown-style
+    /// text) down to plain prose so a block card never shows a raw tag.
     var noteLine: String? {
         guard let notes else { return nil }
-        return notes
-            .split(separator: "\n", omittingEmptySubsequences: true)
-            .map { $0.trimmingCharacters(in: .whitespaces) }
-            .first { !$0.isEmpty }
+        return NotesHTML.firstLine(notes)
     }
 
     var timeString: String? {

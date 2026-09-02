@@ -215,7 +215,10 @@ struct EventDetailView: View {
         guard !loaded else { return }
         loaded = true
         if let note = existingNote() {
-            notesText = note.notes ?? ""
+            // Notes are stored as Tiptap HTML (or markdown-style text — the
+            // web's `notesToHtml` accepts either); the editor here only ever
+            // shows/edits markdown-style text.
+            notesText = NotesHTML.toMarkdown(note.notes ?? "")
             links = note.links ?? []
         }
     }

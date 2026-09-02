@@ -126,6 +126,83 @@ final class SkinScreenshotsUITests: XCTestCase {
         XCTAssertEqual(checkCircleAfter.label, expected, "check circle label didn't flip after tapping it — the tap may not have reached the Button")
     }
 
+    // MARK: - Notes-HTML live check (fix verification)
+
+    /// A task seeded directly via the Management API with a Tiptap-HTML
+    /// `notes` value (the same shape the web writes) — "iOS notes-HTML live
+    /// check", scheduled for today. Confirms the bug is actually fixed on
+    /// device: the Today block's italic note line reads as prose (not
+    /// `<h3>…`), and the task sheet's Notes editor shows the markdown-style
+    /// text (`###`, `-`), never a raw tag.
+    @MainActor
+    func testNotesHTMLRendersAsTextNotTags() throws {
+        let app = XCUIApplication()
+        app.launch()
+        installSystemAlertMonitor(app)
+        signIn(app)
+
+        let today = app.staticTexts["Today"]
+        XCTAssertTrue(today.waitForExistence(timeout: 30), "never reached Today")
+
+        let rowTitle = app.staticTexts["iOS notes-HTML live check"].firstMatch
+        XCTAssertTrue(rowTitle.waitForExistence(timeout: 20), "seeded notes-HTML task never appeared on Today")
+
+        // The block's italic note line: first heading in the seeded HTML,
+        // rendered as prose — no "<h3>" survives.
+        let noteLine = app.staticTexts["SIVIA / CHRISTIAN MEJIA — CONTEXT FOR RESPONSE"].firstMatch
+        XCTAssertTrue(noteLine.waitForExistence(timeout: 10), "Today block's note line isn't showing the converted heading as prose")
+        attach(name: "07-notes-html-block")
+
+        // The row may be scrolled off-hittable below other seed data.
+        for _ in 0..<5 where !rowTitle.isHittable {
+            app.swipeUp()
+            Thread.sleep(forTimeInterval: 0.3)
+        }
+
+        // Today's TimelineItemCard exposes Push/Context/More (not the Inbox
+        // row's When/Context/More panel) — wait for "Push" as the reveal signal.
+        revealSlideActions(rowTitle)
+        let pushAction = app.buttons["Push"]
+        XCTAssertTrue(pushAction.waitForExistence(timeout: 5), "row action panel never revealed")
+
+        // The row's "More" and the dock's "More" tab share the label —
+        // disambiguate by Y position the same way testTodayInboxAndTaskSheetSkin does.
+        let dockAnchorY = app.buttons["Projects"].frame.minY
+        var openedTaskSheet = false
+        let moreCandidates = app.buttons.matching(NSPredicate(format: "label == 'More'"))
+        for i in 0..<moreCandidates.count {
+            let el = moreCandidates.element(boundBy: i)
+            if el.exists, el.frame.minY < dockAnchorY - 50 {
+                el.tap()
+                openedTaskSheet = true
+                break
+            }
+        }
+        XCTAssertTrue(openedTaskSheet, "couldn't find the row's 'More' action distinct from the dock tab")
+
+        let taskSheetTitle = app.navigationBars["Task"]
+        XCTAssertTrue(taskSheetTitle.waitForExistence(timeout: 10), "task detail sheet never opened")
+
+        let notesEditor = app.textViews.matching(NSPredicate(format: "value CONTAINS[c] 'SIVIA'")).firstMatch
+        XCTAssertTrue(notesEditor.waitForExistence(timeout: 10), "notes editor never showed the converted markdown text")
+        // Scroll it into view (found by accessibility above the fold isn't
+        // guaranteed) so the screenshot is visual evidence, not just an
+        // off-screen accessibility value.
+        for _ in 0..<6 where !notesEditor.isHittable {
+            app.swipeUp()
+            Thread.sleep(forTimeInterval: 0.2)
+        }
+        attach(name: "08-notes-html-editor")
+
+        let notesValue = (notesEditor.value as? String) ?? ""
+        XCTAssertFalse(notesValue.contains("<h3>"), "notes editor is still showing raw HTML tags")
+        XCTAssertFalse(notesValue.contains("<p>"), "notes editor is still showing raw HTML tags")
+        XCTAssertTrue(notesValue.contains("### SIVIA"), "notes editor didn't render the heading as markdown")
+        XCTAssertTrue(notesValue.contains("- Sivia is acting as a full-service RIA."), "notes editor didn't render the bullet list as markdown")
+
+        app.buttons["Done"].firstMatch.tap()
+    }
+
     // MARK: - Helpers
 
     private func installSystemAlertMonitor(_ app: XCUIApplication) {
