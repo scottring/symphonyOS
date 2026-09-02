@@ -47,20 +47,28 @@ Deno.serve(async (req: Request) => {
   if (!capture_id) return json({ error: 'capture_id required' }, 400)
 
   const supabase = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
-  const { data: capture } = await supabase.from('captures').select('*').eq('id', capture_id).single()
+  const { data: capture, error: captureError } = await supabase.from('captures').select('*').eq('id', capture_id).maybeSingle()
+  if (captureError) return json({ error: `db: ${captureError.message}` }, 500)
   if (!capture) return json({ error: 'capture not found' }, 404)
-  if (capture.kind !== 'email' || !capture.household_id) return json({ error: 'not an email capture' }, 400)
+  if (capture.kind !== 'email' || !capture.household_id) {
+    await supabase.from('captures').update({ status: 'failed', error: 'not an email capture' }).eq('id', capture.id)
+    return json({ error: 'not an email capture' }, 400)
+  }
 
   try {
-    const { data: hh } = await supabase.from('households').select('timezone').eq('id', capture.household_id).single()
+    const { data: hh, error: hhError } = await supabase.from('households').select('timezone').eq('id', capture.household_id).single()
+    if (hhError) throw new Error(`households read failed: ${hhError.message}`)
     const tz = hh?.timezone ?? 'America/New_York'
 
     // The household roster: every family_members row owned by any active member.
-    const { data: hm } = await supabase.from('household_members').select('user_id').eq('household_id', capture.household_id).eq('status', 'active')
+    const { data: hm, error: hmError } = await supabase.from('household_members').select('user_id').eq('household_id', capture.household_id).eq('status', 'active')
+    if (hmError) throw new Error(`household_members read failed: ${hmError.message}`)
     const userIds = (hm ?? []).map((m) => m.user_id)
-    const { data: fm } = await supabase
+    if (userIds.length === 0) throw new Error('household has no active members')
+    const { data: fm, error: fmError } = await supabase
       .from('family_members').select('id, name, role_label, member_type, display_order')
       .in('user_id', userIds).eq('member_type', 'core').order('display_order', { ascending: true })
+    if (fmError) throw new Error(`family_members read failed: ${fmError.message}`)
     const seen = new Set<string>()
     const members: Member[] = (fm ?? []).flatMap((m) => {
       const key = m.name.trim().toLowerCase()
@@ -70,13 +78,15 @@ Deno.serve(async (req: Request) => {
     })
 
     // Existing email-derived blocks (for dedupe), with their child titles.
-    const { data: blocks } = await supabase
+    const { data: blocks, error: blocksError } = await supabase
       .from('tasks').select('id, title, scheduled_for')
       .in('user_id', userIds).not('capture_id', 'is', null).is('parent_task_id', null).eq('completed', false).not('scheduled_for', 'is', null)
+    if (blocksError) throw new Error(`tasks (blocks) read failed: ${blocksError.message}`)
     const blockIds = (blocks ?? []).map((b) => b.id)
-    const { data: kids } = blockIds.length
+    const { data: kids, error: kidsError } = blockIds.length
       ? await supabase.from('tasks').select('parent_task_id, title').in('parent_task_id', blockIds)
-      : { data: [] as { parent_task_id: string; title: string }[] }
+      : { data: [] as { parent_task_id: string; title: string }[], error: null }
+    if (kidsError) throw new Error(`tasks (children) read failed: ${kidsError.message}`)
     const existing: ExistingBlock[] = (blocks ?? []).map((b) => ({
       id: b.id, title: b.title,
       ymd: new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(b.scheduled_for)),
@@ -108,12 +118,25 @@ Deno.serve(async (req: Request) => {
       }
     }
     if (plan.inbox.length) {
-      const { error } = await supabase.from('tasks').insert(plan.inbox)
-      if (error) throw new Error(`inbox insert failed: ${error.message}`)
+      // Retry-safe: drop inbox rows this capture has already written.
+      const { data: existingInbox, error: existingInboxError } = await supabase.from('tasks').select('title').eq('capture_id', capture.id)
+      if (existingInboxError) throw new Error(`existing inbox read failed: ${existingInboxError.message}`)
+      const existingInboxTitles = new Set((existingInbox ?? []).map((t) => t.title))
+      const inboxToInsert = plan.inbox.filter((t) => !existingInboxTitles.has(t.title))
+      if (inboxToInsert.length) {
+        const { error } = await supabase.from('tasks').insert(inboxToInsert)
+        if (error) throw new Error(`inbox insert failed: ${error.message}`)
+      }
     }
     if (plan.note) {
-      const { error } = await supabase.from('notes').insert(plan.note)
-      if (error) throw new Error(`note insert failed: ${error.message}`)
+      // Retry-safe: skip the note if this capture's sender+subject note already exists.
+      const { data: existingNote, error: existingNoteError } = await supabase
+        .from('notes').select('id').eq('user_id', capture.user_id).eq('title', plan.note.title).limit(1)
+      if (existingNoteError) throw new Error(`existing note read failed: ${existingNoteError.message}`)
+      if (!existingNote || existingNote.length === 0) {
+        const { error } = await supabase.from('notes').insert(plan.note)
+        if (error) throw new Error(`note insert failed: ${error.message}`)
+      }
     }
 
     await supabase.from('captures').update({ status: 'extracted', error: null }).eq('id', capture.id)
