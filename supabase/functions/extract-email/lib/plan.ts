@@ -127,7 +127,7 @@ export function planWrites(i: PlanInput): WritePlan {
           gtk.length ? 'Good to know:\n' + gtk.map((g) => `- ${g}`).join('\n') : '',
           gaps.length ? 'Needs another look:\n' + gaps.map((g) => `- ${g.note}`).join('\n') : '',
         ].filter(Boolean).join('\n\n'),
-        ...FAMILY, source: 'import', type: 'general',
+        ...FAMILY, source: 'import', type: 'general', external_id: `capture:${i.capture.id}`,
       }
     : null
 

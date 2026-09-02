@@ -34,7 +34,7 @@ export interface TaskRow {
   needed_on: string | null
 }
 export interface NoteRow {
-  user_id: string; title: string; content: string; context: 'family'; scope: 'compound'; source: 'import'; type: 'general'
+  user_id: string; title: string; content: string; context: 'family'; scope: 'compound'; source: 'import'; type: 'general'; external_id: string
 }
 /** An incomplete email-derived block already in the household, for dedupe. */
 export interface ExistingBlock { id: string; title: string; ymd: string; childTitles: string[] }

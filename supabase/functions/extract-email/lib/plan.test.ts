@@ -111,7 +111,7 @@ describe('planWrites — dedupe against existing blocks', () => {
 describe('planWrites — the note', () => {
   it('writes one note with good-to-know and gaps, none when both are empty', () => {
     const p = planWrites({ ...base, extraction: { ...empty, good_to_know: ['Early dismissal Friday'], gaps: [{ kind: 'truncated', note: 'Email cut off' }] } })
-    expect(p.note).toMatchObject({ user_id: 'u1', title: 'From Hillside Elementary: Weekly Update', context: 'family', scope: 'compound', source: 'import', type: 'general' })
+    expect(p.note).toMatchObject({ user_id: 'u1', title: 'From Hillside Elementary: Weekly Update', context: 'family', scope: 'compound', source: 'import', type: 'general', external_id: 'capture:cap1' })
     expect(p.note?.content).toContain('Good to know:\n- Early dismissal Friday')
     expect(p.note?.content).toContain('Needs another look:\n- Email cut off')
     expect(planWrites({ ...base, extraction: empty }).note).toBeNull()

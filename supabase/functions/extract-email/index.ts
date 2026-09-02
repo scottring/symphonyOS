@@ -118,8 +118,11 @@ Deno.serve(async (req: Request) => {
       }
     }
     if (plan.inbox.length) {
-      // Retry-safe: drop inbox rows this capture has already written.
-      const { data: existingInbox, error: existingInboxError } = await supabase.from('tasks').select('title').eq('capture_id', capture.id)
+      // Retry-safe: drop inbox rows this capture has already written. Scoped
+      // to bucket='inbox' + parent_task_id=null so it doesn't also match the
+      // parent/child rows this same run just inserted under the same capture_id.
+      const { data: existingInbox, error: existingInboxError } = await supabase
+        .from('tasks').select('title').eq('capture_id', capture.id).eq('bucket', 'inbox').is('parent_task_id', null)
       if (existingInboxError) throw new Error(`existing inbox read failed: ${existingInboxError.message}`)
       const existingInboxTitles = new Set((existingInbox ?? []).map((t) => t.title))
       const inboxToInsert = plan.inbox.filter((t) => !existingInboxTitles.has(t.title))
@@ -129,9 +132,11 @@ Deno.serve(async (req: Request) => {
       }
     }
     if (plan.note) {
-      // Retry-safe: skip the note if this capture's sender+subject note already exists.
+      // Retry-safe: skip the note if this capture already wrote one, keyed on
+      // external_id (capture:<id>) rather than title, since sender+subject can
+      // repeat across distinct emails (e.g. a weekly "Weekly Update").
       const { data: existingNote, error: existingNoteError } = await supabase
-        .from('notes').select('id').eq('user_id', capture.user_id).eq('title', plan.note.title).limit(1)
+        .from('notes').select('id').eq('user_id', capture.user_id).eq('external_id', plan.note.external_id).limit(1)
       if (existingNoteError) throw new Error(`existing note read failed: ${existingNoteError.message}`)
       if (!existingNote || existingNote.length === 0) {
         const { error } = await supabase.from('notes').insert(plan.note)
