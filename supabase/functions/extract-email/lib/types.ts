@@ -1,3 +1,4 @@
+export type Scope = 'individual' | 'couple' | 'compound'
 export type Who = string[] | 'everyone'
 export interface EmailEvent {
   title: string
@@ -21,7 +22,7 @@ export interface TaskRow {
   completed: false
   bucket: 'timed' | 'inbox'
   context: 'family'
-  scope: 'compound'
+  scope: Scope
   category: 'event' | 'task'
   scheduled_for: string | null
   is_all_day: boolean | null
@@ -34,7 +35,7 @@ export interface TaskRow {
   needed_on: string | null
 }
 export interface NoteRow {
-  user_id: string; title: string; content: string; context: 'family'; scope: 'compound'; source: 'import'; type: 'general'; external_id: string
+  user_id: string; title: string; content: string; context: 'family'; scope: Scope; source: 'import'; type: 'general'; external_id: string
 }
 /** An incomplete email-derived block already in the household, for dedupe. */
 export interface ExistingBlock { id: string; title: string; ymd: string; childTitles: string[] }

@@ -1,4 +1,4 @@
-import type { EmailEvent, EmailExtraction, ExistingBlock, Member, NoteRow, TaskRow } from './types.ts'
+import type { EmailEvent, EmailExtraction, ExistingBlock, Member, NoteRow, Scope, TaskRow } from './types.ts'
 import { matchMembers } from './members.ts'
 import { addDays, zonedIso } from './dates.ts'
 
@@ -33,8 +33,20 @@ export function titlesMatch(a: string, b: string): boolean {
   return inter / union >= 0.8
 }
 
-// Mirror of src/lib/scope.ts scopeForDomain for family rows: family → compound.
-const FAMILY = { context: 'family' as const, scope: 'compound' as const }
+// Mirror of src/lib/scope.ts scopeForDomain — the app's single scope rule.
+// (Deno; an edge function cannot import from src/.) Scope is DERIVED from what
+// the row IS plus who it was handed to. Nothing may write a literal scope.
+function scopeFor(
+  context: string | null | undefined,
+  assignees: (string | null | undefined)[],
+  self: string | null,
+): Scope {
+  if (context === 'family') return 'compound'
+  return assignees.some((a) => a && a !== self) ? 'couple' : 'individual'
+}
+
+// Every row this function writes is household mail: family by construction.
+const FAMILY = { context: 'family' as const, scope: scopeFor('family', [], null) }
 
 function sourceNote(c: PlanInput['capture'], quote: string, extra?: string): string {
   const head = `From ${c.sender_label} · ${c.subject}`
