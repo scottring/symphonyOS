@@ -61,6 +61,13 @@ body {
   overflow-x: hidden;
 }
 
+/* iOS Safari ignores overflow-x on <body> alone — the page panned sideways
+   because the 140%-wide hero/CTA glows made the document 1.2× the viewport.
+   Clip on <html> too, and clip those sections on the x axis only (clip, not
+   hidden, so the MacBook shadow still spills below the hero). */
+html { overflow-x: hidden; }
+.hero, .cta-section { overflow-x: clip; }
+
 /* Noise texture overlay */
 body::before {
   content: '';
@@ -96,7 +103,7 @@ h1, h2, h3 { font-family: 'Crimson Pro', Georgia, serif; font-weight: 400; }
 }
 
 section {
-  padding: 100px 0;
+  padding: 72px 0;
 }
 
 @media (min-width: 768px) {
@@ -240,6 +247,17 @@ nav .container {
 
 .nav-sign-in:hover {
   color: var(--text);
+}
+
+/* Phone nav: wordmark + a short pill. "Sign in" moves to the footer. */
+.nav-cta-short { display: none; }
+@media (max-width: 767px) {
+  nav { padding: 14px 0; }
+  .wordmark { font-size: 22px; display: inline-flex; align-items: center; gap: 8px; white-space: nowrap; }
+  .nav-sign-in { display: none; }
+  .nav-cta { padding: 9px 16px; font-size: 13px; white-space: nowrap; }
+  .nav-cta-long { display: none; }
+  .nav-cta-short { display: inline; }
 }
 
 /* ============================================
@@ -487,6 +505,52 @@ nav .container {
   background: linear-gradient(to bottom, transparent, var(--card));
   pointer-events: none;
   z-index: 4;
+}
+
+/* ============================================
+   PHONE HERO FRAME (< 768px)
+   The MacBook window is 16:10 — on a phone it showed two rows of Today.
+   Below the tablet breakpoint the same markup becomes an iPhone: the lid is
+   the bezel, the notch is the Dynamic Island, the base disappears, and the
+   app window turns portrait so the whole morning fits.
+   ============================================ */
+@media (max-width: 767px) {
+  .hero { padding-top: 96px; padding-bottom: 56px; }
+  .toggle-section { padding-top: 40px; }
+  .desktop-wrapper {
+    width: min(330px, calc(100vw - 56px));
+    margin-top: 36px;
+  }
+  .macbook { padding: 0; }
+  .macbook-lid {
+    border-radius: 48px;
+    padding: 12px;
+    box-shadow:
+      inset 0 0 0 1px rgba(255,255,255,0.10),
+      0 2px 4px rgba(0,0,0,0.06),
+      0 24px 48px rgba(44, 37, 32, 0.18);
+  }
+  .macbook-lid::before { border-radius: 48px; }
+  .macbook-screen { border-radius: 38px; }
+  .macbook-notch {
+    top: 10px;
+    width: 92px;
+    height: 26px;
+    border-radius: 100px;
+  }
+  .macbook-notch::after {
+    left: auto;
+    right: 9px;
+    top: 9px;
+    transform: none;
+    width: 8px;
+    height: 8px;
+  }
+  .macbook-base { display: none; }
+  .app-window { aspect-ratio: 9 / 19; }
+  /* The app-content overrides (masthead, rows, blocks) live in a second
+     max-width block after the base timeline/toggle rules — same specificity,
+     so source order decides, and those base rules come later in this file. */
 }
 
 .app-sidebar {
@@ -890,6 +954,29 @@ nav .container {
   background: var(--card);
   color: var(--text);
   box-shadow: 0 2px 8px var(--card-shadow);
+}
+
+/* Phone hero — app content inside the iPhone frame (see PHONE HERO FRAME). */
+@media (max-width: 767px) {
+  .toggle-section { padding-top: 40px; }
+  .app-main { padding: 52px 16px 0; }
+  .app-masthead { padding: 0 2px 10px; }
+  .app-masthead h3 { font-size: 26px; }
+  .app-date { font-size: 12px; }
+  .timeline-item { padding: 11px 10px 11px 12px; gap: 9px; font-size: 13.5px; }
+  .timeline-item .time { min-width: 36px; font-size: 11.5px; }
+  .timeline-item .title {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .playbook-inner { padding: 12px 12px 12px 16px; }
+  .playbook-narrative { font-size: 12.5px; }
+  .playbook-item .item-text {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 }
 
 /* ============================================
@@ -1622,6 +1709,13 @@ footer {
   font-size: 13px;
   color: var(--text-muted);
 }
+.footer-sign-in {
+  margin-left: 12px;
+  color: var(--text-secondary);
+  text-decoration: none;
+  border-bottom: 1px solid var(--border);
+}
+.footer-sign-in:hover { color: var(--text); }
 
 /* ============================================
    LAYER ACTIVATION ANIMATION
@@ -2136,7 +2230,7 @@ footer {
     <a href="#" class="wordmark"><img src="symphony-logo.jpg" alt="Symphony Logo" style="width:32px;height:32px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-right:8px;">Symphony</a>
     <div style="display:flex;align-items:center;gap:16px;">
       <a href="https://app.symphony-os.com" class="nav-sign-in">Sign in</a>
-      <a href="#waitlist" class="nav-cta">Become a founding household</a>
+      <a href="#waitlist" class="nav-cta"><span class="nav-cta-long">Become a founding household</span><span class="nav-cta-short">Join</span></a>
     </div>
   </div>
 </nav>
@@ -3000,7 +3094,7 @@ footer {
 <!-- ========== FOOTER ========== -->
 <footer>
   <div class="container">
-    <p>&copy; 2026 Symphony. Your life, orchestrated.</p>
+    <p>&copy; 2026 Symphony. Your life, orchestrated. <a href="https://app.symphony-os.com" class="footer-sign-in">Sign in</a></p>
   </div>
 </footer>
 
