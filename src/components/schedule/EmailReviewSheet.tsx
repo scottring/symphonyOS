@@ -20,7 +20,7 @@
 // second picker built for this sheet: fixing a date here has to mean exactly
 // what fixing a date on a Today row means, domain gate and toast included.
 
-import { useMemo } from 'react'
+import { useEffect, useMemo } from 'react'
 import { X, Mail, Trash2 } from 'lucide-react'
 import type { Task } from '@/types/task'
 import type { FamilyMember } from '@/types/family'
@@ -91,6 +91,16 @@ export function EmailReviewSheet({
     }
     return map
   }, [tasks, dismissedIds])
+
+  // Escape closes it, the way every modal surface in the app does. Closing is
+  // also what stamps reviewed_at, so this is not merely a dismissal — it is the
+  // same "I have looked" the X and the backdrop mean.
+  useEffect(() => {
+    if (!open) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [open, onClose])
 
   if (!open) return null
 

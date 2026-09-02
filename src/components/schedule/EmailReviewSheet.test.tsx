@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { EmailReviewSheet } from './EmailReviewSheet'
 import { ScheduleActionsProvider, type ScheduleActionsValue } from '@/contexts/ScheduleActionsContext'
@@ -121,6 +121,18 @@ describe('EmailReviewSheet', () => {
     const { props, user } = renderSheet()
     await user.click(screen.getByRole('button', { name: 'Close' }))
     expect(props.onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('Escape closes the sheet', () => {
+    const { props } = renderSheet()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(props.onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('listens for Escape only while it is open', () => {
+    const { props } = renderSheet({ open: false })
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(props.onClose).not.toHaveBeenCalled()
   })
 
   it('offers the row rail’s own date control per row', () => {
