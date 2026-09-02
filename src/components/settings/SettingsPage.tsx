@@ -9,6 +9,7 @@ import { useTextSize } from '@/hooks/useTextSize'
 import { HomeAddressSettings } from './HomeAddressSettings'
 import { PlanningRhythmSettings } from './PlanningRhythmSettings'
 import { DemoControls } from './DemoControls'
+import { SchoolMailCard } from './SchoolMailCard'
 import type { FamilyMember } from '@/types/family'
 
 interface SettingsPageProps {
@@ -640,6 +641,9 @@ export function SettingsPage({
                 )}
               </div>
             </section>
+
+            {/* School mail — the household's forwarding address */}
+            <SchoolMailCard />
 
           </div>
         )}

@@ -277,6 +277,12 @@ verify_jwt = false
 [functions.extract-email]
 verify_jwt = false
 
+# Called from the browser by a signed-in household member. It holds
+# CAPTURE_SHARED_SECRET so the browser never has to; JWT verification MUST stay
+# on — it is the only thing proving who is asking.
+[functions.capture-retry]
+verify_jwt = true
+
 # GitHub webhook (scottring/scotts-world) calls this with an x-hub-signature-256
 # HMAC, not a Supabase JWT. JWT verification must stay off or the webhook 401s
 # at the platform gateway before the function's own signature check runs.
