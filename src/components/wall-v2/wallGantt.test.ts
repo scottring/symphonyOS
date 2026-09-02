@@ -552,3 +552,54 @@ describe('titleForBlockId — the tap-handler fallback', () => {
     expect(titleForBlockId(board, 'no-such-id')).toBeNull()
   })
 })
+
+// ---------------------------------------------------------------------------
+// Homework chips: open homework sits on the assignee's row until it is done.
+// A separate array from `anytime` so the day's chips keep their cap and order.
+// ---------------------------------------------------------------------------
+import type { Task } from '@/types/task'
+import { HOUSEHOLD_ID } from './wallEventAttribution'
+
+const hw = (o: Partial<Task>): Task =>
+  ({ id: Math.random().toString(36).slice(2), title: 'Blue sheet', completed: false, category: 'homework',
+     context: 'family', createdAt: at(0), updatedAt: at(0), ...o }) as Task
+
+describe('adaptGanttBoard — homework chips', () => {
+  const members = [member('k1', 'Kaleb'), member('k2', 'Ella')]
+  const now = at(15) // Sun Aug 23 2026
+
+  it('lands on the assignee track with a due label, and nowhere else', () => {
+    const board = adaptGanttBoard(members, [day([])], now, TRACK_PX, [
+      hw({ assignedTo: 'k1', neededOn: new Date(2026, 7, 28) }),
+    ])
+    const kaleb = board.tracks.find((t) => t.memberId === 'k1')!
+    const ella = board.tracks.find((t) => t.memberId === 'k2')!
+    expect(kaleb.homework).toEqual([{ id: expect.any(String), label: 'Blue sheet · Fri', late: false }])
+    expect(ella.homework).toEqual([])
+    expect(kaleb.anytime).toEqual([])
+  })
+
+  it('an unassigned or unknown assignee falls to the household row', () => {
+    const board = adaptGanttBoard(members, [day([])], now, TRACK_PX, [
+      hw({ title: 'Nobody' }), hw({ title: 'Stranger', assignedTo: 'zz' }),
+    ])
+    const house = board.tracks.find((t) => t.memberId === HOUSEHOLD_ID)!
+    expect(house.homework.map((h) => h.label)).toEqual(['Nobody', 'Stranger'])
+  })
+
+  it('orders late, then by date, then undated; completed rows never show', () => {
+    const board = adaptGanttBoard(members, [day([])], now, TRACK_PX, [
+      hw({ assignedTo: 'k1', title: 'Undated' }),
+      hw({ assignedTo: 'k1', title: 'Fri', neededOn: new Date(2026, 7, 28) }),
+      hw({ assignedTo: 'k1', title: 'Old', neededOn: new Date(2026, 7, 20) }),
+      hw({ assignedTo: 'k1', title: 'Done', completed: true }),
+    ])
+    const kaleb = board.tracks.find((t) => t.memberId === 'k1')!
+    expect(kaleb.homework.map((h) => [h.label, h.late])).toEqual([['Old · Late', true], ['Fri · Fri', false], ['Undated', false]])
+  })
+
+  it('defaults to no homework when the argument is omitted', () => {
+    const board = adaptGanttBoard(members, [day([])], now)
+    expect(board.tracks.every((t) => t.homework.length === 0)).toBe(true)
+  })
+})

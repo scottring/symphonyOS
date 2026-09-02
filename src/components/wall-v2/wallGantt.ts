@@ -24,6 +24,8 @@
 import type { WallDayData } from '@/hooks/useWallData';
 import type { TimelineItem } from '@/types/timeline';
 import type { FamilyMember } from '@/types/family';
+import type { Task } from '@/types/task';
+import { homeworkDue, sortHomework } from '@/lib/wall/homeworkLabel';
 import { isEverydayRoutine } from '@/lib/routineUtils';
 import { PREVIEW_SECTIONS } from '@/components/wall/today/tomorrowPreview';
 import type { DaySection } from '@/lib/timeUtils';
@@ -124,10 +126,25 @@ export interface GanttBlock {
   type: TimelineItem['type'];
 }
 
+/** One open homework item, as the row draws it. */
+export interface GanttHomework {
+  id: string;
+  /** "Blue sheet · Fri" — title plus the due word, or the title alone when undated. */
+  label: string;
+  late: boolean;
+}
+
 export interface GanttTrack {
   memberId: string;
   name: string;
   blocks: GanttBlock[];
+  /**
+   * Open homework for this person, from the day it arrives until it is
+   * checked off. A separate array from `anytime` so the day's chips keep
+   * their own cap and time order; homework has neither a time nor a day —
+   * it has a due date, and it nags until done.
+   */
+  homework: GanttHomework[];
   /**
    * What the row carries that cannot honestly be a bar, in time order.
    *
@@ -277,9 +294,23 @@ export function adaptGanttBoard(
   days: WallDayData[],
   now: Date,
   trackPx: number = TRACK_PX,
+  homework: Task[] = [],
 ): GanttBoard {
   const today = days[0];
   const roster = [...members, householdMember()];
+
+  // Homework by row. Assigned to a person on the roster → their row; anyone
+  // else (unassigned, or a member id the wall doesn't know) → the household
+  // row, the same fall-through boardOwnersOf gives an unassigned task.
+  const memberIds = new Set(members.map((m) => m.id));
+  const homeworkByTrack = new Map<string, Task[]>();
+  for (const t of homework) {
+    if (t.completed) continue;
+    const key = t.assignedTo && memberIds.has(t.assignedTo) ? t.assignedTo : HOUSEHOLD_ID;
+    const list = homeworkByTrack.get(key);
+    if (list) list.push(t);
+    else homeworkByTrack.set(key, [t]);
+  }
 
   const starts: number[] = [];
   const ends: number[] = [];
@@ -421,6 +452,10 @@ export function adaptGanttBoard(
 
     return {
       memberId: m.id, name: m.name, blocks,
+      homework: sortHomework(homeworkByTrack.get(m.id) ?? [], now).map((t) => {
+        const due = homeworkDue(t.neededOn, now);
+        return { id: t.id, label: due.label ? `${t.title} · ${due.label}` : t.title, late: due.late };
+      }),
       anytime: anytimeItems.map((a) => a.title),
       laterCount,
     };

@@ -35,6 +35,7 @@ const track = (over: Partial<GanttTrack> = {}): GanttTrack => ({
   memberId: 'kid-1',
   name: 'Ella',
   blocks: [block()],
+  homework: [],
   anytime: [],
   laterCount: 0,
   ...over,
