@@ -80,6 +80,40 @@ describe('TapContextPanel', () => {
     expect(tel).not.toBeNull()
   })
 
+  it("surfaces the parent project's links and phone as inherited context", () => {
+    const project = createMockProject({
+      id: 'p1',
+      name: 'Kitchen renovation',
+      phoneNumber: '555-8890',
+      links: [{ url: 'https://example.com/tile-spec', title: 'Tile spec' }],
+    })
+    // The task carries its own number, so the action bar's call button is the
+    // task's — the project's must still be reachable, attributed to the project.
+    const task = createMockTask({ projectId: 'p1', phoneNumber: '555-0001' })
+    render(<TapContextPanel
+      task={task}
+      contacts={[]} projects={[project]} events={[]} familyMembers={[]} siblingTaskCandidates={[]} allTasks={[task]}
+      {...baseHandlers}
+    />)
+    expect(screen.getByText('From Kitchen renovation')).toBeInTheDocument()
+    const link = screen.getByRole('link', { name: /Tile spec/ })
+    expect(link).toHaveAttribute('href', 'https://example.com/tile-spec')
+    expect(link).toHaveAttribute('target', '_blank')
+    expect(document.querySelector('a[href="tel:555-8890"]')).not.toBeNull()
+  })
+
+  it("does not repeat the project's phone when the action bar already carries it", () => {
+    const project = createMockProject({ id: 'p1', name: 'Kitchen renovation', phoneNumber: '555-8890' })
+    const task = createMockTask({ projectId: 'p1' })
+    render(<TapContextPanel
+      task={task}
+      contacts={[]} projects={[project]} events={[]} familyMembers={[]} siblingTaskCandidates={[]} allTasks={[task]}
+      {...baseHandlers}
+    />)
+    expect(document.querySelectorAll('a[href="tel:555-8890"]')).toHaveLength(1)
+    expect(screen.queryByText('From Kitchen renovation')).not.toBeInTheDocument()
+  })
+
   it('renders Might be relevant items', () => {
     const target = createMockTask({ id: 't1', contactId: 'c1', title: 'Call Dr. Smith' })
     const sib = createMockTask({ id: 't2', contactId: 'c1', title: 'Last call to Dr. Smith' })

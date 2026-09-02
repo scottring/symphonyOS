@@ -16,6 +16,7 @@ import { PanelSubtasks } from './sections/PanelSubtasks'
 import { PanelPeople } from './sections/PanelPeople'
 import { PanelLinked } from './sections/PanelLinked'
 import { PanelLinks } from './sections/PanelLinks'
+import { PanelProjectContext } from './sections/PanelProjectContext'
 import { PanelPhotos } from './sections/PanelPhotos'
 import { PanelConversations } from './sections/PanelConversations'
 import { PanelLocation } from './sections/PanelLocation'
@@ -332,6 +333,7 @@ export function TapContextPanel(props: TapContextPanelProps) {
             onOpenEvent={props.onOpenEvent}
             onOpenTask={props.onOpenTask}
           />
+          <PanelProjectContext project={linked.project} actionPhone={phone} />
           <PanelMightBeRelevant items={mightBeRelevant} onOpen={props.onOpenRelated} />
         </>
       }

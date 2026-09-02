@@ -4,8 +4,11 @@ export interface PanelRowProps {
   /** Leading badge — pass the caller's tinted wrapper around a ConceptIcon. */
   icon: ReactNode
   onClick?: () => void
-  /** When set, renders an external link instead of a button. */
+  /** When set, renders a link instead of a button. */
   href?: string
+  /** Open the href in a new tab (the default for web links). Turn off for
+   *  tel:/mailto: hrefs, which the OS hands off rather than navigating. */
+  external?: boolean
   children: ReactNode
 }
 
@@ -18,7 +21,7 @@ const ROW_CLASS =
  * suggestion. The chrome was character-identical in PanelLinks, PanelLinked and
  * PanelMightBeRelevant; three copies of a class string is three chances to drift.
  */
-export function PanelRow({ icon, onClick, href, children }: PanelRowProps) {
+export function PanelRow({ icon, onClick, href, external = true, children }: PanelRowProps) {
   const body = (
     <>
       <span className="w-6 h-6 flex shrink-0 items-center justify-center rounded-md text-sm">
@@ -30,7 +33,12 @@ export function PanelRow({ icon, onClick, href, children }: PanelRowProps) {
 
   if (href) {
     return (
-      <a href={href} target="_blank" rel="noopener noreferrer" className={ROW_CLASS}>
+      <a
+        href={href}
+        target={external ? '_blank' : undefined}
+        rel={external ? 'noopener noreferrer' : undefined}
+        className={ROW_CLASS}
+      >
         {body}
       </a>
     )
