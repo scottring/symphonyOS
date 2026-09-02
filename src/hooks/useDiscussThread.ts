@@ -129,11 +129,24 @@ export function useDiscussThread(
 
   const { members, getCurrentUserMember } = useFamilyMembers()
 
+  // The viewer's AUTH id — what every author carries, and the only reliable way
+  // to tell "mine" from "my partner's". Not the member row's auth_user_id: that
+  // is null on the household creator's own seed row.
+  const [selfAuthId, setSelfAuthId] = useState<string | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      const { data: { user } } = await getAuthUser()
+      if (!cancelled) setSelfAuthId(user?.id ?? null)
+    })()
+    return () => { cancelled = true }
+  }, [])
+
   // Refs so send() and reload() don't have to re-create on every message.
   const threadIdRef = useRef<string | null>(null)
   const messagesRef = useRef<DiscussMessage[]>([])
   const sendingRef = useRef(false)
-  messagesRef.current = messages
+  useEffect(() => { messagesRef.current = messages }, [messages])
 
   const entityType = entity?.type ?? null
   const entityId = entity?.id ?? null
@@ -320,5 +333,5 @@ export function useDiscussThread(
     ...(selfName ? [selfName] : []),
   ]))
 
-  return { threadId, messages, loading, sending, error, toolActivity, send, participants, reload }
+  return { threadId, messages, loading, sending, error, toolActivity, send, participants, reload, selfAuthId }
 }

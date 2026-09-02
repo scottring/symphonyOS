@@ -30,6 +30,7 @@ const discussState = vi.hoisted(() => ({
   error: null as string | null,
   messages: [] as Array<Record<string, unknown>>,
   participants: [] as string[],
+  selfAuthId: 'u1' as string | null,
 }))
 
 vi.mock('@/hooks/useDiscussThread', () => ({
@@ -45,6 +46,7 @@ vi.mock('@/hooks/useDiscussThread', () => ({
       toolActivity: [],
       send: discussSend,
       participants: discussState.participants,
+      selfAuthId: discussState.selfAuthId,
       reload: vi.fn(),
     }
   },
@@ -52,8 +54,10 @@ vi.mock('@/hooks/useDiscussThread', () => ({
 
 vi.mock('@/hooks/useFamilyMembers', () => ({
   useFamilyMembers: () => ({
+    // The household creator's own row carries a NULL auth_user_id — the drawer
+    // must not use it to decide which bubbles are the viewer's own.
     members: [],
-    getCurrentUserMember: () => ({ id: 'm1', name: 'Scott', auth_user_id: 'u1' }),
+    getCurrentUserMember: () => ({ id: 'm1', name: 'Scott', auth_user_id: null, user_id: 'u1' }),
   }),
 }))
 
@@ -73,6 +77,7 @@ describe('AssistDrawer', () => {
     discussState.error = null
     discussState.messages = []
     discussState.participants = []
+    discussState.selfAuthId = 'u1'
   })
 
   it('scopes the assistant to the item and shows its title', () => {
@@ -141,6 +146,17 @@ describe('AssistDrawer', () => {
       render(<AssistDrawer item={task} onClose={vi.fn()} />)
       expect(screen.getByRole('dialog', { name: 'Plan Replace kitchen light bulbs' })).toBeInTheDocument()
       expect(discussSpy).toHaveBeenCalledWith(null, expect.anything())
+    })
+
+    it("puts the viewer's own messages on the right, even as the household creator", () => {
+      // Scott's member row has auth_user_id null; his auth id is u1. Reading
+      // "mine" off the member row would put his own words on the partner side.
+      discussState.messages = [{
+        id: 'm-0', role: 'user', content: 'On it.', timestamp: new Date(),
+        author: { id: 'u1', name: 'Scott', kind: 'member' },
+      }]
+      render(<AssistDrawer item={task} onClose={vi.fn()} discuss={discuss} />)
+      expect(screen.getByText('On it.').closest('.flex')?.className).toContain('justify-end')
     })
   })
 })

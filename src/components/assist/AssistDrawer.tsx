@@ -44,7 +44,7 @@ interface AssistDrawerProps {
 
 export function AssistDrawer({ item, onClose, onMutate, discuss }: AssistDrawerProps) {
   const isRoutine = item.kind === 'routine'
-  const { members, getCurrentUserMember } = useFamilyMembers()
+  const { members } = useFamilyMembers()
   // Viewing an older pre-Discuss conversation from the history dropdown.
   // Sending always goes back to the shared thread.
   const [viewingHistory, setViewingHistory] = useState(false)
@@ -112,7 +112,7 @@ export function AssistDrawer({ item, onClose, onMutate, discuss }: AssistDrawerP
             entityContext={{ id: item.id, name: item.title, type: isRoutine ? 'routine' : 'task' }}
             mode="chat"
             heading={discuss ? 'Discussion' : undefined}
-            currentUserId={getCurrentUserMember()?.auth_user_id ?? undefined}
+            currentUserId={thread.selfAuthId}
             familyMembers={members}
             participants={inDiscuss ? thread.participants : []}
             suggestions={isRoutine ? ROUTINE_SUGGESTIONS : TASK_SUGGESTIONS}
