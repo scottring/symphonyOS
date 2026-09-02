@@ -1,17 +1,9 @@
 import Foundation
 import Supabase
 
-/// Structured fields returned by the `scan-to-task` edge function.
-struct ScanExtraction: Decodable {
-    var title: String?
-    var dueDate: String?      // YYYY-MM-DD
-    var notes: String?
-    var context: String?      // work | family | personal
-}
-
 /// Source-agnostic document ingestion: upload the original to the `attachments`
-/// bucket, ask `scan-to-task` for structured fields, and attach the file to a task.
-/// Used by the in-app scanner/picker and (later) the Share Extension.
+/// bucket and attach the file to an entity (task, note, …). Used by `PageIngest`
+/// to file a snapped page against its first landed item.
 enum DocumentIngest {
 
     // MARK: - Pure helpers (unit-tested)
@@ -39,17 +31,6 @@ enum DocumentIngest {
             .from("attachments")
             .upload(path, data: data, options: FileOptions(contentType: contentType, upsert: false))
         return path
-    }
-
-    /// Ask `scan-to-task` to extract task fields from an image. Returns nil on failure
-    /// (the caller falls back to a generic title so nothing is lost).
-    static func extract(imageData: Data, mediaType: String) async -> ScanExtraction? {
-        struct Body: Encodable { let imageBase64: String; let mediaType: String }
-        let body = Body(imageBase64: imageData.base64EncodedString(), mediaType: mediaType)
-        return try? await supabase.functions.invoke(
-            "scan-to-task",
-            options: FunctionInvokeOptions(body: body)
-        )
     }
 
     /// Insert the `attachments` row pointing an entity (task or note) at the

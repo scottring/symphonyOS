@@ -37,6 +37,10 @@ struct PageResult: Equatable {
     static let empty = PageResult(items: [], notes: [], unclear: [], windowDates: [], storagePath: nil)
 }
 
+extension PageResult: Identifiable {
+    var id: String { storagePath ?? "page" }
+}
+
 /// Wire shape of the `parse-page` edge function response.
 struct PageParseResponse: Decodable {
     struct Item: Decodable {

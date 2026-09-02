@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 #if os(iOS)
 import PhotosUI
 #endif
@@ -120,44 +121,50 @@ private struct SymphonyDock: View {
                 .shadow(color: Color.cardShadow, radius: 8, y: 3)
         }
         .buttonStyle(.plain)
+        .accessibilityLabel("Add")
         .frame(maxWidth: .infinity)
         .offset(y: -8)
     }
 }
 
-// MARK: - Capture Sheet (dock "+": reuse the NL-aware capture bar + scan/photo)
+// MARK: - Capture Sheet (dock "+": typed capture, or snap a page → parse-page)
 
 private struct CaptureSheet: View {
     let userId: UUID
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
+    @Query private var familyMembers: [FamilyMember]
 
+    private enum Phase: Equatable {
+        case idle
+        case uploading
+        case parsing(storagePath: String)
+        case failed(storagePath: String, message: String)
+        case committing
+    }
+
+    @State private var phase: Phase = .idle
     @State private var showScanner = false
     @State private var showPhotoPicker = false
     @State private var photoItem: PhotosPickerItem?
-    @State private var isProcessing = false
-    @State private var pendingReview: PendingReview?
-
-    private struct PendingReview: Identifiable {
-        let id = UUID()
-        let image: UIImage
-        let data: Data
-        let extraction: ScanExtraction?
-    }
+    @State private var review: PageResult?
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 18) {
-                // Reuse the existing natural-language capture bar for typed tasks.
                 QuickCaptureBar(userId: userId)
-                    .clipShape(RoundedRectangle(cornerRadius: 14))
 
-                // Or capture a document.
                 HStack(spacing: 12) {
-                    captureOption(title: "Scan document", systemImage: "doc.viewfinder") { showScanner = true }
+                    captureOption(title: "Snap a page", systemImage: "doc.viewfinder") { showScanner = true }
                     captureOption(title: "Choose photo", systemImage: "photo.on.rectangle") { showPhotoPicker = true }
                 }
-                .padding(.horizontal, 20)
+                .padding(.horizontal, 16)
+
+                Text("Photograph a handwritten plan. Every line lands on its day, this week, or the inbox — you review before anything is added.")
+                    .font(.bodySmall)
+                    .foregroundStyle(Color.textTertiary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 32)
 
                 Spacer(minLength: 0)
             }
@@ -167,17 +174,11 @@ private struct CaptureSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } }
             }
-            .overlay {
-                if isProcessing {
-                    ProgressView().controlSize(.large)
-                        .padding(20)
-                        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 12))
-                }
-            }
+            .overlay { progressOverlay }
             .fullScreenCover(isPresented: $showScanner) {
                 DocumentScanner { data in
                     showScanner = false
-                    if let data { Task { await beginReview(imageData: data) } }
+                    if let data { Task { await snap(imageData: data) } }
                 }
                 .ignoresSafeArea()
             }
@@ -185,23 +186,48 @@ private struct CaptureSheet: View {
             .onChange(of: photoItem) { _, item in
                 guard let item else { return }
                 Task {
-                    if let data = try? await item.loadTransferable(type: Data.self) {
-                        await beginReview(imageData: data)
-                    }
+                    if let data = try? await item.loadTransferable(type: Data.self) { await snap(imageData: data) }
                     photoItem = nil
                 }
             }
-            .sheet(item: $pendingReview) { review in
-                ScanReviewSheet(
-                    image: review.image,
-                    initial: review.extraction,
-                    onSave: { title, scheduledFor, notes, context in
-                        pendingReview = nil
-                        saveScan(data: review.data, title: title, scheduledFor: scheduledFor, notes: notes, context: context)
-                    },
-                    onCancel: { pendingReview = nil }
-                )
+            .sheet(item: $review) { result in
+                PageReviewSheet(result: result, members: familyMembers,
+                                onCommit: { items, notes in
+                                    review = nil
+                                    Task { await commit(items: items, notes: notes, storagePath: result.storagePath) }
+                                },
+                                onCancel: { review = nil; phase = .idle })
             }
+            .alert("Couldn't read the page", isPresented: isFailed) {
+                if case .failed(let path, _) = phase {
+                    Button("Retry") { Task { await parse(storagePath: path) } }
+                }
+                Button("Cancel", role: .cancel) { phase = .idle }
+            } message: {
+                if case .failed(_, let message) = phase { Text(message) }
+            }
+        }
+    }
+
+    private var isFailed: Binding<Bool> {
+        Binding(get: { if case .failed = phase { return true } else { return false } },
+                set: { if !$0, case .failed = phase { phase = .idle } })
+    }
+
+    @ViewBuilder
+    private var progressOverlay: some View {
+        switch phase {
+        case .uploading, .parsing, .committing:
+            VStack(spacing: 10) {
+                ProgressView().controlSize(.large)
+                Text(phase == .uploading ? "Uploading…" : phase == .committing ? "Adding…" : "Reading the page…")
+                    .font(.bodySmall).foregroundStyle(Color.textSecondary)
+            }
+            .padding(24)
+            .background(Color.bgElevated, in: RoundedRectangle(cornerRadius: 16))
+            .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Color.cardBorder, lineWidth: 1))
+        default:
+            EmptyView()
         }
     }
 
@@ -211,51 +237,49 @@ private struct CaptureSheet: View {
                 Image(systemName: systemImage).font(.system(size: 24))
                 Text(title).font(.captionBold)
             }
-            .foregroundStyle(Color.primaryTint)
+            .foregroundStyle(Color.textPrimary)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 20)
-            .background(Color.bgSurface, in: RoundedRectangle(cornerRadius: 14))
+            .cardStyle(padding: 0)
         }
         .buttonStyle(.plain)
     }
 
-    private func beginReview(imageData: Data) async {
+    // MARK: Flow: upload → parse → review → commit
+
+    private func snap(imageData: Data) async {
         guard let ui = UIImage(data: imageData) else { return }
-        isProcessing = true
         let jpeg = ui.jpegData(compressionQuality: 0.8) ?? imageData
-        let extraction = await DocumentIngest.extract(imageData: jpeg, mediaType: "image/jpeg")
-        isProcessing = false
-        pendingReview = PendingReview(image: ui, data: jpeg, extraction: extraction)
+        phase = .uploading
+        do {
+            let path = try await PageIngest.upload(jpeg: jpeg, userId: userId)
+            await parse(storagePath: path)
+        } catch {
+            phase = .failed(storagePath: "", message: "Upload failed: \(error.localizedDescription)")
+        }
     }
 
-    private func saveScan(data: Data, title: String, scheduledFor: Date?, notes: String?, context: String?) {
-        let vm = TaskViewModel(modelContext: modelContext)
-        let finalTitle = title.isEmpty ? "Scanned document" : title
-        let task = vm.createTask(
-            title: finalTitle, userId: userId,
-            scheduledFor: scheduledFor, isAllDay: scheduledFor != nil, context: context
-        )
-
-        if let notes, !notes.isEmpty {
-            task.notes = notes
-            try? modelContext.save()
+    private func parse(storagePath: String) async {
+        guard !storagePath.isEmpty else { phase = .idle; return }
+        phase = .parsing(storagePath: storagePath)
+        do {
+            let result = try await PageIngest.parse(storagePath: storagePath, members: familyMembers)
+            phase = .idle
+            review = result
+        } catch {
+            // The image stays uploaded — Retry re-parses without re-uploading.
+            phase = .failed(storagePath: storagePath, message: error.localizedDescription)
         }
+    }
 
+    private func commit(items: [PageItem], notes: [PageNote], storagePath: String?) async {
+        phase = .committing
+        let outcome = await PageIngest.commit(items: items, notes: notes, storagePath: storagePath,
+                                              userId: userId, members: familyMembers, modelContext: modelContext)
+        phase = .idle
         #if os(iOS)
-        UINotificationFeedbackGenerator().notificationOccurred(.success)
+        UINotificationFeedbackGenerator().notificationOccurred(outcome.failures == 0 ? .success : .warning)
         #endif
-
-        Task {
-            do {
-                let path = try await DocumentIngest.upload(data: data, userId: userId, ext: "jpg", contentType: "image/jpeg")
-                try await DocumentIngest.attach(
-                    entityId: task.id, userId: userId, storagePath: path,
-                    fileName: "scan.jpg", fileType: "image/jpeg", fileSize: data.count
-                )
-            } catch {
-                // Task already created; attachment failed (offline, etc.) — acceptable for V1.
-            }
-        }
         dismiss()
     }
 }

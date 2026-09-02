@@ -103,4 +103,108 @@ final class SkinScreenshotsUITests: XCTestCase {
         shot.lifetime = .keepAlways
         add(shot)
     }
+
+    // MARK: - Task 10: Snap a page flow (temporary, exercised for the checkpoint)
+
+    /// Signs in, taps the dock "+", "Choose photo", picks the first photo in
+    /// the simulator library (added via `xcrun simctl addmedia` before this
+    /// runs — a photographed 3-line handwritten list), waits for the review
+    /// sheet, screenshots it, taps "Add all", and screenshots Today after.
+    @MainActor
+    func testSnapPageFlow() throws {
+        let app = XCUIApplication()
+        app.launch()
+
+        addUIInterruptionMonitor(withDescription: "System alerts") { alert in
+            for label in ["Don't Allow", "Not Now", "Allow", "OK"] {
+                if alert.buttons[label].exists {
+                    alert.buttons[label].tap()
+                    return true
+                }
+            }
+            return false
+        }
+        app.tap()
+
+        let email = app.textFields["Email"]
+        if email.waitForExistence(timeout: 10) {
+            email.tap()
+            email.typeText("symphonytest4444@gmail.com")
+            let password = app.secureTextFields["Password"]
+            password.tap()
+            password.typeText("SymphonyTest!2026")
+            app.buttons.matching(NSPredicate(format: "label CONTAINS[c] 'Sign In'")).firstMatch.tap()
+        }
+
+        let today = app.staticTexts["Today"]
+        XCTAssertTrue(today.waitForExistence(timeout: 30), "never reached Today")
+        Thread.sleep(forTimeInterval: 5)
+
+        let addButton = app.buttons["Add"]
+        XCTAssertTrue(addButton.waitForExistence(timeout: 10), "no dock Add button")
+        addButton.tap()
+
+        let choosePhoto = app.buttons["Choose photo"]
+        XCTAssertTrue(choosePhoto.waitForExistence(timeout: 10), "no Choose photo option")
+        choosePhoto.tap()
+
+        // PHPicker presents out-of-process; wait for its content, dismiss the
+        // "Private Access to Photos" banner if shown (it occludes the top
+        // photo row — our just-added photo is newest, so it sorts first/
+        // top-left), then tap the grid image by its picker-specific
+        // identifier — `app.images` unscoped grabs the Today screen's own
+        // "plus.circle.fill" icon underneath, since that window is earlier
+        // in traversal order.
+        Thread.sleep(forTimeInterval: 2)
+        let bannerClose = app.buttons["Close"]
+        let sawBanner = bannerClose.exists
+        print("SNAP-DEBUG sawBanner=\(sawBanner)")
+        if sawBanner {
+            bannerClose.tap()
+            Thread.sleep(forTimeInterval: 1)
+        }
+
+        var tapped = false
+        for attempt in 0..<10 {
+            let firstPhoto = app.images.matching(identifier: "PXGGridLayout-Info").firstMatch
+            let exists = firstPhoto.waitForExistence(timeout: 5)
+            print("SNAP-DEBUG attempt=\(attempt) exists=\(exists) hittable=\(firstPhoto.isHittable) label=\(firstPhoto.label)")
+            if exists, firstPhoto.isHittable {
+                firstPhoto.tap()
+                tapped = true
+                break
+            }
+            Thread.sleep(forTimeInterval: 1)
+        }
+        if !tapped {
+            // Force a coordinate tap at the element's center as a last resort.
+            let firstPhoto = app.images.matching(identifier: "PXGGridLayout-Info").firstMatch
+            if firstPhoto.exists {
+                firstPhoto.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+                tapped = true
+            }
+        }
+        print("SNAP-DEBUG tappedPhoto=\(tapped)")
+
+        let reviewTitle = app.navigationBars["Review page"]
+        let sawReview = reviewTitle.waitForExistence(timeout: 60)
+        print("SNAP-DEBUG sawReviewSheet=\(sawReview)")
+        attach(name: "page-review")
+
+        if sawReview {
+            let addAll = app.buttons["Add all"]
+            if addAll.waitForExistence(timeout: 5) {
+                addAll.tap()
+            }
+            Thread.sleep(forTimeInterval: 4)
+            attach(name: "today-after-add-all")
+
+            let inboxTab = app.buttons["Inbox"]
+            if inboxTab.waitForExistence(timeout: 10) {
+                inboxTab.tap()
+                Thread.sleep(forTimeInterval: 3)
+                attach(name: "inbox-after-add-all")
+            }
+        }
+    }
 }
