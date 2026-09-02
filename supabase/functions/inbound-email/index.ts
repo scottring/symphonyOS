@@ -45,10 +45,26 @@ Deno.serve(async (req: Request) => {
   if (!owner) return json({ error: 'household has no active members' }, 404)
 
   const sourceKey = sourceKeyFor(body)
-  const { data: existing, error: existingError } = await admin
-    .from('captures').select('id').eq('kind', 'email').eq('source_key', sourceKey).maybeSingle()
+  const findExisting = (key: string) =>
+    admin.from('captures').select('id, status').eq('kind', 'email').eq('source_key', key).maybeSingle()
+  // Fire-and-forget: the caller does not wait on extraction. A dispatch lost to
+  // a cold start or a dropped socket is recovered by the next delivery/retry,
+  // which lands here as a duplicate and re-fires while the capture is pending.
+  const fireExtraction = (captureId: string) => {
+    fetch(`${supabaseUrl}/functions/v1/extract-email`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-capture-secret': secret },
+      body: JSON.stringify({ capture_id: captureId }),
+    }).catch(() => {})
+  }
+
+  const { data: existing, error: existingError } = await findExisting(sourceKey)
   if (existingError) return json({ error: `db: ${existingError.message}` }, 500)
-  if (existing) return json({ ok: true, capture_id: existing.id, duplicate: true }, 200)
+  if (existing) {
+    const refired = existing.status === 'pending'
+    if (refired) fireExtraction(existing.id)
+    return json({ ok: true, capture_id: existing.id, duplicate: true, refired }, 200)
+  }
 
   const rawText = `Subject: ${body.subject}\nFrom: ${body.from}\n\n${body.text}`
   const { data: cap, error } = await admin
@@ -69,17 +85,17 @@ Deno.serve(async (req: Request) => {
   if (error || !cap) {
     // A concurrent duplicate loses the unique-index race; report it as such.
     if (error?.code === '23505') {
-      const { data: dup } = await admin.from('captures').select('id').eq('kind', 'email').eq('source_key', sourceKey).maybeSingle()
-      if (dup) return json({ ok: true, capture_id: dup.id, duplicate: true }, 200)
+      const { data: dup } = await findExisting(sourceKey)
+      if (dup) {
+        const refired = dup.status === 'pending'
+        if (refired) fireExtraction(dup.id)
+        return json({ ok: true, capture_id: dup.id, duplicate: true, refired }, 200)
+      }
     }
     return json({ error: `capture insert failed: ${error?.message ?? 'unknown'}` }, 500)
   }
 
-  fetch(`${supabaseUrl}/functions/v1/extract-email`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json', 'x-capture-secret': secret },
-    body: JSON.stringify({ capture_id: cap.id }),
-  }).catch(() => {})
+  fireExtraction(cap.id)
 
   return json({ ok: true, capture_id: cap.id }, 202)
 })
