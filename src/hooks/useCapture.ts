@@ -29,14 +29,21 @@ interface CaptureRow {
 /** Named columns only — `captures.raw_text` is the whole email, never SELECT *. */
 const CAPTURE_COLUMNS = 'id, subject, sender, source_label, raw_text, created_at'
 
-export function useCapture(id: string | undefined): { capture: Capture | null; loading: boolean } {
+export function useCapture(
+  id: string | undefined,
+): { capture: Capture | null; loading: boolean; error: string | null } {
   const [capture, setCapture] = useState<Capture | null>(null)
   const [loading, setLoading] = useState(Boolean(id))
+  // A read that FAILS and a task whose capture was deleted both left `capture`
+  // null, and the panel drew nothing either way — so a broken read looked
+  // exactly like a row that simply has no source.
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!id) {
       setCapture(null)
       setLoading(false)
+      setError(null)
       return
     }
 
@@ -44,13 +51,14 @@ export function useCapture(id: string | undefined): { capture: Capture | null; l
     setLoading(true)
 
     void (async () => {
-      const { data } = await supabase
+      const { data, error: queryError } = await supabase
         .from('captures')
         .select(CAPTURE_COLUMNS)
         .eq('id', id)
         .maybeSingle()
 
       if (cancelled) return
+      setError(queryError ? (queryError.message || 'Could not load the source email') : null)
       const row = data as CaptureRow | null
       setCapture(
         row
@@ -70,5 +78,5 @@ export function useCapture(id: string | undefined): { capture: Capture | null; l
     return () => { cancelled = true }
   }, [id])
 
-  return { capture, loading }
+  return { capture, loading, error }
 }

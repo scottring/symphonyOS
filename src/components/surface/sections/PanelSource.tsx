@@ -22,10 +22,21 @@ function receivedOn(iso: string): string {
  * email yourself.
  */
 export function PanelSource({ captureId }: PanelSourceProps) {
-  const { capture } = useCapture(captureId)
+  const { capture, error } = useCapture(captureId)
   const [open, setOpen] = useState(false)
 
-  if (!capture) return null
+  // A failed read used to be indistinguishable from a task with no source at
+  // all — both drew nothing. One quiet line, because the reason someone opens
+  // this section is that they do not trust the extraction, and silence there
+  // is the worst possible answer.
+  if (!capture) {
+    if (!error) return null
+    return (
+      <PanelSection id="source" label="Source">
+        <p className="text-sm text-neutral-500">Couldn’t load the source email.</p>
+      </PanelSection>
+    )
+  }
 
   const headline = [capture.sender, capture.subject].filter(Boolean).join(' · ')
   const received = receivedOn(capture.createdAt)

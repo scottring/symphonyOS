@@ -7,11 +7,12 @@ import type { Capture } from '@/hooks/useCapture'
 
 let mockCapture: Capture | null = null
 let mockLoading = false
+let mockError: string | null = null
 
 vi.mock('@/hooks/useCapture', () => ({
   useCapture: (id: string | undefined) => {
     void id
-    return { capture: mockCapture, loading: mockLoading }
+    return { capture: mockCapture, loading: mockLoading, error: mockError }
   },
 }))
 
@@ -28,6 +29,7 @@ describe('PanelSource', () => {
   beforeEach(() => {
     mockCapture = capture
     mockLoading = false
+    mockError = null
   })
 
   it('renders nothing when there is no capture', () => {
@@ -57,6 +59,23 @@ describe('PanelSource', () => {
 
     await user.click(screen.getByRole('button', { name: 'Hide original' }))
     expect(screen.queryByText(/Please send a bag lunch/)).not.toBeInTheDocument()
+  })
+
+  // A failed read used to be indistinguishable from a task with no source —
+  // both drew nothing, on the one section a reader opens precisely because
+  // they do not trust the extraction.
+  it('says so when the read failed', () => {
+    mockCapture = null
+    mockError = 'permission denied for table captures'
+    render(<PanelSource captureId="c1" />)
+    expect(screen.getByText(/Couldn.t load the source email/)).toBeInTheDocument()
+  })
+
+  it('still renders nothing when there is simply no source and no error', () => {
+    mockCapture = null
+    mockError = null
+    const { container } = render(<PanelSource captureId="c1" />)
+    expect(container.firstChild).toBeNull()
   })
 
   it('offers no toggle when the capture kept no raw text', () => {
