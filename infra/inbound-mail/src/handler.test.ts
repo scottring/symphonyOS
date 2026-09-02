@@ -36,6 +36,13 @@ describe('buildPayload', () => {
   it('returns null for a non-token recipient', () => {
     expect(buildPayload(parsed, 'hello@symphony-os.com', new Date(0))).toBeNull()
   })
+  it('decodes numeric and common named entities in the html fallback', () => {
+    const p = buildPayload(
+      { ...parsed, text: undefined, html: '<p>Thursday&#8217;s update &mdash; bring a hat &amp; water</p>' },
+      'a1b2c3d4e5f60718@symphony-os.com', new Date(0),
+    )
+    expect(p?.text).toBe('Thursday’s update — bring a hat & water')
+  })
 })
 
 describe('deliver', () => {
