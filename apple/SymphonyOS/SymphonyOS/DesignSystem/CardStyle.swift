@@ -1,58 +1,61 @@
 import SwiftUI
 
-// MARK: - Card Modifier
+// MARK: - Card (landing `.card`: white, warm 1px border, soft shadow, r16)
 
 struct CardStyle: ViewModifier {
     var padding: CGFloat = 16
+    var cornerRadius: CGFloat = 16
 
     func body(content: Content) -> some View {
         content
             .padding(padding)
             .background(Color.bgElevated)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .shadow(color: .black.opacity(0.06), radius: 8, x: 0, y: 2)
+            .clipShape(RoundedRectangle(cornerRadius: cornerRadius))
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius)
+                    .strokeBorder(Color.cardBorder, lineWidth: 1)
+            )
+            .shadow(color: Color.cardShadow, radius: 8, x: 0, y: 2)
     }
 }
 
 extension View {
-    func cardStyle(padding: CGFloat = 16) -> some View {
-        modifier(CardStyle(padding: padding))
+    func cardStyle(padding: CGFloat = 16, cornerRadius: CGFloat = 16) -> some View {
+        modifier(CardStyle(padding: padding, cornerRadius: cornerRadius))
     }
 }
 
-// MARK: - Coaching Card Modifier
+// MARK: - Coaching Card (amber tint)
 
 struct CoachingCardStyle: ViewModifier {
     func body(content: Content) -> some View {
         content
             .padding(16)
             .background(Color.coachingBg)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .clipShape(RoundedRectangle(cornerRadius: 16))
             .overlay(
-                RoundedRectangle(cornerRadius: 12)
+                RoundedRectangle(cornerRadius: 16)
                     .strokeBorder(Color.coachingTint.opacity(0.3), lineWidth: 1)
             )
-            .shadow(color: Color.coachingTint.opacity(0.08), radius: 6, x: 0, y: 2)
+            .shadow(color: Color.cardShadow, radius: 6, x: 0, y: 2)
     }
 }
 
 extension View {
-    func coachingCardStyle() -> some View {
-        modifier(CoachingCardStyle())
-    }
+    func coachingCardStyle() -> some View { modifier(CoachingCardStyle()) }
 }
 
-// MARK: - Primary Button Style
+// MARK: - Primary button (landing `.btn-primary`: ink pill, white text)
 
 struct SymphonyButtonStyle: ButtonStyle {
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.bodyMediumBold)
             .foregroundStyle(.white)
-            .padding(.horizontal, 20)
-            .padding(.vertical, 12)
-            .background(Color.primaryTint)
-            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .padding(.horizontal, 22)
+            .padding(.vertical, 13)
+            .background(Color.ink)
+            .clipShape(Capsule())
             .opacity(configuration.isPressed ? 0.85 : 1.0)
             .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
             .animation(.easeInOut(duration: 0.15), value: configuration.isPressed)
@@ -63,18 +66,39 @@ extension ButtonStyle where Self == SymphonyButtonStyle {
     static var symphony: SymphonyButtonStyle { SymphonyButtonStyle() }
 }
 
-// MARK: - Input Style
+// MARK: - Secondary button (landing `.btn-secondary`: cream pill, warm border)
+
+struct SymphonySecondaryButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.bodyMediumBold)
+            .foregroundStyle(Color.textPrimary)
+            .padding(.horizontal, 22)
+            .padding(.vertical, 13)
+            .background(Color.bgWarm)
+            .clipShape(Capsule())
+            .overlay(Capsule().strokeBorder(Color.cardBorder, lineWidth: 1))
+            .opacity(configuration.isPressed ? 0.85 : 1.0)
+            .animation(.easeInOut(duration: 0.15), value: configuration.isPressed)
+    }
+}
+
+extension ButtonStyle where Self == SymphonySecondaryButtonStyle {
+    static var symphonySecondary: SymphonySecondaryButtonStyle { SymphonySecondaryButtonStyle() }
+}
+
+// MARK: - Input (cream field, warm border, r10)
 
 struct SymphonyTextFieldStyle: TextFieldStyle {
     func _body(configuration: TextField<Self._Label>) -> some View {
         configuration
             .font(.bodyLarge)
             .padding(12)
-            .background(Color.bgElevated)
+            .background(Color.bgSurface)
             .clipShape(RoundedRectangle(cornerRadius: 10))
             .overlay(
                 RoundedRectangle(cornerRadius: 10)
-                    .strokeBorder(Color.textTertiary.opacity(0.3), lineWidth: 1)
+                    .strokeBorder(Color.cardBorder, lineWidth: 1)
             )
     }
 }
