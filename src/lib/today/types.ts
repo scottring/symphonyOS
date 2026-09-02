@@ -21,7 +21,7 @@ export interface TodayDataInput {
   hideRoutines: boolean
   /** The checked layers. Unsorted is a layer, not a wildcard. */
   layers: ReadonlySet<Layer>
-  eventNotesMap?: Map<string, { notes?: string; assignedTo?: string | null }>
+  eventNotesMap?: Map<string, { notes?: string; assignedTo?: string | null; isFree?: boolean }>
   eventContextOverrides?: Map<string, 'work' | 'family' | 'personal'>
   getDomainForCalendar?: (calendarId?: string, calendarName?: string) => 'work' | 'family' | 'personal' | null
   /** Present for parity with legacy deps; not used by current logic. */

@@ -30,6 +30,7 @@ import type { ResolverContext } from '@/lib/entityResolver';
 import type { TodayCaptureResult } from '@/components/schedule/TodayAddInput';
 import type { TimelineCaptureResult } from '@/components/schedule/TimelineQuickInput';
 import { useEventNotes } from '@/hooks/useEventNotes';
+import { eventNoteKeys } from '@/lib/today/eventFree';
 import { useContacts } from '@/hooks/useContacts';
 import { useProjects } from '@/hooks/useProjects';
 import { useRoutines } from '@/hooks/useRoutines';
@@ -63,10 +64,12 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
   const { tasks, loading: tasksLoading, addTask, toggleTask, toggleWaiting, deleteTask, updateTask, updateTasksBulk, pushTask, getLinkedTasks, refetch, updateTaskOrders } = useSupabaseTasks();
   const { isConnected, events, fetchEvents, fetchCalendarList, isFetching: eventsFetching, updateEvent, createEvent, deleteEvent, removeEventLocal, restoreEventLocal } = useGoogleCalendar();
   // Passing the visible event ids opts in to auto-loading notes (context
-  // overrides, assignees, shared-with-family) + realtime — without it those
-  // persist to the DB but render stale on every fresh window.
-  const visibleEventIds = useMemo(() => events.map((e) => e.google_event_id || e.id), [events]);
-  const { notes: eventNotesMap, updateEventAssignment, updateEventAssignmentAll, updateEventContext, updateEventProject, updateEventSharedWithFamily, dismissShareNudge } = useEventNotes(visibleEventIds);
+  // overrides, assignees, shared-with-family, free) + realtime — without it
+  // those persist to the DB but render stale on every fresh window.
+  // eventNoteKeys also loads each event's SERIES id (recurring_event_id), so
+  // a "free" flag set once on the series note resolves for every occurrence.
+  const visibleEventIds = useMemo(() => eventNoteKeys(events), [events]);
+  const { notes: eventNotesMap, updateEventAssignment, updateEventAssignmentAll, updateEventContext, updateEventProject, updateEventSharedWithFamily, updateEventFree, dismissShareNudge } = useEventNotes(visibleEventIds);
   const { contacts, contactsMap, addContact, searchContacts } = useContacts();
   const { projects, projectsMap, addProject } = useProjects();
   const {
@@ -754,6 +757,7 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
       onSkipEvent: scheduleActions.onSkipEvent,
       onPushEvent: scheduleActions.onPushEvent,
       onUpdateEventContext: updateEventContext,
+      onUpdateEventFree: updateEventFree,
       onShareEventWithFamily: (id: string) => updateEventSharedWithFamily(id, true),
       onDismissShareNudge: (id: string) => dismissShareNudge(id),
       onHideEvent: hideEvent,
@@ -786,7 +790,7 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
     [
       toggleTask, toggleWaiting, gated, deleteTask, onSetNeededToday, viewedDate, onCreateTaskFromValue, onCreateTaskParsed, parserContext, resolverContext, getRecentTaskForContact, onScheduleListItemAsTask, onCreateTaskAt, onCreateEventAt, onCreateRoutineAt, handleCreateFollowUp, handleGroupItems, handleAddToGroup, handleRemoveFromGroup, handleUngroup, undo.pushAction, updateTaskOrders,
       setSelection, navigate,
-      scheduleActions, updateRoutine, updateEventContext, updateEventSharedWithFamily, dismissShareNudge, hideEvent, handleDeleteEvent, sendTaskToBuy,
+      scheduleActions, updateRoutine, updateEventContext, updateEventFree, updateEventSharedWithFamily, dismissShareNudge, hideEvent, handleDeleteEvent, sendTaskToBuy,
       contactsMap, projectsMap, projects, contacts, familyMembers, lists, listsByCategory,
       eventNotesMapWithDefaults, eventContextOverrides,
       addProject, handleConvertTaskToProject, searchContacts, addContact, getDomainForCalendar,

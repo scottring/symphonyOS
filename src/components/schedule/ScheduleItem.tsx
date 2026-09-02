@@ -232,7 +232,10 @@ export const ScheduleItem = memo(function ScheduleItem({
   const isTask = item.type === 'task'
   const isRoutine = item.type === 'routine'
   const isEvent = item.type === 'event'
-  const isActionable = isTask || isRoutine || isEvent // Events are now checkable
+  /** Informational-only: no prep/handoff expected, so it's never actionable
+   *  and never gets a check circle/checkbox. See eventFree.ts. */
+  const isFree = !!item.isFree
+  const isActionable = (isTask || isRoutine || isEvent) && !isFree // Events are now checkable
   /** This row came out of a capture (a forwarded school email). */
   const fromEmail = !!item.captureId
   /**
@@ -401,7 +404,7 @@ export const ScheduleItem = memo(function ScheduleItem({
       <ScheduleItemMobileCard
         swipeMaxPx={SWIPE_MAX_PX}
         swipeCommitPx={SWIPE_COMMIT_PX}
-        onCompleteSwipe={() => handleCheckboxClick({ stopPropagation: () => {} } as React.MouseEvent)}
+        onCompleteSwipe={() => { if (!isFree) handleCheckboxClick({ stopPropagation: () => {} } as React.MouseEvent) }}
         onEditSwipe={onSelect}
         // Centred is right for a one-line row and wrong the moment the inline
         // per-person items (or the "From an email" line) make the title column
@@ -412,7 +415,7 @@ export const ScheduleItem = memo(function ScheduleItem({
           relative flex ${hasPerPersonItems || fromEmail ? 'items-start' : 'items-center'} gap-3 bg-bg-elevated rounded-2xl border border-neutral-200/70
           px-3 py-3 shadow-card
           ${selected ? 'ring-2 ring-primary-300 shadow-md' : ''}
-          ${item.completed || item.skipped ? 'opacity-60' : ''}
+          ${item.completed || item.skipped || isFree ? 'opacity-60' : ''}
         `}
         ariaPressed={selected}
       >
@@ -523,7 +526,7 @@ export const ScheduleItem = memo(function ScheduleItem({
               : 'border-transparent hover:bg-primary-50/50 hover:border-primary-100'
             }`
         }
-        ${item.completed || item.skipped ? 'opacity-60' : ''}
+        ${item.completed || item.skipped || isFree ? 'opacity-60' : ''}
       `}
     >
       {/* Bulk multi-select checkbox — hover-revealed at the row's left edge.
@@ -640,7 +643,10 @@ export const ScheduleItem = memo(function ScheduleItem({
           <div className={`w-5 shrink-0 flex items-center justify-center relative z-[1] ${
             hasBelowTitleContent ? `self-start ${variant === 'minimal' ? '' : 'mt-0.5'}` : ''
           }`}>
-            {isEvent ? (
+            {isEvent && isFree ? (
+              // Free events carry no check circle — nothing for a parent to do.
+              null
+            ) : isEvent ? (
               // Calendar events show a calendar icon with the context color
               <button
                 onClick={handleCheckboxClick}
@@ -825,11 +831,18 @@ export const ScheduleItem = memo(function ScheduleItem({
         />
       </div>
 
-      {/* Metadata row — location on hover, contact/parentTask always compact */}
-      {(item.location || hasContactChip || parentTaskName) && (() => {
-        const onlyLocation = !hasContactChip && !parentTaskName
+      {/* Metadata row — location on hover, contact/parentTask/Free always compact */}
+      {(item.location || hasContactChip || parentTaskName || isFree) && (() => {
+        const onlyLocation = !hasContactChip && !parentTaskName && !isFree
         const metadataContent = (
           <div className={`flex items-center gap-2 ml-[5.75rem] flex-wrap ${onlyLocation ? 'pt-1' : 'mt-1'}`}>
+            {/* Free chip — informational-only: no prep/handoff expected. */}
+            {isFree && (
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-neutral-500 bg-neutral-100 rounded px-1.5 py-0.5">
+                Free
+              </span>
+            )}
+
             {/* Location chip — hover-only for cleaner default view.
                 URL-shaped locations (Zoom/Meet/Teams) open the meeting URL
                 directly; physical locations open Google Maps directions. */}

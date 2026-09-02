@@ -5,6 +5,7 @@ import type { EventNote } from '@/hooks/useEventNotes'
 import type { TaskContext } from '@/types/task'
 import { resolveEventContext } from './eventContext'
 import { isFamilyHours } from '@/lib/workingHours'
+import { isEventFree } from './eventFree'
 
 export interface ShareNudge {
   eventId: string
@@ -40,6 +41,8 @@ export function computeShareNudges(
     const note = eventNotesMap?.get(eventId)
     if (note?.sharedWithFamily) continue
     if (note?.shareNudgeDismissed) continue
+    // "Free" events carry no handoff expectation — never nudge to share them.
+    if (isEventFree(event, eventNotesMap)) continue
 
     nudges.push({ eventId, title: event.title, context })
   }

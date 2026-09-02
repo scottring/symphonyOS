@@ -211,6 +211,62 @@ describe('TapEventPanel', () => {
     })
   })
 
+  describe('free flag', () => {
+    it('hides the Free pill when onToggleFree is not provided', () => {
+      render(<TapEventPanel event={mockEvent} notes={undefined} allTasks={[]} {...baseHandlers} />)
+      expect(screen.queryByRole('button', { name: /free/i })).not.toBeInTheDocument()
+    })
+
+    it('marks an event free via the Free pill', async () => {
+      const onToggleFree = vi.fn()
+      const { user } = render(<TapEventPanel
+        event={mockEvent} notes={undefined} allTasks={[]} {...baseHandlers}
+        free={false}
+        onToggleFree={onToggleFree}
+      />)
+      await user.click(screen.getByRole('button', { name: 'Free' }))
+      expect(onToggleFree).toHaveBeenCalledWith(true)
+    })
+
+    it('un-marks a free event via the Free pill (pressed state)', async () => {
+      const onToggleFree = vi.fn()
+      const { user } = render(<TapEventPanel
+        event={mockEvent} notes={undefined} allTasks={[]} {...baseHandlers}
+        free={true}
+        onToggleFree={onToggleFree}
+      />)
+      const pill = screen.getByRole('button', { name: 'Free' })
+      expect(pill).toHaveAttribute('aria-pressed', 'true')
+      await user.click(pill)
+      expect(onToggleFree).toHaveBeenCalledWith(false)
+    })
+
+    it('recurring event: the pill title says it applies to every occurrence', () => {
+      render(<TapEventPanel
+        event={mockEvent} notes={undefined} allTasks={[]} {...baseHandlers}
+        free={false}
+        onToggleFree={vi.fn()}
+        freeAppliesToSeries={true}
+      />)
+      expect(screen.getByRole('button', { name: 'Free' })).toHaveAttribute(
+        'title',
+        expect.stringContaining('Applies to every occurrence.'),
+      )
+    })
+
+    it('free event: hides the Complete pill and the prep-task input', () => {
+      render(<TapEventPanel
+        event={mockEvent} notes={undefined} allTasks={[]} {...baseHandlers}
+        free={true}
+        onToggleFree={vi.fn()}
+        completed={false}
+        onToggleComplete={vi.fn()}
+      />)
+      expect(screen.queryByRole('button', { name: /complete/i })).not.toBeInTheDocument()
+      expect(screen.queryByPlaceholderText(/add a prep task/i)).not.toBeInTheDocument()
+    })
+  })
+
   describe('mark done', () => {
     it('hides the Complete pill when onToggleComplete is not provided', () => {
       render(<TapEventPanel event={mockEvent} notes={undefined} allTasks={[]} {...baseHandlers} />)

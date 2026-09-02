@@ -9,6 +9,8 @@ import { resolveEventContext } from './eventContext'
 import { expandRoutineDoses, routineStatusKey } from './doseExpansion'
 import { resolveRoutineTime } from './routineTime'
 import { groupRoutineSteps, buildCollectionItem } from './routineCollections'
+import { isEventFree } from './eventFree'
+import type { EventNote } from '@/hooks/useEventNotes'
 
 export interface GroupingInput {
   timedTasks: Task[]
@@ -18,7 +20,7 @@ export interface GroupingInput {
   routineStatusMap: Map<string, ActionableInstance>
   eventStatusMap: Map<string, ActionableInstance>
   match: (assignedTo: string | null | undefined, assignedToAll?: readonly string[] | null) => boolean
-  eventNotesMap?: Map<string, { notes?: string; assignedTo?: string | null }>
+  eventNotesMap?: Map<string, { notes?: string; assignedTo?: string | null; isFree?: boolean }>
   eventContextOverrides?: Map<string, 'work' | 'family' | 'personal'>
   getDomainForCalendar?: (calendarId?: string, calendarName?: string) => 'work' | 'family' | 'personal' | null
 }
@@ -40,6 +42,9 @@ export function buildGroupedSections(input: GroupingInput): Record<DaySection, T
       const eventNote = eventNotesMap?.get(eventId)
       if (eventNote?.notes) item.notes = eventNote.notes
       if (eventNote?.assignedTo) item.assignedTo = eventNote.assignedTo
+      // "Free" resolution mirrors instance-then-series precedence, so a flag
+      // set once on a recurring series' note applies to every occurrence.
+      item.isFree = isEventFree(event, eventNotesMap as Map<string, EventNote> | undefined)
       // Resolve event context (override → calendar domain mapping → null) via
       // the shared helper, so this matches HomeView's event domain filter.
       const resolvedContext = resolveEventContext(event, eventContextOverrides, getDomainForCalendar)

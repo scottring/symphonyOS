@@ -28,6 +28,7 @@ import { partitionSelection } from '@/lib/today/timelineKey'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
 import type { ProactiveSuggestion } from '@/types/proactiveSuggestion'
 import { useUnpromptedSuggestions, type UnpromptedItem } from '@/hooks/useUnpromptedSuggestions'
+import { isEventFree } from '@/lib/today/eventFree'
 import { UnpromptedLines } from '@/components/assistant/UnpromptedLines'
 import { resolveSuggestionAction, revealItemId } from '@/lib/assistant/suggestionAction'
 import { useSystemHealth, getHealthTextClasses } from '@/hooks/useSystemHealth'
@@ -450,6 +451,18 @@ export function TodayView({
     // pivot (the guided sessions they pointed at are gone).
     includeCadence: false,
   })
+
+  // A "free" event carries no prep/handoff expectation — its suggestion chips
+  // (e.g. "leave by…") never surface, even if the engine generated one before
+  // the flag was set.
+  const visibleUnpromptedItems = useMemo(() => {
+    return unprompted.items.filter((item) => {
+      if (item.suggestion.entityType !== 'calendar_event') return true
+      const event = events.find((e) => (e.google_event_id || e.id) === item.suggestion.entityId)
+      if (!event) return true
+      return !isEventFree(event, ctx.eventNotesMap)
+    })
+  }, [unprompted.items, events, ctx.eventNotesMap])
 
   // `?why=1` renders each suggestion's policy verdict — the thing that makes a
   // silent surface debuggable instead of mystical.
@@ -902,7 +915,7 @@ export function TodayView({
         <Sparkles className={`w-5 h-5 ${suggestionsEnabled ? '' : 'opacity-40'}`} />
         <span>
           {suggestionsEnabled ? 'Hide suggestions' : 'Show suggestions'}
-          {unprompted.items.length > 0 && ` · ${unprompted.items.length}`}
+          {visibleUnpromptedItems.length > 0 && ` · ${visibleUnpromptedItems.length}`}
         </span>
       </button>
       {data.isToday && ctx.onOpenPlanning && (
@@ -1070,7 +1083,7 @@ export function TodayView({
             opening it. */}
         {suggestionsEnabled && (
           <UnpromptedLines
-            items={unprompted.items}
+            items={visibleUnpromptedItems}
             onAct={handleUnpromptedAct}
             onSnooze={unprompted.snooze}
             decisions={unprompted.decisions}

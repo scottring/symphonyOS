@@ -79,6 +79,9 @@ export interface TimelineItem {
   collectionSteps?: CollectionStepGroup[] // one entry per exercise (NOT per dose); present only on 'routine-collection'
   // Derived display state
   isOverdue?: boolean // True when item is past-due and incomplete
+  /** Informational-only: the kids just show up, nothing for a parent to do —
+   *  no prep/handoff/nudge. See docs/superpowers/specs/2026-09-02-event-free-flag-design.md. */
+  isFree?: boolean
   // Original data for actions
   originalTask?: Task
   originalEvent?: CalendarEvent

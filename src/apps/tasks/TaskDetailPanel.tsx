@@ -30,7 +30,8 @@ import { useGatedTaskActions } from '@/hooks/useGatedTaskActions';
 import { useContacts } from '@/hooks/useContacts';
 import { useProjects } from '@/hooks/useProjects';
 import { useGoogleCalendar, CalendarReconnectError, type GoogleCalendarInfo, type CalendarEvent } from '@/hooks/useGoogleCalendar';
-import { useEventNotes } from '@/hooks/useEventNotes';
+import { useEventNotes, type EventNote } from '@/hooks/useEventNotes';
+import { isEventFree, freeKeyFor, seriesKey } from '@/lib/today/eventFree';
 import { useEventDiscussionFlags } from '@/hooks/useEventDiscussionFlags';
 import { useActionableInstances } from '@/hooks/useActionableInstances';
 import { useRoutines } from '@/hooks/useRoutines';
@@ -407,7 +408,7 @@ function EventPanelBody({ id }: { id: string }) {
   const { clearSelection } = useSelection();
   const navigate = useNavigate();
   const { events, updateEvent, moveEvent, fetchEvents, fetchCalendarList, isFetching, isLoading } = useGoogleCalendar();
-  const { getNote, updateNote, fetchNote, addEventLink } = useEventNotes();
+  const { getNote, updateNote, fetchNote, addEventLink, updateEventFree } = useEventNotes();
   const { tasks, addPrepTask } = useSupabaseTasks();
   const {
     isFlagged,
@@ -437,6 +438,14 @@ function EventPanelBody({ id }: { id: string }) {
   // starts empty — without this fetch, saved notes/links never displayed.
   useEffect(() => {
     if (event) fetchNote(event.google_event_id || event.id);
+  }, [event, fetchNote]);
+
+  // "Free" can live on the SERIES note (recurring_event_id), not just the
+  // instance note fetched above — warm that one too (fetchNote is a no-op
+  // when the key is already cached, e.g. a non-recurring event) so the pill
+  // reflects a flag set on a previous occurrence.
+  useEffect(() => {
+    if (event) fetchNote(freeKeyFor(event));
   }, [event, fetchNote]);
 
   // Done state lives in actionable_instances (Symphony-side, never a Google
@@ -489,6 +498,18 @@ function EventPanelBody({ id }: { id: string }) {
   if (!event) return <PanelLoading />;
 
   const eventId = event.google_event_id || event.id;
+
+  // "Free" resolution: instance note wins, else the series note. getNote is
+  // cache-only — the effects above warm both keys.
+  const seriesEventKey = seriesKey(event);
+  const freeNotes = new Map<string, EventNote>();
+  const instanceNote = getNote(eventId);
+  if (instanceNote) freeNotes.set(eventId, instanceNote);
+  if (seriesEventKey) {
+    const seriesNote = getNote(seriesEventKey);
+    if (seriesNote) freeNotes.set(seriesEventKey, seriesNote);
+  }
+  const isFree = isEventFree(event, freeNotes);
 
   // Resolve the event's calendar in the account's calendar list. Events with
   // no calendar_id live on the primary calendar (always writable — it's ours).
@@ -551,6 +572,9 @@ function EventPanelBody({ id }: { id: string }) {
         }
       }}
       onDiscussionNoteChange={(note) => updateDiscussionNote(eventId, note)}
+      free={isFree}
+      freeAppliesToSeries={!!seriesEventKey}
+      onToggleFree={(free) => updateEventFree(freeKeyFor(event), free)}
       onOpenTask={(tid) => navigate(`/today?detail=task:${tid}`)}
       onOpenProject={() => {}}
       onOpenRelated={() => {}}

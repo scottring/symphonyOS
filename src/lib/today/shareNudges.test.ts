@@ -35,4 +35,12 @@ describe('computeShareNudges', () => {
     const notes = new Map<string, EventNote>([['1', { id: 'n', googleEventId: '1', notes: null, shareNudgeDismissed: true, createdAt: new Date(), updatedAt: new Date() }]])
     expect(computeShareNudges([ev('1', at(19))], notes, noOverrides, work)).toEqual([])
   })
+  it('skips a free event', () => {
+    const notes = new Map<string, EventNote>([['1', { id: 'n', googleEventId: '1', notes: null, isFree: true, createdAt: new Date(), updatedAt: new Date() }]])
+    expect(computeShareNudges([ev('1', at(19))], notes, noOverrides, work)).toEqual([])
+  })
+  it('skips a free event flagged via its recurring series note', () => {
+    const notes = new Map<string, EventNote>([['series-1', { id: 'n', googleEventId: 'series-1', notes: null, isFree: true, createdAt: new Date(), updatedAt: new Date() }]])
+    expect(computeShareNudges([ev('1', at(19), { recurring_event_id: 'series-1' })], notes, noOverrides, work)).toEqual([])
+  })
 })

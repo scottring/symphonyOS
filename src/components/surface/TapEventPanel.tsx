@@ -71,6 +71,14 @@ interface TapEventPanelProps {
   onToggleDiscussion?: (flagged: boolean) => void
   /** Save the discussion note ("what's the question?"). */
   onDiscussionNoteChange?: (note: string) => void
+  /** Informational-only "free" flag: the kids just show up, nothing for a
+   *  parent to do. When set, the Complete pill and prep-task input hide. */
+  free?: boolean
+  /** Toggle the free flag. When omitted, the Free pill hides. */
+  onToggleFree?: (free: boolean) => void
+  /** True when this event is part of a recurring series — toggling free
+   *  writes the series note, so the pill's title says it applies to every occurrence. */
+  freeAppliesToSeries?: boolean
 }
 
 type AnyEvent = { start_time?: string; startTime?: string; end_time?: string; endTime?: string }
@@ -238,7 +246,7 @@ export function TapEventPanel(props: TapEventPanelProps) {
   )
 
   const actions: PanelAction[] = [
-    ...(props.onToggleComplete
+    ...(props.onToggleComplete && !props.free
       ? [{
           id: 'complete',
           label: props.completed ? 'Completed' : 'Complete',
@@ -284,6 +292,17 @@ export function TapEventPanel(props: TapEventPanelProps) {
             ? 'Remove from the For Discussion list'
             : 'Flag to talk through together — shows on the For Discussion list',
           onClick: () => props.onToggleDiscussion?.(!discussionFlagged),
+        }]
+      : []),
+    ...(props.onToggleFree
+      ? [{
+          id: 'free',
+          label: 'Free',
+          kind: (props.free ? 'flagged' : 'default') as PanelAction['kind'],
+          pressed: !!props.free,
+          title: 'The kids just show up — no prep, no handoff, nothing for a parent to do.'
+            + (props.freeAppliesToSeries ? ' Applies to every occurrence.' : ''),
+          onClick: () => props.onToggleFree?.(!props.free),
         }]
       : []),
   ]
@@ -426,15 +445,17 @@ export function TapEventPanel(props: TapEventPanelProps) {
                   <span className="block text-sm text-neutral-800">{t.title}</span>
                 </PanelRow>
               ))}
-              <input
-                type="text"
-                value={prepDraft}
-                onChange={(e) => setPrepDraft(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') commitPrepTask() }}
-                onBlur={commitPrepTask}
-                placeholder="+ Add a prep task…"
-                className="text-sm px-2 py-1.5 rounded-md bg-transparent text-neutral-500 placeholder:text-neutral-400 focus:outline-none focus:bg-neutral-50 hover:bg-neutral-50"
-              />
+              {!props.free && (
+                <input
+                  type="text"
+                  value={prepDraft}
+                  onChange={(e) => setPrepDraft(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') commitPrepTask() }}
+                  onBlur={commitPrepTask}
+                  placeholder="+ Add a prep task…"
+                  className="text-sm px-2 py-1.5 rounded-md bg-transparent text-neutral-500 placeholder:text-neutral-400 focus:outline-none focus:bg-neutral-50 hover:bg-neutral-50"
+                />
+              )}
             </div>
           </PanelSection>
 

@@ -98,6 +98,13 @@ describe('ScheduleItem — mobile swipe gesture', () => {
     expect(onSelect).not.toHaveBeenCalled()
     expect(onToggleComplete).not.toHaveBeenCalled()
   })
+
+  // "Free" events are informational-only — no swipe-to-complete.
+  it('a free event ignores a complete swipe', () => {
+    const { card, onToggleComplete } = renderRow({ type: 'event', isFree: true })
+    swipe(card, 200, 100) // dx = -100, past the 80px commit threshold
+    expect(onToggleComplete).not.toHaveBeenCalled()
+  })
 })
 
 describe('ScheduleItem — swipe runtime', () => {

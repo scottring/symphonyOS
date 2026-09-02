@@ -116,6 +116,8 @@ export interface ScheduleActionsValue {
   onPushEvent?: (eventId: string, date: Date) => void
   onDeleteEvent?: (event: CalendarEvent) => void
   onUpdateEventContext?: (eventId: string, context: TaskContext | null) => void
+  /** Key is freeKeyFor(event) — the series id when recurring, else the instance id. */
+  onUpdateEventFree?: (key: string, free: boolean) => void
   onShareEventWithFamily?: (googleEventId: string) => void
   onDismissShareNudge?: (googleEventId: string) => void
   onHideEvent?: (googleEventId: string, title?: string, calendarId?: string) => Promise<boolean>
