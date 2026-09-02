@@ -1,0 +1,4 @@
+name = "symphony-inbound-mail"
+main = "src/index.ts"
+compatibility_date = "2025-06-01"
+# Secrets (wrangler secret put): SUPABASE_URL, CAPTURE_SHARED_SECRET
