@@ -16,8 +16,11 @@ Secrets already present in the project: `CAPTURE_SHARED_SECRET`, `ANTHROPIC_API_
 
 ## Cloudflare (one time, Scott)
 
+Run `npm test` in `infra/inbound-mail` before any Worker deploy — CI runs it too, but the Worker deploys outside CI.
+
 ```bash
 cd infra/inbound-mail && npm install
+npm test
 npx wrangler login
 npx wrangler secret put SUPABASE_URL          # https://mwadppyrqzuzgstmwpuy.supabase.co
 npx wrangler secret put CAPTURE_SHARED_SECRET # same value as the Supabase secret

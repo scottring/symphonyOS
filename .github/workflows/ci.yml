@@ -29,6 +29,10 @@ jobs:
       - name: Unit tests
         run: npx vitest run
 
+      - name: Inbound-mail Worker tests
+        working-directory: infra/inbound-mail
+        run: npm ci && npm test
+
   build:
     runs-on: ubuntu-latest
     needs: lint-typecheck-test
