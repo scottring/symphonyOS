@@ -82,6 +82,16 @@ export interface WallDayData {
   milestones: MilestoneItem[]
 }
 
+/** A `notices` row as the wall reads it. `received_on` is a DATE column. */
+export interface WallNotice {
+  id: string
+  /** null = addressed to everyone */
+  familyMemberId: string | null
+  text: string
+  senderLabel: string | null
+  receivedOn: Date
+}
+
 export interface UseWallDataReturn {
   days: WallDayData[]
   familyMembers: FamilyMember[]
@@ -100,6 +110,15 @@ export interface UseWallDataReturn {
    * "Needed today" card.
    */
   neededTasks: Task[]
+  /**
+   * Open homework (category 'homework'), ANY date. A homework chip sits on
+   * the kid's board row from the day it arrives until it is checked off, so
+   * there is deliberately no date filter here. Its own query for the same
+   * reason as neededTasks: no `scheduled_for`, invisible to the day query.
+   */
+  homeworkTasks: Task[]
+  /** Standing info from school, last 14 days, for the kid page's "From school" card. */
+  notices: WallNotice[]
   /**
    * Raw fetched routine rows — BEFORE the wall's effectiveTimeOfDay remap
    * (a Step's time_of_day stays null here, not filled from its collection
@@ -155,6 +174,8 @@ export function useWallData(): UseWallDataReturn {
   const [overdueTasks, setOverdueTasks] = useState<TimelineItem[]>([])
   const [allTasks, setAllTasks] = useState<Task[]>([])
   const [neededTasks, setNeededTasks] = useState<Task[]>([])
+  const [homeworkTasks, setHomeworkTasks] = useState<Task[]>([])
+  const [notices, setNotices] = useState<WallNotice[]>([])
   const [rawRoutines, setRawRoutines] = useState<Routine[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -197,6 +218,8 @@ export function useWallData(): UseWallDataReturn {
         routineCompletionsRes,
         neededRes,
         freeEventNotesRes,
+        homeworkRes,
+        noticesRes,
       ] = await Promise.all([
         // 1. Family members
         supabase.from('family_members').select('*').order('display_order'),
@@ -297,6 +320,24 @@ export function useWallData(): UseWallDataReturn {
         // note keyed by recurring_event_id, so this key can be an instance OR a
         // series id — resolved below alongside the instance id per event.
         supabase.from('event_notes').select('google_event_id').eq('is_free', true),
+
+        // 15. Open homework, any date. A homework chip sits on the kid's row
+        // from the day it arrives until it is checked off — "until done" is
+        // the whole point, so there is deliberately no date filter.
+        supabase
+          .from('tasks')
+          .select(TASK_COLUMNS)
+          .eq('completed', false)
+          .eq('context', 'family')
+          .eq('category', 'homework'),
+
+        // 16. Standing info from school, last 14 days. Aged by query, never
+        // deleted — the rows are the record.
+        supabase
+          .from('notices')
+          .select('id, family_member_id, text, sender_label, received_on')
+          .gte('received_on', localYmd(addDays(new Date(), -14)))
+          .order('received_on', { ascending: false }),
       ])
 
       if (!mountedRef.current) return
@@ -309,7 +350,7 @@ export function useWallData(): UseWallDataReturn {
       const dataError = [
         membersRes, tasksRes, routinesRes, instancesRes, contactsRes,
         milestonesRes, stBudgetsRes, stEntriesRes, stAdjustmentsRes,
-        overdueRes, routineCompletionsRes, neededRes, freeEventNotesRes,
+        overdueRes, routineCompletionsRes, neededRes, freeEventNotesRes, homeworkRes, noticesRes,
       ].find((r) => r.error)?.error?.message ?? null
 
       const members = (membersRes.data || []) as FamilyMember[]
@@ -318,6 +359,12 @@ export function useWallData(): UseWallDataReturn {
       // Transform snake_case DB rows to camelCase Task objects
       const tasks: Task[] = (tasksRes.data || []).map(rowToTask)
       const needed: Task[] = (neededRes.data || []).map(rowToTask)
+      const homework: Task[] = (homeworkRes.data || []).map(rowToTask)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const noticeRows: WallNotice[] = (noticesRes.data || []).map((n: any) => ({
+        id: n.id, familyMemberId: n.family_member_id ?? null, text: n.text,
+        senderLabel: n.sender_label ?? null, receivedOn: parseLocalYmd(n.received_on),
+      }))
 
       // Every routine row, keyed by id — the lookup a Step uses to find the
       // hour on its collection. Built before any filtering, because a parent
@@ -508,6 +555,8 @@ export function useWallData(): UseWallDataReturn {
           setOverdueTasks(overdueItems)
           setAllTasks(tasks)
           setNeededTasks(needed)
+          setHomeworkTasks(homework)
+          setNotices(noticeRows)
           setRawRoutines(allRoutines)
         }
         setCalendarUnavailable(calendarFailed)
@@ -552,5 +601,5 @@ export function useWallData(): UseWallDataReturn {
     }
   }, [fetchAllData])
 
-  return { days, familyMembers, calendarEvents: calendarEventsState, calendarUnavailable, screenTimeSummaries, overdueTasks, tasks: allTasks, neededTasks, routines: rawRoutines, loading, error, lastRefresh, refetch: fetchAllData }
+  return { days, familyMembers, calendarEvents: calendarEventsState, calendarUnavailable, screenTimeSummaries, overdueTasks, tasks: allTasks, neededTasks, homeworkTasks, notices, routines: rawRoutines, loading, error, lastRefresh, refetch: fetchAllData }
 }
