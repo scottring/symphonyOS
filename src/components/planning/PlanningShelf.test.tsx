@@ -35,13 +35,33 @@ function renderShelf(overrides: Partial<PlanningShelfProps> = {}) {
 }
 
 describe('PlanningShelf', () => {
-  it('orders pills carried-over → project → loose and never truncates titles', () => {
-    renderShelf()
+  // Projects are hidden from the product (2026-09-02 — see the note in
+  // Sidebar.tsx). The shelf used to pull every task sharing a project into one
+  // adjacent run between the carried-over items and the loose ones; it now
+  // keeps input order after the carried-over run. `projectId` still rides on
+  // the task — the shelf just stops reading it.
+  it('orders pills carried-over → the rest in input order, and never truncates titles', () => {
+    renderShelf({
+      tasks: [
+        task('c1', 'Ask for YNAB refund'),
+        task('l1', 'Make a chore plan'),
+        task('p1', 'Weed the backyard', 'proj'),
+        task('l2', 'Book the sitter'),
+      ],
+    })
     const titles = screen.getAllByTestId('shelf-pill-title').map((el) => el.textContent)
-    expect(titles).toEqual(['Ask for YNAB refund', 'Weed the backyard', 'Make a chore plan'])
+    // Project grouping would have hoisted 'Weed the backyard' above the loose
+    // pair; it stays where the caller put it.
+    expect(titles).toEqual(['Ask for YNAB refund', 'Make a chore plan', 'Weed the backyard', 'Book the sitter'])
     for (const el of screen.getAllByTestId('shelf-pill-title')) {
       expect(el.className).not.toMatch(/truncate|line-clamp/)
     }
+  })
+
+  it('never labels a pill with its project name', () => {
+    renderShelf()
+    // projectsMap names 'proj' "Backyards" and 'p1' carries it.
+    expect(screen.queryByText(/Backyards/)).not.toBeInTheDocument()
   })
 
   it('collapses past SHELF_COLLAPSED_COUNT behind a +N more toggle', () => {
@@ -320,8 +340,11 @@ describe('PlanningShelf board layout', () => {
     task('b', 'Lamp', 'proj'),
     task('c', 'Research keyboards'),
   ]
+  // 'project' is no longer a ShelfGroup kind (2026-09-02 — see the note in
+  // Sidebar.tsx): a cluster on this board is a season pick or the unfiled
+  // residue, never a project.
   const boardGroups = [
-    { id: 'project:proj', label: 'Living room upgrades', kind: 'project' as const, taskIds: ['a', 'b'] },
+    { id: 'pick:living', label: 'Living room upgrades', kind: 'pick' as const, taskIds: ['a', 'b'] },
     { id: 'unfiled', label: 'Unfiled', kind: 'unfiled' as const, taskIds: ['c'] },
   ]
 
@@ -338,7 +361,7 @@ describe('PlanningShelf board layout', () => {
 
   it('renders one block per group, each showing all its members', () => {
     renderBoard()
-    const block = screen.getByTestId('shelf-block-project:proj')
+    const block = screen.getByTestId('shelf-block-pick:living')
     expect(block).toHaveTextContent('Living room upgrades')
     expect(block).toHaveTextContent('Rug')
     expect(block).toHaveTextContent('Lamp')
@@ -354,7 +377,7 @@ describe('PlanningShelf board layout', () => {
 
   it('gives a cluster header a drag handle carrying every member id', () => {
     renderBoard()
-    const handle = screen.getByTestId('shelf-block-drag-project:proj')
+    const handle = screen.getByTestId('shelf-block-drag-pick:living')
     const setData = vi.fn()
     fireEvent.dragStart(handle, { dataTransfer: { setData } })
     expect(setData).toHaveBeenCalledWith('text/task-ids', 'a,b')
@@ -384,25 +407,11 @@ describe('PlanningShelf board layout', () => {
     expect(screen.getByText('Rug')).toBeInTheDocument()
   })
 
-  // A project block's own tasks restating "· <that project>" on every pill is
-  // pure noise — the block header already says it. projectsMap names 'proj'
-  // "Backyards"; the suffix must not appear anywhere in this block.
-  it('suppresses the project suffix on a project block for its own project', () => {
+  // Pills used to carry a "· <project>" suffix, suppressed only inside that
+  // project's own block. Projects are hidden from the product (2026-09-02 —
+  // see the note in Sidebar.tsx), so no pill names one anywhere.
+  it('never suffixes a board pill with its project name', () => {
     renderBoard()
-    const block = screen.getByTestId('shelf-block-project:proj')
-    expect(block).not.toHaveTextContent('· Backyards')
-  })
-
-  // A pick block's members can belong to a DIFFERENT project than the block
-  // itself names — that's genuinely useful information, so it must survive.
-  it('keeps the project suffix on a pick block whose task belongs to a project', () => {
-    renderBoard({
-      groups: [
-        { id: 'pick:p1', label: 'Porch and backyard set up', kind: 'pick', taskIds: ['a'] },
-        { id: 'unfiled', label: 'Unfiled', kind: 'unfiled', taskIds: ['c'] },
-      ],
-    })
-    const block = screen.getByTestId('shelf-block-pick:p1')
-    expect(block).toHaveTextContent('· Backyards')
+    expect(screen.queryByText(/Backyards/)).not.toBeInTheDocument()
   })
 })

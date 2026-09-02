@@ -103,11 +103,16 @@ export interface PlanningShelfProps {
 
 export interface ShelfGroup {
   id: string
-  /** The move this cluster really is — a season pick, or the project. */
+  /** The move this cluster really is — a season pick. */
   label: string
   /** Board layout only. 'unfiled' is the residue, not a cluster: it renders
-   *  last, hosts the composer, and gets no drag handle. */
-  kind?: 'pick' | 'project' | 'unfiled'
+   *  last, hosts the composer, and gets no drag handle.
+   *
+   *  'project' was a third kind until Projects were hidden from the product
+   *  (2026-09-02 — see the note in Sidebar.tsx). Dropping it from the union is
+   *  the compiler-enforced half of that: no caller can hand this board a
+   *  cluster whose header is a project name. */
+  kind?: 'pick' | 'unfiled'
   taskIds: string[]
 }
 
@@ -119,7 +124,6 @@ interface ShelfPillProps {
   carried: boolean
   staleWeek?: boolean
   onBringForward?: (id: string) => void
-  projectName?: string
   onOpenTask: (id: string) => void
   onSetBucket: (id: string, bucket: TaskBucket) => void
   onDeleteTask: (id: string) => void
@@ -149,7 +153,7 @@ const stopDragAndOpen = {
 }
 
 function ShelfPillContent({
-  task, projectName, staleWeek, onBringForward, onOpenTask, onSetBucket, onDeleteTask, onPushTask, onCompleteTask, fileUnder,
+  task, staleWeek, onBringForward, onOpenTask, onSetBucket, onDeleteTask, onPushTask, onCompleteTask, fileUnder,
 }: Omit<ShelfPillProps, 'carried'>) {
   return (
     <>
@@ -173,7 +177,6 @@ function ShelfPillContent({
           assertion); break-words covers the case where a single word alone
           (e.g. a long URL) is wider than the block. */}
       <span data-testid="shelf-pill-title" className="min-w-0 break-words text-neutral-700">{task.title}</span>
-      {projectName && <span className="text-xs text-neutral-400">· {projectName}</span>}
       {/* Amber alone says "late"; this says late FROM WHERE. A move placed on a
           week that came and went is a specific, legible fact about the plan. */}
       {staleWeek && task.weekStart && (
@@ -328,21 +331,9 @@ function NativeShelfFrame({ onNativeUnschedule, children }: {
   )
 }
 
-// Board mode only: a pill's own block already names its project in the
-// header, so restating it on every member pill is pure noise (and roughly
-// doubles each pill's text, which is what made blocks wrap to two lines). Only
-// suppress for a task whose project IS the block's project — a pick block
-// (or a different project block) still needs the name, since its members
-// come from elsewhere and the name is the useful part.
-function boardPillProjectName(
-  t: Task,
-  group: ShelfGroup,
-  projectsMap: Map<string, { id: string; name: string }>,
-): string | undefined {
-  if (!t.projectId) return undefined
-  if (group.kind === 'project' && group.id === `project:${t.projectId}`) return undefined
-  return projectsMap.get(t.projectId)?.name
-}
+// boardPillProjectName lived here: a pill used to carry a "· <project>" suffix,
+// suppressed only inside that project's own block. Projects are hidden from the
+// product (2026-09-02 — see the note in Sidebar.tsx), so no pill names one.
 
 // One block on the board. The header is the cluster's drag handle: dropping
 // it on a week row places every member at once, which is the whole payoff of
@@ -386,7 +377,9 @@ function ShelfBlock({ group, members, draggable: canDrag, children }: {
 export function PlanningShelf(props: PlanningShelfProps) {
   const {
     tasks, carryOverIds, staleWeekIds = EMPTY_IDS, onBringForward,
-    projectsMap, tasksById, onOpenTask, onSetBucket, onDeleteTask, onPushTask,
+    // projectsMap stays on the props — callers still hand it over and the data
+    // is intact — but the shelf no longer reads it (2026-09-02, Sidebar.tsx).
+    tasksById, onOpenTask, onSetBucket, onDeleteTask, onPushTask,
     onCompleteTask, fileUnder,
     draft, onDraftChange, onSubmitDraft, hiddenCount = 0, showingAll = false, onToggleShowAll,
     tend, onApplyProposal, dragMode = 'dndkit', onNativeUnschedule,
@@ -396,30 +389,29 @@ export function PlanningShelf(props: PlanningShelfProps) {
   const [expanded, setExpanded] = useState(false)
   const [openGroups, setOpenGroups] = useState<Set<string>>(() => new Set())
 
-  // Stale week placements → other carried-over → project-grouped (by name) →
-  // loose. Stable within groups.
+  // Stale week placements → other carried-over → the rest, in the order the
+  // caller gave them. Stable within each run.
   //
   // Stale placements lead because they're the easiest thing here to lose: only
   // the first SHELF_COLLAPSED_COUNT pills render, so a stranded move sitting
   // behind ten overdue items would hide under "+N more" — on the one surface
   // built to stop it being forgotten.
+  //
+  // A fourth run used to sit between carried and loose: every task sharing a
+  // project, pulled adjacent. Projects are hidden from the product (2026-09-02
+  // — see the note in Sidebar.tsx), so the shelf stops reading `projectId`. The
+  // column still rides on every task; nothing was dropped from the model.
   const ordered = useMemo(() => {
     const stale: Task[] = []
     const carried: Task[] = []
-    const byProject = new Map<string, Task[]>()
     const loose: Task[] = []
     for (const t of tasks) {
       if (staleWeekIds.has(t.id)) { stale.push(t); continue }
       if (carryOverIds.has(t.id)) { carried.push(t); continue }
-      const p = t.projectId ? projectsMap.get(t.projectId) : undefined
-      if (p) {
-        const arr = byProject.get(p.id) ?? []
-        arr.push(t)
-        byProject.set(p.id, arr)
-      } else loose.push(t)
+      loose.push(t)
     }
-    return [...stale, ...carried, ...[...byProject.values()].flat(), ...loose]
-  }, [tasks, carryOverIds, staleWeekIds, projectsMap])
+    return [...stale, ...carried, ...loose]
+  }, [tasks, carryOverIds, staleWeekIds])
 
   // Rolled-up members leave the flat run; the header count still speaks for
   // the whole list, so the month reads as "8 moves", not "21 chores".
@@ -565,7 +557,6 @@ export function PlanningShelf(props: PlanningShelfProps) {
               {members.map((t) => (
                 <Pill key={t.id} task={t} carried={carryOverIds.has(t.id)}
                   staleWeek={staleWeekIds.has(t.id)} onBringForward={onBringForward}
-                  projectName={boardPillProjectName(t, group, projectsMap)}
                   onOpenTask={onOpenTask} onSetBucket={onSetBucket} onDeleteTask={onDeleteTask}
                   onPushTask={onPushTask} onCompleteTask={onCompleteTask} fileUnder={fileUnder} />
               ))}
@@ -605,7 +596,6 @@ export function PlanningShelf(props: PlanningShelfProps) {
                     {members.map((t) => (
                       <Pill key={t.id} task={t} carried={carryOverIds.has(t.id)}
                         staleWeek={staleWeekIds.has(t.id)} onBringForward={onBringForward}
-                        projectName={t.projectId ? projectsMap.get(t.projectId)?.name : undefined}
                         onOpenTask={onOpenTask} onSetBucket={onSetBucket} onDeleteTask={onDeleteTask} onPushTask={onPushTask}
                         onCompleteTask={onCompleteTask} fileUnder={fileUnder} />
                     ))}
@@ -617,7 +607,6 @@ export function PlanningShelf(props: PlanningShelfProps) {
           {visible.map((t) => (
             <Pill key={t.id} task={t} carried={carryOverIds.has(t.id)}
               staleWeek={staleWeekIds.has(t.id)} onBringForward={onBringForward}
-              projectName={t.projectId ? projectsMap.get(t.projectId)?.name : undefined}
               onOpenTask={onOpenTask} onSetBucket={onSetBucket} onDeleteTask={onDeleteTask} onPushTask={onPushTask}
               onCompleteTask={onCompleteTask} fileUnder={fileUnder} />
           ))}

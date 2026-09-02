@@ -321,7 +321,6 @@ interface EventCardProps {
   isSelected: boolean
   onSelect: () => void
   onToggleComplete: () => void
-  projectName?: string
   contactName?: string
 }
 
@@ -334,7 +333,6 @@ function EventCard({
   isSelected,
   onSelect,
   onToggleComplete,
-  projectName,
   contactName,
 }: EventCardProps) {
   const colors = STREAM_COLORS[memberColor] || STREAM_COLORS.blue
@@ -388,11 +386,6 @@ function EventCard({
                 {event.startTime && !event.isAllDay && (
                   <span className="text-xs text-neutral-500" style={{ fontFamily: 'var(--font-family-display)', fontStyle: 'italic' }}>
                     {formatTime(getMinutesFromMidnight(event.startTime))}
-                  </span>
-                )}
-                {projectName && (
-                  <span className="text-xs text-primary-600 bg-primary-50 px-1.5 py-0.5 rounded-md truncate max-w-[100px]">
-                    {projectName}
                   </span>
                 )}
                 {contactName && (
@@ -571,7 +564,9 @@ export function CascadingRiverView({
   viewedDate,
   onDateChange,
   contactsMap,
-  projectsMap,
+  // projectsMap stays on the props — callers still hand it over — but no card
+  // reads it any more: Projects are hidden from the product (2026-09-02, see
+  // the note in Sidebar.tsx). `projectId` still rides on each card's data.
   eventNotesMap,
   layers,
   familyMembers,
@@ -1077,7 +1072,6 @@ export function CascadingRiverView({
                   isSelected={selectedItemId === event.prefixedId}
                   onSelect={() => onSelectItem(event.prefixedId)}
                   onToggleComplete={() => handleToggleComplete(event)}
-                  projectName={event.projectId ? projectsMap?.get(event.projectId)?.name : undefined}
                   contactName={event.contactId ? contactsMap?.get(event.contactId)?.name : undefined}
                 />
               )

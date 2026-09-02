@@ -248,3 +248,33 @@ describe('CascadingRiverView responds to the "hide daily routines" toggle', () =
     expect(screen.getByText('Pinned Med Routine')).toBeInTheDocument()
   })
 })
+
+// Projects are hidden from the product (2026-09-02 — see the note in
+// Sidebar.tsx). A river card used to carry a small project-name chip beside
+// its time; `projectId` still rides on the card's data, it is just never drawn.
+describe('CascadingRiverView — Projects hidden', () => {
+  it('draws no project chip on a card whose task carries a project', () => {
+    const task = {
+      id: 't-proj',
+      title: 'Weed the backyard',
+      assignedTo: 'scott',
+      scheduledFor: new Date(2026, 7, 24, 10, 0, 0),
+      isAllDay: false,
+      completed: false,
+      projectId: 'proj',
+    } as unknown as Task
+
+    render(
+      <CascadingRiverView
+        {...BASE_PROPS}
+        routines={[]}
+        tasks={[task]}
+        projectsMap={new Map([['proj', { id: 'proj', name: 'Backyards' }]]) as never}
+      />
+    )
+
+    // Positive control — the card really did render.
+    expect(screen.getByText('Weed the backyard')).toBeInTheDocument()
+    expect(screen.queryByText('Backyards')).not.toBeInTheDocument()
+  })
+})
