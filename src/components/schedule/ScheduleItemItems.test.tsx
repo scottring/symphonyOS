@@ -96,6 +96,39 @@ describe('ScheduleItemItems', () => {
     expect(queryByText('today')).toBeNull()
   })
 
+  // Adjacent checks used to overlap: the button carried `margin: -8` to claw
+  // back a 32px box out of a 16px circle, so on a phone one kid's hit area ran
+  // under the next kid's row and a tap in the seam completed the wrong item.
+  // The row now reserves the height (min-h-11) and the button pads out to a
+  // 40px box that stays inside it.
+  it('gives each check a padded tap box with no negative margin', () => {
+    const { getAllByRole, container } = render(
+      <ScheduleItemItems
+        items={[
+          task({ id: 't1', title: 'Wear a collared shirt', assignedTo: 'm-liam' }),
+          task({ id: 't2', title: 'Bring the order form', assignedTo: 'm-mia' }),
+        ]}
+        members={members}
+        onToggle={vi.fn()}
+        viewedDate={viewedDate}
+      />,
+    )
+
+    for (const button of getAllByRole('button', { name: /^Complete / })) {
+      const style = (button as HTMLElement).style
+      expect(style.padding).toBe('12px')
+      // Any negative margin re-creates the overlap this test exists to stop.
+      expect(style.margin).not.toMatch(/-/)
+      expect(style.marginTop).not.toMatch(/-/)
+      expect(style.marginLeft).not.toMatch(/-/)
+    }
+
+    // And the row itself reserves the height, so the boxes cannot collide.
+    for (const li of container.querySelectorAll('li')) {
+      expect(li.className).toContain('min-h-11')
+    }
+  })
+
   it('renders nothing when there are no items', () => {
     const { container } = render(
       <ScheduleItemItems items={[]} members={members} viewedDate={viewedDate} />,

@@ -51,7 +51,11 @@ export function ScheduleItemItems({ items, members, onToggle, viewedDate }: Sche
         const member = members.find((m) => m.id === it.assignedTo)
         const hint = neededHint(it.neededOn, day)
         return (
-          <li key={it.id} className="flex items-center gap-1.5 min-w-0">
+          // min-h-11 (44px) is not decoration: the check below pads out to a
+          // 40px tap box, and the row has to be tall enough to hold it. When
+          // the row was only as tall as its 16px circle, consecutive boxes
+          // overlapped and a tap in the seam completed the WRONG kid's item.
+          <li key={it.id} className="flex items-center gap-1.5 min-w-0 min-h-11">
             <button
               type="button"
               aria-label={`Complete ${it.title}`}
@@ -64,9 +68,15 @@ export function ScheduleItemItems({ items, members, onToggle, viewedDate }: Sche
               // 48px; min-width: 48px; padding: .75rem }` under 768px, which
               // beats every Tailwind utility (see the tailwind-v4 note) and
               // blew this into a 48px ring. Inline style is the only thing that
-              // wins. The padding/negative margin keep a 32px tap target while
-              // the circle still occupies 16px of layout.
-              style={{ minHeight: 0, minWidth: 0, padding: 8, margin: -8 }}
+              // wins.
+              //
+              // 12px of padding around the 16px circle makes a 40x40 tap box.
+              // It used to be `padding: 8, margin: -8` — a 32px box pulled back
+              // OUT of the row, so adjacent boxes overlapped in the gap between
+              // rows and a tap in the seam completed the next kid's item. The
+              // padding now stays inside the row (min-h-11 above reserves the
+              // height) and the drawn circle is still 16px.
+              style={{ minHeight: 0, minWidth: 0, padding: 12 }}
             >
               <span className="grid place-items-center w-4 h-4 rounded-full border-[1.5px] border-neutral-300 text-transparent hover:border-primary-500 hover:text-primary-500 transition-colors">
                 <Check className="w-2.5 h-2.5" strokeWidth={3} />
