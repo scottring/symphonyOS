@@ -26,6 +26,15 @@
 	<string>Scan documents to create tasks with the photo attached.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Attach a photo or screenshot to a new task.</string>
+	<key>UIAppFonts</key>
+	<array>
+		<string>CrimsonPro-Regular.ttf</string>
+		<string>CrimsonPro-Italic.ttf</string>
+		<string>CrimsonPro-SemiBold.ttf</string>
+		<string>DMSans-Regular.ttf</string>
+		<string>DMSans-Medium.ttf</string>
+		<string>DMSans-SemiBold.ttf</string>
+	</array>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

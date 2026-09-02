@@ -14,10 +14,6 @@ struct SymphonyApp: App {
     @State private var authService = AuthService()
     @State private var appState = AppState()
 
-    init() {
-        FontLoader.registerFonts()
-    }
-
     var body: some Scene {
         WindowGroup {
             ContentView()
