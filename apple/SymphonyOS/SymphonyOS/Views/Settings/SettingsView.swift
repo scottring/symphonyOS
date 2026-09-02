@@ -3,7 +3,6 @@ import SwiftData
 
 struct SettingsView: View {
     @Environment(AuthService.self) private var auth
-    @Environment(AppState.self) private var appState
     @Query private var familyMembers: [FamilyMember]
 
     var body: some View {
@@ -26,18 +25,6 @@ struct SettingsView: View {
                     CalendarSettingsView()
                 } label: {
                     Label("Google Calendar", systemImage: "calendar")
-                }
-            }
-
-            // Coaching
-            Section("Coaching") {
-                Toggle("Show Coaching Blocks", isOn: Binding(
-                    get: { !appState.hideCoaching },
-                    set: { appState.hideCoaching = !$0 }
-                ))
-
-                NavigationLink("Family Rules") {
-                    FamilyRulesView()
                 }
             }
 

@@ -17,8 +17,6 @@ struct TodayView: View {
     @Query(filter: #Predicate<Routine> { $0.visibility == "active" })
     private var routines: [Routine]
     @Query private var instances: [ActionableInstance]
-    @Query private var playbookBlocks: [PlaybookBlock]
-    @Query private var playbookInstances: [PlaybookInstance]
     @Query private var eventNotes: [EventNote]
 
     var body: some View {
@@ -118,7 +116,6 @@ struct TodayView: View {
         // carried-over/timeline snapshot stayed stale (visible completion bug).
         .onChange(of: tasksRevision) { _, _ in rebuildTimeline() }
         .onChange(of: instancesRevision) { _, _ in rebuildTimeline() }
-        .onChange(of: playbookInstances.count) { _, _ in rebuildTimeline() }
         // A note/link edit on an EventNote (via the event detail sheet) must
         // flip its timeline row from plain to block without leaving Today.
         .onChange(of: eventNotesRevision) { _, _ in rebuildTimeline() }
@@ -359,13 +356,8 @@ struct TodayView: View {
             tasks: allTasks,
             routines: routines,
             instances: instances,
-            playbookBlocks: playbookBlocks,
-            playbookInstances: playbookInstances,
             date: appState.selectedDate,
             domainFilter: appState.domainFilter,
-            // Playbook "coaching" blocks (Solo Morning, Get Ready Relay, …) are
-            // relics — keep them off the timeline.
-            showCoaching: false,
             eventItems: calendar.eventItems,
             eventNotes: eventNotes
         )

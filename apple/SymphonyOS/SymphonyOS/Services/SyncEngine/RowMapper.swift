@@ -23,16 +23,8 @@ enum RowMapper {
             return actionableInstanceFromRow(row) as? T
         case is EventNote.Type:
             return eventNoteFromRow(row) as? T
-        case is PlaybookBlock.Type:
-            return playbookBlockFromRow(row) as? T
-        case is PlaybookInstance.Type:
-            return playbookInstanceFromRow(row) as? T
         case is WeeklyTemplate.Type:
             return weeklyTemplateFromRow(row) as? T
-        case is FamilyRule.Type:
-            return familyRuleFromRow(row) as? T
-        case is Responsibility.Type:
-            return responsibilityFromRow(row) as? T
         case is SymphonyList.Type:
             return listFromRow(row) as? T
         case is SymphonyListItem.Type:
@@ -249,48 +241,6 @@ enum RowMapper {
         return note
     }
 
-    private static func playbookBlockFromRow(_ row: [String: AnyJSON]) -> PlaybookBlock? {
-        guard let id = row.uuid("id"),
-              let userId = row.uuid("user_id"),
-              let timeSlot = row.string("time_slot"),
-              let label = row.string("label"),
-              let blockType = row.string("block_type"),
-              let narrative = row.string("narrative") else { return nil }
-
-        let items: [PlaybookItem] = row.codable("items") ?? []
-        let dayTypes: [String] = row.stringArray("day_types") ?? ["school-day"]
-
-        let block = PlaybookBlock(id: id, userId: userId, timeSlot: timeSlot, label: label, blockType: blockType, narrative: narrative, items: items, dayTypes: dayTypes, syncStatus: .synced)
-        block.templateId = row.uuid("template_id")
-        block.layerId = row.uuid("layer_id")
-        block.sourceRuleIds = row.uuidArray("source_rule_ids")
-        block.visibility = row.string("visibility")
-        block.coachingNote = row.string("coaching_note")
-        block.sortOrder = row.int("sort_order") ?? 0
-        block.lastSyncedAt = Date()
-        block.createdAt = row.date("created_at") ?? Date()
-        block.updatedAt = row.date("updated_at") ?? Date()
-        return block
-    }
-
-    private static func playbookInstanceFromRow(_ row: [String: AnyJSON]) -> PlaybookInstance? {
-        guard let id = row.uuid("id"),
-              let userId = row.uuid("user_id"),
-              let blockId = row.uuid("block_id"),
-              let date = row.date("date") else { return nil }
-
-        let instance = PlaybookInstance(id: id, userId: userId, blockId: blockId, date: date, syncStatus: .synced)
-        instance.completed = row.bool("completed") ?? false
-        instance.react = row.string("react")
-        instance.tags = row.stringArray("tags") ?? []
-        instance.notes = row.string("notes")
-        instance.itemsState = row.codable("items_state")
-        instance.lastSyncedAt = Date()
-        instance.createdAt = row.date("created_at") ?? Date()
-        instance.updatedAt = row.date("updated_at") ?? Date()
-        return instance
-    }
-
     private static func weeklyTemplateFromRow(_ row: [String: AnyJSON]) -> WeeklyTemplate? {
         guard let id = row.uuid("id"),
               let userId = row.uuid("user_id"),
@@ -303,38 +253,6 @@ enum RowMapper {
         template.createdAt = row.date("created_at") ?? Date()
         template.updatedAt = row.date("updated_at") ?? Date()
         return template
-    }
-
-    private static func familyRuleFromRow(_ row: [String: AnyJSON]) -> FamilyRule? {
-        guard let id = row.uuid("id"),
-              let userId = row.uuid("user_id"),
-              let rule = row.string("rule") else { return nil }
-
-        let model = FamilyRule(id: id, userId: userId, rule: rule, syncStatus: .synced)
-        model.appliesTo = row.stringArray("applies_to") ?? ["everyone"]
-        model.status = row.string("status") ?? "active"
-        model.rationale = row.string("rationale")
-        model.enforcementTip = row.string("enforcement_tip")
-        model.lastSyncedAt = Date()
-        model.createdAt = row.date("created_at") ?? Date()
-        model.updatedAt = row.date("updated_at") ?? Date()
-        return model
-    }
-
-    private static func responsibilityFromRow(_ row: [String: AnyJSON]) -> Responsibility? {
-        guard let id = row.uuid("id"),
-              let userId = row.uuid("user_id"),
-              let who = row.string("who"),
-              let task = row.string("task") else { return nil }
-
-        let model = Responsibility(id: id, userId: userId, who: who, task: task, syncStatus: .synced)
-        model.frequency = row.string("frequency") ?? "daily"
-        model.status = row.string("status") ?? "active"
-        model.ruleId = row.uuid("rule_id")
-        model.lastSyncedAt = Date()
-        model.createdAt = row.date("created_at") ?? Date()
-        model.updatedAt = row.date("updated_at") ?? Date()
-        return model
     }
 
     private static func householdFromRow(_ row: [String: AnyJSON]) -> Household? {

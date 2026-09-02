@@ -25,26 +25,6 @@ extension View {
     }
 }
 
-// MARK: - Coaching Card (amber tint)
-
-struct CoachingCardStyle: ViewModifier {
-    func body(content: Content) -> some View {
-        content
-            .padding(16)
-            .background(Color.coachingBg)
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-            .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .strokeBorder(Color.coachingTint.opacity(0.3), lineWidth: 1)
-            )
-            .shadow(color: Color.cardShadow, radius: 6, x: 0, y: 2)
-    }
-}
-
-extension View {
-    func coachingCardStyle() -> some View { modifier(CoachingCardStyle()) }
-}
-
 // MARK: - Primary button (landing `.btn-primary`: ink pill, white text)
 
 struct SymphonyButtonStyle: ButtonStyle {

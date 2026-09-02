@@ -50,10 +50,6 @@ extension Color {
     static let contextFamily   = Color(hue: 30/360,  saturation: 0.65, brightness: 0.55)
     static let contextPersonal = Color(hue: 270/360, saturation: 0.45, brightness: 0.55)
 
-    // MARK: Coaching / Playbook → amber family
-    static let coachingTint = primaryTint
-    static let coachingBg   = accentBg
-
     // MARK: Feedback
     static let feedbackGreen = successGreen
     static let feedbackAmber = primaryTint

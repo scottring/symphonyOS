@@ -2,7 +2,7 @@ import Foundation
 import SwiftData
 import SwiftUI
 
-/// Builds the blended timeline for a given date from tasks, routines, and playbook blocks.
+/// Builds the blended timeline for a given date from tasks, routines, and events.
 @Observable
 final class TimelineViewModel {
     var timelineItems: [TimelineItem] = []
@@ -29,11 +29,8 @@ final class TimelineViewModel {
         tasks: [SymphonyTask],
         routines: [Routine],
         instances: [ActionableInstance],
-        playbookBlocks: [PlaybookBlock],
-        playbookInstances: [PlaybookInstance],
         date: Date,
         domainFilter: DomainFilter,
-        showCoaching: Bool,
         eventItems: [TimelineItem] = [],
         eventNotes: [EventNote] = []
     ) {
@@ -138,39 +135,6 @@ final class TimelineViewModel {
                 entityId: routine.id,
                 assignedTo: routine.assignedTo.map { [$0] } ?? []
             ))
-        }
-
-        // Playbook blocks (if coaching is ON)
-        if showCoaching {
-            let dayType = date.isWeekend ? "weekend" : "school-day"
-
-            for block in playbookBlocks {
-                guard block.dayTypes.contains(dayType) else { continue }
-
-                // Check for instance
-                let instance = playbookInstances.first {
-                    $0.blockId == block.id && cal.isDate($0.date, inSameDayAs: date)
-                }
-
-                let startTime: Date? = {
-                    let timeStr = block.timeSlot.split(separator: "-").first.map(String.init) ?? block.timeSlot
-                    let parts = timeStr.trimmingCharacters(in: .whitespaces).split(separator: ":").compactMap { Int($0) }
-                    guard parts.count >= 2 else { return nil }
-                    return cal.date(bySettingHour: parts[0], minute: parts[1], second: 0, of: startOfDay)
-                }()
-
-                items.append(TimelineItem(
-                    id: "playbook-\(block.id.uuidString)",
-                    type: .playbook,
-                    title: block.label,
-                    startTime: startTime,
-                    isAllDay: false,
-                    completed: instance?.completed ?? false,
-                    context: "family",
-                    entityId: block.id,
-                    blockType: block.blockType
-                ))
-            }
         }
 
         // Google Calendar events (already mapped to TimelineItems by
@@ -285,7 +249,6 @@ struct TimelineItem: Identifiable {
     var completed: Bool
     let context: String?
     let entityId: UUID
-    var blockType: String? = nil
     var assignedTo: [UUID] = []
     var location: String? = nil
     /// Google event id — the actionable_instances entity_id for events
@@ -304,7 +267,6 @@ struct TimelineItem: Identifiable {
         case task
         case routine
         case event
-        case playbook
     }
 
     /// Where a block came from — the pill in its top-right corner.

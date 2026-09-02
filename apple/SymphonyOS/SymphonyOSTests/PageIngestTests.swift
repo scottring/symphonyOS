@@ -9,9 +9,8 @@ struct PageIngestTests {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         let container = try ModelContainer(
             for: SymphonyTask.self, Project.self, Routine.self, Contact.self,
-            FamilyMember.self, ActionableInstance.self, EventNote.self, PlaybookBlock.self,
-            PlaybookInstance.self, WeeklyTemplate.self, FamilyRule.self,
-            Responsibility.self, Household.self, UserProfile.self, PendingChange.self,
+            FamilyMember.self, ActionableInstance.self, EventNote.self, WeeklyTemplate.self,
+            Household.self, UserProfile.self, PendingChange.self,
             configurations: config
         )
         return ModelContext(container)

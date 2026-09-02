@@ -14,9 +14,8 @@ struct SyncSerializationTests {
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         let container = try ModelContainer(
             for: SymphonyTask.self, Project.self, Routine.self, Contact.self,
-            FamilyMember.self, ActionableInstance.self, EventNote.self, PlaybookBlock.self,
-            PlaybookInstance.self, WeeklyTemplate.self, FamilyRule.self,
-            Responsibility.self, Household.self, UserProfile.self, PendingChange.self,
+            FamilyMember.self, ActionableInstance.self, EventNote.self, WeeklyTemplate.self,
+            Household.self, UserProfile.self, PendingChange.self,
             configurations: config
         )
         return ModelContext(container)
@@ -86,12 +85,11 @@ struct SyncSerializationTests {
         #expect(row["name"]?.stringValue == "Water plants")
     }
 
-    @Test func projectAndContactAndRuleRowsMatchProdColumns() throws {
+    @Test func projectAndContactRowsMatchProdColumns() throws {
         let context = try makeContext()
         let project = Project(userId: UUID(), name: "Kitchen reno")
         let contact = Contact(userId: UUID(), name: "Dr. Smith")
-        let rule = FamilyRule(userId: UUID(), rule: "No screens at dinner", status: "active")
-        context.insert(project); context.insert(contact); context.insert(rule)
+        context.insert(project); context.insert(contact)
         try context.save()
 
         let projectRow = try #require(SyncEngine.serializeRow(table: "projects", id: project.id, context: context))
@@ -104,12 +102,6 @@ struct SyncSerializationTests {
         #expect(Set(contactRow.keys).isSubset(of: [
             "id", "user_id", "name", "phone", "email", "notes", "created_at", "updated_at",
             "category", "birthday", "relationship", "preferences", "context", "scope", "place_id",
-        ]))
-
-        let ruleRow = try #require(SyncEngine.serializeRow(table: "family_rules", id: rule.id, context: context))
-        #expect(Set(ruleRow.keys).isSubset(of: [
-            "id", "user_id", "rule", "applies_to", "status", "rationale",
-            "enforcement_tip", "created_at", "updated_at", "category", "layer_id",
         ]))
     }
 

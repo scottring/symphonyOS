@@ -399,7 +399,6 @@ struct MacMainView: View {
 
 struct MoreView: View {
     @Environment(AuthService.self) private var auth
-    @Environment(AppState.self) private var appState
 
     var body: some View {
         List {
@@ -421,12 +420,6 @@ struct MoreView: View {
                 } label: {
                     Label("Contacts", systemImage: "person.2")
                 }
-
-                NavigationLink {
-                    FamilyRulesView()
-                } label: {
-                    Label("Family Rules", systemImage: "list.clipboard")
-                }
             }
             .listRowBackground(Color.bgElevated)
 
@@ -442,14 +435,6 @@ struct MoreView: View {
                 } label: {
                     Label("Settings", systemImage: "gear")
                 }
-            }
-            .listRowBackground(Color.bgElevated)
-
-            Section {
-                Toggle("Show Coaching", isOn: Binding(
-                    get: { !appState.hideCoaching },
-                    set: { appState.hideCoaching = !$0 }
-                ))
             }
             .listRowBackground(Color.bgElevated)
 

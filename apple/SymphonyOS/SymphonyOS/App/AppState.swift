@@ -75,23 +75,9 @@ final class AppState {
     // Domain filter
     var domainFilter: DomainFilter = .all
 
-    // Coaching toggle (matches web's localStorage key semantics)
-    @ObservationIgnored
-    var hideCoaching: Bool {
-        get { UserDefaults.standard.bool(forKey: "symphony-hide-coaching") }
-        set { UserDefaults.standard.set(newValue, forKey: "symphony-hide-coaching") }
-    }
-
     // Presentation state
     var showingQuickCapture = false
     var showingSettings = false
-
-    init() {
-        // Default coaching to hidden (matching web behavior)
-        if !UserDefaults.standard.contains(key: "symphony-hide-coaching") {
-            UserDefaults.standard.set(true, forKey: "symphony-hide-coaching")
-        }
-    }
 
     // MARK: - Date Navigation
 
@@ -109,13 +95,5 @@ final class AppState {
 
     var isToday: Bool {
         Calendar.current.isDateInToday(selectedDate)
-    }
-}
-
-// MARK: - UserDefaults Helper
-
-extension UserDefaults {
-    func contains(key: String) -> Bool {
-        object(forKey: key) != nil
     }
 }

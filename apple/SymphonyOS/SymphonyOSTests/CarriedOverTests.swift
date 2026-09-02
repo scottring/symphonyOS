@@ -31,11 +31,8 @@ private func buildCarried(_ tasks: [SymphonyTask]) -> [SymphonyTask] {
         tasks: tasks,
         routines: [],
         instances: [],
-        playbookBlocks: [],
-        playbookInstances: [],
         date: Date(),
-        domainFilter: .all,
-        showCoaching: false
+        domainFilter: .all
     )
     return vm.carriedOverTasks
 }

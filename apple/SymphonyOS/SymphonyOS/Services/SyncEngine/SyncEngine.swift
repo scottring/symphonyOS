@@ -33,10 +33,6 @@ actor SyncEngine {
         ("actionable_instances", ActionableInstance.self),
         ("event_notes", EventNote.self),
         ("weekly_templates", WeeklyTemplate.self),
-        ("playbook_blocks", PlaybookBlock.self),
-        ("playbook_instances", PlaybookInstance.self),
-        ("family_rules", FamilyRule.self),
-        ("responsibilities", Responsibility.self),
     ]
 
     init(modelContainer: ModelContainer) {
@@ -211,10 +207,6 @@ actor SyncEngine {
         await pullTable("actionable_instances", as: ActionableInstance.self, userId: userId)
         await pullTable("event_notes", as: EventNote.self, userId: userId)
         await pullTable("weekly_templates", as: WeeklyTemplate.self, userId: userId)
-        await pullTable("playbook_blocks", as: PlaybookBlock.self, userId: userId)
-        await pullTable("playbook_instances", as: PlaybookInstance.self, userId: userId)
-        await pullTable("family_rules", as: FamilyRule.self, userId: userId)
-        await pullTable("responsibilities", as: Responsibility.self, userId: userId)
     }
 
     // MARK: - Pull
@@ -398,9 +390,6 @@ actor SyncEngine {
         case "contacts":
             guard let c = find(Contact.self) else { return nil }
             return contactRow(c)
-        case "family_rules":
-            guard let f = find(FamilyRule.self) else { return nil }
-            return familyRuleRow(f)
         case "actionable_instances":
             guard let i = find(ActionableInstance.self) else { return nil }
             return instanceRow(i)
@@ -435,7 +424,6 @@ actor SyncEngine {
     private static func dateOnly(_ v: Date?) -> AnyJSON { v.map { .string(dateOnlyOut.string(from: $0)) } ?? .null }
     private static func u(_ v: UUID?) -> AnyJSON { v.map { .string($0.uuidString) } ?? .null }
     private static func us(_ v: [UUID]?) -> AnyJSON { v.map { .array($0.map { .string($0.uuidString) }) } ?? .null }
-    private static func ss(_ v: [String]?) -> AnyJSON { v.map { .array($0.map { .string($0) }) } ?? .null }
     private static func j<T: Encodable>(_ v: T?) -> AnyJSON {
         guard let v, let data = try? JSONEncoder().encode(v),
               let any = try? JSONDecoder().decode(AnyJSON.self, from: data) else { return .null }
@@ -585,20 +573,6 @@ actor SyncEngine {
         ]
     }
 
-    private static func familyRuleRow(_ f: FamilyRule) -> [String: AnyJSON] {
-        [
-            "id": .string(f.id.uuidString),
-            "user_id": .string(f.userId.uuidString),
-            "rule": .string(f.rule),
-            "applies_to": ss(f.appliesTo),
-            "status": .string(f.status),
-            "rationale": s(f.rationale),
-            "enforcement_tip": s(f.enforcementTip),
-            "created_at": .string(isoOut.string(from: f.createdAt)),
-            "updated_at": .string(isoOut.string(from: Date())),
-        ]
-    }
-
     private static func instanceRow(_ i: ActionableInstance) -> [String: AnyJSON] {
         [
             "id": .string(i.id.uuidString),
@@ -646,8 +620,7 @@ actor SyncEngine {
 
     private func subscribeToRealtime() async {
         let tablesToWatch = ["tasks", "projects", "routines", "contacts", "family_members",
-                             "actionable_instances", "event_notes", "playbook_blocks", "playbook_instances",
-                             "family_rules", "responsibilities"]
+                             "actionable_instances", "event_notes"]
 
         for table in tablesToWatch {
             let channel = supabase.realtimeV2.channel("public:\(table)")
@@ -711,14 +684,6 @@ actor SyncEngine {
             if let model = RowMapper.toModel(ActionableInstance.self, from: record) { upsert(model, context: context) }
         case "event_notes":
             if let model = RowMapper.toModel(EventNote.self, from: record) { upsert(model, context: context) }
-        case "playbook_blocks":
-            if let model = RowMapper.toModel(PlaybookBlock.self, from: record) { upsert(model, context: context) }
-        case "playbook_instances":
-            if let model = RowMapper.toModel(PlaybookInstance.self, from: record) { upsert(model, context: context) }
-        case "family_rules":
-            if let model = RowMapper.toModel(FamilyRule.self, from: record) { upsert(model, context: context) }
-        case "responsibilities":
-            if let model = RowMapper.toModel(Responsibility.self, from: record) { upsert(model, context: context) }
         default:
             break
         }
@@ -765,14 +730,6 @@ actor SyncEngine {
             deleteById(ActionableInstance.self, id: id, context: context)
         case "event_notes":
             deleteById(EventNote.self, id: id, context: context)
-        case "playbook_blocks":
-            deleteById(PlaybookBlock.self, id: id, context: context)
-        case "playbook_instances":
-            deleteById(PlaybookInstance.self, id: id, context: context)
-        case "family_rules":
-            deleteById(FamilyRule.self, id: id, context: context)
-        case "responsibilities":
-            deleteById(Responsibility.self, id: id, context: context)
         default:
             break
         }
@@ -853,10 +810,6 @@ extension FamilyMember: HasUUID {}
 extension ActionableInstance: HasUUID {}
 extension EventNote: HasUUID {}
 extension WeeklyTemplate: HasUUID {}
-extension PlaybookBlock: HasUUID {}
-extension PlaybookInstance: HasUUID {}
-extension FamilyRule: HasUUID {}
-extension Responsibility: HasUUID {}
 extension Household: HasUUID {}
 extension UserProfile: HasUUID {}
 extension SymphonyList: HasUUID {}

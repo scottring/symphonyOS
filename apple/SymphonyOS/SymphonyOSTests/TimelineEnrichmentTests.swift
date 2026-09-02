@@ -15,8 +15,7 @@ private func task(_ title: String, today: Bool = true, parent: UUID? = nil, crea
 
 private func build(_ tasks: [SymphonyTask]) -> [TimelineItem] {
     let vm = TimelineViewModel()
-    vm.buildTimeline(tasks: tasks, routines: [], instances: [], playbookBlocks: [], playbookInstances: [],
-                     date: Date(), domainFilter: .all, showCoaching: false)
+    vm.buildTimeline(tasks: tasks, routines: [], instances: [], date: Date(), domainFilter: .all)
     return vm.timelineItems
 }
 

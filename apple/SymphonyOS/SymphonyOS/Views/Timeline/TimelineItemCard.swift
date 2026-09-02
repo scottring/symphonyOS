@@ -163,11 +163,9 @@ struct TimelineItemCard: View {
 
             AssigneeAvatars(memberIds: item.assignedTo, members: familyMembers, size: 20)
 
-            if item.type != .playbook {
-                CheckCircle(checked: isCompleted) {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) { isCompleted.toggle() }
-                    toggleCompletion()
-                }
+            CheckCircle(checked: isCompleted) {
+                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) { isCompleted.toggle() }
+                toggleCompletion()
             }
         }
         .padding(.horizontal, 14)
@@ -226,7 +224,7 @@ struct TimelineItemCard: View {
             .padding(.trailing, 14)
             .padding(.vertical, 12)
         }
-        .background(item.type == .playbook ? Color.coachingBg : Color.bgElevated)
+        .background(Color.bgElevated)
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Color.cardBorder, lineWidth: 1))
         .shadow(color: Color.cardShadow, radius: 8, x: 0, y: 2)
@@ -292,10 +290,6 @@ struct TimelineItemCard: View {
             Image(systemName: "repeat")
                 .font(.captionBold)
                 .foregroundStyle(Color.textSecondary)
-        case .playbook:
-            Image(systemName: "book.pages")
-                .font(.captionBold)
-                .foregroundStyle(Color.coachingTint)
         }
     }
 
