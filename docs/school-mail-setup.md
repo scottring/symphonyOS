@@ -63,7 +63,8 @@ To test the real path, forward any email to the household address and watch `npx
 
 | Symptom | Where to look |
 |---|---|
-| `captures.status = 'failed'` | `captures.error` says why. Retry: POST `{"capture_id":"…"}` to `extract-email` with the shared secret. Retries are idempotent (placed blocks, inbox rows and the note are all deduped). |
+| `captures.status = 'failed'` | `captures.error` says why. A failed capture is never retried automatically (a poisoned email must not loop); a re-delivery of the same email returns `duplicate: true` and does nothing. Retry by hand: POST `{"capture_id":"…"}` to `extract-email` with the shared secret. Retries are idempotent (placed blocks, inbox rows and the note are all deduped). |
+| `captures.status = 'pending'` for more than a minute | The extraction dispatch was lost. Forwarding the email again re-fires it (`refired: true`), or POST the capture id to `extract-email` by hand. |
 | Nothing arrives | `wrangler tail` shows whether the Worker ran. A non-token recipient is dropped by design. A 404 from `inbound-email` means the token does not match any household. |
 | Event landed in Inbox instead of on its day | Confidence below 0.75, or the date was in the past. The row's notes say which. |
 | A child's item is unassigned | The email used a name that is not a household member's first name, or two members share the first name. The name is kept in the item text. |
