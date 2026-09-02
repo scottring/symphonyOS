@@ -25,7 +25,19 @@ function getCachedCoords(): { lat: number; lng: number } | null {
 }
 
 function cacheCoords(lat: number, lng: number) {
-  localStorage.setItem(COORDS_CACHE_KEY, JSON.stringify({ lat, lng }))
+  try {
+    localStorage.setItem(COORDS_CACHE_KEY, JSON.stringify({ lat, lng }))
+  } catch { /* ignore */ }
+}
+
+/**
+ * Pin the weather location for this browser (first-run setup, Settings).
+ * Drops the last reading so the next fetch is for the new place rather than
+ * showing a stale forecast for wherever the browser resolved to before.
+ */
+export function setHomeCoords(lat: number, lng: number) {
+  cacheCoords(lat, lng)
+  try { localStorage.removeItem(WEATHER_CACHE_KEY) } catch { /* ignore */ }
 }
 
 const WEATHER_CACHE_KEY = 'symphony-weather-last'
@@ -144,9 +156,6 @@ async function fetchWeatherData(lat: number, lng: number): Promise<WeatherData> 
   }
 }
 
-// Baltimore 21211 — hardcoded home coordinates
-const HOME_COORDS = { lat: 39.3285, lng: -76.6178 }
-
 export function useWeather() {
   const { user } = useAuth()
   // Seed from the last-known reading so the chip shows immediately (and never
@@ -253,10 +262,15 @@ export function useWeather() {
       }
     }
 
-    // 4. Hardcoded fallback — always works
+    // 4. Nothing resolved: show no weather rather than someone else's.
+    // (A hardcoded home fell back to the founder's city for every user.)
     if (!coords) {
-      coords = HOME_COORDS
-      coordSource = 'hardcoded-baltimore'
+      console.warn('[weather] no location available')
+      if (mountedRef.current) {
+        setError('no-location')
+        setLoading(false)
+      }
+      return
     }
 
     console.log('[weather] coords resolved via:', coordSource, coords)

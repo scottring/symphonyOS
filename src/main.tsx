@@ -95,6 +95,7 @@ import { DomainGateProvider } from './components/domain/DomainGate'
 import { PlaceProvider } from './hooks/usePlace'
 import { Shell } from './shell/Shell'
 import { AuthGate } from './components/auth/AuthGate'
+import { FirstRunGate } from './components/setup/FirstRunGate'
 import { ErrorBoundary } from './components/ErrorBoundary'
 
 // Quick-capture window for the Mac shell (desktop/): a frameless Tauri window
@@ -135,7 +136,8 @@ if (isDesktopShell()) {
 // to any tree that can unmount. See lib/realtime/keepAlive.ts.
 startRealtimeKeepAlive()
 
-const cutoverShell = <AuthGate>{() => <Shell />}</AuthGate>
+// A brand-new account sees the one-screen household setup before the Shell.
+const cutoverShell = <AuthGate>{({ user }) => <FirstRunGate user={user}><Shell /></FirstRunGate>}</AuthGate>
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

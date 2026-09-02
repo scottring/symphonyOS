@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
+import { geocodePlace } from '@/lib/geocode'
+import { setHomeCoords } from '@/hooks/useWeather'
 
 // Local storage key for home location (shared with DirectionsBuilder)
 const HOME_LOCATION_KEY = 'symphony_home_location'
@@ -52,9 +54,19 @@ export function HomeAddressSettings() {
 
   const saveToSupabase = async (address: string) => {
     if (!user) return
+    // Coordinates feed the weather chip; best effort, the address saves regardless.
+    let coords: { home_lat: number; home_lng: number } | null = null
+    try {
+      const hit = await geocodePlace(address)
+      if (hit) {
+        coords = { home_lat: hit.lat, home_lng: hit.lng }
+        setHomeCoords(hit.lat, hit.lng)
+      }
+    } catch { /* offline or provider down */ }
     await supabase.from('user_profiles').upsert({
       user_id: user.id,
       home_location: address,
+      ...(coords ?? {}),
       updated_at: new Date().toISOString(),
     }, { onConflict: 'user_id' })
   }
