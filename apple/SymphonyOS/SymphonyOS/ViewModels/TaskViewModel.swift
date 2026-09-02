@@ -38,6 +38,7 @@ final class TaskViewModel {
         task.bucket = fields.bucket
         task.weekStart = fields.weekStart
         task.assignedTo = fields.assignedTo
+        task.scope = fields.scope
         modelContext.insert(task)
         queueChange(tableName: "tasks", recordId: task.id, type: "insert")
         try? modelContext.save()

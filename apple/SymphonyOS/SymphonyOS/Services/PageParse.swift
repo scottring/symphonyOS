@@ -5,6 +5,8 @@ import Foundation
 //   src/lib/pageParse.ts  — validatePageResult caps
 //   src/lib/cadence/config.ts — DEFAULT_CADENCE.weekStartsOn (Sunday), weekStartAnchor
 // If any of those change, change this file too — they are two copies of one contract.
+// Deliberate divergence: item titles are capped at `titleMax` (80) here; the web's
+// planParse does not cap item titles at all.
 
 enum PagePlacement: Equatable {
     case date(String)   // local YYYY-MM-DD inside the echoed window
@@ -71,6 +73,8 @@ struct PageTaskFields: Equatable {
     var weekStart: Date?
     var assignedTo: UUID?
     var notes: String?
+    /// Twin of src/lib/scope.ts scopeForDomain — see `taskFields` below.
+    var scope: String
 }
 
 enum PageParse {
@@ -150,7 +154,8 @@ enum PageParse {
             let clipped = String(content.prefix(contentMax))
             let explicit = n.title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             let title = explicit.isEmpty
-                ? String(clipped.split(separator: "\n").first.map(String.init) ?? clipped).prefix(titleMax)
+                ? String(clipped.split(separator: "\n").first.map(String.init) ?? clipped)
+                    .trimmingCharacters(in: .whitespaces).prefix(titleMax)
                 : explicit.prefix(titleMax)
             return PageNote(id: UUID(), title: String(title), content: clipped)
         }
@@ -165,20 +170,30 @@ enum PageParse {
 
     // MARK: Placement → task fields (twin of planItemToAddTaskArgs)
 
-    static func taskFields(for item: PageItem, currentWeekStart: Date, defaultAssignee: UUID?) -> PageTaskFields {
+    /// `selfMemberId` is the planner doing the snap (`me` in `PageIngest.commit`) —
+    /// needed to mirror src/lib/scope.ts scopeForDomain's self-exclusion so an
+    /// item handed to someone else shares as "couple" instead of landing private.
+    static func taskFields(for item: PageItem, currentWeekStart: Date, defaultAssignee: UUID?,
+                           selfMemberId: UUID?) -> PageTaskFields {
         // Unassigned lines default to the planner; only a named member overrides.
         let assignee = item.assigneeId ?? defaultAssignee
+        // Twin of scopeForDomain(context: nil, assignees: [assignee], selfMemberId):
+        // a page capture has no context, so this reduces to the assignee check.
+        let scope = (assignee != nil && assignee != selfMemberId) ? "couple" : "individual"
         switch item.placement {
         case .date(let ymd):
             return PageTaskFields(title: item.title, scheduledFor: parseLocalYmd(ymd), isAllDay: true,
-                                  bucket: "timed", weekStart: nil, assignedTo: assignee, notes: item.note)
+                                  bucket: "timed", weekStart: nil, assignedTo: assignee, notes: item.note,
+                                  scope: scope)
         case .week:
             // bucket='week' rows must say WHICH week (placement cascade).
             return PageTaskFields(title: item.title, scheduledFor: nil, isAllDay: false,
-                                  bucket: "week", weekStart: currentWeekStart, assignedTo: assignee, notes: item.note)
+                                  bucket: "week", weekStart: currentWeekStart, assignedTo: assignee, notes: item.note,
+                                  scope: scope)
         case .inbox:
             return PageTaskFields(title: item.title, scheduledFor: nil, isAllDay: false,
-                                  bucket: "inbox", weekStart: nil, assignedTo: assignee, notes: item.note)
+                                  bucket: "inbox", weekStart: nil, assignedTo: assignee, notes: item.note,
+                                  scope: scope)
         }
     }
 }

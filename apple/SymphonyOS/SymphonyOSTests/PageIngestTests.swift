@@ -40,7 +40,8 @@ struct PageIngestTests {
         let userId = UUID(), assignee = UUID()
         let weekStart = Calendar.current.startOfDay(for: Date())
         let fields = PageTaskFields(title: "Call school", scheduledFor: nil, isAllDay: false, bucket: "week",
-                                    weekStart: weekStart, assignedTo: assignee, notes: "ask about pickup")
+                                    weekStart: weekStart, assignedTo: assignee, notes: "ask about pickup",
+                                    scope: "couple")
         let task = TaskViewModel(modelContext: context).createTask(fields: fields, userId: userId)
         #expect(task.title == "Call school")
         #expect(task.bucket == "week")
@@ -48,6 +49,7 @@ struct PageIngestTests {
         #expect(task.assignedTo == assignee)
         #expect(task.notes == "ask about pickup")
         #expect(task.context == nil)          // a capture never stamps the lens
+        #expect(task.scope == "couple")
         let queued = try context.fetch(FetchDescriptor<PendingChange>())
         #expect(queued.contains { $0.tableName == "tasks" && $0.recordId == task.id && $0.changeType == "insert" })
     }

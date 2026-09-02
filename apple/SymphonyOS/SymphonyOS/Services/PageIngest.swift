@@ -64,6 +64,7 @@ enum PageIngest {
             options: FunctionInvokeOptions(body: body)
         )
         if let error = response.error, !error.isEmpty { throw ParseError(message: error) }
+        if response.ok == false { throw ParseError(message: "The page couldn't be read.") }
         return PageParse.validate(response, fallbackWindow: dates, memberIds: Set(members.map(\.id)))
     }
 
@@ -79,7 +80,8 @@ enum PageIngest {
 
         var firstTaskId: UUID?
         for item in items {
-            let fields = PageParse.taskFields(for: item, currentWeekStart: weekStart, defaultAssignee: me)
+            let fields = PageParse.taskFields(for: item, currentWeekStart: weekStart, defaultAssignee: me,
+                                              selfMemberId: me)
             let task = vm.createTask(fields: fields, userId: userId)
             outcome.tasksCreated += 1
             firstTaskId = firstTaskId ?? task.id

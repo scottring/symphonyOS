@@ -86,26 +86,35 @@ struct PageParseTests {
         let me = UUID(), other = UUID()
         let weekStart = ymd(2026, 8, 30)
         let dated = PageItem(id: UUID(), title: "Buy cleats", placement: .date("2026-09-03"), assigneeId: other, note: "size 4")
-        let f1 = PageParse.taskFields(for: dated, currentWeekStart: weekStart, defaultAssignee: me)
+        let f1 = PageParse.taskFields(for: dated, currentWeekStart: weekStart, defaultAssignee: me, selfMemberId: me)
         #expect(f1.scheduledFor == ymd(2026, 9, 3))
         #expect(f1.isAllDay == true)
         #expect(f1.bucket == "timed")
         #expect(f1.weekStart == nil)
         #expect(f1.assignedTo == other)
         #expect(f1.notes == "size 4")
+        #expect(f1.scope == "couple")         // assigned to someone else → shared
 
         let week = PageItem(id: UUID(), title: "Call school", placement: .week, assigneeId: nil, note: nil)
-        let f2 = PageParse.taskFields(for: week, currentWeekStart: weekStart, defaultAssignee: me)
+        let f2 = PageParse.taskFields(for: week, currentWeekStart: weekStart, defaultAssignee: me, selfMemberId: me)
         #expect(f2.scheduledFor == nil)
         #expect(f2.bucket == "week")
         #expect(f2.weekStart == weekStart)
         #expect(f2.assignedTo == me)          // unassigned → the planner
+        #expect(f2.scope == "individual")     // defaults to me → private
 
         let inbox = PageItem(id: UUID(), title: "Idea", placement: .inbox, assigneeId: nil, note: nil)
-        let f3 = PageParse.taskFields(for: inbox, currentWeekStart: weekStart, defaultAssignee: nil)
+        let f3 = PageParse.taskFields(for: inbox, currentWeekStart: weekStart, defaultAssignee: nil, selfMemberId: me)
         #expect(f3.bucket == "inbox")
         #expect(f3.scheduledFor == nil)
         #expect(f3.weekStart == nil)
         #expect(f3.assignedTo == nil)
+        #expect(f3.scope == "individual")     // unassigned → private
+
+        // Assigned explicitly to me (not just defaulted) also stays private.
+        let assignedToMe = PageItem(id: UUID(), title: "Water plants", placement: .inbox, assigneeId: me, note: nil)
+        let f4 = PageParse.taskFields(for: assignedToMe, currentWeekStart: weekStart, defaultAssignee: nil, selfMemberId: me)
+        #expect(f4.assignedTo == me)
+        #expect(f4.scope == "individual")
     }
 }

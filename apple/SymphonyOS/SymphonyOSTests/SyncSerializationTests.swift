@@ -236,9 +236,27 @@ struct SyncSerializationTests {
 
         let row = try #require(SyncEngine.serializeRow(table: "tasks", id: task.id, context: context))
         // A blanket null would wipe a week placement made on the web; scope and
-        // capture_id are server/web-owned and the phone never writes them.
+        // capture_id are server/web-owned and the phone never writes them on UPDATE.
         #expect(row["week_start"] == nil)
         #expect(row["scope"] == nil)
         #expect(row["capture_id"] == nil)
+    }
+
+    @Test func taskRowSendsScopeOnInsertOnlyNotOnUpdate() throws {
+        // F1: a page item assigned to another household member must share as
+        // "couple" — but only on the INSERT that creates the row. Sending scope
+        // on every UPDATE too would echo a possibly-stale local value over a
+        // web-side relabel, since scope is otherwise server/web-owned.
+        let context = try makeContext()
+        let task = SymphonyTask(userId: UUID(), title: "Buy cleats")
+        task.scope = "couple"
+        context.insert(task)
+        try context.save()
+
+        let insertRow = try #require(SyncEngine.serializeRow(table: "tasks", id: task.id, context: context, forInsert: true))
+        #expect(insertRow["scope"]?.stringValue == "couple")
+
+        let updateRow = try #require(SyncEngine.serializeRow(table: "tasks", id: task.id, context: context))
+        #expect(updateRow["scope"] == nil)
     }
 }

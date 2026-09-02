@@ -59,8 +59,10 @@ final class SymphonyTask {
     var assignedToAll: [UUID]? // multi-member assignment
     var projectId: UUID?
     var parentTaskId: UUID?
-    /// Who can SEE it: "individual" | "couple" | "compound". Read-only on the
-    /// phone — the web derives it (scopeForDomain) and the phone never writes it.
+    /// Who can SEE it: "individual" | "couple" | "compound". Derived once at
+    /// creation (PageParse.taskFields mirrors scopeForDomain) and pushed on
+    /// INSERT only — SyncEngine never sends it on UPDATE, so a web-side
+    /// relabel is never echoed back over.
     var scope: String?
     /// Set when this task was extracted from a capture (school email, paper
     /// page). Read-only on the phone; drives the "From an email" source pill.

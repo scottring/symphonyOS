@@ -298,7 +298,7 @@ actor SyncEngine {
             // UNIQUE(user_id, entity_type, entity_id, date) key — if the web/wall
             // created the same day's instance first (different id), conflict on
             // that natural key and update it instead of failing the push forever.
-            guard let row = Self.serializeRow(table: change.tableName, id: change.recordId, context: context) else { return }
+            guard let row = Self.serializeRow(table: change.tableName, id: change.recordId, context: context, forInsert: true) else { return }
             let conflictKey = Self.naturalKey(for: change.tableName)?.joined(separator: ",")
             if let conflictKey {
                 var naturalRow = row
@@ -374,14 +374,14 @@ actor SyncEngine {
 
     private static let isoOut = ISO8601DateFormatter()
 
-    static func serializeRow(table: String, id: UUID, context: ModelContext) -> [String: AnyJSON]? {
+    static func serializeRow(table: String, id: UUID, context: ModelContext, forInsert: Bool = false) -> [String: AnyJSON]? {
         func find<T: PersistentModel & HasUUID>(_ type: T.Type) -> T? {
             (try? context.fetch(FetchDescriptor<T>()))?.first(where: { $0.id == id })
         }
         switch table {
         case "tasks":
             guard let t = find(SymphonyTask.self) else { return nil }
-            return taskRow(t)
+            return taskRow(t, forInsert: forInsert)
         case "routines":
             guard let r = find(Routine.self) else { return nil }
             return routineRow(r)
@@ -435,7 +435,7 @@ actor SyncEngine {
         return any
     }
 
-    private static func taskRow(_ t: SymphonyTask) -> [String: AnyJSON] {
+    private static func taskRow(_ t: SymphonyTask, forInsert: Bool = false) -> [String: AnyJSON] {
         var row: [String: AnyJSON] = [
             "id": .string(t.id.uuidString),
             "user_id": .string(t.userId.uuidString),
@@ -477,6 +477,12 @@ actor SyncEngine {
         // web. DATE column → local yyyy-MM-dd (dateOnly), never ISO.
         if let ws = t.weekStart {
             row["week_start"] = dateOnly(ws)
+        }
+        // scope is derived once at creation (PageParse.taskFields) and pushed on
+        // INSERT only — sending it on UPDATE too would echo a possibly-stale
+        // local value over a web-side relabel (scope is otherwise server/web-owned).
+        if forInsert, let scope = t.scope {
+            row["scope"] = .string(scope)
         }
         return row
     }
