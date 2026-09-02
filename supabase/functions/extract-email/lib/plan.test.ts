@@ -15,8 +15,8 @@ const empty: EmailExtraction = { events: [], todos: [], good_to_know: [], gaps: 
 const pictureDay = (over: Partial<EmailExtraction['events'][number]> = {}) => ({
   title: 'School Picture Day', date: '2026-09-10', for: 'everyone' as const,
   items: [
-    { text: 'Payment envelope in backpack', for: ['Liam'], needed: 'night_before' as const },
-    { text: 'Wear school colors', for: 'everyone' as const, needed: 'day_of' as const },
+    { text: 'Payment envelope in backpack', for: ['Liam'], needed: 'night_before' as const, kind: 'todo' as const },
+    { text: 'Wear school colors', for: 'everyone' as const, needed: 'day_of' as const, kind: 'todo' as const },
   ],
   source_quote: 'Students should bring payment and wear school colors on Thursday.',
   confidence: 0.92, ...over,
@@ -92,7 +92,7 @@ describe('planWrites — what goes to inbox instead', () => {
   })
   it('todos become inbox tasks, assigned when they name one member', () => {
     const p = planWrites({ ...base, extraction: { ...empty, todos: [
-      { title: 'Return the field trip form', due: '2026-09-15', for: ['Liam'], source_quote: 'Forms due 9/15', confidence: 0.8 },
+      { title: 'Return the field trip form', due: '2026-09-15', for: ['Liam'], kind: 'todo', source_quote: 'Forms due 9/15', confidence: 0.8 },
     ] } })
     expect(p.inbox[0]).toMatchObject({ title: 'Return the field trip form', assigned_to: 'k1', needed_on: '2026-09-15', bucket: 'inbox' })
   })
@@ -114,7 +114,7 @@ describe('planWrites — dedupe against existing blocks', () => {
 
 describe('planWrites — the note', () => {
   it('writes one note with good-to-know and gaps, none when both are empty', () => {
-    const p = planWrites({ ...base, extraction: { ...empty, good_to_know: ['Early dismissal Friday'], gaps: [{ kind: 'truncated', note: 'Email cut off' }] } })
+    const p = planWrites({ ...base, extraction: { ...empty, good_to_know: [{ text: 'Early dismissal Friday', for: 'everyone' }], gaps: [{ kind: 'truncated', note: 'Email cut off' }] } })
     expect(p.note).toMatchObject({ user_id: 'u1', title: 'From Hillside Elementary: Weekly Update', context: 'family', scope: 'compound', source: 'import', type: 'general', external_id: 'capture:cap1' })
     expect(p.note?.content).toContain('Good to know:\n- Early dismissal Friday')
     expect(p.note?.content).toContain('Needs another look:\n- Email cut off')
@@ -140,5 +140,47 @@ describe('titlesMatch', () => {
     expect(titlesMatch('School Picture Day!', 'school picture day')).toBe(true)
     expect(titlesMatch('Picture Day', 'School Picture Day')).toBe(false)   // 2/3 < 0.8
     expect(titlesMatch('Fall Concert', 'Spring Concert')).toBe(false)
+  })
+})
+
+describe('planWrites — homework and notices', () => {
+  it('a homework item becomes a homework subtask with the detail in its notes', () => {
+    const p = planWrites({ ...base, extraction: { ...empty, events: [pictureDay({ items: [
+      { text: 'Return permission slip', for: ['Liam'], needed: '2026-09-08', kind: 'homework', detail: 'Aquarium trip, $12, to the front office' },
+    ] })] } })
+    const [c] = p.events[0].children
+    expect(c).toMatchObject({ category: 'homework', assigned_to: 'k1', needed_on: '2026-09-08' })
+    expect(c.notes).toBe('From Hillside Elementary · Weekly Update\n\nAquarium trip, $12, to the front office')
+  })
+
+  it('a plain item without detail keeps notes null and category task', () => {
+    const p = planWrites({ ...base, extraction: { ...empty, events: [pictureDay()] } })
+    expect(p.events[0].children[0]).toMatchObject({ category: 'task', notes: null })
+  })
+
+  it('a homework todo is a homework inbox row with detail after the source line', () => {
+    const p = planWrites({ ...base, extraction: { ...empty, todos: [
+      { title: 'Reading log', due: '2026-09-11', for: ['Mia'], kind: 'homework', detail: 'Sign each night', source_quote: 'Logs due Friday', confidence: 0.8 },
+    ] } })
+    expect(p.inbox[0]).toMatchObject({ category: 'homework', assigned_to: 'k2', needed_on: '2026-09-11' })
+    expect(p.inbox[0].notes).toBe('From Hillside Elementary · Weekly Update\n\nSign each night\n\n“Logs due Friday”')
+  })
+
+  it('good_to_know fans out into notices per member; everyone and strangers → null member', () => {
+    const p = planWrites({ ...base, extraction: { ...empty, good_to_know: [
+      { text: 'PE is Tue/Thu', for: ['Liam', 'Mia'] },
+      { text: 'Early dismissal Friday', for: 'everyone' },
+      { text: 'Ask Ms. Park', for: ['Nobody'] },
+    ] } })
+    const row = (family_member_id: string | null, text: string) =>
+      ({ user_id: 'u1', family_member_id, text, sender_label: 'Hillside Elementary', received_on: '2026-09-02', capture_id: 'cap1' })
+    expect(p.notices).toEqual([
+      row('k1', 'PE is Tue/Thu'), row('k2', 'PE is Tue/Thu'), row(null, 'Early dismissal Friday'), row(null, 'Ask Ms. Park'),
+    ])
+    expect(p.note?.content).toContain('- PE is Tue/Thu')
+  })
+
+  it('no good_to_know → no notices', () => {
+    expect(planWrites({ ...base, extraction: empty }).notices).toEqual([])
   })
 })

@@ -1,4 +1,4 @@
-import type { EmailEvent, EmailExtraction, ExistingBlock, Member, NoteRow, Scope, TaskRow } from './types.ts'
+import type { EmailEvent, EmailExtraction, ExistingBlock, ItemKind, Member, NoteRow, NoticeRow, Scope, TaskRow } from './types.ts'
 import { matchMembers } from './members.ts'
 import { addDays, zonedIso } from './dates.ts'
 
@@ -16,7 +16,7 @@ export interface EventPlan {
   parent: { row: TaskRow } | { existingId: string }
   children: Omit<TaskRow, 'parent_task_id'>[]
 }
-export interface WritePlan { events: EventPlan[]; inbox: TaskRow[]; note: NoteRow | null }
+export interface WritePlan { events: EventPlan[]; inbox: TaskRow[]; note: NoteRow | null; notices: NoticeRow[] }
 
 export function normaliseTitle(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim()
@@ -78,6 +78,8 @@ function baseRow(i: PlanInput, title: string): TaskRow {
   }
 }
 
+const categoryFor = (kind: ItemKind): TaskRow['category'] => (kind === 'homework' ? 'homework' : 'task')
+
 function neededYmd(needed: EmailEvent['items'][number]['needed'], eventYmd: string): string {
   if (needed === 'night_before') return addDays(eventYmd, -1)
   if (needed === 'day_of') return eventYmd
@@ -92,7 +94,10 @@ function childrenFor(i: PlanInput, ev: EmailEvent, skipTitles: string[]): EventP
     const push = (title: string, assigned: string | null) => {
       if (skipTitles.some((t) => itemsMatch(t, title))) return
       const { parent_task_id: _omit, ...row } = baseRow(i, title)
-      out.push({ ...row, assigned_to: assigned, needed_on: ymd })
+      // A child carries notes only when the email said something worth
+      // reading when doing it — the kid page expands them under the row.
+      out.push({ ...row, assigned_to: assigned, needed_on: ymd, category: categoryFor(item.kind),
+        notes: item.detail ? sourceNote(i.capture, '', item.detail) : null })
     }
     for (const m of matched) push(item.text, m.id)
     if (unmatched.length) push(`${item.text} — ${unmatched.join(', ')}`, null)
@@ -141,7 +146,7 @@ export function planWrites(i: PlanInput): WritePlan {
   for (const t of i.extraction.todos) {
     const { matched } = t.for ? matchMembers(t.for, i.members) : { matched: [] as Member[] }
     inbox.push({ ...baseRow(i, t.title), needed_on: t.due ?? null, assigned_to: matched.length === 1 ? matched[0].id : null,
-      notes: sourceNote(i.capture, t.source_quote) })
+      category: categoryFor(t.kind), notes: sourceNote(i.capture, t.source_quote, t.detail) })
   }
 
   const gtk = i.extraction.good_to_know
@@ -151,12 +156,28 @@ export function planWrites(i: PlanInput): WritePlan {
         user_id: i.capture.user_id,
         title: `From ${i.capture.sender_label}: ${i.capture.subject}`,
         content: [
-          gtk.length ? 'Good to know:\n' + gtk.map((g) => `- ${g}`).join('\n') : '',
+          gtk.length ? 'Good to know:\n' + gtk.map((g) => `- ${g.text}`).join('\n') : '',
           gaps.length ? 'Needs another look:\n' + gaps.map((g) => `- ${g.note}`).join('\n') : '',
         ].filter(Boolean).join('\n\n'),
         ...FAMILY, source: 'import', type: 'general', external_id: `capture:${i.capture.id}`,
       }
     : null
 
-  return { events, inbox, note }
+  // Standing info → notices, one row per addressee. "everyone" is ONE row
+  // with a null member (the wall shows null to every member), not one per
+  // kid; a name not on the roster also lands on everyone rather than being
+  // guessed onto someone.
+  const notices: NoticeRow[] = []
+  for (const g of gtk) {
+    const row = (member: string | null): NoticeRow => ({
+      user_id: i.capture.user_id, family_member_id: member, text: g.text,
+      sender_label: i.capture.sender_label, received_on: i.todayYmd, capture_id: i.capture.id,
+    })
+    if (g.for === 'everyone') { notices.push(row(null)); continue }
+    const { matched } = matchMembers(g.for, i.members)
+    if (matched.length === 0) { notices.push(row(null)); continue }
+    for (const m of matched) notices.push(row(m.id))
+  }
+
+  return { events, inbox, note, notices }
 }
