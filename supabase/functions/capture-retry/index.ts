@@ -38,10 +38,14 @@ Deno.serve(async (req: Request) => {
 
   const admin = createClient(supabaseUrl, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!)
 
+  // `kind` is part of the lookup, not an afterthought: extract-email is the
+  // only thing this forwards to, so a capture of any other kind is not a
+  // retryable target and must not be reachable through this door.
   const { data: capture, error: captureError } = await admin
     .from('captures')
     .select('id, user_id')
     .eq('id', captureId)
+    .eq('kind', 'email')
     .maybeSingle()
   if (captureError) return json({ error: `db: ${captureError.message}` }, 500)
   if (!capture) return json({ error: 'capture not found' }, 404)
@@ -62,6 +66,14 @@ Deno.serve(async (req: Request) => {
     body: JSON.stringify({ capture_id: captureId }),
   })
   const text = await res.text()
+  // A failure from extract-email is relayed as a generic message. Its body can
+  // carry model output, prompt fragments and the email's own text, and this
+  // response goes to a browser — the detail belongs in the function log, not
+  // in the client.
+  if (!res.ok) {
+    console.error(`extract-email failed (${res.status}):`, text)
+    return json({ error: 'retry failed' }, res.status)
+  }
   let payload: unknown
   try { payload = JSON.parse(text) } catch { payload = { error: text } }
   return json(payload, res.status)
