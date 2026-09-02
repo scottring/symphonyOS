@@ -1,7 +1,9 @@
 import { useState } from 'react'
+import DOMPurify from 'dompurify'
 import type { ChatMessage as ChatMessageType } from '@/types/chat'
 import type { FamilyMember } from '@/types/family'
 import { AssigneeAvatar } from '@/components/family/AssigneeAvatar'
+import { inlineMarkdownToHtml } from '@/lib/notes/notesToHtml'
 
 interface ChatMessageProps {
   message: ChatMessageType
@@ -128,6 +130,16 @@ export function ChatMessage({
   // Render content with inline add buttons for bullet items
   function renderContent() {
     if (bulletItems.length === 0) {
+      // Assistant text streams back as markdown ("**bold**", `code`, etc.) —
+      // render it, not the literal asterisks. User-typed text stays plain.
+      if (!isUser) {
+        return (
+          <div
+            className="text-sm leading-relaxed whitespace-pre-wrap"
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(inlineMarkdownToHtml(message.content)) }}
+          />
+        )
+      }
       return <div className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</div>
     }
 

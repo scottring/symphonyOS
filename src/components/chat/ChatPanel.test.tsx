@@ -121,3 +121,29 @@ describe('ChatPanel authorship (shared Discuss thread)', () => {
     expect(screen.getByRole('heading', { name: 'Discussion' })).toBeInTheDocument()
   })
 })
+
+describe('ChatPanel assistant markdown rendering', () => {
+  it("renders an assistant message's markdown, not the literal asterisks", () => {
+    const messages: ChatMessage[] = [
+      {
+        id: '1', role: 'assistant',
+        content: 'Let’s look at **which scenario you and Iris prefer**.',
+        timestamp: new Date(),
+      },
+    ]
+    const { container } = render(<ChatPanel {...baseProps} messages={messages} />)
+    const strong = container.querySelector('strong')
+    expect(strong).toBeTruthy()
+    expect(strong?.textContent).toBe('which scenario you and Iris prefer')
+    expect(screen.queryByText(/\*\*/)).toBeNull()
+  })
+
+  it('leaves a user message with markdown-looking text unrendered', () => {
+    const messages: ChatMessage[] = [
+      { id: '1', role: 'user', content: 'is **this** urgent?', timestamp: new Date() },
+    ]
+    const { container } = render(<ChatPanel {...baseProps} messages={messages} />)
+    expect(container.querySelector('strong')).toBeNull()
+    expect(screen.getByText('is **this** urgent?')).toBeInTheDocument()
+  })
+})

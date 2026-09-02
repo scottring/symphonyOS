@@ -177,3 +177,16 @@ export function notesToHtml(raw: string | null | undefined): string {
 
   return html.join('')
 }
+
+/**
+ * Bold, italic, code — nothing block-level. For prose that isn't a note, such
+ * as an assistant chat bubble: streamed text is a paragraph of sentences, not
+ * headings/lists/quotes, so the block classifier in `notesToHtml` would be
+ * the wrong tool (and would swallow a caps-heavy sentence as an `<h3>`).
+ * Newlines are left as literal characters — pair with a `white-space:
+ * pre-wrap` container to render them as line breaks. Sanitise the result
+ * (e.g. with DOMPurify) before using it in `dangerouslySetInnerHTML`.
+ */
+export function inlineMarkdownToHtml(raw: string): string {
+  return inlineMarkdown(escapeHtml(raw))
+}

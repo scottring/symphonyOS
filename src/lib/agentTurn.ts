@@ -68,15 +68,28 @@ export async function runAgentTurn(
   let sources: AgentSourceNote[] | undefined
   let didWrite = false
   let streamError: string | null = null
+  // Set on a tool event, cleared on the next text delta. A tool call sits
+  // between two text segments in the transcript (e.g. "Let me check." / tool
+  // use / "Found it."); without a separator those segments run together into
+  // one sentence ("Let me check.Found it.").
+  let needsSeparatorBeforeNextText = false
 
   try {
     await streamSymphonyAgent(messages, {
       onText: (chunk) => {
-        text += chunk
-        handlers.onText?.(chunk)
+        let out = chunk
+        if (needsSeparatorBeforeNextText) {
+          needsSeparatorBeforeNextText = false
+          if (text.length > 0 && !/\s$/.test(text)) {
+            out = `\n\n${chunk}`
+          }
+        }
+        text += out
+        handlers.onText?.(out)
       },
       onTool: (name) => {
         if (WRITE_TOOLS.has(name)) didWrite = true
+        needsSeparatorBeforeNextText = true
         handlers.onTool?.(name)
       },
       onDone: (reply, _sessionId, replySources) => {
