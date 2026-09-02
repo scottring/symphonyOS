@@ -1002,6 +1002,9 @@ export function TodayView({
         <NeededTodayNote
           tasks={tasks}
           viewedDate={viewedDate}
+          // Only the evening "Tomorrow" group draws a pill, and only to say
+          // whose bag has to be packed before the morning.
+          members={familyMembers}
           onToggleTask={onToggleTask}
           onOpenTask={(id) => handleSelectItem(`task-${id}`)}
           // Into the temporal flow: same write shape as the bulk scheduler

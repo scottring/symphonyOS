@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { neededToday, NEEDED_TODAY_VISIBLE, NEEDED_TODAY_EXPANDED_MAX } from './neededToday'
+import { neededToday, neededWindow, NEEDED_TODAY_VISIBLE, NEEDED_TODAY_EXPANDED_MAX } from './neededToday'
+import { isSameDay } from '@/lib/dateUtils'
 import type { Task } from '@/types/task'
 import type { ListItem } from '@/types/list'
 
@@ -125,5 +126,109 @@ describe('neededToday', () => {
     const { items, overflow } = neededToday(many, [], DAY, SHOPPING, NEEDED_TODAY_EXPANDED_MAX)
     expect(items).toHaveLength(NEEDED_TODAY_EXPANDED_MAX)
     expect(overflow).toBe(4)
+  })
+})
+
+// ── The evening "Tomorrow" group. ─────────────────────────────────────────
+//
+// Same "a date expires" semantics as the rest of the note: nothing is written
+// and nothing is cleared. The READ window simply widens by a day once the
+// evening arrives — the moment tomorrow is still something you can act on.
+const TOMORROW = new Date(2026, 7, 20)
+const EVENING = new Date(2026, 7, 19, 18, 0)
+const MORNING = new Date(2026, 7, 19, 9, 0)
+
+describe('neededWindow', () => {
+  it('offers tomorrow from 17:00 on the day being viewed', () => {
+    const w = neededWindow(DAY, EVENING)
+    expect(w.today).toEqual(DAY)
+    expect(w.tomorrow && isSameDay(w.tomorrow, TOMORROW)).toBe(true)
+  })
+
+  it('offers no tomorrow before 17:00', () => {
+    expect(neededWindow(DAY, MORNING).tomorrow).toBeNull()
+  })
+
+  it('opens exactly at 17:00, not at 16:59', () => {
+    expect(neededWindow(DAY, new Date(2026, 7, 19, 16, 59)).tomorrow).toBeNull()
+    expect(neededWindow(DAY, new Date(2026, 7, 19, 17, 0)).tomorrow).not.toBeNull()
+  })
+
+  // Reading a past (or future) day is reading THAT day's note, not planning
+  // this evening — there is no "tomorrow" to assemble there.
+  it('offers no tomorrow when the viewed day is not the current day', () => {
+    expect(neededWindow(new Date(2026, 7, 18), EVENING).tomorrow).toBeNull()
+    expect(neededWindow(new Date(2026, 7, 21), EVENING).tomorrow).toBeNull()
+  })
+})
+
+describe('neededToday tomorrow group', () => {
+  it('lists tomorrow-marked tasks in the evening', () => {
+    const { tomorrow } = neededToday(
+      [task({ id: 'a', neededOn: TOMORROW, title: 'Swim bag' })],
+      [], DAY, SHOPPING, undefined, EVENING,
+    )
+    expect(tomorrow.map(i => i.id)).toEqual(['a'])
+    expect(tomorrow[0].title).toBe('Swim bag')
+  })
+
+  it('lists nothing for tomorrow in the morning', () => {
+    const { tomorrow } = neededToday(
+      [task({ id: 'a', neededOn: TOMORROW })], [], DAY, SHOPPING, undefined, MORNING,
+    )
+    expect(tomorrow).toEqual([])
+  })
+
+  it('lists nothing for tomorrow when a past day is being viewed', () => {
+    const past = new Date(2026, 7, 18)
+    const { tomorrow } = neededToday(
+      [task({ id: 'a', neededOn: DAY })], [], past, SHOPPING, undefined, EVENING,
+    )
+    expect(tomorrow).toEqual([])
+  })
+
+  it('never lists a completed task for tomorrow', () => {
+    const { tomorrow } = neededToday(
+      [task({ id: 'a', neededOn: TOMORROW, completed: true })],
+      [], DAY, SHOPPING, undefined, EVENING,
+    )
+    expect(tomorrow).toEqual([])
+  })
+
+  // Same rule as today's group: a task already scheduled on that day is in
+  // that day's agenda, so listing it here says the same thing twice.
+  it('excludes a tomorrow task already scheduled on tomorrow', () => {
+    const { tomorrow } = neededToday(
+      [task({ id: 'a', neededOn: TOMORROW, scheduledFor: new Date(2026, 7, 20, 9, 0) })],
+      [], DAY, SHOPPING, undefined, EVENING,
+    )
+    expect(tomorrow).toEqual([])
+  })
+
+  it('carries the assignee through so the note can draw a member pill', () => {
+    const { items, tomorrow } = neededToday(
+      [task({ id: 'a', neededOn: TOMORROW, assignedTo: 'm1' }), task({ id: 'b', neededOn: DAY, assignedTo: 'm2' })],
+      [], DAY, SHOPPING, undefined, EVENING,
+    )
+    expect(tomorrow[0].assignedTo).toBe('m1')
+    expect(items[0].assignedTo).toBe('m2')
+  })
+
+  // Today is a fixed-space surface: the two groups share ONE budget, and what
+  // the budget can't hold is admitted in the overflow count, never dropped.
+  it('shares the visible budget with today and reports the fold', () => {
+    const todayTasks = Array.from({ length: 4 }, (_, n) => task({ id: `t${n}`, neededOn: DAY }))
+    const tomorrowTasks = Array.from({ length: 3 }, (_, n) => task({ id: `m${n}`, neededOn: TOMORROW }))
+    const { items, tomorrow, overflow } = neededToday(
+      [...todayTasks, ...tomorrowTasks], [], DAY, SHOPPING, undefined, EVENING,
+    )
+    expect(items).toHaveLength(4)
+    expect(tomorrow).toHaveLength(1)
+    expect(overflow).toBe(2)
+  })
+
+  it('returns an empty group when nothing is marked for tomorrow', () => {
+    const { tomorrow } = neededToday([task({ id: 'a', neededOn: DAY })], [], DAY, SHOPPING, undefined, EVENING)
+    expect(tomorrow).toEqual([])
   })
 })

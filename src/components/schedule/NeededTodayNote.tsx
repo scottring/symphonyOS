@@ -8,6 +8,8 @@
 import { useMemo, useState } from 'react'
 import { ShoppingBag, MessageCircle, AlertCircle, Clock } from 'lucide-react'
 import type { Task } from '@/types/task'
+import type { FamilyMember } from '@/types/family'
+import { AssigneeAvatar } from '@/components/family/AssigneeAvatar'
 import { useListsContextOrNull } from '@/contexts/ListsContext'
 import { useNeededListItems } from '@/hooks/useNeededListItems'
 import { localYmd } from '@/lib/cadence/config'
@@ -25,6 +27,10 @@ interface NeededTodayNoteProps {
   /** Give a list-item row a time by spawning a linked task at it. The item
    *  itself stays on its list; on success the note clears its mark. */
   onScheduleListItem?: (item: { id: string; title: string }, date: Date, isAllDay: boolean) => Promise<void> | void
+  /** Draws the pill beside a tomorrow row, so an evening glance says WHOSE. */
+  members?: FamilyMember[]
+  /** The clock, injected. Only tests and the wall pass it; see the memo below. */
+  now?: Date
 }
 
 const KIND_ICON: Record<NeededKind, typeof ShoppingBag> = {
@@ -35,6 +41,7 @@ const KIND_ICON: Record<NeededKind, typeof ShoppingBag> = {
 
 export function NeededTodayNote({
   tasks, viewedDate, onToggleTask, onOpenTask, onScheduleTask, onScheduleListItem,
+  members, now,
 }: NeededTodayNoteProps) {
   // Expansion is scoped to the day it was opened on, not held across
   // navigation: "+N more" is a decision about THIS day's note. Derived from
@@ -72,7 +79,11 @@ export function NeededTodayNote({
     [lists],
   )
 
-  const { items, overflow } = useMemo(
+  // `now` stays out of the deps as a live clock deliberately: a Date built
+  // each render would defeat the memo, and a timer that repaints Today at
+  // 17:00 sharp is furniture nobody asked for. The evening group appears on
+  // the next render after five — and Today re-renders constantly.
+  const { items, overflow, tomorrow } = useMemo(
     () => neededToday(
       tasks,
       listItems,
@@ -82,12 +93,16 @@ export function NeededTodayNote({
       // premise is fixed space, and an uncapped note could push the day off
       // screen. Anything past the cap stays behind the count.
       expanded ? NEEDED_TODAY_EXPANDED_MAX : undefined,
+      now,
     ),
-    [tasks, listItems, viewedDate, shoppingListIds, expanded],
+    [tasks, listItems, viewedDate, shoppingListIds, expanded, now],
   )
 
+  const memberFor = (id: string | null | undefined) =>
+    id ? members?.find((m) => m.id === id) : undefined
+
   // The whole reason top-of-card placement is safe.
-  if (items.length === 0) return null
+  if (items.length === 0 && tomorrow.length === 0) return null
 
   // A strip, not a card (2026-08-31). As a filled amber box with a stacked
   // list, three small errands took more vertical space and more colour than
@@ -100,88 +115,93 @@ export function NeededTodayNote({
       data-testid="needed-today-note"
       className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 px-3 md:px-0 py-1"
     >
-      <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wide text-amber-700/80">
-        Needed today
-      </span>
-      <ul className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        {items.map((item) => {
-          const Icon = KIND_ICON[item.kind]
-          return (
-            <li key={`${item.source}-${item.id}`} data-testid="needed-today-row" className="flex items-center gap-1.5">
-              <input
-                type="checkbox"
-                aria-label={item.title}
-                className="w-3.5 h-3.5 rounded border-neutral-300"
-                onChange={() =>
-                  item.source === 'task' ? onToggleTask(item.id) : void completeListItem(item.id)
-                }
-              />
-              {/* The kind icon only where it DISAMBIGUATES. Nearly everything
-                  on this note is something to buy, so a shopping bag beside
-                  every row is a fact repeated until it stops being read;
-                  "discuss" and "urgent" are the ones worth a glyph. */}
-              {item.kind !== 'buy' && (
-                <Icon className="w-3.5 h-3.5 shrink-0 text-amber-600/70" aria-hidden />
-              )}
-              {/* A list item has no detail surface to open, so its title is
-                  plain text — a button with no handler still reads as
-                  clickable and rewards the tap with nothing. */}
-              {item.source === 'task' ? (
-                <button
-                  type="button"
-                  className="text-left text-[13px] text-neutral-700 hover:text-neutral-900"
-                  onClick={() => onOpenTask(item.id)}
-                >
-                  {item.title}
-                </button>
-              ) : (
-                <span className="text-left text-[13px] text-neutral-700">{item.title}</span>
-              )}
-              {/* Into the temporal flow: pick a time and the row becomes a
-                  timed agenda entry — a task moves, a list item spawns a
-                  linked task (the purchase stays on its list). skipToTime +
-                  the viewed day means one tap lands on time presets. */}
-              {(item.source === 'task' ? onScheduleTask : onScheduleListItem) && (
-                <span className="ml-auto">
-                  <SchedulePopover
-                    value={viewedDate}
-                    skipToTime
-                    itemTitle={item.title}
-                    onSchedule={(date, isAllDay) => {
-                      if (item.source === 'task') {
-                        onScheduleTask?.(item.id, date, isAllDay)
-                        return
-                      }
-                      void (async () => {
-                        try {
-                          await onScheduleListItem?.({ id: item.id, title: item.title }, date, isAllDay)
-                        } catch {
-                          // Spawn failed — keep the mark so the row survives.
+      {/* An evening can be tomorrow-only: nothing is needed today, but the
+          swim bag still has to be packed. The label would then be a lie. */}
+      {items.length > 0 && (<>
+        <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wide text-amber-700/80">
+          Needed today
+        </span>
+        <ul className="flex flex-wrap items-center gap-x-3 gap-y-1">
+          {items.map((item) => {
+            const Icon = KIND_ICON[item.kind]
+            return (
+              <li key={`${item.source}-${item.id}`} data-testid="needed-today-row" className="flex items-center gap-1.5">
+                <input
+                  type="checkbox"
+                  aria-label={item.title}
+                  className="w-3.5 h-3.5 rounded border-neutral-300"
+                  onChange={() =>
+                    item.source === 'task' ? onToggleTask(item.id) : void completeListItem(item.id)
+                  }
+                />
+                {/* The kind icon only where it DISAMBIGUATES. Nearly everything
+                    on this note is something to buy, so a shopping bag beside
+                    every row is a fact repeated until it stops being read;
+                    "discuss" and "urgent" are the ones worth a glyph. */}
+                {item.kind !== 'buy' && (
+                  <Icon className="w-3.5 h-3.5 shrink-0 text-amber-600/70" aria-hidden />
+                )}
+                {/* A list item has no detail surface to open, so its title is
+                    plain text — a button with no handler still reads as
+                    clickable and rewards the tap with nothing. */}
+                {item.source === 'task' ? (
+                  <button
+                    type="button"
+                    className="text-left text-[13px] text-neutral-700 hover:text-neutral-900"
+                    onClick={() => onOpenTask(item.id)}
+                  >
+                    {item.title}
+                  </button>
+                ) : (
+                  <span className="text-left text-[13px] text-neutral-700">{item.title}</span>
+                )}
+                {/* Into the temporal flow: pick a time and the row becomes a
+                    timed agenda entry — a task moves, a list item spawns a
+                    linked task (the purchase stays on its list). skipToTime +
+                    the viewed day means one tap lands on time presets. */}
+                {(item.source === 'task' ? onScheduleTask : onScheduleListItem) && (
+                  <span className="ml-auto">
+                    <SchedulePopover
+                      value={viewedDate}
+                      skipToTime
+                      itemTitle={item.title}
+                      onSchedule={(date, isAllDay) => {
+                        if (item.source === 'task') {
+                          onScheduleTask?.(item.id, date, isAllDay)
                           return
                         }
-                        await clearMark(item.id)
-                      })()
-                    }}
-                    trigger={
-                      <button
-                        type="button"
-                        aria-label={`Schedule "${item.title}"`}
-                        title="Give this a time today"
-                        className="p-1 rounded text-amber-600/50 hover:text-amber-700 hover:bg-amber-100/60"
-                      >
-                        <Clock className="w-3.5 h-3.5" aria-hidden />
-                      </button>
-                    }
-                  />
-                </span>
-              )}
-            </li>
-          )
-        })}
-      </ul>
+                        void (async () => {
+                          try {
+                            await onScheduleListItem?.({ id: item.id, title: item.title }, date, isAllDay)
+                          } catch {
+                            // Spawn failed — keep the mark so the row survives.
+                            return
+                          }
+                          await clearMark(item.id)
+                        })()
+                      }}
+                      trigger={
+                        <button
+                          type="button"
+                          aria-label={`Schedule "${item.title}"`}
+                          title="Give this a time today"
+                          className="p-1 rounded text-amber-600/50 hover:text-amber-700 hover:bg-amber-100/60"
+                        >
+                          <Clock className="w-3.5 h-3.5" aria-hidden />
+                        </button>
+                      }
+                    />
+                  </span>
+                )}
+              </li>
+            )
+          })}
+        </ul>
+      </>)}
       {/* Expanded still has a cap, so overflow can survive expansion. Say so
           in plain text rather than dropping the count — a note that silently
-          omits rows is worse than one that admits it. */}
+          omits rows is worse than one that admits it. The count covers BOTH
+          groups: they share one budget (see neededToday). */}
       {overflow > 0 && (expanded ? (
         <div className="text-[12px] text-amber-700/70">+{overflow} more</div>
       ) : (
@@ -193,6 +213,52 @@ export function NeededTodayNote({
           +{overflow} more
         </button>
       ))}
+
+      {/* Tomorrow, assembled — from 17:00 on the day you are standing in.
+          `basis-full` breaks it onto its own line: today's queue is the
+          sentence, this is the postscript. Cooler ink than the amber above so
+          it never competes with what today actually needs.
+
+          Same "a date expires" semantics: nothing here is written, cleared or
+          moved — the READ window widened by a day, and at midnight it narrows
+          again on its own. This is not a pin. */}
+      {tomorrow.length > 0 && (
+        <div className="basis-full flex flex-wrap items-center gap-x-3 gap-y-1">
+          <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
+            Tomorrow
+          </span>
+          <ul className="flex flex-wrap items-center gap-x-3 gap-y-1">
+            {tomorrow.map((item) => (
+              <li
+                key={`tomorrow-${item.id}`}
+                data-testid="needed-tomorrow-row"
+                className="flex items-center gap-1.5"
+              >
+                <input
+                  type="checkbox"
+                  aria-label={item.title}
+                  className="w-3.5 h-3.5 rounded border-neutral-300"
+                  onChange={() => onToggleTask(item.id)}
+                />
+                {/* Whose it is, at a glance — the evening question is not
+                    "what is needed" but "who do I have to hand it to". Drawn
+                    only when there IS someone: the avatar's unassigned state
+                    is a grey disc that says nothing and costs a column. */}
+                {memberFor(item.assignedTo) && (
+                  <AssigneeAvatar member={memberFor(item.assignedTo)} size="sm" />
+                )}
+                <button
+                  type="button"
+                  className="text-left text-[13px] text-neutral-600 hover:text-neutral-900"
+                  onClick={() => onOpenTask(item.id)}
+                >
+                  {item.title}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   )
 }

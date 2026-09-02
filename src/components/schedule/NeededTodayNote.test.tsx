@@ -5,9 +5,16 @@ import { NeededTodayNote } from './NeededTodayNote'
 import { NEEDED_TODAY_EXPANDED_MAX } from '@/lib/today/neededToday'
 import type { Task } from '@/types/task'
 import type { ListItem } from '@/types/list'
+import type { FamilyMember } from '@/types/family'
 
 const DAY = new Date(2026, 7, 19)
 const NEXT_DAY = new Date(2026, 7, 20)
+const EVENING = new Date(2026, 7, 19, 18, 0)
+const MORNING = new Date(2026, 7, 19, 9, 0)
+
+const MEMBERS = [
+  { id: 'm1', name: 'Mia', initials: 'MI', color: 'purple' } as FamilyMember,
+]
 
 // Partial mock: keep the real module (ListsProvider, useListsContext) and
 // override only the accessor the note reads. Replacing the whole module is
@@ -219,5 +226,60 @@ describe('NeededTodayNote', () => {
 
     rerender(<NeededTodayNote tasks={nextDayTasks} viewedDate={NEXT_DAY} {...noop} />)
     expect(screen.getAllByTestId('needed-today-row')).toHaveLength(5)
+  })
+
+  // ── The evening "Tomorrow" group. ───────────────────────────────────────
+  // `now` is a prop, not a mocked clock: the note is a pure read of a window,
+  // and the wall reads the same window through neededWindow().
+  describe('tomorrow group', () => {
+    it('shows a "Tomorrow" heading with tomorrow-marked items in the evening', () => {
+      render(
+        <NeededTodayNote
+          tasks={[task({ id: 'a', title: 'Swim bag', neededOn: NEXT_DAY, assignedTo: 'm1' })]}
+          viewedDate={DAY} now={EVENING} members={MEMBERS} {...noop}
+        />,
+      )
+      expect(screen.getByText('Tomorrow')).toBeInTheDocument()
+      expect(screen.getByText('Swim bag')).toBeInTheDocument()
+      // The member pill, so an evening glance says WHOSE bag it is.
+      expect(screen.getByText('MI')).toBeInTheDocument()
+    })
+
+    it('shows nothing for tomorrow in the morning', () => {
+      const { container } = render(
+        <NeededTodayNote
+          tasks={[task({ id: 'a', title: 'Swim bag', neededOn: NEXT_DAY })]}
+          viewedDate={DAY} now={MORNING} members={MEMBERS} {...noop}
+        />,
+      )
+      expect(container.querySelector('[data-testid="needed-today-note"]')).toBeNull()
+      expect(screen.queryByText('Tomorrow')).not.toBeInTheDocument()
+    })
+
+    // An evening with nothing marked for today still earns the note when
+    // tomorrow needs assembling — but the "Needed today" label does not.
+    it('renders the note for a tomorrow-only evening without a today heading', () => {
+      render(
+        <NeededTodayNote
+          tasks={[task({ id: 'a', title: 'Swim bag', neededOn: NEXT_DAY })]}
+          viewedDate={DAY} now={EVENING} {...noop}
+        />,
+      )
+      expect(screen.getByTestId('needed-today-note')).toBeInTheDocument()
+      expect(screen.queryByText('Needed today')).not.toBeInTheDocument()
+      expect(screen.getByTestId('needed-tomorrow-row')).toBeInTheDocument()
+    })
+
+    it('completes a tomorrow row through the same task toggle', () => {
+      const onToggleTask = vi.fn()
+      render(
+        <NeededTodayNote
+          tasks={[task({ id: 'a', title: 'Swim bag', neededOn: NEXT_DAY })]}
+          viewedDate={DAY} now={EVENING} {...noop} onToggleTask={onToggleTask}
+        />,
+      )
+      fireEvent.click(screen.getByRole('checkbox', { name: /swim bag/i }))
+      expect(onToggleTask).toHaveBeenCalledWith('a')
+    })
   })
 })
