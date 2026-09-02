@@ -77,6 +77,10 @@ describe('planWrites — what goes to inbox instead', () => {
     expect(p.inbox[0]).toMatchObject({ title: 'School Picture Day', bucket: 'inbox', scheduled_for: null, capture_id: 'cap1' })
     expect(p.inbox[0].notes).toContain('2026-09-10')
   })
+  it('keeps the stated time in the why line', () => {
+    const p = planWrites({ ...base, extraction: { ...empty, events: [pictureDay({ time: '15:30', confidence: MIN_EVENT_CONFIDENCE - 0.01 })] } })
+    expect(p.inbox[0].notes).toContain('Dated 2026-09-10 15:30 (')
+  })
   it('an event more than a day in the past goes to inbox', () => {
     const p = planWrites({ ...base, extraction: { ...empty, events: [pictureDay({ date: '2026-08-30' })] } })
     expect(p.events).toEqual([])

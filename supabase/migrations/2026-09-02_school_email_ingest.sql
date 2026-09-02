@@ -22,6 +22,10 @@ alter table captures
 create unique index if not exists captures_email_message_idx
   on captures (source_key) where kind = 'email';
 
+-- The Settings/review surfaces read a household's captures newest-first.
+create index if not exists captures_household_recent_idx
+  on captures (household_id, created_at desc) where household_id is not null;
+
 -- The partner who did not forward the email can still open it.
 drop policy if exists captures_household_read on captures;
 create policy captures_household_read on captures for select

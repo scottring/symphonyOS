@@ -165,7 +165,10 @@ Deno.serve(async (req: Request) => {
     await supabase.from('captures').update({ status: 'extracted', error: null }).eq('id', capture.id)
     return json({ ok: true, events: plan.events.length, children, inbox: plan.inbox.length, note: !!plan.note })
   } catch (e) {
-    await supabase.from('captures').update({ status: 'failed', error: String(e) }).eq('id', capture.id)
+    const { error: markError } = await supabase.from('captures').update({ status: 'failed', error: String(e) }).eq('id', capture.id)
+    // If even this write fails the capture stays 'pending' and looks like a
+    // lost dispatch; the log is the only place that says otherwise.
+    if (markError) console.error('failed to mark capture failed', capture.id, markError.message)
     return json({ error: String(e) }, 500)
   }
 })

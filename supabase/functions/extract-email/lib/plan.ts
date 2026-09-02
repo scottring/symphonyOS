@@ -83,7 +83,8 @@ export function planWrites(i: PlanInput): WritePlan {
   for (const ev of i.extraction.events) {
     const placeable = ev.confidence >= MIN_EVENT_CONFIDENCE && ev.date >= yesterday
     if (!placeable) {
-      const why = ev.date < yesterday ? `Dated ${ev.date} (already past)` : `Dated ${ev.date} (needs a look — confidence ${ev.confidence.toFixed(2)})`
+      const when = ev.time ? `${ev.date} ${ev.time}` : ev.date
+      const why = ev.date < yesterday ? `Dated ${when} (already past)` : `Dated ${when} (needs a look — confidence ${ev.confidence.toFixed(2)})`
       const itemLines = ev.items.map((it) => `- ${it.text}${it.for === 'everyone' ? '' : ` (${it.for.join(', ')})`}`).join('\n')
       inbox.push({ ...baseRow(i, ev.title), category: 'event', location: ev.location ?? null,
         notes: sourceNote(i.capture, ev.source_quote, itemLines ? `${why}\n\nItems:\n${itemLines}` : why) })

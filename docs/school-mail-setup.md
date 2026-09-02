@@ -42,6 +42,8 @@ select ensure_inbound_token(id) from households where id = '<household id>';
 
 → `<token>@symphony-os.com`. The RPC is member-only and idempotent. The Settings card (client phase) will expose this in the app.
 
+The address is a credential: anyone who knows it can write into the household. Never publish it in a screenshot, a doc, or a support thread. There is no rotation path yet — a leaked token means editing `households.inbound_token` by hand.
+
 ## Smoke test
 
 With the shared secret (the Fly connectors worker holds it: `fly ssh console -a symphony-connectors`), POST a fixture email straight to the edge function, bypassing Cloudflare:
