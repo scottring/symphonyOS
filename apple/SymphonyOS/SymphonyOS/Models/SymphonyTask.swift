@@ -59,11 +59,21 @@ final class SymphonyTask {
     var assignedToAll: [UUID]? // multi-member assignment
     var projectId: UUID?
     var parentTaskId: UUID?
-    /// Who can SEE it: "individual" | "couple" | "compound". Derived once at
-    /// creation (PageParse.taskFields mirrors scopeForDomain) and pushed on
-    /// INSERT only — SyncEngine never sends it on UPDATE, so a web-side
-    /// relabel is never echoed back over.
+    /// Who can SEE it: "individual" | "couple" | "compound". Derived at
+    /// creation (PageParse.taskFields) and recomputed on every context/
+    /// assignee edit (TaskViewModel.reconcileScope), both mirroring
+    /// ScopeRule.scopeForDomain. Pushed on INSERT, and on UPDATE only when
+    /// `scopeDirty` — otherwise a web-side relabel is echoed back over.
     var scope: String?
+    /// True when `scope` was recomputed locally by a context/assignee edit
+    /// (TaskViewModel.reconcileScope) and hasn't pushed yet. Never sent to
+    /// Supabase itself — SyncEngine reads it to decide whether an UPDATE
+    /// should include `scope`, then clears it after a successful push.
+    /// Inline default (not just in `init`) so SwiftData's lightweight
+    /// migration can add this column to an existing on-device store without
+    /// a value — an existing install losing its local store on this build
+    /// bricks it, not just fails to compile.
+    var scopeDirty: Bool = false
     /// Set when this task was extracted from a capture (school email, paper
     /// page). Read-only on the phone; drives the "From an email" source pill.
     var captureId: UUID?
@@ -119,6 +129,7 @@ final class SymphonyTask {
         self.projectId = nil
         self.parentTaskId = nil
         self.scope = nil
+        self.scopeDirty = false
         self.captureId = nil
         self.weekStart = nil
         self.linkedTo = nil

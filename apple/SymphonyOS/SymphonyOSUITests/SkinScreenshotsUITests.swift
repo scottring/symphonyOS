@@ -384,4 +384,60 @@ final class SkinScreenshotsUITests: XCTestCase {
         // The report records whichever way this comes out.
         print("F4 diagnostic: dock Today tab exists on pushed Settings screen = \(dockSurvives)")
     }
+
+    // MARK: - Scope follow-up: assigning from the phone must derive scope
+
+    /// Opens "Fix fence"'s task detail sheet from Inbox and taps the "Kid
+    /// Symphony" assignee chip (a household member other than this seed
+    /// account's own "Dad Symphony" row, and not already assigned — a clean
+    /// widen) — driving TaskDetailView.toggleAssignee → TaskViewModel.
+    /// reconcileScope. Doesn't assert on `tasks.scope` itself (that's a
+    /// server round-trip checked separately via a Management API SELECT);
+    /// this only proves the tap reaches the chip and the sheet dismisses
+    /// cleanly.
+    @MainActor
+    func testAssignFixFenceToOtherMemberDerivesScope() throws {
+        let app = XCUIApplication()
+        app.launch()
+        installSystemAlertMonitor(app)
+        signIn(app)
+
+        let today = app.staticTexts["Today"]
+        XCTAssertTrue(today.waitForExistence(timeout: 30), "never reached Today")
+
+        let inboxTab = app.buttons["Inbox"]
+        XCTAssertTrue(inboxTab.waitForExistence(timeout: 10), "no Inbox tab")
+        inboxTab.tap()
+
+        let fixFence = app.staticTexts["Fix fence"].firstMatch
+        XCTAssertTrue(fixFence.waitForExistence(timeout: 15), "no 'Fix fence' row in Inbox — Task 10 seed data missing")
+
+        revealSlideActions(fixFence)
+        let whenAction = app.buttons["When"]
+        XCTAssertTrue(whenAction.waitForExistence(timeout: 5), "row action panel never revealed")
+
+        let dockAnchorY = app.buttons["Projects"].frame.minY
+        var openedTaskSheet = false
+        let moreCandidates = app.buttons.matching(NSPredicate(format: "label == 'More'"))
+        for i in 0..<moreCandidates.count {
+            let el = moreCandidates.element(boundBy: i)
+            if el.exists, el.frame.minY < dockAnchorY - 50 {
+                el.tap()
+                openedTaskSheet = true
+                break
+            }
+        }
+        XCTAssertTrue(openedTaskSheet, "couldn't find the row's 'More' action distinct from the dock tab")
+
+        let taskSheetTitle = app.navigationBars["Task"]
+        XCTAssertTrue(taskSheetTitle.waitForExistence(timeout: 10), "task detail sheet never opened")
+
+        let kidChip = app.buttons.matching(NSPredicate(format: "label CONTAINS[c] 'Kid Symphony'")).firstMatch
+        XCTAssertTrue(kidChip.waitForExistence(timeout: 10), "no 'Kid Symphony' assignee chip in the task sheet")
+        kidChip.tap()
+        attach(name: "scope-01-assigned-to-kid")
+
+        app.buttons["Done"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["Fix fence"].firstMatch.waitForExistence(timeout: 10), "never returned to Inbox after dismissing the task sheet")
+    }
 }

@@ -68,18 +68,20 @@ final class TaskViewModel {
         try? modelContext.save()
     }
 
-    func setContext(_ task: SymphonyTask, context: String?) {
+    func setContext(_ task: SymphonyTask, context: String?, members: [FamilyMember]) {
         task.context = context
         task.updatedAt = Date()
         task.syncStatus = .pending
+        reconcileScope(task, members: members)
         queueChange(tableName: "tasks", recordId: task.id, type: "update")
         try? modelContext.save()
     }
 
-    func assign(_ task: SymphonyTask, to memberId: UUID?) {
+    func assign(_ task: SymphonyTask, to memberId: UUID?, members: [FamilyMember]) {
         task.assignedTo = memberId
         task.updatedAt = Date()
         task.syncStatus = .pending
+        reconcileScope(task, members: members)
         queueChange(tableName: "tasks", recordId: task.id, type: "update")
         try? modelContext.save()
     }
@@ -130,6 +132,25 @@ final class TaskViewModel {
         task.syncStatus = .pending
         queueChange(tableName: "tasks", recordId: task.id, type: "update")
         try? modelContext.save()
+    }
+
+    /// Recompute `task.scope` per ScopeRule.derive and flag it dirty (so
+    /// SyncEngine pushes the new value) only if it actually changed. Call
+    /// this from every write path that can move `context`, `assignedTo`, or
+    /// `assignedToAll` — mirrors useSupabaseTasks.ts updateTask's
+    /// scope-recompute block. Does not save; callers already do.
+    func reconcileScope(_ task: SymphonyTask, members: [FamilyMember]) {
+        var parent: SymphonyTask?
+        if let parentId = task.parentTaskId {
+            var descriptor = FetchDescriptor<SymphonyTask>(predicate: #Predicate { $0.id == parentId })
+            descriptor.fetchLimit = 1
+            parent = try? modelContext.fetch(descriptor).first
+        }
+        let next = ScopeRule.derive(for: task, parent: parent, members: members)
+        if task.scope != next {
+            task.scope = next
+            task.scopeDirty = true
+        }
     }
 
     // MARK: - Delete

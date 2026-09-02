@@ -177,9 +177,8 @@ enum PageParse {
                            selfMemberId: UUID?) -> PageTaskFields {
         // Unassigned lines default to the planner; only a named member overrides.
         let assignee = item.assigneeId ?? defaultAssignee
-        // Twin of scopeForDomain(context: nil, assignees: [assignee], selfMemberId):
-        // a page capture has no context, so this reduces to the assignee check.
-        let scope = (assignee != nil && assignee != selfMemberId) ? "couple" : "individual"
+        // A page capture has no context, so this reduces to the assignee check.
+        let scope = ScopeRule.scopeForDomain(context: nil, assignees: [assignee], selfMemberId: selfMemberId)
         switch item.placement {
         case .date(let ymd):
             return PageTaskFields(title: item.title, scheduledFor: parseLocalYmd(ymd), isAllDay: true,

@@ -149,6 +149,13 @@ actor SyncEngine {
                 do {
                     try await pushChange(change, context: context)
                     context.delete(change)
+                    // The phone's locally-derived scope just pushed — stop
+                    // sending it on the next UPDATE until another edit
+                    // recomputes it (SyncEngine.taskRow gates on this flag).
+                    if change.tableName == "tasks",
+                       let task = (try? context.fetch(FetchDescriptor<SymphonyTask>()))?.first(where: { $0.id == change.recordId }) {
+                        task.scopeDirty = false
+                    }
                 } catch {
                     change.attempts += 1
                     change.lastAttemptAt = Date()
@@ -478,10 +485,13 @@ actor SyncEngine {
         if let ws = t.weekStart {
             row["week_start"] = dateOnly(ws)
         }
-        // scope is derived once at creation (PageParse.taskFields) and pushed on
-        // INSERT only — sending it on UPDATE too would echo a possibly-stale
-        // local value over a web-side relabel (scope is otherwise server/web-owned).
-        if forInsert, let scope = t.scope {
+        // scope is derived on the phone at creation (PageParse.taskFields) and
+        // whenever a context/assignee edit recomputes it (TaskViewModel.
+        // reconcileScope, which flags scopeDirty). Sending it on every UPDATE
+        // would echo a possibly-stale local value over a web-side relabel
+        // (scope is otherwise server/web-owned) — only send it on INSERT, or
+        // on an UPDATE the phone itself just changed.
+        if (forInsert || t.scopeDirty), let scope = t.scope {
             row["scope"] = .string(scope)
         }
         return row

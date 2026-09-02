@@ -315,6 +315,7 @@ struct ContextPickerSheet: View {
     let task: SymphonyTask
     let modelContext: ModelContext
     @Environment(\.dismiss) private var dismiss
+    @Query private var familyMembers: [FamilyMember]
 
     var body: some View {
         NavigationStack {
@@ -326,7 +327,7 @@ struct ContextPickerSheet: View {
                 if task.context != nil {
                     Button {
                         let vm = TaskViewModel(modelContext: modelContext)
-                        vm.setContext(task, context: nil)
+                        vm.setContext(task, context: nil, members: familyMembers)
                         dismiss()
                     } label: {
                         Text("Clear Context")
@@ -347,7 +348,7 @@ struct ContextPickerSheet: View {
     private func contextOption(_ label: String, value: String, color: Color) -> some View {
         Button {
             let vm = TaskViewModel(modelContext: modelContext)
-            vm.setContext(task, context: value)
+            vm.setContext(task, context: value, members: familyMembers)
             dismiss()
         } label: {
             HStack {

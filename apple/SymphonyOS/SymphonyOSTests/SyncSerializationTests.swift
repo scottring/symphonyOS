@@ -259,4 +259,20 @@ struct SyncSerializationTests {
         let updateRow = try #require(SyncEngine.serializeRow(table: "tasks", id: task.id, context: context))
         #expect(updateRow["scope"] == nil)
     }
+
+    @Test func taskRowSendsScopeOnUpdateWhenThePhoneChangedIt() throws {
+        // A context/assignee edit on the phone recomputes scope (TaskViewModel.
+        // reconcileScope) and flags scopeDirty — that recomputed value must
+        // reach the server on the very next UPDATE, unlike the default (server-
+        // owned) case above.
+        let context = try makeContext()
+        let task = SymphonyTask(userId: UUID(), title: "Assign to Iris")
+        task.scope = "couple"
+        task.scopeDirty = true
+        context.insert(task)
+        try context.save()
+
+        let updateRow = try #require(SyncEngine.serializeRow(table: "tasks", id: task.id, context: context))
+        #expect(updateRow["scope"]?.stringValue == "couple")
+    }
 }

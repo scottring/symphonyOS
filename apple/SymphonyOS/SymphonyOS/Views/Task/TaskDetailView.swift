@@ -140,8 +140,19 @@ struct TaskDetailView: View {
                         Label("Assigned to", systemImage: "person.2")
                             .eyebrowStyle()
 
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 116), spacing: 8)],
-                                  alignment: .leading, spacing: 8) {
+                        // A LazyVGrid here (matching the "When" chips above)
+                        // rendered zero children on iOS 26.2 — confirmed via
+                        // an XCUITest accessibility-tree dump showing the
+                        // "Assigned to" header present but nothing between it
+                        // and the next section despite `sortedMembers` being
+                        // non-empty. The one structural difference from the
+                        // working "When" grid is that this one sits behind an
+                        // `if !familyMembers.isEmpty` — LazyVGrid appears not
+                        // to lay out its cells reliably on a pass where it
+                        // first appears via a conditional. A plain VStack
+                        // sidesteps it and made assignee chips tappable again
+                        // (they were silently unreachable from the phone).
+                        VStack(alignment: .leading, spacing: 8) {
                             ForEach(sortedMembers, id: \.id) { member in
                                 assigneeChip(member)
                             }
@@ -471,6 +482,7 @@ struct TaskDetailView: View {
     private func contextChip(_ label: String, value: String, color: Color) -> some View {
         Button {
             task.context = task.context == value ? nil : value
+            viewModel.reconcileScope(task, members: familyMembers)
             markDirty()
         } label: {
             Text(label)
@@ -502,6 +514,7 @@ struct TaskDetailView: View {
         let arr = Array(set)
         task.assignedToAll = arr.isEmpty ? nil : arr
         task.assignedTo = arr.first
+        viewModel.reconcileScope(task, members: familyMembers)
         markDirty()
     }
 
@@ -525,6 +538,7 @@ struct TaskDetailView: View {
                     .lineLimit(1)
                 Spacer(minLength: 0)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 8)
             .padding(.vertical, 6)
             .background(isAssigned ? color.opacity(0.16) : Color.bgElevated)
