@@ -273,6 +273,10 @@ verify_jwt = false
 [functions.inbound-email]
 verify_jwt = false
 
+# Internal: called by inbound-email with the shared secret, not a JWT.
+[functions.extract-email]
+verify_jwt = false
+
 # GitHub webhook (scottring/scotts-world) calls this with an x-hub-signature-256
 # HMAC, not a Supabase JWT. JWT verification must stay off or the webhook 401s
 # at the platform gateway before the function's own signature check runs.
