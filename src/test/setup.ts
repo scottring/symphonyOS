@@ -17,7 +17,6 @@ vi.mock('@/lib/supabase', () => {
       // happened to mount Today.
       is: () => chain,
       in: () => chain,
-      not: () => chain,
       order: () => chain, // Return chain to support multiple .order() calls
       limit: () => chain,
       select: () => chain,
