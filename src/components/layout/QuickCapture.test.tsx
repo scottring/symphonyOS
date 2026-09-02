@@ -259,7 +259,10 @@ describe('QuickCapture', () => {
       expect(screen.getByText(/Tomorrow|Today/)).toBeInTheDocument()
     })
 
-    it('shows preview when project is parsed with #hashtag', async () => {
+    // Projects are hidden from the product (2026-09-02 — see the note in
+    // Sidebar.tsx). `#montreal` still parses and still rides along as a
+    // projectId on the created task; capture just doesn't advertise it.
+    it('shows no project chip when #hashtag resolves to one', async () => {
       const { user } = render(
         <QuickCapture
           onAdd={vi.fn()}
@@ -273,8 +276,7 @@ describe('QuickCapture', () => {
       const input = screen.getByPlaceholderText('Try "call the vet tomorrow 2pm"')
       await user.type(input, 'book flights #montreal')
 
-      // Preview should show project
-      expect(screen.getByText('Montreal Trip')).toBeInTheDocument()
+      expect(screen.queryByText('Montreal Trip')).not.toBeInTheDocument()
     })
 
     it('shows preview when contact is parsed with @mention', async () => {
@@ -375,19 +377,15 @@ describe('QuickCapture', () => {
       )
 
       const input = screen.getByPlaceholderText('Try "call the vet tomorrow 2pm"')
-      await user.type(input, 'book flight #montreal')
+      await user.type(input, 'call @iris')
 
-      // Project should be shown
-      expect(screen.getByText('Montreal Trip')).toBeInTheDocument()
+      // Contact should be shown
+      expect(screen.getByText('Iris')).toBeInTheDocument()
 
-      // Click × to remove project
-      const removeButton = screen.getByText('Montreal Trip').closest('span')?.querySelector('button')
-      if (removeButton) {
-        await user.click(removeButton)
-      }
+      // Click × to remove the contact
+      await user.click(screen.getByRole('button', { name: /clear contact/i }))
 
-      // Project chip should be gone
-      expect(screen.queryByText('Montreal Trip')).not.toBeInTheDocument()
+      expect(screen.queryByText('Iris')).not.toBeInTheDocument()
     })
   })
 

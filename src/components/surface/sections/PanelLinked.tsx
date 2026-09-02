@@ -1,15 +1,15 @@
 import type { Task } from '@/types/task'
-import type { Project } from '@/types/project'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import { ConceptIcon } from '@/lib/conceptIcons'
 import { PanelSection } from './PanelSection'
 import { PanelRow } from './PanelRow'
 
+// The parent project used to be the first row here. Projects are hidden from
+// the product (2026-09-02 — see the note in Sidebar.tsx), so "Linked" is now
+// the event and the sibling tasks; the task carries its own context.
 interface PanelLinkedProps {
-  project?: Project
   linkedEvent?: CalendarEvent
   siblingTasks: Task[]
-  onOpenProject: (id: string) => void
   onOpenEvent: (id: string) => void
   onOpenTask: (id: string) => void
 }
@@ -20,20 +20,12 @@ function formatEventTime(iso?: string): string {
   return d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
 }
 
-export function PanelLinked({ project, linkedEvent, siblingTasks, onOpenProject, onOpenEvent, onOpenTask }: PanelLinkedProps) {
-  const hasAny = project || linkedEvent || siblingTasks.length > 0
+export function PanelLinked({ linkedEvent, siblingTasks, onOpenEvent, onOpenTask }: PanelLinkedProps) {
+  const hasAny = linkedEvent || siblingTasks.length > 0
   if (!hasAny) return null
 
   return (
-    <PanelSection id="linked" label="Linked" preview={project?.name ?? (linkedEvent?.title || (siblingTasks.length ? `${siblingTasks.length} related` : undefined))}>
-      {project && (
-        <PanelRow
-          onClick={() => onOpenProject(project.id)}
-          icon={<span className="w-6 h-6 flex items-center justify-center rounded-md bg-violet-100"><ConceptIcon name="project" decorative /></span>}
-        >
-          <span className="block text-sm text-neutral-800">{project.name}</span>
-        </PanelRow>
-      )}
+    <PanelSection id="linked" label="Linked" preview={linkedEvent?.title || (siblingTasks.length ? `${siblingTasks.length} related` : undefined)}>
       {linkedEvent && (
         <PanelRow
           onClick={() => onOpenEvent(linkedEvent.id)}

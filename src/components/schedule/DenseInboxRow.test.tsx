@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { DenseInboxRow } from './DenseInboxRow'
 import type { QuickAction } from './DenseInboxRow'
-import { createMockTask, createMockProject } from '@/test/mocks/factories'
+import { createMockTask } from '@/test/mocks/factories'
 
 vi.mock('@/hooks/useGooglePlaces', () => ({
   useGooglePlaces: () => ({ results: [], loading: false, searchPlaces: vi.fn(), getPlaceDetails: vi.fn(), clearResults: vi.fn() }),
@@ -82,18 +82,12 @@ describe('DenseInboxRow', () => {
     expect(onSelect).toHaveBeenCalled()
   })
 
-  it('renders project chip when project provided', () => {
-    const project = createMockProject({ id: 'p1', name: 'My Project' })
-    render(<DenseInboxRow {...baseProps} project={project} quickActions={INBOX_ACTIONS} />)
-    expect(screen.getByText('My Project')).toBeInTheDocument()
-  })
-
-  it('clears project assignment when chip × clicked', () => {
-    const project = createMockProject({ id: 'p1', name: 'My Project' })
-    const onUpdate = vi.fn()
-    render(<DenseInboxRow {...baseProps} onUpdate={onUpdate} project={project} quickActions={INBOX_ACTIONS} />)
-    fireEvent.click(screen.getByRole('button', { name: /remove project/i }))
-    expect(onUpdate).toHaveBeenCalledWith({ projectId: undefined })
+  // The row used to carry a ProjectControl — a chip when filed, a picker when
+  // not. Projects are hidden from the product (2026-09-02 — see the note in
+  // Sidebar.tsx), so a triage row no longer files anything into one.
+  it('offers no project chip or picker', () => {
+    render(<DenseInboxRow {...baseProps} quickActions={INBOX_ACTIONS} />)
+    expect(screen.queryByRole('button', { name: /project/i })).not.toBeInTheDocument()
   })
 
   it('applies leaving class when isLeaving is true', () => {

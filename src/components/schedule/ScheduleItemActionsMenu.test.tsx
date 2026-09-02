@@ -160,33 +160,30 @@ describe('ScheduleItemActionsMenu', () => {
     expect(screen.queryByText('Waiting for…')).not.toBeInTheDocument()
   })
 
-  // Promote-to-project and the discussion picker moved off the row and into
-  // this menu, so the row's action rail could be a fixed four slots.
+  // The discussion picker moved off the row and into this menu, so the row's
+  // action rail could be a fixed four slots. Convert/Promote/View project moved
+  // here too and then went away entirely: Projects are hidden from the product
+  // (2026-09-02 — see the note in Sidebar.tsx).
   describe('actions that moved off the row', () => {
-    it('offers Convert to project for an unlinked task', () => {
+    it('offers no project action for a task', () => {
       renderMenu(taskItem, {})
-      expect(screen.getByText('Convert to project')).toBeInTheDocument()
+      expect(screen.queryByText(/project/i)).not.toBeInTheDocument()
     })
 
-    it('offers Promote to project for an unlinked event', () => {
+    it('offers no project action for an event', () => {
       renderMenu(eventItem, {})
-      expect(screen.getByText('Promote to project')).toBeInTheDocument()
+      expect(screen.queryByText(/project/i)).not.toBeInTheDocument()
     })
 
-    it('offers View project instead when the item is already linked', () => {
-      const onOpenProject = vi.fn()
-      const linked = { ...taskItem, projectId: 'proj-1' } as unknown as TimelineItem
-      renderMenu(linked, { onOpenProject })
-
-      expect(screen.queryByText('Convert to project')).not.toBeInTheDocument()
-      fireEvent.click(screen.getByText('View project'))
-      expect(onOpenProject).toHaveBeenCalledWith('proj-1')
-    })
-
-    it('omits the promote item for routines', () => {
+    it('offers no project action for a routine', () => {
       renderMenu(routineItem, {})
-      expect(screen.queryByText('Convert to project')).not.toBeInTheDocument()
-      expect(screen.queryByText('Promote to project')).not.toBeInTheDocument()
+      expect(screen.queryByText(/project/i)).not.toBeInTheDocument()
+    })
+
+    it('offers no View project even when the item is already linked to one', () => {
+      const linked = { ...taskItem, projectId: 'proj-1' } as unknown as TimelineItem
+      renderMenu(linked, {})
+      expect(screen.queryByText(/project/i)).not.toBeInTheDocument()
     })
 
     it('opens the discussion popover from the menu and reports the flag', () => {

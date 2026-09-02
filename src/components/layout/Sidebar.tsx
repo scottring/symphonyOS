@@ -13,7 +13,6 @@ import {
   Sun,
   CalendarRange,
   UtensilsCrossed,
-  FolderKanban,
   Home,
   Inbox,
   Users2,
@@ -82,7 +81,7 @@ export function Sidebar({
   const { state: groupState, toggle: toggleGroup, setOpen: openGroup } = useSidebarGroupState()
 
   // The rhythm spine (Phase 2b): Inbox · the horizon rungs · Routines · Library.
-  // The Library group (Projects, Goals, Meals, Contacts, Lists, House, History,
+  // The Library group (Goals, Meals, Contacts, Lists, House, History,
   // + registry apps) auto-expands when any of its destinations is the active
   // route. Group→state-key: LIBRARY→'library'.
   //
@@ -90,12 +89,10 @@ export function Sidebar({
   // group: leaving it in would throw Library open every time you visited a page
   // that is no longer in it.
   const libraryActive =
-    activeView === 'projects' ||
     activeView === 'goals' || activeView === 'meals' ||
     activeView === 'home-app' || activeView === 'lists' ||
     activeView === 'contacts' || activeView === 'contact-detail' ||
     activeView === 'history' || activeView === 'routines' ||
-    location.pathname.startsWith('/projects') ||
     location.pathname.startsWith('/goals') || location.pathname.startsWith('/meals') ||
     location.pathname.startsWith('/lists') || location.pathname.startsWith('/contacts') ||
     location.pathname.startsWith('/history') || location.pathname.startsWith('/home') ||
@@ -299,14 +296,14 @@ export function Sidebar({
             {!collapsed && <span>Routines</span>}
           </button>
 
-          {/* Projects */}
-          <button
-            onClick={() => navigate('/projects')}
-            className={navItemClass(location.pathname.startsWith('/projects'))}
-          >
-            {createElement(FolderKanban, { className: 'w-5 h-5 shrink-0' })}
-            {!collapsed && <span>Projects</span>}
-          </button>
+          {/* Projects is HIDDEN (2026-09-02) — the noun read as GTD jargon and
+              confused the household-OS pitch, so it goes the way "Us" and
+              "Jobs" went in the 2026-09-01 pare-down: the UI goes, the model
+              stays. The projects table, useProjects, types/project.ts and the
+              ProjectsList/ProjectView components are all untouched; the three
+              seams that hide it are this nav entry, the appRegistry mount and
+              the /projects route (redirected in main.tsx). Put all three back
+              and the surface returns exactly as it was. */}
 
           {/* Goals is WITHHELD with the horizon ladder (2026-08 analog-planning
               pivot) — route stays live at /goals, just not in daily nav. */}

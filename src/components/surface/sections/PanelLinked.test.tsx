@@ -2,11 +2,10 @@ import { describe, it, expect, vi } from 'vitest'
 import { screen } from '@testing-library/react'
 import { render } from '@/test/test-utils'
 import { PanelLinked } from './PanelLinked'
-import { createMockProject, createMockTask } from '@/test/mocks/factories'
+import { createMockTask } from '@/test/mocks/factories'
 
 describe('PanelLinked', () => {
   const handlers = {
-    onOpenProject: vi.fn(),
     onOpenEvent: vi.fn(),
     onOpenTask: vi.fn(),
   }
@@ -14,12 +13,6 @@ describe('PanelLinked', () => {
   it('renders nothing when no links', () => {
     const { container } = render(<PanelLinked siblingTasks={[]} {...handlers} />)
     expect(container.firstChild).toBeNull()
-  })
-
-  it('renders project card', () => {
-    const project = createMockProject({ id: 'p1', name: 'Liam — Health' })
-    render(<PanelLinked project={project} siblingTasks={[]} {...handlers} />)
-    expect(screen.getByText('Liam — Health')).toBeInTheDocument()
   })
 
   it('renders linked event title and time', () => {
@@ -37,11 +30,7 @@ describe('PanelLinked', () => {
     expect(screen.getByText('Refill rx')).toBeInTheDocument()
   })
 
-  it('calls onOpenProject when project is clicked', async () => {
-    const project = createMockProject({ id: 'p1', name: 'Project X' })
-    const onOpenProject = vi.fn()
-    const { user } = render(<PanelLinked project={project} siblingTasks={[]} {...{ ...handlers, onOpenProject }} />)
-    await user.click(screen.getByRole('button', { name: /Project X/ }))
-    expect(onOpenProject).toHaveBeenCalledWith('p1')
-  })
+  // The parent-project row was the first thing this section drew until Projects
+  // were hidden from the product (2026-09-02 — see the note in Sidebar.tsx).
+  // "Linked" is the event and the siblings now; a task carries its own context.
 })

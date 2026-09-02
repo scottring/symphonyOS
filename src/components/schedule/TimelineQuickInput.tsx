@@ -116,10 +116,8 @@ export function TimelineQuickInput({ kind, anchorTime, parserContext, onSubmit, 
       />
       <ParsedFieldChips
         parsed={chipsParsed}
-        projectName={qp.projectName}
         contactName={qp.contactName}
         onClearDate={qp.clearDate}
-        onClearProject={qp.clearProject}
         onClearContact={qp.clearContact}
         onClearCategory={qp.clearCategory}
         onClearContext={qp.clearContext}

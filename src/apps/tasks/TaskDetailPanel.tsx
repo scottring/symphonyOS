@@ -29,7 +29,6 @@ import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
 import { useGatedTaskActions } from '@/hooks/useGatedTaskActions';
 import { useContacts } from '@/hooks/useContacts';
 import { useProjects } from '@/hooks/useProjects';
-import { useGoals } from '@/hooks/useGoals';
 import { useGoogleCalendar, CalendarReconnectError, type GoogleCalendarInfo, type CalendarEvent } from '@/hooks/useGoogleCalendar';
 import { useEventNotes } from '@/hooks/useEventNotes';
 import { useEventDiscussionFlags } from '@/hooks/useEventDiscussionFlags';
@@ -47,7 +46,6 @@ import { nextStepOrder } from '@/lib/today/stepOrdering';
 import type { Routine } from '@/types/actionable';
 import { TapEventPanel } from '@/components/surface/TapEventPanel';
 import { TapMealPanel } from '@/components/surface/TapMealPanel';
-import { WhyChain } from '@/components/why/WhyChain';
 import { applyTriageWhen, describeTriageWhen } from '@/lib/triage/applyWhen';
 import { formatDateLabel } from '@/lib/dateHelpers';
 import type { Task, TaskLink } from '@/types/task';
@@ -150,9 +148,6 @@ function TaskPanelBody({ id }: { id: string }) {
   const { tasks, addSubtask, deleteTask, toggleTask, updateTask: rawUpdateTask, updateTasksBulk, pushTask, setBucket, refetch } = useSupabaseTasks();
   const { contacts, addContact, searchContacts } = useContacts();
   const { projects } = useProjects();
-  // Goals fetched via the hook directly (the global DetailPanel renders outside
-  // GoalsProvider) — powers the why-chain (Task → Project → Goal).
-  const { goals } = useGoals();
   const { events } = useGoogleCalendar();
   const { members: familyMembers } = useFamilyMembers();
   const pinnedItems = usePinnedItems();
@@ -197,15 +192,9 @@ function TaskPanelBody({ id }: { id: string }) {
       familyMembers={familyMembers}
       siblingTaskCandidates={tasks}
       allTasks={tasks}
-      whyChain={
-        <WhyChain
-          task={task}
-          projects={projects}
-          goals={goals}
-          onOpenProject={(pid) => navigate(`/projects/${pid}`)}
-          onOpenGoal={() => navigate('/goals')}
-        />
-      }
+      // The why-chain (Task → Project → Goal) is not passed any more: Projects
+      // are hidden from the product (2026-09-02 — see the note in Sidebar.tsx)
+      // and WhyChain renders nothing without one. Component + test are parked.
       // createdByName not tracked in current data model
       onAssistMutate={refetch}
       onClose={handleClose}

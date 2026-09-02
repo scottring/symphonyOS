@@ -4,11 +4,10 @@ import type { FamilyMember } from '@/types/family'
 import type { TaskContext } from '@/types/task'
 import { formatTimeLong, formatTimeRangeLong, inferMealTime } from '@/lib/timeUtils'
 import { isSameDay } from '@/lib/dateUtils'
-import { getProjectColor } from '@/lib/projectUtils'
 import { SchedulePopover, type ScheduleContextItem } from '@/components/triage'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
 import { AssigneeDropdown, MultiAssigneeDropdown } from '@/components/family'
-import { Video, Tag, Check, Pencil, Hourglass, ListChecks, ChevronUp, ChevronDown, MessageCircle, AlertCircle } from 'lucide-react'
+import { Video, Check, Pencil, Hourglass, ListChecks, ChevronUp, ChevronDown, MessageCircle, AlertCircle } from 'lucide-react'
 import { RowActionRail } from './RowActionRail'
 import { useMobile } from '@/hooks/useMobile'
 import { TaskCheckbox } from './TaskCheckbox'
@@ -114,6 +113,11 @@ interface ScheduleItemProps {
   onSchedule?: (date: Date, isAllDay: boolean) => void
   onSkip?: () => void
   contactName?: string
+  /**
+   * Projects are hidden from the product (2026-09-02, see Sidebar.tsx) so the
+   * row no longer draws either of these. They stay on the props because the
+   * data and every caller still carry them — hide the noun, keep the model.
+   */
   projectName?: string
   projectId?: string
   parentTaskName?: string
@@ -140,8 +144,6 @@ interface ScheduleItemProps {
   onClosePanel?: () => void
   // Coaching indicator
   hasCoaching?: boolean
-  // Event → Project promotion suggestion
-  isSuggestedPromotion?: boolean
   // Visual weight variant
   variant?: 'full' | 'minimal'
   // Hide time label (for same-time grouping) — preserves column space
@@ -187,8 +189,6 @@ export const ScheduleItem = memo(function ScheduleItem({
   onPush,
   onSchedule,
   contactName,
-  projectName,
-  projectId,
   parentTaskName,
   parentTaskId,
   onOpenParentTask,
@@ -205,7 +205,6 @@ export const ScheduleItem = memo(function ScheduleItem({
   panelOpen,
   onClosePanel,
   hasCoaching,
-  isSuggestedPromotion,
   variant = 'full',
   hideTime,
   spineAbove,
@@ -296,20 +295,17 @@ export const ScheduleItem = memo(function ScheduleItem({
 
   const timeDisplay = getTimeDisplay()
 
-  // Check if we should hide project on mobile (passed as prop or detected)
   const hasContactChip = !!contactName
   const hasSubtasks = item.subtaskCount && item.subtaskCount > 0
   // Steps disclosure — collapsed by default. Local because it is pure view
   // state and each row opens independently.
   const [stepsOpen, setStepsOpen] = useState(false)
 
-  // Get project color for left edge indicator
-  const projectColor = projectId ? getProjectColor(projectId) : null
 
   // ── Mobile card render ────────────────────────────────────────────────────
   // Matches the mockup: each row is a discrete card with a left time column,
   // a tinted icon block, a title + small context line, and a right cluster
-  // (project tag, assignee, more). Desktop render falls through below.
+  // (assignee, more). Desktop render falls through below.
   if (isMobile) {
     // Time displayed stacked: "1:00 / PM" for single times, with a hyphen row
     // for ranges ("6:30 / – / 7:15 / PM").
@@ -344,9 +340,10 @@ export const ScheduleItem = memo(function ScheduleItem({
       )
     }
 
-    // Small context line: prefer project name, then category, then location.
-    const contextLabel = projectName || (item.category && item.category !== 'task' ? item.category : null) || item.location || null
-    const dotColor = projectColor || contextColor || null
+    // Small context line: category, then location. (Project was the first
+    // preference until Projects was hidden — 2026-09-02, see Sidebar.tsx.)
+    const contextLabel = (item.category && item.category !== 'task' ? item.category : null) || item.location || null
+    const dotColor = contextColor || null
 
     // Swipe gestures: right → complete, left → edit (open detail panel).
     // The card translates with the finger; coloured action panels behind it
@@ -394,7 +391,7 @@ export const ScheduleItem = memo(function ScheduleItem({
           )}
         </div>
 
-        {/* Right cluster — project tag + assignee. Three-dot removed; swipe
+        {/* Right cluster — assignee. Three-dot removed; swipe
             now exposes the same actions (right→complete, left→edit). Needed
             today is a TAP control here, not a third swipe — swipe already
             means complete (right) / edit (left), and a third gesture would be
@@ -416,9 +413,6 @@ export const ScheduleItem = memo(function ScheduleItem({
             >
               <AlertCircle className={`w-4 h-4 ${isNeededToday ? 'text-amber-500' : 'text-neutral-300'}`} />
             </button>
-          )}
-          {projectName && (
-            <Tag className="w-4 h-4 text-orange-400" style={projectColor ? { color: projectColor } : undefined} />
           )}
           {familyMembers.length > 0 && onAssignAll ? (
             <div onClick={(e) => e.stopPropagation()}>
@@ -470,14 +464,6 @@ export const ScheduleItem = memo(function ScheduleItem({
         ${item.completed || item.skipped ? 'opacity-60' : ''}
       `}
     >
-      {/* Left edge indicator - project color only (not overdue) */}
-      {projectColor && !isOverdue && (
-        <div
-          className="absolute left-0 top-[20%] w-[3px] h-[60%] rounded-none"
-          style={{ backgroundColor: projectColor }}
-        />
-      )}
-
       {/* Bulk multi-select checkbox — hover-revealed at the row's left edge.
           Absolutely positioned so it never shifts layout; the row content gets
           a left pad (below) only while it's shown. Toggling stops propagation
@@ -699,18 +685,6 @@ export const ScheduleItem = memo(function ScheduleItem({
                   : <ChevronDown className="w-3 h-3" />}
               </button>
             )}
-            {/* Project chip — inline pill next to title (desktop only) */}
-            {projectName && (
-              <span
-                className="hidden md:inline-flex shrink-0 items-center max-w-[200px] truncate text-[11px] font-medium px-2 py-0.5 rounded-md"
-                style={projectColor
-                  ? { backgroundColor: `color-mix(in srgb, ${projectColor} 14%, transparent)`, color: projectColor }
-                  : { backgroundColor: 'hsl(210 40% 96%)', color: 'hsl(210 50% 40%)' }}
-                title={projectName}
-              >
-                {projectName}
-              </span>
-            )}
           </div>
           {/* What the wait is ON — its own line beneath the title, never a
               replacement for it. Replacing the title would break scanning: two
@@ -767,7 +741,6 @@ export const ScheduleItem = memo(function ScheduleItem({
           familyMembers={familyMembers}
           assignedTo={assignedTo}
           assignedToAll={assignedToAll}
-          isSuggestedPromotion={isSuggestedPromotion}
         />
       </div>
 

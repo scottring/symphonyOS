@@ -149,7 +149,13 @@ createRoot(document.getElementById('root')!).render(
               {/* /, /today, /inbox, /task/:id are served by the Shell via the
                   /* catch-all below (explicit routes here win by specificity). */}
               <Route path="/goals/*" element={cutoverShell} />
-              <Route path="/projects/*" element={cutoverShell} />
+              {/* /projects retired from the UI (2026-09-02): "Projects" read as
+                  GTD jargon and muddied the household-OS pitch. HIDE THE NOUN,
+                  KEEP THE DATA — the table, useProjects, types/project.ts and
+                  ProjectsList/ProjectView all stay; only the way in goes.
+                  Redirected rather than deleted, for the same reason /jobs and
+                  /us are: stale bookmarks and the Mac shell's restored route. */}
+              <Route path="/projects/*" element={<Navigate to="/today" replace />} />
               <Route path="/routines/*" element={cutoverShell} />
               {/* /meds withheld — see the note in Sidebar.tsx. Redirected
                   rather than simply deleted: unmounting the app alone left the

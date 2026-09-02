@@ -21,7 +21,6 @@ interface RowActionRailProps {
   assignedTo?: string | null
   assignedToAll: string[]
   /** Events the system suggests promoting — tints the overflow trigger amber. */
-  isSuggestedPromotion?: boolean
 }
 
 /** An icon cell — 28px, on every row, always. */
@@ -143,8 +142,8 @@ function SkipRoutineButton({ item }: { item: TimelineItem }) {
  * reading, not for layout.
  *
  * The rail carries ACTIONS only. State (flagged for discussion, subtask
- * counts, project) belongs with the title, because a strip that means two
- * things can't have one shape.
+ * counts) belongs with the title, because a strip that means two things can't
+ * have one shape.
  */
 export function RowActionRail({
   item,
@@ -157,7 +156,6 @@ export function RowActionRail({
   familyMembers,
   assignedTo,
   assignedToAll,
-  isSuggestedPromotion,
 }: RowActionRailProps) {
   const isTask = item.type === 'task'
   const isRoutine = item.type === 'routine'
@@ -176,7 +174,6 @@ export function RowActionRail({
         item={item}
         onOpenDetail={onSelect}
         onUpdateDiscussion={onUpdateDiscussion}
-        isSuggestedPromotion={isSuggestedPromotion}
       />
     )
     : null

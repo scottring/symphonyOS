@@ -104,10 +104,8 @@ export function QuickCapture({
   const qp = useQuickParse(title, parserCtx)
   const {
     effectiveParsed,
-    projectName,
     contactName,
     resetOverrides,
-    clearProject,
     clearContact,
     clearDate,
     clearDuration,
@@ -451,13 +449,11 @@ export function QuickCapture({
                     </>
                   )}
 
-                  {/* Parsed-field chips: project, date/time, contact, category, applied context; assignment/priority/suggested-context chips follow inline after this group */}
+                  {/* Parsed-field chips: date/time, contact, category, applied context; assignment/priority/suggested-context chips follow inline after this group */}
                   <ParsedFieldChips
                     parsed={effectiveParsed}
-                    projectName={projectName}
                     contactName={contactName}
                     onClearDate={clearDate}
-                    onClearProject={clearProject}
                     onClearContact={clearContact}
                     onClearCategory={clearCategory}
                     onClearContext={clearContext}

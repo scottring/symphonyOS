@@ -3,14 +3,14 @@ import { Check } from 'lucide-react'
 import { ConceptIcon } from '@/lib/conceptIcons'
 import { SchedulePopover } from '@/components/triage'
 import type { Task } from '@/types/task'
-import type { Project } from '@/types/project'
 import type { FamilyMember } from '@/types/family'
 
 type FocusBucket = 'today' | 'week' | 'month' | 'quarter'
 
+// The project chip is gone (2026-09-02 — see the note in Sidebar.tsx): Projects
+// are hidden from the product, so a triage card no longer names one.
 interface FocusInboxCardProps {
   tasks: Task[]
-  projects: Project[]
   familyMembers: FamilyMember[]
   onTriage: (taskId: string, bucket: FocusBucket) => void
   onDelete: (taskId: string) => void
@@ -35,7 +35,7 @@ const WHEN_BUTTONS: Array<{ key: string; bucket: FocusBucket; label: string; sub
 ]
 
 export function FocusInboxCard({
-  tasks, projects, familyMembers: _familyMembers,
+  tasks, familyMembers: _familyMembers,
   onTriage, onDelete, onComplete, onUpdate: _onUpdate, onSelectDetail, onExitFocus,
   onSendToCalendar, sending = false,
 }: FocusInboxCardProps) {
@@ -148,8 +148,6 @@ export function FocusInboxCard({
     )
   }
 
-  const project = projects.find((p) => p.id === current.projectId)
-
   return (
     <div className="max-w-2xl mx-auto">
       <div className="text-xs uppercase tracking-wide text-neutral-400 mb-3">
@@ -165,11 +163,6 @@ export function FocusInboxCard({
           {current.context && (
             <span className="px-3 py-1 rounded-full bg-neutral-50 text-neutral-700 text-xs">
               {current.context}
-            </span>
-          )}
-          {project && (
-            <span className="px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs">
-              <ConceptIcon name="project" decorative /> {project.name}
             </span>
           )}
         </div>

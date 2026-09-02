@@ -31,7 +31,6 @@ import { useUnpromptedSuggestions, type UnpromptedItem } from '@/hooks/useUnprom
 import { UnpromptedLines } from '@/components/assistant/UnpromptedLines'
 import { resolveSuggestionAction, revealItemId } from '@/lib/assistant/suggestionAction'
 import { useSystemHealth, getHealthTextClasses } from '@/hooks/useSystemHealth'
-import { useRecurringEventDetection } from '@/hooks/useRecurringEventDetection'
 import { useTimelineInsert } from '@/hooks/useTimelineInsert'
 import { useDomain } from '@/hooks/useDomain'
 
@@ -159,7 +158,6 @@ export function TodayView({
     onPushRoutine, onPushEvent, onUpdateEventContext,
     onNotify,
     contactsMap, familyMembers = [],
-    eventNotesMap,
   } = ctx
   // NOTE: completing a Needed Today list-item row is NOT wired from here.
   // It belongs to useNeededListItems (which the note owns), because
@@ -447,8 +445,6 @@ export function TodayView({
     }
     void unprompted.act(item.suggestion.id)
   }, [navigate, unprompted, onSelectItem])
-
-  const { isPromotionSuggested } = useRecurringEventDetection(events, eventNotesMap)
 
   // Timeline insert points: radial wheel pick → note composer (task/event/routine
   // are handled inline by TimelineInsertPoint via onCreate)
@@ -1078,7 +1074,6 @@ export function TodayView({
               shareNudgeByEventId={shareNudgeByEventId}
               parserContext={parserContext}
               insert={insert}
-              isPromotionSuggested={isPromotionSuggested}
               onSelectItem={handleSelectItem}
               onToggleTask={onToggleTask}
               onCompleteRoutine={onCompleteRoutine}

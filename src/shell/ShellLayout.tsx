@@ -57,7 +57,8 @@ const TODAY_PATHS = new Set(['/', '/today', '/tasks-new/today', '/tasks-new']);
  */
 export function deriveActiveView(pathname: string): ViewType {
   if (pathname.startsWith('/goals')) return 'goals';
-  if (pathname.startsWith('/projects')) return 'projects';
+  // /projects is hidden (2026-09-02) and redirects to /today in main.tsx, so
+  // it never reaches here; see the note in Sidebar.tsx.
   if (pathname.startsWith('/routines')) return 'routines';
   if (pathname === '/contacts') return 'contacts';
   if (pathname.startsWith('/contacts/')) return 'contact-detail';
@@ -174,9 +175,6 @@ function ShellLayoutInner({ children }: Props) {
           return;
         case 'agent':
           navigate('/agent');
-          return;
-        case 'projects':
-          navigate('/projects');
           return;
         case 'routines':
           navigate('/routines');

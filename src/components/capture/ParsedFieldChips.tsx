@@ -1,12 +1,14 @@
 import type { EffectiveParsed } from '@/hooks/useQuickParse'
 import { ConceptIcon } from '@/lib/conceptIcons'
 
+// The project chip is gone (2026-09-02 — see the note in Sidebar.tsx): Projects
+// are hidden from the product, so capture no longer offers to file into one.
+// useQuickParse still parses `#name` and still sets projectId — the model is
+// untouched; only the chip that advertised it is.
 interface Props {
   parsed: EffectiveParsed
-  projectName: string | null
   contactName: string | null
   onClearDate: () => void
-  onClearProject: () => void
   onClearContact: () => void
   onClearCategory: () => void
   onClearContext: () => void
@@ -53,17 +55,15 @@ function formatDate(date: Date) {
 }
 
 /**
- * Renders the parsed-field chips (project, date/time, contact, category,
+ * Renders the parsed-field chips (date/time, contact, category,
  * applied context) with their × clear affordances. Behaviorally equivalent to
  * QuickCapture's original chip rendering, with aria-labels added to the clear (×) buttons
  * for accessibility. Extracted to support regression testing without markup changes.
  */
 export function ParsedFieldChips({
   parsed,
-  projectName,
   contactName,
   onClearDate,
-  onClearProject,
   onClearContact,
   onClearCategory,
   onClearContext,
@@ -71,7 +71,6 @@ export function ParsedFieldChips({
 }: Props) {
   if (
     !parsed.dueDate &&
-    !parsed.projectId &&
     !parsed.contactId &&
     !parsed.category &&
     !parsed.context &&
@@ -82,26 +81,7 @@ export function ParsedFieldChips({
 
   return (
     <>
-      {/* Only show task-related fields if NOT a note */}
-      {!parsed.isNote && parsed.projectId && projectName && (
-        <div className="flex items-center gap-2">
-          <span className="text-base"><ConceptIcon name="project" size={18} decorative /></span>
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-blue-50 text-blue-700 rounded-full text-xs font-medium border border-blue-100">
-            {projectName}
-            <button
-              type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={onClearProject}
-              aria-label="Clear project"
-              className="ml-1 text-blue-400 hover:text-blue-600"
-            >
-              ×
-            </button>
-          </span>
-        </div>
-      )}
-
-      {/* Date/time chip */}
+      {/* Date/time chip — only task-related fields, and only if NOT a note */}
       {!parsed.isNote && parsed.dueDate && (
         <div className="flex items-center gap-2">
           <span className="text-base">

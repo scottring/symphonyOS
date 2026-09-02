@@ -19,7 +19,9 @@ describe('deriveActiveView', () => {
 
   it('still derives the other known views correctly (no regression)', () => {
     expect(deriveActiveView('/goals')).toBe('goals')
-    expect(deriveActiveView('/projects')).toBe('projects')
+    // /projects is hidden (2026-09-02) — it redirects to /today, so nothing
+    // ever asks this function about it.
+    expect(deriveActiveView('/projects')).toBe('today')
     expect(deriveActiveView('/routines')).toBe('routines')
     expect(deriveActiveView('/contacts')).toBe('contacts')
     expect(deriveActiveView('/contacts/abc')).toBe('contact-detail')

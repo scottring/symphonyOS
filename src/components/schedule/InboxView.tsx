@@ -58,14 +58,13 @@ interface InboxViewProps {
 }
 
 export function InboxView({
-  tasks, projects, selectedItemId: _selectedItemId, onSelectItem,
+  tasks, selectedItemId: _selectedItemId, onSelectItem,
   panelOpen: _panelOpen, onClosePanel: _onClosePanel,
   loading = false,
 }: InboxViewProps) {
   const {
     onUpdateTask, onPushTask, onDeleteTask, onUpdateTasksBulk,
-    onAssignTaskAll, familyMembers = [], onOpenProject, onToggleTask,
-    onAddProject, onDeleteProject,
+    onAssignTaskAll, familyMembers = [], onToggleTask,
   } = useScheduleActionsContext()
   const { notes, addNote, updateNote, deleteNote } = useNotes()
   const { addTask } = useSupabaseTasks()
@@ -115,30 +114,10 @@ export function InboxView({
     exitSelection()
   }, [selectedTaskIds, onDeleteTask, exitSelection])
 
-  const makeOnCreateProject = useCallback(
-    (taskId: string) => async (name: string, context: TaskContext | null) => {
-      if (!onAddProject) return
-      const project = await onAddProject({ name, context: context ?? undefined })
-      if (!project) return
-      const removeCreatedProject = (): Promise<void> =>
-        onDeleteProject ? onDeleteProject(project.id) : Promise.resolve()
-      try {
-        await onUpdateTask?.(taskId, { projectId: project.id })
-      } catch (err) {
-        console.error('Failed to attach project to task:', err)
-        await removeCreatedProject()
-        return
-      }
-      setUndo({
-        taskId,
-        message: `Attached to '${project.name}'`,
-        previous: { projectId: undefined },
-        undoable: true,
-        onUndoExtra: removeCreatedProject,
-      })
-    },
-    [onAddProject, onDeleteProject, onUpdateTask],
-  )
+  // makeOnCreateProject (create a project from an inbox row and file the task
+  // into it) lived here until Projects was hidden — 2026-09-02, see the note in
+  // Sidebar.tsx. onAddProject/onDeleteProject stay on the props: they are still
+  // wired by the container and nothing else needs to change to bring it back.
 
   // Restore a task snapshot verbatim after a destructive triage route (note
   // conversion, send-to-calendar). ONE insert, deliberately: the old two-step
@@ -512,7 +491,6 @@ export function InboxView({
   }, [onUpdateTask, onDeleteTask])
 
   const renderRow = (task: Task) => {
-    const project = projects.find((p) => p.id === task.projectId)
     // Photo-capture suggestion: the AI matched this capture to an open task —
     // one tap merges note + photo onto it (mirrors the iOS inbox chip).
     const suggestedTarget =
@@ -523,8 +501,6 @@ export function InboxView({
       <div key={task.id} className="relative">
         <DenseInboxRow
           task={task}
-          project={project}
-          projects={projects}
           familyMembers={familyMembers}
           quickActions={INBOX_ACTIONS}
           isLeaving={leavingIds.has(task.id)}
@@ -574,9 +550,7 @@ export function InboxView({
           selectionMode={selectionMode}
           isSelected={selectedTaskIds.has(task.id)}
           onToggleSelection={() => toggleTaskSelection(task.id)}
-          onOpenProject={onOpenProject}
           onAssign={onAssignTaskAll ? (memberIds) => onAssignTaskAll(task.id, memberIds) : undefined}
-          onCreateProject={makeOnCreateProject(task.id)}
         />
         {suggestedTarget && (
           <button
@@ -662,7 +636,6 @@ export function InboxView({
       ) : mode === 'focus' ? (
         <FocusInboxCard
           tasks={inboxTasks}
-          projects={projects}
           familyMembers={familyMembers}
           onTriage={handleFocusTriage}
           onDelete={handleFocusDelete}

@@ -57,7 +57,10 @@ describe('TapContextPanel', () => {
     expect(screen.getAllByText(/555-0107/).length).toBeGreaterThan(0)
   })
 
-  it('renders project when linked', () => {
+  // Projects are hidden from the product (2026-09-02 — see the note in
+  // Sidebar.tsx). The task still CARRIES its projectId and still inherits the
+  // project's phone (below); the panel just never names the project any more.
+  it('never names the linked project', () => {
     const project = createMockProject({ id: 'p1', name: 'Liam — Health' })
     const task = createMockTask({ projectId: 'p1' })
     render(<TapContextPanel
@@ -65,7 +68,7 @@ describe('TapContextPanel', () => {
       contacts={[]} projects={[project]} events={[]} familyMembers={[]} siblingTaskCandidates={[]} allTasks={[task]}
       {...baseHandlers}
     />)
-    expect(screen.getByText('Liam — Health')).toBeInTheDocument()
+    expect(screen.queryByText('Liam — Health')).not.toBeInTheDocument()
   })
 
   it('falls back to the project phone number when task and contact have none', () => {
@@ -80,38 +83,24 @@ describe('TapContextPanel', () => {
     expect(tel).not.toBeNull()
   })
 
-  it("surfaces the parent project's links and phone as inherited context", () => {
+  // PanelProjectContext ("From <project>" — the vendor's site, the contractor's
+  // number, attributed to the project) is deleted with the noun. The task's own
+  // context is all the panel shows now.
+  it('does not attribute inherited context to a project', () => {
     const project = createMockProject({
       id: 'p1',
       name: 'Kitchen renovation',
       phoneNumber: '555-8890',
       links: [{ url: 'https://example.com/tile-spec', title: 'Tile spec' }],
     })
-    // The task carries its own number, so the action bar's call button is the
-    // task's — the project's must still be reachable, attributed to the project.
     const task = createMockTask({ projectId: 'p1', phoneNumber: '555-0001' })
     render(<TapContextPanel
       task={task}
       contacts={[]} projects={[project]} events={[]} familyMembers={[]} siblingTaskCandidates={[]} allTasks={[task]}
       {...baseHandlers}
     />)
-    expect(screen.getByText('From Kitchen renovation')).toBeInTheDocument()
-    const link = screen.getByRole('link', { name: /Tile spec/ })
-    expect(link).toHaveAttribute('href', 'https://example.com/tile-spec')
-    expect(link).toHaveAttribute('target', '_blank')
-    expect(document.querySelector('a[href="tel:555-8890"]')).not.toBeNull()
-  })
-
-  it("does not repeat the project's phone when the action bar already carries it", () => {
-    const project = createMockProject({ id: 'p1', name: 'Kitchen renovation', phoneNumber: '555-8890' })
-    const task = createMockTask({ projectId: 'p1' })
-    render(<TapContextPanel
-      task={task}
-      contacts={[]} projects={[project]} events={[]} familyMembers={[]} siblingTaskCandidates={[]} allTasks={[task]}
-      {...baseHandlers}
-    />)
-    expect(document.querySelectorAll('a[href="tel:555-8890"]')).toHaveLength(1)
     expect(screen.queryByText('From Kitchen renovation')).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: /Tile spec/ })).not.toBeInTheDocument()
   })
 
   it('renders Might be relevant items', () => {

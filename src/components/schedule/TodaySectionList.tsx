@@ -104,7 +104,6 @@ export interface TodaySectionListProps {
   shareNudgeByEventId: Map<string, { eventId: string; context: string }>
   parserContext: ParserContext
   insert: ReturnType<typeof useTimelineInsert>
-  isPromotionSuggested: (eventId: string) => boolean
   onSelectItem: (id: string | null) => void
   onToggleTask: (taskId: string) => void
   onCompleteRoutine?: (routineId: string, completed: boolean, completedAt?: Date) => void
@@ -139,7 +138,6 @@ export function TodaySectionList({
   shareNudgeByEventId,
   parserContext,
   insert,
-  isPromotionSuggested,
   onSelectItem,
   onToggleTask,
   onCompleteRoutine,
@@ -616,11 +614,6 @@ export function TodaySectionList({
                       }
                       panelOpen={panelOpen}
                       onClosePanel={onClosePanel}
-                      isSuggestedPromotion={
-                        item.type === 'event'
-                          ? isPromotionSuggested(item.id.replace('event-', ''))
-                          : undefined
-                      }
                       variant={item.type === 'routine' ? 'minimal' : 'full'}
                     />
                     {item.type === 'event' && (() => {

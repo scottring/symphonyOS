@@ -2,12 +2,10 @@ import { memo, useState, useCallback } from 'react'
 import { Trash2, Check, Tag, Star, GripVertical } from 'lucide-react'
 import { ConceptIcon } from '@/lib/conceptIcons'
 import type { Task, TaskContext } from '@/types/task'
-import type { Project } from '@/types/project'
 import type { FamilyMember } from '@/types/family'
 import { MultiAssigneeDropdown } from '@/components/family'
 import { TaskCheckbox } from './TaskCheckbox'
 import { DOMAIN_COLORS } from '@/lib/domainColors'
-import { ProjectControl } from '@/components/project/ProjectControl'
 
 export type QuickAction =
   | { kind: 'today' }
@@ -30,25 +28,19 @@ const ACTION_LABELS: Record<QuickAction['kind'], string> = {
   delete: 'Delete',
 }
 
+// The project chip/picker used to live between the title and the context dot.
+// Projects are hidden from the product (2026-09-02 — see the note in
+// Sidebar.tsx), so the triage row no longer files anything into one.
 interface DenseInboxRowProps {
   task: Task
-  project?: Project
-  projects?: Project[]
   familyMembers: FamilyMember[]
   quickActions: QuickAction[]
   onQuickAction: (action: QuickAction) => void
   onToggleComplete: () => void
   onUpdate: (updates: Partial<Task>) => void
   onSelect: () => void
-  onOpenProject?: (projectId: string) => void
   onAssign?: (memberIds: string[]) => void
-  /** Called when the user creates a new project from the inline form.
-   *  Should create the project and assign it to this task. */
-  onCreateProject?: (name: string, context: TaskContext | null) => void
   isLeaving?: boolean
-  /** When false, hide the project chip (used inside project-grouped surfaces
-   *  where the project name lives in the group header). Default: true. */
-  showProjectChip?: boolean
   /** When true, hide context dot + quick actions until the row is hovered or
    *  contains focus. Reduces visual noise in long lists. Default: false. */
   hoverOnlyChrome?: boolean
@@ -83,20 +75,15 @@ const CONTEXT_OPTIONS: Array<{ value: TaskContext | null; label: string }> = [
 ]
 
 export const DenseInboxRow = memo(function DenseInboxRow({
-  showProjectChip = true,
   hoverOnlyChrome = false,
   task,
-  project,
-  projects,
   familyMembers,
   quickActions,
   onQuickAction,
   onToggleComplete,
   onUpdate,
   onSelect,
-  onOpenProject,
   onAssign,
-  onCreateProject,
   isLeaving,
   selectionMode = false,
   isSelected = false,
@@ -203,21 +190,6 @@ export const DenseInboxRow = memo(function DenseInboxRow({
           </span>
         )}
       </button>
-
-      {/* Project chip (assigned) or picker (unassigned). Hidden inside
-          project-grouped surfaces where the group header already names the
-          project. */}
-      {showProjectChip && (
-        <ProjectControl
-          project={project}
-          projects={projects}
-          onOpenProject={onOpenProject}
-          onAssign={(projectId) => onUpdate({ projectId })}
-          onClear={() => onUpdate({ projectId: undefined })}
-          onCreate={onCreateProject}
-          defaultNewName={task.title}
-        />
-      )}
 
 
       {/* Context dot — moved to the trailing controls so it sits with the rest

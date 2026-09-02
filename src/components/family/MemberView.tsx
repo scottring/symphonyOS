@@ -25,7 +25,7 @@ interface MemberViewProps {
 
 export function MemberView({
   member, tasks, onBack, onSelectTask, onEditInSettings,
-  projects, familyMembers, onToggleTask, onUpdateTask, onDeleteTask, onPushTask, onSetBucket,
+  familyMembers, onToggleTask, onUpdateTask, onDeleteTask, onPushTask, onSetBucket,
 }: MemberViewProps) {
   const { open, upcoming } = selectMemberTasks(tasks, member.id)
   const colors = FAMILY_COLORS[member.color as FamilyMemberColor] ?? FAMILY_COLORS.blue
@@ -34,8 +34,6 @@ export function MemberView({
     <DenseInboxRow
       key={task.id}
       task={task}
-      project={projects.find((p) => p.id === task.projectId)}
-      projects={projects}
       familyMembers={familyMembers}
       quickActions={[]}
       onQuickAction={() => {}}

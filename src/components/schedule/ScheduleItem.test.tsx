@@ -136,3 +136,20 @@ describe('ScheduleItem — static rows (no suggestion chips)', () => {
     expect(queryByRole('button', { name: /call now/i })).toBeNull()
   })
 })
+
+// Projects are HIDDEN from the product (2026-09-02). The mobile card used to
+// carry a Tag icon and put the project name on its small context line.
+describe('ScheduleItem — Projects hidden (mobile card)', () => {
+  it('never shows the project name on the mobile context line', () => {
+    const { queryByText } = render(
+      <ScheduleItem
+        item={{ ...baseTask, projectId: 'proj-1' } as TimelineItem}
+        projectName="Kitchen renovation"
+        projectId="proj-1"
+        onSelect={vi.fn()}
+        onToggleComplete={vi.fn()}
+      />,
+    )
+    expect(queryByText('Kitchen renovation')).toBeNull()
+  })
+})
