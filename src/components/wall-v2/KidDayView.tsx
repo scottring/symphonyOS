@@ -5,15 +5,16 @@
 // more; a plain routine or an assigned task is a straight checkbox tap.
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, Flame } from 'lucide-react'
+import { ArrowLeft, BookOpen, Flame, Mail } from 'lucide-react'
 import { WALL } from './wallTheme'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
 import { useMemberInstanceHistory } from './useMemberInstanceHistory'
 import { buildMemberDayModel } from '@/lib/wall/kidDayModel'
-import type { KidRow, KidNeededRow, KidBandKey, MemberDayModel } from '@/lib/wall/kidDayModel'
+import type { KidRow, KidNeededRow, KidHomeworkRow, KidNoticeRow, KidBandKey, MemberDayModel } from '@/lib/wall/kidDayModel'
 import type { Routine } from '@/types/actionable'
 import type { FamilyMember } from '@/types/family'
 import type { Task } from '@/types/task'
+import type { WallNotice } from '@/hooks/useWallData'
 import type { TimelineItem } from '@/types/timeline'
 import type { DaySection } from '@/lib/timeUtils'
 
@@ -41,10 +42,26 @@ interface KidDayViewProps {
   /** Incomplete tasks carrying `needed_on`, from useWallData's narrow query.
    *  They have no `scheduled_for`, so they are absent from `todayItems`. */
   neededTasks: Task[]
+  /** Open homework, any date, from useWallData's own query. The Homework
+   *  card owns these rows; the model keeps them out of needed/bands. */
+  homeworkTasks: Task[]
+  /** Standing info from school, last 14 days. */
+  notices: WallNotice[]
   /** Complete/uncomplete a TASK row — the Shell's handleToggleComplete, the
    *  wall's single task-completion path. Explicit direction, never a toggle. */
   onToggleTask: (taskId: string, completed: boolean) => void
   onClose: () => void
+}
+
+function dueText(row: KidHomeworkRow): string | null {
+  if (!row.due) return null
+  if (row.late) return 'Late'
+  return row.due === 'Today' ? 'Due today' : `Due ${row.due}`
+}
+
+function noticeMeta(n: KidNoticeRow): string {
+  const date = n.receivedOn.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+  return n.senderLabel ? `${n.senderLabel} · ${date}` : date
 }
 
 function targetText(amount: number, unit: 'minutes' | 'count', progress: number): string {
@@ -64,7 +81,7 @@ function neededToRow(needed: KidNeededRow): KidRow {
   return { entityType: 'task', id: needed.id, title: needed.title, done: false, timeOfDay: null, target: null }
 }
 
-export function KidDayView({ member, routines, todayItems, neededTasks, onToggleTask, onClose }: KidDayViewProps) {
+export function KidDayView({ member, routines, todayItems, neededTasks, homeworkTasks, notices, onToggleTask, onClose }: KidDayViewProps) {
   const { markDone, undoDone, addProgress, setProgress } = useActionableInstances()
   const { history } = useMemberInstanceHistory()
 
@@ -79,7 +96,7 @@ export function KidDayView({ member, routines, todayItems, neededTasks, onToggle
   useEffect(() => {
     setProgressOverlay(new Map())
     setDoneOverlay(new Map())
-  }, [history, todayItems, neededTasks])
+  }, [history, todayItems, neededTasks, homeworkTasks])
 
   // Which target rows are expanded, and whether they're in "Exact…" mode.
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
@@ -90,8 +107,8 @@ export function KidDayView({ member, routines, todayItems, neededTasks, onToggle
     // One clock read for both arguments: the day being rendered IS today on
     // the kiosk, and `now` is what the evening "needed tomorrow" rule reads.
     const clock = new Date()
-    return buildMemberDayModel({ member, date: clock, now: clock, routines, todayItems, neededTasks, history })
-  }, [member, routines, todayItems, neededTasks, history])
+    return buildMemberDayModel({ member, date: clock, now: clock, routines, todayItems, neededTasks, homeworkTasks, notices, history })
+  }, [member, routines, todayItems, neededTasks, homeworkTasks, notices, history])
 
   const resetIdleTimer = useIdleClose(onClose)
 
@@ -259,6 +276,78 @@ export function KidDayView({ member, routines, todayItems, neededTasks, onToggle
     )
   }
 
+  // The Homework card. Two tap targets per row: the checkbox (the existing
+  // task path — overlay, then onToggleTask with the one `task-` prefix) and
+  // the title, which opens the item's notes when it has any. Expanded state
+  // is namespaced `homework:` so it can't collide with a target routine id.
+  function renderHomeworkRow(row: KidHomeworkRow) {
+    const key = `task:${row.id}`
+    const done = doneOverlay.has(key) ? doneOverlay.get(key)! : false
+    const open = expanded.has(`homework:${row.id}`)
+    const due = dueText(row)
+    return (
+      <div key={row.id} className={`${WALL.cardInset} flex flex-col`}>
+        <div className="flex items-stretch">
+          <button
+            type="button"
+            aria-label={`Mark ${row.title} ${done ? 'not done' : 'done'}`}
+            onClick={() => handleTaskTap({ entityType: 'task', id: row.id, title: row.title, done, timeOfDay: null, target: null })}
+            className="shrink-0 min-h-[56px] w-16 grid place-items-center"
+          >
+            <span
+              aria-hidden="true"
+              className={`w-6 h-6 rounded-full border-2 ${
+                done ? 'bg-[#2E4638] border-[#2E4638] dark:bg-[#6DC4A7] dark:border-[#6DC4A7]' : 'border-[#8A7D68]'
+              }`}
+            />
+          </button>
+          <button
+            type="button"
+            aria-label={row.title}
+            disabled={!row.notes}
+            onClick={() => toggleExpand(`homework:${row.id}`)}
+            className="flex-1 min-w-0 py-3 pr-4 text-left"
+          >
+            <div className={`text-[1.05rem] font-semibold ${done ? WALL.muted + ' line-through' : WALL.inkStrong}`}>{row.title}</div>
+            {due && <div className={`text-[0.9rem] font-semibold ${row.late ? WALL.warn : WALL.muted}`}>{due}</div>}
+          </button>
+        </div>
+        {open && row.notes && (
+          <div className={`px-4 pb-4 pl-16 text-[0.95rem] whitespace-pre-line ${WALL.muted}`}>{row.notes}</div>
+        )}
+      </div>
+    )
+  }
+
+  const homeworkCard = model.homework.length > 0 && (
+    <div className={`${WALL.card} p-5 flex flex-col gap-3`}>
+      <div className={`flex items-center gap-2 text-[1.15rem] font-bold ${WALL.inkStrong}`}>
+        <BookOpen className="w-5 h-5" aria-hidden="true" />
+        Homework
+      </div>
+      <div className="flex flex-col gap-2">{model.homework.map(renderHomeworkRow)}</div>
+    </div>
+  )
+
+  // Information, not work: rendered whether or not the page has a list, and
+  // read-only — a notice ages out by query after 14 days.
+  const noticesCard = model.notices.length > 0 && (
+    <div className={`${WALL.card} p-5 flex flex-col gap-3`}>
+      <div className={`flex items-center gap-2 text-[1.15rem] font-bold ${WALL.inkStrong}`}>
+        <Mail className="w-5 h-5" aria-hidden="true" />
+        From school
+      </div>
+      <div className="flex flex-col gap-2">
+        {model.notices.map((n) => (
+          <div key={n.id} className={`${WALL.cardInset} px-4 py-3`}>
+            <div className={`text-[1.05rem] font-semibold ${WALL.inkStrong}`}>{n.text}</div>
+            <div className={`text-[0.85rem] ${WALL.muted}`}>{noticeMeta(n)}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+
   const weekday = new Date().toLocaleDateString(undefined, { weekday: 'long' })
 
   return (
@@ -288,6 +377,8 @@ export function KidDayView({ member, routines, todayItems, neededTasks, onToggle
           </div>
         ) : (
           <>
+            {homeworkCard}
+
             {model.needed.length > 0 && (
               <div className={`${WALL.card} p-5 flex flex-col gap-3`}>
                 <div className={`text-[1.15rem] font-bold ${WALL.inkStrong}`}>Needed today</div>
@@ -324,6 +415,8 @@ export function KidDayView({ member, routines, todayItems, neededTasks, onToggle
             ))}
           </>
         )}
+
+        {noticesCard}
       </div>
     </div>
   )

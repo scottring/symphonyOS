@@ -4,6 +4,7 @@ import type { Routine, ActionableInstance } from '@/types/actionable'
 import type { FamilyMember } from '@/types/family'
 import type { TimelineItem } from '@/types/timeline'
 import type { Task } from '@/types/task'
+import type { WallNotice } from '@/hooks/useWallData'
 import { emptySections } from '@/lib/today/types'
 
 const mocks = vi.hoisted(() => ({
@@ -81,6 +82,8 @@ function renderView(props: {
   history?: ActionableInstance[]
   todayItems?: Partial<Record<string, TimelineItem[]>>
   neededTasks?: Task[]
+  homeworkTasks?: Task[]
+  notices?: WallNotice[]
   onToggleTask?: (id: string, completed: boolean) => void
   onClose?: () => void
 } = {}) {
@@ -93,6 +96,8 @@ function renderView(props: {
       routines={props.routines ?? []}
       todayItems={{ ...emptySections<TimelineItem>(), ...(props.todayItems ?? {}) }}
       neededTasks={props.neededTasks ?? []}
+      homeworkTasks={props.homeworkTasks ?? []}
+      notices={props.notices ?? []}
       onToggleTask={onToggleTask}
       onClose={onClose}
     />,
@@ -276,5 +281,44 @@ describe('KidDayView — Needed today card', () => {
       expect(screen.getByText('Tomorrow')).toBeInTheDocument()
       expect(screen.getByText('Swim kit')).toBeInTheDocument()
     })
+  })
+})
+
+describe('Homework card', () => {
+  it('renders rows with due text and checks off through onToggleTask', () => {
+    const onToggleTask = vi.fn()
+    renderView({ onToggleTask, homeworkTasks: [
+      neededTask({ id: 'h1', title: 'Blue sheet', category: 'homework', neededOn: new Date() }),
+    ] })
+    expect(screen.getByText('Homework')).toBeInTheDocument()
+    expect(screen.getByText('Due today')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Mark Blue sheet done' }))
+    expect(onToggleTask).toHaveBeenCalledWith('task-h1', true)
+  })
+
+  it('expands notes on title tap', () => {
+    renderView({ homeworkTasks: [
+      neededTask({ id: 'h1', title: 'Blue sheet', category: 'homework', neededOn: undefined, notes: 'Permission slip, $12' }),
+    ] })
+    expect(screen.queryByText('Permission slip, $12')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Blue sheet' }))
+    expect(screen.getByText('Permission slip, $12')).toBeInTheDocument()
+  })
+
+  it('does not render the card without homework', () => {
+    renderView({})
+    expect(screen.queryByText('Homework')).toBeNull()
+  })
+})
+
+describe('From school card', () => {
+  it('renders notices with sender and date, even on an otherwise empty page', () => {
+    renderView({ notices: [
+      { id: 'n1', familyMemberId: 'kid-1', text: 'PE is Tue/Thu', senderLabel: 'Hillside', receivedOn: new Date(2026, 8, 1) },
+    ] })
+    expect(screen.getByText('From school')).toBeInTheDocument()
+    expect(screen.getByText('PE is Tue/Thu')).toBeInTheDocument()
+    expect(screen.getByText('Hillside · Sep 1')).toBeInTheDocument()
+    expect(screen.getByText(/go play/)).toBeInTheDocument()
   })
 })
