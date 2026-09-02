@@ -139,7 +139,9 @@ private struct CaptureSheet: View {
         case idle
         case uploading
         case parsing(storagePath: String)
-        case failed(storagePath: String, message: String)
+        /// `storagePath == nil` means the upload never succeeded (or the file
+        /// couldn't even be decoded) — Retry must re-upload, not re-parse.
+        case failed(storagePath: String?, message: String)
         case committing
     }
 
@@ -148,6 +150,11 @@ private struct CaptureSheet: View {
     @State private var showPhotoPicker = false
     @State private var photoItem: PhotosPickerItem?
     @State private var review: PageResult?
+    /// The JPEG bytes for the in-flight snap, kept until upload succeeds so a
+    /// post-upload-failure Retry can re-upload without re-picking a photo.
+    /// Cleared on upload success and on Cancel; left nil when the source data
+    /// couldn't even be decoded (see `snap`), which is what hides Retry then.
+    @State private var pendingJpeg: Data?
 
     var body: some View {
         NavigationStack {
@@ -198,11 +205,22 @@ private struct CaptureSheet: View {
                                 },
                                 onCancel: { review = nil; phase = .idle })
             }
-            .alert("Couldn't read the page", isPresented: isFailed) {
+            .alert(alertTitle, isPresented: isFailed) {
                 if case .failed(let path, _) = phase {
-                    Button("Retry") { Task { await parse(storagePath: path) } }
+                    if let path {
+                        // Parse failed; the image is already uploaded — retry
+                        // parsing only, never re-upload.
+                        Button("Retry") { Task { await parse(storagePath: path) } }
+                    } else if pendingJpeg != nil {
+                        // Upload failed (or never ran); the JPEG is still in
+                        // memory — retry the upload.
+                        Button("Retry") { Task { await retryUpload() } }
+                    }
+                    // else: the source data couldn't be decoded as an image
+                    // at all (see `snap`) — retrying would just fail again,
+                    // so no Retry button.
                 }
-                Button("Cancel", role: .cancel) { phase = .idle }
+                Button("Cancel", role: .cancel) { phase = .idle; pendingJpeg = nil }
             } message: {
                 if case .failed(_, let message) = phase { Text(message) }
             }
@@ -212,6 +230,13 @@ private struct CaptureSheet: View {
     private var isFailed: Binding<Bool> {
         Binding(get: { if case .failed = phase { return true } else { return false } },
                 set: { if !$0, case .failed = phase { phase = .idle } })
+    }
+
+    private var alertTitle: String {
+        if case .failed(let path, _) = phase {
+            return path == nil ? "Couldn't upload the page" : "Couldn't read the page"
+        }
+        return ""
     }
 
     @ViewBuilder
@@ -248,19 +273,33 @@ private struct CaptureSheet: View {
     // MARK: Flow: upload → parse → review → commit
 
     private func snap(imageData: Data) async {
-        guard let ui = UIImage(data: imageData) else { return }
+        guard let ui = UIImage(data: imageData) else {
+            phase = .failed(storagePath: nil, message: "That file isn't an image.")
+            return
+        }
         let jpeg = ui.jpegData(compressionQuality: 0.8) ?? imageData
+        pendingJpeg = jpeg
+        await upload(jpeg: jpeg)
+    }
+
+    private func retryUpload() async {
+        guard let jpeg = pendingJpeg else { phase = .idle; return }
+        await upload(jpeg: jpeg)
+    }
+
+    private func upload(jpeg: Data) async {
         phase = .uploading
         do {
             let path = try await PageIngest.upload(jpeg: jpeg, userId: userId)
+            pendingJpeg = nil
             await parse(storagePath: path)
         } catch {
-            phase = .failed(storagePath: "", message: "Upload failed: \(error.localizedDescription)")
+            // Keep pendingJpeg — Retry re-uploads the same bytes, no re-pick.
+            phase = .failed(storagePath: nil, message: "Upload failed: \(error.localizedDescription)")
         }
     }
 
     private func parse(storagePath: String) async {
-        guard !storagePath.isEmpty else { phase = .idle; return }
         phase = .parsing(storagePath: storagePath)
         do {
             let result = try await PageIngest.parse(storagePath: storagePath, members: familyMembers)
