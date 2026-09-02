@@ -16,6 +16,12 @@ describe('buildEmailPrompt', () => {
     expect(p).toContain('2026-09-02')
     expect(p).toContain('strict JSON')
   })
+
+  it('asks for a truncated gap only when the body was cut', () => {
+    const args = { subject: 'Weekly Update', sender: 'Hillside', body: 'Picture Day Thursday', members, todayYmd: '2026-09-02' }
+    expect(buildEmailPrompt(args)).not.toContain('emit a gap of kind truncated')
+    expect(buildEmailPrompt({ ...args, truncated: true })).toContain('The email was truncated at the end; emit a gap of kind truncated.')
+  })
 })
 
 describe('parseEmailExtraction', () => {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { validateInbound, sourceKeyFor, senderLabel } from './validate'
+import { validateInbound, sourceKeyFor, senderLabel, MAX_TEXT } from './validate'
 
 const good = {
   token: 'a1b2c3d4e5f60718',
@@ -22,6 +22,11 @@ describe('validateInbound', () => {
   it('rejects empty text', () => {
     const r = validateInbound({ ...good, text: '   ' })
     expect(r).toEqual({ ok: false, status: 400, error: 'text required' })
+  })
+  it('caps an oversized body instead of rejecting the delivery', () => {
+    const r = validateInbound({ ...good, text: 'x'.repeat(MAX_TEXT + 5_000) })
+    expect(r.ok).toBe(true)
+    expect(r.ok && r.body.text.length).toBe(MAX_TEXT)
   })
   it('defaults subject to (no subject) and from to unknown', () => {
     const r = validateInbound({ ...good, subject: undefined, from: undefined })

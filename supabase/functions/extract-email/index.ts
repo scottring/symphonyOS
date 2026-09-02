@@ -31,6 +31,9 @@ async function callClaude(prompt: string, apiKey: string): Promise<string> {
   return text
 }
 
+/** Characters of the email body that reach the prompt; the rest is cut. */
+const MAX_PROMPT_BODY = 60_000
+
 /** Today's YYYY-MM-DD on the household's wall clock. */
 function todayIn(tz: string): string {
   const p = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date())
@@ -103,8 +106,15 @@ Deno.serve(async (req: Request) => {
 
     const subject = capture.subject ?? '(no subject)'
     const senderLabel = capture.source_label ?? capture.sender ?? 'email'
-    const body = (capture.raw_text ?? '').replace(/^Subject: .*\nFrom: .*\n\n/, '')
-    const raw = await callClaude(buildEmailPrompt({ subject, sender: capture.sender ?? senderLabel, body, members, todayYmd }), Deno.env.get('ANTHROPIC_API_KEY')!)
+    const fullBody = (capture.raw_text ?? '').replace(/^Subject: .*\nFrom: .*\n\n/, '')
+    // The prompt has to fit the model's window and the whole email is rarely
+    // the actionable part. Keep the head, and tell the model it was cut so it
+    // reports a truncated gap instead of silently losing the tail.
+    const truncated = fullBody.length > MAX_PROMPT_BODY
+    const body = truncated
+      ? `${fullBody.slice(0, MAX_PROMPT_BODY)}\n\n[TRUNCATED — the email was longer than what could be read]`
+      : fullBody
+    const raw = await callClaude(buildEmailPrompt({ subject, sender: capture.sender ?? senderLabel, body, members, todayYmd, truncated }), Deno.env.get('ANTHROPIC_API_KEY')!)
     const extraction = parseEmailExtraction(raw)
     const plan = planWrites({ extraction, members, todayYmd, tz, capture: { id: capture.id, user_id: capture.user_id, subject, sender_label: senderLabel }, existing })
 

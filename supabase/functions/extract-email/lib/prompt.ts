@@ -1,7 +1,7 @@
 import type { EmailEvent, EmailExtraction, EmailGap, EmailTodo, Member, Who } from './types.ts'
 import { isYmd } from './dates.ts'
 
-export interface PromptInput { subject: string; sender: string; body: string; members: Member[]; todayYmd: string }
+export interface PromptInput { subject: string; sender: string; body: string; members: Member[]; todayYmd: string; truncated?: boolean }
 
 export function buildEmailPrompt(i: PromptInput): string {
   const kids = i.members.filter((m) => m.isChild).map((m) => m.name)
@@ -22,7 +22,7 @@ Return, in this order:
 3. "good_to_know": things to KNOW but not DO — policy, dismissal rules, curriculum notes. One short sentence each. Never repeat these as events or todos.
 4. "gaps": what you could not read — unreadable_attachment, truncated, low_confidence — with a note.
 
-Use only names from the HOUSEHOLD list in "for"; any other name goes in the item text. Do not invent dates. Do not invent items.
+Use only names from the HOUSEHOLD list in "for"; any other name goes in the item text. Do not invent dates. Do not invent items.${i.truncated ? '\nThe email was truncated at the end; emit a gap of kind truncated.' : ''}
 
 Respond with strict JSON only, no prose, no markdown fence:
 {"events":[{"title":"...","date":"YYYY-MM-DD","time":"HH:mm|omit","location":"...|omit","for":["Name"]|"everyone","items":[{"text":"...","for":["Name"]|"everyone","needed":"night_before|day_of|YYYY-MM-DD"}],"source_quote":"...","confidence":0.0}],"todos":[{"title":"...","due":"YYYY-MM-DD|omit","for":["Name"]|omit,"source_quote":"...","confidence":0.0}],"good_to_know":["..."],"gaps":[{"kind":"unreadable_attachment|truncated|low_confidence","note":"..."}]}`

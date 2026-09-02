@@ -14,6 +14,10 @@ export type InboundValidation =
 
 const TOKEN = /^[0-9a-f]{16}$/
 
+// A mail body past this is a newsletter dump or an inlined attachment; keep the
+// head of it rather than rejecting the whole delivery.
+export const MAX_TEXT = 200_000
+
 export function validateInbound(p: Partial<InboundPayload>): InboundValidation {
   if (typeof p.token !== 'string' || !TOKEN.test(p.token)) {
     return { ok: false, status: 400, error: 'invalid token' }
@@ -25,7 +29,7 @@ export function validateInbound(p: Partial<InboundPayload>): InboundValidation {
     ok: true,
     body: {
       token: p.token,
-      text: p.text,
+      text: p.text.slice(0, MAX_TEXT),
       subject: typeof p.subject === 'string' && p.subject.trim() ? p.subject.trim() : '(no subject)',
       from: typeof p.from === 'string' && p.from.trim() ? p.from.trim() : 'unknown',
       message_id: typeof p.message_id === 'string' && p.message_id.trim() ? p.message_id.trim() : undefined,
