@@ -130,87 +130,155 @@ struct TimelineItemCard: View {
         return (try? modelContext.fetch(descriptor))?.first { $0.id == item.entityId }
     }
 
+    @State private var safariURL: URL?
+
+    @ViewBuilder
     private var cardContent: some View {
+        if item.isBlock { blockContent } else { plainRow }
+    }
+
+    // MARK: Plain row — time · dot · title · check circle (landing "Just a list" row)
+
+    private var plainRow: some View {
+        HStack(spacing: 12) {
+            Text(item.timeString ?? "")
+                .font(.captionText)
+                .foregroundStyle(Color.textTertiary)
+                .frame(width: 52, alignment: .leading)
+
+            Circle()
+                .fill(isCompleted ? Color.textLight : accentColor)
+                .frame(width: 6, height: 6)
+
+            HStack(spacing: 6) {
+                typeIcon
+                Text(item.title)
+                    .font(.bodyMedium)
+                    .foregroundStyle(isCompleted ? Color.textTertiary : Color.textPrimary)
+                    .strikethrough(isCompleted)
+                    .lineLimit(2)
+            }
+
+            Spacer(minLength: 0)
+
+            AssigneeAvatars(memberIds: item.assignedTo, members: familyMembers, size: 20)
+
+            if item.type != .playbook {
+                CheckCircle(checked: isCompleted) {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) { isCompleted.toggle() }
+                    toggleCompletion()
+                }
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+        .background(Color.bgSurface, in: RoundedRectangle(cornerRadius: 10))
+        .opacity(isCompleted ? 0.7 : 1.0)
+    }
+
+    // MARK: Block — rail · time + pill · serif title · note line · children · context row
+
+    private var blockContent: some View {
         HStack(spacing: 0) {
-            // Left accent bar — context colored
             RoundedRectangle(cornerRadius: 2)
-                .fill(isCompleted ? Color.textTertiary.opacity(0.3) : accentColor)
+                .fill(isCompleted ? Color.textLight : Color.primaryTint)
                 .frame(width: 3)
-                .padding(.vertical, 8)
 
-            // Main content
-            HStack(spacing: 12) {
-                // Content column (completion is via swipe-left now — no checkbox)
-                VStack(alignment: .leading, spacing: 3) {
-                    // Title row
-                    HStack(spacing: 6) {
-                        typeIcon
-
-                        Text(item.title)
-                            .font(.bodyMedium)
-                            .foregroundStyle(isCompleted ? Color.textTertiary : Color.textPrimary)
-                            .strikethrough(isCompleted)
-                            .lineLimit(2)
-                    }
-
-                    // Metadata row
-                    HStack(spacing: 8) {
-                        if let time = item.timeString {
-                            HStack(spacing: 4) {
-                                Image(systemName: "clock")
-                                    .font(.system(size: 10))
-                                Text(time)
-                                    .font(.captionText)
-                            }
-                            .foregroundStyle(Color.textSecondary)
-                        }
-
-                        if let context = item.context {
-                            ContextBadge(context: context)
-                        }
-                    }
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text(item.timeString ?? (item.isAllDay ? "All day" : ""))
+                        .font(.captionText)
+                        .foregroundStyle(Color.textTertiary)
+                    Spacer()
+                    if let source = item.source { SourcePill(source: source) }
                 }
 
-                Spacer(minLength: 0)
-
-                // Trailing: location pin + assignee avatars
-                if item.location != nil || !item.assignedTo.isEmpty {
-                    HStack(spacing: 6) {
-                        if item.location != nil {
-                            Image(systemName: "mappin")
-                                .font(.system(size: 12))
-                                .foregroundStyle(Color.textTertiary)
-                        }
-                        AssigneeAvatars(memberIds: item.assignedTo, members: familyMembers)
-                    }
+                HStack(alignment: .top, spacing: 6) {
+                    typeIcon
+                    Text(item.title)
+                        .font(.displaySmall)
+                        .foregroundStyle(isCompleted ? Color.textTertiary : Color.textPrimary)
+                        .strikethrough(isCompleted)
+                        .lineLimit(2)
+                    Spacer(minLength: 0)
+                    AssigneeAvatars(memberIds: item.assignedTo, members: familyMembers, size: 20)
                 }
+
+                if let line = item.noteLine {
+                    Text(line)
+                        .font(.displayItalic)
+                        .foregroundStyle(Color.textSecondary)
+                        .lineLimit(2)
+                }
+
+                if !item.children.isEmpty {
+                    VStack(alignment: .leading, spacing: 4) {
+                        ForEach(item.children) { child in
+                            ChildRow(child: child, members: familyMembers) { toggleChild(child) }
+                        }
+                    }
+                    .padding(.top, 2)
+                }
+
+                if hasContextRow { contextRow.padding(.top, 2) }
             }
             .padding(.leading, 12)
             .padding(.trailing, 14)
             .padding(.vertical, 12)
         }
-        .background(
-            RoundedRectangle(cornerRadius: 14)
-                .fill(item.type == .playbook ? Color.coachingBg : Color.bgElevated)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .strokeBorder(
-                    item.type == .playbook
-                        ? Color.coachingTint.opacity(0.25)
-                        : Color.textTertiary.opacity(0.08),
-                    lineWidth: 1
-                )
-        )
-        .shadow(
-            color: item.type == .playbook
-                ? Color.coachingTint.opacity(0.06)
-                : Color.black.opacity(0.05),
-            radius: 6,
-            x: 0,
-            y: 2
-        )
+        .background(item.type == .playbook ? Color.coachingBg : Color.bgElevated)
+        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Color.cardBorder, lineWidth: 1))
+        .shadow(color: Color.cardShadow, radius: 8, x: 0, y: 2)
         .opacity(isCompleted ? 0.7 : 1.0)
+        .sheet(item: $safariURL) { url in SafariView(url: url) }
+    }
+
+    private var hasContextRow: Bool {
+        !item.links.isEmpty || item.phoneNumber != nil || item.location != nil
+    }
+
+    /// Link · phone · directions — small muted icons that open on tap.
+    private var contextRow: some View {
+        HStack(spacing: 14) {
+            ForEach(Array(item.links.prefix(3).enumerated()), id: \.offset) { _, link in
+                if let url = URL(string: link.url) {
+                    Button { safariURL = url } label: {
+                        Label(link.title ?? url.host ?? "Link", systemImage: "link")
+                    }
+                }
+            }
+            if let phone = item.phoneNumber,
+               let url = URL(string: "tel:" + phone.filter { $0.isNumber || $0 == "+" }) {
+                Link(destination: url) { Label(phone, systemImage: "phone") }
+            }
+            if let location = item.location {
+                Link(destination: Self.mapsURL(location: location, placeId: item.locationPlaceId)) {
+                    Label("Directions", systemImage: "arrow.triangle.turn.up.right.diamond")
+                }
+            }
+        }
+        .font(.captionBold)
+        .foregroundStyle(Color.textSecondary)
+        .labelStyle(.titleAndIcon)
+        .buttonStyle(.plain)
+        .lineLimit(1)
+    }
+
+    static func mapsURL(location: String, placeId: String?) -> URL {
+        var c = URLComponents(string: "https://www.google.com/maps/dir/")!
+        c.queryItems = [URLQueryItem(name: "api", value: "1"), URLQueryItem(name: "destination", value: location)]
+        if let placeId { c.queryItems?.append(URLQueryItem(name: "destination_place_id", value: placeId)) }
+        return c.url!
+    }
+
+    private func toggleChild(_ child: TimelineItem.ChildItem) {
+        let descriptor = FetchDescriptor<SymphonyTask>()
+        guard let task = (try? modelContext.fetch(descriptor))?.first(where: { $0.id == child.id }) else { return }
+        #if os(iOS)
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
+        #endif
+        TaskViewModel(modelContext: modelContext).toggleComplete(task)
     }
 
     // MARK: - Type Icon
@@ -218,17 +286,15 @@ struct TimelineItemCard: View {
     @ViewBuilder
     private var typeIcon: some View {
         switch item.type {
-        case .task:
+        case .task, .event:
             EmptyView()
         case .routine:
             Image(systemName: "repeat")
-                .font(.system(size: 11, weight: .medium))
+                .font(.captionBold)
                 .foregroundStyle(Color.textSecondary)
-        case .event:
-            EmptyView() // Calendar checkbox already indicates event
         case .playbook:
             Image(systemName: "book.pages")
-                .font(.system(size: 11, weight: .medium))
+                .font(.captionBold)
                 .foregroundStyle(Color.coachingTint)
         }
     }
@@ -306,6 +372,76 @@ struct TimelineItemCard: View {
     }
 }
 
+extension URL: @retroactive Identifiable { public var id: String { absoluteString } }
+
+// MARK: - Source Pill (landing `.pill`: "From an email" / "From the calendar" / "Shared")
+
+struct SourcePill: View {
+    let source: TimelineItem.Source
+
+    var body: some View {
+        Text(source.label)
+            .font(.captionBold)
+            .foregroundStyle(foreground)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 3)
+            .background(background, in: RoundedRectangle(cornerRadius: 6))
+    }
+
+    private var foreground: Color { source == .calendar ? .infoBlue : .primaryTint }
+    private var background: Color { source == .calendar ? .infoBlueBg : .accentBg }
+}
+
+// MARK: - Check circle (plain rows + child rows)
+
+struct CheckCircle: View {
+    let checked: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            ZStack {
+                Circle().strokeBorder(checked ? Color.successGreen : Color.textLight, lineWidth: 1.5)
+                if checked {
+                    Circle().fill(Color.successGreen)
+                    Image(systemName: "checkmark").font(.system(size: 10, weight: .bold)).foregroundStyle(.white)
+                }
+            }
+            .frame(width: 20, height: 20)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(checked ? "Completed" : "Mark complete")
+    }
+}
+
+// MARK: - Child row (per-kid item under a block)
+
+struct ChildRow: View {
+    let child: TimelineItem.ChildItem
+    let members: [FamilyMember]
+    let onToggle: () -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            CheckCircle(checked: child.completed, action: onToggle)
+            if let m = members.first(where: { child.assignedTo.contains($0.id) }) {
+                Text(m.name.split(separator: " ").first.map(String.init) ?? m.name)
+                    .font(.captionBold)
+                    .foregroundStyle(Color.memberColor(m.color))
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 2)
+                    .background(Color.memberColor(m.color).opacity(0.15), in: RoundedRectangle(cornerRadius: 6))
+            }
+            Text(child.title)
+                .font(.bodySmall)
+                .foregroundStyle(child.completed ? Color.textTertiary : Color.textPrimary)
+                .strikethrough(child.completed)
+                .lineLimit(1)
+        }
+    }
+}
+
 // MARK: - Context Badge
 
 struct ContextBadge: View {
@@ -313,7 +449,7 @@ struct ContextBadge: View {
 
     var body: some View {
         Text(context.capitalized)
-            .font(.system(size: 10, weight: .semibold))
+            .font(.captionBold)
             .foregroundStyle(color)
             .padding(.horizontal, 7)
             .padding(.vertical, 2.5)
