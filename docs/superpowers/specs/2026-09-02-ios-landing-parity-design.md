@@ -254,3 +254,8 @@ UI / visual:
 - `week_start` must exist as a column on `tasks` (it does; the web writes
   it) — the push serializer must only send it when set.
 - SlideRow gesture tuning must not change; only tints do.
+
+## Corrections made during implementation
+
+- Fonts are registered in the manual `SymphonyOS/App/Info.plist` (`UIAppFonts`), not `project.yml` — the app uses `INFOPLIST_FILE` with `GENERATE_INFOPLIST_FILE: NO`.
+- Week start defaults to **Sunday**, mirroring the web's `DEFAULT_CADENCE.weekStartsOn = 0` (per-browser localStorage the phone cannot read), not Monday.
