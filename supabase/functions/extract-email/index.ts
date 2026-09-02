@@ -6,6 +6,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { buildEmailPrompt, parseEmailExtraction } from './lib/prompt.ts'
 import { planWrites } from './lib/plan.ts'
+import { addDays, zonedIso } from './lib/dates.ts'
 import type { ExistingBlock, Member, TaskRow } from './lib/types.ts'
 
 const corsHeaders = {
@@ -59,6 +60,7 @@ Deno.serve(async (req: Request) => {
     const { data: hh, error: hhError } = await supabase.from('households').select('timezone').eq('id', capture.household_id).single()
     if (hhError) throw new Error(`households read failed: ${hhError.message}`)
     const tz = hh?.timezone ?? 'America/New_York'
+    const todayYmd = todayIn(tz)
 
     // The household roster: every family_members row owned by any active member.
     const { data: hm, error: hmError } = await supabase.from('household_members').select('user_id').eq('household_id', capture.household_id).eq('status', 'active')
@@ -78,13 +80,19 @@ Deno.serve(async (req: Request) => {
     })
 
     // Existing email-derived blocks (for dedupe), with their child titles.
+    // Bounded on purpose: dedupe only ever compares against dates an email
+    // could plausibly name — from two days back (late-arriving mail places on
+    // yesterday) to a year out — so this never grows into a full-table read.
     const { data: blocks, error: blocksError } = await supabase
       .from('tasks').select('id, title, scheduled_for')
       .in('user_id', userIds).not('capture_id', 'is', null).is('parent_task_id', null).eq('completed', false).not('scheduled_for', 'is', null)
+      .gte('scheduled_for', zonedIso(addDays(todayYmd, -2), null, tz))
+      .lte('scheduled_for', zonedIso(addDays(todayYmd, 366), null, tz))
+      .limit(500)
     if (blocksError) throw new Error(`tasks (blocks) read failed: ${blocksError.message}`)
     const blockIds = (blocks ?? []).map((b) => b.id)
     const { data: kids, error: kidsError } = blockIds.length
-      ? await supabase.from('tasks').select('parent_task_id, title').in('parent_task_id', blockIds)
+      ? await supabase.from('tasks').select('parent_task_id, title').in('parent_task_id', blockIds).limit(2000)
       : { data: [] as { parent_task_id: string; title: string }[], error: null }
     if (kidsError) throw new Error(`tasks (children) read failed: ${kidsError.message}`)
     const existing: ExistingBlock[] = (blocks ?? []).map((b) => ({
@@ -96,9 +104,9 @@ Deno.serve(async (req: Request) => {
     const subject = capture.subject ?? '(no subject)'
     const senderLabel = capture.source_label ?? capture.sender ?? 'email'
     const body = (capture.raw_text ?? '').replace(/^Subject: .*\nFrom: .*\n\n/, '')
-    const raw = await callClaude(buildEmailPrompt({ subject, sender: capture.sender ?? senderLabel, body, members, todayYmd: todayIn(tz) }), Deno.env.get('ANTHROPIC_API_KEY')!)
+    const raw = await callClaude(buildEmailPrompt({ subject, sender: capture.sender ?? senderLabel, body, members, todayYmd }), Deno.env.get('ANTHROPIC_API_KEY')!)
     const extraction = parseEmailExtraction(raw)
-    const plan = planWrites({ extraction, members, todayYmd: todayIn(tz), tz, capture: { id: capture.id, user_id: capture.user_id, subject, sender_label: senderLabel }, existing })
+    const plan = planWrites({ extraction, members, todayYmd, tz, capture: { id: capture.id, user_id: capture.user_id, subject, sender_label: senderLabel }, existing })
 
     let children = 0
     for (const ev of plan.events) {
