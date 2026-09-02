@@ -812,6 +812,105 @@ export function TodayView({
   }, [printing])
 
   // ── Render ────────────────────────────────────────────────────────────────────
+  /* Today's secondary controls behind one button. ONE instance: on desktop it
+     sits in the controls strip; on mobile that strip is `hidden md:flex`, so
+     the same menu mounts beside the date masthead instead — otherwise "Plan
+     from paper" was unreachable on the one device that always has a camera. */
+  const overflowMenu = (
+    <TodayOverflowMenu>
+      {onOpenPlanFromPaper && (
+        <button
+          type="button"
+          onClick={onOpenPlanFromPaper}
+          title="Plan from paper — photograph your written plan and place its items"
+          className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[15px] text-neutral-600 transition-all hover:bg-neutral-100"
+        >
+          <NotebookPen className="w-5 h-5" />
+          <span>Plan from paper</span>
+        </button>
+      )}
+      <button
+        type="button"
+        onClick={toggleHideRoutines}
+        title={hideRoutines ? 'Show daily activities' : 'Hide daily activities'}
+        aria-label={hideRoutines ? 'Show daily' : 'Hide daily'}
+        className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[15px] text-neutral-600 transition-all hover:bg-neutral-100"
+      >
+        {createElement(hideRoutines ? EyeOff : Eye, { className: 'w-5 h-5' })}
+        <span>{hideRoutines ? 'Show daily' : 'Hide daily'}</span>
+      </button>
+      {/* The unprompted tier's ONE control (2026-08-18): shows the pending
+          count, toggles the suggestions onto/off the page. Off by default —
+          the tier is opt-in. Only this tier is gated: the assistant pane
+          and the chips inside an item you opened still work. Lives here,
+          next to "Hide daily", because both answer the same question: how
+          much is this page allowed to put in front of me. */}
+      <button
+        type="button"
+        onClick={() => setSuggestionsEnabled(!suggestionsEnabled)}
+        title={suggestionsEnabled
+          ? 'Stop the assistant suggesting things on this page'
+          : 'Show what the assistant would suggest for this page'}
+        aria-pressed={suggestionsEnabled}
+        className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[15px] text-neutral-600 transition-all hover:bg-neutral-100"
+      >
+        <Sparkles className={`w-5 h-5 ${suggestionsEnabled ? '' : 'opacity-40'}`} />
+        <span>
+          {suggestionsEnabled ? 'Hide suggestions' : 'Show suggestions'}
+          {unprompted.items.length > 0 && ` · ${unprompted.items.length}`}
+        </span>
+      </button>
+      {data.isToday && ctx.onOpenPlanning && (
+        <button
+          type="button"
+          onClick={ctx.onOpenPlanning}
+          title="Block out the day on an hour grid"
+          className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[15px] text-neutral-600 transition-all hover:bg-neutral-100"
+        >
+          <CalendarClock className="w-5 h-5" />
+          <span>Time-block</span>
+        </button>
+      )}
+      <button
+        type="button"
+        onClick={printList}
+        title="Print a compact list of this day"
+        className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[15px] text-neutral-600 transition-all hover:bg-neutral-100"
+      >
+        <Printer className="w-5 h-5" />
+        <span>Print list</span>
+      </button>
+      {data.isToday && (
+        <button
+          type="button"
+          onClick={() => setReviewMode('evening')}
+          title="Reflect, prep for tomorrow, and close the day"
+          className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[15px] text-neutral-600 transition-all hover:bg-neutral-100"
+        >
+          <Moon className="w-5 h-5" />
+          <span>End of day review</span>
+        </button>
+      )}
+
+      {/* Signals that only appear when they have something to say. */}
+      {(clarityTrigger || discussion.length > 0 ||
+        (data.isToday && (sweep.pairs.length > 0 || proposal.count > 0))) && (
+        <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-neutral-100 px-2.5 pt-2 text-[12px] text-neutral-400">
+          {clarityTrigger}
+          {discussion.length > 0 && (
+            <DiscussionBadge items={discussion} onSelectItem={onSelectItem} />
+          )}
+          {data.isToday && sweep.pairs.length > 0 && (
+            <DuplicateSweepTrigger count={sweep.pairs.length} onOpen={() => sweep.setOpen(true)} />
+          )}
+          {data.isToday && proposal.count > 0 && (
+            <ProposalTrigger count={proposal.count} onOpen={() => proposal.setOpen(true)} />
+          )}
+        </div>
+      )}
+    </TodayOverflowMenu>
+  )
+
   return (
     <div className="max-w-[940px] w-full mx-auto px-0 py-2 md:px-8 md:py-8">
       {/* Mounted only while printing. Keeping it permanently in the DOM would
@@ -828,8 +927,11 @@ export function TodayView({
       {/* Date masthead with prev/next-day nav — mobile only. Desktop renders
           DayNavCluster in HomeHeader above the view; mobile had no date header,
           so surface the same control (it's responsive) here. */}
-      <div className="md:hidden px-3 mb-2">
-        <DayNavCluster viewedDate={viewedDate} onDateChange={onDateChange} />
+      <div data-testid="today-mobile-masthead" className="md:hidden px-3 mb-2 flex items-start gap-2">
+        <div className="flex-1 min-w-0">
+          <DayNavCluster viewedDate={viewedDate} onDateChange={onDateChange} />
+        </div>
+        {isMobile && overflowMenu}
       </div>
 
       {/* Needs your OK — COS-proposed actions awaiting approval. Top of Today
@@ -885,98 +987,7 @@ export function TodayView({
           />
         )}
 
-        <TodayOverflowMenu>
-          {onOpenPlanFromPaper && (
-            <button
-              type="button"
-              onClick={onOpenPlanFromPaper}
-              title="Plan from paper — photograph your written plan and place its items"
-              className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[15px] text-neutral-600 transition-all hover:bg-neutral-100"
-            >
-              <NotebookPen className="w-5 h-5" />
-              <span>Plan from paper</span>
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={toggleHideRoutines}
-            title={hideRoutines ? 'Show daily activities' : 'Hide daily activities'}
-            aria-label={hideRoutines ? 'Show daily' : 'Hide daily'}
-            className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[15px] text-neutral-600 transition-all hover:bg-neutral-100"
-          >
-            {createElement(hideRoutines ? EyeOff : Eye, { className: 'w-5 h-5' })}
-            <span>{hideRoutines ? 'Show daily' : 'Hide daily'}</span>
-          </button>
-          {/* The unprompted tier's ONE control (2026-08-18): shows the pending
-              count, toggles the suggestions onto/off the page. Off by default —
-              the tier is opt-in. Only this tier is gated: the assistant pane
-              and the chips inside an item you opened still work. Lives here,
-              next to "Hide daily", because both answer the same question: how
-              much is this page allowed to put in front of me. */}
-          <button
-            type="button"
-            onClick={() => setSuggestionsEnabled(!suggestionsEnabled)}
-            title={suggestionsEnabled
-              ? 'Stop the assistant suggesting things on this page'
-              : 'Show what the assistant would suggest for this page'}
-            aria-pressed={suggestionsEnabled}
-            className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[15px] text-neutral-600 transition-all hover:bg-neutral-100"
-          >
-            <Sparkles className={`w-5 h-5 ${suggestionsEnabled ? '' : 'opacity-40'}`} />
-            <span>
-              {suggestionsEnabled ? 'Hide suggestions' : 'Show suggestions'}
-              {unprompted.items.length > 0 && ` · ${unprompted.items.length}`}
-            </span>
-          </button>
-          {data.isToday && ctx.onOpenPlanning && (
-            <button
-              type="button"
-              onClick={ctx.onOpenPlanning}
-              title="Block out the day on an hour grid"
-              className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[15px] text-neutral-600 transition-all hover:bg-neutral-100"
-            >
-              <CalendarClock className="w-5 h-5" />
-              <span>Time-block</span>
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={printList}
-            title="Print a compact list of this day"
-            className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[15px] text-neutral-600 transition-all hover:bg-neutral-100"
-          >
-            <Printer className="w-5 h-5" />
-            <span>Print list</span>
-          </button>
-          {data.isToday && (
-            <button
-              type="button"
-              onClick={() => setReviewMode('evening')}
-              title="Reflect, prep for tomorrow, and close the day"
-              className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[15px] text-neutral-600 transition-all hover:bg-neutral-100"
-            >
-              <Moon className="w-5 h-5" />
-              <span>End of day review</span>
-            </button>
-          )}
-
-          {/* Signals that only appear when they have something to say. */}
-          {(clarityTrigger || discussion.length > 0 ||
-            (data.isToday && (sweep.pairs.length > 0 || proposal.count > 0))) && (
-            <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-neutral-100 px-2.5 pt-2 text-[12px] text-neutral-400">
-              {clarityTrigger}
-              {discussion.length > 0 && (
-                <DiscussionBadge items={discussion} onSelectItem={onSelectItem} />
-              )}
-              {data.isToday && sweep.pairs.length > 0 && (
-                <DuplicateSweepTrigger count={sweep.pairs.length} onOpen={() => sweep.setOpen(true)} />
-              )}
-              {data.isToday && proposal.count > 0 && (
-                <ProposalTrigger count={proposal.count} onOpen={() => proposal.setOpen(true)} />
-              )}
-            </div>
-          )}
-        </TodayOverflowMenu>
+        {!isMobile && overflowMenu}
       </div>
 
       {/* Task list — wrapped in a card on desktop; on mobile the rows go

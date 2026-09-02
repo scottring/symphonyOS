@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { ALL_LAYERS } from '@/lib/domains'
 import { screen, fireEvent, within } from '@testing-library/react'
 import { render } from '@/test/test-utils'
@@ -7,10 +7,12 @@ import { createMockRoutine } from '@/test/mocks/factories'
 import { TodayView } from './TodayView'
 
 // File-wide mock: every test in this file renders TodayView's mobile branch.
-// Today this affects exactly one JS branch (the EveningMealCard at
-// TodayView.tsx ~line 651) — if you add a meal-related test, scope a
-// per-test override with vi.spyOn so the desktop meal card path is reachable.
-vi.mock('@/hooks/useMobile', () => ({ useMobile: () => true }))
+// This affects the EveningMealCard branch (TodayView.tsx ~line 651) and WHERE
+// the overflow menu mounts (mobile: beside the date masthead; desktop: in the
+// controls strip). Override per test with `mockUseMobile.mockReturnValue(false)`
+// (reset in afterEach) to reach the desktop paths.
+const mockUseMobile = vi.fn(() => true)
+vi.mock('@/hooks/useMobile', () => ({ useMobile: () => mockUseMobile() }))
 vi.mock('@/hooks/useWeather', () => ({ useWeather: () => ({ weather: null, loading: false, error: 'x', requestLocation: vi.fn() }) }))
 vi.mock('@/hooks/useProactiveSuggestions', () => ({ useProactiveSuggestions: () => ({ suggestions: [], topSuggestions: [], suggestionsForEntity: () => [], actOnSuggestion: vi.fn(), dismissSuggestion: vi.fn(), isLoading: false }) }))
 vi.mock('@/hooks/useRoutineStats', () => ({ useRoutineStats: () => ({ getStats: () => undefined }) }))
@@ -418,6 +420,51 @@ describe('TodayView', () => {
     expect(screen.queryByRole('button', { name: /afternoon/i })).not.toBeInTheDocument()
 
     localStorage.clear()
+  })
+})
+
+
+// ── Plan from paper on mobile web ──
+// The desktop controls strip is `hidden md:flex`, so for a long time the only
+// "Plan from paper" entry point was invisible on a phone — the one place a
+// camera is always at hand. The overflow menu is ONE instance: on mobile it
+// mounts beside the date masthead; on desktop it stays in the controls strip.
+describe('TodayView plan from paper — mobile entry point', () => {
+  afterEach(() => { mockUseMobile.mockReturnValue(true) })
+
+  it('mobile: the overflow lives beside the date masthead, not in the hidden controls strip', () => {
+    renderView({ onOpenPlanFromPaper: vi.fn() })
+    const strip = screen.getByTestId('today-controls')
+    expect(within(strip).queryByRole('button', { name: /more controls/i })).not.toBeInTheDocument()
+    const masthead = screen.getByTestId('today-mobile-masthead')
+    expect(within(masthead).getByRole('button', { name: /more controls/i })).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: /more controls/i })).toHaveLength(1)
+  })
+
+  it('mobile: "Plan from paper" is reachable from the overflow and fires the same handler', async () => {
+    const onOpenPlanFromPaper = vi.fn()
+    const { user } = renderView({ onOpenPlanFromPaper })
+    await openOverflow(user)
+    await user.click(screen.getByRole('button', { name: /plan from paper/i }))
+    expect(onOpenPlanFromPaper).toHaveBeenCalledTimes(1)
+  })
+
+  it('mobile: no "Plan from paper" item when the handler is absent', async () => {
+    const { user } = renderView()
+    await openOverflow(user)
+    expect(screen.queryByRole('button', { name: /plan from paper/i })).not.toBeInTheDocument()
+  })
+
+  it('desktop: the overflow stays in the controls strip, still one instance', async () => {
+    mockUseMobile.mockReturnValue(false)
+    const onOpenPlanFromPaper = vi.fn()
+    const { user } = renderView({ onOpenPlanFromPaper })
+    const strip = screen.getByTestId('today-controls')
+    expect(within(strip).getByRole('button', { name: /more controls/i })).toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: /more controls/i })).toHaveLength(1)
+    await openOverflow(user)
+    await user.click(screen.getByRole('button', { name: /plan from paper/i }))
+    expect(onOpenPlanFromPaper).toHaveBeenCalledTimes(1)
   })
 })
 
