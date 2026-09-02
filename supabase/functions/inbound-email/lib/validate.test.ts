@@ -60,3 +60,19 @@ describe('senderLabel', () => {
     expect(senderLabel('news@hillside.org')).toBe('hillside.org')
   })
 })
+
+import { originalSender } from './validate'
+describe('originalSender', () => {
+  const gmail = 'Hi all\n\n---------- Forwarded message ---------\nFrom: Friends Of Hampden School <foh@hampden.org>\nDate: Tue, Sep 1\nSubject: Flock Party\nTo: scott@x.com\n\nBody'
+  const apple = 'Begin forwarded message:\n\nFrom: Hillside Elementary <news@hillside.org>\nSubject: Weekly Update\nDate: Sep 1\n\nBody'
+  it('uses the forwarded From line when the subject is a forward', () => {
+    expect(originalSender('Fwd: Flock Party', gmail, 'Scott <scott@x.com>')).toBe('Friends Of Hampden School <foh@hampden.org>')
+    expect(originalSender('FW: Weekly Update', apple, 'Scott <scott@x.com>')).toBe('Hillside Elementary <news@hillside.org>')
+  })
+  it('keeps the envelope sender when the subject is not a forward', () => {
+    expect(originalSender('Weekly Update', gmail, 'Scott <scott@x.com>')).toBe('Scott <scott@x.com>')
+  })
+  it('keeps the envelope sender when no From line exists in the body', () => {
+    expect(originalSender('Fwd: hi', 'just text', 'Scott <scott@x.com>')).toBe('Scott <scott@x.com>')
+  })
+})

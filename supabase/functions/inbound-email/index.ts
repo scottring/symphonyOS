@@ -2,7 +2,7 @@
 // Worker, resolves the household by its inbound token, stores an idempotent
 // captures row, and hands off to extract-email. Auth: x-capture-secret.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { validateInbound, sourceKeyFor, senderLabel, type InboundPayload } from './lib/validate.ts'
+import { validateInbound, sourceKeyFor, senderLabel, originalSender, type InboundPayload } from './lib/validate.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -74,9 +74,9 @@ Deno.serve(async (req: Request) => {
       household_id: hh.id,
       kind: 'email',
       source_key: sourceKey,
-      source_label: senderLabel(body.from),
+      source_label: senderLabel(originalSender(body.subject, body.text, body.from)),
       subject: body.subject,
-      sender: body.from,
+      sender: originalSender(body.subject, body.text, body.from),
       raw_text: rawText,
       status: 'pending',
     })

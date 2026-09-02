@@ -67,3 +67,19 @@ export function senderLabel(from: string): string {
   const at = from.indexOf('@')
   return at > -1 ? from.slice(at + 1).replace(/>$/, '').trim() : from.trim()
 }
+
+/**
+ * A forwarded email carries the forwarder's From; the original sender sits in
+ * the body's header block ("---------- Forwarded message ---------" / "Begin
+ * forwarded message:" followed by "From: Name <addr>"). When the subject says
+ * it is a forward, prefer that line so the source reads "Friends of Hampden",
+ * not the parent who forwarded it.
+ */
+export function originalSender(subject: string, text: string, from: string): string {
+  if (!/^\s*(fwd?|fw)\s*:/i.test(subject)) return from
+  const head = text.slice(0, 4000)
+  const m = /^[>\s]*\*?From:\*?\s*(.+?)\s*$/im.exec(head)
+  if (!m) return from
+  const candidate = m[1].replace(/\s+/g, ' ').trim()
+  return candidate.includes('@') || candidate.length > 1 ? candidate : from
+}
