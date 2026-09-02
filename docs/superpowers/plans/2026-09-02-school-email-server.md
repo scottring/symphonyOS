@@ -969,7 +969,7 @@ describe('planWrites — what goes to inbox instead', () => {
 
 describe('planWrites — dedupe against existing blocks', () => {
   it('attaches only new items to a matching existing block', () => {
-    const existing = [{ id: 'old1', title: 'Picture Day', ymd: '2026-09-10', childTitles: ['Wear school colors'] }]
+    const existing = [{ id: 'old1', title: 'School Picture Day!', ymd: '2026-09-10', childTitles: ['Wear school colors'] }]
     const p = planWrites({ ...base, existing, extraction: { ...empty, events: [pictureDay()] } })
     expect(p.events[0].parent).toEqual({ existingId: 'old1' })
     expect(p.events[0].children.map((c) => c.title)).toEqual(['Payment envelope in backpack'])
@@ -1453,7 +1453,7 @@ function htmlToText(html: string): string {
     .replace(/<script[\s\S]*?<\/script>/gi, ' ')
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<\/(p|div|li|tr|h[1-6])>/gi, '\n')
-    .replace(/<[^>]+>/g, ' ')
+    .replace(/<[^>]+>/g, '')
     .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&#39;/g, "'")
     .replace(/[ \t]+/g, ' ')
     .replace(/\s*\n\s*/g, '\n')
