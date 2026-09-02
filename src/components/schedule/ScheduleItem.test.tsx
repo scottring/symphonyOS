@@ -190,6 +190,33 @@ describe('ScheduleItem — per-person items inline (mobile)', () => {
     expect(onToggleSubtask).toHaveBeenCalledWith('s1')
   })
 
+  // The card centres its columns, which is right for a one-line row and wrong
+  // the moment the inline items make the title column tall: the time and the
+  // type tile drifted to the vertical middle of the whole card, away from the
+  // title they label. Desktop already pins its leading column with self-start
+  // when anything renders below the title; the phone now mirrors that.
+  it('top-aligns the leading columns when inline items make the row tall', () => {
+    const { container } = render(
+      <ScheduleItem
+        item={emailBlock}
+        familyMembers={members}
+        onSelect={vi.fn()}
+        onToggleComplete={vi.fn()}
+      />,
+    )
+    const card = container.querySelector('[data-selectable]') as HTMLElement
+    expect(card.className).toContain('items-start')
+    expect(card.className).not.toContain('items-center')
+  })
+
+  it('keeps a plain one-line row centred', () => {
+    const { container } = render(
+      <ScheduleItem item={baseTask} onSelect={vi.fn()} onToggleComplete={vi.fn()} />,
+    )
+    const card = container.querySelector('[data-selectable]') as HTMLElement
+    expect(card.className).toContain('items-center')
+  })
+
   it('shows the "From an email" badge on a row with a captureId', () => {
     const { getByText } = render(
       <ScheduleItem item={emailBlock} onSelect={vi.fn()} onToggleComplete={vi.fn()} />,

@@ -403,8 +403,13 @@ export const ScheduleItem = memo(function ScheduleItem({
         swipeCommitPx={SWIPE_COMMIT_PX}
         onCompleteSwipe={() => handleCheckboxClick({ stopPropagation: () => {} } as React.MouseEvent)}
         onEditSwipe={onSelect}
+        // Centred is right for a one-line row and wrong the moment the inline
+        // per-person items (or the "From an email" line) make the title column
+        // tall — the time and the type tile drift to the vertical middle of the
+        // card, away from the title they label. Same rule the desktop branch
+        // applies to its leading column via hasBelowTitleContent/self-start.
         cardClassName={`
-          relative flex items-center gap-3 bg-bg-elevated rounded-2xl border border-neutral-200/70
+          relative flex ${hasPerPersonItems || fromEmail ? 'items-start' : 'items-center'} gap-3 bg-bg-elevated rounded-2xl border border-neutral-200/70
           px-3 py-3 shadow-card
           ${selected ? 'ring-2 ring-primary-300 shadow-md' : ''}
           ${item.completed || item.skipped ? 'opacity-60' : ''}
