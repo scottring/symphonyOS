@@ -1,26 +1,10 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { supabase, getAuthUser } from '@/lib/supabase'
-import { streamSymphonyAgent, type AgentApiMessage, type AssistantTaskContext, type AgentSourceNote } from '@/lib/agentStream'
+import type { AgentApiMessage, AssistantTaskContext, AgentSourceNote } from '@/lib/agentStream'
+import { runAgentTurn } from '@/lib/agentTurn'
 import type { ChatMessage, ChatSession } from '@/types/chat'
 import type { ChatAttachment } from '@/components/chat/ChatAttachment'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
-
-// Tools that mutate task/project data. When the agent uses one, the app needs
-// to refresh so the change shows without a page reload.
-const WRITE_TOOLS = new Set([
-  'symphony_create_task',
-  'symphony_create_calendar_event',
-  'symphony_update_task',
-  'symphony_complete_task',
-  'symphony_delete_task',
-  'symphony_create_project',
-  'symphony_update_project',
-  'symphony_create_routine',
-  'symphony_update_routine',
-  'symphony_delete_routine',
-  'symphony_create_note',
-  'symphony_attach_source',
-])
 
 const SESSIONS_LIMIT = 20
 
@@ -89,10 +73,14 @@ export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
     ;(async () => {
       setSessionsLoading(true)
       try {
+        // mode='chat' only: the item's Discuss thread is a chat_sessions row on
+        // the same entity_id, and it belongs to the drawer's main pane, not to
+        // the "older conversations" dropdown.
         let query = supabase
           .from('chat_sessions')
           .select('id, title, entity_type, entity_id, mode, messages, created_at, updated_at')
           .eq('entity_type', persistKey)
+          .eq('mode', 'chat')
         if (persistEntityId) query = query.eq('entity_id', persistEntityId)
         const { data } = await query
           .order('updated_at', { ascending: false })
@@ -197,17 +185,6 @@ export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
     setError(null)
     setToolActivity([])
 
-    // Track the assistant's reply locally too, so persistence doesn't depend
-    // on reading back async state.
-    let assistantText = ''
-    let assistantSources: AgentSourceNote[] | undefined
-    const appendText = (chunk: string) => {
-      assistantText += chunk
-      setMessages((prev) => prev.map((m) =>
-        m.id === assistantId ? { ...m, content: m.content + chunk } : m))
-    }
-
-    let didWrite = false
     // Pass attachment metadata to the edge function so the agent can call
     // symphony_attach_source to register the uploaded PDF on the project.
     const attachmentMeta = attachment
@@ -219,60 +196,39 @@ export function useSymphonyAssistant(options?: UseSymphonyAssistantOptions) {
         }
       : undefined
 
-    let streamError: string | null = null
-    try {
-      await streamSymphonyAgent(apiMessages, {
-        onText: appendText,
-        onTool: (name) => {
-          if (WRITE_TOOLS.has(name)) didWrite = true
-          setToolActivity((prev) => [...prev, name])
-        },
-        onDone: (reply, _sessionId, sources) => {
-          // Fall back to the authoritative final reply if no text streamed.
-          if (assistantText.length === 0) assistantText = reply
-          if (sources && sources.length > 0) assistantSources = sources
-          setMessages((prev) => prev.map((m) =>
-            m.id === assistantId
-              ? {
-                  ...m,
-                  content: m.content.length === 0 ? reply : m.content,
-                  sources: sources && sources.length > 0 ? sources : m.sources,
-                }
-              : m))
-        },
-        onError: (message) => {
-          streamError = message
-          setError(message)
-        },
-        attachment: attachmentMeta,
-        currentMemberId: getCurrentUserMember()?.id,
-        taskContext,
-      })
-    } catch {
-      streamError = 'Connection dropped'
-      setError('The assistant connection dropped.')
-    }
+    const turn = await runAgentTurn(apiMessages, {
+      onText: (chunk) => {
+        setMessages((prev) => prev.map((m) =>
+          m.id === assistantId ? { ...m, content: m.content + chunk } : m))
+      },
+      onTool: (name) => setToolActivity((prev) => [...prev, name]),
+      onReplyFallback: (reply) => {
+        setMessages((prev) => prev.map((m) =>
+          m.id === assistantId && m.content.length === 0 ? { ...m, content: reply } : m))
+      },
+      onSources: (sources) => {
+        setMessages((prev) => prev.map((m) =>
+          m.id === assistantId ? { ...m, sources } : m))
+      },
+      onError: (message) => setError(message),
+      onFallbackText: (text) => {
+        setMessages((prev) => prev.map((m) =>
+          m.id === assistantId && m.content.length === 0 ? { ...m, content: text } : m))
+      },
+      attachment: attachmentMeta,
+      currentMemberId: getCurrentUserMember()?.id,
+      taskContext,
+    })
 
-    // Never leave the placeholder bubble empty: an invisible failure reads as
-    // the assistant ignoring the message, so the user re-sends and double-posts
-    // (and a silent tool-only turn looks the same). Always say something.
-    if (assistantText.length === 0) {
-      assistantText = streamError
-        ? `Something went wrong on my end (${streamError}). Please try that again.`
-        : 'Something went wrong on my end — please try that again.'
-      const fallback = assistantText
-      setMessages((prev) => prev.map((m) =>
-        m.id === assistantId && m.content.length === 0
-          ? { ...m, content: fallback } : m))
-    }
+    const assistantSources: AgentSourceNote[] | undefined = turn.sources
 
-    if (didWrite) onMutate?.()
+    if (turn.didWrite) onMutate?.()
     setLoading(false)
 
     void persistTurn([
       ...messages,
       userMsg,
-      { id: assistantId, role: 'assistant', content: assistantText, sources: assistantSources, timestamp: new Date() },
+      { id: assistantId, role: 'assistant', content: turn.text, sources: assistantSources, timestamp: new Date() },
     ])
   }, [loading, messages, onMutate, taskContext, getCurrentUserMember, persistTurn])
 

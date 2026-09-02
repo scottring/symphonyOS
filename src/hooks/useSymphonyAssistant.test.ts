@@ -27,14 +27,17 @@ vi.mock('@/lib/supabase', () => {
       },
       from: (table: string) => {
         if (table === 'chat_sessions') {
+          // Self-returning filter chain — the sessions read stacks several
+          // .eq()s (entity_type, mode, and optionally entity_id).
+          const query: Record<string, unknown> = {}
+          const back = () => query
+          Object.assign(query, {
+            eq: back,
+            order: back,
+            limit: () => thenable(db.sessionsRows),
+          })
           return {
-            select: () => ({
-              eq: () => ({
-                order: () => ({
-                  limit: () => thenable(db.sessionsRows),
-                }),
-              }),
-            }),
+            select: () => query,
             insert: (row: Record<string, unknown>) => {
               db.inserted.push(row)
               return {
