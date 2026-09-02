@@ -28,6 +28,22 @@ final class TaskViewModel {
         return task
     }
 
+    /// Create a task from a placed page item. Everything rides the INSERT —
+    /// the row exists locally with all fields before the push, so no follow-up
+    /// update can race the temp→real swap (the addTask-then-setBucket lesson).
+    func createTask(fields: PageTaskFields, userId: UUID) -> SymphonyTask {
+        let task = SymphonyTask(userId: userId, title: fields.title, scheduledFor: fields.scheduledFor,
+                                context: nil, notes: fields.notes)
+        task.isAllDay = fields.isAllDay
+        task.bucket = fields.bucket
+        task.weekStart = fields.weekStart
+        task.assignedTo = fields.assignedTo
+        modelContext.insert(task)
+        queueChange(tableName: "tasks", recordId: task.id, type: "insert")
+        try? modelContext.save()
+        return task
+    }
+
     // MARK: - Update
 
     func toggleComplete(_ task: SymphonyTask) {

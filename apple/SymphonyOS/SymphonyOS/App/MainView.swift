@@ -249,7 +249,7 @@ private struct CaptureSheet: View {
             do {
                 let path = try await DocumentIngest.upload(data: data, userId: userId, ext: "jpg", contentType: "image/jpeg")
                 try await DocumentIngest.attach(
-                    taskId: task.id, userId: userId, storagePath: path,
+                    entityId: task.id, userId: userId, storagePath: path,
                     fileName: "scan.jpg", fileType: "image/jpeg", fileSize: data.count
                 )
             } catch {

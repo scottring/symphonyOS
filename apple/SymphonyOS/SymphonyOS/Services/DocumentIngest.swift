@@ -52,8 +52,9 @@ enum DocumentIngest {
         )
     }
 
-    /// Insert the `attachments` row pointing a task at the uploaded file.
-    static func attach(taskId: UUID, userId: UUID, storagePath: String,
+    /// Insert the `attachments` row pointing an entity (task or note) at the
+    /// uploaded file.
+    static func attach(entityType: String = "task", entityId: UUID, userId: UUID, storagePath: String,
                        fileName: String, fileType: String, fileSize: Int) async throws {
         struct NewAttachment: Encodable {
             let user_id: String
@@ -66,8 +67,8 @@ enum DocumentIngest {
         }
         let row = NewAttachment(
             user_id: userId.uuidString,
-            entity_type: "task",
-            entity_id: taskId.uuidString,
+            entity_type: entityType,
+            entity_id: entityId.uuidString,
             file_name: fileName,
             file_type: fileType,
             file_size: fileSize,
