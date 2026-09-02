@@ -363,11 +363,25 @@ export function TodayView({
   // commits the one already pending.
   const pendingDismissRef = useRef<string | null>(null)
   const [pendingDismiss, setPendingDismiss] = useState<{ id: string; title: string } | null>(null)
+  // The delete is reached through a ref rather than closed over. `commitDismiss`
+  // used to depend on `ctx`, which re-identifies on every task change — and
+  // InboxUndoToast restarts its timer whenever its props change, so on a live
+  // page the timer that OWNS the commit was perpetually reset and the delete
+  // could never fire.
+  const deleteTaskRef = useRef(ctx.onDeleteTask)
+  useEffect(() => { deleteTaskRef.current = ctx.onDeleteTask }, [ctx.onDeleteTask])
   const commitDismiss = useCallback(() => {
-    if (pendingDismissRef.current) ctx.onDeleteTask?.(pendingDismissRef.current)
+    if (pendingDismissRef.current) deleteTaskRef.current?.(pendingDismissRef.current)
     pendingDismissRef.current = null
     setPendingDismiss(null)
-  }, [ctx])
+  }, [])
+  // And nothing at all committed on unmount: navigating away inside the window
+  // left the row un-deleted for good while the sheet had already reported it
+  // gone. No setState here — the component is on its way out.
+  useEffect(() => () => {
+    if (pendingDismissRef.current) deleteTaskRef.current?.(pendingDismissRef.current)
+    pendingDismissRef.current = null
+  }, [])
   const handleDismissEmailRow = useCallback((taskId: string) => {
     const task = tasks.find((t) => t.id === taskId)
     if (!task) return
