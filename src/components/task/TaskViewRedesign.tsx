@@ -49,11 +49,6 @@ export function TaskViewRedesign({
   onSearchContacts,
   onAddContact,
   onOpenContact,
-  project,
-  projects = [],
-  onSearchProjects,
-  onOpenProject,
-  onAddProject,
   onAddSubtask,
   entityNotes = [],
   entityNotesLoading = false,
@@ -78,12 +73,6 @@ export function TaskViewRedesign({
   const [newContactEmail, setNewContactEmail] = useState('')
   const [isCreatingContactLoading, setIsCreatingContactLoading] = useState(false)
 
-  // Project picker state
-  const [showProjectPicker, setShowProjectPicker] = useState(false)
-  const [projectSearchQuery, setProjectSearchQuery] = useState('')
-  const [isCreatingProject, setIsCreatingProject] = useState(false)
-  const [newProjectName, setNewProjectName] = useState('')
-  const [isCreatingProjectLoading, setIsCreatingProjectLoading] = useState(false)
 
   // Delete confirmation
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
@@ -118,9 +107,6 @@ export function TaskViewRedesign({
     ? onSearchContacts(contactSearchQuery)
     : contacts.slice(0, 5)
 
-  const filteredProjects = onSearchProjects && projectSearchQuery
-    ? onSearchProjects(projectSearchQuery)
-    : projects.slice(0, 5)
 
   const handleTitleSave = () => {
     const trimmed = editedTitle.trim()
@@ -188,29 +174,8 @@ export function TaskViewRedesign({
     }
   }
 
-  const handleLinkProject = (selectedProject: Project) => {
-    onUpdate(task.id, { projectId: selectedProject.id })
-    setShowProjectPicker(false)
-    setProjectSearchQuery('')
-  }
 
-  const handleUnlinkProject = () => {
-    onUpdate(task.id, { projectId: undefined })
-  }
 
-  const handleCreateAndLinkProject = async () => {
-    if (!onAddProject || !newProjectName.trim()) return
-    setIsCreatingProjectLoading(true)
-    const createdProject = await onAddProject({ name: newProjectName.trim() })
-    setIsCreatingProjectLoading(false)
-    if (createdProject) {
-      onUpdate(task.id, { projectId: createdProject.id })
-      setIsCreatingProject(false)
-      setNewProjectName('')
-      setShowProjectPicker(false)
-      setProjectSearchQuery('')
-    }
-  }
 
   const handleAddLink = (e: React.FormEvent) => {
     e.preventDefault()
@@ -681,129 +646,14 @@ export function TaskViewRedesign({
                 </div>
               </div>
 
-              {/* Project */}
-              <div className="pb-6 border-b border-neutral-200/60">
-                <h3 className="text-xs font-semibold text-neutral-400 uppercase tracking-wider mb-3">
-                  Project
-                </h3>
-                {project ? (
-                  <div className="flex items-center gap-3">
-                    <span className="w-9 h-9 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4.5 h-4.5" viewBox="0 0 20 20" fill="currentColor">
-                        <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
-                      </svg>
-                    </span>
-                    <button
-                      onClick={() => onOpenProject?.(project.id)}
-                      className="flex-1 text-left font-medium text-neutral-800 hover:text-blue-600 transition-colors"
-                    >
-                      {project.name}
-                    </button>
-                    <button
-                      onClick={handleUnlinkProject}
-                      className="p-1.5 text-neutral-300 hover:text-red-500 transition-colors"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                      </svg>
-                    </button>
-                  </div>
-                ) : showProjectPicker ? (
-                  <div className="bg-white rounded-xl border border-neutral-200 overflow-hidden">
-                    {!isCreatingProject ? (
-                      <>
-                        <div className="p-2 border-b border-neutral-100">
-                          <input
-                            type="text"
-                            value={projectSearchQuery}
-                            onChange={(e) => setProjectSearchQuery(e.target.value)}
-                            placeholder="Search..."
-                            className="w-full px-3 py-2 text-sm rounded-lg bg-neutral-50
-                                       focus:outline-none focus:ring-2 focus:ring-primary-500"
-                            autoFocus
-                          />
-                        </div>
-                        <div className="max-h-40 overflow-auto">
-                          {filteredProjects.length > 0 ? (
-                            filteredProjects.map((p) => (
-                              <button
-                                key={p.id}
-                                onClick={() => handleLinkProject(p)}
-                                className="w-full px-3 py-2.5 text-left text-sm hover:bg-neutral-50 transition-colors"
-                              >
-                                {p.name}
-                              </button>
-                            ))
-                          ) : (
-                            <div className="px-3 py-4 text-center text-sm text-neutral-400">No projects</div>
-                          )}
-                        </div>
-                        <div className="p-2 border-t border-neutral-100 flex gap-2">
-                          <button
-                            onClick={() => { setShowProjectPicker(false); setProjectSearchQuery('') }}
-                            className="flex-1 px-3 py-1.5 text-sm text-neutral-500 hover:bg-neutral-50 rounded-lg"
-                          >
-                            Cancel
-                          </button>
-                          {onAddProject && (
-                            <button
-                              onClick={() => { setIsCreatingProject(true); setNewProjectName(projectSearchQuery) }}
-                              className="flex-1 px-3 py-1.5 text-sm text-white bg-primary-500 hover:bg-primary-600 rounded-lg"
-                            >
-                              + New
-                            </button>
-                          )}
-                        </div>
-                      </>
-                    ) : (
-                      <div className="p-3">
-                        <input
-                          type="text"
-                          value={newProjectName}
-                          onChange={(e) => setNewProjectName(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' && newProjectName.trim()) handleCreateAndLinkProject()
-                            else if (e.key === 'Escape') { setIsCreatingProject(false); setNewProjectName('') }
-                          }}
-                          placeholder="Project name..."
-                          className="w-full px-3 py-2 text-sm rounded-lg border border-neutral-200 bg-neutral-50
-                                     focus:outline-none focus:ring-2 focus:ring-primary-500 mb-3"
-                          autoFocus
-                          disabled={isCreatingProjectLoading}
-                        />
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => { setIsCreatingProject(false); setNewProjectName('') }}
-                            className="flex-1 px-3 py-1.5 text-sm text-neutral-500 hover:bg-neutral-50 rounded-lg"
-                            disabled={isCreatingProjectLoading}
-                          >
-                            Cancel
-                          </button>
-                          <button
-                            onClick={handleCreateAndLinkProject}
-                            disabled={!newProjectName.trim() || isCreatingProjectLoading}
-                            className="flex-1 px-3 py-1.5 text-sm text-white bg-primary-500 hover:bg-primary-600 rounded-lg disabled:opacity-50"
-                          >
-                            {isCreatingProjectLoading ? '...' : 'Create'}
-                          </button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => setShowProjectPicker(true)}
-                    className="flex items-center gap-3 w-full text-left text-neutral-400 hover:text-neutral-600 transition-colors"
-                  >
-                    <span className="w-9 h-9 rounded-xl bg-neutral-100 flex items-center justify-center">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="w-4.5 h-4.5" viewBox="0 0 20 20" fill="currentColor">
-                        <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
-                      </svg>
-                    </span>
-                    <span>Add to project</span>
-                  </button>
-                )}
-              </div>
+              {/* The Project section — the linked project, the search/create
+                  picker, and the "Add to project" button — lived here until
+                  Projects were hidden from the product (2026-09-02, see the
+                  note in Sidebar.tsx). This page is reachable at /task/:id from
+                  History, Contacts and Family, so the affordance was live. The
+                  props (project, projects, onSearchProjects, onOpenProject,
+                  onAddProject) stay: callers still pass them and the task still
+                  carries its projectId. */}
 
               {/* Contact */}
               <div className="pb-6 border-b border-neutral-200/60">

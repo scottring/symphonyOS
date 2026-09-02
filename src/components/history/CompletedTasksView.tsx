@@ -59,7 +59,8 @@ function formatCompletionDate(date: Date): string {
 export function CompletedTasksView({
   tasks,
   contactsMap,
-  projectsMap,
+  // projectsMap stays on the props — HistoryApp still hands it over — but
+  // nothing here reads it any more (2026-09-02, see Sidebar.tsx).
   onSelectTask,
 }: CompletedTasksViewProps) {
   const [searchQuery, setSearchQuery] = useState('')
@@ -86,14 +87,13 @@ export function CompletedTasksView({
         const contact = contactsMap.get(task.contactId)
         if (contact?.name.toLowerCase().includes(query)) return true
       }
-      // Search in project name
-      if (task.projectId) {
-        const project = projectsMap.get(task.projectId)
-        if (project?.name.toLowerCase().includes(query)) return true
-      }
+      // Project name was searchable here until Projects were hidden from the
+      // product (2026-09-02 — see the note in Sidebar.tsx). It had to go with
+      // the row's chip: matching on a name the row never shows returns results
+      // with no visible reason for matching.
       return false
     })
-  }, [completedTasks, searchQuery, contactsMap, projectsMap])
+  }, [completedTasks, searchQuery, contactsMap])
 
   // Group by month
   const monthGroups = useMemo(() => groupByMonth(filteredTasks), [filteredTasks])
@@ -159,7 +159,6 @@ export function CompletedTasksView({
                       key={task.id}
                       task={task}
                       contact={task.contactId ? contactsMap.get(task.contactId) : undefined}
-                      project={task.projectId ? projectsMap.get(task.projectId) : undefined}
                       onSelect={() => onSelectTask(task.id)}
                     />
                   ))}
@@ -205,12 +204,10 @@ export function CompletedTasksView({
 function TaskHistoryRow({
   task,
   contact,
-  project,
   onSelect,
 }: {
   task: Task
   contact?: Contact
-  project?: Project
   onSelect: () => void
 }) {
   // Truncate notes to ~60 chars
@@ -249,8 +246,9 @@ function TaskHistoryRow({
         </svg>
       </div>
 
-      {/* Metadata row: contact, project, notes */}
-      {(contact || project || notesSnippet) && (
+      {/* Metadata row: contact, notes. The project chip lived between them
+          until Projects were hidden (2026-09-02 — see the note in Sidebar.tsx). */}
+      {(contact || notesSnippet) && (
         <div className="ml-8 flex flex-wrap items-center gap-2 text-xs text-neutral-500">
           {contact && (
             <span className="flex items-center gap-1">
@@ -258,14 +256,6 @@ function TaskHistoryRow({
                 <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
               </svg>
               {contact.name}
-            </span>
-          )}
-          {project && (
-            <span className="flex items-center gap-1">
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
-                <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
-              </svg>
-              {project.name}
             </span>
           )}
           {notesSnippet && (
