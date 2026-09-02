@@ -32,6 +32,7 @@ const CATEGORIES: { value: TaskCategory; label: string; icon: ConceptName; descr
   { value: 'chore', label: 'Chore', icon: 'chore', description: 'Recurring household', color: 'amber' },
   { value: 'errand', label: 'Errand', icon: 'errand', description: 'Location-based', color: 'purple' },
   { value: 'task', label: 'Task', icon: 'task', description: 'One-off action', color: 'neutral' },
+  { value: 'homework', label: 'Homework', icon: 'task', description: 'For a kid to do and hand in', color: 'green' },
 ]
 
 export function InboxTriageModal({

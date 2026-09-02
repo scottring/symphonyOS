@@ -13,6 +13,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import type { ConfirmationToastMessage } from '@/components/toast';
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
+import type { TaskCategory } from '@/types/task';
 import { useProjects } from '@/hooks/useProjects';
 import { useContacts } from '@/hooks/useContacts';
 import { useRoutines } from '@/hooks/useRoutines';
@@ -33,7 +34,7 @@ interface QuickAddRichData {
   contactId?: string;
   scheduledFor?: Date;
   durationMinutes?: number;
-  category?: 'task' | 'chore' | 'errand' | 'event' | 'activity';
+  category?: TaskCategory;
   context?: 'work' | 'family' | 'personal';
   assignedMemberIds?: string[];
 }

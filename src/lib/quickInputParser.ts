@@ -12,7 +12,7 @@ export interface ParsedQuickInput {
   durationMinutes?: number           // Parsed duration ("45m", "1h30m", "for 45 minutes", or a chrono range)
   durationMatch?: string             // What text matched (e.g., "45m")
   priority?: 'high' | 'medium' | 'low'
-  category?: 'task' | 'chore' | 'errand' | 'event' | 'activity'
+  category?: 'task' | 'chore' | 'errand' | 'event' | 'activity' | 'homework'
   categoryMatch?: string             // What text matched (e.g., "errand:")
   isNote?: boolean                   // True if this is a note (not a task)
   noteContent?: string               // Clean note content (without prefix)
@@ -90,10 +90,12 @@ export function parseQuickInput(
     'chore:': 'chore',
     'errand:': 'errand',
     'task:': 'task',
+    'homework:': 'homework',
     // Short aliases
     'ev:': 'event',
     'act:': 'activity',
     'ch:': 'chore',
+    'hw:': 'homework',
     'er:': 'errand',
   }
 

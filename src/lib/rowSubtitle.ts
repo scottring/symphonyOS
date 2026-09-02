@@ -33,6 +33,7 @@ function categoryLabel(item: TimelineItem): string {
     case 'errand': return 'Errand'
     case 'chore': return 'Chore'
     case 'activity': return 'Activity'
+    case 'homework': return 'Homework'
     case 'task':
     case 'event':
     default:

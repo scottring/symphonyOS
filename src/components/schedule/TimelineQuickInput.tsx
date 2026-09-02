@@ -1,3 +1,4 @@
+import type { TaskCategory } from '@/types/task'
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { CalendarClock } from 'lucide-react'
 import type { ParserContext } from '@/lib/quickInputParser'
@@ -33,7 +34,7 @@ function isSoftDate(matchText?: string): boolean {
 export interface TimelineCaptureResult {
   title: string
   scheduledFor: Date | null
-  category?: 'task' | 'chore' | 'errand' | 'event' | 'activity'
+  category?: TaskCategory
   projectId?: string
   contactId?: string
   assignedMemberIds?: string[]

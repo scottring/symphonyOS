@@ -196,6 +196,12 @@ describe('category prefix parsing', () => {
     expect(result.title).toBe('review code')
   })
 
+  it('hw: and homework: prefixes set the homework category', () => {
+    expect(parseQuickInput('hw: return blue sheet', mockContext).category).toBe('homework')
+    expect(parseQuickInput('homework: reading log', mockContext).category).toBe('homework')
+    expect(parseQuickInput('hw: return blue sheet', mockContext).title).toBe('return blue sheet')
+  })
+
   it('parses short aliases (er:, ev:, ch:, act:)', () => {
     expect(parseQuickInput('er: groceries', mockContext).category).toBe('errand')
     expect(parseQuickInput('ev: meeting', mockContext).category).toBe('event')

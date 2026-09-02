@@ -23,7 +23,7 @@ export type TaskContext = 'work' | 'family' | 'personal'
 
 // Category represents what KIND of family item this is
 // Defaults to 'task' for backwards compatibility
-export type TaskCategory = 'task' | 'chore' | 'errand' | 'event' | 'activity'
+export type TaskCategory = 'task' | 'chore' | 'errand' | 'event' | 'activity' | 'homework'
 
 // Prep/Follow-up task linking
 export type LinkType = 'prep' | 'followup'
