@@ -3,6 +3,7 @@ import { ChatMessage } from './ChatMessage'
 import { ChatInput } from './ChatInput'
 import { VaultDraftCard } from './VaultDraftCard'
 import type { ChatMessage as ChatMessageType, EntityContext, ChatMode, ChatSession } from '@/types/chat'
+import type { FamilyMember } from '@/types/family'
 import type { ChatAttachment } from './ChatAttachment'
 
 interface ChatPanelProps {
@@ -27,6 +28,19 @@ interface ChatPanelProps {
   onDeleteSession?: (sessionId: string) => void
   onNewChat?: () => void
   activeSessionId?: string | null
+  // Shared (Discuss) threads
+  /** Title shown in the header instead of "Symphony AI". */
+  heading?: string
+  /** The viewer's auth user id — decides which bubbles are "mine". */
+  currentUserId?: string | null
+  /** Faces for the authors in a shared thread, matched on auth_user_id. */
+  familyMembers?: FamilyMember[]
+  /** Names in the shared thread; rendered as avatars in the header. */
+  participants?: string[]
+}
+
+function initialsFrom(name: string): string {
+  return name.split(/\s+/).filter(Boolean).map((w) => w[0]).join('').slice(0, 2).toUpperCase()
 }
 
 /** Format a date for the session list */
@@ -64,6 +78,10 @@ export function ChatPanel({
   onDeleteSession,
   onNewChat,
   activeSessionId,
+  heading,
+  currentUserId,
+  familyMembers = [],
+  participants = [],
 }: ChatPanelProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const [dismissedDrafts, setDismissedDrafts] = useState<Set<string>>(new Set())
@@ -119,7 +137,7 @@ export function ChatPanel({
           </div>
           <div>
             <h3 className="text-sm font-medium text-neutral-800">
-              {mode === 'guided_reflection' ? 'Think It Through' : 'Symphony AI'}
+              {heading ?? (mode === 'guided_reflection' ? 'Think It Through' : 'Symphony AI')}
             </h3>
             {entityContext && (
               <p className="text-[10px] text-neutral-400">
@@ -127,6 +145,20 @@ export function ChatPanel({
               </p>
             )}
           </div>
+          {/* Who is in this conversation — a shared thread only */}
+          {participants.length > 0 && (
+            <div className="flex items-center -space-x-1 ml-1" aria-label="Participants">
+              {participants.map((name) => (
+                <span
+                  key={name}
+                  title={name}
+                  className="w-5 h-5 rounded-full bg-neutral-200 text-neutral-600 text-[9px] font-semibold flex items-center justify-center ring-1 ring-white"
+                >
+                  {initialsFrom(name)}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-1">
           {/* New chat button */}
@@ -286,6 +318,8 @@ export function ChatPanel({
                 message={msg}
                 onSourceClick={onSourceClick}
                 onAddTask={onAddTask}
+                currentUserId={currentUserId}
+                familyMembers={familyMembers}
               />
               {msg.vaultDraft && onSaveToVault && !dismissedDrafts.has(msg.id) && (
                 <VaultDraftCard

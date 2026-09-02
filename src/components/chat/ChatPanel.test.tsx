@@ -7,6 +7,7 @@ vi.mock('@/hooks/useAuth', () => ({
 
 import { ChatPanel } from './ChatPanel'
 import type { ChatMessage } from '@/types/chat'
+import type { FamilyMember } from '@/types/family'
 
 const baseProps = {
   messages: [] as ChatMessage[],
@@ -41,5 +42,82 @@ describe('ChatPanel suggestions', () => {
       <ChatPanel {...baseProps} messages={messages} suggestions={['Break this into doable steps']} />,
     )
     expect(screen.queryByRole('button', { name: 'Break this into doable steps' })).toBeNull()
+  })
+})
+
+describe('ChatPanel authorship (shared Discuss thread)', () => {
+  const iris: FamilyMember = {
+    id: 'm2', user_id: 'u1', auth_user_id: 'u2', name: 'Iris', initials: 'IK',
+    color: 'purple', avatar_url: null, is_full_user: true, display_order: 1,
+    member_type: 'core', created_at: '2026-01-01T00:00:00Z',
+  }
+
+  const thread: ChatMessage[] = [
+    {
+      id: '1', role: 'user', content: 'Can you take her Thursday?', timestamp: new Date(),
+      author: { id: 'u2', name: 'Iris', kind: 'member' },
+    },
+    {
+      id: '2', role: 'user', content: 'Yes, after 3.', timestamp: new Date(),
+      author: { id: 'u1', name: 'Scott', kind: 'member' },
+    },
+    {
+      id: '3', role: 'assistant', content: 'Booked for 3:30.', timestamp: new Date(),
+      author: { id: null, name: 'Symphony', kind: 'symphony' },
+    },
+  ]
+
+  function renderThread() {
+    return render(
+      <ChatPanel {...baseProps} messages={thread} currentUserId="u1" familyMembers={[iris]} />,
+    )
+  }
+
+  it("renders a partner's message on the left, named, with an avatar", () => {
+    const { container } = renderThread()
+    const bubble = screen.getByText('Can you take her Thursday?').closest('.flex')
+    expect(bubble?.className).toContain('justify-start')
+    expect(screen.getByText('Iris')).toBeInTheDocument()
+    expect(container.querySelector('[title="Iris"]')).toBeTruthy()
+  })
+
+  it("renders the viewer's own message on the right, unlabelled", () => {
+    renderThread()
+    const bubble = screen.getByText('Yes, after 3.').closest('.flex')
+    expect(bubble?.className).toContain('justify-end')
+    expect(screen.queryByText('Scott')).toBeNull()
+  })
+
+  it('labels the assistant Symphony', () => {
+    renderThread()
+    const bubble = screen.getByText('Booked for 3:30.').closest('.flex')
+    expect(bubble?.className).toContain('justify-start')
+    expect(screen.getByText('Symphony')).toBeInTheDocument()
+  })
+
+  it('leaves an author-less (solo) conversation rendering as before', () => {
+    const solo: ChatMessage[] = [
+      { id: '1', role: 'user', content: 'hi', timestamp: new Date() },
+      { id: '2', role: 'assistant', content: 'hello', timestamp: new Date() },
+    ]
+    render(<ChatPanel {...baseProps} messages={solo} currentUserId="u1" />)
+    expect(screen.getByText('hi').closest('.flex')?.className).toContain('justify-end')
+    expect(screen.queryByText('Symphony')).toBeNull()
+  })
+
+  it('shows the participants in the header', () => {
+    render(
+      <ChatPanel
+        {...baseProps}
+        messages={thread}
+        currentUserId="u1"
+        familyMembers={[iris]}
+        participants={['Scott', 'Iris']}
+        heading="Discussion"
+      />,
+    )
+    const header = screen.getByLabelText('Participants')
+    expect(header.textContent).toBe('SI')
+    expect(screen.getByRole('heading', { name: 'Discussion' })).toBeInTheDocument()
   })
 })

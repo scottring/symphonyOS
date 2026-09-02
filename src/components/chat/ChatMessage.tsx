@@ -1,10 +1,21 @@
 import { useState } from 'react'
 import type { ChatMessage as ChatMessageType } from '@/types/chat'
+import type { FamilyMember } from '@/types/family'
+import { AssigneeAvatar } from '@/components/family/AssigneeAvatar'
 
 interface ChatMessageProps {
   message: ChatMessageType
   onSourceClick?: (noteId: string) => void
   onAddTask?: (title: string, destination: 'inbox' | 'today') => void
+  /** The viewer's auth user id. A shared-thread message by anyone else renders
+   *  on the left, attributed. Omit for solo chats. */
+  currentUserId?: string | null
+  /** Used to put a face to an author, matched on auth_user_id. */
+  familyMembers?: FamilyMember[]
+}
+
+function initialsFrom(name: string): string {
+  return name.split(/\s+/).filter(Boolean).map((w) => w[0]).join('').slice(0, 2).toUpperCase()
 }
 
 /** Extract actionable bullet items from assistant message text */
@@ -87,9 +98,32 @@ function AddTaskButton({ task, onAddTask }: { task: string; onAddTask: (title: s
   )
 }
 
-export function ChatMessage({ message, onSourceClick, onAddTask }: ChatMessageProps) {
+export function ChatMessage({
+  message, onSourceClick, onAddTask, currentUserId, familyMembers = [],
+}: ChatMessageProps) {
   const isUser = message.role === 'user'
   const bulletItems = !isUser && onAddTask ? extractBulletItems(message.content) : []
+
+  // In a shared thread a user message written by the OTHER member reads as
+  // someone else talking: left-aligned, with a face and a name. Everything
+  // without an author (every solo chat) keeps today's rendering exactly.
+  const author = message.author
+  const isPartner = isUser && !!author && author.kind === 'member'
+    && author.id !== null && author.id !== currentUserId
+  const alignRight = isUser && !isPartner
+  const authorMember = isPartner
+    ? familyMembers.find((m) => m.auth_user_id === author.id)
+    : undefined
+  // No linked member row (a household member who hasn't been matched yet):
+  // stand in with the name we do have rather than an anonymous silhouette.
+  const avatarMember = authorMember ?? (isPartner
+    ? ({
+        id: `author-${author.id}`,
+        name: author.name,
+        initials: initialsFrom(author.name),
+        color: 'blue',
+      } as FamilyMember)
+    : undefined)
 
   // Render content with inline add buttons for bullet items
   function renderContent() {
@@ -125,16 +159,26 @@ export function ChatMessage({ message, onSourceClick, onAddTask }: ChatMessagePr
   }
 
   return (
-    <div className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-3`}>
+    <div className={`flex items-start gap-2 ${alignRight ? 'justify-end' : 'justify-start'} mb-3`}>
+      {isPartner && <AssigneeAvatar member={avatarMember} size="sm" className="mt-0.5 shrink-0" />}
       <div
         className={`
           max-w-[85%] rounded-2xl px-4 py-2.5
-          ${isUser
+          ${alignRight
             ? 'bg-primary-600 text-white'
+            : isPartner
+            ? 'bg-white text-neutral-800 shadow-[inset_0_0_0_1px_#e5e7eb]'
             : 'bg-neutral-100 text-neutral-800'
           }
         `}
       >
+        {/* Who is talking — only when it isn't obvious (a shared thread) */}
+        {(isPartner || (!isUser && author?.kind === 'symphony')) && (
+          <p className="text-[10px] font-medium uppercase tracking-wide text-neutral-400 mb-1">
+            {isPartner ? author.name : 'Symphony'}
+          </p>
+        )}
+
         {/* Message content */}
         {renderContent()}
 

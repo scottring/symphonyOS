@@ -3,6 +3,14 @@ export interface VaultDraft {
   content: string
 }
 
+/** Who wrote a message in a shared (Discuss) thread. `id` is the auth user id,
+ *  so the panel can tell "me" from "my partner". Absent on solo chats. */
+export interface ChatAuthor {
+  id: string | null
+  name: string
+  kind: 'member' | 'symphony'
+}
+
 export interface ChatMessage {
   id: string
   role: 'user' | 'assistant'
@@ -10,6 +18,8 @@ export interface ChatMessage {
   sources?: { id: string; title: string; vaultPath?: string }[]
   vaultDraft?: VaultDraft
   timestamp: Date
+  /** Set only in a shared thread — see ChatAuthor. */
+  author?: ChatAuthor
 }
 
 export interface EntityContext {
