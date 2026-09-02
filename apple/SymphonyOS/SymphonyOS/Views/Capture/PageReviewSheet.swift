@@ -73,6 +73,9 @@ struct PageReviewSheet: View {
             .navigationTitle("Review page")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text("Review page").font(.displayMedium).foregroundStyle(Color.textPrimary)
+                }
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel", action: onCancel) }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Add all") { onCommit(items, notes) }
