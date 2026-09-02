@@ -1,7 +1,7 @@
 import { memo, useState, useRef, useEffect } from 'react'
 import type { TimelineItem } from '@/types/timeline'
 import type { FamilyMember } from '@/types/family'
-import type { TaskContext } from '@/types/task'
+import type { Task, TaskContext } from '@/types/task'
 import { formatTimeLong, formatTimeRangeLong, inferMealTime } from '@/lib/timeUtils'
 import { isSameDay } from '@/lib/dateUtils'
 import { SchedulePopover, type ScheduleContextItem } from '@/components/triage'
@@ -242,10 +242,18 @@ export const ScheduleItem = memo(function ScheduleItem({
    * so they render inline, always, at every width. Completed ones drop out:
    * what is left is what still has to happen.
    */
+  const isPerPerson = (s: Task) => !!s.assignedTo || fromEmail
   const perPersonItems = (item.originalTask?.subtasks ?? []).filter(
-    (s) => !s.completed && (!!s.assignedTo || fromEmail),
+    (s) => !s.completed && isPerPerson(s),
   )
   const hasPerPersonItems = perPersonItems.length > 0
+  /**
+   * Everything the per-person list does NOT cover — ordinary steps, which stay
+   * behind the disclosure. Split on the per-person PREDICATE, not on the
+   * rendered list: a per-person item that has been completed drops out of the
+   * inline list, and it must not reappear here as if it were a plain step.
+   */
+  const plainSubtasks = (item.originalTask?.subtasks ?? []).filter((s) => !isPerPerson(s))
   /** Anything rendering beneath the title makes the title column taller — the
    *  leading columns then need pinning to the title's first line. */
   const hasBelowTitleContent = !!belowTitleAccessory
@@ -316,10 +324,18 @@ export const ScheduleItem = memo(function ScheduleItem({
   const timeDisplay = getTimeDisplay()
 
   const hasContactChip = !!contactName
-  // The steps disclosure is for plain subtasks only. When the row has
-  // per-person items they are already on screen, always open, so a chip that
-  // reveals the same names again is a second, contradicting affordance.
-  const hasSubtasks = !hasPerPersonItems && item.subtaskCount && item.subtaskCount > 0
+  // The steps disclosure is for plain subtasks only — the per-person items are
+  // already on screen, always open, so a chip revealing the same names again is
+  // a second, contradicting affordance. It used to be `!hasPerPersonItems &&
+  // …`, which let ONE assigned subtask hide every plain step beside it. The two
+  // populations coexist: the chip now counts what the inline list does not
+  // cover, and reads its counts from the split rather than from the row's
+  // whole-subtask totals.
+  const stepsTotal = hasPerPersonItems ? plainSubtasks.length : (item.subtaskCount ?? 0)
+  const stepsDone = hasPerPersonItems
+    ? plainSubtasks.filter((s) => s.completed).length
+    : (item.subtaskCompletedCount ?? 0)
+  const hasSubtasks = stepsTotal > 0
   /** Provenance, rendered in the subtitle slot at EVERY width. */
   const emailBadge = (
     <span className="inline-flex items-center gap-1 align-middle">
@@ -715,12 +731,12 @@ export const ScheduleItem = memo(function ScheduleItem({
               <button
                 type="button"
                 aria-expanded={stepsOpen}
-                aria-label={`${item.subtaskCount} steps`}
+                aria-label={`${stepsTotal} steps`}
                 onClick={(e) => { e.stopPropagation(); setStepsOpen((v) => !v) }}
                 className="hidden md:inline-flex shrink-0 items-center gap-1 text-xs text-neutral-400 hover:text-neutral-600 transition-colors"
               >
                 <ListChecks className="w-3 h-3" />
-                {item.subtaskCompletedCount}/{item.subtaskCount}
+                {stepsDone}/{stepsTotal}
                 {stepsOpen
                   ? <ChevronUp className="w-3 h-3" />
                   : <ChevronDown className="w-3 h-3" />}
@@ -771,9 +787,9 @@ export const ScheduleItem = memo(function ScheduleItem({
           {/* Steps — revealed by the subtask chip above. Left-aligned WITH the
               title (a block sibling of the whole row would sit under the time
               gutter and read as the next task's content). */}
-          {stepsOpen && !hasPerPersonItems && item.originalTask?.subtasks?.length ? (
+          {stepsOpen && plainSubtasks.length ? (
             <ul className="hidden md:block mt-1 space-y-0.5 border-l-2 border-neutral-200 pl-3">
-              {item.originalTask.subtasks.map((s) => (
+              {plainSubtasks.map((s) => (
                 <li key={s.id} className="text-[13px] text-neutral-600">
                   <span className={s.completed ? 'line-through text-neutral-400' : ''}>
                     {s.title}

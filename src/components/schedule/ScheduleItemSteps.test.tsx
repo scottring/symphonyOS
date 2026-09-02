@@ -99,12 +99,12 @@ describe('ScheduleItem per-person items (desktop)', () => {
     },
   } as unknown as TimelineItem
 
-  it('renders the items without any disclosure, and drops the steps chip', () => {
-    const { getByText, queryByRole } = render(
+  // (That the items themselves render inline is asserted in
+  // ScheduleItem.test.tsx — this file only owns the disclosure's behaviour.)
+  it('drops the steps chip when every subtask is a per-person item', () => {
+    const { queryByRole } = render(
       <ScheduleItem item={emailBlock} onSelect={vi.fn()} onToggleComplete={vi.fn()} />,
     )
-    expect(getByText('Wear a collared shirt')).toBeInTheDocument()
-    expect(getByText('Bring the order form')).toBeInTheDocument()
     expect(queryByRole('button', { name: /steps/i })).toBeNull()
   })
 
@@ -113,5 +113,44 @@ describe('ScheduleItem per-person items (desktop)', () => {
       <ScheduleItem item={emailBlock} onSelect={vi.fn()} onToggleComplete={vi.fn()} />,
     )
     expect(getByText('From an email')).toBeInTheDocument()
+  })
+
+  // The two populations coexist. `hasSubtasks` used to be
+  // `!hasPerPersonItems && …`, so ONE assigned subtask hid every plain step
+  // beside it — no chip, no disclosure, nowhere left to see them.
+  const mixed = {
+    ...withSteps,
+    id: 'task-mixed',
+    title: 'Field trip to the aquarium',
+    subtaskCount: 3,
+    subtaskCompletedCount: 0,
+    originalTask: {
+      id: 'field-trip',
+      subtasks: [
+        { id: 'a1', title: 'Wear a collared shirt', completed: false, assignedTo: 'm-liam' },
+        { id: 'q1', title: 'Print the permission slip', completed: false },
+        { id: 'q2', title: 'Call the office about allergies', completed: false },
+      ],
+    },
+  } as unknown as TimelineItem
+
+  it('renders the assigned item inline AND keeps the steps chip for the plain ones', () => {
+    const { getByText, getByRole, queryByText, getAllByText } = render(
+      <ScheduleItem item={mixed} onSelect={vi.fn()} onToggleComplete={vi.fn()} />,
+    )
+
+    // Inline, always open — it is the content of the row.
+    expect(getByText('Wear a collared shirt')).toBeInTheDocument()
+
+    // The chip counts the REMAINING plain steps, not all three subtasks.
+    const chip = getByRole('button', { name: /2 steps/i })
+    expect(chip).toHaveTextContent('0/2')
+    expect(queryByText('Print the permission slip')).toBeNull()
+
+    fireEvent.click(chip)
+    expect(getByText('Print the permission slip')).toBeInTheDocument()
+    expect(getByText('Call the office about allergies')).toBeInTheDocument()
+    // …and the assigned item is not repeated inside the disclosure.
+    expect(getAllByText('Wear a collared shirt')).toHaveLength(1)
   })
 })
