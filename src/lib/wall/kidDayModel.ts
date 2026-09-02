@@ -5,16 +5,21 @@
 // assigned tasks bucketed by their timeline section.
 //
 // PURE: no React, no Supabase, no hidden clock reads — everything derives
-// from the `date` argument passed in.
+// from the `date` and `now` arguments passed in (`date` is the day being
+// rendered; `now` is the wall clock, which only the evening "needed
+// tomorrow" rule reads).
 
 import type { Routine, ActionableInstance, TargetUnit } from '@/types/actionable'
 import type { TimelineItem } from '@/types/timeline'
+import type { Task } from '@/types/task'
 import type { DaySection } from '@/lib/timeUtils'
 import type { FamilyMember } from '@/types/family'
 import type { Layer } from '@/lib/domains'
 import { resolveRoutine, routineOwners, effectiveTimeOfDay, matchesRecurrenceForDate } from '@/lib/routineUtils'
 import { groupRoutineSteps } from '@/lib/today/routineCollections'
 import { stepAppliesOnDate } from '@/lib/today/stepSchedule'
+import { neededWindow } from '@/lib/today/neededToday'
+import { isSameDay } from '@/lib/dateUtils'
 
 export type KidBandKey = 'morning' | 'afternoon' | 'evening' | 'anytime'
 
@@ -41,7 +46,18 @@ export interface KidCollection {
   rows: KidRow[]
 }
 
+/** A row of the "Needed today" card — a task marked `needed_on`, which has no
+ *  `scheduled_for` and so never reaches the timeline (or a band). */
+export interface KidNeededRow {
+  id: string // raw task uuid — the view prefixes it once for onToggleTask
+  title: string
+  /** True for the evening preview of the next day's needs. */
+  tomorrow: boolean
+}
+
 export interface MemberDayModel {
+  /** Rendered first, above the collections — today's needs, then tomorrow's. */
+  needed: KidNeededRow[]
   collections: KidCollection[]
   bands: Record<KidBandKey, KidRow[]>
   isEmpty: boolean
@@ -161,11 +177,19 @@ function sectionBand(section: DaySection): KidBandKey {
 export function buildMemberDayModel(input: {
   member: FamilyMember
   date: Date
+  /** The wall clock. Only the evening "needed tomorrow" rule reads it. */
+  now: Date
   routines: Routine[]
   todayItems: Record<DaySection, TimelineItem[]>
+  /**
+   * Incomplete tasks carrying a `needed_on` date. NOT timeline items — a
+   * needed-on row has no `scheduled_for`, so it never appears in
+   * `todayItems` and the wall fetches it with its own narrow query.
+   */
+  neededTasks: Task[]
   history: ActionableInstance[]
 }): MemberDayModel {
-  const { member, date, routines, todayItems, history } = input
+  const { member, date, now, routines, todayItems, neededTasks, history } = input
   const todayStr = toDateStr(date)
   const byId = new Map<string, Pick<Routine, 'id' | 'time_of_day'>>(routines.map((r) => [r.id, r]))
 
@@ -230,8 +254,26 @@ export function buildMemberDayModel(input: {
     }
   }
 
-  // Rule 9
-  const isEmpty = collections.length === 0 && Object.values(bands).every((rows) => rows.length === 0)
+  // Needed-on rows. The evening rule is NOT re-derived here — `neededWindow`
+  // is the one place it lives, shared with the Needed Today note, so the wall
+  // and the phone can never disagree about when tomorrow starts showing.
+  const window = neededWindow(date, now)
+  const neededOnDay = (t: Task, day: Date) => !!t.neededOn && isSameDay(t.neededOn, day)
+  const forMember = neededTasks.filter((t) => !t.completed && t.assignedTo === member.id)
+  const needed: KidNeededRow[] = [
+    ...forMember.filter((t) => neededOnDay(t, window.today)).map((t) => ({ id: t.id, title: t.title, tomorrow: false })),
+    ...(window.tomorrow
+      ? forMember
+          .filter((t) => neededOnDay(t, window.tomorrow!))
+          .map((t) => ({ id: t.id, title: t.title, tomorrow: true }))
+      : []),
+  ]
 
-  return { collections, bands, isEmpty }
+  // Rule 9
+  const isEmpty =
+    needed.length === 0 &&
+    collections.length === 0 &&
+    Object.values(bands).every((rows) => rows.length === 0)
+
+  return { needed, collections, bands, isEmpty }
 }

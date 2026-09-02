@@ -4,6 +4,7 @@ import type { Routine, ActionableInstance } from '@/types/actionable'
 import type { FamilyMember } from '@/types/family'
 import { emptySections } from '@/lib/today/types'
 import type { TimelineItem } from '@/types/timeline'
+import type { Task } from '@/types/task'
 
 const KID = { id: 'kid-1', name: 'Kaleb' } as FamilyMember
 const TODAY = new Date('2026-08-30T10:00:00') // a Sunday
@@ -41,17 +42,29 @@ function taskItem(over: Partial<TimelineItem> = {}): TimelineItem {
     ...over,
   } as TimelineItem
 }
+function task(over: Partial<Task> = {}): Task {
+  return {
+    id: `k-${++seq}`, title: 'Needed thing', completed: false,
+    createdAt: TODAY, updatedAt: TODAY,
+    assignedTo: KID.id, context: 'family', category: 'task',
+    ...over,
+  } as Task
+}
 function build(
   routines: Routine[],
   history: ActionableInstance[] = [],
   items: Partial<Record<string, TimelineItem[]>> = {},
+  neededTasks: Task[] = [],
+  now: Date = TODAY,
 ) {
   return buildMemberDayModel({
     member: KID,
     date: TODAY,
+    now,
     routines,
     history,
     todayItems: { ...emptySections<TimelineItem>(), ...items },
+    neededTasks,
   })
 }
 
@@ -172,7 +185,58 @@ describe('buildMemberDayModel', () => {
     const model = build([])
     expect(model.isEmpty).toBe(true)
     expect(model.collections).toEqual([])
+    expect(model.needed).toEqual([])
     expect(model.bands).toEqual({ morning: [], afternoon: [], evening: [], anytime: [] })
+  })
+})
+
+describe('buildMemberDayModel — needed today', () => {
+  const TOMORROW = new Date('2026-08-31T09:00:00')
+  const EVENING = new Date('2026-08-30T18:00:00')
+
+  it("lists this member's task needed on the viewed day", () => {
+    const t = task({ id: 'n-1', title: 'Library book', neededOn: TODAY })
+    const model = build([], [], {}, [t])
+    expect(model.needed).toEqual([{ id: 'n-1', title: 'Library book', tomorrow: false }])
+    expect(model.isEmpty).toBe(false)
+  })
+
+  it("excludes another member's needed task", () => {
+    const t = task({ id: 'n-2', neededOn: TODAY, assignedTo: 'other-kid' })
+    const model = build([], [], {}, [t])
+    expect(model.needed).toEqual([])
+    expect(model.isEmpty).toBe(true)
+  })
+
+  it('excludes a completed needed task', () => {
+    const t = task({ id: 'n-3', neededOn: TODAY, completed: true })
+    const model = build([], [], {}, [t])
+    expect(model.needed).toEqual([])
+  })
+
+  it('excludes a task needed on another day entirely', () => {
+    const t = task({ id: 'n-4', neededOn: new Date('2026-09-04T09:00:00') })
+    const model = build([], [], {}, [t], EVENING)
+    expect(model.needed).toEqual([])
+  })
+
+  it("omits tomorrow's needed task before 17:00", () => {
+    const t = task({ id: 'n-5', title: 'Gym shoes', neededOn: TOMORROW })
+    const model = build([], [], {}, [t], TODAY)
+    expect(model.needed).toEqual([])
+  })
+
+  it("includes tomorrow's needed task from 17:00, flagged tomorrow", () => {
+    const t = task({ id: 'n-6', title: 'Gym shoes', neededOn: TOMORROW })
+    const model = build([], [], {}, [t], EVENING)
+    expect(model.needed).toEqual([{ id: 'n-6', title: 'Gym shoes', tomorrow: true }])
+  })
+
+  it("puts today's needs before tomorrow's", () => {
+    const later = task({ id: 'n-7', title: 'Gym shoes', neededOn: TOMORROW })
+    const now = task({ id: 'n-8', title: 'Library book', neededOn: TODAY })
+    const model = build([], [], {}, [later, now], EVENING)
+    expect(model.needed.map((n) => n.id)).toEqual(['n-8', 'n-7'])
   })
 })
 

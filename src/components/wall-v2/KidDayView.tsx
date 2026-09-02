@@ -10,9 +10,10 @@ import { WALL } from './wallTheme'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
 import { useMemberInstanceHistory } from './useMemberInstanceHistory'
 import { buildMemberDayModel } from '@/lib/wall/kidDayModel'
-import type { KidRow, KidBandKey, MemberDayModel } from '@/lib/wall/kidDayModel'
+import type { KidRow, KidNeededRow, KidBandKey, MemberDayModel } from '@/lib/wall/kidDayModel'
 import type { Routine } from '@/types/actionable'
 import type { FamilyMember } from '@/types/family'
+import type { Task } from '@/types/task'
 import type { TimelineItem } from '@/types/timeline'
 import type { DaySection } from '@/lib/timeUtils'
 
@@ -37,6 +38,9 @@ interface KidDayViewProps {
   /** Raw routines, from useWallData. */
   routines: Routine[]
   todayItems: Record<DaySection, TimelineItem[]>
+  /** Incomplete tasks carrying `needed_on`, from useWallData's narrow query.
+   *  They have no `scheduled_for`, so they are absent from `todayItems`. */
+  neededTasks: Task[]
   /** Complete/uncomplete a TASK row — the Shell's handleToggleComplete, the
    *  wall's single task-completion path. Explicit direction, never a toggle. */
   onToggleTask: (taskId: string, completed: boolean) => void
@@ -54,7 +58,13 @@ function overlayKey(row: KidRow): string {
   return `${row.entityType}:${row.id}`
 }
 
-export function KidDayView({ member, routines, todayItems, onToggleTask, onClose }: KidDayViewProps) {
+/** A needed-on row wears the plain task-row shape, so it completes through the
+ *  same handler (and the same optimistic overlay) as an assigned task. */
+function neededToRow(needed: KidNeededRow): KidRow {
+  return { entityType: 'task', id: needed.id, title: needed.title, done: false, timeOfDay: null, target: null }
+}
+
+export function KidDayView({ member, routines, todayItems, neededTasks, onToggleTask, onClose }: KidDayViewProps) {
   const { markDone, undoDone, addProgress, setProgress } = useActionableInstances()
   const { history } = useMemberInstanceHistory()
 
@@ -69,17 +79,19 @@ export function KidDayView({ member, routines, todayItems, onToggleTask, onClose
   useEffect(() => {
     setProgressOverlay(new Map())
     setDoneOverlay(new Map())
-  }, [history, todayItems])
+  }, [history, todayItems, neededTasks])
 
   // Which target rows are expanded, and whether they're in "Exact…" mode.
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [exactMode, setExactMode] = useState<Set<string>>(new Set())
   const [exactValue, setExactValue] = useState<Record<string, string>>({})
 
-  const model: MemberDayModel = useMemo(
-    () => buildMemberDayModel({ member, date: new Date(), routines, todayItems, history }),
-    [member, routines, todayItems, history],
-  )
+  const model: MemberDayModel = useMemo(() => {
+    // One clock read for both arguments: the day being rendered IS today on
+    // the kiosk, and `now` is what the evening "needed tomorrow" rule reads.
+    const clock = new Date()
+    return buildMemberDayModel({ member, date: clock, now: clock, routines, todayItems, neededTasks, history })
+  }, [member, routines, todayItems, neededTasks, history])
 
   const resetIdleTimer = useIdleClose(onClose)
 
@@ -276,6 +288,25 @@ export function KidDayView({ member, routines, todayItems, onToggleTask, onClose
           </div>
         ) : (
           <>
+            {model.needed.length > 0 && (
+              <div className={`${WALL.card} p-5 flex flex-col gap-3`}>
+                <div className={`text-[1.15rem] font-bold ${WALL.inkStrong}`}>Needed today</div>
+                {model.needed.some((n) => !n.tomorrow) && (
+                  <div className="flex flex-col gap-2">
+                    {model.needed.filter((n) => !n.tomorrow).map((n) => renderRow(neededToRow(n)))}
+                  </div>
+                )}
+                {model.needed.some((n) => n.tomorrow) && (
+                  <>
+                    <div className={WALL.label}>Tomorrow</div>
+                    <div className="flex flex-col gap-2">
+                      {model.needed.filter((n) => n.tomorrow).map((n) => renderRow(neededToRow(n)))}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
             {model.collections.map((collection) => (
               <div key={collection.id} className={`${WALL.card} p-5 flex flex-col gap-3`}>
                 <div className={`text-[1.15rem] font-bold ${WALL.inkStrong}`}>{collection.title}</div>

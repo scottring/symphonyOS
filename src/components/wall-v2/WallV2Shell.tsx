@@ -814,6 +814,7 @@ export function WallV2Shell() {
           member={kidViewMember}
           routines={wallData.routines}
           todayItems={(wallData.days.find((d) => d.isToday) ?? wallData.days[0])?.items ?? emptySections<TimelineItem>()}
+          neededTasks={wallData.neededTasks}
           onToggleTask={handleToggleComplete}
           onClose={handleCloseKidView}
         />

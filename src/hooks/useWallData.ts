@@ -12,6 +12,8 @@ import {
 import { groupByDaySection, type DaySection } from '@/lib/timeUtils'
 import { isQuietHours } from '@/lib/quietHours'
 import { graceFloor } from '@/lib/today/taskPools'
+import { localYmd, parseLocalYmd } from '@/lib/cadence/config'
+import { addDays } from '@/lib/dateUtils'
 import { resolveFetchOutcome } from '@/hooks/wallDataCommit'
 import { computeScreenTimeSummaries, type ChildScreenTimeSummary } from '@/hooks/useScreenTime'
 import type { TimelineItem } from '@/types/timeline'
@@ -29,7 +31,36 @@ const FAMILY_LAYER: ReadonlySet<Layer> = new Set(['family'])
 // Only the columns the wall actually renders. Avoids `select('*')`, which pulls
 // heavy/unused columns (links jsonb, codes, etc.) on every poll and dominates egress.
 const TASK_COLUMNS =
-  'id, title, completed, created_at, updated_at, scheduled_for, is_all_day, is_waiting, context, category, notes, phone_number, contact_id, assigned_to, project_id, parent_task_id, location, location_place_id'
+  'id, title, completed, created_at, updated_at, scheduled_for, needed_on, is_all_day, is_waiting, context, category, notes, phone_number, contact_id, assigned_to, project_id, parent_task_id, location, location_place_id'
+
+/** One snake_case → Task mapper for every task query on the wall, so a column
+ *  added to TASK_COLUMNS can't reach one list and silently miss another. */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function rowToTask(t: any): Task {
+  return {
+    id: t.id,
+    title: t.title,
+    completed: t.completed,
+    createdAt: new Date(t.created_at),
+    updatedAt: new Date(t.updated_at),
+    scheduledFor: t.scheduled_for ? new Date(t.scheduled_for) : undefined,
+    // `needed_on` is a DATE column — parse it as a local day, never `new
+    // Date(str)` (which reads it as UTC midnight and can land yesterday).
+    neededOn: t.needed_on ? parseLocalYmd(t.needed_on) : undefined,
+    isAllDay: t.is_all_day ?? undefined,
+    isWaiting: t.is_waiting ?? undefined,
+    context: t.context ?? null,
+    category: t.category ?? 'task',
+    notes: t.notes ?? undefined,
+    phoneNumber: t.phone_number ?? undefined,
+    contactId: t.contact_id ?? undefined,
+    assignedTo: t.assigned_to ?? undefined,
+    projectId: t.project_id ?? undefined,
+    parentTaskId: t.parent_task_id ?? undefined,
+    location: t.location ?? undefined,
+    locationPlaceId: t.location_place_id ?? undefined,
+  }
+}
 
 export interface BirthdayItem {
   name: string
@@ -60,6 +91,14 @@ export interface UseWallDataReturn {
   overdueTasks: TimelineItem[]
   /** Raw Task[] for surfaces (e.g. WallNow) that need real Task shape, not TimelineItem. */
   tasks: Task[]
+  /**
+   * Incomplete tasks marked `needed_on` today or tomorrow. A SEPARATE query,
+   * not a slice of `tasks`: a needed-on row (a school-email subtask, say) has
+   * no `scheduled_for`, so the date-ranged task query above cannot see it and
+   * it never becomes a timeline item. Consumed by the kid day view's
+   * "Needed today" card.
+   */
+  neededTasks: Task[]
   /**
    * Raw fetched routine rows — BEFORE the wall's effectiveTimeOfDay remap
    * (a Step's time_of_day stays null here, not filled from its collection
@@ -114,6 +153,7 @@ export function useWallData(): UseWallDataReturn {
   const [screenTimeSummaries, setScreenTimeSummaries] = useState<ChildScreenTimeSummary[]>([])
   const [overdueTasks, setOverdueTasks] = useState<TimelineItem[]>([])
   const [allTasks, setAllTasks] = useState<Task[]>([])
+  const [neededTasks, setNeededTasks] = useState<Task[]>([])
   const [rawRoutines, setRawRoutines] = useState<Routine[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -154,6 +194,7 @@ export function useWallData(): UseWallDataReturn {
         stAdjustmentsRes,
         overdueRes,
         routineCompletionsRes,
+        neededRes,
       ] = await Promise.all([
         // 1. Family members
         supabase.from('family_members').select('*').order('display_order'),
@@ -235,6 +276,18 @@ export function useWallData(): UseWallDataReturn {
           .eq('entity_type', 'routine')
           .eq('status', 'completed')
           .order('date', { ascending: false }),
+
+        // 13. Needed-on tasks for today and tomorrow. Query 2 is ranged on
+        // `scheduled_for` and a needed-on row has none, so these would be
+        // invisible to the wall without their own read. Two days, never a
+        // range: the evening "tomorrow" rule lives in neededWindow, and this
+        // query only has to make sure the rows are in hand when it fires.
+        supabase
+          .from('tasks')
+          .select(TASK_COLUMNS)
+          .eq('completed', false)
+          .eq('context', 'family')
+          .in('needed_on', [todayStr, localYmd(addDays(new Date(), 1))]),
       ])
 
       if (!mountedRef.current) return
@@ -247,34 +300,15 @@ export function useWallData(): UseWallDataReturn {
       const dataError = [
         membersRes, tasksRes, routinesRes, instancesRes, contactsRes,
         milestonesRes, stBudgetsRes, stEntriesRes, stAdjustmentsRes,
-        overdueRes, routineCompletionsRes,
+        overdueRes, routineCompletionsRes, neededRes,
       ].find((r) => r.error)?.error?.message ?? null
 
       const members = (membersRes.data || []) as FamilyMember[]
       setFamilyMembers(members)
 
       // Transform snake_case DB rows to camelCase Task objects
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const tasks: Task[] = (tasksRes.data || []).map((t: any) => ({
-        id: t.id,
-        title: t.title,
-        completed: t.completed,
-        createdAt: new Date(t.created_at),
-        updatedAt: new Date(t.updated_at),
-        scheduledFor: t.scheduled_for ? new Date(t.scheduled_for) : undefined,
-        isAllDay: t.is_all_day ?? undefined,
-        isWaiting: t.is_waiting ?? undefined,
-        context: t.context ?? null,
-        category: t.category ?? 'task',
-        notes: t.notes ?? undefined,
-        phoneNumber: t.phone_number ?? undefined,
-        contactId: t.contact_id ?? undefined,
-        assignedTo: t.assigned_to ?? undefined,
-        projectId: t.project_id ?? undefined,
-        parentTaskId: t.parent_task_id ?? undefined,
-        location: t.location ?? undefined,
-        locationPlaceId: t.location_place_id ?? undefined,
-      }))
+      const tasks: Task[] = (tasksRes.data || []).map(rowToTask)
+      const needed: Task[] = (neededRes.data || []).map(rowToTask)
 
       // Every routine row, keyed by id — the lookup a Step uses to find the
       // hour on its collection. Built before any filtering, because a parent
@@ -429,27 +463,7 @@ export function useWallData(): UseWallDataReturn {
       )
 
       // Transform overdue tasks to timeline items
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const overdueItems: TimelineItem[] = (overdueRes.data || []).map((t: any) => taskToTimelineItem({
-        id: t.id,
-        title: t.title,
-        completed: t.completed,
-        createdAt: new Date(t.created_at),
-        updatedAt: new Date(t.updated_at),
-        scheduledFor: t.scheduled_for ? new Date(t.scheduled_for) : undefined,
-        isAllDay: t.is_all_day ?? undefined,
-        isWaiting: t.is_waiting ?? undefined,
-        context: t.context ?? null,
-        category: t.category ?? 'task',
-        notes: t.notes ?? undefined,
-        phoneNumber: t.phone_number ?? undefined,
-        contactId: t.contact_id ?? undefined,
-        assignedTo: t.assigned_to ?? undefined,
-        projectId: t.project_id ?? undefined,
-        parentTaskId: t.parent_task_id ?? undefined,
-        location: t.location ?? undefined,
-        locationPlaceId: t.location_place_id ?? undefined,
-      }))
+      const overdueItems: TimelineItem[] = (overdueRes.data || []).map((t) => taskToTimelineItem(rowToTask(t)))
 
       // Sort overdue by scheduled date (most recent first)
       overdueItems.sort((a, b) => {
@@ -475,6 +489,7 @@ export function useWallData(): UseWallDataReturn {
           setScreenTimeSummaries(stSummaries)
           setOverdueTasks(overdueItems)
           setAllTasks(tasks)
+          setNeededTasks(needed)
           setRawRoutines(allRoutines)
         }
         setCalendarUnavailable(calendarFailed)
@@ -519,5 +534,5 @@ export function useWallData(): UseWallDataReturn {
     }
   }, [fetchAllData])
 
-  return { days, familyMembers, calendarEvents: calendarEventsState, calendarUnavailable, screenTimeSummaries, overdueTasks, tasks: allTasks, routines: rawRoutines, loading, error, lastRefresh, refetch: fetchAllData }
+  return { days, familyMembers, calendarEvents: calendarEventsState, calendarUnavailable, screenTimeSummaries, overdueTasks, tasks: allTasks, neededTasks, routines: rawRoutines, loading, error, lastRefresh, refetch: fetchAllData }
 }

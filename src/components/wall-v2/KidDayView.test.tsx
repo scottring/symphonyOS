@@ -1,8 +1,9 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import type { Routine, ActionableInstance } from '@/types/actionable'
 import type { FamilyMember } from '@/types/family'
 import type { TimelineItem } from '@/types/timeline'
+import type { Task } from '@/types/task'
 import { emptySections } from '@/lib/today/types'
 
 const mocks = vi.hoisted(() => ({
@@ -64,10 +65,22 @@ function dateStr(d: Date): string {
   return `${y}-${m}-${day}`
 }
 
+function neededTask(over: Partial<Task> = {}): Task {
+  const today = new Date()
+  return {
+    id: `k-${++seq}`, title: 'Needed thing', completed: false,
+    createdAt: today, updatedAt: today,
+    assignedTo: KID.id, context: 'family', category: 'task',
+    neededOn: today,
+    ...over,
+  } as Task
+}
+
 function renderView(props: {
   routines?: Routine[]
   history?: ActionableInstance[]
   todayItems?: Partial<Record<string, TimelineItem[]>>
+  neededTasks?: Task[]
   onToggleTask?: (id: string, completed: boolean) => void
   onClose?: () => void
 } = {}) {
@@ -79,6 +92,7 @@ function renderView(props: {
       member={KID}
       routines={props.routines ?? []}
       todayItems={{ ...emptySections<TimelineItem>(), ...(props.todayItems ?? {}) }}
+      neededTasks={props.neededTasks ?? []}
       onToggleTask={onToggleTask}
       onClose={onClose}
     />,
@@ -217,5 +231,50 @@ describe('KidDayView', () => {
     const { onClose } = renderView()
     fireEvent.click(screen.getByRole('button', { name: /back/i }))
     expect(onClose).toHaveBeenCalled()
+  })
+})
+
+describe('KidDayView — Needed today card', () => {
+  it('renders the card with a tappable row for a task needed today', () => {
+    renderView({ neededTasks: [neededTask({ id: 'need-1', title: 'Library book' })] })
+    expect(screen.getByText('Needed today')).toBeInTheDocument()
+    expect(screen.getByText('Library book')).toBeInTheDocument()
+    expect(screen.queryByText('Nothing on your list — go play.')).not.toBeInTheDocument()
+  })
+
+  it('tapping a needed row completes it through onToggleTask, prefixed once', () => {
+    const { onToggleTask } = renderView({
+      neededTasks: [neededTask({ id: 'need-2', title: 'Gym shoes' })],
+    })
+    fireEvent.click(screen.getByText('Gym shoes'))
+    expect(onToggleTask).toHaveBeenCalledWith('task-need-2', true)
+  })
+
+  it('shows no card when nothing is needed', () => {
+    renderView()
+    expect(screen.queryByText('Needed today')).not.toBeInTheDocument()
+  })
+
+  describe('after 5pm', () => {
+    beforeEach(() => {
+      vi.useFakeTimers({ shouldAdvanceTime: true })
+      vi.setSystemTime(new Date('2026-08-30T18:00:00'))
+    })
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    it('groups a task needed tomorrow under a Tomorrow sub-heading', () => {
+      renderView({
+        neededTasks: [
+          neededTask({ id: 'need-3', title: 'Library book', neededOn: new Date('2026-08-30T09:00:00') }),
+          neededTask({ id: 'need-4', title: 'Swim kit', neededOn: new Date('2026-08-31T09:00:00') }),
+        ],
+      })
+      expect(screen.getByText('Needed today')).toBeInTheDocument()
+      expect(screen.getByText('Library book')).toBeInTheDocument()
+      expect(screen.getByText('Tomorrow')).toBeInTheDocument()
+      expect(screen.getByText('Swim kit')).toBeInTheDocument()
+    })
   })
 })
