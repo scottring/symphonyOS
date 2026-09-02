@@ -12,6 +12,24 @@ import Foundation
 /// equivalent markdown-style text out. Editing on the phone then writes that
 /// markdown text straight back to `notes` — the web's own `notesToHtml`
 /// upgrades it to HTML again next time it loads.
+///
+/// Lossy edges, deliberate:
+///  - **Nested lists.** Tiptap's `ListItem` content is `paragraph block*` (and
+///    `TaskItem` is `nested: true`), so an `<li>` can hold a nested
+///    `<ul>`/`<ol>`/taskList or extra `<p>` siblings. `notesToHtml` has no
+///    markdown syntax for that nesting, so a note edited on the phone and
+///    reloaded on the web comes back as flat bullets/paragraphs instead of a
+///    true sub-list. The content itself is never dropped — every child of
+///    every `<li>` is rendered, indented two spaces per nesting level — this
+///    is a real degrade in STRUCTURE, not in DATA.
+///  - **Code blocks** (`<pre>`) render as a fenced ``` block. The web grammar
+///    doesn't parse fences either, so they come back as a plain paragraph —
+///    but the cue (and the content) survives.
+///  - **Tables.** The web's Tiptap toolbar CAN produce real `<table>` notes
+///    (this isn't a hypothetical), and `notesToHtml` has no table syntax at
+///    all. Cells are joined with " | ", rows with newlines — readable, and
+///    nothing is lost, but it round-trips through the web as plain text, not
+///    a table.
 enum NotesHTML {
     /// Same regex as the web's `BLOCK_TAG`: a note containing one of these
     /// tags is real HTML the web produced; anything else is markdown-style
@@ -148,19 +166,112 @@ enum NotesHTML {
         return out
     }
 
-    /// The text-bearing content of a `<li>` — a bullet/ordered item wraps its
-    /// text in `<p>`; a taskItem nests it inside `<label>` (skip) + `<div><p>`.
-    private static func liContent(_ li: HNode) -> [HNode] {
-        if let p = findFirst(li.children, tag: "p") { return p.children }
+    /// Raw text for a `<pre>` code block — no bold/italic/code markdown, no
+    /// entity re-escaping beyond decode. `<br>` (or a literal newline in the
+    /// text node, which `<pre>` preserves) both become real newlines.
+    private static func codeText(_ nodes: [HNode]) -> String {
+        var out = ""
+        for n in nodes {
+            switch n.tag {
+            case "#text": out += decodeEntities(n.text)
+            case "br": out += "\n"
+            default: out += codeText(n.children)
+            }
+        }
+        return out
+    }
+
+    /// Table rows as cell-text arrays. `<thead>`/`<tbody>`/`<tfoot>` are
+    /// transparent wrappers; any `<tr>` found (at any depth) contributes a row.
+    private static func tableRows(_ nodes: [HNode]) -> [[String]] {
+        var rows: [[String]] = []
+        for n in nodes {
+            if n.tag == "tr" {
+                let cells = n.children
+                    .filter { $0.tag == "td" || $0.tag == "th" }
+                    .map { inline($0.children).trimmingCharacters(in: .whitespacesAndNewlines) }
+                if !cells.isEmpty { rows.append(cells) }
+            } else {
+                rows.append(contentsOf: tableRows(n.children))
+            }
+        }
+        return rows
+    }
+
+    /// The content nodes a list item's bullet line and continuations are
+    /// built from. A bullet/ordered `<li>` holds them directly; a taskItem
+    /// `<li>` wraps them in `<div>` next to the `<label>` checkbox (which is
+    /// dropped — it carries no text, `inline` already treats its `<input>`
+    /// child as silent).
+    private static func liContentNodes(_ li: HNode) -> [HNode] {
+        guard li.children.contains(where: { $0.tag == "label" }) else { return li.children }
+        if let div = li.children.first(where: { $0.tag == "div" }) { return div.children }
         return li.children.filter { $0.tag != "label" }
     }
 
-    private static func findFirst(_ nodes: [HNode], tag: String) -> HNode? {
-        for n in nodes {
-            if n.tag == tag { return n }
-            if let found = findFirst(n.children, tag: tag) { return found }
+    /// Every child of one `<li>`, rendered as markdown lines: the first
+    /// text-bearing child becomes the marker line (`- `, `1. `, `- [x] `);
+    /// every later child is a continuation, indented two spaces past the
+    /// marker's own indent — an extra `<p>` as a plain line, a nested
+    /// `<ul>`/`<ol>` as its own indented list (numbering restarts per list,
+    /// per `renderListLines`), anything else (a `<pre>`, `<table>`,
+    /// `<blockquote>`…) through the generic block renderer. Nothing is
+    /// dropped — see the file header for why that matters.
+    private static func renderLiLines(_ li: HNode, marker: String, depth: Int) -> [String] {
+        let indent = String(repeating: "  ", count: depth)
+        let contIndent = indent + "  "
+        var lines: [String] = []
+        var markerEmitted = false
+
+        func addContentLines(_ text: String) {
+            let textLines = text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+            guard !textLines.isEmpty else { return }
+            for (i, l) in textLines.enumerated() {
+                lines.append((!markerEmitted && i == 0 ? indent + marker : contIndent) + l)
+            }
+            markerEmitted = true
         }
-        return nil
+
+        for child in liContentNodes(li) {
+            switch child.tag {
+            case "p", "#text":
+                let text = (child.tag == "p" ? inline(child.children) : decodeEntities(child.text))
+                    .trimmingCharacters(in: .whitespaces)
+                if !text.isEmpty || !markerEmitted { addContentLines(text) }
+            case "ul", "ol":
+                if !markerEmitted { addContentLines("") } // preserve the marker even with no leading text
+                lines.append(contentsOf: renderListLines(child, depth: depth + 1))
+            default:
+                let rendered = blocks([child]).joined(separator: "\n")
+                if !rendered.isEmpty { addContentLines(rendered) }
+            }
+        }
+        if !markerEmitted { lines.append(indent + marker) }
+        return lines
+    }
+
+    /// A `<ul>`/`<ol>` (bullet, ordered, or taskList) as fully indented
+    /// markdown lines at the given nesting `depth`. Ordered numbering always
+    /// restarts at 1 — that's per-list, not per-document, matching the web's
+    /// own `ORDERED` grammar.
+    private static func renderListLines(_ node: HNode, depth: Int) -> [String] {
+        let items = node.children.filter { $0.tag == "li" }
+        let isTaskList = node.attrs["data-type"] == "taskList"
+        var lines: [String] = []
+        var counter = 1
+        for li in items {
+            let marker: String
+            if node.tag == "ol" {
+                marker = "\(counter). "
+                counter += 1
+            } else if isTaskList {
+                marker = li.attrs["data-checked"] == "true" ? "- [x] " : "- [ ] "
+            } else {
+                marker = "- "
+            }
+            lines.append(contentsOf: renderLiLines(li, marker: marker, depth: depth))
+        }
+        return lines
     }
 
     /// Top-level block elements → markdown blocks, one array entry each.
@@ -175,21 +286,16 @@ enum NotesHTML {
             case "h3", "h4", "h5", "h6":
                 result.append("### \(inline(n.children).trimmingCharacters(in: .whitespaces))")
             case "hr": result.append("---")
-            case "ul":
-                let items = n.children.filter { $0.tag == "li" }
-                let isTaskList = n.attrs["data-type"] == "taskList"
-                let lines = items.map { li -> String in
-                    let text = inline(liContent(li)).trimmingCharacters(in: .whitespaces)
-                    guard isTaskList else { return "- \(text)" }
-                    return (li.attrs["data-checked"] == "true" ? "- [x] " : "- [ ] ") + text
-                }
+            case "ul", "ol":
+                let lines = renderListLines(n, depth: 0)
                 if !lines.isEmpty { result.append(lines.joined(separator: "\n")) }
-            case "ol":
-                let items = n.children.filter { $0.tag == "li" }
-                let lines = items.enumerated().map { index, li in
-                    "\(index + 1). \(inline(liContent(li)).trimmingCharacters(in: .whitespaces))"
-                }
-                if !lines.isEmpty { result.append(lines.joined(separator: "\n")) }
+            case "pre":
+                let code = codeText(n.children).trimmingCharacters(in: .newlines)
+                result.append("```\n\(code)\n```")
+            case "table":
+                let rows = tableRows(n.children)
+                let text = rows.map { $0.joined(separator: " | ") }.joined(separator: "\n")
+                if !text.isEmpty { result.append(text) }
             case "blockquote":
                 let inner = blocks(n.children).joined(separator: "\n\n")
                 let quoted = inner.split(separator: "\n", omittingEmptySubsequences: false)
@@ -203,7 +309,7 @@ enum NotesHTML {
                 let text = decodeEntities(n.text).trimmingCharacters(in: .whitespaces)
                 if !text.isEmpty { result.append(text) }
             default:
-                // li/div/table and anything unrecognised: recurse so their
+                // li/div and anything unrecognised: recurse so their
                 // block-level content still surfaces instead of vanishing.
                 result.append(contentsOf: blocks(n.children))
             }

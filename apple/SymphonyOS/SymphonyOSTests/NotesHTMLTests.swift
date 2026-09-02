@@ -113,4 +113,52 @@ struct NotesHTMLTests {
         #expect(NotesHTML.firstLine("") == nil)
         #expect(NotesHTML.firstLine("   ") == nil)
     }
+
+    // MARK: - Nested lists, extra paragraphs, code blocks, tables (fix round 1)
+    //
+    // `liContent` used to grab only the first `<p>` inside an `<li>` and drop
+    // every sibling after it — a nested list or a second paragraph vanished
+    // silently, and an edit on the phone wrote the truncated note straight
+    // back. These pin the fix: every child of every `<li>` survives, indented
+    // two spaces per nesting level.
+
+    @Test func toMarkdownRendersNestedBulletUnderBullet() {
+        let html = "<ul><li><p>Parent</p><ul><li><p>Child</p></li></ul></li></ul>"
+        #expect(NotesHTML.toMarkdown(html) == "- Parent\n  - Child")
+    }
+
+    @Test func toMarkdownRendersNestedTaskItemUnderTaskItem() {
+        let html = "<ul data-type=\"taskList\">" +
+            "<li data-type=\"taskItem\" data-checked=\"false\">" +
+            "<label><input type=\"checkbox\"><span></span></label>" +
+            "<div><p>Parent task</p>" +
+            "<ul data-type=\"taskList\">" +
+            "<li data-type=\"taskItem\" data-checked=\"true\">" +
+            "<label><input type=\"checkbox\" checked><span></span></label><div><p>Child task</p></div></li>" +
+            "</ul></div></li></ul>"
+        #expect(NotesHTML.toMarkdown(html) == "- [ ] Parent task\n  - [x] Child task")
+    }
+
+    @Test func toMarkdownKeepsEveryParagraphInAListItem() {
+        let html = "<ul><li><p>Para 1</p><p>Para 2</p></li></ul>"
+        #expect(NotesHTML.toMarkdown(html) == "- Para 1\n  Para 2")
+    }
+
+    @Test func toMarkdownRestartsNumberingForOrderedListNestedInBullet() {
+        let html = "<ul><li><p>Item</p><ol><li><p>Sub one</p></li><li><p>Sub two</p></li></ol></li></ul>"
+        #expect(NotesHTML.toMarkdown(html) == "- Item\n  1. Sub one\n  2. Sub two")
+    }
+
+    @Test func toMarkdownFencesCodeBlocks() {
+        let html = "<pre><code>const x = 1;\nconsole.log(x);</code></pre>"
+        #expect(NotesHTML.toMarkdown(html) == "```\nconst x = 1;\nconsole.log(x);\n```")
+    }
+
+    @Test func toMarkdownFlattensTablesReadably() {
+        let html = "<table><tbody>" +
+            "<tr><td><p>A1</p></td><td><p>B1</p></td></tr>" +
+            "<tr><td><p>A2</p></td><td><p>B2</p></td></tr>" +
+            "</tbody></table>"
+        #expect(NotesHTML.toMarkdown(html) == "A1 | B1\nA2 | B2")
+    }
 }
