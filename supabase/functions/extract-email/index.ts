@@ -71,7 +71,7 @@ Deno.serve(async (req: Request) => {
     const userIds = (hm ?? []).map((m) => m.user_id)
     if (userIds.length === 0) throw new Error('household has no active members')
     const { data: fm, error: fmError } = await supabase
-      .from('family_members').select('id, name, role_label, member_type, display_order')
+      .from('family_members').select('id, name, role_label, member_type, display_order, is_full_user')
       .in('user_id', userIds).eq('member_type', 'core').order('display_order', { ascending: true })
     if (fmError) throw new Error(`family_members read failed: ${fmError.message}`)
     const seen = new Set<string>()
@@ -79,7 +79,10 @@ Deno.serve(async (req: Request) => {
       const key = m.name.trim().toLowerCase()
       if (seen.has(key)) return []
       seen.add(key)
-      return [{ id: m.id, name: m.name, isChild: m.role_label === 'child' }]
+      // Households label children inconsistently ('child', 'family', null).
+      // A parent is labelled 'parent' or holds a login; everyone else is a child.
+      const isChild = m.role_label === 'child' ? true : m.role_label === 'parent' ? false : !m.is_full_user
+      return [{ id: m.id, name: m.name, isChild }]
     })
 
     // Existing email-derived blocks (for dedupe), with their child titles.

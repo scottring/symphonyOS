@@ -59,6 +59,14 @@ describe('parseEmailExtraction', () => {
     expect(r.events[0].confidence).toBe(1)
     expect(r.events[0].items[0].needed).toBe('day_of')
   })
+  it('treats an echoed "omit" placeholder as absent', () => {
+    const r = parseEmailExtraction(JSON.stringify({
+      events: [{ title: 'A', date: '2026-09-10', time: 'omit', location: 'omit', for: 'everyone', items: [], source_quote: 'q', confidence: 0.9 }],
+      todos: [], good_to_know: [], gaps: [],
+    }))
+    expect(r.events[0].location).toBeUndefined()
+    expect(r.events[0].time).toBeUndefined()
+  })
   it('returns an empty extraction on garbage', () => {
     expect(parseEmailExtraction('not json at all')).toEqual({ events: [], todos: [], good_to_know: [], gaps: [] })
   })

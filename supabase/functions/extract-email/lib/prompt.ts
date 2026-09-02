@@ -32,6 +32,10 @@ const EMPTY: EmailExtraction = { events: [], todos: [], good_to_know: [], gaps: 
 
 const clamp01 = (n: unknown) => (typeof n === 'number' && Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : 0)
 const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '')
+// The prompt shows optional fields as "...|omit"; a model sometimes echoes the
+// placeholder instead of leaving the key out. Treat those as absent.
+const PLACEHOLDERS = new Set(['omit', 'null', 'none', 'n/a', '-', ''])
+const opt = (v: unknown) => { const s = str(v); return PLACEHOLDERS.has(s.toLowerCase()) ? '' : s }
 
 function who(v: unknown): Who | null {
   if (v === 'everyone') return 'everyone'
@@ -63,9 +67,9 @@ function event(v: unknown): EmailEvent | null {
         return [{ text, for: who(io.for) ?? w, needed: needed(io.needed) }]
       })
     : []
-  const time = /^\d{2}:\d{2}$/.test(str(o.time)) ? str(o.time) : undefined
+  const time = /^\d{2}:\d{2}$/.test(opt(o.time)) ? opt(o.time) : undefined
   return {
-    title, date: o.date, time, location: str(o.location) || undefined, for: w, items,
+    title, date: o.date, time, location: opt(o.location) || undefined, for: w, items,
     source_quote: str(o.source_quote), confidence: clamp01(o.confidence),
   }
 }
