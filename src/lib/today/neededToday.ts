@@ -81,12 +81,37 @@ export function neededToday(
     assignedTo: t.assignedTo ?? null,
   })
 
-  const fromTasks: NeededItem[] = tasks
+  /**
+   * Parents AND the children nested under them.
+   *
+   * Per-person items ("Liam — collared shirt") are SUBTASKS, nested under their
+   * block by `nestSubtasks` in useSupabaseTasks. A flat scan of `tasks` never
+   * reached them, so the wall's kid day card drew them while the note on Today
+   * showed nothing. The parent rides along because the double-render rule below
+   * has to ask where the child is already being drawn.
+   */
+  const entries: { task: Task; parent: Task | null }[] = tasks.flatMap((t) => [
+    { task: t, parent: null },
+    ...(t.subtasks ?? []).map((s) => ({ task: s, parent: t })),
+  ])
+
+  /**
+   * Is this row already on that day's agenda? A task is when it is scheduled
+   * there. A SUBTASK also is when its PARENT is: the block renders its
+   * per-person items inline (ScheduleItemItems), so repeating them in the note
+   * says the same thing twice. A parent on a DIFFERENT day draws nothing here,
+   * and then the note is the only place the child appears.
+   */
+  const drawnOn = (e: { task: Task; parent: Task | null }, day: Date) =>
+    markedOn(e.task.scheduledFor ?? undefined, day) ||
+    markedOn(e.parent?.scheduledFor ?? undefined, day)
+
+  const fromTasks: NeededItem[] = entries
     // A task scheduled ON the viewed day is already in the day's agenda —
     // the note lists only the untimed needs, so nothing shows twice on
     // Today. The mark itself stays: unscheduling returns the task here.
-    .filter((t) => !t.completed && marked(t.neededOn) && !marked(t.scheduledFor ?? undefined))
-    .map(taskItem)
+    .filter((e) => !e.task.completed && marked(e.task.neededOn) && !drawnOn(e, viewedDate))
+    .map((e) => taskItem(e.task))
 
   const fromItems: NeededItem[] = listItems
     .filter((i) => !i.completed && marked(i.neededOn))
@@ -108,14 +133,14 @@ export function neededToday(
   // set to filter here — inventing one would silently show nothing.
   const nextDay = window.tomorrow
   const tomorrowAll: NeededItem[] = nextDay
-    ? tasks
+    ? entries
         .filter(
-          (t) =>
-            !t.completed &&
-            markedOn(t.neededOn, nextDay) &&
-            !markedOn(t.scheduledFor ?? undefined, nextDay),
+          (e) =>
+            !e.task.completed &&
+            markedOn(e.task.neededOn, nextDay) &&
+            !drawnOn(e, nextDay),
         )
-        .map(taskItem)
+        .map((e) => taskItem(e.task))
         .sort((a, b) => KIND_ORDER[a.kind] - KIND_ORDER[b.kind])
     : []
 

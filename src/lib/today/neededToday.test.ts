@@ -53,6 +53,47 @@ describe('neededToday', () => {
     expect(items.map(i => i.id)).toEqual(['a'])
   })
 
+  // Per-person items arrive NESTED under their parent (nestSubtasks in
+  // useSupabaseTasks), so a flat read of `tasks` never saw them: the wall's kid
+  // card drew "Liam — collared shirt" while the note on Today showed nothing.
+  it('sees a subtask nested under its parent', () => {
+    const { items } = neededToday(
+      [task({
+        id: 'p', title: 'Picture Day',
+        subtasks: [task({ id: 's', title: 'Collared shirt', neededOn: DAY })],
+      })],
+      [], DAY, SHOPPING,
+    )
+    expect(items.map(i => i.id)).toEqual(['s'])
+    expect(items[0].title).toBe('Collared shirt')
+  })
+
+  // The block already renders its per-person items inline (ScheduleItemItems),
+  // so listing the child in the note as well is the same row twice.
+  it('excludes a nested subtask whose PARENT is scheduled on the viewed day', () => {
+    const { items } = neededToday(
+      [task({
+        id: 'p', scheduledFor: DAY, isAllDay: true,
+        subtasks: [task({ id: 's', neededOn: DAY })],
+      })],
+      [], DAY, SHOPPING,
+    )
+    expect(items).toEqual([])
+  })
+
+  // Parent on a DIFFERENT day means nothing draws the child on this one — the
+  // note is the only place it can appear.
+  it('keeps a nested subtask when its parent sits on another day', () => {
+    const { items } = neededToday(
+      [task({
+        id: 'p', scheduledFor: new Date(2026, 7, 21, 9, 0),
+        subtasks: [task({ id: 's', neededOn: DAY })],
+      })],
+      [], DAY, SHOPPING,
+    )
+    expect(items.map(i => i.id)).toEqual(['s'])
+  })
+
   it('matches by calendar day, ignoring time of day', () => {
     const { items } = neededToday([task({ id: 'a', neededOn: new Date(2026, 7, 19, 23, 30) })], [], DAY, SHOPPING)
     expect(items).toHaveLength(1)
@@ -225,6 +266,32 @@ describe('neededToday tomorrow group', () => {
     expect(items).toHaveLength(4)
     expect(tomorrow).toHaveLength(1)
     expect(overflow).toBe(2)
+  })
+
+  // The evening question is "what does tomorrow need?" — and per-person items
+  // are exactly that. A parent sitting on TODAY does not draw them tomorrow,
+  // so they belong in this group.
+  it('lists a nested subtask marked for tomorrow, even under a parent on today', () => {
+    const { tomorrow } = neededToday(
+      [task({
+        id: 'p', scheduledFor: DAY, isAllDay: true,
+        subtasks: [task({ id: 's', title: 'Swim bag', neededOn: TOMORROW })],
+      })],
+      [], DAY, SHOPPING, undefined, EVENING,
+    )
+    expect(tomorrow.map(i => i.id)).toEqual(['s'])
+    expect(tomorrow[0].title).toBe('Swim bag')
+  })
+
+  it('excludes a nested subtask whose parent is scheduled on tomorrow', () => {
+    const { tomorrow } = neededToday(
+      [task({
+        id: 'p', scheduledFor: TOMORROW, isAllDay: true,
+        subtasks: [task({ id: 's', neededOn: TOMORROW })],
+      })],
+      [], DAY, SHOPPING, undefined, EVENING,
+    )
+    expect(tomorrow).toEqual([])
   })
 
   it('returns an empty group when nothing is marked for tomorrow', () => {
