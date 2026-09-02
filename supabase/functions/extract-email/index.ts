@@ -165,8 +165,22 @@ Deno.serve(async (req: Request) => {
       }
     }
 
+    if (plan.notices.length) {
+      // Retry-safe: the model re-phrases between runs, so match by token
+      // containment (itemsMatch), the same rule the inbox uses.
+      const { data: existingNotices, error: existingNoticesError } = await supabase
+        .from('notices').select('text').eq('capture_id', capture.id)
+      if (existingNoticesError) throw new Error(`existing notices read failed: ${existingNoticesError.message}`)
+      const seenTexts = (existingNotices ?? []).map((r) => r.text as string)
+      const noticesToInsert = plan.notices.filter((n) => !seenTexts.some((e) => itemsMatch(e, n.text)))
+      if (noticesToInsert.length) {
+        const { error } = await supabase.from('notices').insert(noticesToInsert)
+        if (error) throw new Error(`notices insert failed: ${error.message}`)
+      }
+    }
+
     await supabase.from('captures').update({ status: 'extracted', error: null }).eq('id', capture.id)
-    return json({ ok: true, events: plan.events.length, children, inbox: plan.inbox.length, note: !!plan.note })
+    return json({ ok: true, events: plan.events.length, children, inbox: plan.inbox.length, note: !!plan.note, notices: plan.notices.length })
   } catch (e) {
     const { error: markError } = await supabase.from('captures').update({ status: 'failed', error: String(e) }).eq('id', capture.id)
     // If even this write fails the capture stays 'pending' and looks like a
