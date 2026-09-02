@@ -76,12 +76,20 @@ enum PageIngest {
         var outcome = CommitOutcome()
         let vm = TaskViewModel(modelContext: modelContext)
         let weekStart = PageParse.weekStartAnchor(now: Date())
-        let me = FamilyMember.current(in: members, authUserId: userId)?.id
+        // Two different questions, two different lookups: `defaultAssignee`
+        // is "who is the app user" (FamilyMember.current's broader fallback
+        // chain, fine for defaulting an unassigned line to the planner), but
+        // `selfOwnerId` answers scopeForDomain's self-exclusion — the strict
+        // memberForAuthUser twin, since a page capture's owner-as-self
+        // question is the same one ScopeRule.derive answers for every other
+        // write path.
+        let defaultAssignee = FamilyMember.current(in: members, authUserId: userId)?.id
+        let selfOwnerId = ScopeRule.memberForAuthUser(in: members, authUserId: userId)?.id
 
         var firstTaskId: UUID?
         for item in items {
-            let fields = PageParse.taskFields(for: item, currentWeekStart: weekStart, defaultAssignee: me,
-                                              selfMemberId: me)
+            let fields = PageParse.taskFields(for: item, currentWeekStart: weekStart, defaultAssignee: defaultAssignee,
+                                              selfMemberId: selfOwnerId)
             let task = vm.createTask(fields: fields, userId: userId)
             outcome.tasksCreated += 1
             firstTaskId = firstTaskId ?? task.id

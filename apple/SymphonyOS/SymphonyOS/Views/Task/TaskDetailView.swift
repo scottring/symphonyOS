@@ -160,12 +160,20 @@ struct TaskDetailView: View {
                         // working "When" grid is that this one sits behind an
                         // `if !familyMembers.isEmpty` — LazyVGrid appears not
                         // to lay out its cells reliably on a pass where it
-                        // first appears via a conditional. A plain VStack
+                        // first appears via a conditional. A non-lazy `Grid`
+                        // (fixed two columns, matching the original design)
                         // sidesteps it and made assignee chips tappable again
                         // (they were silently unreachable from the phone).
-                        VStack(alignment: .leading, spacing: 8) {
-                            ForEach(sortedMembers, id: \.id) { member in
-                                assigneeChip(member)
+                        Grid(alignment: .leading, horizontalSpacing: 8, verticalSpacing: 8) {
+                            ForEach(Array(memberPairs.enumerated()), id: \.offset) { _, pair in
+                                GridRow {
+                                    assigneeChip(pair.0)
+                                    if let second = pair.1 {
+                                        assigneeChip(second)
+                                    } else {
+                                        Color.clear
+                                    }
+                                }
                             }
                         }
                     }
@@ -527,6 +535,15 @@ struct TaskDetailView: View {
 
     private var sortedMembers: [FamilyMember] {
         familyMembers.sorted { $0.displayOrder < $1.displayOrder }
+    }
+
+    /// `sortedMembers` chunked into rows of two, for the fixed two-column
+    /// `Grid` below — `Grid`/`GridRow` want a uniform cell count per row, so
+    /// an odd trailing member pairs with `nil` (rendered as an empty cell).
+    private var memberPairs: [(FamilyMember, FamilyMember?)] {
+        stride(from: 0, to: sortedMembers.count, by: 2).map { i in
+            (sortedMembers[i], i + 1 < sortedMembers.count ? sortedMembers[i + 1] : nil)
+        }
     }
 
     private var assignedSet: Set<UUID> {
