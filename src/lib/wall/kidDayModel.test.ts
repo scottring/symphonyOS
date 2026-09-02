@@ -5,6 +5,7 @@ import type { FamilyMember } from '@/types/family'
 import { emptySections } from '@/lib/today/types'
 import type { TimelineItem } from '@/types/timeline'
 import type { Task } from '@/types/task'
+import type { WallNotice } from '@/hooks/useWallData'
 
 const KID = { id: 'kid-1', name: 'Kaleb' } as FamilyMember
 const TODAY = new Date('2026-08-30T10:00:00') // a Sunday
@@ -56,6 +57,8 @@ function build(
   items: Partial<Record<string, TimelineItem[]>> = {},
   neededTasks: Task[] = [],
   now: Date = TODAY,
+  homeworkTasks: Task[] = [],
+  notices: WallNotice[] = [],
 ) {
   return buildMemberDayModel({
     member: KID,
@@ -65,6 +68,8 @@ function build(
     history,
     todayItems: { ...emptySections<TimelineItem>(), ...items },
     neededTasks,
+    homeworkTasks,
+    notices,
   })
 }
 
@@ -296,5 +301,45 @@ describe('streakFor', () => {
       inst({ entity_id: r.id, date: '2026-08-28', status: 'pending' }), // Friday, not a recurring day
     ]
     expect(streakFor(r, history, TODAY)).toBe(2)
+  })
+})
+
+describe('homework + notices', () => {
+  it('lists open homework for the member, ordered, with due + notes', () => {
+    const model = build([], [], {}, [], TODAY, [
+      task({ id: 'h-undated', title: 'Reading log', category: 'homework' }),
+      task({ id: 'h-late', title: 'Blue sheet', category: 'homework', neededOn: new Date('2026-08-28T00:00:00'), notes: 'Permission slip, $12' }),
+      task({ id: 'h-other', title: 'Not mine', category: 'homework', assignedTo: 'kid-2' }),
+      task({ id: 'h-done', title: 'Done', category: 'homework', completed: true }),
+    ])
+    expect(model.homework).toEqual([
+      { id: 'h-late', title: 'Blue sheet', due: 'Late', late: true, notes: 'Permission slip, $12' },
+      { id: 'h-undated', title: 'Reading log', due: null, late: false, notes: null },
+    ])
+    expect(model.isEmpty).toBe(false)
+  })
+
+  it('a homework task due today is NOT also a needed row', () => {
+    const t = task({ id: 'h1', category: 'homework', neededOn: TODAY })
+    const model = build([], [], {}, [t], TODAY, [t])
+    expect(model.needed).toEqual([])
+    expect(model.homework.map((h) => h.id)).toEqual(['h1'])
+  })
+
+  it('a homework task on the timeline is NOT also a band row', () => {
+    const model = build([], [], { morning: [taskItem({ id: 'task-h1', title: 'HW', category: 'homework' })] }, [], TODAY,
+      [task({ id: 'h1', title: 'HW', category: 'homework' })])
+    expect(model.bands.morning).toEqual([])
+    expect(model.homework).toHaveLength(1)
+  })
+
+  it('notices: mine or everyone, newest first; they never make the page non-empty', () => {
+    const model = build([], [], {}, [], TODAY, [], [
+      { id: 'n-old', familyMemberId: null, text: 'Old', senderLabel: 'School', receivedOn: new Date('2026-08-20T00:00:00') },
+      { id: 'n-mine', familyMemberId: 'kid-1', text: 'PE is Tue/Thu', senderLabel: 'School', receivedOn: new Date('2026-08-29T00:00:00') },
+      { id: 'n-other', familyMemberId: 'kid-2', text: 'Not mine', senderLabel: null, receivedOn: new Date('2026-08-29T00:00:00') },
+    ])
+    expect(model.notices.map((n) => n.id)).toEqual(['n-mine', 'n-old'])
+    expect(model.isEmpty).toBe(true)
   })
 })

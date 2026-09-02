@@ -20,6 +20,8 @@ import { groupRoutineSteps } from '@/lib/today/routineCollections'
 import { stepAppliesOnDate } from '@/lib/today/stepSchedule'
 import { neededWindow } from '@/lib/today/neededToday'
 import { isSameDay } from '@/lib/dateUtils'
+import { homeworkDue, sortHomework } from '@/lib/wall/homeworkLabel'
+import type { WallNotice } from '@/hooks/useWallData'
 
 export type KidBandKey = 'morning' | 'afternoon' | 'evening' | 'anytime'
 
@@ -55,9 +57,32 @@ export interface KidNeededRow {
   tomorrow: boolean
 }
 
+/** A row of the "Homework" card — open homework assigned to this member,
+ *  until it is checked off. Due label and order come from homeworkLabel,
+ *  shared with the board, so the two can never disagree about "Fri". */
+export interface KidHomeworkRow {
+  id: string // raw task uuid — the view prefixes it once for onToggleTask
+  title: string
+  /** 'Today' | 'Tomorrow' | 'Fri' | 'Sep 9' | 'Late' | null when undated */
+  due: string | null
+  late: boolean
+  /** Supporting detail (what the form is, the $12), or null. */
+  notes: string | null
+}
+
+/** A row of the "From school" card. Information, never work. */
+export interface KidNoticeRow {
+  id: string
+  text: string
+  senderLabel: string | null
+  receivedOn: Date
+}
+
 export interface MemberDayModel {
   /** Rendered first, above the collections — today's needs, then tomorrow's. */
   needed: KidNeededRow[]
+  homework: KidHomeworkRow[]
+  notices: KidNoticeRow[]
   collections: KidCollection[]
   bands: Record<KidBandKey, KidRow[]>
   isEmpty: boolean
@@ -187,9 +212,16 @@ export function buildMemberDayModel(input: {
    * `todayItems` and the wall fetches it with its own narrow query.
    */
   neededTasks: Task[]
+  /** Open homework, any date (useWallData.homeworkTasks). Optional so
+   *  callers that predate the card keep working. */
+  homeworkTasks?: Task[]
+  /** Standing info from school (useWallData.notices). */
+  notices?: WallNotice[]
   history: ActionableInstance[]
 }): MemberDayModel {
   const { member, date, now, routines, todayItems, neededTasks, history } = input
+  const homeworkTasks = input.homeworkTasks ?? []
+  const noticeInput = input.notices ?? []
   const todayStr = toDateStr(date)
   const byId = new Map<string, Pick<Routine, 'id' | 'time_of_day'>>(routines.map((r) => [r.id, r]))
 
@@ -238,6 +270,8 @@ export function buildMemberDayModel(input: {
     for (const item of todayItems[section]) {
       if (item.type !== 'task') continue
       if (item.assignedTo !== member.id) continue
+      // The Homework card owns homework rows — one row per item on the page.
+      if (item.category === 'homework') continue
       const row: KidRow = {
         entityType: 'task',
         // taskToTimelineItem prefixes the timeline id (`task-${task.id}`) —
@@ -259,7 +293,9 @@ export function buildMemberDayModel(input: {
   // and the phone can never disagree about when tomorrow starts showing.
   const window = neededWindow(date, now)
   const neededOnDay = (t: Task, day: Date) => !!t.neededOn && isSameDay(t.neededOn, day)
-  const forMember = neededTasks.filter((t) => !t.completed && t.assignedTo === member.id)
+  // Homework is excluded here too: a form due today is still the Homework
+  // card's row, not a second one under "Needed today".
+  const forMember = neededTasks.filter((t) => !t.completed && t.assignedTo === member.id && t.category !== 'homework')
   const needed: KidNeededRow[] = [
     ...forMember.filter((t) => neededOnDay(t, window.today)).map((t) => ({ id: t.id, title: t.title, tomorrow: false })),
     ...(window.tomorrow
@@ -269,11 +305,27 @@ export function buildMemberDayModel(input: {
       : []),
   ]
 
+  // Homework: the card owns these rows. Order and label come from
+  // homeworkLabel so the page and the board never disagree about "Fri".
+  const mine = homeworkTasks.filter((t) => !t.completed && t.assignedTo === member.id)
+  const homework: KidHomeworkRow[] = sortHomework(mine, now).map((t) => {
+    const due = homeworkDue(t.neededOn, now)
+    return { id: t.id, title: t.title, due: due.label, late: due.late, notes: t.notes?.trim() || null }
+  })
+
+  // Notices: addressed to this member or to everyone. Newest first. They are
+  // information, not work, so they never count toward isEmpty.
+  const notices: KidNoticeRow[] = noticeInput
+    .filter((n) => n.familyMemberId === null || n.familyMemberId === member.id)
+    .sort((a, b) => b.receivedOn.getTime() - a.receivedOn.getTime() || a.text.localeCompare(b.text))
+    .map((n) => ({ id: n.id, text: n.text, senderLabel: n.senderLabel, receivedOn: n.receivedOn }))
+
   // Rule 9
   const isEmpty =
     needed.length === 0 &&
+    homework.length === 0 &&
     collections.length === 0 &&
     Object.values(bands).every((rows) => rows.length === 0)
 
-  return { needed, collections, bands, isEmpty }
+  return { needed, homework, notices, collections, bands, isEmpty }
 }
