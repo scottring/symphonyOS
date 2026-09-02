@@ -129,6 +129,23 @@ describe('EmailReviewSheet', () => {
     expect(within(parent).getByRole('button', { name: 'Reschedule' })).toBeInTheDocument()
   })
 
+  // The sheet's body scrolls (`max-h-[85vh] overflow-auto`), and an absolutely
+  // positioned popover inside a scroll container is CLIPPED by it — the
+  // fix-date grid was cut off at the sheet's edge, which is the one control
+  // this sheet exists to offer. It is portalled now, so nothing between it and
+  // the document can clip it.
+  it('opens the fix-date grid outside the sheet’s scroll container', async () => {
+    const { user } = renderSheet()
+    const row = screen.getByTestId('email-review-row-p1')
+    await user.click(within(row).getByRole('button', { name: 'Reschedule' }))
+
+    const menu = screen.getByRole('menu')
+    expect(row.contains(menu)).toBe(false)
+    for (let el: HTMLElement | null = menu.parentElement; el; el = el.parentElement) {
+      expect(typeof el.className === 'string' ? el.className : '').not.toMatch(/overflow-/)
+    }
+  })
+
   it('says where a row landed, and names the inbox when it has no date', () => {
     renderSheet()
     expect(within(screen.getByTestId('email-review-row-p2')).getByText('Inbox')).toBeInTheDocument()
