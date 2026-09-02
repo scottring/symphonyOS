@@ -18,36 +18,54 @@ struct InboxView: View {
         ZStack {
             Color.bgBase.ignoresSafeArea()
 
-            if inboxTasks.isEmpty {
-                emptyState
-            } else {
-                ScrollView {
-                    LazyVStack(spacing: 4) {
-                        ForEach(filteredTasks, id: \.id) { task in
-                            InboxTaskRow(
-                                task: task,
-                                modelContext: modelContext,
-                                userId: auth.currentUser?.id ?? UUID()
-                            )
-                            .padding(.horizontal, 16)
+            VStack(spacing: 0) {
+                // Editorial masthead — mirrors Today's own header instead of
+                // the system nav-bar title (which renders in system bold sans,
+                // off-brand for Nordic Journal's serif display type).
+                Text("Inbox")
+                    .font(.displayLarge)
+                    .foregroundStyle(Color.textPrimary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 20)
+                    .padding(.top, 8)
+                    .padding(.bottom, 4)
+
+                ZStack {
+                    if inboxTasks.isEmpty {
+                        emptyState
+                    } else {
+                        ScrollView {
+                            LazyVStack(spacing: 4) {
+                                ForEach(filteredTasks, id: \.id) { task in
+                                    InboxTaskRow(
+                                        task: task,
+                                        modelContext: modelContext,
+                                        userId: auth.currentUser?.id ?? UUID()
+                                    )
+                                    .padding(.horizontal, 16)
+                                }
+                            }
+                            .padding(.vertical, 8)
+                            .padding(.bottom, 80)
                         }
                     }
-                    .padding(.vertical, 8)
-                    .padding(.bottom, 80)
-                }
-            }
 
-            // Quick capture
-            if let userId = auth.currentUser?.id {
-                VStack {
-                    Spacer()
-                    QuickCaptureBar(userId: userId)
+                    // Quick capture
+                    if let userId = auth.currentUser?.id {
+                        VStack {
+                            Spacer()
+                            QuickCaptureBar(userId: userId)
+                        }
+                        // See TodayView's matching comment (F4) — the dock's
+                        // safeAreaInset lives outside this NavigationStack, so
+                        // pad explicitly to clear it.
+                        .padding(.bottom, DockMetrics.height)
+                    }
                 }
             }
         }
-        .navigationTitle("Inbox")
         #if os(iOS)
-        .navigationBarTitleDisplayMode(.large)
+        .toolbar(.hidden, for: .navigationBar)
         #endif
     }
 

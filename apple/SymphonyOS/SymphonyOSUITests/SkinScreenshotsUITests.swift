@@ -270,4 +270,118 @@ final class SkinScreenshotsUITests: XCTestCase {
             }
         }
     }
+
+    // MARK: - F2: editing a plain row's notes must flip it to a block WITHOUT leaving Today
+
+    /// Adds a fresh task via QuickCaptureBar (lands as a plain row — no
+    /// notes), opens its detail sheet, types a note, dismisses with Done, and
+    /// confirms — without navigating away from Today — that the row now
+    /// renders as a block (its note line visible). Before F2 this required
+    /// leaving and re-entering Today because `tasksRevision` didn't hash
+    /// `notes`.
+    @MainActor
+    func testEditingNotesFlipsPlainRowToBlockWithoutLeavingToday() throws {
+        let app = XCUIApplication()
+        app.launch()
+        installSystemAlertMonitor(app)
+        signIn(app)
+
+        let today = app.staticTexts["Today"]
+        XCTAssertTrue(today.waitForExistence(timeout: 30), "never reached Today")
+
+        let uniqueTitle = "F2 note check \(Int(Date().timeIntervalSince1970))"
+        let field = app.textFields["Add to today…"]
+        XCTAssertTrue(field.waitForExistence(timeout: 10), "no QuickCaptureBar field on Today")
+        field.tap()
+        field.typeText(uniqueTitle)
+        app.keyboards.buttons["return"].tap()
+
+        let row = app.staticTexts[uniqueTitle].firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 15), "new task never appeared on Today")
+        attach(name: "f2-01-before-plain-row")
+
+        // Let the post-create sync settle (push + any pull-reconcile) before
+        // swiping — a mid-gesture rebuild can drop the in-flight drag.
+        Thread.sleep(forTimeInterval: 2)
+        XCTAssertTrue(row.exists, "row disappeared before the swipe")
+        revealSlideActions(row)
+        // "More" is ambiguous with the dock's own "More" tab — disambiguate
+        // by Y position the same way testTodayInboxAndTaskSheetSkin does.
+        let dockAnchorY = app.buttons["Projects"].frame.minY
+        var openedTaskSheet = false
+        let moreCandidates = app.buttons.matching(NSPredicate(format: "label == 'More'"))
+        XCTAssertTrue(moreCandidates.firstMatch.waitForExistence(timeout: 5), "row action panel never revealed")
+        for i in 0..<moreCandidates.count {
+            let el = moreCandidates.element(boundBy: i)
+            if el.exists, el.frame.minY < dockAnchorY - 50 {
+                el.tap()
+                openedTaskSheet = true
+                break
+            }
+        }
+        XCTAssertTrue(openedTaskSheet, "couldn't find the row's 'More' action distinct from the dock tab")
+
+        let taskSheetTitle = app.navigationBars["Task"]
+        XCTAssertTrue(taskSheetTitle.waitForExistence(timeout: 10), "task detail sheet never opened")
+
+        let notesEditor = app.textViews.firstMatch
+        XCTAssertTrue(notesEditor.waitForExistence(timeout: 5), "no notes TextEditor in task detail")
+        notesEditor.tap()
+        let noteText = "field is behind the gym, park on Elm"
+        notesEditor.typeText(noteText)
+
+        app.buttons["Done"].firstMatch.tap()
+        // Back on Today — without ever leaving it.
+        XCTAssertTrue(today.waitForExistence(timeout: 10))
+
+        // The row must now be a BLOCK: its note line renders as visible text.
+        let noteLine = app.staticTexts[noteText].firstMatch
+        XCTAssertTrue(noteLine.waitForExistence(timeout: 10), "row did not flip to a block after editing notes — tasksRevision may not be hashing notes")
+        attach(name: "f2-02-after-block")
+    }
+
+    // MARK: - F4: does the dock survive a NavigationLink push?
+
+    /// More → Settings pushes a new view onto the More tab's NavigationStack.
+    /// The Task 3 fix attached the dock via `.safeAreaInset` on each stack's
+    /// ROOT view — verifies whether a push still shows it, or whether the
+    /// pushed hosting controller covers it.
+    @MainActor
+    func testDockOnPushedScreen() throws {
+        let app = XCUIApplication()
+        app.launch()
+        installSystemAlertMonitor(app)
+        signIn(app)
+
+        let today = app.staticTexts["Today"]
+        XCTAssertTrue(today.waitForExistence(timeout: 30), "never reached Today")
+        attach(name: "f4-01-today-dock")
+        print("F4 measure: window frame = \(app.windows.firstMatch.frame)")
+        print("F4 measure: Today dock button frame = \(app.buttons["Today"].frame)")
+        print("F4 measure: Add dock button frame = \(app.buttons["Add"].frame)")
+        print("F4 measure: Projects dock button frame = \(app.buttons["Projects"].frame)")
+
+        let moreTab = app.buttons["More"]
+        XCTAssertTrue(moreTab.waitForExistence(timeout: 10), "no More tab")
+        moreTab.tap()
+
+        let settingsRow = app.buttons["Settings"]
+        XCTAssertTrue(settingsRow.waitForExistence(timeout: 10), "no Settings row in More")
+        attach(name: "f4-02-more-dock")
+        settingsRow.tap()
+
+        // Something on SettingsView to confirm the push landed.
+        let signedInAs = app.staticTexts["symphonytest4444@gmail.com"]
+        _ = signedInAs.waitForExistence(timeout: 10)
+        attach(name: "f4-03-settings-pushed")
+
+        // The dock's own tab buttons — if the push covers the dock, these
+        // won't exist at all (not just be non-hittable, since the dock view
+        // itself would be off-screen/removed).
+        let todayTabOnPush = app.buttons["Today"]
+        let dockSurvives = todayTabOnPush.exists
+        // Not an XCTAssert — this is a diagnostic run, not a pass/fail gate.
+        // The report records whichever way this comes out.
+        print("F4 diagnostic: dock Today tab exists on pushed Settings screen = \(dockSurvives)")
+    }
 }

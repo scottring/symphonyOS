@@ -95,6 +95,11 @@ struct TodayView: View {
                     Spacer()
                     QuickCaptureBar(userId: userId, defaultDate: appState.selectedDate)
                 }
+                // The dock's `.safeAreaInset` is attached outside this
+                // NavigationStack (see iOSMainView, F4) so it doesn't propagate
+                // down here — pad explicitly by the dock's own content height
+                // so the bar floats clear of it instead of sitting behind it.
+                .padding(.bottom, DockMetrics.height)
             }
         }
         #if os(iOS)
@@ -114,6 +119,9 @@ struct TodayView: View {
         .onChange(of: tasksRevision) { _, _ in rebuildTimeline() }
         .onChange(of: instancesRevision) { _, _ in rebuildTimeline() }
         .onChange(of: playbookInstances.count) { _, _ in rebuildTimeline() }
+        // A note/link edit on an EventNote (via the event detail sheet) must
+        // flip its timeline row from plain to block without leaving Today.
+        .onChange(of: eventNotesRevision) { _, _ in rebuildTimeline() }
         // Google events arrived (or changed) → fold them into the timeline.
         .onChange(of: calendar.eventItems.count) { _, _ in rebuildTimeline() }
     }
@@ -293,9 +301,12 @@ struct TodayView: View {
     }
 
     /// A content fingerprint of the task list. Changes whenever a task is added,
-    /// removed, completed, or rescheduled — the signals that affect what the
-    /// timeline shows. Keying `.onChange` on this (instead of `allTasks.count`)
-    /// makes completion/reschedule actually re-derive the Today view.
+    /// removed, completed, rescheduled, or edited in any field the block card
+    /// (TimelineItemCard) renders — the signals that affect what the timeline
+    /// shows. Keying `.onChange` on this (instead of `allTasks.count`) makes
+    /// completion/reschedule/edit actually re-derive the Today view. Without
+    /// title/notes/phoneNumber/links/etc here, editing a task's notes on the
+    /// phone left its row plain until Today was re-entered.
     private var tasksRevision: Int {
         var hasher = Hasher()
         hasher.combine(allTasks.count)
@@ -304,6 +315,29 @@ struct TodayView: View {
             hasher.combine(task.completed)
             hasher.combine(task.scheduledFor)
             hasher.combine(task.bucket)
+            hasher.combine(task.title)
+            hasher.combine(task.notes)
+            hasher.combine(task.phoneNumber)
+            hasher.combine(task.links?.count)
+            hasher.combine(task.location)
+            hasher.combine(task.parentTaskId)
+            hasher.combine(task.captureId)
+            hasher.combine(task.scope)
+            hasher.combine(task.assignedTo)
+            hasher.combine(task.assignedToAll?.count)
+        }
+        return hasher.finalize()
+    }
+
+    /// Same idea for EventNote content — notes/links typed in the event detail
+    /// sheet must flip a plain event row into a block card without leaving Today.
+    private var eventNotesRevision: Int {
+        var hasher = Hasher()
+        hasher.combine(eventNotes.count)
+        for note in eventNotes {
+            hasher.combine(note.id)
+            hasher.combine(note.notes)
+            hasher.combine(note.links?.count)
         }
         return hasher.finalize()
     }

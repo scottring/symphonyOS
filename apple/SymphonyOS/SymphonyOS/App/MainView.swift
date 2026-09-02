@@ -32,29 +32,32 @@ struct iOSMainView: View {
     var body: some View {
         @Bindable var state = appState
         Group {
-            // The dock's `.safeAreaInset` is attached to each NavigationStack's
-            // OWN content (inside the stack), not to the `Group` wrapping the
-            // switch. A NavigationStack hosts its content in its own UIKit view
-            // controller, which does not forward a safe-area inset added by an
-            // ancestor OUTSIDE the stack down to that content — so a sibling
-            // `VStack { Spacer(); QuickCaptureBar() }` inside TodayView/InboxView
-            // never saw the reserved space and rendered behind the dock.
-            // Attaching the inset to each destination view directly — INSIDE the
-            // NavigationStack initializer, not wrapping the stack from outside —
-            // keeps it inside the same view-controller boundary that Today/Inbox
-            // actually measure against (an inset attached to `NavigationStack { … }`
-            // from outside the braces still doesn't propagate down).
+            // The dock's `.safeAreaInset` was briefly attached to each
+            // NavigationStack's OWN content (inside the stack) instead of here,
+            // to get the floating QuickCaptureBar to see the reserved space
+            // (see the padding comment in TodayView/InboxView). That traded one
+            // bug for another: a NavigationLink push (More → Settings, say)
+            // installs a new hosting controller that covers the root view the
+            // inset was attached to, and the dock — living inside that same
+            // view-controller boundary — went with it (F4). Attaching the inset
+            // to this `Group`, OUTSIDE every NavigationStack, keeps the dock in
+            // its own layer above the stack's own view-controller churn, so it
+            // now survives pushes. The tradeoff: this boundary doesn't forward
+            // the inset down into Today/Inbox's own content, so their floating
+            // capture bar instead gets an explicit `.padding(.bottom:
+            // SymphonyDock.height)` sized to match.
             switch state.activeTab {
             case .today:
-                NavigationStack { TodayView().safeAreaInset(edge: .bottom, spacing: 0) { dock } }
+                NavigationStack { TodayView() }
             case .inbox:
-                NavigationStack { InboxView().safeAreaInset(edge: .bottom, spacing: 0) { dock } }
+                NavigationStack { InboxView() }
             case .projects:
-                NavigationStack { ProjectListView().safeAreaInset(edge: .bottom, spacing: 0) { dock } }
+                NavigationStack { ProjectListView() }
             case .more:
-                NavigationStack { MoreView().safeAreaInset(edge: .bottom, spacing: 0) { dock } }
+                NavigationStack { MoreView() }
             }
         }
+        .safeAreaInset(edge: .bottom, spacing: 0) { dock }
         .sheet(isPresented: $showCapture) {
             if let userId = auth.currentUser?.id {
                 CaptureSheet(userId: userId)
@@ -67,6 +70,20 @@ struct iOSMainView: View {
             Task { await PhotoCaptureService.retryPending(modelContext: modelContext) }
         }
     }
+}
+
+// MARK: - Dock metrics (shared with TodayView/InboxView's floating capture bar)
+
+/// The dock's own content height above the home indicator — NOT the full
+/// `.safeAreaInset` height (which also swallows the home indicator strip via
+/// `ignoresSafeArea(edges: .bottom)`). Measured from the dock's accessibility
+/// frame in the simulator: a tab button's frame spanned y 790.7–833.7 while
+/// the window was 874pt tall, i.e. 43pt of visible tab content sits directly
+/// above the (already-safe-area-respecting) bottom edge. TodayView/InboxView's
+/// `VStack { Spacer(); QuickCaptureBar() }` pads its bottom by this amount so
+/// the floating capture bar clears the dock (see F4 in MainView's iOSMainView).
+enum DockMetrics {
+    static let height: CGFloat = 43
 }
 
 // MARK: - Custom Dock (5 slots: Today · Inbox · ＋ · Projects · More)
@@ -155,6 +172,10 @@ private struct CaptureSheet: View {
     /// Cleared on upload success and on Cancel; left nil when the source data
     /// couldn't even be decoded (see `snap`), which is what hides Retry then.
     @State private var pendingJpeg: Data?
+    /// Set when a commit finished with `outcome.failures > 0` — spec §4.7:
+    /// failures are counted AND reported, not just felt as a haptic. The sheet
+    /// stays up until the user acknowledges, then dismisses.
+    @State private var commitFailureMessage: String?
 
     var body: some View {
         NavigationStack {
@@ -178,7 +199,11 @@ private struct CaptureSheet: View {
             .padding(.top, 12)
             .background(Color.bgBase)
             .navigationTitle("Add")
+            .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text("Add").font(.displayMedium).foregroundStyle(Color.textPrimary)
+                }
                 ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } }
             }
             .overlay { progressOverlay }
@@ -223,6 +248,14 @@ private struct CaptureSheet: View {
                 Button("Cancel", role: .cancel) { phase = .idle; pendingJpeg = nil }
             } message: {
                 if case .failed(_, let message) = phase { Text(message) }
+            }
+            .alert("Some items couldn't be saved", isPresented: Binding(
+                get: { commitFailureMessage != nil },
+                set: { if !$0 { commitFailureMessage = nil } }
+            )) {
+                Button("OK") { commitFailureMessage = nil; dismiss() }
+            } message: {
+                Text(commitFailureMessage ?? "")
             }
         }
     }
@@ -319,7 +352,11 @@ private struct CaptureSheet: View {
         #if os(iOS)
         UINotificationFeedbackGenerator().notificationOccurred(outcome.failures == 0 ? .success : .warning)
         #endif
-        dismiss()
+        // Failures are counted AND reported (spec §4.7) — don't dismiss silently;
+        // let the user see that something didn't land before the sheet closes.
+        guard outcome.failures > 0 else { dismiss(); return }
+        let itemWord = outcome.failures == 1 ? "item" : "items"
+        commitFailureMessage = "\(outcome.failures) \(itemWord) couldn't be saved. The page image is kept in your attachments."
     }
 }
 #endif
