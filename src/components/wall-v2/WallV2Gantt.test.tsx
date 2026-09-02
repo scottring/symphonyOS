@@ -99,3 +99,31 @@ describe('WallV2Gantt free events', () => {
     expect(screen.queryByText('Free')).not.toBeInTheDocument()
   })
 })
+
+describe('WallV2Gantt homework chips', () => {
+  it('renders a homework chip as a button that opens the kid page', async () => {
+    const onTapMember = vi.fn()
+    const b = board([track({ blocks: [], homework: [{ id: 'h1', label: 'Blue sheet · Fri', late: false }] })])
+    const { user } = render(<WallV2Gantt board={b} onTapMember={onTapMember} />)
+    await user.click(screen.getByRole('button', { name: "Open Ella's homework: Blue sheet · Fri" }))
+    expect(onTapMember).toHaveBeenCalledWith('kid-1')
+    expect(screen.queryByText('Nothing scheduled')).toBeNull()
+  })
+
+  it('household homework is not a button', () => {
+    const b = board([track({ memberId: HOUSEHOLD_ID, name: 'Everyone', blocks: [], homework: [{ id: 'h1', label: 'Nobody', late: false }] })])
+    render(<WallV2Gantt board={b} onTapMember={vi.fn()} />)
+    expect(screen.getByText('Nobody')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /homework/ })).toBeNull()
+  })
+
+  it('caps at two chips and counts the rest', () => {
+    const b = board([track({ blocks: [], homework: [
+      { id: 'a', label: 'A', late: false }, { id: 'b', label: 'B', late: false }, { id: 'c', label: 'C', late: false },
+    ] })])
+    render(<WallV2Gantt board={b} />)
+    expect(screen.getByText('A')).toBeInTheDocument()
+    expect(screen.queryByText('C')).toBeNull()
+    expect(screen.getByText('+1')).toBeInTheDocument()
+  })
+})

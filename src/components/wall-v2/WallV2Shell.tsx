@@ -29,7 +29,7 @@ import { WallV2StaleBanner } from './WallV2StaleBanner';
 import { computeFreshness } from './wallFreshness';
 import { useDailyDiscussionPrompt } from '@/hooks/useDailyDiscussionPrompt';
 import { WallV2Gantt } from './WallV2Gantt';
-import { adaptGanttBoard, titleForBlockId } from './wallGantt';
+import { adaptGanttBoard, titleForBlockId, TRACK_PX } from './wallGantt';
 import { KidDayView } from './KidDayView';
 import { emptySections } from '@/lib/today/types';
 import type { TimelineItem } from '@/types/timeline';
@@ -464,8 +464,12 @@ export function WallV2Shell() {
     // out (Scott, 2026-08-25): the board is the day, and a wall that mixes
     // Sunday's unfinished prep into Tuesday stops describing Tuesday. The
     // backlog belongs to Review, not to the kitchen wall.
-    () => adaptGanttBoard(wallData.familyMembers, wallData.days, now),
-    [wallData.familyMembers, wallData.days, now],
+    //
+    // Homework rides along: open, any date, on the assignee's row until it
+    // is checked off. That is not "carrying over" — a form due Friday IS
+    // Tuesday's business.
+    () => adaptGanttBoard(wallData.familyMembers, wallData.days, now, TRACK_PX, wallData.homeworkTasks),
+    [wallData.familyMembers, wallData.days, now, wallData.homeworkTasks],
   );
 
   // ─── Bottom strip ───

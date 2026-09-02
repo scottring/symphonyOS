@@ -12,10 +12,10 @@
 // labels outside.
 
 import { useState } from 'react';
-import { Home } from 'lucide-react';
+import { BookOpen, Home } from 'lucide-react';
 import { WALL, personAccent } from './wallTheme';
 import { HOUSEHOLD_ID } from './wallEventAttribution';
-import type { GanttBoard, GanttBlock, GanttTrack } from './wallGantt';
+import type { GanttBoard, GanttBlock, GanttTrack, GanttHomework } from './wallGantt';
 
 // Every row must start its track at the SAME x, or the shared axis — the only
 // thing that makes a Gantt worth its cost — is a lie. These are the pieces of
@@ -32,6 +32,9 @@ const NAME_W = 168;   // portrait + name column
 const ANYTIME_SHOWN = 4;
 /** The same, on a row that drew no bars and can spend the track's space. */
 const ANYTIME_SHOWN_ROOMY = 8;
+/** Homework chips named before a row counts the rest. Its own cap: homework
+ *  is the actionable thing on the row, so it never competes with specials. */
+const HOMEWORK_SHOWN = 2;
 
 /** Bar fills per person index, matching the lane accents. */
 const BAR_TINTS = [
@@ -145,6 +148,32 @@ function Chip({ label, wide }: { label: string; wide: boolean }) {
 }
 
 /**
+ * A homework chip. Filled in the forest tone so it reads as "yours to do",
+ * distinct from the sand-coloured specials beside it. On a person's row it
+ * opens their page (where the checkbox lives — a chip on a TV is too small
+ * to be one); the household row has no page, so there it is just words.
+ */
+function HomeworkChip({ chip, wide, name, onTap }: { chip: GanttHomework; wide: boolean; name: string; onTap?: () => void }) {
+  const size = wide ? 'px-3 py-1 text-[0.95rem] max-w-[300px]' : 'px-2.5 py-0.5 text-[0.8rem] max-w-[220px]';
+  const tone = chip.late
+    ? 'bg-[#F6E3C9] dark:bg-[#4A3620] text-[#A8600F] dark:text-[#E0A959]'
+    : 'bg-[#DCE8DE] dark:bg-[#2F4A3B] text-[#2E4638] dark:text-[#BFE3CF]';
+  const cls = `inline-flex items-center gap-1.5 rounded-lg font-bold shrink min-w-0 ${tone} ${size}`;
+  const body = (
+    <>
+      <BookOpen className="w-4 h-4 shrink-0" aria-hidden="true" />
+      <span className="truncate">{chip.label}</span>
+    </>
+  );
+  if (!onTap) return <span className={cls}>{body}</span>;
+  return (
+    <button type="button" onClick={onTap} aria-label={`Open ${name}'s homework: ${chip.label}`} className={cls}>
+      {body}
+    </button>
+  );
+}
+
+/**
  * Everything on this row that has no position on a clock — today's untimed
  * items and its routines, and nothing else. Carried-over work was shown here
  * briefly and removed: the board is the day.
@@ -154,12 +183,21 @@ function Chip({ label, wide }: { label: string; wide: boolean }) {
  * second line, more of them named. A row earns its space by what it holds,
  * not by whether what it holds happens to have a time.
  */
-function AnytimeArea({ track, roomy }: { track: GanttTrack; roomy: boolean }) {
+function AnytimeArea({ track, roomy, name, onTapMember }: { track: GanttTrack; roomy: boolean; name: string; onTapMember?: () => void }) {
   const cap = roomy ? ANYTIME_SHOWN_ROOMY : ANYTIME_SHOWN;
   const shown = track.anytime.slice(0, cap);
   const more = track.anytime.length - shown.length;
+  const homeworkMore = track.homework.length - HOMEWORK_SHOWN;
   return (
     <div className={`flex items-center gap-1.5 min-w-0 ${roomy ? 'flex-wrap content-center' : 'overflow-hidden'}`}>
+      {/* Homework first: it is the thing to DO on this row; the day's chips
+          behind it are what the day looks like. */}
+      {track.homework.slice(0, HOMEWORK_SHOWN).map((h) => (
+        <HomeworkChip key={h.id} chip={h} wide={roomy} name={name} onTap={onTapMember} />
+      ))}
+      {homeworkMore > 0 && (
+        <span className={`shrink-0 text-[0.9rem] font-bold ${WALL.muted}`}>+{homeworkMore}</span>
+      )}
       {shown.map((t) => <Chip key={t} label={t} wide={roomy} />)}
       {more > 0 && (
         <span className={`shrink-0 text-[0.9rem] font-bold ${WALL.muted}`}>+{more}</span>
@@ -175,7 +213,7 @@ function AnytimeArea({ track, roomy }: { track: GanttTrack; roomy: boolean }) {
 
 function Track({ track, index, onTapItem, onTapMember }: { track: GanttTrack; index: number; onTapItem?: (id: string) => void; onTapMember?: (memberId: string) => void }) {
   const hasBars = track.blocks.length > 0;
-  const hasChips = track.anytime.length > 0 || track.laterCount > 0;
+  const hasChips = track.anytime.length > 0 || track.laterCount > 0 || track.homework.length > 0;
   const nameColumn = (
     <>
       <Face memberId={track.memberId} name={track.name} index={index} />
@@ -215,7 +253,14 @@ function Track({ track, index, onTapItem, onTapMember }: { track: GanttTrack; in
           </div>
         )}
         {hasChips
-          ? <AnytimeArea track={track} roomy={!hasBars} />
+          ? (
+              <AnytimeArea
+                track={track}
+                roomy={!hasBars}
+                name={track.name}
+                onTapMember={onTapMember && track.memberId !== HOUSEHOLD_ID ? () => onTapMember(track.memberId) : undefined}
+              />
+            )
           : !hasBars && (
               <span className={`text-[1.05rem] ${WALL.muted}`}>Nothing scheduled</span>
             )}
