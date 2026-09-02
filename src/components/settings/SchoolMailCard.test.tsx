@@ -84,4 +84,36 @@ describe('SchoolMailCard', () => {
     render(<SchoolMailCard />)
     expect(screen.queryByRole('button', { name: /copy/i })).toBeNull()
   })
+
+  // The card used to swallow all three of the hook's other states: a load that
+  // failed, a load still running, and a signed-in user with no household. All
+  // three rendered as the flat lie "No email has arrived yet."
+  it('shows a skeleton, not "nothing yet", while the load is still running', () => {
+    h.state.loading = true
+    render(<SchoolMailCard />)
+    expect(screen.getByTestId('school-mail-skeleton')).toBeInTheDocument()
+    expect(screen.queryByText(/No email has arrived yet/i)).toBeNull()
+  })
+
+  it('says so quietly when the load failed', () => {
+    h.state.error = 'permission denied for table captures'
+    render(<SchoolMailCard />)
+    expect(screen.getByText(/permission denied for table captures/)).toBeInTheDocument()
+  })
+
+  // No household means there is no address to mint — the fix is to join one,
+  // and saying nothing left the reader staring at an empty card.
+  it('points a household-less user at the thing that would give them an address', () => {
+    h.state.address = null
+    h.state.loading = false
+    render(<SchoolMailCard />)
+    expect(screen.getByText(/Join or create a household/i)).toBeInTheDocument()
+  })
+
+  it('says nothing about households while the address is still loading', () => {
+    h.state.address = null
+    h.state.loading = true
+    render(<SchoolMailCard />)
+    expect(screen.queryByText(/Join or create a household/i)).toBeNull()
+  })
 })

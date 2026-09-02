@@ -31,7 +31,7 @@ function StatusPill({ status }: { status: string }) {
 }
 
 export function SchoolMailCard() {
-  const { address, recent, retry } = useSchoolMail()
+  const { address, recent, retry, loading, error } = useSchoolMail()
   const [copied, setCopied] = useState(false)
   const [retrying, setRetrying] = useState<string | null>(null)
 
@@ -80,9 +80,27 @@ export function SchoolMailCard() {
         </div>
       )}
 
+      {/* No address and nothing still in flight means no household — and the
+          address is minted per household, so there is a concrete next step
+          rather than an empty card. */}
+      {!address && !loading && (
+        <p className="text-sm text-neutral-500">
+          Join or create a household to get a forwarding address.
+        </p>
+      )}
+
       <div className="mt-4">
         <label className="block text-sm text-neutral-500 mb-2">Recent</label>
-        {recent.length === 0 ? (
+        {loading ? (
+          // A skeleton, not "No email has arrived yet" — a load in flight and a
+          // genuinely empty list are different things, and saying the second
+          // while the first is true is simply wrong.
+          <div
+            data-testid="school-mail-skeleton"
+            aria-hidden
+            className="h-12 rounded-lg bg-neutral-100 animate-pulse"
+          />
+        ) : recent.length === 0 ? (
           <p className="text-xs text-neutral-400">No email has arrived yet.</p>
         ) : (
           <div className="space-y-2">
@@ -115,6 +133,11 @@ export function SchoolMailCard() {
             ))}
           </div>
         )}
+
+        {/* The hook's own failure — a load that never landed, or a retry that
+            was refused. Quiet: one line, no banner, no retry button of its
+            own (opening Settings again re-runs the load). */}
+        {error && <p className="mt-2 text-xs text-red-500">{error}</p>}
       </div>
     </section>
   )
