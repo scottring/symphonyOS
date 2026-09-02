@@ -2,6 +2,7 @@ import { useEffect, useState, lazy, Suspense } from 'react'
 import { Maximize2, Minimize2 } from 'lucide-react'
 import DOMPurify from 'dompurify'
 import { PanelSection } from './PanelSection'
+import { notesToHtml } from '@/lib/notes/notesToHtml'
 
 const TiptapEditor = lazy(() =>
   import('@/components/notes/TiptapEditor').then((m) => ({ default: m.TiptapEditor })),
@@ -109,10 +110,48 @@ export function PanelNotes({
       <TiptapEditor content={notes ?? ''} onChange={onChange} placeholder="Add notes…" />
     </Suspense>
   ) : (
-    <div
-      className="text-sm text-neutral-600 border-l-2 border-neutral-300 pl-3 py-1 prose-sm"
-      dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(notes ?? '') }}
-    />
+    <>
+      <div
+        className="panel-notes-read text-sm text-neutral-600 border-l-2 border-neutral-300 pl-3 py-1"
+        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(notesToHtml(notes)) }}
+      />
+      {/* The editor carries its own spacing; the read-only branch has to say it
+          again or an agent's headings and bullets run together here. */}
+      <style>{`
+        .panel-notes-read p { margin: 0.45rem 0; }
+        .panel-notes-read p:first-child { margin-top: 0; }
+        .panel-notes-read h1,
+        .panel-notes-read h2,
+        .panel-notes-read h3 {
+          font-weight: 600;
+          margin: 0.75rem 0 0.25rem;
+          color: #404040;
+        }
+        .panel-notes-read h1 { font-size: 1.125rem; }
+        .panel-notes-read h2 { font-size: 1rem; }
+        .panel-notes-read h3 { font-size: 0.9375rem; }
+        .panel-notes-read :is(h1, h2, h3):first-child { margin-top: 0; }
+        .panel-notes-read ul { list-style: disc; padding-left: 1.25rem; margin: 0.4rem 0; }
+        .panel-notes-read ol { list-style: decimal; padding-left: 1.25rem; margin: 0.4rem 0; }
+        .panel-notes-read ul[data-type="taskList"] { list-style: none; padding-left: 0; }
+        .panel-notes-read li { margin: 0.15rem 0; }
+        .panel-notes-read li p { margin: 0; }
+        .panel-notes-read blockquote {
+          border-left: 3px solid #e5e7eb;
+          padding-left: 0.75rem;
+          color: #6b7280;
+          margin: 0.5rem 0;
+        }
+        .panel-notes-read code {
+          font-family: ui-monospace, monospace;
+          font-size: 0.9em;
+          background: #f3f4f6;
+          padding: 0.1em 0.3em;
+          border-radius: 4px;
+        }
+        .panel-notes-read hr { border: 0; border-top: 1px solid #e5e7eb; margin: 0.75rem 0; }
+      `}</style>
+    </>
   )
 
   return (

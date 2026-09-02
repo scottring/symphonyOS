@@ -6,7 +6,8 @@ import { TableCell } from '@tiptap/extension-table-cell'
 import { TableHeader } from '@tiptap/extension-table-header'
 import { TaskList } from '@tiptap/extension-task-list'
 import { TaskItem } from '@tiptap/extension-task-item'
-import { useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useMemo } from 'react'
+import { notesToHtml } from '@/lib/notes/notesToHtml'
 
 interface TiptapEditorProps {
   content: string
@@ -23,6 +24,11 @@ export function TiptapEditor({
   autoFocus = false,
   editable = true,
 }: TiptapEditorProps) {
+  // Notes reach us from agents, the MCP server and ingest functions as plain
+  // text or markdown. Tiptap parses whatever it is given as HTML, so without
+  // this every newline and every "- " bullet would collapse into one paragraph.
+  const html = useMemo(() => notesToHtml(content), [content])
+
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -41,7 +47,7 @@ export function TiptapEditor({
         nested: true,
       }),
     ],
-    content,
+    content: html,
     editable,
     autofocus: autoFocus,
     editorProps: {
@@ -117,10 +123,10 @@ export function TiptapEditor({
   // (switching entities, programmatic updates).
   // emitUpdate: false avoids triggering onChange when syncing external content.
   useEffect(() => {
-    if (editor && !editor.isFocused && content !== editor.getHTML()) {
-      editor.commands.setContent(content, { emitUpdate: false })
+    if (editor && !editor.isFocused && html !== editor.getHTML()) {
+      editor.commands.setContent(html, { emitUpdate: false })
     }
-  }, [content, editor])
+  }, [html, editor])
 
   // Update editable state.
   //
@@ -434,6 +440,32 @@ export function TiptapEditor({
       <style>{`
         .ProseMirror {
           min-height: 200px;
+          font-size: 14px;
+          line-height: 1.6;
+        }
+        .ProseMirror p {
+          margin: 0.45rem 0;
+        }
+        .ProseMirror p:first-child {
+          margin-top: 0;
+        }
+        .ProseMirror blockquote {
+          border-left: 3px solid #e5e7eb;
+          padding-left: 0.75rem;
+          color: #6b7280;
+          margin: 0.5rem 0;
+        }
+        .ProseMirror code {
+          font-family: ui-monospace, monospace;
+          font-size: 0.9em;
+          background: #f3f4f6;
+          padding: 0.1em 0.3em;
+          border-radius: 4px;
+        }
+        .ProseMirror hr {
+          border: 0;
+          border-top: 1px solid #e5e7eb;
+          margin: 0.75rem 0;
         }
         .ProseMirror p.is-editor-empty:first-child::before {
           color: #9ca3af;
@@ -522,6 +554,11 @@ export function TiptapEditor({
         }
         .ProseMirror li {
           margin: 0.25rem 0;
+        }
+        /* List items wrap their text in a paragraph; the paragraph margin above
+           would otherwise double every list's line spacing. */
+        .ProseMirror li p {
+          margin: 0;
         }
       `}</style>
     </div>

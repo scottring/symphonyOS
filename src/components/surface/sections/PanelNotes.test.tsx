@@ -72,6 +72,24 @@ describe('PanelNotes', () => {
     expect(screen.getByRole('button', { name: /widen what to bring/i })).toBeInTheDocument()
   })
 
+  // Agents, the MCP server and the ingest functions write plain text. Read-only
+  // panels used to hand that straight to the browser as HTML, so the newlines
+  // vanished and the "- " dashes stayed.
+  it('formats plain-text notes in the read-only branch', () => {
+    const { container } = render(<PanelNotes notes={'THINGS TO ASK\n- one\n- two'} />)
+
+    const items = container.querySelectorAll('li')
+    expect(Array.from(items).map((li) => li.textContent)).toEqual(['one', 'two'])
+    expect(container.querySelector('h3')?.textContent).toBe('THINGS TO ASK')
+  })
+
+  it('leaves notes that are already HTML untouched in the read-only branch', () => {
+    const { container } = render(<PanelNotes notes="<p>Ask about the <em>3pm</em></p>" />)
+
+    expect(container.querySelector('p')?.innerHTML).toBe('Ask about the <em>3pm</em>')
+    expect(container.querySelectorAll('li')).toHaveLength(0)
+  })
+
   it('renders nothing when there is no content and no way to add any', () => {
     const { container } = render(<PanelNotes notes={undefined} />)
     expect(container).toBeEmptyDOMElement()
