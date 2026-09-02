@@ -91,13 +91,25 @@ vi.mock('@/lib/supabase', () => ({
   supabase: {
     from: () => ({
       // .select('*').in('list_id', ids).eq('needed_on', day).eq('completed', false)
-      select: () => ({
-        in: () => ({
-          eq: () => ({
-            eq: () => Promise.resolve({ data: rowCompleted ? [] : [row], error: null }),
+      // …and, since TodayView also mounts useUnreviewedCaptures,
+      // .select(...).eq('kind').eq('status').is('reviewed_at', null).order().limit()
+      select: () => {
+        const captures: Record<string, unknown> = {}
+        Object.assign(captures, {
+          eq: () => captures,
+          is: () => captures,
+          order: () => captures,
+          limit: () => Promise.resolve({ data: [], error: null }),
+        })
+        return {
+          ...captures,
+          in: () => ({
+            eq: () => ({
+              eq: () => Promise.resolve({ data: rowCompleted ? [] : [row], error: null }),
+            }),
           }),
-        }),
-      }),
+        }
+      },
       // .update({ completed, completed_at }).eq('id', id)
       update: (patch: Record<string, unknown>) => ({
         eq: (_field: string, id: string) => {

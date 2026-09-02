@@ -59,6 +59,8 @@ import { ReviewDrawer, type ReviewMode } from './ReviewDrawer'
 import { HorizonPoolDropdown } from './HorizonPoolDropdown'
 import { DayNavCluster } from './DayNavCluster'
 import { TodayBacklogFooter } from './TodayBacklogFooter'
+import { EmailReviewSheet } from './EmailReviewSheet'
+import { useUnreviewedCaptures } from '@/hooks/useUnreviewedCaptures'
 import { InboxUndoToast } from './InboxUndoToast'
 import { BulkActionToolbar } from './BulkActionToolbar'
 import { TimelineNoteComposer } from './TimelineNoteComposer'
@@ -340,6 +342,39 @@ export function TodayView({
     const result = await ctx.onSendTaskToBuy?.(taskId)
     if (result) setToBuyToast({ message: `"${result.itemText}" moved to To buy`, undo: result.undo })
   }, [ctx])
+
+  // ── "New from email": the quiet door, and the sheet behind it ──────────────
+  // The census gates the footer link — Today never shows a count, so the link's
+  // presence IS the signal. Closing the sheet stamps reviewed_at on everything
+  // it showed, so the door closes for good.
+  const { captures: emailCaptures, markReviewed } = useUnreviewedCaptures()
+  const [emailReviewOpen, setEmailReviewOpen] = useState(false)
+  const closeEmailReview = useCallback(() => {
+    setEmailReviewOpen(false)
+    void markReviewed(emailCaptures.map((c) => c.id))
+  }, [emailCaptures, markReviewed])
+
+  // Dismissing a wrongly-extracted row. The DELETE is deferred to the end of
+  // the undo window rather than fired immediately: deleteTask cascades to the
+  // row's per-person subtasks, and nothing on the schedule-actions surface can
+  // recreate a parent WITH its children — so an immediate delete would make
+  // "Undo" a promise this page cannot keep. Holding the row for ten seconds
+  // costs nothing and makes the undo real. Newest wins: a second dismiss
+  // commits the one already pending.
+  const pendingDismissRef = useRef<string | null>(null)
+  const [pendingDismiss, setPendingDismiss] = useState<{ id: string; title: string } | null>(null)
+  const commitDismiss = useCallback(() => {
+    if (pendingDismissRef.current) ctx.onDeleteTask?.(pendingDismissRef.current)
+    pendingDismissRef.current = null
+    setPendingDismiss(null)
+  }, [ctx])
+  const handleDismissEmailRow = useCallback((taskId: string) => {
+    const task = tasks.find((t) => t.id === taskId)
+    if (!task) return
+    if (pendingDismissRef.current && pendingDismissRef.current !== taskId) commitDismiss()
+    pendingDismissRef.current = taskId
+    setPendingDismiss({ id: taskId, title: task.title })
+  }, [tasks, commitDismiss])
 
   // Which sections the user has folded shut. Persisted; Unscheduled starts
   // collapsed because it holds the untimed-routine slab. A section whose
@@ -1159,6 +1194,7 @@ export function TodayView({
             carriedCount={carriedCount}
             attentionItems={data.attentionItems}
             onReview={() => setReviewMode('morning')}
+            onReviewEmail={emailCaptures.length > 0 ? () => setEmailReviewOpen(true) : undefined}
           />
         )}
 
@@ -1169,6 +1205,16 @@ export function TodayView({
             message={toBuyToast.message}
             onUndo={() => { void toBuyToast.undo(); setToBuyToast(null) }}
             onDismiss={() => setToBuyToast(null)}
+          />
+        )}
+
+        {/* Undo window for a dismissed email row. Letting the toast go — by
+            timeout or by the X — is what commits the delete. */}
+        {pendingDismiss && (
+          <InboxUndoToast
+            message={`"${pendingDismiss.title}" dismissed`}
+            onUndo={() => { pendingDismissRef.current = null; setPendingDismiss(null) }}
+            onDismiss={commitDismiss}
           />
         )}
       </div>
@@ -1187,6 +1233,17 @@ export function TodayView({
         onUpdateTask={(id, u) => onUpdateTask?.(id, u)}
         onPushTask={ctx.onPushTask}
         onDeleteTask={ctx.onDeleteTask}
+      />
+
+      {/* What arrived from a forwarded email and nobody has looked at yet. */}
+      <EmailReviewSheet
+        open={emailReviewOpen}
+        captures={emailCaptures}
+        tasks={tasks}
+        members={ctx.familyMembers}
+        onClose={closeEmailReview}
+        onDismiss={handleDismissEmailRow}
+        dismissedIds={pendingDismiss ? [pendingDismiss.id] : undefined}
       />
 
       {/* Clarity curtain — pulled down by the binoculars in the header. */}

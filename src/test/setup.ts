@@ -11,6 +11,13 @@ vi.mock('@/lib/supabase', () => {
     const chain: any = {
       eq: () => chain,
       or: () => chain,
+      // `.is('col', null)` — the unreviewed-captures census filters on a NULL
+      // column, and a chain missing this link throws inside an effect, which
+      // surfaces as an unhandled rejection in whichever unrelated test file
+      // happened to mount Today.
+      is: () => chain,
+      in: () => chain,
+      not: () => chain,
       order: () => chain, // Return chain to support multiple .order() calls
       limit: () => chain,
       select: () => chain,
@@ -36,6 +43,7 @@ vi.mock('@/lib/supabase', () => {
               single: () => Promise.resolve({ data: null, error: null }),
             }),
           }),
+          in: () => Promise.resolve({ error: null }),
         }),
         delete: () => ({
           eq: () => Promise.resolve({ error: null }),

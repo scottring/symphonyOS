@@ -6,6 +6,13 @@ interface TodayBacklogFooterProps {
   carriedCount: number
   attentionItems: AttentionItem[]
   onReview: () => void
+  /**
+   * Opens the "New from email" review sheet. Passed only while the household
+   * actually has unreviewed email captures — the link's presence IS the
+   * signal, which is why there is no count prop and never will be. Absent
+   * handler, absent link.
+   */
+  onReviewEmail?: () => void
 }
 
 /**
@@ -30,8 +37,9 @@ interface TodayBacklogFooterProps {
  * carried-over + attention, deduped and oldest-first, so "Review" is the only
  * handle either set needs.
  */
-export function TodayBacklogFooter({ carriedCount, attentionItems, onReview }: TodayBacklogFooterProps) {
-  if (carriedCount === 0 && attentionItems.length === 0) return null
+export function TodayBacklogFooter({ carriedCount, attentionItems, onReview, onReviewEmail }: TodayBacklogFooterProps) {
+  const hasBacklog = carriedCount > 0 || attentionItems.length > 0
+  if (!hasBacklog && !onReviewEmail) return null
 
   return (
     // mb-[7.5rem] (mobile only): this is the last block on the mobile Today
@@ -40,15 +48,31 @@ export function TodayBacklogFooter({ carriedCount, attentionItems, onReview }: T
     // down — obscuring "Review", the one thing here a user can act on. The
     // value was verified in the browser to clear the FAB's ~5rem band with
     // margin to spare. Desktop has no FAB, hence md:mb-0.
-    <div className="mb-[7.5rem] md:mb-0 flex px-3 md:px-0 py-2 mt-1">
-      <button
-        type="button"
-        onClick={onReview}
-        className="ml-auto flex items-center gap-0.5 text-[13px] text-neutral-400 hover:text-neutral-600 transition-colors"
-      >
-        Review
-        <ChevronRight className="w-3.5 h-3.5 shrink-0" />
-      </button>
+    <div className="mb-[7.5rem] md:mb-0 flex items-center gap-4 px-3 md:px-0 py-2 mt-1">
+      {/* Both links are the same quiet word-and-chevron. "New from email" sits
+          FIRST because it is the perishable one: it is a one-time look at what
+          arrived on its own, while Review is always there. Same weight, same
+          colour — neither is a notification. */}
+      {onReviewEmail && (
+        <button
+          type="button"
+          onClick={onReviewEmail}
+          className="ml-auto flex items-center gap-0.5 text-[13px] text-neutral-400 hover:text-neutral-600 transition-colors"
+        >
+          New from email
+          <ChevronRight className="w-3.5 h-3.5 shrink-0" />
+        </button>
+      )}
+      {hasBacklog && (
+        <button
+          type="button"
+          onClick={onReview}
+          className={`${onReviewEmail ? '' : 'ml-auto '}flex items-center gap-0.5 text-[13px] text-neutral-400 hover:text-neutral-600 transition-colors`}
+        >
+          Review
+          <ChevronRight className="w-3.5 h-3.5 shrink-0" />
+        </button>
+      )}
     </div>
   )
 }
