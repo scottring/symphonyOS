@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { planWrites, titlesMatch, MIN_EVENT_CONFIDENCE } from './plan'
+import { planWrites, titlesMatch, itemsMatch, MIN_EVENT_CONFIDENCE } from './plan'
 import type { EmailExtraction, Member } from './types'
 
 const members: Member[] = [
@@ -119,6 +119,19 @@ describe('planWrites — the note', () => {
     expect(p.note?.content).toContain('Good to know:\n- Early dismissal Friday')
     expect(p.note?.content).toContain('Needs another look:\n- Email cut off')
     expect(planWrites({ ...base, extraction: empty }).note).toBeNull()
+  })
+})
+
+describe('itemsMatch', () => {
+  it('treats a re-phrased item as the same item', () => {
+    expect(itemsMatch('bring payment envelope', 'Payment envelope in backpack')).toBe(true)
+    expect(itemsMatch('Wear school colors', 'school colors laid out')).toBe(true)
+    expect(itemsMatch('Bring a hat', 'Payment envelope')).toBe(false)
+  })
+  it('a retry does not duplicate a re-phrased child under an existing block', () => {
+    const existing = [{ id: 'old1', title: 'School Picture Day', ymd: '2026-09-10', childTitles: ['bring payment envelope', 'school colors laid out'] }]
+    const p = planWrites({ ...base, existing, extraction: { ...empty, events: [pictureDay()] } })
+    expect(p.events).toEqual([])
   })
 })
 

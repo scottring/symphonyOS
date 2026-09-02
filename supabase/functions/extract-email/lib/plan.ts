@@ -22,6 +22,20 @@ export function normaliseTitle(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim()
 }
 
+/**
+ * Item titles are re-phrased by the model between runs ("bring payment
+ * envelope" vs "payment envelope"), so a retry must not duplicate a child.
+ * Containment: shared tokens over the SMALLER title ≥ 0.6.
+ */
+export function itemsMatch(a: string, b: string): boolean {
+  const A = new Set(normaliseTitle(a).split(' ').filter(Boolean))
+  const B = new Set(normaliseTitle(b).split(' ').filter(Boolean))
+  if (A.size === 0 || B.size === 0) return false
+  let inter = 0
+  for (const t of A) if (B.has(t)) inter++
+  return inter / Math.min(A.size, B.size) >= 0.6
+}
+
 /** Jaccard overlap of normalised tokens ≥ 0.8. */
 export function titlesMatch(a: string, b: string): boolean {
   const A = new Set(normaliseTitle(a).split(' ').filter(Boolean))
@@ -76,7 +90,7 @@ function childrenFor(i: PlanInput, ev: EmailEvent, skipTitles: string[]): EventP
     const { matched, unmatched } = matchMembers(item.for, i.members)
     const ymd = neededYmd(item.needed, ev.date)
     const push = (title: string, assigned: string | null) => {
-      if (skipTitles.some((t) => titlesMatch(t, title))) return
+      if (skipTitles.some((t) => itemsMatch(t, title))) return
       const { parent_task_id: _omit, ...row } = baseRow(i, title)
       out.push({ ...row, assigned_to: assigned, needed_on: ymd })
     }

@@ -5,7 +5,7 @@
 // Auth: x-capture-secret. Called by inbound-email; safe to re-run by hand.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { buildEmailPrompt, parseEmailExtraction } from './lib/prompt.ts'
-import { planWrites } from './lib/plan.ts'
+import { planWrites, itemsMatch } from './lib/plan.ts'
 import { addDays, zonedIso } from './lib/dates.ts'
 import type { ExistingBlock, Member, TaskRow } from './lib/types.ts'
 
@@ -145,8 +145,8 @@ Deno.serve(async (req: Request) => {
       const { data: existingInbox, error: existingInboxError } = await supabase
         .from('tasks').select('title').eq('capture_id', capture.id).eq('bucket', 'inbox').is('parent_task_id', null)
       if (existingInboxError) throw new Error(`existing inbox read failed: ${existingInboxError.message}`)
-      const existingInboxTitles = new Set((existingInbox ?? []).map((t) => t.title))
-      const inboxToInsert = plan.inbox.filter((t) => !existingInboxTitles.has(t.title))
+      const existingInboxTitles = (existingInbox ?? []).map((r) => r.title as string)
+      const inboxToInsert = plan.inbox.filter((t) => !existingInboxTitles.some((e) => itemsMatch(e, t.title)))
       if (inboxToInsert.length) {
         const { error } = await supabase.from('tasks').insert(inboxToInsert)
         if (error) throw new Error(`inbox insert failed: ${error.message}`)
