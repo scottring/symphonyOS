@@ -101,7 +101,8 @@ export function DomainSwitcher() {
                 type="button"
                 aria-label={`Only ${label}`}
                 onClick={() => only(id)}
-                className="px-2 py-1 text-[11px] text-neutral-500 rounded opacity-0 group-hover:opacity-100 focus:opacity-100 hover:bg-neutral-100"
+                // Hover-revealed on desktop; always visible where there is no hover (touch).
+                className="px-2 py-1 text-[11px] text-neutral-500 rounded opacity-0 group-hover:opacity-100 focus:opacity-100 [@media(hover:none)]:opacity-100 hover:bg-neutral-100"
               >
                 Only
               </button>

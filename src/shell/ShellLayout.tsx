@@ -253,7 +253,11 @@ function ShellLayoutInner({ children }: Props) {
             : { marginRight: selection ? '480px' : rightRailVisible ? '380px' : todayRailVisible ? '420px' : '0' }
         }
       >
-        {/* Mobile header — logo + sign-out (date nav lives in HomeHeader on Today) */}
+        {/* Mobile header — logo + domain switcher + sign-out (date nav lives in
+            HomeHeader on Today). This header is the one piece of chrome every
+            mobile Shell route renders, so the switcher lives here and nowhere
+            else on phones: HomeHeader hides its copy below md, and the desktop
+            top-right cluster further down is gated on !isMobile. */}
         {isMobile && (
           <header
             className="sticky top-0 z-10 bg-transparent px-3 py-1"
@@ -266,7 +270,8 @@ function ShellLayoutInner({ children }: Props) {
                 className="w-7 h-7 rounded-full shrink-0 object-cover"
               />
               <div className="flex-1" />
-              <div className="flex items-center gap-0.5 shrink-0">
+              <div className="flex items-center gap-1 shrink-0">
+                <DomainSwitcher />
                 {signOut && (
                   <button
                     onClick={signOut}
