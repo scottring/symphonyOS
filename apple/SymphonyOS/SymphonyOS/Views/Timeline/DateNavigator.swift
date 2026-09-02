@@ -11,7 +11,7 @@ struct DateNavigator: View {
                 }
             } label: {
                 Image(systemName: "chevron.left")
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.bodyMediumBold)
                     .foregroundStyle(Color.textSecondary)
             }
             .buttonStyle(.plain)
@@ -37,7 +37,7 @@ struct DateNavigator: View {
                 }
             } label: {
                 Image(systemName: "chevron.right")
-                    .font(.system(size: 16, weight: .semibold))
+                    .font(.bodyMediumBold)
                     .foregroundStyle(Color.textSecondary)
             }
             .buttonStyle(.plain)

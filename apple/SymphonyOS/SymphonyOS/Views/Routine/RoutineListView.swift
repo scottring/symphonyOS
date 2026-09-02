@@ -79,9 +79,9 @@ struct RoutineListView: View {
         VStack(spacing: 16) {
             Image(systemName: "repeat")
                 .font(.system(size: 48))
-                .foregroundStyle(Color.primaryTint.opacity(0.5))
+                .foregroundStyle(Color.textLight)
             Text("No Routines")
-                .font(.displaySmall)
+                .font(.displayMedium)
             Text("Add routines for recurring activities.")
                 .font(.bodySmall)
                 .foregroundStyle(Color.textSecondary)

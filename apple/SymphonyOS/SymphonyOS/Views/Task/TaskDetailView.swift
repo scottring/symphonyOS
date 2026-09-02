@@ -54,8 +54,7 @@ struct TaskDetailView: View {
                 // Schedule
                 VStack(alignment: .leading, spacing: 8) {
                     Label("Schedule", systemImage: "calendar")
-                        .font(.bodySmallBold)
-                        .foregroundStyle(Color.textSecondary)
+                        .eyebrowStyle()
 
                     if let scheduled = task.scheduledFor {
                         HStack {
@@ -72,7 +71,7 @@ struct TaskDetailView: View {
                                 viewModel.schedule(task, for: nil)
                             }
                             .font(.bodySmall)
-                            .foregroundStyle(.red)
+                            .foregroundStyle(Color.feedbackRed)
                         }
                     } else if task.bucket == "week" || task.bucket == "someday" {
                         Text(task.bucket == "week" ? "Next week" : "Someday")
@@ -108,8 +107,7 @@ struct TaskDetailView: View {
                 // Duration
                 HStack {
                     Label("Duration", systemImage: "clock")
-                        .font(.bodySmallBold)
-                        .foregroundStyle(Color.textSecondary)
+                        .eyebrowStyle()
                     Spacer()
                     Picker("Duration", selection: Binding(
                         get: { task.estimatedDuration },
@@ -127,8 +125,7 @@ struct TaskDetailView: View {
                 // Context
                 VStack(alignment: .leading, spacing: 8) {
                     Label("Context", systemImage: "tag")
-                        .font(.bodySmallBold)
-                        .foregroundStyle(Color.textSecondary)
+                        .eyebrowStyle()
 
                     HStack(spacing: 8) {
                         contextChip("Work", value: "work", color: .contextWork)
@@ -141,8 +138,7 @@ struct TaskDetailView: View {
                 if !familyMembers.isEmpty {
                     VStack(alignment: .leading, spacing: 8) {
                         Label("Assigned to", systemImage: "person.2")
-                            .font(.bodySmallBold)
-                            .foregroundStyle(Color.textSecondary)
+                            .eyebrowStyle()
 
                         LazyVGrid(columns: [GridItem(.adaptive(minimum: 116), spacing: 8)],
                                   alignment: .leading, spacing: 8) {
@@ -157,8 +153,7 @@ struct TaskDetailView: View {
                 if !projects.isEmpty {
                     VStack(alignment: .leading, spacing: 8) {
                         Label("Project", systemImage: "folder")
-                            .font(.bodySmallBold)
-                            .foregroundStyle(Color.textSecondary)
+                            .eyebrowStyle()
 
                         Picker("Project", selection: Binding(
                             get: { task.projectId },
@@ -176,8 +171,7 @@ struct TaskDetailView: View {
                 // Notes
                 VStack(alignment: .leading, spacing: 8) {
                     Label("Notes", systemImage: "note.text")
-                        .font(.bodySmallBold)
-                        .foregroundStyle(Color.textSecondary)
+                        .eyebrowStyle()
 
                     TextEditor(text: Binding(
                         get: { task.notes ?? "" },
@@ -202,8 +196,7 @@ struct TaskDetailView: View {
                 // Links — product pages, reservations, docs (web parity)
                 VStack(alignment: .leading, spacing: 8) {
                     Label("Links", systemImage: "link")
-                        .font(.bodySmallBold)
-                        .foregroundStyle(Color.textSecondary)
+                        .eyebrowStyle()
 
                     ForEach(Array((task.links ?? []).enumerated()), id: \.element) { index, link in
                         HStack(spacing: 8) {
@@ -283,8 +276,7 @@ struct TaskDetailView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
                             Label("Contact", systemImage: "person.crop.circle")
-                                .font(.bodySmallBold)
-                                .foregroundStyle(Color.textSecondary)
+                                .eyebrowStyle()
                             Spacer()
                             Picker("Contact", selection: Binding(
                                 get: { task.contactId },
@@ -319,8 +311,7 @@ struct TaskDetailView: View {
                 // Phone number (manual, task-level)
                 VStack(alignment: .leading, spacing: 8) {
                     Label("Phone", systemImage: "phone")
-                        .font(.bodySmallBold)
-                        .foregroundStyle(Color.textSecondary)
+                        .eyebrowStyle()
 
                     TextField("Phone number", text: Binding(
                         get: { task.phoneNumber ?? "" },
@@ -336,8 +327,7 @@ struct TaskDetailView: View {
                 // Location + directions
                 VStack(alignment: .leading, spacing: 8) {
                     Label("Location", systemImage: "mappin.and.ellipse")
-                        .font(.bodySmallBold)
-                        .foregroundStyle(Color.textSecondary)
+                        .eyebrowStyle()
 
                     TextField("Address or place", text: Binding(
                         get: { task.location ?? "" },
@@ -406,7 +396,7 @@ struct TaskDetailView: View {
                     dismiss()
                 } label: {
                     Label("Delete Task", systemImage: "trash")
-                        .foregroundStyle(.red)
+                        .foregroundStyle(Color.feedbackRed)
                         .font(.bodyMedium)
                 }
                 .padding(.top, 20)

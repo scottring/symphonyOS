@@ -91,8 +91,7 @@ struct EventDetailView: View {
     private var notesSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             Label("Notes", systemImage: "note.text")
-                .font(.bodySmallBold)
-                .foregroundStyle(Color.textSecondary)
+                .eyebrowStyle()
 
             TextEditor(text: Binding(
                 get: { notesText },
@@ -117,8 +116,7 @@ struct EventDetailView: View {
     private var linksSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             Label("Links", systemImage: "link")
-                .font(.bodySmallBold)
-                .foregroundStyle(Color.textSecondary)
+                .eyebrowStyle()
 
             ForEach(Array(links.enumerated()), id: \.element) { index, link in
                 HStack(spacing: 8) {

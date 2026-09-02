@@ -64,9 +64,9 @@ struct ProjectListView: View {
         VStack(spacing: 16) {
             Image(systemName: "folder")
                 .font(.system(size: 48))
-                .foregroundStyle(Color.primaryTint.opacity(0.5))
+                .foregroundStyle(Color.textLight)
             Text("No Projects")
-                .font(.displaySmall)
+                .font(.displayMedium)
             Text("Create a project to organize related tasks.")
                 .font(.bodySmall)
                 .foregroundStyle(Color.textSecondary)

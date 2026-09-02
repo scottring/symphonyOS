@@ -82,7 +82,7 @@ struct SettingsView: View {
                 Button("Sign Out") {
                     Task { await auth.signOut() }
                 }
-                .foregroundStyle(.red)
+                .foregroundStyle(Color.feedbackRed)
             }
         }
         .navigationTitle("Settings")

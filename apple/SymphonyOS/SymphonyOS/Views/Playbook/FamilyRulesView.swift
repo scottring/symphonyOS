@@ -15,9 +15,9 @@ struct FamilyRulesView: View {
                 VStack(spacing: 16) {
                     Image(systemName: "list.clipboard")
                         .font(.system(size: 48))
-                        .foregroundStyle(Color.coachingTint.opacity(0.5))
+                        .foregroundStyle(Color.textLight)
                     Text("No Family Rules")
-                        .font(.displaySmall)
+                        .font(.displayMedium)
                     Text("Add rules to guide daily coaching.")
                         .font(.bodySmall)
                         .foregroundStyle(Color.textSecondary)

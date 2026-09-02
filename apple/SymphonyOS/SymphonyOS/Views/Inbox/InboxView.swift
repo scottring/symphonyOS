@@ -45,7 +45,7 @@ struct InboxView: View {
                 }
             }
         }
-        .navigationTitle("Inbox (\(filteredTasks.count))")
+        .navigationTitle("Inbox")
         #if os(iOS)
         .navigationBarTitleDisplayMode(.large)
         #endif
@@ -62,10 +62,10 @@ struct InboxView: View {
         VStack(spacing: 16) {
             Image(systemName: "tray")
                 .font(.system(size: 48))
-                .foregroundStyle(Color.primaryTint.opacity(0.5))
+                .foregroundStyle(Color.textLight)
 
             Text("Inbox Zero")
-                .font(.displaySmall)
+                .font(.displayMedium)
                 .foregroundStyle(Color.textPrimary)
 
             Text("All caught up! Add tasks with the bar below.")
@@ -313,7 +313,7 @@ struct ContextPickerSheet: View {
                     } label: {
                         Text("Clear Context")
                             .font(.bodySmall)
-                            .foregroundStyle(.red)
+                            .foregroundStyle(Color.feedbackRed)
                     }
                     .padding(.top, 8)
                 }

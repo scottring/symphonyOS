@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		02E7F7BF8E5CF9DB0592F619 /* SyncSerializationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 91980E464779ADF9B4FE89A3 /* SyncSerializationTests.swift */; };
+		8F69C05570367387B8D6B7E3 /* SkinScreenshotsUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8033477B45D95A6118E7FC66 /* SkinScreenshotsUITests.swift */; };
 		03A5E53758E11DAA36391C9A /* PhotoCaptureService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D281A39DAC953BBEB0F5A15B /* PhotoCaptureService.swift */; };
 		07094B11FD0EFD2BC3927820 /* RoutineDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 777FA26749C1A4208B9DDC94 /* RoutineDetailView.swift */; };
 		0C4A58B20B67EBDA3028040D /* SupabaseClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1D08C8E525AA8CAF264A73A1 /* SupabaseClient.swift */; };
@@ -105,6 +106,7 @@
 
 /* Begin PBXFileReference section */
 		0190D691EF214A5E96258AF1 /* CarriedOverUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CarriedOverUITests.swift; sourceTree = "<group>"; };
+		8033477B45D95A6118E7FC66 /* SkinScreenshotsUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SkinScreenshotsUITests.swift; sourceTree = "<group>"; };
 		03604927E77497336FD51F47 /* DMSans-SemiBold.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "DMSans-SemiBold.ttf"; sourceTree = "<group>"; };
 		092BB44BAB79A5C7BC3022FB /* PlaybookBlock.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybookBlock.swift; sourceTree = "<group>"; };
 		09BD930B3AFC90435DE5E822 /* SlideRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SlideRow.swift; sourceTree = "<group>"; };
@@ -521,6 +523,7 @@
 			isa = PBXGroup;
 			children = (
 				0190D691EF214A5E96258AF1 /* CarriedOverUITests.swift */,
+				8033477B45D95A6118E7FC66 /* SkinScreenshotsUITests.swift */,
 				718E56D8B02093D599728E35 /* SymphonyOSUITests.swift */,
 			);
 			path = SymphonyOSUITests;
@@ -724,6 +727,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				386379CF5A08540EE1B036D4 /* CarriedOverUITests.swift in Sources */,
+				8F69C05570367387B8D6B7E3 /* SkinScreenshotsUITests.swift in Sources */,
 				B243747A711245915530C319 /* SymphonyOSUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

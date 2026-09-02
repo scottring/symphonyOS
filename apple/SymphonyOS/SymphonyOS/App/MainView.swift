@@ -310,6 +310,7 @@ struct MoreView: View {
                     Label("Family Rules", systemImage: "list.clipboard")
                 }
             }
+            .listRowBackground(Color.bgElevated)
 
             Section {
                 NavigationLink {
@@ -324,6 +325,7 @@ struct MoreView: View {
                     Label("Settings", systemImage: "gear")
                 }
             }
+            .listRowBackground(Color.bgElevated)
 
             Section {
                 Toggle("Show Coaching", isOn: Binding(
@@ -331,14 +333,18 @@ struct MoreView: View {
                     set: { appState.hideCoaching = !$0 }
                 ))
             }
+            .listRowBackground(Color.bgElevated)
 
             Section {
                 Button("Sign Out") {
                     Task { await auth.signOut() }
                 }
-                .foregroundStyle(.red)
+                .foregroundStyle(Color.feedbackRed)
             }
+            .listRowBackground(Color.bgElevated)
         }
+        .scrollContentBackground(.hidden)
+        .background(Color.bgBase)
         .navigationTitle("More")
     }
 }

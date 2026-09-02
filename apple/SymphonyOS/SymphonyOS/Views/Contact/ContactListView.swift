@@ -72,9 +72,9 @@ struct ContactListView: View {
         VStack(spacing: 16) {
             Image(systemName: "person.2")
                 .font(.system(size: 48))
-                .foregroundStyle(Color.primaryTint.opacity(0.5))
+                .foregroundStyle(Color.textLight)
             Text("No Contacts")
-                .font(.displaySmall)
+                .font(.displayMedium)
             Text("Add contacts to link them to tasks.")
                 .font(.bodySmall)
                 .foregroundStyle(Color.textSecondary)
