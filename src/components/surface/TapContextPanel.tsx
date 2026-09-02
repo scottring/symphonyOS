@@ -12,6 +12,7 @@ import { SchedulePicker } from '@/components/schedule/SchedulePicker'
 import { useDayLoads } from './hooks/useDayLoads'
 import { PanelAssistant } from './sections/PanelAssistant'
 import { PanelNotes } from './sections/PanelNotes'
+import { PanelSource } from './sections/PanelSource'
 import { PanelSubtasks } from './sections/PanelSubtasks'
 import { PanelPeople } from './sections/PanelPeople'
 import { PanelLinked } from './sections/PanelLinked'
@@ -281,6 +282,9 @@ export function TapContextPanel(props: TapContextPanelProps) {
               onSaveToVault={props.onSaveNoteToVault}
             />
           )}
+          {/* Where this row came from. Only an extracted row carries a capture,
+              so the section is absent for everything typed by hand. */}
+          {task.captureId && <PanelSource captureId={task.captureId} />}
           <PanelPhotos
             hideWhenEmpty={!revealed.has('photo')}
             onContentChange={setPhotosHaveContent}
