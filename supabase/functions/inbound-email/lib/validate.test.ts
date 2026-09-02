@@ -34,11 +34,16 @@ describe('sourceKeyFor', () => {
   it('uses the Message-ID when present', () => {
     expect(sourceKeyFor(good)).toBe('email:<abc@hillside.org>')
   })
-  it('falls back to a stable hash of from+subject+received_at', () => {
-    const a = sourceKeyFor({ ...good, message_id: undefined })
-    const b = sourceKeyFor({ ...good, message_id: undefined })
+  it('falls back to a hash that survives a delivery retry (received_at is not in it)', () => {
+    const a = sourceKeyFor({ ...good, message_id: undefined, received_at: '2026-09-02T12:00:00Z' })
+    const b = sourceKeyFor({ ...good, message_id: undefined, received_at: '2026-09-02T12:04:31Z' })
     expect(a).toBe(b)
     expect(a.startsWith('email:sha:')).toBe(true)
+  })
+  it('a different body is a different email', () => {
+    const a = sourceKeyFor({ ...good, message_id: undefined })
+    const b = sourceKeyFor({ ...good, message_id: undefined, text: 'Picture Day is Friday.' })
+    expect(a).not.toBe(b)
   })
 })
 

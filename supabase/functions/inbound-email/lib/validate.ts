@@ -45,9 +45,15 @@ function fnv1a(s: string): string {
   return h.toString(16).padStart(8, '0')
 }
 
-export function sourceKeyFor(p: Pick<InboundPayload, 'message_id' | 'from' | 'subject' | 'received_at'>): string {
+/**
+ * Deliberately NOT keyed on received_at: that is the Worker's own clock, so it
+ * changes on every Cloudflare retry and a redelivery of the same mail would
+ * hash to a new key and be captured twice. from+subject+text is what actually
+ * identifies the message when the client stripped Message-ID.
+ */
+export function sourceKeyFor(p: Pick<InboundPayload, 'message_id' | 'from' | 'subject' | 'text'>): string {
   if (p.message_id && p.message_id.trim()) return `email:${p.message_id.trim()}`
-  return `email:sha:${fnv1a(`${p.from ?? ''}|${p.subject ?? ''}|${p.received_at ?? ''}`)}`
+  return `email:sha:${fnv1a(`${p.from ?? ''}|${p.subject ?? ''}|${p.text ?? ''}`)}`
 }
 
 /** "Hillside Elementary <news@hillside.org>" → "Hillside Elementary"; bare address → its domain. */
