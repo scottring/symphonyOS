@@ -7,7 +7,8 @@ import { isSameDay } from '@/lib/dateUtils'
 import { SchedulePopover, type ScheduleContextItem } from '@/components/triage'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
 import { AssigneeDropdown, MultiAssigneeDropdown } from '@/components/family'
-import { Video, Check, Pencil, Hourglass, ListChecks, ChevronUp, ChevronDown, MessageCircle, AlertCircle } from 'lucide-react'
+import { Video, Check, Pencil, Hourglass, ListChecks, ChevronUp, ChevronDown, MessageCircle, AlertCircle, Mail } from 'lucide-react'
+import { ScheduleItemItems } from './ScheduleItemItems'
 import { RowActionRail } from './RowActionRail'
 import { useMobile } from '@/hooks/useMobile'
 import { TaskCheckbox } from './TaskCheckbox'
@@ -108,6 +109,9 @@ interface ScheduleItemProps {
   onToggleBulkSelect?: () => void
   onSelect: () => void
   onToggleComplete: () => void
+  /** Completes ONE per-person item under the block. Subtasks are tasks, so
+   *  callers pass the same task-completion handler the parent row uses. */
+  onToggleSubtask?: (subtaskId: string) => void
   onToggleWaiting?: () => void
   onPush?: (target: Date | 'week' | 'month' | 'quarter') => void
   onSchedule?: (date: Date, isAllDay: boolean) => void
@@ -185,6 +189,7 @@ export const ScheduleItem = memo(function ScheduleItem({
   onToggleBulkSelect,
   onSelect,
   onToggleComplete,
+  onToggleSubtask,
   onToggleWaiting,
   onPush,
   onSchedule,
@@ -228,10 +233,25 @@ export const ScheduleItem = memo(function ScheduleItem({
   const isRoutine = item.type === 'routine'
   const isEvent = item.type === 'event'
   const isActionable = isTask || isRoutine || isEvent // Events are now checkable
+  /** This row came out of a capture (a forwarded school email). */
+  const fromEmail = !!item.captureId
+  /**
+   * Per-person items: subtasks that name a person, plus every open subtask of a
+   * row extracted from an email. Unlike plain steps these are the CONTENT of
+   * the block — "Picture Day" means nothing without "Liam: collared shirt" —
+   * so they render inline, always, at every width. Completed ones drop out:
+   * what is left is what still has to happen.
+   */
+  const perPersonItems = (item.originalTask?.subtasks ?? []).filter(
+    (s) => !s.completed && (!!s.assignedTo || fromEmail),
+  )
+  const hasPerPersonItems = perPersonItems.length > 0
   /** Anything rendering beneath the title makes the title column taller — the
    *  leading columns then need pinning to the title's first line. */
   const hasBelowTitleContent = !!belowTitleAccessory
     || !!(item.isWaiting && item.waitingFor && !item.completed)
+    || hasPerPersonItems
+    || fromEmail
   const contextColor = item.context ? DOMAIN_COLORS[item.context]?.dot : undefined
 
   const handleCheckboxClick = (e: React.MouseEvent) => {
@@ -296,7 +316,17 @@ export const ScheduleItem = memo(function ScheduleItem({
   const timeDisplay = getTimeDisplay()
 
   const hasContactChip = !!contactName
-  const hasSubtasks = item.subtaskCount && item.subtaskCount > 0
+  // The steps disclosure is for plain subtasks only. When the row has
+  // per-person items they are already on screen, always open, so a chip that
+  // reveals the same names again is a second, contradicting affordance.
+  const hasSubtasks = !hasPerPersonItems && item.subtaskCount && item.subtaskCount > 0
+  /** Provenance, rendered in the subtitle slot at EVERY width. */
+  const emailBadge = (
+    <span className="inline-flex items-center gap-1 align-middle">
+      <Mail className="w-3 h-3 shrink-0" aria-hidden />
+      From an email
+    </span>
+  )
   // Steps disclosure — collapsed by default. Local because it is pure view
   // state and each row opens independently.
   const [stepsOpen, setStepsOpen] = useState(false)
@@ -389,6 +419,17 @@ export const ScheduleItem = memo(function ScheduleItem({
               <span className="truncate">{contextLabel}</span>
             </div>
           )}
+          {fromEmail && (
+            <div className="text-[12px] text-neutral-500 mt-0.5">{emailBadge}</div>
+          )}
+          {/* Per-person items — inline on the phone too. This is where a
+              parent actually reads "who needs what tomorrow". */}
+          <ScheduleItemItems
+            items={perPersonItems}
+            members={familyMembers}
+            onToggle={onToggleSubtask}
+            viewedDate={viewedDate}
+          />
         </div>
 
         {/* Right cluster — assignee. Three-dot removed; swipe
@@ -698,20 +739,39 @@ export const ScheduleItem = memo(function ScheduleItem({
               </span>
             </div>
           )}
-          {/* Subtitle: category + duration. Empty for plain tasks. */}
+          {/* Subtitle: category + duration, plus provenance. Empty for plain
+              tasks. The category/duration half stays desktop-only as before;
+              "From an email" shows at every width, so a row carrying it is not
+              wrapped in `hidden md:block`. */}
           {(() => {
             const subtitle = rowSubtitle(item)
-            if (!subtitle) return null
+            if (!subtitle && !fromEmail) return null
+            if (!fromEmail) {
+              return (
+                <div className="hidden md:block text-[12px] text-neutral-500 leading-tight mt-0.5">
+                  {subtitle}
+                </div>
+              )
+            }
             return (
-              <div className="hidden md:block text-[12px] text-neutral-500 leading-tight mt-0.5">
-                {subtitle}
+              <div className="text-[12px] text-neutral-500 leading-tight mt-0.5">
+                {subtitle && <span className="hidden md:inline">{subtitle} · </span>}
+                {emailBadge}
               </div>
             )
           })()}
+          {/* Per-person items — always open, every width. Left-aligned WITH the
+              title, same as the steps list below. */}
+          <ScheduleItemItems
+            items={perPersonItems}
+            members={familyMembers}
+            onToggle={onToggleSubtask}
+            viewedDate={viewedDate}
+          />
           {/* Steps — revealed by the subtask chip above. Left-aligned WITH the
               title (a block sibling of the whole row would sit under the time
               gutter and read as the next task's content). */}
-          {stepsOpen && item.originalTask?.subtasks?.length ? (
+          {stepsOpen && !hasPerPersonItems && item.originalTask?.subtasks?.length ? (
             <ul className="hidden md:block mt-1 space-y-0.5 border-l-2 border-neutral-200 pl-3">
               {item.originalTask.subtasks.map((s) => (
                 <li key={s.id} className="text-[13px] text-neutral-600">

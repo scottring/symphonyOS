@@ -47,6 +47,10 @@ export interface TimelineItem {
   contactId?: string // Linked contact
   projectId?: string // Linked project
   parentTaskId?: string // Parent task ID for subtasks
+  /** The capture (e.g. a forwarded email) this row was extracted from. Drives
+   *  the "From an email" badge — the row says where it came from without
+   *  making the reader open it. */
+  captureId?: string
   assignedTo?: string | null // Family member assignment
   /** Routine items only: every member who owns this, collapsed from the three
    *  assignment columns by routineOwners(). `assignedTo` stays for callers that
@@ -106,6 +110,7 @@ export function taskToTimelineItem(task: Task): TimelineItem {
     contactId: task.contactId,
     projectId: task.projectId,
     parentTaskId: task.parentTaskId,
+    captureId: task.captureId,
     isSubtask: !!task.parentTaskId,
     assignedTo: task.assignedTo,
     context: task.context,

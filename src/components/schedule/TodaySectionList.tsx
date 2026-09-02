@@ -538,6 +538,9 @@ export function TodaySectionList({
                           onCompleteEvent(item.id.replace('event-', ''), !item.completed)
                         }
                       }}
+                      // Per-person items under the row. A subtask IS a task, so
+                      // the same handler the parent uses completes it.
+                      onToggleSubtask={onToggleTask}
                       onPush={
                         item.type === 'task' && taskId && onPushTask
                           ? (target) => onPushTask(taskId, target)

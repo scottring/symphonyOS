@@ -137,6 +137,107 @@ describe('ScheduleItem — static rows (no suggestion chips)', () => {
   })
 })
 
+// Per-person items (spec §4.4): the rows an extracted email writes under a
+// block must be visible on the phone too — that is where they get read.
+describe('ScheduleItem — per-person items inline (mobile)', () => {
+  const members = [
+    { id: 'm-liam', name: 'Liam', initials: 'L', color: 'blue' },
+    { id: 'm-mia', name: 'Mia', initials: 'M', color: 'purple' },
+  ] as never
+
+  const emailBlock = {
+    ...baseTask,
+    id: 'task-picture-day',
+    title: 'Picture Day',
+    captureId: 'cap-1',
+    subtaskCount: 2,
+    subtaskCompletedCount: 0,
+    originalTask: {
+      id: 'picture-day',
+      subtasks: [
+        { id: 's1', title: 'Wear a collared shirt', completed: false, assignedTo: 'm-liam' },
+        { id: 's2', title: 'Bring the order form', completed: false, assignedTo: 'm-mia' },
+      ],
+    },
+  } as unknown as TimelineItem
+
+  it('renders the assigned subtasks inline without expanding steps', () => {
+    const { getByText } = render(
+      <ScheduleItem
+        item={emailBlock}
+        familyMembers={members}
+        onSelect={vi.fn()}
+        onToggleComplete={vi.fn()}
+      />,
+    )
+    expect(getByText('Wear a collared shirt')).toBeInTheDocument()
+    expect(getByText('Bring the order form')).toBeInTheDocument()
+    expect(getByText('L')).toBeInTheDocument()
+  })
+
+  it('completing an inline item calls onToggleSubtask with the subtask id', () => {
+    const onToggleSubtask = vi.fn()
+    const { getByRole } = render(
+      <ScheduleItem
+        item={emailBlock}
+        familyMembers={members}
+        onSelect={vi.fn()}
+        onToggleComplete={vi.fn()}
+        onToggleSubtask={onToggleSubtask}
+      />,
+    )
+    fireEvent.click(getByRole('button', { name: 'Complete Wear a collared shirt' }))
+    expect(onToggleSubtask).toHaveBeenCalledWith('s1')
+  })
+
+  it('shows the "From an email" badge on a row with a captureId', () => {
+    const { getByText } = render(
+      <ScheduleItem item={emailBlock} onSelect={vi.fn()} onToggleComplete={vi.fn()} />,
+    )
+    expect(getByText('From an email')).toBeInTheDocument()
+  })
+
+  it('shows no badge and no inline items for plain subtasks with no captureId', () => {
+    const { queryByText } = render(
+      <ScheduleItem
+        item={{
+          ...baseTask,
+          subtaskCount: 1,
+          subtaskCompletedCount: 0,
+          originalTask: {
+            id: 'plain',
+            subtasks: [{ id: 's9', title: 'Research destinations', completed: false }],
+          },
+        } as unknown as TimelineItem}
+        onSelect={vi.fn()}
+        onToggleComplete={vi.fn()}
+      />,
+    )
+    expect(queryByText('Research destinations')).toBeNull()
+    expect(queryByText('From an email')).toBeNull()
+  })
+
+  it('does not render an already-completed per-person item', () => {
+    const { queryByText } = render(
+      <ScheduleItem
+        item={{
+          ...emailBlock,
+          originalTask: {
+            id: 'picture-day',
+            subtasks: [
+              { id: 's1', title: 'Wear a collared shirt', completed: true, assignedTo: 'm-liam' },
+            ],
+          },
+        } as unknown as TimelineItem}
+        familyMembers={members}
+        onSelect={vi.fn()}
+        onToggleComplete={vi.fn()}
+      />,
+    )
+    expect(queryByText('Wear a collared shirt')).toBeNull()
+  })
+})
+
 // Projects are HIDDEN from the product (2026-09-02). The mobile card used to
 // carry a Tag icon and put the project name on its small context line.
 describe('ScheduleItem — Projects hidden (mobile card)', () => {

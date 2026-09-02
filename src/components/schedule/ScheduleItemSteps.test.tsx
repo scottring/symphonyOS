@@ -78,3 +78,40 @@ describe('ScheduleItem subtask steps', () => {
     expect(queryByRole('button', { name: /steps/i })).toBeNull()
   })
 })
+
+// Per-person items (spec §4.4) are always-open, never a disclosure: the point
+// of the block is who has to do what. They replace the steps chip on the rows
+// that have them; plain steps rows (above) are untouched.
+describe('ScheduleItem per-person items (desktop)', () => {
+  const emailBlock = {
+    ...withSteps,
+    id: 'task-picture-day',
+    title: 'Picture Day',
+    captureId: 'cap-1',
+    subtaskCount: 2,
+    subtaskCompletedCount: 0,
+    originalTask: {
+      id: 'picture-day',
+      subtasks: [
+        { id: 's1', title: 'Wear a collared shirt', completed: false, assignedTo: 'm-liam' },
+        { id: 's2', title: 'Bring the order form', completed: false, assignedTo: 'm-mia' },
+      ],
+    },
+  } as unknown as TimelineItem
+
+  it('renders the items without any disclosure, and drops the steps chip', () => {
+    const { getByText, queryByRole } = render(
+      <ScheduleItem item={emailBlock} onSelect={vi.fn()} onToggleComplete={vi.fn()} />,
+    )
+    expect(getByText('Wear a collared shirt')).toBeInTheDocument()
+    expect(getByText('Bring the order form')).toBeInTheDocument()
+    expect(queryByRole('button', { name: /steps/i })).toBeNull()
+  })
+
+  it('shows the "From an email" badge', () => {
+    const { getByText } = render(
+      <ScheduleItem item={emailBlock} onSelect={vi.fn()} onToggleComplete={vi.fn()} />,
+    )
+    expect(getByText('From an email')).toBeInTheDocument()
+  })
+})
