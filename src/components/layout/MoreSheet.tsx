@@ -2,6 +2,7 @@
 // Opens from the "More" tab in the bottom nav
 
 import type { ReactElement } from 'react'
+import { MessageCircle } from 'lucide-react'
 import type { ViewType } from './Sidebar'
 
 interface MoreSheetProps {
@@ -9,6 +10,8 @@ interface MoreSheetProps {
   onClose: () => void
   onNavigate: (view: ViewType) => void
   activeView: ViewType
+  /** Unread Discussions — shown as the badge on that row. */
+  discussionsUnread?: number
 }
 
 interface NavItem {
@@ -19,8 +22,14 @@ interface NavItem {
   badge?: number
 }
 
-export function MoreSheet({ isOpen, onClose, onNavigate, activeView }: MoreSheetProps) {
+export function MoreSheet({ isOpen, onClose, onNavigate, activeView, discussionsUnread }: MoreSheetProps) {
   const items: NavItem[] = [
+    {
+      view: 'discussions',
+      label: 'Discussions',
+      badge: discussionsUnread,
+      icon: <MessageCircle className="w-5 h-5" />,
+    },
     // Projects is HIDDEN here too (2026-09-02) — see the note in Sidebar.tsx.
     {
       view: 'routines',

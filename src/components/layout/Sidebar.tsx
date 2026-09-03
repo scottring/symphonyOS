@@ -12,6 +12,7 @@ import { ConceptIcon } from '@/lib/conceptIcons'
 import {
   Sun,
   CalendarRange,
+  MessageCircle,
   UtensilsCrossed,
   Home,
   Inbox,
@@ -30,7 +31,7 @@ const FEATURES = {
   lists: true,
 }
 
-export type ViewType = 'agent' | 'home' | 'home-app' | 'today' | 'inbox' | 'goals' | 'projects' | 'routines' | 'lists' | 'contacts' | 'history' | 'task-detail' | 'contact-detail' | 'settings' | 'meals' | 'weekly-planning' | 'family-member'
+export type ViewType = 'agent' | 'home' | 'home-app' | 'today' | 'inbox' | 'goals' | 'projects' | 'routines' | 'lists' | 'contacts' | 'history' | 'task-detail' | 'contact-detail' | 'settings' | 'meals' | 'weekly-planning' | 'family-member' | 'discussions'
 
 interface SidebarProps {
   collapsed: boolean
@@ -42,6 +43,8 @@ interface SidebarProps {
   onViewChange: (view: ViewType) => void
   onOpenSearch?: () => void
   inboxCount?: number
+  /** Discussions waiting on the viewer — unread threads, never a count of work. */
+  discussionsUnread?: number
 }
 
 function getGreetingWord(): string {
@@ -74,6 +77,7 @@ export function Sidebar({
   onViewChange,
   onOpenSearch,
   inboxCount,
+  discussionsUnread,
 }: SidebarProps) {
   const navigate = useNavigate()
   const location = useLocation()
@@ -273,6 +277,25 @@ export function Sidebar({
         >
           <CalendarRange className="w-5 h-5 shrink-0" />
           {!collapsed && <span>This Week</span>}
+        </button>
+
+        {/* Discussions — the inbox of item conversations. Part of the loop, not
+            the Library: a message on a task is addressed to you. */}
+        <button
+          onClick={() => navigate('/discussions')}
+          className={navItemClass(location.pathname.startsWith('/discussions'))}
+        >
+          <MessageCircle className="w-5 h-5 shrink-0" />
+          {!collapsed && (
+            <>
+              <span className="flex-1 text-left">Discussions</span>
+              {typeof discussionsUnread === 'number' && discussionsUnread > 0 && (
+                <span className="text-[11px] tabular-nums px-1.5 py-0.5 rounded-md bg-primary-100 text-primary-700">
+                  {discussionsUnread}
+                </span>
+              )}
+            </>
+          )}
         </button>
 
         {/* ── Library ── everything that is reference, not a daily surface.

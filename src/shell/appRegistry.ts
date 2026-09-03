@@ -10,6 +10,7 @@ import { listsAppDef } from '@/apps/lists';
 import { contactsAppDef } from '@/apps/contacts';
 import { documentsAppDef } from '@/apps/documents';
 import { notesAppDef } from '@/apps/notes';
+import { discussionsAppDef } from '@/apps/discussions';
 import { routinesAppDef } from '@/apps/routines';
 // import { medsAppDef } from '@/apps/meds';  // withheld — see Sidebar.tsx
 // import { projectsAppDef } from '@/apps/projects';  // hidden — see Sidebar.tsx
@@ -74,6 +75,7 @@ export const appRegistry: AppRegistry = createRegistry([
   contactsAppDef,
   documentsAppDef,
   notesAppDef,
+  discussionsAppDef,
   routinesAppDef,
   // medsAppDef — withheld, see the note in Sidebar.tsx. The app itself still
   // builds; it just isn't mounted.

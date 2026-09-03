@@ -16,6 +16,7 @@ import { PinsProvider } from '@/contexts/PinsContext';
 import { useAuth } from '@/hooks/useAuth';
 import { useMobile } from '@/hooks/useMobile';
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
+import { useDiscussionInbox } from '@/hooks/useDiscussionInbox';
 import { useSymphonyAssistant } from '@/hooks/useSymphonyAssistant';
 import { useScratchpadHidden } from '@/hooks/useScratchpadHidden';
 import { useAssistantLaunchRequests, useAssistantLauncher } from '@/contexts/AssistantLaunchContext';
@@ -96,6 +97,7 @@ function ShellLayoutInner({ children }: Props) {
   const isToday = TODAY_PATHS.has(location.pathname);
 
   const { tasks } = useSupabaseTasks();
+  const { unreadCount: discussionsUnread } = useDiscussionInbox();
   const inboxCount = useMemo(
     () => tasks.filter((t) => t.bucket === 'inbox' && !t.completed).length,
     [tasks],
@@ -170,6 +172,9 @@ function ShellLayoutInner({ children }: Props) {
         case 'inbox':
           navigate('/inbox');
           return;
+        case 'discussions':
+          navigate('/discussions');
+          return;
         case 'goals':
           navigate('/goals');
           return;
@@ -231,6 +236,7 @@ function ShellLayoutInner({ children }: Props) {
           onViewChange={handleViewChange}
           onOpenSearch={() => setQuickAddOpen(true)}
           inboxCount={inboxCount}
+          discussionsUnread={discussionsUnread}
         />
       )}
 
@@ -453,6 +459,7 @@ function ShellLayoutInner({ children }: Props) {
           onClose={() => setMoreSheetOpen(false)}
           onNavigate={handleViewChange}
           activeView={activeView}
+          discussionsUnread={discussionsUnread}
         />
       )}
 

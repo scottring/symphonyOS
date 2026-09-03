@@ -23,6 +23,26 @@ vi.mock('@/hooks/useLists', () => ({
 }))
 
 describe('Sidebar', () => {
+  it('lists Discussions in the loop with a badge only when something is unread', () => {
+    const { rerender } = render(
+      <MemoryRouter>
+        <DomainProvider><PlaceProvider>
+          <Sidebar collapsed={false} onToggle={vi.fn()} activeView="today" onViewChange={vi.fn()} discussionsUnread={0} />
+        </PlaceProvider></DomainProvider>
+      </MemoryRouter>,
+    )
+    const row = screen.getByRole('button', { name: /Discussions/ })
+    expect(row.textContent).toBe('Discussions')
+    rerender(
+      <MemoryRouter>
+        <DomainProvider><PlaceProvider>
+          <Sidebar collapsed={false} onToggle={vi.fn()} activeView="today" onViewChange={vi.fn()} discussionsUnread={2} />
+        </PlaceProvider></DomainProvider>
+      </MemoryRouter>,
+    )
+    expect(screen.getByRole('button', { name: /Discussions/ }).textContent).toBe('Discussions2')
+  })
+
   // Regression test: the House item used to call onViewChange('home-app'),
   // but ShellLayout's handleViewChange has no case for that view, so it
   // silently fell through to `default: navigate('/')` (Today) instead of
