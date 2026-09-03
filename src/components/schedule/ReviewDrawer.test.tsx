@@ -65,14 +65,30 @@ describe('ReviewDrawer — morning goes straight to triage', () => {
     expect(screen.queryByText(/best part of today/)).not.toBeInTheDocument()
   })
 
-  it('caps the backlog at the session cap, oldest first, and says how many wait', () => {
+  it('caps the backlog at the session cap, NEWEST first, and says how many wait', () => {
     const items = Array.from({ length: BACKLOG_SESSION_CAP + 3 }, (_, i) =>
       attn(task({ id: `s${i}`, title: `Slipped ${i}` }), 10 + i))
     render(<ReviewDrawer {...base} mode="morning" attentionItems={items} />)
-    // Oldest (highest age) render; the youngest three wait for the next session.
-    expect(screen.getByText(`Slipped ${BACKLOG_SESSION_CAP + 2}`)).toBeInTheDocument()
-    expect(screen.queryByText('Slipped 0')).not.toBeInTheDocument()
-    expect(screen.getByText(/\+3 more waiting/)).toBeInTheDocument()
+    // Youngest (lowest age) render; the oldest three wait — they're in the
+    // Inbox's Expired section, which is where a long list belongs.
+    expect(screen.getByText('Slipped 0')).toBeInTheDocument()
+    expect(screen.queryByText(`Slipped ${BACKLOG_SESSION_CAP + 2}`)).not.toBeInTheDocument()
+    expect(screen.getByText(/\+3 older waiting/)).toBeInTheDocument()
+  })
+
+  // The reported bug: Review was the only door to a carried-over task, and
+  // oldest-first buried yesterday's slip behind a wall of ancient ones — so
+  // "Respond to Christian", one day old, was reachable from nowhere.
+  it("puts yesterday's carry-over in front of a 25-day-old item", () => {
+    const yesterday = new Date(today); yesterday.setDate(yesterday.getDate() - 1)
+    const longAgo = new Date(today); longAgo.setDate(longAgo.getDate() - 25)
+    render(<ReviewDrawer {...base} mode="morning" overdueTasks={[
+      task({ id: 'old', title: 'Brainstorm vacation ideas', scheduledFor: longAgo }),
+      task({ id: 'new', title: 'Respond to Christian', scheduledFor: yesterday }),
+    ]} />)
+    const titles = screen.getAllByRole('listitem').map((li) => li.textContent ?? '')
+    expect(titles[0]).toContain('Respond to Christian')
+    expect(titles[1]).toContain('Brainstorm vacation ideas')
   })
 
   it('a backlog verdict writes through pushTask and resolves the row', async () => {

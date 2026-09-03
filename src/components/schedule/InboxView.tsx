@@ -30,7 +30,9 @@ import { InboxUndoToast } from './InboxUndoToast'
 import { filterTasksForLayers } from '@/lib/today/domainFilter'
 import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
 import { selectRefileRows } from '@/lib/today/refile'
+import { selectExpired } from '@/lib/today/expired'
 import { RefileStrip } from './RefileStrip'
+import { ExpiredSection } from './ExpiredSection'
 
 const INBOX_ACTIONS: QuickAction[] = [
   { kind: 'today' }, { kind: 'week' }, { kind: 'month' }, { kind: 'someday' }, { kind: 'note' }, { kind: 'delete' }
@@ -323,6 +325,16 @@ export function InboxView({
   // show planning outputs — and their per-horizon copies — as "items to triage",
   // which is exactly the confusing duplication the inbox should never show.
   const totalCount = inboxTasks.length
+
+  // ...with ONE exception, added 2026-09-03: work whose date has passed.
+  //
+  // That isn't a planning output, it's the opposite — an expired date means
+  // the commitment lapsed and the item is undecided again, which is exactly
+  // what this page is for. It also had nowhere else to live: Today stopped
+  // rendering carried-over rows and Review shows five at a time, so 26 open
+  // past-dated tasks were reachable from no screen at all. Its own collapsed
+  // section below the captures, never mixed into the triage list above.
+  const expiredRows = useMemo(() => selectExpired(filteredTasks), [filteredTasks])
 
   const [leavingIds, setLeavingIds] = useState<Set<string>>(new Set())
   const [undo, setUndo] = useState<UndoEntry | null>(null)
@@ -651,6 +663,14 @@ export function InboxView({
           {inboxTasks.map(renderRow)}
         </div>
       )}
+
+      <ExpiredSection
+        rows={expiredRows}
+        canDelete={!!onDeleteTask}
+        onUpdateTask={(id, updates) => onUpdateTask?.(id, updates)}
+        onPushTask={onPushTask}
+        onDeleteTask={onDeleteTask}
+      />
 
       {undo && (
         <InboxUndoToast

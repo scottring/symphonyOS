@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { Sparkles, Check, ArrowRight, Moon, Sun, X } from 'lucide-react'
 import type { Task } from '@/types/task'
 import type { AttentionItem } from '@/lib/today/attention'
+import { daysBetween } from '@/lib/today/taskPools'
 import { useEveningReflection } from '@/hooks/useEveningReflection'
 import { TriageRow, applyTriageVerdict, type Verdict } from './TriageRow'
 
@@ -14,10 +15,11 @@ import { TriageRow, applyTriageVerdict, type Verdict } from './TriageRow'
  *
  * The backlog section is the "active management" the passive footer line
  * couldn't provide: carried-over + needs-attention, capped at
- * BACKLOG_SESSION_CAP oldest per session so it drains without any session
+ * BACKLOG_SESSION_CAP NEWEST per session so it drains without any session
  * becoming a slog. Each item gets a one-tap fate: Today / Tomorrow /
  * This week / Someday / Delete. Leaving an item alone is also a verdict —
- * nothing is forced.
+ * nothing is forced. Everything past the cap is scannable in full in the
+ * Inbox's Expired section; this drawer is the paced ritual, not the list.
  *
  * The week and month pools are NOT here. Scott, 2026-08-19: they must never
  * be part of the daily review/planning session — they live as separate
@@ -71,23 +73,39 @@ export function ReviewDrawer({
   }, [tasks, viewedDate])
 
   // ── Triage populations ─────────────────────────────────────────────────────
-  // Backlog: carried-over + attention, deduped, OLDEST first, capped per
-  // session. Oldest-first is the drain guarantee: five verdicts a day and the
-  // 248-day item is gone this week, not "someday".
+  // Backlog: carried-over + attention, deduped, NEWEST first, capped per
+  // session.
+  //
+  // This was oldest-first until 2026-09-03, on a drain argument: five verdicts
+  // a day and the 248-day item is gone this week. In practice it drained
+  // nothing and cost the one thing the drawer is for. Since the flat-agenda
+  // pass, Review is the ONLY door to a carried-over task — and oldest-first
+  // meant the same five 25-day-old items every morning while yesterday's slip
+  // sat at #26 of 29, unreachable from any screen ("Respond to Christian",
+  // reported by Scott). Yesterday's slip is also the recoverable one; a task
+  // that has sat for 25 days has already told you what it is.
+  //
+  // The ancient pile is not abandoned — it moved to a surface built for a
+  // list, the Inbox's Expired section (selectExpired), where the whole thing
+  // is scannable and killable in one pass instead of rationed five a morning.
   const backlog = useMemo(() => {
     const byId = new Map<string, { task: Task; ageDays: number }>()
     for (const t of overdueTasks) {
       if (t.completed) continue
-      const age = t.scheduledFor
-        ? Math.max(0, Math.floor((viewedDate.getTime() - new Date(t.scheduledFor).getTime()) / 86_400_000))
-        : 0
+      // daysBetween, not a raw instant subtraction: what expired is the DAY.
+      // Dividing instants called a task dated 8pm yesterday "0 days old" at
+      // 5am today, so it rendered with no age at all here while the Inbox's
+      // Expired section — which floors to midnight — correctly said
+      // "yesterday". One definition, or the two surfaces disagree about the
+      // same row.
+      const age = t.scheduledFor ? Math.max(0, daysBetween(t.scheduledFor, viewedDate)) : 0
       byId.set(t.id, { task: t, ageDays: age })
     }
     for (const a of attentionItems) {
       const existing = byId.get(a.task.id)
       if (!existing || a.ageDays > existing.ageDays) byId.set(a.task.id, { task: a.task, ageDays: a.ageDays })
     }
-    return [...byId.values()].sort((x, y) => y.ageDays - x.ageDays)
+    return [...byId.values()].sort((x, y) => x.ageDays - y.ageDays)
   }, [overdueTasks, attentionItems, viewedDate])
 
   if (!isOpen) return null
@@ -225,7 +243,7 @@ export function ReviewDrawer({
           {backlogSlice.length > 0 && (
             <section className="space-y-2">
               <p className="text-sm font-medium text-neutral-700">
-                Oldest {backlogSlice.length === 1 ? 'item' : `${backlogSlice.length} items`} that never happened — give each a fate, or leave it.
+                {backlogSlice.length === 1 ? '1 item' : `${backlogSlice.length} items`} that slid — give each a fate, or leave it.
               </p>
               <ul className="space-y-1.5">
                 {backlogSlice.map(({ task, ageDays }) => (
@@ -241,7 +259,10 @@ export function ReviewDrawer({
                 ))}
               </ul>
               {backlogRest > 0 && (
-                <p className="text-xs text-neutral-400">+{backlogRest} more waiting — five a session keeps it honest.</p>
+                <p className="text-xs text-neutral-400">
+                  +{backlogRest} older waiting — five a session keeps it honest. The whole
+                  list lives in the Inbox, under Expired.
+                </p>
               )}
             </section>
           )}
