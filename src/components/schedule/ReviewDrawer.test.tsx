@@ -55,6 +55,21 @@ describe('ReviewDrawer — evening keeps the end-of-day ritual', () => {
   })
 })
 
+describe('ReviewDrawer — a loose end can be closed, not only postponed', () => {
+  it('ticking an unfinished task completes it instead of pushing it', async () => {
+    const onCompleteTask = vi.fn()
+    const { user } = render(<ReviewDrawer {...base} mode="evening" onCompleteTask={onCompleteTask} tasks={[
+      task({ id: 'u', title: 'Never got to it', scheduledFor: today }),
+    ]} />)
+    const row = screen.getByText('Never got to it').closest('li')!
+    await user.click(within(row).getByRole('button', { name: 'Complete "Never got to it"' }))
+    expect(onCompleteTask).toHaveBeenCalledWith('u')
+    expect(within(row).getByText('done')).toBeInTheDocument()
+    // And the Tomorrow verb is gone — the row is resolved either way.
+    expect(within(row).queryByRole('button', { name: /Tomorrow/ })).not.toBeInTheDocument()
+  })
+})
+
 describe('ReviewDrawer — morning goes straight to triage', () => {
   it('skips the evening ritual sections', () => {
     render(<ReviewDrawer {...base} mode="morning" tasks={[
@@ -89,6 +104,26 @@ describe('ReviewDrawer — morning goes straight to triage', () => {
     const titles = screen.getAllByRole('listitem').map((li) => li.textContent ?? '')
     expect(titles[0]).toContain('Respond to Christian')
     expect(titles[1]).toContain('Brainstorm vacation ideas')
+  })
+
+  // "we need a completed checkbox for the review modal" — Scott, 2026-09-03.
+  // Half of what is in this drawer is work you already did and never ticked
+  // off; without this the only honest fates were to reschedule it or delete
+  // it, and deleting loses that it happened.
+  it('a backlog row can be marked done, not just rescheduled', async () => {
+    const onCompleteTask = vi.fn()
+    const { user } = render(<ReviewDrawer {...base} mode="morning" onCompleteTask={onCompleteTask}
+      attentionItems={[attn(task({ id: 's', title: 'Old thing' }), 100)]} />)
+    const row = screen.getByText('Old thing').closest('li')!
+    await user.click(within(row).getByRole('button', { name: 'Complete "Old thing"' }))
+    expect(onCompleteTask).toHaveBeenCalledWith('s')
+    expect(within(row).getByText('done')).toBeInTheDocument()
+  })
+
+  it('offers no checkbox when the surface has no completion handler', () => {
+    render(<ReviewDrawer {...base} mode="morning"
+      attentionItems={[attn(task({ id: 's', title: 'Old thing' }), 100)]} />)
+    expect(screen.queryByRole('button', { name: 'Complete "Old thing"' })).not.toBeInTheDocument()
   })
 
   it('a backlog verdict writes through pushTask and resolves the row', async () => {

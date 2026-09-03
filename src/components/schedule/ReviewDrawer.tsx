@@ -47,6 +47,11 @@ interface ReviewDrawerProps {
   onUpdateTask: (id: string, updates: Partial<Task>) => void | Promise<void | boolean>
   onPushTask?: (id: string, target: Date | 'week' | 'month' | 'quarter') => void | Promise<void | boolean>
   onDeleteTask?: (id: string) => void
+  /** Toggling a row you already did. Absent = no checkbox, same as the
+   *  horizon pools. Half of a backlog is work that happened and was never
+   *  ticked off; without this the only fates were reschedule or delete, and
+   *  delete throws away that it happened. */
+  onCompleteTask?: (id: string) => void
 }
 
 function sameDay(a: Date | undefined, b: Date): boolean {
@@ -57,7 +62,7 @@ function sameDay(a: Date | undefined, b: Date): boolean {
 
 export function ReviewDrawer({
   isOpen, mode, onClose, tasks, attentionItems, overdueTasks,
-  viewedDate, onUpdateTask, onPushTask, onDeleteTask,
+  viewedDate, onUpdateTask, onPushTask, onDeleteTask, onCompleteTask,
 }: ReviewDrawerProps) {
   const { highlight, setHighlight, notes, setNotes, save } = useEveningReflection(viewedDate)
   const [movedIds, setMovedIds] = useState<Set<string>>(() => new Set())
@@ -118,6 +123,15 @@ export function ReviewDrawer({
     })()
   }
 
+  // Same shape HorizonPoolDropdown uses: onToggleTask flips a row that is by
+  // definition incomplete here, then the row renders its own resolved state.
+  const complete = onCompleteTask
+    ? (t: Task) => {
+        onCompleteTask(t.id)
+        setVerdicts((prev) => new Map(prev).set(t.id, 'completed' as Verdict))
+      }
+    : undefined
+
   const pushToTomorrow = (t: Task) => {
     const base = t.scheduledFor ? new Date(t.scheduledFor) : new Date(viewedDate)
     const tomorrow = new Date(viewedDate)
@@ -129,7 +143,9 @@ export function ReviewDrawer({
 
   const close = async () => { if (mode === 'evening') await save(); onClose() }
 
-  const remaining = unfinished.filter((t) => !movedIds.has(t.id))
+  // A ticked-off loose end is no longer loose — it must leave this count or
+  // the heading keeps asking you to sweep work you just closed.
+  const remaining = unfinished.filter((t) => !movedIds.has(t.id) && verdicts.get(t.id) !== 'completed')
   const dateLabel = viewedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
 
   const backlogSlice = backlog.slice(0, BACKLOG_SESSION_CAP)
@@ -216,13 +232,34 @@ export function ReviewDrawer({
                   </p>
                   <ul className="space-y-1.5">
                     {unfinished.map((t) => {
+                      // Two ways a loose end resolves — you did it, or it moves.
+                      // Either way the row is spent and shows what happened.
+                      const done = verdicts.get(t.id) === 'completed'
                       const moved = movedIds.has(t.id)
+                      const spent = done || moved
                       return (
                         <li key={t.id} className="flex items-start gap-2 rounded-xl border border-neutral-100 bg-white px-3 py-2">
-                          <span className={`flex-1 min-w-0 text-sm leading-snug ${moved ? 'text-neutral-400' : 'text-neutral-700'}`}>{t.title}</span>
-                          {moved ? (
+                          {complete && (
+                            <button
+                              type="button"
+                              onClick={() => complete(t)}
+                              disabled={spent}
+                              aria-label={`Complete "${t.title}"`}
+                              className={`mt-0.5 shrink-0 w-4 h-4 rounded-full border-2 inline-flex items-center justify-center transition-colors ${
+                                done
+                                  ? 'border-primary-500 bg-primary-500'
+                                  : spent
+                                    ? 'border-neutral-200'
+                                    : 'border-neutral-300 hover:border-primary-500'
+                              }`}
+                            >
+                              {done && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
+                            </button>
+                          )}
+                          <span className={`flex-1 min-w-0 text-sm leading-snug ${spent ? 'text-neutral-400' : 'text-neutral-700'} ${done ? 'line-through' : ''}`}>{t.title}</span>
+                          {spent ? (
                             <span className="shrink-0 inline-flex items-center gap-1 text-xs text-primary-700">
-                              <Check className="w-3 h-3" strokeWidth={3} /> tomorrow
+                              <Check className="w-3 h-3" strokeWidth={3} /> {done ? 'done' : 'tomorrow'}
                             </span>
                           ) : (
                             <button type="button" onClick={() => pushToTomorrow(t)}
@@ -255,6 +292,7 @@ export function ReviewDrawer({
                     verdict={verdicts.get(task.id)}
                     canDelete={!!onDeleteTask}
                     onVerdict={apply}
+                    onComplete={complete}
                   />
                 ))}
               </ul>

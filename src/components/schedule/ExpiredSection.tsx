@@ -25,28 +25,60 @@ import { TriageRow, applyTriageVerdict, type Verdict } from './TriageRow'
  * the page you opened on purpose.
  */
 export function ExpiredSection({
-  rows, canDelete, onUpdateTask, onPushTask, onDeleteTask,
+  rows, canDelete, onUpdateTask, onPushTask, onDeleteTask, onCompleteTask,
 }: {
   rows: ExpiredRow[]
   canDelete: boolean
   onUpdateTask: (id: string, updates: Partial<Task>) => void | Promise<void | boolean>
   onPushTask?: (id: string, target: Date | 'week' | 'month' | 'quarter') => void | Promise<void | boolean>
   onDeleteTask?: (id: string) => void
+  /** Ticking off work you already did. The single most common truth about a
+   *  three-week-old row, and the one fate rescheduling and deleting both get
+   *  wrong. Same prop, same behavior as the Review drawer. */
+  onCompleteTask?: (id: string) => void
 }) {
   const [open, setOpen] = useState(false)
   const [verdicts, setVerdicts] = useState<Map<string, Verdict>>(() => new Map())
+  // Rows this session has resolved, kept by value.
+  //
+  // EVERY verdict takes a row out of `selectExpired` — done, rescheduled or
+  // deleted, it is no longer open-and-past-dated — so relying on the incoming
+  // prop made a ticked row VANISH mid-list instead of settling into TriageRow's
+  // "✓ done" state. In a 19-row list that reads as a glitch, gives no
+  // confirmation of which fate landed, and loses your place. Holding the row
+  // here lets the list drain deliberately: the header count drops immediately,
+  // the row stays put wearing its verdict until you leave the page.
+  const [held, setHeld] = useState<Map<string, ExpiredRow>>(() => new Map())
 
-  if (rows.length === 0) return null
+  const resolve = (row: ExpiredRow, v: Verdict) => {
+    setHeld((prev) => new Map(prev).set(row.task.id, row))
+    setVerdicts((prev) => new Map(prev).set(row.task.id, v))
+  }
 
-  const apply = (task: Task, v: Verdict) => {
+  // Live rows first, then anything held that has already left them, back in
+  // age order so a resolved row doesn't jump.
+  const live = new Set(rows.map((r) => r.task.id))
+  const shown = [...rows, ...[...held.values()].filter((r) => !live.has(r.task.id))]
+    .sort((a, b) => a.ageDays - b.ageDays)
+
+  if (shown.length === 0) return null
+
+  const apply = (row: ExpiredRow, v: Verdict) => {
     void (async () => {
       // A cancelled domain gate writes nothing — don't mark the row resolved.
-      const ok = await applyTriageVerdict(task, v, {
+      const ok = await applyTriageVerdict(row.task, v, {
         viewedDate: new Date(), onUpdateTask, onPushTask, onDeleteTask,
       })
-      if (ok) setVerdicts((prev) => new Map(prev).set(task.id, v))
+      if (ok) resolve(row, v)
     })()
   }
+
+  const complete = onCompleteTask
+    ? (row: ExpiredRow) => {
+        onCompleteTask(row.task.id)
+        resolve(row, 'completed')
+      }
+    : undefined
 
   const ageLabel = (days: number) =>
     days === 1 ? 'yesterday' : days < 14 ? `${days} days ago` : `${Math.floor(days / 7)} weeks ago`
@@ -62,21 +94,24 @@ export function ExpiredSection({
         <ChevronRight className={`w-4 h-4 shrink-0 text-neutral-400 transition-transform ${open ? 'rotate-90' : ''}`} />
         <span className="text-sm font-medium text-neutral-700">Expired · {rows.length}</span>
         <span className="text-xs text-neutral-400">
-          {open ? 'dated, then the day passed' : `oldest ${ageLabel(rows[rows.length - 1].ageDays)}`}
+          {open || rows.length === 0
+            ? 'dated, then the day passed'
+            : `oldest ${ageLabel(rows[rows.length - 1].ageDays)}`}
         </span>
       </button>
 
       {open && (
         <ul className="mt-3 space-y-1.5">
-          {rows.map(({ task, ageDays }) => (
+          {shown.map((row) => (
             <TriageRow
-              key={task.id}
-              task={task}
-              meta={ageLabel(ageDays)}
+              key={row.task.id}
+              task={row.task}
+              meta={ageLabel(row.ageDays)}
               offer={['today', 'tomorrow', 'week', 'someday', 'deleted']}
-              verdict={verdicts.get(task.id)}
+              verdict={verdicts.get(row.task.id)}
               canDelete={canDelete}
-              onVerdict={apply}
+              onVerdict={(_t, v) => apply(row, v)}
+              onComplete={complete && (() => complete(row))}
             />
           ))}
         </ul>

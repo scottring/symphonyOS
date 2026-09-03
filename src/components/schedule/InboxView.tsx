@@ -670,6 +670,7 @@ export function InboxView({
         onUpdateTask={(id, updates) => onUpdateTask?.(id, updates)}
         onPushTask={onPushTask}
         onDeleteTask={onDeleteTask}
+        onCompleteTask={onToggleTask}
       />
 
       {undo && (

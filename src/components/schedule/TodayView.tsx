@@ -1254,6 +1254,7 @@ export function TodayView({
         attentionItems={data.attentionItems}
         overdueTasks={data.overdueTasks}
         viewedDate={viewedDate}
+        onCompleteTask={onToggleTask}
         onUpdateTask={(id, u) => onUpdateTask?.(id, u)}
         onPushTask={ctx.onPushTask}
         onDeleteTask={ctx.onDeleteTask}
