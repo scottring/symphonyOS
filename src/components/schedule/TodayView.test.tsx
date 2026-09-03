@@ -441,15 +441,17 @@ describe('TodayView plan from paper — mobile entry point', () => {
     expect(screen.getAllByRole('button', { name: /more controls/i })).toHaveLength(1)
   })
 
-  it('mobile: "Plan from paper" is reachable from the overflow and fires the same handler', async () => {
+  it('mobile: "Plan from paper" is its own visible button beside the masthead — no overflow to open', async () => {
     const onOpenPlanFromPaper = vi.fn()
     const { user } = renderView({ onOpenPlanFromPaper })
-    await openOverflow(user)
-    await user.click(screen.getByRole('button', { name: /plan from paper/i }))
+    const masthead = screen.getByTestId('today-mobile-masthead')
+    await user.click(within(masthead).getByRole('button', { name: /plan from paper/i }))
     expect(onOpenPlanFromPaper).toHaveBeenCalledTimes(1)
+    await openOverflow(user)
+    expect(screen.getAllByRole('button', { name: /plan from paper/i })).toHaveLength(1)
   })
 
-  it('mobile: no "Plan from paper" item when the handler is absent', async () => {
+  it('mobile: no "Plan from paper" button when the handler is absent', async () => {
     const { user } = renderView()
     await openOverflow(user)
     expect(screen.queryByRole('button', { name: /plan from paper/i })).not.toBeInTheDocument()
@@ -462,8 +464,8 @@ describe('TodayView plan from paper — mobile entry point', () => {
     const strip = screen.getByTestId('today-controls')
     expect(within(strip).getByRole('button', { name: /more controls/i })).toBeInTheDocument()
     expect(screen.getAllByRole('button', { name: /more controls/i })).toHaveLength(1)
-    await openOverflow(user)
-    await user.click(screen.getByRole('button', { name: /plan from paper/i }))
+    // Plan from paper is a visible button in the strip, not an overflow item.
+    await user.click(within(strip).getByRole('button', { name: /plan from paper/i }))
     expect(onOpenPlanFromPaper).toHaveBeenCalledTimes(1)
   })
 })

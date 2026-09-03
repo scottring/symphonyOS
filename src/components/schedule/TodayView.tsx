@@ -871,19 +871,23 @@ export function TodayView({
      sits in the controls strip; on mobile that strip is `hidden md:flex`, so
      the same menu mounts beside the date masthead instead — otherwise "Plan
      from paper" was unreachable on the one device that always has a camera. */
+  /* Plan from paper is the way a day gets planned here — the paper plan is
+     the product (see the analog pivot). It sat in the overflow for a while,
+     hidden behind an ellipsis; Scott: "too important to be hidden" (2026-09-03).
+     One visible button, same two mount points as the overflow. */
+  const planFromPaperButton = onOpenPlanFromPaper && (
+    <button
+      type="button"
+      onClick={onOpenPlanFromPaper}
+      title="Plan from paper — photograph your written plan and place its items"
+      className="flex items-center gap-1.5 rounded-lg border border-primary-500/40 bg-primary-50 px-2.5 py-1.5 text-[13px] font-semibold text-primary-700 transition-colors hover:bg-primary-100"
+    >
+      <NotebookPen className="w-4 h-4" />
+      <span>Plan from paper</span>
+    </button>
+  )
   const overflowMenu = (
     <TodayOverflowMenu>
-      {onOpenPlanFromPaper && (
-        <button
-          type="button"
-          onClick={onOpenPlanFromPaper}
-          title="Plan from paper — photograph your written plan and place its items"
-          className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[15px] text-neutral-600 transition-all hover:bg-neutral-100"
-        >
-          <NotebookPen className="w-5 h-5" />
-          <span>Plan from paper</span>
-        </button>
-      )}
       <button
         type="button"
         onClick={toggleHideRoutines}
@@ -986,6 +990,7 @@ export function TodayView({
         <div className="flex-1 min-w-0">
           <DayNavCluster viewedDate={viewedDate} onDateChange={onDateChange} />
         </div>
+        {isMobile && planFromPaperButton}
         {isMobile && overflowMenu}
       </div>
 
@@ -1042,6 +1047,7 @@ export function TodayView({
           />
         )}
 
+        {!isMobile && planFromPaperButton}
         {!isMobile && overflowMenu}
       </div>
 
