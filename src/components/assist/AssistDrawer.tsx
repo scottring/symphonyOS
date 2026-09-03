@@ -12,6 +12,7 @@
 // Rendered at z-[60] so it sits above full-screen overlays.
 
 import { useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import { useSymphonyAssistant } from '@/hooks/useSymphonyAssistant'
 import { useDiscussThread, type DiscussEntity } from '@/hooks/useDiscussThread'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
@@ -82,7 +83,10 @@ export function AssistDrawer({ item, onClose, onMutate, discuss }: AssistDrawerP
     ? EVENT_SUGGESTIONS
     : isRoutine ? ROUTINE_SUGGESTIONS : TASK_SUGGESTIONS
 
-  return (
+  // Portaled to <body>: the detail panel that opens this drawer is its own
+  // stacking context, so a z-[60] inside it still sat under the z-50 capture
+  // FAB. Out here the z-index means what it says.
+  return createPortal(
     <div
       className="fixed inset-0 z-[60]"
       role="dialog"
@@ -147,6 +151,7 @@ export function AssistDrawer({ item, onClose, onMutate, discuss }: AssistDrawerP
           />
         )}
       </aside>
-    </div>
+    </div>,
+    document.body,
   )
 }

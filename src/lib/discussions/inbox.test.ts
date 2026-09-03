@@ -53,6 +53,15 @@ describe('buildInboxRows', () => {
     expect(rows[0].unread).toBe(false)
   })
 
+  it('previews markdown as plain one-line text', () => {
+    const rows = buildInboxRows([
+      session({
+        messages: [{ role: 'assistant', content: 'Pull up the task.\n\nWaiting on **which scenario** you prefer.', timestamp: '2026-09-02T09:00:00Z' }],
+      }),
+    ], {}, 'u1')
+    expect(rows[0].lastText).toBe('Pull up the task. Waiting on which scenario you prefer.')
+  })
+
   it('names Symphony as the author of an assistant reply', () => {
     const rows = buildInboxRows([
       session({

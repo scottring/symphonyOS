@@ -40,6 +40,11 @@ function readMessages(raw: unknown): StoredMessage[] {
   return Array.isArray(raw) ? (raw as StoredMessage[]) : []
 }
 
+/** One-line preview: markdown markers and line breaks read as noise in a list row. */
+function previewText(raw: string): string {
+  return raw.replace(/[*_`#>]+/g, '').replace(/\s+/g, ' ').trim()
+}
+
 function isEntityType(t: string | null): t is InboxEntityType {
   return t === 'task' || t === 'routine' || t === 'event'
 }
@@ -73,7 +78,7 @@ export function buildInboxRows(
       entityId: s.entity_id,
       title: s.title?.trim() || 'Untitled',
       lastAuthor: last.role === 'assistant' ? 'Symphony' : (last.author?.name ?? 'Someone'),
-      lastText: (last.content ?? '').trim(),
+      lastText: previewText(last.content ?? ''),
       lastAt,
       unread: isUnread(readable, selfAuthId, readAt),
     })
