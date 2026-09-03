@@ -155,9 +155,12 @@ function Chip({ label, wide }: { label: string; wide: boolean }) {
   // Written out rather than composed onto WALL.prepChip: that token bakes in
   // its own padding and size, and two conflicting Tailwind utilities resolve
   // by CSS order, not by their order in the string.
+  // The small size is the one-glance answer under a kid's School bar — "PE",
+  // "Music" — and 0.8rem read as a footnote from the sink. 0.9rem still fits
+  // beside a 44px bar in a 1024×768 row.
   const size = wide
     ? 'px-3 py-1 text-[0.95rem] max-w-[300px]'
-    : 'px-2.5 py-0.5 text-[0.8rem] max-w-[220px]';
+    : 'px-3 py-0.5 text-[0.9rem] max-w-[240px]';
   return (
     <span className={`rounded-lg font-bold truncate shrink bg-[#F2E4C4] dark:bg-[#4A3D28] text-[#7A5A2E] dark:text-[#D8BC85] ${size}`}>
       {label}
