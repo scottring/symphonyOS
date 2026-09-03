@@ -34,6 +34,17 @@ export function scopeForDomain(
   return others.length > 0 ? 'couple' : 'individual'
 }
 
+/**
+ * The scope of a calendar event's shared surfaces (its Discussion). Events are
+ * not private in Symphony: the kitchen wall shows them to the household and
+ * the For Discussion flag is a household list, and no calendar→domain mapping
+ * exists to narrow them. So: the household layer, always. Revisit here — and
+ * only here — when calendars carry a domain.
+ */
+export function scopeForCalendarEvent(): Scope {
+  return 'compound'
+}
+
 /** The shape of a `family_members` row this module needs to identify a person. */
 export interface MemberIdentity {
   id: string

@@ -23,6 +23,7 @@ import { computeEventReschedule } from '@/components/planning/planningReschedule
 import { AssistDrawer } from '@/components/assist/AssistDrawer'
 import { useThreadUnread } from '@/hooks/useThreadUnread'
 import { getRecurringBaseId } from '@/hooks/useHiddenCalendarEvents'
+import { scopeForCalendarEvent } from '@/lib/scope'
 
 interface TapEventPanelProps {
   event: CalendarEvent
@@ -504,10 +505,7 @@ export function TapEventPanel(props: TapEventPanelProps) {
       {assistOpen && (
         <AssistDrawer
           item={{ id: eventId, title: event.title, notes: props.notes ?? null }}
-          // Events aren't private in Symphony (the wall shows them to the
-          // household), so the thread is household-wide. Revisit when
-          // calendars carry a domain.
-          discuss={{ type: 'event', id: discussionBaseId, title: event.title, scope: 'compound' }}
+          discuss={{ type: 'event', id: discussionBaseId, title: event.title, scope: scopeForCalendarEvent() }}
           onClose={() => setAssistOpen(false)}
         />
       )}
