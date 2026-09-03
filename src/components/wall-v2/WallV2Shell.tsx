@@ -31,6 +31,16 @@ import { useDailyDiscussionPrompt } from '@/hooks/useDailyDiscussionPrompt';
 import { WallV2Gantt } from './WallV2Gantt';
 import { adaptGanttBoard, titleForBlockId, TRACK_PX } from './wallGantt';
 import { KidDayView } from './KidDayView';
+import { WallV2WhoSheet } from './WallV2WhoSheet';
+import { openHandoffQuestions, type HandoffQuestion } from './wallQuestions';
+import { assignWallEvent } from '@/lib/wall/eventAssign';
+import { HOUSEHOLD_ID } from './wallEventAttribution';
+import { readReadingTimer, readingTimerKey, elapsedMinutes } from '@/lib/wall/readingScreenTime';
+import { localYmd } from '@/lib/cadence/config';
+
+const safeStorage = (): Storage | null => {
+  try { return typeof localStorage !== 'undefined' ? localStorage : null; } catch { return null; }
+};
 import { emptySections } from '@/lib/today/types';
 import type { TimelineItem } from '@/types/timeline';
 import type { FamilyMember } from '@/types/family';
@@ -291,6 +301,8 @@ export function WallV2Shell() {
   // handlers below (useCallback) so a parent re-render doesn't recreate
   // onClose/onTapMember and restart KidDayView's idle-close timer.
   const [kidViewMember, setKidViewMember] = useState<FamilyMember | null>(null);
+  // "Who's on?" — the sheet that answers an unclaimed handoff with a face.
+  const [showWhoSheet, setShowWhoSheet] = useState(false);
   // Which dinner day the wall is looking at — shared by the face's dinner card
   // and the recipe viewer, so tapping a paged card opens that same day.
   // null = today.
@@ -468,7 +480,18 @@ export function WallV2Shell() {
     // Homework rides along: open, any date, on the assignee's row until it
     // is checked off. That is not "carrying over" — a form due Friday IS
     // Tuesday's business.
-    () => adaptGanttBoard(wallData.familyMembers, wallData.days, now, TRACK_PX, wallData.homeworkTasks),
+    () => {
+      const board = adaptGanttBoard(wallData.familyMembers, wallData.days, now, TRACK_PX, wallData.homeworkTasks);
+      // A reading timer left running on a kid's page (it auto-closes after two
+      // idle minutes) shows on their row, so a parent can see it from the
+      // kitchen and the kid can find it again.
+      const ymd = localYmd(now);
+      for (const t of board.tracks) {
+        const timer = readReadingTimer(safeStorage(), readingTimerKey(t.memberId, ymd));
+        if (timer) t.live = `Reading · ${elapsedMinutes(timer, now)} min`;
+      }
+      return board;
+    },
     [wallData.familyMembers, wallData.days, now, wallData.homeworkTasks],
   );
 
@@ -585,7 +608,43 @@ export function WallV2Shell() {
   // board's, but if that drifts again, this recovers the title from the same
   // board data already in scope so the tap flashes something instead of
   // dead-ending silently.
+  // The open questions: handoffs nobody has claimed, today (still ahead) and
+  // tomorrow (from the evening). Read off the days the wall already holds.
+  const handoffQuestions = useMemo(
+    () => openHandoffQuestions(wallData.days, wallData.familyMembers, now),
+    [wallData.days, wallData.familyMembers, now],
+  );
+  const adults = useMemo(
+    () => wallData.familyMembers.filter((m) => m.role_label === 'parent' || m.is_full_user),
+    [wallData.familyMembers],
+  );
+  const handoffAsk = useMemo(() => {
+    const q = handoffQuestions[0];
+    if (!q) return null;
+    return { lead: `${q.when === 'today' ? 'Today' : 'Tomorrow'} · ${q.time}`, prompt: q.prompt, more: handoffQuestions.length - 1 };
+  }, [handoffQuestions]);
+
+  const handlePickWho = useCallback((q: HandoffQuestion, member: FamilyMember) => {
+    if (!user) return;
+    void (async () => {
+      const err = await assignWallEvent(user.id, q.eventKey, member.id);
+      if (err) { showFlash('Could not save — try again'); return; }
+      showFlash(`${member.name} · ${q.title}`);
+      await wallData.refetch();
+    })();
+    // One question answered closes the sheet when it was the last one; the
+    // list re-derives from the refetch, so a second question stays up.
+    if (handoffQuestions.length <= 1) setShowWhoSheet(false);
+  }, [user, showFlash, wallData, handoffQuestions.length]);
+
   const handleTapGanttItem = useCallback((itemId: string) => {
+    // An unclaimed handoff on the Everyone row IS the question; tapping the
+    // bar answers it, same as tapping the strip card.
+    const household = ganttBoard.tracks.find((t) => t.memberId === HOUSEHOLD_ID);
+    if (household?.blocks.some((b) => b.id === itemId && b.openHandoff)) {
+      setShowWhoSheet(true);
+      return;
+    }
     handleTapLane(itemId, titleForBlockId(ganttBoard, itemId));
   }, [handleTapLane, ganttBoard]);
 
@@ -739,10 +798,12 @@ export function WallV2Shell() {
           meals={mealRows}
           comingUp={comingUpRows}
           question={discussionDismissed ? null : discussionPrompt}
+          handoff={handoffAsk}
           onCall={() => setShowPhone(true)}
           onTapDinner={handleTapDinnerCard}
           onSelectDinnerDay={(key) => setMealDayKey(key === todayKey ? null : key)}
           onTapQuestion={dismissDiscussion}
+          onTapHandoff={() => setShowWhoSheet(true)}
         />
       </div>
 
@@ -818,11 +879,25 @@ export function WallV2Shell() {
           member={kidViewMember}
           routines={wallData.routines}
           todayItems={(wallData.days.find((d) => d.isToday) ?? wallData.days[0])?.items ?? emptySections<TimelineItem>()}
+          tomorrowItems={wallData.days[1]?.items}
+          members={wallData.familyMembers}
+          screenTime={wallData.screenTimeSummaries.find((s) => s.familyMemberId === kidViewMember.id) ?? null}
+          weather={weather}
           neededTasks={wallData.neededTasks}
           homeworkTasks={wallData.homeworkTasks}
           notices={wallData.notices}
           onToggleTask={handleToggleComplete}
           onClose={handleCloseKidView}
+        />
+      )}
+
+      {showWhoSheet && (
+        <WallV2WhoSheet
+          questions={handoffQuestions}
+          adults={adults}
+          accentIndex={(id) => Math.max(0, wallData.familyMembers.findIndex((m) => m.id === id))}
+          onPick={handlePickWho}
+          onClose={() => setShowWhoSheet(false)}
         />
       )}
 

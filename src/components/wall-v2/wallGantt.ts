@@ -29,7 +29,7 @@ import { homeworkDue, sortHomework } from '@/lib/wall/homeworkLabel';
 import { isEverydayRoutine } from '@/lib/routineUtils';
 import { PREVIEW_SECTIONS } from '@/components/wall/today/tomorrowPreview';
 import type { DaySection } from '@/lib/timeUtils';
-import { HOUSEHOLD_ID, householdMember, titleForMember } from './wallEventAttribution';
+import { HOUSEHOLD_ID, householdMember, titleForMember, isHandoffEvent, withoutMemberList } from './wallEventAttribution';
 import { ownersOf } from './wallLanes';
 
 /** Hours of track. Below this a quiet day stretches two items across the wall. */
@@ -89,6 +89,16 @@ export const RHYTHM_HORIZON_MIN = 180;
  */
 const BOARD_SECTIONS: DaySection[] = [...PREVIEW_SECTIONS, 'unscheduled'];
 
+/**
+ * A free event this long is not a commitment, it is WHERE SOMEONE IS. School
+ * (7:30–2:10) and after-care (2:10–5:30) are the kids' whole day; drawn as
+ * dimmed forty-percent bars they read as two things nobody bothered with.
+ * Drawn as a stay — a pale filled box with the words inside — they read as
+ * the day's shape. Two hours: long enough that a "free" birthday party
+ * qualifies, short enough that a fifteen-minute handoff never does.
+ */
+export const STAY_MIN = 120;
+
 /** Default duration for an item with a start but no end. */
 const DEFAULT_DURATION_MIN = 60;
 
@@ -123,6 +133,13 @@ export interface GanttBlock {
   past: boolean;
   /** Informational-only: no prep/handoff expected — drawn dimmer with a "Free" label. */
   free?: boolean;
+  /** A long free event: where this person IS. Pale box, label inside, not dimmed. */
+  stay?: boolean;
+  /**
+   * A handoff (walk / pick up / drop off …) nobody has claimed, so it sits on
+   * the household row. Tapping it is how the board asks "who?".
+   */
+  openHandoff?: boolean;
   type: TimelineItem['type'];
 }
 
@@ -157,6 +174,9 @@ export interface GanttTrack {
   anytime: string[];
   /** Items that start after the window closes — counted, not dropped. */
   laterCount: number;
+  /** Something happening on this row RIGHT NOW that has no calendar slot —
+   *  a reading timer running. Set by the shell, not the adapter. */
+  live?: string;
 }
 
 export interface GanttAxis {
@@ -334,6 +354,8 @@ export function adaptGanttBoard(
     const blocks: GanttBlock[] = [];
     /** Kept with its time so the line can read in the order the day happens. */
     const anytimeItems: { title: string; at: number }[] = [];
+    /** Timed items, collected before drawing so stays can be known first. */
+    const timed: { it: TimelineItem; title: string; s: number; e: number }[] = [];
     let laterCount = 0;
 
     for (const it of today ? itemsFor(today, m.id, members) : []) {
@@ -341,7 +363,11 @@ export function adaptGanttBoard(
       // Ella: Visual Art · Kaleb: PE". Attribution rightly puts it in both
       // kids' tracks; rendering the same string in both is what made it
       // useless. Each track shows only the words addressed to that person.
-      const title = titleForMember(it.title, m.name);
+      // …and on a person's own row a trailing name list is the row saying
+      // its own name: "School — Ella & Kaleb" is "School" under Ella's face.
+      const title = m.id === HOUSEHOLD_ID
+        ? titleForMember(it.title, m.name)
+        : withoutMemberList(titleForMember(it.title, m.name), members);
       if (isAnytimeItem(it)) {
         const at = it.startTime ? minutesOfDay(it.startTime) : Number.MAX_SAFE_INTEGER;
         // A rhythm that has already happened is not information. At 8am the
@@ -375,6 +401,21 @@ export function adaptGanttBoard(
 
       const s = minutesOfDay(it.startTime!);
       const e = it.endTime ? minutesOfDay(it.endTime) : s + DEFAULT_DURATION_MIN;
+      timed.push({ it, title, s, e });
+    }
+
+    // Stays first, so a free scrap inside one can be dropped: "Ella & Kaleb
+    // to FFG", fifteen free minutes at 2:10, sits entirely inside the FFG
+    // block that already says where they are. Drawing both put a bar with no
+    // room for a label on top of the one with the words.
+    const stays = timed.filter((t) => !!t.it.isFree && t.e - t.s >= STAY_MIN);
+    const insideAStay = (t: { s: number; e: number }) =>
+      stays.some((st) => st !== t && st.s <= t.s && t.e <= st.e);
+
+    for (const t of timed) {
+      const { it, title, s, e } = t;
+      const stay = stays.includes(t);
+      if (!stay && it.isFree && insideAStay(t)) continue;
 
       if (s >= axis.endMin) { laterCount++; continue; }
       if (e <= axis.startMin) continue; // already over and off the left edge
@@ -394,6 +435,11 @@ export function adaptGanttBoard(
         labelRoomPct: 0,
         past: e <= nowMin,
         free: it.isFree,
+        stay: stay || undefined,
+        openHandoff:
+          m.id === HOUSEHOLD_ID && it.type === 'event' && !it.assignedTo && isHandoffEvent(it.title)
+            ? true
+            : undefined,
         type: it.type,
       });
     }

@@ -319,7 +319,12 @@ export function useWallData(): UseWallDataReturn {
         // not just the kiosk account's own. A recurring series' flag lives on a
         // note keyed by recurring_event_id, so this key can be an instance OR a
         // series id — resolved below alongside the instance id per event.
-        supabase.from('event_notes').select('google_event_id').eq('is_free', true),
+        // …and who is ON an event (`assigned_to`) — the on-duty parent for a
+        // handoff like "Walk Ella & Kaleb to school". Same table, one read.
+        supabase
+          .from('event_notes')
+          .select('google_event_id, is_free, assigned_to')
+          .or('is_free.eq.true,assigned_to.not.is.null'),
 
         // 15. Open homework, any date. A homework chip sits on the kid's row
         // from the day it arrives until it is checked off — "until done" is
@@ -379,9 +384,11 @@ export function useWallData(): UseWallDataReturn {
       const contacts = (contactsRes.data || []) as { id: string; name: string; birthday: string }[]
 
       // "Free" flags — a key can be an instance id OR a series (recurring_event_id) id.
-      const freeKeys = new Set(
-        ((freeEventNotesRes.data || []) as { google_event_id: string }[]).map((r) => r.google_event_id),
-      )
+      const noteRows = (freeEventNotesRes.data || []) as { google_event_id: string; is_free: boolean; assigned_to: string | null }[]
+      const freeKeys = new Set(noteRows.filter((r) => r.is_free).map((r) => r.google_event_id))
+      // Who is on an event. Instance first (this Tuesday), then the series
+      // (every Tuesday) — an answer for one day must beat a standing default.
+      const assigneeByKey = new Map(noteRows.filter((r) => r.assigned_to).map((r) => [r.google_event_id, r.assigned_to!]))
 
       // Supabase !inner join returns goals as object or array depending on version
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -483,6 +490,8 @@ export function useWallData(): UseWallDataReturn {
             const ev = item.originalEvent
             const series = seriesKey(ev)
             item.isFree = freeKeys.has(instanceKey(ev)) || (series ? freeKeys.has(series) : false)
+            const who = assigneeByKey.get(instanceKey(ev)) ?? (series ? assigneeByKey.get(series) : undefined)
+            if (who) item.assignedTo = who
           }
         }
 

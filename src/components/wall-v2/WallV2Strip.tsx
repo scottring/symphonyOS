@@ -13,7 +13,7 @@
 // and left is the reachable corner, and it keeps the dedicated always-visible
 // one-tap target the phone is owed.
 
-import { Phone, MessageCircle, UtensilsCrossed } from 'lucide-react';
+import { HelpCircle, MessageCircle, Phone, UtensilsCrossed } from 'lucide-react';
 import { WALL } from './wallTheme';
 import type { MealRow, DueRow, ComingUpRow } from './wallStrip';
 
@@ -148,7 +148,42 @@ export function WallV2DinnerStripCard({
   );
 }
 
-export function WallV2QuestionStripCard({ question, onTap }: { question: string | null; onTap?: () => void }) {
+/**
+ * What the strip asks when a handoff is unclaimed. Outranks the discussion
+ * prompt: "who's walking tomorrow?" has an answer the house needs by 7am,
+ * a conversation starter does not.
+ */
+export interface HandoffAsk {
+  /** "Tomorrow · 7:15a" */
+  lead: string;
+  /** "Who's walking Ella & Kaleb to school?" */
+  prompt: string;
+  /** Questions beyond the one shown. */
+  more: number;
+}
+
+export function WallV2QuestionStripCard({ question, handoff, onTap }: { question: string | null; handoff?: HandoffAsk | null; onTap?: () => void }) {
+  if (handoff) {
+    return (
+      <button
+        type="button"
+        onClick={onTap}
+        aria-label={`${handoff.prompt} Tap to answer`}
+        className={`${WALL.card} flex flex-col min-w-0 px-4 py-3 overflow-hidden text-left border-[#E0BE7E] dark:border-[#6B5430] active:scale-[.99] transition-transform`}
+      >
+        <div className={`${WALL.label} shrink-0 mb-2 flex items-center gap-1.5 text-[#A8600F] dark:text-[#E0A959]`}>
+          <HelpCircle className="w-3.5 h-3.5" />
+          Who's on? · {handoff.lead}
+        </div>
+        <p className={`font-display text-[1.2rem] leading-snug line-clamp-3 ${WALL.inkStrong}`}>
+          {handoff.prompt}
+        </p>
+        <p className={`mt-auto text-[0.9rem] font-bold ${WALL.muted}`}>
+          {handoff.more > 0 ? `Tap to answer · +${handoff.more} more` : 'Tap a face to answer'}
+        </p>
+      </button>
+    );
+  }
   return (
     <button
       type="button"
@@ -174,16 +209,18 @@ export function WallV2QuestionStripCard({ question, onTap }: { question: string 
 }
 
 export function WallV2Strip({
-  tonight, meals, comingUp, question, onCall, onTapDinner, onSelectDinnerDay, onTapQuestion,
+  tonight, meals, comingUp, question, handoff, onCall, onTapDinner, onSelectDinnerDay, onTapQuestion, onTapHandoff,
 }: {
   tonight: string | null;
   meals: MealRow[];
   comingUp: ComingUpRow[];
   question: string | null;
+  handoff?: HandoffAsk | null;
   onCall: () => void;
   onTapDinner?: () => void;
   onSelectDinnerDay?: (dateKey: string) => void;
   onTapQuestion?: () => void;
+  onTapHandoff?: () => void;
 }) {
   return (
     // Fixed height so the board above absorbs whatever the screen gives.
@@ -197,7 +234,7 @@ export function WallV2Strip({
       <WallV2CallTile onTap={onCall} />
       <div className="flex-1 min-w-0 grid grid-cols-3 gap-3">
         <WallV2DinnerStripCard tonight={tonight} rows={meals} onTap={onTapDinner} onSelectDay={onSelectDinnerDay} />
-        <WallV2QuestionStripCard question={question} onTap={onTapQuestion} />
+        <WallV2QuestionStripCard question={question} handoff={handoff} onTap={handoff ? onTapHandoff : onTapQuestion} />
         <WallV2ComingUpCard rows={comingUp} />
       </div>
     </div>

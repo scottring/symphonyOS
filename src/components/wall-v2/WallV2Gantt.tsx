@@ -12,7 +12,7 @@
 // labels outside.
 
 import { useState } from 'react';
-import { BookOpen, Home } from 'lucide-react';
+import { BookOpen, HelpCircle, Home } from 'lucide-react';
 import { WALL, personAccent } from './wallTheme';
 import { HOUSEHOLD_ID } from './wallEventAttribution';
 import type { GanttBoard, GanttBlock, GanttTrack, GanttHomework } from './wallGantt';
@@ -35,6 +35,14 @@ const ANYTIME_SHOWN_ROOMY = 8;
 /** Homework chips named before a row counts the rest. Its own cap: homework
  *  is the actionable thing on the row, so it never competes with specials. */
 const HOMEWORK_SHOWN = 2;
+
+/** A stay's edge, per person index — the same family as the bar fills. */
+const STAY_EDGES = [
+  'border-[#7A8E7E] dark:border-[#4E7261]',
+  'border-[#C9A96B] dark:border-[#A8894B]',
+  'border-[#D97F5E] dark:border-[#B4644A]',
+  'border-[#7C93A8] dark:border-[#5E7488]',
+] as const;
 
 /** Bar fills per person index, matching the lane accents. */
 const BAR_TINTS = [
@@ -89,8 +97,15 @@ function Bar({ block, index, onTap }: { block: GanttBlock; index: number; onTap?
       type="button"
       onClick={() => onTap?.(block.id)}
       style={{ left: `${block.leftPct}%`, width: `${block.widthPct}%` }}
-      className={`absolute top-1/2 -translate-y-1/2 h-[44px] rounded-lg ${tint} ${
-        block.past || block.free ? 'opacity-40' : ''
+      className={`absolute top-1/2 -translate-y-1/2 h-[44px] rounded-lg ${
+        // A stay is where someone IS, not something they do: pale box, the
+        // person's tint as an edge, the words in ink. Dimmed only once over.
+        block.stay
+          ? `bg-[#F4ECDB] dark:bg-[#3A3227] border-2 ${STAY_EDGES[index % STAY_EDGES.length]} ${block.past ? 'opacity-50' : ''}`
+          : block.openHandoff
+            // Unclaimed: hollow, so the row says "someone" rather than "done".
+            ? `border-2 border-dashed border-[#C2603A] dark:border-[#E0895F] bg-[#FBF1E6] dark:bg-[#3D2E22] ${block.past ? 'opacity-40' : ''}`
+            : `${tint} ${block.past || block.free ? 'opacity-40' : ''}`
       } active:scale-[.98] transition-transform`}
     >
       {/* A bar wide enough carries its own label. A narrow one hands the label
@@ -98,9 +113,12 @@ function Bar({ block, index, onTap }: { block: GanttBlock; index: number; onTap?
           duration stays honest and the words stay readable, rather than
           trading one for the other and getting "Food shop…". */}
       {block.labelSide === 'in' && (
-        <span className="absolute inset-0 flex items-center gap-1.5 px-3 text-[1.05rem] font-bold text-white truncate text-left">
-          {block.title}
-          {block.free && (
+        <span className={`absolute inset-0 flex items-center gap-1.5 px-3 text-[1.05rem] font-bold truncate text-left ${
+          block.stay ? WALL.inkStrong : block.openHandoff ? 'text-[#A8440F] dark:text-[#E0895F]' : 'text-white'
+        }`}>
+          {block.openHandoff && <HelpCircle className="w-5 h-5 shrink-0" aria-hidden="true" />}
+          <span className="truncate">{block.title}</span>
+          {block.free && !block.stay && (
             <span className="shrink-0 text-[0.75rem] font-semibold uppercase tracking-wide opacity-90">Free</span>
           )}
         </span>
@@ -190,6 +208,12 @@ function AnytimeArea({ track, roomy, name, onTapMember }: { track: GanttTrack; r
   const homeworkMore = track.homework.length - HOMEWORK_SHOWN;
   return (
     <div className={`flex items-center gap-1.5 min-w-0 ${roomy ? 'flex-wrap content-center' : 'overflow-hidden'}`}>
+      {track.live && (
+        <span className={`inline-flex items-center gap-1.5 rounded-lg font-bold shrink-0 bg-[#2E4638] dark:bg-[#4E7261] text-white ${roomy ? 'px-3 py-1 text-[0.95rem]' : 'px-2.5 py-0.5 text-[0.8rem]'}`}>
+          <BookOpen className="w-4 h-4" aria-hidden="true" />
+          {track.live}
+        </span>
+      )}
       {/* Homework first: it is the thing to DO on this row; the day's chips
           behind it are what the day looks like. */}
       {track.homework.slice(0, HOMEWORK_SHOWN).map((h) => (
@@ -213,7 +237,7 @@ function AnytimeArea({ track, roomy, name, onTapMember }: { track: GanttTrack; r
 
 function Track({ track, index, onTapItem, onTapMember }: { track: GanttTrack; index: number; onTapItem?: (id: string) => void; onTapMember?: (memberId: string) => void }) {
   const hasBars = track.blocks.length > 0;
-  const hasChips = track.anytime.length > 0 || track.laterCount > 0 || track.homework.length > 0;
+  const hasChips = track.anytime.length > 0 || track.laterCount > 0 || track.homework.length > 0 || !!track.live;
   const nameColumn = (
     <>
       <Face memberId={track.memberId} name={track.name} index={index} />

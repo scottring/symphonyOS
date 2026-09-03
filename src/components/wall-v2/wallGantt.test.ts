@@ -239,14 +239,14 @@ describe('a rotation written on one row still reads per person', () => {
     expect(board.tracks[1].anytime).toEqual(['PE'])
   })
 
-  it('leaves a genuinely shared commitment whole in both tracks', () => {
+  it('a shared commitment keeps its words in both tracks — minus the name list the row already says', () => {
     const board = adaptGanttBoard(
       KIDS,
       [day([item({ title: 'School — Ella & Kaleb', startTime: at(9), endTime: at(14) })])],
       at(9),
     )
-    expect(board.tracks[0].blocks[0].title).toBe('School — Ella & Kaleb')
-    expect(board.tracks[1].blocks[0].title).toBe('School — Ella & Kaleb')
+    expect(board.tracks[0].blocks[0].title).toBe('School')
+    expect(board.tracks[1].blocks[0].title).toBe('School')
   })
 
   it('splits a timed block the same way', () => {
@@ -601,5 +601,60 @@ describe('adaptGanttBoard — homework chips', () => {
   it('defaults to no homework when the argument is omitted', () => {
     const board = adaptGanttBoard(members, [day([])], now)
     expect(board.tracks.every((t) => t.homework.length === 0)).toBe(true)
+  })
+})
+
+describe('stays — a long free event is where someone IS', () => {
+  const ella = member('ella', 'Ella');
+  const school = () => item({ id: 'school', title: 'School — Ella & Kaleb', startTime: at(7, 30), endTime: at(14, 10), isFree: true });
+  const shift = () => item({ id: 'shift', title: 'Ella & Kaleb to FFG', startTime: at(14, 10), endTime: at(14, 25), isFree: true });
+  const ffg = () => item({ id: 'ffg', title: 'FFG — Ella & Kaleb', startTime: at(14, 10), endTime: at(17, 30), isFree: true });
+
+  it('marks a free event of two hours or more as a stay, on the kid\'s row', () => {
+    const board = adaptGanttBoard([ella], [day([school()])], at(9))
+    const block = board.tracks[0].blocks.find((b) => b.id === 'school')
+    expect(block?.stay).toBe(true)
+    expect(block?.free).toBe(true)
+  })
+
+  it('a short free event is not a stay', () => {
+    const board = adaptGanttBoard([ella], [day([shift()])], at(14))
+    expect(board.tracks[0].blocks.find((b) => b.id === 'shift')?.stay).toBeUndefined()
+  })
+
+  it('drops a free scrap that sits entirely inside a stay — the stay already says where they are', () => {
+    const board = adaptGanttBoard([ella], [day([school(), shift(), ffg()])], at(13))
+    const ids = board.tracks[0].blocks.map((b) => b.id)
+    expect(ids).toContain('school')
+    expect(ids).toContain('ffg')
+    expect(ids).not.toContain('shift')
+  })
+
+  it('keeps a real commitment that overlaps a stay — a dentist during school is still a dentist', () => {
+    const dentist = item({ id: 'dentist', title: 'Ella dentist', startTime: at(10), endTime: at(11) })
+    const board = adaptGanttBoard([ella], [day([school(), dentist])], at(9))
+    expect(board.tracks[0].blocks.map((b) => b.id)).toContain('dentist')
+  })
+})
+
+describe('an unclaimed handoff sits on the household row as an open question', () => {
+  const scott = member('4fd6259b-2246-4304-96c3-d93a12fd43ae', 'Scott');
+  const ella = member('ella', 'Ella');
+  const walk = (assignedTo?: string) => item({
+    id: 'walk', title: 'Walk Ella & Kaleb to school', startTime: at(7, 15), endTime: at(7, 30), assignedTo,
+  })
+
+  it('unassigned: household row, flagged openHandoff, not on the kid', () => {
+    const board = adaptGanttBoard([scott, ella], [day([walk()])], at(7))
+    const household = board.tracks.find((t) => t.memberId === '__household__')!
+    expect(household.blocks.find((b) => b.id === 'walk')?.openHandoff).toBe(true)
+    expect(board.tracks.find((t) => t.memberId === 'ella')!.blocks).toHaveLength(0)
+  })
+
+  it('assigned: the parent\'s row, and no longer a question', () => {
+    const board = adaptGanttBoard([scott, ella], [day([walk(scott.id)])], at(7))
+    const mine = board.tracks.find((t) => t.memberId === scott.id)!
+    expect(mine.blocks.find((b) => b.id === 'walk')?.openHandoff).toBeUndefined()
+    expect(board.tracks.find((t) => t.memberId === '__household__')!.blocks).toHaveLength(0)
   })
 })

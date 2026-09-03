@@ -109,6 +109,14 @@ export function attributeEvent(
 
   if (calId && CALENDAR_OWNER[calId]) return [CALENDAR_OWNER[calId]];
 
+  // A handoff names the kids but is not theirs: "Walk Ella & Kaleb to school"
+  // is a parent's fifteen minutes. Unassigned, it belongs to the house — and
+  // is the open question the wall asks in the evening (see wallQuestions).
+  // A rotation ("Pickup · Ella: bus · Kaleb: aftercare") names the verb too,
+  // but a per-person segment means it is telling each kid THEIR answer — that
+  // is theirs, split downstream by titleForMember, not a question for an adult.
+  if (isHandoffEvent(event.title ?? '') && !hasPerPersonSegments(event.title ?? '', members)) return [HOUSEHOLD_ID];
+
   const named = members
     .filter((m) => matchesName(event.title ?? '', m.name))
     .map((m) => m.id);
@@ -182,4 +190,69 @@ export function withoutKindPrefix(title: string, members: FamilyMember[]): strin
     if (at >= 0 && (earliest < 0 || at < earliest)) earliest = at;
   }
   return earliest > 0 ? title.slice(earliest) : title;
+}
+
+/**
+ * Verbs that make an event a HANDOFF — something an adult does to or for the
+ * kids it names. Walk, pick up, drop off, take, drive, bring, collect. The
+ * title starts with the verb ("Walk Ella & Kaleb to school", "Pick up Ella &
+ * Kaleb from FFG"), which is how a family actually writes these. Deliberately
+ * not "Grampappa picks up Ella & Kaleb": that already says who, and stays the
+ * kids' own line ("who picks me up") rather than a question for the board.
+ */
+const HANDOFF_VERBS: { re: RegExp; doing: string }[] = [
+  { re: /^walk\b/i, doing: 'walking' },
+  { re: /^pick[ -]?up\b/i, doing: 'picking up' },
+  { re: /^drop[ -]?off\b/i, doing: 'dropping off' },
+  { re: /^take\b/i, doing: 'taking' },
+  { re: /^drive\b/i, doing: 'driving' },
+  { re: /^bring\b/i, doing: 'bringing' },
+  { re: /^collect\b/i, doing: 'collecting' },
+];
+
+/** True when the title carries a word-bounded `Name:` segment for any member. */
+export function hasPerPersonSegments(title: string, members: FamilyMember[]): boolean {
+  return members.some((m) => {
+    const first = m.name.trim().split(/\s+/)[0];
+    if (!first) return false;
+    const escaped = first.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp(`\\b${escaped}\\s*:`, 'i').test(title);
+  });
+}
+
+export function isHandoffEvent(title: string): boolean {
+  const t = title.trim();
+  return HANDOFF_VERBS.some((v) => v.re.test(t));
+}
+
+/**
+ * The question a handoff poses when nobody has claimed it:
+ * "Walk Ella & Kaleb to school" → "Who's walking Ella & Kaleb to school?"
+ * Null for a title that is not a handoff.
+ */
+export function handoffQuestion(title: string): string | null {
+  const t = title.trim();
+  for (const v of HANDOFF_VERBS) {
+    const m = t.match(v.re);
+    if (!m) continue;
+    const rest = t.slice(m[0].length).trim();
+    return rest ? `Who's ${v.doing} ${rest}?` : `Who's ${v.doing}?`;
+  }
+  return null;
+}
+
+/**
+ * A title with a trailing member list dropped: "School — Ella & Kaleb" on
+ * Ella's own row is just "School". The row already says whose it is, and on
+ * a stay that runs seven hours the names are the widest part of the label.
+ * Only a tail made ENTIRELY of household first names comes off; "Dinner —
+ * Grandma & Kaleb" keeps its words because Grandma is not on the roster.
+ */
+export function withoutMemberList(title: string, members: FamilyMember[]): string {
+  const m = title.match(/^(.*?)\s*(?:—|–|-|\()\s*([^—–(]+?)\)?\s*$/);
+  if (!m || !m[1].trim()) return title;
+  const firsts = new Set(members.map((x) => x.name.trim().split(/\s+/)[0].toLowerCase()).filter(Boolean));
+  const names = m[2].split(/\s*(?:&|,|\band\b|\+)\s*/).map((n) => n.trim()).filter(Boolean);
+  if (names.length === 0 || !names.every((n) => firsts.has(n.toLowerCase()))) return title;
+  return m[1].trim();
 }

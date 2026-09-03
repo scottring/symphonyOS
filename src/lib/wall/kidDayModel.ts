@@ -22,6 +22,7 @@ import { neededWindow } from '@/lib/today/neededToday'
 import { isSameDay } from '@/lib/dateUtils'
 import { homeworkDue, sortHomework } from '@/lib/wall/homeworkLabel'
 import type { WallNotice } from '@/hooks/useWallData'
+import { matchesName, titleForMember, hasPerPersonSegments } from '@/components/wall-v2/wallEventAttribution'
 
 export type KidBandKey = 'morning' | 'afternoon' | 'evening' | 'anytime'
 
@@ -78,9 +79,28 @@ export interface KidNoticeRow {
   receivedOn: Date
 }
 
+/** The day's school facts a kid actually asks about. */
+export interface KidSchoolDay {
+  /** "PE" — this kid's half of the Specials rotation, or null. */
+  special: string | null
+  /** The sentence in the rotation's description that names this kid: "Ella has PE — sneakers." */
+  hint: string | null
+  /** From the evening: tomorrow's special, so the bag gets packed. */
+  tomorrowSpecial: string | null
+  /** Who collects them and when. `who` null = nobody has claimed it yet. */
+  pickup: { time: string; who: string | null } | null
+}
+
 export interface MemberDayModel {
   /** Rendered first, above the collections — today's needs, then tomorrow's. */
   needed: KidNeededRow[]
+  /**
+   * The reading target ("Read", 20 min), pulled out of the bands to be the
+   * page's own card. Null when this member has no such routine.
+   */
+  reading: KidRow | null
+  /** Today at school — null on a day with no school on the calendar. */
+  school: KidSchoolDay | null
   homework: KidHomeworkRow[]
   notices: KidNoticeRow[]
   collections: KidCollection[]
@@ -217,15 +237,21 @@ export function buildMemberDayModel(input: {
   homeworkTasks?: Task[]
   /** Standing info from school (useWallData.notices). */
   notices?: WallNotice[]
+  /** Tomorrow's items, for the evening "tomorrow's special" line. */
+  tomorrowItems?: Record<DaySection, TimelineItem[]>
+  /** The roster, to name who is on a pickup. */
+  members?: FamilyMember[]
   history: ActionableInstance[]
 }): MemberDayModel {
   const { member, date, now, routines, todayItems, neededTasks, history } = input
   const homeworkTasks = input.homeworkTasks ?? []
   const noticeInput = input.notices ?? []
+  const members = input.members ?? [member]
   const todayStr = toDateStr(date)
   const byId = new Map<string, Pick<Routine, 'id' | 'time_of_day'>>(routines.map((r) => [r.id, r]))
 
   const bands: Record<KidBandKey, KidRow[]> = { morning: [], afternoon: [], evening: [], anytime: [] }
+  let reading: KidRow | null = null
 
   // Rules 1 + 2: loose (parentless) routines — membership by owner, then the
   // full resolver ladder with the show_on_timeline declutter-hack override.
@@ -238,6 +264,8 @@ export function buildMemberDayModel(input: {
     )
     if (!resolution.shows) continue
     const row = buildRow(r, byId, date, todayStr, history)
+    // The reading target is the page's own card, not a line in "Anytime".
+    if (reading == null && isReadingTarget(r)) { reading = row; continue }
     bands[bandForTime(row.timeOfDay)].push(row)
   }
 
@@ -320,12 +348,84 @@ export function buildMemberDayModel(input: {
     .sort((a, b) => b.receivedOn.getTime() - a.receivedOn.getTime() || a.text.localeCompare(b.text))
     .map((n) => ({ id: n.id, text: n.text, senderLabel: n.senderLabel, receivedOn: n.receivedOn }))
 
-  // Rule 9
+  const school = buildSchoolDay(member, members, todayItems, input.tomorrowItems, now)
+
+  // Rule 9. Reading and school are the page's furniture, not its list — a
+  // kid with a reading target and nothing else still sees the card, but the
+  // page is honest that the list is empty.
   const isEmpty =
     needed.length === 0 &&
     homework.length === 0 &&
     collections.length === 0 &&
     Object.values(bands).every((rows) => rows.length === 0)
 
-  return { needed, homework, notices, collections, bands, isEmpty }
+  return { needed, reading, school, homework, notices, collections, bands, isEmpty }
+}
+
+/** A minutes target whose name is about reading: "Read", "Read 20 min", "Reading". */
+export function isReadingTarget(r: Routine): boolean {
+  return r.target_amount != null && r.target_unit === 'minutes' && /\bread(ing)?\b/i.test(r.name)
+}
+
+const SPECIALS = /^specials?\b/i
+const PICKUP = /\bpick(s|ed)?[ -]?up\b/i
+
+function clock(d: Date): string {
+  const h24 = d.getHours()
+  const h = h24 % 12 === 0 ? 12 : h24 % 12
+  const m = d.getMinutes()
+  return `${h}${m ? ':' + String(m).padStart(2, '0') : ''}${h24 < 12 ? 'a' : 'p'}`
+}
+
+function allItems(items: Record<DaySection, TimelineItem[]> | undefined): TimelineItem[] {
+  return items ? (Object.values(items) as TimelineItem[][]).flat() : []
+}
+
+/** This kid's special on a day: the rotation row split to their half. */
+function specialFor(member: FamilyMember, members: FamilyMember[], items: TimelineItem[]): TimelineItem | null {
+  return items.find((it) =>
+    it.type === 'event' && it.allDay && (SPECIALS.test(it.title) || hasPerPersonSegments(it.title, members))
+    && matchesName(it.title, member.name)) ?? null
+}
+
+/** The sentence of a description that names this kid. */
+function sentenceNaming(text: string | undefined, name: string): string | null {
+  if (!text) return null
+  const first = name.trim().split(/\s+/)[0]
+  const sentences = text.replace(/<[^>]+>/g, ' ').split(/(?<=[.!?])\s+|\n+/)
+  const hit = sentences.map((x) => x.trim()).find((x) => x && matchesName(x, first))
+  return hit ?? null
+}
+
+function buildSchoolDay(
+  member: FamilyMember,
+  members: FamilyMember[],
+  todayItems: Record<DaySection, TimelineItem[]>,
+  tomorrowItems: Record<DaySection, TimelineItem[]> | undefined,
+  now: Date,
+): KidSchoolDay | null {
+  const today = allItems(todayItems)
+  const rotation = specialFor(member, members, today)
+  const special = rotation ? titleForMember(rotation.title, member.name) : null
+  const hint = rotation ? sentenceNaming(rotation.googleDescription, member.name) : null
+
+  // The pickup is a handoff about this kid: "Pick up Ella & Kaleb from FFG"
+  // (claimed by a parent or not) or "Grampappa picks up Ella & Kaleb".
+  const pickupItem = today
+    .filter((it) => it.type === 'event' && !!it.startTime && !it.allDay && PICKUP.test(it.title) && matchesName(it.title, member.name))
+    .sort((a, b) => a.startTime!.getTime() - b.startTime!.getTime())[0]
+  let pickup: KidSchoolDay['pickup'] = null
+  if (pickupItem) {
+    const assignee = pickupItem.assignedTo ? members.find((m) => m.id === pickupItem.assignedTo)?.name ?? null : null
+    // "Grampappa picks up …" already says who.
+    const named = assignee ?? pickupItem.title.match(/^([A-Z][\w'-]*)\s+picks?\s+up\b/)?.[1] ?? null
+    pickup = { time: clock(pickupItem.startTime!), who: named }
+  }
+
+  const evening = now.getHours() >= 17
+  const tomorrowRotation = evening ? specialFor(member, members, allItems(tomorrowItems)) : null
+  const tomorrowSpecial = tomorrowRotation ? titleForMember(tomorrowRotation.title, member.name) : null
+
+  if (!special && !pickup && !tomorrowSpecial) return null
+  return { special, hint, tomorrowSpecial, pickup }
 }

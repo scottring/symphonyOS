@@ -23,6 +23,10 @@ const historyMock = vi.hoisted(() => ({
 vi.mock('./useMemberInstanceHistory', () => ({
   useMemberInstanceHistory: () => historyMock.current,
 }))
+const ledger = vi.hoisted(() => ({ syncEarned: vi.fn(async () => null) }))
+vi.mock('./useReadingScreenTime', () => ({
+  useReadingScreenTime: () => ledger,
+}))
 
 import { KidDayView } from './KidDayView'
 
@@ -149,24 +153,24 @@ describe('KidDayView', () => {
   })
 
   it('target row shows "12 of 20 min" given a history instance with progress: 12', () => {
-    const r = routine({ name: 'Read', target_amount: 20, target_unit: 'minutes' })
+    const r = routine({ name: 'Piano', target_amount: 20, target_unit: 'minutes' })
     const todayStr = dateStr(new Date())
     renderView({ routines: [r], history: [inst({ entity_id: r.id, date: todayStr, status: 'pending', progress: 12 })] })
     expect(screen.getByText('12 of 20 min')).toBeInTheDocument()
   })
 
   it('tapping a target row then +10 calls addProgress with (routine, id, date, 10, 20)', () => {
-    const r = routine({ name: 'Read', target_amount: 20, target_unit: 'minutes' })
+    const r = routine({ name: 'Piano', target_amount: 20, target_unit: 'minutes' })
     renderView({ routines: [r] })
-    fireEvent.click(screen.getByText('Read'))
+    fireEvent.click(screen.getByText('Piano'))
     fireEvent.click(screen.getByText('+10'))
     expect(mocks.addProgress).toHaveBeenCalledWith('routine', r.id, expect.any(Date), 10, 20)
   })
 
   it('Exact… -> typing 18 -> Set calls setProgress(..., 18, 20)', () => {
-    const r = routine({ name: 'Read', target_amount: 20, target_unit: 'minutes' })
+    const r = routine({ name: 'Piano', target_amount: 20, target_unit: 'minutes' })
     renderView({ routines: [r] })
-    fireEvent.click(screen.getByText('Read'))
+    fireEvent.click(screen.getByText('Piano'))
     fireEvent.click(screen.getByText('Exact…'))
     const input = screen.getByRole('spinbutton')
     fireEvent.change(input, { target: { value: '18' } })
@@ -320,5 +324,48 @@ describe('From school card', () => {
     expect(screen.getByText('PE is Tue/Thu')).toBeInTheDocument()
     expect(screen.getByText('Hillside · Sep 1')).toBeInTheDocument()
     expect(screen.getByText(/go play/)).toBeInTheDocument()
+  })
+})
+
+describe('KidDayView — the reading card', () => {
+  beforeEach(() => { localStorage.clear(); ledger.syncEarned.mockClear(); mocks.addProgress.mockClear() })
+
+  it('a Read target is its own card with a Start button, not a row in Anytime', () => {
+    renderView({ routines: [routine({ name: 'Read', target_amount: 20, target_unit: 'minutes' })] })
+    expect(screen.getByRole('button', { name: 'Start reading' })).toBeTruthy()
+    expect(screen.queryByText('Anytime')).toBeNull()
+  })
+
+  it('+10 on the reading card logs progress AND moves the screen-time ledger to what it earned', () => {
+    const r = routine({ name: 'Read', target_amount: 20, target_unit: 'minutes' })
+    renderView({ routines: [r] })
+    fireEvent.click(screen.getByText('+10'))
+    expect(mocks.addProgress).toHaveBeenCalledWith('routine', r.id, expect.any(Date), 10, 20)
+    expect(ledger.syncEarned).toHaveBeenCalledWith(KID.id, expect.any(String), 10)
+    expect(screen.getByText('Screen time today')).toBeTruthy()
+  })
+
+  it('Start then Stop logs the minutes read, whole, at least one', () => {
+    vi.useFakeTimers()
+    try {
+      const r = routine({ name: 'Read', target_amount: 20, target_unit: 'minutes' })
+      renderView({ routines: [r] })
+      fireEvent.click(screen.getByRole('button', { name: 'Start reading' }))
+      expect(localStorage.length).toBe(1)
+      vi.advanceTimersByTime(7 * 60_000 + 20_000)
+      fireEvent.click(screen.getByRole('button', { name: 'Stop reading' }))
+      expect(mocks.addProgress).toHaveBeenCalledWith('routine', r.id, expect.any(Date), 7, 20)
+      expect(ledger.syncEarned).toHaveBeenCalledWith(KID.id, expect.any(String), 7)
+      expect(localStorage.length).toBe(0)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('earned screen time is capped at the target', () => {
+    const r = routine({ name: 'Read', target_amount: 20, target_unit: 'minutes' })
+    renderView({ routines: [r], history: [inst({ entity_id: r.id, date: dateStr(new Date()), progress: 15 })] })
+    fireEvent.click(screen.getByText('+10'))
+    expect(ledger.syncEarned).toHaveBeenCalledWith(KID.id, expect.any(String), 20)
   })
 })

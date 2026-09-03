@@ -43,6 +43,17 @@ export interface ChildScreenTimeSummary {
 
 // --- Pure computation (used by both this hook and useWallData) ---
 
+/**
+ * A child is anyone who is not a parent and has no account of their own.
+ * Scott's roster labels the kids 'family', not 'child' (the label is free
+ * text from the member form), so matching the literal word found nobody and
+ * every screen-time summary came back empty.
+ */
+export function isChildMember(m: Pick<FamilyMember, 'role_label' | 'is_full_user'>): boolean {
+  if (m.role_label === 'child') return true
+  return m.role_label !== 'parent' && !m.is_full_user
+}
+
 export function computeScreenTimeSummaries(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   rawBudgets: any[],
@@ -53,14 +64,17 @@ export function computeScreenTimeSummaries(
   familyMembers: FamilyMember[],
   dateStr: string,
 ): ChildScreenTimeSummary[] {
-  const children = familyMembers.filter(m => m.role_label === 'child')
+  const children = familyMembers.filter(isChildMember)
 
   return children.map(child => {
     // Find budget (prefer specific day_type match, fall back to 'all')
     const budget = rawBudgets.find(
       (b: { family_member_id: string }) => b.family_member_id === child.id
     )
-    const budgetMinutes = budget?.daily_minutes ?? 60
+    // No budget row means no standing allowance: on the wall, screen time is
+    // what reading earned today (see readingScreenTime.ts). A household that
+    // wants a base allowance sets one.
+    const budgetMinutes = budget?.daily_minutes ?? 0
 
     // Find entry for this date
     const entry = rawEntries.find(

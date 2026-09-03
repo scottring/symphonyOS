@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   attributeEvent, matchesName, titleForMember, HOUSEHOLD_ID, EXCLUDED_CALENDAR_IDS, CALENDAR_OWNER,
+  isHandoffEvent, handoffQuestion, withoutMemberList,
 } from './wallEventAttribution';
 import type { FamilyMember } from '@/types/family';
 
@@ -152,5 +153,44 @@ describe('titleForMember', () => {
   it('falls back to the whole title rather than returning nothing', () => {
     expect(titleForMember('Ella:', 'Ella')).toBe('Ella:');
     expect(titleForMember('', 'Ella')).toBe('');
+  });
+});
+
+describe('handoffs — a parent\'s fifteen minutes, not the kids\' event', () => {
+  it('recognises the verbs a family writes a handoff with', () => {
+    expect(isHandoffEvent('Walk Ella & Kaleb to school')).toBe(true);
+    expect(isHandoffEvent('Pick up Ella & Kaleb from FFG')).toBe(true);
+    expect(isHandoffEvent('pickup Kaleb')).toBe(true);
+    expect(isHandoffEvent('Drop off Ella at piano')).toBe(true);
+    expect(isHandoffEvent('Ella & Kaleb to FFG')).toBe(false);
+    expect(isHandoffEvent('Grampappa picks up Ella & Kaleb')).toBe(false);
+    expect(isHandoffEvent('School — Ella & Kaleb')).toBe(false);
+  });
+
+  it('unassigned, it belongs to the house — not to the kids it names', () => {
+    expect(attributeEvent(ev('Walk Ella & Kaleb to school', FAMILY_CAL), MEMBERS)).toEqual([HOUSEHOLD_ID]);
+  });
+
+  it('assigned, it belongs to that parent alone', () => {
+    expect(attributeEvent(ev('Walk Ella & Kaleb to school', FAMILY_CAL), MEMBERS, SCOTT_ID)).toEqual([SCOTT_ID]);
+  });
+
+  it('turns the title into the question the wall asks', () => {
+    expect(handoffQuestion('Walk Ella & Kaleb to school')).toBe("Who's walking Ella & Kaleb to school?");
+    expect(handoffQuestion('Pick up Ella & Kaleb from FFG')).toBe("Who's picking up Ella & Kaleb from FFG?");
+    expect(handoffQuestion('School — Ella & Kaleb')).toBeNull();
+  });
+});
+
+describe('withoutMemberList — a person\'s row does not repeat its own name', () => {
+  it('drops a trailing list of household first names', () => {
+    expect(withoutMemberList('School — Ella & Kaleb', MEMBERS)).toBe('School');
+    expect(withoutMemberList('FFG - Ella, Kaleb', MEMBERS)).toBe('FFG');
+    expect(withoutMemberList('Swim (Ella)', MEMBERS)).toBe('Swim');
+  });
+  it('keeps a tail that names anyone off the roster, and titles with no tail', () => {
+    expect(withoutMemberList('Dinner — Grandma & Kaleb', MEMBERS)).toBe('Dinner — Grandma & Kaleb');
+    expect(withoutMemberList('Ella & Kaleb to FFG', MEMBERS)).toBe('Ella & Kaleb to FFG');
+    expect(withoutMemberList('Bang trim', MEMBERS)).toBe('Bang trim');
   });
 });

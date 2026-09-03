@@ -143,7 +143,8 @@ describe('buildMemberDayModel', () => {
   })
 
   it('builds target rows with progress from today instance', () => {
-    const r = routine({ name: 'Read', target_amount: 20, target_unit: 'minutes' })
+    // Not 'Read': a reading target is the page's own card (see kidDaySchool.test).
+    const r = routine({ name: 'Piano', target_amount: 20, target_unit: 'minutes' })
     const history = [inst({ entity_id: r.id, date: '2026-08-30', status: 'pending', progress: 12 })]
     const model = build([r], history)
     const row = model.bands.anytime.find((x) => x.id === r.id)

@@ -74,7 +74,10 @@ Deno.serve(async (req: Request) => {
       household_id: hh.id,
       kind: 'email',
       source_key: sourceKey,
-      source_label: senderLabel(originalSender(body.subject, body.text, body.from)),
+      // The daily school digest is sent from a parent's own Gmail, so its
+      // From is the parent; the kids' "From school" card should say where it
+      // really came from.
+      source_label: /^school digest\b/i.test(body.subject) ? 'School digest' : senderLabel(originalSender(body.subject, body.text, body.from)),
       subject: body.subject,
       sender: originalSender(body.subject, body.text, body.from),
       raw_text: rawText,
