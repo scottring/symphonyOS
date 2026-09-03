@@ -328,7 +328,7 @@ describe('From school card', () => {
 })
 
 describe('KidDayView — the reading card', () => {
-  beforeEach(() => { localStorage.clear(); ledger.syncEarned.mockClear(); mocks.addProgress.mockClear() })
+  beforeEach(() => { localStorage.clear(); ledger.syncEarned.mockClear(); mocks.addProgress.mockClear(); mocks.setProgress.mockClear() })
 
   it('a Read target is its own card with a Start button, not a row in Anytime', () => {
     renderView({ routines: [routine({ name: 'Read', target_amount: 20, target_unit: 'minutes' })] })
@@ -345,21 +345,62 @@ describe('KidDayView — the reading card', () => {
     expect(screen.getByText('Screen time today')).toBeTruthy()
   })
 
-  it('Start then Stop logs the minutes read, whole, at least one', () => {
+  it('Start, Pause, Resume, then Done logs the minutes actually read', () => {
     vi.useFakeTimers()
     try {
       const r = routine({ name: 'Read', target_amount: 20, target_unit: 'minutes' })
       renderView({ routines: [r] })
       fireEvent.click(screen.getByRole('button', { name: 'Start reading' }))
       expect(localStorage.length).toBe(1)
-      vi.advanceTimersByTime(7 * 60_000 + 20_000)
-      fireEvent.click(screen.getByRole('button', { name: 'Stop reading' }))
+      vi.advanceTimersByTime(4 * 60_000)
+      fireEvent.click(screen.getByRole('button', { name: 'Pause reading' }))
+      vi.advanceTimersByTime(30 * 60_000) // a long snack — does not count
+      expect(screen.getByText('Paused')).toBeTruthy()
+      fireEvent.click(screen.getByRole('button', { name: 'Resume reading' }))
+      vi.advanceTimersByTime(3 * 60_000 + 20_000)
+      fireEvent.click(screen.getByRole('button', { name: 'Done reading' }))
       expect(mocks.addProgress).toHaveBeenCalledWith('routine', r.id, expect.any(Date), 7, 20)
       expect(ledger.syncEarned).toHaveBeenCalledWith(KID.id, expect.any(String), 7)
       expect(localStorage.length).toBe(0)
     } finally {
       vi.useRealTimers()
     }
+  })
+
+  it('Reset takes two taps and logs nothing', () => {
+    vi.useFakeTimers()
+    try {
+      renderView({ routines: [routine({ name: 'Read', target_amount: 20, target_unit: 'minutes' })] })
+      fireEvent.click(screen.getByRole('button', { name: 'Start reading' }))
+      vi.advanceTimersByTime(5 * 60_000)
+      fireEvent.click(screen.getByRole('button', { name: 'Reset the timer' }))
+      expect(localStorage.length).toBe(1) // first tap only asks
+      fireEvent.click(screen.getByRole('button', { name: 'Yes, reset the timer' }))
+      expect(localStorage.length).toBe(0)
+      expect(mocks.addProgress).not.toHaveBeenCalled()
+      expect(screen.getByRole('button', { name: 'Start reading' })).toBeTruthy()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('−5 takes minutes back but never below zero, and Reset to 0 clears the day', () => {
+    const r = routine({ name: 'Read', target_amount: 20, target_unit: 'minutes' })
+    renderView({ routines: [r], history: [inst({ entity_id: r.id, date: dateStr(new Date()), progress: 3 })] })
+    fireEvent.click(screen.getByText('−5'))
+    expect(mocks.addProgress).toHaveBeenCalledWith('routine', r.id, expect.any(Date), -5, 20)
+    expect(ledger.syncEarned).toHaveBeenLastCalledWith(KID.id, expect.any(String), 0)
+    expect(screen.queryByText('−5')).toBeNull() // nothing left to take back
+  })
+
+  it('Reset to 0 asks first, then sets the day to zero', () => {
+    const r = routine({ name: 'Read', target_amount: 20, target_unit: 'minutes' })
+    renderView({ routines: [r], history: [inst({ entity_id: r.id, date: dateStr(new Date()), progress: 12 })] })
+    fireEvent.click(screen.getByText('Reset to 0'))
+    expect(mocks.setProgress).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByText('Yes, reset to 0'))
+    expect(mocks.setProgress).toHaveBeenCalledWith('routine', r.id, expect.any(Date), 0, 20)
+    expect(ledger.syncEarned).toHaveBeenLastCalledWith(KID.id, expect.any(String), 0)
   })
 
   it('earned screen time is capped at the target', () => {

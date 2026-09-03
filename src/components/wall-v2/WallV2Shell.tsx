@@ -35,7 +35,7 @@ import { WallV2WhoSheet } from './WallV2WhoSheet';
 import { openHandoffQuestions, type HandoffQuestion } from './wallQuestions';
 import { assignWallEvent } from '@/lib/wall/eventAssign';
 import { HOUSEHOLD_ID } from './wallEventAttribution';
-import { readReadingTimer, readingTimerKey, elapsedMinutes } from '@/lib/wall/readingScreenTime';
+import { readReadingTimer, readingTimerKey, elapsedMinutes, isTimerRunning } from '@/lib/wall/readingScreenTime';
 import { localYmd } from '@/lib/cadence/config';
 
 const safeStorage = (): Storage | null => {
@@ -488,7 +488,7 @@ export function WallV2Shell() {
       const ymd = localYmd(now);
       for (const t of board.tracks) {
         const timer = readReadingTimer(safeStorage(), readingTimerKey(t.memberId, ymd));
-        if (timer) t.live = `Reading · ${elapsedMinutes(timer, now)} min`;
+        if (timer) t.live = `${isTimerRunning(timer) ? 'Reading' : 'Reading paused'} · ${elapsedMinutes(timer, now)} min`;
       }
       return board;
     },

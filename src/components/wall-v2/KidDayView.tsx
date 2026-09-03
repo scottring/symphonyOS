@@ -9,7 +9,7 @@
 // (useDragScroll) — native touch scrolling never fires there.
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, BookOpen, Flame, GraduationCap, Mail, Play, Square, Tv, Umbrella } from 'lucide-react'
+import { ArrowLeft, BookOpen, Check, Flame, GraduationCap, Mail, Pause, Play, RotateCcw, Tv, Umbrella } from 'lucide-react'
 import { WALL } from './wallTheme'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
 import { useMemberInstanceHistory } from './useMemberInstanceHistory'
@@ -19,6 +19,7 @@ import { buildMemberDayModel } from '@/lib/wall/kidDayModel'
 import type { KidRow, KidNeededRow, KidHomeworkRow, KidNoticeRow, KidBandKey, MemberDayModel } from '@/lib/wall/kidDayModel'
 import {
   READING_REASON, readingEarns, readingTimerKey, readReadingTimer, writeReadingTimer,
+  startReadingTimer, pauseReadingTimer, resumeReadingTimer, isTimerRunning,
   elapsedLabel, minutesToLog, type ReadingTimer,
 } from '@/lib/wall/readingScreenTime'
 import { whatToWear } from '@/lib/wall/whatToWear'
@@ -45,7 +46,7 @@ const BAND_LABELS: Record<KidBandKey, string> = {
   evening: 'Evening',
   anytime: 'Anytime',
 }
-const MINUTE_CHIPS = [5, 10, 20]
+const MINUTE_CHIPS = [-5, 5, 10, 20]
 const COUNT_CHIPS = [1]
 
 interface KidDayViewProps {
@@ -149,10 +150,18 @@ export function KidDayView({
   const [timer, setTimer] = useState<ReadingTimer | null>(() => readReadingTimer(storage(), timerKey))
   const [tick, setTick] = useState(() => new Date())
   useEffect(() => {
-    if (!timer) return
+    if (!timer || !isTimerRunning(timer)) return
     const id = setInterval(() => setTick(new Date()), 1000)
     return () => clearInterval(id)
   }, [timer])
+  // Resets are two taps — "Reset" then "Yes, reset" — so a kid's elbow can't
+  // wipe fifteen minutes of reading. The second tap has four seconds.
+  const [confirmReset, setConfirmReset] = useState<'timer' | 'minutes' | null>(null)
+  useEffect(() => {
+    if (!confirmReset) return
+    const id = setTimeout(() => setConfirmReset(null), 4000)
+    return () => clearTimeout(id)
+  }, [confirmReset])
 
   const toggleExpand = useCallback((id: string) => {
     setExpanded((prev) => {
@@ -198,7 +207,8 @@ export function KidDayView({
   const handleChipAdd = useCallback((row: KidRow, amount: number) => {
     if (!row.target) return
     const current = progressOverlay.has(row.id) ? progressOverlay.get(row.id)! : row.target.progress
-    const next = current + amount
+    const next = Math.max(0, current + amount)
+    if (next === current) return
     setProgressOverlay((prev) => new Map(prev).set(row.id, next))
     void addProgress('routine', row.id, new Date(), amount, row.target.amount)
     afterReadingChange(row, next)
@@ -224,20 +234,40 @@ export function KidDayView({
     })
   }, [exactValue, setProgress, afterReadingChange])
 
-  const handleTimerStart = useCallback(() => {
-    const t = { startedAt: new Date().toISOString() }
+  const putTimer = useCallback((t: ReadingTimer | null) => {
     writeReadingTimer(storage(), timerKey, t)
     setTimer(t)
     setTick(new Date())
+    setConfirmReset(null)
   }, [timerKey])
 
-  const handleTimerStop = useCallback((row: KidRow) => {
+  const handleTimerStart = useCallback(() => putTimer(startReadingTimer(new Date())), [putTimer])
+  const handleTimerPause = useCallback(() => { if (timer) putTimer(pauseReadingTimer(timer, new Date())) }, [timer, putTimer])
+  const handleTimerResume = useCallback(() => { if (timer) putTimer(resumeReadingTimer(timer, new Date())) }, [timer, putTimer])
+
+  /** Done: log what was read (whole minutes) and clear the timer. */
+  const handleTimerDone = useCallback((row: KidRow) => {
     if (!timer) return
     const minutes = minutesToLog(timer, new Date())
-    writeReadingTimer(storage(), timerKey, null)
-    setTimer(null)
+    putTimer(null)
     if (minutes > 0) handleChipAdd(row, minutes)
-  }, [timer, timerKey, handleChipAdd])
+  }, [timer, putTimer, handleChipAdd])
+
+  /** Reset: throw the timer away, logging nothing. Two taps. */
+  const handleTimerReset = useCallback(() => {
+    if (confirmReset !== 'timer') { setConfirmReset('timer'); return }
+    putTimer(null)
+  }, [confirmReset, putTimer])
+
+  /** Reset the day's minutes to zero. Two taps. */
+  const handleMinutesReset = useCallback((row: KidRow) => {
+    if (!row.target) return
+    if (confirmReset !== 'minutes') { setConfirmReset('minutes'); return }
+    setConfirmReset(null)
+    setProgressOverlay((prev) => new Map(prev).set(row.id, 0))
+    void setProgress('routine', row.id, new Date(), 0, row.target.amount)
+    afterReadingChange(row, 0)
+  }, [confirmReset, setProgress, afterReadingChange])
 
   function displayRow(row: KidRow): KidRow {
     if (row.target) {
@@ -249,9 +279,10 @@ export function KidDayView({
     return { ...row, done }
   }
 
-  function renderChips(row: KidRow) {
+  function renderChips(row: KidRow, withReset = false) {
     if (!row.target) return null
-    const chips = row.target.unit === 'minutes' ? MINUTE_CHIPS : COUNT_CHIPS
+    const chips = (row.target.unit === 'minutes' ? MINUTE_CHIPS : COUNT_CHIPS)
+      .filter((amount) => amount > 0 || row.target!.progress > 0)
     const isExact = exactMode.has(row.id)
     return (
       <div className="flex flex-wrap items-center gap-2">
@@ -262,9 +293,18 @@ export function KidDayView({
             onClick={() => handleChipAdd(row, amount)}
             className={`${WALL.card} px-4 h-14 font-bold text-[1rem]`}
           >
-            +{amount}
+            {amount > 0 ? `+${amount}` : `−${-amount}`}
           </button>
         ))}
+        {!isExact && withReset && row.target.progress > 0 && (
+          <button
+            type="button"
+            onClick={() => handleMinutesReset(row)}
+            className={`${WALL.card} px-4 h-14 font-bold text-[1rem] ${confirmReset === 'minutes' ? 'bg-[#F7E4C0] dark:bg-[#4A3A1E] ' + WALL.warn : WALL.muted}`}
+          >
+            {confirmReset === 'minutes' ? 'Yes, reset to 0' : 'Reset to 0'}
+          </button>
+        )}
         {!isExact && (
           <button
             type="button"
@@ -450,16 +490,52 @@ export function KidDayView({
       </div>
 
       {timer ? (
-        <button
-          type="button"
-          onClick={() => handleTimerStop(reading)}
-          aria-label="Stop reading"
-          className="min-h-[72px] rounded-xl flex items-center justify-between px-5 bg-[#2E4638] dark:bg-[#4E7261] text-white active:scale-[.98] transition-transform"
-        >
-          <span className="text-[1.1rem] font-bold">Reading…</span>
-          <span className="font-display text-[2rem] tabular-nums">{elapsedLabel(timer, tick)}</span>
-          <span className="flex items-center gap-2 text-[1.05rem] font-bold"><Square className="w-5 h-5 fill-current" aria-hidden="true" />Stop</span>
-        </button>
+        <div className="flex flex-col gap-2">
+          <div className="min-h-[72px] rounded-xl flex items-center justify-between px-5 bg-[#2E4638] dark:bg-[#4E7261] text-white">
+            <span className="text-[1.1rem] font-bold">{isTimerRunning(timer) ? 'Reading…' : 'Paused'}</span>
+            <span className="font-display text-[2.2rem] tabular-nums">{elapsedLabel(timer, tick)}</span>
+            <span className="w-16" aria-hidden="true" />
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            {isTimerRunning(timer) ? (
+              <button
+                type="button"
+                onClick={handleTimerPause}
+                aria-label="Pause reading"
+                className={`${WALL.card} min-h-[64px] flex items-center justify-center gap-2 font-bold text-[1.05rem]`}
+              >
+                <Pause className="w-5 h-5 fill-current" aria-hidden="true" />Pause
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleTimerResume}
+                aria-label="Resume reading"
+                className={`${WALL.card} min-h-[64px] flex items-center justify-center gap-2 font-bold text-[1.05rem]`}
+              >
+                <Play className="w-5 h-5 fill-current" aria-hidden="true" />Resume
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => handleTimerDone(reading)}
+              aria-label="Done reading"
+              className="min-h-[64px] rounded-2xl flex items-center justify-center gap-2 font-bold text-[1.05rem] bg-[#2E4638] dark:bg-[#4E7261] text-white active:scale-[.98] transition-transform"
+            >
+              <Check className="w-5 h-5" aria-hidden="true" />Done
+            </button>
+            <button
+              type="button"
+              onClick={handleTimerReset}
+              aria-label={confirmReset === 'timer' ? 'Yes, reset the timer' : 'Reset the timer'}
+              className={`${WALL.card} min-h-[64px] flex items-center justify-center gap-2 font-bold text-[1.05rem] ${
+                confirmReset === 'timer' ? 'bg-[#F7E4C0] dark:bg-[#4A3A1E] ' + WALL.warn : WALL.muted
+              }`}
+            >
+              <RotateCcw className="w-5 h-5" aria-hidden="true" />{confirmReset === 'timer' ? 'Yes, reset' : 'Reset'}
+            </button>
+          </div>
+        </div>
       ) : (
         <button
           type="button"
@@ -472,7 +548,7 @@ export function KidDayView({
         </button>
       )}
 
-      {renderChips(reading)}
+      {renderChips(reading, true)}
     </div>
   )
 
