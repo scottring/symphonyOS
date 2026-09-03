@@ -141,15 +141,35 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
   // null = Google primary. Stored in calendar_connections.calendar_id.
   const [defaultCalendarId, setDefaultCalendarIdState] = useState<string | null>(null)
 
-  // Check connection status and validate token
+  // Check connection status and validate token.
+  //
+  // This used to run exactly once, on mount. On the kitchen wall that is a
+  // race the Pi loses: Chromium opens the app before Wi-Fi is up, the session
+  // restore and the calendar_connections read both fail, isConnected stays
+  // false, and every later poll returns [] without asking again — a wall with
+  // tasks and routines and no calendar until someone reloads it (2026-09-03).
+  // So a check that fails for any reason other than a real "reconnect needed"
+  // tries again, and a sign-in / token refresh triggers a fresh check.
   useEffect(() => {
+    let cancelled = false
+    let retryTimer: ReturnType<typeof setTimeout> | null = null
+    let attempts = 0
+
+    const scheduleRetry = () => {
+      if (cancelled || attempts >= CONNECTION_CHECK_MAX_ATTEMPTS) return
+      attempts += 1
+      retryTimer = setTimeout(() => { void checkAndValidateConnection() }, CONNECTION_CHECK_RETRY_MS)
+    }
+
     async function checkAndValidateConnection() {
+      if (cancelled) return
       try {
         const { data: { user } } = await getAuthUser()
         if (!user) {
           setIsConnected(false)
           setNeedsReconnect(false)
           setIsLoading(false)
+          scheduleRetry()
           return
         }
 
@@ -165,6 +185,8 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
           setIsConnected(false)
           setNeedsReconnect(false)
           setIsLoading(false)
+          // No row is a real answer; a failed read (network down) is not.
+          if (connError) scheduleRetry()
           return
         }
 
@@ -219,12 +241,28 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
         console.error('Error checking calendar connection:', err)
         setIsConnected(false)
         setNeedsReconnect(false)
+        scheduleRetry()
       } finally {
         setIsLoading(false)
       }
     }
 
-    checkAndValidateConnection()
+    void checkAndValidateConnection()
+
+    // A session arriving after mount (the wall coming online, a sign-in) is
+    // the moment to look again — with a fresh attempt budget.
+    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        attempts = 0
+        void checkAndValidateConnection()
+      }
+    })
+
+    return () => {
+      cancelled = true
+      if (retryTimer) clearTimeout(retryTimer)
+      sub.subscription.unsubscribe()
+    }
   }, [])
 
   // Connect to Google Calendar
@@ -672,6 +710,12 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
     </GoogleCalendarContext.Provider>
   )
 }
+
+/** How long to wait before re-checking a calendar connection that could not
+ *  be checked (network not up yet, session not restored). */
+const CONNECTION_CHECK_RETRY_MS = 30_000
+/** ~10 minutes of trying — a kiosk booting before its Wi-Fi is well inside that. */
+const CONNECTION_CHECK_MAX_ATTEMPTS = 20
 
 export function useGoogleCalendar() {
   const context = useContext(GoogleCalendarContext)
