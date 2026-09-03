@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, useEffect } from 'react'
 
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Task, TaskLink } from '@/types/task'
@@ -20,6 +20,9 @@ import { PanelLocation } from './sections/PanelLocation'
 import { locationLink } from '@/lib/locationLink'
 import { ConceptIcon } from '@/lib/conceptIcons'
 import { computeEventReschedule } from '@/components/planning/planningReschedule'
+import { AssistDrawer } from '@/components/assist/AssistDrawer'
+import { useThreadUnread } from '@/hooks/useThreadUnread'
+import { getRecurringBaseId } from '@/hooks/useHiddenCalendarEvents'
 
 interface TapEventPanelProps {
   event: CalendarEvent
@@ -71,6 +74,8 @@ interface TapEventPanelProps {
   onToggleDiscussion?: (flagged: boolean) => void
   /** Save the discussion note ("what's the question?"). */
   onDiscussionNoteChange?: (note: string) => void
+  /** Open the Discussion on mount (deep link from the Discussions inbox). */
+  autoOpenDiscussion?: boolean
   /** Informational-only "free" flag: the kids just show up, nothing for a
    *  parent to do. When set, the Complete pill and prep-task input hide. */
   free?: boolean
@@ -146,6 +151,8 @@ export function TapEventPanel(props: TapEventPanelProps) {
   const [showDirections, setShowDirections] = useState(false)
   const [showDurationMenu, setShowDurationMenu] = useState(false)
   const [prepDraft, setPrepDraft] = useState('')
+  const [assistOpen, setAssistOpen] = useState(props.autoOpenDiscussion === true)
+  useEffect(() => { if (props.autoOpenDiscussion) setAssistOpen(true) }, [props.autoOpenDiscussion])
 
   const relations = useEntityRelations({
     kind: 'event',
@@ -158,6 +165,9 @@ export function TapEventPanel(props: TapEventPanelProps) {
   const startTime = getStartTime(event)
   const endTime = getEndTime(event)
   const eventId = event.google_event_id ?? event.id
+  // One thread per series, not per instance — the same key the wall flag uses.
+  const discussionBaseId = getRecurringBaseId(eventId)
+  const discussionUnread = useThreadUnread('event', discussionBaseId)
   const calendarId = event.calendar_id ?? event.calendarId
 
   // Google refuses writes to view-only calendars — don't offer them.
@@ -282,15 +292,22 @@ export function TapEventPanel(props: TapEventPanelProps) {
     ...(canEdit && props.onReschedule && durationMinutes !== null && durationMinutes > 0
       ? [{ id: 'duration', label: formatDuration(durationMinutes), render: () => durationMenu }]
       : []),
+    {
+      id: 'discussion',
+      label: 'Discussion',
+      icon: 'discussion' as const,
+      dot: discussionUnread,
+      onClick: () => setAssistOpen(true),
+    },
     ...(props.onToggleDiscussion
       ? [{
           id: 'discuss',
-          label: discussionFlagged ? 'To discuss' : 'Discuss',
+          label: discussionFlagged ? 'On the list' : 'Bring up',
           kind: (discussionFlagged ? 'flagged' : 'default') as PanelAction['kind'],
           pressed: discussionFlagged,
           title: discussionFlagged
-            ? 'Remove from the For Discussion list'
-            : 'Flag to talk through together — shows on the For Discussion list',
+            ? "Take it off the wall's For Discussion list"
+            : "Bring up in person — adds it to the wall's For Discussion list",
           onClick: () => props.onToggleDiscussion?.(!discussionFlagged),
         }]
       : []),
@@ -483,6 +500,17 @@ export function TapEventPanel(props: TapEventPanelProps) {
         /* Events carry no created/updated timestamps; show the start time. */
         startTime ? <PanelFooter createdAt={new Date(startTime)} updatedAt={new Date(startTime)} /> : undefined
       }
-    />
+    >
+      {assistOpen && (
+        <AssistDrawer
+          item={{ id: eventId, title: event.title, notes: props.notes ?? null }}
+          // Events aren't private in Symphony (the wall shows them to the
+          // household), so the thread is household-wide. Revisit when
+          // calendars carry a domain.
+          discuss={{ type: 'event', id: discussionBaseId, title: event.title, scope: 'compound' }}
+          onClose={() => setAssistOpen(false)}
+        />
+      )}
+    </PanelShell>
   )
 }

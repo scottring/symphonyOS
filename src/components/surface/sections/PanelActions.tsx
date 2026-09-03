@@ -19,6 +19,8 @@ export interface PanelAction {
    * state rather than just changing color.
    */
   pressed?: boolean
+  /** A small dot after the label — "something here is waiting for you". */
+  dot?: boolean
   /** Hover/long-press explanation. */
   title?: string
   /** Owns its own popover (schedule, duration). Rendered verbatim. */
@@ -60,6 +62,7 @@ function Chip({ action }: { action: PanelAction }) {
       {action.kind === 'completed' && <Check className="w-4 h-4" aria-hidden />}
       {action.icon && <ConceptIcon name={action.icon} decorative />}
       {action.label}
+      {action.dot && <span className="h-1.5 w-1.5 rounded-full bg-primary-500" aria-label="Unread" />}
     </>
   )
 

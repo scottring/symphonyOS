@@ -19,6 +19,7 @@ import { PanelAttachments } from './sections/PanelAttachments'
 import { ExtractSteps } from '@/components/routine/ExtractSteps'
 import { ConceptIcon } from '@/lib/conceptIcons'
 import { AssistDrawer } from '@/components/assist/AssistDrawer'
+import { useThreadUnread } from '@/hooks/useThreadUnread'
 import { useAttachments } from '@/hooks/useAttachments'
 import { useRoutineStepChecklist } from '@/hooks/useRoutineStepChecklist'
 
@@ -57,6 +58,8 @@ interface TapRoutinePanelProps {
   onReorderSteps?: (writes: { id: string; step_order: number }[]) => void
   /** Refetch after the planning assistant writes (enables the Help-me-plan action). */
   onAssistMutate?: () => void
+  /** Open the Discussion on mount (deep link from the Discussions inbox). */
+  autoOpenDiscussion?: boolean
   /** Existing routines this one can be tucked into as a step (standalone routines only). */
   moveTargets?: { id: string; name: string }[]
   onMoveInto?: (targetId: string) => void
@@ -73,7 +76,9 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
   const [editingSchedule, setEditingSchedule] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [showDirections, setShowDirections] = useState(false)
-  const [assistOpen, setAssistOpen] = useState(false)
+  const [assistOpen, setAssistOpen] = useState(props.autoOpenDiscussion === true)
+  useEffect(() => { if (props.autoOpenDiscussion) setAssistOpen(true) }, [props.autoOpenDiscussion])
+  const discussionUnread = useThreadUnread('routine', props.routine.id)
   const onTimeline = routine.visibility === 'active'
 
   // Today-completion checklist for the steps — same instance keys as the
@@ -118,7 +123,8 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
               onClick={() => setAssistOpen(true)}
               className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-sm font-medium bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition-colors"
             >
-              <ConceptIcon name="ai" size={14} decorative /> Discuss
+              <ConceptIcon name="discussion" size={14} decorative /> Discussion
+              {discussionUnread && <span className="h-1.5 w-1.5 rounded-full bg-primary-500" aria-label="Unread" />}
             </button>
           )}
         </div>

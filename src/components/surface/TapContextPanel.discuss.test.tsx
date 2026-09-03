@@ -1,4 +1,4 @@
-// The Discuss action on the task panel: it says "Discuss", and the scope it
+// The Discussion action on the task panel: it says "Discussion", and the scope it
 // hands the drawer is DERIVED from the task (scopeForDomain), never a literal.
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { screen, fireEvent } from '@testing-library/react'
@@ -61,14 +61,14 @@ describe('TapContextPanel Discuss action', () => {
 
   it('labels the action Discuss', () => {
     renderPanel(createMockTask({ title: 'Book the dentist' }))
-    expect(screen.getByRole('button', { name: 'Discuss' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Discussion' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Help me plan' })).toBeNull()
   })
 
   it('passes compound scope for a family task', () => {
     const task = createMockTask({ id: 't1', title: 'Book the dentist', context: 'family' })
     renderPanel(task)
-    fireEvent.click(screen.getByRole('button', { name: 'Discuss' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Discussion' }))
     expect(drawerProps).toHaveBeenCalledWith(expect.objectContaining({
       discuss: { type: 'task', id: 't1', title: 'Book the dentist', scope: 'compound' },
     }))
@@ -79,7 +79,7 @@ describe('TapContextPanel Discuss action', () => {
       id: 't2', title: 'Renew passport', context: 'personal', assignedTo: 'm-self',
     })
     renderPanel(task)
-    fireEvent.click(screen.getByRole('button', { name: 'Discuss' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Discussion' }))
     expect(drawerProps).toHaveBeenCalledWith(expect.objectContaining({
       discuss: expect.objectContaining({ scope: 'individual' }),
     }))
@@ -90,7 +90,7 @@ describe('TapContextPanel Discuss action', () => {
       id: 't3', title: 'Call the plumber', context: 'personal', assignedTo: 'm-iris',
     })
     renderPanel(task)
-    fireEvent.click(screen.getByRole('button', { name: 'Discuss' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Discussion' }))
     expect(drawerProps).toHaveBeenCalledWith(expect.objectContaining({
       discuss: expect.objectContaining({ scope: 'couple' }),
     }))

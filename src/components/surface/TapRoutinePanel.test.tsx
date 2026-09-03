@@ -204,7 +204,7 @@ describe('TapRoutinePanel', () => {
 })
 
 describe('TapRoutinePanel Discuss action', () => {
-  it('labels the action Discuss and hands the drawer the routine own scope', () => {
+  it('labels the action Discussion and hands the drawer the routine own scope', () => {
     const shared = { ...routine, scope: 'compound' as const }
     render(
       <TapRoutinePanel
@@ -216,7 +216,7 @@ describe('TapRoutinePanel Discuss action', () => {
         onAssistMutate={vi.fn()}
       />,
     )
-    const button = screen.getByRole('button', { name: 'Discuss' })
+    const button = screen.getByRole('button', { name: 'Discussion' })
     expect(screen.queryByRole('button', { name: 'Help me plan' })).toBeNull()
     fireEvent.click(button)
     expect(drawerProps).toHaveBeenCalledWith(expect.objectContaining({

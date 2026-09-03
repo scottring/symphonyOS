@@ -26,6 +26,14 @@ vi.mock('@/hooks/useDirections', () => ({
   formatDistance: (m: number) => `${m}m`,
 }))
 
+const drawerProps = vi.fn()
+vi.mock('@/components/assist/AssistDrawer', () => ({
+  AssistDrawer: (props: Record<string, unknown>) => {
+    drawerProps(props)
+    return <div data-testid="assist-drawer" />
+  },
+}))
+
 const baseHandlers = {
   onClose: vi.fn(),
   onNotesChange: vi.fn(),
@@ -173,23 +181,23 @@ describe('TapEventPanel', () => {
   })
 
   describe('discussion flag', () => {
-    it('hides the Discuss chip when onToggleDiscussion is not provided', () => {
+    it('hides the Bring up chip when onToggleDiscussion is not provided', () => {
       render(<TapEventPanel event={mockEvent} notes={undefined} allTasks={[]} {...baseHandlers} />)
-      expect(screen.queryByRole('button', { name: /discuss/i })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: /bring up/i })).not.toBeInTheDocument()
     })
 
-    it('flags an unflagged event via the Discuss chip', async () => {
+    it('flags an unflagged event via the Bring up chip', async () => {
       const onToggleDiscussion = vi.fn()
       const { user } = render(<TapEventPanel
         event={mockEvent} notes={undefined} allTasks={[]} {...baseHandlers}
         discussion={{ flagged: false }}
         onToggleDiscussion={onToggleDiscussion}
       />)
-      await user.click(screen.getByRole('button', { name: /discuss/i }))
+      await user.click(screen.getByRole('button', { name: /bring up/i }))
       expect(onToggleDiscussion).toHaveBeenCalledWith(true)
     })
 
-    it('flagged event: shows the To discuss state, note field, and saves the note on blur', async () => {
+    it('flagged event: shows the On the list state, note field, and saves the note on blur', async () => {
       const onToggleDiscussion = vi.fn()
       const onDiscussionNoteChange = vi.fn()
       const { user } = render(<TapEventPanel
@@ -198,7 +206,7 @@ describe('TapEventPanel', () => {
         onToggleDiscussion={onToggleDiscussion}
         onDiscussionNoteChange={onDiscussionNoteChange}
       />)
-      const chip = screen.getByRole('button', { name: /to discuss/i })
+      const chip = screen.getByRole('button', { name: /on the list/i })
       expect(chip).toHaveAttribute('aria-pressed', 'true')
 
       const noteField = screen.getByPlaceholderText(/what's the question/i)
@@ -208,6 +216,17 @@ describe('TapEventPanel', () => {
 
       await user.click(chip)
       expect(onToggleDiscussion).toHaveBeenCalledWith(false)
+    })
+  })
+
+  describe('discussion thread', () => {
+    it('opens the event thread household-wide, keyed on the series', async () => {
+      const { user } = render(<TapEventPanel event={mockEvent} notes={undefined} allTasks={[]} {...baseHandlers} />)
+      await user.click(screen.getByRole('button', { name: 'Discussion' }))
+      expect(screen.getByTestId('assist-drawer')).toBeInTheDocument()
+      expect(drawerProps).toHaveBeenCalledWith(expect.objectContaining({
+        discuss: expect.objectContaining({ type: 'event', scope: 'compound', title: mockEvent.title }),
+      }))
     })
   })
 

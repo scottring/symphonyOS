@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useRef, useState, type ReactNode, useEffect } from 'react'
 import type { Task, TaskContext } from '@/types/task'
 import type { Contact } from '@/types/contact'
 import type { Project } from '@/types/project'
@@ -28,6 +28,7 @@ import { PanelFooter } from './sections/PanelFooter'
 import { useLinkedEntities } from './hooks/useLinkedEntities'
 import { useMightBeRelevant } from './hooks/useMightBeRelevant'
 import { AssistDrawer } from '@/components/assist/AssistDrawer'
+import { useThreadUnread } from '@/hooks/useThreadUnread'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { scopeForDomain } from '@/lib/scope'
 import type { MightBeRelevantItem } from './types'
@@ -94,13 +95,17 @@ interface TapContextPanelProps {
   onAddContact?: (name: string, details?: { phone?: string; category?: import('@/types/contact').ContactCategory; placeId?: string }) => Promise<Contact | null>
   /** Refetch after the planning assistant writes (enables the Help-me-plan action). */
   onAssistMutate?: () => void
+  /** Open the Discussion on mount (deep link from the Discussions inbox). */
+  autoOpenDiscussion?: boolean
 }
 
 export function TapContextPanel(props: TapContextPanelProps) {
   const { task, allTasks, createdByName } = props
 
   const [showDirections, setShowDirections] = useState(false)
-  const [assistOpen, setAssistOpen] = useState(false)
+  const [assistOpen, setAssistOpen] = useState(props.autoOpenDiscussion === true)
+  useEffect(() => { if (props.autoOpenDiscussion) setAssistOpen(true) }, [props.autoOpenDiscussion])
+  const discussionUnread = useThreadUnread('task', task.id)
 
   // The Discuss thread is shared exactly as widely as the task is: its scope is
   // DERIVED from the task's domain + assignees, never picked. Self is whoever
@@ -207,8 +212,9 @@ export function TapContextPanel(props: TapContextPanelProps) {
     ...(props.onAssistMutate
       ? [{
           id: 'assist',
-          label: 'Discuss',
-          icon: 'ai' as const,
+          label: 'Discussion',
+          icon: 'discussion' as const,
+          dot: discussionUnread,
           onClick: () => setAssistOpen(true),
         }]
       : []),

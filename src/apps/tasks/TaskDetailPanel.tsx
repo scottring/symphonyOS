@@ -21,7 +21,7 @@
 // onSaveNoteToVault is omitted so the "Save to vault" affordance stays hidden.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { showToast } from '@/hooks/useToast';
 import { useSelection } from '@/shell/providers/SelectionProvider';
 import type { SelectionRef } from '@/shell/types';
@@ -143,6 +143,7 @@ export function shouldCloseStaleEventPanel(opts: {
 
 // ── Task ──────────────────────────────────────────────────────────────────
 function TaskPanelBody({ id }: { id: string }) {
+  const autoOpenDiscussion = useAutoOpenDiscussion();
   const { clearSelection } = useSelection();
   const navigate = useNavigate();
 
@@ -198,6 +199,7 @@ function TaskPanelBody({ id }: { id: string }) {
       // and WhyChain renders nothing without one. Component + test are parked.
       // createdByName not tracked in current data model
       onAssistMutate={refetch}
+      autoOpenDiscussion={autoOpenDiscussion}
       onClose={handleClose}
       onTitleChange={(t) => updateTask(task.id, { title: t })}
       onNotesChange={(n) => updateTask(task.id, { notes: n })}
@@ -297,6 +299,7 @@ function TaskPanelBody({ id }: { id: string }) {
 
 // ── Routine ─────────────────────────────────────────────────────────────────
 function RoutinePanelBody({ id }: { id: string }) {
+  const autoOpenDiscussion = useAutoOpenDiscussion();
   const { clearSelection, setSelection } = useSelection();
   // Search ALL routines (not just active): flipping a routine to "reference"
   // visibility removes it from the active set/timeline but the panel must stay
@@ -378,6 +381,7 @@ function RoutinePanelBody({ id }: { id: string }) {
         updateRoutine(routine.id, { location: null, location_place_id: null })
       }
       onAssistMutate={refetchRoutines}
+      autoOpenDiscussion={autoOpenDiscussion}
     />
   );
 }
@@ -405,6 +409,7 @@ function eventUpdateErrorMessage(err: unknown): string {
 
 // ── Event ─────────────────────────────────────────────────────────────────
 function EventPanelBody({ id }: { id: string }) {
+  const autoOpenDiscussion = useAutoOpenDiscussion();
   const { clearSelection } = useSelection();
   const navigate = useNavigate();
   const { events, updateEvent, moveEvent, fetchEvents, fetchCalendarList, isFetching, isLoading } = useGoogleCalendar();
@@ -530,6 +535,7 @@ function EventPanelBody({ id }: { id: string }) {
   return (
     <TapEventPanel
       event={event}
+      autoOpenDiscussion={autoOpenDiscussion}
       notes={getNote(eventId)?.notes ?? undefined}
       allTasks={tasks}
       completed={completed}
@@ -630,6 +636,25 @@ function MealPanelBody({ id }: { id: string }) {
   if (!event) return <PanelLoading />;
 
   return <TapMealPanel event={event} onClose={handleClose} />;
+}
+
+/**
+ * `?discuss=1` (the Discussions inbox deep link) opens the item's Discussion
+ * as the panel mounts, then leaves the URL — a reload shouldn't reopen it.
+ */
+function useAutoOpenDiscussion(): boolean {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const wanted = searchParams.get('discuss') === '1';
+  const [auto] = useState(wanted);
+  useEffect(() => {
+    if (!wanted) return;
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete('discuss');
+      return next;
+    }, { replace: true });
+  }, [wanted, setSearchParams]);
+  return auto;
 }
 
 export function TaskDetailPanel({ selection }: { selection: SelectionRef }) {
