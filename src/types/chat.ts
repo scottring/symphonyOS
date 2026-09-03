@@ -20,6 +20,8 @@ export interface ChatMessage {
   timestamp: Date
   /** Set only in a shared thread — see ChatAuthor. */
   author?: ChatAuthor
+  /** A member message that invited Symphony (Ask button or "@Symphony"). */
+  askedSymphony?: true
 }
 
 export interface EntityContext {

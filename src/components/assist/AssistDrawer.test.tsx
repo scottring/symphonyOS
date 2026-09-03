@@ -23,13 +23,15 @@ vi.mock('@/hooks/useSymphonyAssistant', () => ({
   },
 }))
 
-const discussSend = vi.fn()
+const discussPost = vi.fn()
+const discussAsk = vi.fn()
 const discussSpy = vi.fn()
 const discussState = vi.hoisted(() => ({
   threadId: 'thr-1' as string | null,
   error: null as string | null,
   messages: [] as Array<Record<string, unknown>>,
   participants: [] as string[],
+  sharedWith: [] as string[],
   selfAuthId: 'u1' as string | null,
 }))
 
@@ -44,8 +46,10 @@ vi.mock('@/hooks/useDiscussThread', () => ({
       sending: false,
       error: discussState.error,
       toolActivity: [],
-      send: discussSend,
+      post: discussPost,
+      ask: discussAsk,
       participants: discussState.participants,
+      sharedWith: discussState.sharedWith,
       selfAuthId: discussState.selfAuthId,
       reload: vi.fn(),
     }
@@ -77,6 +81,7 @@ describe('AssistDrawer', () => {
     discussState.error = null
     discussState.messages = []
     discussState.participants = []
+    discussState.sharedWith = []
     discussState.selfAuthId = 'u1'
   })
 
@@ -114,11 +119,25 @@ describe('AssistDrawer', () => {
       expect(screen.getByRole('heading', { name: 'Discussion' })).toBeInTheDocument()
     })
 
-    it('sends into the shared thread, not the solo assistant', () => {
+    it('marks the thread read while it is open', () => {
+      render(<AssistDrawer item={task} onClose={vi.fn()} discuss={discuss} />)
+      expect(discussSpy).toHaveBeenCalledWith(discuss, expect.objectContaining({ markRead: true }))
+    })
+
+    it('suggestion chips ask Symphony in the shared thread, not the solo assistant', () => {
       render(<AssistDrawer item={task} onClose={vi.fn()} discuss={discuss} />)
       fireEvent.click(screen.getByRole('button', { name: 'Break this into doable steps' }))
-      expect(discussSend).toHaveBeenCalledWith('Break this into doable steps')
+      expect(discussAsk).toHaveBeenCalledWith('Break this into doable steps')
       expect(sendMessage).not.toHaveBeenCalled()
+    })
+
+    it('a typed message posts to the people in the thread and never wakes Symphony', () => {
+      render(<AssistDrawer item={task} onClose={vi.fn()} discuss={discuss} />)
+      const box = screen.getByRole('textbox', { name: 'Message' })
+      fireEvent.change(box, { target: { value: 'Iris, can you grab these?' } })
+      fireEvent.keyDown(box, { key: 'Enter' })
+      expect(discussPost).toHaveBeenCalledWith('Iris, can you grab these?')
+      expect(discussAsk).not.toHaveBeenCalled()
     })
 
     it("says the discussion isn't available yet when the ensure RPC failed", () => {
@@ -130,8 +149,8 @@ describe('AssistDrawer', () => {
       expect(screen.queryByRole('heading', { name: 'Discussion' })).toBeNull()
     })
 
-    it('renders the shared thread with its authors and participants', () => {
-      discussState.participants = ['Scott', 'Iris']
+    it('renders the shared thread with its authors and says who can see it', () => {
+      discussState.sharedWith = ['Iris']
       discussState.messages = [{
         id: 'm-0', role: 'user', content: 'Can you grab bulbs?', timestamp: new Date(),
         author: { id: 'u2', name: 'Iris', kind: 'member' },
@@ -139,7 +158,7 @@ describe('AssistDrawer', () => {
       render(<AssistDrawer item={task} onClose={vi.fn()} discuss={discuss} />)
       expect(screen.getByText('Can you grab bulbs?')).toBeInTheDocument()
       expect(screen.getByText('Iris')).toBeInTheDocument()
-      expect(screen.getByLabelText('Participants').textContent).toBe('SI')
+      expect(screen.getByText('Shared with Iris')).toBeInTheDocument()
     })
 
     it('keeps the solo planning label when no discuss entity is given', () => {

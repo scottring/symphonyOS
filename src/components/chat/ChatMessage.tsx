@@ -194,6 +194,13 @@ export function ChatMessage({
         {/* Message content */}
         {renderContent()}
 
+        {/* This line invited Symphony — say so, so the reply below reads as an answer */}
+        {message.askedSymphony && (
+          <p className={`mt-1 text-[10px] font-medium ${alignRight ? 'text-white/70' : 'text-neutral-400'}`}>
+            asked Symphony
+          </p>
+        )}
+
         {/* Source notes */}
         {!isUser && message.sources && message.sources.length > 0 && (
           <div className="mt-2 pt-2 border-t border-neutral-200/50">

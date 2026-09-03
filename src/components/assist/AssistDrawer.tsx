@@ -1,24 +1,25 @@
 // src/components/assist/AssistDrawer.tsx
 //
-// The Discuss drawer: a right-side drawer hosting the item's ONE shared AI
-// thread. On a family task both partners open the same conversation — each
-// message says who wrote it, it updates live, and Symphony answers whoever
-// asked with the whole thread as context. Private items keep private threads.
+// A right-side drawer with two faces:
 //
-// Given a `discuss` entity it uses useDiscussThread. Without one it falls back
-// to the older per-opener planning chat (useSymphonyAssistant), which also
-// still supplies the read-only history dropdown of pre-Discuss conversations.
+// - Given a `discuss` entity: the item's ONE shared Discussion. Everyone who
+//   can see the item sees the same thread, each message says who wrote it, it
+//   updates live, and Symphony speaks only when invited (Ask button or
+//   "@Symphony"). Rendered by DiscussionThread.
+// - Without one: the older per-opener planning chat (useSymphonyAssistant),
+//   rendered by ChatPanel — the solo AI surface.
 //
-// Used from the task/routine detail panels. Rendered at z-[60] so it sits
-// above full-screen overlays.
+// Rendered at z-[60] so it sits above full-screen overlays.
 
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import { useSymphonyAssistant } from '@/hooks/useSymphonyAssistant'
 import { useDiscussThread, type DiscussEntity } from '@/hooks/useDiscussThread'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import type { AssistantTaskContext } from '@/lib/agentStream'
 import type { ChatMessage } from '@/types/chat'
+import { sharedWithLabel } from '@/lib/discussions/sharedWith'
 import { ChatPanel } from '@/components/chat/ChatPanel'
+import { DiscussionThread } from '@/components/discussion/DiscussionThread'
 
 const TASK_SUGGESTIONS = [
   'Break this into doable steps',
@@ -32,12 +33,18 @@ const ROUTINE_SUGGESTIONS = [
   'What would make this routine stick?',
 ]
 
+const EVENT_SUGGESTIONS = [
+  'What do we need to have ready for this?',
+  'Who is taking the kids?',
+  'Draft a note to the organizer',
+]
+
 interface AssistDrawerProps {
   item: AssistantTaskContext
   onClose: () => void
   /** Called after the agent writes (subtasks/notes/schedule) so the caller refetches. */
   onMutate?: () => void
-  /** Turns this into the item's shared Discuss thread. The scope must already
+  /** Turns this into the item's shared Discussion. The scope must already
    *  be derived with scopeForDomain — the drawer never invents one. */
   discuss?: DiscussEntity
 }
@@ -45,15 +52,11 @@ interface AssistDrawerProps {
 export function AssistDrawer({ item, onClose, onMutate, discuss }: AssistDrawerProps) {
   const isRoutine = item.kind === 'routine'
   const { members } = useFamilyMembers()
-  // Viewing an older pre-Discuss conversation from the history dropdown.
-  // Sending always goes back to the shared thread.
-  const [viewingHistory, setViewingHistory] = useState(false)
 
   // The item's shared thread. Null entity = solo mode, and the hook no-ops.
-  const thread = useDiscussThread(discuss ?? null, { taskContext: item, onMutate })
+  const thread = useDiscussThread(discuss ?? null, { taskContext: item, onMutate, markRead: true })
 
-  // Still mounted in Discuss mode: it supplies the read-only history of older
-  // mode='chat' conversations on this entity.
+  // Solo planning chat. Called unconditionally (hooks), used only without `discuss`.
   const assistant = useSymphonyAssistant({
     taskContext: item,
     onMutate,
@@ -69,12 +72,15 @@ export function AssistDrawer({ item, onClose, onMutate, discuss }: AssistDrawerP
       timestamp: m.timestamp,
       author: m.author,
       ...(m.sources ? { sources: m.sources } : {}),
+      ...(m.askedSymphony ? { askedSymphony: true as const } : {}),
     })),
     [thread.messages],
   )
 
-  const inDiscuss = !!discuss && !viewingHistory
   const unavailable = !!discuss && !thread.threadId && !!thread.error
+  const suggestions = discuss?.type === 'event'
+    ? EVENT_SUGGESTIONS
+    : isRoutine ? ROUTINE_SUGGESTIONS : TASK_SUGGESTIONS
 
   return (
     <div
@@ -104,35 +110,40 @@ export function AssistDrawer({ item, onClose, onMutate, discuss }: AssistDrawerP
               Close
             </button>
           </div>
-        ) : (
-          <ChatPanel
-            messages={inDiscuss ? discussMessages : assistant.messages}
-            loading={inDiscuss ? (thread.loading || thread.sending) : assistant.loading}
-            error={inDiscuss ? thread.error : assistant.error}
-            entityContext={{ id: item.id, name: item.title, type: isRoutine ? 'routine' : 'task' }}
-            mode="chat"
-            heading={discuss ? 'Discussion' : undefined}
+        ) : discuss ? (
+          <DiscussionThread
+            title={item.title}
+            sharedWithLabel={sharedWithLabel(thread.sharedWith, discuss.scope)}
+            messages={discussMessages}
+            loading={thread.loading}
+            sending={thread.sending}
+            error={thread.error}
+            toolActivity={thread.toolActivity}
             currentUserId={thread.selfAuthId}
             familyMembers={members}
-            participants={inDiscuss ? thread.participants : []}
-            suggestions={isRoutine ? ROUTINE_SUGGESTIONS : TASK_SUGGESTIONS}
-            onSend={discuss
-              ? (msg) => { setViewingHistory(false); void thread.post(msg) }
-              : assistant.sendMessage}
+            suggestions={suggestions}
+            onPost={(text) => { void thread.post(text) }}
+            onAsk={(text) => { void thread.ask(text) }}
+            onClose={onClose}
+          />
+        ) : (
+          <ChatPanel
+            messages={assistant.messages}
+            loading={assistant.loading}
+            error={assistant.error}
+            entityContext={{ id: item.id, name: item.title, type: isRoutine ? 'routine' : 'task' }}
+            mode="chat"
+            suggestions={suggestions}
+            onSend={assistant.sendMessage}
             onClear={assistant.resetSession}
             onClose={onClose}
-            onNewChat={discuss
-              ? () => { setViewingHistory(false); assistant.resetSession() }
-              : assistant.resetSession}
-            toolActivity={inDiscuss ? thread.toolActivity : assistant.toolActivity}
+            onNewChat={assistant.resetSession}
+            toolActivity={assistant.toolActivity}
             sessions={assistant.sessions}
             sessionsLoading={assistant.sessionsLoading}
-            onLoadSession={(session) => {
-              assistant.loadSession(session)
-              if (discuss) setViewingHistory(true)
-            }}
+            onLoadSession={assistant.loadSession}
             onDeleteSession={assistant.deleteSession}
-            activeSessionId={viewingHistory ? assistant.activeSessionId : null}
+            activeSessionId={assistant.activeSessionId}
           />
         )}
       </aside>
