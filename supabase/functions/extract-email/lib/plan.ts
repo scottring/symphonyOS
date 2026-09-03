@@ -145,8 +145,19 @@ export function planWrites(i: PlanInput): WritePlan {
 
   for (const t of i.extraction.todos) {
     const { matched } = t.for ? matchMembers(t.for, i.members) : { matched: [] as Member[] }
-    inbox.push({ ...baseRow(i, t.title), needed_on: t.due ?? null, assigned_to: matched.length === 1 ? matched[0].id : null,
-      category: categoryFor(t.kind), notes: sourceNote(i.capture, t.source_quote, t.detail) })
+    const row = (assigned: string | null): TaskRow => ({
+      ...baseRow(i, t.title), needed_on: t.due ?? null, assigned_to: assigned,
+      category: categoryFor(t.kind), notes: sourceNote(i.capture, t.source_quote, t.detail),
+    })
+    // Homework is a STUDENT's. A class-wide "return the blue sheet" names
+    // nobody, and an unassigned homework row sits on the wall's Everyone row
+    // where neither kid sees it as theirs (2026-09-03). No name, or several:
+    // one row per child, like an event's items.
+    if (t.kind === 'homework' && matched.length !== 1) {
+      const kids = matched.length ? matched : i.members.filter((m) => m.isChild)
+      if (kids.length) { for (const k of kids) inbox.push(row(k.id)); continue }
+    }
+    inbox.push(row(matched.length === 1 ? matched[0].id : null))
   }
 
   const gtk = i.extraction.good_to_know

@@ -184,3 +184,27 @@ describe('planWrites — homework and notices', () => {
     expect(planWrites({ ...base, extraction: empty }).notices).toEqual([])
   })
 })
+
+describe('planWrites — class-wide homework is every child\'s', () => {
+  const todo = (over: Record<string, unknown>) => ({
+    title: 'Return blue planning sheet', due: '2026-09-04', kind: 'homework', source_quote: 'q', confidence: 0.9, ...over,
+  })
+  const run = (t: Record<string, unknown>) =>
+    planWrites({ ...base, extraction: { events: [], todos: [todo(t) as never], good_to_know: [], gaps: [] } })
+
+  it('with no name, one homework row per child', () => {
+    const rows = run({}).inbox
+    expect(rows.map((r) => r.assigned_to).sort()).toEqual(['k1', 'k2'])
+    expect(rows.every((r) => r.category === 'homework')).toBe(true)
+  })
+  it('for "everyone", the same', () => {
+    expect(run({ for: 'everyone' }).inbox.map((r) => r.assigned_to).sort()).toEqual(['k1', 'k2'])
+  })
+  it('named children only get theirs; one name is one row', () => {
+    expect(run({ for: ['Liam', 'Mia'] }).inbox.map((r) => r.assigned_to).sort()).toEqual(['k1', 'k2'])
+    expect(run({ for: ['Mia'] }).inbox.map((r) => r.assigned_to)).toEqual(['k2'])
+  })
+  it('a plain todo with no name stays one unassigned row', () => {
+    expect(run({ kind: 'todo' }).inbox.map((r) => r.assigned_to)).toEqual([null])
+  })
+})

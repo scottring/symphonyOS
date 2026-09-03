@@ -33,6 +33,8 @@ async function callClaude(prompt: string, apiKey: string): Promise<string> {
 
 /** Characters of the email body that reach the prompt; the rest is cut. */
 const MAX_PROMPT_BODY = 60_000
+/** How far back a mail-born task or notice counts as "already have it". */
+const DEDUPE_WINDOW_DAYS = 14
 
 /** Today's YYYY-MM-DD on the household's wall clock. */
 function todayIn(tz: string): string {
@@ -139,14 +141,22 @@ Deno.serve(async (req: Request) => {
       }
     }
     if (plan.inbox.length) {
-      // Retry-safe: drop inbox rows this capture has already written. Scoped
-      // to bucket='inbox' + parent_task_id=null so it doesn't also match the
-      // parent/child rows this same run just inserted under the same capture_id.
+      // Dedupe against what the household already has from mail, not just
+      // this capture. A school digest repeats itself day to day ("send the
+      // take-home folder daily", "return the blue sheet") and a parent may
+      // forward the same digest by hand (2026-09-03: both happened, three
+      // copies of one sheet). Any mail-born row from the last two weeks
+      // with the same words AND the same assignee already counts.
       const { data: existingInbox, error: existingInboxError } = await supabase
-        .from('tasks').select('title').eq('capture_id', capture.id).eq('bucket', 'inbox').is('parent_task_id', null)
+        .from('tasks').select('title, assigned_to').eq('user_id', capture.user_id)
+        .not('capture_id', 'is', null).is('parent_task_id', null)
+        .gte('created_at', new Date(Date.now() - DEDUPE_WINDOW_DAYS * 86_400_000).toISOString())
+        .limit(500)
       if (existingInboxError) throw new Error(`existing inbox read failed: ${existingInboxError.message}`)
-      const existingInboxTitles = (existingInbox ?? []).map((r) => r.title as string)
-      const inboxToInsert = plan.inbox.filter((t) => !existingInboxTitles.some((e) => itemsMatch(e, t.title)))
+      const existingRows = (existingInbox ?? []) as { title: string; assigned_to: string | null }[]
+      const inboxToInsert = plan.inbox.filter(
+        (t) => !existingRows.some((e) => (e.assigned_to ?? null) === (t.assigned_to ?? null) && itemsMatch(e.title, t.title)),
+      )
       if (inboxToInsert.length) {
         const { error } = await supabase.from('tasks').insert(inboxToInsert)
         if (error) throw new Error(`inbox insert failed: ${error.message}`)
@@ -168,8 +178,12 @@ Deno.serve(async (req: Request) => {
     if (plan.notices.length) {
       // Retry-safe: the model re-phrases between runs, so match by token
       // containment (itemsMatch), the same rule the inbox uses.
+      // …and, like the inbox, against the household's recent notices: the
+      // same standing info arrives in every digest for a fortnight.
       const { data: existingNotices, error: existingNoticesError } = await supabase
-        .from('notices').select('text').eq('capture_id', capture.id)
+        .from('notices').select('text').eq('user_id', capture.user_id)
+        .gte('received_on', new Date(Date.now() - DEDUPE_WINDOW_DAYS * 86_400_000).toISOString().slice(0, 10))
+        .limit(500)
       if (existingNoticesError) throw new Error(`existing notices read failed: ${existingNoticesError.message}`)
       const seenTexts = (existingNotices ?? []).map((r) => r.text as string)
       const noticesToInsert = plan.notices.filter((n) => !seenTexts.some((e) => itemsMatch(e, n.text)))
