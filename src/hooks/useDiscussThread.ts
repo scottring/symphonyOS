@@ -20,6 +20,7 @@ import type { AgentApiMessage, AgentSourceNote, AssistantTaskContext } from '@/l
 import { runAgentTurn } from '@/lib/agentTurn'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { useRefreshOnVisible } from '@/hooks/useRefreshOnVisible'
+import { emitThreadRead } from '@/lib/discussions/readSignal'
 import { memberForAuthUser, type Scope } from '@/lib/scope'
 import { sharedWithNames } from '@/lib/discussions/sharedWith'
 
@@ -365,17 +366,25 @@ export function useDiscussThread(
   // ── Mark read ─────────────────────────────────────────────────────────────
   // Stamp whenever the thread on screen changes while the tab is visible. A
   // failed stamp only affects the dot, so it stays silent.
+  // A hidden tab (drawer left open, user elsewhere) doesn't count as reading;
+  // the stamp waits for the tab to come back, since a partner line that landed
+  // meanwhile would otherwise stay "unread" while it's right there on screen.
   const messageCount = messages.length
   useEffect(() => {
     if (!markRead || !threadId || !selfAuthId || loading) return
-    if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return
-    void supabase
-      .from('chat_session_reads')
-      .upsert(
-        { session_id: threadId, user_id: selfAuthId, last_read_at: new Date().toISOString() },
-        { onConflict: 'session_id,user_id' },
-      )
-      .then(() => undefined, () => undefined)
+    const stamp = () => {
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return
+      void supabase
+        .from('chat_session_reads')
+        .upsert(
+          { session_id: threadId, user_id: selfAuthId, last_read_at: new Date().toISOString() },
+          { onConflict: 'session_id,user_id' },
+        )
+        .then(() => { emitThreadRead(threadId) }, () => undefined)
+    }
+    stamp()
+    document.addEventListener('visibilitychange', stamp)
+    return () => document.removeEventListener('visibilitychange', stamp)
   }, [markRead, threadId, selfAuthId, loading, messageCount])
 
   /** Distinct member names in the thread, plus whoever is looking. */

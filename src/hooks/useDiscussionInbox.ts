@@ -11,6 +11,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase, getAuthUser } from '@/lib/supabase'
 import { useRefreshOnVisible } from '@/hooks/useRefreshOnVisible'
+import { onThreadRead } from '@/lib/discussions/readSignal'
 import { buildInboxRows, type InboxRow, type InboxSession } from '@/lib/discussions/inbox'
 
 export function useDiscussionInbox() {
@@ -53,7 +54,9 @@ export function useDiscussionInbox() {
         () => { void reload() },
       )
       .subscribe()
-    return () => { supabase.removeChannel?.(channel) }
+    // Read stamps don't touch chat_sessions; the drawer announces them in-tab.
+    const offRead = onThreadRead(() => { void reload() })
+    return () => { supabase.removeChannel?.(channel); offRead() }
   }, [reload])
 
   useRefreshOnVisible(() => { void reload() })

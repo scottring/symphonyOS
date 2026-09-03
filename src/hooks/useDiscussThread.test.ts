@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, act, waitFor } from '@testing-library/react'
+import { onThreadRead } from '@/lib/discussions/readSignal'
 
 vi.mock('@/lib/agentStream', () => ({
   streamSymphonyAgent: vi.fn(),
@@ -215,6 +216,38 @@ describe('useDiscussThread', () => {
     const quiet = renderHook(() => useDiscussThread(familyTask))
     await waitFor(() => expect(quiet.result.current.messages).toHaveLength(1))
     expect(db.upserts).toHaveLength(1)
+  })
+
+  it('waits for the tab to be visible before stamping, then stamps on return', async () => {
+    seedRow([
+      { role: 'user', content: 'hi', timestamp: '2026-08-01T10:00:00Z',
+        author: { id: 'u2', name: 'Iris', kind: 'member' } },
+    ])
+    let state: DocumentVisibilityState = 'hidden'
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => state })
+    try {
+      const { result } = renderHook(() => useDiscussThread(familyTask, { markRead: true }))
+      await waitFor(() => expect(result.current.messages).toHaveLength(1))
+      expect(db.upserts).toHaveLength(0)
+
+      state = 'visible'
+      await act(async () => { document.dispatchEvent(new Event('visibilitychange')) })
+      await waitFor(() => expect(db.upserts).toHaveLength(1))
+    } finally {
+      delete (document as unknown as Record<string, unknown>).visibilityState
+    }
+  })
+
+  it('announces the read in-tab so badges can refresh without a realtime hop', async () => {
+    seedRow([
+      { role: 'user', content: 'hi', timestamp: '2026-08-01T10:00:00Z',
+        author: { id: 'u2', name: 'Iris', kind: 'member' } },
+    ])
+    const heard: string[] = []
+    const off = onThreadRead((id) => { heard.push(id) })
+    renderHook(() => useDiscussThread(familyTask, { markRead: true }))
+    await waitFor(() => expect(heard).toEqual(['thr-1']))
+    off()
   })
 
   it('sends the whole thread to the agent name-prefixed, behind a participants preface', async () => {

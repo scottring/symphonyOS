@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { renderHook, waitFor } from '@testing-library/react'
+import { renderHook, waitFor, act } from '@testing-library/react'
+import { emitThreadRead } from '@/lib/discussions/readSignal'
 
 const db = vi.hoisted(() => ({
   session: null as null | { id: string; messages: unknown[] },
@@ -74,5 +75,17 @@ describe('useThreadUnread', () => {
     const { result } = renderHook(() => useThreadUnread('task', 't1'))
     await waitFor(() => expect(db.realtime.cb).not.toBeNull())
     expect(result.current).toBe(false)
+  })
+
+  it('clears the dot when the drawer marks this thread read in-tab', async () => {
+    db.session = { id: 's1', messages: [
+      { role: 'user', content: 'hi', timestamp: '2026-09-02T10:00:00Z', author: iris },
+    ] }
+    const { result } = renderHook(() => useThreadUnread('task', 't1'))
+    await waitFor(() => expect(result.current).toBe(true))
+
+    db.read = { last_read_at: '2026-09-02T11:00:00Z' }
+    await act(async () => { emitThreadRead('s1') })
+    await waitFor(() => expect(result.current).toBe(false))
   })
 })

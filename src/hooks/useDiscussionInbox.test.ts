@@ -34,6 +34,7 @@ vi.mock('@/lib/supabase', () => {
 })
 
 import { useDiscussionInbox } from './useDiscussionInbox'
+import { emitThreadRead } from '@/lib/discussions/readSignal'
 
 const iris = { id: 'u2', name: 'Iris', kind: 'member' }
 const scott = { id: 'u1', name: 'Scott', kind: 'member' }
@@ -70,5 +71,18 @@ describe('useDiscussionInbox', () => {
     ]
     await act(async () => { db.realtime.cb?.() })
     await waitFor(() => expect(result.current.rows).toHaveLength(1))
+  })
+
+  it('drops the badge as soon as a thread is marked read in this tab', async () => {
+    db.sessions = [
+      { id: 's1', entity_type: 'task', entity_id: 't1', title: 'Dentist', updated_at: '2026-09-02T10:00:00Z',
+        messages: [{ role: 'user', content: 'hi', timestamp: '2026-09-02T10:00:00Z', author: iris }] },
+    ]
+    const { result } = renderHook(() => useDiscussionInbox())
+    await waitFor(() => expect(result.current.unreadCount).toBe(1))
+
+    db.reads = [{ session_id: 's1', last_read_at: '2026-09-02T12:00:00Z' }]
+    await act(async () => { emitThreadRead('s1') })
+    await waitFor(() => expect(result.current.unreadCount).toBe(0))
   })
 })

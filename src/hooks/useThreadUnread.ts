@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { supabase, getAuthUser } from '@/lib/supabase'
 import { useRefreshOnVisible } from '@/hooks/useRefreshOnVisible'
+import { onThreadRead } from '@/lib/discussions/readSignal'
 import { isUnread, type ReadableMessage } from '@/lib/discussions/unread'
 
 interface StoredMessage {
@@ -70,7 +71,9 @@ export function useThreadUnread(
         () => { void load() },
       )
       .subscribe()
-    return () => { supabase.removeChannel?.(channel) }
+    // The drawer's own read stamp: clear the dot without waiting on realtime.
+    const offRead = onThreadRead(() => { void load() })
+    return () => { supabase.removeChannel?.(channel); offRead() }
   }, [entityType, entityId, load])
 
   useRefreshOnVisible(() => { void load() }, { enabled: !!entityId })
