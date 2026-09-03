@@ -658,3 +658,22 @@ describe('an unclaimed handoff sits on the household row as an open question', (
     expect(board.tracks.find((t) => t.memberId === '__household__')!.blocks).toHaveLength(0)
   })
 })
+
+describe('completion hides a commitment, never information', () => {
+  const ella = member('ella', 'Ella');
+  it('a completed all-day rotation still chips — the kid still had PE', () => {
+    const sp = item({ title: 'Specials — Ella: PE · Kaleb: Music', startTime: at(8), endTime: at(20), allDay: true, completed: true })
+    const board = adaptGanttBoard([ella], [day([sp])], at(14))
+    expect(board.tracks[0].anytime).toEqual(['PE'])
+  })
+  it('a completed free stay still draws — they are still at school', () => {
+    const school = item({ id: 'school', title: 'School — Ella', startTime: at(7, 30), endTime: at(14, 10), isFree: true, completed: true })
+    const board = adaptGanttBoard([ella], [day([school])], at(9))
+    expect(board.tracks[0].blocks.map((b) => b.id)).toContain('school')
+  })
+  it('a completed timed commitment is gone', () => {
+    const dentist = item({ id: 'dentist', title: 'Ella dentist', startTime: at(10), endTime: at(11), completed: true })
+    const board = adaptGanttBoard([ella], [day([dentist])], at(9))
+    expect(board.tracks[0].blocks).toHaveLength(0)
+  })
+})

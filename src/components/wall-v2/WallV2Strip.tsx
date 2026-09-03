@@ -188,8 +188,7 @@ export function WallV2QuestionStripCard({ question, handoff, onTap }: { question
     <button
       type="button"
       onClick={onTap}
-      disabled={!question}
-      className={`${WALL.card} flex flex-col min-w-0 px-4 py-3 overflow-hidden text-left disabled:cursor-default active:scale-[.99] transition-transform`}
+      className={`${WALL.card} flex flex-col min-w-0 px-4 py-3 overflow-hidden text-left active:scale-[.99] transition-transform`}
     >
       <div className={`${WALL.label} shrink-0 mb-2 flex items-center gap-1.5`}>
         <MessageCircle className="w-3.5 h-3.5" />
@@ -202,7 +201,7 @@ export function WallV2QuestionStripCard({ question, handoff, onTap }: { question
           &ldquo;{question}&rdquo;
         </p>
       ) : (
-        <p className={`${ROW} ${WALL.muted}`}>No question today</p>
+        <p className={`${ROW} ${WALL.muted}`}>Done for tonight</p>
       )}
     </button>
   );

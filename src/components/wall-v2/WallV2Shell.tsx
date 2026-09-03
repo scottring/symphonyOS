@@ -32,6 +32,7 @@ import { WallV2Gantt } from './WallV2Gantt';
 import { adaptGanttBoard, titleForBlockId, TRACK_PX } from './wallGantt';
 import { KidDayView } from './KidDayView';
 import { WallV2WhoSheet } from './WallV2WhoSheet';
+import { WallV2QuestionSheet } from './WallV2QuestionSheet';
 import { openHandoffQuestions, type HandoffQuestion } from './wallQuestions';
 import { assignWallEvent } from '@/lib/wall/eventAssign';
 import { HOUSEHOLD_ID } from './wallEventAttribution';
@@ -465,7 +466,12 @@ export function WallV2Shell() {
     prompt: discussionPrompt,
     dismissed: discussionDismissed,
     dismiss: dismissDiscussion,
+    undismiss: undismissDiscussion,
+    next: nextDiscussion,
   } = useDailyDiscussionPrompt();
+  // A tap on the strip's question OPENS it. It used to dismiss it — one
+  // touch and tonight's question was gone for the day (Scott, 2026-09-03).
+  const [showQuestionSheet, setShowQuestionSheet] = useState(false);
 
   // ─── Timeline board ───
   // Today only, from days[0] — a time axis across several days is a calendar,
@@ -802,7 +808,7 @@ export function WallV2Shell() {
           onCall={() => setShowPhone(true)}
           onTapDinner={handleTapDinnerCard}
           onSelectDinnerDay={(key) => setMealDayKey(key === todayKey ? null : key)}
-          onTapQuestion={dismissDiscussion}
+          onTapQuestion={() => setShowQuestionSheet(true)}
           onTapHandoff={() => setShowWhoSheet(true)}
         />
       </div>
@@ -888,6 +894,17 @@ export function WallV2Shell() {
           notices={wallData.notices}
           onToggleTask={handleToggleComplete}
           onClose={handleCloseKidView}
+        />
+      )}
+
+      {showQuestionSheet && (
+        <WallV2QuestionSheet
+          question={discussionPrompt}
+          dismissed={discussionDismissed}
+          onNext={nextDiscussion}
+          onDone={() => { dismissDiscussion(); setShowQuestionSheet(false); }}
+          onBringBack={undismissDiscussion}
+          onClose={() => setShowQuestionSheet(false)}
         />
       )}
 

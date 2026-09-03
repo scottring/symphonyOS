@@ -298,7 +298,12 @@ function itemsFor(day: WallDayData, memberId: string, members: FamilyMember[]): 
       // isAnytimeItem and draws as a real timed bar.
       if (item.type === 'routine' && item.originalRoutine?.parent_routine_id != null) continue;
       if (!boardOwnersOf(item, members).includes(memberId)) continue;
-      if (item.completed) continue;
+      // Done means gone — for a commitment. An all-day rotation ("Specials —
+      // Ella: PE") or a free stay is information, and "did you have gym
+      // today" has the same answer after someone taps it done. 2026-09-03:
+      // today's Specials instance was marked completed and both kids' chips
+      // vanished from the wall.
+      if (item.completed && !item.allDay && !item.isFree) continue;
       out.push(item);
     }
   }

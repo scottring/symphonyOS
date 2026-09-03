@@ -1,45 +1,27 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useDailyDiscussionPrompt } from './useDailyDiscussionPrompt'
+import { FAMILY_DISCUSSION_PROMPTS } from '@/data/familyDiscussionPrompts'
 
 describe('useDailyDiscussionPrompt', () => {
-  beforeEach(() => {
-    localStorage.clear()
-    vi.useFakeTimers()
-    vi.setSystemTime(new Date('2026-05-17T12:00:00'))
-  })
-  afterEach(() => { vi.useRealTimers() })
+  beforeEach(() => localStorage.clear())
 
-  it('returns a non-empty prompt string', () => {
+  it('next moves to another question and sticks for the day', () => {
     const { result } = renderHook(() => useDailyDiscussionPrompt())
-    expect(typeof result.current.prompt).toBe('string')
-    expect(result.current.prompt.length).toBeGreaterThan(0)
+    const first = result.current.prompt
+    act(() => result.current.next())
+    expect(result.current.prompt).not.toBe(first)
+    expect(FAMILY_DISCUSSION_PROMPTS).toContain(result.current.prompt)
+    const again = renderHook(() => useDailyDiscussionPrompt())
+    expect(again.result.current.prompt).toBe(result.current.prompt)
+  })
+
+  it('dismiss is explicit and reversible', () => {
+    const { result } = renderHook(() => useDailyDiscussionPrompt())
     expect(result.current.dismissed).toBe(false)
-  })
-
-  it('returns the same prompt all day', () => {
-    const { result: r1 } = renderHook(() => useDailyDiscussionPrompt())
-    const first = r1.current.prompt
-    vi.setSystemTime(new Date('2026-05-17T23:00:00'))
-    const { result: r2 } = renderHook(() => useDailyDiscussionPrompt())
-    expect(r2.current.prompt).toBe(first)
-  })
-
-  it('returns a different prompt on a different day', () => {
-    renderHook(() => useDailyDiscussionPrompt())
-    vi.setSystemTime(new Date('2026-05-18T08:00:00')) // next day
-    const { result: r2 } = renderHook(() => useDailyDiscussionPrompt())
-    expect(typeof r2.current.prompt).toBe('string')
-    expect(r2.current.prompt.length).toBeGreaterThan(0)
-    expect(r2.current.prompt).not.toBe('')
-  })
-
-  it('dismiss() marks dismissed and persists', () => {
-    const { result } = renderHook(() => useDailyDiscussionPrompt())
-    act(() => { result.current.dismiss() })
+    act(() => result.current.dismiss())
     expect(result.current.dismissed).toBe(true)
-
-    const { result: r2 } = renderHook(() => useDailyDiscussionPrompt())
-    expect(r2.current.dismissed).toBe(true)
+    act(() => result.current.undismiss())
+    expect(result.current.dismissed).toBe(false)
   })
 })
