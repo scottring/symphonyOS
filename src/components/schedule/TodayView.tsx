@@ -872,9 +872,10 @@ export function TodayView({
      the same menu mounts beside the date masthead instead — otherwise "Plan
      from paper" was unreachable on the one device that always has a camera. */
   /* Plan from paper is the way a day gets planned here — the paper plan is
-     the product (see the analog pivot). It sat in the overflow for a while,
-     hidden behind an ellipsis; Scott: "too important to be hidden" (2026-09-03).
-     One visible button, same two mount points as the overflow. */
+     the product (see the analog pivot). On desktop the sidenav carries it
+     (Sidebar.tsx, from any page); on a phone the sidenav is hidden, so this
+     button sits beside the date masthead. Never back in the overflow —
+     Scott: "too important to be hidden" (2026-09-03). */
   const planFromPaperButton = onOpenPlanFromPaper && (
     <button
       type="button"
@@ -1047,7 +1048,6 @@ export function TodayView({
           />
         )}
 
-        {!isMobile && planFromPaperButton}
         {!isMobile && overflowMenu}
       </div>
 

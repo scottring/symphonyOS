@@ -464,9 +464,11 @@ describe('TodayView plan from paper — mobile entry point', () => {
     const strip = screen.getByTestId('today-controls')
     expect(within(strip).getByRole('button', { name: /more controls/i })).toBeInTheDocument()
     expect(screen.getAllByRole('button', { name: /more controls/i })).toHaveLength(1)
-    // Plan from paper is a visible button in the strip, not an overflow item.
-    await user.click(within(strip).getByRole('button', { name: /plan from paper/i }))
-    expect(onOpenPlanFromPaper).toHaveBeenCalledTimes(1)
+    // On desktop the sidenav carries Plan from paper; Today's strip and
+    // overflow do not repeat it.
+    await openOverflow(user)
+    expect(screen.queryByRole('button', { name: /plan from paper/i })).not.toBeInTheDocument()
+    expect(onOpenPlanFromPaper).not.toHaveBeenCalled()
   })
 })
 

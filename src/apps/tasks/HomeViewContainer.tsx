@@ -11,6 +11,7 @@
 // own copy until full cutover (then the legacy synthesis becomes dead code).
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { onPlanFromPaperRequest, consumePlanFromPaperRequest } from '@/lib/planFromPaperSignal';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
 import { useGoogleCalendar, CalendarReconnectError, type GoogleCalendarInfo } from '@/hooks/useGoogleCalendar';
@@ -111,6 +112,12 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
   // Plan-from-paper (analog-planning pivot): photograph the written plan page,
   // review the parsed items, commit them as placed tasks.
   const [planFromPaperOpen, setPlanFromPaperOpen] = useState(false);
+  // The sidenav asks for the flow from outside this tree (planFromPaperSignal):
+  // answer while mounted, and pick up a request made before we existed.
+  useEffect(() => {
+    if (consumePlanFromPaperRequest()) setPlanFromPaperOpen(true);
+    return onPlanFromPaperRequest(() => setPlanFromPaperOpen(true));
+  }, []);
   const { selection, setSelection, clearSelection } = useSelection();
 
   const [searchParams, setSearchParams] = useSearchParams();

@@ -5,6 +5,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
 import { DomainProvider } from '@/hooks/useDomain'
 import { PlaceProvider } from '@/hooks/usePlace'
+import { onPlanFromPaperRequest, consumePlanFromPaperRequest } from '@/lib/planFromPaperSignal'
 
 const mockNavigate = vi.fn()
 vi.mock('react-router-dom', async (importOriginal) => {
@@ -116,5 +117,40 @@ describe('Sidebar', () => {
     )
     expect(screen.queryByText('Projects')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /projects/i })).not.toBeInTheDocument()
+  })
+})
+
+describe('Sidebar — Plan from paper', () => {
+  const mount = (onViewChange = vi.fn()) => {
+    render(
+      <MemoryRouter>
+        <DomainProvider><PlaceProvider>
+          <Sidebar collapsed={false} onToggle={vi.fn()} activeView="contacts" onViewChange={onViewChange} discussionsUnread={0} />
+        </PlaceProvider></DomainProvider>
+      </MemoryRouter>,
+    )
+    return onViewChange
+  }
+
+  it('is its own row in the nav, from any page', () => {
+    mount()
+    expect(screen.getByRole('button', { name: /plan from paper/i })).toBeInTheDocument()
+  })
+
+  it('a mounted Home view opens the flow in place — no navigation', async () => {
+    const cb = vi.fn()
+    const off = onPlanFromPaperRequest(cb)
+    const onViewChange = mount()
+    await userEvent.click(screen.getByRole('button', { name: /plan from paper/i }))
+    expect(cb).toHaveBeenCalledTimes(1)
+    expect(onViewChange).not.toHaveBeenCalled()
+    off()
+  })
+
+  it('with no Home view mounted it goes to Today and leaves the request for it', async () => {
+    const onViewChange = mount()
+    await userEvent.click(screen.getByRole('button', { name: /plan from paper/i }))
+    expect(onViewChange).toHaveBeenCalledWith('today')
+    expect(consumePlanFromPaperRequest()).toBe(true)
   })
 })

@@ -1,5 +1,6 @@
 import { useEffect, createElement } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
+import { requestPlanFromPaper } from '@/lib/planFromPaperSignal'
 import { appRegistry } from '@/shell/appRegistry'
 import { SidebarGroup } from './SidebarGroup'
 import { useSidebarGroupState } from '@/hooks/useSidebarGroupState'
@@ -277,6 +278,20 @@ export function Sidebar({
         >
           <CalendarRange className="w-5 h-5 shrink-0" />
           {!collapsed && <span>This Week</span>}
+        </button>
+
+        {/* Plan from paper — the verb that starts the day and the week. Not a
+            place, so it does not look like one: tinted, an action row. From
+            any page (Scott, 2026-09-03: it is too important to hide). A Home
+            view that is mounted opens the flow in place; otherwise Today
+            opens and picks the request up on mount. */}
+        <button
+          onClick={() => { if (!requestPlanFromPaper()) onViewChange('today') }}
+          title="Plan from paper — photograph your written plan and place its items"
+          className={`${navItemClass(false)} mt-1 border border-primary-500/30 bg-primary-50 text-primary-700 hover:bg-primary-100`}
+        >
+          <NotebookPen className="w-5 h-5 shrink-0" />
+          {!collapsed && <span className="font-semibold">Plan from paper</span>}
         </button>
 
         {/* Discussions — the inbox of item conversations. Part of the loop, not
