@@ -13,6 +13,7 @@ const db = vi.hoisted(() => ({
   rows: {} as Record<string, { id: string; messages: unknown[]; scope: string; user_id: string }>,
   rpcCalls: [] as Array<{ fn: string; args: Record<string, unknown> }>,
   members: [] as Array<Record<string, unknown>>,
+  upserts: [] as Array<{ table: string; row: Record<string, unknown> }>,
   realtime: { filter: null as unknown, cb: null as null | (() => void) },
   removed: 0,
 }))
@@ -46,6 +47,14 @@ vi.mock('@/lib/supabase', () => {
         return Promise.resolve({ data: null, error: null })
       },
       from: (table: string) => {
+        if (table === 'chat_session_reads') {
+          return {
+            upsert: (row: Record<string, unknown>) => {
+              db.upserts.push({ table, row })
+              return Promise.resolve({ data: null, error: null })
+            },
+          }
+        }
         if (table !== 'chat_sessions') return familyChain
         const chain: Record<string, unknown> = {}
         const back = () => chain
@@ -95,6 +104,7 @@ describe('useDiscussThread', () => {
     db.threadId = 'thr-1'
     db.ensureError = null
     db.rpcCalls = []
+    db.upserts = []
     db.realtime = { filter: null, cb: null }
     db.removed = 0
     db.members = [{
@@ -147,19 +157,64 @@ describe('useDiscussThread', () => {
     expect(result.current.messages[1].author).toEqual({ id: null, name: 'Symphony', kind: 'symphony' })
   })
 
-  it('appends the sent message via the RPC, stamped with its author', async () => {
+  it('post appends the message stamped with its author and never wakes Symphony', async () => {
     const { result } = renderHook(() => useDiscussThread(familyTask))
     await waitFor(() => expect(result.current.threadId).toBe('thr-1'))
 
-    await act(async () => { await result.current.send('When can we go?') })
+    await act(async () => { await result.current.post('When can we go?') })
 
     const append = db.rpcCalls.filter((c) => c.fn === 'append_chat_message')
+    expect(append).toHaveLength(1)
     expect(append[0].args.p_session).toBe('thr-1')
-    expect(append[0].args.p_message).toMatchObject({
+    expect(append[0].args.p_message).toEqual({
       role: 'user',
       content: 'When can we go?',
+      timestamp: expect.any(String),
       author: { id: 'u1', name: 'Scott', kind: 'member' },
     })
+    expect(streamSymphonyAgent).not.toHaveBeenCalled()
+  })
+
+  it('ask marks the question as addressed to Symphony', async () => {
+    const { result } = renderHook(() => useDiscussThread(familyTask))
+    await waitFor(() => expect(result.current.threadId).toBe('thr-1'))
+
+    await act(async () => { await result.current.ask('What should we do first?') })
+
+    const append = db.rpcCalls.filter((c) => c.fn === 'append_chat_message')
+    expect(append[0].args.p_message).toMatchObject({
+      role: 'user', content: 'What should we do first?', askedSymphony: true,
+    })
+    expect(streamSymphonyAgent).toHaveBeenCalledTimes(1)
+  })
+
+  it('names who else can see the thread from the item scope', async () => {
+    db.members = [
+      ...db.members,
+      { id: 'm2', user_id: 'u1', auth_user_id: 'u2', name: 'Iris', initials: 'I', color: 'red',
+        avatar_url: null, is_full_user: false, display_order: 1, member_type: 'core', created_at: '2026-01-01T00:00:00Z' },
+    ]
+    const { result } = renderHook(() => useDiscussThread(familyTask))
+    await waitFor(() => expect(result.current.sharedWith).toEqual(['Iris']))
+
+    const solo = renderHook(() => useDiscussThread({ ...familyTask, scope: 'individual' }))
+    await waitFor(() => expect(solo.result.current.threadId).toBe('thr-1'))
+    expect(solo.result.current.sharedWith).toEqual([])
+  })
+
+  it('stamps chat_session_reads once the thread is on screen when markRead is set', async () => {
+    seedRow([
+      { role: 'user', content: 'hi', timestamp: '2026-08-01T10:00:00Z',
+        author: { id: 'u2', name: 'Iris', kind: 'member' } },
+    ])
+    const { result } = renderHook(() => useDiscussThread(familyTask, { markRead: true }))
+    await waitFor(() => expect(result.current.messages).toHaveLength(1))
+    await waitFor(() => expect(db.upserts).toHaveLength(1))
+    expect(db.upserts[0].row).toMatchObject({ session_id: 'thr-1', user_id: 'u1' })
+
+    const quiet = renderHook(() => useDiscussThread(familyTask))
+    await waitFor(() => expect(quiet.result.current.messages).toHaveLength(1))
+    expect(db.upserts).toHaveLength(1)
   })
 
   it('sends the whole thread to the agent name-prefixed, behind a participants preface', async () => {
@@ -177,7 +232,7 @@ describe('useDiscussThread', () => {
 
     const { result } = renderHook(() => useDiscussThread(familyTask))
     await waitFor(() => expect(result.current.messages).toHaveLength(2))
-    await act(async () => { await result.current.send('Thursday works') })
+    await act(async () => { await result.current.ask('Thursday works') })
 
     expect(captured[0].content).toContain('Participants in this discussion: Iris, Scott')
     expect(captured.map((m) => m.content)).toEqual([
@@ -191,7 +246,7 @@ describe('useDiscussThread', () => {
   it('appends the reply with the Symphony author', async () => {
     const { result } = renderHook(() => useDiscussThread(familyTask))
     await waitFor(() => expect(result.current.threadId).toBe('thr-1'))
-    await act(async () => { await result.current.send('help') })
+    await act(async () => { await result.current.ask('help') })
 
     const append = db.rpcCalls.filter((c) => c.fn === 'append_chat_message')
     expect(append).toHaveLength(2)
@@ -213,7 +268,7 @@ describe('useDiscussThread', () => {
     const taskContext = { id: 't1', title: 'Book the dentist' }
     const { result } = renderHook(() => useDiscussThread(familyTask, { taskContext, onMutate }))
     await waitFor(() => expect(result.current.threadId).toBe('thr-1'))
-    await act(async () => { await result.current.send('mark it done') })
+    await act(async () => { await result.current.ask('mark it done') })
 
     expect(seenContext).toEqual(taskContext)
     expect(onMutate).toHaveBeenCalledTimes(1)

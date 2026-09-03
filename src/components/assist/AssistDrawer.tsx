@@ -117,7 +117,7 @@ export function AssistDrawer({ item, onClose, onMutate, discuss }: AssistDrawerP
             participants={inDiscuss ? thread.participants : []}
             suggestions={isRoutine ? ROUTINE_SUGGESTIONS : TASK_SUGGESTIONS}
             onSend={discuss
-              ? (msg) => { setViewingHistory(false); void thread.send(msg) }
+              ? (msg) => { setViewingHistory(false); void thread.post(msg) }
               : assistant.sendMessage}
             onClear={assistant.resetSession}
             onClose={onClose}

@@ -21,9 +21,10 @@ import { runAgentTurn } from '@/lib/agentTurn'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { useRefreshOnVisible } from '@/hooks/useRefreshOnVisible'
 import { memberForAuthUser, type Scope } from '@/lib/scope'
+import { sharedWithNames } from '@/lib/discussions/sharedWith'
 
 export interface DiscussEntity {
-  type: 'task' | 'routine'
+  type: 'task' | 'routine' | 'event'
   id: string
   title: string
   /** Derived by scopeForDomain — never a literal from a picker. */
@@ -44,6 +45,8 @@ export interface DiscussMessage {
   timestamp: Date
   author: DiscussAuthor
   sources?: AgentSourceNote[]
+  /** A member message that invited Symphony (Ask button or "@Symphony"). */
+  askedSymphony?: true
 }
 
 export interface UseDiscussThreadOptions {
@@ -51,6 +54,8 @@ export interface UseDiscussThreadOptions {
   taskContext?: AssistantTaskContext
   /** Called after a turn in which the agent wrote data, so the caller refetches. */
   onMutate?: () => void
+  /** Stamp chat_session_reads while the thread is on screen in a visible tab. */
+  markRead?: boolean
 }
 
 /** Shown when the Discuss RPCs aren't reachable (migration not applied yet). */
@@ -66,6 +71,7 @@ interface StoredDiscussMessage {
   timestamp?: string
   author?: Partial<DiscussAuthor>
   sources?: AgentSourceNote[]
+  askedSymphony?: boolean
 }
 
 function readAuthor(raw: Partial<DiscussAuthor> | undefined, role: 'user' | 'assistant'): DiscussAuthor {
@@ -90,6 +96,7 @@ export function hydrateDiscussMessages(raw: unknown, threadId: string): DiscussM
       timestamp: m.timestamp ? new Date(m.timestamp) : new Date(),
       author: readAuthor(m.author, role),
       ...(Array.isArray(m.sources) && m.sources.length > 0 ? { sources: m.sources } : {}),
+      ...(m.askedSymphony === true ? { askedSymphony: true as const } : {}),
     }
   })
 }
@@ -119,7 +126,7 @@ export function useDiscussThread(
   entity: DiscussEntity | null,
   options: UseDiscussThreadOptions = {},
 ) {
-  const { taskContext, onMutate } = options
+  const { taskContext, onMutate, markRead = false } = options
   const [threadId, setThreadId] = useState<string | null>(null)
   const [messages, setMessages] = useState<DiscussMessage[]>([])
   const [loading, setLoading] = useState(false)
@@ -242,7 +249,57 @@ export function useDiscussThread(
     return { id: user?.id ?? null, name, kind: 'member' }
   }, [members, getCurrentUserMember])
 
-  const send = useCallback(async (content: string) => {
+  /**
+   * Append the member's own line. Optimistic: the sender sees it immediately;
+   * realtime + the reload after the append reconcile it with the stored array.
+   * Returns the thread as it stands after the append (for the agent's view).
+   */
+  const appendMember = useCallback(async (text: string, askedSymphony: boolean): Promise<DiscussMessage[]> => {
+    const id = threadIdRef.current!
+    const author = await resolveAuthor()
+    const timestamp = new Date()
+    const userMsg: DiscussMessage = {
+      id: crypto.randomUUID(),
+      role: 'user',
+      content: text,
+      timestamp,
+      author,
+      ...(askedSymphony ? { askedSymphony: true as const } : {}),
+    }
+    const thread = [...messagesRef.current, userMsg]
+    setMessages(thread)
+    try {
+      await supabase.rpc('append_chat_message', {
+        p_session: id,
+        p_message: {
+          role: 'user',
+          content: text,
+          timestamp: timestamp.toISOString(),
+          author,
+          ...(askedSymphony ? { askedSymphony: true } : {}),
+        },
+      })
+    } catch {
+      // Fall through: the reload will show what stuck.
+    }
+    return thread
+  }, [resolveAuthor])
+
+  /** Say something to the people in the thread. Symphony stays quiet. */
+  const post = useCallback(async (content: string) => {
+    const text = content.trim()
+    if (!text || !threadIdRef.current || sendingRef.current) return
+    sendingRef.current = true
+    setSending(true)
+    setError(null)
+    await appendMember(text, false)
+    sendingRef.current = false
+    setSending(false)
+    void reload()
+  }, [appendMember, reload])
+
+  /** Invite Symphony: post the question, then one agent turn with the whole thread. */
+  const ask = useCallback(async (content: string) => {
     const text = content.trim()
     const id = threadIdRef.current
     if (!text || !id || sendingRef.current) return
@@ -252,28 +309,7 @@ export function useDiscussThread(
     setError(null)
     setToolActivity([])
 
-    const author = await resolveAuthor()
-    const timestamp = new Date()
-    const userMsg: DiscussMessage = {
-      id: crypto.randomUUID(),
-      role: 'user',
-      content: text,
-      timestamp,
-      author,
-    }
-    // Optimistic: the sender sees their own line immediately; realtime + the
-    // reload after the append reconcile it with the stored array.
-    const thread = [...messagesRef.current, userMsg]
-    setMessages(thread)
-
-    try {
-      await supabase.rpc('append_chat_message', {
-        p_session: id,
-        p_message: { role: 'user', content: text, timestamp: timestamp.toISOString(), author },
-      })
-    } catch {
-      // Fall through: still answer, and the reload will show what stuck.
-    }
+    const thread = await appendMember(text, true)
 
     const assistantId = crypto.randomUUID()
     setMessages((prev) => [
@@ -324,7 +360,23 @@ export function useDiscussThread(
     // Re-read so the optimistic ids give way to the stored array (and so the
     // partner's messages that landed mid-turn are folded in).
     void reload()
-  }, [resolveAuthor, getCurrentUserMember, taskContext, onMutate, reload])
+  }, [appendMember, getCurrentUserMember, taskContext, onMutate, reload])
+
+  // ── Mark read ─────────────────────────────────────────────────────────────
+  // Stamp whenever the thread on screen changes while the tab is visible. A
+  // failed stamp only affects the dot, so it stays silent.
+  const messageCount = messages.length
+  useEffect(() => {
+    if (!markRead || !threadId || !selfAuthId || loading) return
+    if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return
+    void supabase
+      .from('chat_session_reads')
+      .upsert(
+        { session_id: threadId, user_id: selfAuthId, last_read_at: new Date().toISOString() },
+        { onConflict: 'session_id,user_id' },
+      )
+      .then(() => undefined, () => undefined)
+  }, [markRead, threadId, selfAuthId, loading, messageCount])
 
   /** Distinct member names in the thread, plus whoever is looking. */
   const selfName = getCurrentUserMember()?.name
@@ -333,5 +385,11 @@ export function useDiscussThread(
     ...(selfName ? [selfName] : []),
   ]))
 
-  return { threadId, messages, loading, sending, error, toolActivity, send, participants, reload, selfAuthId }
+  /** Everyone else who can open this thread — derived from the item's scope. */
+  const sharedWith = entityScope ? sharedWithNames(members, selfAuthId, entityScope) : []
+
+  return {
+    threadId, messages, loading, sending, error, toolActivity,
+    post, ask, participants, sharedWith, reload, selfAuthId,
+  }
 }
