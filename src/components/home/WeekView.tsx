@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect } from 'react'
+import { readCadenceConfig, weekStartAnchor } from '@/lib/cadence/config'
 import type { Task } from '@/types/task'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine, ActionableInstance } from '@/types/actionable'
@@ -329,14 +330,10 @@ export function WeekView({
     onWeekChange(next)
   }
 
+  // "This week" means the week the user's Planning Rhythm says it means, not
+  // whatever Monday is nearest.
   const goToThisWeek = () => {
-    const today = new Date()
-    const day = today.getDay()
-    const diff = today.getDate() - day + (day === 0 ? -6 : 1) // Adjust for Monday start
-    const monday = new Date(today)
-    monday.setDate(diff)
-    monday.setHours(0, 0, 0, 0)
-    onWeekChange(monday)
+    onWeekChange(weekStartAnchor(new Date(), readCadenceConfig().weekStartsOn))
   }
 
   return (

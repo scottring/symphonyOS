@@ -1,4 +1,5 @@
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
+import { useCadenceConfig, readCadenceConfig, weekStartAnchor } from '@/lib/cadence/config'
 import { HomeChromeControls } from './HomeChromeControls'
 import type { HomeViewType } from '@/types/homeView'
 import type { Task } from '@/types/task'
@@ -193,16 +194,21 @@ export function HomeView({
     return false
   }, [filteredTasks, filteredEvents, filteredRoutines, ctx.eventNotesMap])
 
-  // Week view state
-  const [weekStart, setWeekStart] = useState(() => {
-    const today = new Date()
-    const day = today.getDay()
-    const diff = today.getDate() - day + (day === 0 ? -6 : 1)
-    const monday = new Date(today)
-    monday.setDate(diff)
-    monday.setHours(0, 0, 0, 0)
-    return monday
-  })
+  // Week view state. Anchored to the user's "Week starts on" (Settings →
+  // Planning Rhythm), which every other week reader already honours through
+  // weekStartAnchor — the grid was the one place still hardcoded to Monday
+  // (since 2026-02), so a Sunday setting silently did nothing here while the
+  // task buckets it placed into moved.
+  const { config: cadenceConfig } = useCadenceConfig()
+  const weekStartsOn = cadenceConfig.weekStartsOn
+  const [weekStart, setWeekStart] = useState(() => weekStartAnchor(new Date(), readCadenceConfig().weekStartsOn))
+
+  // Changing the setting re-anchors the week on screen. Without this the view
+  // keeps whatever the initial state captured until a remount, so the setting
+  // appears not to work at the exact moment you change it.
+  useEffect(() => {
+    setWeekStart((prev) => weekStartAnchor(prev, weekStartsOn))
+  }, [weekStartsOn])
 
   const [monthStart, setMonthStart] = useState(() => {
     const today = new Date()
