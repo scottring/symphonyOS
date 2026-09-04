@@ -1,4 +1,4 @@
-import type { EmailEvent, EmailExtraction, ExistingBlock, ItemKind, Member, NoteRow, NoticeRow, Scope, TaskRow } from './types.ts'
+import type { EmailEvent, EmailExtraction, ExistingBlock, ItemKind, Member, NoteRow, NoticeRow, RoutineRow, Scope, TaskRow } from './types.ts'
 import { matchMembers } from './members.ts'
 import { addDays, zonedIso } from './dates.ts'
 
@@ -16,7 +16,7 @@ export interface EventPlan {
   parent: { row: TaskRow } | { existingId: string }
   children: Omit<TaskRow, 'parent_task_id'>[]
 }
-export interface WritePlan { events: EventPlan[]; inbox: TaskRow[]; note: NoteRow | null; notices: NoticeRow[] }
+export interface WritePlan { events: EventPlan[]; inbox: TaskRow[]; routines: RoutineRow[]; note: NoteRow | null; notices: NoticeRow[] }
 
 export function normaliseTitle(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim()
@@ -138,6 +138,7 @@ function childrenFor(i: PlanInput, ev: EmailEvent, skipTitles: string[]): EventP
 export function planWrites(i: PlanInput): WritePlan {
   const events: EventPlan[] = []
   const inbox: TaskRow[] = []
+  const routines: RoutineRow[] = []
   const yesterday = addDays(i.todayYmd, -1)
 
   for (const ev of i.extraction.events) {
@@ -178,6 +179,33 @@ export function planWrites(i: PlanInput): WritePlan {
       ...baseRow(i, t.title), needed_on: t.due ?? null, assigned_to: assigned,
       category: categoryFor(t.kind), notes: sourceNote(i.capture, t.source_quote, t.detail),
     })
+    // A STANDING instruction is not a task. "Send the take-home folder daily"
+    // as a dated row is wrong twice over: left open it carries forward every
+    // day forever, and ticking it off says the household is done sending the
+    // folder. It is a routine — it recurs, and each day's copy is its own.
+    if (t.repeat) {
+      const kids = matched.length ? matched : i.members.filter((m) => m.isChild)
+      const single = matched.length === 1 ? matched[0].id : null
+      const all = !single && kids.length ? kids.map((k) => k.id) : null
+      routines.push({
+        user_id: i.capture.user_id,
+        name: t.title,
+        description: t.detail ?? null,
+        recurrence_pattern: t.repeat.days ? { type: t.repeat.type, days: t.repeat.days } : { type: t.repeat.type },
+        time_of_day: null,
+        visibility: 'active',
+        assigned_to: single,
+        assigned_to_all: all,
+        context: 'family',
+        scope: scopeFor('family', [single, ...(all ?? [])], null),
+        // Untimed, so Today files it under Unscheduled rather than pinning it
+        // to an hour the email never named.
+        show_on_timeline: true,
+        raw_input: t.source_quote || null,
+      })
+      continue
+    }
+
     // Homework is a STUDENT's. A class-wide "return the blue sheet" names
     // nobody, and an unassigned homework row sits on the wall's Everyone row
     // where neither kid sees it as theirs (2026-09-03).
@@ -231,5 +259,5 @@ export function planWrites(i: PlanInput): WritePlan {
     for (const m of matched) notices.push(row(m.id))
   }
 
-  return { events, inbox, note, notices }
+  return { events, inbox, routines, note, notices }
 }

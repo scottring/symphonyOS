@@ -1,4 +1,4 @@
-import type { EmailEvent, EmailExtraction, EmailGap, EmailTodo, GoodToKnow, ItemKind, Member, Who } from './types.ts'
+import type { EmailEvent, EmailExtraction, EmailGap, EmailRepeat, EmailTodo, GoodToKnow, ItemKind, Member, Who } from './types.ts'
 import { isYmd } from './dates.ts'
 
 export interface PromptInput { subject: string; sender: string; body: string; members: Member[]; todayYmd: string; truncated?: boolean }
@@ -18,14 +18,14 @@ ${i.body}
 
 Return, in this order:
 1. "events": each DATED occasion that needs something from the household (picture day, field trip, spirit week day, concert, early dismissal that changes pickup). For each: title; date as YYYY-MM-DD (resolve weekday names relative to TODAY and the email's own dates; if you cannot resolve a date, it is not an event — put it in todos); time as HH:mm only when stated; location if stated; "for": the children's first names it applies to, or "everyone" when it applies to all students; "items": what each person must bring, wear, sign or pay — text, "for" (names or "everyone"), and "needed": "night_before" for things laid out or packed, "day_of" for things that happen that day, or an explicit YYYY-MM-DD; "kind": "homework" when a STUDENT does or hands it in (a form to sign and return, a reading log, a project, studying for a test, a permission slip), otherwise "todo" (a fee a parent pays, a thing to pack or wear); "detail": one or two sentences of context a person needs when doing it (what the form is for, cost, where to hand it in), never a repeat of the text; "source_quote": the exact sentence(s) you took it from; "confidence" 0–1.
-2. "todos": actions with no occasion date (return a form, pay a fee, sign up) — title, due as YYYY-MM-DD if stated, "for" names if specific, "kind" and "detail" as above, source_quote, confidence.
+2. "todos": actions with no occasion date (return a form, pay a fee, sign up) — title, due as YYYY-MM-DD if stated, "for" names if specific, "kind" and "detail" as above, source_quote, confidence. Add "repeat" ONLY for a STANDING instruction that recurs indefinitely with no end — "send the take-home folder every day", "read 20 minutes nightly", "PE uniform on Tuesdays and Thursdays": {"type":"daily"} or {"type":"weekly","days":["tue","thu"]} using lowercase three-letter weekdays. A thing done ONCE is never a repeat, however soon it is due. Omit "repeat" when in doubt — a wrong repeat becomes a chore the household sees every day.
 3. "good_to_know": things to KNOW but not DO — policy, dismissal rules, curriculum notes. One short sentence each, with "for": the children it concerns, or "everyone". Never repeat these as events or todos.
 4. "gaps": what you could not read — unreadable_attachment, truncated, low_confidence — with a note.
 
 Use only names from the HOUSEHOLD list in "for"; any other name goes in the item text. Do not invent dates. Do not invent items.${i.truncated ? '\nThe email was truncated at the end; emit a gap of kind truncated.' : ''}
 
 Respond with strict JSON only, no prose, no markdown fence:
-{"events":[{"title":"...","date":"YYYY-MM-DD","time":"HH:mm|omit","location":"...|omit","for":["Name"]|"everyone","items":[{"text":"...","for":["Name"]|"everyone","needed":"night_before|day_of|YYYY-MM-DD","kind":"homework|todo","detail":"...|omit"}],"source_quote":"...","confidence":0.0}],"todos":[{"title":"...","due":"YYYY-MM-DD|omit","for":["Name"]|omit,"kind":"homework|todo","detail":"...|omit","source_quote":"...","confidence":0.0}],"good_to_know":[{"text":"...","for":["Name"]|"everyone"}],"gaps":[{"kind":"unreadable_attachment|truncated|low_confidence","note":"..."}]}`
+{"events":[{"title":"...","date":"YYYY-MM-DD","time":"HH:mm|omit","location":"...|omit","for":["Name"]|"everyone","items":[{"text":"...","for":["Name"]|"everyone","needed":"night_before|day_of|YYYY-MM-DD","kind":"homework|todo","detail":"...|omit"}],"source_quote":"...","confidence":0.0}],"todos":[{"title":"...","due":"YYYY-MM-DD|omit","for":["Name"]|omit,"kind":"homework|todo","detail":"...|omit","repeat":{"type":"daily|weekly","days":["mon"]}|omit,"source_quote":"...","confidence":0.0}],"good_to_know":[{"text":"...","for":["Name"]|"everyone"}],"gaps":[{"kind":"unreadable_attachment|truncated|low_confidence","note":"..."}]}`
 }
 
 const EMPTY: EmailExtraction = { events: [], todos: [], good_to_know: [], gaps: [] }
@@ -86,6 +86,27 @@ function event(v: unknown): EmailEvent | null {
   }
 }
 
+const WEEKDAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
+
+/**
+ * A standing instruction's cadence, or undefined.
+ *
+ * Strict on purpose. A wrong repeat becomes a chore the household is shown
+ * every single day, which is worse than a one-off task they can tick once —
+ * so anything that is not plainly 'daily' or a 'weekly' naming at least one
+ * real weekday is dropped rather than guessed at.
+ */
+function repeat(v: unknown): EmailRepeat | undefined {
+  if (!v || typeof v !== 'object') return undefined
+  const o = v as Record<string, unknown>
+  if (o.type === 'daily') return { type: 'daily' }
+  if (o.type !== 'weekly') return undefined
+  const days = (Array.isArray(o.days) ? o.days : [])
+    .map((d) => String(d).slice(0, 3).toLowerCase())
+    .filter((d) => WEEKDAYS.includes(d))
+  return days.length ? { type: 'weekly', days: [...new Set(days)] } : undefined
+}
+
 function todo(v: unknown): EmailTodo | null {
   if (!v || typeof v !== 'object') return null
   const o = v as Record<string, unknown>
@@ -94,7 +115,7 @@ function todo(v: unknown): EmailTodo | null {
   const w = who(o.for)
   return {
     title, due: isYmd(o.due) ? o.due : undefined, for: Array.isArray(w) ? w : undefined,
-    kind: kind(o.kind), detail: detail(o.detail),
+    kind: kind(o.kind), detail: detail(o.detail), repeat: repeat(o.repeat),
     source_quote: str(o.source_quote), confidence: clamp01(o.confidence),
   }
 }

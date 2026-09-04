@@ -256,3 +256,52 @@ describe('sameAudience — one instruction, two teachers', () => {
     expect(sameAudience({ assigned_to: 'ella', assigned_to_all: ['kaleb'] }, { assigned_to: 'kaleb' })).toBe(true)
   })
 })
+
+// A standing instruction is not a task. "Send the take-home folder daily" as a
+// dated row is wrong twice: left open it carries forward every day forever,
+// and ticking it off claims the household is done sending the folder.
+describe('planWrites — standing instructions become routines', () => {
+  const todo = (over: Record<string, unknown>) => ({
+    title: 'Send take-home folder', kind: 'todo', source_quote: 'send it daily', confidence: 0.9, ...over,
+  })
+  const run = (t: Record<string, unknown>) =>
+    planWrites({ ...base, extraction: { events: [], todos: [todo(t) as never], good_to_know: [], gaps: [] } })
+
+  it('writes a daily routine and no task row', () => {
+    const plan = run({ repeat: { type: 'daily' } })
+    expect(plan.inbox).toHaveLength(0)
+    expect(plan.routines).toHaveLength(1)
+    expect(plan.routines[0].recurrence_pattern).toEqual({ type: 'daily' })
+    expect(plan.routines[0].name).toBe('Send take-home folder')
+  })
+
+  it('carries the named weekdays for a weekly instruction', () => {
+    const plan = run({ repeat: { type: 'weekly', days: ['tue', 'thu'] } })
+    expect(plan.routines[0].recurrence_pattern).toEqual({ type: 'weekly', days: ['tue', 'thu'] })
+  })
+
+  it('leaves the time unset, so Today files it under Unscheduled', () => {
+    expect(run({ repeat: { type: 'daily' } }).routines[0].time_of_day).toBeNull()
+  })
+
+  it('is family-scoped so the whole household can see the chore', () => {
+    const r = run({ repeat: { type: 'daily' } }).routines[0]
+    expect(r.context).toBe('family')
+    expect(r.scope).toBe('compound')
+  })
+
+  it('names one child when the instruction names one, and all of them otherwise', () => {
+    expect(run({ repeat: { type: 'daily' }, for: ['Mia'] }).routines[0].assigned_to).toBe('k2')
+    const classWide = run({ repeat: { type: 'daily' } }).routines[0]
+    expect(classWide.assigned_to).toBeNull()
+    expect([...(classWide.assigned_to_all ?? [])].sort()).toEqual(['k1', 'k2'])
+  })
+
+  // The whole point: without a repeat it stays a task, so nothing that is
+  // genuinely done once becomes a chore the household sees every day.
+  it('leaves a one-off todo as a task', () => {
+    const plan = run({})
+    expect(plan.routines).toHaveLength(0)
+    expect(plan.inbox).toHaveLength(1)
+  })
+})

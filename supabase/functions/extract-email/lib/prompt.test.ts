@@ -100,3 +100,38 @@ describe('parseEmailExtraction — homework, detail, addressed good_to_know', ()
     expect(p).toContain('"good_to_know":[{"text":"...","for":["Name"]|"everyone"}]')
   })
 })
+
+// The repeat parser is deliberately strict. A wrong repeat becomes a chore the
+// household is shown every single day, which is worse than a one-off task they
+// can tick once — so anything not plainly daily, or weekly naming a real
+// weekday, is dropped rather than guessed at.
+describe('parseEmailExtraction — standing instructions', () => {
+  const withTodo = (todo: unknown) =>
+    parseEmailExtraction(JSON.stringify({ events: [], todos: [todo], good_to_know: [], gaps: [] })).todos[0]
+
+  const base = { title: 'Send folder', kind: 'todo', source_quote: 'q', confidence: 0.9 }
+
+  it('accepts daily', () => {
+    expect(withTodo({ ...base, repeat: { type: 'daily' } }).repeat).toEqual({ type: 'daily' })
+  })
+
+  it('accepts weekly with real weekdays, normalised and deduped', () => {
+    expect(withTodo({ ...base, repeat: { type: 'weekly', days: ['Tuesday', 'THU', 'tue'] } }).repeat)
+      .toEqual({ type: 'weekly', days: ['tue', 'thu'] })
+  })
+
+  it('drops a weekly that names no real weekday', () => {
+    expect(withTodo({ ...base, repeat: { type: 'weekly', days: ['someday'] } }).repeat).toBeUndefined()
+    expect(withTodo({ ...base, repeat: { type: 'weekly' } }).repeat).toBeUndefined()
+  })
+
+  it('drops cadences it was never taught', () => {
+    expect(withTodo({ ...base, repeat: { type: 'monthly' } }).repeat).toBeUndefined()
+    expect(withTodo({ ...base, repeat: 'daily' }).repeat).toBeUndefined()
+    expect(withTodo({ ...base, repeat: true }).repeat).toBeUndefined()
+  })
+
+  it('leaves an ordinary todo with no repeat at all', () => {
+    expect(withTodo(base).repeat).toBeUndefined()
+  })
+})

@@ -162,6 +162,22 @@ Deno.serve(async (req: Request) => {
         if (error) throw new Error(`inbox insert failed: ${error.message}`)
       }
     }
+    // Standing instructions become routines. Deduped by name against the
+    // household's existing routines: a school digest repeats "send the folder
+    // daily" in every issue, and a second copy would show the chore twice on
+    // the wall for the rest of the year.
+    if (plan.routines.length) {
+      const { data: existingRoutines, error: routinesReadError } = await supabase
+        .from('routines').select('name').in('user_id', userIds).limit(500)
+      if (routinesReadError) throw new Error(`routines read failed: ${routinesReadError.message}`)
+      const names = (existingRoutines ?? []).map((r) => r.name as string)
+      const routinesToInsert = plan.routines.filter((r) => !names.some((n) => itemsMatch(n, r.name)))
+      if (routinesToInsert.length) {
+        const { error } = await supabase.from('routines').insert(routinesToInsert)
+        if (error) throw new Error(`routines insert failed: ${error.message}`)
+      }
+    }
+
     if (plan.note) {
       // Retry-safe: skip the note if this capture already wrote one, keyed on
       // external_id (capture:<id>) rather than title, since sender+subject can
@@ -194,7 +210,7 @@ Deno.serve(async (req: Request) => {
     }
 
     await supabase.from('captures').update({ status: 'extracted', error: null }).eq('id', capture.id)
-    return json({ ok: true, events: plan.events.length, children, inbox: plan.inbox.length, note: !!plan.note, notices: plan.notices.length })
+    return json({ ok: true, events: plan.events.length, children, inbox: plan.inbox.length, routines: plan.routines.length, note: !!plan.note, notices: plan.notices.length })
   } catch (e) {
     const { error: markError } = await supabase.from('captures').update({ status: 'failed', error: String(e) }).eq('id', capture.id)
     // If even this write fails the capture stays 'pending' and looks like a
