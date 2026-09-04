@@ -17,7 +17,7 @@ export interface TaskLink {
   analyzedAt?: string
 }
 
-export type TaskBucket = 'inbox' | 'week' | 'month' | 'quarter' | 'someday' | 'timed'
+export type TaskBucket = 'inbox' | 'week' | 'month' | 'quarter' | 'someday' | 'timed' | 'span'
 
 export type TaskContext = 'work' | 'family' | 'personal'
 
@@ -62,6 +62,7 @@ export interface Task {
   deferCount?: number // Times this task has been deferred
   weekDeferredAt?: Date // Set when an item already in 'week' bucket is bumped to next week — sinks it to the bottom of the This Week popover
   weekStart?: Date // Which week a bucket='week' task belongs to (that week's start, per weekStartsOn). undefined = the current week (legacy rows).
+  spanId?: string | null // Which span a bucket='span' task belongs to. The span's stamp, exactly as weekStart is the week's.
   pickedAt?: Date | null // Season picks: set when the user explicitly picks this quarter item for the season (null/undefined = on the shelf). null is an explicit "set aside" write.
   captureMeta?: TaskCaptureMeta // Photo-first capture state (AI enrichment + suggested merge destination)
   isAllDay?: boolean // True = all day task, false/undefined = specific time

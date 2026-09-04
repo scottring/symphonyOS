@@ -10,6 +10,7 @@ import type { TaskDirections } from '@/types/directions'
 import { scopeForDomain, memberForAuthUser, type Scope } from '@/lib/scope'
 import { localYmd, parseLocalYmd, weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
 import { weekStartForBucket } from '@/lib/today/weekPlacement'
+import { spanIdForBucket } from '@/lib/today/spanPlacement'
 import { onRealtimeResumed } from '@/lib/realtime/keepAlive'
 import { announceToBuyChanged } from '@/lib/lists/toBuy'
 // `import type` on purpose: erased at compile time, so it does NOT drag
@@ -86,6 +87,7 @@ export interface DbTask {
   needed_on: string | null
   week_deferred_at: string | null
   week_start: string | null
+  span_id: string | null
   picked_at: string | null
   capture_meta: { status?: string; storage_path?: string; suggested_task_id?: string } | null
   source_id: string | null
@@ -167,6 +169,8 @@ export function dbTaskToTask(dbTask: DbTask): Task {
     weekDeferredAt: dbTask.week_deferred_at ? new Date(dbTask.week_deferred_at) : undefined,
     // A `date` column — parse to LOCAL midnight, never `new Date(str)` (that's UTC).
     weekStart: dbTask.week_start ? parseLocalYmd(dbTask.week_start) : undefined,
+    // The span's placement stamp, exactly as week_start is the week's.
+    spanId: dbTask.span_id ?? null,
     pickedAt: dbTask.picked_at ? new Date(dbTask.picked_at) : undefined,
     sourceId: dbTask.source_id ?? undefined,
     goalId: dbTask.goal_id ?? undefined,
@@ -1258,6 +1262,7 @@ export function useSupabaseTasks() {
     if ('weekDeferredAt' in updates) dbUpdates.week_deferred_at = updates.weekDeferredAt?.toISOString() ?? null
     // `week_start` is a DATE column — localYmd, not toISOString (which shifts the day west of Greenwich).
     if ('weekStart' in updates) dbUpdates.week_start = updates.weekStart ? localYmd(updates.weekStart) : null
+    if ('spanId' in updates) dbUpdates.span_id = updates.spanId ?? null
     if ('pickedAt' in updates) dbUpdates.picked_at = updates.pickedAt?.toISOString() ?? null
     if ('sortOrder' in updates) dbUpdates.sort_order = updates.sortOrder ?? null
 
@@ -1428,6 +1433,7 @@ export function useSupabaseTasks() {
     if ('weekDeferredAt' in updates) dbUpdates.week_deferred_at = updates.weekDeferredAt?.toISOString() ?? null
     // `week_start` is a DATE column — localYmd, not toISOString (which shifts the day west of Greenwich).
     if ('weekStart' in updates) dbUpdates.week_start = updates.weekStart ? localYmd(updates.weekStart) : null
+    if ('spanId' in updates) dbUpdates.span_id = updates.spanId ?? null
     if ('pickedAt' in updates) dbUpdates.picked_at = updates.pickedAt?.toISOString() ?? null
     if ('sortOrder' in updates) dbUpdates.sort_order = updates.sortOrder ?? null
 
@@ -1672,7 +1678,25 @@ export function useSupabaseTasks() {
       updates.scheduledFor = undefined
     }
     updates.weekStart = weekStartForBucket(bucket, currentWeekStart())
+    // Clearing matters as much as stamping: a task moved out of a span that
+    // kept its span_id would come back in that span's pool forever. Same bug
+    // week_start's clear exists to prevent. Placing INTO a span goes through
+    // setSpan below, which is the only writer that sets a stamp.
+    updates.spanId = spanIdForBucket(bucket, null)
     await updateTask(id, updates)
+  }, [updateTask])
+
+  /**
+   * Place a task on a span. The one writer that stamps `span_id`, so the
+   * bucket and the stamp can never disagree.
+   */
+  const setSpan = useCallback(async (id: string, spanId: string) => {
+    await updateTask(id, {
+      bucket: 'span',
+      spanId,
+      scheduledFor: undefined,
+      weekStart: undefined,
+    })
   }, [updateTask])
 
   // Add a prep task linked to an event (e.g., "Defrost chicken" for a dinner event)
@@ -1755,5 +1779,5 @@ export function useSupabaseTasks() {
     }
   }, [tasks])
 
-  return { tasks, loading, error, refetch, addTask, addSubtask, addPrepTask, getPrepTasks, getLinkedTasks, toggleTask, toggleWaiting, deleteTask, updateTask, updateTasksBulk, updateTaskOrders, scheduleTask, pushTask, setBucket }
+  return { tasks, loading, error, refetch, addTask, addSubtask, addPrepTask, getPrepTasks, getLinkedTasks, toggleTask, toggleWaiting, deleteTask, updateTask, updateTasksBulk, updateTaskOrders, scheduleTask, pushTask, setBucket, setSpan }
 }
