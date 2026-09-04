@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback } from 'react'
+import { HomeChromeControls } from './HomeChromeControls'
 import type { HomeViewType } from '@/types/homeView'
 import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
@@ -415,6 +416,7 @@ export function HomeView({
     // Today view uses TodayView — it reads most props from context
     return (
       <TodayView
+        headerControls={<HomeChromeControls className="flex" />}
         tasks={filteredTasks}
         events={filteredEvents}
         // Domain-UNfiltered on purpose: TodayView's own pipeline applies

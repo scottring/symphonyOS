@@ -1,9 +1,7 @@
-import { ChevronLeft, ChevronRight, Sparkles } from 'lucide-react'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
 import type { HomeViewType } from '@/types/homeView'
-import { DomainSwitcher } from '@/components/domain/DomainSwitcher'
-import { DayNavCluster } from '@/components/schedule/DayNavCluster'
+import { HomeChromeControls } from './HomeChromeControls'
 import { mondayOfWeek } from '@/lib/workweekHelpers'
-import { useAppShellChrome } from '@/contexts/AppShellChromeContext'
 
 interface HomeHeaderProps {
   currentView: HomeViewType
@@ -36,7 +34,6 @@ function formatDayShort(d: Date): string {
 
 export function HomeHeader(props: HomeHeaderProps) {
   const { currentView, viewedDate, onDateChange, weekStart, onWeekChange, monthStart, onMonthChange } = props
-  const { chatOpen, onChatOpenChange } = useAppShellChrome()
 
   // Per-view label + chevron handlers
   let label: { short: string; long: string }
@@ -83,6 +80,11 @@ export function HomeHeader(props: HomeHeaderProps) {
     nextLabel = 'Next month'
   }
 
+  // Today draws its own masthead inside the day card: the date nav, and the
+  // domain/assistant controls in its top-right corner. Rendering a header
+  // above it just put a second empty band on the page.
+  if (currentView === 'today') return null
+
   return (
     <header className="mb-6 px-3 md:px-0">
       {/* Wraps rather than competing for one line. Every part of the date
@@ -91,10 +93,7 @@ export function HomeHeader(props: HomeHeaderProps) {
           title was the only thing that could give and "August 7, 2026"
           collapsed to "Au…". The controls drop to their own line instead. */}
       <div className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-end md:justify-between md:gap-4">
-        {currentView === 'today' ? (
-          <DayNavCluster viewedDate={viewedDate} onDateChange={onDateChange} />
-        ) : (
-          <div className="flex items-center gap-2 min-w-0 justify-center md:justify-start">
+        <div className="flex items-center gap-2 min-w-0 justify-center md:justify-start">
             <button
               aria-label={prevLabel}
               onClick={onPrev}
@@ -113,28 +112,16 @@ export function HomeHeader(props: HomeHeaderProps) {
             >
               <ChevronRight className="w-4 h-4" />
             </button>
-          </div>
-        )}
+        </div>
 
       {/* D/W/M switcher, "Plan the week", and the horizon explainer left with
           the 2026-08 analog-planning pivot — the masthead keeps only the
           domain chooser and the assistant toggle. */}
-      <div className="hidden md:flex items-center gap-2 md:shrink-0 md:pb-1">
-        <DomainSwitcher />
-        <button
-          onClick={() => onChatOpenChange(!chatOpen)}
-          className={`w-9 h-9 rounded-full bg-bg-elevated border border-neutral-200 text-neutral-500 hover:text-primary-500 hover:border-primary-300 transition-all grid place-items-center shadow-card ${
-            chatOpen ? 'ring-2 ring-primary-500/30 text-primary-500 border-primary-500' : ''
-          }`}
-          aria-label="AI chat"
-          title="AI chat"
-        >
-          <Sparkles className="w-4 h-4" />
-        </button>
-      </div>
+      <HomeChromeControls className="hidden md:flex md:shrink-0 md:pb-1" />
       </div>
 
-      {/* Hairline rule anchors the masthead and separates it from the content below */}
+      {/* Hairline rule anchors the masthead and separates it from the content
+          below. Today's day card draws its own border, so it doesn't need one. */}
       <div className="hidden md:block mt-4 h-px bg-gradient-to-r from-neutral-200 to-transparent" />
     </header>
   )

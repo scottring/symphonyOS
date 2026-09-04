@@ -35,7 +35,7 @@ import { useSystemHealth, getHealthTextClasses } from '@/hooks/useSystemHealth'
 import { useTimelineInsert } from '@/hooks/useTimelineInsert'
 import { useDomain } from '@/hooks/useDomain'
 
-import { Eye, EyeOff, Repeat, Binoculars, Printer, GripVertical, CalendarClock, Moon, Sparkles, NotebookPen, Inbox, CalendarDays, AlertTriangle, CheckCircle2, Clock3, ListChecks, Route, Utensils, ArrowRight } from 'lucide-react'
+import { Eye, EyeOff, Repeat, Binoculars, Printer, GripVertical, CalendarClock, Moon, Sparkles, NotebookPen, Inbox, CalendarDays, ArrowRight } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { AssigneeFilter } from '@/components/home/AssigneeFilter'
 
@@ -105,6 +105,10 @@ interface TodayViewProps {
   onClosePanel?: () => void
   /** Opens plan-from-paper (photo of the written plan → placed tasks). */
   onOpenPlanFromPaper?: () => void
+  /** Page chrome (domain chooser, assistant toggle) rendered in the day card's
+   *  top-right corner. Passed in rather than read from context so TodayView
+   *  stays renderable without an AppShell around it. */
+  headerControls?: React.ReactNode
   // Bulk actions (managed by HomeView)
   onUpdateTasksBulk?: (taskIds: string[], updates: Partial<Task>) => Promise<void>
   // Timeline insert points — fall back to context
@@ -143,6 +147,7 @@ export function TodayView({
   panelOpen,
   onClosePanel,
   onOpenPlanFromPaper,
+  headerControls,
   onCreateNoteAt: onCreateNoteAtProp,
   onAppendNoteAt: onAppendNoteAtProp,
   onLinkNote: onLinkNoteProp,
@@ -631,17 +636,9 @@ export function TodayView({
     onGroupItems, onReorderTasks: ctx.onReorderTasks,
   })
 
-  const timelineItems = useMemo(
-    () => data.sectionsOrder.flatMap((section) => data.grouped[section] ?? []),
-    [data.sectionsOrder, data.grouped],
-  )
   const nowForDisplay = useMemo(() => new Date(nowTick), [nowTick])
   const dayName = useMemo(
     () => viewedDate.toLocaleDateString('en-US', { weekday: 'long' }),
-    [viewedDate],
-  )
-  const fullDateLabel = useMemo(
-    () => viewedDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric' }),
     [viewedDate],
   )
   const greeting = useMemo(() => {
@@ -651,23 +648,51 @@ export function TodayView({
     return 'Good evening'
   }, [nowForDisplay])
   const decisionCount = data.attentionItems.length + emailCaptures.length + visibleUnpromptedItems.length
-  const logisticsCount = useMemo(
-    () => timelineItems.filter((item) => /\b(pickup|pick up|dropoff|drop off|carpool|drive|appointment|practice|school|camp)\b/i.test(`${item.title} ${item.subtitle ?? ''}`)).length,
-    [timelineItems],
-  )
-  const mealCount = useMemo(
-    () => timelineItems.filter((item) => /\b(breakfast|lunch|dinner|meal|grocer|snack)\b/i.test(`${item.title} ${item.subtitle ?? ''}`)).length,
-    [timelineItems],
-  )
-  const unresolvedCount = Math.max(data.counts.actionableCount - data.counts.completedCount, 0)
-  const heroLine = loading
-    ? 'Loading the household picture.'
-    : data.counts.totalItems === 0
-      ? 'No scheduled work is on the board.'
-      : `${unresolvedCount} open of ${data.counts.actionableCount} actionable item${data.counts.actionableCount === 1 ? '' : 's'}.`
   const nextTimeLabel = upNext?.item.startTime
     ? upNext.item.startTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
     : upNext ? 'Today' : ''
+  // upNext only resolves against the wall clock, so it is empty on every day
+  // but today. Looking at Saturday, the honest opener is what Saturday starts
+  // with — saying "nothing left with a time on it" over a 7:00 AM list is the
+  // kind of small lie that teaches people not to read the header.
+  const dayItems = useMemo(
+    () => data.sectionsOrder.flatMap((section) => data.grouped[section] ?? []),
+    [data.sectionsOrder, data.grouped],
+  )
+  const firstTimed = useMemo(() => {
+    const timed = dayItems.filter((i) => i.startTime && !i.completed)
+    if (timed.length === 0) return null
+    return timed.reduce((a, b) => (a.startTime!.getTime() <= b.startTime!.getTime() ? a : b))
+  }, [dayItems])
+  const firstTimedLabel = firstTimed?.startTime
+    ? firstTimed.startTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+    : ''
+
+  // The subline says what is actually next, by name. It replaced a tally
+  // ("2 open of 2 actionable items") and a pair of status cards that between
+  // them managed to point at the timeline without ever naming the thing on it.
+  // Today is a commitment surface: no counts, no scores.
+  const heroLine = loading
+    ? 'Loading the day.'
+    : data.counts.totalItems === 0
+      ? 'Nothing on the board for this day.'
+      : data.isToday
+        ? upNext
+          ? `Next: ${upNext.item.title}${nextTimeLabel ? ` · ${nextTimeLabel}` : ''}`
+          : 'Nothing left with a time on it.'
+        : firstTimed
+          ? `Starts with: ${firstTimed.title}${firstTimedLabel ? ` · ${firstTimedLabel}` : ''}`
+          : 'Nothing with a time on it.'
+  // Viewing another day: "Tomorrow"/"Yesterday" reads better than repeating the
+  // weekday the date line above already shows.
+  const relativeDayLabel = useMemo(() => {
+    const a = new Date(viewedDate); a.setHours(0, 0, 0, 0)
+    const b = new Date(nowForDisplay); b.setHours(0, 0, 0, 0)
+    const days = Math.round((a.getTime() - b.getTime()) / 86400000)
+    if (days === 1) return 'Tomorrow'
+    if (days === -1) return 'Yesterday'
+    return dayName
+  }, [viewedDate, nowForDisplay, dayName])
 
   // ── Drag: the pure resolver's inputs ─────────────────────────────────────────
   const { isReadOnlyCalendar } = useCalendarPermissions()
@@ -1022,13 +1047,9 @@ export function TodayView({
           overdue={data.overdueTasks}
         />
       )}
-      {/* Date masthead with prev/next-day nav — mobile only. Desktop renders
-          DayNavCluster in HomeHeader above the view; mobile had no date header,
-          so surface the same control (it's responsive) here. */}
-      <div data-testid="today-mobile-masthead" className="md:hidden px-3 mb-2 flex items-start gap-2">
-        <div className="flex-1 min-w-0">
-          <DayNavCluster viewedDate={viewedDate} onDateChange={onDateChange} />
-        </div>
+      {/* Mobile-only action row. The date nav that used to live here moved into
+          the day card below, which now carries it on every breakpoint. */}
+      <div data-testid="today-mobile-masthead" className="md:hidden px-3 mb-2 flex items-center justify-end gap-2">
         {isMobile && planFromPaperButton}
         {isMobile && overflowMenu}
       </div>
@@ -1044,63 +1065,32 @@ export function TodayView({
 
       <section className="mx-3 mb-4 overflow-hidden rounded-2xl border border-neutral-200/80 bg-bg-elevated shadow-sm md:mx-0">
         <div className="border-b border-neutral-100 px-4 py-4 md:px-5">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
-              <div className="mb-2 flex flex-wrap items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.08em] text-neutral-400">
-                <span>{data.isToday ? 'Today' : dayName}</span>
-                <span className="h-1 w-1 rounded-full bg-neutral-300" />
-                <span>{fullDateLabel}</span>
+              {/* The page's one and only date masthead. It used to sit in a
+                  separate header above this card; two stacked date headers
+                  said the same thing twice. */}
+              <div className="mb-1 -ml-1.5">
+                <DayNavCluster viewedDate={viewedDate} onDateChange={onDateChange} variant="inline" />
               </div>
               <h1 className="font-display text-[28px] font-semibold leading-tight text-neutral-950 md:text-[34px]">
-                {data.isToday ? greeting : dayName}
+                {data.isToday ? greeting : relativeDayLabel}
               </h1>
               <p className="mt-1 max-w-2xl text-sm text-neutral-500 md:text-[15px]">{heroLine}</p>
             </div>
 
-            <div className="grid min-w-0 gap-2 sm:grid-cols-2 lg:w-[420px]">
-              <div className="rounded-xl border border-primary-100 bg-primary-50/60 px-3 py-2.5">
-                <div className="flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.06em] text-primary-700">
-                  <Clock3 className="h-3.5 w-3.5" />
-                  Now / Next
-                </div>
-                <p className="mt-1 truncate text-sm font-semibold text-neutral-900">
-                  {upNext ? 'Next commitment is marked in the timeline' : loading ? 'Loading next move' : 'Nothing queued'}
-                </p>
-                <p className="mt-0.5 truncate text-xs text-neutral-500">
-                  {upNext ? `${nextTimeLabel}${upNextStatus ? ` · ${upNextStatus}` : ''}` : 'The timeline is quiet.'}
-                </p>
-              </div>
-              <div className="rounded-xl border border-neutral-200 bg-white px-3 py-2.5">
-                <div className="flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.06em] text-neutral-500">
-                  <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
-                  Decisions
-                </div>
-                <p className="mt-1 text-sm font-semibold text-neutral-900">
-                  {decisionCount === 0 ? 'No decisions waiting' : `${decisionCount} waiting`}
-                </p>
-                <p className="mt-0.5 truncate text-xs text-neutral-500">
-                  {emailCaptures.length > 0 ? `${emailCaptures.length} from email` : data.attentionItems.length > 0 ? 'Review the attention queue' : 'No triage needed.'}
-                </p>
-              </div>
-            </div>
+            {/* Domain chooser + assistant toggle. They used to float in a
+                header band of their own above this card; the card is the
+                masthead now, so they sit in its corner. */}
+            {headerControls && <div className="hidden shrink-0 md:block">{headerControls}</div>}
           </div>
 
           <div className="mt-4 flex flex-wrap items-center gap-2">
-            {onOpenPlanFromPaper && (
-              <button
-                type="button"
-                onClick={onOpenPlanFromPaper}
-                className="inline-flex items-center gap-2 rounded-lg bg-neutral-950 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-neutral-800"
-              >
-                <NotebookPen className="h-4 w-4" />
-                Snap paper plan
-              </button>
-            )}
             {data.isToday && ctx.onOpenPlanning && (
               <button
                 type="button"
                 onClick={ctx.onOpenPlanning}
-                className="inline-flex items-center gap-2 rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-50"
+                className="inline-flex items-center gap-2 rounded-lg bg-neutral-950 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-neutral-800"
               >
                 <CalendarClock className="h-4 w-4" />
                 Time-block
@@ -1122,28 +1112,6 @@ export function TodayView({
               <CalendarDays className="h-4 w-4" />
               Plan week
             </button>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 divide-x divide-neutral-100 sm:grid-cols-4">
-          <div className="px-4 py-3">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-neutral-400">Open</p>
-            <p className="mt-1 text-xl font-semibold tabular-nums text-neutral-900">{unresolvedCount}</p>
-          </div>
-          <div className="px-4 py-3">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-neutral-400">Logistics</p>
-            <p className="mt-1 text-xl font-semibold tabular-nums text-neutral-900">{logisticsCount}</p>
-          </div>
-          <div className="px-4 py-3">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-neutral-400">Meals</p>
-            <p className="mt-1 text-xl font-semibold tabular-nums text-neutral-900">{mealCount}</p>
-          </div>
-          <div className="px-4 py-3">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-neutral-400">Clarity</p>
-            <div className="mt-1 flex items-center gap-2">
-              <Binoculars className={`h-4 w-4 ${clarityColorClass}`} aria-hidden="true" />
-              <span className={`text-sm font-semibold ${clarityColorClass}`}>{clarityHealth.healthStatus}</span>
-            </div>
           </div>
         </div>
       </section>
@@ -1195,7 +1163,9 @@ export function TodayView({
         {!isMobile && overflowMenu}
       </div>
 
-      <div className="px-3 md:px-0 lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start lg:gap-4">
+      {/* The rail column only exists when the rail does; otherwise the day gets
+          the full width instead of a 320px empty gutter. */}
+      <div className={`px-3 md:px-0 ${decisionCount > 0 ? 'lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start lg:gap-4' : ''}`}>
         <main className="min-w-0">
       {/* Task list — wrapped in a card on desktop; on mobile the rows go
           full-width (no card, no border, no inner padding) to match the
@@ -1250,36 +1220,10 @@ export function TodayView({
                 ? 'Loading your day…'
                 : data.isToday && data.counts.completedCount > 0 ? 'All cleared — nicely done' : 'Your day is clear'}
             </p>
-            {!loading && data.isToday && (
-              <div className="mt-5 flex flex-wrap justify-center gap-2">
-                {onOpenPlanFromPaper && (
-                  <button
-                    type="button"
-                    onClick={onOpenPlanFromPaper}
-                    className="inline-flex items-center gap-2 rounded-lg border border-primary-200 bg-primary-50 px-3 py-2 text-sm font-medium text-primary-800 hover:bg-primary-100 transition-colors"
-                  >
-                    <NotebookPen className="h-4 w-4" />
-                    Snap paper plan
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => navigate('/inbox')}
-                  className="inline-flex items-center gap-2 rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50 transition-colors"
-                >
-                  <Inbox className="h-4 w-4" />
-                  Process inbox
-                </button>
-                <button
-                  type="button"
-                  onClick={() => navigate('/week')}
-                  className="inline-flex items-center gap-2 rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50 transition-colors"
-                >
-                  <CalendarDays className="h-4 w-4" />
-                  Plan week
-                </button>
-              </div>
-            )}
+            {/* No button row here. The day card directly above already offers
+                Time-block / Process inbox / Plan week, and the sidenav carries
+                Plan from paper — repeating all four under "Your day is clear"
+                made an empty day the busiest screen in the app. */}
           </div>
         ) : (
           <div className="space-y-6">
@@ -1426,13 +1370,18 @@ export function TodayView({
       </div>
         </main>
 
+        {/* The decision rail is not a permanent fixture — it appears when the
+            assistant, the inbox or email actually put something in it, and is
+            absent otherwise. A card whose job is to announce its own emptiness
+            still costs a third of the page. */}
+        {decisionCount > 0 && (
         <aside className="mt-4 hidden space-y-3 lg:mt-0 lg:block">
           <section className="rounded-2xl border border-neutral-200/80 bg-bg-elevated p-4 shadow-sm">
             <div className="mb-3 flex items-center justify-between gap-3">
               <div>
                 <p className="text-[12px] font-semibold uppercase tracking-[0.08em] text-neutral-400">Needs a Decision</p>
                 <h2 className="font-display text-lg font-semibold text-neutral-900">
-                  {decisionCount === 0 ? 'All clear' : `${decisionCount} item${decisionCount === 1 ? '' : 's'}`}
+                  {decisionCount} item{decisionCount === 1 ? '' : 's'}
                 </h2>
               </div>
               <button
@@ -1463,49 +1412,11 @@ export function TodayView({
                   <span className="ml-3 shrink-0 text-xs font-semibold tabular-nums">{visibleUnpromptedItems.length}</span>
                 </button>
               )}
-              {decisionCount === 0 && (
-                <div className="flex items-start gap-2 rounded-xl border border-emerald-100 bg-emerald-50/70 px-3 py-2 text-emerald-800">
-                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
-                  <span>No inbox, email, or assistant decisions are demanding attention.</span>
-                </div>
-              )}
             </div>
           </section>
 
-          <section className="rounded-2xl border border-neutral-200/80 bg-bg-elevated p-4 shadow-sm">
-            <p className="text-[12px] font-semibold uppercase tracking-[0.08em] text-neutral-400">Household Signals</p>
-            <div className="mt-3 space-y-2">
-              <div className="flex items-center justify-between gap-3 rounded-xl bg-neutral-50 px-3 py-2">
-                <span className="inline-flex min-w-0 items-center gap-2 truncate text-sm text-neutral-700">
-                  <Route className="h-4 w-4 shrink-0 text-blue-600" />
-                  Logistics
-                </span>
-                <span className="text-sm font-semibold tabular-nums text-neutral-900">{logisticsCount}</span>
-              </div>
-              <div className="flex items-center justify-between gap-3 rounded-xl bg-neutral-50 px-3 py-2">
-                <span className="inline-flex min-w-0 items-center gap-2 truncate text-sm text-neutral-700">
-                  <Utensils className="h-4 w-4 shrink-0 text-rose-600" />
-                  Meals and groceries
-                </span>
-                <span className="text-sm font-semibold tabular-nums text-neutral-900">{mealCount}</span>
-              </div>
-              <div className="flex items-center justify-between gap-3 rounded-xl bg-neutral-50 px-3 py-2">
-                <span className="inline-flex min-w-0 items-center gap-2 truncate text-sm text-neutral-700">
-                  <ListChecks className="h-4 w-4 shrink-0 text-violet-600" />
-                  Week bench
-                </span>
-                <span className="text-sm font-semibold tabular-nums text-neutral-900">{weekPool.length}</span>
-              </div>
-              <div className="flex items-center justify-between gap-3 rounded-xl bg-neutral-50 px-3 py-2">
-                <span className="inline-flex min-w-0 items-center gap-2 truncate text-sm text-neutral-700">
-                  <CalendarDays className="h-4 w-4 shrink-0 text-teal-600" />
-                  Month bench
-                </span>
-                <span className="text-sm font-semibold tabular-nums text-neutral-900">{monthPool.length}</span>
-              </div>
-            </div>
-          </section>
         </aside>
+        )}
       </div>
 
       {/* Review drawer — evening from the ⋯ menu, morning from the backlog

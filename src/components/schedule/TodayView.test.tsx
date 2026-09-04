@@ -584,3 +584,62 @@ describe('TodayView attention line', () => {
   })
 })
 
+
+// ── Today is a commitment surface, not a dashboard ──
+// A "control room" pass in 2026-09 added a four-tile counter strip (Open /
+// Logistics / Meals / Clarity), a Household Signals tally card, and a pair of
+// status cards that between them announced four times that nothing was
+// happening. Today shows the day and what is next; it does not score you, and
+// it does not spend a third of the page saying a queue is empty.
+describe('TodayView — no scoreboard', () => {
+  it('shows no counter tiles or tally cards', () => {
+    renderView()
+    for (const label of [/^open$/i, /^logistics$/i, /^meals$/i, /^clarity$/i, /household signals/i, /week bench/i, /month bench/i]) {
+      expect(screen.queryByText(label)).not.toBeInTheDocument()
+    }
+  })
+
+  it('does not tally the day in the subline', () => {
+    renderView()
+    expect(screen.queryByText(/actionable item/i)).not.toBeInTheDocument()
+  })
+
+  it('names the next commitment instead of pointing at the timeline', () => {
+    const soon = new Date(TODAY)
+    soon.setHours(soon.getHours() + 1, 0, 0, 0)
+    renderView({
+      tasks: [{
+        id: 'next-up', title: 'Pick up Mia from climbing', completed: false,
+        createdAt: TODAY, updatedAt: TODAY, bucket: 'timed' as const, scheduledFor: soon,
+      }],
+    } as never)
+    expect(screen.getByText(/^Next: Pick up Mia from climbing/)).toBeInTheDocument()
+    expect(screen.queryByText(/marked in the timeline/i)).not.toBeInTheDocument()
+  })
+
+  it('renders no decision rail when there is nothing to decide', () => {
+    renderView()
+    expect(screen.queryByText(/needs a decision/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/all clear/i)).not.toBeInTheDocument()
+  })
+})
+
+// ── One date masthead ──
+// The page used to stack two: HomeHeader's big serif date above the day card's
+// own "TODAY · SEPTEMBER 4" eyebrow. The card's eyebrow is now the real
+// control — weekday, date, carets and picker — and HomeHeader draws none.
+describe('TodayView — the day card carries the date nav', () => {
+  it('puts the weekday, the date and both day carets in the card header', () => {
+    renderView()
+    const weekday = TODAY.toLocaleDateString('en-US', { weekday: 'long' })
+    const date = TODAY.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })
+    expect(screen.getByText(`${weekday} · ${date}`)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /previous day/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /next day/i })).toBeInTheDocument()
+  })
+
+  it('renders exactly one date nav — the mobile masthead no longer repeats it', () => {
+    renderView()
+    expect(screen.getAllByRole('button', { name: /previous day/i })).toHaveLength(1)
+  })
+})

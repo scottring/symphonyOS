@@ -33,6 +33,32 @@ describe('DayNavCluster', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
+  // The inline variant is what the Today card's header uses. It has to keep
+  // every affordance of the masthead — carets, picker, Today chip — because it
+  // REPLACED the masthead rather than supplementing it.
+  it('inline: prints the weekday with the date on one line and still shifts days', async () => {
+    const onDateChange = vi.fn()
+    const { user } = render(
+      <DayNavCluster viewedDate={tue} today={tue} onDateChange={onDateChange} variant="inline" />,
+    )
+    expect(screen.getByText('Tuesday · May 19')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /previous day/i }))
+    expect((onDateChange.mock.calls[0][0] as Date).getDate()).toBe(18)
+  })
+
+  it('inline: still opens the month picker', async () => {
+    const { user } = render(
+      <DayNavCluster viewedDate={tue} today={tue} onDateChange={vi.fn()} variant="inline" />,
+    )
+    await user.click(screen.getByText('Tuesday · May 19'))
+    expect(screen.getByRole('dialog', { name: /choose a date/i })).toBeInTheDocument()
+  })
+
+  it('inline: offers the Today chip when viewing another day', () => {
+    render(<DayNavCluster viewedDate={wed} today={tue} onDateChange={vi.fn()} variant="inline" />)
+    expect(screen.getByRole('button', { name: /go to today/i })).toBeInTheDocument()
+  })
+
   it('hides the Today chip when already viewing today', () => {
     render(<DayNavCluster viewedDate={tue} today={tue} onDateChange={vi.fn()} />)
     expect(screen.queryByRole('button', { name: /go to today/i })).not.toBeInTheDocument()

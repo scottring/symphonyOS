@@ -7,6 +7,12 @@ interface DayNavClusterProps {
   onDateChange: (d: Date) => void
   /** "Today" reference; injectable for tests, defaults to now. */
   today?: Date
+  /**
+   * 'masthead' — the big serif date headline (used where the date IS the page
+   * title). 'inline' — an eyebrow-sized date line that sits inside another
+   * card's header, so the page has one masthead instead of two stacked ones.
+   */
+  variant?: 'masthead' | 'inline'
 }
 
 function shift(d: Date, days: number): Date {
@@ -28,7 +34,7 @@ function sameDay(a: Date, b: Date): boolean {
  * headline, flanked by prev/next day carets. The date opens a month picker for
  * jumping to any day; a "Today" chip appears only when viewing another day.
  */
-export function DayNavCluster({ viewedDate, onDateChange, today = new Date() }: DayNavClusterProps) {
+export function DayNavCluster({ viewedDate, onDateChange, today = new Date(), variant = 'masthead' }: DayNavClusterProps) {
   const [pickerOpen, setPickerOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -36,6 +42,7 @@ export function DayNavCluster({ viewedDate, onDateChange, today = new Date() }: 
   const weekdayShort = viewedDate.toLocaleDateString('en-US', { weekday: 'short' })
   const dateLong = viewedDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })
   const dateShort = viewedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  const dateMedium = viewedDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })
   const isToday = sameDay(viewedDate, today)
 
   useEffect(() => {
@@ -57,6 +64,69 @@ export function DayNavCluster({ viewedDate, onDateChange, today = new Date() }: 
   const handlePick = (d: Date) => {
     onDateChange(d)
     setPickerOpen(false)
+  }
+
+  const picker = pickerOpen ? (
+    <div
+      role="dialog"
+      aria-label="Choose a date"
+      className="absolute left-1/2 -translate-x-1/2 md:left-0 md:translate-x-0 top-full mt-2 z-30"
+    >
+      <MiniMonthPicker selected={viewedDate} today={today} onSelect={handlePick} />
+    </div>
+  ) : null
+
+  if (variant === 'inline') {
+    return (
+      <div ref={ref} className="relative inline-flex min-w-0 items-center gap-0.5">
+        <button
+          type="button"
+          aria-label="Previous day"
+          onClick={() => onDateChange(shift(viewedDate, -1))}
+          className="rounded-lg p-1.5 text-neutral-300 transition-colors hover:bg-neutral-100 hover:text-neutral-700"
+        >
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+
+        <button
+          type="button"
+          aria-haspopup="dialog"
+          aria-expanded={pickerOpen}
+          onClick={() => setPickerOpen((o) => !o)}
+          className="group inline-flex min-w-0 items-center gap-1.5 rounded px-1.5 py-1 transition-colors hover:bg-neutral-100/70"
+        >
+          <span className="truncate text-[12px] font-semibold uppercase tracking-[0.08em] text-neutral-500">
+            {weekdayLong} · {dateMedium}
+          </span>
+          <ChevronDown
+            className={`h-3.5 w-3.5 shrink-0 text-neutral-300 transition-all group-hover:text-neutral-500 ${pickerOpen ? 'rotate-180' : ''}`}
+          />
+        </button>
+
+        <button
+          type="button"
+          aria-label="Next day"
+          onClick={() => onDateChange(shift(viewedDate, 1))}
+          className="rounded-lg p-1.5 text-neutral-300 transition-colors hover:bg-neutral-100 hover:text-neutral-700"
+        >
+          <ChevronRight className="h-4 w-4" />
+        </button>
+
+        {!isToday && (
+          <button
+            type="button"
+            aria-label="Go to today"
+            onClick={() => onDateChange(new Date(today))}
+            className="ml-1 inline-flex shrink-0 items-center gap-1 rounded-full border border-primary-100 bg-primary-50 px-2 py-0.5 text-[11px] font-semibold text-primary-600 transition-colors hover:bg-primary-100"
+          >
+            <CalendarCheck className="h-3 w-3" />
+            Today
+          </button>
+        )}
+
+        {picker}
+      </div>
+    )
   }
 
   return (
@@ -114,15 +184,7 @@ export function DayNavCluster({ viewedDate, onDateChange, today = new Date() }: 
         )}
       </div>
 
-      {pickerOpen && (
-        <div
-          role="dialog"
-          aria-label="Choose a date"
-          className="absolute left-1/2 -translate-x-1/2 md:left-0 md:translate-x-0 top-full mt-2 z-30"
-        >
-          <MiniMonthPicker selected={viewedDate} today={today} onSelect={handlePick} />
-        </div>
-      )}
+      {picker}
     </div>
   )
 }
