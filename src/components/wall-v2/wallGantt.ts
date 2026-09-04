@@ -314,6 +314,16 @@ function itemsFor(day: WallDayData, memberId: string, members: FamilyMember[]): 
  * The board. Today only — a time axis across more than one day is a calendar,
  * and the wall already has one of those.
  */
+/** Every roster row a homework task belongs on. `assignedToAll` wins when it
+ *  names anyone the wall knows; `assignedTo` is the legacy single column and
+ *  stays the fallback. Nothing recognisable → the household row. */
+function homeworkOwners(t: Task, memberIds: Set<string>): string[] {
+  const all = (t.assignedToAll ?? []).filter((id) => memberIds.has(id));
+  if (all.length) return [...new Set(all)];
+  if (t.assignedTo && memberIds.has(t.assignedTo)) return [t.assignedTo];
+  return [HOUSEHOLD_ID];
+}
+
 export function adaptGanttBoard(
   members: FamilyMember[],
   days: WallDayData[],
@@ -324,17 +334,28 @@ export function adaptGanttBoard(
   const today = days[0];
   const roster = [...members, householdMember()];
 
-  // Homework by row. Assigned to a person on the roster → their row; anyone
-  // else (unassigned, or a member id the wall doesn't know) → the household
-  // row, the same fall-through boardOwnersOf gives an unassigned task.
+  // Homework by row. Every member it is assigned to gets it on their row;
+  // anyone else (unassigned, or member ids the wall doesn't know) → the
+  // household row, the same fall-through boardOwnersOf gives an unassigned
+  // task.
+  //
+  // `assignedToAll` is read FIRST and is why one row can sit on two kids'
+  // rows. Class-wide homework used to be written as one row per child purely
+  // so each kid saw it as theirs here; with two kids in mirror-image classes
+  // that put every class-wide instruction on Today twice. The pipeline now
+  // writes ONE row carrying both kids, which only works if this reads it —
+  // otherwise a merged row lands on one kid's row, or falls to Everyone,
+  // which is exactly the 2026-09-03 defect that fan-out was fixing.
   const memberIds = new Set(members.map((m) => m.id));
   const homeworkByTrack = new Map<string, Task[]>();
   for (const t of homework) {
     if (t.completed) continue;
-    const key = t.assignedTo && memberIds.has(t.assignedTo) ? t.assignedTo : HOUSEHOLD_ID;
-    const list = homeworkByTrack.get(key);
-    if (list) list.push(t);
-    else homeworkByTrack.set(key, [t]);
+    const owners = homeworkOwners(t, memberIds);
+    for (const key of owners) {
+      const list = homeworkByTrack.get(key);
+      if (list) list.push(t);
+      else homeworkByTrack.set(key, [t]);
+    }
   }
 
   const starts: number[] = [];

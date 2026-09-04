@@ -579,6 +579,38 @@ describe('adaptGanttBoard — homework chips', () => {
     expect(kaleb.anytime).toEqual([])
   })
 
+  // One row, both kids' tracks. Class-wide homework used to be written as one
+  // row PER child so each kid saw it as theirs here — which put every
+  // class-wide instruction on Today twice once two kids shared a class. The
+  // pipeline now writes one row carrying both; this is the half that keeps
+  // the wall behaviour the fan-out was protecting.
+  it('puts a row assigned to several kids on every one of their tracks', () => {
+    const board = adaptGanttBoard(members, [day([])], now, TRACK_PX, [
+      hw({ assignedTo: 'k1', assignedToAll: ['k1', 'k2'], neededOn: new Date(2026, 7, 28) }),
+    ])
+    const kaleb = board.tracks.find((t) => t.memberId === 'k1')!
+    const ella = board.tracks.find((t) => t.memberId === 'k2')!
+    const house = board.tracks.find((t) => t.memberId === HOUSEHOLD_ID)!
+    expect(kaleb.homework.map((h) => h.label)).toEqual(['Blue sheet · Fri'])
+    expect(ella.homework.map((h) => h.label)).toEqual(['Blue sheet · Fri'])
+    expect(house.homework).toEqual([])
+  })
+
+  it('ignores ids in assignedToAll that are not on the roster', () => {
+    const board = adaptGanttBoard(members, [day([])], now, TRACK_PX, [
+      hw({ assignedToAll: ['k2', 'zz'] }),
+    ])
+    expect(board.tracks.find((t) => t.memberId === 'k2')!.homework.map((h) => h.label)).toEqual(['Blue sheet'])
+    expect(board.tracks.find((t) => t.memberId === HOUSEHOLD_ID)!.homework).toEqual([])
+  })
+
+  it('falls back to assignedTo when assignedToAll names nobody the wall knows', () => {
+    const board = adaptGanttBoard(members, [day([])], now, TRACK_PX, [
+      hw({ assignedTo: 'k1', assignedToAll: ['zz'] }),
+    ])
+    expect(board.tracks.find((t) => t.memberId === 'k1')!.homework.map((h) => h.label)).toEqual(['Blue sheet'])
+  })
+
   it('an unassigned or unknown assignee falls to the household row', () => {
     const board = adaptGanttBoard(members, [day([])], now, TRACK_PX, [
       hw({ title: 'Nobody' }), hw({ title: 'Stranger', assignedTo: 'zz' }),

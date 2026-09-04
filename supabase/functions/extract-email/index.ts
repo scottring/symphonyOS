@@ -5,7 +5,7 @@
 // Auth: x-capture-secret. Called by inbound-email; safe to re-run by hand.
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { buildEmailPrompt, parseEmailExtraction } from './lib/prompt.ts'
-import { planWrites, itemsMatch } from './lib/plan.ts'
+import { planWrites, itemsMatch, sameAudience, type MailRowAudience } from './lib/plan.ts'
 import { addDays, zonedIso } from './lib/dates.ts'
 import type { ExistingBlock, Member, TaskRow } from './lib/types.ts'
 
@@ -148,14 +148,14 @@ Deno.serve(async (req: Request) => {
       // copies of one sheet). Any mail-born row from the last two weeks
       // with the same words AND the same assignee already counts.
       const { data: existingInbox, error: existingInboxError } = await supabase
-        .from('tasks').select('title, assigned_to').eq('user_id', capture.user_id)
+        .from('tasks').select('title, assigned_to, assigned_to_all').eq('user_id', capture.user_id)
         .not('capture_id', 'is', null).is('parent_task_id', null)
         .gte('created_at', new Date(Date.now() - DEDUPE_WINDOW_DAYS * 86_400_000).toISOString())
         .limit(500)
       if (existingInboxError) throw new Error(`existing inbox read failed: ${existingInboxError.message}`)
-      const existingRows = (existingInbox ?? []) as { title: string; assigned_to: string | null }[]
+      const existingRows = (existingInbox ?? []) as MailRowAudience[]
       const inboxToInsert = plan.inbox.filter(
-        (t) => !existingRows.some((e) => (e.assigned_to ?? null) === (t.assigned_to ?? null) && itemsMatch(e.title, t.title)),
+        (t) => !existingRows.some((e) => itemsMatch(e.title, t.title) && sameAudience(e, t)),
       )
       if (inboxToInsert.length) {
         const { error } = await supabase.from('tasks').insert(inboxToInsert)

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { planWrites, titlesMatch, itemsMatch, MIN_EVENT_CONFIDENCE } from './plan'
+import { planWrites, titlesMatch, itemsMatch, sameAudience, MIN_EVENT_CONFIDENCE } from './plan'
 import type { EmailExtraction, Member } from './types'
 
 const members: Member[] = [
@@ -192,19 +192,67 @@ describe('planWrites — class-wide homework is every child\'s', () => {
   const run = (t: Record<string, unknown>) =>
     planWrites({ ...base, extraction: { events: [], todos: [todo(t) as never], good_to_know: [], gaps: [] } })
 
-  it('with no name, one homework row per child', () => {
+  // ONE row carrying every child, not one row per child. Per-child rows put
+  // every class-wide instruction on Today once per kid, and — because the
+  // cross-capture dedupe compares audiences — made the same sheet arriving
+  // from each kid's teacher look like two different instructions. The wall
+  // reads assigned_to_all and still gives each kid the row on their own track.
+  it('with no name, one row carrying every child', () => {
     const rows = run({}).inbox
-    expect(rows.map((r) => r.assigned_to).sort()).toEqual(['k1', 'k2'])
-    expect(rows.every((r) => r.category === 'homework')).toBe(true)
+    expect(rows).toHaveLength(1)
+    expect(rows[0].assigned_to).toBeNull()
+    expect([...(rows[0].assigned_to_all ?? [])].sort()).toEqual(['k1', 'k2'])
+    expect(rows[0].category).toBe('homework')
   })
   it('for "everyone", the same', () => {
-    expect(run({ for: 'everyone' }).inbox.map((r) => r.assigned_to).sort()).toEqual(['k1', 'k2'])
+    const rows = run({ for: 'everyone' }).inbox
+    expect(rows).toHaveLength(1)
+    expect([...(rows[0].assigned_to_all ?? [])].sort()).toEqual(['k1', 'k2'])
   })
-  it('named children only get theirs; one name is one row', () => {
-    expect(run({ for: ['Liam', 'Mia'] }).inbox.map((r) => r.assigned_to).sort()).toEqual(['k1', 'k2'])
-    expect(run({ for: ['Mia'] }).inbox.map((r) => r.assigned_to)).toEqual(['k2'])
+  it('several named children are one row naming both', () => {
+    const rows = run({ for: ['Liam', 'Mia'] }).inbox
+    expect(rows).toHaveLength(1)
+    expect([...(rows[0].assigned_to_all ?? [])].sort()).toEqual(['k1', 'k2'])
+  })
+  it('one named child is still that child\'s own row', () => {
+    const rows = run({ for: ['Mia'] }).inbox
+    expect(rows.map((r) => r.assigned_to)).toEqual(['k2'])
+    expect(rows[0].assigned_to_all ?? null).toBeNull()
   })
   it('a plain todo with no name stays one unassigned row', () => {
     expect(run({ kind: 'todo' }).inbox.map((r) => r.assigned_to)).toEqual([null])
+  })
+})
+
+// The rule that let a duplicate through on 2026-09-04. Two teachers, two kids
+// in mirror-image classes, the same sheet: the old check compared assignees
+// for EQUALITY, so Ella's row and Kaleb's row were "different" instructions
+// and Today showed both.
+describe('sameAudience — one instruction, two teachers', () => {
+  it('treats overlapping audiences as the same instruction', () => {
+    expect(sameAudience({ assigned_to: 'ella' }, { assigned_to_all: ['ella', 'kaleb'] })).toBe(true)
+    expect(sameAudience({ assigned_to_all: ['ella', 'kaleb'] }, { assigned_to: 'kaleb' })).toBe(true)
+  })
+
+  it('treats two class-wide rows, naming nobody, as the same instruction', () => {
+    expect(sameAudience({ assigned_to: null }, { assigned_to: null })).toBe(true)
+    expect(sameAudience({ assigned_to_all: [] }, {})).toBe(true)
+  })
+
+  it('keeps genuinely different people apart', () => {
+    expect(sameAudience({ assigned_to: 'ella' }, { assigned_to: 'kaleb' })).toBe(false)
+    expect(sameAudience({ assigned_to_all: ['ella'] }, { assigned_to_all: ['kaleb'] })).toBe(false)
+  })
+
+  // A named row and a class-wide row are NOT the same: "Ella: bring your
+  // recorder" must not be swallowed by a class-wide row that happens to share
+  // words with it.
+  it('does not merge a named row into an unassigned one', () => {
+    expect(sameAudience({ assigned_to: null }, { assigned_to: 'ella' })).toBe(false)
+    expect(sameAudience({ assigned_to: 'ella' }, { assigned_to: null })).toBe(false)
+  })
+
+  it('prefers assigned_to_all over the legacy single column', () => {
+    expect(sameAudience({ assigned_to: 'ella', assigned_to_all: ['kaleb'] }, { assigned_to: 'kaleb' })).toBe(true)
   })
 })

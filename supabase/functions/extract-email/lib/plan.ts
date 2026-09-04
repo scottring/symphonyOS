@@ -36,6 +36,35 @@ export function itemsMatch(a: string, b: string): boolean {
   return inter / Math.min(A.size, B.size) >= 0.6
 }
 
+/** A mail-born row's audience, as stored. */
+export type MailRowAudience = { assigned_to?: string | null; assigned_to_all?: string[] | null }
+
+/** Everyone a mail-born row is for, as a set. */
+export function audienceOf(r: MailRowAudience): Set<string> {
+  const all = r.assigned_to_all ?? []
+  if (all.length) return new Set(all)
+  return r.assigned_to ? new Set([r.assigned_to]) : new Set()
+}
+
+/**
+ * Two mail-born rows with the same words are the same instruction when they
+ * are for the same people — which, across two teachers writing to two kids in
+ * mirror-image classes, means OVERLAPPING rather than identical audiences.
+ * Kaleb's teacher and Ella's teacher each send "return the blue sheet"; the
+ * second must attach to the first, not sit beside it. Comparing audiences for
+ * EQUALITY is what let both through (2026-09-04).
+ *
+ * Class-wide rows name nobody at all, and two of those are also the same
+ * instruction.
+ */
+export function sameAudience(a: MailRowAudience, b: MailRowAudience): boolean {
+  const A = audienceOf(a)
+  const B = audienceOf(b)
+  if (A.size === 0 && B.size === 0) return true
+  for (const id of B) if (A.has(id)) return true
+  return false
+}
+
 /** Jaccard overlap of normalised tokens ≥ 0.8. */
 export function titlesMatch(a: string, b: string): boolean {
   const A = new Set(normaliseTitle(a).split(' ').filter(Boolean))
@@ -151,11 +180,23 @@ export function planWrites(i: PlanInput): WritePlan {
     })
     // Homework is a STUDENT's. A class-wide "return the blue sheet" names
     // nobody, and an unassigned homework row sits on the wall's Everyone row
-    // where neither kid sees it as theirs (2026-09-03). No name, or several:
-    // one row per child, like an event's items.
+    // where neither kid sees it as theirs (2026-09-03).
+    //
+    // That was first solved with one row PER child, which put every class-wide
+    // instruction on Today once per kid — and with two kids in mirror-image
+    // classes, that is every instruction, twice, every day. Worse, it defeated
+    // the cross-capture dedupe downstream: that compares assignees, so the
+    // same sheet from each kid's teacher looked like two different rows.
+    //
+    // One row now, carrying every child in `assigned_to_all`. The wall reads
+    // it (wallGantt homeworkOwners) and still puts the row on each kid's own
+    // track, so nothing the fan-out protected is lost.
     if (t.kind === 'homework' && matched.length !== 1) {
       const kids = matched.length ? matched : i.members.filter((m) => m.isChild)
-      if (kids.length) { for (const k of kids) inbox.push(row(k.id)); continue }
+      if (kids.length) {
+        inbox.push({ ...row(null), assigned_to_all: kids.map((k) => k.id) })
+        continue
+      }
     }
     inbox.push(row(matched.length === 1 ? matched[0].id : null))
   }
