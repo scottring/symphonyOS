@@ -1076,7 +1076,7 @@ export function TodayView({
           edge, faint enough to read as paper texture rather than a sticker.
           Purely decorative: aria-hidden, pointer-events-none, and every piece
           of text above it keeps the unchanged neutral palette. */}
-      <section className="relative isolate mx-3 mb-4 rounded-2xl border border-neutral-200/80 bg-bg-elevated shadow-sm md:mx-0">
+      <section className="relative mx-3 mb-4 rounded-2xl border border-neutral-200/80 bg-bg-elevated shadow-sm md:mx-0">
         <PlaceWash />
 
         <div className="relative px-4 py-4 md:px-5">

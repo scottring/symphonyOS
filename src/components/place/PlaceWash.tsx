@@ -7,11 +7,21 @@ import { PlaceMedallion } from './PlaceMedallion'
  * Purely decorative — aria-hidden, pointer-events-none, and it never touches the
  * neutral text palette, so contrast is unchanged whichever place is chosen.
  *
- * Drop it as the FIRST child of a `relative isolate` surface. It clips ITSELF
- * (and inherits the surface's corner radius), so the surface must NOT set
- * `overflow-hidden` — doing so also clips any dropdown opened from inside it,
- * which is how the Today card started cutting the bottom off its own pool
- * menus.
+ * Drop it as the FIRST child of a `relative` surface, and wrap that surface's
+ * real content in a `relative` sibling AFTER it. Both stay at the default
+ * z-index, which is the whole trick: two positioned siblings paint in DOM
+ * order, so the content covers the wash without either one creating a
+ * stacking context.
+ *
+ * That matters more than it sounds. The first attempt put the wash at -z-10
+ * and `isolate` on the surface — which worked visually and then trapped every
+ * dropdown opened from inside the Today card, because `isolate` confines a
+ * child's z-50 to the card and the task list below simply painted over the
+ * open menu. It reads exactly like a translucent panel, and isn't.
+ *
+ * It also clips ITSELF and inherits the surface's corner radius, so the
+ * surface must not set `overflow-hidden` either — that clipped the bottom off
+ * the same menus.
  * `isolate` is load-bearing: the wash sits at -z-10 so no content child needs a
  * z-index, but a negative-z child only paints above its parent's background if
  * that parent is a stacking context. Without `isolate` the wash paints beneath
@@ -41,7 +51,7 @@ export function PlaceWash({
       : 'linear-gradient(to bottom, black 25%, transparent 90%)'
 
   return (
-    <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 overflow-hidden rounded-[inherit]">
+    <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden rounded-[inherit]">
       <div
         className={`absolute inset-0 bg-gradient-to-br ${
           tint === 'strong'

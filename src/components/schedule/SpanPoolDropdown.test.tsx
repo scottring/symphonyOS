@@ -36,9 +36,9 @@ describe('SpanPoolDropdown', () => {
     expect(screen.getByRole('button', { name: /labor day weekend pool/i })).toBeInTheDocument()
   })
 
-  it('falls back to a neutral label when there is no span to show', () => {
+  it('falls back to the category label when there is no range to show', () => {
     setup({ spans: [] })
-    expect(screen.getByRole('button', { name: /^spans$/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /custom range/i })).toBeInTheDocument()
   })
 
   it('shows the span\'s shape and its pool when opened', async () => {
@@ -58,7 +58,7 @@ describe('SpanPoolDropdown', () => {
   // stale week placement strands work on a week nobody reopens.
   it('offers no ended span, even when one exists', () => {
     setup({ spans: [span({ startDate: d(1), endDate: d(2) })], viewedDate: d(10) })
-    expect(screen.getByRole('button', { name: /^spans$/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /custom range/i })).toBeInTheDocument()
   })
 
   it('adds a task straight onto the selected span', async () => {
@@ -72,8 +72,8 @@ describe('SpanPoolDropdown', () => {
   it('creates a span inline, defaulting to the coming Sat–Mon', async () => {
     const onCreateSpan = vi.fn().mockResolvedValue(span())
     const { user } = setup({ spans: [], onCreateSpan })
-    await user.click(screen.getByRole('button', { name: /^spans$/i }))
-    await user.click(screen.getByRole('button', { name: /new span/i }))
+    await user.click(screen.getByRole('button', { name: /custom range/i }))
+    await user.click(screen.getByRole('button', { name: /new custom range/i }))
     await user.type(screen.getByRole('textbox', { name: /span name/i }), 'Fall break')
     await user.click(screen.getByRole('button', { name: /^create$/i }))
     expect(onCreateSpan).toHaveBeenCalledTimes(1)
@@ -87,8 +87,8 @@ describe('SpanPoolDropdown', () => {
   it('refuses a span whose last day precedes its first', async () => {
     const onCreateSpan = vi.fn()
     const { user } = setup({ spans: [], onCreateSpan })
-    await user.click(screen.getByRole('button', { name: /^spans$/i }))
-    await user.click(screen.getByRole('button', { name: /new span/i }))
+    await user.click(screen.getByRole('button', { name: /custom range/i }))
+    await user.click(screen.getByRole('button', { name: /new custom range/i }))
     await user.type(screen.getByRole('textbox', { name: /span name/i }), 'Backwards')
     const last = screen.getByLabelText(/last day/i)
     await user.clear(last)

@@ -126,7 +126,7 @@ export function ChatPanel({
 
   return (
     <div
-      className="relative isolate flex flex-col h-full min-h-0 bg-white border-l border-neutral-200"
+      className="relative flex flex-col h-full min-h-0 bg-white border-l border-neutral-200"
       onKeyDown={handleKeyDown}
     >
       {/* The pane wears the user's Place, same as Today's day card. Anchored to
@@ -135,7 +135,7 @@ export function ChatPanel({
       <PlaceWash anchor="top" opacity={0.24} tint="strong" />
 
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-neutral-200">
+      <div className="relative flex items-center justify-between px-4 py-3 border-b border-neutral-200">
         <div className="flex items-center gap-2">
           <div className="w-6 h-6 rounded-full bg-primary-100 flex items-center justify-center">
             <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 text-primary-600" viewBox="0 0 20 20" fill="currentColor">
@@ -281,7 +281,7 @@ export function ChatPanel({
       </div>
 
       {/* Messages area */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 py-4">
+      <div ref={scrollRef} className="relative flex-1 overflow-y-auto px-4 py-4">
         {messages.length === 0 ? (
           <div className="relative flex flex-col items-center justify-center h-full text-center">
             {/* The blank slate is the largest surface in this pane, and it was
@@ -365,7 +365,7 @@ export function ChatPanel({
 
       {/* Tool activity */}
       {toolActivity && toolActivity.length > 0 && loading && (
-        <div className="px-4 py-1.5 text-xs text-neutral-400 border-t border-neutral-200/60">
+        <div className="relative px-4 py-1.5 text-xs text-neutral-400 border-t border-neutral-200/60">
           {toolActivity[toolActivity.length - 1].replace(/^mcp__symphony__symphony_/, '').replace(/^symphony_/, '').replace(/_/g, ' ')}…
         </div>
       )}

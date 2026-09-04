@@ -7,15 +7,17 @@ import { selectPlaceableSpans, selectSpanPool, spanDayCount } from '@/lib/today/
 import { TriageRow, applyTriageVerdict, type Verdict } from './TriageRow'
 
 /**
- * Spans on Today's controls row, beside Week and Month.
+ * Custom ranges on Today's controls row, beside Week and Month.
  *
- * A span is the planning unit the week grid can't express — a three-day
- * weekend, a school break. It sits with the other pools because it IS one:
- * somewhere to look and pick from, never part of the review session (Scott,
- * 2026-08-19).
+ * The planning unit the week grid can't express — a three-day weekend, a
+ * school break. It sits with the other pools because it IS one: somewhere to
+ * look and pick from, never part of the review session (Scott, 2026-08-19).
  *
- * The trigger names the nearest span rather than saying "Span", because the
- * whole point is to focus on THAT weekend. Creating one is inline: a span is
+ * "Span" is the model's word and stays in the code; the UI says "Custom",
+ * because nobody planning a long weekend thinks in spans (Scott, 2026-09-04).
+ *
+ * The trigger names the nearest range rather than the category, because the
+ * whole point is to focus on THAT weekend. Creating one is inline: a range is
  * made in the moment you realise you want to plan into it, and sending that
  * through a settings page would lose the thought.
  */
@@ -82,7 +84,7 @@ export function SpanPoolDropdown({
       }
     : undefined
 
-  const label = selected ? selected.name : 'Spans'
+  const label = selected ? selected.name : 'Custom'
 
   return (
     <div className="relative">
@@ -90,8 +92,8 @@ export function SpanPoolDropdown({
         type="button"
         onClick={() => (open ? close() : setOpen(true))}
         aria-expanded={open}
-        aria-label={selected ? `${selected.name} pool` : 'Spans'}
-        title={selected ? `${selected.name} — ${describe(selected)}` : 'Plan a stretch of days the week grid cannot hold'}
+        aria-label={selected ? `${selected.name} pool` : 'Custom range'}
+        title={selected ? `${selected.name} — ${describe(selected)}` : 'Plan your own stretch of days — a long weekend, a school break'}
         className="flex max-w-[15rem] items-center gap-1 rounded-lg px-2 py-1.5 text-[13px] text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700"
       >
         <CalendarRange className="h-3.5 w-3.5 shrink-0" />
@@ -102,7 +104,7 @@ export function SpanPoolDropdown({
       {open && (
         <>
           <button type="button" aria-hidden tabIndex={-1} onClick={close} className="fixed inset-0 z-40 cursor-default" />
-          <div className="absolute right-0 top-full z-50 mt-1 max-h-[60vh] w-[440px] max-w-[90vw] overflow-auto rounded-xl border border-neutral-200 bg-white p-2 shadow-lg">
+          <div className="absolute right-0 top-full z-50 mt-1 max-h-[60vh] w-[440px] max-w-[90vw] overflow-auto rounded-xl border border-neutral-300 bg-white p-2 shadow-xl ring-1 ring-neutral-900/5">
             {placeable.length > 1 && (
               <div className="mb-1.5 flex flex-wrap gap-1 border-b border-neutral-100 pb-1.5">
                 {placeable.map((s) => (
@@ -129,7 +131,7 @@ export function SpanPoolDropdown({
                   type="button"
                   onClick={() => { void onDeleteSpan(selected.id); setSelectedId(null) }}
                   aria-label={`Delete ${selected.name}`}
-                  title="Delete this span — anything planned into it goes back to the inbox"
+                  title="Delete this range — anything planned into it goes back to the inbox"
                   className="rounded p-1 text-neutral-300 transition-colors hover:bg-neutral-100 hover:text-neutral-600"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
@@ -189,7 +191,7 @@ export function SpanPoolDropdown({
                 className="mt-1.5 flex w-full items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-xs text-primary-600 transition-colors hover:bg-primary-50 hover:text-primary-700"
               >
                 <Plus className="h-3.5 w-3.5" />
-                New span
+                New custom range
               </button>
             )}
           </div>
@@ -228,7 +230,7 @@ function SpanCreateForm({
 
   return (
     <form
-      className="mt-1.5 space-y-2 rounded-lg border border-neutral-200 bg-neutral-50/70 p-2"
+      className="mt-1.5 space-y-2 rounded-lg border border-neutral-200 bg-neutral-50 p-2"
       onSubmit={(e) => {
         e.preventDefault()
         if (invalid) return

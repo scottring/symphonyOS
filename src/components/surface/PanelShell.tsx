@@ -49,7 +49,7 @@ export function PanelShell({
   return (
     <article
       ref={innerRef}
-      className={`relative isolate bg-bg-elevated max-w-md w-full rounded-2xl px-4 md:px-5 py-3 md:py-5 ${RHYTHM}`}
+      className={`relative bg-bg-elevated max-w-md w-full rounded-2xl px-4 md:px-5 py-3 md:py-5 ${RHYTHM}`}
     >
       {/* The panel wears the user's Place, same as Today's day card. Top-anchored
           so the medallion sits behind the identity zone, not the reading column. */}
@@ -65,7 +65,11 @@ export function PanelShell({
           // render — `related` on a task with no project and no suggestions is a
           // truthy fragment that produces nothing — and a wrapper with no
           // children still draws a divider and a chunk of padding.
-          <div key={i} className={`${RHYTHM} empty:hidden`}>
+          // `relative` puts the zone above the place wash, which is an
+          // unpositioned-looking sibling drawn before it. Both stay at the
+          // default z-index so neither becomes a stacking context that would
+          // trap a popover opened from inside a zone.
+          <div key={i} className={`relative ${RHYTHM} empty:hidden`}>
             {zone}
           </div>
         ),
