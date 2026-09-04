@@ -18,6 +18,22 @@ describe('buildPagePrompt', () => {
     expect(prompt).toContain('"notes"')
     expect(prompt).toContain('"unclear"')
   })
+
+  // Demo walkthrough 2026-09-04: "Mia: dentist 10am" and "call Dr. Park re
+  // Mia's inhaler" were both ASSIGNED to Mia. A kid's name on a line says
+  // who it is about; the role tells the model who can do it.
+  it('labels each member with a role and tells the model a named child is the subject, not the doer', () => {
+    const prompt = buildPagePrompt(
+      windowCalendar('2026-08-25', '2026-08-26'),
+      [{ id: 'm-1', name: 'Iris', role: 'parent' }, { id: 'm-2', name: 'Mia', role: 'child' }, { id: 'm-3', name: 'Edith' }],
+      '2026-08-25',
+    )
+    expect(prompt).toContain('m-1: Iris (parent)')
+    expect(prompt).toContain('m-2: Mia (child)')
+    expect(prompt).toContain('m-3: Edith\n')
+    expect(prompt).toContain('who the line is ABOUT')
+    expect(prompt).toContain('"Take Mia to dentist", assignee_id null')
+  })
 })
 
 describe('parsePageResponse', () => {

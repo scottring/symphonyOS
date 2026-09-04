@@ -1,6 +1,23 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useWeekDragDrop } from './useWeekDragDrop'
+
+vi.mock('@/hooks/useToast', () => ({ showToast: vi.fn() }))
+
+// The fixtures below live in May 2026. Pool-chip drops onto a PAST day are
+// refused (see isPastDay), so pin the clock to the fixture week — a test
+// that "drops on 2026-05-20" must not start failing when the wall clock
+// moves past it.
+beforeEach(() => {
+  // Full fake timers (not just Date): the auto-advance tests below call
+  // vi.useFakeTimers() themselves, which is a no-op once timers are faked —
+  // faking only Date here would leave their setTimeout real.
+  vi.useFakeTimers()
+  vi.setSystemTime(new Date(2026, 4, 17, 9, 0, 0))
+})
+afterEach(() => {
+  vi.useRealTimers()
+})
 
 const mkOver = (slotId: string) => ({
   active: { id: 'chip:t1', data: { current: { kind: 'chip', taskId: 't1' } } },
@@ -41,6 +58,42 @@ describe('useWeekDragDrop', () => {
     expect(req.routineId).toBe('r1')
     expect(req.when).toBeInstanceOf(Date)
     expect(req.when.getHours()).toBe(17)
+  })
+
+  it('refuses a pool-chip drop on a day that has already passed', async () => {
+    const onUpdateTask = vi.fn().mockResolvedValue(undefined)
+    const { result } = renderHook(() => useWeekDragDrop({
+      weekStart: new Date(2026, 4, 17),
+      onWeekChange: vi.fn(),
+      onUpdateTask,
+      onUpdateEvent: vi.fn(),
+      onUpdateRoutine: vi.fn(),
+      tasks: [{ id: 't1', title: 'X' } as never],
+      events: [], routines: [],
+    }))
+
+    await act(async () => {
+      // Yesterday relative to the pinned clock (Sun May 17): a timed slot…
+      result.current.dndHandlers.onDragEnd({
+        active: { id: 'chip:t1', data: { current: { kind: 'chip', taskId: 't1' } } },
+        over: { id: 'slot:2026-05-16:10:00', data: { current: { kind: 'timed', dayIso: '2026-05-16', hour: 10, minute: 0 } } },
+      } as never)
+      // …and the all-day lane.
+      result.current.dndHandlers.onDragEnd({
+        active: { id: 'chip:t1', data: { current: { kind: 'chip', taskId: 't1' } } },
+        over: { id: 'allday:2026-05-16', data: { current: { kind: 'allDay', dayIso: '2026-05-16' } } },
+      } as never)
+    })
+    expect(onUpdateTask).not.toHaveBeenCalled()
+
+    // Today itself is fine.
+    await act(async () => {
+      result.current.dndHandlers.onDragEnd({
+        active: { id: 'chip:t1', data: { current: { kind: 'chip', taskId: 't1' } } },
+        over: { id: 'slot:2026-05-17:10:00', data: { current: { kind: 'timed', dayIso: '2026-05-17', hour: 10, minute: 0 } } },
+      } as never)
+    })
+    expect(onUpdateTask).toHaveBeenCalledTimes(1)
   })
 
   it('chip drop on timed slot calls onUpdateTask with the new start + 30-min duration', async () => {

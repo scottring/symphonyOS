@@ -51,7 +51,9 @@ export function usePageFromPaper(members: FamilyMember[]) {
         placeStart: dates[0],
         placeEnd: dates[dates.length - 1],
         today: localYmd(new Date()),
-        members: members.map((m) => ({ id: m.id, name: m.name })),
+        // role_label rides along so the model knows a named child is the
+        // subject of "dentist 10am", not the one who drives (parse-page prompt).
+        members: members.map((m) => ({ id: m.id, name: m.name, role: m.role_label ?? null })),
       },
     })
     if (fnErr) throw new Error(fnErr.message)

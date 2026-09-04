@@ -101,6 +101,7 @@ Deno.serve(async (req) => {
 
   const members = (body.members ?? [])
     .filter((m): m is Member => typeof m?.id === 'string' && typeof m?.name === 'string')
+    .map((m) => ({ id: m.id, name: m.name, role: typeof m.role === 'string' && m.role.trim() ? m.role.trim() : null }))
     .slice(0, 20)
 
   try {

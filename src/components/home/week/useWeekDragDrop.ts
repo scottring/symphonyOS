@@ -3,6 +3,8 @@ import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core'
 import type { Task } from '@/types/task'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { Routine } from '@/types/actionable'
+import { localYmd } from '@/lib/cadence/config'
+import { showToast } from '@/hooks/useToast'
 
 // Task updates may include endTime (timed duration) even though it's not yet
 // on the base Task type — the DB layer accepts it via the update handler.
@@ -44,6 +46,11 @@ interface UseWeekDragDropResult {
 
 const DEFAULT_DURATION_MS = 30 * 60 * 1000
 
+/** Is this grid day (local YYYY-MM-DD) before today? */
+function isPastDay(dayIso: string): boolean {
+  return dayIso < localYmd(new Date())
+}
+
 export function useWeekDragDrop(args: UseWeekDragDropArgs): UseWeekDragDropResult {
   const { tasks, onUpdateTask } = args
   const [activeDragId, setActiveDragId] = useState<string | null>(null)
@@ -68,6 +75,17 @@ export function useWeekDragDrop(args: UseWeekDragDropArgs): UseWeekDragDropResul
       | undefined
 
     if (!activeData || !overData) return
+
+    // A pool chip dropped on a day that has already passed lands "expired"
+    // the instant it is written — Today's attention queue, the Start-the-day
+    // sheet and Inbox's Expired section all read a past date as slid. (Demo
+    // walkthrough 2026-09-04: a fresh "this week" task dragged onto the
+    // current week's Sunday read as "slid 5d" everywhere.) Refuse the drop
+    // and say why; a block already on the grid may still be moved anywhere.
+    if (activeData.kind === 'chip' && overData.dayIso && isPastDay(overData.dayIso)) {
+      showToast('That day has passed — drop it on today or later', 'warning')
+      return
+    }
 
     // Dropped on a day's all-day cell → schedule (or keep) the task as all-day
     // on that day. Without this, an all-day chip could only be dropped on a

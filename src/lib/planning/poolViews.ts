@@ -59,13 +59,19 @@ export function unscheduledPool(tasks: Task[], ctx: PoolCtx): Task[] {
     }
 
     // All-day tasks: a date inside the visible grid range means it renders in
-    // that day's all-day lane, not the pool. Without a date, or with a date
-    // outside the range, it stays in the pool.
+    // that day's all-day lane, not the pool. Without a date it stays in the
+    // pool. With a date OUTSIDE the range it is placed on some other day, and
+    // the same rule as timed tasks below applies: only a PAST date resurfaces
+    // (carried over). A future date is a real placement — listing "Pay water
+    // bill (Thu 9/10)" under UNSCHEDULED on the previous week's shelf read as
+    // "Symphony lost my date" in the 2026-09-04 demo walkthrough.
     if (task.isAllDay) {
       if (!task.scheduledFor) return true
       const allDayDate = new Date(task.scheduledFor)
       if (rangeStart && rangeEnd && allDayDate >= rangeStart && allDayDate <= rangeEnd) return false
-      return true
+      const allDayDay = new Date(allDayDate)
+      allDayDay.setHours(0, 0, 0, 0)
+      return allDayDay < today
     }
 
     if (!task.scheduledFor) return true
@@ -91,7 +97,15 @@ export function applyPoolView(pool: Task[], view: PoolView, ctx: PoolCtx): Task[
   today.setHours(0, 0, 0, 0)
   const currentWeek = weekStartAnchor(today, ctx.weekStartsOn)
   return pool.filter((t) => {
-    if (t.isAllDay) return true
+    // All-day: undated, or carried over from a past day. (unscheduledPool has
+    // already dropped future placements, but the rule is stated here too so
+    // the two functions cannot disagree.)
+    if (t.isAllDay) {
+      if (!t.scheduledFor) return true
+      const d = new Date(t.scheduledFor)
+      d.setHours(0, 0, 0, 0)
+      return d < today
+    }
     // This week's items, plus anything left behind by an earlier week — a
     // stranded placement is the MOST relevant thing here. Only a move placed
     // on a week still ahead is filtered out.

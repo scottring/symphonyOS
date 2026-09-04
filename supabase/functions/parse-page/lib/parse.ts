@@ -2,7 +2,10 @@
 // Vitest runs it (vitest.config.ts includes supabase/functions/**).
 
 export interface CalendarDay { ymd: string; weekday: string }
-export interface Member { id: string; name: string }
+/** `role` is the household role_label ("parent", "child", …) when known. It
+ *  tells the model who can actually DO a line — a child's name on "dentist
+ *  10am" says who the appointment is about, not who drives. */
+export interface Member { id: string; name: string; role?: string | null }
 export interface PageItemRaw { title: string; day: string; time: string | null; assignee_id: string | null; note: string | null }
 export interface PageNoteRaw { title: string; content: string }
 export interface PageParseResult { items: PageItemRaw[]; notes: PageNoteRaw[]; unclear: string[] }
@@ -30,14 +33,18 @@ export function windowCalendar(placeStart: string, placeEnd: string): CalendarDa
 
 export function buildPagePrompt(calendar: CalendarDay[], members: Member[], today: string): string {
   const calendarLines = calendar.map((c) => `- ${c.ymd} (${c.weekday})`).join('\n')
-  const memberLines = members.length ? members.map((m) => `- ${m.id}: ${m.name}`).join('\n') : '(none)'
+  const memberLines = members.length
+    ? members.map((m) => `- ${m.id}: ${m.name}${m.role ? ` (${m.role})` : ''}`).join('\n')
+    : '(none)'
   return `You are the capture assistant for Symphony, a personal task app. The user keeps a handwritten daily scratchpad on an e-ink tablet and has exported a page. A scratchpad page mixes registers: some lines are things to do, some are notes and reference and thinking, and some are simply hard to read. Sort the page into those three registers. Do not force everything into tasks.
 
 Today is ${today}. The ONLY dates a task may be placed on (day headers like "Mon" or "Tue 8/18" map to these):
 ${calendarLines}
 
-Household members (id: name) — assign a task ONLY when the line clearly names one (e.g. "Iris: return library books"):
+Household members (id: name, role when known) — assign a task ONLY when the line clearly names the person who will DO it (e.g. "Iris: return library books"):
 ${memberLines}
+
+A name on a line says who the line is ABOUT; it is the assignee only if that person will do the work themselves. A child does their own homework, practice, reading and chores ("Liam: finish science poster" -> Liam). Appointments, doctor calls, pickups, forms, errands and purchases FOR a child are done by an adult: leave assignee_id null and keep the child's name in the title ("Mia: dentist 10am" -> "Take Mia to dentist", assignee_id null; "call Dr. Park re Mia's inhaler" -> assignee_id null). When no one is named, assignee_id is null.
 
 Respond with ONLY a JSON object (no markdown fences, no prose):
 

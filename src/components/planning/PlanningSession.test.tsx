@@ -479,21 +479,20 @@ describe('PlanningSession', () => {
     expect(screen.getByText('All tasks scheduled')).toBeInTheDocument()
   })
 
-  it('does not render the all-day lane chip for out-of-range all-day tasks (they stay in the pool)', () => {
+  it('neither the lane nor the pool shows a FUTURE out-of-range all-day task; a PAST one resurfaces in the pool', () => {
     const today = new Date()
     today.setHours(0, 0, 0, 0)
     const farFuture = new Date(today)
     farFuture.setDate(farFuture.getDate() + 30)
+    const lastWeek = new Date(today)
+    lastWeek.setDate(lastWeek.getDate() - 7)
 
-    const allDayTask = createMockTask({
-      title: 'Future all-day task',
-      isAllDay: true,
-      scheduledFor: farFuture,
-    })
+    const futureTask = createMockTask({ title: 'Future all-day task', isAllDay: true, scheduledFor: farFuture })
+    const pastTask = createMockTask({ title: 'Past all-day task', isAllDay: true, scheduledFor: lastWeek })
 
     render(
       <PlanningSession
-        tasks={[allDayTask]}
+        tasks={[futureTask, pastTask]}
         events={[]}
         routines={[]}
         onUpdateTask={vi.fn()}
@@ -503,10 +502,13 @@ describe('PlanningSession', () => {
       />
     )
 
-    // Out-of-range all-day task still shows in the drawer pool, not the lane.
+    // A future all-day date is a real placement on some other day — it is not
+    // "Unscheduled" (demo walkthrough 2026-09-04: next week's paper tasks sat
+    // in this drawer). A past one is carried over and must be offered again.
     const lane = screen.getByTestId('allday-lane')
     expect(lane).not.toHaveTextContent('Future all-day task')
-    expect(screen.getByText('Future all-day task')).toBeInTheDocument()
+    expect(screen.queryByText('Future all-day task')).not.toBeInTheDocument()
+    expect(screen.getByText('Past all-day task')).toBeInTheDocument()
   })
 
   it('initialDays seeds a multi-day range', () => {

@@ -50,6 +50,20 @@ describe('unscheduledPool', () => {
     ], ctx)
     expect(pool.map((t) => t.id).sort()).toEqual([past.id, allDayUndated.id].sort())
   })
+
+  // Demo walkthrough 2026-09-04: paper-planned all-day tasks dated NEXT week
+  // ("Pay water bill", Thu 9/10) sat under UNSCHEDULED on this week's shelf,
+  // and this week's Saturday errands sat under UNSCHEDULED on next week's.
+  // A dated all-day task outside the grid is placed, not unscheduled — only
+  // a past one resurfaces, the same as a timed task.
+  it('drops future-dated all-day tasks outside the range, resurfaces past-dated ones', () => {
+    const nextWeek = task({ isAllDay: true, scheduledFor: new Date(2026, 8, 10) })
+    const lastWeek = task({ isAllDay: true, scheduledFor: new Date(2026, 7, 25) })
+    const pool = unscheduledPool([nextWeek, lastWeek], ctx)
+    expect(pool.map((t) => t.id)).toEqual([lastWeek.id])
+    // and the week view agrees on its own
+    expect(applyPoolView([nextWeek, lastWeek], 'week', ctx).map((t) => t.id)).toEqual([lastWeek.id])
+  })
 })
 
 describe('unscheduledPool — assignee scoping', () => {

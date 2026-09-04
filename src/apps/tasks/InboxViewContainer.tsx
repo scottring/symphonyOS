@@ -22,6 +22,7 @@ import { useListsContext } from '@/contexts/ListsContext';
 import { ScheduleActionsProvider, type ScheduleActionsValue } from '@/contexts/ScheduleActionsContext';
 import { useUndo } from '@/hooks/useUndo';
 import { useConvertTaskToProject } from '@/hooks/useConvertTaskToProject';
+import { useSendTaskToBuy } from '@/hooks/useSendTaskToBuy';
 import { InboxView } from '@/components/schedule/InboxView';
 import { useSelection } from '@/shell/providers/SelectionProvider';
 
@@ -39,8 +40,14 @@ export function InboxViewContainer() {
   const { members: familyMembers, getCurrentUserMember } = useFamilyMembers();
   const { hideEvent } = useHiddenCalendarEvents();
   const { getDomainForCalendar } = useCalendarDomainMappings();
-  const { lists, listsByCategory } = useListsContext();
+  const { lists, listsByCategory, addList } = useListsContext();
   const undo = useUndo();
+
+  // The "To buy" nudge on a buyish inbox row ("Buy strawberries…") needs a
+  // sender in this provider or InboxView never renders it — this container
+  // has its own ScheduleActionsProvider, so HomeViewContainer's sender never
+  // reached /inbox (demo walkthrough 2026-09-04).
+  const sendTaskToBuy = useSendTaskToBuy({ tasks, lists, addList, deleteTask, addTask });
 
   const { selection, setSelection, clearSelection } = useSelection();
 
@@ -182,9 +189,10 @@ export function InboxViewContainer() {
       getDomainForCalendar,
 
       onUpdateEventProject: updateEventProject,
+      onSendTaskToBuy: sendTaskToBuy,
     }),
     [
-      toggleTask, toggleWaiting, gated, deleteTask, onCreateTaskFromValue,
+      toggleTask, toggleWaiting, gated, deleteTask, onCreateTaskFromValue, sendTaskToBuy,
       setSelection, navigate,
       scheduleActions, updateRoutine, updateEventContext, hideEvent,
       contactsMap, projectsMap, projects, contacts, familyMembers, lists, listsByCategory,
