@@ -333,6 +333,21 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
     [filteredEvents, layers, eventContextOverrides, getDomainForCalendar, eventNotesMapWithDefaults],
   );
 
+  /**
+   * Create a task already placed on a span. The placement rides the INSERT for
+   * the reason `bucket` and `weekStart` do: a follow-up write can reach
+   * tasksRef before the temp→real id swap has rendered and be dropped as
+   * "Task not found".
+   */
+  const onCreateTaskInSpan = useCallback(
+    async (title: string, spanId: string) => {
+      const clean = title.trim();
+      if (!clean) return;
+      await addTask(clean, undefined, undefined, undefined, { bucket: 'span', spanId, context: 'family' });
+    },
+    [addTask],
+  );
+
   const onCreateTaskFromValue = useCallback(
     async (raw: string) => {
       // Natural-language parse the quick-add text: pull out date/time, project,
@@ -725,6 +740,7 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
       onSetNeededToday,
       viewedDate,
       onCreateTask: onCreateTaskFromValue,
+      onCreateTaskInSpan,
       onCreateTaskParsed,
       parserContext,
       resolverContext,

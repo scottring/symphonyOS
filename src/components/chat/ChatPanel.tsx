@@ -126,7 +126,7 @@ export function ChatPanel({
 
   return (
     <div
-      className="relative isolate flex flex-col h-full min-h-0 overflow-hidden bg-white border-l border-neutral-200"
+      className="relative isolate flex flex-col h-full min-h-0 bg-white border-l border-neutral-200"
       onKeyDown={handleKeyDown}
     >
       {/* The pane wears the user's Place, same as Today's day card. Anchored to

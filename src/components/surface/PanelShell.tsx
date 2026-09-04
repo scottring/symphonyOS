@@ -49,7 +49,7 @@ export function PanelShell({
   return (
     <article
       ref={innerRef}
-      className={`relative isolate overflow-hidden bg-bg-elevated max-w-md w-full rounded-2xl px-4 md:px-5 py-3 md:py-5 ${RHYTHM}`}
+      className={`relative isolate bg-bg-elevated max-w-md w-full rounded-2xl px-4 md:px-5 py-3 md:py-5 ${RHYTHM}`}
     >
       {/* The panel wears the user's Place, same as Today's day card. Top-anchored
           so the medallion sits behind the identity zone, not the reading column. */}

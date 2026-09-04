@@ -572,6 +572,10 @@ export function useSupabaseTasks() {
      *  rows must say WHICH week). Rides the INSERT — same race rationale as
      *  `bucket`. Ignored unless bucket is 'week'. */
     weekStart?: Date
+    /** Which span a bucket='span' creation belongs to. The span's stamp, and
+     *  it rides the INSERT for the same reason `weekStart` does. Ignored
+     *  unless bucket is 'span'. */
+    spanId?: string
     /** Cascade lineage: the task this one is copied down from. */
     sourceId?: string
     /** Season pick: set when the created quarter item is immediately chosen as
@@ -625,6 +629,7 @@ export function useSupabaseTasks() {
       projectId,
       scheduledFor,
       weekStart: !scheduledFor && options?.bucket === 'week' ? options?.weekStart : undefined,
+      spanId: !scheduledFor && options?.bucket === 'span' ? options?.spanId ?? null : null,
       linkedTo: options?.linkedTo,
       linkType: options?.linkType,
       assignedTo: effectiveAssignedTo ?? undefined,
@@ -666,6 +671,7 @@ export function useSupabaseTasks() {
         scheduled_for: scheduledFor?.toISOString() ?? null,
         // `week_start` is a DATE column — localYmd, not toISOString (which shifts the day west of Greenwich).
         week_start: !scheduledFor && options?.bucket === 'week' && options?.weekStart ? localYmd(options.weekStart) : null,
+        span_id: !scheduledFor && options?.bucket === 'span' && options?.spanId ? options.spanId : null,
         linked_activity_type: options?.linkedTo?.type ?? null,
         linked_activity_id: options?.linkedTo?.id ?? null,
         link_type: options?.linkType ?? null,

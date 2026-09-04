@@ -37,6 +37,10 @@ export interface ScheduleActionsValue {
    */
   viewedDate?: Date
   onCreateTask?: (title: string) => void
+  /** Create a task placed straight onto a span. The placement rides the INSERT
+   *  rather than a follow-up write — an addTask-then-setBucket pair can hit
+   *  tasksRef before the temp→real id swap renders and be silently dropped. */
+  onCreateTaskInSpan?: (title: string, spanId: string) => void | Promise<void>
   onGroupTasks?: (
     taskIds: string[],
     groupName: string,

@@ -58,6 +58,8 @@ import { resolveRoutine, isDraggableRoutine } from '@/lib/routineUtils'
 import { TodayOverflowMenu } from './TodayOverflowMenu'
 import { ReviewDrawer, type ReviewMode } from './ReviewDrawer'
 import { HorizonPoolDropdown } from './HorizonPoolDropdown'
+import { SpanPoolDropdown } from './SpanPoolDropdown'
+import { useSpans } from '@/hooks/useSpans'
 import { DayNavCluster } from './DayNavCluster'
 import { PlaceWash } from '@/components/place/PlaceWash'
 import { TodayBacklogFooter } from './TodayBacklogFooter'
@@ -311,6 +313,8 @@ export function TodayView({
   // review by decree (Scott, 2026-08-19): look and pick from up here, never
   // inside the review session. Unfiltered on purpose: the pools are a full
   // census, not a view of the current assignee filter.
+  const { spans, createSpan, deleteSpan } = useSpans()
+
   const poolMatchAll = useMemo(() => () => true, [])
   const weekPool = useMemo(
     () => selectHorizonPool(tasks, 'week', poolMatchAll, currentWeekStart),
@@ -1072,7 +1076,7 @@ export function TodayView({
           edge, faint enough to read as paper texture rather than a sticker.
           Purely decorative: aria-hidden, pointer-events-none, and every piece
           of text above it keeps the unchanged neutral palette. */}
-      <section className="relative isolate mx-3 mb-4 overflow-hidden rounded-2xl border border-neutral-200/80 bg-bg-elevated shadow-sm md:mx-0">
+      <section className="relative isolate mx-3 mb-4 rounded-2xl border border-neutral-200/80 bg-bg-elevated shadow-sm md:mx-0">
         <PlaceWash />
 
         <div className="relative px-4 py-4 md:px-5">
@@ -1148,6 +1152,21 @@ export function TodayView({
                 onCompleteTask={onToggleTask}
                 benchRoute="/week"
                 benchLabel="Open week bench"
+              />
+              {/* A span is the planning unit the week grid cannot hold — a
+                  long weekend, a school break. It belongs with the other
+                  pools because it IS one: somewhere to look and pick from. */}
+              <SpanPoolDropdown
+                spans={spans}
+                tasks={tasks}
+                viewedDate={viewedDate}
+                onCreateSpan={createSpan}
+                onDeleteSpan={deleteSpan}
+                onUpdateTask={(id, u) => onUpdateTask?.(id, u)}
+                onPushTask={ctx.onPushTask}
+                onDeleteTask={ctx.onDeleteTask}
+                onCompleteTask={onToggleTask}
+                onAddToSpan={ctx.onCreateTaskInSpan}
               />
               <HorizonPoolDropdown
                 label="Month"
