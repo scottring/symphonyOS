@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useIsAppAdmin } from '@/hooks/useIsAppAdmin'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { useHouseholdInvitations } from '@/hooks/useHouseholdInvitations'
 import { CalendarSettings } from './CalendarSettings'
@@ -98,6 +99,11 @@ export function SettingsPage({
   const { members, addMember, updateMember, deleteMember } = useFamilyMembers()
   const { invitations, createInvitation, deleteInvitation } = useHouseholdInvitations()
   const [activeTab, setActiveTab] = useState<Tab>('general')
+  // The Admin tab carries demo controls and the waitlist roster. It rendered
+  // for every signed-in user until the 2026-09-04 launch rehearsal; the
+  // waitlist RLS was the real hole and is fixed in a migration, but a tab
+  // whose panels would now come back empty should not be offered at all.
+  const { isAdmin: isAppAdmin } = useIsAppAdmin()
 
   // Add member state
   const [isAdding, setIsAdding] = useState(false)
@@ -238,7 +244,7 @@ export function SettingsPage({
   const mainUser = members.find(m => m.is_full_user)
   const otherMembers = members.filter(m => !m.is_full_user)
 
-  const tabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
+  const allTabs: { id: Tab; label: string; icon: React.ReactNode }[] = [
     {
       id: 'general',
       label: 'General',
@@ -267,6 +273,8 @@ export function SettingsPage({
       ),
     },
   ]
+
+  const tabs = allTabs.filter((t) => t.id !== 'admin' || isAppAdmin)
 
   return (
     <div className="h-full overflow-auto">
@@ -652,7 +660,7 @@ export function SettingsPage({
           <CalendarSettings />
         )}
 
-        {activeTab === 'admin' && (
+        {activeTab === 'admin' && isAppAdmin && (
           <div className="space-y-8">
             <section>
               <h2 className="text-lg font-semibold text-neutral-700 mb-2">Demo Controls</h2>

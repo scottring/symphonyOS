@@ -19,8 +19,24 @@ export type PlanPlacement =
 export interface PlanItem {
   title: string
   placement: PlanPlacement
+  /** Local clock time as "HH:MM" (24h) when the line named one, else null.
+   *  Only meaningful alongside a 'date' placement — a time with no day has
+   *  nothing to hang on. A page that writes "Dentist 2pm" means a 2pm block,
+   *  not an all-day chip with "2pm" buried in the note. */
+  time: string | null
   assigneeId: string | null
   note: string | null
+}
+
+const HHMM = /^([01]\d|2[0-3]):([0-5]\d)$/
+
+/** Apply "HH:MM" to a local date. Returns a copy; invalid times are ignored. */
+export function applyTimeToDate(date: Date, time: string | null): Date {
+  if (!time || !HHMM.test(time)) return date
+  const [h, m] = time.split(':').map(Number)
+  const out = new Date(date)
+  out.setHours(h, m, 0, 0)
+  return out
 }
 
 const YMD = /^\d{4}-\d{2}-\d{2}$/
@@ -51,7 +67,7 @@ export function validatePlanItems(
   const window = new Set(windowDates)
   const out: PlanItem[] = []
   for (const entry of items) {
-    const e = entry as { title?: unknown; day?: unknown; assignee_id?: unknown; note?: unknown }
+    const e = entry as { title?: unknown; day?: unknown; time?: unknown; assignee_id?: unknown; note?: unknown }
     if (typeof e.title !== 'string' || !e.title.trim()) continue
     const day = typeof e.day === 'string' ? e.day : 'inbox'
     const placement: PlanPlacement =
@@ -62,6 +78,12 @@ export function validatePlanItems(
     out.push({
       title: e.title.trim(),
       placement,
+      // A time survives only on a real date — mirrors the edge function's own
+      // validation so a stale or hand-rolled response can't sneak one onto a
+      // 'week'/'inbox' row where nothing would render it.
+      time: placement.kind === 'date' && typeof e.time === 'string' && HHMM.test(e.time.trim())
+        ? e.time.trim()
+        : null,
       assigneeId: typeof e.assignee_id === 'string' && memberIds.has(e.assignee_id) ? e.assignee_id : null,
       note: typeof e.note === 'string' && e.note.trim() ? e.note.trim() : null,
     })
@@ -103,12 +125,18 @@ export function planItemToAddTaskArgs(item: PlanItem, ctx: PlanCommitContext): P
     notes: item.note ?? undefined,
   }
   switch (item.placement.kind) {
-    case 'date':
+    case 'date': {
+      // A named clock time makes this a real block on the day, not an all-day
+      // chip. Times written on paper ("Dentist 2pm") used to land in the note
+      // and the task arrived all-day — the placement the user drew on the page
+      // was silently discarded.
+      const day = parseLocalYmd(item.placement.date)
       return {
         title: item.title,
-        scheduledFor: parseLocalYmd(item.placement.date),
-        options: { ...base, isAllDay: true },
+        scheduledFor: applyTimeToDate(day, item.time),
+        options: { ...base, isAllDay: !item.time },
       }
+    }
     case 'week':
       // bucket='week' rows must say WHICH week (placement cascade) — an
       // unstamped row reads as "the current week" only by legacy accident.

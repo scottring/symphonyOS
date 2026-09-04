@@ -40,9 +40,9 @@ describe('validatePlanItems', () => {
       MEMBERS,
     )
     expect(items).toEqual([
-      { title: 'Call dentist', placement: { kind: 'date', date: '2026-08-18' }, assigneeId: null, note: '410-555-0100' },
-      { title: 'Return library books', placement: { kind: 'week' }, assigneeId: 'm-iris', note: null },
-      { title: 'Research summer camps', placement: { kind: 'inbox' }, assigneeId: null, note: null },
+      { title: 'Call dentist', placement: { kind: 'date', date: '2026-08-18' }, time: null, assigneeId: null, note: '410-555-0100' },
+      { title: 'Return library books', placement: { kind: 'week' }, time: null, assigneeId: 'm-iris', note: null },
+      { title: 'Research summer camps', placement: { kind: 'inbox' }, time: null, assigneeId: null, note: null },
     ])
   })
 
@@ -104,5 +104,31 @@ describe('planItemToAddTaskArgs', () => {
     expect(planItemToAddTaskArgs(named, ctx).options.assignedTo).toBe('m-iris')
     const unnamed: PlanItem = { title: 'Y', placement: { kind: 'inbox' }, assigneeId: null, note: null }
     expect(planItemToAddTaskArgs(unnamed, ctx).options.assignedTo).toBeUndefined()
+  })
+})
+
+// "Dentist 2pm" from a paper page must become a 2pm block, not an all-day chip
+// with "2pm" buried in the note (launch rehearsal, 2026-09-04).
+describe('planItemToAddTaskArgs — times', () => {
+  const CTX = { currentWeekStart: new Date(2026, 7, 17), context: null }
+
+  it('schedules a dated item with a time as a real block', () => {
+    const args = planItemToAddTaskArgs(
+      { title: 'Dentist', placement: { kind: 'date', date: '2026-08-18' }, time: '14:00', assigneeId: null, note: null },
+      CTX,
+    )
+    expect(args.options.isAllDay).toBe(false)
+    expect(args.scheduledFor?.getHours()).toBe(14)
+    expect(args.scheduledFor?.getMinutes()).toBe(0)
+    expect(args.scheduledFor?.getDate()).toBe(18)
+  })
+
+  it('still writes an all-day chip when the line named no time', () => {
+    const args = planItemToAddTaskArgs(
+      { title: 'Mow', placement: { kind: 'date', date: '2026-08-18' }, time: null, assigneeId: null, note: null },
+      CTX,
+    )
+    expect(args.options.isAllDay).toBe(true)
+    expect(args.scheduledFor?.getHours()).toBe(0)
   })
 })

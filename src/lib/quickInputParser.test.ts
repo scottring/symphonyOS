@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { parseQuickInput, hasParsedFields } from './quickInputParser'
 
 const mockContext = {
@@ -297,5 +297,71 @@ describe('duration parsing', () => {
     const result = parseQuickInput('mow lawn 30m', mockContext)
     expect(result.durationMinutes).toBe(30)
     expect(hasParsedFields(result)).toBe(true)
+  })
+})
+
+// ── Time resolution ─────────────────────────────────────────────────────────
+// The 2026-09-04 launch rehearsal's two trust failures, pinned. Both run
+// against a fixed "now" (Friday 2026-09-04 09:00 local) because both bugs are
+// relative to the current day and weekday.
+describe('time resolution (bare hours and backward weekdays)', () => {
+  const NOW = new Date(2026, 8, 4, 9, 0, 0) // Friday 4 Sept 2026, 09:00 local
+
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(NOW)
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('reads a bare evening hour as PM, not AM', () => {
+    const r = parseQuickInput('Pick up Michael from soccer at 6', mockContext)
+    expect(r.dueDate?.getHours()).toBe(18)
+    expect(r.dueDate?.getDate()).toBe(4) // still today
+  })
+
+  it('reads "at 5:30" as PM and keeps the minutes', () => {
+    const r = parseQuickInput('pickup at 5:30', mockContext)
+    expect(r.dueDate?.getHours()).toBe(17)
+    expect(r.dueDate?.getMinutes()).toBe(30)
+  })
+
+  it('leaves a bare morning hour alone (7+ is genuinely ambiguous)', () => {
+    const r = parseQuickInput('standup at 9', mockContext)
+    expect(r.dueDate?.getHours()).toBe(9)
+  })
+
+  it('never resolves a bare weekday into the past', () => {
+    // "thu" typed on a Friday used to land on YESTERDAY, arriving overdue.
+    const r = parseQuickInput('dentist thu 2pm', mockContext)
+    expect(r.dueDate!.getTime()).toBeGreaterThan(NOW.getTime())
+    expect(r.dueDate?.getDay()).toBe(4) // Thursday
+    expect(r.dueDate?.getHours()).toBe(14)
+  })
+
+  it('does not roll an explicit past date forward', () => {
+    // "yesterday" is deliberate — logging something that already happened.
+    const r = parseQuickInput('call mom yesterday', mockContext)
+    expect(r.dueDate?.getDate()).toBe(3)
+    expect(r.dueDate!.getTime()).toBeLessThan(NOW.getTime())
+  })
+
+  it('does not push a named calendar date into next year', () => {
+    const r = parseQuickInput('sept 1 review', mockContext)
+    expect(r.dueDate?.getFullYear()).toBe(2026)
+    expect(r.dueDate?.getMonth()).toBe(8)
+    expect(r.dueDate?.getDate()).toBe(1)
+  })
+
+  it('respects an explicit meridiem over the PM heuristic', () => {
+    const r = parseQuickInput('flight at 6am', mockContext)
+    expect(r.dueDate?.getHours()).toBe(6)
+  })
+
+  it('keeps an explicit duration alongside a corrected weekday', () => {
+    const r = parseQuickInput('dentist thu 2pm 45m', mockContext)
+    expect(r.durationMinutes).toBe(45)
+    expect(r.dueDate!.getTime()).toBeGreaterThan(NOW.getTime())
   })
 })

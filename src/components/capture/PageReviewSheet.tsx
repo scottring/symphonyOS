@@ -70,7 +70,7 @@ export function PageReviewSheet({
     setNoteRows((prev) => prev.map((r, i) => (i === index ? { ...r, ...patch } : r)))
 
   const promoteToTask = (line: string) => {
-    setItemRows((prev) => [...prev, { title: line, placement: { kind: 'inbox' }, assigneeId: null, note: null, included: true }])
+    setItemRows((prev) => [...prev, { title: line, placement: { kind: 'inbox' }, time: null, assigneeId: null, note: null, included: true }])
     setUnread((prev) => prev.filter((l) => l !== line))
   }
   const promoteToNote = (line: string) => {
@@ -135,7 +135,13 @@ export function PageReviewSheet({
                     </div>
                     <select
                       value={placementValue(row.placement)}
-                      onChange={(e) => updateItem(i, { placement: placementFromValue(e.target.value) })}
+                      onChange={(e) => {
+                        const placement = placementFromValue(e.target.value)
+                        // A time only lives on a real date. Moving a row to
+                        // This week / Inbox must drop it, or a stale "14:00"
+                        // rides along on a row that no longer shows one.
+                        updateItem(i, { placement, ...(placement.kind === 'date' ? {} : { time: null }) })
+                      }}
                       aria-label="When"
                       className="text-[13px] text-neutral-700 bg-neutral-100 rounded-lg px-2 py-1.5 shrink-0"
                     >
@@ -145,6 +151,15 @@ export function PageReviewSheet({
                         <option key={d} value={d}>{dateLabel(d)}</option>
                       ))}
                     </select>
+                    {row.placement.kind === 'date' && (
+                      <input
+                        type="time"
+                        value={row.time ?? ''}
+                        onChange={(e) => updateItem(i, { time: e.target.value || null })}
+                        aria-label={`Time for "${row.title}"`}
+                        className="text-[13px] text-neutral-700 bg-neutral-100 rounded-lg px-2 py-1.5 shrink-0 w-[104px]"
+                      />
+                    )}
                     <select
                       value={row.assigneeId ?? UNASSIGNED}
                       onChange={(e) => updateItem(i, { assigneeId: e.target.value === UNASSIGNED ? null : e.target.value })}

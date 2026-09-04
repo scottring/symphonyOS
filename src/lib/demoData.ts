@@ -25,6 +25,29 @@ export interface DemoDataResult {
 }
 
 /**
+ * A readable message for anything thrown in here.
+ *
+ * Supabase/PostgREST errors are PLAIN OBJECTS ({ message, details, hint,
+ * code }), not Error instances — so the usual `e instanceof Error ? e.message
+ * : 'Unknown error'` collapsed every database failure into the useless
+ * "Unknown error" the launch rehearsal hit. Read the shape, not the class.
+ */
+function describeError(error: unknown): string {
+  if (error instanceof Error) return error.message
+  if (error && typeof error === 'object') {
+    const e = error as { message?: unknown; details?: unknown; hint?: unknown; code?: unknown }
+    const parts = [
+      typeof e.message === 'string' ? e.message : '',
+      typeof e.details === 'string' ? e.details : '',
+      typeof e.hint === 'string' ? e.hint : '',
+    ].filter(Boolean)
+    const text = parts.join(' — ')
+    if (text) return typeof e.code === 'string' ? `${text} (${e.code})` : text
+  }
+  return typeof error === 'string' && error ? error : 'Unknown error'
+}
+
+/**
  * Clear all demo data for current user
  */
 export async function clearDemoData(): Promise<{ success: boolean; message: string }> {
@@ -34,17 +57,20 @@ export async function clearDemoData(): Promise<{ success: boolean; message: stri
       return { success: false, message: 'Not authenticated' }
     }
 
-    // Delete in order (tasks first due to foreign keys)
-    await supabase.from('tasks').delete().eq('user_id', user.id)
-    await supabase.from('projects').delete().eq('user_id', user.id)
-    await supabase.from('contacts').delete().eq('user_id', user.id)
-    await supabase.from('routines').delete().eq('user_id', user.id)
-    await supabase.from('lists').delete().eq('user_id', user.id)
+    // Delete in order (tasks first due to foreign keys).
+    //
+    // Every delete's error is CHECKED. They used to be discarded, so a clear
+    // blocked by RLS or a foreign key still reported success and the caller
+    // happily reseeded on top of the leftovers.
+    for (const table of ['tasks', 'projects', 'contacts', 'routines', 'lists'] as const) {
+      const { error } = await supabase.from(table).delete().eq('user_id', user.id)
+      if (error) throw error
+    }
 
     return { success: true, message: 'Demo data cleared successfully' }
   } catch (error) {
     console.error('Error clearing demo data:', error)
-    return { success: false, message: `Error: ${error instanceof Error ? error.message : 'Unknown error'}` }
+    return { success: false, message: describeError(error) }
   }
 }
 
@@ -79,6 +105,9 @@ export async function loadDemoData(): Promise<DemoDataResult> {
       status: 'in_progress' as const,
       phone_number: '(555) 123-4567',
       notes: 'Contractor: Bob Johnson\nTile: Arctic White subway 3x6\nMeasurements: 45 sq ft needed',
+      // Links live on the project's own jsonb column. DemoControls advertises
+      // "a project with phone/link/notes", so the link belongs in the seed.
+      links: [{ url: 'https://tilesupplier.com', title: 'Tile Supplier' }],
       user_id: user.id,
     }
 
@@ -91,21 +120,13 @@ export async function loadDemoData(): Promise<DemoDataResult> {
 
     const kitchenProject = projects[0]
 
-    // 3. Add link to Kitchen Renovation project
-    if (kitchenProject) {
-      const { error: linkError } = await supabase
-        .from('task_links')
-        .insert([{
-          url: 'https://tilesupplier.com',
-          title: 'Tile Supplier',
-          project_id: kitchenProject.id,
-          user_id: user.id,
-        }])
-
-      if (linkError) throw linkError
-    }
-
-    // 4. Create a few completed tasks to show history
+    // 3. Create a few completed tasks to show history
+    //
+    // (There used to be a separate `task_links` INSERT here. That table does
+    // not exist in the database — it never shipped — so every load threw on
+    // it, which is what broke Reset Demo: the clear ran, the reload died, and
+    // the account was left half-empty. The link now rides the project insert
+    // above, on the `links` jsonb column where links actually live.)
     const yesterday = new Date()
     yesterday.setDate(yesterday.getDate() - 1)
     yesterday.setHours(14, 0, 0, 0)
@@ -160,7 +181,7 @@ export async function loadDemoData(): Promise<DemoDataResult> {
     console.error('Error loading demo data:', error)
     return {
       success: false,
-      message: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+      message: describeError(error),
     }
   }
 }
@@ -171,11 +192,20 @@ export async function loadDemoData(): Promise<DemoDataResult> {
 export async function resetDemo(): Promise<DemoDataResult> {
   const clearResult = await clearDemoData()
   if (!clearResult.success) {
-    return { success: false, message: `Failed to clear data: ${clearResult.message}` }
+    return { success: false, message: `Nothing was cleared: ${clearResult.message}` }
   }
 
   // Wait a moment for deletes to complete
   await new Promise(resolve => setTimeout(resolve, 500))
 
-  return await loadDemoData()
+  const loadResult = await loadDemoData()
+  if (!loadResult.success) {
+    // The clear already happened. Saying only "reload failed" left the
+    // rehearsal guessing why the account had gone empty.
+    return {
+      ...loadResult,
+      message: `Data was cleared but the reload failed, so the account is now EMPTY. Press "Load Data" to retry. ${loadResult.message}`,
+    }
+  }
+  return loadResult
 }

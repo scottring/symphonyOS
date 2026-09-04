@@ -48,6 +48,68 @@ function isWeakDateMatch(match: chrono.ParsedResult): boolean {
   return AMBIGUOUS_BARE_DATE.has(text)
 }
 
+// ── Time resolution ─────────────────────────────────────────────────────────
+// chrono is a good date reader and a poor household mind-reader. Two of its
+// defaults produced the "wait, did it understand me?" moments in the
+// 2026-09-04 launch rehearsal, and both are fixed here rather than by
+// abandoning chrono:
+//
+//   "Pick up Michael from soccer at 6" -> 6:00 AM.  A bare hour with no
+//   meridiem is left as written, and 6 means 6am. Nobody collects a kid from
+//   soccer at dawn.
+//
+//   "dentist thu 2pm" typed on a Friday -> LAST Thursday, a date in the past,
+//   which then reads as overdue the moment it is created. chrono resolves a
+//   bare weekday to the CLOSEST one in either direction.
+
+/** Bare hours at or below this are read as PM ("at 6" -> 6:00 PM).
+ *  1am-6am is almost never what someone means when they omit the meridiem;
+ *  7 and up is genuinely ambiguous (7am school run vs 7pm dinner) and is left
+ *  alone. Matches the older parseNaturalDate heuristic so the two agree. */
+const BARE_HOUR_PM_CEILING = 6
+
+/** Did the text pin an actual calendar date ("Sept 1", "3/15", "yesterday")?
+ *  Those are explicit — a past one is deliberate, and rolling it forward would
+ *  turn "sept 1 review" into September 2027. */
+function namesCalendarDate(m: chrono.ParsedResult): boolean {
+  return m.start.isCertain('day') || m.start.isCertain('month') || m.start.isCertain('year')
+}
+
+/**
+ * chrono's date for a match, corrected for a household planner.
+ *
+ * @param match    the plain parse
+ * @param forward  the same match re-parsed with chrono's forwardDate option,
+ *                 if it survived that parse
+ * @param now      reference time
+ */
+function resolveDateMatch(
+  match: chrono.ParsedResult,
+  forward: chrono.ParsedResult | undefined,
+  now: Date,
+): Date {
+  const bumpToPm = (d: Date) => {
+    // Only when the writer left the meridiem out AND actually named an hour.
+    if (!match.start.isCertain('hour') || match.start.isCertain('meridiem')) return d
+    const h = d.getHours()
+    if (h < 1 || h > BARE_HOUR_PM_CEILING) return d
+    const out = new Date(d)
+    out.setHours(h + 12)
+    return out
+  }
+
+  const plain = bumpToPm(match.start.date())
+  if (plain >= now) return plain
+
+  // The corrected time is still behind us. If the writer named a real date,
+  // they meant it — leave it (Expired work is reachable from the inbox).
+  if (namesCalendarDate(match)) return plain
+
+  // Otherwise it was a weekday or a bare time, which chrono resolved
+  // backwards. Take chrono's own forward-looking reading of the same text.
+  return forward ? bumpToPm(forward.start.date()) : plain
+}
+
 export function parseQuickInput(
   input: string,
   context: ParserContext
@@ -131,10 +193,14 @@ export function parseQuickInput(
 
   // 1. Extract dates using chrono-node — skipping weak/ambiguous bare keywords
   //    (see isWeakDateMatch) so topic words like "weekend" or "May" don't
-  //    hijack scheduling and mangle the title.
-  const dateMatch = chrono.parse(workingText).find((m) => !isWeakDateMatch(m))
+  //    hijack scheduling and mangle the title. resolveDateMatch then applies
+  //    the two household corrections chrono does not make on its own (bare
+  //    evening hours, and weekday names that resolve backwards).
+  const now = new Date()
+  const dateMatch = chrono.parse(workingText, now).find((m) => !isWeakDateMatch(m))
   if (dateMatch) {
-    result.dueDate = dateMatch.start.date()
+    const forward = chrono.parse(workingText, now, { forwardDate: true }).find((m) => m.text === dateMatch.text)
+    result.dueDate = resolveDateMatch(dateMatch, forward, now)
     result.dueDateMatch = dateMatch.text
     workingText = workingText.replace(dateMatch.text, '').trim()
     // A chrono range ("2pm-3:30pm") carries the end time — derive a duration

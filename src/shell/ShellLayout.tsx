@@ -15,6 +15,8 @@ import { ListsProvider } from '@/contexts/ListsContext';
 import { PinsProvider } from '@/contexts/PinsContext';
 import { useAuth } from '@/hooks/useAuth';
 import { useMobile } from '@/hooks/useMobile';
+import { useDomain } from '@/hooks/useDomain';
+import { filterTasksForLayers } from '@/lib/today/domainFilter';
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
 import { useDiscussionInbox } from '@/hooks/useDiscussionInbox';
 import { useSymphonyAssistant } from '@/hooks/useSymphonyAssistant';
@@ -98,9 +100,14 @@ function ShellLayoutInner({ children }: Props) {
 
   const { tasks } = useSupabaseTasks();
   const { unreadCount: discussionsUnread } = useDiscussionInbox();
+  // The badge MUST mirror what the Inbox actually renders. It used to count
+  // every inbox task regardless of the active domain layers, so an item in an
+  // unchecked layer showed as "1 to triage" in the chrome while the Inbox —
+  // and Focus mode — said "Inbox zero" (launch rehearsal, 2026-09-04).
+  const { layers } = useDomain();
   const inboxCount = useMemo(
-    () => tasks.filter((t) => t.bucket === 'inbox' && !t.completed).length,
-    [tasks],
+    () => filterTasksForLayers(tasks, layers).filter((t) => t.bucket === 'inbox' && !t.completed).length,
+    [tasks, layers],
   );
 
   // Chrome data + handlers, sourced from shared hooks (not props).

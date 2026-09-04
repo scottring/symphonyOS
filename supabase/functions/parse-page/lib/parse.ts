@@ -3,7 +3,7 @@
 
 export interface CalendarDay { ymd: string; weekday: string }
 export interface Member { id: string; name: string }
-export interface PageItemRaw { title: string; day: string; assignee_id: string | null; note: string | null }
+export interface PageItemRaw { title: string; day: string; time: string | null; assignee_id: string | null; note: string | null }
 export interface PageNoteRaw { title: string; content: string }
 export interface PageParseResult { items: PageItemRaw[]; notes: PageNoteRaw[]; unclear: string[] }
 
@@ -11,6 +11,8 @@ const MAX_ITEMS = 40
 const MAX_NOTES = 20
 const MAX_UNCLEAR = 20
 const YMD = /^\d{4}-\d{2}-\d{2}$/
+// 24-hour HH:MM. A clock time on a paper line is a real appointment, not trivia.
+const HHMM = /^([01]\d|2[0-3]):([0-5]\d)$/
 
 /** The dates of the window, inclusive, as local YYYY-MM-DD plus weekday names. */
 export function windowCalendar(placeStart: string, placeEnd: string): CalendarDay[] {
@@ -44,8 +46,9 @@ Respond with ONLY a JSON object (no markdown fences, no prose):
     {
       "title": "Short imperative task title, cleaned up from the handwriting",
       "day": "YYYY-MM-DD from the calendar above if the line sits under a day heading or names a day; \\"week\\" if it should happen soon but names no day; \\"inbox\\" if it has no time frame at all",
+      "time": "\\"HH:MM\\" in 24-hour form if the line names a clock time (\\"2pm\\" -> \\"14:00\\", \\"7:30\\" -> \\"19:30\\"), otherwise null",
       "assignee_id": "member id from the list above, or null",
-      "note": "extra detail written on that line beyond the action itself (phone number, store, quantity, 'before 3pm'), or null"
+      "note": "extra detail written on that line beyond the action itself (phone number, store, quantity, a constraint like 'before 3pm'), or null"
     }
   ],
   "notes": [
@@ -56,6 +59,9 @@ Respond with ONLY a JSON object (no markdown fences, no prose):
 
 Rules:
 - A line naming an action — something to do, obtain, decide, or contact — is an ITEM. One item per distinct action. Do not invent, do not merge.
+- A clock time on an item line ("Dentist 2pm", "soccer 6", "movie night 7pm") goes in "time", NOT in "note" and NOT left in the title. A time written on paper is the appointment; burying it in a note turns a 2pm appointment into an all-day reminder.
+- A bare hour with no am/pm on a household page means the EVENING when it is 1 through 6 ("soccer 6" -> "18:00"). 7 and above, and anything with am/pm written, take the hour as written.
+- An item with a time must also have a "day". If the line names a time but no day, use today's date from the calendar above.
 - A paragraph, a list of facts, a caption, a piece of reasoning, a phone number or address with no action attached, is a NOTE.
 - A line you cannot read confidently goes in UNCLEAR, verbatim best guess. NEVER promote a guess to an item — a wrong task is worse than an unread line.
 - Skip crossed-out lines and anything ticked or checked. It was already done on paper.
@@ -75,9 +81,15 @@ function parseItems(raw: unknown, calendar: Set<string>, memberIds: Set<string>)
     // Out-of-window degrades to 'week' rather than being dropped — the review
     // sheet lets the user fix it, and a silently vanished line is worse.
     if (day !== 'week' && day !== 'inbox' && !(YMD.test(day) && calendar.has(day))) day = 'week'
+    // A time only means something on a real date. On 'week'/'inbox' there is
+    // no day to hang it on, so it is dropped rather than half-applied.
+    const time = typeof e.time === 'string' && HHMM.test(e.time.trim()) && day !== 'week' && day !== 'inbox'
+      ? e.time.trim()
+      : null
     out.push({
       title: e.title.trim().slice(0, 200),
       day,
+      time,
       assignee_id: typeof e.assignee_id === 'string' && memberIds.has(e.assignee_id) ? e.assignee_id : null,
       note: typeof e.note === 'string' && e.note.trim() ? e.note.trim().slice(0, 1000) : null,
     })

@@ -177,6 +177,14 @@ export function TodaySectionList({
   const onCreateEventAt = ctx.onCreateEventAt
   const onCreateRoutineAt = ctx.onCreateRoutineAt
 
+  // Names the "To buy" nudge consults so it stops offering to shop for a
+  // child. Household members and contacts both count — "pick up Michael" and
+  // "pick up Dr. Smith" are equally not purchases.
+  const knownPeopleNames = useMemo(
+    () => [...familyMembers.map((m) => m.name), ...Array.from(contactsMap?.values() ?? []).map((c) => c.name)],
+    [familyMembers, contactsMap],
+  )
+
   // Core members act as default diners on the evening meal card until per-meal
   // diner assignment lands.
   const { diners, servesCount } = useMemo(() => {
@@ -631,7 +639,7 @@ export function TodaySectionList({
                       )
                     })()}
                     {item.type === 'task' && taskId && onSendToBuy && !item.completed &&
-                      isBuyish(item.title) && !isToBuyNudgeDismissed(taskId) && (
+                      isBuyish(item.title, knownPeopleNames) && !isToBuyNudgeDismissed(taskId) && (
                       <ToBuyNudge
                         onSend={() => onSendToBuy(taskId)}
                         onDismiss={() => { dismissToBuyNudge(taskId); bumpToBuyDismissals() }}

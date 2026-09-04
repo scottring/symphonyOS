@@ -28,6 +28,8 @@ import { FocusInboxCard } from './FocusInboxCard'
 import { InboxModeToggle } from './InboxModeToggle'
 import { InboxUndoToast } from './InboxUndoToast'
 import { filterTasksForLayers } from '@/lib/today/domainFilter'
+import { isBuyish, isToBuyNudgeDismissed, dismissToBuyNudge } from '@/lib/lists/toBuy'
+import { ToBuyNudge } from './ToBuyNudge'
 import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
 import { selectRefileRows } from '@/lib/today/refile'
 import { selectExpired } from '@/lib/today/expired'
@@ -67,6 +69,7 @@ export function InboxView({
   const {
     onUpdateTask, onPushTask, onDeleteTask, onUpdateTasksBulk,
     onAssignTaskAll, familyMembers = [], onToggleTask,
+    onSendTaskToBuy: sendTaskToBuy,
   } = useScheduleActionsContext()
   const { notes, addNote, updateNote, deleteNote } = useNotes()
   const { addTask } = useSupabaseTasks()
@@ -312,6 +315,23 @@ export function InboxView({
     )
   }, [filteredByDomain])
 
+  // "To buy" routing, offered in the inbox as well as on Today.
+  //
+  // The nudge only ever rendered on the Today timeline, so a captured
+  // "Buy strawberries" that was never scheduled had no route onto the list at
+  // all — it just sat in the inbox as a task (launch rehearsal, 2026-09-04).
+  // Triage is exactly where that decision belongs.
+  const knownPeopleNames = useMemo(
+    () => familyMembers.map((m) => m.name),
+    [familyMembers],
+  )
+  // localStorage holds the dismissals, so nothing re-renders on its own.
+  const [toBuyDismissals, setToBuyDismissals] = useState(0)
+  const handleSendToBuy = useCallback(async (taskId: string) => {
+    const result = await sendTaskToBuy?.(taskId)
+    if (result) showToast(`"${result.itemText}" moved to To buy`, 'success', 4000)
+  }, [sendTaskToBuy])
+
   const sortByCreated = (a: Task, b: Task) =>
     new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
 
@@ -509,6 +529,12 @@ export function InboxView({
       task.captureMeta?.status === 'done' && task.captureMeta.suggestedTaskId
         ? tasks.find((t) => t.id === task.captureMeta?.suggestedTaskId && !t.completed)
         : undefined
+    const showToBuy =
+      !!sendTaskToBuy &&
+      !task.completed &&
+      isBuyish(task.title, knownPeopleNames) &&
+      !isToBuyNudgeDismissed(task.id)
+    void toBuyDismissals // re-read localStorage after a dismissal
     return (
       <div key={task.id} className="relative">
         <DenseInboxRow
@@ -564,6 +590,12 @@ export function InboxView({
           onToggleSelection={() => toggleTaskSelection(task.id)}
           onAssign={onAssignTaskAll ? (memberIds) => onAssignTaskAll(task.id, memberIds) : undefined}
         />
+        {showToBuy && (
+          <ToBuyNudge
+            onSend={() => void handleSendToBuy(task.id)}
+            onDismiss={() => { dismissToBuyNudge(task.id); setToBuyDismissals((n) => n + 1) }}
+          />
+        )}
         {suggestedTarget && (
           <button
             type="button"

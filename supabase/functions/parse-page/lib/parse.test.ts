@@ -30,7 +30,7 @@ describe('parsePageResponse', () => {
       CAL,
       MEMBERS,
     )
-    expect(out.items).toEqual([{ title: 'Call dentist', day: '2026-08-26', assignee_id: null, note: null }])
+    expect(out.items).toEqual([{ title: 'Call dentist', day: '2026-08-26', time: null, assignee_id: null, note: null }])
   })
 
   it('degrades an out-of-window date to week rather than dropping the item', () => {
@@ -59,5 +59,38 @@ describe('parsePageResponse', () => {
 
   it('throws on unparseable text so the caller can retry', () => {
     expect(() => parsePageResponse('I could not read that page.', CAL, MEMBERS)).toThrow()
+  })
+})
+
+// A clock time on a paper line is the appointment. It used to be dropped into
+// `note`, so "Dentist 2pm" arrived as an all-day chip (launch rehearsal,
+// 2026-09-04).
+describe('parsePageResponse — times', () => {
+  const CAL = new Set(['2026-08-25', '2026-08-26'])
+  const MEMBERS = new Set(['m-1'])
+
+  it('keeps a valid HH:MM time on a dated item', () => {
+    const out = parsePageResponse(
+      '{"items":[{"title":"Dentist","day":"2026-08-26","time":"14:00"}]}',
+      CAL,
+      MEMBERS,
+    )
+    expect(out.items[0].time).toBe('14:00')
+  })
+
+  it('drops a time from an item with no real day to hang it on', () => {
+    const out = parsePageResponse('{"items":[{"title":"Dentist","day":"week","time":"14:00"}]}', CAL, MEMBERS)
+    expect(out.items[0].time).toBeNull()
+  })
+
+  it('rejects a malformed time rather than passing it through', () => {
+    for (const bad of ['2pm', '25:00', '14:60', '9:00', '']) {
+      const out = parsePageResponse(
+        `{"items":[{"title":"X","day":"2026-08-26","time":${JSON.stringify(bad)}}]}`,
+        CAL,
+        MEMBERS,
+      )
+      expect(out.items[0].time).toBeNull()
+    }
   })
 })

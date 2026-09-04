@@ -70,3 +70,33 @@ describe('nudge dismissals', () => {
     expect(isToBuyNudgeDismissed('t2')).toBe(false)
   })
 })
+
+// "pick up" is two verbs. The launch rehearsal (2026-09-04) caught the nudge
+// offering to add a child to the shopping list.
+describe('isBuyish — collecting a person is not a purchase', () => {
+  const PEOPLE = ['Michael Chen', 'Jane Chen', 'Iris']
+
+  it('does not fire on "pick up <person> from <place>"', () => {
+    expect(isBuyish('Pick up Michael from soccer at 6', PEOPLE)).toBe(false)
+    expect(isBuyish('Pick up Jane from climbing at 6', PEOPLE)).toBe(false)
+  })
+
+  it('does not fire on a bare "pick up <known person>"', () => {
+    expect(isBuyish('pick up Iris', PEOPLE)).toBe(false)
+  })
+
+  it('rules out "pick up X from Y" even for an unknown name', () => {
+    // The "from a place" shape is enough on its own — no roster needed.
+    expect(isBuyish('pick up Sasha from daycare')).toBe(false)
+  })
+
+  it('still fires on a real purchase', () => {
+    expect(isBuyish('pick up milk', PEOPLE)).toBe(true)
+    expect(isBuyish('Buy strawberries and lunch snacks', PEOPLE)).toBe(true)
+    expect(isBuyish('order cabinet hardware', PEOPLE)).toBe(true)
+  })
+
+  it('leaves the other verbs alone — "buy X from Etsy" is still shopping', () => {
+    expect(isBuyish('buy a rug from Etsy', PEOPLE)).toBe(true)
+  })
+})

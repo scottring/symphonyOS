@@ -11,8 +11,10 @@
  * Target/Costco item parked between "milk" and "eggs" gets skipped.
  *
  * Detection is suggest-and-confirm, never automatic: a buy-ish title grows a
- * one-tap nudge under its row. False positives ("pick up kids") cost one
- * persistent dismissal, which is why the verb list can afford to be generous.
+ * one-tap nudge under its row. A false positive costs one persistent
+ * dismissal, which is why the verb list can afford to be generous — but
+ * "pick up <a person>" was nudging often enough to read as the app not
+ * understanding the sentence, so isBuyish now rules that shape out.
  */
 import type { List } from '@/types/list'
 
@@ -20,9 +22,38 @@ export const TO_BUY_LIST_TITLE = 'To buy'
 
 const BUY_VERB_RE = /^(buy|pick\s*up|order|purchase)\s+\S/i
 
-/** Would this task title read as a purchase/errand? ("get" excluded — too broad.) */
-export function isBuyish(title: string): boolean {
-  return BUY_VERB_RE.test(title.trim())
+/** "pick up X FROM/AT somewhere" is collecting someone or something from a
+ *  place — a school run, not a shopping trip. "buy X from Etsy" is still a
+ *  purchase, so this only disqualifies the ambiguous "pick up" verb. */
+const PICK_UP_FROM_RE = /^pick\s*up\s+.+\s(from|at)\s+\S/i
+
+const PICK_UP_RE = /^pick\s*up\s+/i
+
+/**
+ * Would this task title read as a purchase/errand? ("get" excluded — too broad.)
+ *
+ * `knownPeople` are household members and contacts. "pick up" is the one verb
+ * here that is genuinely two verbs — buying a thing and collecting a person —
+ * and the launch rehearsal caught it nudging "Pick up Michael from soccer at 6"
+ * onto the shopping list. Naming a person, or naming where you're collecting
+ * them from, settles it.
+ */
+export function isBuyish(title: string, knownPeople: string[] = []): boolean {
+  const trimmed = title.trim()
+  if (!BUY_VERB_RE.test(trimmed)) return false
+
+  if (PICK_UP_RE.test(trimmed)) {
+    if (PICK_UP_FROM_RE.test(trimmed)) return false
+    // "pick up Michael", "pick up Jane and Michael" — the object is a person.
+    const object = trimmed.replace(PICK_UP_RE, '').toLowerCase()
+    const firstWord = object.split(/[\s,]+/)[0]?.replace(/[^a-z'-]/g, '') ?? ''
+    if (firstWord && knownPeople.some((p) => {
+      const first = p.trim().split(/\s+/)[0]?.toLowerCase()
+      return !!first && first === firstWord
+    })) return false
+  }
+
+  return true
 }
 
 /**
