@@ -35,7 +35,7 @@ import { useSystemHealth, getHealthTextClasses } from '@/hooks/useSystemHealth'
 import { useTimelineInsert } from '@/hooks/useTimelineInsert'
 import { useDomain } from '@/hooks/useDomain'
 
-import { Eye, EyeOff, Repeat, Binoculars, Printer, GripVertical, CalendarClock, Moon, Sparkles, NotebookPen, Inbox, CalendarDays } from 'lucide-react'
+import { Eye, EyeOff, Repeat, Binoculars, Printer, GripVertical, CalendarClock, Moon, Sparkles, NotebookPen, Inbox, CalendarDays, AlertTriangle, CheckCircle2, Clock3, ListChecks, Route, Utensils, ArrowRight } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { AssigneeFilter } from '@/components/home/AssigneeFilter'
 
@@ -631,6 +631,44 @@ export function TodayView({
     onGroupItems, onReorderTasks: ctx.onReorderTasks,
   })
 
+  const timelineItems = useMemo(
+    () => data.sectionsOrder.flatMap((section) => data.grouped[section] ?? []),
+    [data.sectionsOrder, data.grouped],
+  )
+  const nowForDisplay = useMemo(() => new Date(nowTick), [nowTick])
+  const dayName = useMemo(
+    () => viewedDate.toLocaleDateString('en-US', { weekday: 'long' }),
+    [viewedDate],
+  )
+  const fullDateLabel = useMemo(
+    () => viewedDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric' }),
+    [viewedDate],
+  )
+  const greeting = useMemo(() => {
+    const hour = nowForDisplay.getHours()
+    if (hour < 12) return 'Good morning'
+    if (hour < 17) return 'Good afternoon'
+    return 'Good evening'
+  }, [nowForDisplay])
+  const decisionCount = data.attentionItems.length + emailCaptures.length + visibleUnpromptedItems.length
+  const logisticsCount = useMemo(
+    () => timelineItems.filter((item) => /\b(pickup|pick up|dropoff|drop off|carpool|drive|appointment|practice|school|camp)\b/i.test(`${item.title} ${item.subtitle ?? ''}`)).length,
+    [timelineItems],
+  )
+  const mealCount = useMemo(
+    () => timelineItems.filter((item) => /\b(breakfast|lunch|dinner|meal|grocer|snack)\b/i.test(`${item.title} ${item.subtitle ?? ''}`)).length,
+    [timelineItems],
+  )
+  const unresolvedCount = Math.max(data.counts.actionableCount - data.counts.completedCount, 0)
+  const heroLine = loading
+    ? 'Loading the household picture.'
+    : data.counts.totalItems === 0
+      ? 'No scheduled work is on the board.'
+      : `${unresolvedCount} open of ${data.counts.actionableCount} actionable item${data.counts.actionableCount === 1 ? '' : 's'}.`
+  const nextTimeLabel = upNext?.item.startTime
+    ? upNext.item.startTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+    : upNext ? 'Today' : ''
+
   // ── Drag: the pure resolver's inputs ─────────────────────────────────────────
   const { isReadOnlyCalendar } = useCalendarPermissions()
 
@@ -972,7 +1010,7 @@ export function TodayView({
   )
 
   return (
-    <div className="max-w-[940px] w-full mx-auto px-0 py-2 md:px-8 md:py-8">
+    <div className="w-full max-w-[1180px] mx-auto px-0 py-2 md:px-8 md:py-8">
       {/* Mounted only while printing. Keeping it permanently in the DOM would
           duplicate every title — invisible to the eye (CSS-hidden) but very
           real to screen readers and to any getByText. */}
@@ -1003,6 +1041,112 @@ export function TodayView({
           <NeedsYourOK />
         </div>
       )}
+
+      <section className="mx-3 mb-4 overflow-hidden rounded-2xl border border-neutral-200/80 bg-bg-elevated shadow-sm md:mx-0">
+        <div className="border-b border-neutral-100 px-4 py-4 md:px-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="min-w-0">
+              <div className="mb-2 flex flex-wrap items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.08em] text-neutral-400">
+                <span>{data.isToday ? 'Today' : dayName}</span>
+                <span className="h-1 w-1 rounded-full bg-neutral-300" />
+                <span>{fullDateLabel}</span>
+              </div>
+              <h1 className="font-display text-[28px] font-semibold leading-tight text-neutral-950 md:text-[34px]">
+                {data.isToday ? `${greeting}, Scott` : dayName}
+              </h1>
+              <p className="mt-1 max-w-2xl text-sm text-neutral-500 md:text-[15px]">{heroLine}</p>
+            </div>
+
+            <div className="grid min-w-0 gap-2 sm:grid-cols-2 lg:w-[420px]">
+              <div className="rounded-xl border border-primary-100 bg-primary-50/60 px-3 py-2.5">
+                <div className="flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.06em] text-primary-700">
+                  <Clock3 className="h-3.5 w-3.5" />
+                  Now / Next
+                </div>
+                <p className="mt-1 truncate text-sm font-semibold text-neutral-900">
+                  {upNext ? 'Next commitment is marked in the timeline' : loading ? 'Loading next move' : 'Nothing queued'}
+                </p>
+                <p className="mt-0.5 truncate text-xs text-neutral-500">
+                  {upNext ? `${nextTimeLabel}${upNextStatus ? ` · ${upNextStatus}` : ''}` : 'The timeline is quiet.'}
+                </p>
+              </div>
+              <div className="rounded-xl border border-neutral-200 bg-white px-3 py-2.5">
+                <div className="flex items-center gap-2 text-[12px] font-semibold uppercase tracking-[0.06em] text-neutral-500">
+                  <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
+                  Decisions
+                </div>
+                <p className="mt-1 text-sm font-semibold text-neutral-900">
+                  {decisionCount === 0 ? 'No decisions waiting' : `${decisionCount} waiting`}
+                </p>
+                <p className="mt-0.5 truncate text-xs text-neutral-500">
+                  {emailCaptures.length > 0 ? `${emailCaptures.length} from email` : data.attentionItems.length > 0 ? 'Review the attention queue' : 'No triage needed.'}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            {onOpenPlanFromPaper && (
+              <button
+                type="button"
+                onClick={onOpenPlanFromPaper}
+                className="inline-flex items-center gap-2 rounded-lg bg-neutral-950 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-neutral-800"
+              >
+                <NotebookPen className="h-4 w-4" />
+                Snap paper plan
+              </button>
+            )}
+            {data.isToday && ctx.onOpenPlanning && (
+              <button
+                type="button"
+                onClick={ctx.onOpenPlanning}
+                className="inline-flex items-center gap-2 rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-50"
+              >
+                <CalendarClock className="h-4 w-4" />
+                Time-block
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => navigate('/inbox')}
+              className="inline-flex items-center gap-2 rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-50"
+            >
+              <Inbox className="h-4 w-4" />
+              Process inbox
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate('/week')}
+              className="inline-flex items-center gap-2 rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-50"
+            >
+              <CalendarDays className="h-4 w-4" />
+              Plan week
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 divide-x divide-neutral-100 sm:grid-cols-4">
+          <div className="px-4 py-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-neutral-400">Open</p>
+            <p className="mt-1 text-xl font-semibold tabular-nums text-neutral-900">{unresolvedCount}</p>
+          </div>
+          <div className="px-4 py-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-neutral-400">Logistics</p>
+            <p className="mt-1 text-xl font-semibold tabular-nums text-neutral-900">{logisticsCount}</p>
+          </div>
+          <div className="px-4 py-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-neutral-400">Meals</p>
+            <p className="mt-1 text-xl font-semibold tabular-nums text-neutral-900">{mealCount}</p>
+          </div>
+          <div className="px-4 py-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-neutral-400">Clarity</p>
+            <div className="mt-1 flex items-center gap-2">
+              <Binoculars className={`h-4 w-4 ${clarityColorClass}`} aria-hidden="true" />
+              <span className={`text-sm font-semibold ${clarityColorClass}`}>{clarityHealth.healthStatus}</span>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* Today's controls — one primary action, everything else one tap away.
           This strip used to carry a progress bar, four counters and seven
@@ -1051,6 +1195,8 @@ export function TodayView({
         {!isMobile && overflowMenu}
       </div>
 
+      <div className="px-3 md:px-0 lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start lg:gap-4">
+        <main className="min-w-0">
       {/* Task list — wrapped in a card on desktop; on mobile the rows go
           full-width (no card, no border, no inner padding) to match the
           compact list the pre-redesign mobile had.
@@ -1277,6 +1423,89 @@ export function TodayView({
             onDismiss={commitDismiss}
           />
         )}
+      </div>
+        </main>
+
+        <aside className="mt-4 hidden space-y-3 lg:mt-0 lg:block">
+          <section className="rounded-2xl border border-neutral-200/80 bg-bg-elevated p-4 shadow-sm">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-[12px] font-semibold uppercase tracking-[0.08em] text-neutral-400">Needs a Decision</p>
+                <h2 className="font-display text-lg font-semibold text-neutral-900">
+                  {decisionCount === 0 ? 'All clear' : `${decisionCount} item${decisionCount === 1 ? '' : 's'}`}
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => navigate('/inbox')}
+                className="rounded-lg p-2 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700"
+                aria-label="Open inbox"
+              >
+                <ArrowRight className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="space-y-2 text-sm">
+              {data.attentionItems.length > 0 && (
+                <button type="button" onClick={() => setReviewMode('morning')} className="flex w-full items-center justify-between rounded-xl border border-amber-100 bg-amber-50/70 px-3 py-2 text-left text-amber-900 transition-colors hover:bg-amber-100/70">
+                  <span className="min-w-0 truncate">Review attention queue</span>
+                  <span className="ml-3 shrink-0 text-xs font-semibold tabular-nums">{data.attentionItems.length}</span>
+                </button>
+              )}
+              {emailCaptures.length > 0 && (
+                <button type="button" onClick={() => setEmailReviewOpen(true)} className="flex w-full items-center justify-between rounded-xl border border-primary-100 bg-primary-50/70 px-3 py-2 text-left text-primary-900 transition-colors hover:bg-primary-100/70">
+                  <span className="min-w-0 truncate">Review captured email</span>
+                  <span className="ml-3 shrink-0 text-xs font-semibold tabular-nums">{emailCaptures.length}</span>
+                </button>
+              )}
+              {visibleUnpromptedItems.length > 0 && (
+                <button type="button" onClick={() => setSuggestionsEnabled(true)} className="flex w-full items-center justify-between rounded-xl border border-neutral-200 bg-white px-3 py-2 text-left text-neutral-700 transition-colors hover:bg-neutral-50">
+                  <span className="min-w-0 truncate">Show assistant suggestions</span>
+                  <span className="ml-3 shrink-0 text-xs font-semibold tabular-nums">{visibleUnpromptedItems.length}</span>
+                </button>
+              )}
+              {decisionCount === 0 && (
+                <div className="flex items-start gap-2 rounded-xl border border-emerald-100 bg-emerald-50/70 px-3 py-2 text-emerald-800">
+                  <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+                  <span>No inbox, email, or assistant decisions are demanding attention.</span>
+                </div>
+              )}
+            </div>
+          </section>
+
+          <section className="rounded-2xl border border-neutral-200/80 bg-bg-elevated p-4 shadow-sm">
+            <p className="text-[12px] font-semibold uppercase tracking-[0.08em] text-neutral-400">Household Signals</p>
+            <div className="mt-3 space-y-2">
+              <div className="flex items-center justify-between gap-3 rounded-xl bg-neutral-50 px-3 py-2">
+                <span className="inline-flex min-w-0 items-center gap-2 truncate text-sm text-neutral-700">
+                  <Route className="h-4 w-4 shrink-0 text-blue-600" />
+                  Logistics
+                </span>
+                <span className="text-sm font-semibold tabular-nums text-neutral-900">{logisticsCount}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3 rounded-xl bg-neutral-50 px-3 py-2">
+                <span className="inline-flex min-w-0 items-center gap-2 truncate text-sm text-neutral-700">
+                  <Utensils className="h-4 w-4 shrink-0 text-rose-600" />
+                  Meals and groceries
+                </span>
+                <span className="text-sm font-semibold tabular-nums text-neutral-900">{mealCount}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3 rounded-xl bg-neutral-50 px-3 py-2">
+                <span className="inline-flex min-w-0 items-center gap-2 truncate text-sm text-neutral-700">
+                  <ListChecks className="h-4 w-4 shrink-0 text-violet-600" />
+                  Week bench
+                </span>
+                <span className="text-sm font-semibold tabular-nums text-neutral-900">{weekPool.length}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3 rounded-xl bg-neutral-50 px-3 py-2">
+                <span className="inline-flex min-w-0 items-center gap-2 truncate text-sm text-neutral-700">
+                  <CalendarDays className="h-4 w-4 shrink-0 text-teal-600" />
+                  Month bench
+                </span>
+                <span className="text-sm font-semibold tabular-nums text-neutral-900">{monthPool.length}</span>
+              </div>
+            </div>
+          </section>
+        </aside>
       </div>
 
       {/* Review drawer — evening from the ⋯ menu, morning from the backlog
