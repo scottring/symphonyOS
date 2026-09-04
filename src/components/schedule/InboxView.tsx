@@ -1,7 +1,8 @@
 // src/components/schedule/InboxView.tsx
 import { useMemo, useCallback, useState } from 'react'
 import { PAGE_COLUMN } from '@/components/layout/pageLayout'
-import { X, CornerDownRight } from 'lucide-react'
+import { X, CornerDownRight, CalendarDays, Sun } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 import type { Task, TaskContext } from '@/types/task'
 import { mergeCaptureIntoTask } from '@/lib/captureMerge'
 import type { Project } from '@/types/project'
@@ -66,6 +67,7 @@ export function InboxView({
   panelOpen: _panelOpen, onClosePanel: _onClosePanel,
   loading = false,
 }: InboxViewProps) {
+  const navigate = useNavigate()
   const {
     onUpdateTask, onPushTask, onDeleteTask, onUpdateTasksBulk,
     onAssignTaskAll, familyMembers = [], onToggleTask,
@@ -668,14 +670,32 @@ export function InboxView({
           <p className="font-display text-xl text-neutral-700">Loading your inbox…</p>
         </div>
       ) : totalCount === 0 ? (
-        <div className="text-center py-16">
+        <div className="mx-auto max-w-xl text-center py-16">
           <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-primary-50 flex items-center justify-center">
             <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 text-primary-400" viewBox="0 0 20 20" fill="currentColor">
               <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
             </svg>
           </div>
           <p className="font-display text-xl text-neutral-700 mb-2">Inbox zero</p>
-          <p className="text-neutral-500">Press <kbd className="px-2 py-1 bg-neutral-100 rounded-md text-xs font-mono">Cmd+K</kbd> to capture something</p>
+          <p className="text-neutral-500">Nothing is waiting for a decision.</p>
+          <div className="mt-5 flex flex-wrap justify-center gap-2">
+            <button
+              type="button"
+              onClick={() => navigate('/today')}
+              className="inline-flex items-center gap-2 rounded-lg border border-primary-200 bg-primary-50 px-3 py-2 text-sm font-medium text-primary-800 hover:bg-primary-100 transition-colors"
+            >
+              <Sun className="h-4 w-4" />
+              Open today
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate('/week')}
+              className="inline-flex items-center gap-2 rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50 transition-colors"
+            >
+              <CalendarDays className="h-4 w-4" />
+              Plan week
+            </button>
+          </div>
         </div>
       ) : mode === 'focus' ? (
         <FocusInboxCard
@@ -735,4 +755,3 @@ export function InboxView({
     </div>
   )
 }
-

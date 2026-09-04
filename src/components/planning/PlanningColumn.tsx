@@ -13,6 +13,7 @@ import { layoutLanes, type Lane } from './overlapLanes'
 import { resolveRoutineTime } from '@/lib/today/routineTime'
 import type { ActionableInstance } from '@/types/actionable'
 import { ALL_DAY_LANE_HEIGHT, allDayLaneCapacity, allDayLaneHeight } from '@/lib/planning/allDayLane'
+import { TaskKindBadge } from '@/components/task/TaskKindBadge'
 
 // Max side-by-side lanes before overlapping items collapse into a "+N" chip.
 const MAX_LANES = 4
@@ -558,14 +559,14 @@ function AllDayLaneCell({ dateKey, tasks, onChipClick, laneHeight, fluid = false
       className={`px-1.5 py-1 grid content-start gap-1 transition-colors ${
         fluid
           ? 'grid-cols-1 flex-1 min-h-[200px] rounded-md ring-1 ring-transparent'
-          : 'grid-cols-2 border-b border-neutral-200 overflow-hidden'
+          : 'grid-cols-1 border-b border-neutral-200 overflow-hidden'
       } ${isOver ? (fluid ? 'bg-primary-100 ring-primary-300' : 'bg-primary-100') : fluid ? 'bg-transparent' : 'bg-neutral-50/60'}`}
     >
       {visible.map((task) => (
         <AllDayChip key={task.id} task={task} onClick={() => onChipClick(task.id)} />
       ))}
       {overflow > 0 && (
-        <span className="h-5 grid place-items-center text-[10px] font-semibold text-neutral-500 bg-neutral-200 rounded-full px-1.5">
+        <span className="min-h-8 grid place-items-center text-[10px] font-semibold text-neutral-500 bg-neutral-200 rounded-md px-1.5">
           +{overflow}
         </span>
       )}
@@ -632,7 +633,7 @@ function AllDayChip({ task, onClick }: AllDayChipProps) {
     : undefined
 
   if (isDragging) {
-    return <div ref={setNodeRef} className="h-5 w-full rounded bg-primary-100 border border-dashed border-primary-300 opacity-50" />
+    return <div ref={setNodeRef} className="min-h-8 w-full rounded-md bg-primary-100 border border-dashed border-primary-300 opacity-50" />
   }
 
   return (
@@ -644,9 +645,18 @@ function AllDayChip({ task, onClick }: AllDayChipProps) {
       {...listeners}
       onClick={onClick}
       title={task.title}
-      className="min-w-0 w-full h-5 px-1.5 rounded bg-primary-50 border border-primary-200 text-[10px] font-medium text-primary-700 truncate text-left cursor-grab active:cursor-grabbing touch-none"
+      className="group/chip flex min-h-8 w-full min-w-0 items-start gap-1 rounded-md border border-primary-200 bg-primary-50 px-1.5 py-1 text-left text-[10.5px] font-medium leading-tight text-primary-800 cursor-grab active:cursor-grabbing touch-none hover:border-primary-300 hover:bg-primary-100/70 transition-colors"
     >
-      {task.title}
+      <TaskKindBadge
+        title={task.title}
+        category={task.category}
+        note={task.notes}
+        id={task.id}
+        className="mt-0.5"
+      />
+      <span className="min-w-0 overflow-hidden break-words [display:-webkit-box] [-webkit-line-clamp:2] [-webkit-box-orient:vertical]">
+        {task.title}
+      </span>
     </button>
   )
 }

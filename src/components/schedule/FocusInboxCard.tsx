@@ -141,9 +141,19 @@ export function FocusInboxCard({
 
   if (total === 0 || !current) {
     return (
-      <div className="text-center py-16">
+      <div className="mx-auto max-w-md text-center py-16">
+        <div className="w-14 h-14 mx-auto mb-5 rounded-2xl bg-primary-50 flex items-center justify-center">
+          <Check className="w-7 h-7 text-primary-500" />
+        </div>
         <p className="font-display text-xl text-neutral-700 mb-2">Inbox zero</p>
-        <p className="text-neutral-500">Press Esc to return to list</p>
+        <p className="text-neutral-500">Every inbox item has a next place.</p>
+        <button
+          type="button"
+          onClick={onExitFocus}
+          className="mt-5 rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50 transition-colors"
+        >
+          Return to list
+        </button>
       </div>
     )
   }

@@ -4,6 +4,7 @@ import { parseLocalYmd } from '@/lib/cadence/config'
 import type { PlanItem, PlanPlacement } from '@/lib/planParse'
 import type { PageNote } from '@/lib/pageParse'
 import type { FamilyMember } from '@/types/family'
+import { TaskKindBadge } from '@/components/task/TaskKindBadge'
 
 export interface PageReviewPayload {
   items: PlanItem[]
@@ -62,6 +63,15 @@ export function PageReviewSheet({
     () => itemRows.filter((r) => r.included).length + noteRows.filter((r) => r.included).length,
     [itemRows, noteRows],
   )
+  const summary = useMemo(() => {
+    const includedItems = itemRows.filter((r) => r.included).length
+    const includedNotes = noteRows.filter((r) => r.included).length
+    return [
+      `${includedItems} task${includedItems === 1 ? '' : 's'}`,
+      includedNotes > 0 ? `${includedNotes} note${includedNotes === 1 ? '' : 's'}` : null,
+      unread.length > 0 ? `${unread.length} unclear` : null,
+    ].filter(Boolean).join(' / ')
+  }, [itemRows, noteRows, unread.length])
   const isEmpty = itemRows.length === 0 && noteRows.length === 0 && unread.length === 0
 
   const updateItem = (index: number, patch: Partial<ItemRow>) =>
@@ -97,10 +107,13 @@ export function PageReviewSheet({
         role="dialog"
         aria-label="Review page items"
       >
-        <div className="flex items-center justify-between px-5 py-4 border-b border-neutral-200/60">
+        <div className="flex items-center justify-between gap-4 px-5 py-4 border-b border-neutral-200/60">
           <div className="flex items-center gap-2">
             <NotebookPen className="w-5 h-5 text-primary-600" />
-            <h3 className="font-display text-xl text-neutral-900">From your page</h3>
+            <div>
+              <h3 className="font-display text-xl text-neutral-900">From your page</h3>
+              {!isEmpty && <p className="mt-0.5 text-[13px] text-neutral-500">Check what Symphony read before it changes the week.</p>}
+            </div>
           </div>
           <button type="button" onClick={onClose} aria-label="Close review" className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors">
             <X className="w-5 h-5" />
@@ -113,64 +126,76 @@ export function PageReviewSheet({
           </div>
         ) : (
           <div className="flex-1 overflow-y-auto px-5 py-3 space-y-4">
+            {summary && (
+              <div className="rounded-xl border border-primary-100 bg-primary-50/50 px-3 py-2 text-[13px] text-primary-800">
+                <span className="font-semibold">Ready to add:</span> {summary}
+              </div>
+            )}
             {itemRows.length > 0 && (
               <div className="space-y-2">
                 {itemRows.map((row, i) => (
-                  <div key={`i-${i}`} className={`flex items-center gap-3 rounded-xl border border-neutral-200/70 px-3 py-2 ${row.included ? 'bg-white' : 'bg-neutral-50 opacity-60'}`}>
-                    <input
-                      type="checkbox"
-                      checked={row.included}
-                      onChange={(e) => updateItem(i, { included: e.target.checked })}
-                      aria-label={`Include "${row.title}"`}
-                      className="w-4 h-4 accent-primary-600 shrink-0"
-                    />
-                    <div className="flex-1 min-w-0">
+                  <div key={`i-${i}`} className={`flex flex-col gap-2 rounded-xl border border-neutral-200/70 px-3 py-2.5 sm:flex-row sm:items-center sm:gap-3 ${row.included ? 'bg-white' : 'bg-neutral-50 opacity-60'}`}>
+                    <div className="flex min-w-0 flex-1 items-start gap-3">
                       <input
-                        value={row.title}
-                        onChange={(e) => updateItem(i, { title: e.target.value })}
-                        aria-label="Task title"
-                        className="w-full bg-transparent text-[15px] text-neutral-900 focus:outline-none"
+                        type="checkbox"
+                        checked={row.included}
+                        onChange={(e) => updateItem(i, { included: e.target.checked })}
+                        aria-label={`Include "${row.title}"`}
+                        className="mt-1 w-4 h-4 accent-primary-600 shrink-0"
                       />
-                      {row.note && <p className="text-[13px] text-neutral-500 truncate">{row.note}</p>}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <TaskKindBadge title={row.title} note={row.note} label />
+                          <input
+                            value={row.title}
+                            onChange={(e) => updateItem(i, { title: e.target.value })}
+                            aria-label="Task title"
+                            className="min-w-0 flex-1 bg-transparent text-[15px] text-neutral-900 focus:outline-none"
+                          />
+                        </div>
+                        {row.note && <p className="mt-1 text-[13px] text-neutral-500 line-clamp-2">{row.note}</p>}
+                      </div>
                     </div>
-                    <select
-                      value={placementValue(row.placement)}
-                      onChange={(e) => {
-                        const placement = placementFromValue(e.target.value)
-                        // A time only lives on a real date. Moving a row to
-                        // This week / Inbox must drop it, or a stale "14:00"
-                        // rides along on a row that no longer shows one.
-                        updateItem(i, { placement, ...(placement.kind === 'date' ? {} : { time: null }) })
-                      }}
-                      aria-label="When"
-                      className="text-[13px] text-neutral-700 bg-neutral-100 rounded-lg px-2 py-1.5 shrink-0"
-                    >
-                      <option value="inbox">Inbox</option>
-                      <option value="week">This week</option>
-                      {windowDates.map((d) => (
-                        <option key={d} value={d}>{dateLabel(d)}</option>
-                      ))}
-                    </select>
-                    {row.placement.kind === 'date' && (
-                      <input
-                        type="time"
-                        value={row.time ?? ''}
-                        onChange={(e) => updateItem(i, { time: e.target.value || null })}
-                        aria-label={`Time for "${row.title}"`}
-                        className="text-[13px] text-neutral-700 bg-neutral-100 rounded-lg px-2 py-1.5 shrink-0 w-[104px]"
-                      />
-                    )}
-                    <select
-                      value={row.assigneeId ?? UNASSIGNED}
-                      onChange={(e) => updateItem(i, { assigneeId: e.target.value === UNASSIGNED ? null : e.target.value })}
-                      aria-label="Assignee"
-                      className="text-[13px] text-neutral-700 bg-neutral-100 rounded-lg px-2 py-1.5 shrink-0 max-w-[110px]"
-                    >
-                      <option value={UNASSIGNED}>Me</option>
-                      {members.map((m) => (
-                        <option key={m.id} value={m.id}>{m.name}</option>
-                      ))}
-                    </select>
+                    <div className="ml-7 flex flex-wrap items-center gap-2 sm:ml-0 sm:shrink-0 sm:flex-nowrap">
+                      <select
+                        value={placementValue(row.placement)}
+                        onChange={(e) => {
+                          const placement = placementFromValue(e.target.value)
+                          // A time only lives on a real date. Moving a row to
+                          // This week / Inbox must drop it, or a stale "14:00"
+                          // rides along on a row that no longer shows one.
+                          updateItem(i, { placement, ...(placement.kind === 'date' ? {} : { time: null }) })
+                        }}
+                        aria-label="When"
+                        className="text-[13px] text-neutral-700 bg-neutral-100 rounded-lg px-2 py-1.5 shrink-0"
+                      >
+                        <option value="inbox">Inbox</option>
+                        <option value="week">This week</option>
+                        {windowDates.map((d) => (
+                          <option key={d} value={d}>{dateLabel(d)}</option>
+                        ))}
+                      </select>
+                      {row.placement.kind === 'date' && (
+                        <input
+                          type="time"
+                          value={row.time ?? ''}
+                          onChange={(e) => updateItem(i, { time: e.target.value || null })}
+                          aria-label={`Time for "${row.title}"`}
+                          className="text-[13px] text-neutral-700 bg-neutral-100 rounded-lg px-2 py-1.5 shrink-0 w-[104px]"
+                        />
+                      )}
+                      <select
+                        value={row.assigneeId ?? UNASSIGNED}
+                        onChange={(e) => updateItem(i, { assigneeId: e.target.value === UNASSIGNED ? null : e.target.value })}
+                        aria-label="Assignee"
+                        className="text-[13px] text-neutral-700 bg-neutral-100 rounded-lg px-2 py-1.5 shrink-0 max-w-[110px]"
+                      >
+                        <option value={UNASSIGNED}>Me</option>
+                        {members.map((m) => (
+                          <option key={m.id} value={m.id}>{m.name}</option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                 ))}
               </div>

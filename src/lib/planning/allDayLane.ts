@@ -15,14 +15,14 @@
 /** One row of chips: the original lane height. */
 export const ALL_DAY_LANE_HEIGHT = 44
 
-/** Two chips per row is what fits legibly in a day column's width. */
-export const ALL_DAY_CHIPS_PER_ROW = 2
+/** One chip per row keeps day-level items readable in a seven-column week. */
+export const ALL_DAY_CHIPS_PER_ROW = 1
 
-/** Each additional row of chips costs this much height (chip h-5 + gap). */
-const ALL_DAY_ROW_HEIGHT = 24
+/** Each additional row of chips costs this much height (chip min-h-8 + gap). */
+const ALL_DAY_ROW_HEIGHT = 34
 
 /** The lane stops growing here — taller than this and it eats the hour grid. */
-export const ALL_DAY_MAX_ROWS = 4
+export const ALL_DAY_MAX_ROWS = 5
 
 /** Height needed to show `maxCount` chips without hiding any (up to the cap). */
 export function allDayLaneHeight(maxCount: number): number {

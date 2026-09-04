@@ -30,6 +30,7 @@ import type { TendState } from '@/hooks/useTendWeek'
 import type { TendProposal } from '@/lib/tend/types'
 import { TaskFateMenu } from '@/components/schedule/TaskFateMenu'
 import { applyTriageWhen } from '@/lib/triage/applyWhen'
+import { TaskKindBadge } from '@/components/task/TaskKindBadge'
 
 export const SHELF_COLLAPSED_COUNT = 8
 
@@ -176,6 +177,12 @@ function ShelfPillContent({
           (never truncate — see PlanningShelf.test.tsx's never-truncates
           assertion); break-words covers the case where a single word alone
           (e.g. a long URL) is wider than the block. */}
+      <TaskKindBadge
+        title={task.title}
+        category={task.category}
+        note={task.notes}
+        id={task.id}
+      />
       <span data-testid="shelf-pill-title" className="min-w-0 break-words text-neutral-700">{task.title}</span>
       {/* Amber alone says "late"; this says late FROM WHERE. A move placed on a
           week that came and went is a specific, legible fact about the plan. */}

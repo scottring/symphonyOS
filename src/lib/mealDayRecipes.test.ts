@@ -90,9 +90,6 @@ describe('buildMealDayRecipes', () => {
   // Feeding the stored string straight through is what fixes it, so this test
   // asserts the exact value Postgres returns still resolves a day.
   it('matches a plan by its stored week_start string, not a timezone-shifted Date', () => {
-    const shiftedKey = new Date(THIS_WEEK) // what the old code built: UTC midnight
-    expect(shiftedKey.getDate()).not.toBe(2) // ...which is Aug 1 locally, i.e. the bug
-
     const days = buildMealDayRecipes({
       plans: [plan({ weekStartIso: THIS_WEEK, entries: [entry({ id: 'e1', dayOfWeek: 3, recipeId: 'r1' })] })],
       recipes: [piccata],

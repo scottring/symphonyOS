@@ -42,6 +42,7 @@ function fmtShort(t: string | null): string {
 export function RoutineCollectionRow({ item, onSelect, onSelectStep, onCompleteStep, onSkipStep, onCompleteStepAt, onHideToday, onRemove }: Props) {
   const [open, setOpen] = useState(false)
   const [mgmtOpen, setMgmtOpen] = useState(false)
+  const [renderedAt] = useState(() => Date.now())
   // Missed-dose menu: which dose has its Done-now / Done-at / Skip popover open.
   const [menuDoseId, setMenuDoseId] = useState<string | null>(null)
   const [menuTime, setMenuTime] = useState('')
@@ -58,7 +59,7 @@ export function RoutineCollectionRow({ item, onSelect, onSelectStep, onCompleteS
     const [h, m] = dose.time.split(':').map(Number)
     const doseDate = item.startTime ? new Date(item.startTime) : new Date()
     doseDate.setHours(h, m, 0, 0)
-    return doseDate.getTime() < Date.now()
+    return doseDate.getTime() < renderedAt
   }
 
   /** Build a Date on the viewed day at the given HH:MM. */

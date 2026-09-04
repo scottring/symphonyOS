@@ -76,7 +76,7 @@ export function useSystemHealth(tasksOrInput: Task[] | SystemHealthInput): Syste
       if (t.isSomeday) return false
       return true
     })
-    const scheduledTasks = incompleteTasks.filter(t => t.scheduledFor || t.bucket === 'timed')
+    const _scheduledTasks = incompleteTasks.filter(t => t.scheduledFor || t.bucket === 'timed')
     // Deferred = bucket is week/month/quarter (temporal home but not scheduled to a specific time)
     const deferredTasks = incompleteTasks.filter(t => {
       if (t.bucket === 'week' || t.bucket === 'month' || t.bucket === 'quarter') return true
