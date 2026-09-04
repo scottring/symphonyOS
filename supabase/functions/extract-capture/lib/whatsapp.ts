@@ -18,10 +18,11 @@ function pad(n: number): string {
 // Accepts "2026-05-30, 09:14:23" and "5/30/26, 9:14:23 AM" -> "YYYY-MM-DDTHH:mm:ss".
 export function normalizeTimestamp(raw: string): string {
   const [datePart, timePartRaw] = raw.split(',').map((s) => s.trim())
-  let h: number, m: number, s: number
   const ampm = /\b(AM|PM)\b/i.exec(timePartRaw)
   const [hh, mm, ss] = timePartRaw.replace(/\s*(AM|PM)\s*/i, '').split(':')
-  h = parseInt(hh, 10); m = parseInt(mm, 10); s = parseInt(ss ?? '0', 10)
+  let h = parseInt(hh, 10)
+  const m = parseInt(mm, 10)
+  const s = parseInt(ss ?? '0', 10)
   if (ampm) {
     const isPM = ampm[1].toUpperCase() === 'PM'
     if (isPM && h !== 12) h += 12

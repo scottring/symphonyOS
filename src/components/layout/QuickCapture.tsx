@@ -11,6 +11,7 @@ import { ParsedFieldChips } from '@/components/capture/ParsedFieldChips'
 import { ConceptIcon } from '@/lib/conceptIcons'
 import { DictationMicButton } from '@/components/common/DictationMicButton'
 import { MOBILE_TAB_BAR_HEIGHT } from '@/shell/mobileChrome'
+import { TaskKindBadge } from '@/components/task/TaskKindBadge'
 
 interface QuickCaptureProps {
   onAdd: (title: string) => void
@@ -443,7 +444,7 @@ export function QuickCapture({
                     <>
                       {/* Title row */}
                       <div className="flex items-center gap-2 text-neutral-800">
-                        <span className="text-base"><ConceptIcon name="list" size={18} decorative /></span>
+                        <TaskKindBadge title={effectiveParsed.title} category={effectiveParsed.category} label />
                         <span className="font-medium">"{effectiveParsed.title}"</span>
                       </div>
                     </>

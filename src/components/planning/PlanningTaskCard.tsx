@@ -4,6 +4,7 @@ import type { Task } from '@/types/task'
 import { FAMILY_COLORS, type FamilyMember, type FamilyMemberColor } from '@/types/family'
 import { PlanningResizeHandle } from './PlanningResizeHandle'
 import { PushDropdown } from '@/components/triage'
+import { TaskKindBadge } from '@/components/task/TaskKindBadge'
 
 interface PlanningTaskCardProps {
   task: Task
@@ -104,6 +105,14 @@ export function PlanningTaskCard({ task, isDragging, isPlaced, onPushTask, onCom
             </svg>
           </div>
         )}
+
+        <TaskKindBadge
+          title={task.title}
+          category={task.category}
+          note={task.notes}
+          id={task.id}
+          className="mt-[1px]"
+        />
 
         {/* Task title */}
         <span

@@ -35,7 +35,7 @@ import { useSystemHealth, getHealthTextClasses } from '@/hooks/useSystemHealth'
 import { useTimelineInsert } from '@/hooks/useTimelineInsert'
 import { useDomain } from '@/hooks/useDomain'
 
-import { Eye, EyeOff, Repeat, Binoculars, Printer, GripVertical, CalendarClock, Moon, Sparkles, NotebookPen } from 'lucide-react'
+import { Eye, EyeOff, Repeat, Binoculars, Printer, GripVertical, CalendarClock, Moon, Sparkles, NotebookPen, Inbox, CalendarDays } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { AssigneeFilter } from '@/components/home/AssigneeFilter'
 
@@ -1095,7 +1095,7 @@ export function TodayView({
         )}
 
         {data.counts.totalItems === 0 ? (
-          <div className="text-center py-16">
+          <div className="mx-auto max-w-xl text-center py-16">
             <p className="font-display text-xl text-neutral-700">
               {/* While the day's data is still in flight, an empty list means
                   "not loaded yet" — not "clear". Say so, so the user never sees
@@ -1104,6 +1104,36 @@ export function TodayView({
                 ? 'Loading your day…'
                 : data.isToday && data.counts.completedCount > 0 ? 'All cleared — nicely done' : 'Your day is clear'}
             </p>
+            {!loading && data.isToday && (
+              <div className="mt-5 flex flex-wrap justify-center gap-2">
+                {onOpenPlanFromPaper && (
+                  <button
+                    type="button"
+                    onClick={onOpenPlanFromPaper}
+                    className="inline-flex items-center gap-2 rounded-lg border border-primary-200 bg-primary-50 px-3 py-2 text-sm font-medium text-primary-800 hover:bg-primary-100 transition-colors"
+                  >
+                    <NotebookPen className="h-4 w-4" />
+                    Snap paper plan
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => navigate('/inbox')}
+                  className="inline-flex items-center gap-2 rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50 transition-colors"
+                >
+                  <Inbox className="h-4 w-4" />
+                  Process inbox
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate('/week')}
+                  className="inline-flex items-center gap-2 rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50 transition-colors"
+                >
+                  <CalendarDays className="h-4 w-4" />
+                  Plan week
+                </button>
+              </div>
+            )}
           </div>
         ) : (
           <div className="space-y-6">
