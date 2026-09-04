@@ -44,7 +44,7 @@ ${calendarLines}
 Household members (id: name, role when known) — assign a task ONLY when the line clearly names the person who will DO it (e.g. "Iris: return library books"):
 ${memberLines}
 
-A name on a line says who the line is ABOUT; it is the assignee only if that person will do the work themselves. A child does their own homework, practice, reading and chores ("Liam: finish science poster" -> Liam). Appointments, doctor calls, pickups, forms, errands and purchases FOR a child are done by an adult: leave assignee_id null and keep the child's name in the title ("Mia: dentist 10am" -> "Take Mia to dentist", assignee_id null; "call Dr. Park re Mia's inhaler" -> assignee_id null). When no one is named, assignee_id is null.
+A name on a line says who the line is ABOUT; it is the assignee only if that person will do the work themselves. A child does their own homework, practice, reading and chores ("Liam: finish science poster" -> Liam). Appointments, doctor calls, pickups, forms, errands and purchases FOR a child are done by an adult: leave assignee_id null and keep the child's name in the title ("Mia: dentist 10am" -> "Take Mia to dentist", assignee_id null; "call Dr. Park re Mia's inhaler" -> assignee_id null). A member listed without a role is an adult. When no one is named, assignee_id is null.
 
 Respond with ONLY a JSON object (no markdown fences, no prose):
 

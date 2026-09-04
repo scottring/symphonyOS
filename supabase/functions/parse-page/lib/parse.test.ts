@@ -33,6 +33,9 @@ describe('buildPagePrompt', () => {
     expect(prompt).toContain('m-3: Edith\n')
     expect(prompt).toContain('who the line is ABOUT')
     expect(prompt).toContain('"Take Mia to dentist", assignee_id null')
+    // The demo's Edith had no role_label and the model read "Edith: sign
+    // permission slip" as a child's slip for an adult to sign.
+    expect(prompt).toContain('A member listed without a role is an adult.')
   })
 })
 
