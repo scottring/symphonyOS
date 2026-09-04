@@ -21,16 +21,22 @@ describe('PanelShell', () => {
     ])
   })
 
+  // The panel also carries a decorative place wash (aria-hidden). It is not a
+  // zone, so the ghost-divider guard counts everything BUT it.
+  const zoneChildren = (container: HTMLElement) =>
+    [...container.querySelector('article')!.children]
+      .filter((el) => el.getAttribute('aria-hidden') !== 'true')
+
   it('renders no wrapper for an omitted zone, so no ghost divider appears', () => {
     const { container } = render(<PanelShell identity={<p>only</p>} />)
-    expect(container.querySelector('article')!.children).toHaveLength(1)
+    expect(zoneChildren(container)).toHaveLength(1)
   })
 
   it('treats a zone rendering null as omitted', () => {
     const { container } = render(
       <PanelShell identity={<p>only</p>} act={null} details={undefined} />,
     )
-    expect(container.querySelector('article')!.children).toHaveLength(1)
+    expect(zoneChildren(container)).toHaveLength(1)
   })
 
   it('renders children outside the divided flow', () => {

@@ -1,4 +1,5 @@
 import type { ReactNode, Ref } from 'react'
+import { PlaceWash } from '@/components/place/PlaceWash'
 
 /**
  * Hairline rules with even vertical padding, and no padding at the ends. Applied
@@ -48,8 +49,12 @@ export function PanelShell({
   return (
     <article
       ref={innerRef}
-      className={`bg-bg-elevated max-w-md w-full rounded-2xl px-4 md:px-5 py-3 md:py-5 ${RHYTHM}`}
+      className={`relative isolate overflow-hidden bg-bg-elevated max-w-md w-full rounded-2xl px-4 md:px-5 py-3 md:py-5 ${RHYTHM}`}
     >
+      {/* The panel wears the user's Place, same as Today's day card. Top-anchored
+          so the medallion sits behind the identity zone, not the reading column. */}
+      <PlaceWash anchor="top" opacity={0.14} />
+
       {zones.map((zone, i) =>
         // The rhythm repeats INSIDE a zone: `details` holds many sections, and
         // without it Phone and Notes butt together with no rule between them

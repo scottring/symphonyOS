@@ -87,3 +87,12 @@ export function usePlace() {
   if (!context) throw new Error('usePlace must be used within PlaceProvider')
   return context
 }
+
+/** The active place, or the default when no provider is mounted.
+ *  For DECORATIVE consumers only (medallions, washes): a surface that renders
+ *  bare — in a test, or in a subtree outside PlaceProvider — should quietly
+ *  wear the default place, never throw. Anything that WRITES the place must
+ *  use usePlace() and be inside the provider. */
+export function usePlaceOrDefault(): PlaceId {
+  return useContext(PlaceContext)?.place ?? DEFAULT_PLACE
+}

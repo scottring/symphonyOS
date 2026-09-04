@@ -59,6 +59,7 @@ import { TodayOverflowMenu } from './TodayOverflowMenu'
 import { ReviewDrawer, type ReviewMode } from './ReviewDrawer'
 import { HorizonPoolDropdown } from './HorizonPoolDropdown'
 import { DayNavCluster } from './DayNavCluster'
+import { PlaceWash } from '@/components/place/PlaceWash'
 import { TodayBacklogFooter } from './TodayBacklogFooter'
 import { EmailReviewSheet } from './EmailReviewSheet'
 import { useUnreviewedCaptures } from '@/hooks/useUnreviewedCaptures'
@@ -648,6 +649,7 @@ export function TodayView({
     return 'Good evening'
   }, [nowForDisplay])
   const decisionCount = data.attentionItems.length + emailCaptures.length + visibleUnpromptedItems.length
+
   const nextTimeLabel = upNext?.item.startTime
     ? upNext.item.startTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
     : upNext ? 'Today' : ''
@@ -1063,8 +1065,17 @@ export function TodayView({
         </div>
       )}
 
-      <section className="mx-3 mb-4 overflow-hidden rounded-2xl border border-neutral-200/80 bg-bg-elevated shadow-sm md:mx-0">
-        <div className="border-b border-neutral-100 px-4 py-4 md:px-5">
+      {/* The day card wears the user's Place (Settings → the five illustrated
+          worlds). The place already re-tints primary/accent globally via
+          [data-place]; here that tinting becomes visible — a soft wash in
+          those hues, and the place's own medallion bleeding off the right
+          edge, faint enough to read as paper texture rather than a sticker.
+          Purely decorative: aria-hidden, pointer-events-none, and every piece
+          of text above it keeps the unchanged neutral palette. */}
+      <section className="relative isolate mx-3 mb-4 overflow-hidden rounded-2xl border border-neutral-200/80 bg-bg-elevated shadow-sm md:mx-0">
+        <PlaceWash />
+
+        <div className="relative px-4 py-4 md:px-5">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
               {/* The page's one and only date masthead. It used to sit in a
@@ -1085,7 +1096,8 @@ export function TodayView({
             {headerControls && <div className="hidden shrink-0 md:block">{headerControls}</div>}
           </div>
 
-          <div className="mt-4 flex flex-wrap items-center gap-2">
+          <div className="mt-4 flex flex-wrap items-end justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2">
             {data.isToday && ctx.onOpenPlanning && (
               <button
                 type="button"
@@ -1112,61 +1124,74 @@ export function TodayView({
               <CalendarDays className="h-4 w-4" />
               Plan week
             </button>
+            </div>
+
+            {/* The day's lookups and settings, in the card's lower-right —
+                      opposite the actions. They used to float in a strip of their
+                      own between the card and the list, anchored by a negative
+                      margin; the card can simply hold them. */}
+                  <div
+                    data-testid="today-controls"
+                    className="hidden shrink-0 md:flex items-center gap-1"
+                  >
+              {/* The week/month pools — separate dropdowns, deliberately OUTSIDE
+                  the review drawer. Always rendered (a place to look must always
+                  be there); each opens to the same triage rows the drawer uses. */}
+              <HorizonPoolDropdown
+                label="Week"
+                tasks={weekPool}
+                offer={['today', 'tomorrow', 'someday', 'deleted']}
+                viewedDate={viewedDate}
+                onUpdateTask={(id, u) => onUpdateTask?.(id, u)}
+                onPushTask={ctx.onPushTask}
+                onDeleteTask={ctx.onDeleteTask}
+                onCompleteTask={onToggleTask}
+                benchRoute="/week"
+                benchLabel="Open week bench"
+              />
+              <HorizonPoolDropdown
+                label="Month"
+                tasks={monthPool}
+                offer={['today', 'week', 'someday', 'deleted']}
+                viewedDate={viewedDate}
+                onUpdateTask={(id, u) => onUpdateTask?.(id, u)}
+                onPushTask={ctx.onPushTask}
+                onDeleteTask={ctx.onDeleteTask}
+                onCompleteTask={onToggleTask}
+              />
+
+              {onSelectAssignees && ((assigneesWithTasks?.length ?? 0) > 0 || hasUnassignedTasks) && (
+                <AssigneeFilter
+                  selectedAssignees={selectedAssignees ?? []}
+                  onSelectAssignees={onSelectAssignees}
+                  assigneesWithTasks={assigneesWithTasks ?? []}
+                  hasUnassignedTasks={!!hasUnassignedTasks}
+                />
+              )}
+
+              {!isMobile && overflowMenu}
+            </div>
           </div>
         </div>
       </section>
 
-      {/* Today's controls — one primary action, everything else one tap away.
-          This strip used to carry a progress bar, four counters and seven
-          always-visible buttons above a list of two tasks. Nothing here was
-          removed; the rarely-used controls moved behind the overflow so the
-          page spends its space on the day instead of on itself. */}
-      <div
-        data-testid="today-controls"
-        className="px-3 md:px-0 mb-3 md:-mt-5 hidden md:flex items-center justify-end gap-1"
-      >
-        {/* The week/month pools — separate dropdowns, deliberately OUTSIDE
-            the review drawer. Always rendered (a place to look must always
-            be there); each opens to the same triage rows the drawer uses. */}
-        <HorizonPoolDropdown
-          label="Week"
-          tasks={weekPool}
-          offer={['today', 'tomorrow', 'someday', 'deleted']}
-          viewedDate={viewedDate}
-          onUpdateTask={(id, u) => onUpdateTask?.(id, u)}
-          onPushTask={ctx.onPushTask}
-          onDeleteTask={ctx.onDeleteTask}
-          onCompleteTask={onToggleTask}
-          benchRoute="/week"
-          benchLabel="Open week bench"
-        />
-        <HorizonPoolDropdown
-          label="Month"
-          tasks={monthPool}
-          offer={['today', 'week', 'someday', 'deleted']}
-          viewedDate={viewedDate}
-          onUpdateTask={(id, u) => onUpdateTask?.(id, u)}
-          onPushTask={ctx.onPushTask}
-          onDeleteTask={ctx.onDeleteTask}
-          onCompleteTask={onToggleTask}
-        />
-
-        {onSelectAssignees && ((assigneesWithTasks?.length ?? 0) > 0 || hasUnassignedTasks) && (
-          <AssigneeFilter
-            selectedAssignees={selectedAssignees ?? []}
-            onSelectAssignees={onSelectAssignees}
-            assigneesWithTasks={assigneesWithTasks ?? []}
-            hasUnassignedTasks={!!hasUnassignedTasks}
-          />
-        )}
-
-        {!isMobile && overflowMenu}
-      </div>
 
       {/* The rail column only exists when the rail does; otherwise the day gets
           the full width instead of a 320px empty gutter. */}
-      <div className={`px-3 md:px-0 ${decisionCount > 0 ? 'lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start lg:gap-4' : ''}`}>
+      <div className={`@container px-3 md:px-0 ${decisionCount > 0 ? '@[62rem]:grid @[62rem]:grid-cols-[minmax(0,1fr)_320px] @[62rem]:items-start @[62rem]:gap-4' : ''}`}>
         <main className="min-w-0">
+          {decisionCount > 0 && (
+            <button
+              type="button"
+              onClick={() => navigate('/inbox')}
+              className="mb-3 flex w-full items-center justify-between gap-3 rounded-xl border border-neutral-200/80 bg-bg-elevated px-3 py-2 text-left text-sm text-neutral-700 shadow-sm transition-colors hover:bg-neutral-50 @[62rem]:hidden"
+            >
+              <span className="min-w-0 truncate">
+                {decisionCount} need{decisionCount === 1 ? 's' : ''} a decision
+              </span>
+              <ArrowRight className="h-4 w-4 shrink-0 text-neutral-400" />
+            </button>
+          )}
       {/* Task list — wrapped in a card on desktop; on mobile the rows go
           full-width (no card, no border, no inner padding) to match the
           compact list the pre-redesign mobile had.
@@ -1375,7 +1400,7 @@ export function TodayView({
             absent otherwise. A card whose job is to announce its own emptiness
             still costs a third of the page. */}
         {decisionCount > 0 && (
-        <aside className="mt-4 hidden space-y-3 lg:mt-0 lg:block">
+        <aside className="mt-4 hidden space-y-3 @[62rem]:mt-0 @[62rem]:block">
           <section className="rounded-2xl border border-neutral-200/80 bg-bg-elevated p-4 shadow-sm">
             <div className="mb-3 flex items-center justify-between gap-3">
               <div>

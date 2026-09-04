@@ -1,4 +1,5 @@
 import { useRef, useEffect, useCallback, useState } from 'react'
+import { PlaceWash } from '@/components/place/PlaceWash'
 import { ChatMessage } from './ChatMessage'
 import { ChatInput } from './ChatInput'
 import { VaultDraftCard } from './VaultDraftCard'
@@ -124,9 +125,14 @@ export function ChatPanel({
 
   return (
     <div
-      className="flex flex-col h-full min-h-0 bg-white border-l border-neutral-200"
+      className="relative isolate flex flex-col h-full min-h-0 overflow-hidden bg-white border-l border-neutral-200"
       onKeyDown={handleKeyDown}
     >
+      {/* The pane wears the user's Place, same as Today's day card. Anchored to
+          the top so the medallion sits behind the header rather than behind the
+          conversation. */}
+      <PlaceWash anchor="top" opacity={0.16} />
+
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-neutral-200">
         <div className="flex items-center gap-2">

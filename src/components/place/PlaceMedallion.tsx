@@ -1,7 +1,7 @@
 // The active place's medallion — one flat-vector SVG scene per place.
 // Pass an explicit `place` (the Settings picker previews all five) or omit
 // it to render the user's current place.
-import { usePlace } from '@/hooks/usePlace'
+import { usePlaceOrDefault } from '@/hooks/usePlace'
 import type { PlaceId } from '@/config/places'
 import { DenselyUrbanVignette } from './vignettes/DenselyUrbanVignette'
 import { SmallCityVignette } from './vignettes/SmallCityVignette'
@@ -18,7 +18,7 @@ const VIGNETTES: Record<PlaceId, (props: { className?: string }) => React.JSX.El
 }
 
 export function PlaceMedallion({ place, className = '' }: { place?: PlaceId; className?: string }) {
-  const { place: currentPlace } = usePlace()
+  const currentPlace = usePlaceOrDefault()
   const Vignette = VIGNETTES[place ?? currentPlace]
   return <Vignette className={className} />
 }

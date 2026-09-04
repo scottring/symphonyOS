@@ -280,15 +280,18 @@ export function Sidebar({
           {!collapsed && <span>This Week</span>}
         </button>
 
-        {/* Plan from paper — the verb that starts the day and the week. Not a
-            place, so it does not look like one: tinted, an action row. From
+        {/* Plan from paper — the verb that starts the day and the week. From
             any page (Scott, 2026-09-03: it is too important to hide). A Home
             view that is mounted opens the flow in place; otherwise Today
-            opens and picks the request up on mount. */}
+            opens and picks the request up on mount.
+
+            It sits in the nav flush with the places around it — no border, no
+            fill. The weight of the label is enough to say it is the one row
+            here that does something rather than goes somewhere. */}
         <button
           onClick={() => { if (!requestPlanFromPaper()) onViewChange('today') }}
           title="Plan from paper — photograph your written plan and place its items"
-          className={`${navItemClass(false)} mt-1 border border-primary-500/30 bg-primary-50 text-primary-700 hover:bg-primary-100`}
+          className={navItemClass(false)}
         >
           <NotebookPen className="w-5 h-5 shrink-0" />
           {!collapsed && <span className="font-semibold">Plan from paper</span>}
