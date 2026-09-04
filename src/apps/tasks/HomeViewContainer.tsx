@@ -63,7 +63,7 @@ import { useMealEventsForDate } from '@/shell/providers/MealEventsProvider';
 export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' } = {}) {
   // Data hooks
   const { tasks, loading: tasksLoading, addTask, toggleTask, toggleWaiting, deleteTask, updateTask, updateTasksBulk, pushTask, getLinkedTasks, refetch, updateTaskOrders } = useSupabaseTasks();
-  const { isConnected, events, fetchEvents, fetchCalendarList, isFetching: eventsFetching, updateEvent, createEvent, deleteEvent, removeEventLocal, restoreEventLocal } = useGoogleCalendar();
+  const { isConnected, events, fetchEvents, fetchCalendarList, updateEvent, createEvent, deleteEvent, removeEventLocal, restoreEventLocal } = useGoogleCalendar();
   // Passing the visible event ids opts in to auto-loading notes (context
   // overrides, assignees, shared-with-family, free) + realtime — without it
   // those persist to the DB but render stale on every fresh window.
@@ -832,7 +832,15 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
         dateInstances={dateInstances}
         selectedItemId={selectedItemId}
         onSelectItem={handleSelectItem}
-        loading={tasksLoading || eventsFetching || routinesLoading}
+        // The calendar is NOT allowed to gate the day.
+        //
+        // Google is the one source here that can fail indefinitely — an
+        // expired session, a revoked token, an edge function 404 — and while
+        // `eventsFetching` was in this expression a calendar that never
+        // answered left Today showing "Loading…" over tasks and routines that
+        // had arrived perfectly well (2026-09-04, prod). Events fill in when
+        // they arrive; the rest of the day should never wait on them.
+        loading={tasksLoading || routinesLoading}
         viewedDate={viewedDate}
         onDateChange={setViewedDate}
         onOpenPlanFromPaper={() => setPlanFromPaperOpen(true)}

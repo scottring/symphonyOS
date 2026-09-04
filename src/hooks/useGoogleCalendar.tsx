@@ -173,13 +173,21 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
           return
         }
 
-        // Get connection with token expiry info
+        // Get connection with token expiry info.
+        //
+        // maybeSingle, NOT single. `single()` asks PostgREST for exactly one
+        // row and returns 406 when it gets none — so "this user has no
+        // calendar connection" arrived as an ERROR, which is the one thing the
+        // line below promises to retry. The result was a signed-out or
+        // RLS-invisible session retrying 20 times over ten minutes and filling
+        // the console with 406s, when the honest answer was "not connected"
+        // on the first try (2026-09-04, prod).
         const { data: connection, error: connError } = await supabase
           .from('calendar_connections')
           .select('id, token_expires_at, calendar_id')
           .eq('user_id', user.id)
           .eq('provider', 'google')
-          .single()
+          .maybeSingle()
 
         if (connError || !connection) {
           setIsConnected(false)
