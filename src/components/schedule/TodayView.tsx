@@ -1052,7 +1052,7 @@ export function TodayView({
                 <span>{fullDateLabel}</span>
               </div>
               <h1 className="font-display text-[28px] font-semibold leading-tight text-neutral-950 md:text-[34px]">
-                {data.isToday ? `${greeting}, Scott` : dayName}
+                {data.isToday ? greeting : dayName}
               </h1>
               <p className="mt-1 max-w-2xl text-sm text-neutral-500 md:text-[15px]">{heroLine}</p>
             </div>
