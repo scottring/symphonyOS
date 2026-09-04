@@ -132,7 +132,7 @@ export function ChatPanel({
       {/* The pane wears the user's Place, same as Today's day card. Anchored to
           the top so the medallion sits behind the header rather than behind the
           conversation. */}
-      <PlaceWash anchor="top" opacity={0.16} />
+      <PlaceWash anchor="top" opacity={0.24} tint="strong" />
 
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-neutral-200">

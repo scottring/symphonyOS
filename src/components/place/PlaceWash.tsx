@@ -16,11 +16,16 @@ import { PlaceMedallion } from './PlaceMedallion'
 export function PlaceWash({
   anchor = 'right',
   opacity = 0.22,
+  tint = 'soft',
 }: {
   /** 'right' for wide surfaces (the day card); 'top' for tall narrow panes,
    *  where a centred medallion would sit behind the reading column. */
   anchor?: 'right' | 'top'
   opacity?: number
+  /** How much of the place's colour the surface carries. 'soft' for surfaces
+   *  sitting on the warm paper ground, where a little goes a long way;
+   *  'strong' for a pane on flat white, which otherwise reads as untouched. */
+  tint?: 'soft' | 'strong'
 }) {
   const position =
     anchor === 'right'
@@ -33,7 +38,13 @@ export function PlaceWash({
 
   return (
     <div aria-hidden="true" className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-br from-primary-50/70 via-transparent to-accent-50/40" />
+      <div
+        className={`absolute inset-0 bg-gradient-to-br ${
+          tint === 'strong'
+            ? 'from-primary-100/80 via-primary-50/45 to-accent-100/55'
+            : 'from-primary-50/70 via-transparent to-accent-50/40'
+        }`}
+      />
       <div
         className={`absolute hidden sm:block ${position}`}
         style={{ opacity, maskImage: fade, WebkitMaskImage: fade }}
