@@ -177,4 +177,71 @@ describe('WeekPoolLane', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Everything' }))
     expect(screen.getByText('Backlog item')).toBeInTheDocument()
   })
+
+  // A routine with no time needs a slot exactly the way an unscheduled task
+  // does, so it rides in the same strip instead of hiding behind its own tab
+  // (Scott, 2026-09-05).
+  it('carries routines that need a home into the week strip, after the tasks', () => {
+    render(
+      <DndContext>
+        <WeekPoolLane
+          weekStart={weekStart}
+          dayCount={5}
+          onSelectItem={() => {}}
+          tasks={[task({ id: 'a', title: 'Call VW', bucket: 'week' })]}
+          routines={[createMockRoutine({ name: 'Trash night', time_of_day: null })]}
+        />
+      </DndContext>,
+    )
+    expect(screen.getByText('Call VW')).toBeInTheDocument()
+    expect(screen.getByText('Trash night')).toBeInTheDocument()
+    // Both counted in the header
+    expect(screen.getByRole('button', { name: /Unscheduled · 2/ })).toBeInTheDocument()
+  })
+
+  // 'This Month' is a BUCKET view; a routine has no bucket.
+  it('leaves routines out of the month bucket', () => {
+    render(
+      <DndContext>
+        <WeekPoolLane
+          weekStart={weekStart}
+          dayCount={5}
+          onSelectItem={() => {}}
+          tasks={[]}
+          routines={[createMockRoutine({ name: 'Trash night', time_of_day: null })]}
+        />
+      </DndContext>,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'This month' }))
+    expect(screen.queryByText('Trash night')).not.toBeInTheDocument()
+  })
+
+  // Routines get their own allowance. Sharing the tasks' budget meant a busy
+  // week (34 loose tasks) spent every slot on tasks and showed no routine at
+  // all — the very segregation this change ends.
+  it('always shows routines on a busy strip, capped separately from the tasks', () => {
+    const many = Array.from({ length: 20 }, (_, i) =>
+      task({ id: `t${i}`, title: `Loose ${i}`, bucket: 'week' }))
+    const routines = Array.from({ length: 6 }, (_, i) =>
+      createMockRoutine({ id: `r${i}`, name: `Routine ${i}`, time_of_day: null }))
+    render(
+      <DndContext>
+        <WeekPoolLane
+          weekStart={weekStart}
+          dayCount={5}
+          onSelectItem={() => {}}
+          tasks={many}
+          routines={routines}
+        />
+      </DndContext>,
+    )
+    // Tasks fill their 8 slots AND four routines still show
+    expect(screen.getAllByTitle(/Loose /)).toHaveLength(8)
+    expect(screen.getByText('Routine 3')).toBeInTheDocument()
+    expect(screen.queryByText('Routine 4')).not.toBeInTheDocument()
+    // One expander opens what both lists are holding back: 12 tasks + 2 routines
+    fireEvent.click(screen.getByRole('button', { name: '+14 more' }))
+    expect(screen.getByText('Routine 5')).toBeInTheDocument()
+    expect(screen.getAllByTitle(/Loose /)).toHaveLength(20)
+  })
 })

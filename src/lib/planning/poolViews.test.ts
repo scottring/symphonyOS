@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import {
   unscheduledPool, applyPoolView, orderPool, groupPool, isMealTask,
-  readPoolView, writePoolView, type PoolCtx,
+  readPoolView, writePoolView, routinesForView, type PoolCtx,
 } from './poolViews'
 import type { Task } from '@/types/task'
+import type { Routine } from '@/types/actionable'
 
 // Fixture builder — values shaped like what the hooks hand the components
 // (Dates hydrated, optional fields absent unless set).
@@ -155,5 +156,40 @@ describe('pool view persistence', () => {
     writePoolView('overlay', 'month')
     expect(readPoolView('overlay')).toBe('month')
     expect(readPoolView('weekbench')).toBe('week') // other surface untouched
+  })
+})
+
+
+describe('routinesForView', () => {
+  // The hosts hand in routines that are ALREADY unhomed — this decides only
+  // which views show them at all.
+  const routines = [
+    { id: 'r1', name: 'Do kitchen laundry' },
+    { id: 'r2', name: 'Weeding front and back yards' },
+  ] as Routine[]
+
+  // A routine with no time is the same kind of thing as an unscheduled task:
+  // something that needs a slot. Segregating it on its own tab meant you had
+  // to remember to go looking for it before the week was blocked out.
+  it('mixes routines into this week', () => {
+    expect(routinesForView(routines, 'week')).toEqual(routines)
+  })
+
+  it('mixes routines into everything', () => {
+    expect(routinesForView(routines, 'all')).toEqual(routines)
+  })
+
+  it('keeps the routines tab as the isolate filter', () => {
+    expect(routinesForView(routines, 'routines')).toEqual(routines)
+  })
+
+  // 'month' is a BUCKET view — it answers "what did I put in the month
+  // bucket". A routine has no bucket, so it has no business there.
+  it('leaves routines out of the month bucket', () => {
+    expect(routinesForView(routines, 'month')).toEqual([])
+  })
+
+  it('never returns a new empty array identity to churn memos', () => {
+    expect(routinesForView([], 'week')).toHaveLength(0)
   })
 })

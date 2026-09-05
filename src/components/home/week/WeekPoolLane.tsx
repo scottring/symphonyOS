@@ -14,6 +14,7 @@ import { Check, ChevronDown, ChevronRight, ChevronsRight, CookingPot, GripVertic
 import type { Task } from '@/types/task'
 import type { Routine } from '@/types/actionable'
 import { routineTemporalLabel } from '@/lib/planning/routineTemporal'
+import { routinesForView } from '@/lib/planning/poolViews'
 import {
   unscheduledPool, applyPoolView, orderPool, groupPool,
   readPoolView, writePoolView, type PoolView,
@@ -27,6 +28,11 @@ const SURFACE = 'weekbench'
 
 // Loose pills visible before the "+N more" expander — roughly two tidy rows.
 const STRIP_CAP = 8
+// Routines get their OWN allowance rather than sharing the tasks' budget. With
+// 34 loose tasks a shared cap spent every slot on tasks and showed no routine
+// at all — which is the segregation this change exists to end (Scott,
+// 2026-09-05). Costs at most one extra row; nothing is taken from the tasks.
+const ROUTINE_STRIP_CAP = 4
 
 // A pill is a dnd-kit drag handle end-to-end, so inline buttons must stop the
 // pointer BEFORE the sensor arms a drag (same guard as the overlay cards).
@@ -163,12 +169,17 @@ export function WeekPoolLane({
     return groupPool(orderPool(applyPoolView(unscheduledPool(tasks, ctx), view, ctx), ctx))
   }, [tasks, weekStart, dayCount, view, meId])
 
-  const needsHome = routines
   const routinesView = view === 'routines'
+  // A routine with no time needs a slot the way an unscheduled task does, so
+  // it rides in the same strip. The host hands over only unhomed ones;
+  // routinesForView decides which views carry them, shared with the overlay's
+  // drawer so the two surfaces cannot disagree.
+  const needsHome = routinesForView(routines, view)
 
-  const total = routinesView ? needsHome.length : pool.meals.length + pool.loose.length
+  const total = routinesView ? needsHome.length : pool.meals.length + pool.loose.length + needsHome.length
   const visibleLoose = showAll ? pool.loose : pool.loose.slice(0, STRIP_CAP)
-  const overflow = pool.loose.length - visibleLoose.length
+  const visibleRoutines = showAll ? needsHome : needsHome.slice(0, ROUTINE_STRIP_CAP)
+  const overflow = (pool.loose.length - visibleLoose.length) + (needsHome.length - visibleRoutines.length)
 
   const pillProps = { onSelect: onSelectItem, onCompleteTask, onNotThisWeek, onPushTask }
 
@@ -228,6 +239,7 @@ export function WeekPoolLane({
           )}
           {mealsOpen && pool.meals.map((t) => <PoolPill key={t.id} task={t} {...pillProps} />)}
           {visibleLoose.map((t) => <PoolPill key={t.id} task={t} {...pillProps} />)}
+          {visibleRoutines.map((r) => <RoutinePill key={r.id} routine={r} onSelect={onSelectItem} />)}
           {overflow > 0 && (
             <button
               type="button"

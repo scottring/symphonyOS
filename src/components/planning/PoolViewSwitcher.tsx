@@ -10,9 +10,12 @@ const ROUTINES_VIEW: { value: PoolView; label: string } = { value: 'routines', l
 
 /** The official pool views, as a segmented control. Shared by the overlay
  *  drawer and /week's pool lane so the vocabulary stays identical.
- *  `includeRoutines` adds the Routines tab — only where a host can actually
- *  offer draggable routines (the overlay; /week has no routine-drop protocol
- *  from the pool yet). */
+ *
+ *  `includeRoutines` adds the Routines tab, which ISOLATES routines the way
+ *  'month' isolates the month bucket — it is a filter, not a separate mode.
+ *  Unhomed routines also ride along in 'week' and 'all' (see routinesForView),
+ *  because a routine with no time needs a slot exactly the way an unscheduled
+ *  task does, and on its own tab it was never blocked out. */
 export function PoolViewSwitcher({ view, onChange, includeRoutines = false }: {
   view: PoolView
   onChange: (v: PoolView) => void

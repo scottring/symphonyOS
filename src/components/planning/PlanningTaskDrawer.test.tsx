@@ -7,6 +7,15 @@ import type { Task } from '@/types/task'
 function task(id: string, title: string): Task {
   return { id, title, completed: false, createdAt: new Date(), updatedAt: new Date() } as Task
 }
+function routine(id: string, name: string) {
+  return {
+    id,
+    name,
+    recurrence_pattern: { type: 'weekly', days: ['sat'] },
+    time_of_day: null,
+    is_active: true,
+  } as never
+}
 const noop = () => {}
 
 function renderDrawer(over: Partial<React.ComponentProps<typeof PlanningTaskDrawer>> = {}) {
@@ -42,31 +51,47 @@ describe('PlanningTaskDrawer', () => {
   })
 
   it('Routines tab lists draggable routines with their temporal parameters', () => {
-    const routine = {
-      id: 'r1',
-      name: 'Food shopping',
-      recurrence_pattern: { type: 'weekly', days: ['sat'] },
-      time_of_day: null,
-      is_active: true,
-    } as never
-    renderDrawer({ view: 'routines', routines: [routine], mealTasks: [] })
+    renderDrawer({ view: 'routines', routines: [routine('r1', 'Food shopping')], mealTasks: [] })
     expect(screen.getByText('Food shopping')).toBeInTheDocument()
     expect(screen.getByText('Weekly · Sat · no set time')).toBeInTheDocument()
     // Task pool stays out of the Routines tab
     expect(screen.queryByText('Call VW')).not.toBeInTheDocument()
   })
 
-  it('keeps routines out of the task views (they live on their own tab now)', () => {
-    const routine = {
-      id: 'r1',
-      name: 'Food shopping',
-      recurrence_pattern: { type: 'weekly', days: ['sat'] },
-      time_of_day: null,
-      is_active: true,
-    } as never
-    renderDrawer({ view: 'week', routines: [routine] })
+  // A routine with no time needs a slot exactly the way an unscheduled task
+  // does. On its own tab you had to remember to go looking for it before the
+  // week was blocked out, so it stayed unblocked (Scott, 2026-09-05).
+  it('carries routines into this week, grouped after the tasks', () => {
+    renderDrawer({ view: 'week', routines: [routine('r1', 'Food shopping')] })
+    expect(screen.getByText('Food shopping')).toBeInTheDocument()
+    expect(screen.getByText('Call VW')).toBeInTheDocument()
+    expect(screen.getByText(/Routines · 1/)).toBeInTheDocument()
+  })
+
+  it('carries routines into Everything too', () => {
+    renderDrawer({ view: 'all', routines: [routine('r1', 'Food shopping')] })
+    expect(screen.getByText('Food shopping')).toBeInTheDocument()
+  })
+
+  // 'This month' is a BUCKET view — it answers "what did I put in the month
+  // bucket", and a routine has no bucket.
+  it('leaves routines out of the month bucket', () => {
+    renderDrawer({ view: 'month', routines: [routine('r1', 'Food shopping')] })
     expect(screen.queryByText('Food shopping')).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Routines' })).toBeInTheDocument()
+  })
+
+  it('counts routines in the Unscheduled badge', () => {
+    renderDrawer({ view: 'week', mealTasks: [], routines: [routine('r1', 'A'), routine('r2', 'B')] })
+    // 2 loose tasks + 2 routines
+    expect(screen.getByText('4')).toBeInTheDocument()
+  })
+
+  // The group is a label, not a disclosure: routines you have to expand are
+  // routines you forget to block.
+  it('shows the routines group expanded, with no toggle to open', () => {
+    renderDrawer({ view: 'week', routines: [routine('r1', 'Food shopping')] })
+    expect(screen.queryByRole('button', { name: /Routines · 1/ })).not.toBeInTheDocument()
+    expect(screen.getByText('Food shopping')).toBeInTheDocument()
   })
 
   it('caps loose tasks at 15 behind an expander', () => {

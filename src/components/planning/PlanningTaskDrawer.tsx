@@ -1,10 +1,11 @@
 import { useState } from 'react'
 import { useDroppable } from '@dnd-kit/core'
-import { ChevronDown, ChevronRight, CookingPot } from 'lucide-react'
+import { ChevronDown, ChevronRight, CookingPot, Repeat } from 'lucide-react'
 import type { Task } from '@/types/task'
 import type { Routine } from '@/types/actionable'
 import type { PoolView } from '@/lib/planning/poolViews'
 import { routineTemporalLabel } from '@/lib/planning/routineTemporal'
+import { routinesForView } from '@/lib/planning/poolViews'
 import { PoolViewSwitcher } from './PoolViewSwitcher'
 import { PlanningTaskCard } from './PlanningTaskCard'
 import { PlanningRoutineDragCard } from './PlanningRoutineDragCard'
@@ -18,6 +19,9 @@ interface PlanningTaskDrawerProps {
   tasks: Task[]
   /** Weekly-dinner-seeded chores, rolled into one collapsible group. */
   mealTasks?: Task[]
+  /** Routines that still need a home — ALREADY filtered by the host, which
+   *  runs the eligibility ladder. Which VIEWS show them is routinesForView's
+   *  call, so this surface and /week's lane cannot disagree. */
   routines?: Routine[]
   onPushTask: (id: string, target: Date | 'week' | 'month' | 'quarter') => void
   onComplete?: (id: string) => void
@@ -45,7 +49,11 @@ export function PlanningTaskDrawer({
   const routinesView = view === 'routines'
   const visibleTasks = showAllLoose ? tasks : tasks.slice(0, POOL_CAP)
   const looseOverflow = tasks.length - visibleTasks.length
-  const total = routinesView ? routines.length : tasks.length + mealTasks.length
+  // A routine with no time needs a slot the way an unscheduled task does, so
+  // it belongs in the same pool. The host hands over only unhomed ones; this
+  // decides which views carry them.
+  const shownRoutines = routinesForView(routines, view)
+  const total = routinesView ? shownRoutines.length : tasks.length + mealTasks.length + shownRoutines.length
 
   return (
     <div
@@ -83,13 +91,13 @@ export function PlanningTaskDrawer({
       {/* Task list - overflow-x-clip allows dropdown to show while y scrolls */}
       <div className="flex-1 overflow-y-auto overflow-x-clip p-3 space-y-2">
         {routinesView ? (
-          routines.length === 0 ? (
+          shownRoutines.length === 0 ? (
             <p className="text-center text-sm text-neutral-500 py-8">
               No routines waiting for a time — every active routine is placed.
             </p>
           ) : (
             <>
-              {routines.map((routine) => (
+              {shownRoutines.map((routine) => (
                 <PlanningRoutineDragCard
                   key={routine.id}
                   routine={routine}
@@ -159,6 +167,27 @@ export function PlanningTaskDrawer({
               >
                 {looseOverflow} more
               </button>
+            )}
+            {/* Routines last, and never collapsed. Grouped so ten unhomed
+                routines can't bury five tasks; expanded because a routine you
+                have to open a disclosure to see is a routine you forget to
+                block. */}
+            {shownRoutines.length > 0 && (
+              <div>
+                <div className="flex items-center gap-1.5 px-1 py-1.5 text-xs font-semibold uppercase tracking-wide text-neutral-500">
+                  <Repeat className="w-3.5 h-3.5" />
+                  Routines · {shownRoutines.length}
+                </div>
+                <div className="space-y-2 mt-1">
+                  {shownRoutines.map((routine) => (
+                    <PlanningRoutineDragCard
+                      key={routine.id}
+                      routine={routine}
+                      temporalLabel={routineTemporalLabel(routine)}
+                    />
+                  ))}
+                </div>
+              </div>
             )}
           </>
         )}

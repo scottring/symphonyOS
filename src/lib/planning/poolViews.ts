@@ -5,6 +5,7 @@
 // the two surfaces cannot drift (the same rule that put onShelfCount on
 // PlanningSession).
 import type { Task } from '@/types/task'
+import type { Routine } from '@/types/actionable'
 import { belongsToWeek, isStaleWeekPlacement } from '@/lib/today/weekPlacement'
 import { weekStartAnchor, type WeekStart } from '@/lib/cadence/config'
 
@@ -117,6 +118,28 @@ export function applyPoolView(pool: Task[], view: PoolView, ctx: PoolCtx): Task[
     }
     return false
   })
+}
+
+const NO_ROUTINES: Routine[] = []
+
+/** Which views show routines that still need a home.
+ *
+ *  A routine with no time is the same KIND of thing as an unscheduled task:
+ *  something that needs a slot. It used to live on its own exclusive tab,
+ *  which meant you had to remember to go looking for it before the week was
+ *  blocked out — so it stayed unblocked. Now the tab is a filter like the
+ *  others, and the pool views carry routines alongside their tasks.
+ *
+ *  'month' is the exception because it is a BUCKET view — it answers "what did
+ *  I put in the month bucket", and a routine has no bucket.
+ *
+ *  `routines` must ALREADY be filtered to the unhomed ones by the host (each
+ *  surface runs its own eligibility ladder: the overlay drops any routine that
+ *  resolves to a time inside the visible range, /week runs unhomedRoutines()).
+ */
+export function routinesForView(routines: Routine[], view: PoolView): Routine[] {
+  if (view === 'month') return NO_ROUTINES
+  return routines
 }
 
 /** Actionability order: carried-over/stranded first (easiest to lose), then
