@@ -101,4 +101,11 @@ describe('PlanningTaskDrawer', () => {
     fireEvent.click(screen.getByRole('button', { name: '5 more' }))
     expect(screen.getByText('Loose 16')).toBeInTheDocument()
   })
+
+  // After a drag to the grid, the month row STAYS in the This month tab (it
+  // was copied, not moved). Without a mark that reads as a failed drag.
+  it('a placed month original shows → placed on its card', () => {
+    renderDrawer({ view: 'month', tasks: [task('m1', 'Repaint the porch')], mealTasks: [], placedFor: () => 'placed-open' })
+    expect(screen.getByText('→ placed')).toBeInTheDocument()
+  })
 })

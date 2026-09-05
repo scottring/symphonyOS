@@ -1,6 +1,7 @@
 import { Check, Trash2 } from 'lucide-react'
 import type { Task } from '@/types/task'
 import { wasWritten } from '@/hooks/useGatedTaskActions'
+import type { PlacementFate } from '@/lib/planning/lineage'
 
 /**
  * One triage row — a task title plus one-tap fate buttons — shared by the
@@ -52,8 +53,11 @@ export async function applyTriageVerdict(t: Task, v: Verdict, h: VerdictHandlers
   }
 }
 
-export function TriageRow({ task, meta, metaTitle, isNew, offer, verdict, canDelete, onVerdict, onComplete }: {
+export function TriageRow({ task, meta, metaTitle, isNew, offer, verdict, canDelete, onVerdict, onComplete, placed }: {
   task: Task
+  /** A month/season original that has been copied down. It stays on its list
+   * (the look-back needs it) but it has been decided: a → mark, no verbs. */
+  placed?: PlacementFate
   /** A second line under the title. The School pool uses it for what a
    * candidate is asking of you — when, where, the deadline, which child.
    * Its own line rather than a trailing span: a school title and a school
@@ -119,9 +123,15 @@ export function TriageRow({ task, meta, metaTitle, isNew, offer, verdict, canDel
             <Check className="w-3 h-3" strokeWidth={3} /> {VERDICT_LABEL[verdict]}
           </span>
         )}
+        {!verdict && placed === 'placed-open' && (
+          <span className="shrink-0 text-xs text-neutral-400">→ placed</span>
+        )}
+        {!verdict && placed === 'placed-done' && (
+          <span className="shrink-0 text-xs text-primary-700">→ done</span>
+        )}
       </div>
 
-      {!verdict && (
+      {!verdict && !(placed === 'placed-open' || placed === 'placed-done') && (
         <span className="mt-1.5 flex flex-wrap items-center justify-end gap-1">
           {offer.map((v) => v === 'deleted' ? (
             canDelete && (

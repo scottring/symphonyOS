@@ -3,6 +3,7 @@ import { ChevronDown } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import type { Task } from '@/types/task'
 import { TriageRow, applyTriageVerdict, type Verdict } from './TriageRow'
+import type { PlacementFate } from '@/lib/planning/lineage'
 
 /**
  * A horizon pool as a header dropdown — "Week" / "Month" in Today's controls
@@ -44,11 +45,14 @@ interface HorizonPoolDropdownProps {
   /** Fired as the dropdown opens and closes, so the host can record that the
    * pool has been looked at. */
   onOpenChange?: (open: boolean) => void
+  /** The month pool passes this: a row that has been copied down shows a →
+   * mark instead of verbs. */
+  placedFor?: (task: Task) => PlacementFate
 }
 
 export function HorizonPoolDropdown({
   label, tasks, offer, viewedDate, onUpdateTask, onPushTask, onDeleteTask, onCompleteTask, benchRoute, benchLabel,
-  metaFor, isNewFor, hasNew, onOpenChange,
+  metaFor, isNewFor, hasNew, onOpenChange, placedFor,
 }: HorizonPoolDropdownProps) {
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
@@ -128,6 +132,7 @@ export function HorizonPoolDropdown({
                     meta={metaFor?.(t)?.text} metaTitle={metaFor?.(t)?.title}
                     isNew={isNewFor?.(t)}
                     verdict={verdicts.get(t.id)} canDelete={!!onDeleteTask}
+                    placed={placedFor?.(t)}
                     onVerdict={onVerdict} onComplete={onComplete} />
                 ))}
               </ul>

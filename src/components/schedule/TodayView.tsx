@@ -51,6 +51,7 @@ import { ClarityCurtain } from '@/components/clarity/ClarityCurtain'
 import { computeClaritySteps, type ClarityStepId } from '@/lib/clarity/claritySteps'
 import { selectOverdue } from '@/lib/today/taskPools'
 import { selectHorizonPool } from '@/lib/today/horizons'
+import { placementFate } from '@/lib/planning/lineage'
 import { useSuggestionsEnabled } from '@/lib/assistant/suggestionsPref'
 import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
 import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
@@ -1153,6 +1154,7 @@ export function TodayView({
                 label="Month"
                 tasks={monthPool}
                 offer={['today', 'week', 'someday', 'deleted']}
+                placedFor={(t) => placementFate(t, tasks)}
                 viewedDate={viewedDate}
                 onUpdateTask={(id, u) => onUpdateTask?.(id, u)}
                 onPushTask={ctx.onPushTask}

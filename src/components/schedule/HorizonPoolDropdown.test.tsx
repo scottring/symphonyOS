@@ -179,4 +179,15 @@ describe('HorizonPoolDropdown — the pools live up here, never in the review', 
     // row markers survive being looked at.
     expect(onOpenChange).toHaveBeenLastCalledWith(false)
   })
+
+  // A month task that has been copied down is still ON the month list — the
+  // look-back needs it there — but it has been decided: no verbs, a → mark.
+  it('a placed original shows → placed and offers no verbs', async () => {
+    const placed = task({ id: 'm1', title: 'Repaint the porch', bucket: 'month' })
+    const { user } = render(<HorizonPoolDropdown {...base} label="Month" tasks={[placed]}
+      offer={['today', 'week', 'someday']} placedFor={() => 'placed-open'} />)
+    await user.click(screen.getByRole('button', { name: /Month/ }))
+    expect(screen.getByText('→ placed')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^Today$|^This wk$|^Someday$/ })).not.toBeInTheDocument()
+  })
 })

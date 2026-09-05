@@ -39,6 +39,7 @@ import {
   unscheduledPool, applyPoolView, orderPool, groupPool,
   readPoolView, writePoolView, type PoolView,
 } from '@/lib/planning/poolViews'
+import { placementFate } from '@/lib/planning/lineage'
 import { suggestSlots, busyIntervals, type BusyInterval } from '@/lib/planning/dropSmarts'
 
 interface PlanningSessionProps {
@@ -857,6 +858,7 @@ export function PlanningSession({
               onNotThisWeek={handleNotThisWeek}
               view={poolView}
               onViewChange={handleViewChange}
+              placedFor={poolView === 'month' ? (t) => placementFate(t, tasks) : undefined}
             />
           )}
 

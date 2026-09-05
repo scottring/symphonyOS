@@ -6,6 +6,7 @@ import type { Routine } from '@/types/actionable'
 import type { PoolView } from '@/lib/planning/poolViews'
 import { routineTemporalLabel } from '@/lib/planning/routineTemporal'
 import { routinesForView } from '@/lib/planning/poolViews'
+import type { PlacementFate } from '@/lib/planning/lineage'
 import { PoolViewSwitcher } from './PoolViewSwitcher'
 import { PlanningTaskCard } from './PlanningTaskCard'
 import { PlanningRoutineDragCard } from './PlanningRoutineDragCard'
@@ -28,6 +29,9 @@ interface PlanningTaskDrawerProps {
   onNotThisWeek?: (id: string) => void
   view: PoolView
   onViewChange: (v: PoolView) => void
+  /** For the This month view: a row copied down shows → placed instead of
+   *  looking like a failed drag. */
+  placedFor?: (task: Task) => PlacementFate
 }
 
 export function PlanningTaskDrawer({
@@ -39,6 +43,7 @@ export function PlanningTaskDrawer({
   onNotThisWeek,
   view,
   onViewChange,
+  placedFor,
 }: PlanningTaskDrawerProps) {
   const { isOver, setNodeRef } = useDroppable({
     id: 'unscheduled-drawer',
@@ -157,6 +162,7 @@ export function PlanningTaskDrawer({
                 onPushTask={onPushTask}
                 onComplete={onComplete}
                 onNotThisWeek={onNotThisWeek}
+                placed={placedFor?.(task)}
               />
             ))}
             {looseOverflow > 0 && (
