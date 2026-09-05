@@ -1,5 +1,6 @@
 import type { EffectiveParsed } from '@/hooks/useQuickParse'
 import { ConceptIcon } from '@/lib/conceptIcons'
+import { domainById } from '@/lib/domains'
 
 // The project chip is gone (2026-09-02 — see the note in Sidebar.tsx): Projects
 // are hidden from the product, so capture no longer offers to file into one.
@@ -168,30 +169,28 @@ export function ParsedFieldChips({
         </div>
       )}
 
-      {/* Applied context chip - show when context has been applied */}
+      {/* Applied context chip - show when context has been applied, whether by
+          the domain picker or a typed #work/#family/#personal token. Colours
+          come from DOMAINS so this reads as the filled-in state of the picker
+          rather than a separate palette. */}
       {!parsed.isNote && parsed.context && (
         <div className="flex items-center gap-2">
           <span className="text-base"><ConceptIcon name="context" size={18} decorative /></span>
-          <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border ${
-            parsed.context === 'work'
-              ? 'bg-blue-50 text-blue-700 border-blue-100'
-              : parsed.context === 'family'
-              ? 'bg-amber-50 text-amber-700 border-amber-100'
-              : 'bg-purple-50 text-purple-700 border-purple-100'
-          }`}>
-            {parsed.context.charAt(0).toUpperCase() + parsed.context.slice(1)}
+          <span
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border"
+            style={{
+              color: domainById(parsed.context).color,
+              borderColor: `color-mix(in srgb, ${domainById(parsed.context).color} 30%, transparent)`,
+              backgroundColor: `color-mix(in srgb, ${domainById(parsed.context).color} 12%, transparent)`,
+            }}
+          >
+            {domainById(parsed.context).label}
             <button
               type="button"
               onMouseDown={(e) => e.preventDefault()}
               onClick={onClearContext}
               aria-label="Clear context"
-              className={`ml-1 ${
-                parsed.context === 'work'
-                  ? 'text-blue-400 hover:text-blue-600'
-                  : parsed.context === 'family'
-                  ? 'text-amber-400 hover:text-amber-600'
-                  : 'text-purple-400 hover:text-purple-600'
-              }`}
+              className="ml-1 opacity-60 hover:opacity-100"
             >
               ×
             </button>

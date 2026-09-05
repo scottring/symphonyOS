@@ -4,8 +4,7 @@ import { usePhotoCapture } from '@/hooks/usePhotoCapture'
 import { CameraCaptureModal } from '@/components/capture/CameraCaptureModal'
 import { hasParsedFields } from '@/lib/quickInputParser'
 import type { TaskCategory, TaskContext } from '@/types/task'
-import { useDomain } from '@/hooks/useDomain'
-import { domainById } from '@/lib/domains'
+import { DomainChooser } from '@/components/domain/DomainChooser'
 import { useQuickParse } from '@/hooks/useQuickParse'
 import { ParsedFieldChips } from '@/components/capture/ParsedFieldChips'
 import { ConceptIcon } from '@/lib/conceptIcons'
@@ -73,10 +72,6 @@ export function QuickCapture({
   // position and the slide is invisible. Desktop ignores it (no transform).
   const [isEntering, setIsEntering] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
-
-  // The sole checked domain, if exactly one — drives the "Add to X?" chip only.
-  // Captures never stamp context from the lens.
-  const { soleDomain } = useDomain()
 
   // Photo-first capture: live camera → AI-enriched inbox task. On macOS,
   // Continuity Camera lists the iPhone as a camera device, making the phone
@@ -198,9 +193,21 @@ export function QuickCapture({
     // Get input position for animation before any state changes
     const inputRect = inputRef.current?.getBoundingClientRect()
 
-    const hasRichFields = hasParsedFields(effectiveParsed) || !!effectiveParsed.context
+    const hasRichFields = hasParsedFields(effectiveParsed)
 
-    if (useRaw || (!hasRichFields)) {
+    if (useRaw && effectiveParsed.context && onAddRich) {
+      // "Add to My Inbox" discards what the PARSER inferred (dates, contacts,
+      // projects) — but a context is never inferred: the user either tapped a
+      // domain chip or typed the reserved token. Dropping it here would throw
+      // away the one field they set by hand. Keep the raw text as the title,
+      // minus the token itself if that is where the context came from.
+      onAddRich({
+        title: effectiveParsed.contextMatch
+          ? trimmed.replace(effectiveParsed.contextMatch, '').replace(/\s+/g, ' ').trim()
+          : trimmed,
+        context: effectiveParsed.context,
+      })
+    } else if (useRaw || (!hasRichFields)) {
       // Plain inbox add (current behavior)
       onAdd(trimmed)
     } else if (onAddRich) {
@@ -492,27 +499,34 @@ export function QuickCapture({
                     </div>
                   )}
 
-                  {/* Suggested context chip - the user's explicit choice to stamp the
-                      capture with the sole checked domain; shown only when exactly
-                      one real domain is checked and context isn't already set. */}
-                  {!effectiveParsed.isNote && soleDomain && !effectiveParsed.context && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-base"><ConceptIcon name="context" size={18} decorative /></span>
-                      <button
-                        type="button"
-                        onClick={() => applyContext(soleDomain)}
-                        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
-                          soleDomain === 'work'
-                            ? 'bg-blue-50/50 text-blue-600 border-blue-200 hover:bg-blue-50 hover:border-blue-300'
-                            : soleDomain === 'family'
-                            ? 'bg-amber-50/50 text-amber-600 border-amber-200 hover:bg-amber-50 hover:border-amber-300'
-                            : 'bg-purple-50/50 text-purple-600 border-purple-200 hover:bg-purple-50 hover:border-purple-300'
-                        }`}
-                      >
-                        + Add to {domainById(soleDomain).label}?
-                      </button>
-                    </div>
-                  )}
+                </div>
+              )}
+
+              {/* Domain picker — the same chips as the Inbox's "Where does this
+                  belong?" gate, so filing a capture and filing an inbox item
+                  look like one gesture. It sits OUTSIDE the parsed-preview card
+                  on purpose: the preview only appears once something parsed, and
+                  the plainest capture ("buy milk") is exactly the one that most
+                  needs a domain. The predecessor — a single "Add to X?" chip —
+                  appeared only when exactly one layer was checked, so with
+                  Everyone on there was no way to tag at all. Typing the reserved
+                  token (#work) sets context too, which swaps this row for the
+                  applied chip in the preview above.
+
+                  The wrapper's preventDefault keeps the caret in the input: a
+                  bare mousedown on a chip would blur it and break the type →
+                  tag → Enter run. */}
+              {title.trim().length > 0 && !effectiveParsed.isNote && !effectiveParsed.context && (
+                <div
+                  className="flex items-center gap-2 flex-wrap px-1 pt-3"
+                  onMouseDown={(e) => e.preventDefault()}
+                >
+                  <span className="text-base"><ConceptIcon name="context" size={18} decorative /></span>
+                  <span className="text-xs text-neutral-400">Add to</span>
+                  <DomainChooser
+                    size="sm"
+                    onChoose={(d) => { applyContext(d); inputRef.current?.focus() }}
+                  />
                 </div>
               )}
 

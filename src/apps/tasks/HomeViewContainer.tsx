@@ -384,7 +384,8 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
       if (r.destination === 'note') {
         const note = await addNote({
           content: r.title,
-          context: undefined,
+          // Only from an explicit #work/#family/#personal token; never the lens.
+          context: r.context,
         });
         showToast(note ? 'Note saved' : 'Could not save the note', note ? 'success' : 'error');
         return;
@@ -402,7 +403,8 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
         {
           assignedTo: r.assignedMemberIds?.[0] ?? getCurrentUserMember()?.id,
           assignedToAll: r.assignedMemberIds,
-          context: undefined,
+          // Only from an explicit #work/#family/#personal token; never the lens.
+          context: r.context,
           category: r.category,
           isAllDay: toInbox ? undefined : r.scheduledFor ? false : true,
           phoneNumber: r.phoneNumber,
@@ -471,7 +473,8 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
       await addTask(r.title, r.contactId, r.projectId, r.scheduledFor ?? undefined, {
         assignedTo: getCurrentUserMember()?.id,
         assignedToAll: r.assignedMemberIds,
-        context: undefined,
+        // Only from an explicit #work/#family/#personal token; never the lens.
+        context: r.context,
         // A timed anchor means a specific time-of-day, so it is not all-day.
         isAllDay: r.scheduledFor ? false : undefined,
       });

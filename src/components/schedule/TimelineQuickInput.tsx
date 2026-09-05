@@ -1,4 +1,4 @@
-import type { TaskCategory } from '@/types/task'
+import type { TaskCategory, TaskContext } from '@/types/task'
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { CalendarClock } from 'lucide-react'
 import type { ParserContext } from '@/lib/quickInputParser'
@@ -35,6 +35,8 @@ export interface TimelineCaptureResult {
   title: string
   scheduledFor: Date | null
   category?: TaskCategory
+  /** Set only by an explicit #work/#family/#personal token — never the lens. */
+  context?: TaskContext
   projectId?: string
   contactId?: string
   assignedMemberIds?: string[]
@@ -90,6 +92,7 @@ export function TimelineQuickInput({ kind, anchorTime, parserContext, onSubmit, 
       title: p.title?.trim() || t,
       scheduledFor: effectiveScheduledFor,
       category: p.category,
+      context: p.context,
       projectId: p.projectId,
       contactId: p.contactId,
       assignedMemberIds: p.assignedMemberIds,

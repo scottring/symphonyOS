@@ -73,12 +73,13 @@ export function useQuickParse(title: string, ctx: ParserContext, resolver?: Reso
     durationMinutes: overrides.durationMinutes === null ? undefined : (overrides.durationMinutes ?? parsed.durationMinutes),
     category: overrides.category === null ? undefined : (overrides.category ?? parsed.category),
     // No lens-driven default: captures land Unsorted unless the user explicitly
-    // applies a context (the "Add to X?" chip, or a future explicit-syntax token).
-    context: overrides.context === null ? undefined : overrides.context,
+    // asked for a context — either by picking one (the domain picker) or by
+    // typing the reserved token (#work / #family / #personal).
+    context: overrides.context === null ? undefined : (overrides.context ?? parsed.context),
     assignedMemberIds: overrides.assignedMemberIds === null ? undefined : (overrides.assignedMemberIds ?? parsed.assignedMemberIds),
   }), [parsed, overrides, suggestionApplied, suggestion])
 
-  const hasFields = hasParsedFields(effectiveParsed) || !!effectiveParsed.context
+  const hasFields = hasParsedFields(effectiveParsed)
 
   const projectName = useMemo(
     () => (effectiveParsed.projectId ? ctx.projects.find(p => p.id === effectiveParsed.projectId)?.name ?? null : null),

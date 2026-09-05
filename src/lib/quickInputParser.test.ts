@@ -99,9 +99,12 @@ describe('parseQuickInput', () => {
     expect(result.title).toBe('fix bug')
   })
 
+  // Was "#work" -> "Work Stuff". The domain ids are reserved tokens now (see
+  // the "explicit domain tokens" block below), so a partial project match has
+  // to be tested with a word that isn't a domain.
   it('handles partial project name matches', () => {
-    const result = parseQuickInput('review code #work', mockContext)
-    expect(result.projectId).toBe('p2')
+    const result = parseQuickInput('review code #symphony', mockContext)
+    expect(result.projectId).toBe('p3')
   })
 
   it('handles case insensitive matching', () => {
@@ -363,5 +366,50 @@ describe('time resolution (bare hours and backward weekdays)', () => {
     const r = parseQuickInput('dentist thu 2pm 45m', mockContext)
     expect(r.durationMinutes).toBe(45)
     expect(r.dueDate!.getTime()).toBeGreaterThan(NOW.getTime())
+  })
+})
+
+describe('explicit domain tokens', () => {
+  it('stamps context from #work and strips the token from the title', () => {
+    const r = parseQuickInput('email the auditor #work', mockContext)
+    expect(r.context).toBe('work')
+    expect(r.contextMatch).toBe('#work')
+    expect(r.title).toBe('email the auditor')
+  })
+
+  it('stamps #family and #personal', () => {
+    expect(parseQuickInput('school forms #family', mockContext).context).toBe('family')
+    expect(parseQuickInput('book haircut #personal', mockContext).context).toBe('personal')
+  })
+
+  it('matches the token anywhere in the line, case-insensitively', () => {
+    const r = parseQuickInput('#Work draft the deck', mockContext)
+    expect(r.context).toBe('work')
+    expect(r.title).toBe('draft the deck')
+  })
+
+  // The domain tokens are RESERVED: mockContext has a project literally called
+  // "Work Stuff", which the #project pattern would otherwise fuzzy-match.
+  it('wins over a project whose name shares the domain word', () => {
+    const r = parseQuickInput('email the auditor #work', mockContext)
+    expect(r.context).toBe('work')
+    expect(r.projectId).toBeUndefined()
+  })
+
+  it('leaves a longer word starting with a domain id alone', () => {
+    const r = parseQuickInput('sign up for #workout class', mockContext)
+    expect(r.context).toBeUndefined()
+    expect(r.title).toContain('#workout')
+  })
+
+  it('coexists with the other parsed fields', () => {
+    const r = parseQuickInput('call the plumber tomorrow #family', mockContext)
+    expect(r.context).toBe('family')
+    expect(r.dueDate).toBeDefined()
+    expect(r.title).toBe('call the plumber')
+  })
+
+  it('counts as a parsed field on its own', () => {
+    expect(hasParsedFields(parseQuickInput('pay the invoice #work', mockContext))).toBe(true)
   })
 })

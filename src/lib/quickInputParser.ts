@@ -1,4 +1,6 @@
 import * as chrono from 'chrono-node'
+import { DOMAINS } from '@/lib/domains'
+import type { TaskContext } from '@/types/task'
 
 export interface ParsedQuickInput {
   rawText: string                    // Original input, always preserved
@@ -14,6 +16,8 @@ export interface ParsedQuickInput {
   priority?: 'high' | 'medium' | 'low'
   category?: 'task' | 'chore' | 'errand' | 'event' | 'activity' | 'homework'
   categoryMatch?: string             // What text matched (e.g., "errand:")
+  context?: TaskContext              // Domain stamped by an explicit #work/#family/#personal token
+  contextMatch?: string              // What text matched (e.g., "#work")
   isNote?: boolean                   // True if this is a note (not a task)
   noteContent?: string               // Clean note content (without prefix)
   topicName?: string                 // Topic name if specified with @topic
@@ -109,6 +113,12 @@ function resolveDateMatch(
   // backwards. Take chrono's own forward-looking reading of the same text.
   return forward ? bumpToPm(forward.start.date()) : plain
 }
+
+// Explicit domain tokens: "#work", "#family", "#personal". The ids come from
+// DOMAINS so this can never drift from the domain registry (and so nothing here
+// enumerates the three ids by hand). \b keeps "#workout" and "#personality"
+// out; the leading group preserves the whitespace we splice back into the title.
+const CONTEXT_TOKEN_RE = new RegExp(`(^|\\s)#(${DOMAINS.map((d) => d.id).join('|')})\\b`, 'i')
 
 export function parseQuickInput(
   input: string,
@@ -249,6 +259,17 @@ export function parseQuickInput(
     }
   }
 
+  // 2b. Explicit domain token. RESERVED — matched BEFORE the #project pattern
+  //      below, so a project that happens to share a domain's name can never
+  //      shadow the context token. This is the only way text stamps a context:
+  //      captures still never inherit the domain lens.
+  const contextTokenMatch = workingText.match(CONTEXT_TOKEN_RE)
+  if (contextTokenMatch) {
+    result.context = contextTokenMatch[2].toLowerCase() as TaskContext
+    result.contextMatch = `#${contextTokenMatch[2]}`
+    workingText = workingText.replace(CONTEXT_TOKEN_RE, '$1').replace(/\s+/g, ' ').trim()
+  }
+
   // 3. Check for explicit project markers: #project, "in Project", "for Project"
   // Pattern: #ProjectName or "in/for [Project Name]"
   const projectPatterns = [
@@ -332,5 +353,5 @@ export function parseQuickInput(
 
 // Helper to check if anything was parsed beyond the title
 export function hasParsedFields(parsed: ParsedQuickInput): boolean {
-  return !!(parsed.projectId || parsed.contactId || parsed.dueDate || parsed.durationMinutes || parsed.priority || parsed.category || parsed.isNote || parsed.assignedMemberIds?.length)
+  return !!(parsed.projectId || parsed.contactId || parsed.dueDate || parsed.durationMinutes || parsed.priority || parsed.category || parsed.context || parsed.isNote || parsed.assignedMemberIds?.length)
 }

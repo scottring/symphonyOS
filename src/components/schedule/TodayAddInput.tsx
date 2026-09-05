@@ -6,7 +6,7 @@ import type { ResolverContext, ContactSuggestion } from '@/lib/entityResolver'
 import { useQuickParse } from '@/hooks/useQuickParse'
 import { useAssistantLauncher } from '@/contexts/AssistantLaunchContext'
 import type { ResolutionAction } from '@/hooks/useResolutionLearning'
-import type { TaskCategory } from '@/types/task'
+import type { TaskCategory, TaskContext } from '@/types/task'
 
 export type CaptureDestination = 'today' | 'inbox' | 'note'
 
@@ -16,6 +16,8 @@ export interface TodayCaptureResult {
   /** Where this capture lands. Default 'today' (task on today). */
   destination?: CaptureDestination
   category?: TaskCategory
+  /** Set only by an explicit #work/#family/#personal token — never the lens. */
+  context?: TaskContext
   projectId?: string
   contactId?: string
   assignedMemberIds?: string[]
@@ -113,6 +115,7 @@ export function TodayAddInput({ onAdd, parserContext, resolver, getRecentTaskFor
       scheduledFor: p.dueDate ?? null,
       destination,
       category: p.category,
+      context: p.context,
       projectId: p.projectId,
       contactId: p.contactId,
       assignedMemberIds: p.assignedMemberIds,

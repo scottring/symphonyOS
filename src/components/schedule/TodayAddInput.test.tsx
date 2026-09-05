@@ -150,4 +150,26 @@ describe('TodayAddInput smart capture', () => {
       expect(screen.getByRole('button', { name: /add to today/i })).toBeInTheDocument()
     })
   })
+
+  it('carries an explicit #work token through to the capture', async () => {
+    vi.useFakeTimers()
+    const { input, onAdd } = setup()
+    fireEvent.change(input, { target: { value: 'Send the audit pack #work' } })
+    await act(() => vi.advanceTimersByTimeAsync(200))
+    fireEvent.keyDown(input, { key: 'Enter' })
+    const r = onAdd.mock.calls[0][0]
+    expect(r.context).toBe('work')
+    expect(r.title).toBe('Send the audit pack')
+    vi.useRealTimers()
+  })
+
+  it('leaves context unset when no token was typed', async () => {
+    vi.useFakeTimers()
+    const { input, onAdd } = setup()
+    fireEvent.change(input, { target: { value: 'Send the audit pack' } })
+    await act(() => vi.advanceTimersByTimeAsync(200))
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(onAdd.mock.calls[0][0].context).toBeUndefined()
+    vi.useRealTimers()
+  })
 })

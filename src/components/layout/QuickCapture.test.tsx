@@ -199,7 +199,7 @@ describe('QuickCapture', () => {
       }
     })
 
-    it('the "Add to Work?" chip is offered but not applied — tapping it is the only way in', async () => {
+    it('the Work chip is offered but not applied — tapping it is the only way in', async () => {
       localStorage.setItem(LAYERS_KEY, JSON.stringify(['work']))
       try {
         const onAddRich = vi.fn()
@@ -216,7 +216,7 @@ describe('QuickCapture', () => {
         const input = screen.getByPlaceholderText('Try "call the vet tomorrow 2pm"')
         await user.type(input, 'book flights #montreal tomorrow')
 
-        const chip = screen.getByRole('button', { name: /Add to Work\?/i })
+        const chip = screen.getByRole('button', { name: 'Work' })
         await user.click(chip)
         await user.click(screen.getByRole('button', { name: 'Schedule Task' }))
 
@@ -226,6 +226,106 @@ describe('QuickCapture', () => {
       } finally {
         localStorage.removeItem(LAYERS_KEY)
       }
+    })
+  })
+
+  describe('domain picker', () => {
+    const open = (props = {}) =>
+      render(
+        <QuickCapture onAdd={vi.fn()} onAddRich={vi.fn()} isOpen={true} showFab={false} {...props} />,
+      )
+
+    it('offers all three domains once there is something to file', async () => {
+      const { user } = open()
+      const input = screen.getByPlaceholderText('Try "call the vet tomorrow 2pm"')
+      await user.type(input, 'Buy milk')
+
+      expect(screen.getByRole('button', { name: 'Work' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Family' })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Personal' })).toBeInTheDocument()
+    })
+
+    it('shows nothing to pick on an empty box', () => {
+      open()
+      expect(screen.queryByRole('button', { name: 'Work' })).not.toBeInTheDocument()
+    })
+
+    // The predecessor chip only appeared when exactly ONE layer was checked, so
+    // with every layer on there was no way to tag a capture at all.
+    it('offers a domain other than the checked lens', async () => {
+      localStorage.setItem(LAYERS_KEY, JSON.stringify(['work']))
+      try {
+        const onAddRich = vi.fn()
+        const { user } = open({ onAddRich })
+        const input = screen.getByPlaceholderText('Try "call the vet tomorrow 2pm"')
+        await user.type(input, 'Sign the permission slip')
+        await user.click(screen.getByRole('button', { name: 'Family' }))
+        await user.click(screen.getByRole('button', { name: 'Save Task' }))
+
+        expect(onAddRich).toHaveBeenCalledWith(
+          expect.objectContaining({ title: 'Sign the permission slip', context: 'family' }),
+        )
+      } finally {
+        localStorage.removeItem(LAYERS_KEY)
+      }
+    })
+
+    it('swaps the picker for a clearable chip once a domain is applied', async () => {
+      const { user } = open()
+      const input = screen.getByPlaceholderText('Try "call the vet tomorrow 2pm"')
+      await user.type(input, 'Buy milk')
+      await user.click(screen.getByRole('button', { name: 'Personal' }))
+
+      expect(screen.queryByRole('button', { name: 'Work' })).not.toBeInTheDocument()
+      const clear = screen.getByRole('button', { name: 'Clear context' })
+      await user.click(clear)
+      expect(screen.getByRole('button', { name: 'Work' })).toBeInTheDocument()
+    })
+
+    it('"Add to My Inbox" keeps a hand-picked domain', async () => {
+      const onAdd = vi.fn()
+      const onAddRich = vi.fn()
+      const { user } = open({ onAdd, onAddRich })
+      const input = screen.getByPlaceholderText('Try "call the vet tomorrow 2pm"')
+      await user.type(input, 'Buy milk tomorrow')
+      await user.click(screen.getByRole('button', { name: 'Work' }))
+      await user.click(screen.getByRole('button', { name: 'Add to My Inbox' }))
+
+      // The parsed date is discarded (that is what the raw button is for); the
+      // domain the user tapped is not.
+      expect(onAdd).not.toHaveBeenCalled()
+      expect(onAddRich).toHaveBeenCalledWith({ title: 'Buy milk tomorrow', context: 'work' })
+    })
+  })
+
+  describe('#work token', () => {
+    it('stamps the domain and drops the token from the title', async () => {
+      const onAddRich = vi.fn()
+      const { user } = render(
+        <QuickCapture onAdd={vi.fn()} onAddRich={onAddRich} isOpen={true} showFab={false} />,
+      )
+      const input = screen.getByPlaceholderText('Try "call the vet tomorrow 2pm"')
+      await user.type(input, 'email the auditor #work')
+
+      // No picker: the typed token already answered the question.
+      expect(screen.queryByRole('button', { name: 'Family' })).not.toBeInTheDocument()
+
+      await user.click(screen.getByRole('button', { name: 'Save Task' }))
+      expect(onAddRich).toHaveBeenCalledWith(
+        expect.objectContaining({ title: 'email the auditor', context: 'work' }),
+      )
+    })
+
+    it('strips the token from the raw inbox add too', async () => {
+      const onAddRich = vi.fn()
+      const { user } = render(
+        <QuickCapture onAdd={vi.fn()} onAddRich={onAddRich} isOpen={true} showFab={false} />,
+      )
+      const input = screen.getByPlaceholderText('Try "call the vet tomorrow 2pm"')
+      await user.type(input, 'email the auditor #work')
+      await user.click(screen.getByRole('button', { name: 'Add to My Inbox' }))
+
+      expect(onAddRich).toHaveBeenCalledWith({ title: 'email the auditor', context: 'work' })
     })
   })
 
