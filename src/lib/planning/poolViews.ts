@@ -1,15 +1,16 @@
 //
-// The planning pool, decided once. Both planning surfaces (the Plan Your Time
-// overlay's drawer and /week's pool lane) select, filter, order and group
-// their Unscheduled pool through these pure functions — one derivation, so
-// the two surfaces cannot drift (the same rule that put onShelfCount on
-// PlanningSession).
+// The week list, decided once. Both planning surfaces (the Plan Your Time
+// overlay's drawer and /week's strip) select, filter, order and group THIS
+// WEEK'S LIST through these pure functions — one derivation, so the two
+// surfaces cannot drift.
+//
+// There used to be four views here (This week / This month / Everything /
+// Routines). The model no longer has that pool: the month is a reference list
+// in the rail, looked at rather than drained; the backlog lives in Inbox;
+// unhomed routines ride in the week list itself (Scott, 2026-09-05).
 import type { Task } from '@/types/task'
-import type { Routine } from '@/types/actionable'
 import { belongsToWeek, isStaleWeekPlacement } from '@/lib/today/weekPlacement'
 import { weekStartAnchor, type WeekStart } from '@/lib/cadence/config'
-
-export type PoolView = 'week' | 'month' | 'all' | 'routines'
 
 export interface PoolCtx {
   today: Date
@@ -86,14 +87,10 @@ export function unscheduledPool(tasks: Task[], ctx: PoolCtx): Task[] {
   })
 }
 
-/** The official views. 'week' is the relevance rule (this week's moves, stale
- *  placements, carried-over, all-day); 'month' is the month bucket; 'all'
- *  absorbs the old "Show more from the backlog" toggle. */
-export function applyPoolView(pool: Task[], view: PoolView, ctx: PoolCtx): Task[] {
-  // The Routines tab shows routines, not tasks — the task pool is empty there.
-  if (view === 'routines') return []
-  if (view === 'all') return pool
-  if (view === 'month') return pool.filter((t) => t.bucket === 'month')
+/** This week's list: this week's moves, stranded placements from earlier
+ *  weeks (the MOST relevant thing here), carried-over dated items, and undated
+ *  all-day work. A move placed on a week still ahead stays out. */
+export function weekList(pool: Task[], ctx: PoolCtx): Task[] {
   const today = new Date(ctx.today)
   today.setHours(0, 0, 0, 0)
   const currentWeek = weekStartAnchor(today, ctx.weekStartsOn)
@@ -107,9 +104,6 @@ export function applyPoolView(pool: Task[], view: PoolView, ctx: PoolCtx): Task[
       d.setHours(0, 0, 0, 0)
       return d < today
     }
-    // This week's items, plus anything left behind by an earlier week — a
-    // stranded placement is the MOST relevant thing here. Only a move placed
-    // on a week still ahead is filtered out.
     if (t.bucket === 'week') return belongsToWeek(t, currentWeek) || isStaleWeekPlacement(t, currentWeek)
     if (t.scheduledFor) {
       const d = new Date(t.scheduledFor)
@@ -118,28 +112,6 @@ export function applyPoolView(pool: Task[], view: PoolView, ctx: PoolCtx): Task[
     }
     return false
   })
-}
-
-const NO_ROUTINES: Routine[] = []
-
-/** Which views show routines that still need a home.
- *
- *  A routine with no time is the same KIND of thing as an unscheduled task:
- *  something that needs a slot. It used to live on its own exclusive tab,
- *  which meant you had to remember to go looking for it before the week was
- *  blocked out — so it stayed unblocked. Now the tab is a filter like the
- *  others, and the pool views carry routines alongside their tasks.
- *
- *  'month' is the exception because it is a BUCKET view — it answers "what did
- *  I put in the month bucket", and a routine has no bucket.
- *
- *  `routines` must ALREADY be filtered to the unhomed ones by the host (each
- *  surface runs its own eligibility ladder: the overlay drops any routine that
- *  resolves to a time inside the visible range, /week runs unhomedRoutines()).
- */
-export function routinesForView(routines: Routine[], view: PoolView): Routine[] {
-  if (view === 'month') return NO_ROUTINES
-  return routines
 }
 
 /** Actionability order: carried-over/stranded first (easiest to lose), then
@@ -178,25 +150,4 @@ export function groupPool(pool: Task[]): { meals: Task[]; loose: Task[] } {
   const loose: Task[] = []
   for (const t of pool) (isMealTask(t) ? meals : loose).push(t)
   return { meals, loose }
-}
-
-// Per-surface persistence. try/catch because storage access can throw
-// (private windows, blocked site data).
-const KEY_PREFIX = 'symphony-pool-view:'
-
-export function readPoolView(surface: string): PoolView {
-  try {
-    const v = localStorage.getItem(KEY_PREFIX + surface)
-    return v === 'month' || v === 'all' || v === 'routines' ? v : 'week'
-  } catch {
-    return 'week'
-  }
-}
-
-export function writePoolView(surface: string, v: PoolView): void {
-  try {
-    localStorage.setItem(KEY_PREFIX + surface, v)
-  } catch {
-    // per-viewer convenience only — losing it is fine
-  }
 }

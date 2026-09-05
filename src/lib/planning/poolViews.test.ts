@@ -1,10 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest'
 import {
-  unscheduledPool, applyPoolView, orderPool, groupPool, isMealTask,
-  readPoolView, writePoolView, routinesForView, type PoolCtx,
+  unscheduledPool, weekList, orderPool, groupPool, isMealTask, type PoolCtx,
 } from './poolViews'
 import type { Task } from '@/types/task'
-import type { Routine } from '@/types/actionable'
 
 // Fixture builder — values shaped like what the hooks hand the components
 // (Dates hydrated, optional fields absent unless set).
@@ -62,8 +60,8 @@ describe('unscheduledPool', () => {
     const lastWeek = task({ isAllDay: true, scheduledFor: new Date(2026, 7, 25) })
     const pool = unscheduledPool([nextWeek, lastWeek], ctx)
     expect(pool.map((t) => t.id)).toEqual([lastWeek.id])
-    // and the week view agrees on its own
-    expect(applyPoolView([nextWeek, lastWeek], 'week', ctx).map((t) => t.id)).toEqual([lastWeek.id])
+    // and the week list agrees on its own
+    expect(weekList([nextWeek, lastWeek], ctx).map((t) => t.id)).toEqual([lastWeek.id])
   })
 })
 
@@ -86,7 +84,7 @@ describe('unscheduledPool — assignee scoping', () => {
   })
 })
 
-describe('applyPoolView', () => {
+describe('weekList', () => {
   const carried = task({ scheduledFor: new Date(2026, 7, 20, 9) })
   const thisWeek = task({ bucket: 'week', weekStart: new Date(2026, 7, 30) })
   const staleWeek = task({ bucket: 'week', weekStart: new Date(2026, 7, 16) })
@@ -96,8 +94,12 @@ describe('applyPoolView', () => {
   const allDay = task({ isAllDay: true })
   const pool = [carried, thisWeek, staleWeek, futureWeek, monthMove, inboxItem, allDay]
 
-  it("'week' = this week + stale placements + carried-over + all-day; future weeks and month/inbox stay out", () => {
-    const ids = applyPoolView(pool, 'week', ctx).map((t) => t.id)
+  // The week list is the ONLY pool now: month lives in the rail (a reference,
+  // looked at, not drained) and the backlog lives in Inbox. Tabs for "This
+  // month" / "Everything" / "Routines" were three views of a pool the model
+  // no longer has (Scott, 2026-09-05).
+  it('is this week + stale placements + carried-over + all-day; future weeks, month and inbox stay out', () => {
+    const ids = weekList(pool, ctx).map((t) => t.id)
     expect(ids).toContain(carried.id)
     expect(ids).toContain(thisWeek.id)
     expect(ids).toContain(staleWeek.id)
@@ -105,14 +107,6 @@ describe('applyPoolView', () => {
     expect(ids).not.toContain(futureWeek.id)
     expect(ids).not.toContain(monthMove.id)
     expect(ids).not.toContain(inboxItem.id)
-  })
-
-  it("'month' = month bucket only", () => {
-    expect(applyPoolView(pool, 'month', ctx).map((t) => t.id)).toEqual([monthMove.id])
-  })
-
-  it("'all' = everything", () => {
-    expect(applyPoolView(pool, 'all', ctx)).toHaveLength(pool.length)
   })
 })
 
@@ -142,54 +136,5 @@ describe('isMealTask / groupPool', () => {
     const { meals, loose } = groupPool([a, b])
     expect(meals.map((t) => t.id)).toEqual([a.id])
     expect(loose.map((t) => t.id)).toEqual([b.id])
-  })
-})
-
-describe('pool view persistence', () => {
-  beforeEach(() => {
-    localStorage.removeItem('symphony-pool-view:overlay')
-    localStorage.removeItem('symphony-pool-view:weekbench')
-  })
-
-  it('round-trips per surface and defaults to week', () => {
-    expect(readPoolView('overlay')).toBe('week')
-    writePoolView('overlay', 'month')
-    expect(readPoolView('overlay')).toBe('month')
-    expect(readPoolView('weekbench')).toBe('week') // other surface untouched
-  })
-})
-
-
-describe('routinesForView', () => {
-  // The hosts hand in routines that are ALREADY unhomed — this decides only
-  // which views show them at all.
-  const routines = [
-    { id: 'r1', name: 'Do kitchen laundry' },
-    { id: 'r2', name: 'Weeding front and back yards' },
-  ] as Routine[]
-
-  // A routine with no time is the same kind of thing as an unscheduled task:
-  // something that needs a slot. Segregating it on its own tab meant you had
-  // to remember to go looking for it before the week was blocked out.
-  it('mixes routines into this week', () => {
-    expect(routinesForView(routines, 'week')).toEqual(routines)
-  })
-
-  it('mixes routines into everything', () => {
-    expect(routinesForView(routines, 'all')).toEqual(routines)
-  })
-
-  it('keeps the routines tab as the isolate filter', () => {
-    expect(routinesForView(routines, 'routines')).toEqual(routines)
-  })
-
-  // 'month' is a BUCKET view — it answers "what did I put in the month
-  // bucket". A routine has no bucket, so it has no business there.
-  it('leaves routines out of the month bucket', () => {
-    expect(routinesForView(routines, 'month')).toEqual([])
-  })
-
-  it('never returns a new empty array identity to churn memos', () => {
-    expect(routinesForView([], 'week')).toHaveLength(0)
   })
 })
