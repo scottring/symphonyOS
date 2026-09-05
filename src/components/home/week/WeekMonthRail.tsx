@@ -5,9 +5,14 @@
 // looking, not linking). Goals first, because a goal is what the month is
 // for; tasks after, each carrying its fate (→ placed / → done / struck) so the
 // list reads as the record it is.
+//
+// The one action here is "→ this week" on an open task: a one-tap copy-down
+// (the original stays, marked → placed). It replaced the "This month" tab the
+// strip used to have — the weekly gesture is "reference the month, decide
+// what to do this week", and it needs a home that isn't a drag.
 
 import { useState } from 'react'
-import { ChevronLeft, ChevronRight, Target } from 'lucide-react'
+import { ArrowRight, ChevronLeft, ChevronRight, Target } from 'lucide-react'
 import type { Task } from '@/types/task'
 import { belongsToMonth, monthStartOf } from '@/lib/planning/periodPlacement'
 import { placementFate, type PlacementFate } from '@/lib/planning/lineage'
@@ -27,13 +32,21 @@ function FateMark({ fate }: { fate: PlacementFate }) {
   return null
 }
 
-function Row({ task, fate, onSelect }: { task: Task; fate: PlacementFate; onSelect: (id: string) => void }) {
+function Row({ task, fate, onSelect, onAddToWeek }: {
+  task: Task
+  fate: PlacementFate
+  onSelect: (id: string) => void
+  onAddToWeek?: (id: string) => void
+}) {
+  // Only an OPEN task can go to the week: a goal is never placed, a placed row
+  // already went, a done row is done.
+  const canAdd = !!onAddToWeek && !task.isGoal && fate === 'open'
   return (
-    <li>
+    <li className="group flex items-start gap-1">
       <button
         type="button"
         onClick={() => onSelect(`task-${task.id}`)}
-        className="w-full flex items-start gap-2 rounded-md px-1.5 py-1 text-left hover:bg-neutral-50 transition-colors"
+        className="min-w-0 flex-1 flex items-start gap-2 rounded-md px-1.5 py-1 text-left hover:bg-neutral-50 transition-colors"
       >
         {task.isGoal
           ? <Target className="w-3.5 h-3.5 mt-0.5 shrink-0 text-amber-600" />
@@ -43,13 +56,26 @@ function Row({ task, fate, onSelect }: { task: Task; fate: PlacementFate; onSele
         </span>
         <FateMark fate={fate} />
       </button>
+      {canAdd && (
+        <button
+          type="button"
+          aria-label={`Add ${task.title} to this week`}
+          title="Add to this week"
+          onClick={() => onAddToWeek!(task.id)}
+          className="shrink-0 mt-0.5 p-1 rounded text-primary-600 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:bg-primary-50 transition-opacity"
+        >
+          <ArrowRight className="w-3.5 h-3.5" />
+        </button>
+      )}
     </li>
   )
 }
 
-export function WeekMonthRail({ tasks, onSelectItem, now = new Date() }: {
+export function WeekMonthRail({ tasks, onSelectItem, onAddToWeek, now = new Date() }: {
   tasks: Task[]
   onSelectItem: (id: string) => void
+  /** Copy an open month task down to this week (the host's pushTask(id, 'week')). */
+  onAddToWeek?: (id: string) => void
   now?: Date
 }) {
   const [open, setOpen] = useState(readOpen)
@@ -92,13 +118,13 @@ export function WeekMonthRail({ tasks, onSelectItem, now = new Date() }: {
           {goals.length > 0 && (
             <>
               <p className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-amber-700/80">Goals</p>
-              <ul className="mb-2">{goals.map((t) => <Row key={t.id} task={t} fate={placementFate(t, tasks)} onSelect={onSelectItem} />)}</ul>
+              <ul className="mb-2">{goals.map((t) => <Row key={t.id} task={t} fate={placementFate(t, tasks)} onSelect={onSelectItem} onAddToWeek={onAddToWeek} />)}</ul>
             </>
           )}
           {items.length > 0 && (
             <>
               {goals.length > 0 && <p className="text-[11px] font-semibold uppercase tracking-wide text-neutral-400">Tasks</p>}
-              <ul>{items.map((t) => <Row key={t.id} task={t} fate={placementFate(t, tasks)} onSelect={onSelectItem} />)}</ul>
+              <ul>{items.map((t) => <Row key={t.id} task={t} fate={placementFate(t, tasks)} onSelect={onSelectItem} onAddToWeek={onAddToWeek} />)}</ul>
             </>
           )}
         </>

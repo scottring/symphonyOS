@@ -20,7 +20,6 @@ const weekStart = new Date(2026, 7, 31)
 
 describe('WeekPoolLane', () => {
   beforeEach(() => {
-    localStorage.removeItem('symphony-pool-view:weekbench')
   })
 
   it('shows the week list and hides scheduled ones', () => {

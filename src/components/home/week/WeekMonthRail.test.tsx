@@ -56,4 +56,23 @@ describe('WeekMonthRail', () => {
     render(<WeekMonthRail onSelectItem={() => {}} tasks={[]} />)
     expect(screen.getByText("Nothing on this month's list.")).toBeInTheDocument()
   })
+
+  // The weekly gesture: reference the month list, decide what to do this week.
+  // With no "This month" tab to drag from, the rail row itself offers the
+  // copy-down — one tap, not a drag, so nothing links and nothing moves.
+  it('offers → this week on an open task, not on goals, placed or done rows', () => {
+    const onAdd = vi.fn()
+    const open = task({ id: 'o', title: 'Repaint the porch', monthStart: thisMonth })
+    const goal = task({ id: 'g', title: 'Read more', monthStart: thisMonth, isGoal: true })
+    const placed = task({ id: 'p', title: 'Book dentist', monthStart: thisMonth })
+    const copy = task({ id: 'c', title: 'Book dentist', bucket: 'week', sourceId: 'p' })
+    const done = task({ id: 'd', title: 'Mow', monthStart: thisMonth, completed: true })
+    render(<WeekMonthRail onSelectItem={() => {}} onAddToWeek={onAdd} tasks={[open, goal, placed, copy, done]} />)
+    expect(screen.getByRole('button', { name: 'Add Repaint the porch to this week' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Add Read more to this week' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Add Book dentist to this week' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Add Mow to this week' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Add Repaint the porch to this week' }))
+    expect(onAdd).toHaveBeenCalledWith('o')
+  })
 })

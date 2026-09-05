@@ -568,7 +568,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
           ))}
         </WeekGrid>
         </div>
-        <WeekMonthRail tasks={tasks} onSelectItem={onSelectItem} />
+        <WeekMonthRail tasks={tasks} onSelectItem={onSelectItem} onAddToWeek={(id) => { void gated.pushTask(id, 'week') }} />
         </div>
 
         {placingRoutine && routinePlace && (
