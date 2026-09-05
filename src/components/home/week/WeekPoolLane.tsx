@@ -1,6 +1,9 @@
 //
-// /week's Unscheduled pool — the same official views as the overlay drawer
-// (poolViews decides; this only renders). Pills speak the week grid's chip
+// /week's list — THIS WEEK'S LIST, not a pool to drain. The same official views
+// as the overlay drawer (poolViews decides; this only renders). A ticked pill
+// lingers struck-through so the week reads as a list with things done on it;
+// "Last week" swaps in the previous week's rows for the weekly look-back
+// (Scott, 2026-09-05: "we're not trying to make the weekly list disappear"). Pills speak the week grid's chip
 // protocol ({kind:'chip', taskId}), so useWeekDragDrop's existing branches
 // place them with undo attached — the lane adds no drop logic of its own.
 //
@@ -8,9 +11,9 @@
 // leading circle), "not this week" (→ next week's plan), and the defer
 // dropdown. The strip caps at STRIP_CAP loose pills with a "+N more"
 // expander so a deep backlog never buries the grid.
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useDraggable } from '@dnd-kit/core'
-import { Check, ChevronDown, ChevronRight, ChevronsRight, CookingPot, GripVertical } from 'lucide-react'
+import { Check, ChevronDown, ChevronRight, ChevronsRight, CookingPot, GripVertical, Trash2, Archive, ArrowRight } from 'lucide-react'
 import type { Task } from '@/types/task'
 import type { Routine } from '@/types/actionable'
 import { routineTemporalLabel } from '@/lib/planning/routineTemporal'
@@ -23,6 +26,7 @@ import { PoolViewSwitcher } from '@/components/planning/PoolViewSwitcher'
 import { PushDropdown } from '@/components/triage'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { readCadenceConfig } from '@/lib/cadence/config'
+import { isPlacedOnWeek } from '@/lib/today/weekPlacement'
 
 const SURFACE = 'weekbench'
 
@@ -47,28 +51,39 @@ interface PillProps {
   onCompleteTask?: (id: string) => void
   onNotThisWeek?: (id: string) => void
   onPushTask?: (id: string, target: Date | 'week' | 'month' | 'quarter') => void
+  /** Done: rendered struck-through, no actions, not draggable. */
+  struck?: boolean
+  /** Last-week look-back verbs on an unticked row. Not draggable while shown. */
+  lookback?: { onCarryForward: () => void; onDrop: () => void; onSomeday: () => void }
 }
 
-function PoolPill({ task, onSelect, onCompleteTask, onNotThisWeek, onPushTask }: PillProps) {
+function PoolPill({ task, onSelect, onCompleteTask, onNotThisWeek, onPushTask, struck, lookback }: PillProps) {
+  // The hook is unconditional (rules of hooks); whether the pill is a drag
+  // handle is decided by what gets spread.
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `pool:${task.id}`,
     data: { kind: 'chip', taskId: task.id },
   })
+  const draggable = !struck && !lookback
+  const dragProps = draggable ? { ...attributes, ...listeners } : {}
   return (
     <div
       ref={setNodeRef}
-      {...attributes}
-      {...listeners}
+      {...dragProps}
       // Prefixed, like every other selectable id on this grid: the host parses
       // "<kind>-<id>" and drops anything it can't classify, so a bare uuid
       // opened no panel at all.
       onClick={() => onSelect(`task-${task.id}`)}
       title={task.title}
-      className={`group inline-flex max-w-[280px] items-center gap-1.5 rounded-lg border border-neutral-200 bg-white pl-2 pr-1.5 py-1.5 text-[13px] text-neutral-700 touch-none cursor-grab active:cursor-grabbing hover:border-neutral-300 hover:shadow-sm transition-all ${
-        isDragging ? 'opacity-40' : ''
-      }`}
+      className={`group inline-flex max-w-[280px] items-center gap-1.5 rounded-lg border border-neutral-200 bg-white pl-2 pr-1.5 py-1.5 text-[13px] text-neutral-700 touch-none hover:border-neutral-300 hover:shadow-sm transition-all ${
+        draggable ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'
+      } ${isDragging ? 'opacity-40' : ''}`}
     >
-      {onCompleteTask ? (
+      {struck ? (
+        <span className="shrink-0 w-3.5 h-3.5 rounded-full bg-primary-500 text-white grid place-items-center">
+          <Check className="w-2.5 h-2.5" strokeWidth={3} />
+        </span>
+      ) : onCompleteTask && !lookback ? (
         <button
           type="button"
           aria-label={`Complete ${task.title}`}
@@ -82,8 +97,27 @@ function PoolPill({ task, onSelect, onCompleteTask, onNotThisWeek, onPushTask }:
       ) : (
         <span className="shrink-0 w-1.5 h-1.5 rounded-full bg-primary-400/70" />
       )}
-      <span className="min-w-0 truncate">{task.title}</span>
-      {onNotThisWeek && (
+      <span className={`min-w-0 truncate ${struck ? 'line-through text-neutral-400' : ''}`}>{task.title}</span>
+      {lookback && !struck && (
+        <span className="shrink-0 inline-flex items-center gap-0.5 ml-1" {...stopDrag}>
+          <button type="button" aria-label={`Carry forward ${task.title}`} title="Carry forward to this week"
+            onClick={(e) => { e.stopPropagation(); lookback.onCarryForward() }}
+            className="p-0.5 rounded text-primary-600 hover:bg-primary-50">
+            <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+          <button type="button" aria-label={`Someday ${task.title}`} title="Someday"
+            onClick={(e) => { e.stopPropagation(); lookback.onSomeday() }}
+            className="p-0.5 rounded text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100">
+            <Archive className="w-3.5 h-3.5" />
+          </button>
+          <button type="button" aria-label={`Drop ${task.title}`} title="Drop"
+            onClick={(e) => { e.stopPropagation(); lookback.onDrop() }}
+            className="p-0.5 rounded text-neutral-300 hover:text-red-600 hover:bg-red-50">
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
+        </span>
+      )}
+      {onNotThisWeek && !struck && !lookback && (
         <button
           type="button"
           aria-label={`Not this week — move ${task.title} to next week`}
@@ -95,7 +129,7 @@ function PoolPill({ task, onSelect, onCompleteTask, onNotThisWeek, onPushTask }:
           <ChevronsRight className="w-3.5 h-3.5" />
         </button>
       )}
-      {onPushTask && (
+      {onPushTask && !struck && !lookback && (
         <div
           className="shrink-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
           {...stopDrag}
@@ -135,6 +169,7 @@ function RoutinePill({ routine, onSelect }: { routine: Routine; onSelect: (id: s
 
 export function WeekPoolLane({
   tasks, routines = [], weekStart, dayCount, onSelectItem, onCompleteTask, onNotThisWeek, onPushTask,
+  onUpdateTask, onDeleteTask,
 }: {
   tasks: Task[]
   /** Routines that need a home — ALREADY filtered by the host through
@@ -146,11 +181,20 @@ export function WeekPoolLane({
   onCompleteTask?: (id: string) => void
   onNotThisWeek?: (id: string) => void
   onPushTask?: (id: string, target: Date | 'week' | 'month' | 'quarter') => void
+  /** Last-week look-back writes: carry forward (a week→week MOVE) and Someday. */
+  onUpdateTask?: (id: string, updates: Partial<Task>) => void | Promise<unknown>
+  /** Last-week look-back: Drop. */
+  onDeleteTask?: (id: string) => void
 }) {
   const [view, setView] = useState<PoolView>(() => readPoolView(SURFACE))
   const [open, setOpen] = useState(true)
   const [mealsOpen, setMealsOpen] = useState(false)
   const [showAll, setShowAll] = useState(false)
+  const [lastWeek, setLastWeek] = useState(false)
+  // Ticked pills stay, struck, until the strip is collapsed or the view changes
+  // — the list reads as a list with things done on it, not one that shrinks.
+  const [lingering, setLingering] = useState<Task[]>([])
+  useEffect(() => { setLingering([]) }, [view])
 
   // The pool plans MY time — scope candidates to the current member.
   const { getCurrentUserMember } = useFamilyMembers()
@@ -181,19 +225,58 @@ export function WeekPoolLane({
   const visibleRoutines = showAll ? needsHome : needsHome.slice(0, ROUTINE_STRIP_CAP)
   const overflow = (pool.loose.length - visibleLoose.length) + (needsHome.length - visibleRoutines.length)
 
-  const pillProps = { onSelect: onSelectItem, onCompleteTask, onNotThisWeek, onPushTask }
+  const tick = onCompleteTask
+    ? (id: string) => {
+        const t = tasks.find((x) => x.id === id)
+        if (t) setLingering((l) => (l.some((x) => x.id === id) ? l : [...l, t]))
+        onCompleteTask(id)
+      }
+    : undefined
+  const pillProps = { onSelect: onSelectItem, onCompleteTask: tick, onNotThisWeek, onPushTask }
+  // Lingering pills are the ones the pool no longer holds (the host completed them).
+  const struckPills = lingering.filter((t) => !pool.loose.some((p) => p.id === t.id) && !pool.meals.some((p) => p.id === t.id))
+
+  const VIEW_LABEL: Record<PoolView, string> = { week: 'This week', month: 'This month', all: 'Everything', routines: 'Routines' }
+
+  // Last week's list: rows explicitly placed on the previous week, ticked AND
+  // unticked. Strict membership on purpose — a legacy NULL row was always
+  // "the current week", so it has no business appearing as last week's.
+  const prevWeekStart = new Date(weekStart)
+  prevWeekStart.setDate(prevWeekStart.getDate() - 7)
+  const lastWeekRows = lastWeek
+    ? tasks.filter((t) => t.bucket === 'week' && isPlacedOnWeek(t, prevWeekStart))
+    : []
+  const lookbackFor = (t: Task) => ({
+    onCarryForward: () => { void onUpdateTask?.(t.id, { bucket: 'week', scheduledFor: undefined, weekStart }) },
+    onDrop: () => { onDeleteTask?.(t.id) },
+    onSomeday: () => { void onUpdateTask?.(t.id, { bucket: 'someday', scheduledFor: undefined, isAllDay: undefined }) },
+  })
+  const headerLabel = lastWeek && !routinesView ? 'Last week' : VIEW_LABEL[view]
+  const headerCount = lastWeek && !routinesView ? lastWeekRows.length : total
 
   return (
     <div className="mb-2 rounded-xl border border-neutral-200 bg-white px-3 py-2.5 shadow-sm">
       <div className="flex items-center gap-2">
         <button
           type="button"
-          onClick={() => setOpen((v) => !v)}
+          onClick={() => { setOpen((v) => !v); setLingering([]) }}
           className="inline-flex items-center gap-1 text-xs font-semibold tracking-wide uppercase text-neutral-500 hover:text-neutral-700 transition-colors"
         >
           {open ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-          Unscheduled · {total}
+          {headerLabel} · {headerCount}
         </button>
+        {!routinesView && (
+          <button
+            type="button"
+            aria-pressed={lastWeek}
+            onClick={() => setLastWeek((v) => !v)}
+            className={`ml-3 rounded-md px-2 py-0.5 text-xs font-medium transition-colors ${
+              lastWeek ? 'bg-neutral-800 text-white' : 'text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100'
+            }`}
+          >
+            Last week
+          </button>
+        )}
         <div className="ml-auto w-96">
           <PoolViewSwitcher view={view} onChange={(v) => { setView(v); writePoolView(SURFACE, v) }} includeRoutines />
         </div>
@@ -226,7 +309,15 @@ export function WeekPoolLane({
           )}
         </div>
       )}
-      {open && !routinesView && (
+      {open && !routinesView && lastWeek && (
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          {lastWeekRows.map((t) => (
+            <PoolPill key={t.id} task={t} onSelect={onSelectItem} struck={t.completed} lookback={t.completed ? undefined : lookbackFor(t)} />
+          ))}
+          {lastWeekRows.length === 0 && <span className="text-sm text-neutral-400">Nothing was on last week's list.</span>}
+        </div>
+      )}
+      {open && !routinesView && !lastWeek && (
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
           {pool.meals.length > 0 && (
             <button
@@ -239,6 +330,7 @@ export function WeekPoolLane({
           )}
           {mealsOpen && pool.meals.map((t) => <PoolPill key={t.id} task={t} {...pillProps} />)}
           {visibleLoose.map((t) => <PoolPill key={t.id} task={t} {...pillProps} />)}
+          {struckPills.map((t) => <PoolPill key={`struck-${t.id}`} task={{ ...t, completed: true }} onSelect={onSelectItem} struck />)}
           {visibleRoutines.map((r) => <RoutinePill key={r.id} routine={r} onSelect={onSelectItem} />)}
           {overflow > 0 && (
             <button
@@ -258,7 +350,7 @@ export function WeekPoolLane({
               Show less
             </button>
           )}
-          {total === 0 && <span className="text-sm text-neutral-400">Everything is placed.</span>}
+          {total === 0 && struckPills.length === 0 && <span className="text-sm text-neutral-400">Nothing on the list yet.</span>}
         </div>
       )}
     </div>

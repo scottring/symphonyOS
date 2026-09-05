@@ -70,7 +70,7 @@ describe('WeekPoolLane', () => {
         />
       </DndContext>,
     )
-    fireEvent.click(screen.getByRole('button', { name: /Unscheduled · 1/ }))
+    fireEvent.click(screen.getByRole('button', { name: /This week · 1/ }))
     expect(screen.queryByText('Call VW')).not.toBeInTheDocument()
   })
 
@@ -196,7 +196,7 @@ describe('WeekPoolLane', () => {
     expect(screen.getByText('Call VW')).toBeInTheDocument()
     expect(screen.getByText('Trash night')).toBeInTheDocument()
     // Both counted in the header
-    expect(screen.getByRole('button', { name: /Unscheduled · 2/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /This week · 2/ })).toBeInTheDocument()
   })
 
   // 'This Month' is a BUCKET view; a routine has no bucket.
@@ -243,5 +243,81 @@ describe('WeekPoolLane', () => {
     fireEvent.click(screen.getByRole('button', { name: '+14 more' }))
     expect(screen.getByText('Routine 5')).toBeInTheDocument()
     expect(screen.getAllByTitle(/Loose /)).toHaveLength(20)
+  })
+
+  it("is titled as this week's list and says so when empty", () => {
+    render(<DndContext><WeekPoolLane weekStart={weekStart} dayCount={5} onSelectItem={() => {}} tasks={[]} /></DndContext>)
+    expect(screen.getByRole('button', { name: /This week · 0/ })).toBeInTheDocument()
+    expect(screen.getByText('Nothing on the list yet.')).toBeInTheDocument()
+    expect(screen.queryByText(/Everything is placed/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/UNSCHEDULED/i)).not.toBeInTheDocument()
+  })
+
+  it('labels the other views by name', () => {
+    render(<DndContext><WeekPoolLane weekStart={weekStart} dayCount={5} onSelectItem={() => {}} tasks={[]} /></DndContext>)
+    fireEvent.click(screen.getByRole('button', { name: 'Everything' }))
+    expect(screen.getByRole('button', { name: /Everything · 0/ })).toBeInTheDocument()
+  })
+
+  // A ticked pill lingers struck-through instead of vanishing — the week still
+  // reads as a list with things done on it, not a list that shrinks.
+  it('a ticked pill lingers struck-through until the strip is collapsed', () => {
+    const onComplete = vi.fn()
+    const { rerender } = render(
+      <DndContext><WeekPoolLane weekStart={weekStart} dayCount={5} onSelectItem={() => {}} onCompleteTask={onComplete}
+        tasks={[task({ id: 'a', title: 'Call VW', bucket: 'week' })]} /></DndContext>,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Complete Call VW' }))
+    expect(onComplete).toHaveBeenCalledWith('a')
+    rerender(<DndContext><WeekPoolLane weekStart={weekStart} dayCount={5} onSelectItem={() => {}} onCompleteTask={onComplete}
+      tasks={[task({ id: 'a', title: 'Call VW', bucket: 'week', completed: true })]} /></DndContext>)
+    expect(screen.getByText('Call VW')).toHaveClass('line-through')
+    // The header (with its count), not the "This week" view tab.
+    fireEvent.click(screen.getByRole('button', { name: /This week · / }))
+    fireEvent.click(screen.getByRole('button', { name: /This week · / }))
+    expect(screen.queryByText('Call VW')).not.toBeInTheDocument()
+  })
+
+  describe('Last week', () => {
+    const thisWeek = new Date(2026, 7, 30) // Sunday Aug 30 (default week start)
+    const prev = new Date(2026, 7, 23)
+    const onUpdateTask = vi.fn()
+    const onDeleteTask = vi.fn()
+    const renderLane = () => render(
+      <DndContext>
+        <WeekPoolLane weekStart={thisWeek} dayCount={7} onSelectItem={() => {}}
+          onUpdateTask={onUpdateTask} onDeleteTask={onDeleteTask}
+          tasks={[
+            task({ id: 'done', title: 'Washed the car', bucket: 'week', weekStart: prev, completed: true }),
+            task({ id: 'open', title: 'Call the plumber', bucket: 'week', weekStart: prev }),
+            task({ id: 'now', title: 'This week thing', bucket: 'week' }),
+          ]} />
+      </DndContext>,
+    )
+    beforeEach(() => { onUpdateTask.mockClear(); onDeleteTask.mockClear() })
+
+    it("shows last week's rows, ticked and unticked, and hides this week's", () => {
+      renderLane()
+      fireEvent.click(screen.getByRole('button', { name: 'Last week' }))
+      expect(screen.getByText('Washed the car')).toHaveClass('line-through')
+      expect(screen.getByText('Call the plumber')).toBeInTheDocument()
+      expect(screen.queryByText('This week thing')).not.toBeInTheDocument()
+    })
+
+    it('carry forward is a MOVE onto this week', () => {
+      renderLane()
+      fireEvent.click(screen.getByRole('button', { name: 'Last week' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Carry forward Call the plumber' }))
+      expect(onUpdateTask).toHaveBeenCalledWith('open', expect.objectContaining({ bucket: 'week', weekStart: thisWeek }))
+    })
+
+    it('drop deletes; someday writes the explicit someday shape', () => {
+      renderLane()
+      fireEvent.click(screen.getByRole('button', { name: 'Last week' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Drop Call the plumber' }))
+      expect(onDeleteTask).toHaveBeenCalledWith('open')
+      fireEvent.click(screen.getByRole('button', { name: 'Someday Call the plumber' }))
+      expect(onUpdateTask).toHaveBeenCalledWith('open', { bucket: 'someday', scheduledFor: undefined, isAllDay: undefined })
+    })
   })
 })

@@ -503,6 +503,8 @@ export function WeekViewV2(props: WeekViewV2Props) {
           onCompleteTask={(id) => { void toggleTask(id) }}
           onNotThisWeek={handleNotThisWeek}
           onPushTask={(id, target) => { void gated.pushTask(id, target) }}
+          onUpdateTask={(id, u) => { void onUpdateTask(id, u) }}
+          onDeleteTask={(id) => { void deleteTask(id) }}
         />
         <WeekGrid
           weekStart={weekStart}
