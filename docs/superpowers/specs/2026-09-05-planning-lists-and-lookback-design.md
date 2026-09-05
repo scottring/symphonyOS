@@ -38,6 +38,7 @@
 - **Weekly** — on `/week`: look at *last* week's list (ticked/unticked; carry forward, drop, Someday) and at the Month rail; write this week's list.
 - **Monthly** — on `/plans` Month tab: look back at the month just ended (every row's fate); keep-and-migrate, drop, Someday, or make-it-a-task. Read the Season rail.
 - **Seasonal** — same, Season tab, Year goals as the rail. Fires on the household's season boundaries.
+- **Annual** — on `/plans` Year tab: look back at the year just ended (each goal met / not; keep into the new year or drop), then write the new year's goals. The annual anchor stays September 1 (the school-year turn the cadence already uses) unless Scott moves it.
 
 ## 1. Data
 
@@ -91,7 +92,7 @@ New page, `src/apps/plans/` + `src/components/plans/`, using `PageMasthead` + `P
 - **Month tab:** the month's rows via `isPlacedOnMonth` for non-current months and `belongsToMonth` for the current one (so legacy NULL rows appear in *this* month only). **Goals** section first (Target badge), then **Tasks**. Each row: checkbox, title, domain tint, and a **fate mark** — none · ✓ done · → placed (copy open) · → placed ✓ (copy done) · · · Someday. Inline add at the bottom writes `bucket:'month', month_start: viewed, is_goal` per a small Task/Goal toggle beside the input, domain pre-filled from `soleDomain` (a deliberate create, per domain-layers).
 - **Look-back actions** appear on any **past** period's rows (and on the current period's rows during its last 3 days): **Keep** (copy to next period: new row, `source_id`, next `month_start`, same `is_goal`) · **Drop** (delete with undo) · **Someday** (goals excluded — a goal is an outcome, not a task) · **Make it a task** (goal → task, stays in period). Ticked and placed-done rows have no actions — they're the win column.
 - **Season tab:** identical, with `bucket:'quarter'`, `season_start`, the household boundaries for navigation. **Year goals rail** on the right (read-only, from `goals`).
-- **Year tab:** embeds the existing Goals list (`GoalsList`) — no second implementation. The Library "Goals" row redirects here; `/goals` keeps working.
+- **Year tab:** embeds the existing Goals list (`GoalsList`) — no second implementation. The Library "Goals" row redirects here; `/goals` keeps working. **The year gets the same look-back as the other periods:** the navigator pages to a past year; each goal shows its fate (✓ met · untouched · with the count of season picks that served it, from `goal_id`) and offers **Keep** (copy into the new year's goals) · **Drop**. Nothing is placed from here — a year goal is looked at, never moved (Scott, 2026-09-05: "at the end of each period have a review of that period's goals/tasks").
 - **Season rail** on the Month tab (read-only) — the level above, always.
 - Nothing on `/plans` is draggable and nothing opens a time picker. Editing = title, notes, domain, tick, the look-back actions.
 
