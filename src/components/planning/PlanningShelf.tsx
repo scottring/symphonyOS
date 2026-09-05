@@ -638,7 +638,7 @@ export function PlanningShelf(props: PlanningShelfProps) {
           {composer}
           {ordered.length === 0 && (
             <span className="text-sm text-neutral-400 py-1">
-              {isOver ? 'Drop to unschedule' : 'Everything is placed on a day.'}
+              {isOver ? 'Drop to unschedule' : 'Nothing on the list yet.'}
             </span>
           )}
         </div>
