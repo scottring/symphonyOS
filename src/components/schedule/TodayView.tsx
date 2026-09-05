@@ -598,20 +598,19 @@ export function TodayView({
     // launched left with the 2026-08 analog-planning pivot.
   }, [navigate])
 
+  // In the overflow menu it reads like every other row: icon + label. The
+  // icon keeps its health colour; the bare icon with only a hover tooltip
+  // read as an unlabelled button (demo walkthrough 2026-09-04).
   const clarityTrigger = (
     <button
       type="button"
       onClick={() => setClarityOpen(true)}
-      className="group relative inline-flex items-center p-1.5 -m-1.5 rounded-lg hover:bg-neutral-100/60 transition-colors"
+      title="Where you are, and the next move to get clear"
       aria-label="Clarity — where you are and your next move"
+      className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[15px] text-neutral-600 transition-all hover:bg-neutral-100"
     >
-      <Binoculars className={`w-5 h-5 ${clarityColorClass} group-hover:opacity-70 transition-opacity`} />
-      <span
-        role="tooltip"
-        className="pointer-events-none absolute top-full left-1/2 -translate-x-1/2 mt-2 z-50 hidden group-hover:block w-56 rounded-lg bg-neutral-800 px-3 py-2 text-[11px] leading-snug text-white shadow-lg"
-      >
-        <span className="font-medium">Clarity</span> — where you are, and the next move to get clear.
-      </span>
+      <Binoculars className={`w-5 h-5 ${clarityColorClass}`} />
+      <span>Clarity</span>
     </button>
   )
 
@@ -1026,11 +1025,12 @@ export function TodayView({
         </button>
       )}
 
+      {clarityTrigger}
+
       {/* Signals that only appear when they have something to say. */}
-      {(clarityTrigger || discussion.length > 0 ||
+      {(discussion.length > 0 ||
         (data.isToday && (sweep.pairs.length > 0 || proposal.count > 0))) && (
         <div className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-neutral-100 px-2.5 pt-2 text-[12px] text-neutral-400">
-          {clarityTrigger}
           {discussion.length > 0 && (
             <DiscussionBadge items={discussion} onSelectItem={onSelectItem} />
           )}
