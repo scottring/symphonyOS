@@ -212,7 +212,8 @@ export function PageReviewSheet({
                           className="text-[13px] text-neutral-700 bg-neutral-100 rounded-lg px-2 py-1.5 shrink-0 w-[104px]"
                         />
                       )}
-                      <select
+                      {/* A goal has no assignee — it is the household's year, not a chore. */}
+                      {row.placement.kind !== 'goal' && <select
                         value={row.assigneeId ?? UNASSIGNED}
                         onChange={(e) => updateItem(i, { assigneeId: e.target.value === UNASSIGNED ? null : e.target.value })}
                         aria-label="Assignee"
@@ -222,7 +223,7 @@ export function PageReviewSheet({
                         {members.map((m) => (
                           <option key={m.id} value={m.id}>{m.name}</option>
                         ))}
-                      </select>
+                      </select>}
                     </div>
                   </div>
                 ))}

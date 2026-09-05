@@ -147,6 +147,8 @@ describe('PageReviewSheet — altitudes', () => {
     expect(screen.getByText(/1 task \/ 1 goal/)).toBeInTheDocument()
     const whens = screen.getAllByRole('combobox', { name: /when/i })
     expect(Array.from(whens[1].querySelectorAll('option')).map((o) => o.textContent)).toContain('Year goal')
+    // A goal has no assignee: one Assignee select for the season task, none for the goal.
+    expect(screen.getAllByRole('combobox', { name: /assignee/i })).toHaveLength(1)
     await user.selectOptions(whens[0], 'someday')
     await user.click(screen.getByRole('button', { name: /add 2 items/i }))
     expect(onCommit.mock.calls[0][0].items.map((i: { placement: unknown }) => i.placement)).toEqual([{ kind: 'someday' }, { kind: 'season' }])
