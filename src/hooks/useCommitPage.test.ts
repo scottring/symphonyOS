@@ -7,6 +7,9 @@ const mocks = vi.hoisted(() => ({
   addNote: vi.fn(),
   insert: vi.fn(),
   showToast: vi.fn(),
+  addGoal: vi.fn(),
+  addArea: vi.fn(),
+  areas: [] as { id: string; name: string }[],
 }))
 
 vi.mock('@/lib/supabase', () => ({
@@ -19,6 +22,9 @@ vi.mock('@/hooks/useFamilyMembers', () => ({
   useFamilyMembers: () => ({ getCurrentUserMember: () => ({ id: 'member-1' }) }),
 }))
 vi.mock('@/hooks/useToast', () => ({ showToast: mocks.showToast }))
+vi.mock('@/contexts/GoalsContext', () => ({
+  useGoalsContext: () => ({ areas: mocks.areas, addArea: mocks.addArea, addGoal: mocks.addGoal }),
+}))
 
 import { useCommitPage } from './useCommitPage'
 
@@ -41,6 +47,9 @@ beforeEach(() => {
   mocks.addTask.mockResolvedValue('task-1')
   mocks.addNote.mockResolvedValue({ id: 'note-1' })
   mocks.insert.mockResolvedValue({ error: null })
+  mocks.areas.length = 0
+  mocks.addArea.mockResolvedValue({ id: 'area-new', name: 'General' })
+  mocks.addGoal.mockResolvedValue({ id: 'goal-1' })
 })
 
 describe('useCommitPage', () => {
@@ -52,7 +61,7 @@ describe('useCommitPage', () => {
 
     const result = await commit()({ items: [ITEM, ITEM], notes: [], storagePath: null })
 
-    expect(result).toEqual({ tasksCreated: 0, notesCreated: 0, failures: 2 })
+    expect(result).toEqual({ tasksCreated: 0, goalsCreated: 0, notesCreated: 0, failures: 2 })
     expect(successToasts()).toHaveLength(0)
     expect(errorToasts()[0][0]).toMatch(/could not be saved/i)
   })
@@ -66,7 +75,7 @@ describe('useCommitPage', () => {
       storagePath: null,
     })
 
-    expect(result).toEqual({ tasksCreated: 1, notesCreated: 0, failures: 1 })
+    expect(result).toEqual({ tasksCreated: 1, goalsCreated: 0, notesCreated: 0, failures: 1 })
     expect(errorToasts()[0][0]).toMatch(/Added 1 task, but 1 item could not be saved/)
   })
 
@@ -77,7 +86,7 @@ describe('useCommitPage', () => {
       storagePath: null,
     })
 
-    expect(result).toEqual({ tasksCreated: 1, notesCreated: 1, failures: 0 })
+    expect(result).toEqual({ tasksCreated: 1, goalsCreated: 0, notesCreated: 1, failures: 0 })
     expect(successToasts()[0][0]).toBe('Added 1 task and 1 note from your page')
   })
 
@@ -138,5 +147,33 @@ describe('useCommitPage', () => {
     await commit()({ items: [ITEM], notes: [], storagePath: 'user-1/supernote/page.png' })
 
     expect(mocks.insert).not.toHaveBeenCalled()
+  })
+})
+
+// A year page's lines are goals, not tasks (altitudes, 2026-09-05).
+describe('useCommitPage — goals', () => {
+  const GOAL: PlanItem = { title: 'Run a half marathon', placement: { kind: 'goal' }, time: null, assigneeId: null, note: null }
+
+  it('writes a goal row into the first existing area and never calls addTask for it', async () => {
+    mocks.areas.push({ id: 'area-1', name: 'Health' })
+    const result = await commit()({ items: [GOAL, ITEM], notes: [], storagePath: null })
+    expect(mocks.addGoal).toHaveBeenCalledWith('area-1', 'Run a half marathon', undefined)
+    expect(mocks.addArea).not.toHaveBeenCalled()
+    expect(mocks.addTask).toHaveBeenCalledTimes(1)
+    expect(result).toEqual({ tasksCreated: 1, goalsCreated: 1, notesCreated: 0, failures: 0 })
+    expect(successToasts()[0][0]).toMatch(/1 task and 1 goal/)
+  })
+
+  it('creates a General area when the household has none yet', async () => {
+    await commit()({ items: [GOAL], notes: [], storagePath: null })
+    expect(mocks.addArea).toHaveBeenCalledWith('General')
+    expect(mocks.addGoal).toHaveBeenCalledWith('area-new', 'Run a half marathon', undefined)
+  })
+
+  it('counts a goal that did not land as a failure', async () => {
+    mocks.addGoal.mockResolvedValue(null)
+    const result = await commit()({ items: [GOAL], notes: [], storagePath: null })
+    expect(result.failures).toBe(1)
+    expect(result.goalsCreated).toBe(0)
   })
 })
