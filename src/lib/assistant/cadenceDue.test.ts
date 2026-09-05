@@ -6,7 +6,7 @@ import { DEFAULT_CADENCE, weekToken } from '@/lib/cadence/config'
 const thu = new Date(2026, 6, 30, 9, 0, 0)
 const thuWeek = weekToken(thu, DEFAULT_CADENCE.weekStartsOn)
 // July 2026 falls in meteorological summer → S2, started 2026-06-01.
-const allButWeek = new Set(['season:2026-S2', 'month:2026-7'])
+const allButWeek = new Set(['season:2026-summer', 'month:2026-7'])
 
 describe('computeCadenceOverdue', () => {
   it('returns null when every current period was already planned', () => {
@@ -23,13 +23,13 @@ describe('computeCadenceOverdue', () => {
     // Nothing planned at all — the season outranks the month and the week.
     expect(computeCadenceOverdue(DEFAULT_CADENCE, thu, new Set())?.kind).toBe('season')
     // Season done, month not — the month outranks the week.
-    expect(computeCadenceOverdue(DEFAULT_CADENCE, thu, new Set(['season:2026-S2']))?.kind)
+    expect(computeCadenceOverdue(DEFAULT_CADENCE, thu, new Set(['season:2026-summer']))?.kind)
       .toBe('month')
   })
 
   it('counts weeks late for an unplanned month', () => {
     // 2026-07-30 is ~4 weeks past the July 1 anchor.
-    const r = computeCadenceOverdue(DEFAULT_CADENCE, thu, new Set(['season:2026-S2']))
+    const r = computeCadenceOverdue(DEFAULT_CADENCE, thu, new Set(['season:2026-summer']))
     expect(r!.weeksLate).toBe(4)
   })
 
@@ -40,7 +40,7 @@ describe('computeCadenceOverdue', () => {
 
     const oct = new Date(2026, 9, 15, 9, 0, 0)
     const octDone = new Set([
-      'season:2026-S3', 'month:2026-10',
+      'season:2026-fall', 'month:2026-10',
       `week:${weekToken(oct, DEFAULT_CADENCE.weekStartsOn)}`,
     ])
     const r = computeCadenceOverdue(DEFAULT_CADENCE, oct, octDone)
@@ -51,14 +51,14 @@ describe('computeCadenceOverdue', () => {
   it('respects weeklyNudgeEnabled=false for the weekly ritual only', () => {
     const cfg = { ...DEFAULT_CADENCE, weeklyNudgeEnabled: false }
     expect(computeCadenceOverdue(cfg, thu, allButWeek)).toBeNull()
-    expect(computeCadenceOverdue(cfg, thu, new Set(['season:2026-S2']))?.kind).toBe('month')
+    expect(computeCadenceOverdue(cfg, thu, new Set(['season:2026-summer']))?.kind).toBe('month')
   })
 
   it('scores an overdue month above the wall floor via urgency', async () => {
     // (see below for the completion-signal tests)
     // Integration sanity: a 4-week-late month must clear the wall's floor of 70.
     const { computeUrgency } = await import('./urgency')
-    const r = computeCadenceOverdue(DEFAULT_CADENCE, thu, new Set(['season:2026-S2']))
+    const r = computeCadenceOverdue(DEFAULT_CADENCE, thu, new Set(['season:2026-summer']))
     expect(computeUrgency({ cadenceWeeksLate: r!.weeksLate })).toBeGreaterThanOrEqual(70)
   })
 })
@@ -87,11 +87,11 @@ describe('completedCadenceTokens', () => {
     const set = completedCadenceTokens([
       { horizon: 'weekly', period_token: '2026-7-26', notes: { review: 'done' } },
       { horizon: 'monthly', period_token: '2026-7', notes: { review: 'done' } },
-      { horizon: 'seasonal', period_token: '2026-S2', notes: { review: 'done' } },
+      { horizon: 'seasonal', period_token: '2026-summer', notes: { review: 'done' } },
       { horizon: 'annual', period_token: '2026', notes: { review: 'done' } },
     ])
     expect(set).toEqual(new Set([
-      'week:2026-7-26', 'month:2026-7', 'season:2026-S2', 'year:2026',
+      'week:2026-7-26', 'month:2026-7', 'season:2026-summer', 'year:2026',
     ]))
   })
 

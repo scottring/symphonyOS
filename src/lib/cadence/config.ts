@@ -7,6 +7,7 @@
 // Phase-3 concern and can extend this shape without a migration.
 
 import { useState, useEffect, useCallback } from 'react'
+import { readSeasons, isSeasonBoundary, seasonToken as configuredSeasonToken } from '@/lib/cadence/seasons'
 
 /** 0 = Sunday (default), 1 = Monday. The two starts Scott asked to support. */
 export type WeekStart = 0 | 1
@@ -109,17 +110,6 @@ export interface DueSession {
   token: string
 }
 
-/** Meteorological-season index (0–3) and a YYYY-Sx token for `now`. */
-function seasonToken(now: Date): string {
-  const s = Math.floor(((now.getMonth() + 1) % 12) / 3) // Dec→0(winter)… keeps Dec with Jan/Feb
-  return `${now.getFullYear()}-S${s}`
-}
-
-/** Is `now` the first calendar day of a meteorological season (Mar/Jun/Sep/Dec 1)? */
-function isSeasonStart(now: Date): boolean {
-  return now.getDate() === 1 && [2, 5, 8, 11].includes(now.getMonth())
-}
-
 /** Is `now` the first Saturday of its month? (The monthly-session anchor.) */
 function isFirstSaturday(now: Date): boolean {
   return now.getDay() === 6 && now.getDate() <= 7
@@ -129,7 +119,7 @@ function isFirstSaturday(now: Date): boolean {
  * The highest-priority planning nudge due right now (pure + testable). Priority
  * annual → seasonal → monthly → weekly, so a season-turn Sunday surfaces the
  * bigger ritual. Anchors follow the requirements: weekly = configured day,
- * monthly = first Saturday, seasonal = season's first day, annual = September 1.
+ * monthly = first Saturday, seasonal = a configured season boundary, annual = September 1.
  * Returns null when nothing is due. (Annual/seasonal/monthly anchors are fixed
  * this phase; only the weekly day is user-configurable.)
  */
@@ -138,9 +128,10 @@ export function getDueSession(config: CadenceConfig, now: Date): DueSession | nu
   if (now.getMonth() === 8 && now.getDate() === 1) {
     return { kind: 'year', label: 'the year', token: `${now.getFullYear()}` }
   }
-  // Seasonal — first day of a meteorological season.
-  if (isSeasonStart(now)) {
-    return { kind: 'season', label: 'the season', token: seasonToken(now) }
+  // Seasonal — the household's own boundary, not a meteorological one.
+  const seasons = readSeasons()
+  if (isSeasonBoundary(now, seasons)) {
+    return { kind: 'season', label: 'the season', token: configuredSeasonToken(now, seasons) }
   }
   // Monthly — first Saturday.
   if (isFirstSaturday(now)) {

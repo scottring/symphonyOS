@@ -9,7 +9,7 @@
 // month is starving.
 
 import type { Task } from '@/types/task'
-import { SEASON_NAMES, seasonIndex, seasonStart } from '@/lib/cadence/periods'
+import { seasonNames, seasonIndex, seasonStart } from '@/lib/cadence/periods'
 
 export const PICK_CAP = 10
 
@@ -124,7 +124,7 @@ export function goalChapters(goalId: string, tasks: readonly Task[]) {
     .map((bet) => {
       const picked = new Date(bet.pickedAt as Date)
       return {
-        label: `${SEASON_NAMES[seasonIndex(picked)]} ${seasonStart(picked).getFullYear()}`,
+        label: `${seasonNames()[seasonIndex(picked)]} ${seasonStart(picked).getFullYear()}`,
         bet,
         state: (bet.completed ? 'won' : 'open') as 'won' | 'open',
       }

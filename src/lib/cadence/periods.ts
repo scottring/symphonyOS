@@ -1,7 +1,7 @@
 // src/lib/cadence/periods.ts
 //
 // Pure period math for the horizon rungs: what period a horizon is in right
-// now ("July 2026", "Summer 2026"), how far through it we are ("Day 8 of 31"),
+// now ("July 2026", "Summer 2026" — seasons per the household's configured boundaries), how far through it we are ("Day 8 of 31"),
 // and the rung's neighbors on the rhythm spine (for the cascade rail). Shared
 // by HorizonView and the cadence sessions so labels/tokens never drift apart.
 
@@ -9,28 +9,30 @@ import { HORIZONS, type HorizonId } from '@/lib/today/horizons'
 import { readCadenceConfig, weekStartAnchor } from '@/lib/cadence/config'
 
 export const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
-export const SEASON_NAMES = ['Winter', 'Spring', 'Summer', 'Fall']
+import { readSeasons, seasonStartFor, seasonEndFor } from '@/lib/cadence/seasons'
 
-/** Meteorological-season index 0–3 (Dec–Feb winter, Mar–May spring, …). */
+/** The configured season names, in calendar order. Used to be the fixed
+ *  meteorological four; now whatever the household set in Settings. */
+export function seasonNames(): string[] {
+  return readSeasons().map((s) => s.name)
+}
+
+/** Index 0–3 of the configured season containing `d`. */
 export function seasonIndex(d: Date): number {
-  return Math.floor(((d.getMonth() + 1) % 12) / 3)
+  const seasons = readSeasons()
+  const start = seasonStartFor(d, seasons)
+  const idx = seasons.findIndex((b) => b.month - 1 === start.getMonth() && b.day === start.getDate())
+  return idx < 0 ? 0 : idx
 }
 
-/** First day of the meteorological season containing `now` (midnight). Note
- *  December belongs to the *following* winter: its season started Dec 1. */
+/** First day (midnight) of the configured season containing `now`. */
 export function seasonStart(now: Date): Date {
-  // Walk back to the most recent season-start month: Dec(11), Mar(2), Jun(5), Sep(8).
-  const starts = [11, 2, 5, 8]
-  let sm = now.getMonth()
-  while (!starts.includes(sm)) sm = (sm + 11) % 12
-  const year = sm === 11 && now.getMonth() !== 11 ? now.getFullYear() - 1 : now.getFullYear()
-  return new Date(year, sm, 1, 0, 0, 0, 0)
+  return seasonStartFor(now, readSeasons())
 }
 
-/** Exclusive end (first day after) of the season containing `now`. */
+/** Exclusive end (midnight of the next boundary) of the season containing `now`. */
 export function seasonEnd(now: Date): Date {
-  const start = seasonStart(now)
-  return new Date(start.getFullYear(), start.getMonth() + 3, 1, 0, 0, 0, 0)
+  return seasonEndFor(now, readSeasons())
 }
 
 export interface PeriodProgress {
@@ -53,7 +55,7 @@ export function periodLabel(horizon: HorizonId, now: Date = new Date()): string 
     case 'month':
       return `${MONTH_NAMES[now.getMonth()]} ${now.getFullYear()}`
     case 'season':
-      return `${SEASON_NAMES[seasonIndex(now)]} ${now.getFullYear()}`
+      return `${seasonNames()[seasonIndex(now)]} ${seasonStart(now).getFullYear()}`
     case 'year':
       return `${now.getFullYear()}`
     case 'someday':

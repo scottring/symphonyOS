@@ -12,6 +12,7 @@
 
 import type { CadenceConfig, SessionHorizon } from '@/lib/cadence/config'
 import { weekStartAnchor, weekToken } from '@/lib/cadence/config'
+import { readSeasons, seasonStartFor, seasonToken } from '@/lib/cadence/seasons'
 
 export interface CadenceOverdue {
   kind: SessionHorizon
@@ -80,18 +81,13 @@ function wholeWeeksSince(anchor: Date, now: Date): number {
 }
 
 /**
- * Meteorological season index + its start date. Token format mirrors
- * config.ts's seasonToken (Dec→S0, keeping Dec with Jan/Feb).
+ * The configured season containing `now`: its token (mirrors seasons.ts's
+ * seasonToken, "2026-fall") and its start date. Used to be the meteorological
+ * four; now the household's own boundaries.
  */
 function seasonAnchor(now: Date): { token: string; start: Date } {
-  const s = Math.floor(((now.getMonth() + 1) % 12) / 3)
-  const startMonth = [11, 2, 5, 8][s]
-  // A December date belongs to a season that started that same December; a
-  // Jan/Feb date belongs to one that started the PREVIOUS December.
-  const year = startMonth === 11 && now.getMonth() !== 11
-    ? now.getFullYear() - 1
-    : now.getFullYear()
-  return { token: `${now.getFullYear()}-S${s}`, start: new Date(year, startMonth, 1) }
+  const seasons = readSeasons()
+  return { token: seasonToken(now, seasons), start: seasonStartFor(now, seasons) }
 }
 
 /**
