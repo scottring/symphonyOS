@@ -5,6 +5,7 @@ import { CameraCaptureModal } from '@/components/capture/CameraCaptureModal'
 import { hasParsedFields } from '@/lib/quickInputParser'
 import type { TaskCategory, TaskContext } from '@/types/task'
 import { DomainChooser } from '@/components/domain/DomainChooser'
+import { domainForHotkey } from '@/lib/domainHotkey'
 import { useQuickParse } from '@/hooks/useQuickParse'
 import { ParsedFieldChips } from '@/components/capture/ParsedFieldChips'
 import { ConceptIcon } from '@/lib/conceptIcons'
@@ -156,7 +157,11 @@ export function QuickCapture({
   // (Inbox Focus mode binds d=delete, c=complete, 1-4=triage). Closing is
   // always explicit: Escape, ✕, click-outside, or a navigating submit.
 
-  const showPreview = qp.hasFields
+  // An empty box shows no preview even when a domain is still applied (the
+  // sticky domain survives a rapid-entry submit) — otherwise the card renders
+  // around an empty title. The chip reappears the moment there is text again,
+  // which is well before anything can be submitted.
+  const showPreview = title.trim().length > 0 && qp.hasFields
 
   const assignedNames = useMemo(() => {
     if (!effectiveParsed.assignedMemberIds?.length) return []
@@ -245,9 +250,17 @@ export function QuickCapture({
       }))
     }
 
-    // Reset and refocus for rapid entry
+    // Reset and refocus for rapid entry — but the domain STAYS. Entering a run
+    // of captures ("permission slip", "soccer cleats", "call the dentist") is
+    // one train of thought in one domain; re-picking it per item was the whole
+    // complaint. It is the user's own pick from seconds ago, not a guess, and
+    // the chip stays on screen with its ×. Closing the box clears it
+    // (handleClose and the open effect both resetOverrides), so a capture run
+    // can never leak its domain into tomorrow's.
+    const stickyContext = effectiveParsed.context
     setTitle('')
     resetOverrides()
+    if (stickyContext) applyContext(stickyContext)
     inputRef.current?.focus()
   }
 
@@ -259,6 +272,14 @@ export function QuickCapture({
   }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    // ⌥1/⌥2/⌥3 file the capture without reaching for the mouse. Live even once
+    // a domain is applied, so ⌥2 re-files a Work capture as Family.
+    const hotkeyDomain = domainForHotkey(e)
+    if (hotkeyDomain) {
+      e.preventDefault()
+      applyContext(hotkeyDomain)
+      return
+    }
     if (e.key === 'Escape') {
       handleClose()
     } else if (e.key === 'Enter') {
@@ -525,6 +546,7 @@ export function QuickCapture({
                   <span className="text-xs text-neutral-400">Add to</span>
                   <DomainChooser
                     size="sm"
+                    shortcuts
                     onChoose={(d) => { applyContext(d); inputRef.current?.focus() }}
                   />
                 </div>

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, waitFor, act } from '@/test/test-utils'
+import { render, screen, waitFor, act, fireEvent } from '@/test/test-utils'
 import { QuickCapture } from './QuickCapture'
 import { LAYERS_KEY } from '@/hooks/useDomain'
 
@@ -295,6 +295,98 @@ describe('QuickCapture', () => {
       // domain the user tapped is not.
       expect(onAdd).not.toHaveBeenCalled()
       expect(onAddRich).toHaveBeenCalledWith({ title: 'Buy milk tomorrow', context: 'work' })
+    })
+  })
+
+  describe('domain shortcuts and stickiness', () => {
+    const open = (props = {}) =>
+      render(
+        <QuickCapture onAdd={vi.fn()} onAddRich={vi.fn()} isOpen={true} showFab={false} {...props} />,
+      )
+
+    // ⌥1 emits key "¡" on macOS, never "1" — the handler must read e.code.
+    it('⌥2 files the capture as Family', async () => {
+      const onAddRich = vi.fn()
+      const { user } = open({ onAddRich })
+      const input = screen.getByPlaceholderText('Try "call the vet tomorrow 2pm"')
+      await user.type(input, 'Sign the permission slip')
+      fireEvent.keyDown(input, { key: '™', code: 'Digit2', altKey: true })
+
+      expect(screen.getByRole('button', { name: 'Clear context' })).toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: 'Save Task' }))
+      expect(onAddRich).toHaveBeenCalledWith(
+        expect.objectContaining({ context: 'family' }),
+      )
+    })
+
+    it('a later shortcut re-files an already tagged capture', async () => {
+      const onAddRich = vi.fn()
+      const { user } = open({ onAddRich })
+      const input = screen.getByPlaceholderText('Try "call the vet tomorrow 2pm"')
+      await user.type(input, 'Sign the permission slip')
+      fireEvent.keyDown(input, { key: '¡', code: 'Digit1', altKey: true })
+      fireEvent.keyDown(input, { key: '™', code: 'Digit2', altKey: true })
+
+      await user.click(screen.getByRole('button', { name: 'Save Task' }))
+      expect(onAddRich).toHaveBeenCalledWith(expect.objectContaining({ context: 'family' }))
+    })
+
+    it('a plain digit still types', async () => {
+      const { user } = open()
+      const input = screen.getByPlaceholderText('Try "call the vet tomorrow 2pm"') as HTMLInputElement
+      await user.type(input, 'buy 2 tickets')
+      expect(input.value).toBe('buy 2 tickets')
+      expect(screen.getByRole('button', { name: 'Work' })).toBeInTheDocument()
+    })
+
+    // The whole complaint: re-picking the domain for every item in a run.
+    it('the domain rides along to the next capture in the same open box', async () => {
+      const onAddRich = vi.fn()
+      const { user } = open({ onAddRich })
+      const input = screen.getByPlaceholderText('Try "call the vet tomorrow 2pm"')
+
+      await user.type(input, 'permission slip')
+      await user.click(screen.getByRole('button', { name: 'Family' }))
+      await user.click(screen.getByRole('button', { name: 'Save Task' }))
+
+      // Second capture: no chooser to touch, the chip is already there.
+      await user.type(input, 'soccer cleats')
+      expect(screen.queryByRole('button', { name: 'Work' })).not.toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: 'Save Task' }))
+
+      expect(onAddRich).toHaveBeenNthCalledWith(1, expect.objectContaining({ title: 'permission slip', context: 'family' }))
+      expect(onAddRich).toHaveBeenNthCalledWith(2, expect.objectContaining({ title: 'soccer cleats', context: 'family' }))
+    })
+
+    it('shows no preview card around an empty box while the domain is still held', async () => {
+      const { user } = open()
+      const input = screen.getByPlaceholderText('Try "call the vet tomorrow 2pm"')
+      await user.type(input, 'permission slip')
+      await user.click(screen.getByRole('button', { name: 'Family' }))
+      await user.click(screen.getByRole('button', { name: 'Save Task' }))
+
+      expect(screen.queryByRole('button', { name: 'Clear context' })).not.toBeInTheDocument()
+      await user.type(input, 'soccer cleats')
+      expect(screen.getByRole('button', { name: 'Clear context' })).toBeInTheDocument()
+    })
+
+    it('closing the box drops the held domain', async () => {
+      const onAddRich = vi.fn()
+      const onClose = vi.fn()
+      const { user, rerender } = render(
+        <QuickCapture onAdd={vi.fn()} onAddRich={onAddRich} isOpen={true} showFab={false} onClose={onClose} />,
+      )
+      const input = screen.getByPlaceholderText('Try "call the vet tomorrow 2pm"')
+      await user.type(input, 'permission slip')
+      await user.click(screen.getByRole('button', { name: 'Family' }))
+      await user.click(screen.getByRole('button', { name: 'Save Task' }))
+
+      rerender(<QuickCapture onAdd={vi.fn()} onAddRich={onAddRich} isOpen={false} showFab={false} onClose={onClose} />)
+      rerender(<QuickCapture onAdd={vi.fn()} onAddRich={onAddRich} isOpen={true} showFab={false} onClose={onClose} />)
+
+      await user.type(screen.getByPlaceholderText('Try "call the vet tomorrow 2pm"'), 'file the taxes')
+      expect(screen.getByRole('button', { name: 'Work' })).toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Clear context' })).not.toBeInTheDocument()
     })
   })
 

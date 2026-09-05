@@ -6,6 +6,7 @@ import type { ResolverContext, ContactSuggestion } from '@/lib/entityResolver'
 import { useQuickParse } from '@/hooks/useQuickParse'
 import { useAssistantLauncher } from '@/contexts/AssistantLaunchContext'
 import { DomainChooser } from '@/components/domain/DomainChooser'
+import { domainForHotkey } from '@/lib/domainHotkey'
 import { AppliedDomainChip } from '@/components/capture/AppliedDomainChip'
 import { ConceptIcon } from '@/lib/conceptIcons'
 import type { ResolutionAction } from '@/hooks/useResolutionLearning'
@@ -129,6 +130,14 @@ export function TodayAddInput({ onAdd, parserContext, resolver, getRecentTaskFor
   }, [value, qp, suggestion, suggestionState, suggestionApplied, destination, onAdd, reset])
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
+    // ⌥1/⌥2/⌥3 file the capture without reaching for the mouse. Live even once
+    // a domain is applied, so ⌥2 re-files a Work capture as Family.
+    const hotkeyDomain = domainForHotkey(e)
+    if (hotkeyDomain) {
+      e.preventDefault()
+      qp.applyContext(hotkeyDomain)
+      return
+    }
     if (e.key === 'Enter') {
       e.preventDefault()
       handleSubmit()
@@ -230,6 +239,7 @@ export function TodayAddInput({ onAdd, parserContext, resolver, getRecentTaskFor
               <span className="text-xs text-neutral-400">Add to</span>
               <DomainChooser
                 size="sm"
+                shortcuts
                 onChoose={(d) => { qp.applyContext(d); inputRef.current?.focus() }}
               />
             </>

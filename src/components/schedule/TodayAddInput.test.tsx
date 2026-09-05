@@ -216,4 +216,29 @@ describe('TodayAddInput smart capture', () => {
     setup()
     expect(screen.queryByRole('button', { name: 'Work' })).not.toBeInTheDocument()
   })
+
+  // ⌥1 emits "¡" on macOS, never "1" — the handler must read e.code.
+  it('⌥3 files the capture as Personal without touching the mouse', async () => {
+    vi.useFakeTimers()
+    const { input, onAdd } = setup()
+    fireEvent.change(input, { target: { value: 'Book a haircut' } })
+    await act(() => vi.advanceTimersByTimeAsync(200))
+    fireEvent.keyDown(input, { key: '£', code: 'Digit3', altKey: true })
+    fireEvent.keyDown(input, { key: 'Enter' })
+
+    expect(onAdd.mock.calls[0][0].context).toBe('personal')
+    vi.useRealTimers()
+  })
+
+  it('a plain digit still types', async () => {
+    vi.useFakeTimers()
+    const { input, onAdd } = setup()
+    fireEvent.change(input, { target: { value: 'Buy 2 tickets' } })
+    await act(() => vi.advanceTimersByTimeAsync(200))
+    fireEvent.keyDown(input, { key: 'Enter' })
+
+    expect(onAdd.mock.calls[0][0].title).toBe('Buy 2 tickets')
+    expect(onAdd.mock.calls[0][0].context).toBeUndefined()
+    vi.useRealTimers()
+  })
 })
