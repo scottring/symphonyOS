@@ -236,6 +236,58 @@ describe('day focus', () => {
 })
 
 describe('first step on a step-less routine', () => {
+  it('Escape closes an open routine panel and keeps the routine', () => {
+    const onDelete = vi.fn()
+    render(
+      <RhythmPage {...noop} onUpdateRoutine={vi.fn()} onDelete={onDelete}
+        routines={[
+          mk('Kids shower routine', { id: 'shower', recurrence_pattern: { type: 'weekly', days: ['tue'] }, time_of_day: '19:00:00' }),
+          mk('Walk Jax', { id: 'walk', time_of_day: '06:30:00' }),
+        ]} />
+    )
+    fireEvent.click(screen.getByText('Kids shower routine'))
+    expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument()
+    fireEvent.keyDown(document.body, { key: 'Escape' })
+    expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument()
+    expect(onDelete).not.toHaveBeenCalled()
+  })
+
+  it('a "New routine" closed untouched is let go, not left behind', async () => {
+    const onDelete = vi.fn()
+    const draft = mk('New routine', { id: 'draft' })
+    render(
+      <RhythmPage {...noop} onUpdateRoutine={vi.fn()} onDelete={onDelete}
+        onCreateCollection={vi.fn().mockResolvedValue(draft)}
+        routines={[mk('Walk Jax', { id: 'walk', time_of_day: '06:30:00' }), draft]} />
+    )
+    fireEvent.click(screen.getAllByRole('button', { name: 'New routine' })[0])
+    expect(await screen.findByRole('button', { name: 'Close' })).toBeInTheDocument()
+    fireEvent.keyDown(document.body, { key: 'Escape' })
+    expect(onDelete).toHaveBeenCalledWith('draft')
+  })
+
+  it('a "New routine" that was edited is kept on close', async () => {
+    const onDelete = vi.fn()
+    const onUpdateRoutine = vi.fn()
+    const draft = mk('New routine', { id: 'draft' })
+    render(
+      <RhythmPage {...noop} onUpdateRoutine={onUpdateRoutine} onDelete={onDelete}
+        onCreateCollection={vi.fn().mockResolvedValue(draft)}
+        routines={[draft]} />
+    )
+    fireEvent.click(screen.getAllByRole('button', { name: 'New routine' })[0])
+    await screen.findByRole('button', { name: 'Close' })
+    // PanelHeader shows the title as a button; click to enter edit mode.
+    const titleButtons = screen.getAllByRole('button', { name: 'New routine' })
+    fireEvent.click(titleButtons[titleButtons.length - 1])
+    const title = screen.getByDisplayValue('New routine')
+    fireEvent.change(title, { target: { value: 'Sunday reset' } })
+    fireEvent.blur(title)
+    expect(onUpdateRoutine).toHaveBeenCalledWith('draft', { name: 'Sunday reset' })
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+    expect(onDelete).not.toHaveBeenCalled()
+  })
+
   it('shows the add-step input on a step-less routine panel and adds through it', () => {
     const onAddStep = vi.fn()
     render(

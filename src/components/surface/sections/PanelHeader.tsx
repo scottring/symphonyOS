@@ -23,7 +23,11 @@ export function PanelHeader({ title, onTitleChange, onClose }: PanelHeaderProps)
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onBlur={commit}
-          onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+            // Escape cancels the edit; consumed so the panel itself stays open.
+            if (e.key === 'Escape') { e.preventDefault(); setDraft(title); setEditing(false) }
+          }}
           className="flex-1 text-lg font-display font-semibold bg-transparent border-b border-neutral-300 focus:outline-none focus:border-primary-500"
         />
       ) : (

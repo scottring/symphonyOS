@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useEscapeKey } from '@/hooks/useEscapeKey'
 import { Plus, Search, Sparkles, RefreshCw, Wrench } from 'lucide-react'
 import type { RecurrencePattern, Routine } from '@/types/actionable'
 import type { Contact } from '@/types/contact'
@@ -62,6 +63,11 @@ export function RhythmPage(props: RhythmPageProps) {
   const [focusDay, setFocusDay] = useState<DayKey | null>(null)
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState<{ kind: 'routine' | 'standalone-step' | 'step'; id: string } | null>(null)
+  // "New routine" writes a row before the user has typed a name, so the panel
+  // has something to edit. If that panel closes with nothing touched, the row
+  // is let go — otherwise every abandoned click leaves a "New routine" behind
+  // (demo walkthrough 2026-09-04). Any edit clears the draft mark.
+  const [draftId, setDraftId] = useState<string | null>(null)
   const [tendOpen, setTendOpen] = useState(false)
 
   const model = useMemo(() => buildRhythmModel(routines, { memberId, focusDay }), [routines, memberId, focusDay])
@@ -224,6 +230,21 @@ export function RhythmPage(props: RhythmPageProps) {
   const openRoutine = (r: Routine) =>
     setOpen({ kind: model.stepCounts[r.id] ? 'routine' : 'standalone-step', id: r.id })
 
+  const closePanel = () => {
+    if (draftId) { onDelete?.(draftId); setDraftId(null) }
+    setOpen(null)
+  }
+  const touchDraft = (id: string) => { if (id === draftId) setDraftId(null) }
+  const updateRoutine = (id: string, patch: Parameters<typeof onUpdateRoutine>[1]) => {
+    touchDraft(id)
+    return onUpdateRoutine(id, patch)
+  }
+  // Escape mirrors the open panel's own close: a step panel returns to its
+  // routine, a routine panel closes.
+  useEscapeKey(!!open, openStep && parentOfOpenStep
+    ? () => setOpen({ kind: 'routine', id: parentOfOpenStep.id })
+    : closePanel)
+
   return (
     <div className="h-full overflow-auto bg-[var(--color-bg-base)]">
       {/* Full-width canvas (keeps the shared gutter, drops the 940px cap) —
@@ -271,7 +292,7 @@ export function RhythmPage(props: RhythmPageProps) {
               onClick={async () => {
                 if (!onCreateCollection) return
                 const created = await onCreateCollection('New routine')
-                if (created) setOpen({ kind: 'standalone-step', id: created.id })
+                if (created) { setDraftId(created.id); setOpen({ kind: 'standalone-step', id: created.id }) }
               }}
               className="flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 font-medium text-white
                          shadow-sm hover:bg-primary-700 active:bg-primary-800 transition-colors">
@@ -319,7 +340,7 @@ export function RhythmPage(props: RhythmPageProps) {
               onClick={async () => {
                 if (!onCreateCollection) return
                 const created = await onCreateCollection('New routine')
-                if (created) setOpen({ kind: 'standalone-step', id: created.id })
+                if (created) { setDraftId(created.id); setOpen({ kind: 'standalone-step', id: created.id }) }
               }}
               className="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-5 py-2.5 font-medium text-white
                          shadow-sm hover:bg-amber-600 transition-colors">
@@ -385,28 +406,28 @@ export function RhythmPage(props: RhythmPageProps) {
 
       {/* Panel overlay — routine/step editors, shared across all zones */}
       {(openRoutineItem || openStep) && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={() => setOpen(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={closePanel}>
           <div onClick={e => e.stopPropagation()}>
             {openRoutineItem && (
               <TapRoutinePanel
                 key={openRoutineItem.id}
                 routine={openRoutineItem}
                 familyMembers={familyMembers}
-                onClose={() => setOpen(null)}
-                onRename={name => onUpdateRoutine(openRoutineItem.id, { name })}
-                onContextChange={context => onUpdateRoutine(openRoutineItem.id, { context: context ?? null })}
-                onVisibilityChange={visibility => onUpdateRoutine(openRoutineItem.id, { visibility })}
-                onRestUntilChange={pausedUntil => onUpdateRoutine(openRoutineItem.id, { paused_until: pausedUntil })}
-                onAssignChange={memberIds => onUpdateRoutine(openRoutineItem.id, { assigned_to_all: memberIds })}
+                onClose={closePanel}
+                onRename={name => updateRoutine(openRoutineItem.id, { name })}
+                onContextChange={context => updateRoutine(openRoutineItem.id, { context: context ?? null })}
+                onVisibilityChange={visibility => updateRoutine(openRoutineItem.id, { visibility })}
+                onRestUntilChange={pausedUntil => updateRoutine(openRoutineItem.id, { paused_until: pausedUntil })}
+                onAssignChange={memberIds => updateRoutine(openRoutineItem.id, { assigned_to_all: memberIds })}
                 onScheduleChange={(pattern, timeOfDay) =>
-                  onUpdateRoutine(openRoutineItem.id, { recurrence_pattern: pattern, time_of_day: timeOfDay || null })}
-                onNotesChange={description => onUpdateRoutine(openRoutineItem.id, { description })}
-                onTargetChange={t => onUpdateRoutine(openRoutineItem.id, { target_amount: t?.amount ?? null, target_unit: t?.unit ?? null })}
-                onDelete={onDelete ? () => { onDelete(openRoutineItem.id); setOpen(null) } : undefined}
-                onAddSteps={props.onAddSteps ? steps => props.onAddSteps!(openRoutineItem.id, steps) : undefined}
+                  updateRoutine(openRoutineItem.id, { recurrence_pattern: pattern, time_of_day: timeOfDay || null })}
+                onNotesChange={description => updateRoutine(openRoutineItem.id, { description })}
+                onTargetChange={t => updateRoutine(openRoutineItem.id, { target_amount: t?.amount ?? null, target_unit: t?.unit ?? null })}
+                onDelete={onDelete ? () => { onDelete(openRoutineItem.id); setDraftId(null); setOpen(null) } : undefined}
+                onAddSteps={props.onAddSteps ? steps => { touchDraft(openRoutineItem.id); return props.onAddSteps!(openRoutineItem.id, steps) } : undefined}
                 steps={openRoutineItem.steps}
                 onSelectStep={(s: Routine) => setOpen({ kind: 'step', id: s.id })}
-                onAddStep={(name: string) => props.onAddStep(openRoutineItem.id, name)}
+                onAddStep={(name: string) => { touchDraft(openRoutineItem.id); return props.onAddStep(openRoutineItem.id, name) }}
                 onReorderSteps={props.onReorderSteps}
                 {...(openRoutineItem.steps.length === 0 && onAddToCollection ? {
                   moveTargets: foldTargets.filter(t => t.id !== openRoutineItem.id),
