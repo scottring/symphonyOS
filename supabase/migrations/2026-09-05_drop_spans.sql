@@ -10,8 +10,8 @@
 -- takes a start and an end, with Today / Weekend / 3 days / Week presets, and
 -- lays those days out as columns. That is what a span was for.
 --
--- NOT YET APPLIED — run against prod deliberately, after confirming the app
--- code that reads span_id is deployed.
+-- APPLIED to prod 2026-09-05, after the deploy that removed every reader of
+-- span_id. Verified: to_regclass('public.spans') is null, tasks.span_id gone.
 
 drop index if exists public.tasks_span_idx;
 alter table public.tasks drop column if exists span_id;
