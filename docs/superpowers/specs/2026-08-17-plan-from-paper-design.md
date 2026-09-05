@@ -59,7 +59,11 @@ review what was read, and land the items as placed tasks — without typing.
 ## Out of scope (v2 candidates)
 
 iOS entry point (separate build pipeline), recurring-routine detection,
-multi-page plans, month/quarter placements, project/goal linking.
+multi-page plans, project linking.
+
+**Built since (2026-09-05):** page altitudes — Week / Month / Season / Year
+chips in the camera modal; month, season, someday and (year pages only) goal
+placements. See `paper_altitudes_shipped` in memory.
 
 ## Testing
 
