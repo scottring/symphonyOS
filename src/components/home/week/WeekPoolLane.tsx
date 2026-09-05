@@ -1,6 +1,7 @@
 //
-// /week's list — THIS WEEK'S LIST, not a pool to drain. The same official views
-// as the overlay drawer (poolViews decides; this only renders). A ticked pill
+// /week's list — THIS WEEK'S LIST, not a pool to drain. One list, no view
+// tabs: the month is the rail beside the grid, the backlog is Inbox, and
+// unhomed routines ride here (poolViews decides; this only renders). A ticked pill
 // lingers struck-through so the week reads as a list with things done on it;
 // "Last week" swaps in the previous week's rows for the weekly look-back
 // (Scott, 2026-09-05: "we're not trying to make the weekly list disappear"). Pills speak the week grid's chip
@@ -11,24 +12,17 @@
 // leading circle), "not this week" (→ next week's plan), and the defer
 // dropdown. The strip caps at STRIP_CAP loose pills with a "+N more"
 // expander so a deep backlog never buries the grid.
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useDraggable } from '@dnd-kit/core'
 import { Check, ChevronDown, ChevronRight, ChevronsRight, CookingPot, GripVertical, Trash2, Archive, ArrowRight } from 'lucide-react'
 import type { Task } from '@/types/task'
 import type { Routine } from '@/types/actionable'
 import { routineTemporalLabel } from '@/lib/planning/routineTemporal'
-import { routinesForView } from '@/lib/planning/poolViews'
-import {
-  unscheduledPool, applyPoolView, orderPool, groupPool,
-  readPoolView, writePoolView, type PoolView,
-} from '@/lib/planning/poolViews'
-import { PoolViewSwitcher } from '@/components/planning/PoolViewSwitcher'
+import { unscheduledPool, weekList, orderPool, groupPool } from '@/lib/planning/poolViews'
 import { PushDropdown } from '@/components/triage'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { readCadenceConfig } from '@/lib/cadence/config'
 import { isPlacedOnWeek } from '@/lib/today/weekPlacement'
-
-const SURFACE = 'weekbench'
 
 // Loose pills visible before the "+N more" expander — roughly two tidy rows.
 const STRIP_CAP = 8
@@ -186,7 +180,6 @@ export function WeekPoolLane({
   /** Last-week look-back: Drop. */
   onDeleteTask?: (id: string) => void
 }) {
-  const [view, setView] = useState<PoolView>(() => readPoolView(SURFACE))
   const [open, setOpen] = useState(true)
   const [mealsOpen, setMealsOpen] = useState(false)
   const [showAll, setShowAll] = useState(false)
@@ -194,7 +187,6 @@ export function WeekPoolLane({
   // Ticked pills stay, struck, until the strip is collapsed or the view changes
   // — the list reads as a list with things done on it, not one that shrinks.
   const [lingering, setLingering] = useState<Task[]>([])
-  useEffect(() => { setLingering([]) }, [view])
 
   // The pool plans MY time — scope candidates to the current member.
   const { getCurrentUserMember } = useFamilyMembers()
@@ -210,17 +202,13 @@ export function WeekPoolLane({
       weekStartsOn: readCadenceConfig().weekStartsOn,
       meId,
     }
-    return groupPool(orderPool(applyPoolView(unscheduledPool(tasks, ctx), view, ctx), ctx))
-  }, [tasks, weekStart, dayCount, view, meId])
+    return groupPool(orderPool(weekList(unscheduledPool(tasks, ctx), ctx), ctx))
+  }, [tasks, weekStart, dayCount, meId])
 
-  const routinesView = view === 'routines'
   // A routine with no time needs a slot the way an unscheduled task does, so
-  // it rides in the same strip. The host hands over only unhomed ones;
-  // routinesForView decides which views carry them, shared with the overlay's
-  // drawer so the two surfaces cannot disagree.
-  const needsHome = routinesForView(routines, view)
-
-  const total = routinesView ? needsHome.length : pool.meals.length + pool.loose.length + needsHome.length
+  // it rides in the same strip. The host hands over only unhomed ones.
+  const needsHome = routines
+  const total = pool.meals.length + pool.loose.length + needsHome.length
   const visibleLoose = showAll ? pool.loose : pool.loose.slice(0, STRIP_CAP)
   const visibleRoutines = showAll ? needsHome : needsHome.slice(0, ROUTINE_STRIP_CAP)
   const overflow = (pool.loose.length - visibleLoose.length) + (needsHome.length - visibleRoutines.length)
@@ -236,8 +224,6 @@ export function WeekPoolLane({
   // Lingering pills are the ones the pool no longer holds (the host completed them).
   const struckPills = lingering.filter((t) => !pool.loose.some((p) => p.id === t.id) && !pool.meals.some((p) => p.id === t.id))
 
-  const VIEW_LABEL: Record<PoolView, string> = { week: 'This week', month: 'This month', all: 'Everything', routines: 'Routines' }
-
   // Last week's list: rows explicitly placed on the previous week, ticked AND
   // unticked. Strict membership on purpose — a legacy NULL row was always
   // "the current week", so it has no business appearing as last week's.
@@ -251,8 +237,8 @@ export function WeekPoolLane({
     onDrop: () => { onDeleteTask?.(t.id) },
     onSomeday: () => { void onUpdateTask?.(t.id, { bucket: 'someday', scheduledFor: undefined, isAllDay: undefined }) },
   })
-  const headerLabel = lastWeek && !routinesView ? 'Last week' : VIEW_LABEL[view]
-  const headerCount = lastWeek && !routinesView ? lastWeekRows.length : total
+  const headerLabel = lastWeek ? 'Last week' : 'This week'
+  const headerCount = lastWeek ? lastWeekRows.length : total
 
   return (
     <div className="mb-2 rounded-xl border border-neutral-200 bg-white px-3 py-2.5 shadow-sm">
@@ -265,7 +251,7 @@ export function WeekPoolLane({
           {open ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
           {headerLabel} · {headerCount}
         </button>
-        {!routinesView && (
+        {(
           <button
             type="button"
             aria-pressed={lastWeek}
@@ -277,39 +263,8 @@ export function WeekPoolLane({
             Last week
           </button>
         )}
-        <div className="ml-auto w-96">
-          <PoolViewSwitcher view={view} onChange={(v) => { setView(v); writePoolView(SURFACE, v) }} includeRoutines />
-        </div>
       </div>
-      {open && routinesView && (
-        <div className="mt-2 flex flex-wrap items-center gap-1.5">
-          {(showAll ? needsHome : needsHome.slice(0, STRIP_CAP)).map((r) => (
-            <RoutinePill key={r.id} routine={r} onSelect={onSelectItem} />
-          ))}
-          {!showAll && needsHome.length > STRIP_CAP && (
-            <button
-              type="button"
-              onClick={() => setShowAll(true)}
-              className="inline-flex items-center rounded-lg border border-dashed border-neutral-300 bg-neutral-50 px-3 py-1.5 text-[13px] text-neutral-500 hover:bg-neutral-100 hover:text-neutral-700 transition-colors"
-            >
-              +{needsHome.length - STRIP_CAP} more
-            </button>
-          )}
-          {showAll && needsHome.length > STRIP_CAP && (
-            <button
-              type="button"
-              onClick={() => setShowAll(false)}
-              className="inline-flex items-center rounded-lg px-2 py-1.5 text-[13px] text-neutral-400 hover:text-neutral-600 transition-colors"
-            >
-              Show less
-            </button>
-          )}
-          {needsHome.length === 0 && (
-            <span className="text-sm text-neutral-400">Every routine has a home.</span>
-          )}
-        </div>
-      )}
-      {open && !routinesView && lastWeek && (
+      {open && lastWeek && (
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
           {lastWeekRows.map((t) => (
             <PoolPill key={t.id} task={t} onSelect={onSelectItem} struck={t.completed} lookback={t.completed ? undefined : lookbackFor(t)} />
@@ -317,7 +272,7 @@ export function WeekPoolLane({
           {lastWeekRows.length === 0 && <span className="text-sm text-neutral-400">Nothing was on last week's list.</span>}
         </div>
       )}
-      {open && !routinesView && !lastWeek && (
+      {open && !lastWeek && (
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
           {pool.meals.length > 0 && (
             <button

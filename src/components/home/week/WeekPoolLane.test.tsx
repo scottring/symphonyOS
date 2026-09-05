@@ -23,7 +23,7 @@ describe('WeekPoolLane', () => {
     localStorage.removeItem('symphony-pool-view:weekbench')
   })
 
-  it('shows unscheduled tasks for the default week view and hides scheduled ones', () => {
+  it('shows the week list and hides scheduled ones', () => {
     render(
       <DndContext>
         <WeekPoolLane
@@ -142,42 +142,6 @@ describe('WeekPoolLane', () => {
     expect(onPushTask).toHaveBeenCalledWith('a', 'month')
   })
 
-  it('offers a Routines view listing routines that need a home', () => {
-    // The host pre-filters through unhomedRoutines(); the lane only renders.
-    const routines = [createMockRoutine({ name: 'Trash night', time_of_day: null })]
-    render(
-      <DndContext>
-        <WeekPoolLane
-          weekStart={weekStart}
-          dayCount={5}
-          onSelectItem={() => {}}
-          tasks={[]}
-          routines={routines}
-        />
-      </DndContext>,
-    )
-    fireEvent.click(screen.getByRole('button', { name: 'Routines' }))
-    expect(screen.getByText('Trash night')).toBeInTheDocument()
-    expect(screen.getByText(/no set time/)).toBeInTheDocument()
-  })
-
-  it('offers the official view switcher', () => {
-    render(
-      <DndContext>
-        <WeekPoolLane
-          weekStart={weekStart}
-          dayCount={5}
-          onSelectItem={() => {}}
-          tasks={[task({ id: 'a', title: 'Backlog item', bucket: 'inbox' })]}
-        />
-      </DndContext>,
-    )
-    // inbox item hidden in the default week view, shown in Everything
-    expect(screen.queryByText('Backlog item')).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Everything' }))
-    expect(screen.getByText('Backlog item')).toBeInTheDocument()
-  })
-
   // A routine with no time needs a slot exactly the way an unscheduled task
   // does, so it rides in the same strip instead of hiding behind its own tab
   // (Scott, 2026-09-05).
@@ -197,23 +161,6 @@ describe('WeekPoolLane', () => {
     expect(screen.getByText('Trash night')).toBeInTheDocument()
     // Both counted in the header
     expect(screen.getByRole('button', { name: /This week · 2/ })).toBeInTheDocument()
-  })
-
-  // 'This Month' is a BUCKET view; a routine has no bucket.
-  it('leaves routines out of the month bucket', () => {
-    render(
-      <DndContext>
-        <WeekPoolLane
-          weekStart={weekStart}
-          dayCount={5}
-          onSelectItem={() => {}}
-          tasks={[]}
-          routines={[createMockRoutine({ name: 'Trash night', time_of_day: null })]}
-        />
-      </DndContext>,
-    )
-    fireEvent.click(screen.getByRole('button', { name: 'This month' }))
-    expect(screen.queryByText('Trash night')).not.toBeInTheDocument()
   })
 
   // Routines get their own allowance. Sharing the tasks' budget meant a busy
@@ -251,12 +198,6 @@ describe('WeekPoolLane', () => {
     expect(screen.getByText('Nothing on the list yet.')).toBeInTheDocument()
     expect(screen.queryByText(/Everything is placed/)).not.toBeInTheDocument()
     expect(screen.queryByText(/UNSCHEDULED/i)).not.toBeInTheDocument()
-  })
-
-  it('labels the other views by name', () => {
-    render(<DndContext><WeekPoolLane weekStart={weekStart} dayCount={5} onSelectItem={() => {}} tasks={[]} /></DndContext>)
-    fireEvent.click(screen.getByRole('button', { name: 'Everything' }))
-    expect(screen.getByRole('button', { name: /Everything · 0/ })).toBeInTheDocument()
   })
 
   // A ticked pill lingers struck-through instead of vanishing — the week still
@@ -319,5 +260,14 @@ describe('WeekPoolLane', () => {
       fireEvent.click(screen.getByRole('button', { name: 'Someday Call the plumber' }))
       expect(onUpdateTask).toHaveBeenCalledWith('open', { bucket: 'someday', scheduledFor: undefined, isAllDay: undefined })
     })
+  })
+
+  // One list, no view tabs: the month is the rail, the backlog is Inbox.
+  it('has no view tabs', () => {
+    render(<DndContext><WeekPoolLane weekStart={weekStart} dayCount={5} onSelectItem={() => {}} tasks={[]} /></DndContext>)
+    for (const name of ['This month', 'Everything', 'Routines']) {
+      expect(screen.queryByRole('button', { name })).not.toBeInTheDocument()
+    }
+    expect(screen.getByRole('button', { name: 'Last week' })).toBeInTheDocument()
   })
 })

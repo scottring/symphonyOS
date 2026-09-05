@@ -65,9 +65,6 @@ export interface PlanningShelfProps {
   draft: string
   onDraftChange: (v: string) => void
   onSubmitDraft: () => void
-  hiddenCount?: number
-  showingAll?: boolean
-  onToggleShowAll?: () => void
   tend: TendState
   onApplyProposal: (p: TendProposal) => void
   /** 'native' renders HTML5-draggable pills + a droppable lane with no
@@ -388,7 +385,7 @@ export function PlanningShelf(props: PlanningShelfProps) {
     // is intact — but the shelf no longer reads it (2026-09-02, Sidebar.tsx).
     tasksById, onOpenTask, onSetBucket, onDeleteTask, onPushTask,
     onCompleteTask, fileUnder,
-    draft, onDraftChange, onSubmitDraft, hiddenCount = 0, showingAll = false, onToggleShowAll,
+    draft, onDraftChange, onSubmitDraft,
     tend, onApplyProposal, dragMode = 'dndkit', onNativeUnschedule,
     draftPlaceholder = 'Add to this week…', tendingLabel = 'Tending this week',
     poolLabel = 'To place', groups, layout = 'flow',
@@ -627,12 +624,6 @@ export function PlanningShelf(props: PlanningShelfProps) {
             <button type="button" onClick={() => setExpanded(false)}
               className="text-sm text-neutral-400 hover:text-neutral-700 px-2 py-1">
               Show fewer
-            </button>
-          )}
-          {onToggleShowAll && (hiddenCount > 0 || showingAll) && (
-            <button type="button" onClick={onToggleShowAll}
-              className="text-sm text-neutral-400 hover:text-neutral-700 px-2 py-1">
-              {showingAll ? 'Week only' : `+${hiddenCount} from the backlog`}
             </button>
           )}
           {composer}

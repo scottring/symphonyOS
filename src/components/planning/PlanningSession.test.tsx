@@ -5,7 +5,6 @@ import { PlanningSession } from './PlanningSession'
 // The pool-view choice persists per surface; a test that switches tabs must
 // not leak its choice into the next test's initial render.
 beforeEach(() => {
-  localStorage.removeItem('symphony-pool-view:overlay')
 })
 import { createMockTask, createMockRoutine, resetIdCounter } from '@/test/mocks/factories'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
@@ -92,10 +91,11 @@ describe('PlanningSession', () => {
     )
 
     expect(screen.getByText('Unscheduled Task')).toBeInTheDocument()
-    expect(screen.getByText('Unscheduled')).toBeInTheDocument()
+    expect(screen.getByText('This week')).toBeInTheDocument()
   })
 
-  it('keeps backlog (inbox) tasks out of the default view, in Everything', () => {
+  // The drawer is the week list; the backlog lives in Inbox, not behind a tab.
+  it('keeps backlog (inbox) tasks out of the week list', () => {
     const relevant = createMockTask({ id: 'rel', title: 'Week task', bucket: 'week' })
     const backlog = createMockTask({ id: 'back', title: 'Someday side quest' })
 
@@ -112,12 +112,7 @@ describe('PlanningSession', () => {
 
     expect(screen.getByText('Week task')).toBeInTheDocument()
     expect(screen.queryByText('Someday side quest')).not.toBeInTheDocument()
-
-    fireEvent.click(screen.getByRole('button', { name: 'Everything' }))
-    expect(screen.getByText('Someday side quest')).toBeInTheDocument()
-
-    fireEvent.click(screen.getByRole('button', { name: 'This week' }))
-    expect(screen.queryByText('Someday side quest')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Everything' })).not.toBeInTheDocument()
   })
 
   it('displays scheduled tasks on the correct day column', () => {
@@ -245,8 +240,7 @@ describe('PlanningSession', () => {
         onClose={vi.fn()}
       />
     )
-    // Routines live on their own pool tab now.
-    fireEvent.click(screen.getByRole('button', { name: 'Routines' }))
+    // Unhomed routines ride in the week list itself — no tab to open.
     expect(screen.getByText('Food shopping')).toBeInTheDocument()
   })
 
@@ -350,7 +344,7 @@ describe('PlanningSession', () => {
       />
     )
 
-    expect(screen.getByText('All tasks scheduled')).toBeInTheDocument()
+    expect(screen.getByText('Nothing on the list yet.')).toBeInTheDocument()
   })
 
   it('lays overlapping events out in side-by-side lanes (not stacked full-width)', () => {
@@ -509,7 +503,7 @@ describe('PlanningSession', () => {
     const lane = screen.getByTestId('allday-lane')
     expect(lane).toHaveTextContent('Passport renewal')
     // Not in the drawer/pool — the drawer shows its "all scheduled" empty state.
-    expect(screen.getByText('All tasks scheduled')).toBeInTheDocument()
+    expect(screen.getByText('Nothing on the list yet.')).toBeInTheDocument()
   })
 
   it('neither the lane nor the pool shows a FUTURE out-of-range all-day task; a PAST one resurfaces in the pool', () => {
@@ -1074,7 +1068,6 @@ describe('PlanningSession — drawer drops placed routines', () => {
         onUpdateTask={vi.fn()} onPushTask={vi.fn()} onClose={vi.fn()}
       />
     )
-    fireEvent.click(screen.getByRole('button', { name: 'Routines' }))
     expect(screen.getByText('Not yet placed')).toBeInTheDocument()
   })
 })

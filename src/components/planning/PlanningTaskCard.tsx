@@ -5,7 +5,6 @@ import { FAMILY_COLORS, type FamilyMember, type FamilyMemberColor } from '@/type
 import { PlanningResizeHandle } from './PlanningResizeHandle'
 import { PushDropdown } from '@/components/triage'
 import { TaskKindBadge } from '@/components/task/TaskKindBadge'
-import type { PlacementFate } from '@/lib/planning/lineage'
 
 interface PlanningTaskCardProps {
   task: Task
@@ -18,9 +17,6 @@ interface PlanningTaskCardProps {
   /** "Not this week": unschedule and place on NEXT week's plan. */
   onNotThisWeek?: (id: string) => void
   assignee?: FamilyMember
-  /** A month original that has been copied down: shows → placed and is not
-   *  draggable (dragging it again would make a second copy). */
-  placed?: PlacementFate
 }
 
 // The card is a dnd-kit drag handle end-to-end, so an inline button must stop
@@ -30,7 +26,7 @@ const stopDrag = {
   onMouseDown: (e: React.MouseEvent) => e.stopPropagation(),
 }
 
-export function PlanningTaskCard({ task, isDragging, isPlaced, onPushTask, onComplete, onNotThisWeek, assignee, placed }: PlanningTaskCardProps) {
+export function PlanningTaskCard({ task, isDragging, isPlaced, onPushTask, onComplete, onNotThisWeek, assignee }: PlanningTaskCardProps) {
   const { attributes, listeners, setNodeRef, transform, isDragging: isCurrentlyDragging } = useDraggable({
     id: task.id,
   })
@@ -66,14 +62,13 @@ export function PlanningTaskCard({ task, isDragging, isPlaced, onPushTask, onCom
     )
   }
 
-  const copied = placed === 'placed-open' || placed === 'placed-done'
-  const dragProps = copied ? {} : { ...attributes, ...listeners }
   return (
     <div
       ref={setNodeRef}
       style={style}
-      {...dragProps}
-      className={`relative px-2 py-1.5 rounded-lg transition-shadow touch-none ${copied ? 'opacity-70' : ''} ${
+      {...attributes}
+      {...listeners}
+      className={`relative px-2 py-1.5 rounded-lg transition-shadow touch-none ${
         isPlaced ? 'h-full' : 'min-h-[40px]'
       } ${bgClass} border ${
         isDragging
@@ -127,8 +122,6 @@ export function PlanningTaskCard({ task, isDragging, isPlaced, onPushTask, onCom
         >
           {task.title}
         </span>
-        {placed === 'placed-open' && <span className="shrink-0 text-[10px] text-neutral-400">→ placed</span>}
-        {placed === 'placed-done' && <span className="shrink-0 text-[10px] text-primary-700">→ done</span>}
 
         {/* "Not this week" — unschedule + place on next week's plan. Revealed
             on hover so a dense grid stays quiet. */}

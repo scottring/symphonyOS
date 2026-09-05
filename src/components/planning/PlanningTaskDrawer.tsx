@@ -3,11 +3,7 @@ import { useDroppable } from '@dnd-kit/core'
 import { ChevronDown, ChevronRight, CookingPot, Repeat } from 'lucide-react'
 import type { Task } from '@/types/task'
 import type { Routine } from '@/types/actionable'
-import type { PoolView } from '@/lib/planning/poolViews'
 import { routineTemporalLabel } from '@/lib/planning/routineTemporal'
-import { routinesForView } from '@/lib/planning/poolViews'
-import type { PlacementFate } from '@/lib/planning/lineage'
-import { PoolViewSwitcher } from './PoolViewSwitcher'
 import { PlanningTaskCard } from './PlanningTaskCard'
 import { PlanningRoutineDragCard } from './PlanningRoutineDragCard'
 
@@ -21,17 +17,12 @@ interface PlanningTaskDrawerProps {
   /** Weekly-dinner-seeded chores, rolled into one collapsible group. */
   mealTasks?: Task[]
   /** Routines that still need a home — ALREADY filtered by the host, which
-   *  runs the eligibility ladder. Which VIEWS show them is routinesForView's
-   *  call, so this surface and /week's lane cannot disagree. */
+   *  runs the eligibility ladder. They ride in the list after the tasks: a
+   *  routine with no time needs a slot the way an unscheduled task does. */
   routines?: Routine[]
   onPushTask: (id: string, target: Date | 'week' | 'month' | 'quarter') => void
   onComplete?: (id: string) => void
   onNotThisWeek?: (id: string) => void
-  view: PoolView
-  onViewChange: (v: PoolView) => void
-  /** For the This month view: a row copied down shows → placed instead of
-   *  looking like a failed drag. */
-  placedFor?: (task: Task) => PlacementFate
 }
 
 export function PlanningTaskDrawer({
@@ -41,9 +32,6 @@ export function PlanningTaskDrawer({
   onPushTask,
   onComplete,
   onNotThisWeek,
-  view,
-  onViewChange,
-  placedFor,
 }: PlanningTaskDrawerProps) {
   const { isOver, setNodeRef } = useDroppable({
     id: 'unscheduled-drawer',
@@ -51,14 +39,9 @@ export function PlanningTaskDrawer({
 
   const [mealsOpen, setMealsOpen] = useState(false)
   const [showAllLoose, setShowAllLoose] = useState(false)
-  const routinesView = view === 'routines'
   const visibleTasks = showAllLoose ? tasks : tasks.slice(0, POOL_CAP)
   const looseOverflow = tasks.length - visibleTasks.length
-  // A routine with no time needs a slot the way an unscheduled task does, so
-  // it belongs in the same pool. The host hands over only unhomed ones; this
-  // decides which views carry them.
-  const shownRoutines = routinesForView(routines, view)
-  const total = routinesView ? shownRoutines.length : tasks.length + mealTasks.length + shownRoutines.length
+  const total = tasks.length + mealTasks.length + routines.length
 
   return (
     <div
@@ -80,38 +63,21 @@ export function PlanningTaskDrawer({
           >
             <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM14 11a1 1 0 011 1v1h1a1 1 0 110 2h-1v1a1 1 0 11-2 0v-1h-1a1 1 0 110-2h1v-1a1 1 0 011-1z" />
           </svg>
-          Unscheduled
+          This week
           {total > 0 && (
             <span className="ml-auto text-sm text-neutral-500 bg-neutral-200 px-2 py-0.5 rounded-full">
               {total}
             </span>
           )}
         </h2>
-        <p className="text-xs text-neutral-500 mt-1 mb-2">
-          Drag to schedule
+        <p className="text-xs text-neutral-500 mt-1">
+          The week's list — drag onto a day, or tick it off from here.
         </p>
-        <PoolViewSwitcher view={view} onChange={onViewChange} includeRoutines />
       </div>
 
       {/* Task list - overflow-x-clip allows dropdown to show while y scrolls */}
       <div className="flex-1 overflow-y-auto overflow-x-clip p-3 space-y-2">
-        {routinesView ? (
-          shownRoutines.length === 0 ? (
-            <p className="text-center text-sm text-neutral-500 py-8">
-              No routines waiting for a time — every active routine is placed.
-            </p>
-          ) : (
-            <>
-              {shownRoutines.map((routine) => (
-                <PlanningRoutineDragCard
-                  key={routine.id}
-                  routine={routine}
-                  temporalLabel={routineTemporalLabel(routine)}
-                />
-              ))}
-            </>
-          )
-        ) : total === 0 ? (
+        {total === 0 ? (
           <div className={`text-center py-8 ${isOver ? 'opacity-50' : ''}`}>
             <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-neutral-100 flex items-center justify-center">
               <svg
@@ -130,7 +96,7 @@ export function PlanningTaskDrawer({
               </svg>
             </div>
             <p className="text-sm text-neutral-500">
-              {isOver ? 'Drop to unschedule' : 'All tasks scheduled'}
+              {isOver ? 'Drop to unschedule' : 'Nothing on the list yet.'}
             </p>
           </div>
         ) : (
@@ -162,7 +128,6 @@ export function PlanningTaskDrawer({
                 onPushTask={onPushTask}
                 onComplete={onComplete}
                 onNotThisWeek={onNotThisWeek}
-                placed={placedFor?.(task)}
               />
             ))}
             {looseOverflow > 0 && (
@@ -178,14 +143,14 @@ export function PlanningTaskDrawer({
                 routines can't bury five tasks; expanded because a routine you
                 have to open a disclosure to see is a routine you forget to
                 block. */}
-            {shownRoutines.length > 0 && (
+            {routines.length > 0 && (
               <div>
                 <div className="flex items-center gap-1.5 px-1 py-1.5 text-xs font-semibold uppercase tracking-wide text-neutral-500">
                   <Repeat className="w-3.5 h-3.5" />
-                  Routines · {shownRoutines.length}
+                  Routines · {routines.length}
                 </div>
                 <div className="space-y-2 mt-1">
-                  {shownRoutines.map((routine) => (
+                  {routines.map((routine) => (
                     <PlanningRoutineDragCard
                       key={routine.id}
                       routine={routine}

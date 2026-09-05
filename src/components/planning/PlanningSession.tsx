@@ -36,10 +36,8 @@ import { PlanningSlotQuickCreate } from './PlanningSlotQuickCreate'
 import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
 import { resolveRoutineTime } from '@/lib/today/routineTime'
 import {
-  unscheduledPool, applyPoolView, orderPool, groupPool,
-  readPoolView, writePoolView, type PoolView,
+  unscheduledPool, weekList, orderPool, groupPool,
 } from '@/lib/planning/poolViews'
-import { placementFate } from '@/lib/planning/lineage'
 import { suggestSlots, busyIntervals, type BusyInterval } from '@/lib/planning/dropSmarts'
 
 interface PlanningSessionProps {
@@ -115,10 +113,7 @@ interface PlanningSessionProps {
   onOpenDay?: (date: Date) => void
   /** Shelf mode: render the pool as a full-width lane above the grid instead
    *  of the side drawer. The session supplies tasks + backlog toggle. */
-  shelf?: Omit<PlanningShelfProps, 'tasks' | 'hiddenCount' | 'showingAll' | 'onToggleShowAll'>
-  /** localStorage key suffix for the pool-view choice — each mount surface
-   *  remembers its own view. */
-  poolSurface?: string
+  shelf?: Omit<PlanningShelfProps, 'tasks'>
   /**
    * How much a placement on this surface decides.
    *
@@ -172,7 +167,6 @@ export function PlanningSession({
   hideHeader = false,
   onOpenDay,
   shelf,
-  poolSurface = 'overlay',
   placementGrain = 'time',
 }: PlanningSessionProps) {
   const dayGrain = placementGrain === 'day'
@@ -282,14 +276,9 @@ export function PlanningSession({
     })
   )
 
-  // The pool, decided by poolViews (one derivation shared with /week's lane):
+  // The week list, decided by poolViews (one derivation shared with /week's strip):
   // base = tasks not placed on a visible day; the chosen official view filters
   // it; orderPool ranks by actionability; groupPool rolls up the meal noise.
-  const [poolView, setPoolView] = useState<PoolView>(() => readPoolView(poolSurface))
-  const handleViewChange = useCallback((v: PoolView) => {
-    setPoolView(v)
-    writePoolView(poolSurface, v)
-  }, [poolSurface])
 
   // "Not this week": unschedule + place on NEXT week's plan — nothing gets
   // lost, it resurfaces when next week is planned. Rides onUpdateTask, so a
@@ -319,8 +308,8 @@ export function PlanningSession({
     [tasks, poolCtx],
   )
   const viewFiltered = useMemo(
-    () => orderPool(applyPoolView(allUnscheduledTasks, poolView, poolCtx), poolCtx),
-    [allUnscheduledTasks, poolView, poolCtx],
+    () => orderPool(weekList(allUnscheduledTasks, poolCtx), poolCtx),
+    [allUnscheduledTasks, poolCtx],
   )
   const { meals: mealTasks, loose: unscheduledTasks } = useMemo(
     () => groupPool(viewFiltered),
@@ -836,16 +825,11 @@ export function PlanningSession({
           onDragCancel={() => setActiveId(null)}
         >
           {shelf ? (
-            /* Full-width pool lane above the grid — shelf mode replaces the
-               drawer. The shelf keeps its old backlog-toggle vocabulary, so
-               map the official views onto it: showingAll = 'all', and the
-               toggle flips between 'all' and the default 'week' view. */
+            /* Full-width week list above the grid — shelf mode replaces the
+               drawer. */
             <PlanningShelf
               {...shelf}
               tasks={viewFiltered}
-              hiddenCount={allUnscheduledTasks.length - viewFiltered.length}
-              showingAll={poolView === 'all'}
-              onToggleShowAll={() => handleViewChange(poolView === 'all' ? 'week' : 'all')}
             />
           ) : (
             /* Task drawer (sidebar) */
@@ -856,9 +840,6 @@ export function PlanningSession({
               onPushTask={onPushTask}
               onComplete={onCompleteTask}
               onNotThisWeek={handleNotThisWeek}
-              view={poolView}
-              onViewChange={handleViewChange}
-              placedFor={poolView === 'month' ? (t) => placementFate(t, tasks) : undefined}
             />
           )}
 
