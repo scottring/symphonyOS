@@ -1135,7 +1135,11 @@ export function useSupabaseTasks() {
       bucket: to !== 'timed' ? to : undefined,
       weekStart: updates.weekStart,
       monthStart: updates.monthStart,
+      seasonStart: updates.seasonStart,
       isAllDay: to === 'timed' ? updates.isAllDay : undefined,
+      // A copy that stays on its own level (the look-back's Keep) keeps its
+      // kind; a copy that descends is a task — a goal never goes down.
+      isGoal: to === original.bucket ? original.isGoal === true : false,
       sourceId: original.id,
       goalId: original.goalId,
       context: original.context ?? null,
@@ -1150,6 +1154,17 @@ export function useSupabaseTasks() {
       locationPlaceId: original.locationPlaceId,
     })
   }, [addTask])
+
+  /**
+   * The look-back's "Keep": copy a month/season row — task OR goal — into the
+   * next period, leaving the original on the list it was reviewed from. Same
+   * copy as copyDown, same lineage (source_id), no descent: the bucket stays.
+   */
+  const keepForward = useCallback(async (id: string, period: { monthStart?: Date; seasonStart?: Date }): Promise<string | undefined> => {
+    const task = findTaskById(id)
+    if (!task || (task.bucket !== 'month' && task.bucket !== 'quarter')) return undefined
+    return copyDown(task, { bucket: task.bucket, monthStart: period.monthStart, seasonStart: period.seasonStart })
+  }, [findTaskById, copyDown])
 
   const updateTask = useCallback(async (id: string, updates: Partial<Task>) => {
     logger.debug('[updateTask] Called with:', { id, updates })
@@ -1882,5 +1897,5 @@ export function useSupabaseTasks() {
     }
   }, [tasks])
 
-  return { tasks, loading, error, refetch, addTask, addSubtask, addPrepTask, getPrepTasks, getLinkedTasks, toggleTask, toggleWaiting, deleteTask, updateTask, updateTasksBulk, updateTaskOrders, scheduleTask, pushTask, setBucket, setGoal }
+  return { tasks, loading, error, refetch, addTask, addSubtask, addPrepTask, getPrepTasks, getLinkedTasks, toggleTask, toggleWaiting, deleteTask, updateTask, updateTasksBulk, updateTaskOrders, scheduleTask, pushTask, setBucket, setGoal, keepForward }
 }

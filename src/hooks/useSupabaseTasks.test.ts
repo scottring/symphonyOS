@@ -725,6 +725,31 @@ describe('useSupabaseTasks', () => {
     })
   })
 
+  describe('keepForward: the look-back\'s "Keep" copies a row into the next period', () => {
+    it('copies a month task into the next month with source_id, original untouched', async () => {
+      mockSupabaseData.push(createMockDbTask({ id: 'm1', title: 'Repaint the porch', bucket: 'month', month_start: '2026-09-01', context: 'family', notes: 'Sage green' }))
+      const { result } = renderHook(() => useSupabaseTasks())
+      await waitFor(() => expect(result.current.tasks).toHaveLength(1))
+      mockUpdate.mockClear(); mockInsert.mockClear()
+      await act(async () => { await result.current.keepForward('m1', { monthStart: new Date(2026, 9, 1) }) })
+      expect(mockUpdate).not.toHaveBeenCalled()
+      expect(mockInsert).toHaveBeenCalledWith(expect.objectContaining({
+        bucket: 'month', month_start: '2026-10-01', source_id: 'm1', context: 'family', notes: 'Sage green', is_goal: false,
+      }))
+    })
+
+    // A goal is kept as a goal — the one period write a goal accepts, because
+    // it is not moving down, it is staying a goal in the next period.
+    it('keeps a goal as a goal in the next season', async () => {
+      mockSupabaseData.push(createMockDbTask({ id: 'g1', title: 'Read more', bucket: 'quarter', season_start: '2026-07-01', is_goal: true }))
+      const { result } = renderHook(() => useSupabaseTasks())
+      await waitFor(() => expect(result.current.tasks).toHaveLength(1))
+      mockInsert.mockClear()
+      await act(async () => { await result.current.keepForward('g1', { seasonStart: new Date(2026, 9, 1) }) })
+      expect(mockInsert).toHaveBeenCalledWith(expect.objectContaining({ bucket: 'quarter', season_start: '2026-10-01', is_goal: true, source_id: 'g1' }))
+    })
+  })
+
   describe('updateTask', () => {
     it('maps monthStart/seasonStart to DATE strings and isGoal to is_goal', async () => {
       mockSupabaseData.push(createMockDbTask({ id: 'task-1', title: 'Task', bucket: 'month' }))
