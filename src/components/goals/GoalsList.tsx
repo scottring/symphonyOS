@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from 'react'
-import { Sparkles, FolderInput } from 'lucide-react'
-import type { Goal, GoalArea, Quarter } from '@/types/goal'
+import { Sparkles, FolderInput, Plus } from 'lucide-react'
+import type { Goal, GoalArea } from '@/types/goal'
 import type { TaskContext } from '@/types/task'
 import { PAGE_COLUMN } from '@/components/layout/pageLayout'
+import { PageMasthead, QuietAction } from '@/components/layout/PageMasthead'
 import { looksVague } from '@/lib/planning/goalQuality'
 import { useGoalSharpen, type GoalSharpenState } from '@/hooks/useGoalSharpen'
 import { ContextPicker } from '@/components/triage/ContextPicker'
@@ -14,7 +15,6 @@ interface GoalsListProps {
   areas: GoalArea[]
   goals: Goal[]
   loading: boolean
-  currentQuarter: Quarter
   year: number
   onSelectGoal: (goalId: string) => void
   onAddArea: (name: string) => Promise<GoalArea | null>
@@ -28,7 +28,6 @@ export function GoalsList({
   areas,
   goals,
   loading,
-  currentQuarter,
   year,
   onSelectGoal,
   onAddArea,
@@ -100,31 +99,19 @@ export function GoalsList({
       <div className="absolute top-0 left-0 right-0 h-48 bg-gradient-to-b from-primary-50/50 to-transparent pointer-events-none" />
 
       <div className={`relative ${PAGE_COLUMN}`}>
-        {/* Header */}
-        <div className="flex items-start justify-between mb-8">
-          <div>
-            <h1 className="font-display text-3xl font-semibold text-neutral-800 tracking-tight">
-              Goals
-            </h1>
-            <p className="text-sm text-neutral-500 mt-1">
-              {year} &middot; {currentQuarter}
-            </p>
-          </div>
-
-          {!creatingArea && (
-            <button
-              onClick={() => setCreatingArea(true)}
-              className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-primary-500 to-primary-600 text-white rounded-xl font-medium
-                         hover:from-primary-600 hover:to-primary-700 active:from-primary-700 active:to-primary-800 transition-all shadow-sm
-                         hover:shadow-md"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
-              </svg>
-              New Area
-            </button>
-          )}
-        </div>
+        {/* The shared Library masthead (design-unification 2026-09-01): serif
+            title, one muted line, a QUIET action. The wizard-era header wore a
+            filled "New Area" pill and a "2026 · Q3" quarter tag; the quarter
+            went with the season wizard, and a goal's year is the whole line. */}
+        <PageMasthead
+          title="Goals"
+          description={
+            goals.length === 0
+              ? `${year}`
+              : `${year} · ${goals.length} goal${goals.length === 1 ? '' : 's'} across ${areas.length} area${areas.length === 1 ? '' : 's'}`
+          }
+          actions={!creatingArea && <QuietAction icon={Plus} label="Add area" onClick={() => setCreatingArea(true)} />}
+        />
 
         {/* New area form */}
         {creatingArea && (

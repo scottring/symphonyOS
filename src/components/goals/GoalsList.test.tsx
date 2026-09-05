@@ -17,7 +17,6 @@ const baseProps = {
   areas: [area],
   goals: [],
   loading: false,
-  currentQuarter: 'Q3' as const,
   year: 2026,
   onSelectGoal: vi.fn(),
   onAddArea: vi.fn().mockResolvedValue(null),
@@ -120,5 +119,18 @@ describe('GoalsList loading gate', () => {
     render(<GoalsList {...baseProps} areas={[]} loading={false} />)
     expect(screen.getByText('No goals yet')).toBeInTheDocument()
     expect(screen.queryByText('Loading goals…')).not.toBeInTheDocument()
+  })
+})
+
+// The Library masthead grammar (2026-09-05): serif title, one muted line, a
+// quiet "+ Add area". No quarter tag — that went with the season wizard.
+describe('GoalsList masthead', () => {
+  it('describes the year and the count, offers a quiet Add area, and never names a quarter', async () => {
+    const { user } = render(<GoalsList {...baseProps} goals={[makeGoal('Read 20 books'), makeGoal('Half marathon')]} />)
+    expect(screen.getByRole('heading', { name: 'Goals' })).toBeInTheDocument()
+    expect(screen.getByText('2026 · 2 goals across 1 area')).toBeInTheDocument()
+    expect(screen.queryByText(/Q[1-4]/)).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Add area' }))
+    expect(screen.getByPlaceholderText(/Family & Relationships/)).toBeInTheDocument()
   })
 })
