@@ -33,6 +33,12 @@ function mkDT(): DataTransfer {
   return new DataTransfer()
 }
 
+/** UTC midnight on the 1st, N months from now — the shape `paused_until` stores. */
+function wakeInMonths(n: number): string {
+  const d = new Date()
+  return new Date(Date.UTC(d.getFullYear(), d.getMonth() + n, 1)).toISOString()
+}
+
 describe('RhythmPage', () => {
   it('renders all zones from a mixed routine set', () => {
     render(
@@ -42,16 +48,24 @@ describe('RhythmPage', () => {
           mk('PT Exercises'),
           mk('Food shopping', { recurrence_pattern: { type: 'weekly', days: ['sun'] } }),
           mk('Pay FFG', { recurrence_pattern: { type: 'monthly', day_of_month: 1 } }),
-          mk('Walk to school', { visibility: 'reference', paused_until: '2026-09-01T00:00:00Z' }),
+          // Two months out, derived from the wall clock rather than hardcoded —
+          // a fixed date here rots the suite the moment it drifts out of the
+          // rolling twelve-month window.
+          mk('Walk to school', { visibility: 'reference', paused_until: wakeInMonths(2) }),
         ]} />
     )
     expect(screen.getByRole('heading', { name: 'Routines' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Every day' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Through the week' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Sometimes' })).toBeInTheDocument()
-    // Resting routines now live in the Tend drawer, not the page body.
-    fireEvent.click(screen.getByRole('button', { name: /tend/i }))
-    expect(screen.getByText(/Waiting for September/)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Through the year' })).toBeInTheDocument()
+    // A monthly routine pools above the columns; a sleeper with a wake date
+    // inside the window shows in the month it wakes, no longer buried in Tend.
+    expect(screen.getByTestId('every-month').textContent).toContain('Pay FFG')
+    const wake = new Date()
+    wake.setMonth(wake.getMonth() + 2)
+    expect(
+      screen.getByTestId(`year-month-${wake.getFullYear()}-${wake.getMonth() + 1}`).textContent,
+    ).toContain('Walk to school')
   })
 
   it('type-anywhere search dims non-matching routines', () => {

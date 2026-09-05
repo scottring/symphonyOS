@@ -8,6 +8,9 @@ export type DropTarget =
   | { kind: 'routine-target'; routineId: string }
   | { kind: 'axis'; time: string }
   | { kind: 'week-day'; day: DayKey }
+  /** A month column on the year ribbon. `year` is only read when waking a
+   *  resting routine — a yearly recurrence has no year. */
+  | { kind: 'year-month'; month: number; year: number }
 
 export type DropIntent =
   | { type: 'add-steps'; collectionId: string; ids: string[] }
@@ -16,6 +19,8 @@ export type DropIntent =
   | { type: 'shift-group'; ids: string[]; time: string }
   | { type: 'weekly-on'; ids: string[]; day: DayKey }
   | { type: 'move-day'; id: string; fromDay: DayKey; toDay: DayKey }
+  | { type: 'yearly-in'; ids: string[]; month: number }
+  | { type: 'wake-in'; id: string; month: number; year: number }
 
 /** Pure drop resolution. Null = incompatible or no-op drop; the executor
  *  additionally skips steps dropped onto their own parent. */
@@ -41,6 +46,16 @@ export function resolveDrop(payload: DragPayload, target: DropTarget): DropInten
       }
       const ids = payload.kind === 'group' ? payload.ids : [payload.id]
       return { type: 'weekly-on', ids, day: target.day }
+    }
+    case 'year-month': {
+      // A resting card carries its own meaning: dropping it names the month it
+      // wakes, not a recurrence. Everything else lands as "happens in October".
+      if (payload.kind === 'routine' && payload.resting) {
+        if (payload.fromMonth === target.month) return null
+        return { type: 'wake-in', id: payload.id, month: target.month, year: target.year }
+      }
+      const ids = payload.kind === 'group' ? payload.ids : [payload.id]
+      return { type: 'yearly-in', ids, month: target.month }
     }
   }
 }

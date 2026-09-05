@@ -29,7 +29,7 @@ export function arcColumns(cards: RhythmCard[], cols = ARC_COLS, span = CARD_SPA
 
 export type DragPayload =
   | { kind: 'step'; id: string }
-  | { kind: 'routine'; id: string; fromDay?: DayKey }
+  | { kind: 'routine'; id: string; fromDay?: DayKey; resting?: boolean; fromMonth?: number }
   | { kind: 'collection'; id: string }
   | { kind: 'group'; ids: string[] }
 

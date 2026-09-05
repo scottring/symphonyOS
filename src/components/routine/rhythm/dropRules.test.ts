@@ -73,3 +73,28 @@ describe('routine-target (drop A onto B → A becomes a step of B)', () => {
     expect(resolveDrop({ kind: 'group', ids: ['x', 'walk'] }, target)).toBeNull()
   })
 })
+
+describe('year-month target', () => {
+  const oct = { kind: 'year-month', month: 10, year: 2026 } as const
+
+  it('sets a routine to recur in that month, every year', () => {
+    expect(resolveDrop({ kind: 'routine', id: 'r1' }, oct))
+      .toEqual({ type: 'yearly-in', ids: ['r1'], month: 10 })
+    expect(resolveDrop({ kind: 'step', id: 's1' }, oct))
+      .toEqual({ type: 'yearly-in', ids: ['s1'], month: 10 })
+    expect(resolveDrop({ kind: 'collection', id: 'camp' }, oct))
+      .toEqual({ type: 'yearly-in', ids: ['camp'], month: 10 })
+    expect(resolveDrop({ kind: 'group', ids: ['a', 'b'] }, oct))
+      .toEqual({ type: 'yearly-in', ids: ['a', 'b'], month: 10 })
+  })
+
+  it('wakes a resting routine instead of retiming it — same gesture, the card decides', () => {
+    expect(resolveDrop({ kind: 'routine', id: 'spigots', resting: true }, oct))
+      .toEqual({ type: 'wake-in', id: 'spigots', month: 10, year: 2026 })
+  })
+
+  it("is a no-op when a resting routine is dropped on the month it already wakes in", () => {
+    expect(resolveDrop({ kind: 'routine', id: 'spigots', resting: true, fromMonth: 10 }, oct))
+      .toBeNull()
+  })
+})

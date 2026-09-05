@@ -23,8 +23,12 @@ export interface RhythmModel {
     days: Record<DayKey, Routine[]>
     sometime: Routine[]
   }
-  sometimes: Routine[]
-  seasonal: Routine[]
+  /** Everything the year ribbon owns, split here because this is the one file
+   *  sanctioned to read `visibility` directly: `active` carries the
+   *  monthly/quarterly/yearly/specific_days/since_last recurrences, `resting`
+   *  the sleepers the ribbon places by the month they wake. `buildYearModel`
+   *  only places what this hands it. */
+  year: { active: Routine[]; resting: Routine[] }
   stepCounts: Record<string, number>
 }
 
@@ -43,13 +47,13 @@ export function memberIdsOf(r: Routine): string[] {
 }
 
 /** Which zone a recurrence pattern belongs to. Weekly with >=5 days is daily-ish. */
-function zoneOf(p: RecurrencePattern): 'daily' | 'week' | 'sometimes' {
+function zoneOf(p: RecurrencePattern): 'daily' | 'week' | 'year' {
   if (p.type === 'daily') return 'daily'
   if (p.type === 'weekly') {
     if (p.days && p.days.length >= 5) return 'daily'
     return 'week'
   }
-  return 'sometimes'
+  return 'year'
 }
 
 /** Day columns a weekly routine occupies: listed days, else the weekday
@@ -97,8 +101,7 @@ export function buildRhythmModel(
   const model: RhythmModel = {
     daily: { timed: [], anytime: [] },
     week: { days: emptyDays(), sometime: [] },
-    sometimes: [],
-    seasonal: [],
+    year: { active: [], resting: [] },
     stepCounts,
   }
 
@@ -106,7 +109,7 @@ export function buildRhythmModel(
 
   for (const { routine, steps } of topLevel) {
     if (routine.visibility === 'reference') {
-      model.seasonal.push(routine)
+      model.year.resting.push(routine)
       continue
     }
     const zone = zoneOf(routine.recurrence_pattern)
@@ -150,7 +153,7 @@ export function buildRhythmModel(
         }
       }
     } else {
-      model.sometimes.push(routine)
+      model.year.active.push(routine)
     }
   }
 

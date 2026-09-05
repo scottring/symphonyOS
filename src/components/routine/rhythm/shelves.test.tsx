@@ -1,7 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { useState } from 'react'
 import { render, screen, fireEvent } from '@testing-library/react'
-import { SometimesShelf } from './SometimesShelf'
 import { SeasonalShelf } from './SeasonalShelf'
 import { TendCard } from './TendCard'
 import type { TendFinding } from './tendHeuristics'
@@ -18,22 +17,6 @@ function mk(name: string, over: Partial<Routine> = {}): Routine {
     created_at: '', updated_at: '', ...over,
   }
 }
-
-describe('SometimesShelf', () => {
-  it('renders frequency captions and hides when empty', () => {
-    const { container } = render(
-      <SometimesShelf matches={() => true} onOpenRoutine={vi.fn()}
-        routines={[mk('Pay FFG'), mk('Haircut', { recurrence_pattern: { type: 'since_last', interval: 6, unit: 'weeks' } })]} />
-    )
-    expect(screen.getByText(/monthly/)).toBeInTheDocument()
-    expect(screen.getByText(/every 6 weeks/)).toBeInTheDocument()
-    const { container: emptyC } = render(
-      <SometimesShelf matches={() => true} onOpenRoutine={vi.fn()} routines={[]} />
-    )
-    expect(emptyC.firstChild).toBeNull()
-    expect(container.firstChild).not.toBeNull()
-  })
-})
 
 describe('SeasonalShelf', () => {
   it('titles by earliest paused_until month and wakes all', () => {

@@ -58,11 +58,11 @@ describe('buildRhythmModel bucketing', () => {
     expect(m.week.sometime.map(r => r.id)).toEqual(['w'])
   })
 
-  it('sends resting weekly routines to seasonal only, not the week columns', () => {
+  it('sends resting weekly routines to the year zone only, not the week columns', () => {
     const m = buildRhythmModel([
       mk({ id: 'p', visibility: 'reference', recurrence_pattern: { type: 'weekly', days: ['mon'] } }),
     ])
-    expect(m.seasonal.map(r => r.id)).toEqual(['p'])
+    expect(m.year.resting.map(r => r.id)).toEqual(['p'])
     expect(m.week.days.mon).toHaveLength(0)
   })
 
@@ -75,19 +75,20 @@ describe('buildRhythmModel bucketing', () => {
     expect(m.week.sometime).toHaveLength(0)
   })
 
-  it('puts monthly/yearly/specific_days into sometimes', () => {
+  it('puts monthly/quarterly/yearly/specific_days into the year zone', () => {
     const m = buildRhythmModel([
       mk({ id: 'mo', recurrence_pattern: { type: 'monthly', day_of_month: 1 } }),
+      mk({ id: 'qu', recurrence_pattern: { type: 'quarterly', day_of_month: 1 } }),
       mk({ id: 'sp', recurrence_pattern: { type: 'specific_days', dates: ['2026-08-01'] } }),
     ])
-    expect(m.sometimes.map(r => r.id).sort()).toEqual(['mo', 'sp'])
+    expect(m.year.active.map(r => r.id).sort()).toEqual(['mo', 'qu', 'sp'])
   })
 
-  it('sends paused (reference) top-level routines to seasonal regardless of recurrence', () => {
+  it('sends paused (reference) top-level routines to the year zone regardless of recurrence', () => {
     const m = buildRhythmModel([
       mk({ id: 'p', visibility: 'reference', time_of_day: '07:00:00' }),
     ])
-    expect(m.seasonal.map(r => r.id)).toEqual(['p'])
+    expect(m.year.resting.map(r => r.id)).toEqual(['p'])
     expect(m.daily.timed).toHaveLength(0)
   })
 
@@ -101,7 +102,8 @@ describe('buildRhythmModel bucketing', () => {
       ...m.daily.timed.map(c => c.id),
       ...m.daily.anytime.map(r => r.id),
       ...m.week.sometime.map(r => r.id),
-      ...m.sometimes.map(r => r.id),
+      ...m.year.active.map(r => r.id),
+      ...m.year.resting.map(r => r.id),
     ]
     expect(all).not.toContain('s1')
     expect(m.stepCounts['parent']).toBe(2)

@@ -18,7 +18,8 @@ const DAY_FULL: Record<DayKey, string> = {
 import { findTend, tendFindingKey } from './rhythm/tendHeuristics'
 import { DailyArc } from './rhythm/DailyArc'
 import { WeekStrip } from './rhythm/WeekStrip'
-import { SometimesShelf } from './rhythm/SometimesShelf'
+import { YearRibbon } from './rhythm/YearRibbon'
+import { buildYearModel } from './rhythm/yearModel'
 import { TendDrawer } from './rhythm/TendDrawer'
 import type { DropIntent } from './rhythm/dropRules'
 
@@ -71,6 +72,14 @@ export function RhythmPage(props: RhythmPageProps) {
   const [tendOpen, setTendOpen] = useState(false)
 
   const model = useMemo(() => buildRhythmModel(routines, { memberId, focusDay }), [routines, memberId, focusDay])
+  // Twelve months rolling forward. `now` is pinned to the day so the ribbon
+  // doesn't rebuild on every render, and so a session left open overnight
+  // still rolls when the date changes.
+  const today = new Date().toDateString()
+  const yearModel = useMemo(
+    () => buildYearModel(model.year, { now: new Date(today) }),
+    [model.year, today],
+  )
 
   // Dismissed tend suggestions persist so a rejected grouping stays gone.
   const [dismissedTend, setDismissedTend] = useState<string[]>(() => {
@@ -180,6 +189,29 @@ export function RhythmPage(props: RhythmPageProps) {
         }
         return
       }
+      case 'yearly-in': {
+        for (const id of intent.ids) {
+          if (routineById.get(id)?.parent_routine_id) props.onPromoteStep(id)
+          const existing = routineById.get(id)?.recurrence_pattern
+          onUpdateRoutine(id, {
+            recurrence_pattern: {
+              type: 'yearly',
+              month_of_year: intent.month,
+              // Keep the day it already lands on; a routine arriving from the
+              // week or the arc has none, so the 1st is the honest default.
+              day_of_month: existing?.day_of_month ?? 1,
+            },
+          })
+        }
+        return
+      }
+      case 'wake-in': {
+        // Dropping a sleeper names when it wakes. UTC midnight, matching how
+        // every other `paused_until` in the app is stored and read back.
+        const wake = new Date(Date.UTC(intent.year, intent.month - 1, 1)).toISOString()
+        onUpdateRoutine(intent.id, { paused_until: wake })
+        return
+      }
       case 'move-day': {
         const r = routineById.get(intent.id)
         if (!r) return
@@ -207,8 +239,10 @@ export function RhythmPage(props: RhythmPageProps) {
       .map(r => ({ id: r.id, name: r.name })),
     [routines],
   )
+  const handleWake = (id: string) =>
+    onUpdateRoutine(id, { visibility: 'active', paused_until: null })
   const handleWakeAll = () => {
-    for (const r of model.seasonal) onUpdateRoutine(r.id, { visibility: 'active', paused_until: null })
+    for (const r of yearModel.unplaced) handleWake(r.id)
   }
   const handleMerge = (_survivorId: string, loserIds: string[]) => {
     for (const id of loserIds) onDelete?.(id)
@@ -385,7 +419,15 @@ export function RhythmPage(props: RhythmPageProps) {
         </div>
 
         <div>
-          <SometimesShelf routines={model.sometimes} matches={matches} onOpenRoutine={openRoutine} />
+          <YearRibbon
+            model={yearModel}
+            matches={matches}
+            stepCounts={model.stepCounts}
+            familyMembers={familyMembers}
+            onOpenRoutine={openRoutine}
+            onWake={handleWake}
+            onDropIntent={executeDropIntent}
+          />
         </div>
       </div>
 
@@ -394,7 +436,7 @@ export function RhythmPage(props: RhythmPageProps) {
         onClose={() => setTendOpen(false)}
         findings={findings}
         routines={routines}
-        sleepers={model.seasonal}
+        sleepers={yearModel.unplaced}
         onDismiss={dismissTend}
         onMerge={handleMerge}
         onStampDomain={(id, context) => onUpdateRoutine(id, { context })}
