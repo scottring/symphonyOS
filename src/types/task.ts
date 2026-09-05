@@ -62,6 +62,12 @@ export interface Task {
   deferCount?: number // Times this task has been deferred
   weekDeferredAt?: Date // Set when an item already in 'week' bucket is bumped to next week — sinks it to the bottom of the This Week popover
   weekStart?: Date // Which week a bucket='week' task belongs to (that week's start, per weekStartsOn). undefined = the current week (legacy rows).
+  monthStart?: Date // Which month a bucket='month' task belongs to (its 1st). undefined = the current month (legacy rows).
+  seasonStart?: Date // Which season a bucket='quarter' task belongs to (its start, per the household's seasons). undefined = the current season.
+  /** A goal on a month/season list: an outcome you tick, never a thing you place.
+   *  The writers refuse to schedule or bucket-move it. Meaningful only for
+   *  bucket month/quarter; a week row is a task by definition. */
+  isGoal?: boolean
   pickedAt?: Date | null // Season picks: set when the user explicitly picks this quarter item for the season (null/undefined = on the shelf). null is an explicit "set aside" write.
   captureMeta?: TaskCaptureMeta // Photo-first capture state (AI enrichment + suggested merge destination)
   isAllDay?: boolean // True = all day task, false/undefined = specific time

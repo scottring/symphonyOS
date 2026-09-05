@@ -60,6 +60,11 @@ export function createMockDbTask(overrides: Partial<{
   contact_id: string | null
   assigned_to: string | null
   project_id: string | null
+  bucket: string
+  week_start: string | null
+  month_start: string | null
+  season_start: string | null
+  is_goal: boolean
   created_at: string
   updated_at: string
 }> = {}) {
@@ -79,6 +84,11 @@ export function createMockDbTask(overrides: Partial<{
     contact_id: null,
     assigned_to: null,
     project_id: null,
+    bucket: 'inbox',
+    week_start: null,
+    month_start: null,
+    season_start: null,
+    is_goal: false,
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-01T00:00:00Z',
     ...overrides,

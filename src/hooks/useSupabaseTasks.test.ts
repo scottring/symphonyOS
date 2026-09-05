@@ -300,6 +300,53 @@ describe('useSupabaseTasks', () => {
   })
 
   describe('addTask', () => {
+    it('stamps month_start on a month-bucket creation, defaulting to this month', async () => {
+      const { result } = renderHook(() => useSupabaseTasks())
+      await waitFor(() => expect(result.current.loading).toBe(false))
+      await act(async () => {
+        await result.current.addTask('Repaint the porch', undefined, undefined, undefined, { bucket: 'month' })
+      })
+      const now = new Date()
+      const first = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+      expect(mockInsert).toHaveBeenCalledWith(expect.objectContaining({ bucket: 'month', month_start: first, season_start: null, is_goal: false }))
+    })
+
+    it('honours an explicit monthStart and is_goal on a month creation', async () => {
+      const { result } = renderHook(() => useSupabaseTasks())
+      await waitFor(() => expect(result.current.loading).toBe(false))
+      await act(async () => {
+        await result.current.addTask('Read more', undefined, undefined, undefined, {
+          bucket: 'month', monthStart: new Date(2026, 9, 1), isGoal: true,
+        })
+      })
+      expect(mockInsert).toHaveBeenCalledWith(expect.objectContaining({ month_start: '2026-10-01', is_goal: true }))
+    })
+
+    it('stamps season_start on a quarter creation from the configured seasons', async () => {
+      localStorage.clear() // DEFAULT_SEASONS
+      const { result } = renderHook(() => useSupabaseTasks())
+      await waitFor(() => expect(result.current.loading).toBe(false))
+      await act(async () => {
+        await result.current.addTask('Plan the fall trips', undefined, undefined, undefined, { bucket: 'quarter' })
+      })
+      const call = mockInsert.mock.calls.at(-1)![0] as Record<string, unknown>
+      expect(call.bucket).toBe('quarter')
+      expect(typeof call.season_start).toBe('string')
+      expect(call.month_start).toBeNull()
+    })
+
+    // A goal is a month/season thing. A week creation that claims to be a goal
+    // is a caller bug; the row is written as a task so it can never get stuck
+    // unplaceable on the week list.
+    it('ignores isGoal outside the month and quarter buckets', async () => {
+      const { result } = renderHook(() => useSupabaseTasks())
+      await waitFor(() => expect(result.current.loading).toBe(false))
+      await act(async () => {
+        await result.current.addTask('Call VW', undefined, undefined, undefined, { bucket: 'week', isGoal: true })
+      })
+      expect(mockInsert).toHaveBeenCalledWith(expect.objectContaining({ bucket: 'week', is_goal: false, month_start: null }))
+    })
+
     it('creates task with just title', async () => {
       const { result } = renderHook(() => useSupabaseTasks())
 
@@ -449,6 +496,28 @@ describe('useSupabaseTasks', () => {
   })
 
   describe('updateTask', () => {
+    it('maps monthStart/seasonStart to DATE strings and isGoal to is_goal', async () => {
+      mockSupabaseData.push(createMockDbTask({ id: 'task-1', title: 'Task', bucket: 'month' }))
+      const { result } = renderHook(() => useSupabaseTasks())
+      await waitFor(() => expect(result.current.tasks).toHaveLength(1))
+      await act(async () => {
+        await result.current.updateTask('task-1', { monthStart: new Date(2026, 9, 1), isGoal: true })
+      })
+      expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({ month_start: '2026-10-01', is_goal: true }))
+    })
+
+    it('reads month_start/season_start/is_goal back onto the Task', async () => {
+      mockSupabaseData.push(createMockDbTask({
+        id: 'task-1', title: 'Task', bucket: 'month', month_start: '2026-09-01', season_start: null, is_goal: true,
+      }))
+      const { result } = renderHook(() => useSupabaseTasks())
+      await waitFor(() => expect(result.current.tasks).toHaveLength(1))
+      const t = result.current.tasks[0]
+      expect(t.monthStart?.getTime()).toBe(new Date(2026, 8, 1).getTime())
+      expect(t.seasonStart).toBeUndefined()
+      expect(t.isGoal).toBe(true)
+    })
+
     it('updates task title', async () => {
       mockSupabaseData.push(createMockDbTask({ id: 'task-1', title: 'Original Title' }))
 

@@ -10,6 +10,8 @@ import type { TaskDirections } from '@/types/directions'
 import { scopeForDomain, memberForAuthUser, type Scope } from '@/lib/scope'
 import { localYmd, parseLocalYmd, weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
 import { weekStartForBucket } from '@/lib/today/weekPlacement'
+import { monthStartOf } from '@/lib/planning/periodPlacement'
+import { readSeasons, seasonStartFor } from '@/lib/cadence/seasons'
 import { onRealtimeResumed } from '@/lib/realtime/keepAlive'
 import { announceToBuyChanged } from '@/lib/lists/toBuy'
 // `import type` on purpose: erased at compile time, so it does NOT drag
@@ -86,6 +88,9 @@ export interface DbTask {
   needed_on: string | null
   week_deferred_at: string | null
   week_start: string | null
+  month_start: string | null
+  season_start: string | null
+  is_goal: boolean | null
   picked_at: string | null
   capture_meta: { status?: string; storage_path?: string; suggested_task_id?: string } | null
   source_id: string | null
@@ -167,6 +172,9 @@ export function dbTaskToTask(dbTask: DbTask): Task {
     weekDeferredAt: dbTask.week_deferred_at ? new Date(dbTask.week_deferred_at) : undefined,
     // A `date` column — parse to LOCAL midnight, never `new Date(str)` (that's UTC).
     weekStart: dbTask.week_start ? parseLocalYmd(dbTask.week_start) : undefined,
+    monthStart: dbTask.month_start ? parseLocalYmd(dbTask.month_start) : undefined,
+    seasonStart: dbTask.season_start ? parseLocalYmd(dbTask.season_start) : undefined,
+    isGoal: dbTask.is_goal ?? false,
     pickedAt: dbTask.picked_at ? new Date(dbTask.picked_at) : undefined,
     sourceId: dbTask.source_id ?? undefined,
     goalId: dbTask.goal_id ?? undefined,
@@ -568,6 +576,12 @@ export function useSupabaseTasks() {
      *  rows must say WHICH week). Rides the INSERT — same race rationale as
      *  `bucket`. Ignored unless bucket is 'week'. */
     weekStart?: Date
+    /** Which month a bucket='month' creation belongs to. Defaults to this month. */
+    monthStart?: Date
+    /** Which season a bucket='quarter' creation belongs to. Defaults to this season. */
+    seasonStart?: Date
+    /** A month/season goal: ticked, never placed. Ignored outside those buckets. */
+    isGoal?: boolean
     /** Cascade lineage: the task this one is copied down from. */
     sourceId?: string
     /** Season pick: set when the created quarter item is immediately chosen as
@@ -621,6 +635,9 @@ export function useSupabaseTasks() {
       projectId,
       scheduledFor,
       weekStart: !scheduledFor && options?.bucket === 'week' ? options?.weekStart : undefined,
+      monthStart: !scheduledFor && options?.bucket === 'month' ? (options?.monthStart ?? monthStartOf(now)) : undefined,
+      seasonStart: !scheduledFor && options?.bucket === 'quarter' ? (options?.seasonStart ?? seasonStartFor(now, readSeasons())) : undefined,
+      isGoal: !scheduledFor && (options?.bucket === 'month' || options?.bucket === 'quarter') && options?.isGoal === true,
       linkedTo: options?.linkedTo,
       linkType: options?.linkType,
       assignedTo: effectiveAssignedTo ?? undefined,
@@ -662,6 +679,11 @@ export function useSupabaseTasks() {
         scheduled_for: scheduledFor?.toISOString() ?? null,
         // `week_start` is a DATE column — localYmd, not toISOString (which shifts the day west of Greenwich).
         week_start: !scheduledFor && options?.bucket === 'week' && options?.weekStart ? localYmd(options.weekStart) : null,
+        month_start: !scheduledFor && options?.bucket === 'month'
+          ? localYmd(options?.monthStart ?? monthStartOf(now)) : null,
+        season_start: !scheduledFor && options?.bucket === 'quarter'
+          ? localYmd(options?.seasonStart ?? seasonStartFor(now, readSeasons())) : null,
+        is_goal: !scheduledFor && (options?.bucket === 'month' || options?.bucket === 'quarter') && options?.isGoal === true,
         linked_activity_type: options?.linkedTo?.type ?? null,
         linked_activity_id: options?.linkedTo?.id ?? null,
         link_type: options?.linkType ?? null,
@@ -1258,6 +1280,9 @@ export function useSupabaseTasks() {
     if ('weekDeferredAt' in updates) dbUpdates.week_deferred_at = updates.weekDeferredAt?.toISOString() ?? null
     // `week_start` is a DATE column — localYmd, not toISOString (which shifts the day west of Greenwich).
     if ('weekStart' in updates) dbUpdates.week_start = updates.weekStart ? localYmd(updates.weekStart) : null
+    if ('monthStart' in updates) dbUpdates.month_start = updates.monthStart ? localYmd(updates.monthStart) : null
+    if ('seasonStart' in updates) dbUpdates.season_start = updates.seasonStart ? localYmd(updates.seasonStart) : null
+    if ('isGoal' in updates) dbUpdates.is_goal = updates.isGoal === true
     if ('pickedAt' in updates) dbUpdates.picked_at = updates.pickedAt?.toISOString() ?? null
     if ('sortOrder' in updates) dbUpdates.sort_order = updates.sortOrder ?? null
 
@@ -1428,6 +1453,9 @@ export function useSupabaseTasks() {
     if ('weekDeferredAt' in updates) dbUpdates.week_deferred_at = updates.weekDeferredAt?.toISOString() ?? null
     // `week_start` is a DATE column — localYmd, not toISOString (which shifts the day west of Greenwich).
     if ('weekStart' in updates) dbUpdates.week_start = updates.weekStart ? localYmd(updates.weekStart) : null
+    if ('monthStart' in updates) dbUpdates.month_start = updates.monthStart ? localYmd(updates.monthStart) : null
+    if ('seasonStart' in updates) dbUpdates.season_start = updates.seasonStart ? localYmd(updates.seasonStart) : null
+    if ('isGoal' in updates) dbUpdates.is_goal = updates.isGoal === true
     if ('pickedAt' in updates) dbUpdates.picked_at = updates.pickedAt?.toISOString() ?? null
     if ('sortOrder' in updates) dbUpdates.sort_order = updates.sortOrder ?? null
 
