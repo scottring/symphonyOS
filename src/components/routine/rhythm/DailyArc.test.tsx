@@ -30,6 +30,48 @@ const base = {
   onOpenRoutine: vi.fn(),
 }
 
+describe('DailyArc slot add', () => {
+  const card: RhythmCard = {
+    kind: 'single', id: 'walk', name: 'Walk Jax',
+    startTime: '06:30:00', endTime: '06:30:00',
+    routines: [mk({ name: 'Walk Jax', time_of_day: '06:30:00' })],
+  }
+
+  it('creates a daily routine at the point on the ruler you clicked', () => {
+    const onCreateInSlot = vi.fn()
+    render(<DailyArc {...base} cards={[card]} anytime={[]} onCreateInSlot={onCreateInSlot} />)
+
+    fireEvent.click(screen.getByTestId('arc-axis'), { clientX: 0 })
+    const box = screen.getByRole('textbox')
+    fireEvent.change(box, { target: { value: 'Pack lunches' } })
+    fireEvent.keyDown(box, { key: 'Enter' })
+
+    expect(onCreateInSlot).toHaveBeenCalledWith({
+      name: 'Pack lunches',
+      recurrence_pattern: { type: 'daily' },
+      // jsdom reports a zero-width rect, so the mapping floors to the arc start.
+      time_of_day: '06:00',
+    })
+  })
+
+  it('creates an untimed daily routine from the anytime row', () => {
+    const onCreateInSlot = vi.fn()
+    render(
+      <DailyArc {...base} cards={[card]} anytime={[mk({ name: 'Read' })]}
+                onCreateInSlot={onCreateInSlot} />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add a routine with no set time' }))
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Tidy the porch' } })
+    fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter' })
+
+    expect(onCreateInSlot).toHaveBeenCalledWith({
+      name: 'Tidy the porch',
+      recurrence_pattern: { type: 'daily' },
+    })
+  })
+})
+
 describe('DailyArc', () => {
   it('renders cluster cards with time range and members', () => {
     const card: RhythmCard = {

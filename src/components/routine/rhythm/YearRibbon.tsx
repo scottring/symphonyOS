@@ -7,6 +7,7 @@ import { resolveMembers } from './rhythmModel'
 import type { YearEntry, YearMonth, YearModel } from './yearModel'
 import { setDragPayload, acceptsDrag, readDragPayload } from './dragTypes'
 import { resolveDrop, type DropIntent } from './dropRules'
+import { SlotAdd, type CreateRoutineInSlot } from './SlotAdd'
 
 export interface YearRibbonProps {
   model: YearModel
@@ -18,7 +19,14 @@ export interface YearRibbonProps {
   onWake?: (id: string) => void
   /** Drag-and-drop: chips become draggable and month rows accept drops. */
   onDropIntent?: (intent: DropIntent) => void
+  /** Create a routine straight into a month — the month is the recurrence. */
+  onCreateInSlot?: CreateRoutineInSlot
 }
+
+const MONTH_FULL = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+]
 
 const FULL_THRESHOLD = 3
 
@@ -83,6 +91,7 @@ function Chip({ entry, month, matches, onOpen, onWake, stepCounts, familyMembers
 
 export function YearRibbon({
   model, matches, onOpenRoutine, stepCounts = {}, familyMembers = [], onWake, onDropIntent,
+  onCreateInSlot,
 }: YearRibbonProps) {
   const [dropCell, setDropCell] = useState<string | null>(null)
   // Most of a year is empty. Twelve rows of "quiet" is the same failure the
@@ -164,6 +173,16 @@ export function YearRibbon({
                 {r.name}
               </button>
             ))}
+            {onCreateInSlot && (
+              <SlotAdd
+                label="Add a monthly routine"
+                alwaysVisible
+                onCreate={name => onCreateInSlot({
+                  name,
+                  recurrence_pattern: { type: 'monthly', day_of_month: 1 },
+                })}
+              />
+            )}
           </div>
         </div>
       )}
@@ -189,7 +208,7 @@ export function YearRibbon({
               key={key}
               data-testid={`year-month-${key}`}
               {...dropHandlersFor(cell)}
-              className={`flex items-center gap-3 rounded-xl px-3 py-1.5 ${borderClass}`}
+              className={`group flex items-center gap-3 rounded-xl px-3 py-1.5 ${borderClass}`}
             >
               <div
                 className={`w-24 flex-shrink-0 text-[10px] font-bold
@@ -201,7 +220,24 @@ export function YearRibbon({
               </div>
 
               {cell.entries.length === 0 ? (
-                pulse ? <div className="h-2.5" /> : <div className="text-[11px] italic text-neutral-300">quiet</div>
+                pulse ? <div className="h-2.5" /> : (
+                  <div className="flex flex-1 items-center gap-3">
+                    <span className="text-[11px] italic text-neutral-300">quiet</span>
+                    {onCreateInSlot && (
+                      <span className="w-28">
+                        <SlotAdd
+                          label={`Add a routine in ${MONTH_FULL[cell.month - 1]}`}
+                          onCreate={name => onCreateInSlot({
+                            name,
+                            recurrence_pattern: {
+                              type: 'yearly', month_of_year: cell.month, day_of_month: 1,
+                            },
+                          })}
+                        />
+                      </span>
+                    )}
+                  </div>
+                )
               ) : pulse ? (
                 <div className="flex flex-1 items-center gap-0.5">
                   {cell.entries.map(entry => (
@@ -222,6 +258,20 @@ export function YearRibbon({
                 </div>
               ) : (
                 <div className="flex flex-1 flex-wrap items-center gap-1.5">
+                  {onCreateInSlot && (
+                    <span className="order-last w-28">
+                      <SlotAdd
+                        label={`Add a routine in ${MONTH_FULL[cell.month - 1]}`}
+                        alwaysVisible={cell.entries.length === 0}
+                        onCreate={name => onCreateInSlot({
+                          name,
+                          recurrence_pattern: {
+                            type: 'yearly', month_of_year: cell.month, day_of_month: 1,
+                          },
+                        })}
+                      />
+                    </span>
+                  )}
                   {cell.entries.map(entry => (
                     <Chip
                       key={entry.routine.id}

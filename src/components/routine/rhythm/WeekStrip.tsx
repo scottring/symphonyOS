@@ -7,6 +7,7 @@ import type { DayKey } from './rhythmModel'
 import { DAY_ORDER, resolveMembers } from './rhythmModel'
 import { setDragPayload, acceptsDrag, readDragPayload } from './dragTypes'
 import { resolveDrop, type DropIntent } from './dropRules'
+import { SlotAdd, type CreateRoutineInSlot } from './SlotAdd'
 import { orderedDayKeys, type WeekStart } from '@/lib/cadence/config'
 
 export interface WeekStripProps {
@@ -27,10 +28,17 @@ export interface WeekStripProps {
   /** Which day the week starts on (display order only — DAY_ORDER stays the
    *  model/storage order). Defaults to Sunday. */
   weekStartsOn?: WeekStart
+  /** Create a routine straight into a day column — the column is the recurrence. */
+  onCreateInSlot?: CreateRoutineInSlot
 }
 
 const DAY_LABEL: Record<DayKey, string> = {
   sun: 'SUN', mon: 'MON', tue: 'TUE', wed: 'WED', thu: 'THU', fri: 'FRI', sat: 'SAT',
+}
+
+const DAY_FULL: Record<DayKey, string> = {
+  sun: 'Sunday', mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday',
+  thu: 'Thursday', fri: 'Friday', sat: 'Saturday',
 }
 
 const FULL_THRESHOLD = 4
@@ -89,7 +97,7 @@ function Chip({ r, stepCounts, matches, onOpen, familyMembers, steps, day, onDro
   )
 }
 
-export function WeekStrip({ days, sometime, stepCounts, matches, todayKey, onOpenRoutine, familyMembers = [], collectionSteps = {}, onDropIntent, selectedDay = null, onSelectDay, weekStartsOn = 0 }: WeekStripProps) {
+export function WeekStrip({ days, sometime, stepCounts, matches, todayKey, onOpenRoutine, familyMembers = [], collectionSteps = {}, onDropIntent, selectedDay = null, onSelectDay, weekStartsOn = 0, onCreateInSlot }: WeekStripProps) {
   const [dropDay, setDropDay] = useState<DayKey | null>(null)
   // Pulse view: every chip renders as one slim uniform bar, so each column's
   // height reads as that day's load (one unit per routine; steps don't count).
@@ -100,7 +108,7 @@ export function WeekStrip({ days, sometime, stepCounts, matches, todayKey, onOpe
   })
   const orderedDays = useMemo(() => orderedDayKeys(weekStartsOn), [weekStartsOn])
   const total = DAY_ORDER.reduce((n, d) => n + days[d].length, 0)
-  if (total === 0 && sometime.length === 0 && !onDropIntent) return null
+  if (total === 0 && sometime.length === 0 && !onDropIntent && !onCreateInSlot) return null
 
   return (
     <section className="mb-10">
@@ -209,7 +217,7 @@ export function WeekStrip({ days, sometime, stepCounts, matches, todayKey, onOpe
               key={day}
               data-testid={`day-${day}`}
               {...dropHandlers}
-              className={`rounded-xl p-2 ${borderClass}`}
+              className={`group rounded-xl p-2 ${borderClass}`}
             >
               {onSelectDay ? (
                 <button
@@ -233,6 +241,18 @@ export function WeekStrip({ days, sometime, stepCounts, matches, todayKey, onOpe
                           onOpen={onOpenRoutine} familyMembers={familyMembers}
                           steps={collectionSteps[r.id] ?? []} day={day} onDropIntent={onDropIntent} />
                   ))}
+                </div>
+              )}
+              {onCreateInSlot && (
+                <div className="mt-1">
+                  <SlotAdd
+                    label={`Add a routine on ${DAY_FULL[day]}`}
+                    alwaysVisible={items.length === 0}
+                    onCreate={name => onCreateInSlot({
+                      name,
+                      recurrence_pattern: { type: 'weekly', days: [day] },
+                    })}
+                  />
                 </div>
               )}
             </div>

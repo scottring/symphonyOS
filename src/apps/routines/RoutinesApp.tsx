@@ -13,6 +13,7 @@ import { useContacts } from '@/hooks/useContacts'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { usePinnedItems } from '@/hooks/usePinnedItems'
 import { useDomain } from '@/hooks/useDomain'
+import type { SlotRoutineDraft } from '@/components/routine/rhythm/SlotAdd'
 import { matchesLayers } from '@/lib/today/domainFilter'
 import { RoutinesList, RoutineForm, RoutineInput } from '@/components/lazy'
 import { groupRoutineSteps } from '@/lib/today/routineCollections'
@@ -95,6 +96,18 @@ function RoutinesIndex() {
     return addRoutine({ name, context: soleDomain ?? undefined })
   }, [addRoutine, soleDomain])
 
+  // A slot-created routine carries the slot's recurrence and the active domain
+  // lens — same stamping rule as handleCreateCollection, so it joins the layer
+  // model instead of landing unsorted and invisible in a filtered list.
+  const handleCreateRoutineInSlot = useCallback((draft: SlotRoutineDraft) => {
+    void addRoutine({
+      name: draft.name,
+      context: soleDomain ?? undefined,
+      recurrence_pattern: draft.recurrence_pattern,
+      time_of_day: draft.time_of_day,
+    })
+  }, [addRoutine, soleDomain])
+
   const handleGroupIntoCollection = useCallback(async (
     name: string,
     ids: string[],
@@ -138,6 +151,7 @@ function RoutinesIndex() {
         onGroupIntoCollection={handleGroupIntoCollection}
         onAddToCollection={handleAddToCollection}
         onBuildWithAI={() => setBuilderOpen(true)}
+        onCreateRoutineInSlot={handleCreateRoutineInSlot}
       />
       {builderOpen && (
         <RoutineBuilderModal

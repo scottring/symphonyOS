@@ -37,6 +37,22 @@ beforeEach(() => {
   localStorage.clear()
 })
 
+describe('WeekStrip slot add', () => {
+  it('creates a weekly routine on the column you added it to', () => {
+    const onCreateInSlot = vi.fn()
+    render(<WeekStrip {...base} days={{ ...empty }} onCreateInSlot={onCreateInSlot} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add a routine on Tuesday' }))
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Trash out' } })
+    fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter' })
+
+    expect(onCreateInSlot).toHaveBeenCalledWith({
+      name: 'Trash out',
+      recurrence_pattern: { type: 'weekly', days: ['tue'] },
+    })
+  })
+})
+
 describe('WeekStrip', () => {
   it('lets each column stand at its own height, so a quiet day is a small box', () => {
     // Saturday carries the household's whole weekend. Stretching every column

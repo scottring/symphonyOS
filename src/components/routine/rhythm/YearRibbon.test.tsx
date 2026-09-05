@@ -136,6 +136,40 @@ describe('YearRibbon', () => {
   })
 })
 
+describe('YearRibbon slot add', () => {
+  it('creates a yearly routine in the month you added it to', () => {
+    const onCreateInSlot = vi.fn()
+    render(
+      <YearRibbon {...base} model={modelOf([mk({ name: 'Storm windows' })])}
+                  onCreateInSlot={onCreateInSlot} />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add a routine in October' }))
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Service the mower' } })
+    fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter' })
+
+    expect(onCreateInSlot).toHaveBeenCalledWith({
+      name: 'Service the mower',
+      recurrence_pattern: { type: 'yearly', month_of_year: 10, day_of_month: 1 },
+    })
+  })
+
+  it('creates a monthly routine from the every-month pool', () => {
+    const onCreateInSlot = vi.fn()
+    const ffg = mk({ name: 'Pay FFG', recurrence_pattern: { type: 'monthly', day_of_month: 1 } })
+    render(<YearRibbon {...base} model={modelOf([ffg])} onCreateInSlot={onCreateInSlot} />)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Add a monthly routine' }))
+    fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Water bill' } })
+    fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter' })
+
+    expect(onCreateInSlot).toHaveBeenCalledWith({
+      name: 'Water bill',
+      recurrence_pattern: { type: 'monthly', day_of_month: 1 },
+    })
+  })
+})
+
 describe('YearRibbon drag and drop', () => {
   it('opens the quiet months on drag, so a hidden one is still a drop target', () => {
     const onDropIntent = vi.fn()

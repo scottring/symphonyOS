@@ -8,6 +8,7 @@ import { formatRange, formatClock } from './format'
 import { ARC_START, ARC_END, ARC_COLS, CARD_SPAN, arcColumns, setDragPayload, readDragPayload, acceptsDrag, timeFromAxisX, type DragPayload } from './dragTypes'
 import { resolveDrop, type DropIntent } from './dropRules'
 import { GroupNamePopover } from './GroupNamePopover'
+import { SlotAdd, SlotAddInput, type CreateRoutineInSlot } from './SlotAdd'
 
 export interface DailyArcProps {
   cards: RhythmCard[]
@@ -20,6 +21,8 @@ export interface DailyArcProps {
   heading?: string
   onOpenCollection: (id: string) => void
   onOpenRoutine: (r: Routine) => void
+  /** Create a routine straight onto the ruler — where you click IS the time. */
+  onCreateInSlot?: CreateRoutineInSlot
   /** Drag-and-drop: when present, pills/headers become draggable and the
    *  axis + collection blocks become drop targets. */
   onDropIntent?: (intent: DropIntent) => void
@@ -62,6 +65,8 @@ function ArcCard({ card, familyMembers, matches, onOpenCollection, onOpenRoutine
   matches: (r: Routine) => boolean
   onOpenCollection: (id: string) => void
   onOpenRoutine: (r: Routine) => void
+  /** Create a routine straight onto the ruler — where you click IS the time. */
+  onCreateInSlot?: CreateRoutineInSlot
   onDropIntent?: (intent: DropIntent) => void
   foldTargets?: { id: string; name: string }[]
   onNameGroup?: (card: RhythmCard, name: string) => void
@@ -222,8 +227,10 @@ function ArcCard({ card, familyMembers, matches, onOpenCollection, onOpenRoutine
   )
 }
 
-export function DailyArc({ cards, anytime, familyMembers, matches, nowMinutes, heading, onOpenCollection, onOpenRoutine, onDropIntent, foldTargets, onNameGroup, onFoldInto }: DailyArcProps) {
+export function DailyArc({ cards, anytime, familyMembers, matches, nowMinutes, heading, onOpenCollection, onOpenRoutine, onDropIntent, foldTargets, onNameGroup, onFoldInto, onCreateInSlot }: DailyArcProps) {
   const [caret, setCaret] = useState<{ leftPct: number; time: string } | null>(null)
+  // Where you click along the ruler is the time the new routine gets.
+  const [addAt, setAddAt] = useState<{ leftPct: number; time: string } | null>(null)
   if (cards.length === 0 && anytime.length === 0) return null
 
   const columns = arcColumns(cards)
@@ -249,6 +256,23 @@ export function DailyArc({ cards, anytime, familyMembers, matches, nowMinutes, h
     },
   } : {}
 
+  // Creating shares the ruler's geometry with dropping: the same x→time
+  // mapping, and the same caret so the time is visible before you commit.
+  const axisCreateHandlers = onCreateInSlot ? {
+    onMouseMove: (e: React.MouseEvent) => {
+      if (addAt) return
+      const rect = e.currentTarget.getBoundingClientRect()
+      const leftPct = rect.width > 0 ? Math.min(Math.max((e.clientX - rect.left) / rect.width, 0), 1) * 100 : 0
+      setCaret({ leftPct, time: timeFromAxisX(e.clientX, rect) })
+    },
+    onMouseLeave: () => { if (!addAt) setCaret(null) },
+    onClick: (e: React.MouseEvent) => {
+      const rect = e.currentTarget.getBoundingClientRect()
+      const leftPct = rect.width > 0 ? Math.min(Math.max((e.clientX - rect.left) / rect.width, 0), 1) * 100 : 0
+      setAddAt({ leftPct, time: timeFromAxisX(e.clientX, rect) })
+    },
+  } : {}
+
   const cardExtras = { onDropIntent, foldTargets, onNameGroup, onFoldInto }
 
   return (
@@ -271,6 +295,7 @@ export function DailyArc({ cards, anytime, familyMembers, matches, nowMinutes, h
             <div
               data-testid="arc-axis"
               {...axisHandlers}
+              {...axisCreateHandlers}
               className="col-span-full row-start-2 self-center relative z-10 h-8 rounded-full border border-[var(--color-border,#eadfcc)]
                          bg-gradient-to-r from-amber-100 via-emerald-50 to-stone-300/60"
             >
@@ -285,6 +310,27 @@ export function DailyArc({ cards, anytime, familyMembers, matches, nowMinutes, h
                     style={{ left: `${pct(nowMinutes)}%` }}>
                 NOW
               </span>
+              {addAt && onCreateInSlot && (
+                <div
+                  className="absolute top-10 z-20 w-44 -translate-x-1/2"
+                  style={{ left: `${addAt.leftPct}%` }}
+                  onClick={e => e.stopPropagation()}
+                >
+                  <SlotAddInput
+                    placeholder={`Routine at ${addAt.time}`}
+                    onCreate={name => {
+                      onCreateInSlot({
+                        name,
+                        recurrence_pattern: { type: 'daily' },
+                        time_of_day: addAt.time,
+                      })
+                      setAddAt(null)
+                      setCaret(null)
+                    }}
+                    onCancel={() => { setAddAt(null); setCaret(null) }}
+                  />
+                </div>
+              )}
               {caret && (
                 <>
                   <div className="absolute -top-2 -bottom-2 w-0.5 bg-amber-500 pointer-events-none" style={{ left: `${caret.leftPct}%` }} />
@@ -345,8 +391,8 @@ export function DailyArc({ cards, anytime, familyMembers, matches, nowMinutes, h
       )}
 
       {/* Anytime row — pills drag onto the ruler to receive a time */}
-      {anytime.length > 0 && (
-        <div className="flex items-center gap-2 flex-wrap mt-4">
+      {(anytime.length > 0 || onCreateInSlot) && (
+        <div className="group flex items-center gap-2 flex-wrap mt-4">
           <span className="text-xs italic text-neutral-400">anytime today —</span>
           {anytime.map(r => (
             <button
@@ -361,6 +407,15 @@ export function DailyArc({ cards, anytime, familyMembers, matches, nowMinutes, h
               {r.name}
             </button>
           ))}
+          {onCreateInSlot && (
+            <span className="w-32">
+              <SlotAdd
+                label="Add a routine with no set time"
+                alwaysVisible={anytime.length === 0}
+                onCreate={name => onCreateInSlot({ name, recurrence_pattern: { type: 'daily' } })}
+              />
+            </span>
+          )}
         </div>
       )}
     </section>

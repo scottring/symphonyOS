@@ -22,6 +22,7 @@ import { YearRibbon } from './rhythm/YearRibbon'
 import { buildYearModel } from './rhythm/yearModel'
 import { TendDrawer } from './rhythm/TendDrawer'
 import type { DropIntent } from './rhythm/dropRules'
+import type { CreateRoutineInSlot } from './rhythm/SlotAdd'
 
 interface RhythmPageProps {
   routines: Routine[]
@@ -50,13 +51,16 @@ interface RhythmPageProps {
   onAddToCollection?: (collectionId: string, routineIds: string[]) => void
   /** Open the AI routine builder (paste text / drop a PDF → proposed routine). */
   onBuildWithAI?: () => void
+  /** Create a routine in the slot the user clicked — the slot carries the
+   *  recurrence, so no trip through the full form is needed. */
+  onCreateRoutineInSlot?: CreateRoutineInSlot
 }
 
 export function RhythmPage(props: RhythmPageProps) {
   const {
     routines, loading = false, familyMembers = [],
     onUpdateRoutine, onDelete, onGroupIntoCollection, onBuildWithAI, onCreateCollection,
-    onAddToCollection,
+    onAddToCollection, onCreateRoutineInSlot,
   } = props
 
   const [memberId, setMemberId] = useState<string | null>(null)
@@ -395,6 +399,7 @@ export function RhythmPage(props: RhythmPageProps) {
             onOpenCollection={id => setOpen({ kind: 'routine', id })}
             onOpenRoutine={openRoutine}
             onDropIntent={executeDropIntent}
+            onCreateInSlot={onCreateRoutineInSlot}
             foldTargets={foldTargets}
             onNameGroup={handleNameCluster}
             onFoldInto={(targetId, ids) => onAddToCollection?.(targetId, ids)}
@@ -415,6 +420,7 @@ export function RhythmPage(props: RhythmPageProps) {
             selectedDay={focusDay}
             onSelectDay={day => setFocusDay(cur => (cur === day ? null : day))}
             weekStartsOn={readCadenceConfig().weekStartsOn}
+            onCreateInSlot={onCreateRoutineInSlot}
           />
         </div>
 
@@ -427,6 +433,7 @@ export function RhythmPage(props: RhythmPageProps) {
             onOpenRoutine={openRoutine}
             onWake={handleWake}
             onDropIntent={executeDropIntent}
+            onCreateInSlot={onCreateRoutineInSlot}
           />
         </div>
       </div>
