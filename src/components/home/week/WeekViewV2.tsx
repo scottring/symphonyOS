@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback, useEffect } from 'react'
+import { useMemo, useState, useCallback, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   DndContext,
@@ -222,16 +222,15 @@ export function WeekViewV2(props: WeekViewV2Props) {
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
   )
 
-  // Edge-hover state for cross-week auto-advance
+  // Edge-hover state for cross-week auto-advance, measured against the grid box.
   const [edgeHover, setEdgeHover] = useState<'left' | 'right' | null>(null)
+  const gridBoundsRef = useRef<HTMLDivElement>(null)
 
   const handleDragMove = (e: DragMoveEvent) => {
     // activatorEvent is the pointer-down that started the drag; adding delta.x
     // gives the current pointer x position relative to the page.
     const activator = e.activatorEvent as PointerEvent | undefined
-    const rect = (activator?.target as Element | null)
-      ?.closest('[data-week-bounds]')
-      ?.getBoundingClientRect()
+    const rect = gridBoundsRef.current?.getBoundingClientRect()
     if (!rect) return
 
     const currentX = (activator?.clientX ?? 0) + (e.delta?.x ?? 0)
@@ -485,7 +484,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
   }, [weekStart, dayCount, onWeekChange])
 
   return (
-    <div data-week-bounds className="hidden lg:block relative">
+    <div className="hidden lg:block relative">
       <div className="flex items-center justify-end mb-2">
         <RoutinesToggle hidden={hideRoutines} onToggle={() => writeHideRoutines(!hideRoutines)} />
       </div>
@@ -497,25 +496,31 @@ export function WeekViewV2(props: WeekViewV2Props) {
         onDragCancel={drag.dndHandlers.onDragCancel}
         onDragMove={handleDragMove}
       >
-        {/* Unscheduled pool — inside the DndContext so its pills' useDraggable
-            registers; drops ride the existing chip branches in useWeekDragDrop. */}
-        <WeekPoolLane
-          tasks={tasks}
-          routines={shelfRoutines}
-          weekStart={weekStart}
-          dayCount={dayCount}
-          onSelectItem={onSelectItem}
-          onCompleteTask={(id) => { void toggleTask(id) }}
-          onNotThisWeek={handleNotThisWeek}
-          onPushTask={(id, target) => { void gated.pushTask(id, target) }}
-          onUpdateTask={(id, u) => { void onUpdateTask(id, u) }}
-          onDeleteTask={(id) => { void deleteTask(id) }}
-        />
-        {/* The grid, with the month list beside it — the rung above, read-only,
-            so the week is planned by looking at the month (never by dragging
-            from it). */}
+        {/* The week list stands LEFT of the grid, the month list folded beneath
+            it (Scott, 2026-09-05: chips down the side, not along the top).
+            Inside the DndContext so the pills' useDraggable registers; drops
+            ride the existing chip branches in useWeekDragDrop. The month is
+            the rung above, read-only — the week is planned by looking at it,
+            never by dragging from it. */}
         <div className="flex items-start gap-3">
-        <div className="flex-1 min-w-0">
+        <aside aria-label="This week's list" className="shrink-0 w-60 flex flex-col gap-2">
+          <WeekPoolLane
+            tasks={tasks}
+            routines={shelfRoutines}
+            weekStart={weekStart}
+            dayCount={dayCount}
+            onSelectItem={onSelectItem}
+            onCompleteTask={(id) => { void toggleTask(id) }}
+            onNotThisWeek={handleNotThisWeek}
+            onPushTask={(id, target) => { void gated.pushTask(id, target) }}
+            onUpdateTask={(id, u) => { void onUpdateTask(id, u) }}
+            onDeleteTask={(id) => { void deleteTask(id) }}
+          />
+          <WeekMonthRail tasks={tasks} meId={meId} onSelectItem={onSelectItem} onAddToWeek={(id) => { void gated.pushTask(id, 'week') }} />
+        </aside>
+        {/* Edge auto-advance measures THIS box, not the whole view — with the
+            list column to its left, the view's left edge is no longer the grid's. */}
+        <div ref={gridBoundsRef} data-week-bounds className="flex-1 min-w-0">
         <WeekGrid
           weekStart={weekStart}
           dayCount={dayCount}
@@ -572,7 +577,6 @@ export function WeekViewV2(props: WeekViewV2Props) {
           ))}
         </WeekGrid>
         </div>
-        <WeekMonthRail tasks={tasks} meId={meId} onSelectItem={onSelectItem} onAddToWeek={(id) => { void gated.pushTask(id, 'week') }} />
         </div>
 
         {placingRoutine && routinePlace && (

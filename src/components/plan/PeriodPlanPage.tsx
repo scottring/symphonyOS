@@ -2,8 +2,8 @@
 //
 // One page, three levels. This Month, This Season and This Year are the same
 // surface with a different period: the level's own list (tasks and goals, or
-// goals alone for the year), the level above in a rail to reference while you
-// write, and a look-back at the period just ended (Scott, 2026-09-05: "plan
+// goals alone for the year), the level above folded beneath it to reference
+// while you write, and a look-back at the period just ended (Scott, 2026-09-05: "plan
 // the year, then the season referencing the year, then the month referencing
 // the season… then at the end of each period, review it").
 //
@@ -74,7 +74,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
     return [...list.filter((r) => r.isGoal), ...list.filter((r) => !r.isGoal)]
   }, [level, goals, layers, layered, bounds.start, isCurrent, meId, tasks])
 
-  // ── The rail: the level above, for the CURRENT period, read-only ─────────
+  // ── The fold: the level above, for the CURRENT period, read-only ─────────
   const above = railLevel(level)
   const railRows = useMemo<PlanRowModel[]>(() => {
     if (above === 'season') {
@@ -172,8 +172,8 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
         }
       />
 
-      <div className="flex items-start gap-4">
-        <section aria-label={`${bounds.label} list`} className="min-w-0 flex-1 rounded-xl border border-neutral-200 bg-white px-3 py-3 shadow-sm">
+      <div className="flex flex-col gap-3">
+        <section aria-label={`${bounds.label} list`} className="min-w-0 rounded-xl border border-neutral-200 bg-white px-3 py-3 shadow-sm">
           {isPast && (
             <p className="px-2 pb-2 text-xs text-neutral-500">
               Look back: what got done, what didn't. Keep what still matters, drop the rest.
@@ -230,6 +230,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
             onPullDown={level === 'month' ? pullDown : undefined}
             pullLabel="Add to this month:"
             emptyCopy={`Nothing on this ${NOUN[above]}'s list.`}
+            storageKey={`symphony-plan-rail-${level}`}
           />
         )}
       </div>

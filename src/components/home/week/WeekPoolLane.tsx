@@ -1,6 +1,7 @@
 //
-// /week's list — THIS WEEK'S LIST, not a pool to drain. One list, no view
-// tabs: the month is the rail beside the grid, the backlog is Inbox, and
+// /week's list — THIS WEEK'S LIST, not a pool to drain. It stands in a column
+// to the LEFT of the grid (between the side nav and the days), the month list
+// folded beneath it for reference. One list, no view tabs: the backlog is Inbox, and
 // unhomed routines ride here (poolViews decides; this only renders). A ticked pill
 // lingers struck-through so the week reads as a list with things done on it;
 // "Last week" swaps in the previous week's rows for the weekly look-back
@@ -10,8 +11,8 @@
 //
 // Each pill also carries the overlay drawer's basic triage: complete (the
 // leading circle), "not this week" (→ next week's plan), and the defer
-// dropdown. The strip caps at STRIP_CAP loose pills with a "+N more"
-// expander so a deep backlog never buries the grid.
+// dropdown. The column caps at STRIP_CAP loose pills with a "+N more"
+// expander so a deep backlog never runs off the bottom of the grid.
 import { useMemo, useState } from 'react'
 import { useDraggable } from '@dnd-kit/core'
 import { Check, ChevronDown, ChevronRight, ChevronsRight, CookingPot, GripVertical, Trash2, Archive, ArrowRight } from 'lucide-react'
@@ -24,12 +25,12 @@ import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { readCadenceConfig } from '@/lib/cadence/config'
 import { isPlacedOnWeek } from '@/lib/today/weekPlacement'
 
-// Loose pills visible before the "+N more" expander — roughly two tidy rows.
+// Loose pills visible before the "+N more" expander.
 const STRIP_CAP = 8
 // Routines get their OWN allowance rather than sharing the tasks' budget. With
 // 34 loose tasks a shared cap spent every slot on tasks and showed no routine
 // at all — which is the segregation this change exists to end (Scott,
-// 2026-09-05). Costs at most one extra row; nothing is taken from the tasks.
+// 2026-09-05). Costs at most a few rows; nothing is taken from the tasks.
 const ROUTINE_STRIP_CAP = 4
 
 // A pill is a dnd-kit drag handle end-to-end, so inline buttons must stop the
@@ -69,7 +70,7 @@ function PoolPill({ task, onSelect, onCompleteTask, onNotThisWeek, onPushTask, s
       // opened no panel at all.
       onClick={() => onSelect(`task-${task.id}`)}
       title={task.title}
-      className={`group inline-flex max-w-[280px] items-center gap-1.5 rounded-lg border border-neutral-200 bg-white pl-2 pr-1.5 py-1.5 text-[13px] text-neutral-700 touch-none hover:border-neutral-300 hover:shadow-sm transition-all ${
+      className={`group flex w-full items-center gap-1.5 rounded-lg border border-neutral-200 bg-white pl-2 pr-1.5 py-1.5 text-[13px] text-neutral-700 touch-none hover:border-neutral-300 hover:shadow-sm transition-all ${
         draggable ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'
       } ${isDragging ? 'opacity-40' : ''}`}
     >
@@ -91,7 +92,7 @@ function PoolPill({ task, onSelect, onCompleteTask, onNotThisWeek, onPushTask, s
       ) : (
         <span className="shrink-0 w-1.5 h-1.5 rounded-full bg-primary-400/70" />
       )}
-      <span className={`min-w-0 truncate ${struck ? 'line-through text-neutral-400' : ''}`}>{task.title}</span>
+      <span className={`min-w-0 flex-1 truncate ${struck ? 'line-through text-neutral-400' : ''}`}>{task.title}</span>
       {lookback && !struck && (
         <span className="shrink-0 inline-flex items-center gap-0.5 ml-1" {...stopDrag}>
           <button type="button" aria-label={`Carry forward ${task.title}`} title="Carry forward to this week"
@@ -150,12 +151,12 @@ function RoutinePill({ routine, onSelect }: { routine: Routine; onSelect: (id: s
       {...listeners}
       onClick={() => onSelect(`routine-${routine.id}`)}
       title={routine.name}
-      className={`inline-flex max-w-[320px] items-center gap-1.5 rounded-lg border border-[hsl(42_50%_80%)] bg-[hsl(45_75%_90%)] pl-1.5 pr-2.5 py-1.5 touch-none cursor-grab active:cursor-grabbing hover:shadow-sm transition-all ${
+      className={`flex w-full items-center gap-1.5 rounded-lg border border-[hsl(42_50%_80%)] bg-[hsl(45_75%_90%)] pl-1.5 pr-2.5 py-1.5 touch-none cursor-grab active:cursor-grabbing hover:shadow-sm transition-all ${
         isDragging ? 'opacity-40' : ''
       }`}
     >
       <GripVertical className="w-3.5 h-3.5 shrink-0 text-[hsl(40_30%_60%)]" />
-      <span className="min-w-0 truncate text-[12.5px] font-semibold text-[hsl(40_60%_30%)]">{routine.name}</span>
+      <span className="min-w-0 flex-1 truncate text-[12.5px] font-semibold text-[hsl(40_60%_30%)]">{routine.name}</span>
       <span className="shrink-0 text-[11px] text-[hsl(38_25%_45%)]">{routineTemporalLabel(routine)}</span>
     </div>
   )
@@ -241,7 +242,7 @@ export function WeekPoolLane({
   const headerCount = lastWeek ? lastWeekRows.length : total
 
   return (
-    <div className="mb-2 rounded-xl border border-neutral-200 bg-white px-3 py-2.5 shadow-sm">
+    <div className="rounded-xl border border-neutral-200 bg-white px-3 py-2.5 shadow-sm">
       <div className="flex items-center gap-2">
         <button
           type="button"
@@ -265,7 +266,7 @@ export function WeekPoolLane({
         )}
       </div>
       {open && lastWeek && (
-        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+        <div className="mt-2 flex flex-col items-stretch gap-1">
           {lastWeekRows.map((t) => (
             <PoolPill key={t.id} task={t} onSelect={onSelectItem} struck={t.completed} lookback={t.completed ? undefined : lookbackFor(t)} />
           ))}
@@ -273,12 +274,12 @@ export function WeekPoolLane({
         </div>
       )}
       {open && !lastWeek && (
-        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+        <div className="mt-2 flex flex-col items-stretch gap-1">
           {pool.meals.length > 0 && (
             <button
               type="button"
               onClick={() => setMealsOpen((v) => !v)}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-1.5 text-[13px] text-neutral-600 hover:bg-neutral-100 transition-colors"
+              className="flex w-full items-center gap-1.5 rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-1.5 text-[13px] text-neutral-600 hover:bg-neutral-100 transition-colors"
             >
               <CookingPot className="w-3.5 h-3.5" /> Meals · {pool.meals.length}
             </button>
@@ -291,7 +292,7 @@ export function WeekPoolLane({
             <button
               type="button"
               onClick={() => setShowAll(true)}
-              className="inline-flex items-center rounded-lg border border-dashed border-neutral-300 bg-neutral-50 px-3 py-1.5 text-[13px] text-neutral-500 hover:bg-neutral-100 hover:text-neutral-700 transition-colors"
+              className="flex w-full items-center justify-center rounded-lg border border-dashed border-neutral-300 bg-neutral-50 px-3 py-1.5 text-[13px] text-neutral-500 hover:bg-neutral-100 hover:text-neutral-700 transition-colors"
             >
               +{overflow} more
             </button>
@@ -300,7 +301,7 @@ export function WeekPoolLane({
             <button
               type="button"
               onClick={() => setShowAll(false)}
-              className="inline-flex items-center rounded-lg px-2 py-1.5 text-[13px] text-neutral-400 hover:text-neutral-600 transition-colors"
+              className="flex w-full items-center justify-center rounded-lg px-2 py-1.5 text-[13px] text-neutral-400 hover:text-neutral-600 transition-colors"
             >
               Show less
             </button>

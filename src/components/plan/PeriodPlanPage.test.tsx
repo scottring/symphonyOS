@@ -73,10 +73,13 @@ describe('PeriodPlanPage', () => {
     expect(within(list).queryByText("Iris's thing")).not.toBeInTheDocument()
   })
 
-  it('shows the season in the rail on the month page, with → this month on open tasks', () => {
+  it('folds the season beneath the month list, with → this month on open tasks once unfolded', () => {
     state.tasks = [task({ title: 'Fall trips', bucket: 'quarter' })]
     renderPage('month')
     const rail = screen.getByRole('complementary', { name: 'This Season' })
+    // Closed by default — a reference you unfold, not a second list.
+    expect(within(rail).queryByText('Fall trips')).not.toBeInTheDocument()
+    fireEvent.click(within(rail).getByRole('button', { name: /This Season/ }))
     expect(within(rail).getByText('Fall trips')).toBeInTheDocument()
     fireEvent.click(within(rail).getByRole('button', { name: 'Add to this month: Fall trips' }))
     expect(hook.pushTask).toHaveBeenCalledWith(expect.any(String), 'month')
@@ -137,13 +140,14 @@ describe('PeriodPlanPage', () => {
     expect(screen.queryByRole('button', { name: /Someday/ })).not.toBeInTheDocument()
   })
 
-  it('This Season lists quarter rows with the year goals in the rail', () => {
+  it('This Season lists quarter rows with the year goals folded beneath', () => {
     state.tasks = [task({ title: 'Fall trips', bucket: 'quarter' })]
     state.goals = [goal({ name: 'Run a half marathon' })]
     renderPage('season')
     expect(screen.getByRole('heading', { name: 'This Season' })).toBeInTheDocument()
     expect(within(screen.getByRole('region', { name: /list$/ })).getByText('Fall trips')).toBeInTheDocument()
     const rail = screen.getByRole('complementary', { name: 'This Year' })
+    fireEvent.click(within(rail).getByRole('button', { name: /This Year/ }))
     expect(within(rail).getByText('Run a half marathon')).toBeInTheDocument()
     // the year rail is look-only
     expect(within(rail).queryByRole('button', { name: /Add to/ })).not.toBeInTheDocument()

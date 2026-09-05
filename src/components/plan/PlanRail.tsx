@@ -1,14 +1,26 @@
 // src/components/plan/PlanRail.tsx
 //
-// The level above, read-only, beside the list being written. Levels connect by
-// looking, not linking: nothing drags from here and nothing is linked. The one
-// verb is "→ this month" on an open season task (a copy-down), the same way the
-// week's Month rail offers "→ this week".
+// The level above, folded beneath the list being written. Levels connect by
+// looking, not linking: nothing drags from here and nothing is linked. It
+// starts closed — a reference you unfold when you want to glance up — and
+// remembers its state when given a storage key. The one verb is the arrow on
+// an open task (a copy-down: "→ this month" on a season task, "→ this week"
+// on a month task); goals, placed and done rows are look-only.
 
-import { ArrowRight, Target } from 'lucide-react'
+import { useState } from 'react'
+import { ArrowRight, ChevronDown, ChevronRight, Target } from 'lucide-react'
 import type { PlanRowModel } from './PlanRow'
 
-export function PlanRail({ title, subtitle, rows, onOpen, onPullDown, pullLabel, emptyCopy }: {
+function readOpen(key: string | undefined): boolean {
+  if (!key) return false
+  try { return localStorage.getItem(key) === 'open' } catch { return false }
+}
+function writeOpen(key: string | undefined, open: boolean): void {
+  if (!key) return
+  try { localStorage.setItem(key, open ? 'open' : 'collapsed') } catch { /* private browsing */ }
+}
+
+export function PlanRail({ title, subtitle, rows, onOpen, onPullDown, pullLabel, emptyCopy, storageKey }: {
   title: string
   subtitle?: string
   rows: PlanRowModel[]
@@ -17,7 +29,11 @@ export function PlanRail({ title, subtitle, rows, onOpen, onPullDown, pullLabel,
   onPullDown?: (row: PlanRowModel) => void
   pullLabel?: string
   emptyCopy: string
+  /** localStorage key that remembers whether the fold is open. */
+  storageKey?: string
 }) {
+  const [open, setOpen] = useState(() => readOpen(storageKey))
+  const toggle = () => { setOpen((v) => { writeOpen(storageKey, !v); return !v }) }
   const goals = rows.filter((r) => r.isGoal)
   const items = rows.filter((r) => !r.isGoal)
   const Row = ({ row }: { row: PlanRowModel }) => {
@@ -53,15 +69,22 @@ export function PlanRail({ title, subtitle, rows, onOpen, onPullDown, pullLabel,
     )
   }
   return (
-    <aside aria-label={title} className="shrink-0 w-72 rounded-xl border border-neutral-200 bg-white px-3 py-2.5 shadow-sm">
-      <div className="flex items-baseline gap-2 mb-1.5">
-        <span className="text-xs font-semibold tracking-wide uppercase text-neutral-500">{title}</span>
-        {subtitle && <span className="text-xs text-neutral-400">· {subtitle}</span>}
-      </div>
-      {rows.length === 0 ? (
-        <p className="text-sm text-neutral-400 py-2">{emptyCopy}</p>
+    <aside aria-label={title} className="rounded-xl border border-neutral-200 bg-white px-3 py-2.5 shadow-sm">
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={toggle}
+        className="flex w-full items-center gap-1 text-left text-xs font-semibold tracking-wide uppercase text-neutral-500 hover:text-neutral-700 transition-colors"
+      >
+        {open ? <ChevronDown className="w-3.5 h-3.5 shrink-0" /> : <ChevronRight className="w-3.5 h-3.5 shrink-0" />}
+        <span>{title}</span>
+        {subtitle && <span className="font-normal normal-case tracking-normal text-neutral-400">· {subtitle}</span>}
+        {!open && <span className="ml-auto font-normal normal-case tracking-normal text-neutral-400">{rows.length}</span>}
+      </button>
+      {open && (rows.length === 0 ? (
+        <p className="text-sm text-neutral-400 pt-2 pb-1">{emptyCopy}</p>
       ) : (
-        <>
+        <div className="mt-1.5">
           {goals.length > 0 && (
             <>
               <p className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-amber-700/80">Goals</p>
@@ -74,8 +97,8 @@ export function PlanRail({ title, subtitle, rows, onOpen, onPullDown, pullLabel,
               <ul>{items.map((r) => <Row key={r.id} row={r} />)}</ul>
             </>
           )}
-        </>
-      )}
+        </div>
+      ))}
     </aside>
   )
 }
