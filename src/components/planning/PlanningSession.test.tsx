@@ -44,6 +44,39 @@ describe('PlanningSession', () => {
     expect(screen.getByRole('button', { name: /close/i })).toBeInTheDocument()
   })
 
+  it('closes on Escape, the way the header ✕ does', () => {
+    const onClose = vi.fn()
+    render(
+      <PlanningSession
+        tasks={[]}
+        events={[]}
+        routines={[]}
+        onUpdateTask={vi.fn()}
+        onPushTask={vi.fn()}
+        onClose={onClose}
+      />
+    )
+    fireEvent.keyDown(document.body, { key: 'Escape' })
+    expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('embedded (the /week lane) has nothing for Escape to close', () => {
+    const onClose = vi.fn()
+    render(
+      <PlanningSession
+        tasks={[]}
+        events={[]}
+        routines={[]}
+        onUpdateTask={vi.fn()}
+        onPushTask={vi.fn()}
+        onClose={onClose}
+        embedded
+      />
+    )
+    fireEvent.keyDown(document.body, { key: 'Escape' })
+    expect(onClose).not.toHaveBeenCalled()
+  })
+
   it('displays unscheduled tasks in the drawer', () => {
     const unscheduledTask = createMockTask({ title: 'Unscheduled Task', bucket: 'week' })
 

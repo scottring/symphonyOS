@@ -23,6 +23,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { showToast } from '@/hooks/useToast';
+import { useEscapeKey } from '@/hooks/useEscapeKey';
 import { useSelection } from '@/shell/providers/SelectionProvider';
 import type { SelectionRef } from '@/shell/types';
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
@@ -88,7 +89,9 @@ export function shouldDismissPanel(target: HTMLElement | null, panelEl: HTMLElem
 }
 
 /**
- * Shared side-panel chrome: the fixed right-side aside + click-outside-to-close.
+ * Shared side-panel chrome: the fixed right-side aside + click-outside-to-close
+ * + Escape-to-close (useEscapeKey — a nested popover or wide Notes consumes
+ * its own Escape first; a focused field is left before the panel closes).
  * Every kind renders through this so the close behavior is identical (and so
  * clicking another card still switches selection — the card's click fires
  * setSelection after this clears, landing on the new item).
@@ -96,6 +99,7 @@ export function shouldDismissPanel(target: HTMLElement | null, panelEl: HTMLElem
 function PanelChrome({ children }: { children: React.ReactNode }) {
   const { clearSelection } = useSelection();
   const panelRef = useRef<HTMLElement>(null);
+  useEscapeKey(true, clearSelection);
   useEffect(() => {
     function onDown(e: MouseEvent) {
       if (shouldDismissPanel(e.target as HTMLElement | null, panelRef.current)) {

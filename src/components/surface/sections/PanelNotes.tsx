@@ -57,7 +57,9 @@ export function PanelNotes({
   useEffect(() => {
     if (!wide) return
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setWide(false)
+      if (e.key !== 'Escape') return
+      e.preventDefault() // consumed: the panel around it stays open (useEscapeKey)
+      setWide(false)
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)

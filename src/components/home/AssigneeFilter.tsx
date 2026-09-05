@@ -74,7 +74,7 @@ export function AssigneeFilter({
   // Close on escape
   useEffect(() => {
     function handleEscape(event: KeyboardEvent) {
-      if (event.key === 'Escape') setIsOpen(false)
+      if (event.key === 'Escape') { event.preventDefault(); setIsOpen(false) }
     }
 
     if (isOpen) {

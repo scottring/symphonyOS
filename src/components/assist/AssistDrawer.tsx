@@ -13,6 +13,7 @@
 
 import { useMemo } from 'react'
 import { createPortal } from 'react-dom'
+import { useEscapeKey } from '@/hooks/useEscapeKey'
 import { useSymphonyAssistant } from '@/hooks/useSymphonyAssistant'
 import { useDiscussThread, type DiscussEntity } from '@/hooks/useDiscussThread'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
@@ -51,6 +52,8 @@ interface AssistDrawerProps {
 }
 
 export function AssistDrawer({ item, onClose, onMutate, discuss }: AssistDrawerProps) {
+  // Escape closes the drawer first; the panel that opened it stays (useEscapeKey stack).
+  useEscapeKey(true, onClose)
   const isRoutine = item.kind === 'routine'
   const { members } = useFamilyMembers()
 

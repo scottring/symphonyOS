@@ -50,7 +50,7 @@ export function DiscussionThread({
   return (
     <div
       className="flex h-full min-h-0 flex-col border-l border-neutral-200 bg-white"
-      onKeyDown={(e) => { if (e.key === 'Escape') onClose() }}
+      onKeyDown={(e) => { if (e.key === 'Escape') { e.preventDefault(); onClose() } }}
     >
       {/* Header */}
       <div className="flex items-start gap-3 border-b border-neutral-200 px-4 py-3">

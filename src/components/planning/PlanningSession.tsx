@@ -1,6 +1,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react'
 import { readHideRoutines, writeHideRoutines, onHideRoutinesChange } from '@/lib/hideRoutinesSignal'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
+import { useEscapeKey } from '@/hooks/useEscapeKey'
 import { resolveRoutine } from '@/lib/routineUtils'
 import { deferredInRoutineIds } from '@/lib/today/deferredRoutines'
 import { ALL_LAYERS } from '@/lib/domains'
@@ -188,6 +189,11 @@ export function PlanningSession({
 
   // Active drag state
   const [activeId, setActiveId] = useState<string | null>(null)
+
+  // Escape closes the full-screen overlay, the way ✕ does. Embedded (the /week
+  // lane) has nothing to close. A slot quick-create input handles its own
+  // Escape first; useEscapeKey leaves a focused field before closing.
+  useEscapeKey(!embedded, onClose)
 
   // Transient refusal notice (a past-day drop, or a past-day slot click) —
   // auto-clears.

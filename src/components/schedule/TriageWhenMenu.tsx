@@ -94,7 +94,7 @@ export function TriageWhenMenu({ onPick, onDelete, onNote, onComplete, onPickDat
         setOpenGroup(null)
       }
     }
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { openedByClick.current = false; setOpenGroup(null) } }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.preventDefault(); openedByClick.current = false; setOpenGroup(null) } }
     document.addEventListener('mousedown', onDown)
     document.addEventListener('keydown', onKey)
     return () => {

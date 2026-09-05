@@ -18,8 +18,13 @@ export function useClickOutside(
       const el = ref.current
       if (el && !el.contains(e.target as Node)) onDismiss()
     }
+    // preventDefault marks the key consumed: an enclosing surface listening
+    // via useEscapeKey (the detail panel, the Time-block overlay) then leaves
+    // itself open — one Escape closes one layer.
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onDismiss()
+      if (e.key !== 'Escape') return
+      e.preventDefault()
+      onDismiss()
     }
     document.addEventListener('mousedown', handlePointer)
     document.addEventListener('touchstart', handlePointer)

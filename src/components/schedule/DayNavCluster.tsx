@@ -51,7 +51,7 @@ export function DayNavCluster({ viewedDate, onDateChange, today = new Date(), va
       if (ref.current && !ref.current.contains(e.target as Node)) setPickerOpen(false)
     }
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setPickerOpen(false)
+      if (e.key === 'Escape') { e.preventDefault(); setPickerOpen(false) }
     }
     document.addEventListener('mousedown', onDown)
     document.addEventListener('keydown', onKey)

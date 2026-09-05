@@ -77,7 +77,7 @@ export function TaskFateMenu({ onPickWhen, onPickDate, onComplete, onDelete, onO
       setOpen(false); setPicksOpen(false)
     }
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') { setOpen(false); setPicksOpen(false) }
+      if (e.key === 'Escape') { e.preventDefault(); setOpen(false); setPicksOpen(false) }
     }
     document.addEventListener('mousedown', onDown)
     document.addEventListener('keydown', onKey)
