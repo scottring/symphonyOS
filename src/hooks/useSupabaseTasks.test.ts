@@ -529,8 +529,10 @@ describe('useSupabaseTasks', () => {
 
     // The clear is the half that prevents a haunting: a month task sent to the
     // week that kept its month_start would reappear in that month's look-back.
+    // An inbox row carrying a stale month stamp (not a descent — inbox has no
+    // rank on the ladder, so this is a plain move that must CLEAR the stamp).
     it('setBucket to week clears month_start and season_start', async () => {
-      mockSupabaseData.push(createMockDbTask({ id: 'task-1', title: 'Task', bucket: 'month', month_start: '2026-09-01' }))
+      mockSupabaseData.push(createMockDbTask({ id: 'task-1', title: 'Task', bucket: 'inbox', month_start: '2026-09-01' }))
       const { result } = renderHook(() => useSupabaseTasks())
       await waitFor(() => expect(result.current.tasks).toHaveLength(1))
       await act(async () => { await result.current.setBucket('task-1', 'week') })
@@ -538,7 +540,7 @@ describe('useSupabaseTasks', () => {
     })
 
     it('pushTask to a date clears every period stamp', async () => {
-      mockSupabaseData.push(createMockDbTask({ id: 'task-1', title: 'Task', bucket: 'month', month_start: '2026-09-01' }))
+      mockSupabaseData.push(createMockDbTask({ id: 'task-1', title: 'Task', bucket: 'inbox', month_start: '2026-09-01' }))
       const { result } = renderHook(() => useSupabaseTasks())
       await waitFor(() => expect(result.current.tasks).toHaveLength(1))
       await act(async () => { await result.current.pushTask('task-1', new Date(2026, 8, 20, 9)) })
@@ -600,7 +602,7 @@ describe('useSupabaseTasks', () => {
     })
 
     it('updateTasksBulk drops goals from a placement but writes the rest', async () => {
-      mockSupabaseData.push(goal(), createMockDbTask({ id: 't2', title: 'Task', bucket: 'month' }))
+      mockSupabaseData.push(goal(), createMockDbTask({ id: 't2', title: 'Task', bucket: 'inbox' }))
       const { result } = renderHook(() => useSupabaseTasks())
       await waitFor(() => expect(result.current.tasks).toHaveLength(2))
       await act(async () => { await result.current.updateTasksBulk(['g1', 't2'], { bucket: 'week' }) })
@@ -628,6 +630,98 @@ describe('useSupabaseTasks', () => {
       await act(async () => { await result.current.setGoal('t1', true) })
       expect(mockUpdate).not.toHaveBeenCalled()
       expect(mockShowToast).toHaveBeenCalledWith(expect.stringMatching(/month or season/), 'info')
+    })
+  })
+
+  describe('copy-down: placing a month/season task lower copies it', () => {
+    const monthTask = () => createMockDbTask({
+      id: 'm1', title: 'Repaint the porch', bucket: 'month', month_start: '2026-09-01',
+      context: 'family', assigned_to: 'member-iris', notes: 'Sage green', phone_number: '555-0100',
+    })
+
+    it('pushTask to week inserts a copy with source_id and does not touch the original', async () => {
+      mockSupabaseData.push(monthTask())
+      const { result } = renderHook(() => useSupabaseTasks())
+      await waitFor(() => expect(result.current.tasks).toHaveLength(1))
+      mockUpdate.mockClear(); mockInsert.mockClear()
+      await act(async () => { await result.current.pushTask('m1', 'week') })
+      expect(mockUpdate).not.toHaveBeenCalled()
+      expect(mockInsert).toHaveBeenCalledWith(expect.objectContaining({
+        title: 'Repaint the porch', bucket: 'week', source_id: 'm1',
+        context: 'family', assigned_to: 'member-iris', notes: 'Sage green', phone_number: '555-0100',
+        month_start: null, is_goal: false,
+      }))
+      // Both rows are now in the hook's state: the original AND the copy.
+      expect(result.current.tasks.filter((t) => t.title === 'Repaint the porch')).toHaveLength(2)
+      expect(result.current.tasks.find((t) => t.sourceId === 'm1')?.bucket).toBe('week')
+      expect(result.current.tasks.find((t) => t.id === 'm1')?.bucket).toBe('month')
+    })
+
+    it('a drop onto a day (updateTask bucket timed) copies too, carrying the date', async () => {
+      mockSupabaseData.push(monthTask())
+      const { result } = renderHook(() => useSupabaseTasks())
+      await waitFor(() => expect(result.current.tasks).toHaveLength(1))
+      mockUpdate.mockClear(); mockInsert.mockClear()
+      const day = new Date(2026, 8, 20)
+      await act(async () => { await result.current.updateTask('m1', { bucket: 'timed', scheduledFor: day, isAllDay: true }) })
+      expect(mockUpdate).not.toHaveBeenCalled()
+      expect(mockInsert).toHaveBeenCalledWith(expect.objectContaining({
+        bucket: 'timed', scheduled_for: day.toISOString(), is_all_day: true, source_id: 'm1',
+      }))
+    })
+
+    it('a season task copies down to the month with this month stamped', async () => {
+      mockSupabaseData.push(createMockDbTask({ id: 'q1', title: 'Fall trips', bucket: 'quarter', season_start: '2026-07-01' }))
+      const { result } = renderHook(() => useSupabaseTasks())
+      await waitFor(() => expect(result.current.tasks).toHaveLength(1))
+      mockInsert.mockClear()
+      await act(async () => { await result.current.pushTask('q1', 'month') })
+      const call = mockInsert.mock.calls.at(-1)![0] as Record<string, unknown>
+      expect(call.bucket).toBe('month')
+      expect(call.source_id).toBe('q1')
+      expect(typeof call.month_start).toBe('string')
+      expect(call.season_start).toBeNull()
+    })
+
+    // A goal never descends — the refusal from Step 1 still wins, so no copy either.
+    it('a goal is refused, not copied', async () => {
+      mockSupabaseData.push(createMockDbTask({ id: 'g1', title: 'Read more', bucket: 'month', is_goal: true }))
+      const { result } = renderHook(() => useSupabaseTasks())
+      await waitFor(() => expect(result.current.tasks).toHaveLength(1))
+      mockInsert.mockClear()
+      await act(async () => { await result.current.pushTask('g1', 'week') })
+      expect(mockInsert).not.toHaveBeenCalled()
+    })
+
+    // Sideways and upward are still MOVES. Week→week is the carry-forward.
+    it('month→quarter and week→week still update in place', async () => {
+      mockSupabaseData.push(
+        createMockDbTask({ id: 'm1', title: 'A', bucket: 'month' }),
+        createMockDbTask({ id: 'w1', title: 'B', bucket: 'week', week_start: '2026-08-30' }),
+      )
+      const { result } = renderHook(() => useSupabaseTasks())
+      await waitFor(() => expect(result.current.tasks).toHaveLength(2))
+      mockInsert.mockClear()
+      await act(async () => {
+        await result.current.pushTask('m1', 'quarter')
+        await result.current.updateTask('w1', { bucket: 'week', weekStart: new Date(2026, 8, 6) })
+      })
+      expect(mockInsert).not.toHaveBeenCalled()
+      expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({ bucket: 'quarter' }))
+      expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({ bucket: 'week', week_start: '2026-09-06' }))
+    })
+
+    it('updateTasksBulk copies the descending rows and updates the rest', async () => {
+      mockSupabaseData.push(
+        createMockDbTask({ id: 'm1', title: 'A', bucket: 'month' }),
+        createMockDbTask({ id: 'i1', title: 'B', bucket: 'inbox' }),
+      )
+      const { result } = renderHook(() => useSupabaseTasks())
+      await waitFor(() => expect(result.current.tasks).toHaveLength(2))
+      mockInsert.mockClear()
+      await act(async () => { await result.current.updateTasksBulk(['m1', 'i1'], { bucket: 'week' }) })
+      expect(mockInsert).toHaveBeenCalledWith(expect.objectContaining({ bucket: 'week', source_id: 'm1' }))
+      expect(mockIn).toHaveBeenCalledWith('id', ['i1'])
     })
   })
 

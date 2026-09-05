@@ -11,6 +11,7 @@ import { scopeForDomain, memberForAuthUser, type Scope } from '@/lib/scope'
 import { localYmd, parseLocalYmd, weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
 import { weekStartForBucket } from '@/lib/today/weekPlacement'
 import { monthStartOf, monthStartForBucket, seasonStartForBucket, isPlacement } from '@/lib/planning/periodPlacement'
+import { isDescent } from '@/lib/planning/lineage'
 import { readSeasons, seasonStartFor } from '@/lib/cadence/seasons'
 import { onRealtimeResumed } from '@/lib/realtime/keepAlive'
 import { announceToBuyChanged } from '@/lib/lists/toBuy'
@@ -1118,6 +1119,38 @@ export function useSupabaseTasks() {
     }
   }, [findTaskById, findParentOfSubtask])
 
+  /**
+   * Copy-down. Placing a month or season TASK lower does not move it — it
+   * inserts a copy carrying the placement and leaves the original on its list,
+   * so the period's look-back sees everything that was on it (a moved row
+   * would have shown only what you DIDN'T do). The copy carries everything but
+   * the placement: domain (or it lands Unsorted and re-asks DomainGate),
+   * assignees (or the partner is narrowed out), notes, links, contact, project.
+   * `source_id` is the only thread between them; lineage.ts reads it.
+   */
+  const copyDown = useCallback(async (original: Task, updates: Partial<Task>): Promise<string | undefined> => {
+    const to = updates.bucket
+    const scheduledFor = to === 'timed' ? updates.scheduledFor : undefined
+    return addTask(original.title, original.contactId, original.projectId, scheduledFor, {
+      bucket: to !== 'timed' ? to : undefined,
+      weekStart: updates.weekStart,
+      monthStart: updates.monthStart,
+      isAllDay: to === 'timed' ? updates.isAllDay : undefined,
+      sourceId: original.id,
+      goalId: original.goalId,
+      context: original.context ?? null,
+      assignedTo: original.assignedTo ?? null,
+      assignedToAll: original.assignedToAll ?? undefined,
+      category: original.category,
+      notes: original.notes,
+      links: original.links,
+      phoneNumber: original.phoneNumber,
+      email: original.email,
+      location: original.location,
+      locationPlaceId: original.locationPlaceId,
+    })
+  }, [addTask])
+
   const updateTask = useCallback(async (id: string, updates: Partial<Task>) => {
     logger.debug('[updateTask] Called with:', { id, updates })
     const task = findTaskById(id)
@@ -1136,6 +1169,14 @@ export function useSupabaseTasks() {
     if (task.isGoal && isPlacement(updates)) {
       logger.debug('[updateTask] placement refused: row is a goal', { id, updates })
       showToast("Goals aren't scheduled — tick it off when it's done", 'info')
+      return
+    }
+
+    // A month/season TASK stepping down the ladder is copied, not moved — see
+    // copyDown. The original is untouched: no bucket change, no defer_count,
+    // not even updated_at.
+    if (isDescent(task.bucket, updates.bucket)) {
+      await copyDown(task, updates)
       return
     }
 
@@ -1358,7 +1399,7 @@ export function useSupabaseTasks() {
         }
       }
     }
-  }, [tasks, familyMembers, findTaskById, findParentOfSubtask, selfMemberIdForOwner])
+  }, [tasks, familyMembers, findTaskById, findParentOfSubtask, selfMemberIdForOwner, copyDown])
 
   // Bulk update multiple tasks at once
   const updateTasksBulk = useCallback(async (requestedIds: string[], updates: Partial<Task>) => {
@@ -1371,6 +1412,14 @@ export function useSupabaseTasks() {
       if (goals.length) {
         taskIds = requestedIds.filter((id) => !goals.includes(id))
         showToast(`${goals.length} goal${goals.length === 1 ? '' : 's'} stay${goals.length === 1 ? 's' : ''} on the list — goals aren't scheduled`, 'info')
+      }
+    }
+    // Descending rows are copied one by one (copyDown) and leave the bulk write.
+    if (isPlacement(updates) && updates.bucket) {
+      const descending = taskIds.filter((id) => { const t = findTaskById(id); return !!t && isDescent(t.bucket, updates.bucket) })
+      if (descending.length) {
+        for (const id of descending) { const t = findTaskById(id); if (t) await copyDown(t, updates) }
+        taskIds = taskIds.filter((id) => !descending.includes(id))
       }
     }
     if (taskIds.length === 0) return
@@ -1534,7 +1583,7 @@ export function useSupabaseTasks() {
     for (const t of tasksToUpdate) {
       announceLocalWrite({ kind: 'update', task: merged(t) })
     }
-  }, [tasks, selfMemberIdForOwner])
+  }, [tasks, selfMemberIdForOwner, copyDown])
 
   /**
    * Write a different sort_order to each of several tasks. `updateTasksBulk`
