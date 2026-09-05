@@ -320,6 +320,13 @@ describe('homework + notices', () => {
     expect(model.isEmpty).toBe(false)
   })
 
+  it('class-wide homework (assignedToAll, no single assignee) lands on each kid\'s card', () => {
+    const shared = task({ id: 'h-shared', title: 'Return Glee Club permission slip', category: 'homework', assignedTo: null, assignedToAll: [KID.id, 'kid-2'] })
+    const theirs = task({ id: 'h-theirs', title: 'Not mine', category: 'homework', assignedTo: null, assignedToAll: ['kid-2'] })
+    const model = build([], [], {}, [], TODAY, [shared, theirs])
+    expect(model.homework.map((h) => h.id)).toEqual(['h-shared'])
+  })
+
   it('a homework task due today is NOT also a needed row', () => {
     const t = task({ id: 'h1', category: 'homework', neededOn: TODAY })
     const model = build([], [], {}, [t], TODAY, [t])

@@ -20,7 +20,7 @@ import { groupRoutineSteps } from '@/lib/today/routineCollections'
 import { stepAppliesOnDate } from '@/lib/today/stepSchedule'
 import { neededWindow } from '@/lib/today/neededToday'
 import { isSameDay } from '@/lib/dateUtils'
-import { homeworkDue, sortHomework } from '@/lib/wall/homeworkLabel'
+import { homeworkDue, sortHomework, homeworkOwners } from '@/lib/wall/homeworkLabel'
 import type { WallNotice } from '@/hooks/useWallData'
 import { matchesName, titleForMember, hasPerPersonSegments } from '@/components/wall-v2/wallEventAttribution'
 
@@ -333,9 +333,11 @@ export function buildMemberDayModel(input: {
       : []),
   ]
 
-  // Homework: the card owns these rows. Order and label come from
-  // homeworkLabel so the page and the board never disagree about "Fri".
-  const mine = homeworkTasks.filter((t) => !t.completed && t.assignedTo === member.id)
+  // Homework: the card owns these rows. Owner, order and label all come from
+  // homeworkLabel so the page and the board never disagree about whose it is
+  // or about "Fri". A class-wide sheet is one row naming every child.
+  const rosterIds = new Set(members.map((m) => m.id))
+  const mine = homeworkTasks.filter((t) => !t.completed && homeworkOwners(t, rosterIds).includes(member.id))
   const homework: KidHomeworkRow[] = sortHomework(mine, now).map((t) => {
     const due = homeworkDue(t.neededOn, now)
     return { id: t.id, title: t.title, due: due.label, late: due.late, notes: t.notes?.trim() || null }

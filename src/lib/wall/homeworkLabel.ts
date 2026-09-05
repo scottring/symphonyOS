@@ -1,6 +1,19 @@
 // One place that says when homework is due, so the board chip and the kid
 // page can never disagree about "Fri". Pure; `now` is passed in.
 import { isSameDay, addDays } from '@/lib/dateUtils'
+import type { Task } from '@/types/task'
+
+/** Every member a homework task belongs to. `assignedToAll` wins when it
+ *  names anyone in `memberIds` — a class-wide sheet is ONE row carrying every
+ *  child (extract-email, 2026-09-04) — and `assignedTo`, the legacy single
+ *  column, is the fallback. Empty when nobody recognisable owns it. Shared by
+ *  the board and the kid page so a row can never sit on one and not the other. */
+export function homeworkOwners(t: Task, memberIds: Set<string>): string[] {
+  const all = (t.assignedToAll ?? []).filter((id) => memberIds.has(id))
+  if (all.length) return [...new Set(all)]
+  if (t.assignedTo && memberIds.has(t.assignedTo)) return [t.assignedTo]
+  return []
+}
 
 const WEEKDAY = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const MONTH = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
