@@ -1,6 +1,6 @@
 import type { EffectiveParsed } from '@/hooks/useQuickParse'
 import { ConceptIcon } from '@/lib/conceptIcons'
-import { domainById } from '@/lib/domains'
+import { AppliedDomainChip } from './AppliedDomainChip'
 
 // The project chip is gone (2026-09-02 — see the note in Sidebar.tsx): Projects
 // are hidden from the product, so capture no longer offers to file into one.
@@ -176,25 +176,7 @@ export function ParsedFieldChips({
       {!parsed.isNote && parsed.context && (
         <div className="flex items-center gap-2">
           <span className="text-base"><ConceptIcon name="context" size={18} decorative /></span>
-          <span
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border"
-            style={{
-              color: domainById(parsed.context).color,
-              borderColor: `color-mix(in srgb, ${domainById(parsed.context).color} 30%, transparent)`,
-              backgroundColor: `color-mix(in srgb, ${domainById(parsed.context).color} 12%, transparent)`,
-            }}
-          >
-            {domainById(parsed.context).label}
-            <button
-              type="button"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={onClearContext}
-              aria-label="Clear context"
-              className="ml-1 opacity-60 hover:opacity-100"
-            >
-              ×
-            </button>
-          </span>
+          <AppliedDomainChip context={parsed.context} onClear={onClearContext} />
         </div>
       )}
     </>

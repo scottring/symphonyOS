@@ -5,6 +5,9 @@ import type { ParserContext } from '@/lib/quickInputParser'
 import type { ResolverContext, ContactSuggestion } from '@/lib/entityResolver'
 import { useQuickParse } from '@/hooks/useQuickParse'
 import { useAssistantLauncher } from '@/contexts/AssistantLaunchContext'
+import { DomainChooser } from '@/components/domain/DomainChooser'
+import { AppliedDomainChip } from '@/components/capture/AppliedDomainChip'
+import { ConceptIcon } from '@/lib/conceptIcons'
 import type { ResolutionAction } from '@/hooks/useResolutionLearning'
 import type { TaskCategory, TaskContext } from '@/types/task'
 
@@ -70,6 +73,7 @@ export function TodayAddInput({ onAdd, parserContext, resolver, getRecentTaskFor
   const debouncedValue = useDebouncedValue(value, 150)
   const qp = useQuickParse(debouncedValue, ctx, resolver)
   const { suggestion, suggestionState, suggestionApplied } = qp
+  const p = qp.effectiveParsed
 
   const recentTask = useMemo(
     () => (suggestion && getRecentTaskForContact ? getRecentTaskForContact(suggestion.contactId) : null),
@@ -101,7 +105,6 @@ export function TodayAddInput({ onAdd, parserContext, resolver, getRecentTaskFor
   const handleSubmit = useCallback(() => {
     const trimmed = value.trim()
     if (!trimmed) return
-    const p = qp.effectiveParsed
     const attachPhone = suggestionApplied && suggestion?.callIntent && suggestion.phone
       ? suggestion.phone
       : undefined
@@ -207,6 +210,32 @@ export function TodayAddInput({ onAdd, parserContext, resolver, getRecentTaskFor
           </button>
         )}
       </div>
+
+      {/* Domain row — the same chips as ⌘K and the Inbox's "Where does this
+          belong?" gate, so a capture can be filed here instead of coming back
+          to it in triage. Typing #work sets the context too, which swaps the
+          chooser for the applied chip. Mousedown-preventDefault everywhere:
+          losing the caret mid-capture would break the type → tag → Enter run.
+          Hidden for a typed "note:" — that path has its own shape. */}
+      {value.trim() && !p.isNote && (
+        <div
+          className="flex items-center gap-2 px-3 pb-2 md:px-4"
+          onMouseDown={(e) => e.preventDefault()}
+        >
+          <span className="text-base"><ConceptIcon name="context" size={16} decorative /></span>
+          {p.context ? (
+            <AppliedDomainChip context={p.context} onClear={qp.clearContext} />
+          ) : (
+            <>
+              <span className="text-xs text-neutral-400">Add to</span>
+              <DomainChooser
+                size="sm"
+                onChoose={(d) => { qp.applyContext(d); inputRef.current?.focus() }}
+              />
+            </>
+          )}
+        </div>
+      )}
 
       {showSuggestion && (
         <div

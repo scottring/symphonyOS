@@ -172,4 +172,48 @@ describe('TodayAddInput smart capture', () => {
     expect(onAdd.mock.calls[0][0].context).toBeUndefined()
     vi.useRealTimers()
   })
+
+  it('offers the domain chips once there is text, and files the pick', async () => {
+    vi.useFakeTimers()
+    const { input, onAdd } = setup()
+    fireEvent.change(input, { target: { value: 'Sign the permission slip' } })
+    await act(() => vi.advanceTimersByTimeAsync(200))
+
+    expect(screen.getByRole('button', { name: 'Work' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Personal' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Family' }))
+
+    fireEvent.keyDown(input, { key: 'Enter' })
+    expect(onAdd.mock.calls[0][0].context).toBe('family')
+    vi.useRealTimers()
+  })
+
+  it('swaps the chips for a clearable chip once a domain is picked', async () => {
+    vi.useFakeTimers()
+    const { input } = setup()
+    fireEvent.change(input, { target: { value: 'Sign the permission slip' } })
+    await act(() => vi.advanceTimersByTimeAsync(200))
+    fireEvent.click(screen.getByRole('button', { name: 'Family' }))
+
+    expect(screen.queryByRole('button', { name: 'Work' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Clear context' }))
+    expect(screen.getByRole('button', { name: 'Work' })).toBeInTheDocument()
+    vi.useRealTimers()
+  })
+
+  it('shows the applied chip, not the chooser, when #work was typed', async () => {
+    vi.useFakeTimers()
+    const { input } = setup()
+    fireEvent.change(input, { target: { value: 'Send the audit pack #work' } })
+    await act(() => vi.advanceTimersByTimeAsync(200))
+
+    expect(screen.queryByRole('button', { name: 'Family' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Clear context' })).toBeInTheDocument()
+    vi.useRealTimers()
+  })
+
+  it('offers nothing to file on an empty box', () => {
+    setup()
+    expect(screen.queryByRole('button', { name: 'Work' })).not.toBeInTheDocument()
+  })
 })
