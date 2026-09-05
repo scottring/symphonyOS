@@ -495,6 +495,51 @@ describe('useSupabaseTasks', () => {
     })
   })
 
+  describe('period stamping on bucket moves', () => {
+    beforeEach(() => localStorage.clear())
+
+    it('pushTask to month stamps this month and clears week/season', async () => {
+      mockSupabaseData.push(createMockDbTask({ id: 'task-1', title: 'Task', bucket: 'week', week_start: '2026-09-06' }))
+      const { result } = renderHook(() => useSupabaseTasks())
+      await waitFor(() => expect(result.current.tasks).toHaveLength(1))
+      await act(async () => { await result.current.pushTask('task-1', 'month') })
+      const now = new Date()
+      const first = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`
+      expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({
+        bucket: 'month', month_start: first, week_start: null, season_start: null,
+      }))
+    })
+
+    it('pushTask to quarter stamps this season and clears month', async () => {
+      mockSupabaseData.push(createMockDbTask({ id: 'task-1', title: 'Task', bucket: 'month', month_start: '2026-09-01' }))
+      const { result } = renderHook(() => useSupabaseTasks())
+      await waitFor(() => expect(result.current.tasks).toHaveLength(1))
+      await act(async () => { await result.current.pushTask('task-1', 'quarter') })
+      const call = mockUpdate.mock.calls.at(-1)![0] as Record<string, unknown>
+      expect(call.bucket).toBe('quarter')
+      expect(call.month_start).toBeNull()
+      expect(typeof call.season_start).toBe('string')
+    })
+
+    // The clear is the half that prevents a haunting: a month task sent to the
+    // week that kept its month_start would reappear in that month's look-back.
+    it('setBucket to week clears month_start and season_start', async () => {
+      mockSupabaseData.push(createMockDbTask({ id: 'task-1', title: 'Task', bucket: 'month', month_start: '2026-09-01' }))
+      const { result } = renderHook(() => useSupabaseTasks())
+      await waitFor(() => expect(result.current.tasks).toHaveLength(1))
+      await act(async () => { await result.current.setBucket('task-1', 'week') })
+      expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({ bucket: 'week', month_start: null, season_start: null }))
+    })
+
+    it('pushTask to a date clears every period stamp', async () => {
+      mockSupabaseData.push(createMockDbTask({ id: 'task-1', title: 'Task', bucket: 'month', month_start: '2026-09-01' }))
+      const { result } = renderHook(() => useSupabaseTasks())
+      await waitFor(() => expect(result.current.tasks).toHaveLength(1))
+      await act(async () => { await result.current.pushTask('task-1', new Date(2026, 8, 20, 9)) })
+      expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({ bucket: 'timed', month_start: null, season_start: null, week_start: null }))
+    })
+  })
+
   describe('updateTask', () => {
     it('maps monthStart/seasonStart to DATE strings and isGoal to is_goal', async () => {
       mockSupabaseData.push(createMockDbTask({ id: 'task-1', title: 'Task', bucket: 'month' }))

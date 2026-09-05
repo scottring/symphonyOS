@@ -10,7 +10,7 @@ import type { TaskDirections } from '@/types/directions'
 import { scopeForDomain, memberForAuthUser, type Scope } from '@/lib/scope'
 import { localYmd, parseLocalYmd, weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
 import { weekStartForBucket } from '@/lib/today/weekPlacement'
-import { monthStartOf } from '@/lib/planning/periodPlacement'
+import { monthStartOf, monthStartForBucket, seasonStartForBucket } from '@/lib/planning/periodPlacement'
 import { readSeasons, seasonStartFor } from '@/lib/cadence/seasons'
 import { onRealtimeResumed } from '@/lib/realtime/keepAlive'
 import { announceToBuyChanged } from '@/lib/lists/toBuy'
@@ -1630,6 +1630,9 @@ export function useSupabaseTasks() {
       bucket: 'timed',
       scheduledFor: date,
       isAllDay: isAllDay ?? true,
+      weekStart: undefined,
+      monthStart: undefined,
+      seasonStart: undefined,
     })
   }, [updateTask])
 
@@ -1651,6 +1654,8 @@ export function useSupabaseTasks() {
         bucket: target,
         scheduledFor: undefined,
         weekStart: weekStartForBucket(target, currentWeekStart()),
+        monthStart: monthStartForBucket(target, new Date()),
+        seasonStart: seasonStartForBucket(target, new Date()),
         deferCount,
       })
     } else {
@@ -1678,6 +1683,11 @@ export function useSupabaseTasks() {
         bucket: 'timed',
         scheduledFor: newScheduledFor,
         isAllDay: !hasSpecificTime,
+        // A date implies 'timed'; a period stamp left behind would haunt that
+        // period's pool (week) or look-back (month/season).
+        weekStart: undefined,
+        monthStart: undefined,
+        seasonStart: undefined,
         deferCount,
       })
     }
@@ -1700,6 +1710,9 @@ export function useSupabaseTasks() {
       updates.scheduledFor = undefined
     }
     updates.weekStart = weekStartForBucket(bucket, currentWeekStart())
+    // Same rule for the month and the season: stamp the one entered, clear the rest.
+    updates.monthStart = monthStartForBucket(bucket, new Date())
+    updates.seasonStart = seasonStartForBucket(bucket, new Date())
     await updateTask(id, updates)
   }, [updateTask])
 
