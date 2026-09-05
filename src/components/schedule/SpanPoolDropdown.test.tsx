@@ -22,6 +22,7 @@ function setup(over: Partial<React.ComponentProps<typeof SpanPoolDropdown>> = {}
     spans: [span()], tasks: [task()], viewedDate: d(4),
     onCreateSpan: vi.fn().mockResolvedValue(span()),
     onDeleteSpan: vi.fn(),
+    defaultContext: 'family' as const,
     onUpdateTask: vi.fn(),
     ...over,
   }
@@ -66,7 +67,10 @@ describe('SpanPoolDropdown', () => {
     const { user } = setup({ onAddToSpan })
     await user.click(screen.getByRole('button', { name: /labor day weekend pool/i }))
     await user.type(screen.getByRole('textbox', { name: /add to labor day weekend/i }), 'Book the campsite{Enter}')
-    expect(onAddToSpan).toHaveBeenCalledWith('Book the campsite', 's1')
+    // The task inherits the RANGE's domain. Hardcoding one here filed anything
+    // added under a Work or Personal lens to Family, which scopeForDomain turns
+    // into 'compound' — shared with the whole household.
+    expect(onAddToSpan).toHaveBeenCalledWith('Book the campsite', 's1', 'family')
   })
 
   it('creates a span inline, defaulting to the coming Sat–Mon', async () => {
@@ -112,5 +116,39 @@ describe('SpanPoolDropdown', () => {
     await user.click(screen.getByRole('button', { name: /labor day weekend pool/i }))
     await user.click(screen.getByRole('button', { name: /delete labor day weekend/i }))
     expect(onDeleteSpan).toHaveBeenCalledWith('s1')
+  })
+})
+
+// Layers, not modes. A range is filed under the lens you are looking through,
+// and scope follows the domain — so guessing the domain IS the leak.
+describe('SpanPoolDropdown — a range belongs to a layer', () => {
+  it('files a new range under the sole checked layer', async () => {
+    const onCreateSpan = vi.fn().mockResolvedValue(span())
+    const { user } = setup({ spans: [], onCreateSpan, defaultContext: 'work' })
+    await user.click(screen.getByRole('button', { name: /custom range/i }))
+    await user.click(screen.getByRole('button', { name: /new custom range/i }))
+    await user.type(screen.getByRole('textbox', { name: /span name/i }), 'Conference days')
+    await user.click(screen.getByRole('button', { name: /^create$/i }))
+    expect(onCreateSpan.mock.calls[0][0].context).toBe('work')
+  })
+
+  it('leaves a range Unsorted when several layers are checked', async () => {
+    const onCreateSpan = vi.fn().mockResolvedValue(span())
+    const { user } = setup({ spans: [], onCreateSpan, defaultContext: null })
+    await user.click(screen.getByRole('button', { name: /custom range/i }))
+    await user.click(screen.getByRole('button', { name: /new custom range/i }))
+    await user.type(screen.getByRole('textbox', { name: /span name/i }), 'Half term')
+    await user.click(screen.getByRole('button', { name: /^create$/i }))
+    expect(onCreateSpan.mock.calls[0][0].context).toBeNull()
+  })
+
+  it('never assumes family — the case that would over-share', async () => {
+    const onCreateSpan = vi.fn().mockResolvedValue(span())
+    const onAddToSpan = vi.fn()
+    const workSpan = span({ context: 'personal', scope: 'individual', name: 'Recovery week' })
+    const { user } = setup({ spans: [workSpan], onCreateSpan, onAddToSpan, defaultContext: 'personal' })
+    await user.click(screen.getByRole('button', { name: /recovery week pool/i }))
+    await user.type(screen.getByRole('textbox', { name: /add to recovery week/i }), 'Book physio{Enter}')
+    expect(onAddToSpan).toHaveBeenCalledWith('Book physio', 's1', 'personal')
   })
 })

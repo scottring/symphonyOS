@@ -1,6 +1,6 @@
 import { useMemo, useState, useCallback } from 'react'
 import { CalendarRange, ChevronDown, Plus, Trash2 } from 'lucide-react'
-import type { Task } from '@/types/task'
+import type { Task, TaskContext } from '@/types/task'
 import type { Span, SpanInput } from '@/types/span'
 import { localYmd, parseLocalYmd } from '@/lib/cadence/config'
 import { selectPlaceableSpans, selectSpanPool, spanDayCount } from '@/lib/today/spanPlacement'
@@ -27,13 +27,18 @@ interface SpanPoolDropdownProps {
   tasks: Task[]
   viewedDate: Date
   onCreateSpan: (input: SpanInput) => Promise<Span | null>
+  /** The domain a new range is filed under: the sole checked layer, or null
+   *  (Unsorted) when several are checked. NEVER assumed — a range hardcoded to
+   *  'family' derives scope 'compound', which shares it with the whole
+   *  household and puts its work on the kitchen wall. */
+  defaultContext: TaskContext | null
   onDeleteSpan: (id: string) => void | Promise<void>
   onUpdateTask: (id: string, updates: Partial<Task>) => void | Promise<void | boolean>
   onPushTask?: (id: string, target: Date | 'week' | 'month' | 'quarter') => void | Promise<void | boolean>
   onDeleteTask?: (id: string) => void
   onCompleteTask?: (id: string) => void
   /** Adds a task straight onto the selected span. */
-  onAddToSpan?: (title: string, spanId: string) => void | Promise<void>
+  onAddToSpan?: (title: string, spanId: string, context: TaskContext | null) => void | Promise<void>
 }
 
 const OFFER: Verdict[] = ['today', 'tomorrow', 'week', 'someday', 'deleted']
@@ -46,7 +51,7 @@ function describe(span: Span): string {
 }
 
 export function SpanPoolDropdown({
-  spans, tasks, viewedDate, onCreateSpan, onDeleteSpan,
+  spans, tasks, viewedDate, onCreateSpan, onDeleteSpan, defaultContext,
   onUpdateTask, onPushTask, onDeleteTask, onCompleteTask, onAddToSpan,
 }: SpanPoolDropdownProps) {
   const [draft, setDraft] = useState('')
@@ -159,7 +164,7 @@ export function SpanPoolDropdown({
                 onSubmit={(e) => {
                   e.preventDefault()
                   if (!draft.trim()) return
-                  void onAddToSpan(draft, selected.id)
+                  void onAddToSpan(draft, selected.id, selected.context)
                   setDraft('')
                 }}
               >
@@ -177,6 +182,7 @@ export function SpanPoolDropdown({
             {creating ? (
               <SpanCreateForm
                 viewedDate={viewedDate}
+                defaultContext={defaultContext}
                 onCancel={() => setCreating(false)}
                 onCreate={async (input) => {
                   const made = await onCreateSpan(input)
@@ -207,9 +213,10 @@ export function SpanPoolDropdown({
  * plus the Monday, because that is the case this exists for.
  */
 function SpanCreateForm({
-  viewedDate, onCreate, onCancel,
+  viewedDate, defaultContext, onCreate, onCancel,
 }: {
   viewedDate: Date
+  defaultContext: TaskContext | null
   onCreate: (input: SpanInput) => void | Promise<void>
   onCancel: () => void
 }) {
@@ -234,7 +241,10 @@ function SpanCreateForm({
       onSubmit={(e) => {
         e.preventDefault()
         if (invalid) return
-        void onCreate({ name: name.trim(), startDate: parseLocalYmd(start), endDate: parseLocalYmd(end), context: 'family' })
+        // The active lens decides the domain, exactly as it does for goals and
+        // projects. Several layers checked means Unsorted, which is where an
+        // unclassified capture belongs — not Family.
+        void onCreate({ name: name.trim(), startDate: parseLocalYmd(start), endDate: parseLocalYmd(end), context: defaultContext })
       }}
     >
       <input

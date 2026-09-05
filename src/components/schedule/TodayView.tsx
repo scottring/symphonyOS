@@ -60,6 +60,7 @@ import { ReviewDrawer, type ReviewMode } from './ReviewDrawer'
 import { HorizonPoolDropdown } from './HorizonPoolDropdown'
 import { SpanPoolDropdown } from './SpanPoolDropdown'
 import { useSpans } from '@/hooks/useSpans'
+import { filterByLayers } from '@/lib/today/domainFilter'
 import { DayNavCluster } from './DayNavCluster'
 import { PlaceWash } from '@/components/place/PlaceWash'
 import { TodayBacklogFooter } from './TodayBacklogFooter'
@@ -288,7 +289,7 @@ export function TodayView({
   )
   // The checked layer set — feeds the resolver's rung 4 directly (routines no
   // longer arrive pre-filtered by domain from HomeView).
-  const { layers } = useDomain()
+  const { layers, soleDomain } = useDomain()
   const todayInput = useMemo(() => ({
     tasks,
     events,
@@ -313,7 +314,11 @@ export function TodayView({
   // review by decree (Scott, 2026-08-19): look and pick from up here, never
   // inside the review session. Unfiltered on purpose: the pools are a full
   // census, not a view of the current assignee filter.
-  const { spans, createSpan, deleteSpan } = useSpans()
+  const { spans: allSpans, createSpan, deleteSpan } = useSpans()
+  // Ranges are layers like everything else. Without this a Work range sat in
+  // the pool while you were looking at Family only — the one thing the layer
+  // model exists to prevent.
+  const spans = useMemo(() => filterByLayers(allSpans, layers), [allSpans, layers])
 
   const poolMatchAll = useMemo(() => () => true, [])
   const weekPool = useMemo(
@@ -1161,6 +1166,7 @@ export function TodayView({
                 tasks={tasks}
                 viewedDate={viewedDate}
                 onCreateSpan={createSpan}
+                defaultContext={soleDomain}
                 onDeleteSpan={deleteSpan}
                 onUpdateTask={(id, u) => onUpdateTask?.(id, u)}
                 onPushTask={ctx.onPushTask}
