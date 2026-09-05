@@ -1,12 +1,16 @@
 import { useState } from 'react'
 import { RoutinesToggle } from './RoutinesToggle'
+import { buildRange, presetRange, MAX_RANGE_DAYS, type RangePreset } from '@/lib/planning/dateRange'
 
 interface PlanningHeaderProps {
   dateRange: Date[]
   onClose: () => void
   onAddDay: () => void
   onRemoveDay: () => void
-  onDateChange: (startDate: Date) => void
+  /** The whole span the grid should lay out, start through end. A named
+   *  range is a VIEW of the calendar, so it arrives complete rather than as a
+   *  start the host has to guess a length for. */
+  onRangeChange: (range: Date[]) => void
   /** Whether this surface can actually be closed. Gates BOTH close
    *  affordances — the X and the Done button. They are one concept: an
    *  embedded host passes `onClose={() => {}}`, and a primary-styled "Done"
@@ -17,12 +21,19 @@ interface PlanningHeaderProps {
   onToggleRoutines?: () => void
 }
 
+const PRESETS: { value: RangePreset; label: string }[] = [
+  { value: 'today', label: 'Today' },
+  { value: 'weekend', label: 'Weekend' },
+  { value: 'three', label: '3 days' },
+  { value: 'week', label: 'Week' },
+]
+
 export function PlanningHeader({
   dateRange,
   onClose,
   onAddDay,
   onRemoveDay,
-  onDateChange,
+  onRangeChange,
   showClose = true,
   hideRoutines = false,
   onToggleRoutines,
@@ -49,14 +60,30 @@ export function PlanningHeader({
     return `${start.toLocaleDateString('en-US', formatOptions)} – ${end.toLocaleDateString('en-US', formatOptions)}`
   }
 
-  // Handle date input change
-  const handleDateInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value
-    if (value) {
-      const date = new Date(value + 'T00:00:00')
-      onDateChange(date)
-      setShowDatePicker(false)
-    }
+  const start = dateRange[0]
+  const end = dateRange[dateRange.length - 1]
+
+  // A new start slides the whole range along: you are moving the same
+  // three-day weekend, not resetting to one day.
+  const handleStartChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.value) return
+    const nextStart = new Date(e.target.value + 'T00:00:00')
+    const length = dateRange.length
+    const nextEnd = new Date(nextStart)
+    nextEnd.setDate(nextEnd.getDate() + length - 1)
+    onRangeChange(buildRange(nextStart, nextEnd))
+    setShowDatePicker(false)
+  }
+
+  const handleEndChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!e.target.value) return
+    onRangeChange(buildRange(start, new Date(e.target.value + 'T00:00:00')))
+    setShowDatePicker(false)
+  }
+
+  const handlePreset = (preset: RangePreset) => {
+    onRangeChange(presetRange(preset, new Date()))
+    setShowDatePicker(false)
   }
 
   return (
@@ -123,17 +150,54 @@ export function PlanningHeader({
                   className="fixed inset-0 z-10"
                   onClick={() => setShowDatePicker(false)}
                 />
-                <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 z-20 bg-white rounded-xl shadow-lg border border-neutral-200 p-4">
-                  <label className="block text-sm font-medium text-neutral-600 mb-2">
-                    Start date
-                  </label>
-                  <input
-                    type="date"
-                    defaultValue={formatInputDate(dateRange[0])}
-                    onChange={handleDateInputChange}
-                    className="input-base w-full"
-                    autoFocus
-                  />
+                <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 z-20 w-96 bg-white rounded-xl shadow-lg border border-neutral-200 p-4">
+                  {/* The ranges worth one click. A long weekend or a school
+                      break is a view of the calendar, named here rather than
+                      saved somewhere else. */}
+                  <div className="flex flex-wrap gap-1.5 mb-4">
+                    {PRESETS.map(({ value, label }) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => handlePreset(value)}
+                        className="px-2.5 py-1 rounded-md bg-neutral-100 hover:bg-neutral-200 text-xs font-medium text-neutral-700 transition-colors"
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                  <div className="flex items-end gap-2">
+                    <div className="flex-1 min-w-0">
+                      <label htmlFor="planning-range-start" className="block text-xs font-medium text-neutral-500 mb-1">
+                        Start
+                      </label>
+                      <input
+                        id="planning-range-start"
+                        type="date"
+                        value={formatInputDate(start)}
+                        onChange={handleStartChange}
+                        className="input-base w-full"
+                        autoFocus
+                      />
+                    </div>
+                    <span className="pb-2.5 text-neutral-400">–</span>
+                    <div className="flex-1 min-w-0">
+                      <label htmlFor="planning-range-end" className="block text-xs font-medium text-neutral-500 mb-1">
+                        End
+                      </label>
+                      <input
+                        id="planning-range-end"
+                        type="date"
+                        value={formatInputDate(end)}
+                        min={formatInputDate(start)}
+                        onChange={handleEndChange}
+                        className="input-base w-full"
+                      />
+                    </div>
+                  </div>
+                  <p className="mt-3 text-xs text-neutral-400">
+                    Up to {MAX_RANGE_DAYS} days.
+                  </p>
                 </div>
               </>
             )}

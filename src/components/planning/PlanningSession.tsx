@@ -589,19 +589,11 @@ export function PlanningSession({
     })
   }, [])
 
-  // Change the date range start
-  const handleDateChange = useCallback((startDate: Date) => {
-    startDate.setHours(0, 0, 0, 0)
-    setDateRange((prev) => {
-      const daysCount = prev.length
-      const newRange: Date[] = []
-      for (let i = 0; i < daysCount; i++) {
-        const date = new Date(startDate)
-        date.setDate(date.getDate() + i)
-        newRange.push(date)
-      }
-      return newRange
-    })
+  // The header hands back the whole span it wants laid out — a Sat–Mon
+  // weekend arrives in one edit, rather than as a start the grid has to guess
+  // a length for.
+  const handleRangeChange = useCallback((range: Date[]) => {
+    if (range.length) setDateRange(range)
   }, [])
 
   // Handle drag start
@@ -804,7 +796,7 @@ export function PlanningSession({
         onClose={onClose}
         onAddDay={handleAddDay}
         onRemoveDay={handleRemoveDay}
-        onDateChange={handleDateChange}
+        onRangeChange={handleRangeChange}
         showClose={!embedded}
         hideRoutines={hideRoutines}
         onToggleRoutines={() => writeHideRoutines(!hideRoutines)}

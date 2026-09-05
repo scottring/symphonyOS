@@ -11,7 +11,6 @@
 // own copy until full cutover (then the legacy synthesis becomes dead code).
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
-import type { TaskContext } from '@/types/task';
 import { onPlanFromPaperRequest, consumePlanFromPaperRequest } from '@/lib/planFromPaperSignal';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
@@ -331,28 +330,6 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
       eventNotesMap: eventNotesMapWithDefaults,
     }),
     [filteredEvents, layers, eventContextOverrides, getDomainForCalendar, eventNotesMapWithDefaults],
-  );
-
-  /**
-   * Create a task already placed on a span. The placement rides the INSERT for
-   * the reason `bucket` and `weekStart` do: a follow-up write can reach
-   * tasksRef before the temp→real id swap has rendered and be dropped as
-   * "Task not found".
-   *
-   * `context` comes from the RANGE the task is going into — it is not assumed.
-   * This hardcoded 'family' when first written, which meant anything added to
-   * a range under a Work or Personal lens was filed to the family layer, and
-   * scopeForDomain turned that into scope 'compound': shared with the whole
-   * household and shown on the kitchen wall. The domain decides the scope, so
-   * guessing the domain is the leak.
-   */
-  const onCreateTaskInSpan = useCallback(
-    async (title: string, spanId: string, context: TaskContext | null) => {
-      const clean = title.trim();
-      if (!clean) return;
-      await addTask(clean, undefined, undefined, undefined, { bucket: 'span', spanId, context });
-    },
-    [addTask],
   );
 
   const onCreateTaskFromValue = useCallback(
@@ -703,7 +680,6 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
       onSetNeededToday,
       viewedDate,
       onCreateTask: onCreateTaskFromValue,
-      onCreateTaskInSpan,
       onCreateTaskParsed,
       parserContext,
       resolverContext,
