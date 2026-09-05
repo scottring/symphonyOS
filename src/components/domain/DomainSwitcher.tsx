@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { Check, Layers } from 'lucide-react'
+import { Check, type LucideIcon } from 'lucide-react'
+import { ConceptIcon } from '@/lib/conceptIcons'
 import { useDomain } from '@/hooks/useDomain'
 import { DOMAINS, UNSORTED, UNSORTED_ICON, LAYER_LABELS, type Layer } from '@/lib/domains'
 
@@ -14,7 +15,7 @@ import { DOMAINS, UNSORTED, UNSORTED_ICON, LAYER_LABELS, type Layer } from '@/li
 // layout footprint on open will bring that back; the menu is portalled for
 // exactly that reason.
 
-const ROWS: { id: Layer; label: string; icon: typeof Layers; color: string }[] = [
+const ROWS: { id: Layer; label: string; icon: LucideIcon; color: string }[] = [
   ...DOMAINS.map((d) => ({ id: d.id as Layer, label: d.label, icon: d.icon, color: d.color })),
   { id: UNSORTED, label: LAYER_LABELS.unsorted, icon: UNSORTED_ICON, color: 'rgb(115 115 115)' },
 ]
@@ -137,7 +138,11 @@ export function DomainSwitcher() {
         style={{ boxShadow: '0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04), inset 0 1px 0 rgba(255,255,255,0.4)' }}
       >
         {isAll ? (
-          <Layers className="w-[18px] h-[18px] text-neutral-700" strokeWidth={2.25} />
+          // A tag, not a stack of layers: everywhere else in the product a
+          // domain reads as a tag (the capture chips, the applied-context chip,
+          // the row action rail), and the chrome was the one place speaking a
+          // different visual language.
+          <ConceptIcon name="context" size={18} className="text-neutral-700" decorative />
         ) : checked.length === 1 ? (
           (() => {
             const Icon = checked[0].icon
