@@ -106,7 +106,7 @@ export const DenseInboxRow = memo(function DenseInboxRow({
       data-row
       data-task-id={task.id}
       className={`
-        group flex items-start gap-2 rounded-lg border
+        group flex flex-wrap items-start gap-2 rounded-lg border
         px-3 py-2 shadow-sm transition-all duration-200
         ${isSelected ? 'bg-primary-50/50 border-primary-300' : 'bg-white border-neutral-100'}
         ${isLeaving ? 'opacity-0 translate-x-2 max-h-0 py-0 my-0 overflow-hidden border-transparent' : 'hover:shadow-md hover:border-amber-300'}
@@ -171,11 +171,14 @@ export const DenseInboxRow = memo(function DenseInboxRow({
         </button>
       )}
 
-      {/* Title */}
+      {/* Title. The floor is what a title needs to read as one line; when
+          the row is narrower than title + triage controls (a detail panel
+          open beside the inbox), the controls wrap under the title instead
+          of squeezing it to a 90px column (demo walkthrough 2026-09-04). */}
       <button
         type="button"
         onClick={onSelect}
-        className={`flex-1 min-w-[6rem] text-left text-sm leading-snug break-words py-0.5 ${
+        className={`flex-1 min-w-[16rem] text-left text-sm leading-snug break-words py-0.5 ${
           task.completed
             ? 'text-neutral-400 line-through'
             : task.isWaiting
@@ -192,6 +195,8 @@ export const DenseInboxRow = memo(function DenseInboxRow({
       </button>
 
 
+      {/* Trailing triage controls wrap as one unit (see the title above). */}
+      <div className="ml-auto flex items-start gap-2 shrink-0">
       {/* Context dot — moved to the trailing controls so it sits with the rest
           of the triage affordances (assignee, when, delete) instead of crowding
           the title. Popover opens right-aligned to stay on-screen. */}
@@ -298,6 +303,7 @@ export const DenseInboxRow = memo(function DenseInboxRow({
             </button>
           )
         })}
+      </div>
       </div>
     </div>
   )
