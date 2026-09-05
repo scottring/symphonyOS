@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, createContext, useContext, type ReactNode } from 'react'
+import { useState, useEffect, useCallback, useMemo, createContext, useContext, type ReactNode } from 'react'
 import { supabase } from '@/lib/supabase'
 import { logger } from '@/lib/logger'
 import { getRecurringBaseId } from './useHiddenCalendarEvents'
@@ -118,6 +118,10 @@ interface GoogleCalendarContextValue {
   removeEventLocal: (eventId: string) => void
   /** Restore a previously-removed event into the local cache (used by undo). */
   restoreEventLocal: (event: CalendarEvent) => void
+  /** Calendar IDs hidden from Symphony — their events are filtered out everywhere. */
+  hiddenCalendarIds: Set<string>
+  /** Hide/show a whole calendar in Symphony (does not touch Google). */
+  setCalendarHidden: (calendarId: string, hidden: boolean) => Promise<void>
 }
 
 const GoogleCalendarContext = createContext<GoogleCalendarContextValue | null>(null)
@@ -130,6 +134,64 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
   const [isFetching, setIsFetching] = useState(false)
   const [events, setEvents] = useState<CalendarEvent[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [hiddenCalendarIds, setHiddenCalendarIds] = useState<Set<string>>(new Set())
+
+  // Load the user's hidden calendars once. These are filtered out of `events`
+  // below, so every Symphony surface (Today, Week, wall) respects the toggle.
+  useEffect(() => {
+    let cancelled = false
+    async function loadHidden() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user || cancelled) return
+      const { data, error: hiddenErr } = await supabase
+        .from('hidden_calendars')
+        .select('calendar_id')
+        .eq('user_id', user.id)
+      if (hiddenErr || cancelled || !data) return
+      setHiddenCalendarIds(new Set(data.map((r) => r.calendar_id as string)))
+    }
+    loadHidden()
+    return () => { cancelled = true }
+  }, [])
+
+  const setCalendarHidden = useCallback(async (calendarId: string, hidden: boolean): Promise<void> => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    // Optimistic local update so the UI and event filtering react immediately.
+    setHiddenCalendarIds((prev) => {
+      const next = new Set(prev)
+      if (hidden) next.add(calendarId)
+      else next.delete(calendarId)
+      return next
+    })
+    if (hidden) {
+      const { error: upsertErr } = await supabase
+        .from('hidden_calendars')
+        .upsert({ user_id: user.id, calendar_id: calendarId }, { onConflict: 'user_id,calendar_id' })
+      if (upsertErr) {
+        logger.error('Failed to hide calendar:', upsertErr)
+        setHiddenCalendarIds((prev) => { const n = new Set(prev); n.delete(calendarId); return n })
+      }
+    } else {
+      const { error: delErr } = await supabase
+        .from('hidden_calendars')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('calendar_id', calendarId)
+      if (delErr) {
+        logger.error('Failed to show calendar:', delErr)
+        setHiddenCalendarIds((prev) => new Set(prev).add(calendarId))
+      }
+    }
+  }, [])
+
+  // Events from hidden calendars are removed at this single choke point.
+  const visibleEvents = useMemo(
+    () => (hiddenCalendarIds.size === 0
+      ? events
+      : events.filter((e) => !hiddenCalendarIds.has((e.calendar_id ?? e.calendarId ?? '')))),
+    [events, hiddenCalendarIds],
+  )
 
   // Check connection status and validate token
   useEffect(() => {
@@ -596,7 +658,7 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
     needsReconnect,
     isLoading,
     isFetching,
-    events,
+    events: visibleEvents,
     error,
     connect,
     disconnect,
@@ -610,6 +672,8 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
     deleteEvent,
     removeEventLocal,
     restoreEventLocal,
+    hiddenCalendarIds,
+    setCalendarHidden,
   }
 
   return (

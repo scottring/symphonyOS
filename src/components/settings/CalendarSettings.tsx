@@ -1,6 +1,7 @@
-import { useState } from 'react'
-import { useGoogleCalendar } from '@/hooks/useGoogleCalendar'
+import { useState, useEffect } from 'react'
+import { useGoogleCalendar, type GoogleCalendarInfo } from '@/hooks/useGoogleCalendar'
 import { CalendarSetupWizard } from '@/components/calendar/CalendarSetupWizard'
+import { CalendarVisibilityList } from './CalendarVisibilityList'
 
 export function CalendarSettings() {
   const {
@@ -9,10 +10,24 @@ export function CalendarSettings() {
     isLoading,
     error,
     disconnect,
+    fetchCalendarList,
+    hiddenCalendarIds,
+    setCalendarHidden,
   } = useGoogleCalendar()
 
   const [isDisconnecting, setIsDisconnecting] = useState(false)
   const [showSetupWizard, setShowSetupWizard] = useState(false)
+  const [calendars, setCalendars] = useState<GoogleCalendarInfo[]>([])
+
+  // Load the calendar list (for the visibility toggles) once connected.
+  useEffect(() => {
+    if (!isConnected || needsReconnect) return
+    let cancelled = false
+    fetchCalendarList()
+      .then((list) => { if (!cancelled) setCalendars(list) })
+      .catch((err) => console.error('Failed to load calendar list:', err))
+    return () => { cancelled = true }
+  }, [isConnected, needsReconnect, fetchCalendarList])
 
   const handleConnect = () => {
     setShowSetupWizard(true)
@@ -154,6 +169,22 @@ export function CalendarSettings() {
             </>
           )}
         </div>
+
+        {/* Per-calendar visibility — turn off calendars you don't want in Symphony */}
+        {isConnected && !needsReconnect && calendars.length > 0 && (
+          <div className="mt-4 p-4 bg-white rounded-lg border border-neutral-100">
+            <h3 className="text-sm font-medium text-neutral-700">Calendars in Symphony</h3>
+            <p className="text-xs text-neutral-500 mb-2">
+              Turn a calendar off to hide its events everywhere in Symphony. Read-only calendars
+              (holidays, subscriptions, shared) can't be edited in Google, so hiding is the way to clear them.
+            </p>
+            <CalendarVisibilityList
+              calendars={calendars}
+              hiddenIds={hiddenCalendarIds}
+              onSetHidden={setCalendarHidden}
+            />
+          </div>
+        )}
 
         {/* Info about calendar sync */}
         <div className="mt-4 p-4 bg-neutral-50 rounded-lg border border-neutral-100">
