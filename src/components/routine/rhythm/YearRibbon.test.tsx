@@ -43,13 +43,53 @@ beforeEach(() => {
   localStorage.clear()
 })
 
-describe('YearRibbon', () => {
-  it('renders twelve months starting at the current one, and marks it', () => {
+describe('YearRibbon density', () => {
+  it('renders only the months that hold something, and names the rest', () => {
+    render(<YearRibbon {...base} model={modelOf([mk({ name: 'Storm windows' })])} />)
+
+    expect(screen.getByTestId('year-month-2026-10')).toBeInTheDocument()
+    expect(screen.queryByTestId('year-month-2026-11')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '11 quiet months' })).toBeInTheDocument()
+  })
+
+  it('opens the quiet months on request and closes them again', () => {
+    render(<YearRibbon {...base} model={modelOf([mk({ name: 'Storm windows' })])} />)
+
+    fireEvent.click(screen.getByRole('button', { name: '11 quiet months' }))
+    expect(screen.getByTestId('year-month-2026-11')).toBeInTheDocument()
+    expect(screen.getAllByText('quiet')).toHaveLength(11)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Hide quiet months' }))
+    expect(screen.queryByTestId('year-month-2026-11')).not.toBeInTheDocument()
+  })
+
+  it('says so plainly when the whole year is empty, instead of twelve quiet rows', () => {
     render(<YearRibbon {...base} model={modelOf([])} />)
 
-    expect(screen.getAllByText('quiet')).toHaveLength(12)
+    expect(screen.queryByTestId('year-month-2026-9')).not.toBeInTheDocument()
+    expect(screen.queryAllByText('quiet')).toHaveLength(0)
+    expect(screen.getByText(/Nothing seasonal yet/)).toBeInTheDocument()
+  })
+
+  it('keeps the every-month pool even when no month column holds anything', () => {
+    const ffg = mk({ name: 'Pay FFG', recurrence_pattern: { type: 'monthly', day_of_month: 1 } })
+    render(<YearRibbon {...base} model={modelOf([ffg])} />)
+
+    expect(screen.getByTestId('every-month').textContent).toContain('Pay FFG')
+    expect(screen.queryByText(/Nothing seasonal yet/)).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '12 quiet months' })).toBeInTheDocument()
+  })
+})
+
+describe('YearRibbon', () => {
+  it('marks the current month when it holds something', () => {
+    const haircut = mk({
+      name: 'Kaleb haircut',
+      recurrence_pattern: { type: 'since_last', interval: 6, unit: 'weeks' },
+    })
+    render(<YearRibbon {...base} model={modelOf([haircut])} />)
+
     expect(screen.getByTestId('year-month-2026-9').textContent).toContain('now')
-    expect(screen.getByTestId('year-month-2027-8')).toBeInTheDocument()
   })
 
   it('puts a routine in its month and opens it on click', () => {
@@ -60,14 +100,6 @@ describe('YearRibbon', () => {
     expect(screen.getByTestId('year-month-2026-10').textContent).toContain('Storm windows')
     fireEvent.click(screen.getByText('Storm windows'))
     expect(onOpenRoutine).toHaveBeenCalledWith(storm)
-  })
-
-  it('shows the every-month pool above the columns', () => {
-    const ffg = mk({ name: 'Pay FFG', recurrence_pattern: { type: 'monthly', day_of_month: 1 } })
-    render(<YearRibbon {...base} model={modelOf([ffg])} />)
-
-    expect(screen.getByTestId('every-month').textContent).toContain('Pay FFG')
-    expect(screen.getAllByText('quiet')).toHaveLength(12)
   })
 
   it('marks a drifting routine so the date does not read as fixed', () => {
@@ -105,17 +137,22 @@ describe('YearRibbon', () => {
 })
 
 describe('YearRibbon drag and drop', () => {
-  it('sets a dropped routine to recur in that month', () => {
+  it('opens the quiet months on drag, so a hidden one is still a drop target', () => {
     const onDropIntent = vi.fn()
     render(
       <YearRibbon {...base} model={modelOf([mk({ id: 'storm', name: 'Storm windows' })])}
                   onDropIntent={onDropIntent} />,
     )
 
+    expect(screen.queryByTestId('year-month-2026-12')).not.toBeInTheDocument()
+
     const dt = mkDT()
     fireEvent.dragStart(screen.getByText('Storm windows'), { dataTransfer: dt })
-    fireEvent.dragOver(screen.getByTestId('year-month-2026-12'), { dataTransfer: dt })
-    fireEvent.drop(screen.getByTestId('year-month-2026-12'), { dataTransfer: dt })
+    fireEvent.dragEnter(screen.getByTestId('year-ribbon'), { dataTransfer: dt })
+
+    const dec = screen.getByTestId('year-month-2026-12')
+    fireEvent.dragOver(dec, { dataTransfer: dt })
+    fireEvent.drop(dec, { dataTransfer: dt })
 
     expect(onDropIntent).toHaveBeenCalledWith({ type: 'yearly-in', ids: ['storm'], month: 12 })
   })
@@ -130,7 +167,10 @@ describe('YearRibbon drag and drop', () => {
 
     const dt = mkDT()
     fireEvent.dragStart(screen.getByText('Open the spigots'), { dataTransfer: dt })
-    fireEvent.drop(screen.getByTestId('year-month-2026-11'), { dataTransfer: dt })
+    fireEvent.dragEnter(screen.getByTestId('year-ribbon'), { dataTransfer: dt })
+
+    const nov = screen.getByTestId('year-month-2026-11')
+    fireEvent.drop(nov, { dataTransfer: dt })
 
     expect(onDropIntent).toHaveBeenCalledWith({ type: 'wake-in', id: 'spigots', month: 11, year: 2026 })
   })

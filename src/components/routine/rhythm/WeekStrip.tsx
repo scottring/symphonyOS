@@ -114,7 +114,15 @@ export function WeekStrip({ days, sometime, stepCounts, matches, todayKey, onOpe
           {pulse ? 'Normal view' : 'Pulse view'}
         </button>
       </div>
-      <div className={`grid grid-cols-[repeat(7,minmax(92px,1fr))] gap-2 overflow-x-auto min-w-0 ${pulse ? 'items-end' : ''}`}>
+      {/* Columns size to their own content. Stretching them to the tallest day
+          (Saturday carries the whole weekend here) turned the quiet days into
+          tall empty rectangles and pushed everything below off the screen.
+          Pulse view keeps the shared baseline — its bars ARE a histogram. */}
+      <div
+        data-testid="week-grid"
+        className={`grid grid-cols-[repeat(7,minmax(92px,1fr))] gap-2 overflow-x-auto min-w-0
+                    ${pulse ? 'items-end' : 'items-start'}`}
+      >
         {orderedDays.map(day => {
           const items = days[day]
           const isToday = day === todayKey

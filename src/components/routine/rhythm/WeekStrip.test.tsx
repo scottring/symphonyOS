@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { WeekStrip } from './WeekStrip'
 import type { DayKey } from './rhythmModel'
@@ -31,7 +31,28 @@ function mkDT() {
   }
 }
 
+// The pulse toggle persists to localStorage; without this every test after one
+// that flips it renders as a histogram and can't find any chip text.
+beforeEach(() => {
+  localStorage.clear()
+})
+
 describe('WeekStrip', () => {
+  it('lets each column stand at its own height, so a quiet day is a small box', () => {
+    // Saturday carries the household's whole weekend. Stretching every column
+    // to match it turned Mon/Wed/Fri into tall empty rectangles and pushed the
+    // year ribbon a full screen down the page.
+    render(<WeekStrip {...base} days={{ ...empty, sat: [mk({}), mk({}), mk({}), mk({})] }} />)
+    expect(screen.getByTestId('week-grid').className).toContain('items-start')
+  })
+
+  it('keeps the shared baseline in pulse view, where the bars are a histogram', () => {
+    render(<WeekStrip {...base} days={{ ...empty, sat: [mk({})] }} />)
+    fireEvent.click(screen.getByText('Pulse view'))
+    expect(screen.getByTestId('week-grid').className).toContain('items-end')
+    expect(screen.getByTestId('week-grid').className).not.toContain('items-start')
+  })
+
   it('marks quiet days, full days, and today', () => {
     const sat = [mk({}), mk({}), mk({}), mk({})]
     render(<WeekStrip {...base} days={{ ...empty, sat }} />)

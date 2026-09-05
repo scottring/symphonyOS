@@ -85,6 +85,10 @@ export function YearRibbon({
   model, matches, onOpenRoutine, stepCounts = {}, familyMembers = [], onWake, onDropIntent,
 }: YearRibbonProps) {
   const [dropCell, setDropCell] = useState<string | null>(null)
+  // Most of a year is empty. Twelve rows of "quiet" is the same failure the
+  // Sometimes shelf had — space spent saying nothing — so quiet months fold
+  // away behind a line that names how many there are.
+  const [showQuiet, setShowQuiet] = useState(false)
   // Pulse view: one uniform bar per routine, so a row's length reads as that
   // month's load. Horizontal here because the ribbon stacks months as rows.
   const [pulse, setPulse] = useState(() => localStorage.getItem('rhythm-year-density') === 'pulse')
@@ -92,6 +96,11 @@ export function YearRibbon({
     localStorage.setItem('rhythm-year-density', v ? 'normal' : 'pulse')
     return !v
   })
+
+  const busy = model.months.filter(m => m.entries.length > 0)
+  const quietCount = model.months.length - busy.length
+  const visibleMonths = showQuiet ? model.months : busy
+  const barren = busy.length === 0 && model.everyMonth.length === 0
 
   const dropHandlersFor = (cell: YearMonth) => {
     if (!onDropIntent) return {}
@@ -115,7 +124,13 @@ export function YearRibbon({
   }
 
   return (
-    <section className="mb-10">
+    <section
+      className="mb-10"
+      data-testid="year-ribbon"
+      // A folded month can't be a drop target. Dragging anything over the
+      // ribbon unfolds it, so every month is reachable mid-drag.
+      onDragEnter={onDropIntent ? (() => setShowQuiet(true)) : undefined}
+    >
       <div className="mb-3 flex items-baseline justify-between gap-3">
         <h2 className="text-xs font-semibold uppercase tracking-wider text-neutral-400">Through the year</h2>
         <button
@@ -153,8 +168,14 @@ export function YearRibbon({
         </div>
       )}
 
+      {barren && (
+        <p className="rounded-xl border border-dashed border-neutral-200 bg-white px-4 py-6 text-center text-sm text-neutral-400">
+          Nothing seasonal yet{onDropIntent ? ' — drag a routine onto a month to place it' : ''}.
+        </p>
+      )}
+
       <div className="flex flex-col gap-1">
-        {model.months.map(cell => {
+        {visibleMonths.map(cell => {
           const key = `${cell.year}-${cell.month}`
           const borderClass =
             dropCell === key
@@ -220,6 +241,15 @@ export function YearRibbon({
           )
         })}
       </div>
+
+      {quietCount > 0 && (
+        <button
+          onClick={() => setShowQuiet(v => !v)}
+          className="mt-1.5 text-xs text-neutral-400 hover:text-neutral-600 transition-colors"
+        >
+          {showQuiet ? 'Hide quiet months' : `${quietCount} quiet months`}
+        </button>
+      )}
     </section>
   )
 }
