@@ -118,6 +118,29 @@ describe('Sidebar', () => {
     expect(screen.queryByText('Projects')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /projects/i })).not.toBeInTheDocument()
   })
+
+  // Goals came back as a Library row on 2026-09-05: a year page in
+  // Plan-from-paper writes goals rows, and reference you cannot reach is
+  // reference that does not exist.
+  it('offers Goals in the Library group as reference', async () => {
+    const user = userEvent.setup()
+    render(
+      <MemoryRouter initialEntries={['/routines']}>
+        <PlaceProvider>
+          <DomainProvider>
+            <Sidebar
+              collapsed={false}
+              onToggle={() => {}}
+              activeView="today"
+              onViewChange={() => {}}
+            />
+          </DomainProvider>
+        </PlaceProvider>
+      </MemoryRouter>,
+    )
+    await user.click(screen.getByRole('button', { name: 'Goals' }))
+    expect(mockNavigate).toHaveBeenCalledWith('/goals')
+  })
 })
 
 describe('Sidebar — Plan from paper', () => {

@@ -22,6 +22,7 @@ import {
   FileText,
   NotebookPen,
   Repeat,
+  Target,
   History,
   Settings,
   LogOut,
@@ -346,8 +347,19 @@ export function Sidebar({
               the /projects route (redirected in main.tsx). Put all three back
               and the surface returns exactly as it was. */}
 
-          {/* Goals is WITHHELD with the horizon ladder (2026-08 analog-planning
-              pivot) — route stays live at /goals, just not in daily nav. */}
+          {/* Goals — a Library row since 2026-09-05, when a YEAR page in
+              Plan-from-paper started writing goals rows. Withheld with the
+              horizon ladder in the 2026-08 analog pivot; back as REFERENCE, not
+              a rung: you look at the year's goals, you don't work them here.
+              The seasonal paper packet is the intended long-term home — when it
+              ships, ask whether this row still earns its pixel. */}
+          <button
+            onClick={() => navigate('/goals')}
+            className={navItemClass(location.pathname.startsWith('/goals'))}
+          >
+            {createElement(Target, { className: 'w-5 h-5 shrink-0' })}
+            {!collapsed && <span>Goals</span>}
+          </button>
 
           {/* Health (medications + symptoms) is WITHHELD, not deleted — the nav
               entry, the /meds route and the registry entry are the three seams
