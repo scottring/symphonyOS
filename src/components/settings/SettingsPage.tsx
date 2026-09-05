@@ -9,6 +9,7 @@ import { PlacePicker } from './PlacePicker'
 import { useTextSize } from '@/hooks/useTextSize'
 import { HomeAddressSettings } from './HomeAddressSettings'
 import { PlanningRhythmSettings } from './PlanningRhythmSettings'
+import { SeasonsSettings } from './SeasonsSettings'
 import { DemoControls } from './DemoControls'
 import { SchoolMailCard } from './SchoolMailCard'
 import type { FamilyMember } from '@/types/family'
@@ -347,6 +348,9 @@ export function SettingsPage({
 
             {/* Planning Rhythm (W4 — cadence config) */}
             <PlanningRhythmSettings />
+
+            {/* Seasons — the household's own boundaries; every "season" in the app follows them */}
+            <SeasonsSettings />
 
             {/* People Section */}
             <section>
