@@ -59,6 +59,11 @@ const mockDelete = vi.fn()
 const mockInsert = vi.fn()
 const mockEq = vi.fn()
 const mockIn = vi.fn()
+const mockShowToast = vi.fn()
+vi.mock('./useToast', () => ({
+  showToast: (...args: unknown[]) => mockShowToast(...args),
+  useToast: () => ({ toast: null, dismiss: () => {} }),
+}))
 const mockUpsert = vi.fn()
 // update() and eq() are recorded separately, which loses the pairing when
 // several updates are in flight at once (updateTaskOrders). This records the
@@ -229,6 +234,7 @@ vi.mock('@/lib/supabase', () => ({
 
 describe('useSupabaseTasks', () => {
   beforeEach(() => {
+    mockShowToast.mockClear()
     __resetTasksCache()
     vi.clearAllMocks()
     mockSupabaseData.length = 0
@@ -537,6 +543,91 @@ describe('useSupabaseTasks', () => {
       await waitFor(() => expect(result.current.tasks).toHaveLength(1))
       await act(async () => { await result.current.pushTask('task-1', new Date(2026, 8, 20, 9)) })
       expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({ bucket: 'timed', month_start: null, season_start: null, week_start: null }))
+    })
+  })
+
+  describe('a goal cannot be placed', () => {
+    const goal = () => createMockDbTask({ id: 'g1', title: 'Read more', bucket: 'month', month_start: '2026-09-01', is_goal: true })
+
+    it('pushTask to a week is a no-op with a toast', async () => {
+      mockSupabaseData.push(goal())
+      const { result } = renderHook(() => useSupabaseTasks())
+      await waitFor(() => expect(result.current.tasks).toHaveLength(1))
+      mockUpdate.mockClear()
+      await act(async () => { await result.current.pushTask('g1', 'week') })
+      expect(mockUpdate).not.toHaveBeenCalled()
+      expect(mockShowToast).toHaveBeenCalledWith(expect.stringMatching(/Goals aren.t scheduled/), 'info')
+    })
+
+    it('scheduleTask and setBucket are refused the same way', async () => {
+      mockSupabaseData.push(goal())
+      const { result } = renderHook(() => useSupabaseTasks())
+      await waitFor(() => expect(result.current.tasks).toHaveLength(1))
+      mockUpdate.mockClear()
+      await act(async () => {
+        await result.current.scheduleTask('g1', new Date(2026, 8, 20))
+        await result.current.setBucket('g1', 'week')
+        await result.current.updateTask('g1', { scheduledFor: new Date(2026, 8, 21) })
+      })
+      expect(mockUpdate).not.toHaveBeenCalled()
+    })
+
+    // Ticking, renaming, re-tagging: none of these move it, all of them are fine.
+    it('non-placement edits on a goal still write', async () => {
+      mockSupabaseData.push(goal())
+      const { result } = renderHook(() => useSupabaseTasks())
+      await waitFor(() => expect(result.current.tasks).toHaveLength(1))
+      mockUpdate.mockClear()
+      await act(async () => {
+        await result.current.updateTask('g1', { title: 'Read more books', completed: true, context: 'personal' })
+      })
+      expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({ title: 'Read more books', completed: true }))
+    })
+
+    // "Keep" (copy to next month) writes monthStart on a goal — that is the one
+    // period write a goal must accept, because it isn't moving DOWN, it's
+    // staying a goal in the next period. It arrives via addTask (a NEW row),
+    // never updateTask, so the refusal doesn't block it.
+    it('a copy-forward of a goal is an addTask, not a refused update', async () => {
+      const { result } = renderHook(() => useSupabaseTasks())
+      await waitFor(() => expect(result.current.loading).toBe(false))
+      await act(async () => {
+        await result.current.addTask('Read more', undefined, undefined, undefined, {
+          bucket: 'month', monthStart: new Date(2026, 9, 1), isGoal: true, sourceId: 'g1',
+        })
+      })
+      expect(mockInsert).toHaveBeenCalledWith(expect.objectContaining({ is_goal: true, month_start: '2026-10-01', source_id: 'g1' }))
+    })
+
+    it('updateTasksBulk drops goals from a placement but writes the rest', async () => {
+      mockSupabaseData.push(goal(), createMockDbTask({ id: 't2', title: 'Task', bucket: 'month' }))
+      const { result } = renderHook(() => useSupabaseTasks())
+      await waitFor(() => expect(result.current.tasks).toHaveLength(2))
+      await act(async () => { await result.current.updateTasksBulk(['g1', 't2'], { bucket: 'week' }) })
+      expect(mockIn).toHaveBeenCalledWith('id', ['t2'])
+      expect(mockShowToast).toHaveBeenCalledWith(expect.stringMatching(/1 goal stays/), 'info')
+    })
+  })
+
+  describe('setGoal', () => {
+    it('marks a month item as a goal and back', async () => {
+      mockSupabaseData.push(createMockDbTask({ id: 't1', title: 'Task', bucket: 'month' }))
+      const { result } = renderHook(() => useSupabaseTasks())
+      await waitFor(() => expect(result.current.tasks).toHaveLength(1))
+      await act(async () => { await result.current.setGoal('t1', true) })
+      expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({ is_goal: true }))
+      await act(async () => { await result.current.setGoal('t1', false) })
+      expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({ is_goal: false }))
+    })
+
+    it('refuses to make a week item a goal', async () => {
+      mockSupabaseData.push(createMockDbTask({ id: 't1', title: 'Task', bucket: 'week' }))
+      const { result } = renderHook(() => useSupabaseTasks())
+      await waitFor(() => expect(result.current.tasks).toHaveLength(1))
+      mockUpdate.mockClear()
+      await act(async () => { await result.current.setGoal('t1', true) })
+      expect(mockUpdate).not.toHaveBeenCalled()
+      expect(mockShowToast).toHaveBeenCalledWith(expect.stringMatching(/month or season/), 'info')
     })
   })
 

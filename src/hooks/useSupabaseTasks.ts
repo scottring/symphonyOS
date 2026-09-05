@@ -10,7 +10,7 @@ import type { TaskDirections } from '@/types/directions'
 import { scopeForDomain, memberForAuthUser, type Scope } from '@/lib/scope'
 import { localYmd, parseLocalYmd, weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
 import { weekStartForBucket } from '@/lib/today/weekPlacement'
-import { monthStartOf, monthStartForBucket, seasonStartForBucket } from '@/lib/planning/periodPlacement'
+import { monthStartOf, monthStartForBucket, seasonStartForBucket, isPlacement } from '@/lib/planning/periodPlacement'
 import { readSeasons, seasonStartFor } from '@/lib/cadence/seasons'
 import { onRealtimeResumed } from '@/lib/realtime/keepAlive'
 import { announceToBuyChanged } from '@/lib/lists/toBuy'
@@ -1128,6 +1128,17 @@ export function useSupabaseTasks() {
       return
     }
 
+    // A goal is an outcome you tick, never a thing you place. Refusing here,
+    // in the one writer every placement funnels through, covers pushTask,
+    // setBucket, scheduleTask, the drag handlers and DomainGate without each
+    // of them having to remember. Edits that don't move it — title, tick,
+    // domain, notes — pass straight through.
+    if (task.isGoal && isPlacement(updates)) {
+      logger.debug('[updateTask] placement refused: row is a goal', { id, updates })
+      showToast("Goals aren't scheduled — tick it off when it's done", 'info')
+      return
+    }
+
     // Scope is DERIVED. Recompute whenever anything it depends on moves; a
     // caller-supplied `scope` is ignored on purpose (it is not a choice — the
     // row's domain and its assignees say exactly who may read it).
@@ -1350,7 +1361,18 @@ export function useSupabaseTasks() {
   }, [tasks, familyMembers, findTaskById, findParentOfSubtask, selfMemberIdForOwner])
 
   // Bulk update multiple tasks at once
-  const updateTasksBulk = useCallback(async (taskIds: string[], updates: Partial<Task>) => {
+  const updateTasksBulk = useCallback(async (requestedIds: string[], updates: Partial<Task>) => {
+    // Goals aren't placed. A bulk placement that includes some drops them,
+    // says so once, and writes the rest — the same refusal updateTask makes
+    // for a single row.
+    let taskIds = requestedIds
+    if (isPlacement(updates)) {
+      const goals = requestedIds.filter((id) => findTaskById(id)?.isGoal)
+      if (goals.length) {
+        taskIds = requestedIds.filter((id) => !goals.includes(id))
+        showToast(`${goals.length} goal${goals.length === 1 ? '' : 's'} stay${goals.length === 1 ? 's' : ''} on the list — goals aren't scheduled`, 'info')
+      }
+    }
     if (taskIds.length === 0) return
 
     logger.debug('[updateTasksBulk] Called with:', { taskIds, updates })
@@ -1716,6 +1738,21 @@ export function useSupabaseTasks() {
     await updateTask(id, updates)
   }, [updateTask])
 
+  /**
+   * Mark a month/season item as a goal (ticked, never placed) or back into a
+   * task. Only month/quarter rows can be goals — a week row is a task by
+   * definition, so it's refused rather than written into an unplaceable state.
+   */
+  const setGoal = useCallback(async (id: string, isGoal: boolean) => {
+    const task = findTaskById(id)
+    if (!task) return
+    if (isGoal && task.bucket !== 'month' && task.bucket !== 'quarter') {
+      showToast('Only a month or season item can be a goal', 'info')
+      return
+    }
+    await updateTask(id, { isGoal })
+  }, [findTaskById, updateTask])
+
   // Add a prep task linked to an event (e.g., "Defrost chicken" for a dinner event)
   const addPrepTask = useCallback(async (
     title: string,
@@ -1796,5 +1833,5 @@ export function useSupabaseTasks() {
     }
   }, [tasks])
 
-  return { tasks, loading, error, refetch, addTask, addSubtask, addPrepTask, getPrepTasks, getLinkedTasks, toggleTask, toggleWaiting, deleteTask, updateTask, updateTasksBulk, updateTaskOrders, scheduleTask, pushTask, setBucket }
+  return { tasks, loading, error, refetch, addTask, addSubtask, addPrepTask, getPrepTasks, getLinkedTasks, toggleTask, toggleWaiting, deleteTask, updateTask, updateTasksBulk, updateTaskOrders, scheduleTask, pushTask, setBucket, setGoal }
 }
