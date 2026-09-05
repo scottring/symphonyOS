@@ -13,6 +13,8 @@ import { ConceptIcon } from '@/lib/conceptIcons'
 import {
   Sun,
   CalendarRange,
+  CalendarDays,
+  Leaf,
   MessageCircle,
   UtensilsCrossed,
   Home,
@@ -281,6 +283,33 @@ export function Sidebar({
           {!collapsed && <span>This Week</span>}
         </button>
 
+        {/* The planning ladder above the week — one page per level, the same
+            shape on each (its list, the level above in a rail, a look-back at
+            the period just ended). Scott, 2026-09-05: "a planning surface for
+            the year, then the season with a rail of the year, then the month
+            with a rail of the season". */}
+        <button
+          onClick={() => navigate('/month')}
+          className={navItemClass(location.pathname === '/month')}
+        >
+          <CalendarDays className="w-5 h-5 shrink-0" />
+          {!collapsed && <span>This Month</span>}
+        </button>
+        <button
+          onClick={() => navigate('/season')}
+          className={navItemClass(location.pathname === '/season')}
+        >
+          <Leaf className="w-5 h-5 shrink-0" />
+          {!collapsed && <span>This Season</span>}
+        </button>
+        <button
+          onClick={() => navigate('/year')}
+          className={navItemClass(location.pathname === '/year')}
+        >
+          {createElement(Target, { className: 'w-5 h-5 shrink-0' })}
+          {!collapsed && <span>This Year</span>}
+        </button>
+
         {/* Plan from paper — the verb that starts the day and the week. From
             any page (Scott, 2026-09-03: it is too important to hide). A Home
             view that is mounted opens the flow in place; otherwise Today
@@ -346,20 +375,6 @@ export function Sidebar({
               seams that hide it are this nav entry, the appRegistry mount and
               the /projects route (redirected in main.tsx). Put all three back
               and the surface returns exactly as it was. */}
-
-          {/* Goals — a Library row since 2026-09-05, when a YEAR page in
-              Plan-from-paper started writing goals rows. Withheld with the
-              horizon ladder in the 2026-08 analog pivot; back as REFERENCE, not
-              a rung: you look at the year's goals, you don't work them here.
-              The seasonal paper packet is the intended long-term home — when it
-              ships, ask whether this row still earns its pixel. */}
-          <button
-            onClick={() => navigate('/goals')}
-            className={navItemClass(location.pathname.startsWith('/goals'))}
-          >
-            {createElement(Target, { className: 'w-5 h-5 shrink-0' })}
-            {!collapsed && <span>Goals</span>}
-          </button>
 
           {/* Health (medications + symptoms) is WITHHELD, not deleted — the nav
               entry, the /meds route and the registry entry are the three seams

@@ -122,7 +122,10 @@ describe('Sidebar', () => {
   // Goals came back as a Library row on 2026-09-05: a year page in
   // Plan-from-paper writes goals rows, and reference you cannot reach is
   // reference that does not exist.
-  it('offers Goals in the Library group as reference', async () => {
+  // The planning ladder above the week: one page per level, the same shape on
+  // each. The Library's Goals row retired with it — This Year IS the year's
+  // page (Scott, 2026-09-05).
+  it('offers This Month / This Season / This Year as planning rows, and no Goals row', async () => {
     const user = userEvent.setup()
     render(
       <MemoryRouter initialEntries={['/routines']}>
@@ -138,8 +141,13 @@ describe('Sidebar', () => {
         </PlaceProvider>
       </MemoryRouter>,
     )
-    await user.click(screen.getByRole('button', { name: 'Goals' }))
-    expect(mockNavigate).toHaveBeenCalledWith('/goals')
+    await user.click(screen.getByRole('button', { name: 'This Month' }))
+    expect(mockNavigate).toHaveBeenCalledWith('/month')
+    await user.click(screen.getByRole('button', { name: 'This Season' }))
+    expect(mockNavigate).toHaveBeenCalledWith('/season')
+    await user.click(screen.getByRole('button', { name: 'This Year' }))
+    expect(mockNavigate).toHaveBeenCalledWith('/year')
+    expect(screen.queryByRole('button', { name: 'Goals' })).not.toBeInTheDocument()
   })
 })
 

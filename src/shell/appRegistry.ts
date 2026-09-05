@@ -15,6 +15,7 @@ import { routinesAppDef } from '@/apps/routines';
 // import { medsAppDef } from '@/apps/meds';  // withheld — see Sidebar.tsx
 // import { projectsAppDef } from '@/apps/projects';  // hidden — see Sidebar.tsx
 import { goalsAppDef } from '@/apps/goals';
+import { monthPlanAppDef, seasonPlanAppDef, yearPlanAppDef } from '@/apps/plan';
 import { familyAppDef } from '@/apps/family';
 import { agentAppDef } from '@/apps/agent';
 
@@ -82,6 +83,9 @@ export const appRegistry: AppRegistry = createRegistry([
   // projectsAppDef — hidden, see the note in Sidebar.tsx. src/apps/projects/
   // still builds; it just isn't mounted, and /projects redirects in main.tsx.
   goalsAppDef,
+  monthPlanAppDef,
+  seasonPlanAppDef,
+  yearPlanAppDef,
   familyAppDef,
   agentAppDef,
 ]);
