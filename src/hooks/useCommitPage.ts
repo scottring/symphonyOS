@@ -20,6 +20,7 @@ import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
 import { useNotes } from '@/hooks/useNotes'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
+import { useGoalsContext } from '@/contexts/GoalsContext'
 import { showToast } from '@/hooks/useToast'
 
 export interface CommitPagePayload {
@@ -31,6 +32,7 @@ export interface CommitPagePayload {
 
 export interface CommitPageResult {
   tasksCreated: number
+  goalsCreated: number
   notesCreated: number
   /** Tasks + notes that did not make it. Non-zero means: do not delete the page. */
   failures: number
@@ -54,6 +56,9 @@ export function useCommitPage() {
   const { addTask } = useSupabaseTasks()
   const { addNote } = useNotes()
   const { getCurrentUserMember } = useFamilyMembers()
+  // GoalsProvider wraps the whole tasks app, so this is the already-loaded
+  // goals state, not a second fetch.
+  const { areas, addArea, addGoal } = useGoalsContext()
 
   const commitPage = useCallback(async ({ items, notes, storagePath }: CommitPagePayload): Promise<CommitPageResult> => {
     // A committed page is a capture, not a deliberate create — it never
@@ -70,7 +75,7 @@ export function useCommitPage() {
     let firstTaskId: string | undefined
     let tasksCreated = 0
     let failures = 0
-    for (const item of items) {
+    for (const item of items.filter((i) => i.placement.kind !== 'goal')) {
       const args = planItemToAddTaskArgs(item, commitCtx)
       const id = await addTask(args.title, undefined, undefined, args.scheduledFor, {
         ...args.options,
@@ -81,6 +86,20 @@ export function useCommitPage() {
         firstTaskId ??= id
       } else {
         failures += 1
+      }
+    }
+
+    // A year page's lines are goals, not tasks: one `goals` row each, for the
+    // current year. Goals live in an area; the first existing one is used, or
+    // a "General" area is created so a first-ever year page still lands.
+    let goalsCreated = 0
+    const goalItems = items.filter((i) => i.placement.kind === 'goal')
+    if (goalItems.length) {
+      const area = areas[0] ?? (await addArea('General'))
+      for (const item of goalItems) {
+        const created = area ? await addGoal(area.id, item.title, context ?? undefined) : null
+        if (created) goalsCreated += 1
+        else failures += 1
       }
     }
 
@@ -131,6 +150,7 @@ export function useCommitPage() {
 
     const parts = [
       tasksCreated ? `${tasksCreated} task${tasksCreated === 1 ? '' : 's'}` : '',
+      goalsCreated ? `${goalsCreated} goal${goalsCreated === 1 ? '' : 's'}` : '',
       notesCreated ? `${notesCreated} note${notesCreated === 1 ? '' : 's'}` : '',
     ].filter(Boolean)
 
@@ -145,8 +165,8 @@ export function useCommitPage() {
       showToast(`Added ${parts.join(' and ')} from your page`, 'success', 4000)
     }
 
-    return { tasksCreated, notesCreated, failures }
-  }, [addTask, addNote, getCurrentUserMember])
+    return { tasksCreated, goalsCreated, notesCreated, failures }
+  }, [addTask, addNote, getCurrentUserMember, areas, addArea, addGoal])
 
   return { commitPage }
 }

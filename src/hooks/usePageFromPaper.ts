@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from 'react'
 import { supabase, getAuthUser } from '@/lib/supabase'
 import { localYmd } from '@/lib/cadence/config'
-import { planWindowDates } from '@/lib/planParse'
+import { planWindowDates, type PageAltitude } from '@/lib/planParse'
 import { validatePageResult, type PageResult } from '@/lib/pageParse'
 import type { FamilyMember } from '@/types/family'
 
@@ -10,7 +10,7 @@ export type PageParseStatus = 'idle' | 'parsing' | 'ready' | 'error'
 /** Longest side of the uploaded JPEG — plenty for vision, kind to egress. */
 const MAX_DIMENSION = 1600
 
-const EMPTY: PageResult = { items: [], notes: [], unclear: [], windowDates: [], storagePath: null }
+const EMPTY: PageResult = { items: [], notes: [], unclear: [], windowDates: [], altitude: 'week', storagePath: null }
 
 async function toJpeg(blob: Blob): Promise<Blob> {
   const bitmap = await createImageBitmap(blob)
@@ -42,15 +42,21 @@ export function usePageFromPaper(members: FamilyMember[]) {
   const [result, setResult] = useState<PageResult>(EMPTY)
   const [error, setError] = useState<string | null>(null)
   const storagePathRef = useRef<string | null>(null)
+  // Remembered for retry: the second call must read the page as the same
+  // kind of page the user said it was.
+  const altitudeRef = useRef<PageAltitude>('week')
 
-  const invokeParse = useCallback(async (storagePath: string) => {
-    const dates = planWindowDates(new Date())
+  const invokeParse = useCallback(async (storagePath: string, altitude: PageAltitude) => {
+    const today = new Date()
+    const dates = planWindowDates(today, altitude)
     const { data, error: fnErr } = await supabase.functions.invoke('parse-page', {
       body: {
         storagePath,
+        altitude,
+        // A year page has no dates; the function requires no window for it.
         placeStart: dates[0],
         placeEnd: dates[dates.length - 1],
-        today: localYmd(new Date()),
+        today: localYmd(today),
         // role_label rides along so the model knows a named child is the
         // subject of "dentist 10am", not the one who drives (parse-page prompt).
         members: members.map((m) => ({ id: m.id, name: m.name, role: m.role_label ?? null })),
@@ -60,11 +66,12 @@ export function usePageFromPaper(members: FamilyMember[]) {
     if (data?.error) throw new Error(String(data.error))
     // `dates` is only the fallback — the response echoes the window it actually
     // used, and that is what the review sheet must offer.
-    setResult(validatePageResult(data, new Set(members.map((m) => m.id)), dates))
+    setResult(validatePageResult(data, new Set(members.map((m) => m.id)), dates, altitude))
     setStatus('ready')
   }, [members])
 
-  const parseFromBlob = useCallback(async (blob: Blob) => {
+  const parseFromBlob = useCallback(async (blob: Blob, altitude: PageAltitude = 'week') => {
+    altitudeRef.current = altitude
     setStatus('parsing')
     setError(null)
     try {
@@ -80,7 +87,7 @@ export function usePageFromPaper(members: FamilyMember[]) {
       if (uploadErr) throw new Error(uploadErr.message)
 
       storagePathRef.current = storagePath
-      await invokeParse(storagePath)
+      await invokeParse(storagePath, altitude)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
       setStatus('error')
@@ -93,7 +100,7 @@ export function usePageFromPaper(members: FamilyMember[]) {
     setStatus('parsing')
     setError(null)
     try {
-      await invokeParse(storagePath)
+      await invokeParse(storagePath, altitudeRef.current)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
       setStatus('error')
@@ -105,6 +112,7 @@ export function usePageFromPaper(members: FamilyMember[]) {
     setResult(EMPTY)
     setError(null)
     storagePathRef.current = null
+    altitudeRef.current = 'week'
   }, [])
 
   return { status, result, error, parseFromBlob, retry, reset }

@@ -7,6 +7,24 @@ export interface CalendarDay { ymd: string; weekday: string }
  *  10am" says who the appointment is about, not who drives. */
 export interface Member { id: string; name: string; role?: string | null }
 export interface PageItemRaw { title: string; day: string; time: string | null; assignee_id: string | null; note: string | null }
+
+/** Which page the user photographed. The altitude decides what an undated
+ *  line means and which placements the model may use. `week` is the daily
+ *  scratchpad / week plan — the only altitude before 2026-09-05. */
+export type PageAltitude = 'week' | 'month' | 'season' | 'year'
+export const ALTITUDES: readonly PageAltitude[] = ['week', 'month', 'season', 'year']
+export function isAltitude(v: unknown): v is PageAltitude {
+  return typeof v === 'string' && (ALTITUDES as readonly string[]).includes(v)
+}
+
+/** Where a line lands when it names no day. Also where an out-of-window date
+ *  degrades to — the page's own altitude, so a month page never strands a
+ *  misread date in the week pool. */
+export function defaultPlacement(altitude: PageAltitude): string {
+  return altitude === 'year' ? 'goal' : altitude
+}
+
+const HORIZON_DAYS = new Set(['week', 'month', 'season', 'someday', 'inbox'])
 export interface PageNoteRaw { title: string; content: string }
 export interface PageParseResult { items: PageItemRaw[]; notes: PageNoteRaw[]; unclear: string[] }
 
@@ -22,7 +40,8 @@ export function windowCalendar(placeStart: string, placeEnd: string): CalendarDa
   const out: CalendarDay[] = []
   const [y, m, d] = placeStart.split('-').map(Number)
   const cursor = new Date(y, m - 1, d)
-  for (let i = 0; i < 60; i++) {
+  // A season window is 92 days; the cap only guards a malformed placeEnd.
+  for (let i = 0; i < 120; i++) {
     const ymd = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`
     out.push({ ymd, weekday: cursor.toLocaleDateString('en-US', { weekday: 'long' }) })
     if (ymd === placeEnd) return out
@@ -31,15 +50,43 @@ export function windowCalendar(placeStart: string, placeEnd: string): CalendarDa
   return out // malformed placeEnd — the caller validates before we get here
 }
 
-export function buildPagePrompt(calendar: CalendarDay[], members: Member[], today: string): string {
+const ALTITUDE_GUIDE: Record<PageAltitude, string> = {
+  week: `This is a WEEK page: a daily scratchpad or a plan for the coming days. "day" for an item is:
+- "YYYY-MM-DD" from the calendar above if the line sits under a day heading or names a day;
+- "week" if it should happen in the coming days but names no day;
+- "month" if the line says it is for later this month; "season" or "someday" only if the page says so;
+- "inbox" if it has no time frame at all.`,
+  month: `This is a MONTH page: the user is planning the month ahead. "day" for an item is:
+- "YYYY-MM-DD" from the calendar above if the line names a date or a day of the month (the calendar covers the rest of this month and all of next month);
+- "month" for a line with no date — the default on this page;
+- "week" only if the line says it must happen this week or in the next few days;
+- "season" for something explicitly pushed past this month; "someday" for a wish with no timeframe;
+- "inbox" only for a line that is clearly a capture, not a plan.`,
+  season: `This is a SEASON page: the user is planning the next three months. "day" for an item is:
+- "season" for a line with no date — the default on this page;
+- "YYYY-MM-DD" from the calendar above only when the line names an actual date;
+- "month" only when the line says it is for THIS month (the month today falls in). A line naming a later month stays "season" — put the month name in "note";
+- "week" only when the line says it must happen this week;
+- "someday" for a wish with no timeframe; "inbox" only for a clear capture.`,
+  year: `This is a YEAR page: the user's goals and intentions for the year. There is no calendar; do not place items on dates. "day" for an item is:
+- "goal" for a goal, theme, or outcome for the year — the default on this page ("Run a half marathon", "Finish the basement", "Read 20 books");
+- "season" for a concrete task the page places in the coming months;
+- "someday" for a wish with no timeframe;
+- "inbox" only for a clear capture.
+Keep a goal's title as the outcome, not an action: "Half marathon in October", not "Sign up for a half marathon".`,
+}
+
+export function buildPagePrompt(calendar: CalendarDay[], members: Member[], today: string, altitude: PageAltitude = 'week'): string {
   const calendarLines = calendar.map((c) => `- ${c.ymd} (${c.weekday})`).join('\n')
   const memberLines = members.length
     ? members.map((m) => `- ${m.id}: ${m.name}${m.role ? ` (${m.role})` : ''}`).join('\n')
     : '(none)'
   return `You are the capture assistant for Symphony, a personal task app. The user keeps a handwritten daily scratchpad on an e-ink tablet and has exported a page. A scratchpad page mixes registers: some lines are things to do, some are notes and reference and thinking, and some are simply hard to read. Sort the page into those three registers. Do not force everything into tasks.
 
-Today is ${today}. The ONLY dates a task may be placed on (day headers like "Mon" or "Tue 8/18" map to these):
-${calendarLines}
+Today is ${today}.${calendar.length ? ` The ONLY dates a task may be placed on (day headers like "Mon" or "Tue 8/18" map to these):
+${calendarLines}` : ''}
+
+${ALTITUDE_GUIDE[altitude]}
 
 Household members (id: name, role when known) — assign a task ONLY when the line clearly names the person who will DO it (e.g. "Iris: return library books"):
 ${memberLines}
@@ -52,7 +99,7 @@ Respond with ONLY a JSON object (no markdown fences, no prose):
   "items": [
     {
       "title": "Short imperative task title, cleaned up from the handwriting",
-      "day": "YYYY-MM-DD from the calendar above if the line sits under a day heading or names a day; \\"week\\" if it should happen soon but names no day; \\"inbox\\" if it has no time frame at all",
+      "day": "one of the placements described above: a YYYY-MM-DD date${altitude === 'year' ? ', \\"goal\\"' : ''}, \\"week\\", \\"month\\", \\"season\\", \\"someday\\", or \\"inbox\\"",
       "time": "\\"HH:MM\\" in 24-hour form if the line names a clock time (\\"2pm\\" -> \\"14:00\\", \\"7:30\\" -> \\"19:30\\"), otherwise null",
       "assignee_id": "member id from the list above, or null",
       "note": "extra detail written on that line beyond the action itself (phone number, store, quantity, a constraint like 'before 3pm'), or null"
@@ -74,23 +121,27 @@ Rules:
 - Skip crossed-out lines and anything ticked or checked. It was already done on paper.
 - Skip page titles, dates written as headers, decorations, and doodles.
 - A day name with no date (e.g. "Wed") means the NEXT such weekday in the calendar above.
-- If a named day is NOT in the calendar (e.g. a past day), use "week".
+- A page-level heading naming the period ("October", "Fall 2026", "Week of Sept 7", "2026") is a title, not an item.
+- If a named day is NOT in the calendar (e.g. a past day), use "${defaultPlacement(altitude)}".
 - If the page holds nothing at all, return {"items":[],"notes":[],"unclear":[]}.`
 }
 
-function parseItems(raw: unknown, calendar: Set<string>, memberIds: Set<string>): PageItemRaw[] {
+function parseItems(raw: unknown, calendar: Set<string>, memberIds: Set<string>, altitude: PageAltitude): PageItemRaw[] {
   if (!Array.isArray(raw)) return []
   const out: PageItemRaw[] = []
   for (const entry of raw.slice(0, MAX_ITEMS)) {
     const e = entry as Partial<PageItemRaw>
     if (typeof e.title !== 'string' || !e.title.trim()) continue
     let day = typeof e.day === 'string' ? e.day : 'inbox'
-    // Out-of-window degrades to 'week' rather than being dropped — the review
-    // sheet lets the user fix it, and a silently vanished line is worse.
-    if (day !== 'week' && day !== 'inbox' && !(YMD.test(day) && calendar.has(day))) day = 'week'
-    // A time only means something on a real date. On 'week'/'inbox' there is
+    // A goal is a year-page placement only; elsewhere it is a wish.
+    if (day === 'goal' && altitude !== 'year') day = 'someday'
+    // Out-of-window degrades to the page's own altitude rather than being
+    // dropped — the review sheet lets the user fix it, and a silently
+    // vanished line is worse.
+    if (day !== 'goal' && !HORIZON_DAYS.has(day) && !(YMD.test(day) && calendar.has(day))) day = defaultPlacement(altitude)
+    // A time only means something on a real date. A horizon placement has
     // no day to hang it on, so it is dropped rather than half-applied.
-    const time = typeof e.time === 'string' && HHMM.test(e.time.trim()) && day !== 'week' && day !== 'inbox'
+    const time = typeof e.time === 'string' && HHMM.test(e.time.trim()) && YMD.test(day)
       ? e.time.trim()
       : null
     out.push({
@@ -130,11 +181,11 @@ function parseUnclear(raw: unknown): string[] {
 }
 
 /** Throws when the model's text is not JSON at all, so the caller can retry once. */
-export function parsePageResponse(raw: string, calendar: Set<string>, memberIds: Set<string>): PageParseResult {
+export function parsePageResponse(raw: string, calendar: Set<string>, memberIds: Set<string>, altitude: PageAltitude = 'week'): PageParseResult {
   const stripped = raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/```\s*$/, '')
   const parsed = JSON.parse(stripped) as { items?: unknown; notes?: unknown; unclear?: unknown }
   return {
-    items: parseItems(parsed.items, calendar, memberIds),
+    items: parseItems(parsed.items, calendar, memberIds, altitude),
     notes: parseNotes(parsed.notes),
     unclear: parseUnclear(parsed.unclear),
   }

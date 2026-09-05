@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
-import { X, NotebookPen, HelpCircle } from 'lucide-react'
+import { X, NotebookPen, HelpCircle, Target } from 'lucide-react'
 import { parseLocalYmd } from '@/lib/cadence/config'
-import type { PlanItem, PlanPlacement } from '@/lib/planParse'
+import type { PlanItem, PlanPlacement, PageAltitude } from '@/lib/planParse'
 import type { PageNote } from '@/lib/pageParse'
 import type { FamilyMember } from '@/types/family'
 import { TaskKindBadge } from '@/components/task/TaskKindBadge'
@@ -20,6 +20,8 @@ export interface PageReviewSheetProps {
   unclear: string[]
   /** The SAME dates the parser was allowed to place on (local YYYY-MM-DD). */
   windowDates: string[]
+  /** Which page this was read as. A year page's lines may be goals. */
+  altitude?: PageAltitude
   members: FamilyMember[]
   committing: boolean
   /** Called with only the checked rows, as edited. */
@@ -37,9 +39,28 @@ function placementValue(p: PlanPlacement): string {
 }
 
 function placementFromValue(v: string): PlanPlacement {
-  if (v === 'week') return { kind: 'week' }
-  if (v === 'inbox') return { kind: 'inbox' }
-  return { kind: 'date', date: v }
+  switch (v) {
+    case 'week': case 'month': case 'season': case 'someday': case 'inbox': case 'goal':
+      return { kind: v }
+    default:
+      return { kind: 'date', date: v }
+  }
+}
+
+/** The horizon placements every page may use, in ladder order. */
+const HORIZON_OPTIONS: { value: PlanPlacement['kind']; label: string }[] = [
+  { value: 'inbox', label: 'Inbox' },
+  { value: 'week', label: 'This week' },
+  { value: 'month', label: 'This month' },
+  { value: 'season', label: 'This season' },
+  { value: 'someday', label: 'Someday' },
+]
+
+const ALTITUDE_BLURB: Record<PageAltitude, string> = {
+  week: 'Check what Symphony read before it changes the week.',
+  month: 'Read as a month page — undated lines go to the month pool.',
+  season: 'Read as a season page — undated lines are season picks.',
+  year: 'Read as a year page — lines become goals for the year.',
 }
 
 function dateLabel(ymd: string): string {
@@ -53,7 +74,7 @@ function dateLabel(ymd: string): string {
  * and inert precisely because a wrong task costs more than an unread line.
  */
 export function PageReviewSheet({
-  items, notes, unclear, windowDates, members, committing, onCommit, onClose,
+  items, notes, unclear, windowDates, altitude = 'week', members, committing, onCommit, onClose,
 }: PageReviewSheetProps) {
   const [itemRows, setItemRows] = useState<ItemRow[]>(() => items.map((i) => ({ ...i, included: true })))
   const [noteRows, setNoteRows] = useState<NoteRow[]>(() => notes.map((n) => ({ ...n, included: true })))
@@ -64,10 +85,12 @@ export function PageReviewSheet({
     [itemRows, noteRows],
   )
   const summary = useMemo(() => {
-    const includedItems = itemRows.filter((r) => r.included).length
+    const includedGoals = itemRows.filter((r) => r.included && r.placement.kind === 'goal').length
+    const includedItems = itemRows.filter((r) => r.included).length - includedGoals
     const includedNotes = noteRows.filter((r) => r.included).length
     return [
-      `${includedItems} task${includedItems === 1 ? '' : 's'}`,
+      includedItems > 0 || includedGoals === 0 ? `${includedItems} task${includedItems === 1 ? '' : 's'}` : null,
+      includedGoals > 0 ? `${includedGoals} goal${includedGoals === 1 ? '' : 's'}` : null,
       includedNotes > 0 ? `${includedNotes} note${includedNotes === 1 ? '' : 's'}` : null,
       unread.length > 0 ? `${unread.length} unclear` : null,
     ].filter(Boolean).join(' / ')
@@ -112,7 +135,7 @@ export function PageReviewSheet({
             <NotebookPen className="w-5 h-5 text-primary-600" />
             <div>
               <h3 className="font-display text-xl text-neutral-900">From your page</h3>
-              {!isEmpty && <p className="mt-0.5 text-[13px] text-neutral-500">Check what Symphony read before it changes the week.</p>}
+              {!isEmpty && <p className="mt-0.5 text-[13px] text-neutral-500">{ALTITUDE_BLURB[altitude]}</p>}
             </div>
           </div>
           <button type="button" onClick={onClose} aria-label="Close review" className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors">
@@ -145,7 +168,9 @@ export function PageReviewSheet({
                       />
                       <div className="min-w-0 flex-1">
                         <div className="flex min-w-0 items-center gap-2">
-                          <TaskKindBadge title={row.title} note={row.note} label />
+                          {row.placement.kind === 'goal'
+                            ? <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800"><Target className="w-3 h-3" />Goal</span>
+                            : <TaskKindBadge title={row.title} note={row.note} label />}
                           <input
                             value={row.title}
                             onChange={(e) => updateItem(i, { title: e.target.value })}
@@ -169,8 +194,11 @@ export function PageReviewSheet({
                         aria-label="When"
                         className="text-[13px] text-neutral-700 bg-neutral-100 rounded-lg px-2 py-1.5 shrink-0"
                       >
-                        <option value="inbox">Inbox</option>
-                        <option value="week">This week</option>
+                        {HORIZON_OPTIONS.map((o) => (
+                          <option key={o.value} value={o.value}>{o.label}</option>
+                        ))}
+                        {/* A goal is only offered where it can be written: a year page. */}
+                        {(altitude === 'year' || row.placement.kind === 'goal') && <option value="goal">Year goal</option>}
                         {windowDates.map((d) => (
                           <option key={d} value={d}>{dateLabel(d)}</option>
                         ))}

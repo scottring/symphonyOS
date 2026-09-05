@@ -110,6 +110,7 @@ function SupernotePageReview({ page, members, dismiss, onClose }: SupernotePageR
       notes={page.result.notes}
       unclear={page.result.unclear}
       windowDates={page.result.windowDates}
+      altitude={page.result.altitude}
       members={members}
       committing={committing}
       onCommit={(payload) => void handleCommit(payload)}

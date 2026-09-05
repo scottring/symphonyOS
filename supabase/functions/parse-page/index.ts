@@ -11,7 +11,7 @@
 // Auth: either a user JWT, or the service-role key plus an explicit `userId`
 // (the dropbox-poll caller, which has no user session).
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { windowCalendar, buildPagePrompt, parsePageResponse, type Member } from './lib/parse.ts'
+import { windowCalendar, buildPagePrompt, parsePageResponse, isAltitude, type Member, type PageAltitude } from './lib/parse.ts'
 
 const MODEL = 'claude-sonnet-4-6'
 const YMD = /^\d{4}-\d{2}-\d{2}$/
@@ -68,6 +68,9 @@ Deno.serve(async (req) => {
     placeEnd?: string
     today?: string
     members?: Member[]
+    /** Which page this is (week/month/season/year). Absent = week, the only
+     *  altitude before 2026-09-05, so the poller and older clients still work. */
+    altitude?: PageAltitude
   }
   try {
     body = await req.json()
@@ -92,9 +95,12 @@ Deno.serve(async (req) => {
   }
 
   const { storagePath, placeStart, placeEnd, today } = body
+  const altitude: PageAltitude = isAltitude(body.altitude) ? body.altitude : 'week'
   if (!storagePath) return json({ error: 'storagePath required' }, 400)
   if (!storagePath.startsWith(`${userId}/`)) return json({ error: 'storagePath must be under the user id' }, 403)
-  if (!placeStart || !YMD.test(placeStart) || !placeEnd || !YMD.test(placeEnd) || placeEnd < placeStart) {
+  // A year page has no dates to place on, so it carries no window.
+  const needsWindow = altitude !== 'year'
+  if (needsWindow && (!placeStart || !YMD.test(placeStart) || !placeEnd || !YMD.test(placeEnd) || placeEnd < placeStart)) {
     return json({ error: 'placeStart/placeEnd required as YYYY-MM-DD with placeStart <= placeEnd' }, 400)
   }
   if (!today || !YMD.test(today)) return json({ error: 'today required as YYYY-MM-DD' }, 400)
@@ -110,8 +116,8 @@ Deno.serve(async (req) => {
       .createSignedUrl(storagePath, 600)
     if (signErr || !signed?.signedUrl) throw new Error(`Could not sign file URL: ${signErr?.message}`)
 
-    const calendar = windowCalendar(placeStart, placeEnd)
-    const prompt = buildPagePrompt(calendar, members, today)
+    const calendar = needsWindow ? windowCalendar(placeStart!, placeEnd!) : []
+    const prompt = buildPagePrompt(calendar, members, today, altitude)
     const isPdf = storagePath.toLowerCase().endsWith('.pdf')
     const calendarSet = new Set(calendar.map((c) => c.ymd))
     const memberIds = new Set(members.map((m) => m.id))
@@ -120,12 +126,14 @@ Deno.serve(async (req) => {
     // second pass almost always comes back clean (the analyze-attachment rule).
     let parsed
     try {
-      parsed = parsePageResponse(await callVision(signed.signedUrl, isPdf, prompt, apiKey), calendarSet, memberIds)
+      parsed = parsePageResponse(await callVision(signed.signedUrl, isPdf, prompt, apiKey), calendarSet, memberIds, altitude)
     } catch {
-      parsed = parsePageResponse(await callVision(signed.signedUrl, isPdf, prompt, apiKey), calendarSet, memberIds)
+      parsed = parsePageResponse(await callVision(signed.signedUrl, isPdf, prompt, apiKey), calendarSet, memberIds, altitude)
     }
 
-    return json({ ok: true, ...parsed, window: calendar.map((c) => c.ymd), storagePath })
+    // The altitude is echoed with the window for the same reason: a staged
+    // page is reviewed against what the model was told, never re-derived.
+    return json({ ok: true, ...parsed, window: calendar.map((c) => c.ymd), altitude, storagePath })
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
     console.error('parse-page failed:', message)

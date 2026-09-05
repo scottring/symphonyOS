@@ -5,7 +5,7 @@
 // lines the model could not read. Pure, so the rules that decide what gets
 // written are testable without a DOM.
 
-import { validatePlanItems, type PlanItem } from '@/lib/planParse'
+import { validatePlanItems, isPageAltitude, type PlanItem, type PageAltitude } from '@/lib/planParse'
 
 export interface PageNote {
   title: string
@@ -18,6 +18,8 @@ export interface PageResult {
   unclear: string[]
   /** The dates the parser was ALLOWED to place on — echoed by the response. */
   windowDates: string[]
+  /** Which page this was read as — echoed by the response, same reason. */
+  altitude: PageAltitude
   /** Where the page image lives in the `attachments` bucket, when known. */
   storagePath: string | null
 }
@@ -67,9 +69,11 @@ export function validatePageResult(
   raw: unknown,
   memberIds: Set<string>,
   fallbackWindow: string[],
+  fallbackAltitude: PageAltitude = 'week',
 ): PageResult {
   const r = (raw ?? {}) as {
     window?: unknown
+    altitude?: unknown
     notes?: unknown
     unclear?: unknown
     storagePath?: unknown
@@ -77,12 +81,16 @@ export function validatePageResult(
   const echoed = Array.isArray(r.window)
     ? r.window.filter((d): d is string => typeof d === 'string')
     : []
-  const windowDates = echoed.length ? echoed : fallbackWindow
+  // A year page legitimately echoes an EMPTY window, so the echo wins whenever
+  // the response carried one at all.
+  const altitude = isPageAltitude(r.altitude) ? r.altitude : fallbackAltitude
+  const windowDates = Array.isArray(r.window) && (echoed.length || altitude === 'year') ? echoed : fallbackWindow
   return {
-    items: validatePlanItems(raw, windowDates, memberIds),
+    items: validatePlanItems(raw, windowDates, memberIds, altitude),
     notes: validateNotes(r.notes),
     unclear: validateUnclear(r.unclear),
     windowDates,
+    altitude,
     storagePath: typeof r.storagePath === 'string' ? r.storagePath : null,
   }
 }

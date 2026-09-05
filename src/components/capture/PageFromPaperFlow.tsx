@@ -5,6 +5,7 @@ import { PageReviewSheet, type PageReviewPayload } from '@/components/capture/Pa
 import { usePageFromPaper } from '@/hooks/usePageFromPaper'
 import { useCommitPage } from '@/hooks/useCommitPage'
 import type { FamilyMember } from '@/types/family'
+import type { PageAltitude } from '@/lib/planParse'
 
 interface PageFromPaperFlowProps {
   members: FamilyMember[]
@@ -27,6 +28,9 @@ export function PageFromPaperFlow({ members, onClose }: PageFromPaperFlowProps) 
   const { status, result, error, parseFromBlob, retry, reset } = usePageFromPaper(members)
   const { commitPage } = useCommitPage()
   const [camera, setCamera] = useState(true)
+  // Which page is being snapped. Chosen in the camera modal; the client owns
+  // the window, so it must own the altitude too. Week = the old behaviour.
+  const [altitude, setAltitude] = useState<PageAltitude>('week')
   const [committing, setCommitting] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -37,8 +41,8 @@ export function PageFromPaperFlow({ members, onClose }: PageFromPaperFlowProps) 
 
   const handleBlob = useCallback((blob: Blob) => {
     setCamera(false)
-    void parseFromBlob(blob)
-  }, [parseFromBlob])
+    void parseFromBlob(blob, altitude)
+  }, [parseFromBlob, altitude])
 
   const handleFile = useCallback((file: File | null) => {
     if (file) handleBlob(file)
@@ -68,6 +72,8 @@ export function PageFromPaperFlow({ members, onClose }: PageFromPaperFlowProps) 
 
       {camera && (
         <CameraCaptureModal
+          altitude={altitude}
+          onAltitudeChange={setAltitude}
           onCapture={handleBlob}
           onPickFile={() => {
             setCamera(false)
@@ -109,6 +115,7 @@ export function PageFromPaperFlow({ members, onClose }: PageFromPaperFlowProps) 
           notes={result.notes}
           unclear={result.unclear}
           windowDates={result.windowDates}
+          altitude={result.altitude}
           members={members}
           committing={committing}
           onCommit={(payload) => void handleCommit(payload)}

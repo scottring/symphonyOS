@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { X, Camera, ImageUp, RotateCw } from 'lucide-react'
+import { PAGE_ALTITUDES, type PageAltitude } from '@/lib/planParse'
 
 type Rotation = 0 | 90 | 180 | 270
 
@@ -24,6 +25,11 @@ interface CameraCaptureModalProps {
   /** Fallback: user opted to pick a file instead (camera denied/unavailable). */
   onPickFile: () => void
   onClose: () => void
+  /** Plan-from-paper: which page is being snapped. When given, a chip row
+   *  under the title lets the user say so before the shutter — one tap, no
+   *  extra step. Absent for plain photo capture. */
+  altitude?: PageAltitude
+  onAltitudeChange?: (altitude: PageAltitude) => void
 }
 
 /**
@@ -32,7 +38,7 @@ interface CameraCaptureModalProps {
  * ("iPhone Camera") — selecting it makes the phone the desktop's camera. On
  * mobile web this is simply the device camera.
  */
-export function CameraCaptureModal({ onCapture, onPickFile, onClose }: CameraCaptureModalProps) {
+export function CameraCaptureModal({ onCapture, onPickFile, onClose, altitude, onAltitudeChange }: CameraCaptureModalProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([])
@@ -143,11 +149,31 @@ export function CameraCaptureModal({ onCapture, onPickFile, onClose }: CameraCap
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-4 py-3">
-          <h3 className="text-sm font-medium text-white">Snap a photo</h3>
+          <h3 className="text-sm font-medium text-white">{altitude ? 'Snap your page' : 'Snap a photo'}</h3>
           <button type="button" onClick={close} aria-label="Close camera" className="p-1.5 rounded-lg text-neutral-400 hover:text-white transition-colors">
             <X className="w-5 h-5" />
           </button>
         </div>
+        {altitude && onAltitudeChange && (
+          <div role="radiogroup" aria-label="Which page is this" className="flex items-center gap-1.5 px-4 pb-3">
+            {PAGE_ALTITUDES.map((a) => {
+              const on = a.id === altitude
+              return (
+                <button
+                  key={a.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={on}
+                  title={a.hint}
+                  onClick={() => onAltitudeChange(a.id)}
+                  className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${on ? 'bg-white text-neutral-900' : 'bg-white/10 text-neutral-300 hover:bg-white/20'}`}
+                >
+                  {a.label}
+                </button>
+              )
+            })}
+          </div>
+        )}
 
         {error ? (
           <div className="px-6 py-10 text-center space-y-4">

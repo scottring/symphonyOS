@@ -111,3 +111,44 @@ describe('PageReviewSheet', () => {
     expect(screen.queryByRole('button', { name: /add/i })).not.toBeInTheDocument()
   })
 })
+
+// Altitudes (2026-09-05): every page may place on the month, the season, or
+// Someday; only a year page may write goals.
+describe('PageReviewSheet — altitudes', () => {
+  it('offers the horizon placements on a week page but never a goal', () => {
+    renderSheet()
+    const when = screen.getAllByRole('combobox', { name: /when/i })[0]
+    const labels = Array.from(when.querySelectorAll('option')).map((o) => o.textContent)
+    expect(labels).toEqual(expect.arrayContaining(['Inbox', 'This week', 'This month', 'This season', 'Someday']))
+    expect(labels).not.toContain('Year goal')
+  })
+
+  it('commits a month placement chosen in the sheet', async () => {
+    const user = userEvent.setup()
+    const { onCommit } = renderSheet()
+    await user.selectOptions(screen.getAllByRole('combobox', { name: /when/i })[0], 'month')
+    await user.click(screen.getByRole('button', { name: /add 3 items/i }))
+    expect(onCommit.mock.calls[0][0].items[0].placement).toEqual({ kind: 'month' })
+  })
+
+  it('on a year page, lines read as goals show a Goal badge, count as goals, and can still be demoted', async () => {
+    const user = userEvent.setup()
+    const { onCommit } = renderSheet({
+      altitude: 'year',
+      windowDates: [],
+      notes: [],
+      items: [
+        { title: 'Half marathon', placement: { kind: 'goal' }, time: null, assigneeId: null, note: null },
+        { title: 'Book Iceland flights', placement: { kind: 'season' }, time: null, assigneeId: null, note: null },
+      ],
+    })
+    expect(screen.getByText('Goal')).toBeInTheDocument()
+    expect(screen.getByText(/read as a year page/i)).toBeInTheDocument()
+    expect(screen.getByText(/1 task \/ 1 goal/)).toBeInTheDocument()
+    const whens = screen.getAllByRole('combobox', { name: /when/i })
+    expect(Array.from(whens[1].querySelectorAll('option')).map((o) => o.textContent)).toContain('Year goal')
+    await user.selectOptions(whens[0], 'someday')
+    await user.click(screen.getByRole('button', { name: /add 2 items/i }))
+    expect(onCommit.mock.calls[0][0].items.map((i: { placement: unknown }) => i.placement)).toEqual([{ kind: 'someday' }, { kind: 'season' }])
+  })
+})

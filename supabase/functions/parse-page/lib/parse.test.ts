@@ -113,3 +113,65 @@ describe('parsePageResponse — times', () => {
     }
   })
 })
+
+// A page has an altitude — week (the default), month, season, or year — and
+// the altitude decides what an undated line means and which placements the
+// model may use. Plan-from-paper knew only date/week/inbox until 2026-09-05.
+describe('altitudes', () => {
+  const CAL = new Set(['2026-09-05', '2026-09-06'])
+  const MEMBERS = new Set(['m-1'])
+  const calendar = windowCalendar('2026-09-05', '2026-09-06')
+
+  it('tells the model which page it is reading and offers that altitude’s placements', () => {
+    const month = buildPagePrompt(calendar, [], '2026-09-05', 'month')
+    expect(month).toContain('MONTH page')
+    expect(month).toContain('"month"')
+    expect(month).toContain('2026-09-05 (Saturday)')
+
+    const season = buildPagePrompt(calendar, [], '2026-09-05', 'season')
+    expect(season).toContain('SEASON page')
+    expect(season).toContain('"season"')
+
+    const week = buildPagePrompt(calendar, [], '2026-09-05', 'week')
+    expect(week).toContain('WEEK page')
+    expect(week).not.toContain('"goal"')
+  })
+
+  it('a year page gets no calendar and may name goals', () => {
+    const year = buildPagePrompt([], [], '2026-09-05', 'year')
+    expect(year).toContain('YEAR page')
+    expect(year).toContain('"goal"')
+    expect(year).not.toContain('The ONLY dates')
+  })
+
+  it('accepts the horizon placements on any altitude', () => {
+    const out = parsePageResponse(
+      '{"items":[{"title":"A","day":"month"},{"title":"B","day":"season"},{"title":"C","day":"someday"},{"title":"D","day":"week"}]}',
+      CAL, MEMBERS, 'month',
+    )
+    expect(out.items.map((i) => i.day)).toEqual(['month', 'season', 'someday', 'week'])
+  })
+
+  it('degrades an out-of-window date to the page’s own altitude, not always to week', () => {
+    expect(parsePageResponse('{"items":[{"title":"X","day":"2025-01-01"}]}', CAL, MEMBERS, 'month').items[0].day).toBe('month')
+    expect(parsePageResponse('{"items":[{"title":"X","day":"2025-01-01"}]}', CAL, MEMBERS, 'season').items[0].day).toBe('season')
+    expect(parsePageResponse('{"items":[{"title":"X","day":"2025-01-01"}]}', new Set(), MEMBERS, 'year').items[0].day).toBe('goal')
+    expect(parsePageResponse('{"items":[{"title":"X","day":"2025-01-01"}]}', CAL, MEMBERS).items[0].day).toBe('week')
+  })
+
+  it('only a year page may place a goal; elsewhere a goal becomes someday', () => {
+    expect(parsePageResponse('{"items":[{"title":"X","day":"goal"}]}', new Set(), MEMBERS, 'year').items[0].day).toBe('goal')
+    expect(parsePageResponse('{"items":[{"title":"X","day":"goal"}]}', CAL, MEMBERS, 'season').items[0].day).toBe('someday')
+  })
+
+  it('drops a time from a horizon placement the same way it does for week', () => {
+    const out = parsePageResponse('{"items":[{"title":"X","day":"month","time":"14:00"}]}', CAL, MEMBERS, 'month')
+    expect(out.items[0].time).toBeNull()
+  })
+
+  it('walks a window longer than the old 60-day cap (a season is 92 days)', () => {
+    const cal = windowCalendar('2026-09-05', '2026-12-05')
+    expect(cal).toHaveLength(92)
+    expect(cal[91].ymd).toBe('2026-12-05')
+  })
+})

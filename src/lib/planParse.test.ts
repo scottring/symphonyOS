@@ -132,3 +132,77 @@ describe('planItemToAddTaskArgs — times', () => {
     expect(args.scheduledFor?.getHours()).toBe(0)
   })
 })
+
+// Altitudes (2026-09-05): a page is a week, month, season, or year page, and
+// the altitude sizes the window and decides where an undated line lands.
+describe('planWindowDates — altitudes', () => {
+  it('a month page runs from today through the end of NEXT month', () => {
+    const dates = planWindowDates(new Date(2026, 8, 28), 'month') // Sep 28
+    expect(dates[0]).toBe('2026-09-28')
+    expect(dates[dates.length - 1]).toBe('2026-10-31')
+    expect(dates).toContain('2026-10-01')
+  })
+
+  it('a season page runs 92 days', () => {
+    const dates = planWindowDates(TODAY, 'season')
+    expect(dates).toHaveLength(92)
+  })
+
+  it('a year page has no dates', () => {
+    expect(planWindowDates(TODAY, 'year')).toEqual([])
+  })
+
+  it('a week page is unchanged', () => {
+    expect(planWindowDates(TODAY, 'week')).toEqual(WINDOW)
+  })
+})
+
+describe('validatePlanItems — altitudes', () => {
+  it('accepts the horizon placements', () => {
+    const items = validatePlanItems(
+      { items: [{ title: 'A', day: 'month' }, { title: 'B', day: 'season' }, { title: 'C', day: 'someday' }] },
+      WINDOW, MEMBERS, 'month',
+    )
+    expect(items.map((i) => i.placement)).toEqual([{ kind: 'month' }, { kind: 'season' }, { kind: 'someday' }])
+  })
+
+  it('degrades an out-of-window date to the page’s altitude', () => {
+    const bad = { items: [{ title: 'X', day: '2030-01-01' }] }
+    expect(validatePlanItems(bad, WINDOW, MEMBERS, 'month')[0].placement).toEqual({ kind: 'month' })
+    expect(validatePlanItems(bad, WINDOW, MEMBERS, 'season')[0].placement).toEqual({ kind: 'season' })
+    expect(validatePlanItems(bad, [], MEMBERS, 'year')[0].placement).toEqual({ kind: 'goal' })
+  })
+
+  it('keeps a goal only on a year page', () => {
+    const goal = { items: [{ title: 'Half marathon', day: 'goal' }] }
+    expect(validatePlanItems(goal, [], MEMBERS, 'year')[0].placement).toEqual({ kind: 'goal' })
+    expect(validatePlanItems(goal, WINDOW, MEMBERS, 'week')[0].placement).toEqual({ kind: 'someday' })
+  })
+})
+
+describe('planItemToAddTaskArgs — horizons', () => {
+  const ctx = { currentWeekStart: new Date(2026, 7, 16), context: null }
+  const item = (kind: 'month' | 'season' | 'someday' | 'goal'): PlanItem =>
+    ({ title: 'X', placement: { kind }, time: null, assigneeId: null, note: null })
+
+  it('month → the month pool', () => {
+    const args = planItemToAddTaskArgs(item('month'), ctx)
+    expect(args.scheduledFor).toBeUndefined()
+    expect(args.options.bucket).toBe('month')
+    expect(args.options.weekStart).toBeUndefined()
+  })
+
+  it('season → the quarter bucket, picked (writing it on the season page IS the pick)', () => {
+    const args = planItemToAddTaskArgs(item('season'), ctx)
+    expect(args.options.bucket).toBe('quarter')
+    expect(args.options.pickedAt).toBeInstanceOf(Date)
+  })
+
+  it('someday → the someday bucket', () => {
+    expect(planItemToAddTaskArgs(item('someday'), ctx).options.bucket).toBe('someday')
+  })
+
+  it('a goal that reaches the task writer lands in Someday rather than vanishing', () => {
+    expect(planItemToAddTaskArgs(item('goal'), ctx).options.bucket).toBe('someday')
+  })
+})

@@ -11,10 +11,38 @@ import { localYmd, parseLocalYmd } from '@/lib/cadence/config'
  *  planned" from any day of the week (a Sunday page maps Mon–Sun of next week). */
 export const PLAN_WINDOW_DAYS = 14
 
+/** Which page was photographed. The altitude sizes the placement window and
+ *  says where an undated line lands. 'week' is the daily scratchpad / week
+ *  plan — the only altitude before 2026-09-05. Mirrors parse-page's own. */
+export type PageAltitude = 'week' | 'month' | 'season' | 'year'
+
+export const PAGE_ALTITUDES: { id: PageAltitude; label: string; hint: string }[] = [
+  { id: 'week', label: 'Week', hint: 'A day or the week ahead' },
+  { id: 'month', label: 'Month', hint: 'The month ahead' },
+  { id: 'season', label: 'Season', hint: 'The next three months' },
+  { id: 'year', label: 'Year', hint: 'Goals for the year' },
+]
+
+export function isPageAltitude(v: unknown): v is PageAltitude {
+  return v === 'week' || v === 'month' || v === 'season' || v === 'year'
+}
+
 export type PlanPlacement =
   | { kind: 'date'; date: string } // local YYYY-MM-DD
   | { kind: 'week' }
+  | { kind: 'month' }
+  | { kind: 'season' } // bucket 'quarter'
+  | { kind: 'someday' }
   | { kind: 'inbox' }
+  | { kind: 'goal' } // a `goals` row, year pages only — not a task
+
+/** Where a line lands when it names no day, and where an out-of-window date
+ *  degrades to: the page's own altitude. */
+export function defaultPlacement(altitude: PageAltitude): PlanPlacement {
+  return altitude === 'year' ? { kind: 'goal' } : { kind: altitude }
+}
+
+const HORIZON_KINDS = new Set(['week', 'month', 'season', 'someday', 'inbox'])
 
 export interface PlanItem {
   title: string
@@ -41,11 +69,27 @@ export function applyTimeToDate(date: Date, time: string | null): Date {
 
 const YMD = /^\d{4}-\d{2}-\d{2}$/
 
-/** The window's dates as local YYYY-MM-DD strings, today first. */
-export function planWindowDates(today: Date): string[] {
-  const out: string[] = []
+/** A season page looks three months out. */
+export const SEASON_WINDOW_DAYS = 92
+
+/** The window's dates as local YYYY-MM-DD strings, today first. A week page
+ *  looks 14 days out; a month page runs through the END of next month (a page
+ *  written on the 28th is for the coming month); a season page 92 days; a year
+ *  page has no dates at all — goals are not placed on days. */
+export function planWindowDates(today: Date, altitude: PageAltitude = 'week'): string[] {
+  if (altitude === 'year') return []
   const cursor = new Date(today)
-  for (let i = 0; i < PLAN_WINDOW_DAYS; i++) {
+  cursor.setHours(0, 0, 0, 0)
+  const end = new Date(cursor)
+  if (altitude === 'month') {
+    end.setDate(1)
+    end.setMonth(end.getMonth() + 2)
+    end.setDate(0) // last day of next month
+  } else {
+    end.setDate(end.getDate() + (altitude === 'season' ? SEASON_WINDOW_DAYS : PLAN_WINDOW_DAYS) - 1)
+  }
+  const out: string[] = []
+  while (cursor <= end) {
     out.push(localYmd(cursor))
     cursor.setDate(cursor.getDate() + 1)
   }
@@ -61,6 +105,7 @@ export function validatePlanItems(
   raw: unknown,
   windowDates: string[],
   memberIds: Set<string>,
+  altitude: PageAltitude = 'week',
 ): PlanItem[] {
   const items = (raw as { items?: unknown } | null)?.items
   if (!Array.isArray(items)) return []
@@ -71,10 +116,10 @@ export function validatePlanItems(
     if (typeof e.title !== 'string' || !e.title.trim()) continue
     const day = typeof e.day === 'string' ? e.day : 'inbox'
     const placement: PlanPlacement =
-      day === 'week' ? { kind: 'week' }
-      : day === 'inbox' ? { kind: 'inbox' }
+      day === 'goal' ? (altitude === 'year' ? { kind: 'goal' } : { kind: 'someday' })
+      : HORIZON_KINDS.has(day) ? { kind: day as 'week' | 'month' | 'season' | 'someday' | 'inbox' }
       : YMD.test(day) && window.has(day) ? { kind: 'date', date: day }
-      : { kind: 'week' }
+      : defaultPlacement(altitude)
     out.push({
       title: e.title.trim(),
       placement,
@@ -104,6 +149,7 @@ export interface PlanAddTaskArgs {
   options: {
     bucket?: TaskBucket
     weekStart?: Date
+    pickedAt?: Date
     isAllDay?: boolean
     assignedTo?: string
     context: TaskContext | null
@@ -145,6 +191,20 @@ export function planItemToAddTaskArgs(item: PlanItem, ctx: PlanCommitContext): P
         scheduledFor: undefined,
         options: { ...base, bucket: 'week', weekStart: ctx.currentWeekStart },
       }
+    case 'month':
+      // The month bucket has no month (attention.ts): "the month pool".
+      return { title: item.title, scheduledFor: undefined, options: { ...base, bucket: 'month' } }
+    case 'season':
+      // Written on the season page = picked for the season. The pick mark
+      // rides the INSERT like every other field here.
+      return { title: item.title, scheduledFor: undefined, options: { ...base, bucket: 'quarter', pickedAt: new Date() } }
+    case 'someday':
+      return { title: item.title, scheduledFor: undefined, options: { ...base, bucket: 'someday' } }
+    case 'goal':
+      // A goal is a `goals` row, written by useCommitPage — it never reaches
+      // this mapper on the happy path. If one does, Someday keeps it visible
+      // instead of losing a line the user wrote down.
+      return { title: item.title, scheduledFor: undefined, options: { ...base, bucket: 'someday' } }
     case 'inbox':
       return {
         title: item.title,

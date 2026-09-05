@@ -51,6 +51,26 @@ describe('validatePageResult', () => {
 
   it('returns an empty result for junk', () => {
     const out = validatePageResult(null, MEMBERS, FALLBACK)
-    expect(out).toEqual({ items: [], notes: [], unclear: [], windowDates: FALLBACK, storagePath: null })
+    expect(out).toEqual({ items: [], notes: [], unclear: [], windowDates: FALLBACK, altitude: 'week', storagePath: null })
+  })
+})
+
+describe('validatePageResult — altitude', () => {
+  it('reads the echoed altitude and validates items against it', () => {
+    const out = validatePageResult(
+      { window: [], altitude: 'year', items: [{ title: 'Half marathon', day: 'goal' }] },
+      MEMBERS,
+      FALLBACK,
+    )
+    expect(out.altitude).toBe('year')
+    expect(out.windowDates).toEqual([])
+    expect(out.items[0].placement).toEqual({ kind: 'goal' })
+  })
+
+  it('defaults to week when the response predates altitudes', () => {
+    const out = validatePageResult({ items: [{ title: 'X', day: 'goal' }] }, MEMBERS, FALLBACK)
+    expect(out.altitude).toBe('week')
+    expect(out.windowDates).toEqual(FALLBACK)
+    expect(out.items[0].placement).toEqual({ kind: 'someday' })
   })
 })
