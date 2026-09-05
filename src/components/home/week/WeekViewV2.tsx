@@ -25,6 +25,7 @@ import { RoutinePlacePopover } from './RoutinePlacePopover'
 import { RoutinesToggle } from '@/components/planning/RoutinesToggle'
 import { WeekPoolLane } from './WeekPoolLane'
 import { WeekMonthRail } from './WeekMonthRail'
+import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { suggestSlots, type BusyInterval } from '@/lib/planning/dropSmarts'
 import { FIRST_HOUR, LAST_HOUR } from './WeekGrid'
 import { readHideRoutines, writeHideRoutines, onHideRoutinesChange } from '@/lib/hideRoutinesSignal'
@@ -88,6 +89,9 @@ export function WeekViewV2(props: WeekViewV2Props) {
   // Create-gesture wiring
   const navigate = useNavigate()
   const { addTask, deleteTask, toggleTask, updateTask, updateTasksBulk, pushTask } = useSupabaseTasks()
+  // The rail plans MY week — scope it to the current member, as the strip does.
+  const { getCurrentUserMember } = useFamilyMembers()
+  const meId = getCurrentUserMember()?.id ?? null
   const { createEvent, deleteEvent } = useGoogleCalendar()
   const gridCreate = useGridCreate()
 
@@ -568,7 +572,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
           ))}
         </WeekGrid>
         </div>
-        <WeekMonthRail tasks={tasks} onSelectItem={onSelectItem} onAddToWeek={(id) => { void gated.pushTask(id, 'week') }} />
+        <WeekMonthRail tasks={tasks} meId={meId} onSelectItem={onSelectItem} onAddToWeek={(id) => { void gated.pushTask(id, 'week') }} />
         </div>
 
         {placingRoutine && routinePlace && (

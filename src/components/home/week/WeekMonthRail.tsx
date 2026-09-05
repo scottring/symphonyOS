@@ -16,6 +16,7 @@ import { ArrowRight, ChevronLeft, ChevronRight, Target } from 'lucide-react'
 import type { Task } from '@/types/task'
 import { belongsToMonth, monthStartOf } from '@/lib/planning/periodPlacement'
 import { placementFate, type PlacementFate } from '@/lib/planning/lineage'
+import { doableBy } from '@/lib/planning/poolViews'
 
 const STORAGE_KEY = 'symphony-week-month-rail'
 
@@ -71,18 +72,24 @@ function Row({ task, fate, onSelect, onAddToWeek }: {
   )
 }
 
-export function WeekMonthRail({ tasks, onSelectItem, onAddToWeek, now = new Date() }: {
+export function WeekMonthRail({ tasks, onSelectItem, onAddToWeek, meId, now = new Date() }: {
   tasks: Task[]
   onSelectItem: (id: string) => void
   /** Copy an open month task down to this week (the host's pushTask(id, 'week')). */
   onAddToWeek?: (id: string) => void
+  /** The planning member. When set, the rail shows only what this person could
+   *  put on their week: unassigned items and their own. A month item assigned
+   *  exclusively to someone else is rightly VISIBLE elsewhere (shared context)
+   *  but isn't theirs to plan — the same rule the strip applies (doableBy). */
+  meId?: string | null
   now?: Date
 }) {
   const [open, setOpen] = useState(readOpen)
   const monthStart = monthStartOf(now)
   // The current month's list — including done and placed rows. belongsToMonth,
   // not isPlacedOnMonth: a legacy NULL row is this month's.
-  const rows = tasks.filter((t) => t.bucket === 'month' && belongsToMonth(t, monthStart))
+  const rows = tasks.filter((t) =>
+    t.bucket === 'month' && belongsToMonth(t, monthStart) && (!meId || doableBy(t, meId)))
   const goals = rows.filter((t) => t.isGoal)
   const items = rows.filter((t) => !t.isGoal)
   const label = now.toLocaleDateString('en-US', { month: 'long' })

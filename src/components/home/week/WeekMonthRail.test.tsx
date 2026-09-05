@@ -75,4 +75,27 @@ describe('WeekMonthRail', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add Repaint the porch to this week' }))
     expect(onAdd).toHaveBeenCalledWith('o')
   })
+
+  // The rail plans MY week. Iris's month items — assigned exclusively to her —
+  // are rightly VISIBLE elsewhere (shared context), but they aren't mine to
+  // put on my week. Same rule the strip already applies (doableBy).
+  it('hides month items assigned exclusively to someone else; unassigned and mine stay', () => {
+    render(<WeekMonthRail onSelectItem={() => {}} meId="me" tasks={[
+      task({ title: 'Mine', monthStart: thisMonth, assignedTo: 'me' }),
+      task({ title: 'Unassigned', monthStart: thisMonth }),
+      task({ title: 'Ours', monthStart: thisMonth, assignedToAll: ['me', 'iris'] }),
+      task({ title: "Iris's workout plan", monthStart: thisMonth, assignedTo: 'iris' }),
+      task({ title: "Iris's reading", monthStart: thisMonth, assignedToAll: ['iris'] }),
+    ]} />)
+    expect(screen.getByText('Mine')).toBeInTheDocument()
+    expect(screen.getByText('Unassigned')).toBeInTheDocument()
+    expect(screen.getByText('Ours')).toBeInTheDocument()
+    expect(screen.queryByText("Iris's workout plan")).not.toBeInTheDocument()
+    expect(screen.queryByText("Iris's reading")).not.toBeInTheDocument()
+  })
+
+  it('shows everything when no member id is known (legacy callers)', () => {
+    render(<WeekMonthRail onSelectItem={() => {}} tasks={[task({ title: "Iris's reading", monthStart: thisMonth, assignedTo: 'iris' })]} />)
+    expect(screen.getByText("Iris's reading")).toBeInTheDocument()
+  })
 })
