@@ -32,12 +32,13 @@ const FAMILY_LAYER: ReadonlySet<Layer> = new Set(['family'])
 // Only the columns the wall actually renders. Avoids `select('*')`, which pulls
 // heavy/unused columns (links jsonb, codes, etc.) on every poll and dominates egress.
 const TASK_COLUMNS =
-  'id, title, completed, created_at, updated_at, scheduled_for, needed_on, is_all_day, is_waiting, context, category, notes, phone_number, contact_id, assigned_to, project_id, parent_task_id, location, location_place_id'
+  'id, title, completed, created_at, updated_at, scheduled_for, needed_on, is_all_day, is_waiting, context, category, notes, phone_number, contact_id, assigned_to, assigned_to_all, project_id, parent_task_id, location, location_place_id'
 
 /** One snake_case → Task mapper for every task query on the wall, so a column
- *  added to TASK_COLUMNS can't reach one list and silently miss another. */
+ *  added to TASK_COLUMNS can't reach one list and silently miss another.
+ *  Exported for its test only. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function rowToTask(t: any): Task {
+export function rowToTask(t: any): Task {
   return {
     id: t.id,
     title: t.title,
@@ -56,6 +57,10 @@ function rowToTask(t: any): Task {
     phoneNumber: t.phone_number ?? undefined,
     contactId: t.contact_id ?? undefined,
     assignedTo: t.assigned_to ?? undefined,
+    // uuid[] — a class-wide homework row names every child here and nobody in
+    // assigned_to (extract-email, 2026-09-04). Dropping it put those rows on
+    // the Everyone row and on no kid's page.
+    assignedToAll: Array.isArray(t.assigned_to_all) && t.assigned_to_all.length ? t.assigned_to_all : undefined,
     projectId: t.project_id ?? undefined,
     parentTaskId: t.parent_task_id ?? undefined,
     location: t.location ?? undefined,
