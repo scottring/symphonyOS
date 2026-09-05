@@ -24,6 +24,7 @@ import { SlotQuickCreatePopover, type CreateType } from './SlotQuickCreatePopove
 import { RoutinePlacePopover } from './RoutinePlacePopover'
 import { RoutinesToggle } from '@/components/planning/RoutinesToggle'
 import { WeekPoolLane } from './WeekPoolLane'
+import { WeekMonthRail } from './WeekMonthRail'
 import { suggestSlots, type BusyInterval } from '@/lib/planning/dropSmarts'
 import { FIRST_HOUR, LAST_HOUR } from './WeekGrid'
 import { readHideRoutines, writeHideRoutines, onHideRoutinesChange } from '@/lib/hideRoutinesSignal'
@@ -506,6 +507,11 @@ export function WeekViewV2(props: WeekViewV2Props) {
           onUpdateTask={(id, u) => { void onUpdateTask(id, u) }}
           onDeleteTask={(id) => { void deleteTask(id) }}
         />
+        {/* The grid, with the month list beside it — the rung above, read-only,
+            so the week is planned by looking at the month (never by dragging
+            from it). */}
+        <div className="flex items-start gap-3">
+        <div className="flex-1 min-w-0">
         <WeekGrid
           weekStart={weekStart}
           dayCount={dayCount}
@@ -561,6 +567,9 @@ export function WeekViewV2(props: WeekViewV2Props) {
             />
           ))}
         </WeekGrid>
+        </div>
+        <WeekMonthRail tasks={tasks} onSelectItem={onSelectItem} />
+        </div>
 
         {placingRoutine && routinePlace && (
           <RoutinePlacePopover
