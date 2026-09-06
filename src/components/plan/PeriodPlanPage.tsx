@@ -128,18 +128,23 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
     if (!above) return today
     return planningPeriod({
       level: above, today, seasons,
-      countFor: (s) => (above === 'season' ? selectPeriodTasks(layered, 'season', s, true, meId).length : 0),
+      countFor: (s) => (above === 'season' ? selectPeriodTasks(layered, 'season', s, isCurrentPeriod(periodBounds('season', s, seasons), today), meId).length : 0),
     }).start
   }, [above, today, seasons, layered, meId])
   const railRows = useMemo<PlanRowModel[]>(() => {
     if (above === 'season') {
-      return selectPeriodTasks(layered, 'season', aboveStart, true, meId).map((t) => taskRow(t, tasks))
+      // The fold can look ahead to a season that ISN'T actually current
+      // (near a boundary) — asking the pool question there would pull in
+      // every legacy NULL-seasonStart row regardless of which season it
+      // opened on (the exact trap periodPlacement.ts warns about).
+      const aboveIsCurrent = isCurrentPeriod(periodBounds('season', aboveStart, seasons), today)
+      return selectPeriodTasks(layered, 'season', aboveStart, aboveIsCurrent, meId).map((t) => taskRow(t, tasks))
     }
     if (above === 'year') {
       return goals.filter((g) => g.year === aboveStart.getFullYear() && matchesLayers(g.context, layers)).map(goalRow)
     }
     return []
-  }, [above, layered, aboveStart, meId, tasks, goals, layers])
+  }, [above, layered, aboveStart, seasons, today, meId, tasks, goals, layers])
   const railBounds = useMemo(() => (above ? periodBounds(above, aboveStart, seasons) : null), [above, aboveStart, seasons])
 
   // ── Verbs ────────────────────────────────────────────────────────────────

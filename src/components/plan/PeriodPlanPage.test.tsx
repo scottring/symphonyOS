@@ -18,12 +18,12 @@ const goal = (over: Partial<Goal>): Goal => ({
   createdAt: new Date(), updatedAt: new Date(), context: null, ...over,
 } as Goal)
 
-const state: { tasks: Task[]; goals: Goal[] } = { tasks: [], goals: [] }
+const state: { tasks: Task[]; goals: Goal[]; loading: boolean } = { tasks: [], goals: [], loading: false }
 const hook = {
   toggleTask: vi.fn(), deleteTask: vi.fn(), updateTask: vi.fn(), updateTasksBulk: vi.fn(),
   addTask: vi.fn(async () => 'new'), setGoal: vi.fn(), pushTask: vi.fn(), keepForward: vi.fn(),
 }
-vi.mock('@/hooks/useSupabaseTasks', () => ({ useSupabaseTasks: () => ({ tasks: state.tasks, ...hook }) }))
+vi.mock('@/hooks/useSupabaseTasks', () => ({ useSupabaseTasks: () => ({ tasks: state.tasks, loading: state.loading, ...hook }) }))
 vi.mock('@/hooks/useGatedTaskActions', () => ({
   useGatedTaskActions: (raw: Record<string, unknown>) => raw,
 }))
@@ -51,10 +51,12 @@ import { PeriodPlanPage } from './PeriodPlanPage'
 
 const renderPage = (level: 'month' | 'season' | 'year') =>
   render(<MemoryRouter><PeriodPlanPage level={level} /></MemoryRouter>)
+const renderPageAt = (level: 'month' | 'season' | 'year', path: string) =>
+  render(<MemoryRouter initialEntries={[path]}><PeriodPlanPage level={level} /></MemoryRouter>)
 
 describe('PeriodPlanPage', () => {
   beforeEach(() => {
-    state.tasks = []; state.goals = []
+    state.tasks = []; state.goals = []; state.loading = false
     Object.values(hook).forEach((f) => f.mockClear())
     Object.values(goalsApi).forEach((f) => f.mockClear())
     mockNavigate.mockClear()
@@ -180,6 +182,63 @@ describe('PeriodPlanPage', () => {
     expect(within(rail).getByText('Run a half marathon')).toBeInTheDocument()
     // the year rail is look-only
     expect(within(rail).queryByRole('button', { name: /Add to/ })).not.toBeInTheDocument()
+  })
+})
+
+// planningPeriod wiring (fix round 1, review findings 2a-d): the URL param,
+// the "looking ahead" line, the anchor-settle guard, and the fold's own
+// look-ahead all need coverage beyond the pure periodPage.test.ts.
+describe('PeriodPlanPage — planningPeriod wiring', () => {
+  beforeEach(() => {
+    state.tasks = []; state.goals = []; state.loading = false
+    Object.values(hook).forEach((f) => f.mockClear())
+    Object.values(goalsApi).forEach((f) => f.mockClear())
+    mockNavigate.mockClear()
+    // PlanRail remembers fold-open state in localStorage keyed by level; an
+    // earlier test's "folds the season…" click otherwise leaves this month's
+    // fold open before this block even runs.
+    localStorage.clear()
+  })
+  afterEach(() => { vi.useRealTimers() })
+
+  it('an explicit ?start= wins over the current period', () => {
+    renderPageAt('season', '/season?start=2026-12-01')
+    expect(screen.getByRole('heading', { name: 'This Season' })).toBeInTheDocument()
+    expect(screen.getByText('Winter 2026')).toBeInTheDocument()
+  })
+
+  it('opens on the coming season and shows the "looking ahead" line when the current one is nearly over', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 10, 20)) // Nov 20 — 11 days left in Fall
+    renderPage('season')
+    expect(screen.getByText('Winter 2026')).toBeInTheDocument()
+    expect(screen.getByText(/Winter 2026 starts in 11 days/)).toBeInTheDocument()
+    expect(screen.getByText(/looking ahead/)).toBeInTheDocument()
+  })
+
+  it('does not snap back to the looked-ahead period after the user has navigated, even once tasks finish loading', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 10, 20)) // Nov 20 — would look ahead to Winter once tasks load
+    state.loading = true // tasks haven't loaded yet — the initial computation is deferred
+    const { rerender } = renderPage('season')
+    expect(screen.getByText('Fall 2026')).toBeInTheDocument()
+    fireEvent.click(screen.getByLabelText('Previous season'))
+    expect(screen.getByText('Summer 2026')).toBeInTheDocument()
+    // Tasks finish loading — re-rendering the SAME instance must not let the
+    // guarded effect override where the user navigated to.
+    state.loading = false
+    rerender(<MemoryRouter><PeriodPlanPage level="season" /></MemoryRouter>)
+    expect(screen.getByText('Summer 2026')).toBeInTheDocument()
+  })
+
+  it('a looked-ahead season fold excludes a legacy NULL-seasonStart row — the fold is not "current" just because it opened ahead', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 10, 20)) // Nov 20 — season fold looks ahead to Winter
+    state.tasks = [task({ title: 'Legacy quarter row', bucket: 'quarter' })] // no seasonStart
+    renderPage('month')
+    const rail = screen.getByRole('complementary', { name: 'This Season' })
+    fireEvent.click(within(rail).getByRole('button', { name: /This Season/ }))
+    expect(within(rail).queryByText('Legacy quarter row')).not.toBeInTheDocument()
   })
 })
 
