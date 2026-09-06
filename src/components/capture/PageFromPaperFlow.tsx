@@ -54,7 +54,7 @@ interface PageFromPaperFlowProps {
  * flow is open, so those hooks instantiate only then.
  */
 export function PageFromPaperFlow({ members, onClose, existingTasks, calendarTitlesByDay, initialBlob, initialAltitude, sample }: PageFromPaperFlowProps) {
-  const { status, result, error, parseFromBlob, retry, reset } = usePageFromPaper(members)
+  const { status, result, error, parseFromBlob, parseFromStoragePath, retry, reset } = usePageFromPaper(members)
   const { commitPage } = useCommitPage()
   const navigate = useNavigate()
   const [camera, setCamera] = useState(!initialBlob)
@@ -81,6 +81,12 @@ export function PageFromPaperFlow({ members, onClose, existingTasks, calendarTit
     setCamera(false)
     void parseFromBlob(blob, altitude)
   }, [parseFromBlob, altitude])
+
+  // The phone already uploaded the page; read it from where it landed.
+  const handlePhoneHandoff = useCallback((storagePath: string) => {
+    setCamera(false)
+    void parseFromStoragePath(storagePath, altitude)
+  }, [parseFromStoragePath, altitude])
 
   const handleFile = useCallback((file: File | null) => {
     if (file) handleBlob(file)
@@ -125,6 +131,7 @@ export function PageFromPaperFlow({ members, onClose, existingTasks, calendarTit
         <CameraCaptureModal
           altitude={altitude}
           onAltitudeChange={setAltitude}
+          onPhoneHandoff={handlePhoneHandoff}
           onCapture={handleBlob}
           onPickFile={() => {
             setCamera(false)

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { X, Camera, ImageUp, RotateCw } from 'lucide-react'
+import { X, Camera, ImageUp, RotateCw, Smartphone } from 'lucide-react'
 import { PAGE_ALTITUDES, type PageAltitude } from '@/lib/planParse'
+import { PhoneHandoffPanel } from '@/components/capture/PhoneHandoffPanel'
+import { newHandoffId } from '@/lib/paperHandoff'
 
 type Rotation = 0 | 90 | 180 | 270
 
@@ -49,15 +51,24 @@ interface CameraCaptureModalProps {
    *  extra step. Absent for plain photo capture. */
   altitude?: PageAltitude
   onAltitudeChange?: (altitude: PageAltitude) => void
+  /** Plan-from-paper: "Use your phone" — the phone takes the shot and uploads
+   *  it; this fires with the storage path once it lands. Absent = no phone
+   *  option (plain photo capture). */
+  onPhoneHandoff?: (storagePath: string) => void
 }
 
 /**
- * Live camera capture for photo-first capture on web/desktop. On a Mac with an
- * iPhone nearby, Continuity Camera exposes the phone as a system camera device
- * ("iPhone Camera") — selecting it makes the phone the desktop's camera. On
- * mobile web this is simply the device camera.
+ * Live camera capture for photo-first capture on web/desktop. On mobile web
+ * this is simply the device camera.
+ *
+ * Continuity Camera is NOT a route to the phone here: Chrome on macOS never
+ * enumerates the iPhone (Chromium bug 436126054), and even where it is listed
+ * the phone must be locked and motionless — useless for a handheld shot of a
+ * page. Plan-from-paper passes `onPhoneHandoff` instead: a QR code hands the
+ * shot to the phone, which uploads it (see docs/superpowers/specs/
+ * 2026-09-06-paper-phone-handoff-design.md).
  */
-export function CameraCaptureModal({ onCapture, onPickFile, onClose, altitude, onAltitudeChange }: CameraCaptureModalProps) {
+export function CameraCaptureModal({ onCapture, onPickFile, onClose, altitude, onAltitudeChange, onPhoneHandoff }: CameraCaptureModalProps) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const streamRef = useRef<MediaStream | null>(null)
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([])
@@ -71,6 +82,9 @@ export function CameraCaptureModal({ onCapture, onPickFile, onClose, altitude, o
   // webcam at a piece of paper. A remembered rotation means this machine has
   // used the camera before — keep auto-starting for it, as always.
   const [showPicker, setShowPicker] = useState(() => isDesktop() && !hasUsedCameraBefore())
+  // Set while the QR code is up; a fresh id per visit so a stale phone tab
+  // from an earlier run can't feed this one.
+  const [handoffId, setHandoffId] = useState<string | null>(null)
 
   const cycleRotation = useCallback(() => {
     setRotation((prev) => {
@@ -135,13 +149,17 @@ export function CameraCaptureModal({ onCapture, onPickFile, onClose, altitude, o
   }, [stopStream])
 
   useEffect(() => {
-    if (showPicker) return
+    if (showPicker || handoffId) return
     void startStream(deviceId)
     return stopStream
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- restart only when the chosen device (or leaving the picker) changes
-  }, [deviceId, showPicker])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- restart only when the chosen device (or leaving the picker/phone screen) changes
+  }, [deviceId, showPicker, handoffId])
 
-  const useCamera = useCallback(() => setShowPicker(false), [])
+  const useCamera = useCallback(() => { setHandoffId(null); setShowPicker(false) }, [])
+  const usePhone = useCallback(() => { stopStream(); setHandoffId(newHandoffId()) }, [stopStream])
+  // Leaving the phone screen returns to wherever the modal would have been
+  // without it: the picker on a first-run desktop, the camera otherwise.
+  const leavePhone = useCallback(() => setHandoffId(null), [])
 
   const snap = useCallback(() => {
     const video = videoRef.current
@@ -205,16 +223,31 @@ export function CameraCaptureModal({ onCapture, onPickFile, onClose, altitude, o
           </div>
         )}
 
-        {showPicker ? (
+        {handoffId && onPhoneHandoff ? (
+          <PhoneHandoffPanel id={handoffId} onReceived={onPhoneHandoff} onBack={leavePhone} />
+        ) : showPicker ? (
           <div className="px-6 py-10 text-center space-y-4">
             <p className="text-sm text-neutral-300 leading-relaxed">
-              Pick a photo or PDF of the page, or use a camera instead.
+              {onPhoneHandoff
+                ? 'Take the photo with your phone, pick a photo or PDF of the page, or use a camera.'
+                : 'Pick a photo or PDF of the page, or use a camera instead.'}
             </p>
             <div className="flex items-center justify-center gap-3">
+              {onPhoneHandoff && (
+                <button
+                  type="button"
+                  onClick={usePhone}
+                  className="btn-primary px-4 py-2 rounded-lg text-sm inline-flex items-center gap-2"
+                >
+                  <Smartphone className="w-4 h-4" /> Use your phone
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => { stopStream(); onPickFile() }}
-                className="btn-primary px-4 py-2 rounded-lg text-sm inline-flex items-center gap-2"
+                className={onPhoneHandoff
+                  ? 'inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/10 text-white text-sm hover:bg-white/20 transition-colors'
+                  : 'btn-primary px-4 py-2 rounded-lg text-sm inline-flex items-center gap-2'}
               >
                 <ImageUp className="w-4 h-4" /> Choose a file
               </button>
@@ -282,6 +315,15 @@ export function CameraCaptureModal({ onCapture, onPickFile, onClose, altitude, o
               >
                 choose a file
               </button>
+              {onPhoneHandoff && (
+                <button
+                  type="button"
+                  onClick={usePhone}
+                  className="text-xs text-neutral-400 hover:text-white transition-colors shrink-0"
+                >
+                  use your phone
+                </button>
+              )}
               <button
                 type="button"
                 onClick={cycleRotation}

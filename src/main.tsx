@@ -101,6 +101,8 @@ import { ErrorBoundary } from './components/ErrorBoundary'
 // Quick-capture window for the Mac shell (desktop/): a frameless Tauri window
 // loads /capture via the global hotkey. Lazy — browsers never fetch it.
 const CapturePage = lazy(() => import('./desktop/CapturePage').then((m) => ({ default: m.CapturePage })))
+// Plan-from-paper phone hand-off: opened from the desktop's QR code.
+const PhonePaperPage = lazy(() => import('./components/capture/PhonePaperPage').then((m) => ({ default: m.PhonePaperPage })))
 // Design preview for the person-lane wall. Ungated like the kiosk routes so it
 // can be opened on the Pi without a session; carries no live data.
 const WallV2LanePreview = lazy(() => import('./components/wall-v2/WallV2LanePreview').then((m) => ({ default: m.WallV2LanePreview })))
@@ -191,6 +193,10 @@ createRoot(document.getElementById('root')!).render(
               <Route path="/lists/*" element={cutoverShell} />
               <Route path="/capture" element={<Suspense fallback={null}><CapturePage /></Suspense>} />
               <Route path="/join/:token" element={<JoinHousehold />} />
+              <Route
+                path="/paper/phone/:id"
+                element={<AuthGate>{({ user }) => <Suspense fallback={null}><PhonePaperPage user={user} /></Suspense>}</AuthGate>}
+              />
               <Route path="/calendar-callback" element={<CalendarCallback />} />
               {/* The Shell owns the cutover paths (/, /today, /inbox, /task/:id)
                   and any unmatched path. Explicit routes above win by specificity. */}

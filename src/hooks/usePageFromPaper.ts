@@ -5,6 +5,7 @@ import { planWindowDates, type PageAltitude } from '@/lib/planParse'
 import { readSeasons } from '@/lib/cadence/seasons'
 import { validatePageResult, type PageResult } from '@/lib/pageParse'
 import { SessionExpiredError } from '@/lib/authErrors'
+import { toJpeg } from '@/lib/toJpeg'
 import type { FamilyMember } from '@/types/family'
 
 /**
@@ -26,9 +27,6 @@ async function isUnauthorized(fnErr: { context?: { status?: number; json?: () =>
 
 export type PageParseStatus = 'idle' | 'parsing' | 'ready' | 'error'
 
-/** Longest side of the uploaded JPEG — plenty for vision, kind to egress. */
-const MAX_DIMENSION = 1600
-
 const EMPTY: PageResult = {
   items: [],
   notes: [],
@@ -40,23 +38,6 @@ const EMPTY: PageResult = {
   titlePeriod: null,
 }
 
-async function toJpeg(blob: Blob): Promise<Blob> {
-  const bitmap = await createImageBitmap(blob)
-  const scale = Math.min(1, MAX_DIMENSION / Math.max(bitmap.width, bitmap.height))
-  const canvas = document.createElement('canvas')
-  canvas.width = Math.round(bitmap.width * scale)
-  canvas.height = Math.round(bitmap.height * scale)
-  canvas.getContext('2d')?.drawImage(bitmap, 0, 0, canvas.width, canvas.height)
-  bitmap.close()
-  return new Promise((resolve, reject) => {
-    canvas.toBlob(
-      (out) => (out ? resolve(out) : reject(new Error('Could not encode image'))),
-      'image/jpeg',
-      0.8,
-    )
-  })
-}
-
 /**
  * Page-from-paper: upload the photographed (or scanned) page and ask the
  * `parse-page` edge function to read it into placeable items, prose notes,
@@ -64,6 +45,8 @@ async function toJpeg(blob: Blob): Promise<Blob> {
  * only what the user confirms.
  *
  * Retry re-invokes the function with the already-uploaded image (no re-upload).
+ * `parseFromStoragePath` is the same read for a page that is already in the
+ * bucket — the phone hand-off uploads it from the other device.
  */
 export function usePageFromPaper(members: FamilyMember[]) {
   const [status, setStatus] = useState<PageParseStatus>('idle')
@@ -129,6 +112,19 @@ export function usePageFromPaper(members: FamilyMember[]) {
     }
   }, [invokeParse])
 
+  const parseFromStoragePath = useCallback(async (storagePath: string, altitude: PageAltitude = 'week') => {
+    altitudeRef.current = altitude
+    storagePathRef.current = storagePath
+    setStatus('parsing')
+    setError(null)
+    try {
+      await invokeParse(storagePath, altitude)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+      setStatus('error')
+    }
+  }, [invokeParse])
+
   const retry = useCallback(async () => {
     const storagePath = storagePathRef.current
     if (!storagePath) return
@@ -150,5 +146,5 @@ export function usePageFromPaper(members: FamilyMember[]) {
     altitudeRef.current = 'week'
   }, [])
 
-  return { status, result, error, parseFromBlob, retry, reset }
+  return { status, result, error, parseFromBlob, parseFromStoragePath, retry, reset }
 }

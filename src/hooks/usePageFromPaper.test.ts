@@ -41,3 +41,17 @@ describe('usePageFromPaper', () => {
     expect(result.current.error).toBe('boom')
   })
 })
+
+describe('usePageFromPaper.parseFromStoragePath', () => {
+  it('reads a page the phone already uploaded — no upload, same parse call', async () => {
+    invoke.mockResolvedValue({ data: { ok: true, items: [], notes: [], unclear: [], window: [], altitude: 'season', storagePath: 'u1/page/handoff-abc.jpg' }, error: null })
+    vi.mocked(supabase.storage.from).mockClear()
+    const { result } = renderHook(() => usePageFromPaper([]))
+    await act(() => result.current.parseFromStoragePath('u1/page/handoff-abc.jpg', 'season'))
+    expect(supabase.storage.from).not.toHaveBeenCalled()
+    expect(invoke).toHaveBeenCalledTimes(1)
+    expect(invoke.mock.calls[0][1].body).toMatchObject({ storagePath: 'u1/page/handoff-abc.jpg', altitude: 'season' })
+    expect(result.current.status).toBe('ready')
+    expect(result.current.result.storagePath).toBe('u1/page/handoff-abc.jpg')
+  })
+})

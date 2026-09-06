@@ -94,3 +94,40 @@ describe('CameraCaptureModal', () => {
     })
   })
 })
+
+describe('CameraCaptureModal — phone hand-off', () => {
+  afterEach(() => {
+    // @ts-expect-error test cleanup of a property this file defines
+    delete navigator.mediaDevices
+    setTouch(false)
+    try { localStorage.clear() } catch { /* ignore */ }
+    vi.restoreAllMocks()
+  })
+
+  it('on desktop, "Use your phone" leads and opens a QR code for the phone route', async () => {
+    setTouch(false)
+    const getUserMedia = vi.fn().mockResolvedValue({ getVideoTracks: () => [], getTracks: () => [] })
+    stubMediaDevices(getUserMedia)
+    const onPhoneHandoff = vi.fn()
+
+    render(<CameraCaptureModal onCapture={vi.fn()} onPickFile={vi.fn()} onClose={vi.fn()} onPhoneHandoff={onPhoneHandoff} />)
+
+    const phone = await screen.findByRole('button', { name: /use your phone/i })
+    expect(phone.className).toContain('btn-primary')
+    expect(screen.getByRole('button', { name: /choose a file/i }).className).not.toContain('btn-primary')
+
+    await userEvent.click(phone)
+    const img = await screen.findByRole('img', { name: /qr code/i })
+    expect(img.getAttribute('src')).toMatch(/^data:image\/svg\+xml/)
+    expect(screen.getByRole('status')).toHaveTextContent(/waiting for your phone/i)
+    expect(getUserMedia).not.toHaveBeenCalled()
+  })
+
+  it('without the hand-off callback the phone option does not exist', async () => {
+    setTouch(false)
+    stubMediaDevices(vi.fn().mockResolvedValue({ getVideoTracks: () => [], getTracks: () => [] }))
+    render(<CameraCaptureModal onCapture={vi.fn()} onPickFile={vi.fn()} onClose={vi.fn()} />)
+    await screen.findByRole('button', { name: /choose a file/i })
+    expect(screen.queryByRole('button', { name: /use your phone/i })).toBeNull()
+  })
+})
