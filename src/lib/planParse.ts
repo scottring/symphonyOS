@@ -70,6 +70,10 @@ export interface PlanItem {
   kind: 'task' | 'dayfact' | 'recurring'
   recurring: PlanRecurring | null
   phone: string | null
+  /** The named member a line is ABOUT (e.g. "Mia: dentist" → Mia), set by
+   *  decideAssignment in validatePageResult — never the doer. Null when the
+   *  line names no one, or when a named adult IS the doer (assigneeId instead). */
+  contactMemberId: string | null
   /** Lineage chosen on the sheet: the existing task this row is a copy of. */
   sourceId?: string
 }
@@ -229,6 +233,9 @@ export function validatePlanItems(
       kind,
       recurring,
       phone: typeof e.phone === 'string' && PHONE.test(e.phone) ? e.phone.trim() : null,
+      // Overwritten by decideAssignment in validatePageResult, which has the
+      // household roles this pass doesn't.
+      contactMemberId: null,
     })
   }
   return out

@@ -20,8 +20,8 @@ import type { FamilyMember } from '@/types/family'
  */
 export function SupernotePagesSection() {
   const { members } = useFamilyMembers()
-  const memberIds = useMemo(() => new Set(members.map((m) => m.id)), [members])
-  const { pages, dismiss } = usePendingPages(memberIds)
+  const planMembers = useMemo(() => members.map((m) => ({ id: m.id, name: m.name, role: m.role_label ?? null })), [members])
+  const { pages, dismiss } = usePendingPages(planMembers)
   const [openId, setOpenId] = useState<string | null>(null)
 
   if (pages.length === 0) return null

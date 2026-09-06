@@ -10,8 +10,8 @@ import { DEFAULT_SEASONS } from '@/lib/cadence/seasons'
 const WINDOW = ['2026-08-17', '2026-08-18', '2026-08-19']
 const MEMBERS = [{ id: 'm-iris', name: 'Iris' } as FamilyMember]
 const ITEMS: PlanItem[] = [
-  { title: 'Call dentist', placement: { kind: 'date', date: '2026-08-18' }, assigneeId: null, note: '410-555-0100' },
-  { title: 'Return library books', placement: { kind: 'week' }, assigneeId: 'm-iris', note: null },
+  { title: 'Call dentist', placement: { kind: 'date', date: '2026-08-18' }, time: null, assigneeId: null, note: '410-555-0100', dateHint: null, kind: 'task' as const, recurring: null, phone: null, contactMemberId: null },
+  { title: 'Return library books', placement: { kind: 'week' }, time: null, assigneeId: 'm-iris', note: null, dateHint: null, kind: 'task' as const, recurring: null, phone: null, contactMemberId: null },
 ]
 const NOTES: PageNote[] = [{ title: 'Roof quotes', content: 'Two quotes in, gutters add 1200' }]
 
@@ -139,8 +139,8 @@ describe('PageReviewSheet — altitudes', () => {
       windowDates: [],
       notes: [],
       items: [
-        { title: 'Half marathon', placement: { kind: 'goal' }, time: null, assigneeId: null, note: null },
-        { title: 'Book Iceland flights', placement: { kind: 'season' }, time: null, assigneeId: null, note: null },
+        { title: 'Half marathon', placement: { kind: 'goal' }, time: null, assigneeId: null, note: null, dateHint: null, kind: 'task' as const, recurring: null, phone: null, contactMemberId: null },
+        { title: 'Book Iceland flights', placement: { kind: 'season' }, time: null, assigneeId: null, note: null, dateHint: null, kind: 'task' as const, recurring: null, phone: null, contactMemberId: null },
       ],
     })
     expect(screen.getByText('Goal')).toBeInTheDocument()
@@ -162,7 +162,7 @@ describe('PageReviewSheet — altitudes', () => {
       const user = userEvent.setup()
       const { onCommit } = renderSheet({
         altitude: 'month', today: new Date(2026, 8, 5),
-        items: [{ title: 'Repaint the porch', placement: { kind: 'month' }, time: null, assigneeId: null, note: null }],
+        items: [{ title: 'Repaint the porch', placement: { kind: 'month' }, time: null, assigneeId: null, note: null, dateHint: null, kind: 'task' as const, recurring: null, phone: null, contactMemberId: null }],
         notes: [],
       })
       expect(screen.getByText('September')).toBeInTheDocument()
@@ -181,7 +181,7 @@ describe('PageReviewSheet — altitudes', () => {
       const user = userEvent.setup()
       const { onCommit } = renderSheet({
         altitude: 'season', today: new Date(2026, 8, 20), seasons: DEFAULT_SEASONS,
-        items: [{ title: 'Fall trips', placement: { kind: 'season' }, time: null, assigneeId: null, note: null }],
+        items: [{ title: 'Fall trips', placement: { kind: 'season' }, time: null, assigneeId: null, note: null, dateHint: null, kind: 'task' as const, recurring: null, phone: null, contactMemberId: null }],
         notes: [],
       })
       expect(screen.getByText('Fall 2026')).toBeInTheDocument()
@@ -196,8 +196,8 @@ describe('PageReviewSheet — altitudes', () => {
       const { onCommit } = renderSheet({
         altitude: 'month', today: new Date(2026, 8, 5),
         items: [
-          { title: 'Read more', placement: { kind: 'month' }, time: null, assigneeId: null, note: null, goal: true },
-          { title: 'Repaint the porch', placement: { kind: 'month' }, time: null, assigneeId: null, note: null },
+          { title: 'Read more', placement: { kind: 'month' }, time: null, assigneeId: null, note: null, goal: true, dateHint: null, kind: 'task' as const, recurring: null, phone: null, contactMemberId: null },
+          { title: 'Repaint the porch', placement: { kind: 'month' }, time: null, assigneeId: null, note: null, dateHint: null, kind: 'task' as const, recurring: null, phone: null, contactMemberId: null },
         ],
         notes: [],
       })
@@ -213,7 +213,7 @@ describe('PageReviewSheet — altitudes', () => {
       const user = userEvent.setup()
       const { onCommit } = renderSheet({
         altitude: 'month', today: new Date(2026, 8, 5),
-        items: [{ title: 'Read more', placement: { kind: 'month' }, time: null, assigneeId: null, note: null, goal: true }],
+        items: [{ title: 'Read more', placement: { kind: 'month' }, time: null, assigneeId: null, note: null, goal: true, dateHint: null, kind: 'task' as const, recurring: null, phone: null, contactMemberId: null }],
         notes: [],
       })
       await user.selectOptions(screen.getByRole('combobox', { name: /when/i }), '2026-08-18')

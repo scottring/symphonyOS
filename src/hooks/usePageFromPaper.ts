@@ -78,7 +78,7 @@ export function usePageFromPaper(members: FamilyMember[]) {
     if (data?.error) throw new Error(String(data.error))
     // `dates` is only the fallback — the response echoes the window it actually
     // used, and that is what the review sheet must offer.
-    setResult(validatePageResult(data, new Set(members.map((m) => m.id)), dates, altitude))
+    setResult(validatePageResult(data, members.map((m) => ({ id: m.id, name: m.name, role: m.role_label ?? null })), dates, altitude))
     setStatus('ready')
   }, [members])
 

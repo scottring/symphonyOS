@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { validatePageResult } from './pageParse'
 
-const MEMBERS = new Set(['m-iris'])
+const MEMBERS = [{ id: 'm-iris', name: 'Iris', role: 'parent' }]
 const FALLBACK = ['2026-08-25', '2026-08-26']
 
 describe('validatePageResult', () => {

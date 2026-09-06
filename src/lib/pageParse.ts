@@ -6,8 +6,11 @@
 // written are testable without a DOM.
 
 import { validatePlanItems, isPageAltitude, type PlanItem, type PageAltitude } from '@/lib/planParse'
+import { decideAssignment, type PlanMember } from '@/lib/planAssign'
 import { periodFromTitle, type TitlePeriod } from '@/lib/planTitle'
 import { readSeasons } from '@/lib/cadence/seasons'
+
+export type { PlanMember } from '@/lib/planAssign'
 
 export interface PageNote {
   title: string
@@ -73,7 +76,7 @@ function validateUnclear(raw: unknown): string[] {
  */
 export function validatePageResult(
   raw: unknown,
-  memberIds: Set<string>,
+  members: PlanMember[],
   fallbackWindow: string[],
   fallbackAltitude: PageAltitude = 'week',
 ): PageResult {
@@ -85,6 +88,7 @@ export function validatePageResult(
     storagePath?: unknown
     page_title?: unknown
   }
+  const memberIds = new Set(members.map((m) => m.id))
   const echoed = Array.isArray(r.window)
     ? r.window.filter((d): d is string => typeof d === 'string')
     : []
@@ -93,8 +97,15 @@ export function validatePageResult(
   const altitude = isPageAltitude(r.altitude) ? r.altitude : fallbackAltitude
   const windowDates = Array.isArray(r.window) && (echoed.length || altitude === 'year') ? echoed : fallbackWindow
   const pageTitle = typeof r.page_title === 'string' && r.page_title.trim() ? r.page_title.trim() : null
+  // Assignment is a deterministic rule, not the model's per-line guess (the
+  // model is inconsistent line to line — see planAssign.ts). Applied AFTER
+  // validation so it sees the same title/goal shape the sheet will show.
+  const items = validatePlanItems(raw, windowDates, memberIds, altitude).map((item) => {
+    const decision = decideAssignment(item.title, item.assigneeId, members, item.placement.kind === 'goal' || !!item.goal)
+    return { ...item, title: decision.title, assigneeId: decision.assigneeId, contactMemberId: decision.contactMemberId }
+  })
   return {
-    items: validatePlanItems(raw, windowDates, memberIds, altitude),
+    items,
     notes: validateNotes(r.notes),
     unclear: validateUnclear(r.unclear),
     windowDates,

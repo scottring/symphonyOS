@@ -6,7 +6,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { validatePageResult, type PageResult } from '@/lib/pageParse'
+import { validatePageResult, type PageResult, type PlanMember } from '@/lib/pageParse'
 import { useRefreshOnVisible } from '@/hooks/useRefreshOnVisible'
 import { showToast } from '@/hooks/useToast'
 
@@ -26,7 +26,7 @@ interface CaptureRow {
   created_at: string
 }
 
-export function usePendingPages(memberIds: Set<string>) {
+export function usePendingPages(members: PlanMember[]) {
   const [pages, setPages] = useState<PendingPage[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -46,7 +46,7 @@ export function usePendingPages(memberIds: Set<string>) {
         try {
           // The window comes from the stored result — a page parsed last night
           // must be reviewed against the dates the model was shown, not today's.
-          const result = validatePageResult(JSON.parse(row.raw_text), memberIds, [])
+          const result = validatePageResult(JSON.parse(row.raw_text), members, [])
           return [{
             captureId: row.id,
             label: row.source_label ?? 'Page',
@@ -59,7 +59,7 @@ export function usePendingPages(memberIds: Set<string>) {
       }),
     )
     setLoading(false)
-  }, [memberIds])
+  }, [members])
 
   useEffect(() => { void refresh() }, [refresh])
 

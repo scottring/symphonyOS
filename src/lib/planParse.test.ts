@@ -43,7 +43,7 @@ describe('validatePlanItems', () => {
       WINDOW,
       MEMBERS,
     )
-    const extra = { dateHint: null, kind: 'task' as const, recurring: null, phone: null }
+    const extra = { dateHint: null, kind: 'task' as const, recurring: null, phone: null, contactMemberId: null }
     expect(items).toEqual([
       { title: 'Call dentist', placement: { kind: 'date', date: '2026-08-18' }, time: null, assigneeId: null, note: '410-555-0100', ...extra, dateHint: '2026-08-18' },
       { title: 'Return library books', placement: { kind: 'week' }, time: null, assigneeId: 'm-iris', note: null, ...extra },
@@ -80,7 +80,7 @@ describe('planItemToAddTaskArgs', () => {
   const ctx = { currentWeekStart: new Date(2026, 7, 16), monthStart: new Date(2026, 7, 1), seasonStart: new Date(2026, 6, 1), context: 'family' as const }
 
   it('maps a dated item to an all-day scheduledFor on the local date', () => {
-    const item: PlanItem = { title: 'Call dentist', placement: { kind: 'date', date: '2026-08-18' }, time: null, assigneeId: null, note: 'ask about Mia', dateHint: null, kind: 'task', recurring: null, phone: null }
+    const item: PlanItem = { title: 'Call dentist', placement: { kind: 'date', date: '2026-08-18' }, time: null, assigneeId: null, note: 'ask about Mia', dateHint: null, kind: 'task', recurring: null, phone: null, contactMemberId: null }
     const args = planItemToAddTaskArgs(item, ctx)
     expect(args.scheduledFor && localYmd(args.scheduledFor)).toBe('2026-08-18')
     expect(args.options.isAllDay).toBe(true)
@@ -90,7 +90,7 @@ describe('planItemToAddTaskArgs', () => {
   })
 
   it('maps a week item to bucket=week WITH the week stamped', () => {
-    const item: PlanItem = { title: 'Mulch beds', placement: { kind: 'week' }, time: null, assigneeId: null, note: null, dateHint: null, kind: 'task', recurring: null, phone: null }
+    const item: PlanItem = { title: 'Mulch beds', placement: { kind: 'week' }, time: null, assigneeId: null, note: null, dateHint: null, kind: 'task', recurring: null, phone: null, contactMemberId: null }
     const args = planItemToAddTaskArgs(item, ctx)
     expect(args.scheduledFor).toBeUndefined()
     expect(args.options.bucket).toBe('week')
@@ -98,16 +98,16 @@ describe('planItemToAddTaskArgs', () => {
   })
 
   it('maps an inbox item to the inbox bucket with no week', () => {
-    const item: PlanItem = { title: 'Someday thing', placement: { kind: 'inbox' }, time: null, assigneeId: null, note: null, dateHint: null, kind: 'task', recurring: null, phone: null }
+    const item: PlanItem = { title: 'Someday thing', placement: { kind: 'inbox' }, time: null, assigneeId: null, note: null, dateHint: null, kind: 'task', recurring: null, phone: null, contactMemberId: null }
     const args = planItemToAddTaskArgs(item, ctx)
     expect(args.options.bucket).toBe('inbox')
     expect(args.options.weekStart).toBeUndefined()
   })
 
   it('passes a named assignee and leaves unnamed for the default', () => {
-    const named: PlanItem = { title: 'X', placement: { kind: 'inbox' }, time: null, assigneeId: 'm-iris', note: null, dateHint: null, kind: 'task', recurring: null, phone: null }
+    const named: PlanItem = { title: 'X', placement: { kind: 'inbox' }, time: null, assigneeId: 'm-iris', note: null, dateHint: null, kind: 'task', recurring: null, phone: null, contactMemberId: null }
     expect(planItemToAddTaskArgs(named, ctx).options.assignedTo).toBe('m-iris')
-    const unnamed: PlanItem = { title: 'Y', placement: { kind: 'inbox' }, time: null, assigneeId: null, note: null, dateHint: null, kind: 'task', recurring: null, phone: null }
+    const unnamed: PlanItem = { title: 'Y', placement: { kind: 'inbox' }, time: null, assigneeId: null, note: null, dateHint: null, kind: 'task', recurring: null, phone: null, contactMemberId: null }
     expect(planItemToAddTaskArgs(unnamed, ctx).options.assignedTo).toBeUndefined()
   })
 })
@@ -119,7 +119,7 @@ describe('planItemToAddTaskArgs — times', () => {
 
   it('schedules a dated item with a time as a real block', () => {
     const args = planItemToAddTaskArgs(
-      { title: 'Dentist', placement: { kind: 'date', date: '2026-08-18' }, time: '14:00', assigneeId: null, note: null, dateHint: null, kind: 'task', recurring: null, phone: null },
+      { title: 'Dentist', placement: { kind: 'date', date: '2026-08-18' }, time: '14:00', assigneeId: null, note: null, dateHint: null, kind: 'task', recurring: null, phone: null, contactMemberId: null },
       CTX,
     )
     expect(args.options.isAllDay).toBe(false)
@@ -130,7 +130,7 @@ describe('planItemToAddTaskArgs — times', () => {
 
   it('still writes an all-day chip when the line named no time', () => {
     const args = planItemToAddTaskArgs(
-      { title: 'Mow', placement: { kind: 'date', date: '2026-08-18' }, time: null, assigneeId: null, note: null, dateHint: null, kind: 'task', recurring: null, phone: null },
+      { title: 'Mow', placement: { kind: 'date', date: '2026-08-18' }, time: null, assigneeId: null, note: null, dateHint: null, kind: 'task', recurring: null, phone: null, contactMemberId: null },
       CTX,
     )
     expect(args.options.isAllDay).toBe(true)
@@ -230,7 +230,7 @@ describe('planWindowDates — season window from the household boundaries', () =
 describe('planItemToAddTaskArgs — horizons', () => {
   const ctx = { currentWeekStart: new Date(2026, 7, 16), monthStart: new Date(2026, 9, 1), seasonStart: new Date(2026, 9, 1), context: null }
   const item = (kind: 'month' | 'season' | 'someday' | 'goal', goal?: boolean): PlanItem =>
-    ({ title: 'X', placement: { kind }, time: null, assigneeId: null, note: null, goal, dateHint: null, kind: 'task', recurring: null, phone: null })
+    ({ title: 'X', placement: { kind }, time: null, assigneeId: null, note: null, goal, dateHint: null, kind: 'task', recurring: null, phone: null, contactMemberId: null })
 
   it('month → the month list, stamped with the month the page is for', () => {
     const args = planItemToAddTaskArgs(item('month'), ctx)
@@ -322,7 +322,7 @@ describe('planWindowDates with an explicit period start', () => {
 })
 
 describe('rewindowPlanItems', () => {
-  const base = { time: null, assigneeId: null, note: null, kind: 'task' as const, recurring: null, phone: null }
+  const base = { time: null, assigneeId: null, note: null, kind: 'task' as const, recurring: null, phone: null, contactMemberId: null }
   it('a degraded row whose dateHint is now inside the window becomes a date again', () => {
     const [r] = rewindowPlanItems([{ ...base, title: 'Recital', placement: { kind: 'season' }, dateHint: '2026-12-12' }], ['2026-12-11', '2026-12-12'], 'season')
     expect(r.placement).toEqual({ kind: 'date', date: '2026-12-12' })
