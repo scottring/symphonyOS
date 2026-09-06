@@ -1,6 +1,9 @@
 // src/components/schedule/InboxView.tsx
 import { useMemo, useCallback, useState } from 'react'
 import { PAGE_COLUMN } from '@/components/layout/pageLayout'
+import { MastheadCard } from '@/components/layout/MastheadCard'
+import { HomeChromeControls } from '@/components/home/HomeChromeControls'
+import { useAppShellChromeOptional } from '@/contexts/AppShellChromeContext'
 import { X, CornerDownRight, CalendarDays, Sun } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import type { Task, TaskContext } from '@/types/task'
@@ -78,6 +81,10 @@ export function InboxView({
   const { user } = useAuth()
 
   const { soleDomain, layers } = useDomain()
+
+  // Page chrome for the card's corner — only inside an AppShell (tests mount bare).
+
+  const chrome = useAppShellChromeOptional()
 
   // Needs-re-filing strip: the UNFILTERED tasks prop, not filteredByDomain —
   // a stranded row must show regardless of which layers are checked.
@@ -628,36 +635,40 @@ export function InboxView({
   return (
     <div className="h-full overflow-y-auto">
       <div className={PAGE_COLUMN}>
-      <header className="mb-6 flex items-start justify-between">
-        <div>
-          <h1 className="font-display text-2xl font-semibold text-neutral-800">Inbox</h1>
-          <p className="text-sm text-neutral-500 mt-1">
-            {totalCount === 0
-              ? (loading ? 'Loading your inbox…' : 'All clear — nothing to triage')
-              : `${totalCount} item${totalCount !== 1 ? 's' : ''} to triage`}
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          {totalCount > 0 && (
-            <button
-              type="button"
-              onClick={() => (selectionMode ? exitSelection() : setSelectionMode(true))}
-              className={`text-sm font-medium px-2.5 py-1.5 rounded-lg transition-colors ${selectionMode ? 'text-primary-700 bg-primary-50' : 'text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100'}`}
-            >
-              {selectionMode ? 'Done' : 'Select'}
-            </button>
-          )}
-          {totalCount > 0 && <InboxModeToggle mode={mode} onChange={setMode} />}
-          {familyMembers.length > 0 && (
-            <AssigneeFilter
-              selectedAssignees={selectedAssignees}
-              onSelectAssignees={setSelectedAssignees}
-              assigneesWithTasks={familyMembers}
-              hasUnassignedTasks={hasUnassignedTasks}
-            />
-          )}
-        </div>
-      </header>
+      {/* The same masthead card the rest of the top group wears (Today, This
+          Week, the period pages). No eyebrow — the inbox has no period to step
+          through. Its own controls ride along the foot, as Today's do. */}
+      <MastheadCard
+        title="Inbox"
+        subline={
+          totalCount === 0
+            ? (loading ? 'Loading your inbox…' : 'All clear — nothing to triage')
+            : `${totalCount} item${totalCount !== 1 ? 's' : ''} to triage`
+        }
+        controls={chrome ? <HomeChromeControls className="flex" /> : undefined}
+        footer={(totalCount > 0 || familyMembers.length > 0) ? (
+          <div className="flex items-center gap-3">
+            {totalCount > 0 && (
+              <button
+                type="button"
+                onClick={() => (selectionMode ? exitSelection() : setSelectionMode(true))}
+                className={`text-sm font-medium px-2.5 py-1.5 rounded-lg transition-colors ${selectionMode ? 'text-primary-700 bg-primary-50' : 'text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100'}`}
+              >
+                {selectionMode ? 'Done' : 'Select'}
+              </button>
+            )}
+            {totalCount > 0 && <InboxModeToggle mode={mode} onChange={setMode} />}
+            {familyMembers.length > 0 && (
+              <AssigneeFilter
+                selectedAssignees={selectedAssignees}
+                onSelectAssignees={setSelectedAssignees}
+                assigneesWithTasks={familyMembers}
+                hasUnassignedTasks={hasUnassignedTasks}
+              />
+            )}
+          </div>
+        ) : undefined}
+      />
 
       <SupernotePagesSection />
 

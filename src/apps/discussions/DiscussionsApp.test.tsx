@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import type { InboxRow } from '@/lib/discussions/inbox'
 
@@ -53,5 +53,12 @@ describe('DiscussionsApp', () => {
 
   it('builds routine links too', () => {
     expect(discussionHref({ entityType: 'routine', entityId: 'r1' })).toBe('/today?detail=routine:r1&discuss=1')
+  })
+
+
+  it('wears the shared masthead card, like the other rows in the top group', () => {
+    render(<MemoryRouter><DiscussionsApp /></MemoryRouter>)
+    const card = screen.getByTestId('masthead-card')
+    expect(within(card).getByRole('heading', { level: 1, name: 'Discussions' })).toBeInTheDocument()
   })
 })

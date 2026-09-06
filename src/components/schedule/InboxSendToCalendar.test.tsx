@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, act } from '@/test/test-utils'
+import { within } from '@testing-library/react'
 import { InboxView } from './InboxView'
 import { ScheduleActionsProvider, type ScheduleActionsValue } from '@/contexts/ScheduleActionsContext'
 import type { Task } from '@/types/task'
@@ -324,5 +325,14 @@ describe('InboxView send to calendar', () => {
   // and anything else appended here — would run with console.error silenced.
   it('leaves console.error unstubbed for whatever test runs next', () => {
     expect(vi.isMockFunction(console.error)).toBe(false)
+  })
+})
+
+describe('InboxView masthead', () => {
+  it('wears the shared masthead card with the count on the quiet line and the page controls along the foot', () => {
+    renderInbox()
+    const card = screen.getByTestId('masthead-card')
+    expect(within(card).getByRole('heading', { level: 1, name: 'Inbox' })).toBeInTheDocument()
+    expect(within(card).getByText(/1 item to triage/)).toBeInTheDocument()
   })
 })

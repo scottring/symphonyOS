@@ -1,4 +1,7 @@
 // src/apps/discussions/DiscussionsApp.tsx
+import { MastheadCard } from '@/components/layout/MastheadCard'
+import { HomeChromeControls } from '@/components/home/HomeChromeControls'
+import { useAppShellChromeOptional } from '@/contexts/AppShellChromeContext'
 //
 // The Discussions inbox: every item conversation you can see with activity,
 // newest first. This is what makes item threads feel like messaging — a
@@ -27,13 +30,16 @@ export function discussionHref(row: Pick<InboxRow, 'entityType' | 'entityId'>): 
 export function DiscussionsApp() {
   const navigate = useNavigate()
   const { rows, loading } = useDiscussionInbox()
+  const chrome = useAppShellChromeOptional()
 
   return (
     <div className="max-w-3xl mx-auto px-6 py-8">
-      <h1 className="text-3xl font-display text-neutral-900 mb-1">Discussions</h1>
-      <p className="text-[15px] text-neutral-500 mb-6">
-        Conversations on your tasks, routines, and events — newest first.
-      </p>
+      {/* The same masthead card the rest of the top group wears. */}
+      <MastheadCard
+        title="Discussions"
+        subline="Conversations on your tasks, routines, and events — newest first."
+        controls={chrome ? <HomeChromeControls className="flex" /> : undefined}
+      />
 
       {loading && rows.length === 0 && (
         <p className="text-[15px] text-neutral-400">Loading…</p>
