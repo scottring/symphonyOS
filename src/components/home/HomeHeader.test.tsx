@@ -9,22 +9,25 @@ const ymd = (x: Date) => `${x.getFullYear()}-${x.getMonth() + 1}-${x.getDate()}`
 function renderWeek(over: Partial<React.ComponentProps<typeof HomeHeader>> = {}) {
   const onWeekChange = vi.fn()
   const onRangeChange = vi.fn()
-  render(
-    <HomeHeader
-      currentView="week"
-      onViewChange={() => {}}
-      viewedDate={new Date(2026, 8, 9)}
-      onDateChange={() => {}}
-      weekStart={new Date(2026, 8, 6)}
-      onWeekChange={onWeekChange}
-      rangeDays={7}
-      onRangeChange={onRangeChange}
-      monthStart={new Date(2026, 8, 1)}
-      onMonthChange={() => {}}
-      {...over}
-    />,
-  )
-  return { onWeekChange, onRangeChange }
+  const baseProps: React.ComponentProps<typeof HomeHeader> = {
+    currentView: 'week',
+    onViewChange: () => {},
+    viewedDate: new Date(2026, 8, 9),
+    onDateChange: () => {},
+    weekStart: new Date(2026, 8, 6),
+    onWeekChange,
+    rangeDays: 7,
+    onRangeChange,
+    monthStart: new Date(2026, 8, 1),
+    onMonthChange: () => {},
+    ...over,
+  }
+  const view = render(<HomeHeader {...baseProps} />)
+  // Simulates what the real parent does: feed a picked/changed range's shape
+  // back in as props, as if HomeView had stored it and re-rendered.
+  const rerenderWith = (nextOver: Partial<React.ComponentProps<typeof HomeHeader>>) =>
+    view.rerender(<HomeHeader {...baseProps} {...nextOver} />)
+  return { onWeekChange, onRangeChange, rerenderWith }
 }
 
 describe('HomeHeader week range', () => {
@@ -99,6 +102,43 @@ describe('HomeHeader week masthead card', () => {
   })
   it('names a shorter range by its length', () => {
     renderWeek({ weekStart: new Date(2026, 8, 12), rangeDays: 2 })
+    expect(within(screen.getByTestId('masthead-eyebrow')).getByText('2 days')).toBeInTheDocument()
+  })
+
+  // A custom 2-day range and a Weekend-preset 2-day range look identical by
+  // day count alone — the eyebrow must tell them apart by which button was
+  // pressed, not just how many columns came back.
+  it('clicking Weekend labels the eyebrow "Weekend", not a day count', () => {
+    const { onRangeChange, rerenderWith } = renderWeek()
+    fireEvent.click(screen.getByRole('button', { name: 'Weekend' }))
+    const range = onRangeChange.mock.calls[0][0] as Date[]
+    // The parent stores the picked range and re-renders with it.
+    rerenderWith({ weekStart: range[0], rangeDays: range.length })
+    expect(within(screen.getByTestId('masthead-eyebrow')).getByText('Weekend')).toBeInTheDocument()
+  })
+
+  it('a custom 2-day range still says "2 days", even right after a Weekend click', () => {
+    const { rerenderWith } = renderWeek()
+    fireEvent.click(screen.getByRole('button', { name: 'Weekend' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Custom' }))
+    fireEvent.change(screen.getByLabelText('End'), { target: { value: '2026-09-07' } })
+    // Custom's End edit computed a 2-day range from the ORIGINAL weekStart
+    // (Sep 6) — feed that back in, as the real parent would.
+    rerenderWith({ weekStart: new Date(2026, 8, 6), rangeDays: 2 })
+    expect(within(screen.getByTestId('masthead-eyebrow')).getByText('2 days')).toBeInTheDocument()
+  })
+
+  it('the Weekend label does not survive stepping to the next range with the chevron', () => {
+    const { onRangeChange, onWeekChange, rerenderWith } = renderWeek()
+    fireEvent.click(screen.getByRole('button', { name: 'Weekend' }))
+    const range = onRangeChange.mock.calls[0][0] as Date[]
+    rerenderWith({ weekStart: range[0], rangeDays: range.length })
+    expect(within(screen.getByTestId('masthead-eyebrow')).getByText('Weekend')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByLabelText('Later'))
+    const stepped = onWeekChange.mock.calls[0][0] as Date
+    rerenderWith({ weekStart: stepped, rangeDays: range.length })
+    expect(within(screen.getByTestId('masthead-eyebrow')).queryByText('Weekend')).not.toBeInTheDocument()
     expect(within(screen.getByTestId('masthead-eyebrow')).getByText('2 days')).toBeInTheDocument()
   })
 })

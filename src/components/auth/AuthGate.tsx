@@ -87,30 +87,41 @@ export function AuthGate({ children }: { children: (auth: AuthedContext) => Reac
 
   // A session-ending redirect (e.g. a 401 caught as SessionExpiredError)
   // hands back '?return=<path>' — remember it so a fresh sign-in returns
-  // there instead of dropping the user back on Today.
-  const [hasReturnParam] = useState(() => {
-    try {
-      return new URLSearchParams(window.location.search).has('return')
-    } catch {
-      return false
-    }
-  })
+  // there instead of dropping the user back on Today. AuthGate mounts ONCE
+  // at the app root, so this must be consumed rather than latched forever:
+  // a plain `useState(() => hasParam)` initializer never re-runs, which left
+  // a `?return=` visit's banner and forced navigation re-arming on every
+  // later sign-out/sign-in in the same tab (found in review — the state was
+  // read once and never cleared).
+  const [hasReturnHint, setHasReturnHint] = useState(false)
+
   useEffect(() => {
     try {
-      const params = new URLSearchParams(window.location.search)
-      const ret = params.get('return')
-      if (ret) sessionStorage.setItem(RETURN_TO_KEY, ret)
+      const ret = new URLSearchParams(window.location.search).get('return')
+      if (ret) {
+        sessionStorage.setItem(RETURN_TO_KEY, ret)
+        setHasReturnHint(true)
+      }
     } catch {
-      // sessionStorage can throw in a locked-down browser context — the
-      // recovery message still shows, just without a route to return to.
+      // URLSearchParams/sessionStorage can throw in a locked-down browser
+      // context — sign-in still works, just without the recovery banner.
     }
   }, [])
 
-  if (sessionLost || hasReturnParam) recoveringRef.current = true
+  // A sign-in counts as "recovering" only when it follows one of these two
+  // signals — never derived directly in the render body, so a stale read
+  // during an unrelated render can't arm it.
+  useEffect(() => {
+    if (sessionLost || hasReturnHint) recoveringRef.current = true
+  }, [sessionLost, hasReturnHint])
 
   useEffect(() => {
     if (user && wasSignedOutRef.current && recoveringRef.current) {
       recoveringRef.current = false
+      // Consume the return hint here too: leaving it true would re-show the
+      // banner and re-navigate on the NEXT sign-out/sign-in in this same
+      // mounted AuthGate, even though this hint already did its job.
+      setHasReturnHint(false)
       let dest = '/today'
       try {
         dest = sessionStorage.getItem(RETURN_TO_KEY) ?? '/today'
@@ -134,7 +145,7 @@ export function AuthGate({ children }: { children: (auth: AuthedContext) => Reac
   if (!user) {
     return (
       <Suspense fallback={<LoadingFallback />}>
-        <AuthForm message={sessionLost || hasReturnParam ? SESSION_ENDED_MESSAGE : undefined} />
+        <AuthForm message={sessionLost || hasReturnHint ? SESSION_ENDED_MESSAGE : undefined} />
       </Suspense>
     )
   }

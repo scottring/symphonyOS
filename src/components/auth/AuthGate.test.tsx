@@ -162,5 +162,39 @@ describe('AuthGate', () => {
       await screen.findByText('PROTECTED')
       expect(mockNavigate).toHaveBeenCalledWith('/today', { replace: true })
     })
+
+    // Found in review: AuthGate mounts once at the app root, and the return
+    // hint was captured via a lazy useState initializer that never re-runs —
+    // so it stayed "true" for the component's whole lifetime. A later
+    // deliberate sign-out/sign-in in the SAME tab re-triggered the banner and
+    // the forced navigation from a hint that had already done its job.
+    it('does not re-arm the banner or redirect on a later sign-out/sign-in cycle', async () => {
+      authState.user = null
+      window.history.replaceState({}, '', '/?return=%2Fweek')
+
+      const { rerender } = render(<AuthGate>{() => <div>PROTECTED</div>}</AuthGate>)
+      await screen.findByText('AUTH_FORM')
+      expect(screen.getByText('Your session ended. Sign in to continue where you were.')).toBeInTheDocument()
+
+      // First sign-in: consumes the return hint, redirects once.
+      authState.user = { id: 'u1', email: 'a@b.com' }
+      rerender(<AuthGate>{() => <div>PROTECTED</div>}</AuthGate>)
+      await screen.findByText('PROTECTED')
+      expect(mockNavigate).toHaveBeenCalledTimes(1)
+      expect(mockNavigate).toHaveBeenCalledWith('/week', { replace: true })
+
+      // A deliberate sign-out — sessionLost stays false (useAuth's own guard).
+      authState.user = null
+      authState.sessionLost = false
+      rerender(<AuthGate>{() => <div>PROTECTED</div>}</AuthGate>)
+      await screen.findByText('AUTH_FORM')
+      expect(screen.queryByText(/Your session ended/)).not.toBeInTheDocument()
+
+      // Signing back in must NOT re-navigate or re-show the banner.
+      authState.user = { id: 'u1', email: 'a@b.com' }
+      rerender(<AuthGate>{() => <div>PROTECTED</div>}</AuthGate>)
+      await screen.findByText('PROTECTED')
+      expect(mockNavigate).toHaveBeenCalledTimes(1)
+    })
   })
 })
