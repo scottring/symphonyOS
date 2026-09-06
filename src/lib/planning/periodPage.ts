@@ -53,6 +53,32 @@ export function isCurrentPeriod(bounds: PeriodBounds, today: Date): boolean {
   return today >= bounds.start && today < bounds.end
 }
 
+export interface PlanningPeriodInput {
+  level: PlanLevel
+  today: Date
+  seasons: Seasons
+  explicitStart?: Date | null
+  countFor: (start: Date) => number
+}
+
+/** The period a planning page should show first: an explicit start (from the
+ *  URL) always wins; otherwise the current period — unless it is nearly over
+ *  (≤14 days left for a season, ≤6 for a month) or already empty while the
+ *  next period has a list, in which case the page opens on the coming period
+ *  instead (demo run 2026-09-06: pages opened on the clock's period while the
+ *  user's items sat on the next one). A year page never looks ahead. */
+export function planningPeriod({ level, today, seasons, explicitStart, countFor }: PlanningPeriodInput): { start: Date; lookingAhead: boolean } {
+  if (explicitStart) return { start: periodBounds(level, explicitStart, seasons).start, lookingAhead: false }
+  const cur = periodBounds(level, today, seasons)
+  if (level === 'year') return { start: cur.start, lookingAhead: false }
+  const daysLeft = Math.round((cur.end.getTime() - today.getTime()) / 86_400_000)
+  const threshold = level === 'season' ? 14 : 6
+  const nextStart = cur.next
+  if (daysLeft <= threshold) return { start: nextStart, lookingAhead: true }
+  if (countFor(cur.start) === 0 && countFor(nextStart) > 0) return { start: nextStart, lookingAhead: true }
+  return { start: cur.start, lookingAhead: false }
+}
+
 /**
  * The tasks on a month or season list. The CURRENT period is a pool question
  * (`belongsTo*` — a legacy NULL row is this period's); any other period is a

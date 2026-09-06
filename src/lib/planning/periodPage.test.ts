@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { periodBounds, isCurrentPeriod, selectPeriodTasks, actionsFor, railLevel, type PlanLevel } from './periodPage'
+import { periodBounds, isCurrentPeriod, selectPeriodTasks, actionsFor, railLevel, planningPeriod, type PlanLevel } from './periodPage'
 import { DEFAULT_SEASONS } from '@/lib/cadence/seasons'
 import type { Task } from '@/types/task'
 
@@ -91,6 +91,28 @@ describe('actionsFor', () => {
   it('a placed-open row can still be kept or dropped in a look-back, not re-placed', () => {
     expect(actionsFor({ fate: 'placed-open', isGoal: false, isPast: true })).toEqual(['keep', 'drop'])
     expect(actionsFor({ fate: 'placed-open', isGoal: false, isPast: false })).toEqual([])
+  })
+})
+
+describe('planningPeriod', () => {
+  const seasons = DEFAULT_SEASONS
+  it('an explicit start wins', () => {
+    expect(planningPeriod({ level: 'season', today: new Date(2026, 8, 6), seasons, explicitStart: new Date(2026, 11, 1), countFor: () => 0 }).start).toEqual(new Date(2026, 11, 1))
+  })
+  it('looks ahead when the current season has ≤14 days left', () => {
+    const r = planningPeriod({ level: 'season', today: new Date(2026, 10, 20), seasons, countFor: () => 0 })
+    expect(r).toEqual({ start: new Date(2026, 11, 1), lookingAhead: true })
+  })
+  it('looks ahead when this period is empty and the next has a list', () => {
+    const next = new Date(2026, 9, 1)
+    const r = planningPeriod({ level: 'month', today: new Date(2026, 8, 6), seasons, countFor: (s) => (s.getTime() === next.getTime() ? 9 : 0) })
+    expect(r).toEqual({ start: next, lookingAhead: true })
+  })
+  it('otherwise the current period', () => {
+    expect(planningPeriod({ level: 'month', today: new Date(2026, 8, 6), seasons, countFor: () => 3 })).toEqual({ start: new Date(2026, 8, 1), lookingAhead: false })
+  })
+  it('the year level never looks ahead', () => {
+    expect(planningPeriod({ level: 'year', today: new Date(2026, 11, 28), seasons, countFor: () => 0 })).toEqual({ start: new Date(2026, 0, 1), lookingAhead: false })
   })
 })
 

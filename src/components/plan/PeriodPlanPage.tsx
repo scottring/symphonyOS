@@ -11,8 +11,8 @@
 // the rail into this page, or from this page onward in a look-back); a goal
 // is only ever ticked, kept or dropped.
 
-import { useMemo, useState, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useMemo, useState, useCallback, useEffect, useRef } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Plus, Target } from 'lucide-react'
 import { MastheadCard, PeriodNavEyebrow } from '@/components/layout/MastheadCard'
 import { HomeChromeControls } from '@/components/home/HomeChromeControls'
@@ -27,9 +27,9 @@ import { useHouseholdSeasons } from '@/hooks/useHouseholdSeasons'
 import { GoalsProvider, useGoalsContext } from '@/contexts/GoalsContext'
 import { filterTasksForLayers, matchesLayers } from '@/lib/today/domainFilter'
 import { placementFate } from '@/lib/planning/lineage'
-import { seasonStartFor } from '@/lib/cadence/seasons'
+import { parseLocalYmd } from '@/lib/cadence/config'
 import {
-  periodBounds, isCurrentPeriod, selectPeriodTasks, actionsFor, railLevel,
+  periodBounds, isCurrentPeriod, selectPeriodTasks, actionsFor, railLevel, planningPeriod,
   type PlanLevel, type RowAction,
 } from '@/lib/planning/periodPage'
 import type { Task } from '@/types/task'
@@ -49,7 +49,7 @@ function goalRow(g: Goal): PlanRowModel {
 
 function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   const navigate = useNavigate()
-  const { tasks, toggleTask, deleteTask, updateTask, updateTasksBulk, addTask, setGoal, pushTask, keepForward } = useSupabaseTasks()
+  const { tasks, loading, toggleTask, deleteTask, updateTask, updateTasksBulk, addTask, setGoal, pushTask, keepForward } = useSupabaseTasks()
   const gated = useGatedTaskActions({ updateTask, pushTask, updateTasksBulk }, (id) => tasks.find((t) => t.id === id))
   const { layers, soleDomain } = useDomain()
   const { getCurrentUserMember } = useFamilyMembers()
@@ -57,8 +57,18 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   const { seasons } = useHouseholdSeasons()
   const { goals, areas, addGoal, updateGoal, deleteGoal, addArea } = useGoalsContext()
 
+  const [searchParams] = useSearchParams()
+  const startParam = searchParams.get('start')
+  const explicitStart = useMemo(() => (startParam ? parseLocalYmd(startParam) : null), [startParam])
+
   const today = useMemo(() => new Date(), [])
-  const [anchor, setAnchor] = useState<Date>(() => new Date())
+  const [anchor, setAnchor] = useState<Date>(() => (explicitStart ? periodBounds(level, explicitStart, seasons).start : today))
+  const [lookingAhead, setLookingAhead] = useState(false)
+  // Once the user has navigated (prev/next/"Back to this…") — or an explicit
+  // start was given — the initial-period computation below must never
+  // override where they are.
+  const anchorSettledRef = useRef(!!explicitStart)
+
   const bounds = useMemo(() => periodBounds(level, anchor, seasons), [level, anchor, seasons])
   const isCurrent = isCurrentPeriod(bounds, today)
   const isPast = bounds.end <= today
@@ -66,6 +76,29 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   const chrome = useAppShellChromeOptional()
 
   const layered = useMemo(() => filterTasksForLayers(tasks, layers), [tasks, layers])
+
+  // The page opens on the period you actually plan for — the current one,
+  // unless it's nearly over or already empty while the next one has a list
+  // (demo run 2026-09-06). Waits for tasks to load so the count isn't a false
+  // zero; runs once, and never again once the user has navigated.
+  useEffect(() => {
+    if (anchorSettledRef.current) return
+    if (!(tasks.length > 0 || !loading)) return
+    anchorSettledRef.current = true
+    if (level === 'year') return
+    const result = planningPeriod({
+      level, today, seasons,
+      countFor: (s) => selectPeriodTasks(layered, level as 'month' | 'season', s, isCurrentPeriod(periodBounds(level, s, seasons), today), meId).length,
+    })
+    setAnchor(result.start)
+    setLookingAhead(result.lookingAhead)
+  }, [tasks.length, loading, level, today, seasons, layered, meId])
+
+  const goTo = useCallback((d: Date) => {
+    anchorSettledRef.current = true
+    setLookingAhead(false)
+    setAnchor(d)
+  }, [])
 
   // ── The list ─────────────────────────────────────────────────────────────
   const rows = useMemo<PlanRowModel[]>(() => {
@@ -79,18 +112,27 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
     return [...list.filter((r) => r.isGoal), ...list.filter((r) => !r.isGoal)]
   }, [level, goals, layers, layered, bounds.start, isCurrent, meId, tasks])
 
-  // ── The fold: the level above, for the CURRENT period, read-only ─────────
+  // ── The fold: the level above, read-only. It follows the same "plan for
+  //    the period ahead" rule as the page itself — near a season/year
+  //    boundary, the fold looks ahead too. ──────────────────────────────────
   const above = railLevel(level)
+  const aboveStart = useMemo(() => {
+    if (!above) return today
+    return planningPeriod({
+      level: above, today, seasons,
+      countFor: (s) => (above === 'season' ? selectPeriodTasks(layered, 'season', s, true, meId).length : 0),
+    }).start
+  }, [above, today, seasons, layered, meId])
   const railRows = useMemo<PlanRowModel[]>(() => {
     if (above === 'season') {
-      return selectPeriodTasks(layered, 'season', seasonStartFor(today, seasons), true, meId).map((t) => taskRow(t, tasks))
+      return selectPeriodTasks(layered, 'season', aboveStart, true, meId).map((t) => taskRow(t, tasks))
     }
     if (above === 'year') {
-      return goals.filter((g) => g.year === today.getFullYear() && matchesLayers(g.context, layers)).map(goalRow)
+      return goals.filter((g) => g.year === aboveStart.getFullYear() && matchesLayers(g.context, layers)).map(goalRow)
     }
     return []
-  }, [above, layered, today, seasons, meId, tasks, goals, layers])
-  const railBounds = useMemo(() => (above ? periodBounds(above, today, seasons) : null), [above, today, seasons])
+  }, [above, layered, aboveStart, meId, tasks, goals, layers])
+  const railBounds = useMemo(() => (above ? periodBounds(above, aboveStart, seasons) : null), [above, aboveStart, seasons])
 
   // ── Verbs ────────────────────────────────────────────────────────────────
   const open = useCallback((row: PlanRowModel) => {
@@ -150,6 +192,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
 
   const noun = NOUN[level]
   const emptyCopy = isPast ? `Nothing was on this ${noun}'s list.` : `Nothing on this ${noun}'s list yet.`
+  const daysUntilStart = useMemo(() => Math.round((bounds.start.getTime() - today.getTime()) / 86_400_000), [bounds.start, today])
 
   return (
     <div className={`${PAGE_COLUMN_WIDE} py-6`}>
@@ -160,17 +203,17 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
         eyebrow={(
           <PeriodNavEyebrow
             label={bounds.label}
-            onPrev={() => setAnchor(bounds.prev)}
-            onNext={() => setAnchor(bounds.next)}
+            onPrev={() => goTo(bounds.prev)}
+            onNext={() => goTo(bounds.next)}
             prevLabel={`Previous ${noun}`}
             nextLabel={`Next ${noun}`}
             trailing={isCurrent ? (
-              <button type="button" onClick={() => setAnchor(bounds.prev)}
+              <button type="button" onClick={() => goTo(bounds.prev)}
                 className="ml-1 rounded-full border border-neutral-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-neutral-500 hover:text-neutral-700 hover:bg-neutral-50 transition-colors">
                 Last {noun}
               </button>
             ) : (
-              <button type="button" onClick={() => setAnchor(new Date())}
+              <button type="button" onClick={() => goTo(today)}
                 className="ml-1 inline-flex shrink-0 items-center gap-1 rounded-full border border-primary-100 bg-primary-50 px-2 py-0.5 text-[11px] font-semibold text-primary-600 transition-colors hover:bg-primary-100">
                 Back to this {noun}
               </button>
@@ -178,7 +221,11 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
           />
         )}
         title={TITLE[level]}
-        subline={isPast ? 'Look back: what got done, what didn\'t. Keep what still matters, drop the rest.' : undefined}
+        subline={isPast
+          ? 'Look back: what got done, what didn\'t. Keep what still matters, drop the rest.'
+          : lookingAhead
+            ? <p className="text-[12px] text-neutral-500">{bounds.label} starts in {daysUntilStart} days · you&rsquo;re looking ahead</p>
+            : undefined}
         // The plan pages mount outside TasksApp's chrome context, so the
         // assistant toggle isn't reachable here; the domain lens still is,
         // and this page scopes by it (soleDomain).
