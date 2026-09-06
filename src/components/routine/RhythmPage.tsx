@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useEscapeKey } from '@/hooks/useEscapeKey'
+import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { Plus, Search, Sparkles, RefreshCw, Wrench } from 'lucide-react'
 import type { RecurrencePattern, Routine } from '@/types/actionable'
 import type { Contact } from '@/types/contact'
@@ -82,7 +83,29 @@ export function RhythmPage(props: RhythmPageProps) {
     return (draft) => onCreateRoutineInSlot({ ...draft, assigned_to: memberId ?? undefined })
   }, [onCreateRoutineInSlot, memberId])
 
-  const model = useMemo(() => buildRhythmModel(routines, { memberId, focusDay }), [routines, memberId, focusDay])
+  // "Whose week" narrows by assignee (buildRhythmModel's `keep`), which misses
+  // a routine YOU made but never explicitly assigned — under your own lens
+  // that unassigned routine should still be yours (demo run 2026-09-06:
+  // switching to your own pill hid your own routines). buildRhythmModel's
+  // `keep` only reads assigned_to/assigned_to_all, so rather than teach it a
+  // second identity (routine.user_id, an auth user id, vs. the family_member
+  // id it filters on) we stamp the match onto a copy of the routine list
+  // before it ever reaches the model builder.
+  const selfMember = useFamilyMembers().getCurrentUserMember()
+  const routinesForModel = useMemo(() => {
+    const isSelfLens = !!selfMember && memberId === selfMember.id
+    if (!isSelfLens) return routines
+    return routines.map((r) => {
+      const hasAssignee = !!r.assigned_to || (r.assigned_to_all && r.assigned_to_all.length > 0)
+      if (hasAssignee || r.user_id !== selfMember!.user_id) return r
+      return { ...r, assigned_to: selfMember!.id }
+    })
+  }, [routines, memberId, selfMember])
+
+  const model = useMemo(
+    () => buildRhythmModel(routinesForModel, { memberId, focusDay }),
+    [routinesForModel, memberId, focusDay],
+  )
   // Twelve months rolling forward. `now` is pinned to the day so the ribbon
   // doesn't rebuild on every render, and so a session left open overnight
   // still rolls when the date changes.
@@ -460,10 +483,22 @@ export function RhythmPage(props: RhythmPageProps) {
         onOpenRoutine={r => { setTendOpen(false); openRoutine(r) }}
       />
 
-      {/* Panel overlay — routine/step editors, shared across all zones */}
+      {/* Panel overlay — routine/step editors, shared across all zones.
+          The routine panel can run taller than the viewport (many steps, a
+          long description) — without a capped, scrolling wrapper here it
+          used to render past the fold with no way to reach its Delete/Done
+          footer (demo run 2026-09-06). TapRoutinePanel/TapStepPanel share one
+          PanelShell across every panel type in the app, so the cap lives on
+          this wrapper rather than splitting PanelShell into sticky
+          header/body/footer regions. */}
       {(openRoutineItem || openStep) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={closePanel}>
-          <div onClick={e => e.stopPropagation()}>
+          <div
+            data-testid="routine-panel-dialog"
+            onClick={e => e.stopPropagation()}
+            className="flex max-h-[calc(100vh-2rem)] flex-col"
+          >
+            <div data-testid="routine-panel-body" className="min-h-0 flex-1 overflow-y-auto">
             {openRoutineItem && (
               <TapRoutinePanel
                 key={openRoutineItem.id}
@@ -510,6 +545,7 @@ export function RhythmPage(props: RhythmPageProps) {
                 onDelete={props.onDeleteStep ? () => { props.onDeleteStep!(openStep.id); setOpen({ kind: 'routine', id: parentOfOpenStep.id }) } : undefined}
               />
             )}
+            </div>
           </div>
         </div>
       )}

@@ -14,6 +14,13 @@ vi.mock('@/hooks/useAttachments', () => ({
     fetchAttachments: vi.fn(),
   }),
 }))
+// The current user's family_member row — RhythmPage asks this for "which pill
+// is me" so an unassigned routine you made still shows under your own lens.
+vi.mock('@/hooks/useFamilyMembers', () => ({
+  useFamilyMembers: () => ({
+    getCurrentUserMember: () => ({ id: 'me', user_id: 'u1', name: 'Scott' }),
+  }),
+}))
 
 let seq = 0
 function mk(name: string, over: Partial<Routine> = {}): Routine {
@@ -111,6 +118,41 @@ describe('RhythmPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Iris' }))
     expect(screen.queryByTestId('arc-card-jax')).not.toBeInTheDocument()
     expect(screen.getByTestId('arc-card-run')).toBeInTheDocument()
+  })
+
+  // Demo run 2026-09-06: switching "Whose week" to yourself hid your own
+  // routines the moment they had no explicit assignee — an unassigned routine
+  // you made is still yours under your own lens.
+  it('an unassigned routine you made shows under your own "Whose week" lens', () => {
+    render(
+      <RhythmPage {...noop} onUpdateRoutine={vi.fn()}
+        familyMembers={[{ id: 'me', user_id: 'u1', name: 'Scott', initials: 'S', color: '#888', avatar_url: null, is_full_user: true, display_order: 0, created_at: '' } as never]}
+        routines={[
+          mk('My unassigned chore', { id: 'mine', time_of_day: '07:00:00', user_id: 'u1' }),
+          mk('Someone else made this', { id: 'other', time_of_day: '08:00:00', user_id: 'u2' }),
+        ]} />
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Scott' }))
+    expect(screen.getByTestId('arc-card-mine')).toBeInTheDocument()
+    expect(screen.queryByTestId('arc-card-other')).not.toBeInTheDocument()
+  })
+
+  // Demo run 2026-09-06: the routine panel was taller than the viewport and
+  // had no way to scroll to its Delete/Done footer.
+  it('caps the routine panel to the viewport and scrolls its body', () => {
+    render(
+      <RhythmPage {...noop} onUpdateRoutine={vi.fn()}
+        routines={[
+          mk('Water plants', { id: 'x', time_of_day: '09:00:00' }),
+        ]} />
+    )
+    fireEvent.click(within(screen.getByTestId('arc-card-x')).getByRole('button', { name: /Water plants/ }))
+    const dialog = screen.getByTestId('routine-panel-dialog')
+    expect(dialog.className).toContain('max-h-[calc(100vh-2rem)]')
+    expect(dialog.className).toContain('flex-col')
+    const body = screen.getByTestId('routine-panel-body')
+    expect(body.className).toContain('overflow-y-auto')
+    expect(body.className).toContain('min-h-0')
   })
 
   it('naming a group via the canvas popover calls onGroupIntoCollection with time opts', () => {
