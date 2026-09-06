@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useMemo, type ReactNode } from 'react'
 import { Sparkles, Camera } from 'lucide-react'
 import { usePhotoCapture } from '@/hooks/usePhotoCapture'
 import { CameraCaptureModal } from '@/components/capture/CameraCaptureModal'
-import { hasParsedFields } from '@/lib/quickInputParser'
+import { hasParsedFields, allDayFromParse } from '@/lib/quickInputParser'
 import type { TaskCategory, TaskContext } from '@/types/task'
 import { DomainChooser } from '@/components/domain/DomainChooser'
 import { domainForHotkey } from '@/lib/domainHotkey'
@@ -226,7 +226,7 @@ export function QuickCapture({
         projectId: effectiveParsed.projectId,
         contactId: effectiveParsed.contactId,
         scheduledFor: effectiveParsed.dueDate,
-        isAllDay: effectiveParsed.dueDate ? !effectiveParsed.hasTime : undefined,
+        isAllDay: allDayFromParse(effectiveParsed),
         durationMinutes: effectiveParsed.durationMinutes,
         category: effectiveParsed.category,
         context: effectiveParsed.context,

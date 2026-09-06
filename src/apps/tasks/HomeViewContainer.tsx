@@ -22,7 +22,7 @@ import { localYmd } from '@/lib/cadence/config';
 import { parseRoutineTimelineId } from '@/lib/today/doseExpansion';
 import { groupItems, addToGroup, removeFromGroup, ungroupTasks } from '@/lib/today/groupTasks';
 import { useConvertTaskToProject } from '@/hooks/useConvertTaskToProject';
-import { parseQuickInput } from '@/lib/quickInputParser';
+import { parseQuickInput, allDayFromParse } from '@/lib/quickInputParser';
 import type { ParserContext } from '@/lib/quickInputParser';
 import type { ResolverContext } from '@/lib/entityResolver';
 import type { TodayCaptureResult } from '@/components/schedule/TodayAddInput';
@@ -55,7 +55,7 @@ import { useSelection } from '@/shell/providers/SelectionProvider';
 import { useMealEventsForDate } from '@/shell/providers/MealEventsProvider';
 import { FirstWeekCard } from '@/components/schedule/FirstWeekCard';
 import { useFirstWeekSignals } from '@/hooks/useFirstWeekSignals';
-import { firstWeekSteps, shouldShowFirstWeek, FIRST_WEEK_HIDE_KEY, hasSampleIds, readSampleIds, clearSampleIdsRecord } from '@/lib/firstWeek';
+import { firstWeekSteps, shouldShowFirstWeek, FIRST_WEEK_HIDE_KEY, hasSampleIds, readSampleIds, clearSampleIdsRecord, deleteSampleRows } from '@/lib/firstWeek';
 import { getAuthUser } from '@/lib/supabase';
 
 export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' } = {}) {
@@ -84,7 +84,7 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
   const { isHidden: isEventHidden, hideEvent } = useHiddenCalendarEvents();
   const { getDomainForCalendar } = useCalendarDomainMappings();
   const { lists, listsByCategory, addList } = useListsContext();
-  const { addNote, deleteNote } = useNotesContext();
+  const { addNote } = useNotesContext();
   const undo = useUndo();
   const { aliases, recordOutcome } = useResolutionLearning();
 
@@ -170,15 +170,21 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
   const handleClearSample = useCallback(() => {
     if (!firstWeekUid) return;
     const ids = readSampleIds(firstWeekUid);
-    void Promise.all([
-      ...ids.taskIds.map((id) => deleteTask(id)),
-      ...ids.noteIds.map((id) => deleteNote(id)),
-    ]).then(() => {
+    void deleteSampleRows(ids).then((cleared) => {
+      // The localStorage record is the ONLY handle on these rows. Clearing it
+      // inside an unconditional .then() — as this used to — left the sample's
+      // fake tasks and notes sitting in a real household with nothing left
+      // pointing at them. On failure the record stays and the offer can be
+      // taken again.
+      if (!cleared) {
+        showToast("Couldn't clear the sample", 'error');
+        return;
+      }
       clearSampleIdsRecord(firstWeekUid);
       setHasSample(false);
       void refetchFirstWeekSignals();
     });
-  }, [firstWeekUid, deleteTask, deleteNote, refetchFirstWeekSignals]);
+  }, [firstWeekUid, refetchFirstWeekSignals]);
 
   // ?plan=paper (from the card's "Snap this week's page" link) opens the flow
   // directly on this route; ?plan=sample loads the bundled sample first.
@@ -375,8 +381,12 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
         assignedToAll: parsed.assignedMemberIds,
         context: undefined,
         category: parsed.category,
-        // A parsed time means a specific time-of-day → not all-day.
-        isAllDay: parsed.dueDate ? false : true,
+        // A parsed CLOCK TIME means a specific time-of-day → not all-day. A
+        // bare date does not: the parser zeroes the time for a date-only
+        // match, so the old `parsed.dueDate ? false : true` filed "for Monday"
+        // as a timed block at 12:00 AM. No date at all → our default day
+        // (today), all-day.
+        isAllDay: allDayFromParse(parsed) ?? true,
       });
     },
     [addTask, getCurrentUserMember, projects, contacts, familyMembers],
@@ -775,12 +785,18 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
   return (
     <ScheduleActionsProvider value={scheduleActionsValue}>
       {showFirstWeek && (
-        <FirstWeekCard
-          steps={firstWeekStepsList}
-          onHide={handleHideFirstWeek}
-          onSamplePage={handleSamplePage}
-          onClearSample={hasSample ? handleClearSample : undefined}
-        />
+        // The SAME column the Today masthead draws in (TodayView's
+        // max-w-[1152px] + md:px-10 lg:px-14), so the card sits directly above
+        // the day card on the same left and right edges. Without it the card
+        // spanned the full content width and hung out past the page.
+        <div className="w-full max-w-[1152px] mx-auto px-0 pt-2 md:px-10 md:pt-8 lg:px-14">
+          <FirstWeekCard
+            steps={firstWeekStepsList}
+            onHide={handleHideFirstWeek}
+            onSamplePage={handleSamplePage}
+            onClearSample={hasSample ? handleClearSample : undefined}
+          />
+        </div>
       )}
 
       <HomeView

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { parseQuickInput, hasParsedFields } from './quickInputParser'
+import { parseQuickInput, hasParsedFields, allDayFromParse } from './quickInputParser'
 
 const mockContext = {
   projects: [
@@ -430,5 +430,29 @@ describe('dangling preposition and hasTime', () => {
 
   it('"Dentist thu 2pm" keeps the time', () => {
     expect(parseQuickInput('Dentist thu 2pm', ctx).hasTime).toBe(true)
+  })
+})
+
+
+// The all-day rule, in one place — three quick-add call sites read it, and
+// getting it wrong is invisible: a task filed timed with a zeroed time shows
+// as a 12:00 AM block instead of a chip on the day.
+describe('allDayFromParse', () => {
+  const ctx = mockContext
+  it('a bare date is ALL-DAY — the parser zeroed its time, that is not midnight', () => {
+    const p = parseQuickInput('Finish the deck for Monday', ctx)
+    expect(p.dueDate).toBeInstanceOf(Date)
+    expect(p.hasTime).toBe(false)
+    expect(allDayFromParse(p)).toBe(true)
+  })
+
+  it('a named clock time is a real block, not all-day', () => {
+    const p = parseQuickInput('Dentist thu 2pm', ctx)
+    expect(p.hasTime).toBe(true)
+    expect(allDayFromParse(p)).toBe(false)
+  })
+
+  it('no date at all leaves the choice to the caller', () => {
+    expect(allDayFromParse(parseQuickInput('Call mom', ctx))).toBeUndefined()
   })
 })

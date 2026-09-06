@@ -1,6 +1,7 @@
 // src/components/schedule/TodayAddInput.tsx
 import { useState, useCallback, useRef, useMemo, useEffect } from 'react'
 import { Plus, Check, X, Phone, Sparkles } from 'lucide-react'
+import { allDayFromParse } from '@/lib/quickInputParser'
 import type { ParserContext } from '@/lib/quickInputParser'
 import type { ResolverContext, ContactSuggestion } from '@/lib/entityResolver'
 import { useQuickParse } from '@/hooks/useQuickParse'
@@ -120,7 +121,7 @@ export function TodayAddInput({ onAdd, parserContext, resolver, getRecentTaskFor
     onAdd({
       title: p.title?.trim() || trimmed,
       scheduledFor: p.dueDate ?? null,
-      isAllDay: p.dueDate ? !p.hasTime : undefined,
+      isAllDay: allDayFromParse(p),
       destination,
       category: p.category,
       context: p.context,

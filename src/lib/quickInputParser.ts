@@ -26,6 +26,19 @@ export interface ParsedQuickInput {
   assignedMatches?: string[]         // What text matched (e.g., ["-scott", "-iris"])
 }
 
+/**
+ * All-day, from a parse. THE rule for every quick-add call site, because
+ * getting it wrong is invisible: a date-only match has its time zeroed above,
+ * so a task filed with `isAllDay: false` for "Finish the deck for Monday"
+ * lands as a timed block at 12:00 AM rather than a chip on the day.
+ *
+ * `undefined` means the parse named no day at all — the caller decides what
+ * its own default day implies (Today's inline add: all-day).
+ */
+export function allDayFromParse(parsed: Pick<ParsedQuickInput, 'dueDate' | 'hasTime'>): boolean | undefined {
+  return parsed.dueDate ? !parsed.hasTime : undefined
+}
+
 export interface ParserContext {
   projects: Array<{ id: string; name: string }>
   contacts: Array<{ id: string; name: string }>
