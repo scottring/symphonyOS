@@ -46,6 +46,7 @@ import { TodayDragProvider } from './TodayDragProvider'
 import { resolveDrop, writeMoveAndRegisterUndo, type DropIntent } from '@/lib/today/todayDrop'
 import { useCalendarPermissions } from '@/hooks/useCalendarPermissions'
 import { selectUpNext, formatUpNextStatus } from '@/lib/today/upNext'
+import { forwardLook, forwardLine } from '@/lib/today/forwardLook'
 import { NeedsYourOK } from './NeedsYourOK'
 import { ClarityCurtain } from '@/components/clarity/ClarityCurtain'
 import { computeClaritySteps, type ClarityStepId } from '@/lib/clarity/claritySteps'
@@ -664,9 +665,11 @@ export function TodayView({
   }, [nowForDisplay])
   const decisionCount = data.attentionItems.length + emailCaptures.length + visibleUnpromptedItems.length
 
-  const nextTimeLabel = upNext?.item.startTime
-    ? upNext.item.startTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
-    : upNext ? 'Today' : ''
+  const nextTimeLabel = upNext?.item.allDay
+    ? ''
+    : upNext?.item.startTime
+      ? upNext.item.startTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+      : upNext ? 'Today' : ''
   // upNext only resolves against the wall clock, so it is empty on every day
   // but today. Looking at Saturday, the honest opener is what Saturday starts
   // with — saying "nothing left with a time on it" over a 7:00 AM list is the
@@ -680,22 +683,29 @@ export function TodayView({
     if (timed.length === 0) return null
     return timed.reduce((a, b) => (a.startTime!.getTime() <= b.startTime!.getTime() ? a : b))
   }, [dayItems])
-  const firstTimedLabel = firstTimed?.startTime
-    ? firstTimed.startTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
-    : ''
+  const firstTimedLabel = firstTimed?.allDay
+    ? ''
+    : firstTimed?.startTime
+      ? firstTimed.startTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+      : ''
 
   // The subline says what is actually next, by name. It replaced a tally
   // ("2 open of 2 actionable items") and a pair of status cards that between
   // them managed to point at the timeline without ever naming the thing on it.
   // Today is a commitment surface: no counts, no scores.
+  //
+  // A clear Today (nothing left with a time on it, or the whole day is
+  // empty) looks FORWARD rather than sitting mute — the demo run 2026-09-06
+  // found "Your day is clear" sitting over a week that already had 19 things
+  // planned on it.
   const heroLine = loading
     ? 'Loading the day.'
-    : data.counts.totalItems === 0
-      ? 'Nothing on the board for this day.'
-      : data.isToday
-        ? upNext
-          ? `Next: ${upNext.item.title}${nextTimeLabel ? ` · ${nextTimeLabel}` : ''}`
-          : 'Nothing left with a time on it.'
+    : data.isToday
+      ? upNext
+        ? `Next: ${upNext.item.title}${nextTimeLabel ? ` · ${nextTimeLabel}` : ''}`
+        : forwardLine(forwardLook(tasks, viewedDate), viewedDate)
+      : data.counts.totalItems === 0
+        ? 'Nothing on the board for this day.'
         : firstTimed
           ? `Starts with: ${firstTimed.title}${firstTimedLabel ? ` · ${firstTimedLabel}` : ''}`
           : 'Nothing with a time on it.'
