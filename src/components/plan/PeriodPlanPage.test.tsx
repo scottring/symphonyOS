@@ -153,3 +153,14 @@ describe('PeriodPlanPage', () => {
     expect(within(rail).queryByRole('button', { name: /Add to/ })).not.toBeInTheDocument()
   })
 })
+
+describe('PeriodPlanPage masthead', () => {
+  it('wears the shared masthead card with the period in the eyebrow and the page name as the title', () => {
+    renderPage('month')
+    const card = screen.getByTestId('masthead-card')
+    expect(within(card).getByRole('heading', { level: 1, name: 'This Month' })).toBeInTheDocument()
+    const eyebrow = screen.getByTestId('masthead-eyebrow')
+    expect(within(eyebrow).getByLabelText('Previous month')).toBeInTheDocument()
+    expect(within(eyebrow).getByLabelText('Next month')).toBeInTheDocument()
+  })
+})

@@ -5,6 +5,7 @@ import { HomeChromeControls } from './HomeChromeControls'
 import { mondayOfWeek } from '@/lib/workweekHelpers'
 import { buildRange, presetRange, weekRange, type RangePreset } from '@/lib/planning/dateRange'
 import { readCadenceConfig } from '@/lib/cadence/config'
+import { MastheadCard, PeriodNavEyebrow } from '@/components/layout/MastheadCard'
 
 interface HomeHeaderProps {
   currentView: HomeViewType
@@ -167,6 +168,22 @@ export function HomeHeader(props: HomeHeaderProps) {
     </div>
   ) : null
 
+  // /week wears the same card Today does: the run of days in the eyebrow
+  // ("Week", "3 days"), the dates as the serif title, the range presets on
+  // the quiet line, chrome in the corner (Scott, 2026-09-06: the day bar is
+  // the anchor; bring its shape to every planning page).
+  if (currentView === 'week') {
+    const eyebrowLabel = rangeDays === 7 ? 'Week' : rangeDays === 1 ? 'Day' : `${rangeDays} days`
+    return (
+      <MastheadCard
+        eyebrow={<PeriodNavEyebrow label={eyebrowLabel} onPrev={onPrev} onNext={onNext} prevLabel={prevLabel} nextLabel={nextLabel} />}
+        title={label.long}
+        subline={rangeControl}
+        controls={<HomeChromeControls className="flex" />}
+      />
+    )
+  }
+
   return (
     <header className="mb-6 px-3 md:px-0">
       {/* Wraps rather than competing for one line. Every part of the date
@@ -201,7 +218,6 @@ export function HomeHeader(props: HomeHeaderProps) {
           domain chooser and the assistant toggle. */}
       <HomeChromeControls className="hidden md:flex md:shrink-0 md:pb-1" />
       </div>
-      {rangeControl && <div className="mt-2 hidden md:block">{rangeControl}</div>}
 
       {/* Hairline rule anchors the masthead and separates it from the content
           below. Today's day card draws its own border, so it doesn't need one. */}

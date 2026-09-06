@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, within } from '@testing-library/react'
 import { HomeHeader } from './HomeHeader'
 
 vi.mock('./HomeChromeControls', () => ({ HomeChromeControls: () => null }))
@@ -87,5 +87,18 @@ describe('HomeHeader week range', () => {
     fireEvent.change(screen.getByLabelText('Start'), { target: { value: '2026-09-19' } })
     const last = onRangeChange.mock.calls.at(-1)![0] as Date[]
     expect(last.map(ymd)).toEqual(['2026-9-19', '2026-9-20'])
+  })
+})
+
+describe('HomeHeader week masthead card', () => {
+  it('is the same card Today wears, with the week named in the eyebrow and the range as the title', () => {
+    renderWeek()
+    const card = screen.getByTestId('masthead-card')
+    expect(within(card).getByRole('heading', { level: 1, name: 'Sep 6 – Sep 12' })).toBeInTheDocument()
+    expect(within(screen.getByTestId('masthead-eyebrow')).getByText('Week')).toBeInTheDocument()
+  })
+  it('names a shorter range by its length', () => {
+    renderWeek({ weekStart: new Date(2026, 8, 12), rangeDays: 2 })
+    expect(within(screen.getByTestId('masthead-eyebrow')).getByText('2 days')).toBeInTheDocument()
   })
 })

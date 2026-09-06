@@ -63,7 +63,7 @@ import { TodayOverflowMenu } from './TodayOverflowMenu'
 import { ReviewDrawer, type ReviewMode } from './ReviewDrawer'
 import { HorizonPoolDropdown } from './HorizonPoolDropdown'
 import { DayNavCluster } from './DayNavCluster'
-import { PlaceWash } from '@/components/place/PlaceWash'
+import { MastheadCard } from '@/components/layout/MastheadCard'
 import { TodayBacklogFooter } from './TodayBacklogFooter'
 import { EmailReviewSheet } from './EmailReviewSheet'
 import { useUnreviewedCaptures } from '@/hooks/useUnreviewedCaptures'
@@ -1076,39 +1076,18 @@ export function TodayView({
           edge, faint enough to read as paper texture rather than a sticker.
           Purely decorative: aria-hidden, pointer-events-none, and every piece
           of text above it keeps the unchanged neutral palette. */}
-      <section className="relative mx-3 mb-4 rounded-2xl border border-neutral-200/80 bg-bg-elevated shadow-sm md:mx-0">
-        <PlaceWash />
-
-        <div className="relative px-4 py-4 md:px-5">
-          <div className="flex items-start justify-between gap-4">
-            <div className="min-w-0">
-              {/* The page's one and only date masthead. It used to sit in a
-                  separate header above this card; two stacked date headers
-                  said the same thing twice. */}
-              <div className="mb-1 -ml-1.5">
-                <DayNavCluster viewedDate={viewedDate} onDateChange={onDateChange} variant="inline" />
-              </div>
-              <h1 className="font-display text-[28px] font-semibold leading-tight text-neutral-950 md:text-[34px]">
-                {data.isToday ? greeting : relativeDayLabel}
-              </h1>
-              <p className="mt-1 max-w-2xl text-sm text-neutral-500 md:text-[15px]">{heroLine}</p>
-            </div>
-
-            {/* Domain chooser + assistant toggle. They used to float in a
-                header band of their own above this card; the card is the
-                masthead now, so they sit in its corner. */}
-            {headerControls && <div className="hidden shrink-0 md:block">{headerControls}</div>}
-          </div>
-
-          {/* No action buttons on the card. Time-block, Plan week, and Process
-              inbox all left 2026-09-06: the sidebar's This Week and Inbox rows
-              and the "N need a decision" strip below already lead there, and
-              Plan from paper in the sidebar is the day's one verb. */}
-          <div className="mt-4 flex flex-wrap items-end justify-end gap-3">
-            {/* The day's lookups and settings, in the card's lower-right. They
-                      used to float in a strip of their own between the card and
-                      the list, anchored by a negative margin; the card can
-                      simply hold them. */}
+      <MastheadCard
+        eyebrow={<DayNavCluster viewedDate={viewedDate} onDateChange={onDateChange} variant="inline" />}
+        title={data.isToday ? greeting : relativeDayLabel}
+        subline={heroLine}
+        // Domain chooser + assistant toggle, in the card's corner.
+        controls={headerControls}
+        // No action buttons on the card. Time-block, Plan week, and Process
+        // inbox all left 2026-09-06: the sidebar's This Week and Inbox rows
+        // and the "N need a decision" strip below already lead there, and
+        // Plan from paper in the sidebar is the day's one verb. What remains
+        // along the foot is the day's lookups and settings.
+        footer={(
                   <div
                     data-testid="today-controls"
                     className="hidden shrink-0 md:flex items-center gap-1"
@@ -1157,9 +1136,8 @@ export function TodayView({
 
               {!isMobile && overflowMenu}
             </div>
-          </div>
-        </div>
-      </section>
+        )}
+      />
 
 
       {/* The rail column only exists when the rail does; otherwise the day gets

@@ -13,8 +13,10 @@
 
 import { useMemo, useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ChevronLeft, ChevronRight, Plus, Target } from 'lucide-react'
-import { PageMasthead } from '@/components/layout/PageMasthead'
+import { Plus, Target } from 'lucide-react'
+import { MastheadCard, PeriodNavEyebrow } from '@/components/layout/MastheadCard'
+import { HomeChromeControls } from '@/components/home/HomeChromeControls'
+import { useAppShellChromeOptional } from '@/contexts/AppShellChromeContext'
 import { PAGE_COLUMN_WIDE } from '@/components/layout/pageLayout'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
 import { useGatedTaskActions } from '@/hooks/useGatedTaskActions'
@@ -59,6 +61,8 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   const bounds = useMemo(() => periodBounds(level, anchor, seasons), [level, anchor, seasons])
   const isCurrent = isCurrentPeriod(bounds, today)
   const isPast = bounds.end <= today
+  // Page chrome for the card's corner — only inside an AppShell (tests mount bare).
+  const chrome = useAppShellChromeOptional()
 
   const layered = useMemo(() => filterTasksForLayers(tasks, layers), [tasks, layers])
 
@@ -148,37 +152,37 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
 
   return (
     <div className={`${PAGE_COLUMN_WIDE} py-6`}>
-      <PageMasthead
-        title={TITLE[level]}
-        description={
-          <span className="inline-flex items-center gap-1">
-            <button type="button" aria-label={`Previous ${noun}`} onClick={() => setAnchor(bounds.prev)}
-              className="p-1 rounded text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100"><ChevronLeft className="w-4 h-4" /></button>
-            <span className="min-w-[9rem] text-center">{bounds.label}</span>
-            <button type="button" aria-label={`Next ${noun}`} onClick={() => setAnchor(bounds.next)}
-              className="p-1 rounded text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100"><ChevronRight className="w-4 h-4" /></button>
-            {isCurrent ? (
+      {/* The same masthead card Today and Week wear: the period in the
+          eyebrow, the page name as the title, the look-back cue on the quiet
+          line when the period has ended. */}
+      <MastheadCard
+        eyebrow={(
+          <PeriodNavEyebrow
+            label={bounds.label}
+            onPrev={() => setAnchor(bounds.prev)}
+            onNext={() => setAnchor(bounds.next)}
+            prevLabel={`Previous ${noun}`}
+            nextLabel={`Next ${noun}`}
+            trailing={isCurrent ? (
               <button type="button" onClick={() => setAnchor(bounds.prev)}
-                className="ml-3 rounded-md px-2 py-0.5 text-xs font-medium text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100">
+                className="ml-1 rounded-full border border-neutral-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-neutral-500 hover:text-neutral-700 hover:bg-neutral-50 transition-colors">
                 Last {noun}
               </button>
             ) : (
               <button type="button" onClick={() => setAnchor(new Date())}
-                className="ml-3 rounded-md px-2 py-0.5 text-xs font-medium text-neutral-500 hover:text-neutral-700 hover:bg-neutral-100">
+                className="ml-1 inline-flex shrink-0 items-center gap-1 rounded-full border border-primary-100 bg-primary-50 px-2 py-0.5 text-[11px] font-semibold text-primary-600 transition-colors hover:bg-primary-100">
                 Back to this {noun}
               </button>
             )}
-          </span>
-        }
+          />
+        )}
+        title={TITLE[level]}
+        subline={isPast ? 'Look back: what got done, what didn\'t. Keep what still matters, drop the rest.' : undefined}
+        controls={chrome ? <HomeChromeControls className="flex" /> : undefined}
       />
 
       <div className="flex flex-col gap-3">
         <section aria-label={`${bounds.label} list`} className="min-w-0 rounded-xl border border-neutral-200 bg-white px-3 py-3 shadow-sm">
-          {isPast && (
-            <p className="px-2 pb-2 text-xs text-neutral-500">
-              Look back: what got done, what didn't. Keep what still matters, drop the rest.
-            </p>
-          )}
           {rows.length === 0 ? (
             <p className="px-2 py-3 text-sm text-neutral-400">{emptyCopy}</p>
           ) : (

@@ -154,6 +154,11 @@ describe('TodayView', () => {
     expect(screen.queryByRole('button', { name: /plan today/i })).not.toBeInTheDocument()
   })
 
+  it('wears the shared masthead card', () => {
+    renderView()
+    expect(screen.getByTestId('masthead-card')).toBeInTheDocument()
+  })
+
   it('offers no Time-block, Plan week, or Process inbox — the sidebar and the decision strip already reach those', async () => {
     const { user } = renderView()
     expect(screen.queryByRole('button', { name: /time-block/i })).not.toBeInTheDocument()
