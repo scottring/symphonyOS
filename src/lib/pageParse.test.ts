@@ -49,9 +49,30 @@ describe('validatePageResult', () => {
     expect(validatePageResult({}, MEMBERS, FALLBACK).storagePath).toBeNull()
   })
 
+  it('carries the page title through and derives titlePeriod from it', () => {
+    const out = validatePageResult({ page_title: '2026' }, MEMBERS, FALLBACK)
+    expect(out.pageTitle).toBe('2026')
+    expect(out.titlePeriod).toEqual({ kind: 'year', year: 2026 })
+  })
+
+  it('defaults pageTitle and titlePeriod to null when absent', () => {
+    const out = validatePageResult({}, MEMBERS, FALLBACK)
+    expect(out.pageTitle).toBeNull()
+    expect(out.titlePeriod).toBeNull()
+  })
+
   it('returns an empty result for junk', () => {
     const out = validatePageResult(null, MEMBERS, FALLBACK)
-    expect(out).toEqual({ items: [], notes: [], unclear: [], windowDates: FALLBACK, altitude: 'week', storagePath: null })
+    expect(out).toEqual({
+      items: [],
+      notes: [],
+      unclear: [],
+      windowDates: FALLBACK,
+      altitude: 'week',
+      storagePath: null,
+      pageTitle: null,
+      titlePeriod: null,
+    })
   })
 })
 

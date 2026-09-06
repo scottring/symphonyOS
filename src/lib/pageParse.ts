@@ -6,6 +6,8 @@
 // written are testable without a DOM.
 
 import { validatePlanItems, isPageAltitude, type PlanItem, type PageAltitude } from '@/lib/planParse'
+import { periodFromTitle, type TitlePeriod } from '@/lib/planTitle'
+import { readSeasons } from '@/lib/cadence/seasons'
 
 export interface PageNote {
   title: string
@@ -22,6 +24,10 @@ export interface PageResult {
   altitude: PageAltitude
   /** Where the page image lives in the `attachments` bucket, when known. */
   storagePath: string | null
+  /** The page's handwritten heading, echoed by the response ("Fall 2026"). */
+  pageTitle: string | null
+  /** What period `pageTitle` names — decides which period the review sheet opens on. */
+  titlePeriod: TitlePeriod
 }
 
 const MAX_NOTES = 20
@@ -77,6 +83,7 @@ export function validatePageResult(
     notes?: unknown
     unclear?: unknown
     storagePath?: unknown
+    page_title?: unknown
   }
   const echoed = Array.isArray(r.window)
     ? r.window.filter((d): d is string => typeof d === 'string')
@@ -85,6 +92,7 @@ export function validatePageResult(
   // the response carried one at all.
   const altitude = isPageAltitude(r.altitude) ? r.altitude : fallbackAltitude
   const windowDates = Array.isArray(r.window) && (echoed.length || altitude === 'year') ? echoed : fallbackWindow
+  const pageTitle = typeof r.page_title === 'string' && r.page_title.trim() ? r.page_title.trim() : null
   return {
     items: validatePlanItems(raw, windowDates, memberIds, altitude),
     notes: validateNotes(r.notes),
@@ -92,5 +100,7 @@ export function validatePageResult(
     windowDates,
     altitude,
     storagePath: typeof r.storagePath === 'string' ? r.storagePath : null,
+    pageTitle,
+    titlePeriod: periodFromTitle(pageTitle, new Date(), readSeasons()),
   }
 }

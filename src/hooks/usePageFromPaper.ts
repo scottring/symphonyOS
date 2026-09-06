@@ -11,7 +11,16 @@ export type PageParseStatus = 'idle' | 'parsing' | 'ready' | 'error'
 /** Longest side of the uploaded JPEG — plenty for vision, kind to egress. */
 const MAX_DIMENSION = 1600
 
-const EMPTY: PageResult = { items: [], notes: [], unclear: [], windowDates: [], altitude: 'week', storagePath: null }
+const EMPTY: PageResult = {
+  items: [],
+  notes: [],
+  unclear: [],
+  windowDates: [],
+  altitude: 'week',
+  storagePath: null,
+  pageTitle: null,
+  titlePeriod: null,
+}
 
 async function toJpeg(blob: Blob): Promise<Blob> {
   const bitmap = await createImageBitmap(blob)
