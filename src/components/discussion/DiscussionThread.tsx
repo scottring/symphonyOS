@@ -33,8 +33,11 @@ export interface DiscussionThreadProps {
   onPost: (text: string) => void
   onAsk: (text: string) => void
   onClose: () => void
-  /** Offer to share a private thread with the house. Present only when the
-   *  host has decided it's eligible (see canOfferShare). */
+  /** Move the item into Family, which is what makes the house able to read
+   *  the thread. Present only when the host has decided it's eligible (see
+   *  canOfferShare) AND that the domain change is not a surprise — a Work or
+   *  Personal task is never offered it. The label says so out loud: this was
+   *  once "Share with the house", which changed the task's domain silently. */
   onShare?: () => void
 }
 
@@ -75,7 +78,7 @@ export function DiscussionThread({
                 onClick={onShare}
                 className="ml-2 text-[11px] text-primary-700 underline"
               >
-                Share with the house
+                Move to Family and share
               </button>
             )}
           </p>

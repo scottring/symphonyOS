@@ -22,8 +22,16 @@ begin
   values (inv.household_id, current_user_id, 'member', 'active', inv.invited_by, now());
   update household_invitations set accepted_at = now() where id = inv.id;
   if member_id is not null then
+    -- `not is_full_user` is load-bearing, not tidiness: the INVITER's own seed
+    -- row is (is_full_user = true, auth_user_id is null) — see the
+    -- `inviter_name` lookup below, which finds it by exactly that shape.
+    -- Without this clause a member_id naming the inviter's row passed the
+    -- filter and handed the invitee the inviter's identity. It also matches
+    -- the candidate list `invitation_preview` offers, so no legitimate choice
+    -- is excluded.
     update family_members set auth_user_id = current_user_id, is_full_user = true
-    where id = member_id and user_id = inv.invited_by and auth_user_id is null;
+    where id = member_id and user_id = inv.invited_by and auth_user_id is null
+      and not is_full_user;
   else
     update family_members set auth_user_id = current_user_id, is_full_user = true
     where user_id = inv.invited_by and auth_user_id is null and is_full_user = false

@@ -42,13 +42,13 @@ describe('DiscussionThread', () => {
   it('offers to share with the house when onShare is given', () => {
     const onShare = vi.fn()
     renderThread({ sharedWithLabel: 'Only you', scope: 'individual', onShare })
-    fireEvent.click(screen.getByRole('button', { name: 'Share with the house' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Move to Family and share' }))
     expect(onShare).toHaveBeenCalled()
   })
 
   it('never offers to share when onShare is absent', () => {
     renderThread({ sharedWithLabel: 'Only you', scope: 'individual' })
-    expect(screen.queryByRole('button', { name: 'Share with the house' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Move to Family and share' })).not.toBeInTheDocument()
   })
 
   it('Enter posts to the people in the thread and never wakes Symphony', () => {

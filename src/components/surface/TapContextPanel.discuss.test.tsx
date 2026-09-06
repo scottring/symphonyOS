@@ -96,14 +96,40 @@ describe('TapContextPanel Discuss action', () => {
     }))
   })
 
-  it('wires onShare to set the task context to family', () => {
-    const task = createMockTask({
-      id: 't4', title: 'Renew passport', context: 'personal', assignedTo: 'm-self',
-    })
+  // Sharing a private thread MOVES the task into Family — that is what lets
+  // the house read it. So the offer only exists where a domain change is not
+  // a surprise, and the button says what it does ("Move to Family and share").
+  const lastDrawerProps = () =>
+    drawerProps.mock.calls[drawerProps.mock.calls.length - 1][0] as { onShare?: () => void }
+
+  it('offers the move on a task tagged Family', () => {
+    const task = createMockTask({ id: 't4', title: 'Renew passport', context: 'family', assignedTo: 'm-self' })
     renderPanel(task)
     fireEvent.click(screen.getByRole('button', { name: 'Discussion' }))
-    const props = drawerProps.mock.calls[drawerProps.mock.calls.length - 1][0] as { onShare: () => void }
-    props.onShare()
+    lastDrawerProps().onShare?.()
     expect(handlers.onContextChange).toHaveBeenCalledWith('family')
+  })
+
+  it('offers the move on an untagged task', () => {
+    const task = createMockTask({ id: 't5', title: 'Renew passport', context: null, assignedTo: 'm-self' })
+    renderPanel(task)
+    fireEvent.click(screen.getByRole('button', { name: 'Discussion' }))
+    lastDrawerProps().onShare?.()
+    expect(handlers.onContextChange).toHaveBeenCalledWith('family')
+  })
+
+  it('makes NO offer on a Personal task — its domain is not ours to change', () => {
+    const task = createMockTask({ id: 't6', title: 'Renew passport', context: 'personal', assignedTo: 'm-self' })
+    renderPanel(task)
+    fireEvent.click(screen.getByRole('button', { name: 'Discussion' }))
+    expect(lastDrawerProps().onShare).toBeUndefined()
+    expect(handlers.onContextChange).not.toHaveBeenCalled()
+  })
+
+  it('makes NO offer on a Work task', () => {
+    const task = createMockTask({ id: 't7', title: 'Renew passport', context: 'work', assignedTo: 'm-self' })
+    renderPanel(task)
+    fireEvent.click(screen.getByRole('button', { name: 'Discussion' }))
+    expect(lastDrawerProps().onShare).toBeUndefined()
   })
 })

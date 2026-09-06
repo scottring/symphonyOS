@@ -197,7 +197,7 @@ describe('AssistDrawer', () => {
           onShare={onShare}
         />,
       )
-      fireEvent.click(screen.getByRole('button', { name: 'Share with the house' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Move to Family and share' }))
       expect(onShare).toHaveBeenCalled()
     })
 
@@ -207,7 +207,7 @@ describe('AssistDrawer', () => {
         { id: 'm2', name: 'Iris', auth_user_id: 'u2', user_id: 'u1', is_full_user: false },
       ]
       render(<AssistDrawer item={task} onClose={vi.fn()} discuss={discuss} onShare={vi.fn()} />)
-      expect(screen.queryByRole('button', { name: 'Share with the house' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Move to Family and share' })).not.toBeInTheDocument()
     })
 
     it('does not offer to share when nobody else in the house has a login', () => {
@@ -222,7 +222,7 @@ describe('AssistDrawer', () => {
           onShare={vi.fn()}
         />,
       )
-      expect(screen.queryByRole('button', { name: 'Share with the house' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Move to Family and share' })).not.toBeInTheDocument()
     })
 
     it('does not offer to share when the host gives no onShare handler', () => {
@@ -231,7 +231,7 @@ describe('AssistDrawer', () => {
         { id: 'm2', name: 'Iris', auth_user_id: 'u2', user_id: 'u1', is_full_user: false },
       ]
       render(<AssistDrawer item={task} onClose={vi.fn()} discuss={{ ...discuss, scope: 'individual' }} />)
-      expect(screen.queryByRole('button', { name: 'Share with the house' })).not.toBeInTheDocument()
+      expect(screen.queryByRole('button', { name: 'Move to Family and share' })).not.toBeInTheDocument()
     })
   })
 })

@@ -376,7 +376,17 @@ export function TapContextPanel(props: TapContextPanelProps) {
           discuss={{ type: 'task', id: task.id, title: task.title, scope: discussScope }}
           onClose={() => setAssistOpen(false)}
           onMutate={props.onAssistMutate}
-          onShare={() => props.onContextChange('family')}
+          // Sharing a private thread means MOVING the task into Family —
+          // that is what makes the house able to read it. So it is only
+          // offered where a domain change is not a surprise: a task already
+          // tagged Family (or tagged nothing at all). A Work or Personal task
+          // keeps its domain and gets no offer; the button that says what it
+          // does is `Move to Family and share`, in DiscussionThread.
+          onShare={
+            task.context === 'family' || task.context == null
+              ? () => props.onContextChange('family')
+              : undefined
+          }
         />
       )}
     </PanelShell>
