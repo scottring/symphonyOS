@@ -12,6 +12,15 @@ export interface HouseholdInvitation {
   created_at: string
 }
 
+/** What the join page needs before membership exists: whose household this
+ *  is, who invited you, and the inviter's unlinked adult rows to choose
+ *  from ("which one is you?"). */
+export interface InvitationPreview {
+  household_name: string
+  inviter_name: string
+  candidates: { id: string; name: string }[]
+}
+
 export function useHouseholdInvitations() {
   const [invitations, setInvitations] = useState<HouseholdInvitation[]>([])
   const [loading, setLoading] = useState(true)
@@ -45,8 +54,13 @@ export function useHouseholdInvitations() {
     const { data: { user } } = await getAuthUser()
     if (!user) return null
 
-    // Get user's household
-    const { data: householdId } = await supabase.rpc('get_user_household_id')
+    // Get user's household — an account with no household row yet (Invite
+    // partner used to fail here outright) gets one created on the spot.
+    let { data: householdId } = await supabase.rpc('get_user_household_id')
+    if (!householdId) {
+      await supabase.rpc('setup_household', { p_name: null })
+      ;({ data: householdId } = await supabase.rpc('get_user_household_id'))
+    }
     if (!householdId) throw new Error('No household found')
 
     const { data, error } = await supabase
@@ -80,9 +94,10 @@ export function useHouseholdInvitations() {
     setInvitations(prev => prev.filter(i => i.id !== id))
   }, [])
 
-  const acceptInvitation = useCallback(async (token: string) => {
+  const acceptInvitation = useCallback(async (token: string, memberId?: string | null) => {
     const { data, error } = await supabase.rpc('accept_household_invitation', {
       invitation_token: token,
+      member_id: memberId ?? null,
     })
 
     if (error) throw error
@@ -101,6 +116,15 @@ export function useHouseholdInvitations() {
     return data
   }, [])
 
+  /** The join page's pre-membership look: household name, inviter's first
+   *  name, and the inviter's unlinked adult rows to choose from. Null when
+   *  the invitation is gone or already accepted. */
+  const getInvitationPreview = useCallback(async (token: string): Promise<InvitationPreview | null> => {
+    const { data, error } = await supabase.rpc('invitation_preview', { invitation_token: token })
+    if (error || !data) return null
+    return data as InvitationPreview
+  }, [])
+
   return {
     invitations,
     loading,
@@ -108,6 +132,7 @@ export function useHouseholdInvitations() {
     deleteInvitation,
     acceptInvitation,
     getInvitationByToken,
+    getInvitationPreview,
     refetch: fetchInvitations,
   }
 }

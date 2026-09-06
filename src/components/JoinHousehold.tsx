@@ -2,17 +2,21 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { getAuthUser } from '@/lib/supabase'
 import { useHouseholdInvitations } from '@/hooks/useHouseholdInvitations'
-import type { HouseholdInvitation } from '@/hooks/useHouseholdInvitations'
+import type { HouseholdInvitation, InvitationPreview } from '@/hooks/useHouseholdInvitations'
 
 export function JoinHousehold() {
   const { token } = useParams<{ token: string }>()
   const navigate = useNavigate()
-  const { acceptInvitation, getInvitationByToken } = useHouseholdInvitations()
+  const { acceptInvitation, getInvitationByToken, getInvitationPreview } = useHouseholdInvitations()
 
   const [invitation, setInvitation] = useState<HouseholdInvitation | null>(null)
+  const [preview, setPreview] = useState<InvitationPreview | null>(null)
   const [status, setStatus] = useState<'loading' | 'ready' | 'joining' | 'success' | 'error' | 'auth-required'>('loading')
   const [errorMessage, setErrorMessage] = useState('')
   const [user, setUser] = useState<{ id: string; email?: string } | null>(null)
+  // undefined = no choice made yet (Join disabled while candidates exist);
+  // null = "I'm someone new"; a string = the chosen family_members id.
+  const [chosenId, setChosenId] = useState<string | null | undefined>(undefined)
 
   // Check auth and fetch invitation
   useEffect(() => {
@@ -43,6 +47,9 @@ export function JoinHousehold() {
       }
 
       setInvitation(inv)
+      // Best-effort — the invitee whose name==email guess is enough gets no
+      // chooser, and this must never block the join flow if it fails.
+      void getInvitationPreview(token).then(setPreview)
 
       if (!authUser) {
         setStatus('auth-required')
@@ -51,14 +58,16 @@ export function JoinHousehold() {
       }
     }
     init()
-  }, [token, getInvitationByToken])
+  }, [token, getInvitationByToken, getInvitationPreview])
+
+  const needsChoice = !!preview && preview.candidates.length > 0 && chosenId === undefined
 
   const handleJoin = useCallback(async () => {
-    if (!token) return
+    if (!token || needsChoice) return
     setStatus('joining')
 
     try {
-      await acceptInvitation(token)
+      await acceptInvitation(token, chosenId ?? null)
       setStatus('success')
       // Redirect to home after brief delay
       setTimeout(() => navigate('/'), 2000)
@@ -66,7 +75,7 @@ export function JoinHousehold() {
       setStatus('error')
       setErrorMessage(err instanceof Error ? err.message : 'Failed to join household')
     }
-  }, [token, acceptInvitation, navigate])
+  }, [token, needsChoice, acceptInvitation, chosenId, navigate])
 
   const handleSignIn = useCallback(() => {
     // Store the join token so we can redirect back after auth
@@ -120,11 +129,51 @@ export function JoinHousehold() {
                 </svg>
               </div>
               <h2 className="font-display text-xl font-semibold text-neutral-800 mb-2">
-                Join this household
+                {preview ? `${preview.inviter_name} invited you to the ${preview.household_name}` : 'Join this household'}
               </h2>
               <p className="text-sm text-neutral-500 mb-2">
                 Signed in as <span className="font-medium text-neutral-700">{user?.email}</span>
               </p>
+              {preview && preview.candidates.length > 0 && (
+                <fieldset className="mb-4 text-left">
+                  <legend className="text-sm font-medium text-neutral-700 mb-2">Which one is you?</legend>
+                  <div className="flex flex-wrap gap-2">
+                    {preview.candidates.map((c) => (
+                      <label
+                        key={c.id}
+                        className={`cursor-pointer rounded-full border px-3 py-1.5 text-sm transition-colors ${
+                          chosenId === c.id ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-neutral-200 text-neutral-600 hover:bg-neutral-50'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="join-as"
+                          value={c.id}
+                          checked={chosenId === c.id}
+                          onChange={() => setChosenId(c.id)}
+                          className="sr-only"
+                        />
+                        {c.name}
+                      </label>
+                    ))}
+                    <label
+                      className={`cursor-pointer rounded-full border px-3 py-1.5 text-sm transition-colors ${
+                        chosenId === null ? 'border-primary-500 bg-primary-50 text-primary-700' : 'border-neutral-200 text-neutral-600 hover:bg-neutral-50'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="join-as"
+                        value="new"
+                        checked={chosenId === null}
+                        onChange={() => setChosenId(null)}
+                        className="sr-only"
+                      />
+                      I'm someone new
+                    </label>
+                  </div>
+                </fieldset>
+              )}
               <p className="text-sm text-neutral-500 mb-6">
                 You'll be able to see shared family tasks, events, and routines.
               </p>
@@ -137,7 +186,8 @@ export function JoinHousehold() {
                 </button>
                 <button
                   onClick={handleJoin}
-                  className="btn-primary flex-1"
+                  disabled={needsChoice}
+                  className="btn-primary flex-1 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Join household
                 </button>
