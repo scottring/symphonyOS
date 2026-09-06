@@ -49,7 +49,10 @@ describe('parsePageResponse', () => {
       CAL,
       MEMBERS,
     )
-    expect(out.items).toEqual([{ title: 'Call dentist', day: '2026-08-26', time: null, assignee_id: null, note: null }])
+    expect(out.items).toEqual([{
+      title: 'Call dentist', day: '2026-08-26', time: null, assignee_id: null, note: null,
+      date_hint: null, kind: 'task', recurring: null, phone: null,
+    }])
   })
 
   it('degrades an out-of-window date to week rather than dropping the item', () => {
@@ -73,7 +76,7 @@ describe('parsePageResponse', () => {
   })
 
   it('returns an empty result rather than throwing on a missing items array', () => {
-    expect(parsePageResponse('{"notes":[]}', CAL, MEMBERS)).toEqual({ items: [], notes: [], unclear: [] })
+    expect(parsePageResponse('{"notes":[]}', CAL, MEMBERS)).toEqual({ items: [], notes: [], unclear: [], page_title: null })
   })
 
   it('throws on unparseable text so the caller can retry', () => {
@@ -182,5 +185,45 @@ describe('altitudes', () => {
     const cal = windowCalendar('2026-09-05', '2026-12-05')
     expect(cal).toHaveLength(92)
     expect(cal[91].ymd).toBe('2026-12-05')
+  })
+})
+
+// Task 11: date_hint, day-facts, recurring lines, phone, page_title. A
+// dated line whose date isn't in the calendar must never be silently moved
+// to a nearby date — it degrades to the page's placement AND keeps the real
+// date in date_hint so the review sheet can show it.
+describe('parsePageResponse — date_hint, kind, recurring, phone, page_title', () => {
+  it('passes date_hint, kind, recurring, phone through and never clamps', () => {
+    const r = parsePageResponse(JSON.stringify({ items: [
+      { title: 'Book flights', day: 'season', date_hint: '2026-10-01', time: null, assignee_id: null, note: 'deadline Oct 1' },
+      { title: 'No school', day: '2026-09-07', kind: 'dayfact' },
+      { title: 'Liam soccer', day: 'season', kind: 'recurring', recurring: { days: ['sat'], until: '2026-11-30' }, time: '09:00' },
+      { title: 'Call Dr. Park', day: '2026-09-09', phone: '410-555-0142' },
+    ], notes: [], unclear: [], page_title: 'Fall 2026' }), new Set(['2026-09-06', '2026-09-07', '2026-09-09']), new Set(), 'season')
+    expect(r.items[0]).toMatchObject({ day: 'season', date_hint: '2026-10-01' })
+    expect(r.items[1].kind).toBe('dayfact')
+    expect(r.items[2]).toMatchObject({ kind: 'recurring', recurring: { days: ['sat'], until: '2026-11-30' }, time: '09:00' })
+    expect(r.items[3].phone).toBe('410-555-0142')
+    expect(r.page_title).toBe('Fall 2026')
+  })
+
+  it('the prompt tells the model about date_hint, day-facts, recurring lines, emphasis, and the title', () => {
+    const p = buildPagePrompt([], [], '2026-09-06', 'season')
+    expect(p).toMatch(/date_hint/)
+    expect(p).toMatch(/dayfact/)
+    expect(p).toMatch(/recurring/)
+    expect(p).toMatch(/emphasis/i)
+    expect(p).toMatch(/page_title/)
+  })
+
+  it('captures an out-of-window date as date_hint rather than clamping it into the window', () => {
+    const out = parsePageResponse('{"items":[{"title":"Passport renewal","day":"2027-03-01"}]}', new Set(['2026-09-06']), new Set(), 'week')
+    expect(out.items[0].day).toBe('week')
+    expect(out.items[0].date_hint).toBe('2027-03-01')
+  })
+
+  it('defaults kind to task and recurring/phone/date_hint to null when absent', () => {
+    const out = parsePageResponse('{"items":[{"title":"Mow","day":"week"}]}', new Set(), new Set(), 'week')
+    expect(out.items[0]).toMatchObject({ kind: 'task', recurring: null, phone: null, date_hint: null })
   })
 })
