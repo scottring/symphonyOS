@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@/test/test-utils'
+import { render, screen, within } from '@/test/test-utils'
 import { WeekViewV2 } from './WeekViewV2'
-import { createMockRoutine } from '@/test/mocks/factories'
+import { createMockRoutine, createMockTask } from '@/test/mocks/factories'
 import type { Task } from '@/types/task'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import { ALL_LAYERS } from '@/lib/domains'
@@ -79,5 +79,40 @@ describe('WeekViewV2 routine visibility', () => {
     expect((await screen.findAllByText('Scott Routine')).length).toBeGreaterThan(0)
     // Iris's routine — not owned by the selected member — is gone entirely.
     expect(screen.queryByText('Iris Routine')).toBeNull()
+  })
+})
+
+// ── All-day lane + Earlier row (A2.8, A2.9) ─────────────────────────────────
+// Demo run 2026-09-06: a holiday all-day event drew as an 8 AM block, and a
+// 6:50 AM task got pinned to the 8 AM row alongside it.
+describe('WeekViewV2 all-day lane', () => {
+  const labourDayWeek = new Date(2026, 8, 7) // Monday Sep 7, 2026 (Labor Day)
+
+  it('an all-day calendar event sits in the all-day lane', () => {
+    const events = [
+      {
+        id: 'e1',
+        title: 'Labor Day',
+        start_time: '2026-09-07T00:00:00',
+        end_time: '2026-09-08T00:00:00',
+        is_all_day: true,
+      } as unknown as CalendarEvent,
+    ]
+    render(<WeekViewV2 {...defaultProps} routines={[]} weekStart={labourDayWeek} events={events} />)
+    expect(within(screen.getByTestId('allday-2026-09-07')).getByText('Labor Day')).toBeInTheDocument()
+  })
+
+  it('a 6:50 AM task shows in the Earlier row with its time', () => {
+    const tasks = [
+      createMockTask({
+        id: 't1',
+        title: 'Get gutter cleaning quotes',
+        scheduledFor: new Date(2026, 8, 7, 6, 50),
+        isAllDay: false,
+      }),
+    ]
+    render(<WeekViewV2 {...defaultProps} routines={[]} weekStart={labourDayWeek} tasks={tasks} />)
+    expect(screen.getByText(/6:50 AM · Get gutter/)).toBeInTheDocument()
+    expect(screen.getByLabelText(/Earlier: Get gutter cleaning quotes/)).toBeInTheDocument()
   })
 })

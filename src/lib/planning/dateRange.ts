@@ -57,9 +57,13 @@ export function presetRange(preset: RangePreset, today: Date): Date[] {
       return buildRange(start, addDays(start, MAX_RANGE_DAYS - 1))
     case 'weekend': {
       const dow = start.getDay() // 0 Sun … 6 Sat
-      // Sunday's weekend has one day left in it. Offering Saturday would be
-      // offering yesterday.
-      if (dow === 0) return buildRange(start, start)
+      // A Sunday's own weekend is nearly over — the useful answer is the
+      // COMING Saturday–Sunday, not a one-day "weekend" that reads as a
+      // single labelled DAY on the masthead (demo run 2026-09-06).
+      if (dow === 0) {
+        const saturday = addDays(start, 6)
+        return buildRange(saturday, addDays(saturday, 1))
+      }
       const saturday = addDays(start, (6 - dow + 7) % 7)
       return buildRange(saturday, addDays(saturday, 1))
     }

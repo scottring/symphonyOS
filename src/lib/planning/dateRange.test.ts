@@ -67,10 +67,18 @@ describe('presetRange', () => {
     expect(presetRange('weekend', d(2026, 8, 5)).map(ymd)).toEqual(['2026-9-5', '2026-9-6'])
   })
 
-  // Sunday's weekend has one day left in it. Offering Saturday would be
-  // offering yesterday.
-  it('weekend on a Sunday is the day itself', () => {
-    expect(presetRange('weekend', d(2026, 8, 6)).map(ymd)).toEqual(['2026-9-6'])
+  // Was: "the day itself" (a Sunday's weekend has one day left, so offering
+  // Saturday would be offering yesterday). Demo run 2026-09-06 found that a
+  // single-day "Weekend" reading DAY on the masthead — a one-day "weekend" —
+  // so a Sunday now jumps to the COMING Saturday–Sunday, same as any other
+  // weekday.
+  it('weekend on a Sunday is the coming Sat–Sun', () => {
+    expect(presetRange('weekend', d(2026, 8, 6)).map(ymd)).toEqual(['2026-9-12', '2026-9-13'])
+  })
+
+  it('Weekend on a Sunday is the coming Sat–Sun', () => {
+    const days = presetRange('weekend', new Date(2026, 8, 6))
+    expect(days.map((x) => x.getDate())).toEqual([12, 13])
   })
 })
 

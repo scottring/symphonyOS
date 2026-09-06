@@ -15,7 +15,7 @@ import type { Routine, ActionableInstance } from '@/types/actionable'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
 import { taskToTimelineItem, eventToTimelineItem } from '@/types/timeline'
 import { WeekGrid, dayKey } from './WeekGrid'
-import { WeekAllDayChip } from './WeekAllDayChip'
+import { WeekAllDayChip, WeekAllDayEventChip } from './WeekAllDayChip'
 import { WeekEventBlock } from './WeekEventBlock'
 import { layoutWeekLanes, type PlacedItem } from './layoutLanes'
 import { useWeekDragDrop } from './useWeekDragDrop'
@@ -40,6 +40,39 @@ import type { AssigneeFilter } from '@/lib/today/types'
 import type { Layer } from '@/lib/domains'
 
 const EDGE_PX = 40
+
+/** Does this calendar event span the whole day? Explicit flags win; otherwise
+ *  a full-day span (midnight start, 24h+ duration — how a holiday reads from
+ *  Google) counts too. A holiday used to reach the timed grid and get clamped
+ *  to the 8 AM row (demo run 2026-09-06) — it belongs in the all-day lane. */
+function isAllDayEvent(ev: CalendarEvent): boolean {
+  const flagged =
+    (ev as { is_all_day?: boolean }).is_all_day ??
+    (ev as { isAllDay?: boolean }).isAllDay ??
+    ev.all_day ??
+    ev.allDay
+  if (flagged !== undefined) return flagged
+  const startStr = (ev as { start_time?: string }).start_time ?? (ev as { startTime?: string }).startTime
+  const endStr = (ev as { end_time?: string }).end_time ?? (ev as { endTime?: string }).endTime
+  if (!startStr || !endStr) return false
+  const start = new Date(startStr)
+  const end = new Date(endStr)
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return false
+  const startsAtMidnight = start.getHours() === 0 && start.getMinutes() === 0
+  return startsAtMidnight && end.getTime() - start.getTime() >= 24 * 60 * 60 * 1000
+}
+
+/** A task whose start is before the grid's first hour — too early to place on
+ *  the timed grid without being clamped onto FIRST_HOUR (a 6:50 AM task drawn
+ *  as if it were 8 AM; demo run 2026-09-06). Rendered in the all-day lane
+ *  instead, its real time prefixed onto the chip. */
+function isEarlyTask(d: Date): boolean {
+  return d.getHours() * 60 + d.getMinutes() < FIRST_HOUR * 60
+}
+
+function formatEarlyTime(d: Date): string {
+  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+}
 
 interface WeekViewV2Props {
   tasks: Task[]
@@ -271,9 +304,12 @@ export function WeekViewV2(props: WeekViewV2Props) {
 
   const inWeek = (d: Date) => d >= weekStart && d < weekEnd
 
-  // Tasks that have a specific start time (go into the time grid)
+  // Tasks that have a specific start time AND fall at/after the grid's first
+  // hour go into the time grid. Anything earlier is too early to place without
+  // being clamped onto FIRST_HOUR — it renders in the all-day lane's Earlier
+  // row instead (see earlyTasksByDay).
   const scheduledTasks = useMemo(
-    () => tasks.filter((t) => t.scheduledFor && inWeek(t.scheduledFor) && !t.isAllDay),
+    () => tasks.filter((t) => t.scheduledFor && inWeek(t.scheduledFor) && !t.isAllDay && !isEarlyTask(t.scheduledFor)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [tasks, weekStart],
   )
@@ -295,17 +331,47 @@ export function WeekViewV2(props: WeekViewV2Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tasks, weekStart])
 
-  const weekEvents = useMemo(
-    () =>
-      events.filter((ev) => {
-        const startStr =
-          (ev as { start_time?: string }).start_time ??
-          (ev as { startTime?: string }).startTime
-        return startStr ? inWeek(new Date(startStr)) : false
-      }),
+  // Timed tasks too early for the grid ("Earlier" row) — see scheduledTasks.
+  const earlyTasksByDay = useMemo(() => {
+    const map = new Map<string, Task[]>()
+    for (const t of tasks) {
+      if (!t.scheduledFor || t.isAllDay || t.completed) continue
+      if (!inWeek(t.scheduledFor)) continue
+      if (!isEarlyTask(t.scheduledFor)) continue
+      const key = dayKey(t.scheduledFor)
+      const arr = map.get(key)
+      if (arr) arr.push(t)
+      else map.set(key, [t])
+    }
+    return map
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [events, weekStart],
-  )
+  }, [tasks, weekStart])
+
+  // In-week calendar events, split into timed (grid material) and all-day
+  // (all-day lane). A holiday used to reach the timed grid and get clamped to
+  // the 8 AM row (demo run 2026-09-06) — isAllDayEvent keeps it out.
+  const { weekEvents, allDayEventsByDay } = useMemo(() => {
+    const timed: CalendarEvent[] = []
+    const allDayMap = new Map<string, CalendarEvent[]>()
+    for (const ev of events) {
+      const startStr =
+        (ev as { start_time?: string }).start_time ??
+        (ev as { startTime?: string }).startTime
+      if (!startStr) continue
+      const start = new Date(startStr)
+      if (!inWeek(start)) continue
+      if (isAllDayEvent(ev)) {
+        const key = dayKey(start)
+        const arr = allDayMap.get(key)
+        if (arr) arr.push(ev)
+        else allDayMap.set(key, [ev])
+      } else {
+        timed.push(ev)
+      }
+    }
+    return { weekEvents: timed, allDayEventsByDay: allDayMap }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [events, weekStart])
 
   // Respect the app-wide 'Hide daily activities' toggle (same localStorage key
   // TodayView uses). When true, routines are omitted from the grid; tasks and
@@ -536,11 +602,28 @@ export function WeekViewV2(props: WeekViewV2Props) {
         <WeekGrid
           weekStart={weekStart}
           dayCount={dayCount}
-          renderAllDay={(day) =>
-            (allDayByDay.get(dayKey(day)) ?? []).map((t) => (
-              <WeekAllDayChip key={t.id} task={t} onSelect={onSelectItem} />
-            ))
-          }
+          renderAllDay={(day) => {
+            const key = dayKey(day)
+            return (
+              <>
+                {(allDayEventsByDay.get(key) ?? []).map((ev) => (
+                  <WeekAllDayEventChip key={ev.google_event_id || ev.id} event={ev} onSelect={onSelectItem} />
+                ))}
+                {(allDayByDay.get(key) ?? []).map((t) => (
+                  <WeekAllDayChip key={t.id} task={t} onSelect={onSelectItem} />
+                ))}
+                {(earlyTasksByDay.get(key) ?? []).map((t) => (
+                  <WeekAllDayChip
+                    key={t.id}
+                    task={t}
+                    onSelect={onSelectItem}
+                    displayLabel={`${formatEarlyTime(t.scheduledFor!)} · ${t.title}`}
+                    ariaLabel={`Earlier: ${t.title}`}
+                  />
+                ))}
+              </>
+            )
+          }}
           renderDinner={
             extras.dinnersByDay.size === 0
               ? undefined

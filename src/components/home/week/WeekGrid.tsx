@@ -1,5 +1,6 @@
 import { useDroppable } from '@dnd-kit/core'
 import type { ReactNode } from 'react'
+import { localYmd } from '@/lib/cadence/config'
 
 export const FIRST_HOUR = 8
 export const LAST_HOUR = 21       // 9 PM
@@ -158,6 +159,7 @@ function AllDaySlot({ day, children }: { day: Date; children?: ReactNode }) {
   return (
     <div
       ref={setNodeRef}
+      data-testid={`allday-${localYmd(day)}`}
       // min-w-0 is essential: grid items default to min-width:auto, so a long
       // chip title would stretch this cell past its 1fr column, misaligning the
       // all-day row from the hour grid below (chips straddling day boundaries).
