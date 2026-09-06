@@ -20,6 +20,7 @@ vi.mock('@/hooks/useRecurringEventDetection', () => ({ useRecurringEventDetectio
 vi.mock('@/hooks/useProjects', () => ({ useProjects: () => ({ projects: [], loading: false, addProject: vi.fn(), deleteProject: vi.fn(), updateProject: vi.fn() }) }))
 vi.mock('@/hooks/useNotes', () => ({ useNotes: () => ({ notes: [], loading: false, addNote: vi.fn(), updateNote: vi.fn(), deleteNote: vi.fn() }) }))
 vi.mock('@/hooks/useSupabaseTasks', () => ({ useSupabaseTasks: () => ({ tasks: [], loading: false, addTask: vi.fn(), updateTask: vi.fn(), deleteTask: vi.fn() }) }))
+vi.mock('@/hooks/useFamilyMembers', () => ({ useFamilyMembers: () => ({ members: [], loading: false, error: null, getCurrentUserMember: () => ({ id: 'me', name: 'Scott' }) }) }))
 vi.mock('@/hooks/usePinnedItems', () => ({ usePinnedItems: () => ({ isPinned: () => false, pin: vi.fn(), unpin: vi.fn() }) }))
 vi.mock('@/hooks/useActionQueue', () => ({ useActionQueue: () => ({ actions: [], loading: false, approveAction: vi.fn(), rejectAction: vi.fn(), pendingCount: 0, refetch: vi.fn() }) }))
 vi.mock('@/hooks/useDomain.tsx', async (importOriginal) => {
@@ -112,6 +113,26 @@ describe('TodayView', () => {
     await openOverflow(user)
     expect(screen.getAllByRole('button', { name: /this week/i }).map((b) => b.getAttribute('aria-label'))).toEqual(['This week pool'])
     expect(screen.getAllByRole('button', { name: /this month/i }).map((b) => b.getAttribute('aria-label'))).toEqual(['This month pool'])
+  })
+  // The lists plan MY day: unassigned rows and mine. A row assigned only to
+  // someone else stays off — same rule as the /week column and the month fold.
+  it('the This week / This month lists scope to the current member', async () => {
+    const mk = (over: Record<string, unknown>) => ({ id: String(Math.random()), title: 't', completed: false, createdAt: TODAY, updatedAt: TODAY, ...over })
+    const { user } = renderView({ tasks: [
+      mk({ title: 'Unassigned month', bucket: 'month' }),
+      mk({ title: 'My month', bucket: 'month', assignedTo: 'me' }),
+      mk({ title: "Iris's month", bucket: 'month', assignedTo: 'iris' }),
+      mk({ title: "Iris's week", bucket: 'week', assignedToAll: ['iris'] }),
+      mk({ title: 'Our week', bucket: 'week', assignedToAll: ['me', 'iris'] }),
+    ] })
+    await user.click(screen.getByRole('button', { name: 'This month pool' }))
+    expect(screen.getByText('Unassigned month')).toBeInTheDocument()
+    expect(screen.getByText('My month')).toBeInTheDocument()
+    expect(screen.queryByText("Iris's month")).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'This month pool' }))
+    await user.click(screen.getByRole('button', { name: 'This week pool' }))
+    expect(screen.getByText('Our week')).toBeInTheDocument()
+    expect(screen.queryByText("Iris's week")).not.toBeInTheDocument()
   })
   it('keeps the routine show/hide toggle in the overflow', async () => {
     const { user } = renderView({ assigneesWithTasks: [{ id: 'm1', name: 'Iris' } as never], hasUnassignedTasks: true })

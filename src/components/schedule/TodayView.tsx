@@ -52,6 +52,8 @@ import { computeClaritySteps, type ClarityStepId } from '@/lib/clarity/claritySt
 import { selectOverdue } from '@/lib/today/taskPools'
 import { selectHorizonPool } from '@/lib/today/horizons'
 import { monthStartOf } from '@/lib/planning/periodPlacement'
+import { doableBy } from '@/lib/planning/poolViews'
+import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { placementFate } from '@/lib/planning/lineage'
 import { useSuggestionsEnabled } from '@/lib/assistant/suggestionsPref'
 import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
@@ -309,20 +311,29 @@ export function TodayView({
 
   const data = useTodayData(todayInput)
 
-  // The week/month pools for the header dropdowns — separate from the daily
+  // The week/month lists for the header dropdowns — separate from the daily
   // review by decree (Scott, 2026-08-19): look and pick from up here, never
-  // inside the review session. Unfiltered on purpose: the pools are a full
-  // census, not a view of the current assignee filter.
-  const poolMatchAll = useMemo(() => () => true, [])
+  // inside the review session. They plan MY day, so they scope to the current
+  // member the way the /week column and the month fold do (doableBy):
+  // unassigned rows and mine; a row assigned exclusively to someone else is
+  // rightly visible elsewhere but isn't mine to put on today. Not a view of
+  // the assignee FILTER, which is a different question (Scott, 2026-09-05).
+  const { getCurrentUserMember } = useFamilyMembers()
+  const meId = getCurrentUserMember()?.id ?? null
+  const poolMatchMine = useMemo(
+    () => (assignedTo: string | null | undefined, assignedToAll?: readonly string[] | null) =>
+      !meId || doableBy({ assignedTo: assignedTo ?? undefined, assignedToAll: assignedToAll ? [...assignedToAll] : undefined }, meId),
+    [meId],
+  )
   const weekPool = useMemo(
-    () => selectHorizonPool(tasks, 'week', poolMatchAll, currentWeekStart),
-    [tasks, poolMatchAll, currentWeekStart],
+    () => selectHorizonPool(tasks, 'week', poolMatchMine, currentWeekStart),
+    [tasks, poolMatchMine, currentWeekStart],
   )
   // The month list is THIS month's (a legacy NULL month_start row is this
   // month's too); next month's rows wait their turn.
   const monthPool = useMemo(
-    () => selectHorizonPool(tasks, 'month', poolMatchAll, undefined, monthStartOf(viewedDate)),
-    [tasks, poolMatchAll, viewedDate],
+    () => selectHorizonPool(tasks, 'month', poolMatchMine, undefined, monthStartOf(viewedDate)),
+    [tasks, poolMatchMine, viewedDate],
   )
 
   // ── Up Next: the single next commitment, highlighted in place. It used to

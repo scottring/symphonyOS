@@ -30,7 +30,7 @@ export interface PoolCtx {
 /** Is this task doable by `meId`? Unassigned counts; an assignee set that
  *  excludes me does not. Shared with the Month rail so "my week's list" and
  *  "the month I plan it from" scope the same way. */
-export function doableBy(t: Task, meId: string): boolean {
+export function doableBy(t: Pick<Task, 'assignedTo' | 'assignedToAll'>, meId: string): boolean {
   const assignees = t.assignedToAll?.length ? t.assignedToAll : t.assignedTo ? [t.assignedTo] : []
   return assignees.length === 0 || assignees.includes(meId)
 }
