@@ -1,8 +1,11 @@
 import { useMemo, useState } from 'react'
-import { X, NotebookPen, HelpCircle, Target, ChevronLeft, ChevronRight } from 'lucide-react'
+import { X, NotebookPen, HelpCircle, Target, ChevronLeft, ChevronRight, CalendarCheck2 } from 'lucide-react'
 import { parseLocalYmd } from '@/lib/cadence/config'
-import { pageMonthStart, pageSeasonStart, type PlanItem, type PlanPlacement, type PageAltitude } from '@/lib/planParse'
-import { readSeasons, seasonLabel, nextSeasonStart, seasonStartFor, type Seasons } from '@/lib/cadence/seasons'
+import { pageMonthStart, pageSeasonStart, planWindowDates, rewindowPlanItems, type PlanDay, type PlanItem, type PlanPlacement, type PageAltitude } from '@/lib/planParse'
+import { normalizeSeasons, readSeasons, seasonLabel, nextSeasonStart, seasonStartFor, type Seasons } from '@/lib/cadence/seasons'
+import { findLikelyDuplicate, type ExistingTask } from '@/lib/planDuplicates'
+import { DOMAINS, type DomainId } from '@/lib/domains'
+import type { TitlePeriod } from '@/lib/planTitle'
 import type { PageNote } from '@/lib/pageParse'
 import type { FamilyMember } from '@/types/family'
 import { TaskKindBadge } from '@/components/task/TaskKindBadge'
@@ -10,6 +13,9 @@ import { TaskKindBadge } from '@/components/task/TaskKindBadge'
 export interface PageReviewPayload {
   items: PlanItem[]
   notes: PageNote[]
+  /** Which layer the whole page belongs to — asked once, here, and stamped on
+   *  everything the page writes. Family is the sharing switch. */
+  domain: DomainId
   /** The month a MONTH page is for (its 1st) — the chip's choice. */
   monthStart?: Date
   /** The season a SEASON page is for (its start) — the chip's choice. */
@@ -31,6 +37,16 @@ export interface PageReviewSheetProps {
   seasons?: Seasons
   /** When the page was snapped — decides which month/season it is for. Default: now. */
   today?: Date
+  /** The period the page's own HEADING names — it beats the calendar guess. */
+  titlePeriod?: TitlePeriod
+  /** The heading as written, so the sheet can say why it opened where it did. */
+  pageTitle?: string | null
+  /** Open tasks a line might already be — the Link / Keep separate offer. */
+  existingTasks?: ExistingTask[]
+  /** 'YYYY-MM-DD' → the day's event titles, for day-facts already on the calendar. */
+  calendarTitlesByDay?: Map<string, string[]>
+  /** The domain to open on. Default: the one remembered for this altitude, else Family. */
+  initialDomain?: DomainId
   members: FamilyMember[]
   committing: boolean
   /** Called with only the checked rows, as edited. */
@@ -38,7 +54,13 @@ export interface PageReviewSheetProps {
   onClose: () => void
 }
 
-interface ItemRow extends PlanItem { included: boolean }
+interface ItemRow extends PlanItem {
+  included: boolean
+  /** The open task this line probably repeats, if any. */
+  dup?: ExistingTask | null
+  /** "Keep separate" was pressed — the offer is done with. */
+  dupDismissed?: boolean
+}
 interface NoteRow extends PageNote { included: boolean }
 
 const UNASSIGNED = ''
@@ -81,6 +103,45 @@ function dateLabel(ymd: string): string {
   return parseLocalYmd(ymd).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
 }
 
+const DAY_LABEL: Record<PlanDay, string> = {
+  sun: 'Sun', mon: 'Mon', tue: 'Tue', wed: 'Wed', thu: 'Thu', fri: 'Fri', sat: 'Sat',
+}
+
+/** A day-fact and a calendar entry rarely word it the same: "No school —
+ *  Labor Day" against "Labor Day". Strip the framing and compare what's left. */
+function factKey(s: string): string {
+  return s.toLowerCase()
+    .replace(/no school/g, ' ')
+    .replace(/holiday/g, ' ')
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+/** Is this day-fact already on the day's calendar? Then it is not news. */
+function onCalendar(item: PlanItem, byDay?: Map<string, string[]>): boolean {
+  if (!byDay || item.kind !== 'dayfact' || item.placement.kind !== 'date') return false
+  const titles = byDay.get(item.placement.date)
+  if (!titles?.length) return false
+  const a = factKey(item.title)
+  if (!a) return false
+  return titles.some((t) => {
+    const b = factKey(t)
+    return !!b && (a.includes(b) || b.includes(a))
+  })
+}
+
+const DOMAIN_KEY = (altitude: PageAltitude) => `symphony.paper.domain.${altitude}`
+
+function rememberedDomain(altitude: PageAltitude): DomainId | null {
+  try {
+    const raw = localStorage.getItem(DOMAIN_KEY(altitude))
+    return DOMAINS.some((d) => d.id === raw) ? (raw as DomainId) : null
+  } catch {
+    return null
+  }
+}
+
 /**
  * The review step of page-from-paper: everything the parser read, editable,
  * nothing written until "Add". Handwriting parsing will misread sometimes —
@@ -89,22 +150,66 @@ function dateLabel(ymd: string): string {
  */
 export function PageReviewSheet({
   items, notes, unclear, windowDates, altitude = 'week', seasons = readSeasons(), today = new Date(),
-  members, committing, onCommit, onClose,
+  titlePeriod = null, pageTitle = null, existingTasks = [], calendarTitlesByDay,
+  initialDomain, members, committing, onCommit, onClose,
 }: PageReviewSheetProps) {
-  const [itemRows, setItemRows] = useState<ItemRow[]>(() => items.map((i) => ({ ...i, included: true })))
+  // A caller's boundaries may be hand-written and out of calendar order; the
+  // season maths below assume ordered ones.
+  const seasonsOrdered = useMemo(() => normalizeSeasons(seasons), [seasons])
+  // Day-facts the calendar already knows are set aside before anything else:
+  // "No school Monday" written on a page whose event is already on the day is
+  // a confirmation, not a task.
+  const [alreadyOnCalendar] = useState<PlanItem[]>(() => items.filter((i) => onCalendar(i, calendarTitlesByDay)))
+  const [itemRows, setItemRows] = useState<ItemRow[]>(() =>
+    items
+      .filter((i) => !onCalendar(i, calendarTitlesByDay))
+      .map((i) => ({ ...i, included: true, dup: findLikelyDuplicate(i.title, existingTasks) })),
+  )
   const [noteRows, setNoteRows] = useState<NoteRow[]>(() => notes.map((n) => ({ ...n, included: true })))
   const [unread, setUnread] = useState<string[]>(() => unclear)
-  // Which month / season the page is FOR. Guessed from the date (a page
-  // snapped in a month's last week is for the coming month); one tap to fix.
-  const [monthStart, setMonthStart] = useState<Date>(() => pageMonthStart(today))
-  const [seasonStart, setSeasonStart] = useState<Date>(() => pageSeasonStart(today, seasons))
-  const shiftMonth = (by: number) => setMonthStart((m) => new Date(m.getFullYear(), m.getMonth() + by, 1))
-  const shiftSeason = (by: number) => setSeasonStart((st) => {
-    if (by > 0) return nextSeasonStart(st, seasons)
-    const dayBefore = new Date(st)
-    dayBefore.setDate(dayBefore.getDate() - 1)
-    return seasonStartFor(dayBefore, seasons)
-  })
+  const [domain, setDomain] = useState<DomainId>(() => initialDomain ?? rememberedDomain(altitude) ?? 'family')
+  // Which month / season the page is FOR. The page's own heading wins; failing
+  // that it is guessed from the date (a page snapped in a month's last week is
+  // for the coming month). One tap either way to fix.
+  const [monthStart, setMonthStart] = useState<Date>(() =>
+    titlePeriod?.kind === 'month' && altitude === 'month' ? titlePeriod.start : pageMonthStart(today))
+  const [seasonStart, setSeasonStart] = useState<Date>(() =>
+    titlePeriod?.kind === 'season' && altitude === 'season' ? titlePeriod.start : pageSeasonStart(today, seasonsOrdered))
+
+  // The dates this page may place on: a month/season page's window follows the
+  // chip, so flipping it opens dates the parser never saw.
+  const windowNow = useMemo(() => (
+    altitude === 'month' ? planWindowDates(today, 'month', seasonsOrdered, monthStart)
+      : altitude === 'season' ? planWindowDates(today, 'season', seasonsOrdered, seasonStart)
+        : windowDates
+  ), [altitude, today, seasonsOrdered, monthStart, seasonStart, windowDates])
+
+  // Flipping the chip re-places every row against the new window without a
+  // second model call: a Dec 12 line degraded off the Fall list becomes a
+  // dated row the moment Winter is chosen (and back again).
+  const rewindowTo = (periodStart: Date) => {
+    const win = planWindowDates(today, altitude, seasonsOrdered, periodStart)
+    // rewindowPlanItems returns each row spread, so `included` / `dup` ride along.
+    // A row that lands on a date is no longer a goal — goals are never scheduled.
+    setItemRows((rows) => (rewindowPlanItems(rows, win, altitude) as ItemRow[])
+      .map((r) => (r.goal && !canBeGoal(altitude, r.placement) ? { ...r, goal: false } : r)))
+  }
+  const shiftMonth = (by: number) => {
+    const next = new Date(monthStart.getFullYear(), monthStart.getMonth() + by, 1)
+    setMonthStart(next)
+    rewindowTo(next)
+  }
+  const shiftSeason = (by: number) => {
+    let next: Date
+    if (by > 0) next = nextSeasonStart(seasonStart, seasonsOrdered)
+    else {
+      const dayBefore = new Date(seasonStart)
+      dayBefore.setDate(dayBefore.getDate() - 1)
+      next = seasonStartFor(dayBefore, seasonsOrdered)
+    }
+    setSeasonStart(next)
+    rewindowTo(next)
+  }
 
   const includedCount = useMemo(
     () => itemRows.filter((r) => r.included).length + noteRows.filter((r) => r.included).length,
@@ -121,7 +226,7 @@ export function PageReviewSheet({
       unread.length > 0 ? `${unread.length} unclear` : null,
     ].filter(Boolean).join(' / ')
   }, [itemRows, noteRows, unread.length])
-  const isEmpty = itemRows.length === 0 && noteRows.length === 0 && unread.length === 0
+  const isEmpty = itemRows.length === 0 && noteRows.length === 0 && unread.length === 0 && alreadyOnCalendar.length === 0
 
   const updateItem = (index: number, patch: Partial<ItemRow>) =>
     setItemRows((prev) => prev.map((r, i) => (i === index ? { ...r, ...patch } : r)))
@@ -129,7 +234,7 @@ export function PageReviewSheet({
     setNoteRows((prev) => prev.map((r, i) => (i === index ? { ...r, ...patch } : r)))
 
   const promoteToTask = (line: string) => {
-    setItemRows((prev) => [...prev, { title: line, placement: { kind: 'inbox' }, time: null, assigneeId: null, note: null, dateHint: null, kind: 'task', recurring: null, phone: null, contactMemberId: null, included: true }])
+    setItemRows((prev) => [...prev, { title: line, placement: { kind: 'inbox' }, time: null, assigneeId: null, note: null, dateHint: null, kind: 'task', recurring: null, phone: null, contactMemberId: null, included: true, dup: findLikelyDuplicate(line, existingTasks) }])
     setUnread((prev) => prev.filter((l) => l !== line))
   }
   const promoteToNote = (line: string) => {
@@ -138,10 +243,13 @@ export function PageReviewSheet({
   }
 
   const commit = () => {
+    // The house remembers what kind of page this altitude usually is.
+    try { localStorage.setItem(DOMAIN_KEY(altitude), domain) } catch { /* private mode */ }
     onCommit({
+      domain,
       items: itemRows
         .filter((r) => r.included && r.title.trim())
-        .map(({ included: _included, ...item }) => ({ ...item, title: item.title.trim() })),
+        .map(({ included: _included, dup: _dup, dupDismissed: _dupDismissed, ...item }) => ({ ...item, title: item.title.trim() })),
       notes: noteRows
         .filter((r) => r.included && r.content.trim())
         .map(({ included: _included, ...note }) => ({ title: note.title.trim(), content: note.content.trim() })),
@@ -185,7 +293,37 @@ export function PageReviewSheet({
             <div>
               <h3 className="font-display text-xl text-neutral-900">From your page</h3>
               {!isEmpty && <p className="mt-0.5 text-[13px] text-neutral-500">{ALTITUDE_BLURB[altitude]}</p>}
+              {pageTitle && titlePeriod && (
+                <p className="mt-0.5 text-[12px] text-neutral-500">Your page says <b className="font-semibold text-neutral-700">{pageTitle}</b></p>
+              )}
               {periodChip && <div className="mt-1.5">{periodChip}</div>}
+              {!isEmpty && (
+                <div role="radiogroup" aria-label="This page is" className="mt-2 flex flex-wrap items-center gap-1.5 text-[12px]">
+                  <span className="text-neutral-500">This page is</span>
+                  {DOMAINS.map((d) => (
+                    <label
+                      key={d.id}
+                      className={`cursor-pointer rounded-full border px-2.5 py-0.5 font-medium transition-colors ${
+                        domain === d.id ? 'border-primary-300 bg-primary-50 text-primary-800' : 'border-neutral-200 bg-white text-neutral-600'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="page-domain"
+                        value={d.id}
+                        checked={domain === d.id}
+                        onChange={() => setDomain(d.id)}
+                        aria-label={d.label}
+                        className="sr-only"
+                      />
+                      {d.label}
+                    </label>
+                  ))}
+                  <span className="text-neutral-400">
+                    {domain === 'family' ? 'Family pages are shared with everyone in the house.' : 'Only you will see this page.'}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
           <button type="button" onClick={onClose} aria-label="Close review" className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors">
@@ -218,19 +356,13 @@ export function PageReviewSheet({
                       />
                       <div className="min-w-0 flex-1">
                         <div className="flex min-w-0 items-center gap-2">
+                          {/* What KIND of line this is stays on the left, always —
+                              a goal is a state of the row, not its kind. */}
                           {row.placement.kind === 'goal'
                             ? <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800"><Target className="w-3 h-3" />Goal</span>
-                            : canBeGoal(altitude, row.placement)
-                              // A goal on the month's or season's list — ticked, never placed.
-                              ? <button type="button" aria-pressed={!!row.goal} aria-label={`Goal "${row.title}"`}
-                                  title={row.goal ? 'A goal on this list — tap to make it a task' : 'Make it a goal'}
-                                  onClick={() => updateItem(i, { goal: !row.goal })}
-                                  className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors ${
-                                    row.goal ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-neutral-200 bg-white text-neutral-400 hover:text-neutral-700'
-                                  }`}>
-                                  <Target className="w-3 h-3" />Goal
-                                </button>
-                              : <TaskKindBadge title={row.title} note={row.note} label />}
+                            : row.kind === 'dayfact'
+                              ? <span className="inline-flex shrink-0 items-center rounded-md border border-neutral-200 bg-neutral-50 px-1.5 py-0.5 text-[10px] font-semibold leading-none text-neutral-500">Day</span>
+                              : <TaskKindBadge title={row.title} note={row.note} kind={row.kind === 'recurring' ? 'routine' : undefined} label />}
                           <input
                             value={row.title}
                             onChange={(e) => updateItem(i, { title: e.target.value })}
@@ -239,10 +371,40 @@ export function PageReviewSheet({
                           />
                         </div>
                         {row.note && <p className="mt-1 text-[13px] text-neutral-500 line-clamp-2">{row.note}</p>}
+                        {/* The same errand, written twice: one tap says which. */}
+                        {row.dup && !row.dupDismissed && (
+                          row.sourceId
+                            ? <p className="mt-1 text-[12px] text-neutral-500">Linked to <i className="text-neutral-700">{row.dup.title}</i></p>
+                            : (
+                              <p className="mt-1 flex flex-wrap items-center gap-1.5 text-[12px] text-neutral-500">
+                                Looks like <i className="text-neutral-700">{row.dup.title}</i>
+                                <button
+                                  type="button"
+                                  onClick={() => updateItem(i, { sourceId: row.dup?.id })}
+                                  className="rounded-md border border-neutral-200 bg-white px-1.5 py-0.5 font-medium text-neutral-700 hover:bg-neutral-50"
+                                >
+                                  Link
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => updateItem(i, { dupDismissed: true })}
+                                  className="rounded-md px-1 py-0.5 text-neutral-500 hover:text-neutral-700"
+                                >
+                                  Keep separate
+                                </button>
+                              </p>
+                            )
+                        )}
                       </div>
                     </div>
                     <div className="ml-7 flex flex-wrap items-center gap-2 sm:ml-0 sm:shrink-0 sm:flex-nowrap">
-                      <select
+                      {/* A routine has no single day — the pattern IS its when. */}
+                      {row.kind === 'recurring' && row.recurring && (
+                        <span className="shrink-0 rounded-lg bg-primary-50 px-2 py-1.5 text-[13px] font-medium text-primary-800">
+                          Routine · {row.recurring.days.map((d) => DAY_LABEL[d]).join(', ')}
+                        </span>
+                      )}
+                      {row.kind !== 'recurring' && <select
                         value={placementValue(row.placement)}
                         onChange={(e) => {
                           const placement = placementFromValue(e.target.value)
@@ -266,11 +428,27 @@ export function PageReviewSheet({
                         ))}
                         {/* A goal is only offered where it can be written: a year page. */}
                         {(altitude === 'year' || row.placement.kind === 'goal') && <option value="goal">Year goal</option>}
-                        {windowDates.map((d) => (
+                        {windowNow.map((d) => (
                           <option key={d} value={d}>{dateLabel(d)}</option>
                         ))}
-                      </select>
-                      {row.placement.kind === 'date' && (
+                      </select>}
+                      {/* A goal on the month's or season's list — ticked, never
+                          placed. A control with a word on it, not a badge. */}
+                      {canBeGoal(altitude, row.placement) && row.kind !== 'recurring' && (
+                        <button
+                          type="button"
+                          aria-pressed={!!row.goal}
+                          aria-label={`Make "${row.title}" a goal`}
+                          title={row.goal ? 'A goal on this list — tap to make it a task' : 'Make it a goal'}
+                          onClick={() => updateItem(i, { goal: !row.goal })}
+                          className={`inline-flex shrink-0 items-center gap-1 rounded-lg border px-2 py-1.5 text-[13px] font-medium transition-colors ${
+                            row.goal ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-neutral-200 bg-white text-neutral-500 hover:text-neutral-800'
+                          }`}
+                        >
+                          <Target className="w-3.5 h-3.5" />{row.goal ? 'Goal' : 'Make a goal'}
+                        </button>
+                      )}
+                      {(row.placement.kind === 'date' || row.kind === 'recurring') && (
                         <input
                           type="time"
                           value={row.time ?? ''}
@@ -293,6 +471,21 @@ export function PageReviewSheet({
                       </select>}
                     </div>
                   </div>
+                ))}
+              </div>
+            )}
+
+            {alreadyOnCalendar.length > 0 && (
+              <div className="space-y-1.5">
+                <p className="flex items-center gap-1.5 text-[13px] font-medium text-neutral-500">
+                  <CalendarCheck2 className="w-3.5 h-3.5" />
+                  Already on your calendar
+                </p>
+                {alreadyOnCalendar.map((fact, i) => (
+                  <p key={`c-${i}`} className="rounded-xl border border-dashed border-neutral-200 px-3 py-2 text-[13px] text-neutral-500">
+                    {fact.title}
+                    {fact.placement.kind === 'date' && <span className="text-neutral-400"> · {dateLabel(fact.placement.date)}</span>}
+                  </p>
                 ))}
               </div>
             )}

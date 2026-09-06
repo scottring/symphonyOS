@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen } from '@/test/test-utils'
 import userEvent from '@testing-library/user-event'
 import { PageReviewSheet } from './PageReviewSheet'
@@ -53,6 +53,7 @@ describe('PageReviewSheet', () => {
     const { onCommit } = renderSheet()
     await user.click(screen.getByRole('button', { name: /add 3 items/i }))
     expect(onCommit).toHaveBeenCalledWith({
+      domain: 'family',
       items: [
         expect.objectContaining({ title: 'Call dentist', placement: { kind: 'date', date: '2026-08-18' } }),
         expect.objectContaining({ title: 'Return library books', placement: { kind: 'week' } }),
@@ -66,7 +67,7 @@ describe('PageReviewSheet', () => {
     const { onCommit } = renderSheet()
     await user.click(screen.getByRole('checkbox', { name: /include note "Roof quotes"/i }))
     await user.click(screen.getByRole('button', { name: /add 2 items/i }))
-    expect(onCommit).toHaveBeenCalledWith({ items: expect.any(Array), notes: [] })
+    expect(onCommit).toHaveBeenCalledWith({ domain: 'family', items: expect.any(Array), notes: [] })
   })
 
   it('excludes an unchecked task row', async () => {
@@ -202,8 +203,8 @@ describe('PageReviewSheet — altitudes', () => {
         notes: [],
       })
       expect(screen.getByText(/1 task \/ 1 goal/)).toBeInTheDocument()
-      expect(screen.getByRole('button', { name: 'Goal "Read more"' })).toHaveAttribute('aria-pressed', 'true')
-      await user.click(screen.getByRole('button', { name: 'Goal "Repaint the porch"' }))
+      expect(screen.getByRole('button', { name: 'Make "Read more" a goal' })).toHaveAttribute('aria-pressed', 'true')
+      await user.click(screen.getByRole('button', { name: 'Make "Repaint the porch" a goal' }))
       expect(screen.getByText(/2 goals/)).toBeInTheDocument()
       await user.click(screen.getByRole('button', { name: /add 2 items/i }))
       expect(onCommit.mock.calls[0][0].items.map((i: { goal?: boolean }) => !!i.goal)).toEqual([true, true])
@@ -216,16 +217,147 @@ describe('PageReviewSheet — altitudes', () => {
         items: [{ title: 'Read more', placement: { kind: 'month' }, time: null, assigneeId: null, note: null, goal: true, dateHint: null, kind: 'task' as const, recurring: null, phone: null, contactMemberId: null }],
         notes: [],
       })
-      await user.selectOptions(screen.getByRole('combobox', { name: /when/i }), '2026-08-18')
-      expect(screen.queryByRole('button', { name: 'Goal "Read more"' })).toBeNull()
+      await user.selectOptions(screen.getByRole('combobox', { name: /when/i }), '2026-09-18')
+      expect(screen.queryByRole('button', { name: 'Make "Read more" a goal' })).toBeNull()
       await user.click(screen.getByRole('button', { name: /add 1 item/i }))
       expect(onCommit.mock.calls[0][0].items[0].goal).toBeFalsy()
     })
 
     it('a week page offers no goal toggle and no period chip', () => {
       renderSheet({ altitude: 'week' })
-      expect(screen.queryByRole('button', { name: /^Goal "/ })).toBeNull()
+      expect(screen.queryByRole('button', { name: /a goal$/ })).toBeNull()
       expect(screen.queryByRole('button', { name: /Next month|Next season/ })).toBeNull()
     })
+  })
+})
+
+// Task 6 (2026-09-06): the sheet asks the domain once, opens on the period the
+// page's own title names, re-windows when that chip flips, labels the goal
+// control, and keeps day-facts already on the calendar / likely duplicates out
+// of the way.
+describe('PageReviewSheet — domain, page title, duplicates', () => {
+  // Fall starts Sep 1 and Winter Dec 1 here, so the tests never lean on the
+  // household default (which puts Fall in October).
+  const SEASONS = [
+    { name: 'Winter', month: 12, day: 1 },
+    { name: 'Spring', month: 3, day: 1 },
+    { name: 'Summer', month: 6, day: 1 },
+    { name: 'Fall', month: 9, day: 1 },
+  ] as unknown as typeof DEFAULT_SEASONS
+
+  const base = {
+    time: null, assigneeId: null, note: null, dateHint: null,
+    kind: 'task' as const, recurring: null, phone: null, contactMemberId: null,
+  }
+
+  // The choice is remembered per altitude, so it must not leak between tests.
+  beforeEach(() => { try { localStorage.clear() } catch { /* private mode */ } })
+
+  it('shows the domain row defaulting to Family and reports it on commit', async () => {
+    const user = userEvent.setup()
+    const { onCommit } = renderSheet()
+    expect(screen.getByRole('radio', { name: 'Family' })).toBeChecked()
+    await user.click(screen.getByRole('radio', { name: 'Work' }))
+    await user.click(screen.getByRole('button', { name: /^Add/ }))
+    expect(onCommit).toHaveBeenCalledWith(expect.objectContaining({ domain: 'work' }))
+  })
+
+  it('reopens on the domain this altitude was last committed as', () => {
+    localStorage.setItem('symphony.paper.domain.week', 'personal')
+    renderSheet()
+    expect(screen.getByRole('radio', { name: 'Personal' })).toBeChecked()
+  })
+
+  it('opens the season chip on the page title and says so', () => {
+    renderSheet({
+      altitude: 'season', today: new Date(2026, 8, 6), seasons: SEASONS, notes: [],
+      titlePeriod: { kind: 'season', start: new Date(2026, 8, 1), label: 'Fall 2026' },
+      pageTitle: 'Fall 2026',
+      items: [{ ...base, title: 'Rake the yard', placement: { kind: 'season' } }],
+    })
+    expect(screen.getAllByText('Fall 2026').length).toBeGreaterThan(0)
+    expect(screen.getByText(/Your page says/)).toBeInTheDocument()
+  })
+
+  it('flipping the chip re-windows: a Dec 12 hint becomes a date on the Winter list', async () => {
+    const user = userEvent.setup()
+    renderSheet({
+      altitude: 'season', today: new Date(2026, 8, 6), seasons: SEASONS, notes: [],
+      windowDates: ['2026-09-06'],
+      items: [{ ...base, title: 'Recital', placement: { kind: 'season' }, dateHint: '2026-12-12' }],
+    })
+    // Fall runs Sep 1 – Nov 30 here, so Dec 12 is out of the window.
+    expect(screen.getByRole('combobox', { name: 'When' })).toHaveValue('season')
+    await user.click(screen.getByRole('button', { name: 'Next season' }))
+    expect(screen.getByRole('combobox', { name: 'When' })).toHaveValue('2026-12-12')
+    await user.click(screen.getByRole('button', { name: 'Previous season' }))
+    expect(screen.getByRole('combobox', { name: 'When' })).toHaveValue('season')
+  })
+
+  it('a day-fact already on the calendar is listed apart and not committed', async () => {
+    const user = userEvent.setup()
+    const { onCommit } = renderSheet({
+      items: [{ ...base, title: 'No school — Labor Day', kind: 'dayfact', placement: { kind: 'date', date: '2026-09-07' }, dateHint: '2026-09-07' }],
+      calendarTitlesByDay: new Map([['2026-09-07', ['Labor Day']]]),
+    })
+    expect(screen.getByText('Already on your calendar')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /^Add/ }))
+    expect(onCommit.mock.calls[0][0].items).toHaveLength(0)
+  })
+
+  it('a day-fact with no calendar match stays a row to add', async () => {
+    const user = userEvent.setup()
+    const { onCommit } = renderSheet({
+      notes: [],
+      items: [{ ...base, title: 'Early dismissal', kind: 'dayfact', placement: { kind: 'date', date: '2026-08-18' }, dateHint: '2026-08-18' }],
+      calendarTitlesByDay: new Map([['2026-08-18', ['Soccer practice']]]),
+    })
+    expect(screen.queryByText('Already on your calendar')).toBeNull()
+    await user.click(screen.getByRole('button', { name: /^Add/ }))
+    expect(onCommit.mock.calls[0][0].items).toHaveLength(1)
+  })
+
+  it('a likely duplicate offers Link and sets sourceId', async () => {
+    const user = userEvent.setup()
+    const { onCommit } = renderSheet({
+      notes: [],
+      items: [{ ...base, title: 'Pumpkin patch', placement: { kind: 'date', date: '2026-08-18' } }],
+      existingTasks: [{ id: 'x1', title: 'Go to pumpkin patch' }],
+    })
+    expect(screen.getByText(/Looks like/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /^Link/ }))
+    await user.click(screen.getByRole('button', { name: /^Add/ }))
+    expect(onCommit.mock.calls[0][0].items[0].sourceId).toBe('x1')
+  })
+
+  it('Keep separate drops the duplicate line and commits without a sourceId', async () => {
+    const user = userEvent.setup()
+    const { onCommit } = renderSheet({
+      notes: [],
+      items: [{ ...base, title: 'Pumpkin patch', placement: { kind: 'date', date: '2026-08-18' } }],
+      existingTasks: [{ id: 'x1', title: 'Go to pumpkin patch' }],
+    })
+    await user.click(screen.getByRole('button', { name: /^Keep separate/ }))
+    expect(screen.queryByText(/Looks like/)).toBeNull()
+    await user.click(screen.getByRole('button', { name: /^Add/ }))
+    expect(onCommit.mock.calls[0][0].items[0].sourceId).toBeUndefined()
+  })
+
+  it('the Goal control is a labelled button to the right of When, not a badge', () => {
+    renderSheet({
+      altitude: 'month', today: new Date(2026, 8, 5), notes: [],
+      items: [{ ...base, title: 'Read a book', placement: { kind: 'month' } }],
+    })
+    expect(screen.getByRole('button', { name: 'Make "Read a book" a goal' })).toHaveAttribute('aria-pressed', 'false')
+    expect(screen.getByText('Task')).toBeInTheDocument() // the kind badge stays
+  })
+
+  it('a recurring line reads as a routine with its days, not a When select', () => {
+    renderSheet({
+      notes: [],
+      items: [{ ...base, title: 'Trash out', kind: 'recurring', placement: { kind: 'week' }, recurring: { days: ['sat', 'sun'], until: null } }],
+    })
+    expect(screen.getByText('Routine · Sat, Sun')).toBeInTheDocument()
+    expect(screen.queryByRole('combobox', { name: 'When' })).toBeNull()
   })
 })
