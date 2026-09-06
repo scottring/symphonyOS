@@ -1,4 +1,5 @@
-import { Check, Trash2 } from 'lucide-react'
+import { useState } from 'react'
+import { Check, MoreHorizontal, Target, Trash2 } from 'lucide-react'
 import type { Task } from '@/types/task'
 import { wasWritten } from '@/hooks/useGatedTaskActions'
 import type { PlacementFate } from '@/lib/planning/lineage'
@@ -8,6 +9,11 @@ import type { PlacementFate } from '@/lib/planning/lineage'
  * ReviewDrawer's backlog and the header's week/month pool dropdowns. `offer`
  * narrows the verbs: the week pool doesn't offer "This week" (it's already
  * there), etc. A resolved row shows "✓ <fate>" in place of the buttons.
+ *
+ * With `lead`, the row is a LIST row rather than a triage row: one verb shows
+ * (the daily gesture — "Do today" on the week list, "This week" on the month
+ * list) and the rest wait behind ⋯. A goal (task.isGoal) is badged and offers
+ * no verbs at all: a goal is ticked, never placed.
  *
  * Module-level on purpose: an inline component type is recreated every
  * render, so React remounts the whole list on each verdict.
@@ -53,8 +59,14 @@ export async function applyTriageVerdict(t: Task, v: Verdict, h: VerdictHandlers
   }
 }
 
-export function TriageRow({ task, meta, metaTitle, isNew, offer, verdict, canDelete, onVerdict, onComplete, placed }: {
+const LEAD_LABEL: Partial<Record<Verdict, string>> = { today: 'Do today', tomorrow: 'Tomorrow', week: 'This week', someday: 'Someday' }
+const FULL_LABEL: Partial<Record<Verdict, string>> = { today: 'Today', tomorrow: 'Tomorrow', week: 'This week', someday: 'Someday' }
+const SHORT_LABEL: Partial<Record<Verdict, string>> = { today: 'Today', tomorrow: 'Tmrw', week: 'This wk', someday: 'Someday' }
+
+export function TriageRow({ task, meta, metaTitle, isNew, offer, verdict, canDelete, onVerdict, onComplete, placed, lead }: {
   task: Task
+  /** The one verb shown on the row; the rest of `offer` sits behind ⋯. */
+  lead?: Verdict
   /** A month/season original that has been copied down. It stays on its list
    * (the look-back needs it) but it has been decided: a → mark, no verbs. */
   placed?: PlacementFate
@@ -77,6 +89,24 @@ export function TriageRow({ task, meta, metaTitle, isNew, offer, verdict, canDel
    * right fate for a pool item is "actually, that's already done". */
   onComplete?: (task: Task) => void
 }) {
+  const [more, setMore] = useState(false)
+  const isGoal = !!task.isGoal
+  const decided = !!verdict || placed === 'placed-open' || placed === 'placed-done'
+  const verbButton = (v: Verdict, label: string) => v === 'deleted' ? (
+    canDelete && (
+      <button key={v} type="button" onClick={() => onVerdict(task, v)} aria-label={`Delete "${task.title}"`}
+        className="p-1 rounded-md text-neutral-300 hover:text-red-600 hover:bg-red-50 transition-colors">
+        <Trash2 className="w-3.5 h-3.5" />
+      </button>
+    )
+  ) : (
+    <button key={v} type="button" onClick={() => onVerdict(task, v)}
+      className={`text-xs font-medium px-2 py-1 rounded-md transition-colors ${
+        lead && v !== lead ? 'text-neutral-600 hover:bg-neutral-100' : 'text-primary-700 bg-primary-50 hover:bg-primary-100'
+      }`}>
+      {label}
+    </button>
+  )
   return (
     <li className="rounded-xl border border-neutral-100 bg-white px-3 py-2">
       {/* Title and verbs stack rather than share a line. Side by side, the
@@ -105,6 +135,7 @@ export function TriageRow({ task, meta, metaTitle, isNew, offer, verdict, canDel
         )}
         <span className="flex-1 min-w-0">
           <span className={`block text-sm leading-snug ${verdict ? 'text-neutral-400' : 'text-neutral-700'} ${verdict === 'completed' ? 'line-through' : ''}`}>
+            {isGoal && <Target aria-label="Goal" className="mr-1.5 inline-block w-3.5 h-3.5 -mt-0.5 text-amber-600" />}
             {task.title}
             {isNew && !verdict && (
               <span className="ml-1.5 inline-block h-1.5 w-1.5 shrink-0 rounded-full bg-primary-500 align-middle">
@@ -131,21 +162,21 @@ export function TriageRow({ task, meta, metaTitle, isNew, offer, verdict, canDel
         )}
       </div>
 
-      {!verdict && !(placed === 'placed-open' || placed === 'placed-done') && (
+      {!decided && !isGoal && !lead && (
         <span className="mt-1.5 flex flex-wrap items-center justify-end gap-1">
-          {offer.map((v) => v === 'deleted' ? (
-            canDelete && (
-              <button key={v} type="button" onClick={() => onVerdict(task, v)} aria-label={`Delete "${task.title}"`}
-                className="p-1 rounded-md text-neutral-300 hover:text-red-600 hover:bg-red-50 transition-colors">
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
-            )
-          ) : (
-            <button key={v} type="button" onClick={() => onVerdict(task, v)}
-              className="text-xs font-medium px-2 py-1 rounded-md text-primary-700 bg-primary-50 hover:bg-primary-100 transition-colors">
-              {v === 'today' ? 'Today' : v === 'tomorrow' ? 'Tmrw' : v === 'week' ? 'This wk' : 'Someday'}
+          {offer.map((v) => verbButton(v, SHORT_LABEL[v] ?? v))}
+        </span>
+      )}
+      {!decided && !isGoal && lead && (
+        <span className="mt-1.5 flex flex-wrap items-center justify-end gap-1">
+          {more && offer.filter((v) => v !== lead).map((v) => verbButton(v, FULL_LABEL[v] ?? v))}
+          {!more && offer.some((v) => v !== lead) && (
+            <button type="button" aria-label="More" title="More" onClick={() => setMore(true)}
+              className="p-1 rounded-md text-neutral-300 hover:text-neutral-700 hover:bg-neutral-100 transition-colors">
+              <MoreHorizontal className="w-3.5 h-3.5" />
             </button>
-          ))}
+          )}
+          {verbButton(lead, LEAD_LABEL[lead] ?? lead)}
         </span>
       )}
     </li>

@@ -1,5 +1,6 @@
 import type { Task, TaskBucket } from '@/types/task'
 import { belongsToWeek, isStaleWeekPlacement } from './weekPlacement'
+import { belongsToMonth } from '@/lib/planning/periodPlacement'
 
 export type HorizonId = 'today' | 'week' | 'month' | 'season' | 'year' | 'someday'
 type Match = (assignedTo: string | null | undefined, assignedToAll?: readonly string[] | null) => boolean
@@ -24,12 +25,17 @@ export const HORIZONS: { id: HorizonId; label: string; bucket: TaskBucket | null
  * the week of Aug 10 belongs to that week's pool, not to every week's. Callers
  * showing a specific week must pass it — the /week page passes the week it's
  * anchored to, Today passes the current week. Omitting it means "any week",
- * which is only right for a caller that genuinely spans weeks. */
+ * which is only right for a caller that genuinely spans weeks.
+ *
+ * `viewedMonthStart` does the same for the MONTH horizon: since month_start
+ * exists, the month pool is one month's list. A legacy NULL row is the current
+ * month's (belongsToMonth). Omitting it means "any month". */
 export function selectHorizonPool(
   tasks: Task[],
   horizon: HorizonId,
   match: Match,
   viewedWeekStart?: Date,
+  viewedMonthStart?: Date,
 ): Task[] {
   const def = HORIZONS.find(h => h.id === horizon)
   if (!def || !def.bucket || def.bucket === 'timed') return []
@@ -37,6 +43,7 @@ export function selectHorizonPool(
     if (task.completed || task.bucket !== def.bucket) return false
     if (!match(task.assignedTo, task.assignedToAll)) return false
     if (horizon === 'week' && viewedWeekStart) return belongsToWeek(task, viewedWeekStart)
+    if (horizon === 'month' && viewedMonthStart) return belongsToMonth(task, viewedMonthStart)
     return true
   })
 }

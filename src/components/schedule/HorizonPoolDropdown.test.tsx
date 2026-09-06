@@ -190,4 +190,61 @@ describe('HorizonPoolDropdown — the pools live up here, never in the review', 
     expect(screen.getByText('→ placed')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /^Today$|^This wk$|^Someday$/ })).not.toBeInTheDocument()
   })
+
+  // Step 4 of the planning lists: the dropdown is a LIST to plan today from,
+  // not a pool to drain. The row leads with the one verb the daily gesture
+  // needs; the rest wait behind ⋯.
+  describe('lead verb', () => {
+    it('the week list leads with "Do today"; Tomorrow · Someday · Delete sit behind ⋯', async () => {
+      const onPushTask = vi.fn()
+      const onDeleteTask = vi.fn()
+      const { user } = render(<HorizonPoolDropdown {...base} label="This week" lead="today"
+        offer={['today', 'tomorrow', 'someday', 'deleted']} onPushTask={onPushTask} onDeleteTask={onDeleteTask}
+        tasks={[task({ id: 'w1', title: 'Call the plumber', bucket: 'week' })]} />)
+      await user.click(screen.getByRole('button', { name: /This week/ }))
+      const row = screen.getByText('Call the plumber').closest('li')!
+      expect(within(row).getByRole('button', { name: 'Do today' })).toBeInTheDocument()
+      expect(within(row).queryByRole('button', { name: 'Tomorrow' })).toBeNull()
+      expect(within(row).queryByRole('button', { name: /Delete/ })).toBeNull()
+      await user.click(within(row).getByRole('button', { name: 'More' }))
+      expect(within(row).getByRole('button', { name: 'Tomorrow' })).toBeInTheDocument()
+      expect(within(row).getByRole('button', { name: 'Someday' })).toBeInTheDocument()
+      expect(within(row).getByRole('button', { name: 'Delete "Call the plumber"' })).toBeInTheDocument()
+      await user.click(within(row).getByRole('button', { name: 'Do today' }))
+      expect(onPushTask).toHaveBeenCalledWith('w1', expect.any(Date))
+    })
+
+    it('the month list leads with "This week" — a copy down', async () => {
+      const onPushTask = vi.fn()
+      const { user } = render(<HorizonPoolDropdown {...base} label="This month" lead="week"
+        offer={['week', 'today', 'someday', 'deleted']} onPushTask={onPushTask}
+        tasks={[task({ id: 'm1', title: 'Repaint the porch', bucket: 'month' })]} />)
+      await user.click(screen.getByRole('button', { name: /This month/ }))
+      const row = screen.getByText('Repaint the porch').closest('li')!
+      await user.click(within(row).getByRole('button', { name: 'This week' }))
+      expect(onPushTask).toHaveBeenCalledWith('m1', 'week')
+    })
+
+    // A goal is what the month is for. It is ticked, never placed: badge, checkbox, no verbs.
+    it('a goal is badged and offers no verbs — only the checkbox', async () => {
+      const onCompleteTask = vi.fn()
+      const { user } = render(<HorizonPoolDropdown {...base} label="This month" lead="week"
+        offer={['week', 'today', 'someday', 'deleted']} onCompleteTask={onCompleteTask}
+        tasks={[task({ id: 'g1', title: 'Read more', bucket: 'month', isGoal: true })]} />)
+      await user.click(screen.getByRole('button', { name: /This month/ }))
+      const row = screen.getByText('Read more').closest('li')!
+      expect(within(row).getByLabelText('Goal')).toBeInTheDocument()
+      expect(within(row).queryByRole('button', { name: 'This week' })).toBeNull()
+      expect(within(row).queryByRole('button', { name: 'More' })).toBeNull()
+      await user.click(within(row).getByRole('button', { name: 'Complete "Read more"' }))
+      expect(onCompleteTask).toHaveBeenCalledWith('g1')
+    })
+
+    it('says what an empty list is, in the list\'s own words', async () => {
+      const { user } = render(<HorizonPoolDropdown {...base} label="This week" lead="today"
+        offer={['today']} emptyCopy="Nothing on this week's list." tasks={[]} />)
+      await user.click(screen.getByRole('button', { name: /This week/ }))
+      expect(screen.getByText("Nothing on this week's list.")).toBeInTheDocument()
+    })
+  })
 })

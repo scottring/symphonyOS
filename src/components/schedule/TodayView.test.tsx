@@ -105,10 +105,13 @@ describe('TodayView', () => {
   it('no longer offers the This Week / This Month staging triggers (backlog left the page)', async () => {
     // Inbox, /week and /month are now the canonical homes for that work;
     // Today surfaces it only through the attention line.
+    // The header's "This week" / "This month" LIST dropdowns are the one
+    // legitimate pair (planning lists, Step 4) — nothing else may answer to
+    // those names.
     const { user } = renderView()
     await openOverflow(user)
-    expect(screen.queryByRole('button', { name: /this week/i })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /this month/i })).not.toBeInTheDocument()
+    expect(screen.getAllByRole('button', { name: /this week/i }).map((b) => b.getAttribute('aria-label'))).toEqual(['This week pool'])
+    expect(screen.getAllByRole('button', { name: /this month/i }).map((b) => b.getAttribute('aria-label'))).toEqual(['This month pool'])
   })
   it('keeps the routine show/hide toggle in the overflow', async () => {
     const { user } = renderView({ assigneesWithTasks: [{ id: 'm1', name: 'Iris' } as never], hasUnassignedTasks: true })

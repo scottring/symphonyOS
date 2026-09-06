@@ -51,6 +51,7 @@ import { ClarityCurtain } from '@/components/clarity/ClarityCurtain'
 import { computeClaritySteps, type ClarityStepId } from '@/lib/clarity/claritySteps'
 import { selectOverdue } from '@/lib/today/taskPools'
 import { selectHorizonPool } from '@/lib/today/horizons'
+import { monthStartOf } from '@/lib/planning/periodPlacement'
 import { placementFate } from '@/lib/planning/lineage'
 import { useSuggestionsEnabled } from '@/lib/assistant/suggestionsPref'
 import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
@@ -317,9 +318,11 @@ export function TodayView({
     () => selectHorizonPool(tasks, 'week', poolMatchAll, currentWeekStart),
     [tasks, poolMatchAll, currentWeekStart],
   )
+  // The month list is THIS month's (a legacy NULL month_start row is this
+  // month's too); next month's rows wait their turn.
   const monthPool = useMemo(
-    () => selectHorizonPool(tasks, 'month', poolMatchAll),
-    [tasks, poolMatchAll],
+    () => selectHorizonPool(tasks, 'month', poolMatchAll, undefined, monthStartOf(viewedDate)),
+    [tasks, poolMatchAll, viewedDate],
   )
 
   // ── Up Next: the single next commitment, highlighted in place. It used to
@@ -1135,25 +1138,31 @@ export function TodayView({
                     data-testid="today-controls"
                     className="hidden shrink-0 md:flex items-center gap-1"
                   >
-              {/* The week/month pools — separate dropdowns, deliberately OUTSIDE
+              {/* The week/month LISTS — separate dropdowns, deliberately OUTSIDE
                   the review drawer. Always rendered (a place to look must always
-                  be there); each opens to the same triage rows the drawer uses. */}
+                  be there). Each row leads with the daily gesture — tick, or
+                  "Do today" from the week list / "This week" from the month
+                  list — with the triage verbs behind ⋯ (planning lists, Step 4). */}
               <HorizonPoolDropdown
-                label="Week"
+                label="This week"
                 tasks={weekPool}
                 offer={['today', 'tomorrow', 'someday', 'deleted']}
+                lead="today"
+                emptyCopy="Nothing on this week's list."
                 viewedDate={viewedDate}
                 onUpdateTask={(id, u) => onUpdateTask?.(id, u)}
                 onPushTask={ctx.onPushTask}
                 onDeleteTask={ctx.onDeleteTask}
                 onCompleteTask={onToggleTask}
                 benchRoute="/week"
-                benchLabel="Open week bench"
+                benchLabel="Open this week"
               />
               <HorizonPoolDropdown
-                label="Month"
+                label="This month"
                 tasks={monthPool}
-                offer={['today', 'week', 'someday', 'deleted']}
+                offer={['week', 'today', 'someday', 'deleted']}
+                lead="week"
+                emptyCopy="Nothing on this month's list."
                 placedFor={(t) => placementFate(t, tasks)}
                 viewedDate={viewedDate}
                 onUpdateTask={(id, u) => onUpdateTask?.(id, u)}

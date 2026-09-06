@@ -23,6 +23,12 @@ interface HorizonPoolDropdownProps {
   tasks: Task[]
   /** Verbs each row offers — the week pool doesn't offer "This wk". */
   offer: Verdict[]
+  /** The verb a row leads with; the rest of `offer` waits behind ⋯. The week
+   * list leads with "Do today", the month list with "This week" (a copy down).
+   * Without it, every verb shows — the triage posture the School pool keeps. */
+  lead?: Verdict
+  /** What an empty list says, in its own words. */
+  emptyCopy?: string
   viewedDate: Date
   onUpdateTask: (id: string, updates: Partial<Task>) => void | Promise<void | boolean>
   onPushTask?: (id: string, target: Date | 'week' | 'month' | 'quarter') => void | Promise<void | boolean>
@@ -51,7 +57,7 @@ interface HorizonPoolDropdownProps {
 }
 
 export function HorizonPoolDropdown({
-  label, tasks, offer, viewedDate, onUpdateTask, onPushTask, onDeleteTask, onCompleteTask, benchRoute, benchLabel,
+  label, tasks, offer, lead, emptyCopy, viewedDate, onUpdateTask, onPushTask, onDeleteTask, onCompleteTask, benchRoute, benchLabel,
   metaFor, isNewFor, hasNew, onOpenChange, placedFor,
 }: HorizonPoolDropdownProps) {
   const navigate = useNavigate()
@@ -124,11 +130,11 @@ export function HorizonPoolDropdown({
           />
           <div className="absolute right-0 top-full z-50 mt-1 w-[440px] max-w-[90vw] max-h-[60vh] overflow-auto rounded-xl border border-neutral-200 bg-white p-2 shadow-lg">
             {tasks.length === 0 ? (
-              <p className="px-2 py-1.5 text-sm text-neutral-400">Nothing here right now.</p>
+              <p className="px-2 py-1.5 text-sm text-neutral-400">{emptyCopy ?? 'Nothing here right now.'}</p>
             ) : (
               <ul className="space-y-1.5">
                 {tasks.map((t) => (
-                  <TriageRow key={t.id} task={t} offer={offer}
+                  <TriageRow key={t.id} task={t} offer={offer} lead={lead}
                     meta={metaFor?.(t)?.text} metaTitle={metaFor?.(t)?.title}
                     isNew={isNewFor?.(t)}
                     verdict={verdicts.get(t.id)} canDelete={!!onDeleteTask}

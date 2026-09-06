@@ -51,9 +51,22 @@ describe('selectHorizonPool', () => {
       expect(selectHorizonPool(tasks, 'week', matchAll)).toHaveLength(2)
     })
 
-    it('does not scope the month or season pools', () => {
+    it('does not scope the month or season pools by week', () => {
       const monthMove = t({ bucket: 'month', weekStart: JUL_26 })
       expect(selectHorizonPool([monthMove], 'month', matchAll, JUL_19)).toEqual([monthMove])
+    })
+
+    // Since month_start exists (planning lists, Step 1) the month pool is ONE
+    // month's list, not every month row ever written. A legacy NULL row is the
+    // current month's; next month's rows wait their turn.
+    it('scopes the month pool to the viewed month when given one; NULL month_start = this month', () => {
+      const sep = new Date(2026, 8, 1)
+      const oct = new Date(2026, 9, 1)
+      const thisMonth = t({ bucket: 'month', monthStart: sep })
+      const nextMonth = t({ bucket: 'month', monthStart: oct })
+      const legacy = t({ bucket: 'month' })
+      expect(selectHorizonPool([thisMonth, nextMonth, legacy], 'month', matchAll, undefined, sep)).toEqual([thisMonth, legacy])
+      expect(selectHorizonPool([thisMonth, nextMonth, legacy], 'month', matchAll)).toHaveLength(3)
     })
   })
 
