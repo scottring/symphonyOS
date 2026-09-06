@@ -55,7 +55,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   const { layers, soleDomain } = useDomain()
   const { getCurrentUserMember } = useFamilyMembers()
   const meId = getCurrentUserMember()?.id ?? null
-  const { seasons } = useHouseholdSeasons()
+  const { seasons, loading: seasonsLoading } = useHouseholdSeasons()
   const { goals, areas, addGoal, updateGoal, deleteGoal, addArea } = useGoalsContext()
 
   const [searchParams] = useSearchParams()
@@ -81,19 +81,23 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   // The page opens on the period you actually plan for — the current one,
   // unless it's nearly over or already empty while the next one has a list
   // (demo run 2026-09-06). Waits for tasks to load so the count isn't a false
-  // zero; runs once, and never again once the user has navigated.
+  // zero, AND for the household's seasons to load — settling on a stale
+  // localStorage-cached boundary (then having the real one arrive after) put
+  // the wrong season in the masthead. Runs once, and never again once the
+  // user has navigated.
   useEffect(() => {
     if (anchorSettledRef.current) return
     if (!(tasks.length > 0 || !loading)) return
+    if (seasonsLoading) return
     anchorSettledRef.current = true
     if (level === 'year') return
     const result = planningPeriod({
       level, today, seasons,
-      countFor: (s) => selectPeriodTasks(layered, level as 'month' | 'season', s, isCurrentPeriod(periodBounds(level, s, seasons), today), meId).length,
+      countFor: (s) => selectPeriodTasks(layered, level as 'month' | 'season', s, isCurrentPeriod(periodBounds(level, s, seasons), today), meId, seasons).length,
     })
     setAnchor(result.start)
     setLookingAhead(result.lookingAhead)
-  }, [tasks.length, loading, level, today, seasons, layered, meId])
+  }, [tasks.length, loading, seasonsLoading, level, today, seasons, layered, meId])
 
   const goTo = useCallback((d: Date) => {
     anchorSettledRef.current = true
@@ -107,11 +111,11 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
       const year = bounds.start.getFullYear()
       return goals.filter((g) => g.year === year && matchesLayers(g.context, layers)).map(goalRow)
     }
-    const list = selectPeriodTasks(layered, level, bounds.start, isCurrent, meId).map((t) => taskRow(t, tasks))
+    const list = selectPeriodTasks(layered, level, bounds.start, isCurrent, meId, seasons).map((t) => taskRow(t, tasks))
     // Goals first — a goal is what the period is for — then tasks, each in
     // the order they were written.
     return [...list.filter((r) => r.isGoal), ...list.filter((r) => !r.isGoal)]
-  }, [level, goals, layers, layered, bounds.start, isCurrent, meId, tasks])
+  }, [level, goals, layers, layered, bounds.start, isCurrent, meId, tasks, seasons])
 
   // ── On the calendar: timed items landing inside this period. The list
   //    above answers a POOL question (bucket === level); this answers a DATE
@@ -128,7 +132,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
     if (!above) return today
     return planningPeriod({
       level: above, today, seasons,
-      countFor: (s) => (above === 'season' ? selectPeriodTasks(layered, 'season', s, isCurrentPeriod(periodBounds('season', s, seasons), today), meId).length : 0),
+      countFor: (s) => (above === 'season' ? selectPeriodTasks(layered, 'season', s, isCurrentPeriod(periodBounds('season', s, seasons), today), meId, seasons).length : 0),
     }).start
   }, [above, today, seasons, layered, meId])
   const railRows = useMemo<PlanRowModel[]>(() => {
@@ -138,7 +142,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
       // every legacy NULL-seasonStart row regardless of which season it
       // opened on (the exact trap periodPlacement.ts warns about).
       const aboveIsCurrent = isCurrentPeriod(periodBounds('season', aboveStart, seasons), today)
-      return selectPeriodTasks(layered, 'season', aboveStart, aboveIsCurrent, meId).map((t) => taskRow(t, tasks))
+      return selectPeriodTasks(layered, 'season', aboveStart, aboveIsCurrent, meId, seasons).map((t) => taskRow(t, tasks))
     }
     if (above === 'year') {
       return goals.filter((g) => g.year === aboveStart.getFullYear() && matchesLayers(g.context, layers)).map(goalRow)

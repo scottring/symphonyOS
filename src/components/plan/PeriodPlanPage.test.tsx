@@ -3,7 +3,7 @@ import { render, screen, fireEvent, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import type { Task } from '@/types/task'
 import type { Goal } from '@/types/goal'
-import { DEFAULT_SEASONS } from '@/lib/cadence/seasons'
+import { DEFAULT_SEASONS, type Seasons } from '@/lib/cadence/seasons'
 
 // ── Hook mocks: the page is a pure function of these ─────────────────────────
 const now = new Date()
@@ -29,7 +29,10 @@ vi.mock('@/hooks/useGatedTaskActions', () => ({
 }))
 vi.mock('@/hooks/useDomain', () => ({ useDomain: () => ({ layers: new Set(['work', 'family', 'personal', 'unsorted']), soleDomain: null }) }))
 vi.mock('@/hooks/useFamilyMembers', () => ({ useFamilyMembers: () => ({ getCurrentUserMember: () => ({ id: 'me' }) }) }))
-vi.mock('@/hooks/useHouseholdSeasons', () => ({ useHouseholdSeasons: () => ({ seasons: DEFAULT_SEASONS, loading: false, canEdit: true, setSeasons: vi.fn() }) }))
+const seasonsState: { seasons: Seasons; loading: boolean } = { seasons: DEFAULT_SEASONS, loading: false }
+vi.mock('@/hooks/useHouseholdSeasons', () => ({
+  useHouseholdSeasons: () => ({ seasons: seasonsState.seasons, loading: seasonsState.loading, canEdit: true, setSeasons: vi.fn() }),
+}))
 const goalsApi = {
   addGoal: vi.fn(async (_a: string, name: string) => goal({ name })), updateGoal: vi.fn(), deleteGoal: vi.fn(), addArea: vi.fn(async () => ({ id: 'a1' })),
 }
@@ -57,6 +60,7 @@ const renderPageAt = (level: 'month' | 'season' | 'year', path: string) =>
 describe('PeriodPlanPage', () => {
   beforeEach(() => {
     state.tasks = []; state.goals = []; state.loading = false
+    seasonsState.seasons = DEFAULT_SEASONS; seasonsState.loading = false
     Object.values(hook).forEach((f) => f.mockClear())
     Object.values(goalsApi).forEach((f) => f.mockClear())
     mockNavigate.mockClear()
@@ -191,6 +195,7 @@ describe('PeriodPlanPage', () => {
 describe('PeriodPlanPage — planningPeriod wiring', () => {
   beforeEach(() => {
     state.tasks = []; state.goals = []; state.loading = false
+    seasonsState.seasons = DEFAULT_SEASONS; seasonsState.loading = false
     Object.values(hook).forEach((f) => f.mockClear())
     Object.values(goalsApi).forEach((f) => f.mockClear())
     mockNavigate.mockClear()
@@ -229,6 +234,31 @@ describe('PeriodPlanPage — planningPeriod wiring', () => {
     state.loading = false
     rerender(<MemoryRouter><PeriodPlanPage level="season" /></MemoryRouter>)
     expect(screen.getByText('Summer 2026')).toBeInTheDocument()
+  })
+
+  // A stale localStorage-cached season boundary must not get baked into the
+  // settled anchor before the household's real seasons arrive (demo run
+  // 2026-09-06: the effect settled on Summer under an old Oct-1 Fall
+  // boundary, then the household row loaded with Fall moved to Sep 1, and
+  // the masthead stayed stuck on Summer even though Sep 6 is Fall).
+  it('waits for the household seasons to finish loading before settling the initial period', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date(2026, 8, 6)) // Sep 6, 2026
+    const staleSeasons: Seasons = [
+      { name: 'Spring', month: 3, day: 1 },
+      { name: 'Summer', month: 6, day: 1 },
+      { name: 'Fall', month: 10, day: 1 }, // stale cache: Fall used to start Oct 1
+      { name: 'Winter', month: 12, day: 1 },
+    ]
+    seasonsState.seasons = staleSeasons
+    seasonsState.loading = true // household row hasn't loaded yet
+    const { rerender } = renderPage('season')
+    // The real boundaries arrive — Fall now starts Sep 1, so Sep 6 is Fall.
+    seasonsState.seasons = DEFAULT_SEASONS
+    seasonsState.loading = false
+    rerender(<MemoryRouter><PeriodPlanPage level="season" /></MemoryRouter>)
+    expect(screen.getByText('Fall 2026')).toBeInTheDocument()
+    expect(screen.queryByText('Summer 2026')).not.toBeInTheDocument()
   })
 
   it('a looked-ahead season fold excludes a legacy NULL-seasonStart row — the fold is not "current" just because it opened ahead', () => {

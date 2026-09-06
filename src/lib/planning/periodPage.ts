@@ -7,7 +7,7 @@
 
 import type { Task } from '@/types/task'
 import type { Seasons } from '@/lib/cadence/seasons'
-import { seasonStartFor, seasonEndFor, seasonLabel } from '@/lib/cadence/seasons'
+import { seasonStartFor, seasonEndFor, seasonLabel, readSeasons } from '@/lib/cadence/seasons'
 import { monthStartOf, belongsToMonth, isPlacedOnMonth, belongsToSeason, isPlacedOnSeason } from './periodPlacement'
 import { doableBy } from './poolViews'
 import type { PlacementFate } from './lineage'
@@ -94,6 +94,7 @@ export function selectPeriodTasks(
   start: Date,
   isCurrent: boolean,
   meId: string | null,
+  seasons: Seasons = readSeasons(),
 ): Task[] {
   const bucket = level === 'month' ? 'month' : 'quarter'
   return tasks
@@ -101,7 +102,7 @@ export function selectPeriodTasks(
       if (t.bucket !== bucket) return false
       if (meId && !doableBy(t, meId)) return false
       if (level === 'month') return isCurrent ? belongsToMonth(t, start) : isPlacedOnMonth(t, start)
-      return isCurrent ? belongsToSeason(t, start) : isPlacedOnSeason(t, start)
+      return isCurrent ? belongsToSeason(t, start, seasons) : isPlacedOnSeason(t, start, seasons)
     })
     .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
 }

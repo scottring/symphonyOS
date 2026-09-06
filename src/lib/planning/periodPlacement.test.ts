@@ -3,6 +3,7 @@ import {
   monthStartOf, belongsToMonth, isPlacedOnMonth, belongsToSeason, isPlacedOnSeason,
   monthStartForBucket, seasonStartForBucket, isPlacement,
 } from './periodPlacement'
+import type { Seasons } from '@/lib/cadence/seasons'
 
 const d = (y: number, m: number, day: number) => new Date(y, m, day)
 
@@ -52,6 +53,39 @@ describe('belongsToSeason vs isPlacedOnSeason', () => {
     expect(isPlacedOnSeason({ seasonStart: fall }, fall)).toBe(true)
     expect(belongsToSeason({ seasonStart: undefined }, summer)).toBe(true)
     expect(isPlacedOnSeason({ seasonStart: undefined }, summer)).toBe(false)
+  })
+})
+
+// A season's boundary is a household setting, not a calendar fact — moving
+// it must not strand rows stamped under the old one (demo run 2026-09-06:
+// Fall moved Oct 1 → Sep 1 and every row stamped Oct 1 fell off the season
+// list). Membership is a RANGE test against the CURRENT seasons, not an
+// exact-day match.
+describe('belongsToSeason / isPlacedOnSeason under a moved boundary', () => {
+  const seasons: Seasons = [
+    { name: 'Spring', month: 3, day: 1 },
+    { name: 'Summer', month: 6, day: 1 },
+    { name: 'Fall', month: 9, day: 1 }, // moved here from Oct 1
+    { name: 'Winter', month: 12, day: 1 },
+  ]
+  const fallStart = d(2026, 8, 1) // Sep 1 2026 — the new Fall boundary
+
+  it('a row stamped under the OLD Oct 1 boundary still belongs to, and is placed on, the Fall that now starts Sep 1', () => {
+    const strandedRow = { seasonStart: d(2026, 9, 1) } // Oct 1 2026 — the old stamp
+    expect(belongsToSeason(strandedRow, fallStart, seasons)).toBe(true)
+    expect(isPlacedOnSeason(strandedRow, fallStart, seasons)).toBe(true)
+  })
+
+  it('a row stamped Dec 1 (the next season) does not belong to Fall', () => {
+    const winterRow = { seasonStart: d(2026, 11, 1) } // Dec 1 2026
+    expect(belongsToSeason(winterRow, fallStart, seasons)).toBe(false)
+    expect(isPlacedOnSeason(winterRow, fallStart, seasons)).toBe(false)
+  })
+
+  it('NULL-row semantics are unchanged by the range test', () => {
+    const legacy = { seasonStart: undefined }
+    expect(belongsToSeason(legacy, fallStart, seasons)).toBe(true)
+    expect(isPlacedOnSeason(legacy, fallStart, seasons)).toBe(false)
   })
 })
 

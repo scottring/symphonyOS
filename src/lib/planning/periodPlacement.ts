@@ -10,7 +10,7 @@
 
 import type { Task, TaskBucket } from '@/types/task'
 import { localYmd } from '@/lib/cadence/config'
-import { readSeasons, seasonStartFor } from '@/lib/cadence/seasons'
+import { readSeasons, seasonStartFor, seasonEndFor, type Seasons } from '@/lib/cadence/seasons'
 
 /** The 1st of `date`'s month, midnight. */
 export function monthStartOf(date: Date): Date {
@@ -38,14 +38,25 @@ export function isPlacedOnMonth(task: { monthStart?: Date }, monthStart: Date): 
   return localYmd(task.monthStart) === localYmd(monthStart)
 }
 
-export function belongsToSeason(task: { seasonStart?: Date }, seasonStart: Date): boolean {
-  if (!task.seasonStart) return true
-  return localYmd(task.seasonStart) === localYmd(seasonStart)
+// A season's boundary is user-configurable (unlike a month's fixed 1st), so a
+// row stamped under yesterday's boundaries must not strand when the
+// household moves them — e.g. Fall shifts Oct 1 → Sep 1 and an existing
+// season_start=Oct 1 row still belongs to (and is placed on) the season that
+// now runs Sep 1–Dec 1. Membership is therefore a RANGE test against the
+// current `seasons`, not an exact-day match.
+function inSeasonRange(taskSeasonStart: Date, seasonStart: Date, seasons: Seasons): boolean {
+  const end = seasonEndFor(seasonStart, seasons)
+  return taskSeasonStart >= seasonStart && taskSeasonStart < end
 }
 
-export function isPlacedOnSeason(task: { seasonStart?: Date }, seasonStart: Date): boolean {
+export function belongsToSeason(task: { seasonStart?: Date }, seasonStart: Date, seasons: Seasons = readSeasons()): boolean {
+  if (!task.seasonStart) return true
+  return inSeasonRange(task.seasonStart, seasonStart, seasons)
+}
+
+export function isPlacedOnSeason(task: { seasonStart?: Date }, seasonStart: Date, seasons: Seasons = readSeasons()): boolean {
   if (!task.seasonStart) return false
-  return localYmd(task.seasonStart) === localYmd(seasonStart)
+  return inSeasonRange(task.seasonStart, seasonStart, seasons)
 }
 
 /**
