@@ -28,12 +28,23 @@ function isKid(m: PlanMember): boolean {
   return !!m.role && KID_ROLES.has(m.role.toLowerCase())
 }
 
+const escapeName = (name: string) => name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+/** Scan by FORM, not by member: every member is checked for a prefix match
+ *  before any is checked for a possessive, and every member for a possessive
+ *  before any is checked for a plain mention. Household member order
+ *  (`display_order`) is not guaranteed to list adults before children, so a
+ *  per-member loop would let an early kid's plain mention shadow a later
+ *  adult's explicit "Name:" prefix in the same line. */
 function nameAt(title: string, members: PlanMember[]): { member: PlanMember; form: 'prefix' | 'possessive' | 'mention' } | null {
   for (const m of members) {
-    const n = m.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-    if (new RegExp(`^${n}\\s*:`, 'i').test(title)) return { member: m, form: 'prefix' }
-    if (new RegExp(`\\b${n}'s\\b`, 'i').test(title)) return { member: m, form: 'possessive' }
-    if (new RegExp(`\\b${n}\\b`, 'i').test(title)) return { member: m, form: 'mention' }
+    if (new RegExp(`^${escapeName(m.name)}\\s*:`, 'i').test(title)) return { member: m, form: 'prefix' }
+  }
+  for (const m of members) {
+    if (new RegExp(`\\b${escapeName(m.name)}'s\\b`, 'i').test(title)) return { member: m, form: 'possessive' }
+  }
+  for (const m of members) {
+    if (new RegExp(`\\b${escapeName(m.name)}\\b`, 'i').test(title)) return { member: m, form: 'mention' }
   }
   return null
 }

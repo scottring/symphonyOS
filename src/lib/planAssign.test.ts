@@ -30,4 +30,19 @@ describe('decideAssignment', () => {
   it('a model assignee that is an adult is kept even without a name in the title', () => {
     expect(decideAssignment('Book flights', 'e', M, false).assigneeId).toBe('e')
   })
+  it('an explicit adult prefix wins even when kids are listed first and are plainly mentioned', () => {
+    const kidsFirst = [
+      { id: 'l', name: 'Liam', role: 'child' }, { id: 'm', name: 'Mia', role: 'child' },
+      { id: 'a', name: 'Alex', role: 'parent' }, { id: 'e', name: 'Edith', role: 'parent' },
+    ]
+    expect(decideAssignment('Edith: take Liam to soccer', null, kidsFirst, false)).toEqual({
+      title: 'Take Liam to soccer', assigneeId: 'e', contactMemberId: null,
+    })
+  })
+  it('a possessive match wins over a plain mention regardless of member order', () => {
+    const liamFirst = [
+      { id: 'l', name: 'Liam', role: 'child' }, { id: 'e', name: 'Edith', role: 'parent' },
+    ]
+    expect(decideAssignment("Liam watches while renewing Edith's passport", null, liamFirst, false).assigneeId).toBe('e')
+  })
 })
