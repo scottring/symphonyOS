@@ -29,19 +29,24 @@ export function WeekAllDayChip({ task, onSelect }: WeekAllDayChipProps) {
       onClick={() => onSelect(`task-${task.id}`)}
       title={task.title}
       className={`
-        w-full text-left truncate px-2 py-1 rounded-md
-        bg-bg-elevated border border-neutral-200 text-[11px] text-neutral-700
+        w-full text-left px-2 py-1 rounded-md
+        bg-bg-elevated border border-neutral-200 text-[11.5px] leading-snug text-neutral-700
         cursor-grab active:cursor-grabbing
         ${isDragging ? 'opacity-40' : ''}
       `}
     >
-      <span
-        data-testid={hasExecutionContext(task) ? 'readiness-ready' : 'readiness-bare'}
-        className={`inline-block w-1.5 h-1.5 rounded-full mr-1 mb-px align-middle ${
-          hasExecutionContext(task) ? 'bg-primary-500' : 'border border-neutral-400'
-        }`}
-      />
-      {task.title}
+      {/* The all-day lane grows with its chips, so two lines is affordable
+          and reads the whole of most titles; the dot rides inside the clamp
+          so it stays on the first line. */}
+      <span className="line-clamp-2 break-words">
+        <span
+          data-testid={hasExecutionContext(task) ? 'readiness-ready' : 'readiness-bare'}
+          className={`inline-block w-1.5 h-1.5 rounded-full mr-1 mb-px align-middle ${
+            hasExecutionContext(task) ? 'bg-primary-500' : 'border border-neutral-400'
+          }`}
+        />
+        {task.title}
+      </span>
     </button>
   )
 }

@@ -3,7 +3,7 @@ import { screen } from '@testing-library/react'
 import { DndContext, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import type { ReactNode } from 'react'
 import { render } from '@/test/test-utils'
-import { WeekEventBlock, laneCalcStrings } from './WeekEventBlock'
+import { WeekEventBlock, laneCalcStrings, titleLinesFor } from './WeekEventBlock'
 import type { TimelineItem } from '@/types/timeline'
 import type { PlacedItem } from './layoutLanes'
 
@@ -91,5 +91,39 @@ describe('WeekEventBlock', () => {
     const { left, width } = laneCalcStrings(0, 0, 1, 5)
     expect(left).toContain('/ 5')
     expect(width).toContain('/ 5')
+  })
+})
+
+describe('titleLinesFor', () => {
+  // A block may clip, but it shows as many title lines as its height holds,
+  // so the first words name the item without hovering. Height is time, so
+  // the count comes FROM the height — the block never grows to fit the title.
+  it('gives a minimum-height block one line', () => {
+    expect(titleLinesFor(24, {})).toBe(1)
+  })
+  it('gives a half-hour task block one line', () => {
+    expect(titleLinesFor(30, {})).toBe(1)
+  })
+  it('gives an hour-long task block three lines', () => {
+    expect(titleLinesFor(60, {})).toBe(3)
+  })
+  it('reserves a line for the subtitle', () => {
+    expect(titleLinesFor(60, { hasSubtitle: true })).toBe(2)
+  })
+  it('fits more routine lines in the same height, since routine text is smaller', () => {
+    expect(titleLinesFor(60, { isRoutine: true })).toBe(3)
+    expect(titleLinesFor(45, { isRoutine: true })).toBe(2)
+  })
+})
+
+describe('WeekEventBlock title wrapping', () => {
+  const weekStart = new Date(2026, 4, 17)
+  it('clamps the title to the lines its height allows instead of truncating', () => {
+    renderWithDnd(
+      <WeekEventBlock placedItem={mkPlaced({ title: 'Rock Steady Boxing Class with Grandpa' })} weekStart={weekStart} onSelect={vi.fn()} />,
+    )
+    const title = screen.getByText('Rock Steady Boxing Class with Grandpa')
+    expect(title.className).not.toMatch(/\btruncate\b/)
+    expect(title.getAttribute('data-title-lines')).toBe('3')
   })
 })

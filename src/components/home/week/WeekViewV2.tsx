@@ -503,7 +503,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
             the rung above, read-only — the week is planned by looking at it,
             never by dragging from it. */}
         <div className="flex items-start gap-3">
-        <aside aria-label="This week's list" className="shrink-0 w-60 flex flex-col gap-2">
+        <aside aria-label="This week's list" className="shrink-0 w-72 flex flex-col gap-2">
           <WeekPoolLane
             tasks={tasks}
             routines={shelfRoutines}

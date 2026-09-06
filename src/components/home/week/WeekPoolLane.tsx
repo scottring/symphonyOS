@@ -61,6 +61,12 @@ function PoolPill({ task, onSelect, onCompleteTask, onNotThisWeek, onPushTask, s
   })
   const draggable = !struck && !lookback
   const dragProps = draggable ? { ...attributes, ...listeners } : {}
+  // Two rows, read not hovered: the title wraps to its full length beside the
+  // tick, and the row's verbs sit beneath it in plain view. A hover-revealed
+  // rail beside a one-line title was what truncated the titles in the first
+  // place (Scott, 2026-09-06).
+  const showLookback = !!lookback && !struck
+  const showTriage = !struck && !lookback && (!!onNotThisWeek || !!onPushTask)
   return (
     <div
       ref={setNodeRef}
@@ -70,31 +76,33 @@ function PoolPill({ task, onSelect, onCompleteTask, onNotThisWeek, onPushTask, s
       // opened no panel at all.
       onClick={() => onSelect(`task-${task.id}`)}
       title={task.title}
-      className={`group flex w-full items-center gap-1.5 rounded-lg border border-neutral-200 bg-white pl-2 pr-1.5 py-1.5 text-[13px] text-neutral-700 touch-none hover:border-neutral-300 hover:shadow-sm transition-all ${
+      className={`group flex w-full flex-col gap-1 rounded-lg border border-neutral-200 bg-white px-2 py-1.5 text-[13px] text-neutral-700 touch-none hover:border-neutral-300 hover:shadow-sm transition-all ${
         draggable ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'
       } ${isDragging ? 'opacity-40' : ''}`}
     >
-      {struck ? (
-        <span className="shrink-0 w-3.5 h-3.5 rounded-full bg-primary-500 text-white grid place-items-center">
-          <Check className="w-2.5 h-2.5" strokeWidth={3} />
-        </span>
-      ) : onCompleteTask && !lookback ? (
-        <button
-          type="button"
-          aria-label={`Complete ${task.title}`}
-          title="Mark complete"
-          {...stopDrag}
-          onClick={(e) => { e.stopPropagation(); onCompleteTask(task.id) }}
-          className="shrink-0 w-3.5 h-3.5 rounded-full border-[1.5px] border-primary-400/60 text-transparent grid place-items-center cursor-pointer transition-colors hover:border-primary-500 hover:bg-primary-500 hover:text-white"
-        >
-          <Check className="w-2.5 h-2.5" strokeWidth={3} />
-        </button>
-      ) : (
-        <span className="shrink-0 w-1.5 h-1.5 rounded-full bg-primary-400/70" />
-      )}
-      <span className={`min-w-0 flex-1 truncate ${struck ? 'line-through text-neutral-400' : ''}`}>{task.title}</span>
-      {lookback && !struck && (
-        <span className="shrink-0 inline-flex items-center gap-0.5 ml-1" {...stopDrag}>
+      <div className="flex items-start gap-1.5">
+        {struck ? (
+          <span className="mt-[3px] shrink-0 w-3.5 h-3.5 rounded-full bg-primary-500 text-white grid place-items-center">
+            <Check className="w-2.5 h-2.5" strokeWidth={3} />
+          </span>
+        ) : onCompleteTask && !lookback ? (
+          <button
+            type="button"
+            aria-label={`Complete ${task.title}`}
+            title="Mark complete"
+            {...stopDrag}
+            onClick={(e) => { e.stopPropagation(); onCompleteTask(task.id) }}
+            className="mt-[3px] shrink-0 w-3.5 h-3.5 rounded-full border-[1.5px] border-primary-400/60 text-transparent grid place-items-center cursor-pointer transition-colors hover:border-primary-500 hover:bg-primary-500 hover:text-white"
+          >
+            <Check className="w-2.5 h-2.5" strokeWidth={3} />
+          </button>
+        ) : (
+          <span className="mt-[7px] shrink-0 w-1.5 h-1.5 rounded-full bg-primary-400/70" />
+        )}
+        <span className={`min-w-0 flex-1 leading-snug break-words ${struck ? 'line-through text-neutral-400' : ''}`}>{task.title}</span>
+      </div>
+      {showLookback && (
+        <div className="flex items-center gap-0.5 pl-5" {...stopDrag}>
           <button type="button" aria-label={`Carry forward ${task.title}`} title="Carry forward to this week"
             onClick={(e) => { e.stopPropagation(); lookback.onCarryForward() }}
             className="p-0.5 rounded text-primary-600 hover:bg-primary-50">
@@ -110,26 +118,26 @@ function PoolPill({ task, onSelect, onCompleteTask, onNotThisWeek, onPushTask, s
             className="p-0.5 rounded text-neutral-300 hover:text-red-600 hover:bg-red-50">
             <Trash2 className="w-3.5 h-3.5" />
           </button>
-        </span>
+        </div>
       )}
-      {onNotThisWeek && !struck && !lookback && (
-        <button
-          type="button"
-          aria-label={`Not this week — move ${task.title} to next week`}
-          title="Not this week — move to next week"
-          {...stopDrag}
-          onClick={(e) => { e.stopPropagation(); onNotThisWeek(task.id) }}
-          className="shrink-0 p-0.5 rounded opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity cursor-pointer text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100"
-        >
-          <ChevronsRight className="w-3.5 h-3.5" />
-        </button>
-      )}
-      {onPushTask && !struck && !lookback && (
-        <div
-          className="shrink-0 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity"
-          {...stopDrag}
-        >
-          <PushDropdown size="sm" onPush={(target) => onPushTask(task.id, target)} />
+      {showTriage && (
+        <div className="flex items-center gap-0.5 pl-5" {...stopDrag}>
+          {onNotThisWeek && (
+            <button
+              type="button"
+              aria-label={`Not this week — move ${task.title} to next week`}
+              title="Not this week — move to next week"
+              onClick={(e) => { e.stopPropagation(); onNotThisWeek(task.id) }}
+              className="shrink-0 p-0.5 rounded cursor-pointer text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100"
+            >
+              <ChevronsRight className="w-3.5 h-3.5" />
+            </button>
+          )}
+          {onPushTask && (
+            <div className="shrink-0 text-neutral-400">
+              <PushDropdown size="sm" onPush={(target) => onPushTask(task.id, target)} />
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -151,13 +159,15 @@ function RoutinePill({ routine, onSelect }: { routine: Routine; onSelect: (id: s
       {...listeners}
       onClick={() => onSelect(`routine-${routine.id}`)}
       title={routine.name}
-      className={`flex w-full items-center gap-1.5 rounded-lg border border-[hsl(42_50%_80%)] bg-[hsl(45_75%_90%)] pl-1.5 pr-2.5 py-1.5 touch-none cursor-grab active:cursor-grabbing hover:shadow-sm transition-all ${
+      className={`flex w-full items-start gap-1.5 rounded-lg border border-[hsl(42_50%_80%)] bg-[hsl(45_75%_90%)] pl-1.5 pr-2.5 py-1.5 touch-none cursor-grab active:cursor-grabbing hover:shadow-sm transition-all ${
         isDragging ? 'opacity-40' : ''
       }`}
     >
-      <GripVertical className="w-3.5 h-3.5 shrink-0 text-[hsl(40_30%_60%)]" />
-      <span className="min-w-0 flex-1 truncate text-[12.5px] font-semibold text-[hsl(40_60%_30%)]">{routine.name}</span>
-      <span className="shrink-0 text-[11px] text-[hsl(38_25%_45%)]">{routineTemporalLabel(routine)}</span>
+      <GripVertical className="mt-[3px] w-3.5 h-3.5 shrink-0 text-[hsl(40_30%_60%)]" />
+      <span className="min-w-0 flex-1 flex flex-col">
+        <span className="leading-snug break-words text-[12.5px] font-semibold text-[hsl(40_60%_30%)]">{routine.name}</span>
+        <span className="text-[11px] text-[hsl(38_25%_45%)]">{routineTemporalLabel(routine)}</span>
+      </span>
     </div>
   )
 }

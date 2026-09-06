@@ -270,3 +270,57 @@ describe('WeekPoolLane', () => {
     expect(screen.getByRole('button', { name: 'Last week' })).toBeInTheDocument()
   })
 })
+
+describe('WeekPoolLane readability', () => {
+  // The column is read, not hovered: a long title wraps to its full length
+  // and the row's actions sit beneath it in plain view (Scott, 2026-09-06,
+  // from the "completely readable cards" mockup).
+  it('wraps a long title instead of truncating it', () => {
+    render(
+      <DndContext>
+        <WeekPoolLane
+          weekStart={weekStart}
+          dayCount={5}
+          onSelectItem={() => {}}
+          tasks={[task({ id: 'a', title: 'Figure out November school break coverage and sitter options', bucket: 'week' })]}
+        />
+      </DndContext>,
+    )
+    const title = screen.getByText('Figure out November school break coverage and sitter options')
+    expect(title.className).not.toMatch(/\btruncate\b/)
+  })
+
+  it('shows the row actions without hover', () => {
+    render(
+      <DndContext>
+        <WeekPoolLane
+          weekStart={weekStart}
+          dayCount={5}
+          onSelectItem={() => {}}
+          onNotThisWeek={() => {}}
+          onPushTask={() => {}}
+          tasks={[task({ id: 'a', title: 'Call VW', bucket: 'week' })]}
+        />
+      </DndContext>,
+    )
+    const notThisWeek = screen.getByLabelText(/not this week/i)
+    expect(notThisWeek.className).not.toMatch(/opacity-0/)
+    expect(notThisWeek.parentElement?.className).not.toMatch(/opacity-0/)
+  })
+
+  it('wraps a long routine name too', () => {
+    render(
+      <DndContext>
+        <WeekPoolLane
+          weekStart={weekStart}
+          dayCount={5}
+          onSelectItem={() => {}}
+          tasks={[]}
+          routines={[createMockRoutine({ id: 'r1', name: 'Make a weekly math and reading plan for both kids' })]}
+        />
+      </DndContext>,
+    )
+    const name = screen.getByText('Make a weekly math and reading plan for both kids')
+    expect(name.className).not.toMatch(/\btruncate\b/)
+  })
+})

@@ -31,6 +31,21 @@ const EMBED_INSET_PX = 6
 // (This Week redesign) — a 15-min event gets 24px, not a clipped sliver.
 const MIN_BLOCK_PX = 24
 
+// How many title lines a block of this height can show. Height is time — the
+// block never grows to fit its title — so the line count comes FROM the
+// height, and the title clamps there. Line heights mirror the classes below
+// (12px/leading-tight for tasks, 11.5px for routines, 11px for the subtitle).
+const TASK_LINE_PX = 15
+const ROUTINE_LINE_PX = 14.4
+const SUBTITLE_LINE_PX = 13.75
+const TASK_PAD_PX = 8
+const ROUTINE_PAD_PX = 4
+export function titleLinesFor(heightPx: number, { hasSubtitle = false, isRoutine = false }: { hasSubtitle?: boolean; isRoutine?: boolean }): number {
+  const linePx = isRoutine ? ROUTINE_LINE_PX : TASK_LINE_PX
+  const usable = heightPx - (isRoutine ? ROUTINE_PAD_PX : TASK_PAD_PX) - (hasSubtitle ? SUBTITLE_LINE_PX : 0)
+  return Math.max(1, Math.floor(usable / linePx))
+}
+
 interface WeekEventBlockProps {
   placedItem: PlacedItem
   weekStart: Date
@@ -111,9 +126,15 @@ export function WeekEventBlock({ placedItem, weekStart, dayCount = 7, onSelect, 
   // Anything drawn over a container's fill needs an edge and elevation —
   // embedded cards, and title-cleared items pinned into the container's area.
   const elevated = embedded || placedItem.clearedTopMin != null
-
   const previewTopOffset = (resize.preview?.topDelta ?? 0) * (HOUR_ROW_HEIGHT / 60)
   const previewBottomOffset = (resize.preview?.bottomDelta ?? 0) * (HOUR_ROW_HEIGHT / 60)
+  const floorPx = placedItem.clearedTopMin != null
+    ? Math.max(0, (placedItem.clearedTopMin - FIRST_HOUR * 60) * (HOUR_ROW_HEIGHT / 60))
+    : 0
+  const clearancePx = Math.max(0, floorPx - top)
+  const blockHeight = Math.max(MIN_BLOCK_PX, height - clearancePx - previewTopOffset + previewBottomOffset)
+  const titleLines = titleLinesFor(blockHeight, { hasSubtitle: !!placedItem.item.subtitle, isRoutine })
+
 
   return (
     <div
@@ -141,20 +162,14 @@ export function WeekEventBlock({ placedItem, weekStart, dayCount = 7, onSelect, 
         isDragging ? 'opacity-40' : '',
         dragDisabled ? 'cursor-default' : '',
       ].filter(Boolean).join(' ')}
-      style={(() => {
-        // Visual-only nudge below the container's title line; keeps the
-        // block's bottom edge in place so time fidelity mostly holds.
-        const floorPx = placedItem.clearedTopMin != null
-          ? Math.max(0, (placedItem.clearedTopMin - FIRST_HOUR * 60) * (HOUR_ROW_HEIGHT / 60))
-          : 0
-        const clearancePx = Math.max(0, floorPx - top)
-        return {
-          top: top + previewTopOffset + clearancePx,
-          ...laneCalcStrings(dayIdx, laneIdx, laneCount, dayCount, embedded ? EMBED_INSET_PX : 0),
-          height: Math.max(MIN_BLOCK_PX, height - clearancePx - previewTopOffset + previewBottomOffset),
-          zIndex: elevated ? 2 : 1,
-        }
-      })()}
+      style={{
+        // Visual-only nudge below the container's title line (clearancePx);
+        // keeps the block's bottom edge in place so time fidelity mostly holds.
+        top: top + previewTopOffset + clearancePx,
+        ...laneCalcStrings(dayIdx, laneIdx, laneCount, dayCount, embedded ? EMBED_INSET_PX : 0),
+        height: blockHeight,
+        zIndex: elevated ? 2 : 1,
+      }}
     >
       {RESIZE_ENABLED && !isRoutine && (
         <>
@@ -176,7 +191,11 @@ export function WeekEventBlock({ placedItem, weekStart, dayCount = 7, onSelect, 
           />
         </>
       )}
-      <div className={isRoutine ? 'truncate font-normal' : 'truncate font-medium'}>
+      <div
+        data-title-lines={titleLines}
+        className={isRoutine ? 'font-normal break-words' : 'font-medium break-words'}
+        style={{ display: '-webkit-box', WebkitBoxOrient: 'vertical', WebkitLineClamp: titleLines, overflow: 'hidden' }}
+      >
         {placedItem.item.type === 'task' && (
           <span
             title={hasExecutionContext(placedItem.item) ? 'Has context — ready to execute' : 'No context yet — bare title'}
