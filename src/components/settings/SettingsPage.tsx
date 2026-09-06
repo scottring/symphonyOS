@@ -106,7 +106,7 @@ export function SettingsPage({
   // waitlist RLS was the real hole and is fixed in a migration, but a tab
   // whose panels would now come back empty should not be offered at all.
   const { isAdmin: isAppAdmin } = useIsAppAdmin()
-  const { rows: waitlistAdminRows, approve: approveWaitlistRow } = useWaitlistAdmin()
+  const { rows: waitlistAdminRows, approve: approveWaitlistRow, approveError: waitlistApproveError } = useWaitlistAdmin()
 
   // Add member state
   const [isAdding, setIsAdding] = useState(false)
@@ -681,6 +681,15 @@ export function SettingsPage({
               <p className="text-sm text-neutral-500 mb-6">
                 Signups are gated on an approved waitlist row. Approve one to let that email create an account.
               </p>
+              {/* An approve that the database refused. Without this the row
+                  simply stayed un-approved and nothing said why — an admin
+                  would tell a founding household they were in while the signup
+                  gate kept turning them away. */}
+              {waitlistApproveError && (
+                <p role="alert" className="mb-4 rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-sm text-red-700">
+                  Could not approve that signup — {waitlistApproveError}
+                </p>
+              )}
               {waitlistAdminRows.length === 0 ? (
                 <p className="text-sm text-neutral-400">No signups yet.</p>
               ) : (
@@ -700,7 +709,7 @@ export function SettingsPage({
                       ) : (
                         <button
                           type="button"
-                          onClick={() => approveWaitlistRow(row.id)}
+                          onClick={() => void approveWaitlistRow(row.id)}
                           className="shrink-0 rounded-md bg-primary-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-700 transition-colors"
                         >
                           Approve

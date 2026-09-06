@@ -25,9 +25,9 @@ vi.mock('./DemoControls', () => ({ DemoControls: () => null }))
 vi.mock('./SchoolMailCard', () => ({ SchoolMailCard: () => null }))
 
 const mocks = vi.hoisted(() => ({ approve: vi.fn() }))
-const state: { rows: { id: string; email: string; createdAt: Date; approvedAt: Date | null }[]; loading: boolean } = { rows: [], loading: false }
+const state: { rows: { id: string; email: string; createdAt: Date; approvedAt: Date | null }[]; loading: boolean; waitlistApproveError: string | null } = { rows: [], loading: false, waitlistApproveError: null }
 vi.mock('@/hooks/useWaitlistAdmin', () => ({
-  useWaitlistAdmin: () => ({ rows: state.rows, loading: state.loading, approve: mocks.approve }),
+  useWaitlistAdmin: () => ({ rows: state.rows, loading: state.loading, approve: mocks.approve, approveError: state.waitlistApproveError }),
 }))
 
 import { SettingsPage } from './SettingsPage'
@@ -37,6 +37,7 @@ describe('SettingsPage Admin: Founding households', () => {
     vi.clearAllMocks()
     state.rows = []
     state.loading = false
+    state.waitlistApproveError = null
   })
 
   function openAdminTab() {
@@ -57,6 +58,18 @@ describe('SettingsPage Admin: Founding households', () => {
     openAdminTab()
     fireEvent.click(screen.getByRole('button', { name: /Approve/ }))
     expect(mocks.approve).toHaveBeenCalledWith('w1')
+  })
+
+  it('shows the reason when the database refused an approve', () => {
+    // This list IS the signup gate. A silent failure meant an admin telling a
+    // founding household they were in while the signup page kept refusing them.
+    state.rows = [{ id: 'w1', email: 'founding@example.com', createdAt: new Date(2026, 8, 4), approvedAt: null }]
+    state.waitlistApproveError = 'permission denied for table waitlist'
+    openAdminTab()
+    const section = screen.getByText('Founding households').closest('section')!
+    expect(within(section).getByRole('alert')).toHaveTextContent(/permission denied for table waitlist/)
+    // And the row is still offered — nothing pretended it worked.
+    expect(within(section).getByRole('button', { name: /Approve/ })).toBeInTheDocument()
   })
 
   it('an approved row shows the approved label instead of the button', () => {

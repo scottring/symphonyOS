@@ -47,11 +47,25 @@ export function useWaitlistAdmin() {
 
   useEffect(() => { void fetchRows() }, [fetchRows])
 
-  const approve = useCallback(async (id: string) => {
+  // The error from the LAST approve attempt, for the admin block to show.
+  // Null while nothing has failed.
+  const [approveError, setApproveError] = useState<string | null>(null)
+
+  const approve = useCallback(async (id: string): Promise<boolean> => {
     const approvedAtIso = new Date().toISOString()
-    await supabase.from('waitlist').update({ approved_at: approvedAtIso }).eq('id', id)
+    const { error } = await supabase.from('waitlist').update({ approved_at: approvedAtIso }).eq('id', id)
+    if (error) {
+      // Do NOT flip the row. This list IS the signup gate: a row that reads
+      // "approved" while the write was refused means an admin tells a founding
+      // household they are in, and the signup page keeps turning them away
+      // with nothing on screen disagreeing.
+      setApproveError(error.message || 'Could not approve that signup.')
+      return false
+    }
+    setApproveError(null)
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, approvedAt: new Date(approvedAtIso) } : r)))
+    return true
   }, [])
 
-  return { rows, loading, approve }
+  return { rows, loading, approve, approveError }
 }

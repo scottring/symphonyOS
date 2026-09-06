@@ -520,6 +520,31 @@ describe('useAuth', () => {
       expect(result.current.sessionLost).toBe(false)
     })
 
+    it('a throwing localStorage never blocks the sign-out state change', async () => {
+      // Private windows and blocked site data make setItem THROW. Unguarded,
+      // that took the setUser(null) below it down too — the app went on
+      // rendering a signed-in shell over a session that was gone.
+      mockSession = null
+      const { result } = renderHook(() => useAuth())
+      await waitFor(() => expect(result.current.loading).toBe(false))
+
+      const session = createMockSession({ user: createMockUser() })
+      act(() => emitAuth('SIGNED_IN', session))
+      expect(result.current.user).not.toBeNull()
+
+      const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+        throw new DOMException('The quota has been exceeded.', 'QuotaExceededError')
+      })
+      try {
+        act(() => emitAuth('SIGNED_OUT', null))
+      } finally {
+        setItem.mockRestore()
+      }
+
+      expect(result.current.user).toBeNull()
+      expect(result.current.sessionLost).toBe(true)
+    })
+
     it('sessionLost resets to false on the next SIGNED_IN', async () => {
       mockSession = null
       const { result } = renderHook(() => useAuth())

@@ -45,10 +45,44 @@ describe('useWaitlistAdmin', () => {
     const { result } = renderHook(() => useWaitlistAdmin())
     await waitFor(() => expect(result.current.loading).toBe(false))
 
-    await act(async () => { await result.current.approve('w2') })
+    let ok: boolean | undefined
+    await act(async () => { ok = await result.current.approve('w2') })
 
+    expect(ok).toBe(true)
     expect(mocks.update).toHaveBeenCalledWith(expect.objectContaining({ approved_at: expect.any(String) }))
     expect(mocks.eq).toHaveBeenCalledWith('id', 'w2')
+    expect(result.current.rows.find((r) => r.id === 'w2')?.approvedAt).toBeInstanceOf(Date)
+    expect(result.current.approveError).toBeNull()
+  })
+
+  it('a refused approve does NOT flip the row — it reports the error', async () => {
+    // This list is the signup gate itself. A row reading "approved" over a
+    // write the database refused means an admin tells a founding household
+    // they are in while the signup page keeps turning them away.
+    mocks.eq.mockResolvedValue({ error: { message: 'permission denied for table waitlist' } })
+
+    const { result } = renderHook(() => useWaitlistAdmin())
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    let ok: boolean | undefined
+    await act(async () => { ok = await result.current.approve('w2') })
+
+    expect(ok).toBe(false)
+    expect(result.current.rows.find((r) => r.id === 'w2')?.approvedAt).toBeNull()
+    expect(result.current.approveError).toMatch(/permission denied/)
+  })
+
+  it('clears a previous error once an approve succeeds', async () => {
+    mocks.eq.mockResolvedValueOnce({ error: { message: 'nope' } })
+
+    const { result } = renderHook(() => useWaitlistAdmin())
+    await waitFor(() => expect(result.current.loading).toBe(false))
+
+    await act(async () => { await result.current.approve('w2') })
+    expect(result.current.approveError).toBe('nope')
+
+    await act(async () => { await result.current.approve('w2') })
+    expect(result.current.approveError).toBeNull()
     expect(result.current.rows.find((r) => r.id === 'w2')?.approvedAt).toBeInstanceOf(Date)
   })
 })

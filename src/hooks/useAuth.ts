@@ -35,7 +35,14 @@ export function useAuth() {
         // elsewhere, or a bug. Silent before this: the user just saw the
         // login screen with no record anywhere (demo run 2026-09-06).
         if (event === 'SIGNED_OUT' && prevUserRef.current && !signingOutRef.current) {
-          localStorage.setItem('symphony.auth.lostAt', new Date().toISOString())
+          // Guarded: `localStorage` THROWS in a private window and wherever
+          // site data is blocked, and an unguarded write here would take the
+          // `setUser(null)` below down with it — leaving the app rendering a
+          // signed-in shell over a session that is gone. The breadcrumb is a
+          // nice-to-have; the state change is not.
+          try {
+            localStorage.setItem('symphony.auth.lostAt', new Date().toISOString())
+          } catch { /* private mode / blocked site data */ }
           Sentry.captureEvent({
             message: 'auth.session_lost',
             level: 'warning',
