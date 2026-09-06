@@ -1,15 +1,32 @@
 import { useCallback, useRef, useState } from 'react'
-import { Loader2, RotateCcw, X } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Loader2, LogIn, RotateCcw, X } from 'lucide-react'
 import { CameraCaptureModal } from '@/components/capture/CameraCaptureModal'
 import { PageReviewSheet, type PageReviewPayload } from '@/components/capture/PageReviewSheet'
 import { usePageFromPaper } from '@/hooks/usePageFromPaper'
 import { useCommitPage } from '@/hooks/useCommitPage'
+import { isSessionExpired } from '@/lib/authErrors'
+import type { ExistingTask } from '@/lib/planDuplicates'
+import type { DomainId } from '@/lib/domains'
 import type { FamilyMember } from '@/types/family'
 import type { PageAltitude } from '@/lib/planParse'
+
+function rememberedDomain(altitude: PageAltitude): DomainId | undefined {
+  try {
+    const raw = localStorage.getItem(`symphony.paper.domain.${altitude}`)
+    return raw === 'work' || raw === 'family' || raw === 'personal' ? raw : undefined
+  } catch {
+    return undefined
+  }
+}
 
 interface PageFromPaperFlowProps {
   members: FamilyMember[]
   onClose: () => void
+  /** Open (not completed) tasks, for the sheet's Link / Keep separate offer. */
+  existingTasks?: ExistingTask[]
+  /** 'YYYY-MM-DD' → the day's event titles, for day-facts already on the calendar. */
+  calendarTitlesByDay?: Map<string, string[]>
 }
 
 /**
@@ -24,9 +41,10 @@ interface PageFromPaperFlowProps {
  * that is open for a few seconds a week. This component mounts only while the
  * flow is open, so those hooks instantiate only then.
  */
-export function PageFromPaperFlow({ members, onClose }: PageFromPaperFlowProps) {
+export function PageFromPaperFlow({ members, onClose, existingTasks, calendarTitlesByDay }: PageFromPaperFlowProps) {
   const { status, result, error, parseFromBlob, retry, reset } = usePageFromPaper(members)
   const { commitPage } = useCommitPage()
+  const navigate = useNavigate()
   const [camera, setCamera] = useState(true)
   // Which page is being snapped. Chosen in the camera modal; the client owns
   // the window, so it must own the altitude too. Week = the old behaviour.
@@ -53,12 +71,14 @@ export function PageFromPaperFlow({ members, onClose }: PageFromPaperFlowProps) 
     setCommitting(true)
     try {
       // The sheet asks which layer the page belongs to; the payload carries it.
-      await commitPage({ ...payload, storagePath: result.storagePath, altitude: result.altitude })
-      close()
+      const { route } = await commitPage({ ...payload, storagePath: result.storagePath, altitude: result.altitude })
+      reset()
+      onClose()
+      navigate(route)
     } finally {
       setCommitting(false)
     }
-  }, [commitPage, close, result.storagePath, result.altitude])
+  }, [commitPage, reset, onClose, navigate, result.storagePath, result.altitude])
 
   return (
     <>
@@ -96,15 +116,27 @@ export function PageFromPaperFlow({ members, onClose }: PageFromPaperFlowProps) 
       {status === 'error' && (
         <div className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-4" onClick={close}>
           <div className="bg-bg-elevated rounded-2xl shadow-2xl px-6 py-5 max-w-md w-full" onClick={(e) => e.stopPropagation()}>
-            <p className="text-[15px] text-neutral-800 mb-1">Couldn&rsquo;t read the page</p>
+            <p className="text-[15px] text-neutral-800 mb-1">
+              {isSessionExpired(error) ? 'Signed out' : 'Couldn’t read the page'}
+            </p>
             <p className="text-[13px] text-neutral-500 mb-4 break-words">{error}</p>
             <div className="flex justify-end gap-2">
               <button type="button" onClick={close} className="px-4 py-2 rounded-lg text-[14px] text-neutral-600 hover:bg-neutral-100 transition-colors">
                 <X className="w-4 h-4 inline mr-1" />Close
               </button>
-              <button type="button" onClick={() => void retry()} className="btn-primary px-4 py-2 rounded-lg text-[14px]">
-                <RotateCcw className="w-4 h-4 inline mr-1" />Try again
-              </button>
+              {isSessionExpired(error) ? (
+                <button
+                  type="button"
+                  onClick={() => window.location.assign('/?return=' + encodeURIComponent(window.location.pathname))}
+                  className="btn-primary px-4 py-2 rounded-lg text-[14px]"
+                >
+                  <LogIn className="w-4 h-4 inline mr-1" />Sign in again
+                </button>
+              ) : (
+                <button type="button" onClick={() => void retry()} className="btn-primary px-4 py-2 rounded-lg text-[14px]">
+                  <RotateCcw className="w-4 h-4 inline mr-1" />Try again
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -117,6 +149,11 @@ export function PageFromPaperFlow({ members, onClose }: PageFromPaperFlowProps) 
           unclear={result.unclear}
           windowDates={result.windowDates}
           altitude={result.altitude}
+          titlePeriod={result.titlePeriod}
+          pageTitle={result.pageTitle}
+          existingTasks={existingTasks}
+          calendarTitlesByDay={calendarTitlesByDay}
+          initialDomain={rememberedDomain(result.altitude)}
           members={members}
           committing={committing}
           onCommit={(payload) => void handleCommit(payload)}

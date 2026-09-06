@@ -19,6 +19,25 @@ function saveRotation(deviceId: string | null, rotation: Rotation) {
   try { localStorage.setItem(`symphony.camera.rotation.${deviceId}`, String(rotation)) } catch { /* ignore */ }
 }
 
+/** A rotation was only ever saved after a stream actually started on this
+ *  machine — its presence means "this desktop has used the camera before,"
+ *  worth auto-starting for again. */
+function hasUsedCameraBefore(): boolean {
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      if (localStorage.key(i)?.startsWith('symphony.camera.rotation.')) return true
+    }
+  } catch { /* ignore */ }
+  return false
+}
+
+/** No touch surface at all — a laptop/desktop, where "point the camera at
+ *  the page" is an awkward ask and a file (photo already on disk, a scan) is
+ *  the natural first move. */
+function isDesktop(): boolean {
+  return !('ontouchstart' in window) && !navigator.maxTouchPoints
+}
+
 interface CameraCaptureModalProps {
   /** Called with the captured JPEG. The modal closes itself afterwards. */
   onCapture: (blob: Blob) => void
@@ -47,6 +66,11 @@ export function CameraCaptureModal({ onCapture, onPickFile, onClose, altitude, o
   const [rotation, setRotation] = useState<Rotation>(0)
   const [error, setError] = useState<string | null>(null)
   const [ready, setReady] = useState(false)
+  // Desktop, first time: lead with "choose a file" instead of asking for
+  // camera permission the visitor probably doesn't want to grant to point a
+  // webcam at a piece of paper. A remembered rotation means this machine has
+  // used the camera before — keep auto-starting for it, as always.
+  const [showPicker, setShowPicker] = useState(() => isDesktop() && !hasUsedCameraBefore())
 
   const cycleRotation = useCallback(() => {
     setRotation((prev) => {
@@ -95,6 +119,9 @@ export function CameraCaptureModal({ onCapture, onPickFile, onClose, altitude, o
       }
     } catch (e) {
       const name = e instanceof Error ? e.name : ''
+      // Our own restart (device switch, unmount mid-request) aborts the
+      // in-flight getUserMedia call — not a real failure, nothing to show.
+      if (name === 'AbortError') return
       if (name === 'NotAllowedError' || name === 'SecurityError') {
         setError(
           'Camera access is blocked for Symphony. In Chrome, click the icon left of the address bar → Site settings → Camera → Allow, then reload. In the Mac app, allow Symphony under System Settings → Privacy & Security → Camera.',
@@ -108,10 +135,13 @@ export function CameraCaptureModal({ onCapture, onPickFile, onClose, altitude, o
   }, [stopStream])
 
   useEffect(() => {
+    if (showPicker) return
     void startStream(deviceId)
     return stopStream
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- restart only when the chosen device changes
-  }, [deviceId])
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- restart only when the chosen device (or leaving the picker) changes
+  }, [deviceId, showPicker])
+
+  const useCamera = useCallback(() => setShowPicker(false), [])
 
   const snap = useCallback(() => {
     const video = videoRef.current
@@ -175,7 +205,29 @@ export function CameraCaptureModal({ onCapture, onPickFile, onClose, altitude, o
           </div>
         )}
 
-        {error ? (
+        {showPicker ? (
+          <div className="px-6 py-10 text-center space-y-4">
+            <p className="text-sm text-neutral-300 leading-relaxed">
+              Pick a photo or PDF of the page, or use a camera instead.
+            </p>
+            <div className="flex items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => { stopStream(); onPickFile() }}
+                className="btn-primary px-4 py-2 rounded-lg text-sm inline-flex items-center gap-2"
+              >
+                <ImageUp className="w-4 h-4" /> Choose a file
+              </button>
+              <button
+                type="button"
+                onClick={useCamera}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white/10 text-white text-sm hover:bg-white/20 transition-colors"
+              >
+                <Camera className="w-4 h-4" /> Use camera
+              </button>
+            </div>
+          </div>
+        ) : error ? (
           <div className="px-6 py-10 text-center space-y-4">
             <p className="text-sm text-neutral-300 text-left leading-relaxed">
               {error}

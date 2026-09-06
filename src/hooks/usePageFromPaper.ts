@@ -4,7 +4,25 @@ import { localYmd } from '@/lib/cadence/config'
 import { planWindowDates, type PageAltitude } from '@/lib/planParse'
 import { readSeasons } from '@/lib/cadence/seasons'
 import { validatePageResult, type PageResult } from '@/lib/pageParse'
+import { SessionExpiredError } from '@/lib/authErrors'
 import type { FamilyMember } from '@/types/family'
+
+/**
+ * A non-2xx `parse-page` response reads as a 401 if either the transport-level
+ * status says so, or the function's own JSON body does — `.context` is the
+ * raw `Response`, whose body can only be read once and only asynchronously,
+ * so a status-less error (as tests construct) still needs a body check.
+ */
+async function isUnauthorized(fnErr: { context?: { status?: number; json?: () => Promise<unknown> } }): Promise<boolean> {
+  if (fnErr.context?.status === 401) return true
+  try {
+    const body = await fnErr.context?.json?.()
+    return !!body && typeof body === 'object' && 'error' in body &&
+      /invalid token|unauthorized|jwt/i.test(String((body as { error?: unknown }).error ?? ''))
+  } catch {
+    return false
+  }
+}
 
 export type PageParseStatus = 'idle' | 'parsing' | 'ready' | 'error'
 
@@ -74,7 +92,12 @@ export function usePageFromPaper(members: FamilyMember[]) {
         members: members.map((m) => ({ id: m.id, name: m.name, role: m.role_label ?? null })),
       },
     })
-    if (fnErr) throw new Error(fnErr.message)
+    if (fnErr) {
+      if (await isUnauthorized(fnErr as { context?: { status?: number; json?: () => Promise<unknown> } })) {
+        throw new SessionExpiredError()
+      }
+      throw new Error(fnErr.message)
+    }
     if (data?.error) throw new Error(String(data.error))
     // `dates` is only the fallback — the response echoes the window it actually
     // used, and that is what the review sheet must offer.

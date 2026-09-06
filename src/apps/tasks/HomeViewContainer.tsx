@@ -18,6 +18,7 @@ import { useGoogleCalendar, CalendarReconnectError } from '@/hooks/useGoogleCale
 import { showToast } from '@/hooks/useToast';
 import { rangeEventSpan } from '@/lib/weekHelpers';
 import { PageFromPaperFlow } from '@/components/capture/PageFromPaperFlow';
+import { localYmd } from '@/lib/cadence/config';
 import { parseRoutineTimelineId } from '@/lib/today/doseExpansion';
 import { groupItems, addToGroup, removeFromGroup, ungroupTasks } from '@/lib/today/groupTasks';
 import { useConvertTaskToProject } from '@/hooks/useConvertTaskToProject';
@@ -198,6 +199,21 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
   // has its own copy of this synthesis; that becomes dead code post-cutover.
   const mealEvents = useMealEventsForDate(viewedDate);
   const eventsWithMeals = useMemo(() => [...events, ...mealEvents], [events, mealEvents]);
+
+  // Plan-from-paper's day-fact check ("dentist 10am" already on the calendar)
+  // needs every synced event's title, by day — not just the viewed date.
+  const calendarTitlesByDay = useMemo(() => {
+    const byDay = new Map<string, string[]>();
+    for (const ev of events) {
+      const raw = ev.start_time || ev.startTime;
+      if (!raw) continue;
+      const day = localYmd(new Date(raw));
+      const titles = byDay.get(day);
+      if (titles) titles.push(ev.title);
+      else byDay.set(day, [ev.title]);
+    }
+    return byDay;
+  }, [events]);
 
   // Synced calendar events carry no Symphony assignee, and the schedule views
   // (Today/Day/Week/Month) hide events whose assignee isn't selected — so a
@@ -701,6 +717,8 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
         <PageFromPaperFlow
           members={familyMembers}
           onClose={() => setPlanFromPaperOpen(false)}
+          existingTasks={tasks.filter((t) => !t.completed).map((t) => ({ id: t.id, title: t.title }))}
+          calendarTitlesByDay={calendarTitlesByDay}
         />
       )}
 
