@@ -350,7 +350,9 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
           // Only from an explicit #work/#family/#personal token; never the lens.
           context: r.context,
           category: r.category,
-          isAllDay: toInbox ? undefined : r.scheduledFor ? false : true,
+          // A parsed date with no certain time (e.g. "for Monday") is all-day
+          // even though a time is present; r.isAllDay carries that when set.
+          isAllDay: toInbox ? undefined : r.isAllDay ?? (r.scheduledFor ? false : true),
           phoneNumber: r.phoneNumber,
         },
       );

@@ -33,6 +33,8 @@ interface QuickAddRichData {
   projectId?: string;
   contactId?: string;
   scheduledFor?: Date;
+  /** A date with no time (chrono was uncertain of the hour) lands all-day. */
+  isAllDay?: boolean;
   durationMinutes?: number;
   category?: TaskCategory;
   context?: 'work' | 'family' | 'personal';
@@ -154,6 +156,7 @@ export function useShellChrome() {
             : undefined,
         category: data.category,
         context: data.context,
+        isAllDay: data.isAllDay,
       });
       if (taskId) {
         if (data.scheduledFor) showToast('Task scheduled', 'success');

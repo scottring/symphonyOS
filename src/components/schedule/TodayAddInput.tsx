@@ -17,6 +17,9 @@ export type CaptureDestination = 'today' | 'inbox' | 'note'
 export interface TodayCaptureResult {
   title: string
   scheduledFor: Date | null      // null → caller defaults to "today, all-day"
+  /** A parsed date with no certain time (e.g. "for Monday") lands all-day.
+   *  Undefined when there is no parsed date — the caller applies its own default. */
+  isAllDay?: boolean
   /** Where this capture lands. Default 'today' (task on today). */
   destination?: CaptureDestination
   category?: TaskCategory
@@ -117,6 +120,7 @@ export function TodayAddInput({ onAdd, parserContext, resolver, getRecentTaskFor
     onAdd({
       title: p.title?.trim() || trimmed,
       scheduledFor: p.dueDate ?? null,
+      isAllDay: p.dueDate ? !p.hasTime : undefined,
       destination,
       category: p.category,
       context: p.context,

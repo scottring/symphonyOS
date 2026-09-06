@@ -21,6 +21,8 @@ interface QuickCaptureProps {
     projectId?: string
     contactId?: string
     scheduledFor?: Date
+    /** A date with no time (chrono was uncertain of the hour) lands all-day. */
+    isAllDay?: boolean
     durationMinutes?: number
     category?: TaskCategory
     context?: TaskContext
@@ -224,6 +226,7 @@ export function QuickCapture({
         projectId: effectiveParsed.projectId,
         contactId: effectiveParsed.contactId,
         scheduledFor: effectiveParsed.dueDate,
+        isAllDay: effectiveParsed.dueDate ? !effectiveParsed.hasTime : undefined,
         durationMinutes: effectiveParsed.durationMinutes,
         category: effectiveParsed.category,
         context: effectiveParsed.context,

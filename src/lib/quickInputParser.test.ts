@@ -413,3 +413,22 @@ describe('explicit domain tokens', () => {
     expect(hasParsedFields(parseQuickInput('pay the invoice #work', mockContext))).toBe(true)
   })
 })
+
+// ── Dangling preposition + hasTime (A2.7) ───────────────────────────────────
+// "Finish the deck for Monday" used to become "Finish the deck for" — chrono
+// only strips the date text ("Monday"), leaving the preposition that
+// introduced it stranded at the end of the title.
+describe('dangling preposition and hasTime', () => {
+  const ctx = mockContext
+
+  it('"Finish the deck for Monday" → title without the dangling for, no time', () => {
+    const r = parseQuickInput('Finish the deck for Monday', ctx)
+    expect(r.title).toBe('Finish the deck')
+    expect(r.hasTime).toBe(false)
+    expect(r.dueDate?.getHours()).toBe(0)
+  })
+
+  it('"Dentist thu 2pm" keeps the time', () => {
+    expect(parseQuickInput('Dentist thu 2pm', ctx).hasTime).toBe(true)
+  })
+})

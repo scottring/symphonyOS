@@ -11,6 +11,7 @@ export interface ParsedQuickInput {
   contactMatch?: string              // What text matched
   dueDate?: Date                     // Parsed date
   dueDateMatch?: string              // What text matched (e.g., "tomorrow")
+  hasTime: boolean                   // True only when chrono was certain of an hour (vs. a date-only match)
   durationMinutes?: number           // Parsed duration ("45m", "1h30m", "for 45 minutes", or a chrono range)
   durationMatch?: string             // What text matched (e.g., "45m")
   priority?: 'high' | 'medium' | 'low'
@@ -127,6 +128,7 @@ export function parseQuickInput(
   const result: ParsedQuickInput = {
     rawText: input,
     title: input.trim(),
+    hasTime: false,
   }
 
   let workingText = input
@@ -212,7 +214,15 @@ export function parseQuickInput(
     const forward = chrono.parse(workingText, now, { forwardDate: true }).find((m) => m.text === dateMatch.text)
     result.dueDate = resolveDateMatch(dateMatch, forward, now)
     result.dueDateMatch = dateMatch.text
+    result.hasTime = dateMatch.start.isCertain('hour')
+    if (!result.hasTime) {
+      result.dueDate.setHours(0, 0, 0, 0)
+    }
     workingText = workingText.replace(dateMatch.text, '').trim()
+    // The date text is gone, but the preposition that introduced it often
+    // isn't ("Finish the deck for Monday" -> "Finish the deck for"). Strip a
+    // trailing preposition left dangling at the end of the remaining text.
+    workingText = workingText.replace(/\s+(for|on|by|until|till|at)\s*$/i, '').trim()
     // A chrono range ("2pm-3:30pm") carries the end time — derive a duration
     // from it unless an explicit duration token already won.
     if (dateMatch.end && result.durationMinutes === undefined) {
