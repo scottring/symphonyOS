@@ -6,6 +6,7 @@ function renderThread(over: Partial<DiscussionThreadProps> = {}) {
   const props: DiscussionThreadProps = {
     title: 'Book the dentist',
     sharedWithLabel: 'Shared with Iris',
+    scope: 'compound',
     messages: [],
     loading: false,
     sending: false,
@@ -33,9 +34,21 @@ describe('DiscussionThread', () => {
   })
 
   it('reads Only you on a private thread', () => {
-    renderThread({ sharedWithLabel: 'Only you' })
+    renderThread({ sharedWithLabel: 'Only you', scope: 'individual' })
     expect(screen.getByText('Only you')).toBeInTheDocument()
     expect(screen.getByText('Think it through here, or ask Symphony.')).toBeInTheDocument()
+  })
+
+  it('offers to share with the house when onShare is given', () => {
+    const onShare = vi.fn()
+    renderThread({ sharedWithLabel: 'Only you', scope: 'individual', onShare })
+    fireEvent.click(screen.getByRole('button', { name: 'Share with the house' }))
+    expect(onShare).toHaveBeenCalled()
+  })
+
+  it('never offers to share when onShare is absent', () => {
+    renderThread({ sharedWithLabel: 'Only you', scope: 'individual' })
+    expect(screen.queryByRole('button', { name: 'Share with the house' })).not.toBeInTheDocument()
   })
 
   it('Enter posts to the people in the thread and never wakes Symphony', () => {

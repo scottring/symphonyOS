@@ -376,6 +376,7 @@ export function TapContextPanel(props: TapContextPanelProps) {
           discuss={{ type: 'task', id: task.id, title: task.title, scope: discussScope }}
           onClose={() => setAssistOpen(false)}
           onMutate={props.onAssistMutate}
+          onShare={() => props.onContextChange('family')}
         />
       )}
     </PanelShell>

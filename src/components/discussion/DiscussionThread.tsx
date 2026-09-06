@@ -11,6 +11,7 @@ import { ConceptIcon } from '@/lib/conceptIcons'
 import { ChatMessage } from '@/components/chat/ChatMessage'
 import type { ChatMessage as ChatMessageType } from '@/types/chat'
 import type { FamilyMember } from '@/types/family'
+import type { Scope } from '@/lib/scope'
 import { DiscussionComposer } from './DiscussionComposer'
 
 export interface DiscussionThreadProps {
@@ -18,6 +19,8 @@ export interface DiscussionThreadProps {
   title: string
   /** "Shared with Iris" / "Only you" — derived, see sharedWithLabel. */
   sharedWithLabel: string
+  /** The underlying item's scope — drives "shared" state, not string-sniffing the label. */
+  scope: Scope
   messages: ChatMessageType[]
   loading: boolean
   sending: boolean
@@ -30,11 +33,14 @@ export interface DiscussionThreadProps {
   onPost: (text: string) => void
   onAsk: (text: string) => void
   onClose: () => void
+  /** Offer to share a private thread with the house. Present only when the
+   *  host has decided it's eligible (see canOfferShare). */
+  onShare?: () => void
 }
 
 export function DiscussionThread({
-  title, sharedWithLabel, messages, loading, sending, error, toolActivity,
-  currentUserId, familyMembers, suggestions, onPost, onAsk, onClose,
+  title, sharedWithLabel, scope, messages, loading, sending, error, toolActivity,
+  currentUserId, familyMembers, suggestions, onPost, onAsk, onClose, onShare,
 }: DiscussionThreadProps) {
   const scrollRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -45,7 +51,7 @@ export function DiscussionThread({
   const last = messages[messages.length - 1]
   // Symphony has been asked and hasn't started answering yet.
   const thinking = sending && !!last && last.role === 'user' && last.askedSymphony === true
-  const shared = sharedWithLabel !== 'Only you'
+  const shared = scope !== 'individual'
 
   return (
     <div
@@ -63,6 +69,15 @@ export function DiscussionThread({
           <p className={`mt-0.5 inline-flex items-center gap-1 text-[11px] ${shared ? 'text-primary-700' : 'text-neutral-400'}`}>
             <ConceptIcon name="person" size={11} decorative />
             {sharedWithLabel}
+            {onShare && (
+              <button
+                type="button"
+                onClick={onShare}
+                className="ml-2 text-[11px] text-primary-700 underline"
+              >
+                Share with the house
+              </button>
+            )}
           </p>
         </div>
         <button

@@ -19,7 +19,7 @@ import { useDiscussThread, type DiscussEntity } from '@/hooks/useDiscussThread'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import type { AssistantTaskContext } from '@/lib/agentStream'
 import type { ChatMessage } from '@/types/chat'
-import { sharedWithLabel } from '@/lib/discussions/sharedWith'
+import { sharedWithLabel, canOfferShare } from '@/lib/discussions/sharedWith'
 import { ChatPanel } from '@/components/chat/ChatPanel'
 import { DiscussionThread } from '@/components/discussion/DiscussionThread'
 
@@ -49,9 +49,13 @@ interface AssistDrawerProps {
   /** Turns this into the item's shared Discussion. The scope must already
    *  be derived with scopeForDomain — the drawer never invents one. */
   discuss?: DiscussEntity
+  /** Share the underlying item with the house (e.g. task.context -> 'family').
+   *  The drawer has no update function of its own — this comes from whichever
+   *  host has one. Offered only when canOfferShare(...) says it's eligible. */
+  onShare?: () => void
 }
 
-export function AssistDrawer({ item, onClose, onMutate, discuss }: AssistDrawerProps) {
+export function AssistDrawer({ item, onClose, onMutate, discuss, onShare }: AssistDrawerProps) {
   // Escape closes the drawer first; the panel that opened it stays (useEscapeKey stack).
   useEscapeKey(true, onClose)
   const isRoutine = item.kind === 'routine'
@@ -82,6 +86,7 @@ export function AssistDrawer({ item, onClose, onMutate, discuss }: AssistDrawerP
   )
 
   const unavailable = !!discuss && !thread.threadId && !!thread.error
+  const shareEligible = !!discuss && canOfferShare(discuss.scope, members)
   const suggestions = discuss?.type === 'event'
     ? EVENT_SUGGESTIONS
     : isRoutine ? ROUTINE_SUGGESTIONS : TASK_SUGGESTIONS
@@ -121,6 +126,7 @@ export function AssistDrawer({ item, onClose, onMutate, discuss }: AssistDrawerP
           <DiscussionThread
             title={item.title}
             sharedWithLabel={sharedWithLabel(thread.sharedWith, discuss.scope)}
+            scope={discuss.scope}
             messages={discussMessages}
             loading={thread.loading}
             sending={thread.sending}
@@ -132,6 +138,7 @@ export function AssistDrawer({ item, onClose, onMutate, discuss }: AssistDrawerP
             onPost={(text) => { void thread.post(text) }}
             onAsk={(text) => { void thread.ask(text) }}
             onClose={onClose}
+            onShare={shareEligible ? onShare : undefined}
           />
         ) : (
           <ChatPanel

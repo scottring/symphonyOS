@@ -56,11 +56,15 @@ vi.mock('@/hooks/useDiscussThread', () => ({
   },
 }))
 
+const familyMembersState = vi.hoisted(() => ({
+  members: [] as Array<Record<string, unknown>>,
+}))
+
 vi.mock('@/hooks/useFamilyMembers', () => ({
   useFamilyMembers: () => ({
     // The household creator's own row carries a NULL auth_user_id — the drawer
     // must not use it to decide which bubbles are the viewer's own.
-    members: [],
+    members: familyMembersState.members,
     getCurrentUserMember: () => ({ id: 'm1', name: 'Scott', auth_user_id: null, user_id: 'u1' }),
   }),
 }))
@@ -83,6 +87,7 @@ describe('AssistDrawer', () => {
     discussState.participants = []
     discussState.sharedWith = []
     discussState.selfAuthId = 'u1'
+    familyMembersState.members = []
   })
 
   it('scopes the assistant to the item and shows its title', () => {
@@ -176,6 +181,57 @@ describe('AssistDrawer', () => {
       }]
       render(<AssistDrawer item={task} onClose={vi.fn()} discuss={discuss} />)
       expect(screen.getByText('On it.').closest('.flex')?.className).toContain('justify-end')
+    })
+
+    it('offers to share a private thread with the house when the host supplies onShare', () => {
+      familyMembersState.members = [
+        { id: 'm1', name: 'Scott', auth_user_id: null, user_id: 'u1', is_full_user: true },
+        { id: 'm2', name: 'Iris', auth_user_id: 'u2', user_id: 'u1', is_full_user: false },
+      ]
+      const onShare = vi.fn()
+      render(
+        <AssistDrawer
+          item={task}
+          onClose={vi.fn()}
+          discuss={{ ...discuss, scope: 'individual' }}
+          onShare={onShare}
+        />,
+      )
+      fireEvent.click(screen.getByRole('button', { name: 'Share with the house' }))
+      expect(onShare).toHaveBeenCalled()
+    })
+
+    it('does not offer to share when the thread is already shared', () => {
+      familyMembersState.members = [
+        { id: 'm1', name: 'Scott', auth_user_id: null, user_id: 'u1', is_full_user: true },
+        { id: 'm2', name: 'Iris', auth_user_id: 'u2', user_id: 'u1', is_full_user: false },
+      ]
+      render(<AssistDrawer item={task} onClose={vi.fn()} discuss={discuss} onShare={vi.fn()} />)
+      expect(screen.queryByRole('button', { name: 'Share with the house' })).not.toBeInTheDocument()
+    })
+
+    it('does not offer to share when nobody else in the house has a login', () => {
+      familyMembersState.members = [
+        { id: 'm1', name: 'Scott', auth_user_id: null, user_id: 'u1', is_full_user: true },
+      ]
+      render(
+        <AssistDrawer
+          item={task}
+          onClose={vi.fn()}
+          discuss={{ ...discuss, scope: 'individual' }}
+          onShare={vi.fn()}
+        />,
+      )
+      expect(screen.queryByRole('button', { name: 'Share with the house' })).not.toBeInTheDocument()
+    })
+
+    it('does not offer to share when the host gives no onShare handler', () => {
+      familyMembersState.members = [
+        { id: 'm1', name: 'Scott', auth_user_id: null, user_id: 'u1', is_full_user: true },
+        { id: 'm2', name: 'Iris', auth_user_id: 'u2', user_id: 'u1', is_full_user: false },
+      ]
+      render(<AssistDrawer item={task} onClose={vi.fn()} discuss={{ ...discuss, scope: 'individual' }} />)
+      expect(screen.queryByRole('button', { name: 'Share with the house' })).not.toBeInTheDocument()
     })
   })
 })

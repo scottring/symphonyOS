@@ -36,6 +36,15 @@ export function sharedWithNames(
     .map((m) => m.name)
 }
 
+/** True when the underlying item is worth OFFERING to share: it's currently
+ *  private (individual scope), and there's someone to share it WITH — at
+ *  least one other login-holding member besides the person looking at it. */
+export function canOfferShare(scope: Scope, members: readonly SharedWithMember[]): boolean {
+  if (scope !== 'individual') return false
+  const loginHolders = members.filter((m) => !!m.auth_user_id || m.is_full_user)
+  return loginHolders.length >= 2
+}
+
 export function sharedWithLabel(names: readonly string[], scope: Scope): string {
   if (scope === 'individual' || names.length === 0) return 'Only you'
   if (names.length === 1) return `Shared with ${names[0]}`

@@ -95,4 +95,15 @@ describe('TapContextPanel Discuss action', () => {
       discuss: expect.objectContaining({ scope: 'couple' }),
     }))
   })
+
+  it('wires onShare to set the task context to family', () => {
+    const task = createMockTask({
+      id: 't4', title: 'Renew passport', context: 'personal', assignedTo: 'm-self',
+    })
+    renderPanel(task)
+    fireEvent.click(screen.getByRole('button', { name: 'Discussion' }))
+    const props = drawerProps.mock.calls[drawerProps.mock.calls.length - 1][0] as { onShare: () => void }
+    props.onShare()
+    expect(handlers.onContextChange).toHaveBeenCalledWith('family')
+  })
 })
