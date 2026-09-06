@@ -2,6 +2,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { renderHook, waitFor, act } from '@testing-library/react'
 import { useAuth } from './useAuth'
 import { createMockUser, createMockSession } from '@/test/mocks/factories'
+import * as Sentry from '@sentry/react'
+
+vi.mock('@sentry/react', () => ({
+  captureEvent: vi.fn(),
+  setUser: vi.fn(),
+}))
 
 // Module-level state for mocking
 let mockSession: ReturnType<typeof createMockSession> | null = null
@@ -78,6 +84,7 @@ describe('useAuth', () => {
       data: { session: mockSession },
       error: null
     })
+    localStorage.removeItem('symphony.auth.lostAt')
     vi.clearAllMocks()
   })
 
@@ -459,6 +466,75 @@ describe('useAuth', () => {
 
       reloadSpy.mockRestore()
       localStorage.removeItem('sb-testref-auth-token')
+    })
+  })
+
+  // A session ending mid-tab (revoked elsewhere, expired) used to drop the
+  // user to the login screen with no record anywhere — silent from the
+  // user's side and invisible in Sentry. A SIGNED_OUT the user asked for
+  // (pressing Sign out) must NOT be recorded the same way.
+  describe('session loss', () => {
+    const emitAuth = (event: string, session: ReturnType<typeof createMockSession> | null) =>
+      authStateCallback?.(event, session)
+
+    it('a SIGNED_OUT that the user did not ask for is recorded and reported', async () => {
+      mockSession = null
+      const { result } = renderHook(() => useAuth())
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false)
+      })
+
+      const session = createMockSession({ user: createMockUser() })
+      act(() => emitAuth('SIGNED_IN', session))
+      expect(result.current.sessionLost).toBe(false)
+
+      act(() => emitAuth('SIGNED_OUT', null))
+
+      expect(localStorage.getItem('symphony.auth.lostAt')).toBeTruthy()
+      expect(Sentry.captureEvent).toHaveBeenCalledWith(
+        expect.objectContaining({ message: 'auth.session_lost', level: 'warning' }),
+      )
+      expect(result.current.sessionLost).toBe(true)
+    })
+
+    it('pressing Sign out does not count as a lost session', async () => {
+      const mockUser = createMockUser({ email: 'test@example.com' })
+      mockSession = createMockSession({ user: mockUser })
+
+      const { result } = renderHook(() => useAuth())
+
+      await waitFor(() => {
+        expect(result.current.user).toEqual(mockUser)
+      })
+
+      await act(async () => {
+        await result.current.signOut()
+        // Mirrors what a real supabase.auth.signOut() call fires through
+        // onAuthStateChange — the mock above doesn't do this itself.
+        emitAuth('SIGNED_OUT', null)
+      })
+
+      expect(localStorage.getItem('symphony.auth.lostAt')).toBeNull()
+      expect(Sentry.captureEvent).not.toHaveBeenCalled()
+      expect(result.current.sessionLost).toBe(false)
+    })
+
+    it('sessionLost resets to false on the next SIGNED_IN', async () => {
+      mockSession = null
+      const { result } = renderHook(() => useAuth())
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false)
+      })
+
+      const session = createMockSession({ user: createMockUser() })
+      act(() => emitAuth('SIGNED_IN', session))
+      act(() => emitAuth('SIGNED_OUT', null))
+      expect(result.current.sessionLost).toBe(true)
+
+      act(() => emitAuth('SIGNED_IN', session))
+      expect(result.current.sessionLost).toBe(false)
     })
   })
 })

@@ -7,7 +7,15 @@ export function useAuth() {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [isPasswordRecovery, setIsPasswordRecovery] = useState(false)
+  const [sessionLost, setSessionLost] = useState(false)
   const loadingRef = useRef(true)
+  // True only while a signOut() call the user asked for is in flight — a
+  // SIGNED_OUT that fires while this is true is expected, not a loss.
+  const signingOutRef = useRef(false)
+  // What the PREVIOUS auth event carried, so a SIGNED_OUT can tell "we had a
+  // session and it just vanished" from "we were already signed out".
+  const prevUserRef = useRef<User | null>(null)
+  const prevExpiresRef = useRef<number | undefined>(undefined)
 
   useEffect(() => {
     // Timeout to prevent infinite loading if Supabase is unreachable
@@ -22,10 +30,32 @@ export function useAuth() {
     // Listen for auth changes — must be set up BEFORE exchangeCodeForSession
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
+        // A session that just disappeared without the user asking (signOut())
+        // is a LOST session, not a clean sign-out — expiry, revocation
+        // elsewhere, or a bug. Silent before this: the user just saw the
+        // login screen with no record anywhere (demo run 2026-09-06).
+        if (event === 'SIGNED_OUT' && prevUserRef.current && !signingOutRef.current) {
+          localStorage.setItem('symphony.auth.lostAt', new Date().toISOString())
+          Sentry.captureEvent({
+            message: 'auth.session_lost',
+            level: 'warning',
+            extra: {
+              path: window.location.pathname,
+              prevExpiresAt: prevExpiresRef.current,
+            },
+          })
+          setSessionLost(true)
+        }
+        if (event === 'SIGNED_IN') {
+          setSessionLost(false)
+          signingOutRef.current = false
+        }
         setUser(session?.user ?? null)
         if (event === 'PASSWORD_RECOVERY') {
           setIsPasswordRecovery(true)
         }
+        prevUserRef.current = session?.user ?? null
+        prevExpiresRef.current = session?.expires_at
       }
     )
 
@@ -52,6 +82,8 @@ export function useAuth() {
       supabase.auth.getSession()
         .then(({ data: { session } }) => {
           setUser(session?.user ?? null)
+          prevUserRef.current = session?.user ?? null
+          prevExpiresRef.current = session?.expires_at
           loadingRef.current = false
           setLoading(false)
           clearTimeout(timeout)
@@ -114,6 +146,7 @@ export function useAuth() {
   }
 
   const signOut = async () => {
+    signingOutRef.current = true
     const { error } = await supabase.auth.signOut()
     if (error) {
       // If the server session is already dead (revoked by a password change,
@@ -134,6 +167,9 @@ export function useAuth() {
     user,
     loading,
     isPasswordRecovery,
+    /** True after a SIGNED_OUT the user did not ask for (Sign out excluded).
+     *  Resets on the next SIGNED_IN. */
+    sessionLost,
     signInWithEmail,
     signUpWithEmail,
     signOut,

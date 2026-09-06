@@ -7,10 +7,24 @@ if (!supabaseUrl || !supabaseAnonKey) {
   throw new Error('Missing Supabase environment variables')
 }
 
+// Opt-in verbose auth logging (token refresh/expiry) — off by default, and
+// only ever on in dev, so a session-loss repro can be traced without
+// shipping the chatter to prod. Guarded: localStorage can throw in a
+// locked-down browser context (private mode, blocked site data).
+function authDebugEnabled(): boolean {
+  if (!import.meta.env.DEV) return false
+  try {
+    return localStorage.getItem('symphony.auth.debug') === '1'
+  } catch {
+    return false
+  }
+}
+
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
+    debug: authDebugEnabled(),
   },
 })
 

@@ -1,7 +1,13 @@
 import { useState } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 
-export function AuthForm() {
+interface AuthFormProps {
+  /** A banner shown above the form fields — e.g. after a session ended
+   *  unexpectedly, so the sign-in card explains why the user landed here. */
+  message?: string
+}
+
+export function AuthForm({ message }: AuthFormProps = {}) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isSignUp, setIsSignUp] = useState(false)
@@ -58,6 +64,11 @@ export function AuthForm() {
 
         {/* Form card */}
         <div className="card p-8">
+          {message && (
+            <div className="mb-5 p-3 rounded-lg text-sm bg-primary-50 text-primary-700">
+              {message}
+            </div>
+          )}
           <h2 className="font-display text-xl font-medium text-neutral-800 mb-6 text-center">
             {isForgotPassword ? 'Reset Password' : isSignUp ? 'Create Account' : 'Sign In'}
           </h2>

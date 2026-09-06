@@ -1,8 +1,12 @@
-import { useState, Suspense, type ReactNode } from 'react'
+import { useState, useEffect, useRef, Suspense, type ReactNode } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '@/hooks/useAuth'
 import { AuthForm } from '@/components/lazy'
 import { LoadingFallback } from '@/components/layout/LoadingFallback'
 import type { User } from '@supabase/supabase-js'
+
+const SESSION_ENDED_MESSAGE = 'Your session ended. Sign in to continue where you were.'
+const RETURN_TO_KEY = 'symphony.returnTo'
 
 /** Auth values handed to AuthGate's children once the gate is open. */
 export interface AuthedContext {
@@ -71,7 +75,53 @@ function PasswordResetForm({ onSubmit }: { onSubmit: (password: string) => Promi
  * /task/:id) get the same gate when `symphony.useNewTasks` is enabled.
  */
 export function AuthGate({ children }: { children: (auth: AuthedContext) => ReactNode }) {
-  const { user, loading: authLoading, isPasswordRecovery, updatePassword, signOut } = useAuth()
+  const { user, loading: authLoading, isPasswordRecovery, updatePassword, signOut, sessionLost } = useAuth()
+  const navigate = useNavigate()
+  // Did we land here already logged out (the sign-in screen showing), or on a
+  // route that says WHY (?return=)? Either way, a sign-in that follows counts
+  // as "recovering" and should return you where you were, not drop you on
+  // Today. A user who was already signed in when this mounted, or who opens
+  // the sign-in screen fresh with no hint, gets no forced navigation.
+  const recoveringRef = useRef(false)
+  const wasSignedOutRef = useRef(!user)
+
+  // A session-ending redirect (e.g. a 401 caught as SessionExpiredError)
+  // hands back '?return=<path>' — remember it so a fresh sign-in returns
+  // there instead of dropping the user back on Today.
+  const [hasReturnParam] = useState(() => {
+    try {
+      return new URLSearchParams(window.location.search).has('return')
+    } catch {
+      return false
+    }
+  })
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search)
+      const ret = params.get('return')
+      if (ret) sessionStorage.setItem(RETURN_TO_KEY, ret)
+    } catch {
+      // sessionStorage can throw in a locked-down browser context — the
+      // recovery message still shows, just without a route to return to.
+    }
+  }, [])
+
+  if (sessionLost || hasReturnParam) recoveringRef.current = true
+
+  useEffect(() => {
+    if (user && wasSignedOutRef.current && recoveringRef.current) {
+      recoveringRef.current = false
+      let dest = '/today'
+      try {
+        dest = sessionStorage.getItem(RETURN_TO_KEY) ?? '/today'
+        sessionStorage.removeItem(RETURN_TO_KEY)
+      } catch {
+        // Fall back to the default below.
+      }
+      navigate(dest, { replace: true })
+    }
+    wasSignedOutRef.current = !user
+  }, [user, navigate])
 
   if (authLoading) {
     return (
@@ -84,7 +134,7 @@ export function AuthGate({ children }: { children: (auth: AuthedContext) => Reac
   if (!user) {
     return (
       <Suspense fallback={<LoadingFallback />}>
-        <AuthForm />
+        <AuthForm message={sessionLost || hasReturnParam ? SESSION_ENDED_MESSAGE : undefined} />
       </Suspense>
     )
   }
