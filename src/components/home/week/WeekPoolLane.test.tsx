@@ -324,3 +324,28 @@ describe('WeekPoolLane readability', () => {
     expect(name.className).not.toMatch(/\btruncate\b/)
   })
 })
+
+describe('WeekPoolLane week folds', () => {
+  // A range reaching into another week folds that week's placed rows beneath
+  // this week's list — the plan you are placing from is always on top, and the
+  // week the range sits in is a fold, the way the month is.
+  it('folds a touched week beneath the list, named by its first day', () => {
+    render(
+      <DndContext>
+        <WeekPoolLane
+          weekStart={new Date(2027, 0, 9)}
+          dayCount={2}
+          foldWeeks={[new Date(2027, 0, 10)]}
+          onSelectItem={() => {}}
+          tasks={[
+            task({ id: 'n1', title: 'Order the new mattress', bucket: 'week', weekStart: new Date(2027, 0, 10) }),
+            task({ id: 'o1', title: 'Not that week', bucket: 'week', weekStart: new Date(2027, 0, 17) }),
+          ]}
+        />
+      </DndContext>,
+    )
+    expect(screen.getByText('Week of Jan 10')).toBeInTheDocument()
+    expect(screen.getByText('Order the new mattress')).toBeInTheDocument()
+    expect(screen.queryByText('Not that week')).not.toBeInTheDocument()
+  })
+})

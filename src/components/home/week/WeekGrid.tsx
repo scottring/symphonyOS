@@ -20,7 +20,7 @@ interface CreateGestureHandlers {
 interface WeekGridProps {
   weekStart: Date  // First day of the displayed range, 00:00 local
   /** Number of day columns to render. 5 = Mon-Fri (workweek), 7 = full week. Default 7. */
-  dayCount?: 5 | 7
+  dayCount?: number
   children?: ReactNode  // Positioned <WeekEventBlock>s rendered absolutely on top
   /** Optional: handlers for drag-to-create on empty slots. When provided, sub-slots
    *  emit pointerdown/move/up that the parent uses to drive useGridCreate. */

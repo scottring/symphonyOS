@@ -8,6 +8,8 @@
  * 2026-09-05).
  */
 
+import { weekStartAnchor, type WeekStart } from '@/lib/cadence/config'
+
 /** Seven columns is what the grid can read at desk width. Past that the days
  *  are stripes. */
 export const MAX_RANGE_DAYS = 7
@@ -62,4 +64,31 @@ export function presetRange(preset: RangePreset, today: Date): Date[] {
       return buildRange(saturday, addDays(saturday, 1))
     }
   }
+}
+
+/** The calendar week containing `today`, anchored to the configured week
+ *  start. This is what "This week" means on /week — the week list's week —
+ *  as opposed to the rolling seven days a `'week'` preset gives a grid opened
+ *  mid-week. */
+export function weekRange(today: Date, weekStartsOn: WeekStart): Date[] {
+  const start = weekStartAnchor(today, weekStartsOn)
+  return buildRange(start, addDays(start, 6))
+}
+
+/** The weeks a range touches OTHER than the current one, as week-start dates.
+ *  The list beside the grid is always this week's plan; each of these gets its
+ *  placed rows folded beneath it, so a weekend that spills into Sunday, or a
+ *  range parked wholly in a future week, still shows what is planned there. */
+export function foldWeeksFor(rangeStart: Date, dayCount: number, today: Date, weekStartsOn: WeekStart): Date[] {
+  const current = weekStartAnchor(today, weekStartsOn).getTime()
+  const seen = new Set<number>()
+  const out: Date[] = []
+  for (let i = 0; i < dayCount; i++) {
+    const w = weekStartAnchor(addDays(rangeStart, i), weekStartsOn)
+    const t = w.getTime()
+    if (t === current || seen.has(t)) continue
+    seen.add(t)
+    out.push(w)
+  }
+  return out
 }

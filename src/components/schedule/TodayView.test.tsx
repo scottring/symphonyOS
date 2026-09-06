@@ -154,10 +154,13 @@ describe('TodayView', () => {
     expect(screen.queryByRole('button', { name: /plan today/i })).not.toBeInTheDocument()
   })
 
-  it('no longer shows a standalone "Plan day" button (time-blocking moved into the Plan today flow)', () => {
-    const onOpenPlanning = vi.fn()
-    renderView({}, { onOpenPlanning })
+  it('offers neither Time-block nor Plan week — /week is the one grid, and the sidebar already reaches it', async () => {
+    const { user } = renderView()
+    expect(screen.queryByRole('button', { name: /time-block/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /plan week/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /plan day/i })).not.toBeInTheDocument()
+    await openOverflow(user)
+    expect(screen.queryByRole('button', { name: /time-block/i })).not.toBeInTheDocument()
   })
 
   it('routine toggle flips its label after click', async () => {

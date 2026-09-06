@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { sundayOfWeek, dayLabelFor, isToday, formatDateMonthDay, activeDayRange, weekEventSpan } from './weekHelpers'
+import { sundayOfWeek, dayLabelFor, isToday, formatDateMonthDay, activeDayRange, weekEventSpan, rangeEventSpan } from './weekHelpers'
 
 describe('weekHelpers', () => {
   it('sundayOfWeek returns Sunday at the start of the week', () => {
@@ -71,5 +71,15 @@ describe('weekEventSpan', () => {
   it('starts on the Sunday of the given week at local midnight', () => {
     const { start } = weekEventSpan(new Date(2026, 8, 6, 8, 0)) // Sun Sep 6
     expect(start).toEqual(new Date(2026, 8, 6, 0, 0, 0, 0))
+  })
+})
+
+describe('rangeEventSpan', () => {
+  it('covers two weeks from the Sunday of the viewed date, so any 7-day range starting in that week has its events', () => {
+    const { start, end } = rangeEventSpan(new Date(2026, 8, 12, 12)) // Sat Sep 12
+    expect(start.getMonth()).toBe(8)
+    expect(start.getDate()).toBe(6) // Sun Sep 6
+    expect(end.getDate()).toBe(20) // through Sun Sep 20
+    expect(end.getHours()).toBe(23)
   })
 })

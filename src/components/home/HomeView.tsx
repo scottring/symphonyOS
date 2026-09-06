@@ -202,6 +202,16 @@ export function HomeView({
   const { config: cadenceConfig } = useCadenceConfig()
   const weekStartsOn = cadenceConfig.weekStartsOn
   const [weekStart, setWeekStart] = useState(() => weekStartAnchor(new Date(), readCadenceConfig().weekStartsOn))
+  // How many days /week draws from weekStart. 7 is the week; the masthead's
+  // presets and custom start/end set fewer. A range is a VIEW, never a bucket
+  // — it changes what is drawn and writes nothing (Scott, 2026-09-06: the
+  // time-block overlay's range picker moved here and the overlay went).
+  const [rangeDays, setRangeDays] = useState(7)
+  const onRangeChange = useCallback((range: Date[]) => {
+    setWeekStart(range[0])
+    setRangeDays(range.length)
+    onDateChange(range[0])
+  }, [onDateChange])
 
   // Changing the setting re-anchors the week on screen. Without this the view
   // keeps whatever the initial state captured until a remount, so the setting
@@ -353,7 +363,10 @@ export function HomeView({
             routines={allActiveRoutines}
             dateInstances={dateInstances}
             weekStart={weekStart}
-            onWeekChange={(d) => { setWeekStart(sundayOfWeek(d)); onDateChange(d) }}
+            dayCount={rangeDays}
+            // A range start is wherever the range starts; only a 7-day step
+            // is re-anchored to the week, so a weekend stays a weekend.
+            onWeekChange={(d) => { setWeekStart(rangeDays === 7 ? sundayOfWeek(d) : d); onDateChange(d) }}
             selectedAssignee={selectedAssigneeForSchedule}
             selectedAssignees={selectedAssignees}
             layers={layers}
@@ -369,6 +382,7 @@ export function HomeView({
             events={filteredEvents}
             routines={allActiveRoutines}
             weekStart={weekStart}
+            dayCount={rangeDays}
             selectedAssignees={selectedAssignees}
             layers={layers}
             onSelectItem={onSelectItem}
@@ -478,6 +492,8 @@ export function HomeView({
             // container fetches events for the week containing viewedDate,
             // so a week viewedDate isn't in would render without its events.
             onWeekChange={(d) => { setWeekStart(d); onDateChange(d) }}
+            rangeDays={rangeDays}
+            onRangeChange={onRangeChange}
             monthStart={monthStart}
             onMonthChange={setMonthStart}
           />

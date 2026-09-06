@@ -35,7 +35,7 @@ import { useSystemHealth, getHealthTextClasses } from '@/hooks/useSystemHealth'
 import { useTimelineInsert } from '@/hooks/useTimelineInsert'
 import { useDomain } from '@/hooks/useDomain'
 
-import { Eye, EyeOff, Repeat, Binoculars, Printer, GripVertical, CalendarClock, Moon, Sparkles, NotebookPen, Inbox, CalendarDays, ArrowRight } from 'lucide-react'
+import { Eye, EyeOff, Repeat, Binoculars, Printer, GripVertical, Moon, Sparkles, NotebookPen, Inbox, ArrowRight } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { AssigneeFilter } from '@/components/home/AssigneeFilter'
 
@@ -999,17 +999,6 @@ export function TodayView({
           {visibleUnpromptedItems.length > 0 && ` · ${visibleUnpromptedItems.length}`}
         </span>
       </button>
-      {data.isToday && ctx.onOpenPlanning && (
-        <button
-          type="button"
-          onClick={ctx.onOpenPlanning}
-          title="Block out the day on an hour grid"
-          className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[15px] text-neutral-600 transition-all hover:bg-neutral-100"
-        >
-          <CalendarClock className="w-5 h-5" />
-          <span>Time-block</span>
-        </button>
-      )}
       <button
         type="button"
         onClick={printList}
@@ -1113,16 +1102,6 @@ export function TodayView({
 
           <div className="mt-4 flex flex-wrap items-end justify-between gap-3">
             <div className="flex flex-wrap items-center gap-2">
-            {data.isToday && ctx.onOpenPlanning && (
-              <button
-                type="button"
-                onClick={ctx.onOpenPlanning}
-                className="inline-flex items-center gap-2 rounded-lg bg-neutral-950 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-neutral-800"
-              >
-                <CalendarClock className="h-4 w-4" />
-                Time-block
-              </button>
-            )}
             <button
               type="button"
               onClick={() => navigate('/inbox')}
@@ -1130,14 +1109,6 @@ export function TodayView({
             >
               <Inbox className="h-4 w-4" />
               Process inbox
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate('/week')}
-              className="inline-flex items-center gap-2 rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-50"
-            >
-              <CalendarDays className="h-4 w-4" />
-              Plan week
             </button>
             </div>
 
@@ -1268,9 +1239,10 @@ export function TodayView({
                 : data.isToday && data.counts.completedCount > 0 ? 'All cleared — nicely done' : 'Your day is clear'}
             </p>
             {/* No button row here. The day card directly above already offers
-                Time-block / Process inbox / Plan week, and the sidenav carries
-                Plan from paper — repeating all four under "Your day is clear"
-                made an empty day the busiest screen in the app. */}
+                Process inbox, and the sidenav carries Plan from paper and This
+                Week — repeating them under "Your day is clear" made an empty
+                day the busiest screen in the app. (Time-block and Plan week
+                left 2026-09-06: /week is the one grid.) */}
           </div>
         ) : (
           <div className="space-y-6">

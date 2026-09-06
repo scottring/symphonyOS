@@ -147,7 +147,6 @@ export interface ScheduleActionsValue {
   onSearchContacts?: (query: string) => Contact[]
   onAddContact?: (name: string, details?: { phone?: string; category?: ContactCategory }) => Promise<Contact | null>
   onOpenProject?: (projectId: string) => void
-  onOpenPlanning?: () => void
 
   // Calendar domain mapping
   getDomainForCalendar?: (calendarId?: string | null, calendarName?: string | null) => TaskContext | null

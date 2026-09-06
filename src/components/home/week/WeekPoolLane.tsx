@@ -174,7 +174,7 @@ function RoutinePill({ routine, onSelect }: { routine: Routine; onSelect: (id: s
 
 export function WeekPoolLane({
   tasks, routines = [], weekStart, dayCount, onSelectItem, onCompleteTask, onNotThisWeek, onPushTask,
-  onUpdateTask, onDeleteTask,
+  onUpdateTask, onDeleteTask, foldWeeks = [],
 }: {
   tasks: Task[]
   /** Routines that need a home — ALREADY filtered by the host through
@@ -190,6 +190,10 @@ export function WeekPoolLane({
   onUpdateTask?: (id: string, updates: Partial<Task>) => void | Promise<unknown>
   /** Last-week look-back: Drop. */
   onDeleteTask?: (id: string) => void
+  /** Weeks the grid's range reaches into besides the current one (week-start
+   *  dates, from foldWeeksFor). Each folds its PLACED rows beneath the list —
+   *  this week's plan stays on top, the touched week is a fold like the month. */
+  foldWeeks?: Date[]
 }) {
   const [open, setOpen] = useState(true)
   const [mealsOpen, setMealsOpen] = useState(false)
@@ -252,6 +256,7 @@ export function WeekPoolLane({
   const headerCount = lastWeek ? lastWeekRows.length : total
 
   return (
+    <>
     <div className="rounded-xl border border-neutral-200 bg-white px-3 py-2.5 shadow-sm">
       <div className="flex items-center gap-2">
         <button
@@ -317,6 +322,42 @@ export function WeekPoolLane({
             </button>
           )}
           {total === 0 && struckPills.length === 0 && <span className="text-sm text-neutral-400">Nothing on the list yet.</span>}
+        </div>
+      )}
+    </div>
+    {foldWeeks.map((w) => (
+      <WeekFold key={w.getTime()} weekStart={w} tasks={tasks} onSelectItem={onSelectItem} pillProps={pillProps} />
+    ))}
+    </>
+  )
+}
+
+// A touched week's placed rows, folded beneath the list. Strict membership on
+// purpose (a legacy NULL row is the current week's). Pills keep the chip drag
+// protocol, so a row drags onto its own days on the grid.
+function WeekFold({ weekStart, tasks, onSelectItem, pillProps }: {
+  weekStart: Date
+  tasks: Task[]
+  onSelectItem: (id: string) => void
+  pillProps: Pick<PillProps, 'onSelect' | 'onCompleteTask' | 'onNotThisWeek' | 'onPushTask'>
+}) {
+  const [open, setOpen] = useState(true)
+  const rows = tasks.filter((t) => t.bucket === 'week' && !t.completed && isPlacedOnWeek(t, weekStart))
+  const label = `Week of ${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+  return (
+    <div className="rounded-xl border border-neutral-200 bg-white px-3 py-2.5 shadow-sm">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="inline-flex items-center gap-1 text-xs font-semibold tracking-wide uppercase text-neutral-500 hover:text-neutral-700 transition-colors"
+      >
+        {open ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+        {label}
+      </button>
+      {open && (
+        <div className="mt-2 flex flex-col items-stretch gap-1">
+          {rows.map((t) => <PoolPill key={t.id} task={t} {...pillProps} onSelect={onSelectItem} />)}
+          {rows.length === 0 && <span className="text-sm text-neutral-400">Nothing planned for that week yet.</span>}
         </div>
       )}
     </div>

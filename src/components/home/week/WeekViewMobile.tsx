@@ -13,7 +13,7 @@ interface WeekViewMobileProps {
   routines: Routine[]
   weekStart: Date
   /** Number of day sections to render. Default 7. */
-  dayCount?: 5 | 7
+  dayCount?: number
   /** Multi-select assignee filter (rung 5). */
   selectedAssignees?: AssigneeFilter
   /** The checked layers (rung 4). Unsorted is a layer, not a wildcard. */

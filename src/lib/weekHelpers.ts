@@ -79,3 +79,14 @@ export function weekEventSpan(d: Date): { start: Date; end: Date } {
   end.setHours(23, 59, 59, 999)
   return { start, end }
 }
+
+/** The event window for /week: two weeks from the Sunday of `d`. The grid can
+ *  show any run of up to seven days starting in the viewed week (a weekend, a
+ *  custom Thu–Wed), so one week's fetch left the spill-over days empty. */
+export function rangeEventSpan(d: Date): { start: Date; end: Date } {
+  const start = sundayOfWeek(d)
+  const end = new Date(start)
+  end.setDate(end.getDate() + 14)
+  end.setHours(23, 59, 59, 999)
+  return { start, end }
+}

@@ -22,7 +22,8 @@ import { useWeekDragDrop } from './useWeekDragDrop'
 import { useGridCreate } from './useGridCreate'
 import { SlotQuickCreatePopover, type CreateType } from './SlotQuickCreatePopover'
 import { RoutinePlacePopover } from './RoutinePlacePopover'
-import { RoutinesToggle } from '@/components/planning/RoutinesToggle'
+import { RoutinesToggle } from './RoutinesToggle'
+import { foldWeeksFor } from '@/lib/planning/dateRange'
 import { WeekPoolLane } from './WeekPoolLane'
 import { WeekMonthRail } from './WeekMonthRail'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
@@ -62,8 +63,11 @@ interface WeekViewV2Props {
   /** Pin a routine to a time on ONE day (override write, recurrence rule
    *  untouched). Present = routine blocks become draggable. */
   onPushRoutine?: (routineId: string, when: Date, fromDate: Date) => void
-  /** Number of day columns. 5 = workweek (Mon-Fri), 7 = full week. Default 7. */
-  dayCount?: 5 | 7
+  /** Number of day columns drawn from `weekStart` (1–7). 7 = the week; a
+   *  preset or custom range from the masthead draws fewer. A range is a VIEW —
+   *  the list beside the grid stays this week's plan, and any other week the
+   *  range touches folds beneath it. Default 7. */
+  dayCount?: number
   /** From HomeView's useUndo. Called after successful mutations to surface an undo toast. */
   pushAction?: (message: string, undo: () => void) => void
 }
@@ -113,6 +117,13 @@ export function WeekViewV2(props: WeekViewV2Props) {
   // Shelf Routines view: eligible-but-homeless routines, through the one
   // resolver ladder (date-agnostic). hideRoutines is a GRID preference — the
   // shelf still offers homes while the grid hides bands — so it's not passed.
+  // Weeks the range reaches into besides the current one — each folds its
+  // placed rows beneath the list (foldWeeksFor).
+  const foldWeeks = useMemo(
+    () => foldWeeksFor(weekStart, dayCount, new Date(), readCadenceConfig().weekStartsOn),
+    [weekStart, dayCount],
+  )
+
   const shelfRoutines = useMemo(
     () => unhomedRoutines(routines, { member: selectedAssignees, prefs: { hideRoutines: false, layers } }),
     [routines, selectedAssignees, layers],
@@ -515,6 +526,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
             onPushTask={(id, target) => { void gated.pushTask(id, target) }}
             onUpdateTask={(id, u) => { void onUpdateTask(id, u) }}
             onDeleteTask={(id) => { void deleteTask(id) }}
+            foldWeeks={foldWeeks}
           />
           <WeekMonthRail tasks={tasks} meId={meId} onSelectItem={onSelectItem} onAddToWeek={(id) => { void gated.pushTask(id, 'week') }} />
         </aside>

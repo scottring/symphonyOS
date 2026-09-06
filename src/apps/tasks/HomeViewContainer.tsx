@@ -10,17 +10,13 @@
 // consumes useMealEventsForDate(viewedDate). The legacy App.tsx still has its
 // own copy until full cutover (then the legacy synthesis becomes dead code).
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { onPlanFromPaperRequest, consumePlanFromPaperRequest } from '@/lib/planFromPaperSignal';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
-import { useGoogleCalendar, CalendarReconnectError, type GoogleCalendarInfo } from '@/hooks/useGoogleCalendar';
-import { makeCanMoveEvent } from '@/lib/planning/calendarWriteAccess';
+import { useGoogleCalendar, CalendarReconnectError } from '@/hooks/useGoogleCalendar';
 import { showToast } from '@/hooks/useToast';
-import { PlanningSession } from '@/components/lazy';
-import { LoadingFallback } from '@/components/layout/LoadingFallback';
-import { isDraggableRoutine, resolveRoutine, scheduleRoutineOnDate } from '@/lib/routineUtils';
-import { weekEventSpan } from '@/lib/weekHelpers';
+import { rangeEventSpan } from '@/lib/weekHelpers';
 import { PageFromPaperFlow } from '@/components/capture/PageFromPaperFlow';
 import { parseRoutineTimelineId } from '@/lib/today/doseExpansion';
 import { groupItems, addToGroup, removeFromGroup, ungroupTasks } from '@/lib/today/groupTasks';
@@ -42,11 +38,9 @@ import { useScheduleFiltering } from '@/hooks/useScheduleFiltering';
 import { useInstancesRealtime } from '@/hooks/useInstancesRealtime';
 import { useScheduleActions } from '@/hooks/useScheduleActions';
 import { useGatedTaskActions } from '@/hooks/useGatedTaskActions';
-import { useDomain } from '@/hooks/useDomain';
 import { useCalendarDomainMappings } from '@/hooks/useCalendarDomainMappings';
 import { useRefreshOnVisible } from '@/hooks/useRefreshOnVisible';
 import { useDayRollover } from '@/hooks/useDayRollover';
-import { filterTasksForLayers, filterRoutinesForLayers, filterEventsForLayers } from '@/lib/today/domainFilter';
 import { useListsContext } from '@/contexts/ListsContext';
 import { useNotesContext } from '@/contexts/NotesContext';
 import { ScheduleActionsProvider, type ScheduleActionsValue } from '@/contexts/ScheduleActionsContext';
@@ -62,7 +56,7 @@ import { useMealEventsForDate } from '@/shell/providers/MealEventsProvider';
 export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' } = {}) {
   // Data hooks
   const { tasks, loading: tasksLoading, addTask, toggleTask, toggleWaiting, deleteTask, updateTask, updateTasksBulk, pushTask, getLinkedTasks, refetch, updateTaskOrders } = useSupabaseTasks();
-  const { isConnected, events, fetchEvents, fetchCalendarList, updateEvent, createEvent, deleteEvent, removeEventLocal, restoreEventLocal } = useGoogleCalendar();
+  const { isConnected, events, fetchEvents, createEvent, deleteEvent, removeEventLocal, restoreEventLocal } = useGoogleCalendar();
   // Passing the visible event ids opts in to auto-loading notes (context
   // overrides, assignees, shared-with-family, free) + realtime — without it
   // those persist to the DB but render stale on every fresh window.
@@ -86,28 +80,11 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
   const { getDomainForCalendar } = useCalendarDomainMappings();
   const { lists, listsByCategory, addList } = useListsContext();
   const { addNote } = useNotesContext();
-  const { layers } = useDomain();
   const undo = useUndo();
   const { aliases, recordOutcome } = useResolutionLearning();
 
   // UI state local to this container
   const [viewedDate, setViewedDate] = useState<Date>(() => new Date());
-  // Planning overlay. `planningOpen` drives the standalone time-block grid — a
-  // Today execution feature. The guided Five-Horizons sessions that also lived
-  // here (guidedHorizon / ?plan= deep link) left with the 2026-08
-  // analog-planning pivot; planning happens on paper now.
-  const [planningOpen, setPlanningOpen] = useState(false);
-  // Calendar roles for the overlay grid: an event on a reader-role share must
-  // not look movable (Google 403s the write). Fetched only when the overlay
-  // opens — the roles gate a drag affordance nothing else here uses.
-  const [calendars, setCalendars] = useState<GoogleCalendarInfo[]>([]);
-  useEffect(() => {
-    if (!planningOpen) return;
-    let cancelled = false;
-    fetchCalendarList().then((cals) => { if (!cancelled) setCalendars(cals); });
-    return () => { cancelled = true; };
-  }, [planningOpen, fetchCalendarList]);
-  const canMoveEvent = useMemo(() => makeCanMoveEvent(calendars), [calendars]);
   // Plan-from-paper (analog-planning pivot): photograph the written plan page,
   // review the parsed items, commit them as placed tasks.
   const [planFromPaperOpen, setPlanFromPaperOpen] = useState(false);
@@ -190,7 +167,9 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
   const refetchViewedDayEvents = useCallback(async () => {
     if (!isConnected) return;
     if (fixedView === 'week') {
-      const { start, end } = weekEventSpan(viewedDate);
+      // Two weeks, not one: the grid may draw any run of up to seven days
+      // starting in the viewed week (a weekend, a custom Thu–Wed).
+      const { start, end } = rangeEventSpan(viewedDate);
       await fetchEvents(start, end);
       return;
     }
@@ -232,7 +211,7 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
   );
 
   // Schedule filtering (events/routines/instances narrowed to the VIEWED DATE
-  // only — domain scoping is each consumer's job; see planningEvents below)
+  // only — domain scoping is each consumer's job)
   const { filteredEvents, filteredRoutines, dateInstances, refreshDateInstances } = useScheduleFiltering({
     viewedDate,
     events: eventsWithMeals,
@@ -280,57 +259,6 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
     }
     return overrides;
   }, [eventNotesMap]);
-
-  // ── Layer-scoped pools for the time-block grid ──
-  // useScheduleFiltering only narrows to the VIEWED DATE — HomeView applies the
-  // layer scope itself, on its own copy of these props. PlanningSession has no
-  // such internal filter, so the container has to hand it already-scoped pools;
-  // passing the raw ones leaked e.g. a personal task and family routines into
-  // a single-domain grid. Same helpers, same semantics as HomeView.
-  const planningTasks = useMemo(
-    () => filterTasksForLayers(tasks, layers),
-    [tasks, layers],
-  );
-  const planningRoutines = useMemo(
-    () => filterRoutinesForLayers(filteredRoutines, layers),
-    [filteredRoutines, layers],
-  );
-  const planningAllRoutines = useMemo(
-    () => filterRoutinesForLayers(allRoutines, layers),
-    [allRoutines, layers],
-  );
-  // Per-day routine lookup for the overlay grid. Passing only the viewed
-  // date's `routines` starved every ADDED day — a 3-day grid rendered day 1's
-  // routines in all three columns' resolver calls. Same layer scoping as the
-  // sibling pools.
-  const planningGetRoutinesForDate = useCallback(
-    (date: Date) => filterRoutinesForLayers(getRoutinesForDate(date), layers),
-    [getRoutinesForDate, layers],
-  );
-  // resolveRoutine replaces the hand-rolled visibility/everyday/timed check —
-  // same rungs (resting, everyday-sweep, timed) plus the ones the old
-  // predicate never asked (off-timeline, not-theirs, in-collection). Layer
-  // scoping now happens INSIDE the resolveRoutine call (rung 4), so this no
-  // longer needs the separate filterRoutinesForLayers wrapper the sibling
-  // pools above still use. `hideRoutines: true` preserves the old everyday-sweep
-  // exclusion — this grid is time-block Today, so ambient everyday routines
-  // are never drag candidates.
-  const planningDraggableRoutines = useMemo(
-    () => allRoutines.filter(
-      (r) =>
-        isDraggableRoutine(r) &&
-        resolveRoutine(r, { date: viewedDate, prefs: { hideRoutines: true, layers } }).shows,
-    ),
-    [allRoutines, layers, viewedDate],
-  );
-  const planningEvents = useMemo(
-    () => filterEventsForLayers(filteredEvents, layers, {
-      eventContextOverrides,
-      getDomainForCalendar,
-      eventNotesMap: eventNotesMapWithDefaults,
-    }),
-    [filteredEvents, layers, eventContextOverrides, getDomainForCalendar, eventNotesMapWithDefaults],
-  );
 
   const onCreateTaskFromValue = useCallback(
     async (raw: string) => {
@@ -449,23 +377,6 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
       }
     },
     [addTask, getCurrentUserMember],
-  );
-
-  // Click-to-create on the planning overlay's empty slots. One atomic addTask
-  // (never addTask-then-setBucket): scheduledFor rides the INSERT, which also
-  // stamps bucket:'timed'. When exactly ONE domain lens is active, the new
-  // task is stamped with it — a context-less creation would land in Unsorted
-  // and not render on the very grid that was clicked (invisible-new-item trap).
-  const onPlanningCreateTaskAt = useCallback(
-    async (title: string, scheduledFor: Date) => {
-      const domains = [...layers].filter((l): l is Exclude<typeof l, 'unsorted'> => l !== 'unsorted');
-      await addTask(title, undefined, undefined, scheduledFor, {
-        assignedTo: getCurrentUserMember()?.id,
-        context: domains.length === 1 ? domains[0] : undefined,
-        isAllDay: false,
-      });
-    },
-    [addTask, getCurrentUserMember, layers],
   );
 
   const onCreateTaskAt = useCallback(
@@ -670,9 +581,6 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
 
   const scheduleActionsValue = useMemo<ScheduleActionsValue>(
     () => ({
-      // Planning
-      onOpenPlanning: () => setPlanningOpen(true),
-
       // Task actions
       onToggleTask: toggleTask,
       onToggleWaiting: toggleWaiting,
@@ -796,60 +704,6 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
         />
       )}
 
-      {planningOpen && (
-        <Suspense fallback={<LoadingFallback />}>
-          <PlanningSession
-            // The time-block grid is Today with a clock on it — it must scope to
-            // the chosen domain exactly as Today does. Passing the raw pool here
-            // leaked e.g. a personal task into the Family grid.
-            tasks={planningTasks}
-            events={planningEvents}
-            routines={planningRoutines}
-            // Untimed, non-daily routines become draggable chips in the drawer.
-            draggableRoutines={planningDraggableRoutines}
-            // The grid places a dropped routine from its instance's one-day
-            // time override, so it needs the instances for the viewed date.
-            dateInstances={dateInstances}
-            // Only used to resolve a routine DEFERRED INTO a visible day (it
-            // doesn't recur there, so the day's own list can't name it). That
-            // lookup draws on the grid, so it has to be domain-scoped too —
-            // otherwise a family routine deferred to today reappears on the
-            // Personal grid through the back door.
-            allRoutines={planningAllRoutines}
-            getRoutinesForDate={planningGetRoutinesForDate}
-            canMoveEvent={canMoveEvent}
-            onScheduleRoutine={(routineId, date, time) => {
-              const routine = allRoutines.find(r => r.id === routineId);
-              if (routine) updateRoutine(routineId, scheduleRoutineOnDate(routine, date, time));
-            }}
-            // This mount is time grain (Today), so a routine drop must write a
-            // one-day override rather than rewriting recurrence_pattern — one
-            // drag should not move every future occurrence.
-            onScheduleRoutineToday={(routineId, when) => {
-              void scheduleActions.onPushRoutine?.(routineId, when);
-            }}
-            onRescheduleEvent={(event, startTime, endTime) =>
-              updateEvent({
-                eventId: event.google_event_id || event.id,
-                startTime,
-                endTime,
-                calendarId: event.calendar_id || event.calendarId,
-              })
-            }
-            initialDate={viewedDate}
-            onClose={() => setPlanningOpen(false)}
-            // GATED update: dropping a context-less task on the grid opens the
-            // DomainGate modal (Iris's rule — same as /week and every other
-            // process); the pick rides the schedule write, cancel refuses it.
-            onUpdateTask={gated.updateTask}
-            onPushTask={pushTask}
-            onCompleteTask={toggleTask}
-            onCreateTaskAt={onPlanningCreateTaskAt}
-            familyMembers={familyMembers}
-            eventNotesMap={eventNotesMap}
-          />
-        </Suspense>
-      )}
 
       {/* Every action here already registered an undo — this container just
           never rendered the toast, so skipping a routine on Today silently

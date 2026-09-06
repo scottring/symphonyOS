@@ -66,10 +66,6 @@ export const SettingsPage = lazy(() =>
 export const FocusMode = lazy(() =>
   import('./focus/FocusMode').then(m => ({ default: m.FocusMode }))
 )
-export const PlanningSession = lazy(() =>
-  import('./planning/PlanningSession').then(m => ({ default: m.PlanningSession }))
-)
-
 // Guided sessions (Five Horizons) were deleted in the 2026-09-01 pare-down —
 // the wizard era stays dead (docs/vision-streamlined.md); paper owns thinking.
 
