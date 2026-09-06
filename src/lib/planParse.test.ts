@@ -304,6 +304,19 @@ describe('validatePlanItems — new fields', () => {
     const [a] = validatePlanItems({ items: [{ title: 'Book dentist checkups for both kids', day: 'month', note: 'both kids' }] }, win, members, 'month')
     expect(a.note).toBeNull()
   })
+
+  it('a goal line that also looks recurring stays a goal — never a routine', () => {
+    const win2 = ['2026-09-06']
+    const [season] = validatePlanItems({ items: [{ title: 'Walk after dinner as a family', day: 'goal', kind: 'recurring', recurring: { days: ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'], until: null }, time: null, assignee_id: null, note: null }] }, win2, members, 'season')
+    expect(season.placement).toEqual({ kind: 'season' })
+    expect(season.goal).toBe(true)
+    expect(season.kind).toBe('task')
+    expect(season.recurring).toBeNull()
+    const [year] = validatePlanItems({ items: [{ title: 'Read 20 books', day: 'goal', kind: 'recurring', recurring: { days: ['sun'], until: null } }] }, [], members, 'year')
+    expect(year.placement).toEqual({ kind: 'goal' })
+    expect(year.kind).toBe('task')
+    expect(year.recurring).toBeNull()
+  })
 })
 
 describe('planWindowDates with an explicit period start', () => {

@@ -216,8 +216,13 @@ export function validatePlanItems(
       : HORIZON_KINDS.has(day) ? { kind: day as 'week' | 'month' | 'season' | 'someday' | 'inbox' }
       : YMD.test(day) && window.has(day) ? { kind: 'date', date: day }
       : defaultPlacement(altitude)
-    const kind: PlanItem['kind'] = e.kind === 'dayfact' || e.kind === 'recurring' ? e.kind : 'task'
-    const recurring = kind === 'recurring' ? (readRecurring(e.recurring) ?? { days: [], until: null }) : null
+    let kind: PlanItem['kind'] = e.kind === 'dayfact' || e.kind === 'recurring' ? e.kind : 'task'
+    let recurring = kind === 'recurring' ? (readRecurring(e.recurring) ?? { days: [], until: null }) : null
+    // Force goals to be tasks, never routines
+    if (placement.kind === 'goal' || goalOnPage) {
+      kind = 'task'
+      recurring = null
+    }
     const title = e.title.trim()
     out.push({
       title,
