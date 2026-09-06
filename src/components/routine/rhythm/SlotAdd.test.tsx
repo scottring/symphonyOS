@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
-import { SlotAdd, SlotAddInput } from './SlotAdd'
+import { SlotAdd, SlotAddInput, resolveSlotRoutineFields } from './SlotAdd'
 
 describe('SlotAdd', () => {
   it('stays out of the way until asked, then opens an input in place', () => {
@@ -69,5 +69,24 @@ describe('SlotAddInput', () => {
 
     fireEvent.blur(screen.getByPlaceholderText('Routine at 7:15 AM'))
     expect(onCancel).toHaveBeenCalled()
+  })
+})
+
+// A slot-created routine either shares by the active domain lens, or — under
+// no domain lens — assigns to whoever the Routines page's member lens has
+// locked in; only when NEITHER lens is active does it go to the whole family.
+describe('resolveSlotRoutineFields', () => {
+  it('shares with the family when no domain lens and no member lens is active (Everyone)', () => {
+    expect(resolveSlotRoutineFields(null, undefined)).toMatchObject({ context: 'family' })
+  })
+
+  it('assigns to the locked-in member when a member lens is active and no domain lens is set', () => {
+    const fields = resolveSlotRoutineFields(null, 'e')
+    expect(fields).toMatchObject({ assigned_to: 'e' })
+    expect(fields.context).toBeUndefined()
+  })
+
+  it('a domain lens wins over the family default', () => {
+    expect(resolveSlotRoutineFields('work', undefined)).toMatchObject({ context: 'work' })
   })
 })

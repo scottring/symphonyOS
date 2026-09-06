@@ -75,6 +75,13 @@ export function RhythmPage(props: RhythmPageProps) {
   const [draftId, setDraftId] = useState<string | null>(null)
   const [tendOpen, setTendOpen] = useState(false)
 
+  // A slot created while a member lens is locked in shares only with that
+  // person — the lens IS the "who" the user just clicked on.
+  const createRoutineInSlot = useMemo<CreateRoutineInSlot | undefined>(() => {
+    if (!onCreateRoutineInSlot) return undefined
+    return (draft) => onCreateRoutineInSlot({ ...draft, assigned_to: memberId ?? undefined })
+  }, [onCreateRoutineInSlot, memberId])
+
   const model = useMemo(() => buildRhythmModel(routines, { memberId, focusDay }), [routines, memberId, focusDay])
   // Twelve months rolling forward. `now` is pinned to the day so the ribbon
   // doesn't rebuild on every render, and so a session left open overnight
@@ -399,7 +406,7 @@ export function RhythmPage(props: RhythmPageProps) {
             onOpenCollection={id => setOpen({ kind: 'routine', id })}
             onOpenRoutine={openRoutine}
             onDropIntent={executeDropIntent}
-            onCreateInSlot={onCreateRoutineInSlot}
+            onCreateInSlot={createRoutineInSlot}
             foldTargets={foldTargets}
             onNameGroup={handleNameCluster}
             onFoldInto={(targetId, ids) => onAddToCollection?.(targetId, ids)}
@@ -420,7 +427,7 @@ export function RhythmPage(props: RhythmPageProps) {
             selectedDay={focusDay}
             onSelectDay={day => setFocusDay(cur => (cur === day ? null : day))}
             weekStartsOn={readCadenceConfig().weekStartsOn}
-            onCreateInSlot={onCreateRoutineInSlot}
+            onCreateInSlot={createRoutineInSlot}
           />
         </div>
 
@@ -433,7 +440,7 @@ export function RhythmPage(props: RhythmPageProps) {
             onOpenRoutine={openRoutine}
             onWake={handleWake}
             onDropIntent={executeDropIntent}
-            onCreateInSlot={onCreateRoutineInSlot}
+            onCreateInSlot={createRoutineInSlot}
           />
         </div>
       </div>

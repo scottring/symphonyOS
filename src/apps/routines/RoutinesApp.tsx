@@ -14,6 +14,7 @@ import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { usePinnedItems } from '@/hooks/usePinnedItems'
 import { useDomain } from '@/hooks/useDomain'
 import type { SlotRoutineDraft } from '@/components/routine/rhythm/SlotAdd'
+import { resolveSlotRoutineFields } from '@/components/routine/rhythm/SlotAdd'
 import { matchesLayers } from '@/lib/today/domainFilter'
 import { RoutinesList, RoutineForm, RoutineInput } from '@/components/lazy'
 import { groupRoutineSteps } from '@/lib/today/routineCollections'
@@ -96,15 +97,17 @@ function RoutinesIndex() {
     return addRoutine({ name, context: soleDomain ?? undefined })
   }, [addRoutine, soleDomain])
 
-  // A slot-created routine carries the slot's recurrence and the active domain
-  // lens — same stamping rule as handleCreateCollection, so it joins the layer
-  // model instead of landing unsorted and invisible in a filtered list.
+  // A slot-created routine carries the slot's recurrence and either the active
+  // domain lens or the Routines page's member lens (draft.assigned_to) — same
+  // stamping rule as handleCreateCollection, so it joins the layer model
+  // instead of landing unsorted and invisible in a filtered list. Under
+  // "Everyone" with no domain lens, it shares with the whole family.
   const handleCreateRoutineInSlot = useCallback((draft: SlotRoutineDraft) => {
     void addRoutine({
       name: draft.name,
-      context: soleDomain ?? undefined,
       recurrence_pattern: draft.recurrence_pattern,
       time_of_day: draft.time_of_day,
+      ...resolveSlotRoutineFields(soleDomain, draft.assigned_to),
     })
   }, [addRoutine, soleDomain])
 

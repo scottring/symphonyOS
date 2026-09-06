@@ -366,6 +366,58 @@ describe('RoutineForm', () => {
     })
   })
 
+  // A routine created privately (Routines page member lens) lands scoped to
+  // one person with no way to hand it to the whole house from the form.
+  describe('who select', () => {
+    it('offers "Everyone in the house" plus each family member', () => {
+      const routine = createMockRoutine({ assigned_to: null })
+      const familyMembers = [
+        createMockFamilyMember({ id: 'member-1', name: 'Scott' }),
+        createMockFamilyMember({ id: 'member-2', name: 'Iris' }),
+      ]
+
+      renderForm(routine, { familyMembers })
+
+      const select = screen.getByLabelText('Who') as HTMLSelectElement
+      const options = Array.from(select.options).map((o) => o.textContent)
+      expect(options).toEqual(['Everyone in the house', 'Scott', 'Iris'])
+    })
+
+    it('defaults to "Everyone in the house" when assigned_to is null', () => {
+      const routine = createMockRoutine({ assigned_to: null })
+      const familyMembers = [createMockFamilyMember({ id: 'member-1', name: 'Scott' })]
+
+      renderForm(routine, { familyMembers })
+
+      expect(screen.getByLabelText('Who')).toHaveValue('')
+    })
+
+    it('saves the picked member through onUpdate', () => {
+      const routine = createMockRoutine({ assigned_to: null })
+      const familyMembers = [
+        createMockFamilyMember({ id: 'member-1', name: 'Scott' }),
+        createMockFamilyMember({ id: 'member-2', name: 'Iris' }),
+      ]
+
+      renderForm(routine, { familyMembers })
+
+      fireEvent.change(screen.getByLabelText('Who'), { target: { value: 'member-2' } })
+
+      expect(mockOnUpdate).toHaveBeenCalledWith(routine.id, { assigned_to: 'member-2' })
+    })
+
+    it('saves null ("Everyone in the house") through onUpdate', () => {
+      const routine = createMockRoutine({ assigned_to: 'member-1' })
+      const familyMembers = [createMockFamilyMember({ id: 'member-1', name: 'Scott' })]
+
+      renderForm(routine, { familyMembers })
+
+      fireEvent.change(screen.getByLabelText('Who'), { target: { value: '' } })
+
+      expect(mockOnUpdate).toHaveBeenCalledWith(routine.id, { assigned_to: null })
+    })
+  })
+
   describe('save changes', () => {
     it('does not show save button when no changes', () => {
       const routine = createMockRoutine({ raw_input: null })

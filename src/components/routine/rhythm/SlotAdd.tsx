@@ -1,16 +1,33 @@
 import { useRef, useState } from 'react'
 import { Plus } from 'lucide-react'
 import type { RecurrencePattern } from '@/types/actionable'
+import type { DomainId } from '@/lib/domains'
 
 /** A routine born from a slot. The slot supplies the recurrence, so a name is
- *  the only thing left to ask for. */
+ *  the only thing left to ask for. `assigned_to` carries the Routines page's
+ *  member lens, when one is locked in. */
 export interface SlotRoutineDraft {
   name: string
   recurrence_pattern: RecurrencePattern
   time_of_day?: string
+  assigned_to?: string | null
 }
 
 export type CreateRoutineInSlot = (draft: SlotRoutineDraft) => void
+
+/** What a slot-created routine's context/assigned_to should be. A domain
+ *  lens (soleDomain) always wins — same rule as a deliberate create. With no
+ *  domain lens, a locked-in member lens shares only with that person;
+ *  otherwise ("Everyone", no lens at all) it goes to the whole family. */
+export function resolveSlotRoutineFields(
+  soleDomain: DomainId | null,
+  assignedTo: string | null | undefined,
+): { context: DomainId | undefined; assigned_to: string | null | undefined } {
+  return {
+    context: soleDomain ?? (assignedTo ? undefined : 'family'),
+    assigned_to: assignedTo,
+  }
+}
 
 /**
  * The bare input half. Exported on its own for slots whose *position* carries

@@ -270,6 +270,27 @@ export function RoutineForm({ routine, contacts = [], familyMembers = [], onBack
             </label>
           </div>
 
+          {/* Who — controls privacy: "Everyone in the house" shares with the
+              whole family; a member locks the routine to just that person. */}
+          {familyMembers.length > 0 && (
+            <div className="pt-4 border-t border-neutral-100">
+              <label htmlFor="routine-who" className="block text-sm font-medium text-neutral-700 mb-2">
+                Who
+              </label>
+              <select
+                id="routine-who"
+                value={routine.assigned_to ?? ''}
+                onChange={(e) => onUpdate(routine.id, { assigned_to: e.target.value || null })}
+                className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm text-neutral-700"
+              >
+                <option value="">Everyone in the house</option>
+                {familyMembers.map((member) => (
+                  <option key={member.id} value={member.id}>{member.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {/* Assignment — multi-select; tap avatars to toggle assignees */}
           {familyMembers.length > 0 && (() => {
             const selectedIds = routine.assigned_to_all && routine.assigned_to_all.length > 0
