@@ -43,9 +43,14 @@ interface VerdictHandlers {
  * `onVerdict`). */
 export async function applyTriageVerdict(t: Task, v: Verdict, h: VerdictHandlers): Promise<boolean> {
   if (v === 'today') {
-    return wasWritten(h.onPushTask?.(t.id, new Date(h.viewedDate)))
+    // All-day, not the clock time the button was pressed at (demo run
+    // 2026-09-06: "Do today" at 6:50 AM landed a 6:50 AM task).
+    const day = new Date(h.viewedDate)
+    day.setHours(0, 0, 0, 0)
+    return wasWritten(h.onPushTask?.(t.id, day))
   } else if (v === 'tomorrow') {
     const tomorrow = new Date(h.viewedDate)
+    tomorrow.setHours(0, 0, 0, 0)
     tomorrow.setDate(tomorrow.getDate() + 1)
     return wasWritten(h.onPushTask?.(t.id, tomorrow))
   } else if (v === 'week') {
