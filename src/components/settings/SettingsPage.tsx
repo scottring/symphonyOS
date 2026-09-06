@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useIsAppAdmin } from '@/hooks/useIsAppAdmin'
+import { useWaitlistAdmin } from '@/hooks/useWaitlistAdmin'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { useHouseholdInvitations } from '@/hooks/useHouseholdInvitations'
 import { CalendarSettings } from './CalendarSettings'
@@ -105,6 +106,7 @@ export function SettingsPage({
   // waitlist RLS was the real hole and is fixed in a migration, but a tab
   // whose panels would now come back empty should not be offered at all.
   const { isAdmin: isAppAdmin } = useIsAppAdmin()
+  const { rows: waitlistAdminRows, approve: approveWaitlistRow } = useWaitlistAdmin()
 
   // Add member state
   const [isAdding, setIsAdding] = useState(false)
@@ -672,6 +674,42 @@ export function SettingsPage({
                 Set up and reset demo data for presentations.
               </p>
               <DemoControls />
+            </section>
+
+            <section>
+              <h2 className="text-lg font-semibold text-neutral-700 mb-2">Founding households</h2>
+              <p className="text-sm text-neutral-500 mb-6">
+                Signups are gated on an approved waitlist row. Approve one to let that email create an account.
+              </p>
+              {waitlistAdminRows.length === 0 ? (
+                <p className="text-sm text-neutral-400">No signups yet.</p>
+              ) : (
+                <ul className="divide-y divide-neutral-100 rounded-lg border border-neutral-100 bg-white">
+                  {waitlistAdminRows.map((row) => (
+                    <li key={row.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm text-neutral-800">{row.email}</p>
+                        <p className="text-xs text-neutral-400">
+                          {row.createdAt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </p>
+                      </div>
+                      {row.approvedAt ? (
+                        <span className="shrink-0 rounded-full bg-green-50 px-2 py-1 text-xs font-medium text-green-700">
+                          approved
+                        </span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => approveWaitlistRow(row.id)}
+                          className="shrink-0 rounded-md bg-primary-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-primary-700 transition-colors"
+                        >
+                          Approve
+                        </button>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
             </section>
 
             <section>
