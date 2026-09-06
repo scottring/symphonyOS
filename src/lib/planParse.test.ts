@@ -42,10 +42,11 @@ describe('validatePlanItems', () => {
       WINDOW,
       MEMBERS,
     )
+    const extra = { dateHint: null, kind: 'task' as const, recurring: null, phone: null }
     expect(items).toEqual([
-      { title: 'Call dentist', placement: { kind: 'date', date: '2026-08-18' }, time: null, assigneeId: null, note: '410-555-0100' },
-      { title: 'Return library books', placement: { kind: 'week' }, time: null, assigneeId: 'm-iris', note: null },
-      { title: 'Research summer camps', placement: { kind: 'inbox' }, time: null, assigneeId: null, note: null },
+      { title: 'Call dentist', placement: { kind: 'date', date: '2026-08-18' }, time: null, assigneeId: null, note: '410-555-0100', ...extra, dateHint: '2026-08-18' },
+      { title: 'Return library books', placement: { kind: 'week' }, time: null, assigneeId: 'm-iris', note: null, ...extra },
+      { title: 'Research summer camps', placement: { kind: 'inbox' }, time: null, assigneeId: null, note: null, ...extra },
     ])
   })
 
@@ -78,7 +79,7 @@ describe('planItemToAddTaskArgs', () => {
   const ctx = { currentWeekStart: new Date(2026, 7, 16), monthStart: new Date(2026, 7, 1), seasonStart: new Date(2026, 6, 1), context: 'family' as const }
 
   it('maps a dated item to an all-day scheduledFor on the local date', () => {
-    const item: PlanItem = { title: 'Call dentist', placement: { kind: 'date', date: '2026-08-18' }, assigneeId: null, note: 'ask about Mia' }
+    const item: PlanItem = { title: 'Call dentist', placement: { kind: 'date', date: '2026-08-18' }, time: null, assigneeId: null, note: 'ask about Mia', dateHint: null, kind: 'task', recurring: null, phone: null }
     const args = planItemToAddTaskArgs(item, ctx)
     expect(args.scheduledFor && localYmd(args.scheduledFor)).toBe('2026-08-18')
     expect(args.options.isAllDay).toBe(true)
@@ -88,7 +89,7 @@ describe('planItemToAddTaskArgs', () => {
   })
 
   it('maps a week item to bucket=week WITH the week stamped', () => {
-    const item: PlanItem = { title: 'Mulch beds', placement: { kind: 'week' }, assigneeId: null, note: null }
+    const item: PlanItem = { title: 'Mulch beds', placement: { kind: 'week' }, time: null, assigneeId: null, note: null, dateHint: null, kind: 'task', recurring: null, phone: null }
     const args = planItemToAddTaskArgs(item, ctx)
     expect(args.scheduledFor).toBeUndefined()
     expect(args.options.bucket).toBe('week')
@@ -96,16 +97,16 @@ describe('planItemToAddTaskArgs', () => {
   })
 
   it('maps an inbox item to the inbox bucket with no week', () => {
-    const item: PlanItem = { title: 'Someday thing', placement: { kind: 'inbox' }, assigneeId: null, note: null }
+    const item: PlanItem = { title: 'Someday thing', placement: { kind: 'inbox' }, time: null, assigneeId: null, note: null, dateHint: null, kind: 'task', recurring: null, phone: null }
     const args = planItemToAddTaskArgs(item, ctx)
     expect(args.options.bucket).toBe('inbox')
     expect(args.options.weekStart).toBeUndefined()
   })
 
   it('passes a named assignee and leaves unnamed for the default', () => {
-    const named: PlanItem = { title: 'X', placement: { kind: 'inbox' }, assigneeId: 'm-iris', note: null }
+    const named: PlanItem = { title: 'X', placement: { kind: 'inbox' }, time: null, assigneeId: 'm-iris', note: null, dateHint: null, kind: 'task', recurring: null, phone: null }
     expect(planItemToAddTaskArgs(named, ctx).options.assignedTo).toBe('m-iris')
-    const unnamed: PlanItem = { title: 'Y', placement: { kind: 'inbox' }, assigneeId: null, note: null }
+    const unnamed: PlanItem = { title: 'Y', placement: { kind: 'inbox' }, time: null, assigneeId: null, note: null, dateHint: null, kind: 'task', recurring: null, phone: null }
     expect(planItemToAddTaskArgs(unnamed, ctx).options.assignedTo).toBeUndefined()
   })
 })
@@ -117,7 +118,7 @@ describe('planItemToAddTaskArgs — times', () => {
 
   it('schedules a dated item with a time as a real block', () => {
     const args = planItemToAddTaskArgs(
-      { title: 'Dentist', placement: { kind: 'date', date: '2026-08-18' }, time: '14:00', assigneeId: null, note: null },
+      { title: 'Dentist', placement: { kind: 'date', date: '2026-08-18' }, time: '14:00', assigneeId: null, note: null, dateHint: null, kind: 'task', recurring: null, phone: null },
       CTX,
     )
     expect(args.options.isAllDay).toBe(false)
@@ -128,7 +129,7 @@ describe('planItemToAddTaskArgs — times', () => {
 
   it('still writes an all-day chip when the line named no time', () => {
     const args = planItemToAddTaskArgs(
-      { title: 'Mow', placement: { kind: 'date', date: '2026-08-18' }, time: null, assigneeId: null, note: null },
+      { title: 'Mow', placement: { kind: 'date', date: '2026-08-18' }, time: null, assigneeId: null, note: null, dateHint: null, kind: 'task', recurring: null, phone: null },
       CTX,
     )
     expect(args.options.isAllDay).toBe(true)
@@ -228,7 +229,7 @@ describe('planWindowDates — season window from the household boundaries', () =
 describe('planItemToAddTaskArgs — horizons', () => {
   const ctx = { currentWeekStart: new Date(2026, 7, 16), monthStart: new Date(2026, 9, 1), seasonStart: new Date(2026, 9, 1), context: null }
   const item = (kind: 'month' | 'season' | 'someday' | 'goal', goal?: boolean): PlanItem =>
-    ({ title: 'X', placement: { kind }, time: null, assigneeId: null, note: null, goal })
+    ({ title: 'X', placement: { kind }, time: null, assigneeId: null, note: null, goal, dateHint: null, kind: 'task', recurring: null, phone: null })
 
   it('month → the month list, stamped with the month the page is for', () => {
     const args = planItemToAddTaskArgs(item('month'), ctx)
@@ -257,5 +258,49 @@ describe('planItemToAddTaskArgs — horizons', () => {
 
   it('a goal that reaches the task writer lands in Someday rather than vanishing', () => {
     expect(planItemToAddTaskArgs(item('goal'), ctx).options.bucket).toBe('someday')
+  })
+})
+
+describe('validatePlanItems — new fields', () => {
+  const win = ['2026-09-06', '2026-09-07', '2026-09-08']
+  const members = new Set(['m1'])
+
+  it('keeps the raw date_hint even when the row is degraded out of window', () => {
+    const [item] = validatePlanItems({ items: [{ title: 'Recital', day: 'season', date_hint: '2026-12-12', time: null, assignee_id: null, note: null }] }, win, members, 'season')
+    expect(item.placement).toEqual({ kind: 'season' })
+    expect(item.dateHint).toBe('2026-12-12')
+  })
+
+  it('reads kind and recurring', () => {
+    const [a, b] = validatePlanItems({ items: [
+      { title: 'No school – Labor Day', day: '2026-09-07', kind: 'dayfact', time: null, assignee_id: null, note: null },
+      { title: 'Liam soccer', day: 'season', kind: 'recurring', recurring: { days: ['sat'], until: '2026-11-30' }, time: '09:00', assignee_id: null, note: null },
+    ] }, win, members, 'season')
+    expect(a.kind).toBe('dayfact')
+    expect(b.kind).toBe('recurring')
+    expect(b.recurring).toEqual({ days: ['sat'], until: '2026-11-30' })
+    // a recurring row keeps its time even though its placement is not a date
+    expect(b.time).toBe('09:00')
+  })
+
+  it('defaults kind to task and drops junk recurring days', () => {
+    const [item] = validatePlanItems({ items: [{ title: 'x', day: 'week', kind: 'recurring', recurring: { days: ['sat', 'caturday'], until: 'soon' } }] }, win, members)
+    expect(item.kind).toBe('recurring')
+    expect(item.recurring).toEqual({ days: ['sat'], until: null })
+  })
+
+  it('reads a phone number and drops emphasis-only notes', () => {
+    const [a, b] = validatePlanItems({ items: [
+      { title: 'Call Dr. Park', day: 'week', phone: '410-555-0142', note: 'ask for Renee' },
+      { title: 'Less phone at dinner', day: 'goal', note: 'starred' },
+    ] }, win, members, 'year')
+    expect(a.phone).toBe('410-555-0142')
+    expect(a.note).toBe('ask for Renee')
+    expect(b.note).toBeNull()
+  })
+
+  it('drops a note that only repeats the title', () => {
+    const [a] = validatePlanItems({ items: [{ title: 'Book dentist checkups for both kids', day: 'month', note: 'both kids' }] }, win, members, 'month')
+    expect(a.note).toBeNull()
   })
 })

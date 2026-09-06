@@ -45,6 +45,10 @@ export function defaultPlacement(altitude: PageAltitude): PlanPlacement {
 
 const HORIZON_KINDS = new Set(['week', 'month', 'season', 'someday', 'inbox'])
 
+export type PlanDay = 'sun' | 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat'
+const PLAN_DAYS: readonly PlanDay[] = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat']
+export interface PlanRecurring { days: PlanDay[]; until: string | null }
+
 export interface PlanItem {
   title: string
   placement: PlanPlacement
@@ -59,6 +63,15 @@ export interface PlanItem {
   time: string | null
   assigneeId: string | null
   note: string | null
+  /** The raw YYYY-MM-DD the line named, kept even when the row was degraded
+   *  out of the window — so a chip flip can put the date back (spec C2). */
+  dateHint: string | null
+  /** A day-fact ("no school") is not a to-do; a recurring line is a routine. */
+  kind: 'task' | 'dayfact' | 'recurring'
+  recurring: PlanRecurring | null
+  phone: string | null
+  /** Lineage chosen on the sheet: the existing task this row is a copy of. */
+  sourceId?: string
 }
 
 const HHMM = /^([01]\d|2[0-3]):([0-5]\d)$/
@@ -127,6 +140,31 @@ export function planWindowDates(today: Date, altitude: PageAltitude = 'week', se
   return out
 }
 
+/** A ★, an underline, a circle on the page is emphasis, not content. */
+export const EMPHASIS_NOTE = /^(starred|star|priority|important|underlined|circled|highlighted)\.?$/i
+export function isEmphasisNote(note: string | null): boolean {
+  return !!note && EMPHASIS_NOTE.test(note.trim())
+}
+
+const PHONE = /(\+?1[\s.-]?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}/
+
+function cleanNote(title: string, note: unknown): string | null {
+  if (typeof note !== 'string') return null
+  const n = note.trim()
+  if (!n || isEmphasisNote(n)) return null
+  // "both kids" under "Book dentist checkups for both kids" says nothing new.
+  if (title.toLowerCase().includes(n.toLowerCase())) return null
+  return n
+}
+
+function readRecurring(raw: unknown): PlanRecurring | null {
+  const r = raw as { days?: unknown; until?: unknown } | null
+  if (!r || typeof r !== 'object') return null
+  const days = Array.isArray(r.days) ? r.days.filter((d): d is PlanDay => typeof d === 'string' && (PLAN_DAYS as readonly string[]).includes(d)) : []
+  const until = typeof r.until === 'string' && YMD.test(r.until) ? r.until : null
+  return { days, until }
+}
+
 /**
  * Validate the edge function's items into PlanItems. The function already
  * validates server-side; this repeats the cheap parts so a stale/hand-rolled
@@ -143,7 +181,7 @@ export function validatePlanItems(
   const window = new Set(windowDates)
   const out: PlanItem[] = []
   for (const entry of items) {
-    const e = entry as { title?: unknown; day?: unknown; time?: unknown; assignee_id?: unknown; note?: unknown }
+    const e = entry as { title?: unknown; day?: unknown; time?: unknown; assignee_id?: unknown; note?: unknown; date_hint?: unknown; kind?: unknown; recurring?: unknown; phone?: unknown }
     if (typeof e.title !== 'string' || !e.title.trim()) continue
     const day = typeof e.day === 'string' ? e.day : 'inbox'
     // A goal line: a year `goals` row on a year page; a goal ON THE LIST of a
@@ -154,18 +192,23 @@ export function validatePlanItems(
       : HORIZON_KINDS.has(day) ? { kind: day as 'week' | 'month' | 'season' | 'someday' | 'inbox' }
       : YMD.test(day) && window.has(day) ? { kind: 'date', date: day }
       : defaultPlacement(altitude)
+    const kind: PlanItem['kind'] = e.kind === 'dayfact' || e.kind === 'recurring' ? e.kind : 'task'
+    const recurring = kind === 'recurring' ? (readRecurring(e.recurring) ?? { days: [], until: null }) : null
+    const title = e.title.trim()
     out.push({
-      title: e.title.trim(),
+      title,
       placement,
       ...(goalOnPage ? { goal: true } : {}),
-      // A time survives only on a real date — mirrors the edge function's own
-      // validation so a stale or hand-rolled response can't sneak one onto a
-      // 'week'/'inbox' row where nothing would render it.
-      time: placement.kind === 'date' && typeof e.time === 'string' && HHMM.test(e.time.trim())
+      // A time survives on a real date, or on a recurring line (it becomes the routine's time).
+      time: (placement.kind === 'date' || kind === 'recurring') && typeof e.time === 'string' && HHMM.test(e.time.trim())
         ? e.time.trim()
         : null,
       assigneeId: typeof e.assignee_id === 'string' && memberIds.has(e.assignee_id) ? e.assignee_id : null,
-      note: typeof e.note === 'string' && e.note.trim() ? e.note.trim() : null,
+      note: cleanNote(title, e.note),
+      dateHint: typeof e.date_hint === 'string' && YMD.test(e.date_hint) ? e.date_hint : (YMD.test(day) ? day : null),
+      kind,
+      recurring,
+      phone: typeof e.phone === 'string' && PHONE.test(e.phone) ? e.phone.trim() : null,
     })
   }
   return out

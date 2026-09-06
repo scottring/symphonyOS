@@ -31,8 +31,13 @@ import { useCommitPage } from './useCommitPage'
 const ITEM: PlanItem = {
   title: 'Call the dentist',
   placement: { kind: 'inbox' },
+  time: null,
   assigneeId: null,
   note: null,
+  dateHint: null,
+  kind: 'task',
+  recurring: null,
+  phone: null,
 }
 
 function commit() {
@@ -152,7 +157,7 @@ describe('useCommitPage', () => {
 
 // A year page's lines are goals, not tasks (altitudes, 2026-09-05).
 describe('useCommitPage — goals', () => {
-  const GOAL: PlanItem = { title: 'Run a half marathon', placement: { kind: 'goal' }, time: null, assigneeId: null, note: null }
+  const GOAL: PlanItem = { title: 'Run a half marathon', placement: { kind: 'goal' }, time: null, assigneeId: null, note: null, dateHint: null, kind: 'task', recurring: null, phone: null }
 
   it('writes a goal row into the first existing area and never calls addTask for it', async () => {
     mocks.areas.push({ id: 'area-1', name: 'Health' })
