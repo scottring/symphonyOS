@@ -9,30 +9,27 @@ Decisions taken (Scott approved the list in chat): the review sheet asks Househo
 
 ## Part A — Sharing and domain: one choice per page (findings A1.14, A2.2, A3.1, A4.1, A4.2, A4.3, A5.3)
 
-### A1. Review sheet header gains a "For" row
+### A1. Review sheet header gains a Domain row (the share switch)
 
-Under the altitude blurb / period chip, a single row:
+`src/lib/scope.ts` is explicit: scope is DERIVED from domain + assignees and is never picked. So the sheet asks one thing per page, the domain, and says what it means:
 
 ```
-For   [Household ▾]     Domain   [Family] [Work] [Personal]
+This page is   [Family]  [Work]  [Personal]      Family pages are shared with everyone in the house.
 ```
 
-- `For` options: **Household** (everyone in the house sees it), **Just me**.
-- Defaults: season/month/week pages → Household + Family. Year page → Household + Family as well (goals are household goals unless the page is clearly personal; the user can flip).
-- Both choices apply to every row on commit. Per-row assignee still works; a row assigned to a member is Household regardless (assignment already shares — keep that rule).
-- The choice is remembered per altitude in `localStorage` (`symphony.paper.for.<altitude>`, `symphony.paper.domain.<altitude>`) so a household that always writes Family pages never touches it again.
+- Default **Family** for every altitude. Remembered per altitude in `localStorage` (`symphony.paper.domain.<altitude>`) so a household that always writes Family pages never touches it again.
+- Applies to every row on commit: `context = domain`, `scope = scopeForDomain(domain, [assignee], self)` — Family → `compound` (household), Work/Personal → `individual` unless a row is assigned to someone else (→ `couple`). Notes, goals and routines committed from the page get the same domain and the same derivation.
 
-### A2. Commit writes scope + context
+### A2. Commit writes domain everywhere
 
-- `CommitPagePayload` carries `audience: 'household' | 'me'` and `domain: 'work' | 'family' | 'personal'`.
-- `planItemToAddTaskArgs` sets `context: domain` and `scope: audience === 'household' ? scopeForDomain(domain, 'household') : 'individual'` (use the existing `scopeForDomain` helper so Family→`compound`, Work/Personal→`individual` unless assigned; keep whatever the helper already returns for a household-shared Work item).
-- Goals: `goals` gets `scope` (migration, default `'individual'`) and its RLS select policy gains the same household clause tasks have. `addGoal` accepts `scope`; the year-page commit passes it. `/year` and the This Year fold read household goals.
-- Notes committed from a page get the same `scope`.
-- Routines: `RhythmPage` slot-add and the routine form get a **"Who"** control (the existing member picker) plus **"Everyone in the house"**; scope derives the same way. Slot-add under a person lens assigns that person; under Everyone it creates `scope: compound` (household) — that is the one behaviour change from 2026-09-05 ("lands `context:null/individual` when lens is Everyone").
+- `CommitPagePayload` carries `domain: 'work' | 'family' | 'personal'`. `planItemToAddTaskArgs` passes it as `context`; `addTask` derives scope as it already does.
+- Goals: migration adds `goals.scope` (default `'individual'`) and household RLS (same clause as tasks); `area_id` becomes nullable. `addGoal(areaId | null, name, context, extra?: { notes?, scope? })`; the year-page commit passes `context = domain`, `notes = row.note`, `scope = scopeForDomain(domain, [], null)`. `/year` and the This Year fold list household goals (RLS does it; `useGoals` selects without a `user_id` filter).
+- Notes: `addNote` already derives scope from `context`; the commit passes `context = domain`.
+- Routines (slot-add on the Routines page): under a person lens, `assigned_to = that member` (→ couple); under the Everyone lens with no domain lens active, `context = 'family'` (→ compound). That is the one behaviour change from 2026-09-05 ("lands `context:null/individual` when lens is Everyone"). The routine form gains a "Who" select (Everyone in the house · each member).
 
 ### A3. The domain gate stops firing for page rows
 
-Because every paper row now has a `context`, `DomainGate` no longer triggers on Do today / place / copy-down for them. No gate code change beyond: when a task has `context === null` **and** arrived via `capture_meta.source === 'page'` (older rows), the gate offers "Apply to all N items from this page" as a third line. (Cheap, and repairs the 53 rows already on the demo account.)
+Every paper row now has a `context`, so `DomainGate` no longer triggers on Do today / place / copy-down for them. No gate code change. The 53 rows already on the demo account are repaired by a one-off data update (context `family`, scope `compound`), not by code.
 
 ### A4. Discussion header says who can see it, and offers to share
 
