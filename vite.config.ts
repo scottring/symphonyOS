@@ -22,11 +22,16 @@ export default defineConfig({
       // Don't watch sibling git worktrees / scratch dirs. Builds inside
       // them otherwise spam full page reloads and, over a long-running
       // session, accumulate Fast-Refresh failures that corrupt HMR state.
+      //
+      // Anchored to THIS root on purpose. As bare `**/.worktrees/**` globs
+      // they also matched every file of a dev server started INSIDE a
+      // worktree (`.worktrees/<task>/src/...`), which then watched nothing:
+      // edits never reached the browser until a restart (2026-09-05).
       ignored: [
-        '**/.claude/worktrees/**',
-        '**/.worktrees/**',
-        '**/.clone/**',
-        '**/playwright-report/**',
+        `${path.resolve(__dirname, '.claude/worktrees')}/**`,
+        `${path.resolve(__dirname, '.worktrees')}/**`,
+        `${path.resolve(__dirname, '.clone')}/**`,
+        `${path.resolve(__dirname, 'playwright-report')}/**`,
       ],
     },
   },
