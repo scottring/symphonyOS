@@ -14,9 +14,10 @@
 
 import { useCallback } from 'react'
 import { supabase, getAuthUser } from '@/lib/supabase'
-import { planItemToAddTaskArgs, type PlanItem } from '@/lib/planParse'
+import { planItemToAddTaskArgs, pageMonthStart, pageSeasonStart, type PlanItem } from '@/lib/planParse'
 import type { PageNote } from '@/lib/pageParse'
 import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
+import { readSeasons } from '@/lib/cadence/seasons'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
 import { useNotes } from '@/hooks/useNotes'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
@@ -26,6 +27,11 @@ import { showToast } from '@/hooks/useToast'
 export interface CommitPagePayload {
   items: PlanItem[]
   notes: PageNote[]
+  /** The month a MONTH page's rows are for (the review sheet's chip). Absent
+   *  = the page's own default for today (pageMonthStart). */
+  monthStart?: Date
+  /** The season a SEASON page's rows are for. Absent = pageSeasonStart. */
+  seasonStart?: Date
   /** Where the page lives in the `attachments` bucket, if we know. */
   storagePath: string | null
 }
@@ -60,12 +66,15 @@ export function useCommitPage() {
   // goals state, not a second fetch.
   const { areas, addArea, addGoal } = useGoalsContext()
 
-  const commitPage = useCallback(async ({ items, notes, storagePath }: CommitPagePayload): Promise<CommitPageResult> => {
+  const commitPage = useCallback(async ({ items, notes, storagePath, monthStart, seasonStart }: CommitPagePayload): Promise<CommitPageResult> => {
     // A committed page is a capture, not a deliberate create — it never
     // stamps the lens onto what it writes.
     const context = null
+    const now = new Date()
     const commitCtx = {
-      currentWeekStart: weekStartAnchor(new Date(), readCadenceConfig().weekStartsOn),
+      currentWeekStart: weekStartAnchor(now, readCadenceConfig().weekStartsOn),
+      monthStart: monthStart ?? pageMonthStart(now),
+      seasonStart: seasonStart ?? pageSeasonStart(now, readSeasons()),
       context,
     }
     const defaultAssigneeId = getCurrentUserMember()?.id

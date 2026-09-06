@@ -6,6 +6,7 @@
 
 import type { TaskBucket, TaskContext } from '@/types/task'
 import { localYmd, parseLocalYmd } from '@/lib/cadence/config'
+import { seasonStartFor, seasonEndFor, nextSeasonStart, readSeasons, type Seasons } from '@/lib/cadence/seasons'
 
 /** How far ahead the parser may place: today + 13 days covers "the week I just
  *  planned" from any day of the week (a Sunday page maps Mon–Sun of next week). */
@@ -47,6 +48,10 @@ const HORIZON_KINDS = new Set(['week', 'month', 'season', 'someday', 'inbox'])
 export interface PlanItem {
   title: string
   placement: PlanPlacement
+  /** A goal line on a MONTH or SEASON page: written as `is_goal` on that
+   *  page's list (a goal is what the period is for; it is ticked, never
+   *  placed). Distinct from the 'goal' placement, which is a year `goals` row. */
+  goal?: boolean
   /** Local clock time as "HH:MM" (24h) when the line named one, else null.
    *  Only meaningful alongside a 'date' placement — a time with no day has
    *  nothing to hang on. A page that writes "Dentist 2pm" means a 2pm block,
@@ -70,13 +75,34 @@ export function applyTimeToDate(date: Date, time: string | null): Date {
 const YMD = /^\d{4}-\d{2}-\d{2}$/
 
 /** A season page looks three months out. */
-export const SEASON_WINDOW_DAYS = 92
+/** The 1st of the month a MONTH page is for: the current month, unless the
+ *  page is snapped in its last 7 days — a page written on the 28th is for
+ *  October. */
+export function pageMonthStart(today: Date): Date {
+  const d = new Date(today)
+  d.setHours(0, 0, 0, 0)
+  const lastDay = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate()
+  const forNext = lastDay - d.getDate() < 7
+  return new Date(d.getFullYear(), d.getMonth() + (forNext ? 1 : 0), 1)
+}
 
-/** The window's dates as local YYYY-MM-DD strings, today first. A week page
- *  looks 14 days out; a month page runs through the END of next month (a page
- *  written on the 28th is for the coming month); a season page 92 days; a year
- *  page has no dates at all — goals are not placed on days. */
-export function planWindowDates(today: Date, altitude: PageAltitude = 'week'): string[] {
+/** The start of the season a SEASON page is for, per the household
+ *  boundaries: the current season, unless the page is snapped in its last 14
+ *  days, when it is for the coming one. */
+export function pageSeasonStart(today: Date, seasons: Seasons = readSeasons()): Date {
+  const d = new Date(today)
+  d.setHours(0, 0, 0, 0)
+  const end = seasonEndFor(d, seasons)
+  const daysLeft = Math.round((end.getTime() - d.getTime()) / 86_400_000)
+  return daysLeft <= 14 ? nextSeasonStart(d, seasons) : seasonStartFor(d, seasons)
+}
+
+/** The dates a page may place on, today first: a week page 14 days; a month
+ *  page today through the END of next month (so a page written on the 28th
+ *  can place into the coming month); a season page today through the end of
+ *  the season the page is for (pageSeasonStart, from the household
+ *  boundaries); a year page none. */
+export function planWindowDates(today: Date, altitude: PageAltitude = 'week', seasons: Seasons = readSeasons()): string[] {
   if (altitude === 'year') return []
   const cursor = new Date(today)
   cursor.setHours(0, 0, 0, 0)
@@ -85,8 +111,13 @@ export function planWindowDates(today: Date, altitude: PageAltitude = 'week'): s
     end.setDate(1)
     end.setMonth(end.getMonth() + 2)
     end.setDate(0) // last day of next month
+  } else if (altitude === 'season') {
+    // seasonEndFor is exclusive; the window's last day is the day before it.
+    const exclusiveEnd = seasonEndFor(pageSeasonStart(cursor, seasons), seasons)
+    end.setTime(exclusiveEnd.getTime())
+    end.setDate(end.getDate() - 1)
   } else {
-    end.setDate(end.getDate() + (altitude === 'season' ? SEASON_WINDOW_DAYS : PLAN_WINDOW_DAYS) - 1)
+    end.setDate(end.getDate() + PLAN_WINDOW_DAYS - 1)
   }
   const out: string[] = []
   while (cursor <= end) {
@@ -115,14 +146,18 @@ export function validatePlanItems(
     const e = entry as { title?: unknown; day?: unknown; time?: unknown; assignee_id?: unknown; note?: unknown }
     if (typeof e.title !== 'string' || !e.title.trim()) continue
     const day = typeof e.day === 'string' ? e.day : 'inbox'
+    // A goal line: a year `goals` row on a year page; a goal ON THE LIST of a
+    // month or season page; a week page has no goals, so it becomes a wish.
+    const goalOnPage = day === 'goal' && (altitude === 'month' || altitude === 'season')
     const placement: PlanPlacement =
-      day === 'goal' ? (altitude === 'year' ? { kind: 'goal' } : { kind: 'someday' })
+      day === 'goal' ? (altitude === 'year' ? { kind: 'goal' } : goalOnPage ? defaultPlacement(altitude) : { kind: 'someday' })
       : HORIZON_KINDS.has(day) ? { kind: day as 'week' | 'month' | 'season' | 'someday' | 'inbox' }
       : YMD.test(day) && window.has(day) ? { kind: 'date', date: day }
       : defaultPlacement(altitude)
     out.push({
       title: e.title.trim(),
       placement,
+      ...(goalOnPage ? { goal: true } : {}),
       // A time survives only on a real date — mirrors the edge function's own
       // validation so a stale or hand-rolled response can't sneak one onto a
       // 'week'/'inbox' row where nothing would render it.
@@ -139,6 +174,10 @@ export function validatePlanItems(
 export interface PlanCommitContext {
   /** Start of the current week (weekStartAnchor) — stamps bucket='week' rows. */
   currentWeekStart: Date
+  /** The month a month row is for (its 1st) — stamps bucket='month' rows. */
+  monthStart: Date
+  /** The season a season row is for (its start) — stamps bucket='quarter' rows. */
+  seasonStart: Date
   /** Active domain, or null when Universal (matches photo capture). */
   context: TaskContext | null
 }
@@ -149,6 +188,9 @@ export interface PlanAddTaskArgs {
   options: {
     bucket?: TaskBucket
     weekStart?: Date
+    monthStart?: Date
+    seasonStart?: Date
+    isGoal?: boolean
     pickedAt?: Date
     isAllDay?: boolean
     assignedTo?: string
@@ -192,12 +234,13 @@ export function planItemToAddTaskArgs(item: PlanItem, ctx: PlanCommitContext): P
         options: { ...base, bucket: 'week', weekStart: ctx.currentWeekStart },
       }
     case 'month':
-      // The month bucket has no month (attention.ts): "the month pool".
-      return { title: item.title, scheduledFor: undefined, options: { ...base, bucket: 'month' } }
+      // Stamped with the month the PAGE is for, and is_goal when the line was
+      // a goal — both ride the INSERT (the addTask-then-update race).
+      return { title: item.title, scheduledFor: undefined, options: { ...base, bucket: 'month', monthStart: ctx.monthStart, isGoal: !!item.goal } }
     case 'season':
       // Written on the season page = picked for the season. The pick mark
       // rides the INSERT like every other field here.
-      return { title: item.title, scheduledFor: undefined, options: { ...base, bucket: 'quarter', pickedAt: new Date() } }
+      return { title: item.title, scheduledFor: undefined, options: { ...base, bucket: 'quarter', seasonStart: ctx.seasonStart, isGoal: !!item.goal, pickedAt: new Date() } }
     case 'someday':
       return { title: item.title, scheduledFor: undefined, options: { ...base, bucket: 'someday' } }
     case 'goal':

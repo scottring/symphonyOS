@@ -5,6 +5,7 @@ import { PageReviewSheet } from './PageReviewSheet'
 import type { PlanItem } from '@/lib/planParse'
 import type { PageNote } from '@/lib/pageParse'
 import type { FamilyMember } from '@/types/family'
+import { DEFAULT_SEASONS } from '@/lib/cadence/seasons'
 
 const WINDOW = ['2026-08-17', '2026-08-18', '2026-08-19']
 const MEMBERS = [{ id: 'm-iris', name: 'Iris' } as FamilyMember]
@@ -152,5 +153,79 @@ describe('PageReviewSheet — altitudes', () => {
     await user.selectOptions(whens[0], 'someday')
     await user.click(screen.getByRole('button', { name: /add 2 items/i }))
     expect(onCommit.mock.calls[0][0].items.map((i: { placement: unknown }) => i.placement)).toEqual([{ kind: 'someday' }, { kind: 'season' }])
+  })
+
+  // Step 5: a month page says which month it is for, one tap to fix; a goal
+  // line is a goal on that list and can be toggled before commit.
+  describe('month and season pages', () => {
+    it('shows the month the page is for and commits the chosen month', async () => {
+      const user = userEvent.setup()
+      const { onCommit } = renderSheet({
+        altitude: 'month', today: new Date(2026, 8, 5),
+        items: [{ title: 'Repaint the porch', placement: { kind: 'month' }, time: null, assigneeId: null, note: null }],
+        notes: [],
+      })
+      expect(screen.getByText('September')).toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: 'Next month' }))
+      expect(screen.getByText('October')).toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: /add 1 item/i }))
+      expect(onCommit.mock.calls[0][0].monthStart).toEqual(new Date(2026, 9, 1))
+    })
+
+    it('a page snapped in the last week of a month is for the coming month', () => {
+      renderSheet({ altitude: 'month', today: new Date(2026, 8, 26), items: [], notes: [] })
+      expect(screen.getByText('October')).toBeInTheDocument()
+    })
+
+    it('shows the season the page is for, from the household boundaries', async () => {
+      const user = userEvent.setup()
+      const { onCommit } = renderSheet({
+        altitude: 'season', today: new Date(2026, 8, 20), seasons: DEFAULT_SEASONS,
+        items: [{ title: 'Fall trips', placement: { kind: 'season' }, time: null, assigneeId: null, note: null }],
+        notes: [],
+      })
+      expect(screen.getByText('Fall 2026')).toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: 'Previous season' }))
+      expect(screen.getByText('Summer 2026')).toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: /add 1 item/i }))
+      expect(onCommit.mock.calls[0][0].seasonStart).toEqual(new Date(2026, 6, 1))
+    })
+
+    it('a goal line is badged, toggleable, and commits as a goal on the month', async () => {
+      const user = userEvent.setup()
+      const { onCommit } = renderSheet({
+        altitude: 'month', today: new Date(2026, 8, 5),
+        items: [
+          { title: 'Read more', placement: { kind: 'month' }, time: null, assigneeId: null, note: null, goal: true },
+          { title: 'Repaint the porch', placement: { kind: 'month' }, time: null, assigneeId: null, note: null },
+        ],
+        notes: [],
+      })
+      expect(screen.getByText(/1 task \/ 1 goal/)).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Goal "Read more"' })).toHaveAttribute('aria-pressed', 'true')
+      await user.click(screen.getByRole('button', { name: 'Goal "Repaint the porch"' }))
+      expect(screen.getByText(/2 goals/)).toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: /add 2 items/i }))
+      expect(onCommit.mock.calls[0][0].items.map((i: { goal?: boolean }) => !!i.goal)).toEqual([true, true])
+    })
+
+    it('a goal moved onto a date stops being a goal — goals are never scheduled', async () => {
+      const user = userEvent.setup()
+      const { onCommit } = renderSheet({
+        altitude: 'month', today: new Date(2026, 8, 5),
+        items: [{ title: 'Read more', placement: { kind: 'month' }, time: null, assigneeId: null, note: null, goal: true }],
+        notes: [],
+      })
+      await user.selectOptions(screen.getByRole('combobox', { name: /when/i }), '2026-08-18')
+      expect(screen.queryByRole('button', { name: 'Goal "Read more"' })).toBeNull()
+      await user.click(screen.getByRole('button', { name: /add 1 item/i }))
+      expect(onCommit.mock.calls[0][0].items[0].goal).toBeFalsy()
+    })
+
+    it('a week page offers no goal toggle and no period chip', () => {
+      renderSheet({ altitude: 'week' })
+      expect(screen.queryByRole('button', { name: /^Goal "/ })).toBeNull()
+      expect(screen.queryByRole('button', { name: /Next month|Next season/ })).toBeNull()
+    })
   })
 })

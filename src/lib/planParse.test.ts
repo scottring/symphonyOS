@@ -4,9 +4,12 @@ import {
   validatePlanItems,
   planItemToAddTaskArgs,
   PLAN_WINDOW_DAYS,
+  pageMonthStart,
+  pageSeasonStart,
   type PlanItem,
 } from './planParse'
 import { localYmd } from '@/lib/cadence/config'
+import { DEFAULT_SEASONS } from '@/lib/cadence/seasons'
 
 const TODAY = new Date(2026, 7, 17) // Mon Aug 17 2026, local
 const WINDOW = planWindowDates(TODAY)
@@ -72,7 +75,7 @@ describe('validatePlanItems', () => {
 })
 
 describe('planItemToAddTaskArgs', () => {
-  const ctx = { currentWeekStart: new Date(2026, 7, 16), context: 'family' as const }
+  const ctx = { currentWeekStart: new Date(2026, 7, 16), monthStart: new Date(2026, 7, 1), seasonStart: new Date(2026, 6, 1), context: 'family' as const }
 
   it('maps a dated item to an all-day scheduledFor on the local date', () => {
     const item: PlanItem = { title: 'Call dentist', placement: { kind: 'date', date: '2026-08-18' }, assigneeId: null, note: 'ask about Mia' }
@@ -143,9 +146,10 @@ describe('planWindowDates — altitudes', () => {
     expect(dates).toContain('2026-10-01')
   })
 
-  it('a season page runs 92 days', () => {
-    const dates = planWindowDates(TODAY, 'season')
-    expect(dates).toHaveLength(92)
+  it('a season page runs to the end of the season it is for (Aug 17 → Sep 30 under the defaults)', () => {
+    const dates = planWindowDates(TODAY, 'season', DEFAULT_SEASONS)
+    expect(dates[0]).toBe('2026-08-17')
+    expect(dates[dates.length - 1]).toBe('2026-09-30')
   })
 
   it('a year page has no dates', () => {
@@ -173,29 +177,78 @@ describe('validatePlanItems — altitudes', () => {
     expect(validatePlanItems(bad, [], MEMBERS, 'year')[0].placement).toEqual({ kind: 'goal' })
   })
 
-  it('keeps a goal only on a year page', () => {
+  it('keeps a goal on a year page; a week page has no goals', () => {
     const goal = { items: [{ title: 'Half marathon', day: 'goal' }] }
     expect(validatePlanItems(goal, [], MEMBERS, 'year')[0].placement).toEqual({ kind: 'goal' })
     expect(validatePlanItems(goal, WINDOW, MEMBERS, 'week')[0].placement).toEqual({ kind: 'someday' })
   })
+
+  // A goal line on a month or season page is a goal ON THAT LIST (is_goal in
+  // that bucket) — not a year goal, and no longer a wish (Step 5).
+  it('a goal line on a month or season page is a goal on that page', () => {
+    const goal = { items: [{ title: 'Read more', day: 'goal' }] }
+    const m = validatePlanItems(goal, WINDOW, MEMBERS, 'month')[0]
+    expect(m.placement).toEqual({ kind: 'month' })
+    expect(m.goal).toBe(true)
+    const q = validatePlanItems(goal, WINDOW, MEMBERS, 'season')[0]
+    expect(q.placement).toEqual({ kind: 'season' })
+    expect(q.goal).toBe(true)
+    expect(validatePlanItems({ items: [{ title: 'X', day: 'month' }] }, WINDOW, MEMBERS, 'month')[0].goal).toBeFalsy()
+  })
+})
+
+// Which month or season a page is FOR. The current one — unless the page is
+// snapped in the last days of a period, when it is for the coming one (a page
+// written on the 28th is for October).
+describe('pageMonthStart / pageSeasonStart', () => {
+  it('a month page is for this month, or next in the last 7 days', () => {
+    expect(pageMonthStart(new Date(2026, 8, 5))).toEqual(new Date(2026, 8, 1))
+    expect(pageMonthStart(new Date(2026, 8, 23))).toEqual(new Date(2026, 8, 1))
+    expect(pageMonthStart(new Date(2026, 8, 24))).toEqual(new Date(2026, 9, 1))
+    expect(pageMonthStart(new Date(2026, 11, 28))).toEqual(new Date(2027, 0, 1))
+  })
+  it('a season page is for this season, or the coming one in the last 14 days', () => {
+    // DEFAULT_SEASONS: Fall Oct 1 · Winter Jan 1 · Spring Apr 1 · Summer Jul 1
+    expect(pageSeasonStart(new Date(2026, 8, 5), DEFAULT_SEASONS)).toEqual(new Date(2026, 6, 1))
+    expect(pageSeasonStart(new Date(2026, 8, 17), DEFAULT_SEASONS)).toEqual(new Date(2026, 9, 1))
+    expect(pageSeasonStart(new Date(2026, 9, 1), DEFAULT_SEASONS)).toEqual(new Date(2026, 9, 1))
+  })
+})
+
+describe('planWindowDates — season window from the household boundaries', () => {
+  it('runs from today through the end of the season the page is for', () => {
+    const w = planWindowDates(new Date(2026, 8, 5), 'season', DEFAULT_SEASONS)
+    expect(w[0]).toBe('2026-09-05')
+    expect(w[w.length - 1]).toBe('2026-09-30')
+    const late = planWindowDates(new Date(2026, 8, 20), 'season', DEFAULT_SEASONS)
+    expect(late[late.length - 1]).toBe('2026-12-31')
+  })
 })
 
 describe('planItemToAddTaskArgs — horizons', () => {
-  const ctx = { currentWeekStart: new Date(2026, 7, 16), context: null }
-  const item = (kind: 'month' | 'season' | 'someday' | 'goal'): PlanItem =>
-    ({ title: 'X', placement: { kind }, time: null, assigneeId: null, note: null })
+  const ctx = { currentWeekStart: new Date(2026, 7, 16), monthStart: new Date(2026, 9, 1), seasonStart: new Date(2026, 9, 1), context: null }
+  const item = (kind: 'month' | 'season' | 'someday' | 'goal', goal?: boolean): PlanItem =>
+    ({ title: 'X', placement: { kind }, time: null, assigneeId: null, note: null, goal })
 
-  it('month → the month pool', () => {
+  it('month → the month list, stamped with the month the page is for', () => {
     const args = planItemToAddTaskArgs(item('month'), ctx)
     expect(args.scheduledFor).toBeUndefined()
     expect(args.options.bucket).toBe('month')
+    expect(args.options.monthStart).toEqual(new Date(2026, 9, 1))
     expect(args.options.weekStart).toBeUndefined()
+    expect(args.options.isGoal).toBe(false)
   })
 
-  it('season → the quarter bucket, picked (writing it on the season page IS the pick)', () => {
+  it('season → the quarter bucket, stamped and picked (writing it on the season page IS the pick)', () => {
     const args = planItemToAddTaskArgs(item('season'), ctx)
     expect(args.options.bucket).toBe('quarter')
+    expect(args.options.seasonStart).toEqual(new Date(2026, 9, 1))
     expect(args.options.pickedAt).toBeInstanceOf(Date)
+  })
+
+  it('a goal line writes is_goal on its page\'s list', () => {
+    expect(planItemToAddTaskArgs(item('month', true), ctx).options.isGoal).toBe(true)
+    expect(planItemToAddTaskArgs(item('season', true), ctx).options.isGoal).toBe(true)
   })
 
   it('someday → the someday bucket', () => {

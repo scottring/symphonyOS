@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react'
-import { X, NotebookPen, HelpCircle, Target } from 'lucide-react'
+import { X, NotebookPen, HelpCircle, Target, ChevronLeft, ChevronRight } from 'lucide-react'
 import { parseLocalYmd } from '@/lib/cadence/config'
-import type { PlanItem, PlanPlacement, PageAltitude } from '@/lib/planParse'
+import { pageMonthStart, pageSeasonStart, type PlanItem, type PlanPlacement, type PageAltitude } from '@/lib/planParse'
+import { readSeasons, seasonLabel, nextSeasonStart, seasonStartFor, type Seasons } from '@/lib/cadence/seasons'
 import type { PageNote } from '@/lib/pageParse'
 import type { FamilyMember } from '@/types/family'
 import { TaskKindBadge } from '@/components/task/TaskKindBadge'
@@ -9,6 +10,10 @@ import { TaskKindBadge } from '@/components/task/TaskKindBadge'
 export interface PageReviewPayload {
   items: PlanItem[]
   notes: PageNote[]
+  /** The month a MONTH page is for (its 1st) — the chip's choice. */
+  monthStart?: Date
+  /** The season a SEASON page is for (its start) — the chip's choice. */
+  seasonStart?: Date
 }
 
 export interface PageReviewSheetProps {
@@ -22,6 +27,10 @@ export interface PageReviewSheetProps {
   windowDates: string[]
   /** Which page this was read as. A year page's lines may be goals. */
   altitude?: PageAltitude
+  /** The household's season boundaries (for the season chip). Default: the cached ones. */
+  seasons?: Seasons
+  /** When the page was snapped — decides which month/season it is for. Default: now. */
+  today?: Date
   members: FamilyMember[]
   committing: boolean
   /** Called with only the checked rows, as edited. */
@@ -58,9 +67,14 @@ const HORIZON_OPTIONS: { value: PlanPlacement['kind']; label: string }[] = [
 
 const ALTITUDE_BLURB: Record<PageAltitude, string> = {
   week: 'Check what Symphony read before it changes the week.',
-  month: 'Read as a month page — undated lines go to the month pool.',
-  season: 'Read as a season page — undated lines are season picks.',
+  month: "Read as a month page — undated lines go on the month's list.",
+  season: "Read as a season page — undated lines go on the season's list.",
   year: 'Read as a year page — lines become goals for the year.',
+}
+
+/** A goal toggle belongs on a row that sits on a month or season list. */
+function canBeGoal(altitude: PageAltitude, p: PlanPlacement): boolean {
+  return (altitude === 'month' || altitude === 'season') && (p.kind === 'month' || p.kind === 'season')
 }
 
 function dateLabel(ymd: string): string {
@@ -74,18 +88,30 @@ function dateLabel(ymd: string): string {
  * and inert precisely because a wrong task costs more than an unread line.
  */
 export function PageReviewSheet({
-  items, notes, unclear, windowDates, altitude = 'week', members, committing, onCommit, onClose,
+  items, notes, unclear, windowDates, altitude = 'week', seasons = readSeasons(), today = new Date(),
+  members, committing, onCommit, onClose,
 }: PageReviewSheetProps) {
   const [itemRows, setItemRows] = useState<ItemRow[]>(() => items.map((i) => ({ ...i, included: true })))
   const [noteRows, setNoteRows] = useState<NoteRow[]>(() => notes.map((n) => ({ ...n, included: true })))
   const [unread, setUnread] = useState<string[]>(() => unclear)
+  // Which month / season the page is FOR. Guessed from the date (a page
+  // snapped in a month's last week is for the coming month); one tap to fix.
+  const [monthStart, setMonthStart] = useState<Date>(() => pageMonthStart(today))
+  const [seasonStart, setSeasonStart] = useState<Date>(() => pageSeasonStart(today, seasons))
+  const shiftMonth = (by: number) => setMonthStart((m) => new Date(m.getFullYear(), m.getMonth() + by, 1))
+  const shiftSeason = (by: number) => setSeasonStart((st) => {
+    if (by > 0) return nextSeasonStart(st, seasons)
+    const dayBefore = new Date(st)
+    dayBefore.setDate(dayBefore.getDate() - 1)
+    return seasonStartFor(dayBefore, seasons)
+  })
 
   const includedCount = useMemo(
     () => itemRows.filter((r) => r.included).length + noteRows.filter((r) => r.included).length,
     [itemRows, noteRows],
   )
   const summary = useMemo(() => {
-    const includedGoals = itemRows.filter((r) => r.included && r.placement.kind === 'goal').length
+    const includedGoals = itemRows.filter((r) => r.included && (r.placement.kind === 'goal' || r.goal)).length
     const includedItems = itemRows.filter((r) => r.included).length - includedGoals
     const includedNotes = noteRows.filter((r) => r.included).length
     return [
@@ -119,8 +145,31 @@ export function PageReviewSheet({
       notes: noteRows
         .filter((r) => r.included && r.content.trim())
         .map(({ included: _included, ...note }) => ({ title: note.title.trim(), content: note.content.trim() })),
+      ...(altitude === 'month' ? { monthStart } : {}),
+      ...(altitude === 'season' ? { seasonStart } : {}),
     })
   }
+
+  // The period chip: ‹ September › / ‹ Fall 2026 › — which list this page fills.
+  const periodChip = (altitude === 'month' || altitude === 'season') && (
+    <span className="inline-flex items-center gap-0.5 rounded-lg bg-neutral-100 px-1 py-0.5 text-[13px] font-medium text-neutral-700">
+      <button type="button" aria-label={altitude === 'month' ? 'Previous month' : 'Previous season'}
+        onClick={() => (altitude === 'month' ? shiftMonth(-1) : shiftSeason(-1))}
+        className="p-0.5 rounded text-neutral-400 hover:text-neutral-700 hover:bg-neutral-200/60">
+        <ChevronLeft className="w-3.5 h-3.5" />
+      </button>
+      <span className="px-1">
+        {altitude === 'month'
+          ? monthStart.toLocaleDateString('en-US', { month: 'long', ...(monthStart.getFullYear() !== today.getFullYear() ? { year: 'numeric' } : {}) })
+          : seasonLabel(seasonStart, seasons)}
+      </span>
+      <button type="button" aria-label={altitude === 'month' ? 'Next month' : 'Next season'}
+        onClick={() => (altitude === 'month' ? shiftMonth(1) : shiftSeason(1))}
+        className="p-0.5 rounded text-neutral-400 hover:text-neutral-700 hover:bg-neutral-200/60">
+        <ChevronRight className="w-3.5 h-3.5" />
+      </button>
+    </span>
+  )
 
   return (
     <div className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-4" onClick={onClose}>
@@ -136,6 +185,7 @@ export function PageReviewSheet({
             <div>
               <h3 className="font-display text-xl text-neutral-900">From your page</h3>
               {!isEmpty && <p className="mt-0.5 text-[13px] text-neutral-500">{ALTITUDE_BLURB[altitude]}</p>}
+              {periodChip && <div className="mt-1.5">{periodChip}</div>}
             </div>
           </div>
           <button type="button" onClick={onClose} aria-label="Close review" className="p-1.5 rounded-lg text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors">
@@ -170,7 +220,17 @@ export function PageReviewSheet({
                         <div className="flex min-w-0 items-center gap-2">
                           {row.placement.kind === 'goal'
                             ? <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800"><Target className="w-3 h-3" />Goal</span>
-                            : <TaskKindBadge title={row.title} note={row.note} label />}
+                            : canBeGoal(altitude, row.placement)
+                              // A goal on the month's or season's list — ticked, never placed.
+                              ? <button type="button" aria-pressed={!!row.goal} aria-label={`Goal "${row.title}"`}
+                                  title={row.goal ? 'A goal on this list — tap to make it a task' : 'Make it a goal'}
+                                  onClick={() => updateItem(i, { goal: !row.goal })}
+                                  className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors ${
+                                    row.goal ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-neutral-200 bg-white text-neutral-400 hover:text-neutral-700'
+                                  }`}>
+                                  <Target className="w-3 h-3" />Goal
+                                </button>
+                              : <TaskKindBadge title={row.title} note={row.note} label />}
                           <input
                             value={row.title}
                             onChange={(e) => updateItem(i, { title: e.target.value })}
@@ -189,7 +249,14 @@ export function PageReviewSheet({
                           // A time only lives on a real date. Moving a row to
                           // This week / Inbox must drop it, or a stale "14:00"
                           // rides along on a row that no longer shows one.
-                          updateItem(i, { placement, ...(placement.kind === 'date' ? {} : { time: null }) })
+                          // A goal only lives on a month/season list — goals
+                          // are never scheduled, so a move off the list
+                          // makes it a task again.
+                          updateItem(i, {
+                            placement,
+                            ...(placement.kind === 'date' ? {} : { time: null }),
+                            ...(canBeGoal(altitude, placement) ? {} : { goal: false }),
+                          })
                         }}
                         aria-label="When"
                         className="text-[13px] text-neutral-700 bg-neutral-100 rounded-lg px-2 py-1.5 shrink-0"

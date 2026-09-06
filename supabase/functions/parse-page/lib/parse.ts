@@ -59,11 +59,13 @@ const ALTITUDE_GUIDE: Record<PageAltitude, string> = {
   month: `This is a MONTH page: the user is planning the month ahead. "day" for an item is:
 - "YYYY-MM-DD" from the calendar above if the line names a date or a day of the month (the calendar covers the rest of this month and all of next month);
 - "month" for a line with no date — the default on this page;
+- "goal" for a line the page marks as a goal, intention, or outcome for the month rather than a thing to do (under a "Goals" heading, or phrased as an outcome: "Read more", "Be home for dinner");
 - "week" only if the line says it must happen this week or in the next few days;
 - "season" for something explicitly pushed past this month; "someday" for a wish with no timeframe;
 - "inbox" only for a line that is clearly a capture, not a plan.`,
   season: `This is a SEASON page: the user is planning the next three months. "day" for an item is:
 - "season" for a line with no date — the default on this page;
+- "goal" for a line the page marks as a goal, intention, or outcome for the season rather than a thing to do (under a "Goals" heading, or phrased as an outcome);
 - "YYYY-MM-DD" from the calendar above only when the line names an actual date;
 - "month" only when the line says it is for THIS month (the month today falls in). A line naming a later month stays "season" — put the month name in "note";
 - "week" only when the line says it must happen this week;
@@ -99,7 +101,7 @@ Respond with ONLY a JSON object (no markdown fences, no prose):
   "items": [
     {
       "title": "Short imperative task title, cleaned up from the handwriting",
-      "day": "one of the placements described above: a YYYY-MM-DD date${altitude === 'year' ? ', \\"goal\\"' : ''}, \\"week\\", \\"month\\", \\"season\\", \\"someday\\", or \\"inbox\\"",
+      "day": "one of the placements described above: a YYYY-MM-DD date${altitude !== 'week' ? ', \\"goal\\"' : ''}, \\"week\\", \\"month\\", \\"season\\", \\"someday\\", or \\"inbox\\"",
       "time": "\\"HH:MM\\" in 24-hour form if the line names a clock time (\\"2pm\\" -> \\"14:00\\", \\"7:30\\" -> \\"19:30\\"), otherwise null",
       "assignee_id": "member id from the list above, or null",
       "note": "extra detail written on that line beyond the action itself (phone number, store, quantity, a constraint like 'before 3pm'), or null"
@@ -133,8 +135,9 @@ function parseItems(raw: unknown, calendar: Set<string>, memberIds: Set<string>,
     const e = entry as Partial<PageItemRaw>
     if (typeof e.title !== 'string' || !e.title.trim()) continue
     let day = typeof e.day === 'string' ? e.day : 'inbox'
-    // A goal is a year-page placement only; elsewhere it is a wish.
-    if (day === 'goal' && altitude !== 'year') day = 'someday'
+    // A goal line: a year goal on a year page, a goal on the list of a month
+    // or season page. A week page has no goals, so there it is a wish.
+    if (day === 'goal' && altitude === 'week') day = 'someday'
     // Out-of-window degrades to the page's own altitude rather than being
     // dropped — the review sheet lets the user fix it, and a silently
     // vanished line is worse.

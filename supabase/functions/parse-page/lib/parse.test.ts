@@ -159,9 +159,18 @@ describe('altitudes', () => {
     expect(parsePageResponse('{"items":[{"title":"X","day":"2025-01-01"}]}', CAL, MEMBERS).items[0].day).toBe('week')
   })
 
-  it('only a year page may place a goal; elsewhere a goal becomes someday', () => {
+  it('year, month and season pages may place a goal; on a week page a goal becomes someday', () => {
     expect(parsePageResponse('{"items":[{"title":"X","day":"goal"}]}', new Set(), MEMBERS, 'year').items[0].day).toBe('goal')
-    expect(parsePageResponse('{"items":[{"title":"X","day":"goal"}]}', CAL, MEMBERS, 'season').items[0].day).toBe('someday')
+    expect(parsePageResponse('{"items":[{"title":"X","day":"goal"}]}', CAL, MEMBERS, 'season').items[0].day).toBe('goal')
+    expect(parsePageResponse('{"items":[{"title":"X","day":"goal"}]}', CAL, MEMBERS, 'month').items[0].day).toBe('goal')
+    expect(parsePageResponse('{"items":[{"title":"X","day":"goal"}]}', CAL, MEMBERS, 'week').items[0].day).toBe('someday')
+  })
+
+  it('tells the model a month or season page may name goals; a week page may not', () => {
+    const calendar = windowCalendar('2026-09-05', '2026-09-10')
+    expect(buildPagePrompt(calendar, [], '2026-09-05', 'month')).toContain('"goal"')
+    expect(buildPagePrompt(calendar, [], '2026-09-05', 'season')).toContain('"goal"')
+    expect(buildPagePrompt(calendar, [], '2026-09-05', 'week')).not.toContain('"goal"')
   })
 
   it('drops a time from a horizon placement the same way it does for week', () => {

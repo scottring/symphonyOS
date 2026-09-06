@@ -2,6 +2,7 @@ import { useCallback, useRef, useState } from 'react'
 import { supabase, getAuthUser } from '@/lib/supabase'
 import { localYmd } from '@/lib/cadence/config'
 import { planWindowDates, type PageAltitude } from '@/lib/planParse'
+import { readSeasons } from '@/lib/cadence/seasons'
 import { validatePageResult, type PageResult } from '@/lib/pageParse'
 import type { FamilyMember } from '@/types/family'
 
@@ -48,7 +49,9 @@ export function usePageFromPaper(members: FamilyMember[]) {
 
   const invokeParse = useCallback(async (storagePath: string, altitude: PageAltitude) => {
     const today = new Date()
-    const dates = planWindowDates(today, altitude)
+    // The season window runs to the end of the season the page is for, per
+    // the household's boundaries (cached by useHouseholdSeasons).
+    const dates = planWindowDates(today, altitude, readSeasons())
     const { data, error: fnErr } = await supabase.functions.invoke('parse-page', {
       body: {
         storagePath,

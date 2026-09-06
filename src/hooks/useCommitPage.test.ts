@@ -176,4 +176,28 @@ describe('useCommitPage — goals', () => {
     expect(result.failures).toBe(1)
     expect(result.goalsCreated).toBe(0)
   })
+
+  // Step 5: a month page stamps the month it is for; a season page the season.
+  // The sheet's choice wins; without one, the page's own default applies.
+  it('stamps month_start / season_start from the payload onto month and season rows', async () => {
+    await commit()({
+      items: [
+        { ...ITEM, title: 'Repaint', placement: { kind: 'month' } },
+        { ...ITEM, title: 'Trips', placement: { kind: 'season' } },
+        { ...ITEM, title: 'Read more', placement: { kind: 'month' }, goal: true },
+      ],
+      notes: [], storagePath: null,
+      monthStart: new Date(2026, 9, 1), seasonStart: new Date(2026, 9, 1),
+    })
+    const opts = mocks.addTask.mock.calls.map((c) => c[4])
+    expect(opts[0]).toMatchObject({ bucket: 'month', monthStart: new Date(2026, 9, 1), isGoal: false })
+    expect(opts[1]).toMatchObject({ bucket: 'quarter', seasonStart: new Date(2026, 9, 1) })
+    expect(opts[2]).toMatchObject({ bucket: 'month', isGoal: true })
+    expect(mocks.addGoal).not.toHaveBeenCalled()
+  })
+
+  it('stamps the page\'s own month when the payload names none', async () => {
+    await commit()({ items: [{ ...ITEM, placement: { kind: 'month' } }], notes: [], storagePath: null })
+    expect(mocks.addTask.mock.calls[0][4].monthStart).toBeInstanceOf(Date)
+  })
 })
