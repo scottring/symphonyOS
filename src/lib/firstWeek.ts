@@ -6,6 +6,8 @@
 // itself the moment fewer than two steps remain, and stays hidden for a week
 // after "Hide for now" — never a permanent dismiss, never a badge/count.
 
+import { supabase } from '@/lib/supabase'
+
 export type FirstWeekStepId = 'people' | 'page' | 'partner' | 'routine'
 
 export interface FirstWeekSignals {
@@ -131,4 +133,27 @@ export function clearSampleIdsRecord(uid: string): void {
 export function hasSampleIds(uid: string): boolean {
   const ids = readSampleIds(uid)
   return ids.taskIds.length > 0 || ids.noteIds.length > 0
+}
+
+/**
+ * Delete the rows the bundled sample page created, by id. Owner deletes are
+ * what RLS already allows, so this goes straight at the tables rather than
+ * through the task/note hooks — those resolve on the optimistic update and
+ * say nothing about whether the write landed.
+ *
+ * Returns true only when BOTH deletes came back clean. The localStorage id
+ * record is the ONLY thing pointing at these rows: clearing it after a
+ * partial delete strands fake data in a real household with nothing left to
+ * find it by, so the caller must keep the record on false.
+ */
+export async function deleteSampleRows({ taskIds, noteIds }: SampleIds): Promise<boolean> {
+  const [tasks, notes] = await Promise.all([
+    taskIds.length
+      ? supabase.from('tasks').delete().in('id', taskIds)
+      : Promise.resolve({ error: null }),
+    noteIds.length
+      ? supabase.from('notes').delete().in('id', noteIds)
+      : Promise.resolve({ error: null }),
+  ])
+  return !tasks.error && !notes.error
 }

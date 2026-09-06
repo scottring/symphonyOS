@@ -6,6 +6,10 @@
 // to a one-line result. Mounted above the day by HomeViewContainer while
 // `shouldShowFirstWeek` says so; hides itself for a week on "Hide for now",
 // never permanently.
+//
+// Its gutters mirror MastheadCard's (`mx-3 md:mx-0`) and its mount supplies
+// the same page column, so it stacks directly on top of the day card with
+// the same left and right edges instead of spanning the whole content width.
 
 import { Link } from 'react-router-dom'
 import { Circle, CheckCircle2, ArrowRight } from 'lucide-react'
@@ -22,7 +26,7 @@ interface FirstWeekCardProps {
 
 export function FirstWeekCard({ steps, onHide, onSamplePage, onClearSample }: FirstWeekCardProps) {
   return (
-    <section aria-labelledby="first-week" className="card p-5 mb-4">
+    <section aria-labelledby="first-week" className="card mx-3 mb-4 p-5 md:mx-0">
       <div className="flex items-start justify-between gap-3 mb-3">
         <h2 id="first-week" className="font-display text-lg text-neutral-800">
           Your first week
