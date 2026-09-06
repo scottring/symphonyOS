@@ -1,6 +1,6 @@
 // src/components/schedule/InboxView.tsx
 import { useMemo, useCallback, useState } from 'react'
-import { PAGE_COLUMN } from '@/components/layout/pageLayout'
+import { PAGE_COLUMN_WIDE } from '@/components/layout/pageLayout'
 import { MastheadCard } from '@/components/layout/MastheadCard'
 import { HomeChromeControls } from '@/components/home/HomeChromeControls'
 import { useAppShellChromeOptional } from '@/contexts/AppShellChromeContext'
@@ -634,7 +634,7 @@ export function InboxView({
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className={PAGE_COLUMN}>
+      <div className={PAGE_COLUMN_WIDE}>
       {/* The same masthead card the rest of the top group wears (Today, This
           Week, the period pages). No eyebrow — the inbox has no period to step
           through. Its own controls ride along the foot, as Today's do. */}

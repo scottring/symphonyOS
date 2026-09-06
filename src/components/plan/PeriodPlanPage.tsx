@@ -16,6 +16,7 @@ import { useNavigate } from 'react-router-dom'
 import { Plus, Target } from 'lucide-react'
 import { MastheadCard, PeriodNavEyebrow } from '@/components/layout/MastheadCard'
 import { HomeChromeControls } from '@/components/home/HomeChromeControls'
+import { DomainSwitcher } from '@/components/domain/DomainSwitcher'
 import { useAppShellChromeOptional } from '@/contexts/AppShellChromeContext'
 import { PAGE_COLUMN_WIDE } from '@/components/layout/pageLayout'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
@@ -178,7 +179,10 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
         )}
         title={TITLE[level]}
         subline={isPast ? 'Look back: what got done, what didn\'t. Keep what still matters, drop the rest.' : undefined}
-        controls={chrome ? <HomeChromeControls className="flex" /> : undefined}
+        // The plan pages mount outside TasksApp's chrome context, so the
+        // assistant toggle isn't reachable here; the domain lens still is,
+        // and this page scopes by it (soleDomain).
+        controls={chrome ? <HomeChromeControls className="flex" /> : <DomainSwitcher />}
       />
 
       <div className="flex flex-col gap-3">

@@ -60,5 +60,7 @@ describe('DiscussionsApp', () => {
     render(<MemoryRouter><DiscussionsApp /></MemoryRouter>)
     const card = screen.getByTestId('masthead-card')
     expect(within(card).getByRole('heading', { level: 1, name: 'Discussions' })).toBeInTheDocument()
+    // Same column as the rest of the group, so the cards line up page to page.
+    expect(card.parentElement?.className).toMatch(/max-w-\[1152px\]/)
   })
 })

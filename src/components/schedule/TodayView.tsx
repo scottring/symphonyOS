@@ -1040,8 +1040,11 @@ export function TodayView({
     </TodayOverflowMenu>
   )
 
+  // The top group's shared column (PAGE_COLUMN_WIDE) on desktop, so the
+  // masthead cards line up page to page; full-bleed on phones for the
+  // timeline (px-0), which is why this isn't the constant itself.
   return (
-    <div className="w-full max-w-[1180px] mx-auto px-0 py-2 md:px-8 md:py-8">
+    <div className="w-full max-w-[1152px] mx-auto px-0 py-2 md:px-10 lg:px-14 md:py-8">
       {/* Mounted only while printing. Keeping it permanently in the DOM would
           duplicate every title — invisible to the eye (CSS-hidden) but very
           real to screen readers and to any getByText. */}

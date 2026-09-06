@@ -162,5 +162,7 @@ describe('PeriodPlanPage masthead', () => {
     const eyebrow = screen.getByTestId('masthead-eyebrow')
     expect(within(eyebrow).getByLabelText('Previous month')).toBeInTheDocument()
     expect(within(eyebrow).getByLabelText('Next month')).toBeInTheDocument()
+    // Same column as Inbox and Discussions, so the cards line up page to page.
+    expect(card.parentElement?.className).toMatch(/max-w-\[1152px\]/)
   })
 })

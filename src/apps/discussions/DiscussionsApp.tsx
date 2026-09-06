@@ -1,5 +1,6 @@
 // src/apps/discussions/DiscussionsApp.tsx
 import { MastheadCard } from '@/components/layout/MastheadCard'
+import { PAGE_COLUMN_WIDE } from '@/components/layout/pageLayout'
 import { HomeChromeControls } from '@/components/home/HomeChromeControls'
 import { useAppShellChromeOptional } from '@/contexts/AppShellChromeContext'
 //
@@ -33,7 +34,7 @@ export function DiscussionsApp() {
   const chrome = useAppShellChromeOptional()
 
   return (
-    <div className="max-w-3xl mx-auto px-6 py-8">
+    <div className={PAGE_COLUMN_WIDE}>
       {/* The same masthead card the rest of the top group wears. */}
       <MastheadCard
         title="Discussions"

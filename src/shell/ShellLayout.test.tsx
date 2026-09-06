@@ -99,12 +99,15 @@ describe('ShellLayout domain switcher', () => {
     expect(screen.getAllByRole('button', { name: /^Layers:/ })).toHaveLength(1)
   })
 
-  it('on desktop keeps the switcher off Today (HomeHeader owns it there) and on for other views', () => {
+  it('on desktop keeps the switcher off Today and Inbox (their masthead cards own it) and on for other views', () => {
     mobileState.isMobile = false
     const { unmount } = renderAt('/today')
     expect(screen.queryByRole('button', { name: /^Layers:/ })).not.toBeInTheDocument()
     unmount()
-    renderAt('/inbox')
+    const second = renderAt('/inbox')
+    expect(screen.queryByRole('button', { name: /^Layers:/ })).not.toBeInTheDocument()
+    second.unmount()
+    renderAt('/routines')
     expect(screen.getByRole('button', { name: 'Layers: All' })).toBeInTheDocument()
   })
 })

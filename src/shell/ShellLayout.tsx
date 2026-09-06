@@ -309,9 +309,11 @@ function ShellLayoutInner({ children }: Props) {
           </header>
         )}
 
-        {/* Domain switcher + AI + help on non-Today desktop views.
-            On Today these render inside HomeHeader (via AppShellChromeContext). */}
-        {!isMobile && activeView !== 'today' && (
+        {/* Domain switcher + AI + help on desktop views that don't wear the
+            masthead card. Today and Inbox render these in the card's corner
+            (via AppShellChromeContext); drawing them here too put two pairs
+            on Inbox. */}
+        {!isMobile && activeView !== 'today' && activeView !== 'inbox' && (
           <div className="absolute top-4 right-6 z-20 flex items-center gap-2">
             <DomainSwitcher />
             <button
