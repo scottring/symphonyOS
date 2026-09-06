@@ -56,8 +56,12 @@ export function PlanRail({ title, subtitle, rows, onOpen, onPullDown, pullLabel,
   // Captured once at mount, so the hint stays visible for this whole
   // session even after it flips the flag that hides it on the NEXT visit.
   const [hintSeenAtMount] = useState(() => readHintSeen())
-  useEffect(() => { if (!hintSeenAtMount) writeHintSeen() }, [hintSeenAtMount])
   const showHint = open && !!onPullDown && rows.length > 0 && !hintSeenAtMount
+  // Write the flag only once the hint has actually been SHOWN — a closed
+  // fold, or a look-only rail with no onPullDown, must not burn the "first
+  // time" for every other rail on the page (fix round 1: the flag was
+  // written on every mount regardless of open/onPullDown).
+  useEffect(() => { if (showHint) writeHintSeen() }, [showHint])
   const noun = pullNoun(pullLabel)
   const goals = rows.filter((r) => r.isGoal)
   const items = rows.filter((r) => !r.isGoal)

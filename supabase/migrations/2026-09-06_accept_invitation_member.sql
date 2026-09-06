@@ -1,4 +1,9 @@
 -- The invitee says which member row is theirs; the name==email guess stays as a fallback.
+-- `create or replace` does NOT replace the 1-argument overload from
+-- 051_accept_invitation_rpc.sql (different argument-type list) — drop it
+-- first, or both versions coexist and the old one (no search_path, no
+-- member_id) stays callable.
+drop function if exists public.accept_household_invitation(uuid);
 create or replace function public.accept_household_invitation(invitation_token uuid, member_id uuid default null)
 returns jsonb language plpgsql security definer set search_path = public as $$
 declare inv record; current_user_id uuid := auth.uid(); current_membership record;
@@ -28,13 +33,19 @@ begin
 end $$;
 
 -- The join page needs the household name, the inviter's name, and the unlinked adult rows — by token, before membership.
+-- Candidates = unlinked, not-yet-a-full-user rows that are NOT a child.
+-- A member added via Settings -> Add family member never sets role_label
+-- (it stays NULL), and 'adult' is never written anywhere — an allowlist of
+-- ('parent','adult') silently emptied the chooser for the documented
+-- "add your spouse now, invite later" flow. Exclude children by label
+-- instead of allow-listing adult labels that don't exist in the data.
 create or replace function public.invitation_preview(invitation_token uuid)
 returns jsonb language sql security definer set search_path = public stable as $$
   select jsonb_build_object(
     'household_name', h.name,
     'inviter_name', coalesce((select fm.name from family_members fm where fm.user_id = i.invited_by and fm.is_full_user and fm.auth_user_id is null limit 1), 'Your partner'),
     'candidates', coalesce((select jsonb_agg(jsonb_build_object('id', fm.id, 'name', fm.name)) from family_members fm
-        where fm.user_id = i.invited_by and fm.auth_user_id is null and not fm.is_full_user and coalesce(fm.role_label,'') in ('parent','adult')), '[]'::jsonb)
+        where fm.user_id = i.invited_by and fm.auth_user_id is null and not fm.is_full_user and coalesce(fm.role_label,'') not in ('child','kid','family')), '[]'::jsonb)
   )
   from household_invitations i join households h on h.id = i.household_id
   where i.token = invitation_token and i.accepted_at is null and i.expires_at > now();
