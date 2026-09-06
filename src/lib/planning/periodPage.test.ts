@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { periodBounds, isCurrentPeriod, selectPeriodTasks, selectDatedInPeriod, actionsFor, railLevel, planningPeriod, type PlanLevel } from './periodPage'
+import { periodBounds, isCurrentPeriod, selectPeriodTasks, selectDatedInPeriod, actionsFor, railLevel, planningPeriod } from './periodPage'
 import { DEFAULT_SEASONS } from '@/lib/cadence/seasons'
 import type { Task } from '@/types/task'
 
