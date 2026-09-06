@@ -3,6 +3,7 @@ import {
   planWindowDates,
   validatePlanItems,
   planItemToAddTaskArgs,
+  rewindowPlanItems,
   PLAN_WINDOW_DAYS,
   pageMonthStart,
   pageSeasonStart,
@@ -302,5 +303,38 @@ describe('validatePlanItems — new fields', () => {
   it('drops a note that only repeats the title', () => {
     const [a] = validatePlanItems({ items: [{ title: 'Book dentist checkups for both kids', day: 'month', note: 'both kids' }] }, win, members, 'month')
     expect(a.note).toBeNull()
+  })
+})
+
+describe('planWindowDates with an explicit period start', () => {
+  const seasons = [
+    { name: 'Winter', month: 12, day: 1 }, { name: 'Spring', month: 3, day: 1 },
+    { name: 'Summer', month: 6, day: 1 }, { name: 'Fall', month: 9, day: 1 },
+  ] as const
+  it('a month page for October, snapped Sep 6, runs Sep 6 → Oct 31', () => {
+    const d = planWindowDates(new Date(2026, 8, 6), 'month', seasons, new Date(2026, 9, 1))
+    expect(d[0]).toBe('2026-09-06'); expect(d[d.length - 1]).toBe('2026-10-31')
+  })
+  it('a season page for Fall, snapped Aug 20, runs Aug 20 → Nov 30', () => {
+    const d = planWindowDates(new Date(2026, 7, 20), 'season', seasons, new Date(2026, 8, 1))
+    expect(d[0]).toBe('2026-08-20'); expect(d[d.length - 1]).toBe('2026-11-30')
+  })
+})
+
+describe('rewindowPlanItems', () => {
+  const base = { time: null, assigneeId: null, note: null, kind: 'task' as const, recurring: null, phone: null }
+  it('a degraded row whose dateHint is now inside the window becomes a date again', () => {
+    const [r] = rewindowPlanItems([{ ...base, title: 'Recital', placement: { kind: 'season' }, dateHint: '2026-12-12' }], ['2026-12-11', '2026-12-12'], 'season')
+    expect(r.placement).toEqual({ kind: 'date', date: '2026-12-12' })
+  })
+  it('a dated row that falls outside the new window degrades to the altitude and keeps its hint', () => {
+    const [r] = rewindowPlanItems([{ ...base, title: 'Flights', placement: { kind: 'date', date: '2026-10-01' }, dateHint: '2026-10-01', time: '09:00' }], ['2026-09-06'], 'month')
+    expect(r.placement).toEqual({ kind: 'month' })
+    expect(r.dateHint).toBe('2026-10-01')
+    expect(r.time).toBeNull()
+  })
+  it('leaves horizon rows without a hint alone', () => {
+    const [r] = rewindowPlanItems([{ ...base, title: 'x', placement: { kind: 'someday' }, dateHint: null }], ['2026-09-06'], 'week')
+    expect(r.placement).toEqual({ kind: 'someday' })
   })
 })

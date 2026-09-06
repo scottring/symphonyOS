@@ -6,7 +6,7 @@
 
 import type { TaskBucket, TaskContext } from '@/types/task'
 import { localYmd, parseLocalYmd } from '@/lib/cadence/config'
-import { seasonStartFor, seasonEndFor, nextSeasonStart, readSeasons, type Seasons } from '@/lib/cadence/seasons'
+import { seasonStartFor, seasonEndFor, nextSeasonStart, readSeasons, normalizeSeasons, type Seasons } from '@/lib/cadence/seasons'
 
 /** How far ahead the parser may place: today + 13 days covers "the week I just
  *  planned" from any day of the week (a Sunday page maps Mon–Sun of next week). */
@@ -115,18 +115,23 @@ export function pageSeasonStart(today: Date, seasons: Seasons = readSeasons()): 
  *  can place into the coming month); a season page today through the end of
  *  the season the page is for (pageSeasonStart, from the household
  *  boundaries); a year page none. */
-export function planWindowDates(today: Date, altitude: PageAltitude = 'week', seasons: Seasons = readSeasons()): string[] {
+export function planWindowDates(today: Date, altitude: PageAltitude = 'week', seasons: Seasons = readSeasons(), periodStart?: Date): string[] {
   if (altitude === 'year') return []
   const cursor = new Date(today)
   cursor.setHours(0, 0, 0, 0)
   const end = new Date(cursor)
   if (altitude === 'month') {
-    end.setDate(1)
-    end.setMonth(end.getMonth() + 2)
-    end.setDate(0) // last day of next month
+    // Through the end of the month the page is FOR (default: next month's end).
+    const target = periodStart ?? new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1)
+    end.setTime(new Date(target.getFullYear(), target.getMonth() + 1, 0).getTime())
   } else if (altitude === 'season') {
+    // seasonStartFor/seasonEndFor assume a calendar-ordered array — normalize
+    // so a caller's own (possibly hand-written, out-of-month-order) boundary
+    // list doesn't wrap into the wrong year.
+    const normSeasons = normalizeSeasons(seasons)
     // seasonEndFor is exclusive; the window's last day is the day before it.
-    const exclusiveEnd = seasonEndFor(pageSeasonStart(cursor, seasons), seasons)
+    const start = periodStart ?? pageSeasonStart(cursor, normSeasons)
+    const exclusiveEnd = seasonEndFor(start, normSeasons)
     end.setTime(exclusiveEnd.getTime())
     end.setDate(end.getDate() - 1)
   } else {
@@ -138,6 +143,21 @@ export function planWindowDates(today: Date, altitude: PageAltitude = 'week', se
     cursor.setDate(cursor.getDate() + 1)
   }
   return out
+}
+
+/** Re-place items against a new window without a second model call (spec C2). */
+export function rewindowPlanItems(items: PlanItem[], windowDates: string[], altitude: PageAltitude): PlanItem[] {
+  const win = new Set(windowDates)
+  return items.map((item) => {
+    if (item.placement.kind === 'goal' || item.placement.kind === 'inbox' || item.placement.kind === 'someday') return item
+    if (item.dateHint && win.has(item.dateHint)) {
+      return { ...item, placement: { kind: 'date', date: item.dateHint } }
+    }
+    if (item.placement.kind === 'date' && !win.has(item.placement.date)) {
+      return { ...item, placement: defaultPlacement(altitude), time: null }
+    }
+    return item
+  })
 }
 
 /** A ★, an underline, a circle on the page is emphasis, not content. */
