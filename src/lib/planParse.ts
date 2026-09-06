@@ -261,8 +261,14 @@ export interface PlanCommitContext {
 export interface PlanAddTaskArgs {
   title: string
   scheduledFor: Date | undefined
-  /** The named member a line is ABOUT — the THIRD positional arg to addTask,
-   *  never an option (addTask has no `contactId` option). */
+  /** addTask's SECOND positional arg, which lands in `tasks.contact_id`.
+   *
+   *  Always `undefined` from a page. `tasks.contact_id` has a foreign key to
+   *  `contacts`, and the member a line is ABOUT is a `family_members` row —
+   *  writing that id raised FK 23503, addTask returned undefined, and every
+   *  line about a kid came back as "N items could not be saved". The member
+   *  still rides the PlanItem as `contactMemberId` (the review sheet draws its
+   *  avatar from it) and the kid's name is already in the title. */
   contactId: string | undefined
   options: {
     bucket?: TaskBucket
@@ -297,7 +303,9 @@ export function planItemToAddTaskArgs(item: PlanItem, ctx: PlanCommitContext): P
     phoneNumber: item.phone ?? undefined,
     sourceId: item.sourceId,
   }
-  const contactId = item.contactMemberId ?? undefined
+  // NEVER item.contactMemberId: that is a `family_members` id and
+  // `tasks.contact_id` points at `contacts` (FK 23503 → the whole page fails).
+  const contactId: string | undefined = undefined
   switch (item.placement.kind) {
     case 'date': {
       // A named clock time makes this a real block on the day, not an all-day

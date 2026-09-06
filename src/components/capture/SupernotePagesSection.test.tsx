@@ -60,12 +60,24 @@ describe('SupernotePagesSection', () => {
       items: [expect.objectContaining({ title: 'Call dentist' })],
       notes: [],
       storagePath: 'u/supernote/a.png',
-      // No domain picker on this flow yet — falls back to personal when the
-      // checked lens (default: Everyone) names no single domain.
-      domain: 'personal',
+      // The sheet's own picker names the domain; this section must not
+      // re-derive one from the lens. Default with nothing remembered: Family.
+      domain: 'family',
       altitude: undefined,
     })
     expect(dismiss).toHaveBeenCalledWith('c-1')
+  })
+
+  it('commits the domain the review sheet was set to, not one derived here', async () => {
+    // The old code spread `domain: soleDomain ?? 'personal'` AFTER the payload,
+    // so a page the user had just marked Work committed as Personal.
+    const user = userEvent.setup()
+    pages = [PAGE]
+    render(<SupernotePagesSection />)
+    await user.click(screen.getByRole('button', { name: /review page/i }))
+    await user.click(screen.getByRole('radio', { name: 'Work' }))
+    await user.click(screen.getByRole('button', { name: /add 1 item/i }))
+    expect(commitPage).toHaveBeenCalledWith(expect.objectContaining({ domain: 'work' }))
   })
 
   it('keeps the page when the commit reports a failure', async () => {

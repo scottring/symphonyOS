@@ -3,7 +3,6 @@ import { NotebookPen, X } from 'lucide-react'
 import { usePendingPages, type PendingPage } from '@/hooks/usePendingPages'
 import { useCommitPage } from '@/hooks/useCommitPage'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
-import { useDomain } from '@/hooks/useDomain'
 import { PageReviewSheet, type PageReviewPayload } from '@/components/capture/PageReviewSheet'
 import type { FamilyMember } from '@/types/family'
 
@@ -81,21 +80,21 @@ interface SupernotePageReviewProps {
 /**
  * The actual review sheet, mounted only while a page is open. Owns
  * `useCommitPage()` so the expensive hooks it drags in (a fresh
- * `useSupabaseTasks` realtime channel + task refetch, `useNotes`, `useDomain`)
+ * `useSupabaseTasks` realtime channel + task refetch, `useNotes`)
  * instantiate only for the moment a review is in progress, not on every
  * Inbox render.
  */
 function SupernotePageReview({ page, members, dismiss, onClose }: SupernotePageReviewProps) {
   const { commitPage } = useCommitPage()
-  const { soleDomain } = useDomain()
   const [committing, setCommitting] = useState(false)
 
   const handleCommit = async (payload: PageReviewPayload) => {
     setCommitting(true)
     try {
-      // No domain picker on this flow yet — the checked domain lens stands in
-      // for it, falling back to personal when Everyone is checked.
-      const { failures } = await commitPage({ ...payload, storagePath: page.result.storagePath, domain: soleDomain ?? 'personal', altitude: page.result.altitude })
+      // The review sheet asks for the domain and it rides `payload.domain` —
+      // do NOT re-derive it from the lens here. That override silently
+      // relabelled a page the user had just tagged Family as Personal.
+      const { failures } = await commitPage({ ...payload, storagePath: page.result.storagePath, altitude: page.result.altitude })
       // Dismiss HARD DELETES the capture row, and a page cannot be re-parsed
       // from Symphony once it is gone — the only recovery is re-exporting from
       // the tablet. So a page whose commit lost anything stays put. Retrying it

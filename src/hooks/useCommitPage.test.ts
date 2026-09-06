@@ -215,6 +215,19 @@ describe('useCommitPage — domain, routines, day-facts, lineage, route', () => 
     expect(y.route).toBe('/year')
   })
 
+  it('never passes a family_members id as the contact — tasks.contact_id points at contacts', async () => {
+    // decideAssignment puts the named kid on `contactMemberId` (a
+    // family_members id). Passing it to addTask raised FK 23503, addTask
+    // returned undefined, and every line about a kid came back as
+    // "N items could not be saved". The member rides the PlanItem only.
+    const { result } = renderHook(() => useCommitPage())
+    const about = { ...ITEM, title: 'Take Mia to the dentist', contactMemberId: 'member-mia' }
+    const res = await act(() => result.current.commitPage({ items: [about], notes: [], domain: 'family', storagePath: null, altitude: 'week' }))
+    expect(mocks.addTask).toHaveBeenCalledWith('Take Mia to the dentist', undefined, undefined, undefined, expect.any(Object))
+    expect(res.failures).toBe(0)
+    expect(res.tasksCreated).toBe(1)
+  })
+
   it('phone and lineage ride the INSERT', async () => {
     const { result } = renderHook(() => useCommitPage())
     await act(() => result.current.commitPage({ items: [{ ...ITEM, phone: '410-555-0142', sourceId: 'src-1' }], notes: [], domain: 'family', storagePath: null, altitude: 'week' }))
