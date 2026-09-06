@@ -35,7 +35,7 @@ import { useSystemHealth, getHealthTextClasses } from '@/hooks/useSystemHealth'
 import { useTimelineInsert } from '@/hooks/useTimelineInsert'
 import { useDomain } from '@/hooks/useDomain'
 
-import { Eye, EyeOff, Repeat, Binoculars, Printer, GripVertical, Moon, Sparkles, NotebookPen, Inbox, ArrowRight } from 'lucide-react'
+import { Eye, EyeOff, Repeat, Binoculars, Printer, GripVertical, Moon, Sparkles, NotebookPen, ArrowRight } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import { AssigneeFilter } from '@/components/home/AssigneeFilter'
 
@@ -1100,22 +1100,15 @@ export function TodayView({
             {headerControls && <div className="hidden shrink-0 md:block">{headerControls}</div>}
           </div>
 
-          <div className="mt-4 flex flex-wrap items-end justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => navigate('/inbox')}
-              className="inline-flex items-center gap-2 rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-50"
-            >
-              <Inbox className="h-4 w-4" />
-              Process inbox
-            </button>
-            </div>
-
-            {/* The day's lookups and settings, in the card's lower-right —
-                      opposite the actions. They used to float in a strip of their
-                      own between the card and the list, anchored by a negative
-                      margin; the card can simply hold them. */}
+          {/* No action buttons on the card. Time-block, Plan week, and Process
+              inbox all left 2026-09-06: the sidebar's This Week and Inbox rows
+              and the "N need a decision" strip below already lead there, and
+              Plan from paper in the sidebar is the day's one verb. */}
+          <div className="mt-4 flex flex-wrap items-end justify-end gap-3">
+            {/* The day's lookups and settings, in the card's lower-right. They
+                      used to float in a strip of their own between the card and
+                      the list, anchored by a negative margin; the card can
+                      simply hold them. */}
                   <div
                     data-testid="today-controls"
                     className="hidden shrink-0 md:flex items-center gap-1"
@@ -1238,11 +1231,9 @@ export function TodayView({
                 ? 'Loading your day…'
                 : data.isToday && data.counts.completedCount > 0 ? 'All cleared — nicely done' : 'Your day is clear'}
             </p>
-            {/* No button row here. The day card directly above already offers
-                Process inbox, and the sidenav carries Plan from paper and This
-                Week — repeating them under "Your day is clear" made an empty
-                day the busiest screen in the app. (Time-block and Plan week
-                left 2026-09-06: /week is the one grid.) */}
+            {/* No button row here. The sidenav carries Plan from paper, This
+                Week, and Inbox — repeating them under "Your day is clear" made
+                an empty day the busiest screen in the app. */}
           </div>
         ) : (
           <div className="space-y-6">

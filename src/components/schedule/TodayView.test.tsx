@@ -154,10 +154,11 @@ describe('TodayView', () => {
     expect(screen.queryByRole('button', { name: /plan today/i })).not.toBeInTheDocument()
   })
 
-  it('offers neither Time-block nor Plan week — /week is the one grid, and the sidebar already reaches it', async () => {
+  it('offers no Time-block, Plan week, or Process inbox — the sidebar and the decision strip already reach those', async () => {
     const { user } = renderView()
     expect(screen.queryByRole('button', { name: /time-block/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /plan week/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /process inbox/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /plan day/i })).not.toBeInTheDocument()
     await openOverflow(user)
     expect(screen.queryByRole('button', { name: /time-block/i })).not.toBeInTheDocument()
