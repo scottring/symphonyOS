@@ -57,6 +57,13 @@ export interface CommitPageResult {
   route: string
   /** Human label for that period, for the success toast ("this week", "September", "Fall 2026", "2026"). */
   periodLabel: string
+  /** Ids of every task actually inserted, in commit order. Lets a caller that
+   *  knows these rows are throwaway (the first-week sample page) track and
+   *  later delete exactly what it created — there's no `capture_meta` column
+   *  to stamp a marker into instead. */
+  createdTaskIds: string[]
+  /** Ids of every note actually inserted (day-facts plus the page's own notes). */
+  createdNoteIds: string[]
 }
 
 /**
@@ -99,6 +106,7 @@ export function useCommitPage() {
     let firstTaskId: string | undefined
     let tasksCreated = 0
     let failures = 0
+    const createdTaskIds: string[] = []
     const tasks = items.filter((i) => i.placement.kind !== 'goal' && i.kind === 'task')
     for (const item of tasks) {
       const args = planItemToAddTaskArgs(item, commitCtx)
@@ -109,6 +117,7 @@ export function useCommitPage() {
       if (id) {
         tasksCreated += 1
         firstTaskId ??= id
+        createdTaskIds.push(id)
       } else {
         failures += 1
       }
@@ -158,6 +167,7 @@ export function useCommitPage() {
     // not also land there as a second copy.
     let firstNoteId: string | undefined
     let notesCreated = 0
+    const createdNoteIds: string[] = []
     for (const note of [...dayfactNotes, ...notes]) {
       const created = await addNote({
         title: note.title,
@@ -169,6 +179,7 @@ export function useCommitPage() {
       if (created) {
         notesCreated += 1
         firstNoteId ??= created.id
+        createdNoteIds.push(created.id)
       } else {
         failures += 1
       }
@@ -227,7 +238,7 @@ export function useCommitPage() {
       showToast(`Added ${parts.join(', ')} to ${periodLabel}`, 'success', 4000)
     }
 
-    return { tasksCreated, goalsCreated, notesCreated, routinesCreated, failures, route, periodLabel }
+    return { tasksCreated, goalsCreated, notesCreated, routinesCreated, failures, route, periodLabel, createdTaskIds, createdNoteIds }
   }, [addTask, addNote, addRoutine, getCurrentUserMember, areas, addGoal])
 
   return { commitPage }

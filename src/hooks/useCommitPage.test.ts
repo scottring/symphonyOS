@@ -72,7 +72,7 @@ describe('useCommitPage', () => {
 
     const result = await commit()({ items: [ITEM, ITEM], notes: [], domain: 'family', storagePath: null, altitude: 'week' })
 
-    expect(result).toEqual({ tasksCreated: 0, goalsCreated: 0, notesCreated: 0, routinesCreated: 0, failures: 2, route: '/week', periodLabel: 'this week' })
+    expect(result).toEqual({ tasksCreated: 0, goalsCreated: 0, notesCreated: 0, routinesCreated: 0, failures: 2, route: '/week', periodLabel: 'this week', createdTaskIds: [], createdNoteIds: [] })
     expect(successToasts()).toHaveLength(0)
     expect(errorToasts()[0][0]).toMatch(/could not be saved/i)
   })
@@ -88,7 +88,7 @@ describe('useCommitPage', () => {
       altitude: 'week',
     })
 
-    expect(result).toEqual({ tasksCreated: 1, goalsCreated: 0, notesCreated: 0, routinesCreated: 0, failures: 1, route: '/week', periodLabel: 'this week' })
+    expect(result).toEqual({ tasksCreated: 1, goalsCreated: 0, notesCreated: 0, routinesCreated: 0, failures: 1, route: '/week', periodLabel: 'this week', createdTaskIds: ['task-1'], createdNoteIds: [] })
     expect(errorToasts()[0][0]).toMatch(/Added 1 task, but 1 item could not be saved/)
   })
 
@@ -101,8 +101,25 @@ describe('useCommitPage', () => {
       altitude: 'week',
     })
 
-    expect(result).toEqual({ tasksCreated: 1, goalsCreated: 0, notesCreated: 1, routinesCreated: 0, failures: 0, route: '/week', periodLabel: 'this week' })
+    expect(result).toEqual({ tasksCreated: 1, goalsCreated: 0, notesCreated: 1, routinesCreated: 0, failures: 0, route: '/week', periodLabel: 'this week', createdTaskIds: ['task-1'], createdNoteIds: ['note-1'] })
     expect(successToasts()[0][0]).toBe('Added 1 task, 1 note to this week')
+  })
+
+  it('collects every created task and note id, in commit order, skipping failures — for the first-week sample cleanup', async () => {
+    mocks.addTask.mockResolvedValueOnce('task-a').mockResolvedValueOnce(undefined).mockResolvedValueOnce('task-b')
+    mocks.addNote.mockResolvedValueOnce({ id: 'note-a' }).mockResolvedValueOnce(null)
+
+    const result = await commit()({
+      items: [ITEM, ITEM, ITEM],
+      notes: [{ title: 'n1', content: 'c1' }, { title: 'n2', content: 'c2' }],
+      domain: 'family',
+      storagePath: null,
+      altitude: 'week',
+    })
+
+    expect(result.createdTaskIds).toEqual(['task-a', 'task-b'])
+    expect(result.createdNoteIds).toEqual(['note-a'])
+    expect(result.failures).toBe(2)
   })
 
   it('writes the page domain as context on every task and note', async () => {
@@ -213,7 +230,7 @@ describe('useCommitPage — goals', () => {
     expect(mocks.addGoal).toHaveBeenCalledWith('area-1', 'Run a half marathon', 'family', { notes: null, scope: 'compound' })
     expect(mocks.addArea).not.toHaveBeenCalled()
     expect(mocks.addTask).toHaveBeenCalledTimes(1)
-    expect(result).toEqual({ tasksCreated: 1, goalsCreated: 1, notesCreated: 0, routinesCreated: 0, failures: 0, route: '/week', periodLabel: 'this week' })
+    expect(result).toEqual({ tasksCreated: 1, goalsCreated: 1, notesCreated: 0, routinesCreated: 0, failures: 0, route: '/week', periodLabel: 'this week', createdTaskIds: ['task-1'], createdNoteIds: [] })
     expect(successToasts()[0][0]).toMatch(/1 task.*1 goal/)
   })
 

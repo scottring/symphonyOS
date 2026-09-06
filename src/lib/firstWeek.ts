@@ -80,3 +80,55 @@ export function shouldShowFirstWeek(steps: FirstWeekStep[], hiddenAt: string | n
 }
 
 export const FIRST_WEEK_HIDE_KEY = (uid: string) => `symphony.firstWeek.hidden.${uid}`
+
+// ---------------------------------------------------------------------------
+// Sample page — "no paper handy?" commits the bundled sample image through
+// the exact same paper flow as a real page. The rows it creates are real
+// rows (so the step genuinely completes), but they're fake data, so a
+// household that later snaps a real page should be able to clear them out.
+// The row ids are tracked here, client-side, rather than as a DB column —
+// `useCommitPage` has no `capture_meta` column to write a marker into.
+
+export const FIRST_WEEK_SAMPLE_KEY = (uid: string) => `symphony.firstWeek.sampleIds.${uid}`
+
+export interface SampleIds {
+  taskIds: string[]
+  noteIds: string[]
+}
+
+const EMPTY_SAMPLE_IDS: SampleIds = { taskIds: [], noteIds: [] }
+
+export function readSampleIds(uid: string): SampleIds {
+  try {
+    const raw = localStorage.getItem(FIRST_WEEK_SAMPLE_KEY(uid))
+    if (!raw) return EMPTY_SAMPLE_IDS
+    const parsed = JSON.parse(raw) as Partial<SampleIds>
+    return {
+      taskIds: Array.isArray(parsed.taskIds) ? parsed.taskIds : [],
+      noteIds: Array.isArray(parsed.noteIds) ? parsed.noteIds : [],
+    }
+  } catch {
+    return EMPTY_SAMPLE_IDS
+  }
+}
+
+export function writeSampleIds(uid: string, ids: SampleIds): void {
+  try {
+    localStorage.setItem(FIRST_WEEK_SAMPLE_KEY(uid), JSON.stringify(ids))
+  } catch {
+    // ignore — sample tracking is a nice-to-have, not load-bearing
+  }
+}
+
+export function clearSampleIdsRecord(uid: string): void {
+  try {
+    localStorage.removeItem(FIRST_WEEK_SAMPLE_KEY(uid))
+  } catch {
+    // ignore
+  }
+}
+
+export function hasSampleIds(uid: string): boolean {
+  const ids = readSampleIds(uid)
+  return ids.taskIds.length > 0 || ids.noteIds.length > 0
+}

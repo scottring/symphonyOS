@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Loader2, LogIn, RotateCcw, X } from 'lucide-react'
 import { CameraCaptureModal } from '@/components/capture/CameraCaptureModal'
@@ -6,6 +6,8 @@ import { PageReviewSheet, type PageReviewPayload } from '@/components/capture/Pa
 import { usePageFromPaper } from '@/hooks/usePageFromPaper'
 import { useCommitPage } from '@/hooks/useCommitPage'
 import { isSessionExpired } from '@/lib/authErrors'
+import { getAuthUser } from '@/lib/supabase'
+import { readSampleIds, writeSampleIds } from '@/lib/firstWeek'
 import type { ExistingTask } from '@/lib/planDuplicates'
 import type { DomainId } from '@/lib/domains'
 import type { FamilyMember } from '@/types/family'
@@ -27,6 +29,16 @@ interface PageFromPaperFlowProps {
   existingTasks?: ExistingTask[]
   /** 'YYYY-MM-DD' → the day's event titles, for day-facts already on the calendar. */
   calendarTitlesByDay?: Map<string, string[]>
+  /** Skip the camera and parse this blob on mount instead — the first-week
+   *  card's "Use our sample page" offer, which hands over the bundled sample
+   *  image rather than making a paperless household photograph anything. */
+  initialBlob?: Blob
+  /** Altitude for `initialBlob`. Defaults to 'week'. Ignored without initialBlob. */
+  initialAltitude?: PageAltitude
+  /** The page being committed is the bundled sample, not a real one — the
+   *  rows it creates are tracked (client-side) so "Clear sample" can remove
+   *  them once a real page replaces the need for it. */
+  sample?: boolean
 }
 
 /**
@@ -41,16 +53,24 @@ interface PageFromPaperFlowProps {
  * that is open for a few seconds a week. This component mounts only while the
  * flow is open, so those hooks instantiate only then.
  */
-export function PageFromPaperFlow({ members, onClose, existingTasks, calendarTitlesByDay }: PageFromPaperFlowProps) {
+export function PageFromPaperFlow({ members, onClose, existingTasks, calendarTitlesByDay, initialBlob, initialAltitude, sample }: PageFromPaperFlowProps) {
   const { status, result, error, parseFromBlob, retry, reset } = usePageFromPaper(members)
   const { commitPage } = useCommitPage()
   const navigate = useNavigate()
-  const [camera, setCamera] = useState(true)
+  const [camera, setCamera] = useState(!initialBlob)
   // Which page is being snapped. Chosen in the camera modal; the client owns
   // the window, so it must own the altitude too. Week = the old behaviour.
-  const [altitude, setAltitude] = useState<PageAltitude>('week')
+  const [altitude, setAltitude] = useState<PageAltitude>(initialAltitude ?? 'week')
   const [committing, setCommitting] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // A bundled blob (the sample page) skips the camera entirely and parses on
+  // mount, on whatever altitude the caller asked for.
+  useEffect(() => {
+    if (initialBlob) void parseFromBlob(initialBlob, initialAltitude ?? 'week')
+    // Only ever runs for the mount this instance was given a blob for.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const close = useCallback(() => {
     reset()
@@ -71,14 +91,24 @@ export function PageFromPaperFlow({ members, onClose, existingTasks, calendarTit
     setCommitting(true)
     try {
       // The sheet asks which layer the page belongs to; the payload carries it.
-      const { route } = await commitPage({ ...payload, storagePath: result.storagePath, altitude: result.altitude })
+      const { route, createdTaskIds, createdNoteIds } = await commitPage({ ...payload, storagePath: result.storagePath, altitude: result.altitude })
+      if (sample && (createdTaskIds.length || createdNoteIds.length)) {
+        const { data: { user } } = await getAuthUser()
+        if (user) {
+          const existing = readSampleIds(user.id)
+          writeSampleIds(user.id, {
+            taskIds: [...existing.taskIds, ...createdTaskIds],
+            noteIds: [...existing.noteIds, ...createdNoteIds],
+          })
+        }
+      }
       reset()
       onClose()
       navigate(route)
     } finally {
       setCommitting(false)
     }
-  }, [commitPage, reset, onClose, navigate, result.storagePath, result.altitude])
+  }, [commitPage, reset, onClose, navigate, result.storagePath, result.altitude, sample])
 
   return (
     <>

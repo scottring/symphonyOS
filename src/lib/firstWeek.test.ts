@@ -1,5 +1,13 @@
-import { describe, it, expect } from 'vitest'
-import { firstWeekSteps, shouldShowFirstWeek, type FirstWeekSignals } from './firstWeek'
+import { describe, it, expect, beforeEach } from 'vitest'
+import {
+  firstWeekSteps,
+  shouldShowFirstWeek,
+  readSampleIds,
+  writeSampleIds,
+  clearSampleIdsRecord,
+  hasSampleIds,
+  type FirstWeekSignals,
+} from './firstWeek'
 
 const none: FirstWeekSignals = { memberCount: 1, pageCommitted: false, partnerInvited: false, routineCount: 0 }
 
@@ -29,5 +37,26 @@ describe('shouldShowFirstWeek', () => {
 
     expect(shouldShowFirstWeek(two, new Date(Date.now() - 2 * 86_400_000).toISOString(), new Date())).toBe(false)
     expect(shouldShowFirstWeek(two, new Date(Date.now() - 8 * 86_400_000).toISOString(), new Date())).toBe(true)
+  })
+})
+
+describe('sample id tracking', () => {
+  beforeEach(() => localStorage.clear())
+
+  it('round-trips what was written, and reports nothing before a write', () => {
+    expect(hasSampleIds('u1')).toBe(false)
+    expect(readSampleIds('u1')).toEqual({ taskIds: [], noteIds: [] })
+
+    writeSampleIds('u1', { taskIds: ['t1', 't2'], noteIds: ['n1'] })
+    expect(hasSampleIds('u1')).toBe(true)
+    expect(readSampleIds('u1')).toEqual({ taskIds: ['t1', 't2'], noteIds: ['n1'] })
+
+    clearSampleIdsRecord('u1')
+    expect(hasSampleIds('u1')).toBe(false)
+  })
+
+  it('keys are per-user', () => {
+    writeSampleIds('u1', { taskIds: ['t1'], noteIds: [] })
+    expect(hasSampleIds('u2')).toBe(false)
   })
 })

@@ -53,6 +53,10 @@ import { useResolutionLearning } from '@/hooks/useResolutionLearning';
 import { HomeView } from '@/components/home';
 import { useSelection } from '@/shell/providers/SelectionProvider';
 import { useMealEventsForDate } from '@/shell/providers/MealEventsProvider';
+import { FirstWeekCard } from '@/components/schedule/FirstWeekCard';
+import { useFirstWeekSignals } from '@/hooks/useFirstWeekSignals';
+import { firstWeekSteps, shouldShowFirstWeek, FIRST_WEEK_HIDE_KEY, hasSampleIds, readSampleIds, clearSampleIdsRecord } from '@/lib/firstWeek';
+import { getAuthUser } from '@/lib/supabase';
 
 export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' } = {}) {
   // Data hooks
@@ -80,7 +84,7 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
   const { isHidden: isEventHidden, hideEvent } = useHiddenCalendarEvents();
   const { getDomainForCalendar } = useCalendarDomainMappings();
   const { lists, listsByCategory, addList } = useListsContext();
-  const { addNote } = useNotesContext();
+  const { addNote, deleteNote } = useNotesContext();
   const undo = useUndo();
   const { aliases, recordOutcome } = useResolutionLearning();
 
@@ -111,6 +115,85 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
     next.delete('date');
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams]);
+
+  // "Your first week" — a fresh household's onboarding card. uid is fetched
+  // once (not via useAuth, which this tree already has several copies of via
+  // other hooks) purely to key the two localStorage markers (hide, sample ids).
+  const [firstWeekUid, setFirstWeekUid] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    void getAuthUser().then(({ data }) => { if (alive) setFirstWeekUid(data.user?.id ?? null); });
+    return () => { alive = false };
+  }, []);
+
+  const { signals: firstWeekSignals, refetch: refetchFirstWeekSignals } = useFirstWeekSignals();
+  const firstWeekStepsList = useMemo(() => (firstWeekSignals ? firstWeekSteps(firstWeekSignals) : []), [firstWeekSignals]);
+
+  const [firstWeekHiddenAt, setFirstWeekHiddenAt] = useState<string | null>(null);
+  useEffect(() => {
+    if (!firstWeekUid) return;
+    try { setFirstWeekHiddenAt(localStorage.getItem(FIRST_WEEK_HIDE_KEY(firstWeekUid))); } catch { setFirstWeekHiddenAt(null); }
+  }, [firstWeekUid]);
+
+  const [hasSample, setHasSample] = useState(false);
+  useEffect(() => {
+    if (!firstWeekUid) return;
+    setHasSample(hasSampleIds(firstWeekUid));
+  }, [firstWeekUid, firstWeekSignals]);
+
+  // /week mounts this same container (fixedView="week") — the card is a
+  // Today-only onboarding nudge, never shown on the bench.
+  const showFirstWeek = fixedView !== 'week' && firstWeekUid !== null && firstWeekSignals !== null &&
+    shouldShowFirstWeek(firstWeekStepsList, firstWeekHiddenAt, new Date());
+
+  const handleHideFirstWeek = useCallback(() => {
+    if (!firstWeekUid) return;
+    const now = new Date().toISOString();
+    try { localStorage.setItem(FIRST_WEEK_HIDE_KEY(firstWeekUid), now); } catch { /* ignore */ }
+    setFirstWeekHiddenAt(now);
+  }, [firstWeekUid]);
+
+  // "Use our sample page" hands the bundled week-page image straight to the
+  // paper flow on the week altitude, skipping the camera — the same path a
+  // real snap takes, so the same commit/attachment/signal machinery applies.
+  const [sampleBlob, setSampleBlob] = useState<Blob | null>(null);
+  const handleSamplePage = useCallback(() => {
+    void fetch('/sample/week-page.jpg')
+      .then((r) => r.blob())
+      .then((blob) => {
+        setSampleBlob(blob);
+        setPlanFromPaperOpen(true);
+      })
+      .catch(() => showToast('Could not load the sample page', 'error'));
+  }, []);
+
+  const handleClearSample = useCallback(() => {
+    if (!firstWeekUid) return;
+    const ids = readSampleIds(firstWeekUid);
+    void Promise.all([
+      ...ids.taskIds.map((id) => deleteTask(id)),
+      ...ids.noteIds.map((id) => deleteNote(id)),
+    ]).then(() => {
+      clearSampleIdsRecord(firstWeekUid);
+      setHasSample(false);
+      void refetchFirstWeekSignals();
+    });
+  }, [firstWeekUid, deleteTask, deleteNote, refetchFirstWeekSignals]);
+
+  // ?plan=paper (from the card's "Snap this week's page" link) opens the flow
+  // directly on this route; ?plan=sample loads the bundled sample first.
+  useEffect(() => {
+    const plan = searchParams.get('plan');
+    if (!plan) return;
+    const next = new URLSearchParams(searchParams);
+    next.delete('plan');
+    setSearchParams(next, { replace: true });
+    if (plan === 'paper') {
+      setPlanFromPaperOpen(true);
+    } else if (plan === 'sample') {
+      handleSamplePage();
+    }
+  }, [searchParams, setSearchParams, handleSamplePage]);
 
   // Map URL selection back to the legacy `selectedItemId` shape HomeView expects
   // (`task-<id>`, `routine-<id>`, `event-<id>`). The TimelineCard uses this to
@@ -691,6 +774,15 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
 
   return (
     <ScheduleActionsProvider value={scheduleActionsValue}>
+      {showFirstWeek && (
+        <FirstWeekCard
+          steps={firstWeekStepsList}
+          onHide={handleHideFirstWeek}
+          onSamplePage={handleSamplePage}
+          onClearSample={hasSample ? handleClearSample : undefined}
+        />
+      )}
+
       <HomeView
         tasks={tasks}
         events={filteredEvents}
@@ -718,9 +810,15 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
       {planFromPaperOpen && (
         <PageFromPaperFlow
           members={familyMembers}
-          onClose={() => setPlanFromPaperOpen(false)}
+          onClose={() => {
+            setPlanFromPaperOpen(false);
+            setSampleBlob(null);
+          }}
           existingTasks={tasks.filter((t) => !t.completed).map((t) => ({ id: t.id, title: t.title }))}
           calendarTitlesByDay={calendarTitlesByDay}
+          initialBlob={sampleBlob ?? undefined}
+          initialAltitude={sampleBlob ? 'week' : undefined}
+          sample={!!sampleBlob}
         />
       )}
 
