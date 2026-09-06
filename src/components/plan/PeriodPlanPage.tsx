@@ -28,8 +28,9 @@ import { GoalsProvider, useGoalsContext } from '@/contexts/GoalsContext'
 import { filterTasksForLayers, matchesLayers } from '@/lib/today/domainFilter'
 import { placementFate } from '@/lib/planning/lineage'
 import { parseLocalYmd } from '@/lib/cadence/config'
+import { formatShortDate } from '@/lib/dateHelpers'
 import {
-  periodBounds, isCurrentPeriod, selectPeriodTasks, actionsFor, railLevel, planningPeriod,
+  periodBounds, isCurrentPeriod, selectPeriodTasks, selectDatedInPeriod, actionsFor, railLevel, planningPeriod,
   type PlanLevel, type RowAction,
 } from '@/lib/planning/periodPage'
 import type { Task } from '@/types/task'
@@ -111,6 +112,13 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
     // the order they were written.
     return [...list.filter((r) => r.isGoal), ...list.filter((r) => !r.isGoal)]
   }, [level, goals, layers, layered, bounds.start, isCurrent, meId, tasks])
+
+  // ── On the calendar: timed items landing inside this period. The list
+  //    above answers a POOL question (bucket === level); this answers a DATE
+  //    question, so a dated item never goes missing just because it lives on
+  //    a different bucket (demo run 2026-09-06). Month and season only — a
+  //    year list is goals, with no dates to show. ─────────────────────────
+  const dated = useMemo(() => (level === 'year' ? [] : selectDatedInPeriod(layered, bounds)), [level, layered, bounds])
 
   // ── The fold: the level above, read-only. It follows the same "plan for
   //    the period ahead" rule as the page itself — near a season/year
@@ -233,6 +241,25 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
       />
 
       <div className="flex flex-col gap-3">
+        {dated.length > 0 && (
+          <section aria-label="On the calendar" className="min-w-0 rounded-xl border border-neutral-200 bg-white px-3 py-2.5 shadow-sm">
+            <h2 className="text-xs font-semibold tracking-wide uppercase text-neutral-500">On the calendar</h2>
+            <ul className="mt-1.5 space-y-0.5">
+              {dated.map((t) => (
+                <li key={t.id}>
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/task/${t.id}`)}
+                    className="w-full rounded-md px-1.5 py-1 text-left text-[13px] text-neutral-700 hover:bg-neutral-50 transition-colors"
+                  >
+                    {formatShortDate(t.scheduledFor!)} · {t.title}
+                    {!t.isAllDay && ` · ${t.scheduledFor!.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
         <section aria-label={`${bounds.label} list`} className="min-w-0 rounded-xl border border-neutral-200 bg-white px-3 py-3 shadow-sm">
           {rows.length === 0 ? (
             <p className="px-2 py-3 text-sm text-neutral-400">{emptyCopy}</p>

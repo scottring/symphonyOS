@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { periodBounds, isCurrentPeriod, selectPeriodTasks, actionsFor, railLevel, planningPeriod, type PlanLevel } from './periodPage'
+import { periodBounds, isCurrentPeriod, selectPeriodTasks, selectDatedInPeriod, actionsFor, railLevel, planningPeriod, type PlanLevel } from './periodPage'
 import { DEFAULT_SEASONS } from '@/lib/cadence/seasons'
 import type { Task } from '@/types/task'
 
@@ -66,6 +66,28 @@ describe('selectPeriodTasks', () => {
   })
   it('without a member id nothing is scoped away', () => {
     expect(selectPeriodTasks(all, 'month', sep, true, null)).toHaveLength(4)
+  })
+  it('sorts rows by created_at ascending, regardless of input order', () => {
+    const third = task({ bucket: 'month', monthStart: sep, createdAt: d(2026, 8, 3) })
+    const first = task({ bucket: 'month', monthStart: sep, createdAt: d(2026, 8, 1) })
+    const second = task({ bucket: 'month', monthStart: sep, createdAt: d(2026, 8, 2) })
+    const ids = selectPeriodTasks([third, first, second], 'month', sep, true, null).map((t) => t.id)
+    expect(ids).toEqual([first.id, second.id, third.id])
+  })
+})
+
+describe('selectDatedInPeriod', () => {
+  const bounds = periodBounds('month', d(2026, 8, 17), DEFAULT_SEASONS) // September 2026
+
+  it('returns timed, non-completed rows inside the period, sorted by date (all-day first on a tied day)', () => {
+    const later = task({ scheduledFor: d(2026, 8, 20), title: 'Later this month' })
+    const timed = task({ scheduledFor: new Date(2026, 8, 15, 18, 30), title: 'Back to school night' })
+    const allDaySameDate = task({ scheduledFor: d(2026, 8, 15), isAllDay: true, title: 'Picture day' })
+    const outOfRange = task({ scheduledFor: d(2026, 7, 30), title: 'August' })
+    const doneOne = task({ scheduledFor: d(2026, 8, 10), completed: true, title: 'Done already' })
+    const noDate = task({ title: 'No date' })
+    const ids = selectDatedInPeriod([later, timed, allDaySameDate, outOfRange, doneOne, noDate], bounds).map((t) => t.id)
+    expect(ids).toEqual([allDaySameDate.id, timed.id, later.id])
   })
 })
 

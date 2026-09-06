@@ -7,7 +7,7 @@
 // an open task (a copy-down: "→ this month" on a season task, "→ this week"
 // on a month task); goals, placed and done rows are look-only.
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ArrowRight, ChevronDown, ChevronRight, Target } from 'lucide-react'
 import type { PlanRowModel } from './PlanRow'
 
@@ -18,6 +18,25 @@ function readOpen(key: string | undefined): boolean {
 function writeOpen(key: string | undefined, open: boolean): void {
   if (!key) return
   try { localStorage.setItem(key, open ? 'open' : 'collapsed') } catch { /* private browsing */ }
+}
+
+// The hint is a one-time nudge toward the pull-down arrow (demo run
+// 2026-09-06: the arrow was hover-only AND unlabeled, so no one found it).
+// Shown once ever, across every rail — not per storageKey.
+const HINT_SEEN_KEY = 'symphony-plan-rail-hint-seen'
+function readHintSeen(): boolean {
+  try { return localStorage.getItem(HINT_SEEN_KEY) === '1' } catch { return true }
+}
+function writeHintSeen(): void {
+  try { localStorage.setItem(HINT_SEEN_KEY, '1') } catch { /* private browsing */ }
+}
+/** "Add to this month:" → "month" */
+function pullNoun(pullLabel: string | undefined): string | null {
+  return pullLabel?.match(/this (\w+)/)?.[1] ?? null
+}
+/** "Add to this month:" → "Add to this month" */
+function pullTitle(pullLabel: string | undefined): string | undefined {
+  return pullLabel?.replace(/:\s*$/, '')
 }
 
 export function PlanRail({ title, subtitle, rows, onOpen, onPullDown, pullLabel, emptyCopy, storageKey }: {
@@ -34,6 +53,12 @@ export function PlanRail({ title, subtitle, rows, onOpen, onPullDown, pullLabel,
 }) {
   const [open, setOpen] = useState(() => readOpen(storageKey))
   const toggle = () => { setOpen((v) => { writeOpen(storageKey, !v); return !v }) }
+  // Captured once at mount, so the hint stays visible for this whole
+  // session even after it flips the flag that hides it on the NEXT visit.
+  const [hintSeenAtMount] = useState(() => readHintSeen())
+  useEffect(() => { if (!hintSeenAtMount) writeHintSeen() }, [hintSeenAtMount])
+  const showHint = open && !!onPullDown && rows.length > 0 && !hintSeenAtMount
+  const noun = pullNoun(pullLabel)
   const goals = rows.filter((r) => r.isGoal)
   const items = rows.filter((r) => !r.isGoal)
   const Row = ({ row }: { row: PlanRowModel }) => {
@@ -58,9 +83,9 @@ export function PlanRail({ title, subtitle, rows, onOpen, onPullDown, pullLabel,
           <button
             type="button"
             aria-label={`${pullLabel ?? 'Add'} ${row.title}`}
-            title={pullLabel}
+            title={pullTitle(pullLabel)}
             onClick={() => onPullDown!(row)}
-            className="shrink-0 mt-0.5 p-1 rounded text-primary-600 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 hover:bg-primary-50 transition-opacity"
+            className="shrink-0 mt-0.5 p-1 rounded text-primary-600 opacity-60 group-hover:opacity-100 focus-visible:opacity-100 hover:bg-primary-50 transition-opacity"
           >
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
@@ -81,6 +106,9 @@ export function PlanRail({ title, subtitle, rows, onOpen, onPullDown, pullLabel,
         {subtitle && <span className="font-normal normal-case tracking-normal text-neutral-400">· {subtitle}</span>}
         {!open && <span className="ml-auto font-normal normal-case tracking-normal text-neutral-400">{rows.length}</span>}
       </button>
+      {showHint && noun && (
+        <p className="mt-1 text-[11px] text-neutral-400">Press → to bring one into this {noun}.</p>
+      )}
       {open && (rows.length === 0 ? (
         <p className="text-sm text-neutral-400 pt-2 pb-1">{emptyCopy}</p>
       ) : (

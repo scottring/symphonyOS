@@ -96,12 +96,33 @@ export function selectPeriodTasks(
   meId: string | null,
 ): Task[] {
   const bucket = level === 'month' ? 'month' : 'quarter'
-  return tasks.filter((t) => {
-    if (t.bucket !== bucket) return false
-    if (meId && !doableBy(t, meId)) return false
-    if (level === 'month') return isCurrent ? belongsToMonth(t, start) : isPlacedOnMonth(t, start)
-    return isCurrent ? belongsToSeason(t, start) : isPlacedOnSeason(t, start)
-  })
+  return tasks
+    .filter((t) => {
+      if (t.bucket !== bucket) return false
+      if (meId && !doableBy(t, meId)) return false
+      if (level === 'month') return isCurrent ? belongsToMonth(t, start) : isPlacedOnMonth(t, start)
+      return isCurrent ? belongsToSeason(t, start) : isPlacedOnSeason(t, start)
+    })
+    .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
+}
+
+/**
+ * Timed items landing inside the period — the ones that showed up on Today
+ * but never appeared on the month/season page they were also inside (demo
+ * run 2026-09-06: six dated September items were invisible on /month, which
+ * only ever asked the pool question). Not completed, sorted chronologically
+ * with an all-day item ranked before a timed one on the same day.
+ */
+export function selectDatedInPeriod(tasks: readonly Task[], bounds: PeriodBounds): Task[] {
+  const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
+  return tasks
+    .filter((t): t is Task & { scheduledFor: Date } => !t.completed && !!t.scheduledFor && t.scheduledFor >= bounds.start && t.scheduledFor < bounds.end)
+    .sort((a, b) => {
+      const dayDiff = startOfDay(a.scheduledFor) - startOfDay(b.scheduledFor)
+      if (dayDiff !== 0) return dayDiff
+      if (!!a.isAllDay !== !!b.isAllDay) return a.isAllDay ? -1 : 1
+      return a.scheduledFor.getTime() - b.scheduledFor.getTime()
+    })
 }
 
 export type RowAction = 'complete' | 'keep' | 'someday' | 'drop' | 'make-goal' | 'make-task'

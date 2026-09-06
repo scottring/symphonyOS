@@ -41,6 +41,11 @@ vi.mock('@/lib/today/domainFilter', () => ({
   filterTasksForLayers: (t: Task[]) => t,
   matchesLayers: () => true,
 }))
+const mockNavigate = vi.fn()
+vi.mock('react-router-dom', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useNavigate: () => mockNavigate,
+}))
 
 import { PeriodPlanPage } from './PeriodPlanPage'
 
@@ -52,6 +57,7 @@ describe('PeriodPlanPage', () => {
     state.tasks = []; state.goals = []
     Object.values(hook).forEach((f) => f.mockClear())
     Object.values(goalsApi).forEach((f) => f.mockClear())
+    mockNavigate.mockClear()
   })
 
   it("This Month: goals first, then tasks, each with its fate; Iris's rows stay out", () => {
@@ -71,6 +77,29 @@ describe('PeriodPlanPage', () => {
     expect(within(list).getByText('→ placed')).toBeInTheDocument()
     expect(within(list).getByText('Legacy row')).toBeInTheDocument()
     expect(within(list).queryByText("Iris's thing")).not.toBeInTheDocument()
+  })
+
+  it('shows dated items "on the calendar" above the list — the pool question was hiding them (demo run 2026-09-06)', () => {
+    const scheduledFor = new Date(now.getFullYear(), now.getMonth(), 15, 18, 30)
+    const dated = task({ title: 'Back to school night', scheduledFor, bucket: 'week' })
+    state.tasks = [dated]
+    renderPage('month')
+    expect(screen.getByRole('heading', { name: 'On the calendar' })).toBeInTheDocument()
+    const expectedDate = scheduledFor.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+    const expectedTime = scheduledFor.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+    expect(screen.getByText(`${expectedDate} · Back to school night · ${expectedTime}`)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(`${expectedDate} · Back to school night`) }))
+    expect(mockNavigate).toHaveBeenCalledWith(`/task/${dated.id}`)
+  })
+
+  it('an all-day dated item shows no time, and the strip is absent when nothing is dated', () => {
+    renderPage('month')
+    expect(screen.queryByRole('heading', { name: 'On the calendar' })).not.toBeInTheDocument()
+    const scheduledFor = new Date(now.getFullYear(), now.getMonth(), 15)
+    state.tasks = [task({ title: 'Picture day', scheduledFor, isAllDay: true, bucket: 'week' })]
+    renderPage('month')
+    const expectedDate = scheduledFor.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+    expect(screen.getByText(`${expectedDate} · Picture day`)).toBeInTheDocument()
   })
 
   it('folds the season beneath the month list, with → this month on open tasks once unfolded', () => {
