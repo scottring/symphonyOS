@@ -392,8 +392,12 @@ describe('RoutineForm', () => {
       expect(screen.getByLabelText('Who')).toHaveValue('')
     })
 
-    it('saves the picked member through onUpdate', () => {
-      const routine = createMockRoutine({ assigned_to: null })
+    // The Who select and the avatar row below it are two views of ONE
+    // assignment, and `assigned_to_all` is what the avatars — and every reader
+    // — look at first. A select that wrote `assigned_to` alone left the old
+    // assignees standing, so the two halves of the form disagreed.
+    it('saves the picked member through onUpdate — BOTH fields, so the avatar row agrees', () => {
+      const routine = createMockRoutine({ assigned_to: null, assigned_to_all: null })
       const familyMembers = [
         createMockFamilyMember({ id: 'member-1', name: 'Scott' }),
         createMockFamilyMember({ id: 'member-2', name: 'Iris' }),
@@ -403,18 +407,24 @@ describe('RoutineForm', () => {
 
       fireEvent.change(screen.getByLabelText('Who'), { target: { value: 'member-2' } })
 
-      expect(mockOnUpdate).toHaveBeenCalledWith(routine.id, { assigned_to: 'member-2' })
+      expect(mockOnUpdate).toHaveBeenCalledWith(routine.id, {
+        assigned_to: 'member-2',
+        assigned_to_all: ['member-2'],
+      })
     })
 
-    it('saves null ("Everyone in the house") through onUpdate', () => {
-      const routine = createMockRoutine({ assigned_to: 'member-1' })
+    it('"Everyone in the house" clears the member the routine was locked to', () => {
+      const routine = createMockRoutine({ assigned_to: 'member-1', assigned_to_all: ['member-1'] })
       const familyMembers = [createMockFamilyMember({ id: 'member-1', name: 'Scott' })]
 
       renderForm(routine, { familyMembers })
 
       fireEvent.change(screen.getByLabelText('Who'), { target: { value: '' } })
 
-      expect(mockOnUpdate).toHaveBeenCalledWith(routine.id, { assigned_to: null })
+      expect(mockOnUpdate).toHaveBeenCalledWith(routine.id, {
+        assigned_to: null,
+        assigned_to_all: [],
+      })
     })
   })
 

@@ -271,7 +271,13 @@ export function RoutineForm({ routine, contacts = [], familyMembers = [], onBack
           </div>
 
           {/* Who — controls privacy: "Everyone in the house" shares with the
-              whole family; a member locks the routine to just that person. */}
+              whole family; a member locks the routine to just that person.
+              This select and the avatar row below are two views of ONE
+              assignment, and `assigned_to_all` is the field the avatars (and
+              every reader) look at first. Writing `assigned_to` alone left the
+              old assignees standing: picking "Everyone in the house" on a
+              routine assigned to Mia kept it Mia's. Both fields move together
+              here, exactly as `writeAssignees` moves them below. */}
           {familyMembers.length > 0 && (
             <div className="pt-4 border-t border-neutral-100">
               <label htmlFor="routine-who" className="block text-sm font-medium text-neutral-700 mb-2">
@@ -280,7 +286,13 @@ export function RoutineForm({ routine, contacts = [], familyMembers = [], onBack
               <select
                 id="routine-who"
                 value={routine.assigned_to ?? ''}
-                onChange={(e) => onUpdate(routine.id, { assigned_to: e.target.value || null })}
+                onChange={(e) => {
+                  const memberId = e.target.value || null
+                  onUpdate(routine.id, {
+                    assigned_to: memberId,
+                    assigned_to_all: memberId ? [memberId] : [],
+                  })
+                }}
                 className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm text-neutral-700"
               >
                 <option value="">Everyone in the house</option>
