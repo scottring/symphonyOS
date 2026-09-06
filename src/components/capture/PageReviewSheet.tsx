@@ -269,7 +269,7 @@ export function PageReviewSheet({
       <span className="px-1">
         {altitude === 'month'
           ? monthStart.toLocaleDateString('en-US', { month: 'long', ...(monthStart.getFullYear() !== today.getFullYear() ? { year: 'numeric' } : {}) })
-          : seasonLabel(seasonStart, seasons)}
+          : seasonLabel(seasonStart, seasonsOrdered)}
       </span>
       <button type="button" aria-label={altitude === 'month' ? 'Next month' : 'Next season'}
         onClick={() => (altitude === 'month' ? shiftMonth(1) : shiftSeason(1))}

@@ -288,9 +288,13 @@ describe('PageReviewSheet — domain, page title, duplicates', () => {
     })
     // Fall runs Sep 1 – Nov 30 here, so Dec 12 is out of the window.
     expect(screen.getByRole('combobox', { name: 'When' })).toHaveValue('season')
+    expect(screen.getByText('Fall 2026')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Next season' }))
+    // The chip must NAME the season it re-windowed onto, not just window on it.
+    expect(screen.getByText('Winter 2026')).toBeInTheDocument()
     expect(screen.getByRole('combobox', { name: 'When' })).toHaveValue('2026-12-12')
     await user.click(screen.getByRole('button', { name: 'Previous season' }))
+    expect(screen.getByText('Fall 2026')).toBeInTheDocument()
     expect(screen.getByRole('combobox', { name: 'When' })).toHaveValue('season')
   })
 
