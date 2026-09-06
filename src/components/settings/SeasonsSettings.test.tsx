@@ -17,24 +17,24 @@ describe('SeasonsSettings', () => {
   it('renders the four seasons with their start dates', () => {
     render(<SeasonsSettings />)
     expect(screen.getByRole('heading', { name: 'Seasons' })).toBeInTheDocument()
-    expect(screen.getByLabelText('Season 4 name')).toHaveValue('Fall')
-    expect(screen.getByLabelText('Season 4 starts in')).toHaveValue('10')
-    expect(screen.getByLabelText('Season 4 start day')).toHaveValue('1')
+    expect(screen.getByLabelText('Season 3 name')).toHaveValue('Fall')
+    expect(screen.getByLabelText('Season 3 starts in')).toHaveValue('9')
+    expect(screen.getByLabelText('Season 3 start day')).toHaveValue('1')
   })
 
   it('says which season today is in', () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     vi.setSystemTime(new Date(2026, 8, 5))
     render(<SeasonsSettings />)
-    expect(screen.getByText(/Today is in Summer 2026/)).toBeInTheDocument()
+    expect(screen.getByText(/Today is in Fall 2026/)).toBeInTheDocument()
   })
 
   it('changing a start month saves the whole config', () => {
     render(<SeasonsSettings />)
-    fireEvent.change(screen.getByLabelText('Season 4 starts in'), { target: { value: '9' } })
+    fireEvent.change(screen.getByLabelText('Season 4 starts in'), { target: { value: '11' } })
     expect(mockSetSeasons).toHaveBeenCalledTimes(1)
     const next = mockSetSeasons.mock.calls[0][0]
-    expect(next[3]).toEqual({ name: 'Fall', month: 9, day: 1 })
+    expect(next[3]).toEqual({ name: 'Winter', month: 11, day: 1 })
   })
 
   it('renaming saves on blur, not on every keystroke', () => {

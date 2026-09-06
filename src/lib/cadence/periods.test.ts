@@ -2,22 +2,22 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import { seasonIndex, seasonStart, seasonEnd, periodLabel, periodProgress, horizonNeighbors } from './periods'
 
 describe('seasonIndex / seasonStart / seasonEnd', () => {
-  // The household's configured seasons (DEFAULT: Jan 1 / Apr 1 / Jul 1 / Oct 1),
-  // no longer the meteorological four.
+  // The household's configured seasons (DEFAULT: Spring Mar 1 / Summer Jun 1 /
+  // Fall Sep 1 / Winter Dec 1), no longer the meteorological four.
   beforeEach(() => localStorage.clear())
 
   it('maps dates to the configured seasons', () => {
-    expect(seasonIndex(new Date(2026, 0, 15))).toBe(0) // Jan → Winter
-    expect(seasonIndex(new Date(2026, 4, 15))).toBe(1) // May → Spring
-    expect(seasonIndex(new Date(2026, 6, 8))).toBe(2)  // Jul → Summer
-    expect(seasonIndex(new Date(2026, 10, 1))).toBe(3) // Nov → Fall
-    expect(seasonIndex(new Date(2026, 11, 25))).toBe(3) // Dec → still Fall (it started Oct 1)
+    expect(seasonIndex(new Date(2026, 0, 15))).toBe(3) // Jan → Winter (started prev Dec 1)
+    expect(seasonIndex(new Date(2026, 3, 15))).toBe(0) // Apr → Spring
+    expect(seasonIndex(new Date(2026, 6, 8))).toBe(1)  // Jul → Summer
+    expect(seasonIndex(new Date(2026, 9, 1))).toBe(2)  // Oct → Fall
+    expect(seasonIndex(new Date(2026, 11, 25))).toBe(3) // Dec → Winter (it started Dec 1)
   })
 
   it('finds the season start, wrapping the year before the first boundary', () => {
-    expect(seasonStart(new Date(2026, 6, 8))).toEqual(new Date(2026, 6, 1))    // Jul → Jul 1
-    expect(seasonStart(new Date(2026, 11, 25))).toEqual(new Date(2026, 9, 1))  // Dec → Oct 1
-    expect(seasonStart(new Date(2026, 9, 1))).toEqual(new Date(2026, 9, 1))    // Oct 1 → itself
+    expect(seasonStart(new Date(2026, 6, 8))).toEqual(new Date(2026, 5, 1))    // Jul → Jun 1
+    expect(seasonStart(new Date(2026, 11, 25))).toEqual(new Date(2026, 11, 1)) // Dec 25 → Dec 1
+    expect(seasonStart(new Date(2026, 11, 1))).toEqual(new Date(2026, 11, 1))  // Dec 1 → itself
     const uneven = [
       { name: 'Deep winter', month: 2, day: 15 }, { name: 'Spring', month: 4, day: 1 },
       { name: 'Summer', month: 7, day: 1 }, { name: 'Fall', month: 10, day: 1 },
@@ -27,8 +27,8 @@ describe('seasonIndex / seasonStart / seasonEnd', () => {
   })
 
   it('season end is exclusive: the next boundary, wrapping into next year', () => {
-    expect(seasonEnd(new Date(2026, 6, 8))).toEqual(new Date(2026, 9, 1))    // Summer → Oct 1
-    expect(seasonEnd(new Date(2026, 11, 20))).toEqual(new Date(2027, 0, 1))  // Fall → Jan 1
+    expect(seasonEnd(new Date(2026, 6, 8))).toEqual(new Date(2026, 8, 1))    // Summer → Sep 1
+    expect(seasonEnd(new Date(2026, 11, 20))).toEqual(new Date(2027, 2, 1))  // Winter → Mar 1
   })
 })
 
@@ -51,9 +51,9 @@ describe('periodProgress', () => {
   it('month progress', () => {
     expect(periodProgress('month', july8)).toEqual({ day: 8, total: 31 })
   })
-  it('season progress (Summer = Jul 1 → Oct 1 = 92 days by the default seasons)', () => {
+  it('season progress (Summer = Jun 1 → Sep 1 = 92 days by the default seasons)', () => {
     localStorage.clear()
-    expect(periodProgress('season', july8)).toEqual({ day: 8, total: 92 })
+    expect(periodProgress('season', july8)).toEqual({ day: 38, total: 92 })
   })
   it('year progress', () => {
     expect(periodProgress('year', july8)).toEqual({ day: 189, total: 365 })

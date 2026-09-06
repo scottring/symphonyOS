@@ -60,15 +60,18 @@ describe('cadence config', () => {
       expect(due?.token).toBe('2026')
     })
 
-    it('seasonal fires on a configured season boundary (Oct 1 by default), not a meteorological one', () => {
+    it('seasonal fires on a configured season boundary (Dec 1 by default), not a meteorological one', () => {
       localStorage.clear()
-      const oct1 = new Date(2026, 9, 1)
-      const due = getDueSession(DEFAULT_CADENCE, oct1)
+      // Sep 1 is also a season boundary now, but that date is covered by the
+      // annual check above (it outranks the season); Dec 1 (Winter) isolates
+      // the season branch on its own.
+      const dec1 = new Date(2026, 11, 1)
+      const due = getDueSession(DEFAULT_CADENCE, dec1)
       expect(due?.kind).toBe('season')
       expect(due?.label).toBe('the season')
-      expect(due?.token).toBe('2026-fall')
-      // Jun 1 2026 is a Monday: not ours, not a first Saturday, not the default weekly day.
-      expect(getDueSession(DEFAULT_CADENCE, new Date(2026, 5, 1))).toBeNull()
+      expect(due?.token).toBe('2026-winter')
+      // Jun 2 2026 is a Tuesday: not a boundary, not a first Saturday, not the default weekly day.
+      expect(getDueSession(DEFAULT_CADENCE, new Date(2026, 5, 2))).toBeNull()
     })
 
     it('monthly fires on the first Saturday', () => {

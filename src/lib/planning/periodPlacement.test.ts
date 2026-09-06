@@ -71,7 +71,7 @@ describe('monthStartForBucket / seasonStartForBucket', () => {
   })
 
   it('stamps this season (from the configured boundaries) on entry to quarter and clears elsewhere', () => {
-    expect(seasonStartForBucket('quarter', now)?.getTime()).toBe(d(2026, 6, 1).getTime()) // Summer, Jul 1 default
+    expect(seasonStartForBucket('quarter', now)?.getTime()).toBe(d(2026, 8, 1).getTime()) // Fall, Sep 1 default
     expect(seasonStartForBucket('month', now)).toBeUndefined()
   })
 })

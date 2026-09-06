@@ -2,7 +2,7 @@
 //
 // The household's seasons. Not meteorological, not fiscal — the four
 // boundaries this household plans by ("we're making our own groupings",
-// Scott, 2026-09-05; the next one starts October). Everything that says
+// Scott, 2026-09-05; the next one starts September 1). Everything that says
 // "season" reads these: the cadence anchor, the season pool, the Season tab,
 // the paper window. Nothing hard-codes Mar/Jun/Sep/Dec any more.
 //
@@ -21,10 +21,10 @@ export interface SeasonBoundary {
 export type Seasons = readonly [SeasonBoundary, SeasonBoundary, SeasonBoundary, SeasonBoundary]
 
 export const DEFAULT_SEASONS: Seasons = [
-  { name: 'Winter', month: 1, day: 1 },
-  { name: 'Spring', month: 4, day: 1 },
-  { name: 'Summer', month: 7, day: 1 },
-  { name: 'Fall', month: 10, day: 1 },
+  { name: 'Spring', month: 3, day: 1 },
+  { name: 'Summer', month: 6, day: 1 },
+  { name: 'Fall', month: 9, day: 1 },
+  { name: 'Winter', month: 12, day: 1 },
 ]
 
 const STORAGE_KEY = 'symphony-seasons'
@@ -86,7 +86,7 @@ function boundaryOf(start: Date, seasons: Seasons): SeasonBoundary {
 }
 
 /** "Fall 2026" — named for the year the season STARTED, so late December
- *  of a season that began in October is still 2026. */
+ *  of a season that began in September is still 2026. */
 export function seasonLabel(date: Date, seasons: Seasons): string {
   const start = seasonStartFor(date, seasons)
   return `${boundaryOf(start, seasons).name} ${start.getFullYear()}`

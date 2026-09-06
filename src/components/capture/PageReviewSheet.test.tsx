@@ -189,7 +189,7 @@ describe('PageReviewSheet — altitudes', () => {
       await user.click(screen.getByRole('button', { name: 'Previous season' }))
       expect(screen.getByText('Summer 2026')).toBeInTheDocument()
       await user.click(screen.getByRole('button', { name: /add 1 item/i }))
-      expect(onCommit.mock.calls[0][0].seasonStart).toEqual(new Date(2026, 6, 1))
+      expect(onCommit.mock.calls[0][0].seasonStart).toEqual(new Date(2026, 5, 1))
     })
 
     it('a goal line is badged, toggleable, and commits as a goal on the month', async () => {

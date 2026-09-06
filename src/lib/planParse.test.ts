@@ -148,10 +148,10 @@ describe('planWindowDates — altitudes', () => {
     expect(dates).toContain('2026-10-01')
   })
 
-  it('a season page runs to the end of the season it is for (Aug 17 → Sep 30 under the defaults)', () => {
+  it('a season page runs to the end of the season it is for (Aug 17 → Aug 31 under the defaults)', () => {
     const dates = planWindowDates(TODAY, 'season', DEFAULT_SEASONS)
     expect(dates[0]).toBe('2026-08-17')
-    expect(dates[dates.length - 1]).toBe('2026-09-30')
+    expect(dates[dates.length - 1]).toBe('2026-08-31')
   })
 
   it('a year page has no dates', () => {
@@ -210,10 +210,10 @@ describe('pageMonthStart / pageSeasonStart', () => {
     expect(pageMonthStart(new Date(2026, 11, 28))).toEqual(new Date(2027, 0, 1))
   })
   it('a season page is for this season, or the coming one in the last 14 days', () => {
-    // DEFAULT_SEASONS: Fall Oct 1 · Winter Jan 1 · Spring Apr 1 · Summer Jul 1
-    expect(pageSeasonStart(new Date(2026, 8, 5), DEFAULT_SEASONS)).toEqual(new Date(2026, 6, 1))
-    expect(pageSeasonStart(new Date(2026, 8, 17), DEFAULT_SEASONS)).toEqual(new Date(2026, 9, 1))
-    expect(pageSeasonStart(new Date(2026, 9, 1), DEFAULT_SEASONS)).toEqual(new Date(2026, 9, 1))
+    // DEFAULT_SEASONS: Spring Mar 1 · Summer Jun 1 · Fall Sep 1 · Winter Dec 1
+    expect(pageSeasonStart(new Date(2026, 8, 5), DEFAULT_SEASONS)).toEqual(new Date(2026, 8, 1))
+    expect(pageSeasonStart(new Date(2026, 10, 20), DEFAULT_SEASONS)).toEqual(new Date(2026, 11, 1))
+    expect(pageSeasonStart(new Date(2026, 11, 1), DEFAULT_SEASONS)).toEqual(new Date(2026, 11, 1))
   })
 })
 
@@ -221,9 +221,9 @@ describe('planWindowDates — season window from the household boundaries', () =
   it('runs from today through the end of the season the page is for', () => {
     const w = planWindowDates(new Date(2026, 8, 5), 'season', DEFAULT_SEASONS)
     expect(w[0]).toBe('2026-09-05')
-    expect(w[w.length - 1]).toBe('2026-09-30')
-    const late = planWindowDates(new Date(2026, 8, 20), 'season', DEFAULT_SEASONS)
-    expect(late[late.length - 1]).toBe('2026-12-31')
+    expect(w[w.length - 1]).toBe('2026-11-30')
+    const late = planWindowDates(new Date(2026, 10, 20), 'season', DEFAULT_SEASONS)
+    expect(late[late.length - 1]).toBe('2027-02-28')
   })
 })
 

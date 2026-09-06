@@ -12,7 +12,7 @@ function task(over: Partial<Task>): Task {
   } as Task
 }
 
-const NOW = new Date(2026, 6, 20) // Jul 20 — Summer (Jul/Aug/Sep by the default seasons), current month = Jul
+const NOW = new Date(2026, 6, 20) // Jul 20 — Summer (Jun/Jul/Aug by the default seasons), current month = Jul
 
 describe('partitionSeason', () => {
   it('splits open quarter tasks by explicit choice: picked → picks (by pickedAt), unpicked → shelf (by createdAt)', () => {
@@ -53,11 +53,12 @@ describe('betPulse', () => {
     const julyMove = task({ bucket: 'timed', scheduledFor: new Date(2026, 6, 25), sourceId: bet.id })
     const monthMove = task({ bucket: 'month', sourceId: bet.id, completed: true })
     const p = betPulse(bet, [bet, julyMove, monthMove], NOW)
-    // Default seasons: Summer starts Jul 1, so its months are Jul/Aug/Sep.
-    expect(p.months.map((m) => m.label)).toEqual(['Jul', 'Aug', 'Sep'])
-    expect(p.months[0].hasMoves).toBe(true)
-    expect(p.months[0].hasDone).toBe(true)
-    expect(p.months[1].hasMoves).toBe(false)
+    // Default seasons: Summer starts Jun 1, so its months are Jun/Jul/Aug;
+    // NOW (Jul 20) is the current (index 1) month.
+    expect(p.months.map((m) => m.label)).toEqual(['Jun', 'Jul', 'Aug'])
+    expect(p.months[1].hasMoves).toBe(true)
+    expect(p.months[1].hasDone).toBe(true)
+    expect(p.months[0].hasMoves).toBe(false)
     expect(p.starving).toBe(false)
   })
 
@@ -65,7 +66,7 @@ describe('betPulse', () => {
     const bet = task({ bucket: 'quarter', goalId: 'g1', pickedAt: new Date() })
     const move = task({ bucket: 'timed', scheduledFor: new Date(2026, 7, 3), goalId: 'g1' })
     const p = betPulse(bet, [bet, move], NOW)
-    expect(p.months[1].hasMoves).toBe(true) // Aug is the season's second month
+    expect(p.months[2].hasMoves).toBe(true) // Aug is the season's third month now
   })
 
   it('starving = open pick with no moves in the current month', () => {
@@ -100,15 +101,16 @@ describe('goalChapters', () => {
   })
 
   it('anchors the chapter year on the configured season start across the year wrap', () => {
-    // Default seasons: Fall starts Oct 1, Winter starts Jan 1 — so a December
-    // pick is Fall of its own year and a January pick is Winter of the new one.
+    // Default seasons: Winter starts Dec 1 — so a December pick and the
+    // following January's pick are both "Winter" of the year the season
+    // STARTED, not the calendar year of the pick.
     localStorage.clear()
     const dec = task({ bucket: 'quarter', goalId: 'g1', pickedAt: new Date(2026, 11, 10) })
     const jan = task({ bucket: 'quarter', goalId: 'g1', pickedAt: new Date(2027, 0, 15) })
     const ch = goalChapters('g1', [dec, jan])
     expect(ch).toHaveLength(2)
-    expect(ch[0].label).toBe('Fall 2026')
-    expect(ch[1].label).toBe('Winter 2027')
+    expect(ch[0].label).toBe('Winter 2026')
+    expect(ch[1].label).toBe('Winter 2026')
   })
 })
 

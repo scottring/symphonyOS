@@ -6,21 +6,26 @@ import {
 
 const ymd = (d: Date) => `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`
 
-// Scott's stated boundary: the next season starts in October. The other three
-// are the seed he adjusts in Settings.
+// Scott's stated boundary: the next season starts September 1. The other
+// three are the seed he adjusts in Settings.
 describe('DEFAULT_SEASONS', () => {
-  it('starts Fall on October 1 and is calendar-ordered', () => {
+  it('starts Fall on September 1 and is calendar-ordered', () => {
     expect(DEFAULT_SEASONS.map((s) => [s.name, s.month, s.day])).toEqual([
-      ['Winter', 1, 1], ['Spring', 4, 1], ['Summer', 7, 1], ['Fall', 10, 1],
+      ['Spring', 3, 1], ['Summer', 6, 1], ['Fall', 9, 1], ['Winter', 12, 1],
     ])
+  })
+  it('defaults: Winter Dec 1, Spring Mar 1, Summer Jun 1, Fall Sep 1 — Sep 6 is Fall', () => {
+    expect(seasonLabel(new Date(2026, 8, 6), DEFAULT_SEASONS)).toBe('Fall 2026')
+    expect(seasonLabel(new Date(2026, 11, 15), DEFAULT_SEASONS)).toBe('Winter 2026')
+    expect(seasonLabel(new Date(2027, 0, 15), DEFAULT_SEASONS)).toBe('Winter 2026')
   })
 })
 
 describe('seasonStartFor', () => {
   it('finds the boundary on or before the date', () => {
-    expect(ymd(seasonStartFor(new Date(2026, 8, 5), DEFAULT_SEASONS))).toBe('2026-7-1')   // Sep 5 → Summer (Jul 1)
-    expect(ymd(seasonStartFor(new Date(2026, 9, 1), DEFAULT_SEASONS))).toBe('2026-10-1')  // Oct 1 IS the boundary
-    expect(ymd(seasonStartFor(new Date(2026, 11, 31), DEFAULT_SEASONS))).toBe('2026-10-1')
+    expect(ymd(seasonStartFor(new Date(2026, 7, 5), DEFAULT_SEASONS))).toBe('2026-6-1')   // Aug 5 → Summer (Jun 1)
+    expect(ymd(seasonStartFor(new Date(2026, 8, 1), DEFAULT_SEASONS))).toBe('2026-9-1')   // Sep 1 IS the boundary
+    expect(ymd(seasonStartFor(new Date(2026, 11, 31), DEFAULT_SEASONS))).toBe('2026-12-1')
   })
 
   // A date before the year's first boundary belongs to the LAST season of the
@@ -41,26 +46,26 @@ describe('seasonStartFor', () => {
 
 describe('seasonEndFor', () => {
   it('is the next boundary, exclusive, and wraps into next year from the last season', () => {
-    expect(ymd(seasonEndFor(new Date(2026, 8, 5), DEFAULT_SEASONS))).toBe('2026-10-1')
-    expect(ymd(seasonEndFor(new Date(2026, 10, 5), DEFAULT_SEASONS))).toBe('2027-1-1')
+    expect(ymd(seasonEndFor(new Date(2026, 7, 5), DEFAULT_SEASONS))).toBe('2026-9-1')
+    expect(ymd(seasonEndFor(new Date(2026, 9, 5), DEFAULT_SEASONS))).toBe('2026-12-1')
   })
 })
 
 describe('seasonLabel / seasonToken', () => {
   it('names the season by the year it STARTED', () => {
-    expect(seasonLabel(new Date(2026, 8, 5), DEFAULT_SEASONS)).toBe('Summer 2026')
-    expect(seasonLabel(new Date(2026, 11, 20), DEFAULT_SEASONS)).toBe('Fall 2026')
+    expect(seasonLabel(new Date(2026, 7, 5), DEFAULT_SEASONS)).toBe('Summer 2026')
+    expect(seasonLabel(new Date(2026, 11, 20), DEFAULT_SEASONS)).toBe('Winter 2026')
   })
   it('token is stable and lowercase', () => {
-    expect(seasonToken(new Date(2026, 8, 5), DEFAULT_SEASONS)).toBe('2026-summer')
+    expect(seasonToken(new Date(2026, 7, 5), DEFAULT_SEASONS)).toBe('2026-summer')
   })
 })
 
 describe('isSeasonBoundary', () => {
   it('is true only on a configured start day', () => {
-    expect(isSeasonBoundary(new Date(2026, 9, 1), DEFAULT_SEASONS)).toBe(true)
-    expect(isSeasonBoundary(new Date(2026, 8, 1), DEFAULT_SEASONS)).toBe(false) // Sep 1 was meteorological, not ours
-    expect(isSeasonBoundary(new Date(2026, 9, 2), DEFAULT_SEASONS)).toBe(false)
+    expect(isSeasonBoundary(new Date(2026, 8, 1), DEFAULT_SEASONS)).toBe(true)
+    expect(isSeasonBoundary(new Date(2026, 7, 1), DEFAULT_SEASONS)).toBe(false) // Aug 1 was meteorological, not ours
+    expect(isSeasonBoundary(new Date(2026, 8, 2), DEFAULT_SEASONS)).toBe(false)
   })
 })
 

@@ -19,10 +19,10 @@ describe('periodBounds', () => {
     expect(ymd(b.next)).toBe('2026-10-1')
   })
   it('season: follows the configured boundaries and wraps the year', () => {
-    const b = periodBounds('season', d(2026, 11, 20), DEFAULT_SEASONS)
-    expect([ymd(b.start), ymd(b.end), b.label]).toEqual(['2026-10-1', '2027-1-1', 'Fall 2026'])
-    expect(ymd(b.prev)).toBe('2026-7-1')
-    expect(ymd(b.next)).toBe('2027-1-1')
+    const b = periodBounds('season', d(2026, 10, 20), DEFAULT_SEASONS)
+    expect([ymd(b.start), ymd(b.end), b.label]).toEqual(['2026-9-1', '2026-12-1', 'Fall 2026'])
+    expect(ymd(b.prev)).toBe('2026-6-1')
+    expect(ymd(b.next)).toBe('2026-12-1')
   })
   it('year: calendar year', () => {
     const b = periodBounds('year', d(2026, 8, 17), DEFAULT_SEASONS)
