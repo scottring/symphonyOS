@@ -60,6 +60,10 @@ describe('SupernotePagesSection', () => {
       items: [expect.objectContaining({ title: 'Call dentist' })],
       notes: [],
       storagePath: 'u/supernote/a.png',
+      // No domain picker on this flow yet — falls back to personal when the
+      // checked lens (default: Everyone) names no single domain.
+      domain: 'personal',
+      altitude: undefined,
     })
     expect(dismiss).toHaveBeenCalledWith('c-1')
   })

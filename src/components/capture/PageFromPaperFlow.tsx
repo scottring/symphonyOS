@@ -4,6 +4,7 @@ import { CameraCaptureModal } from '@/components/capture/CameraCaptureModal'
 import { PageReviewSheet, type PageReviewPayload } from '@/components/capture/PageReviewSheet'
 import { usePageFromPaper } from '@/hooks/usePageFromPaper'
 import { useCommitPage } from '@/hooks/useCommitPage'
+import { useDomain } from '@/hooks/useDomain'
 import type { FamilyMember } from '@/types/family'
 import type { PageAltitude } from '@/lib/planParse'
 
@@ -27,6 +28,7 @@ interface PageFromPaperFlowProps {
 export function PageFromPaperFlow({ members, onClose }: PageFromPaperFlowProps) {
   const { status, result, error, parseFromBlob, retry, reset } = usePageFromPaper(members)
   const { commitPage } = useCommitPage()
+  const { soleDomain } = useDomain()
   const [camera, setCamera] = useState(true)
   // Which page is being snapped. Chosen in the camera modal; the client owns
   // the window, so it must own the altitude too. Week = the old behaviour.
@@ -52,12 +54,14 @@ export function PageFromPaperFlow({ members, onClose }: PageFromPaperFlowProps) 
   const handleCommit = useCallback(async (payload: PageReviewPayload) => {
     setCommitting(true)
     try {
-      await commitPage({ ...payload, storagePath: result.storagePath })
+      // No domain picker in this flow yet — the checked domain lens stands in
+      // for it, falling back to personal when Everyone is checked.
+      await commitPage({ ...payload, storagePath: result.storagePath, domain: soleDomain ?? 'personal', altitude: result.altitude })
       close()
     } finally {
       setCommitting(false)
     }
-  }, [commitPage, close, result.storagePath])
+  }, [commitPage, close, result.storagePath, result.altitude, soleDomain])
 
   return (
     <>

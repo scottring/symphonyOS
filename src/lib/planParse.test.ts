@@ -115,7 +115,7 @@ describe('planItemToAddTaskArgs', () => {
 // "Dentist 2pm" from a paper page must become a 2pm block, not an all-day chip
 // with "2pm" buried in the note (launch rehearsal, 2026-09-04).
 describe('planItemToAddTaskArgs — times', () => {
-  const CTX = { currentWeekStart: new Date(2026, 7, 17), context: null }
+  const CTX = { currentWeekStart: new Date(2026, 7, 17), context: 'family' as const }
 
   it('schedules a dated item with a time as a real block', () => {
     const args = planItemToAddTaskArgs(
@@ -228,7 +228,7 @@ describe('planWindowDates — season window from the household boundaries', () =
 })
 
 describe('planItemToAddTaskArgs — horizons', () => {
-  const ctx = { currentWeekStart: new Date(2026, 7, 16), monthStart: new Date(2026, 9, 1), seasonStart: new Date(2026, 9, 1), context: null }
+  const ctx = { currentWeekStart: new Date(2026, 7, 16), monthStart: new Date(2026, 9, 1), seasonStart: new Date(2026, 9, 1), context: 'family' as const }
   const item = (kind: 'month' | 'season' | 'someday' | 'goal', goal?: boolean): PlanItem =>
     ({ title: 'X', placement: { kind }, time: null, assigneeId: null, note: null, goal, dateHint: null, kind: 'task', recurring: null, phone: null, contactMemberId: null })
 

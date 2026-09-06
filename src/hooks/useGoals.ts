@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
+import { scopeForDomain, type Scope } from '@/lib/scope'
 import type {
   Goal, GoalAction, GoalArea, GoalMilestone, Quarter,
   DbGoal, DbGoalAction, DbGoalArea, DbGoalMilestone,
@@ -234,15 +235,21 @@ export function useGoals(year?: number) {
   // GOAL CRUD
   // ============================================================================
 
-  const addGoal = useCallback(async (areaId: string, name: string, context?: 'work' | 'family' | 'personal') => {
+  const addGoal = useCallback(async (
+    areaId: string | null,
+    name: string,
+    context?: 'work' | 'family' | 'personal',
+    extra?: { notes?: string | null; scope?: Scope },
+  ) => {
     if (!user) return null
 
     const tempId = crypto.randomUUID()
     const optimistic: Goal = {
       id: tempId,
-      areaId,
+      areaId: areaId ?? '',
       name,
       year: currentYear,
+      notes: extra?.notes ?? undefined,
       context: context ?? undefined,
       status: 'active',
       sortOrder: goals.filter(g => g.areaId === areaId).length,
@@ -262,6 +269,11 @@ export function useGoals(year?: number) {
         year: currentYear,
         sort_order: optimistic.sortOrder,
         context: context ?? null,
+        notes: extra?.notes ?? null,
+        // goals RLS shares on scope, not context — a family goal without this
+        // stays private to its author despite looking shared. It is DERIVED,
+        // never chosen (scope.ts).
+        scope: extra?.scope ?? scopeForDomain(context ?? null, [], null),
       })
       .select()
       .single()

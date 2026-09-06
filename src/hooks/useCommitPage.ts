@@ -1,32 +1,39 @@
 // src/hooks/useCommitPage.ts
 //
 // Commits a reviewed page: one INSERT per confirmed task, one per confirmed
-// note, and one attachments row pinning the page image to whatever came off it.
-// Shared by the manual upload flow and the inbox's pending-page section so the
-// two can never drift.
+// note, one `routines` row per recurring line, one `goals` row per year-goal
+// line, and one attachments row pinning the page image to whatever came off
+// it. Shared by the manual upload flow and the inbox's pending-page section
+// so the two can never drift.
 //
 // It reports what ACTUALLY landed. Neither writer throws — `addTask` returns
-// undefined and `addNote` returns null on failure (each toasts on its own way
-// out) — so a caller that assumed "resolved means committed" would report
-// success over a page that wrote nothing. The inbox uses the returned
-// `failures` count to decide whether the staged capture row may be deleted:
-// a page deleted after a failed commit is unrecoverable.
+// undefined and `addNote`/`addGoal`/`addRoutine` return null on failure (each
+// toasts on its own way out) — so a caller that assumed "resolved means
+// committed" would report success over a page that wrote nothing. The inbox
+// uses the returned `failures` count to decide whether the staged capture row
+// may be deleted: a page deleted after a failed commit is unrecoverable.
 
 import { useCallback } from 'react'
 import { supabase, getAuthUser } from '@/lib/supabase'
-import { planItemToAddTaskArgs, pageMonthStart, pageSeasonStart, type PlanItem } from '@/lib/planParse'
+import { planItemToAddTaskArgs, pageMonthStart, pageSeasonStart, type PlanItem, type PageAltitude } from '@/lib/planParse'
 import type { PageNote } from '@/lib/pageParse'
-import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
-import { readSeasons } from '@/lib/cadence/seasons'
+import { weekStartAnchor, readCadenceConfig, localYmd, parseLocalYmd } from '@/lib/cadence/config'
+import { readSeasons, seasonLabel } from '@/lib/cadence/seasons'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
 import { useNotes } from '@/hooks/useNotes'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
+import { useRoutines } from '@/hooks/useRoutines'
 import { useGoalsContext } from '@/contexts/GoalsContext'
+import { scopeForDomain } from '@/lib/scope'
 import { showToast } from '@/hooks/useToast'
+import type { TaskContext } from '@/types/task'
 
 export interface CommitPagePayload {
   items: PlanItem[]
   notes: PageNote[]
+  /** The page's domain — every task/note/goal/routine it writes is stamped
+   *  with this life area (Task 5: a committed page is no longer "Universal"). */
+  domain: TaskContext
   /** The month a MONTH page's rows are for (the review sheet's chip). Absent
    *  = the page's own default for today (pageMonthStart). */
   monthStart?: Date
@@ -34,14 +41,22 @@ export interface CommitPagePayload {
   seasonStart?: Date
   /** Where the page lives in the `attachments` bucket, if we know. */
   storagePath: string | null
+  /** Which page was photographed — sizes the placement window and decides
+   *  where the caller lands after commit. */
+  altitude: PageAltitude
 }
 
 export interface CommitPageResult {
   tasksCreated: number
   goalsCreated: number
   notesCreated: number
-  /** Tasks + notes that did not make it. Non-zero means: do not delete the page. */
+  routinesCreated: number
+  /** Tasks + goals + notes + routines that did not make it. Non-zero means: do not delete the page. */
   failures: number
+  /** Where the caller should land after commit — the page's own period. */
+  route: string
+  /** Human label for that period, for the success toast ("this week", "September", "Fall 2026", "2026"). */
+  periodLabel: string
 }
 
 /**
@@ -62,14 +77,14 @@ export function useCommitPage() {
   const { addTask } = useSupabaseTasks()
   const { addNote } = useNotes()
   const { getCurrentUserMember } = useFamilyMembers()
+  const { addRoutine } = useRoutines()
   // GoalsProvider wraps the whole tasks app, so this is the already-loaded
   // goals state, not a second fetch.
-  const { areas, addArea, addGoal } = useGoalsContext()
+  const { areas, addGoal } = useGoalsContext()
 
-  const commitPage = useCallback(async ({ items, notes, storagePath, monthStart, seasonStart }: CommitPagePayload): Promise<CommitPageResult> => {
-    // A committed page is a capture, not a deliberate create — it never
-    // stamps the lens onto what it writes.
-    const context = null
+  const commitPage = useCallback(async ({ items, notes, storagePath, monthStart, seasonStart, domain, altitude }: CommitPagePayload): Promise<CommitPageResult> => {
+    // A committed page writes the page's own domain everywhere it lands.
+    const context = domain
     const now = new Date()
     const commitCtx = {
       currentWeekStart: weekStartAnchor(now, readCadenceConfig().weekStartsOn),
@@ -84,9 +99,10 @@ export function useCommitPage() {
     let firstTaskId: string | undefined
     let tasksCreated = 0
     let failures = 0
-    for (const item of items.filter((i) => i.placement.kind !== 'goal')) {
+    const tasks = items.filter((i) => i.placement.kind !== 'goal' && i.kind === 'task')
+    for (const item of tasks) {
       const args = planItemToAddTaskArgs(item, commitCtx)
-      const id = await addTask(args.title, undefined, undefined, args.scheduledFor, {
+      const id = await addTask(args.title, args.contactId, undefined, args.scheduledFor, {
         ...args.options,
         defaultAssigneeId,
       })
@@ -98,18 +114,43 @@ export function useCommitPage() {
       }
     }
 
+    // A recurring line is a routine, not a task: weekly on the named days, at
+    // the named time. No days named defaults to Saturday rather than dropping
+    // the line — a paper "soccer 9am" without a circled day still means SOME
+    // weekly slot, not nothing.
+    let routinesCreated = 0
+    for (const item of items.filter((i) => i.kind === 'recurring')) {
+      const days = item.recurring?.days.length ? item.recurring.days : ['sat' as const]
+      const created = await addRoutine({
+        name: item.title,
+        context,
+        recurrence_pattern: { type: 'weekly', days },
+        time_of_day: item.time ?? undefined,
+        assigned_to: item.assigneeId ?? undefined,
+      })
+      if (created) routinesCreated += 1
+      else failures += 1
+    }
+
+    // A day-fact ("no school") is a note pinned to its day by title — never a
+    // checkbox someone has to tick.
+    const dayfactNotes: PageNote[] = items.filter((i) => i.kind === 'dayfact').map((i) => {
+      const day = i.placement.kind === 'date' ? parseLocalYmd(i.placement.date) : i.dateHint ? parseLocalYmd(i.dateHint) : null
+      const stamp = day ? `${day.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} · ` : ''
+      return { title: `${stamp}${i.title}`, content: i.note ?? i.title }
+    })
+
     // A year page's lines are goals, not tasks: one `goals` row each, for the
-    // current year. Goals live in an area; the first existing one is used, or
-    // a "General" area is created so a first-ever year page still lands.
+    // current year. No invented "General" area — a goal may have none; its
+    // note and derived scope ride the row.
     let goalsCreated = 0
-    const goalItems = items.filter((i) => i.placement.kind === 'goal')
-    if (goalItems.length) {
-      const area = areas[0] ?? (await addArea('General'))
-      for (const item of goalItems) {
-        const created = area ? await addGoal(area.id, item.title, context ?? undefined) : null
-        if (created) goalsCreated += 1
-        else failures += 1
-      }
+    for (const item of items.filter((i) => i.placement.kind === 'goal')) {
+      const created = await addGoal(areas[0]?.id ?? null, item.title, context, {
+        notes: item.note,
+        scope: scopeForDomain(context, [], null),
+      })
+      if (created) goalsCreated += 1
+      else failures += 1
     }
 
     // type 'general', not 'quick_capture': useNotes dual-writes quick captures
@@ -117,13 +158,13 @@ export function useCommitPage() {
     // not also land there as a second copy.
     let firstNoteId: string | undefined
     let notesCreated = 0
-    for (const note of notes) {
+    for (const note of [...dayfactNotes, ...notes]) {
       const created = await addNote({
         title: note.title,
         content: note.content,
         type: 'general',
         source: 'import',
-        context: context ?? undefined,
+        context,
       })
       if (created) {
         notesCreated += 1
@@ -157,25 +198,37 @@ export function useCommitPage() {
       }
     }
 
+    // Where the caller lands, and what to call it in the toast — the page's
+    // own period, not always "this week".
+    const periodLabel = altitude === 'year' ? `${now.getFullYear()}`
+      : altitude === 'season' ? seasonLabel(commitCtx.seasonStart, readSeasons())
+      : altitude === 'month' ? commitCtx.monthStart.toLocaleDateString('en-US', { month: 'long' })
+      : 'this week'
+    const route = altitude === 'year' ? '/year'
+      : altitude === 'season' ? `/season?start=${localYmd(commitCtx.seasonStart)}`
+      : altitude === 'month' ? `/month?start=${localYmd(commitCtx.monthStart)}`
+      : '/week'
+
     const parts = [
       tasksCreated ? `${tasksCreated} task${tasksCreated === 1 ? '' : 's'}` : '',
       goalsCreated ? `${goalsCreated} goal${goalsCreated === 1 ? '' : 's'}` : '',
+      routinesCreated ? `${routinesCreated} routine${routinesCreated === 1 ? '' : 's'}` : '',
       notesCreated ? `${notesCreated} note${notesCreated === 1 ? '' : 's'}` : '',
     ].filter(Boolean)
 
     if (failures > 0) {
-      const added = parts.length ? `Added ${parts.join(' and ')}, but ` : ''
+      const added = parts.length ? `Added ${parts.join(', ')}, but ` : ''
       showToast(
         `${added}${failures} item${failures === 1 ? '' : 's'} could not be saved. The page is still in your inbox.`,
         'error',
         6000,
       )
     } else if (parts.length) {
-      showToast(`Added ${parts.join(' and ')} from your page`, 'success', 4000)
+      showToast(`Added ${parts.join(', ')} to ${periodLabel}`, 'success', 4000)
     }
 
-    return { tasksCreated, goalsCreated, notesCreated, failures }
-  }, [addTask, addNote, getCurrentUserMember, areas, addArea, addGoal])
+    return { tasksCreated, goalsCreated, notesCreated, routinesCreated, failures, route, periodLabel }
+  }, [addTask, addNote, addRoutine, getCurrentUserMember, areas, addGoal])
 
   return { commitPage }
 }

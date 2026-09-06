@@ -3,6 +3,7 @@ import { NotebookPen, X } from 'lucide-react'
 import { usePendingPages, type PendingPage } from '@/hooks/usePendingPages'
 import { useCommitPage } from '@/hooks/useCommitPage'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
+import { useDomain } from '@/hooks/useDomain'
 import { PageReviewSheet, type PageReviewPayload } from '@/components/capture/PageReviewSheet'
 import type { FamilyMember } from '@/types/family'
 
@@ -86,12 +87,15 @@ interface SupernotePageReviewProps {
  */
 function SupernotePageReview({ page, members, dismiss, onClose }: SupernotePageReviewProps) {
   const { commitPage } = useCommitPage()
+  const { soleDomain } = useDomain()
   const [committing, setCommitting] = useState(false)
 
   const handleCommit = async (payload: PageReviewPayload) => {
     setCommitting(true)
     try {
-      const { failures } = await commitPage({ ...payload, storagePath: page.result.storagePath })
+      // No domain picker on this flow yet — the checked domain lens stands in
+      // for it, falling back to personal when Everyone is checked.
+      const { failures } = await commitPage({ ...payload, storagePath: page.result.storagePath, domain: soleDomain ?? 'personal', altitude: page.result.altitude })
       // Dismiss HARD DELETES the capture row, and a page cannot be re-parsed
       // from Symphony once it is gone — the only recovery is re-exporting from
       // the tablet. So a page whose commit lost anything stays put. Retrying it

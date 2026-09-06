@@ -43,7 +43,9 @@ export interface GoalMilestone {
 
 export interface Goal {
   id: string
-  areaId: string
+  /** Null when the goal has no area — a first year page should not have to
+   *  invent a "General" area to land (Task 5). */
+  areaId: string | null
   name: string
   year: number
   notes?: string
@@ -74,7 +76,7 @@ export interface DbGoalArea {
 export interface DbGoal {
   id: string
   user_id: string
-  area_id: string
+  area_id: string | null
   name: string
   year: number
   notes: string | null

@@ -248,13 +248,17 @@ export interface PlanCommitContext {
   monthStart: Date
   /** The season a season row is for (its start) — stamps bucket='quarter' rows. */
   seasonStart: Date
-  /** Active domain, or null when Universal (matches photo capture). */
-  context: TaskContext | null
+  /** The page's domain — a committed page always writes a real life area now
+   *  (Task 5); there is no more "Universal"/untagged commit. */
+  context: TaskContext
 }
 
 export interface PlanAddTaskArgs {
   title: string
   scheduledFor: Date | undefined
+  /** The named member a line is ABOUT — the THIRD positional arg to addTask,
+   *  never an option (addTask has no `contactId` option). */
+  contactId: string | undefined
   options: {
     bucket?: TaskBucket
     weekStart?: Date
@@ -266,6 +270,10 @@ export interface PlanAddTaskArgs {
     assignedTo?: string
     context: TaskContext | null
     notes?: string
+    /** Tap-to-call number a line named ("Call the vet, 410-555-0142"). */
+    phoneNumber?: string
+    /** Lineage: the existing task this row is a copy of. */
+    sourceId?: string
   }
 }
 
@@ -281,7 +289,10 @@ export function planItemToAddTaskArgs(item: PlanItem, ctx: PlanCommitContext): P
     assignedTo: item.assigneeId ?? undefined,
     context: ctx.context,
     notes: item.note ?? undefined,
+    phoneNumber: item.phone ?? undefined,
+    sourceId: item.sourceId,
   }
+  const contactId = item.contactMemberId ?? undefined
   switch (item.placement.kind) {
     case 'date': {
       // A named clock time makes this a real block on the day, not an all-day
@@ -292,6 +303,7 @@ export function planItemToAddTaskArgs(item: PlanItem, ctx: PlanCommitContext): P
       return {
         title: item.title,
         scheduledFor: applyTimeToDate(day, item.time),
+        contactId,
         options: { ...base, isAllDay: !item.time },
       }
     }
@@ -301,27 +313,29 @@ export function planItemToAddTaskArgs(item: PlanItem, ctx: PlanCommitContext): P
       return {
         title: item.title,
         scheduledFor: undefined,
+        contactId,
         options: { ...base, bucket: 'week', weekStart: ctx.currentWeekStart },
       }
     case 'month':
       // Stamped with the month the PAGE is for, and is_goal when the line was
       // a goal — both ride the INSERT (the addTask-then-update race).
-      return { title: item.title, scheduledFor: undefined, options: { ...base, bucket: 'month', monthStart: ctx.monthStart, isGoal: !!item.goal } }
+      return { title: item.title, scheduledFor: undefined, contactId, options: { ...base, bucket: 'month', monthStart: ctx.monthStart, isGoal: !!item.goal } }
     case 'season':
       // Written on the season page = picked for the season. The pick mark
       // rides the INSERT like every other field here.
-      return { title: item.title, scheduledFor: undefined, options: { ...base, bucket: 'quarter', seasonStart: ctx.seasonStart, isGoal: !!item.goal, pickedAt: new Date() } }
+      return { title: item.title, scheduledFor: undefined, contactId, options: { ...base, bucket: 'quarter', seasonStart: ctx.seasonStart, isGoal: !!item.goal, pickedAt: new Date() } }
     case 'someday':
-      return { title: item.title, scheduledFor: undefined, options: { ...base, bucket: 'someday' } }
+      return { title: item.title, scheduledFor: undefined, contactId, options: { ...base, bucket: 'someday' } }
     case 'goal':
       // A goal is a `goals` row, written by useCommitPage — it never reaches
       // this mapper on the happy path. If one does, Someday keeps it visible
       // instead of losing a line the user wrote down.
-      return { title: item.title, scheduledFor: undefined, options: { ...base, bucket: 'someday' } }
+      return { title: item.title, scheduledFor: undefined, contactId, options: { ...base, bucket: 'someday' } }
     case 'inbox':
       return {
         title: item.title,
         scheduledFor: undefined,
+        contactId,
         options: { ...base, bucket: 'inbox' },
       }
   }

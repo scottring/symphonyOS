@@ -1,6 +1,7 @@
 import { createContext, useContext, type ReactNode } from 'react'
 import { useGoals } from '@/hooks/useGoals'
 import type { GoalArea, Goal, Quarter } from '@/types/goal'
+import type { Scope } from '@/lib/scope'
 
 export interface GoalsContextValue {
   areas: GoalArea[]
@@ -9,7 +10,12 @@ export interface GoalsContextValue {
   addArea: (name: string) => Promise<GoalArea | null>
   updateArea: (id: string, updates: { name?: string; sortOrder?: number }) => Promise<void>
   deleteArea: (id: string) => Promise<void>
-  addGoal: (areaId: string, name: string, context?: 'work' | 'family' | 'personal') => Promise<Goal | null>
+  addGoal: (
+    areaId: string | null,
+    name: string,
+    context?: 'work' | 'family' | 'personal',
+    extra?: { notes?: string | null; scope?: Scope },
+  ) => Promise<Goal | null>
   updateGoal: (id: string, updates: Partial<Pick<Goal, 'name' | 'notes' | 'status' | 'areaId' | 'sortOrder' | 'strategy' | 'domainSlug' | 'layerId' | 'context' | 'year'>>) => Promise<void>
   deleteGoal: (id: string) => Promise<void>
   getGoalById: (id: string) => Goal | undefined
