@@ -6,6 +6,9 @@ import {
   PointerSensor,
   useSensor,
   useSensors,
+  pointerWithin,
+  rectIntersection,
+  type CollisionDetection,
   type DragMoveEvent,
 } from '@dnd-kit/core'
 import type { Task } from '@/types/task'
@@ -264,6 +267,20 @@ export function WeekViewV2(props: WeekViewV2Props) {
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
   )
+
+  // The drop lands where the CURSOR is, not where the dragged element's box
+  // happens to overlap. dnd-kit's default (rectIntersection) scores droppables
+  // by area, and a list pill is 262x60 — wide enough to cover whole 15-minute
+  // sub-slots in two day columns at once, so the winner was decided by the
+  // pill's geometry and could sit a day off from where you aimed. pointerWithin
+  // asks the one question a person is asking ("which cell is under my
+  // pointer?"); rectIntersection stays as the fallback for the moments the
+  // pointer is over no droppable at all (between the grid's cells, over a
+  // block), so a drop is never silently swallowed.
+  const collisionDetection = useCallback<CollisionDetection>((args) => {
+    const byPointer = pointerWithin(args)
+    return byPointer.length > 0 ? byPointer : rectIntersection(args)
+  }, [])
 
   // Edge-hover state for cross-week auto-advance, measured against the grid box.
   const [edgeHover, setEdgeHover] = useState<'left' | 'right' | null>(null)
@@ -571,6 +588,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
 
       <DndContext
         sensors={sensors}
+        collisionDetection={collisionDetection}
         onDragStart={handleDragStart}
         onDragEnd={drag.dndHandlers.onDragEnd}
         onDragCancel={drag.dndHandlers.onDragCancel}
@@ -732,6 +750,30 @@ export function WeekViewV2(props: WeekViewV2Props) {
                 // All-day strip chips drag with a 'chip:<taskId>' id and aren't
                 // in placedItems — render their own floating pill so the drag
                 // has visible feedback (without this the chip looked unmovable).
+                // List pills ('pool:' tasks, 'poolroutine:' routines). Without
+                // this the drag had NO visible feedback at all — the pill
+                // stayed put (a list pill applies no transform, by design:
+                // the list must not reflow mid-drag) and the DragOverlay
+                // rendered null, so a drag that was working perfectly well
+                // looked like a pill that could not be picked up.
+                if (drag.activeDragId.startsWith('pool:')) {
+                  const task = tasks.find((t) => t.id === drag.activeDragId!.slice('pool:'.length))
+                  if (!task) return null
+                  return (
+                    <div className="pointer-events-none max-w-[260px] rounded-lg border border-primary-300 bg-white px-2 py-1.5 text-[13px] text-neutral-800 shadow-lg">
+                      {task.title}
+                    </div>
+                  )
+                }
+                if (drag.activeDragId.startsWith('poolroutine:')) {
+                  const routine = routines.find((r) => r.id === drag.activeDragId!.slice('poolroutine:'.length))
+                  if (!routine) return null
+                  return (
+                    <div className="pointer-events-none max-w-[260px] rounded-lg border border-[hsl(42_50%_70%)] bg-[hsl(45_75%_90%)] px-2 py-1.5 text-[12.5px] font-semibold text-[hsl(40_60%_30%)] shadow-lg">
+                      {routine.name}
+                    </div>
+                  )
+                }
                 if (drag.activeDragId.startsWith('chip:')) {
                   const taskId = drag.activeDragId.slice('chip:'.length)
                   const task = tasks.find((t) => t.id === taskId)
