@@ -65,6 +65,53 @@ describe('unscheduledPool', () => {
   })
 })
 
+// Scott, 2026-09-07: "we need to decide what happens with items that are not
+// marked as completed on their assigned day." The day passes, the commitment
+// doesn't — a card whose day is behind us stops being "on the grid" and comes
+// back to the list, even while that day is still one of the columns on screen.
+// (The grid keeps drawing it on its own day; that is the record of what
+// slipped, and it is a separate decision from what the LIST offers.)
+describe('unscheduledPool — a day that has passed gives the card back', () => {
+  // The real /week shape: a Sunday-anchored week, today is the Monday inside it.
+  const weekCtx: PoolCtx = {
+    today: new Date(2026, 7, 31),
+    rangeStart: new Date(2026, 7, 30), // Sun Aug 30 — inside the range, behind us
+    rangeEnd: new Date(2026, 8, 5),    // Sat Sep 5
+    weekStartsOn: 0,
+  }
+
+  it('resurfaces a timed card left on an earlier day of the SAME week', () => {
+    const yesterday = task({ scheduledFor: new Date(2026, 7, 30, 10, 30) })
+    const laterToday = task({ scheduledFor: new Date(2026, 7, 31, 16, 0) })
+    const thursday = task({ scheduledFor: new Date(2026, 8, 3, 9, 0) })
+    const pool = unscheduledPool([yesterday, laterToday, thursday], weekCtx)
+    expect(pool.map((t) => t.id)).toEqual([yesterday.id])
+  })
+
+  it('resurfaces an all-day card left on an earlier day of the same week', () => {
+    const yesterday = task({ isAllDay: true, scheduledFor: new Date(2026, 7, 30) })
+    const saturday = task({ isAllDay: true, scheduledFor: new Date(2026, 8, 5) })
+    expect(unscheduledPool([yesterday, saturday], weekCtx).map((t) => t.id)).toEqual([yesterday.id])
+  })
+
+  it('leaves TODAY alone — the day is not over', () => {
+    const thisMorning = task({ scheduledFor: new Date(2026, 7, 31, 8, 0) })
+    expect(unscheduledPool([thisMorning], weekCtx)).toEqual([])
+  })
+
+  it('a ticked card stays where it was done', () => {
+    const done = task({ completed: true, scheduledFor: new Date(2026, 7, 30, 10, 30) })
+    expect(unscheduledPool([done], weekCtx)).toEqual([])
+  })
+
+  it('hands it back at the TOP of the list, above this week\'s moves', () => {
+    const yesterday = task({ scheduledFor: new Date(2026, 7, 30, 10, 30) })
+    const weekMove = task({ bucket: 'week' })
+    const ordered = orderPool(weekList(unscheduledPool([weekMove, yesterday], weekCtx), weekCtx), weekCtx)
+    expect(ordered.map((t) => t.id)).toEqual([yesterday.id, weekMove.id])
+  })
+})
+
 describe('unscheduledPool — assignee scoping', () => {
   // "Pick out an outfit or two for Boston" (context family, assigned to Iris)
   // sat in Scott's planning pool: shared context rightly makes it VISIBLE, but

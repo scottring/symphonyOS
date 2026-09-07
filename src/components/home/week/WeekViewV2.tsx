@@ -601,7 +601,16 @@ export function WeekViewV2(props: WeekViewV2Props) {
             the rung above, read-only — the week is planned by looking at it,
             never by dragging from it. */}
         <div className="flex items-start gap-3">
-        <aside aria-label="This week's list" className="shrink-0 w-72 flex flex-col gap-2">
+        {/* The list scrolls on its own (Scott, 2026-09-07): a week with 54
+            things on it is taller than the grid, and reading down the list
+            used to drag the grid off the top of the screen with it. The
+            column sticks to the viewport and takes its own scrollbar, so the
+            days stay put while you read the list. overscroll-contain keeps a
+            flick at the list's end from scrolling the page underneath. */}
+        <aside
+          aria-label="This week's list"
+          className="shrink-0 w-72 sticky top-2 max-h-[calc(100vh-1rem)] overflow-y-auto overscroll-contain pr-1 flex flex-col gap-2"
+        >
           <WeekPoolLane
             tasks={tasks}
             routines={shelfRoutines}

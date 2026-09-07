@@ -30,6 +30,17 @@ function mockEvent(over: { id: string; title: string; start: string; end: string
   } as unknown as CalendarEvent
 }
 
+describe('WeekViewV2 layout', () => {
+  // Scott, 2026-09-07: "make the this week column individually scrollable...
+  // we can scroll up and down that list while the grid remains in place."
+  it('gives the list column its own scroll, pinned beside the grid', () => {
+    render(<WeekViewV2 {...defaultProps} routines={[]} />)
+    const list = screen.getByLabelText("This week's list")
+    expect(list.className).toContain('overflow-y-auto')
+    expect(list.className).toContain('sticky')
+  })
+})
+
 describe('WeekViewV2 week extras', () => {
   it('moves dinner into the dinner row and specials into the School subtitle', () => {
     const events = [

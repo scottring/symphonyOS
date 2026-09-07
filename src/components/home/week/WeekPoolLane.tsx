@@ -24,6 +24,7 @@ import { PushDropdown } from '@/components/triage'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { readCadenceConfig } from '@/lib/cadence/config'
 import { isPlacedOnWeek } from '@/lib/today/weekPlacement'
+import { isMissedPlacement, missedLabel } from '@/lib/week/missedPlacement'
 
 // Loose pills visible before the "+N more" expander.
 const STRIP_CAP = 8
@@ -67,6 +68,9 @@ function PoolPill({ task, onSelect, onCompleteTask, onNotThisWeek, onPushTask, s
   // place (Scott, 2026-09-06).
   const showLookback = !!lookback && !struck
   const showTriage = !struck && !lookback && (!!onNotThisWeek || !!onPushTask)
+  // A card whose day passed without a tick is back on the list, and says so.
+  // The day it was given is the whole message — no count, no scoreboard.
+  const missed = isMissedPlacement(task.scheduledFor, task.completed, new Date())
   return (
     <div
       ref={setNodeRef}
@@ -101,6 +105,9 @@ function PoolPill({ task, onSelect, onCompleteTask, onNotThisWeek, onPushTask, s
         )}
         <span className={`min-w-0 flex-1 leading-snug break-words ${struck ? 'line-through text-neutral-400' : ''}`}>{task.title}</span>
       </div>
+      {missed && !struck && (
+        <div className="pl-5 text-[11px] text-neutral-400">{missedLabel(task.scheduledFor!, new Date())}</div>
+      )}
       {showLookback && (
         <div className="flex items-center gap-0.5 pl-5" {...stopDrag}>
           <button type="button" aria-label={`Carry forward ${task.title}`} title="Carry forward to this week"

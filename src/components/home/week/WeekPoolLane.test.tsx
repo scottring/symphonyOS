@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { DndContext } from '@dnd-kit/core'
 import { WeekPoolLane } from './WeekPoolLane'
@@ -19,7 +19,16 @@ function task(over: Partial<Task>): Task {
 const weekStart = new Date(2026, 7, 31)
 
 describe('WeekPoolLane', () => {
+  // The list's membership now turns on which days have PASSED, so "now" can't
+  // be the wall clock — a fixture scheduled for Sep 1 was a future placement
+  // when this file was written and a missed one a week later. Only Date is
+  // faked; timers stay real so Testing Library behaves.
   beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(2026, 7, 31, 9, 0)) // Mon Aug 31, 9am
+  })
+  afterEach(() => {
+    vi.useRealTimers()
   })
 
   it('shows the week list and hides scheduled ones', () => {
@@ -31,13 +40,44 @@ describe('WeekPoolLane', () => {
           onSelectItem={() => {}}
           tasks={[
             task({ id: 'a', title: 'Call VW', bucket: 'week' }),
-            task({ id: 'b', title: 'Placed', scheduledFor: new Date(2026, 8, 1, 10) }),
+            task({ id: 'b', title: 'Placed', scheduledFor: new Date(2026, 8, 1, 10) }), // tomorrow — still its day
           ]}
         />
       </DndContext>,
     )
     expect(screen.getByText('Call VW')).toBeInTheDocument()
     expect(screen.queryByText('Placed')).not.toBeInTheDocument()
+  })
+
+  // Scott, 2026-09-07. The day passes, the commitment doesn't: a card nobody
+  // ticked comes back to the list the next morning, saying which day it was.
+  it('hands back a card whose day passed, and names the day', () => {
+    render(
+      <DndContext>
+        <WeekPoolLane
+          weekStart={weekStart}
+          dayCount={5}
+          onSelectItem={() => {}}
+          tasks={[task({ id: 'c', title: 'Bring forms to Dr. Rubin', scheduledFor: new Date(2026, 7, 30, 10, 30) })]}
+        />
+      </DndContext>,
+    )
+    expect(screen.getByText('Bring forms to Dr. Rubin')).toBeInTheDocument()
+    expect(screen.getByText("Didn't happen \u00b7 Sun")).toBeInTheDocument()
+  })
+
+  it('leaves a ticked card on the day it was done', () => {
+    render(
+      <DndContext>
+        <WeekPoolLane
+          weekStart={weekStart}
+          dayCount={5}
+          onSelectItem={() => {}}
+          tasks={[task({ id: 'd', title: 'Done yesterday', completed: true, scheduledFor: new Date(2026, 7, 30, 10, 30) })]}
+        />
+      </DndContext>,
+    )
+    expect(screen.queryByText('Done yesterday')).not.toBeInTheDocument()
   })
 
   it('emits a prefixed id so a pill click opens the task panel', () => {

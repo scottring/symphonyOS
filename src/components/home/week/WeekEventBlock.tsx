@@ -2,6 +2,7 @@ import { useDraggable } from '@dnd-kit/core'
 import type { PlacedItem } from './layoutLanes'
 import { colorFor } from '@/lib/weekColorMap'
 import { hasExecutionContext } from '@/lib/week/readiness'
+import { isMissedPlacement } from '@/lib/week/missedPlacement'
 import { FIRST_HOUR, HOUR_ROW_HEIGHT, TIME_COL_WIDTH } from './WeekGrid'
 import { useBlockResize } from './useBlockResize'
 
@@ -122,6 +123,13 @@ export function WeekEventBlock({ placedItem, weekStart, dayCount = 7, onSelect, 
 
   const { dayIdx, laneIdx, laneCount, top, height } = placement
   const color = colorFor(placedItem.item)
+  // The card keeps the day it was given even after that day passes without a
+  // tick — the week has to read honestly when you look back at it — but it
+  // reads as history, not as a commitment: quiet fill, dashed edge. The live
+  // copy of the card is back on the list (missedPlacement.ts).
+  const missed =
+    placedItem.item.type === 'task' &&
+    isMissedPlacement(placedItem.item.startTime, placedItem.item.completed, new Date())
   const embedded = !!placedItem.embedded
   // Anything drawn over a container's fill needs an edge and elevation —
   // embedded cards, and title-cleared items pinned into the container's area.
@@ -159,6 +167,7 @@ export function WeekEventBlock({ placedItem, weekStart, dayCount = 7, onSelect, 
         isRoutine
           ? 'px-2 py-0.5 text-[11.5px] leading-tight overflow-hidden cursor-pointer'
           : 'px-2 py-1 text-[12px] leading-tight overflow-hidden cursor-pointer',
+        missed ? 'opacity-60 border-dashed' : '',
         isDragging ? 'opacity-40' : '',
         dragDisabled ? 'cursor-default' : '',
       ].filter(Boolean).join(' ')}

@@ -14,7 +14,10 @@ import { weekStartAnchor, type WeekStart } from '@/lib/cadence/config'
 
 export interface PoolCtx {
   today: Date
-  /** Bounds of the days visible on the grid (null = single-day/no range). */
+  /** Bounds of the days visible on the grid (null = single-day/no range).
+   *  No longer decides list membership on its own — a day that has PASSED
+   *  hands its card back whether or not that day is still on screen (see
+   *  `unscheduledPool`). Kept for callers and for range-aware consumers. */
   rangeStart: Date | null
   rangeEnd: Date | null
   weekStartsOn: WeekStart
@@ -35,18 +38,20 @@ export function doableBy(t: Pick<Task, 'assignedTo' | 'assignedToAll'>, meId: st
   return assignees.length === 0 || assignees.includes(meId)
 }
 
-/** The base pool: candidate tasks that are not placed on a visible day.
- *  Behavior-identical extraction of PlanningSession's allUnscheduledTasks:
- *  a task scheduled onto a visible day is PLACED (it belongs on the grid,
- *  not also in the pool), while past-scheduled tasks resurface so they can
- *  be rescheduled. */
+/** The base pool: candidate tasks that have no day still ahead of them.
+ *
+ *  A date is a placement while its day is today or later — the card belongs
+ *  to that day, on the grid or on a day the grid isn't showing, and the list
+ *  leaves it alone. The moment the day PASSES without the card being ticked,
+ *  the placement is spent and the card comes back to the list, even while its
+ *  column is still on screen (Scott, 2026-09-07: "we need to decide what
+ *  happens with items that are not marked as completed on their assigned
+ *  day"). Nothing is rewritten: `scheduled_for` stands, the grid still draws
+ *  the card on the day it didn't happen, and where it goes next is a person's
+ *  decision, never Symphony's. */
 export function unscheduledPool(tasks: Task[], ctx: PoolCtx): Task[] {
   const today = new Date(ctx.today)
   today.setHours(0, 0, 0, 0)
-  const rangeStart = ctx.rangeStart ? new Date(ctx.rangeStart) : null
-  rangeStart?.setHours(0, 0, 0, 0)
-  const rangeEnd = ctx.rangeEnd ? new Date(ctx.rangeEnd) : null
-  rangeEnd?.setHours(23, 59, 59, 999)
 
   return tasks.filter((task) => {
     if (task.completed) return false
@@ -61,29 +66,22 @@ export function unscheduledPool(tasks: Task[], ctx: PoolCtx): Task[] {
       if (deferDate > today) return false
     }
 
-    // All-day tasks: a date inside the visible grid range means it renders in
-    // that day's all-day lane, not the pool. Without a date it stays in the
-    // pool. With a date OUTSIDE the range it is placed on some other day, and
-    // the same rule as timed tasks below applies: only a PAST date resurfaces
-    // (carried over). A future date is a real placement — listing "Pay water
-    // bill (Thu 9/10)" under UNSCHEDULED on the previous week's shelf read as
-    // "Symphony lost my date" in the 2026-09-04 demo walkthrough.
+    // All-day tasks: undated ones stay in the pool; a dated one is placed on
+    // its day until that day is behind us. Listing "Pay water bill (Thu 9/10)"
+    // under UNSCHEDULED read as "Symphony lost my date" in the 2026-09-04 demo
+    // walkthrough — a day still ahead is never the list's business.
     if (task.isAllDay) {
       if (!task.scheduledFor) return true
-      const allDayDate = new Date(task.scheduledFor)
-      if (rangeStart && rangeEnd && allDayDate >= rangeStart && allDayDate <= rangeEnd) return false
-      const allDayDay = new Date(allDayDate)
+      const allDayDay = new Date(task.scheduledFor)
       allDayDay.setHours(0, 0, 0, 0)
       return allDayDay < today
     }
 
     if (!task.scheduledFor) return true
-    const taskDate = new Date(task.scheduledFor)
-    // Placed on a day shown on the grid → it's on the grid, not unscheduled.
-    if (rangeStart && rangeEnd && taskDate >= rangeStart && taskDate <= rangeEnd) return false
-    // Otherwise, past-scheduled tasks resurface so they can be rescheduled.
-    const taskDay = new Date(taskDate)
+    const taskDay = new Date(task.scheduledFor)
     taskDay.setHours(0, 0, 0, 0)
+    // The day passed and nobody ticked it: the card comes back. Today or
+    // later, the day still holds it.
     return taskDay < today
   })
 }
