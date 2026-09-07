@@ -86,6 +86,10 @@ const ALLOWED: Record<string, string> = {
     'Local 3-valued picker — emits a concrete hour, never a section string (see M5 note there).',
   'src/components/triage/TimePickerPopover.tsx':
     'Local 3-valued picker — emits a concrete hour, never a section string (see M5 note there).',
+  'src/lib/wall/memberPageModel.ts':
+    "BAND_ORDER walks kidDayModel's KidBandKey partition (morning/afternoon/" +
+    'evening/anytime) to flatten an adult\'s chores in band order — the same ' +
+    'total-over-the-day partition KidDayView is allowed below, not a DaySection list.',
   'src/components/wall-v2/KidDayView.tsx':
     "BAND_ORDER is the kid page's own KidBandKey partition (morning/" +
     'afternoon/evening/anytime), not a DaySection list. It is total over ' +

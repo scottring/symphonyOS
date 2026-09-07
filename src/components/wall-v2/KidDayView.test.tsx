@@ -4,7 +4,7 @@ import type { Routine, ActionableInstance } from '@/types/actionable'
 import type { FamilyMember } from '@/types/family'
 import type { TimelineItem } from '@/types/timeline'
 import type { Task } from '@/types/task'
-import type { WallNotice } from '@/hooks/useWallData'
+import type { WallNotice, WallDayData } from '@/hooks/useWallData'
 import { emptySections } from '@/lib/today/types'
 
 const mocks = vi.hoisted(() => ({
@@ -104,6 +104,8 @@ function renderView(props: {
       notices={props.notices ?? []}
       onToggleTask={onToggleTask}
       onClose={onClose}
+      days={[]}
+      tonight={null}
     />,
   )
   return { onToggleTask, onClose }
@@ -309,9 +311,10 @@ describe('Homework card', () => {
     expect(screen.getByText('Permission slip, $12')).toBeInTheDocument()
   })
 
-  it('does not render the card without homework', () => {
+  it('keeps its place without homework and says so — no holes in the grid', () => {
     renderView({})
-    expect(screen.queryByText('Homework')).toBeNull()
+    expect(screen.getByText('Homework')).toBeInTheDocument()
+    expect(screen.getByText('Nothing due')).toBeInTheDocument()
   })
 })
 
@@ -408,5 +411,56 @@ describe('KidDayView — the reading card', () => {
     renderView({ routines: [r], history: [inst({ entity_id: r.id, date: dateStr(new Date()), progress: 15 })] })
     fireEvent.click(screen.getByText('+10'))
     expect(ledger.syncEarned).toHaveBeenCalledWith(KID.id, expect.any(String), 20)
+  })
+})
+
+describe('the adult page', () => {
+  const SCOTT = { id: 'p-1', name: 'Scott', role_label: 'parent', is_full_user: true } as FamilyMember
+  const base = () => ({
+    routines: [] as Routine[], todayItems: emptySections<TimelineItem>(), members: [SCOTT, KID],
+    neededTasks: [] as Task[], homeworkTasks: [] as Task[], notices: [] as WallNotice[], screenTime: null, weather: null,
+    days: [] as WallDayData[], tonight: 'Tacos', onToggleTask: vi.fn(), onClose: vi.fn(),
+  })
+
+  it('shows Appointments, Chores, The kids, Needed today, Dinner and Coming up — and no reading card', () => {
+    render(<KidDayView member={SCOTT} {...base()} />)
+    for (const t of ['Appointments', 'Chores', 'The kids', 'Needed today', 'Dinner', 'Coming up']) {
+      expect(screen.getByText(t)).toBeInTheDocument()
+    }
+    expect(screen.queryByText('Reading')).toBeNull()
+    expect(screen.queryByText('My day')).toBeNull()
+    expect(screen.getByText('Tacos')).toBeInTheDocument()
+  })
+
+  it('a timed event on my day is an appointment and feeds the Next line', () => {
+    const items = emptySections<TimelineItem>()
+    items.afternoon.push({ id: 'e1', type: 'event', title: 'Dentist', startTime: new Date(2026, 8, 7, 16), endTime: new Date(2026, 8, 7, 17), completed: false, assignedTo: SCOTT.id } as TimelineItem)
+    render(<KidDayView member={SCOTT} {...base()} todayItems={items} now={new Date(2026, 8, 7, 12)} />)
+    expect(screen.getByText('Next: Dentist 4:00')).toBeInTheDocument()
+    expect(screen.getByText('4:00')).toBeInTheDocument()
+  })
+
+  it('an untimed task assigned to me is a chore I can tick', () => {
+    const onToggleTask = vi.fn()
+    const items = emptySections<TimelineItem>()
+    items.unscheduled.push(taskItem({ id: 'task-9', title: 'Buy rug', assignedTo: SCOTT.id }))
+    render(<KidDayView member={SCOTT} {...base()} todayItems={items} onToggleTask={onToggleTask} />)
+    fireEvent.click(screen.getByText('Buy rug'))
+    expect(onToggleTask).toHaveBeenCalledWith('task-9', true)
+  })
+
+  it('tapping a kid opens their page', () => {
+    const onOpenMember = vi.fn()
+    render(<KidDayView member={SCOTT} {...base()} onOpenMember={onOpenMember} />)
+    fireEvent.click(screen.getByRole('button', { name: "Open Kaleb's day" }))
+    expect(onOpenMember).toHaveBeenCalledWith(KID.id)
+  })
+})
+
+describe('the kid page keeps its furniture', () => {
+  it('shows My day, Homework, Today at school, Coming up', () => {
+    renderView()
+    for (const t of ['My day', 'Homework', 'Today at school', 'Coming up']) expect(screen.getByText(t)).toBeInTheDocument()
+    expect(screen.queryByText('Appointments')).toBeNull()
   })
 })

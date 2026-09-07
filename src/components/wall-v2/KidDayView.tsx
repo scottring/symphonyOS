@@ -9,13 +9,20 @@
 // (useDragScroll) — native touch scrolling never fires there.
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, BookOpen, Check, Flame, GraduationCap, Mail, Pause, Play, RotateCcw, Tv, Umbrella } from 'lucide-react'
+import { ArrowLeft, BookOpen, Check, Flame, GraduationCap, ListChecks, Pause, Play, RotateCcw, ShoppingBag, Tv, Umbrella } from 'lucide-react'
 import { WALL } from './wallTheme'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
 import { useMemberInstanceHistory } from './useMemberInstanceHistory'
 import { useReadingScreenTime } from './useReadingScreenTime'
 import { useDragScroll } from '@/hooks/useDragScroll'
 import { buildMemberDayModel } from '@/lib/wall/kidDayModel'
+import { memberShape, appointmentsFor, nextLine, choresFor, kidsFor } from '@/lib/wall/memberPageModel'
+import { adaptMemberComingUpRows } from './wallStrip'
+import { Widget } from './member/Widget'
+import { AppointmentsWidget } from './member/AppointmentsWidget'
+import { KidsWidget } from './member/KidsWidget'
+import { ComingUpWidget } from './member/ComingUpWidget'
+import { DinnerWidget } from './member/DinnerWidget'
 import type { KidRow, KidNeededRow, KidHomeworkRow, KidNoticeRow, KidBandKey, MemberDayModel } from '@/lib/wall/kidDayModel'
 import {
   READING_REASON, readingEarns, readingTimerKey, readReadingTimer, writeReadingTimer,
@@ -27,7 +34,7 @@ import { localYmd } from '@/lib/cadence/config'
 import type { Routine } from '@/types/actionable'
 import type { FamilyMember } from '@/types/family'
 import type { Task } from '@/types/task'
-import type { WallNotice } from '@/hooks/useWallData'
+import type { WallNotice, WallDayData } from '@/hooks/useWallData'
 import type { ChildScreenTimeSummary } from '@/hooks/useScreenTime'
 import type { WeatherData } from '@/hooks/useWeather'
 import type { TimelineItem } from '@/types/timeline'
@@ -73,6 +80,16 @@ interface KidDayViewProps {
    *  wall's single task-completion path. Explicit direction, never a toggle. */
   onToggleTask: (taskId: string, completed: boolean) => void
   onClose: () => void
+  /** The week, for this person's own Coming up lines. */
+  days: WallDayData[]
+  /** Tonight's dinner, as the strip names it. Adults get a Dinner widget. */
+  tonight: string | null
+  /** Opens tonight's recipe — the Shell's dinner-card handler. */
+  onOpenDinner?: () => void
+  /** Opens another member's page — an adult tapping a kid in The kids. */
+  onOpenMember?: (id: string) => void
+  /** The wall clock; tests pass a fixed one. */
+  now?: Date
 }
 
 function dueText(row: KidHomeworkRow): string | null {
@@ -109,6 +126,7 @@ const storage = (): Storage | null => {
 
 export function KidDayView({
   member, routines, todayItems, tomorrowItems, members, neededTasks, homeworkTasks, notices, screenTime, weather, onToggleTask, onClose,
+  days, tonight, onOpenDinner, onOpenMember, now,
 }: KidDayViewProps) {
   const { markDone, undoDone, addProgress, setProgress } = useActionableInstances()
   const { history } = useMemberInstanceHistory()
@@ -136,11 +154,26 @@ export function KidDayView({
   const model: MemberDayModel = useMemo(() => {
     // One clock read for both arguments: the day being rendered IS today on
     // the kiosk, and `now` is what the evening "needed tomorrow" rule reads.
-    const clock = new Date()
+    const clock = now ?? new Date()
     return buildMemberDayModel({
       member, date: clock, now: clock, routines, todayItems, tomorrowItems, members, neededTasks, homeworkTasks, notices, history,
     })
-  }, [member, routines, todayItems, tomorrowItems, members, neededTasks, homeworkTasks, notices, history])
+  }, [member, routines, todayItems, tomorrowItems, members, neededTasks, homeworkTasks, notices, history, now])
+
+  // ── Which shape, and the adult model ──────────────────────────────
+  // A kid's page is the checklist model above. An adult's page is what a
+  // parent wants from a wall: the clock, the chores, the kids. Both share
+  // the header's "Next:" line and their own Coming up.
+  const shape = memberShape(member)
+  const roster = useMemo(() => members ?? [member], [members, member])
+  const appointments = useMemo(
+    () => appointmentsFor(member, roster, todayItems, now ?? new Date()),
+    [member, roster, todayItems, now],
+  )
+  const next = nextLine(appointments)
+  const chores = useMemo(() => choresFor(model), [model])
+  const kids = useMemo(() => kidsFor(member, roster, todayItems), [member, roster, todayItems])
+  const comingUp = useMemo(() => adaptMemberComingUpRows(days, member, roster), [days, member, roster])
 
   const resetIdleTimer = useIdleClose(onClose)
 
@@ -430,33 +463,51 @@ export function KidDayView({
     )
   }
 
-  const homeworkCard = model.homework.length > 0 && (
-    <div className={`${WALL.card} p-5 flex flex-col gap-3`}>
-      <div className={`flex items-center gap-2 text-[1.15rem] font-bold ${WALL.inkStrong}`}>
-        <BookOpen className="w-5 h-5" aria-hidden="true" />
-        Homework
-      </div>
-      <div className="flex flex-col gap-2">{model.homework.map(renderHomeworkRow)}</div>
-    </div>
+  // ── Widgets ──────────────────────────────────────────────────────
+  // One grid, no page scroll: 1024x768 is the whole screen and a kiosk that
+  // scrolls is a kiosk nobody reads. The list column (My day / Appointments)
+  // scrolls inside itself; every other widget is capped by its adapter.
+  const empty = (text: string) => <p className={`text-[1.05rem] ${WALL.muted}`}>{text}</p>
+
+  const homeworkWidget = (
+    <Widget title="Homework" icon={BookOpen}>
+      {model.homework.length === 0 && empty('Nothing due')}
+      <div className="flex flex-col gap-2 min-h-0 overflow-y-auto">{model.homework.map(renderHomeworkRow)}</div>
+    </Widget>
   )
 
-  // Information, not work: rendered whether or not the page has a list, and
-  // read-only — a notice ages out by query after 14 days.
-  const noticesCard = model.notices.length > 0 && (
-    <div className={`${WALL.card} p-5 flex flex-col gap-3`}>
-      <div className={`flex items-center gap-2 text-[1.15rem] font-bold ${WALL.inkStrong}`}>
-        <Mail className="w-5 h-5" aria-hidden="true" />
-        From school
-      </div>
-      <div className="flex flex-col gap-2">
-        {model.notices.map((n) => (
-          <div key={n.id} className={`${WALL.cardInset} px-4 py-3`}>
-            <div className={`text-[1.05rem] font-semibold ${WALL.inkStrong}`}>{n.text}</div>
-            <div className={`text-[0.85rem] ${WALL.muted}`}>{noticeMeta(n)}</div>
-          </div>
-        ))}
-      </div>
-    </div>
+  // School: the special (large — it is the one-glance answer), the pickup,
+  // tomorrow's special from the evening, then what school sent. Notices are
+  // information, not work, and never make the page non-empty.
+  const school = model.school
+  const schoolWidget = (
+    <Widget title="Today at school" icon={GraduationCap}>
+      {school?.special ? (
+        <div>
+          <div className={`font-display text-[1.7rem] leading-tight ${WALL.inkStrong}`}>{school.special}</div>
+          {school.hint && <div className={`text-[1rem] font-semibold ${WALL.muted}`}>{school.hint}</div>}
+        </div>
+      ) : empty('Nothing special today')}
+      {school?.pickup && (
+        <div className={`text-[1.05rem] font-bold ${school.pickup.who ? WALL.inkStrong : WALL.warn}`}>
+          Pickup {school.pickup.time} · {school.pickup.who ?? 'not decided yet'}
+        </div>
+      )}
+      {school?.tomorrowSpecial && (
+        <div className={`text-[1rem] font-semibold ${WALL.muted}`}>Tomorrow: {school.tomorrowSpecial}</div>
+      )}
+      {model.notices.length > 0 && (
+        <div className="flex flex-col gap-1.5 min-h-0 overflow-hidden">
+          <div className={WALL.label}>From school</div>
+          {model.notices.slice(0, 2).map((n) => (
+            <div key={n.id} className={`${WALL.cardInset} px-3 py-2`}>
+              <div className={`text-[1rem] font-semibold leading-tight ${WALL.inkStrong}`}>{n.text}</div>
+              <div className={`text-[0.8rem] ${WALL.muted}`}>{noticeMeta(n)}</div>
+            </div>
+          ))}
+        </div>
+      )}
+    </Widget>
   )
 
   // ── Reading + what it earned ──────────────────────────────────────
@@ -467,15 +518,11 @@ export function KidDayView({
   const ledgerReading = screenTime?.adjustments.find((a) => a.reason === READING_REASON)?.minutes ?? 0
   const screenMinutes = Math.max(0, (screenTime?.effectiveBudget ?? 0) - ledgerReading + readingEarned)
 
-  const readingCard = reading && reading.target && (
-    <div className={`${WALL.card} p-5 flex flex-col gap-4`}>
+  const readingWidget = reading && reading.target && (
+    <Widget title="Reading" icon={BookOpen}>
       <div className="flex items-start justify-between gap-3">
         <div>
-          <div className={`flex items-center gap-2 text-[1.15rem] font-bold ${WALL.inkStrong}`}>
-            <BookOpen className="w-5 h-5" aria-hidden="true" />
-            Reading
-          </div>
-          <div className={`font-display text-[2rem] leading-none mt-1 ${WALL.inkStrong}`}>
+          <div className={`font-display text-[2rem] leading-none ${WALL.inkStrong}`}>
             {reading.target.progress}
             <span className={`text-[1.1rem] font-sans font-semibold ${WALL.muted}`}> of {reading.target.amount} min</span>
           </div>
@@ -486,15 +533,14 @@ export function KidDayView({
             </div>
           )}
         </div>
-        <ProgressRing amount={reading.target.amount} progress={reading.target.progress} size={72} />
+        <ProgressRing amount={reading.target.amount} progress={reading.target.progress} size={64} />
       </div>
 
       {timer ? (
         <div className="flex flex-col gap-2">
-          <div className="min-h-[72px] rounded-xl flex items-center justify-between px-5 bg-[#2E4638] dark:bg-[#4E7261] text-white">
-            <span className="text-[1.1rem] font-bold">{isTimerRunning(timer) ? 'Reading…' : 'Paused'}</span>
-            <span className="font-display text-[2.2rem] tabular-nums">{elapsedLabel(timer, tick)}</span>
-            <span className="w-16" aria-hidden="true" />
+          <div className="min-h-[60px] rounded-xl flex items-center justify-between px-4 bg-[#2E4638] dark:bg-[#4E7261] text-white">
+            <span className="text-[1.05rem] font-bold">{isTimerRunning(timer) ? 'Reading…' : 'Paused'}</span>
+            <span className="font-display text-[2rem] tabular-nums">{elapsedLabel(timer, tick)}</span>
           </div>
           <div className="grid grid-cols-3 gap-2">
             {isTimerRunning(timer) ? (
@@ -502,7 +548,7 @@ export function KidDayView({
                 type="button"
                 onClick={handleTimerPause}
                 aria-label="Pause reading"
-                className={`${WALL.card} min-h-[64px] flex items-center justify-center gap-2 font-bold text-[1.05rem]`}
+                className={`${WALL.cardInset} min-h-[56px] flex items-center justify-center gap-2 font-bold text-[1rem]`}
               >
                 <Pause className="w-5 h-5 fill-current" aria-hidden="true" />Pause
               </button>
@@ -511,7 +557,7 @@ export function KidDayView({
                 type="button"
                 onClick={handleTimerResume}
                 aria-label="Resume reading"
-                className={`${WALL.card} min-h-[64px] flex items-center justify-center gap-2 font-bold text-[1.05rem]`}
+                className={`${WALL.cardInset} min-h-[56px] flex items-center justify-center gap-2 font-bold text-[1rem]`}
               >
                 <Play className="w-5 h-5 fill-current" aria-hidden="true" />Resume
               </button>
@@ -520,7 +566,7 @@ export function KidDayView({
               type="button"
               onClick={() => handleTimerDone(reading)}
               aria-label="Done reading"
-              className="min-h-[64px] rounded-2xl flex items-center justify-center gap-2 font-bold text-[1.05rem] bg-[#2E4638] dark:bg-[#4E7261] text-white active:scale-[.98] transition-transform"
+              className="min-h-[56px] rounded-xl flex items-center justify-center gap-2 font-bold text-[1rem] bg-[#2E4638] dark:bg-[#4E7261] text-white active:scale-[.98] transition-transform"
             >
               <Check className="w-5 h-5" aria-hidden="true" />Done
             </button>
@@ -528,7 +574,7 @@ export function KidDayView({
               type="button"
               onClick={handleTimerReset}
               aria-label={confirmReset === 'timer' ? 'Yes, reset the timer' : 'Reset the timer'}
-              className={`${WALL.card} min-h-[64px] flex items-center justify-center gap-2 font-bold text-[1.05rem] ${
+              className={`${WALL.cardInset} min-h-[56px] flex items-center justify-center gap-2 font-bold text-[1rem] ${
                 confirmReset === 'timer' ? 'bg-[#F7E4C0] dark:bg-[#4A3A1E] ' + WALL.warn : WALL.muted
               }`}
             >
@@ -541,98 +587,66 @@ export function KidDayView({
           type="button"
           onClick={handleTimerStart}
           aria-label="Start reading"
-          className="min-h-[72px] rounded-xl flex items-center justify-center gap-3 bg-[#2E4638] dark:bg-[#4E7261] text-white text-[1.25rem] font-bold active:scale-[.98] transition-transform"
+          className="min-h-[64px] rounded-xl flex items-center justify-center gap-3 bg-[#2E4638] dark:bg-[#4E7261] text-white text-[1.2rem] font-bold active:scale-[.98] transition-transform"
         >
           <Play className="w-6 h-6 fill-current" aria-hidden="true" />
           Start reading
         </button>
       )}
 
-      {renderChips(reading, true)}
-    </div>
+      {!timer && renderChips(reading, true)}
+    </Widget>
   )
 
-  const screenCard = reading && (
-    <div className={`${WALL.dinnerCard} p-5 flex items-center gap-4`}>
-      <Tv className="w-9 h-9 shrink-0 text-[#A8743F] dark:text-[#D8BC85]" aria-hidden="true" />
-      <div className="min-w-0">
-        <div className={WALL.dinnerLabel}>Screen time today</div>
-        <div className={`font-display text-[2rem] leading-none ${WALL.inkStrong}`}>
-          {screenMinutes}<span className={`text-[1.1rem] font-sans font-semibold ${WALL.muted}`}> min</span>
-        </div>
-        <div className={`text-[0.9rem] font-semibold ${WALL.muted}`}>
-          A minute read is a minute earned, up to {reading.target?.amount ?? 20}.
-        </div>
+  const screenWidget = reading && (
+    <Widget title="Screen time today" icon={Tv}>
+      <div className={`font-display text-[2.4rem] leading-none ${WALL.inkStrong}`}>
+        {screenMinutes}<span className={`text-[1.1rem] font-sans font-semibold ${WALL.muted}`}> min</span>
       </div>
-    </div>
-  )
-
-  const school = model.school
-  const schoolCard = school && (
-    <div className={`${WALL.card} p-5 flex flex-col gap-3`}>
-      <div className={`flex items-center gap-2 text-[1.15rem] font-bold ${WALL.inkStrong}`}>
-        <GraduationCap className="w-5 h-5" aria-hidden="true" />
-        Today at school
+      <div className={`text-[0.95rem] font-semibold ${WALL.muted}`}>
+        A minute read is a minute earned, up to {reading.target?.amount ?? 20}.
       </div>
-      {school.special && (
-        <div>
-          <div className={WALL.label}>Special</div>
-          <div className={`font-display text-[1.7rem] leading-tight ${WALL.inkStrong}`}>{school.special}</div>
-          {school.hint && <div className={`text-[1rem] font-semibold ${WALL.muted}`}>{school.hint}</div>}
-        </div>
-      )}
-      {school.pickup && (
-        <div>
-          <div className={WALL.label}>Pickup</div>
-          <div className={`text-[1.2rem] font-bold ${school.pickup.who ? WALL.inkStrong : WALL.warn}`}>
-            {school.pickup.time} · {school.pickup.who ?? 'not decided yet'}
-          </div>
-        </div>
-      )}
-      {school.tomorrowSpecial && (
-        <div>
-          <div className={WALL.label}>Tomorrow</div>
-          <div className={`text-[1.2rem] font-bold ${WALL.inkStrong}`}>{school.tomorrowSpecial}</div>
-        </div>
-      )}
-    </div>
+    </Widget>
   )
 
-  const wear = useMemo(() => whatToWear(weather, new Date()), [weather])
-  const weekday = new Date().toLocaleDateString(undefined, { weekday: 'long' })
-
-  const list = (
+  // Needed-on rows: a section at the top of a kid's list, a widget of its
+  // own on an adult's page. Same rows, same handler either way.
+  const neededRows = (
     <>
-      {homeworkCard}
-
-      {model.needed.length > 0 && (
-        <div className={`${WALL.card} p-5 flex flex-col gap-3`}>
-          <div className={`text-[1.15rem] font-bold ${WALL.inkStrong}`}>Needed today</div>
-          {model.needed.some((n) => !n.tomorrow) && (
-            <div className="flex flex-col gap-2">
-              {model.needed.filter((n) => !n.tomorrow).map((n) => renderRow(neededToRow(n)))}
-            </div>
-          )}
-          {model.needed.some((n) => n.tomorrow) && (
-            <>
-              <div className={WALL.label}>Tomorrow</div>
-              <div className="flex flex-col gap-2">
-                {model.needed.filter((n) => n.tomorrow).map((n) => renderRow(neededToRow(n)))}
-              </div>
-            </>
-          )}
+      {model.needed.some((n) => !n.tomorrow) && (
+        <div className="flex flex-col gap-2">
+          {model.needed.filter((n) => !n.tomorrow).map((n) => renderRow(neededToRow(n)))}
         </div>
       )}
-
-      {model.collections.map((collection) => (
-        <div key={collection.id} className={`${WALL.card} p-5 flex flex-col gap-3`}>
-          <div className={`text-[1.15rem] font-bold ${WALL.inkStrong}`}>{collection.title}</div>
+      {model.needed.some((n) => n.tomorrow) && (
+        <>
+          <div className={WALL.label}>Tomorrow</div>
           <div className="flex flex-col gap-2">
-            {collection.rows.map((row) => renderRow(row))}
+            {model.needed.filter((n) => n.tomorrow).map((n) => renderRow(neededToRow(n)))}
           </div>
+        </>
+      )}
+    </>
+  )
+  const neededWidget = (
+    <Widget title="Needed today" icon={ShoppingBag}>
+      {model.needed.length === 0 ? empty('Nothing needed') : <div className="min-h-0 overflow-y-auto flex flex-col gap-2">{neededRows}</div>}
+    </Widget>
+  )
+  // A kid with a reading target has both right-hand cells spoken for, so
+  // their needed rows head the My day list instead. A kid without one gets
+  // the widget in the free cell — only when there is something in it.
+  const kidNeededInList = shape === 'kid' && !!(reading && reading.target)
+
+  // The list itself: collections as titled groups, then the day's bands.
+  const listBody = (
+    <>
+      {model.collections.map((collection) => (
+        <div key={collection.id} className="flex flex-col gap-2">
+          <div className={WALL.label}>{collection.title}</div>
+          {collection.rows.map((row) => renderRow(row))}
         </div>
       ))}
-
       {BAND_ORDER.filter((band) => model.bands[band].length > 0).map((band) => (
         <div key={band} className="flex flex-col gap-2">
           <div className={WALL.label}>{BAND_LABELS[band]}</div>
@@ -642,12 +656,46 @@ export function KidDayView({
     </>
   )
 
+  const myDayWidget = (
+    <Widget title="My day" icon={ListChecks} className="row-span-3">
+      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-3">
+        {kidNeededInList && model.needed.length > 0 && (
+          <div className="flex flex-col gap-2">
+            <div className={`text-[1.05rem] font-bold ${WALL.inkStrong}`}>Needed today</div>
+            {neededRows}
+          </div>
+        )}
+        {model.isEmpty ? (
+          <p className={`text-[1.2rem] font-semibold py-8 text-center ${WALL.muted}`}>Nothing on your list — go play.</p>
+        ) : listBody}
+      </div>
+    </Widget>
+  )
+
+  const choresWidget = (
+    <Widget title="Chores" icon={ListChecks}>
+      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto flex flex-col gap-2">
+        {chores.length === 0 && model.collections.length === 0 && empty('Nothing to do')}
+        {chores.map((row) => renderRow(row))}
+        {model.collections.map((collection) => (
+          <div key={collection.id} className="flex flex-col gap-2">
+            <div className={WALL.label}>{collection.title}</div>
+            {collection.rows.map((row) => renderRow(row))}
+          </div>
+        ))}
+      </div>
+    </Widget>
+  )
+
+  const wear = useMemo(() => whatToWear(weather, new Date()), [weather])
+  const weekday = new Date().toLocaleDateString(undefined, { weekday: 'long' })
+
   return (
     <div
       className={`absolute inset-0 z-50 flex flex-col ${WALL.root}`}
       onPointerDownCapture={resetIdleTimer}
     >
-      <div className="flex items-center gap-4 px-8 pt-6 pb-3 shrink-0">
+      <div className="flex items-center gap-4 px-6 pt-5 pb-3 shrink-0">
         <button
           type="button"
           aria-label="Back"
@@ -658,7 +706,11 @@ export function KidDayView({
         </button>
         <div className="min-w-0">
           <h1 className={`font-display text-[2rem] font-bold leading-tight ${WALL.inkStrong}`}>{member.name}</h1>
-          <div className={WALL.label}>{weekday}</div>
+          <div className="flex items-baseline gap-3 min-w-0">
+            <div className={WALL.label}>{weekday}</div>
+            {/* The one line a glance needs: what is next on the clock. */}
+            {next && <div className={`text-[1.05rem] font-bold truncate ${WALL.inkStrong}`}>{next}</div>}
+          </div>
         </div>
         {wear && (
           <div className={`ml-auto ${WALL.cardInset} flex items-center gap-3 px-4 py-2`}>
@@ -671,21 +723,19 @@ export function KidDayView({
         )}
       </div>
 
-      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto px-8 pb-10">
-        <div className="grid grid-cols-[3fr_2fr] gap-4 items-start">
-          <div className="flex flex-col gap-4 min-w-0">
-            {model.isEmpty ? (
-              <div className={`${WALL.card} flex items-center justify-center py-16`}>
-                <p className={`text-[1.3rem] font-semibold ${WALL.muted}`}>Nothing on your list — go play.</p>
-              </div>
-            ) : list}
-          </div>
-          <div className="flex flex-col gap-4 min-w-0">
-            {readingCard}
-            {screenCard}
-            {schoolCard}
-            {noticesCard}
-          </div>
+      <div className="flex-1 min-h-0 px-6 pb-5">
+        {/* col 1 is the list, three rows tall; cols 2-3 hold two rows of
+            widgets and Coming up across the bottom. The kid and adult shapes
+            fill the same six cells so the page always reads as one system. */}
+        <div className="h-full grid grid-cols-3 grid-rows-[1fr_1fr_auto] gap-3">
+          {shape === 'kid' ? myDayWidget : <AppointmentsWidget rows={appointments} className="row-span-3" />}
+          {shape === 'kid' ? homeworkWidget : choresWidget}
+          {shape === 'kid' ? schoolWidget : <KidsWidget kids={kids} onOpenKid={(id) => onOpenMember?.(id)} />}
+          {shape === 'kid'
+            ? (readingWidget || (model.needed.length > 0 ? neededWidget : <div aria-hidden="true" />))
+            : neededWidget}
+          {shape === 'kid' ? (readingWidget ? screenWidget : <div aria-hidden="true" />) : <DinnerWidget tonight={tonight} onOpen={onOpenDinner} />}
+          <div className="col-span-2 min-h-0"><ComingUpWidget rows={comingUp} /></div>
         </div>
       </div>
     </div>

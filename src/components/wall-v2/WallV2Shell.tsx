@@ -943,6 +943,10 @@ export function WallV2Shell() {
           notices={wallData.notices}
           onToggleTask={handleToggleComplete}
           onClose={handleCloseKidView}
+          days={wallData.days}
+          tonight={selectedDinnerDay ? selectedDinnerDay.title : (dinnerEvent ? dinner.mealName : null)}
+          onOpenDinner={handleTapDinnerCard}
+          onOpenMember={handleTapGanttMember}
         />
       )}
 
