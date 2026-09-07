@@ -52,7 +52,7 @@ export function SpaceView() {
   const parent = isZone ? spaces.find((s) => s.id === space.parentSpaceId) : null
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
+    <div className="py-6 px-6 md:px-10 lg:px-14 max-w-5xl mr-auto">
       <div className="flex items-center justify-between mb-4">
         <Link to={isZone ? `/home/space/${parent?.id}` : '/home'} className="text-sm text-primary-700">
           ← {isZone ? parent?.name : 'Home'}

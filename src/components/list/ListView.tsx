@@ -91,7 +91,7 @@ export function ListView({
 
   return (
     <div className="h-full overflow-auto">
-      <div className="p-6 max-w-2xl mx-auto">
+      <div className="py-6 px-6 md:px-10 lg:px-14 max-w-2xl mr-auto">
         {/* Header */}
         <div className="mb-6">
           {/* Breadcrumb */}

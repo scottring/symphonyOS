@@ -46,7 +46,7 @@ export function CookPage() {
   // ── Loading / error / not-found ────────────────────────────────
   if (loading) {
     return (
-      <div className="px-6 py-6 max-w-7xl mx-auto">
+      <div className="px-6 md:px-10 lg:px-14 py-6 max-w-7xl mr-auto">
         <MealsTabs />
         <div className="text-sm italic text-neutral-400">Loading recipe…</div>
       </div>
@@ -55,7 +55,7 @@ export function CookPage() {
 
   if (error || !recipe) {
     return (
-      <div className="px-6 py-6 max-w-7xl mx-auto">
+      <div className="px-6 md:px-10 lg:px-14 py-6 max-w-7xl mr-auto">
         <MealsTabs />
         <button
           type="button"
@@ -80,7 +80,7 @@ export function CookPage() {
       : `${ordinal(recipe.timesCooked + 1)} time — old friend.`
 
   return (
-    <div className="px-6 py-6 max-w-7xl mx-auto">
+    <div className="px-6 md:px-10 lg:px-14 py-6 max-w-7xl mr-auto">
       <MealsTabs />
 
       {/* Back link */}

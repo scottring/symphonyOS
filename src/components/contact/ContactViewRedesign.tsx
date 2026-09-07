@@ -143,7 +143,7 @@ export function ContactViewRedesign({
       {/* Top accent */}
       <div className="absolute top-0 left-0 right-0 h-48 bg-gradient-to-b from-primary-50/50 to-transparent pointer-events-none" />
 
-      <div className="relative max-w-6xl mx-auto px-6 py-8">
+      <div className="relative max-w-6xl mr-auto px-6 md:px-10 lg:px-14 py-8">
         {/* Back button */}
         <button
           onClick={onBack}

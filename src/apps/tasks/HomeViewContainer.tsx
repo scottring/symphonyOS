@@ -789,7 +789,7 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
         // max-w-[1152px] + md:px-10 lg:px-14), so the card sits directly above
         // the day card on the same left and right edges. Without it the card
         // spanned the full content width and hung out past the page.
-        <div className="w-full max-w-[1152px] mx-auto px-0 pt-2 md:px-10 md:pt-8 lg:px-14">
+        <div className="w-full max-w-[1152px] mr-auto px-0 pt-2 md:px-10 md:pt-8 lg:px-14">
           <FirstWeekCard
             steps={firstWeekStepsList}
             onHide={handleHideFirstWeek}

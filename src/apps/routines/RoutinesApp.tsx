@@ -183,7 +183,7 @@ function RoutineCreate() {
 
   return (
     <div className="h-full overflow-auto">
-      <div className="max-w-2xl mx-auto">
+      <div className="max-w-2xl mr-auto">
         <div className="flex items-center gap-3 p-6 pb-0">
           <button
             onClick={() => navigate('/routines')}

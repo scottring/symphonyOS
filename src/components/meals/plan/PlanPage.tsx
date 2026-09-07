@@ -148,7 +148,7 @@ export function PlanPage() {
   const weekLabel = formatDateMonthDay(weekStart)
 
   return (
-    <div className="px-6 py-6 max-w-7xl mx-auto">
+    <div className="px-6 md:px-10 lg:px-14 py-6 max-w-7xl mr-auto">
       <MealsTabs />
 
       <div className="flex items-center justify-between mb-6 flex-wrap gap-3">

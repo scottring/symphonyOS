@@ -34,7 +34,7 @@ export function AssetView() {
   }
 
   return (
-    <div className="p-6 max-w-3xl mx-auto">
+    <div className="py-6 px-6 md:px-10 lg:px-14 max-w-3xl mr-auto">
       <div className="mb-4">
         <Link to={space ? `/home/space/${space.id}` : '/home'} className="text-sm text-primary-700">
           ← {space?.name ?? 'Home'}

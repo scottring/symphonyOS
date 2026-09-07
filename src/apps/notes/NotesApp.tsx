@@ -108,7 +108,7 @@ export function NotesApp() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-6 py-8">
+    <div className="max-w-3xl mr-auto px-6 md:px-10 lg:px-14 py-8">
       <h1 className="text-3xl font-display text-neutral-900 mb-1">Notes</h1>
       <p className="text-[15px] text-neutral-500 mb-6">
         Everything you've jotted, newest first — typed here, attached to something, or read off a page.

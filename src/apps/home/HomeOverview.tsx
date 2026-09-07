@@ -42,7 +42,7 @@ export function HomeOverview() {
 
   if (!home) {
     return (
-      <div className="p-6 max-w-2xl mx-auto">
+      <div className="py-6 px-6 md:px-10 lg:px-14 max-w-2xl mr-auto">
         <h1 className="font-display text-3xl mb-4">Home</h1>
         <div className="card p-6">
           <p className="mb-4">You don't have a home set up yet.</p>
@@ -61,7 +61,7 @@ export function HomeOverview() {
   }
 
   return (
-    <div className="p-6 max-w-6xl mx-auto">
+    <div className="py-6 px-6 md:px-10 lg:px-14 max-w-6xl mr-auto">
       <header className="flex items-center justify-between mb-6">
         <h1 className="font-display text-3xl">Home</h1>
         <div className="flex gap-2">
