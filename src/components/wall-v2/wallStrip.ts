@@ -60,9 +60,10 @@ export interface DueRow {
 }
 
 /**
- * Today's unfinished tasks. Routines and events are deliberately excluded —
- * they already have a lane, and repeating them here is what made the old
- * board of cards feel busy.
+ * Today's unfinished UNTIMED tasks. Routines and events are deliberately
+ * excluded — they already have a row — and so is a task with an hour: that
+ * is an appointment with yourself and draws as a bar on the board. This
+ * card is for the ones with no place on a clock.
  */
 export function adaptDueRows(
   today: WallDayData | undefined,
@@ -74,7 +75,7 @@ export function adaptDueRows(
   const all: TimelineItem[] = Object.values(today.items).flat();
 
   return all
-    .filter((it) => it.type === 'task' && !it.completed)
+    .filter((it) => it.type === 'task' && !it.completed && (!it.startTime || !!it.allDay))
     .slice(0, limit)
     .map((it) => ({
       id: it.id,

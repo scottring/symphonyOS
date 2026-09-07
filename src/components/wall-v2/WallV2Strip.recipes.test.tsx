@@ -6,6 +6,7 @@ import { WallV2UtilitySheet } from './WallV2UtilitySheet'
 const stripProps = {
   tonight: 'Grilled pizza night',
   meals: [],
+  due: [],
   comingUp: [],
   question: null,
   onCall: vi.fn(),

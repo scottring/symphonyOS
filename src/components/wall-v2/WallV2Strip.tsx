@@ -57,7 +57,7 @@ export function WallV2MealsCard({ rows }: { rows: MealRow[] }) {
 
 export function WallV2DueTodayCard({ rows }: { rows: DueRow[] }) {
   return (
-    <StripCard title={rows.length ? `Due today · ${rows.length}` : 'Due today'}>
+    <StripCard title="Due today">
       {rows.length === 0 && <EmptyRow>Nothing due — nice</EmptyRow>}
       {rows.map((r) => (
         <div key={r.id} className="flex items-baseline gap-2 min-w-0">
@@ -227,10 +227,12 @@ export function WallV2QuestionStripCard({ question, handoff, onTap }: { question
 }
 
 export function WallV2Strip({
-  tonight, meals, comingUp, question, handoff, onCall, onTapDinner, onSelectDinnerDay, onBrowseRecipes, onTapQuestion, onTapHandoff,
+  tonight, meals, due, comingUp, question, handoff, onCall, onTapDinner, onSelectDinnerDay, onBrowseRecipes, onTapQuestion, onTapHandoff,
 }: {
   tonight: string | null;
   meals: MealRow[];
+  /** Today's untimed open tasks — the ones the board no longer draws. */
+  due: DueRow[];
   comingUp: ComingUpRow[];
   question: string | null;
   handoff?: HandoffAsk | null;
@@ -254,7 +256,16 @@ export function WallV2Strip({
       {onBrowseRecipes && <WallV2RecipesTile onTap={onBrowseRecipes} />}
       <div className="flex-1 min-w-0 grid grid-cols-3 gap-3">
         <WallV2DinnerStripCard tonight={tonight} rows={meals} onTap={onTapDinner} onSelectDay={onSelectDinnerDay} />
-        <WallV2QuestionStripCard question={question} handoff={handoff} onTap={handoff ? onTapHandoff : onTapQuestion} />
+        {/* The cell has a ladder. A handoff nobody has claimed is a question the
+            house needs answered by 7am. Below that, what is due today outranks a
+            conversation starter — untimed tasks left the board (they have no
+            place on a clock) and this is where they live now. The question
+            returns when the list is clear. */}
+        {handoff
+          ? <WallV2QuestionStripCard question={question} handoff={handoff} onTap={onTapHandoff} />
+          : due.length > 0
+            ? <WallV2DueTodayCard rows={due} />
+            : <WallV2QuestionStripCard question={question} onTap={onTapQuestion} />}
         <WallV2ComingUpCard rows={comingUp} />
       </div>
     </div>

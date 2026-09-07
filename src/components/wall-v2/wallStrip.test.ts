@@ -85,6 +85,16 @@ describe('adaptDueRows', () => {
     expect(adaptDueRows(day(new Date(), true, many), members)).toHaveLength(STRIP_ROWS)
   })
 
+  it('leaves a timed task to the board — it draws as a bar there', () => {
+    const rows = adaptDueRows(
+      day(new Date(), true, [
+        item({ id: 'timed', title: 'Call the plumber', startTime: new Date(2026, 8, 7, 10), endTime: new Date(2026, 8, 7, 10, 30) }),
+        item({ id: 'untimed', title: 'Buy backyard bench' }),
+        item({ id: 'allday', title: 'Wash bookbags', startTime: new Date(2026, 8, 7), allDay: true }),
+      ]), members)
+    expect(rows.map((r) => r.id)).toEqual(['untimed', 'allday'])
+  })
+
   it('survives a missing day', () => {
     expect(adaptDueRows(undefined, members)).toEqual([])
   })

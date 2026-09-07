@@ -47,7 +47,7 @@ import type { TimelineItem } from '@/types/timeline';
 import type { FamilyMember } from '@/types/family';
 import { WallV2Header } from './WallV2Header';
 import { WallV2Strip } from './WallV2Strip';
-import { adaptMealRows, adaptComingUpRows } from './wallStrip';
+import { adaptMealRows, adaptDueRows, adaptComingUpRows } from './wallStrip';
 import { WallV2ListSheetContainer } from './WallV2ListSheetContainer';
 import { useLists } from '@/hooks/useLists';
 import { scopeForDomain } from '@/lib/scope';
@@ -518,6 +518,11 @@ export function WallV2Shell() {
     () => adaptMealRows(dinnerDays, todayKey),
     [dinnerDays, todayKey],
   );
+  // Untimed tasks have no place on the board's clock; the strip lists them.
+  const dueRows = useMemo(
+    () => adaptDueRows(wallData.days.find((d) => d.isToday) ?? wallData.days[0], wallData.familyMembers),
+    [wallData.days, wallData.familyMembers],
+  );
   const comingUpRows = useMemo(
     () => adaptComingUpRows(wallData.days, wallData.familyMembers),
     [wallData.days, wallData.familyMembers],
@@ -812,6 +817,7 @@ export function WallV2Shell() {
         <WallV2Strip
           tonight={selectedDinnerDay ? selectedDinnerDay.title : (dinnerEvent ? dinner.mealName : null)}
           meals={mealRows}
+          due={dueRows}
           comingUp={comingUpRows}
           question={discussionDismissed ? null : discussionPrompt}
           handoff={handoffAsk}
