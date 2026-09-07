@@ -12,7 +12,8 @@ import type { MealDayRecipe } from '@/lib/mealDayRecipes';
 import type { WallDayData } from '@/hooks/useWallData';
 import type { TimelineItem } from '@/types/timeline';
 import type { FamilyMember } from '@/types/family';
-import { withoutKindPrefix } from './wallEventAttribution';
+import { withoutKindPrefix, titleForMember, withoutMemberList } from './wallEventAttribution';
+import { ownersOf } from './wallLanes';
 
 /** Rows a 200px-tall card can show at eight feet without shrinking type. */
 export const STRIP_ROWS = 5;
@@ -159,4 +160,39 @@ export function adaptComingUpRows(
       };
     })
     .filter((r) => r.summary.length > 0);
+}
+
+/**
+ * One person's next few days, one line each. Same shape as the strip's card,
+ * scoped by attribution: an adult's page should not list the kids' Specials.
+ * Days with nothing for this person are skipped, so three lines are three
+ * pieces of news, not two blanks and a line.
+ */
+export function adaptMemberComingUpRows(
+  days: WallDayData[],
+  member: FamilyMember,
+  members: FamilyMember[],
+  limit = 3,
+  perDay = 2,
+): ComingUpRow[] {
+  const out: ComingUpRow[] = [];
+  for (const d of days.filter((x) => !x.isToday)) {
+    const titles = new Set<string>();
+    for (const it of Object.values(d.items).flat()) {
+      if (it.completed || it.type === 'routine') continue;
+      const owners = ownersOf(it, members);
+      const mine = owners.length ? owners.includes(member.id) : it.assignedTo === member.id;
+      if (!mine) continue;
+      const t = withoutMemberList(titleForMember(withoutKindPrefix(it.title.trim(), members), member.name), members);
+      if (t) titles.add(t);
+    }
+    if (titles.size === 0) continue;
+    out.push({
+      dateKey: `${d.date.getFullYear()}-${d.date.getMonth() + 1}-${d.date.getDate()}`,
+      dayLabel: DAY_NAMES[d.date.getDay()],
+      summary: [...titles].slice(0, perDay).join(JOIN),
+    });
+    if (out.length >= limit) break;
+  }
+  return out;
 }

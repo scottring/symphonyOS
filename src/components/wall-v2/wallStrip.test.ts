@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { adaptMealRows, adaptDueRows, adaptComingUpRows, STRIP_ROWS } from './wallStrip'
+import { adaptMealRows, adaptDueRows, adaptComingUpRows, adaptMemberComingUpRows, STRIP_ROWS } from './wallStrip'
 import type { MealDayRecipe } from '@/lib/mealDayRecipes'
 import type { WallDayData } from '@/hooks/useWallData'
 import type { TimelineItem } from '@/types/timeline'
@@ -196,5 +196,35 @@ describe('adaptComingUpRows', () => {
       day(new Date(2026, 7, 27), false, [item({ title: 'School' })]),
     ])
     expect(rows.map((r) => r.summary)).toEqual(['School', 'School'])
+  })
+})
+
+describe("adaptMemberComingUpRows — one person's next few days", () => {
+  const scott = member('s', 'Scott')
+  const ella = member('e', 'Ella')
+  it('keeps only items attributed to the member, one line a day, three days', () => {
+    const mk = (d: number, items: TimelineItem[]) => day(new Date(2026, 8, 7 + d), d === 0, items)
+    const days = [
+      mk(0, [item({ type: 'event', title: 'Today thing', assignedTo: 's' })]),
+      mk(1, [item({ type: 'event', title: 'Wheelies', assignedTo: 's' }), item({ type: 'event', title: 'Ella: Library', assignedTo: 'e' })]),
+      mk(2, [item({ type: 'routine', title: 'Brush teeth', assignedTo: 's' })]),
+      mk(3, [item({ type: 'event', title: 'Bicycle Connection', assignedTo: 's' })]),
+      mk(4, [item({ type: 'event', title: 'Far away', assignedTo: 's' })]),
+      mk(5, [item({ type: 'event', title: 'Too far', assignedTo: 's' })]),
+    ]
+    const rows = adaptMemberComingUpRows(days, scott, [scott, ella])
+    expect(rows.map((r) => [r.dayLabel, r.summary])).toEqual([
+      ['Tue', 'Wheelies'],
+      ['Thu', 'Bicycle Connection'],
+      ['Fri', 'Far away'],
+    ])
+  })
+  it('a shared-calendar event that names the member is theirs, and the name list comes off', () => {
+    const days = [
+      day(new Date(2026, 8, 7), true, []),
+      day(new Date(2026, 8, 8), false, [item({ type: 'event', title: 'FFG — Ella & Kaleb' })]),
+    ]
+    expect(adaptMemberComingUpRows(days, ella, [scott, ella, member('k', 'Kaleb')]).map((r) => r.summary)).toEqual(['FFG'])
+    expect(adaptMemberComingUpRows(days, scott, [scott, ella])).toEqual([])
   })
 })
