@@ -33,6 +33,7 @@ import { findTaskById } from '@/lib/findTaskById'
 import { sundayOfWeek } from '@/lib/weekHelpers'
 import { CascadingRiverView } from './CascadingRiverView'
 import { TodayView } from '@/components/schedule/TodayView'
+import { PAGE_GUTTER_X } from '@/components/layout/pageLayout'
 import { UndoToast } from '@/components/undo/UndoToast'
 import { HomeHeader } from '@/components/home/HomeHeader'
 import { CalendarReconnectBanner } from '@/components/home/CalendarReconnectBanner'
@@ -481,7 +482,7 @@ export function HomeView({
           date label and controls left/right-aligned with the task rows.
           Week/Month headers stay outside the scroll container (full-width). */}
       {!isMobile && currentView !== 'today' && (
-        <div className="px-6 pt-4">
+        <div className={`${PAGE_GUTTER_X} pt-4`}>
           <HomeHeader
             currentView={currentView}
             onViewChange={handleViewChange}
@@ -502,7 +503,7 @@ export function HomeView({
 
       <div className="flex-1 overflow-y-auto">
         {!isMobile && currentView === 'today' && (
-          <div className="max-w-[940px] w-full mx-auto px-0 md:px-8 pt-4">
+          <div className={`max-w-[940px] w-full mr-auto px-0 ${PAGE_GUTTER_X} pt-4`}>
             <HomeHeader
               currentView={currentView}
               onViewChange={handleViewChange}
@@ -518,10 +519,17 @@ export function HomeView({
         {/* Surfaces an expired/revoked calendar connection so the empty event
             state isn't silent. Wrapper collapses (empty:hidden) when the banner
             renders null, so it adds no padding while connected. */}
-        <div className="px-6 pt-4 empty:hidden">
+        <div className={`${PAGE_GUTTER_X} pt-4 empty:hidden`}>
           <CalendarReconnectBanner />
         </div>
-        {renderContent()}
+        {currentView === 'today' || showRiverView
+          ? renderContent()
+          : (
+            // Week/month/workweek draw no column of their own — they used to
+            // start flush against the content edge, 56px left of their own
+            // masthead card. One gutter, one left edge (Scott, 2026-09-07).
+            <div className={PAGE_GUTTER_X}>{renderContent()}</div>
+          )}
       </div>
 
       <UndoToast

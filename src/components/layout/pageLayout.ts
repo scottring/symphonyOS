@@ -4,20 +4,31 @@
  * <PageContainer> component, or applied directly on pages whose structure makes
  * wrapping awkward) so the app stops shipping five max-widths and six paddings.
  *
- * The column is CENTERED (design-unification pass, 2026-09-01): Today, Notes
- * and Documents — the pages that set the app's look — all center their
- * columns, and a left-hugging page beside them reads as belonging to a
- * different app. The earlier left-aligned rationale (gutter stays put when
- * the right pane opens) traded consistency for a smaller reflow; Today has
- * always taken the reflow, so every page now does the same.
+ * The column STARTS in the same place on every page (Scott, 2026-09-07: "the
+ * today card should appear at the exact same coordinates — at least on the
+ * left/starting margin — for all pages").
+ *
+ * It was CENTERED between 2026-09-01 and then, for a real reason: a
+ * left-hugging page beside a centered one reads as a different app. But
+ * centering only unifies pages that share a width, and these three do not — so
+ * every page put its masthead card at a different x, and the wider the screen
+ * the further apart they drifted. Measured on prod at a 1715px viewport, all
+ * on the same day: /week 280, /today 312, /month 460, /inbox 466, /lists 566,
+ * /notes 626. Left-aligning makes the left edge a constant of the app rather
+ * than a function of each page's max-width; a narrower page now simply ENDS
+ * sooner, which is the difference a reader can actually follow.
  */
-const PAGE_GUTTER = 'px-6 md:px-10 lg:px-14 py-8'
+/** The horizontal half on its own — for pages that own their vertical rhythm
+ *  (the week grid's header + grid) but must share the app's left edge. */
+export const PAGE_GUTTER_X = 'px-6 md:px-10 lg:px-14'
+
+const PAGE_GUTTER = `${PAGE_GUTTER_X} py-8`
 
 /** Default column — rhythm views + library lists. */
-export const PAGE_COLUMN = `w-full max-w-[940px] mx-auto ${PAGE_GUTTER}`
+export const PAGE_COLUMN = `w-full max-w-[940px] mr-auto ${PAGE_GUTTER}`
 
 /** Wide column — detail pages that need more room (e.g. project detail). */
-export const PAGE_COLUMN_WIDE = `w-full max-w-[1152px] mx-auto ${PAGE_GUTTER}`
+export const PAGE_COLUMN_WIDE = `w-full max-w-[1152px] mr-auto ${PAGE_GUTTER}`
 
 /** Full-bleed column — hands-on WORK pages (e.g. /season) where a narrow column
  *  cramps a two-pane grid and wastes the right half of a wide screen. No
