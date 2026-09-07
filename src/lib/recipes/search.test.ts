@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { searchRecipes, pageOf, type WallRecipe } from './recipeSearch'
+import { searchRecipes, pageOf, type WallRecipe } from './search'
 
 function r(title: string, over: Partial<WallRecipe> = {}): WallRecipe {
   return { id: title.toLowerCase().replace(/\W+/g, '-'), title, tags: [], lastCookedAt: null, prepMinutes: null, ...over }
@@ -48,6 +48,34 @@ describe('searchRecipes', () => {
 
   it('returns nothing rather than everything when nothing matches', () => {
     expect(searchRecipes(SHELF, 'zzz')).toEqual([])
+  })
+})
+
+// The meals page has always searched more of a recipe than its title. Sharing
+// the RANKING (not the wall's keyboard) is the point: both surfaces agree on
+// which hit is best, each keeps the input its hardware deserves.
+describe('searchRecipes — the desktop\'s wider net', () => {
+  const shelf: WallRecipe[] = [
+    r('Salmon burgers'),
+    r('Roast chicken', { ingredients: ['2 tsp kosher salt', '1 chicken'] }),
+    r('Weeknight dal', { sourceLabel: 'Salt Fat Acid Heat' }),
+    r('Shakshuka', { acceptanceSentence: 'Both kids ask for seconds' }),
+  ]
+
+  it('leaves ingredients alone unless asked', () => {
+    expect(searchRecipes(shelf, 'salt').map((x) => x.title)).toEqual([])
+  })
+
+  it('finds a recipe by what is in it, by where it came from, and by how it went', () => {
+    expect(searchRecipes(shelf, 'salt', { deep: true }).map((x) => x.title))
+      .toEqual(['Roast chicken', 'Weeknight dal'])
+    expect(searchRecipes(shelf, 'seconds', { deep: true }).map((x) => x.title)).toEqual(['Shakshuka'])
+  })
+
+  it('never lets an ingredient outrank a title', () => {
+    // "sal" is in "Salmon burgers" (title) and "kosher salt" (ingredient).
+    expect(searchRecipes(shelf, 'sal', { deep: true }).map((x) => x.title))
+      .toEqual(['Salmon burgers', 'Roast chicken', 'Weeknight dal'])
   })
 })
 

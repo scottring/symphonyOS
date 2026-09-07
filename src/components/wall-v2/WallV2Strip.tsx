@@ -13,7 +13,7 @@
 // and left is the reachable corner, and it keeps the dedicated always-visible
 // one-tap target the phone is owed.
 
-import { HelpCircle, MessageCircle, Phone, Search, UtensilsCrossed } from 'lucide-react';
+import { ChefHat, HelpCircle, MessageCircle, Phone, UtensilsCrossed } from 'lucide-react';
 import { WALL } from './wallTheme';
 import type { MealRow, DueRow, ComingUpRow } from './wallStrip';
 
@@ -104,17 +104,33 @@ export function WallV2CallTile({ onTap }: { onTap: () => void }) {
   );
 }
 
+/**
+ * Recipes. A tile of its own beside Call, not a row inside the utilities
+ * sheet (Scott, 2026-09-07) — cooking is a thing you come to this wall to do,
+ * and the utilities drawer is where you go to change the theme.
+ */
+export function WallV2RecipesTile({ onTap }: { onTap: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onTap}
+      aria-label="Recipes"
+      className={`${WALL.card} shrink-0 w-[140px] flex flex-col items-center justify-center gap-2 active:scale-[.97] transition-transform`}
+    >
+      <ChefHat className="w-11 h-11 text-[#A8743F] dark:text-[#D8BC85]" />
+      <span className={`font-display text-[1.5rem] leading-none ${WALL.inkStrong}`}>Recipes</span>
+    </button>
+  );
+}
+
 export function WallV2DinnerStripCard({
-  tonight, rows, onTap, onSelectDay, onBrowseRecipes,
+  tonight, rows, onTap, onSelectDay,
 }: {
   tonight: string | null;
   rows: MealRow[];
   onTap?: () => void;
   /** Opens another night's recipe — the prev/next arrows the hero used to carry. */
   onSelectDay?: (dateKey: string) => void;
-  /** Opens the recipe picker — cooking something that was never planned is
-   *  the other half of standing here (Scott, 2026-09-07). */
-  onBrowseRecipes?: () => void;
 }) {
   const rest = rows.filter((r) => !r.isToday).slice(0, 3);
   return (
@@ -147,16 +163,6 @@ export function WallV2DinnerStripCard({
           </button>
         ))}
       </div>
-      {onBrowseRecipes && (
-        <button
-          type="button"
-          onClick={onBrowseRecipes}
-          className={`mt-2 shrink-0 flex items-center gap-1.5 text-left active:scale-[.99] transition-transform ${WALL.dinnerLabel}`}
-        >
-          <Search className="w-3.5 h-3.5" />
-          All recipes
-        </button>
-      )}
     </div>
   );
 }
@@ -245,8 +251,9 @@ export function WallV2Strip({
     // reproduced. Width is the whole ballgame for a Gantt.
     <div className="shrink-0 h-[188px] flex gap-3 min-w-0">
       <WallV2CallTile onTap={onCall} />
+      {onBrowseRecipes && <WallV2RecipesTile onTap={onBrowseRecipes} />}
       <div className="flex-1 min-w-0 grid grid-cols-3 gap-3">
-        <WallV2DinnerStripCard tonight={tonight} rows={meals} onTap={onTapDinner} onSelectDay={onSelectDinnerDay} onBrowseRecipes={onBrowseRecipes} />
+        <WallV2DinnerStripCard tonight={tonight} rows={meals} onTap={onTapDinner} onSelectDay={onSelectDinnerDay} />
         <WallV2QuestionStripCard question={question} handoff={handoff} onTap={handoff ? onTapHandoff : onTapQuestion} />
         <WallV2ComingUpCard rows={comingUp} />
       </div>

@@ -855,7 +855,6 @@ export function WallV2Shell() {
             void wallData.refetch();
             showFlash('Refreshing…');
           }}
-          onRecipes={() => { setShowUtilities(false); setShowRecipePicker(true); }}
           onToggleHideRoutines={toggleHideRoutines}
           onToggleTheme={toggleTheme}
           onClose={() => setShowUtilities(false)}

@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { searchRecipes } from '@/lib/recipes/search'
 import { Sparkles, Loader2 } from 'lucide-react'
 import { useRecipes, type ManualRecipeInput } from '@/hooks/useRecipes'
 import { useMealSlotSuggestions, type SlotSuggestion } from '@/hooks/useMealSlotSuggestions'
@@ -95,8 +96,22 @@ export function RecipePickerModal({
     }
   }
 
+  // Shared ranking (src/lib/recipes/search.ts). This tab was title-only and
+  // unranked, so it and the shelf page disagreed about what a query found.
   const filtered = q
-    ? recipes.filter(r => r.title.toLowerCase().includes(q.toLowerCase()))
+    ? (() => {
+        const byId = new Map(recipes.map(r => [r.id, r]))
+        return searchRecipes(
+          recipes.map(r => ({
+            id: r.id, title: r.title, tags: r.tags,
+            lastCookedAt: r.lastCookedAt ?? null, prepMinutes: r.prepMinutes ?? null,
+            ingredients: r.ingredients, sourceLabel: r.sourceLabel,
+            acceptanceSentence: r.acceptanceSentence,
+          })),
+          q,
+          { deep: true },
+        ).map(r => byId.get(r.id)!).filter(Boolean)
+      })()
     : recipes
 
   const handleAddByUrl = async (url: string) => {

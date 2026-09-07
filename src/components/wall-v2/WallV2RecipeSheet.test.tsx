@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { useState } from 'react'
 import { render, screen, fireEvent, within } from '@testing-library/react'
 import { WallV2RecipeSheet } from './WallV2RecipeSheet'
-import type { WallRecipe } from '@/lib/wall/recipeSearch'
+import type { WallRecipe } from '@/lib/recipes/search'
 
 function r(title: string, over: Partial<WallRecipe> = {}): WallRecipe {
   return { id: title.toLowerCase().replace(/\W+/g, '-'), title, tags: [], lastCookedAt: null, prepMinutes: null, ...over }

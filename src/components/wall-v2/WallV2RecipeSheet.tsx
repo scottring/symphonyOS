@@ -12,7 +12,7 @@
 import { useMemo, useState } from 'react'
 import { ChevronLeft, ChevronRight, Delete, X } from 'lucide-react'
 import { WALL } from './wallTheme'
-import { searchRecipes, pageOf, type WallRecipe } from '@/lib/wall/recipeSearch'
+import { searchRecipes, pageOf, type WallRecipe } from '@/lib/recipes/search'
 
 const PER_PAGE = 9
 const LETTERS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')

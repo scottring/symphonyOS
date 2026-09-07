@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import type { WallRecipe } from '@/lib/wall/recipeSearch'
+import type { WallRecipe } from '@/lib/recipes/search'
 
 interface Result {
   recipes: WallRecipe[]

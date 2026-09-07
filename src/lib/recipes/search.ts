@@ -1,5 +1,6 @@
 //
-// Finding a recipe from across the kitchen.
+// Finding a recipe — one definition of "what does `sal` find, and which one is
+// the best answer", shared by every surface that asks.
 //
 // Scott, 2026-09-07: recipes should be searchable from the wall, and picking
 // one opens the big cooking view. 143 recipes is far past what browsing a grid
@@ -15,6 +16,19 @@ export interface WallRecipe {
   tags: string[]
   lastCookedAt: Date | null
   prepMinutes: number | null
+  /** Only the desktop surfaces carry these — the wall's index deliberately
+   *  fetches titles alone. Absent = that rung simply can't match. */
+  ingredients?: string[]
+  sourceLabel?: string
+  acceptanceSentence?: string
+}
+
+export interface SearchOptions {
+  /** Also match a recipe's ingredients, source and acceptance sentence — the
+   *  wider net the meals page has always cast. The wall leaves it off: it
+   *  never loads those fields, and "what's in it" is not how you reach for a
+   *  recipe standing at a hot stove. */
+  deep?: boolean
 }
 
 /** Lowercase, drop everything that isn't a letter or digit. "Sheet-pan" and
@@ -28,7 +42,7 @@ function words(s: string): string[] {
 }
 
 /** Lower is better. null = no match at all. */
-function rank(recipe: WallRecipe, q: string): number | null {
+function rank(recipe: WallRecipe, q: string, opts: SearchOptions): number | null {
   const squashedQuery = squash(q)
   if (!squashedQuery) return 0
   const title = squash(recipe.title)
@@ -36,6 +50,12 @@ function rank(recipe: WallRecipe, q: string): number | null {
   if (words(recipe.title).some((w) => w.startsWith(squashedQuery))) return 1
   if (title.includes(squashedQuery)) return 2
   if (recipe.tags.some((t) => squash(t).startsWith(squashedQuery))) return 3
+  if (!opts.deep) return null
+  // The wider net, and deliberately BELOW every title and tag hit: a recipe
+  // that merely contains salt must never outrank "Salmon burgers".
+  if (recipe.ingredients?.some((i) => squash(i).includes(squashedQuery))) return 4
+  if (squash(recipe.sourceLabel ?? '').includes(squashedQuery)) return 5
+  if (squash(recipe.acceptanceSentence ?? '').includes(squashedQuery)) return 5
   return null
 }
 
@@ -46,10 +66,14 @@ function rank(recipe: WallRecipe, q: string): number | null {
  * then everything else alphabetically — a stable shelf you can learn the shape
  * of, rather than one that reshuffles itself every night.
  */
-export function searchRecipes(recipes: readonly WallRecipe[], query: string): WallRecipe[] {
+export function searchRecipes(
+  recipes: readonly WallRecipe[],
+  query: string,
+  opts: SearchOptions = {},
+): WallRecipe[] {
   const scored: { r: WallRecipe; rank: number }[] = []
   for (const r of recipes) {
-    const score = rank(r, query)
+    const score = rank(r, query, opts)
     if (score !== null) scored.push({ r, rank: score })
   }
   const byTitle = (a: WallRecipe, b: WallRecipe) => a.title.localeCompare(b.title)

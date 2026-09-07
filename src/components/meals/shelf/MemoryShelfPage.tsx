@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { searchRecipes } from '@/lib/recipes/search'
 import { useRecipes } from '@/hooks/useRecipes'
 import { RecipeCard } from './RecipeCard'
 import { ShelfFilterRow } from './ShelfFilterRow'
@@ -15,18 +16,25 @@ export function MemoryShelfPage() {
   const [detailRecipeId, setDetailRecipeId] = useState<string | null>(null)
   const [search, setSearch] = useState('')
 
-  // Search across title, tags, ingredients, source label, and acceptance sentence.
+  // The same matcher the wall uses (src/lib/recipes/search.ts), with the
+  // deeper net this page has always cast. It used to be an unranked
+  // `includes` sweep: typing "sal" listed whatever order the shelf was in,
+  // with a recipe that merely contains salt level with "Salmon burgers".
+  // Ranking is what's shared; the keyboard is not — a desktop has one.
   const visibleRecipes = useMemo(() => {
-    const q = search.trim().toLowerCase()
-    if (!q) return recipes
-    return recipes.filter(r => {
-      if (r.title.toLowerCase().includes(q)) return true
-      if (r.sourceLabel?.toLowerCase().includes(q)) return true
-      if (r.acceptanceSentence?.toLowerCase().includes(q)) return true
-      if (r.tags.some(t => t.toLowerCase().includes(q))) return true
-      if (r.ingredients.some(i => i.toLowerCase().includes(q))) return true
-      return false
-    })
+    if (!search.trim()) return recipes
+    const ranked = searchRecipes(
+      recipes.map(r => ({
+        id: r.id, title: r.title, tags: r.tags,
+        lastCookedAt: r.lastCookedAt ?? null, prepMinutes: r.prepMinutes ?? null,
+        ingredients: r.ingredients, sourceLabel: r.sourceLabel,
+        acceptanceSentence: r.acceptanceSentence,
+      })),
+      search,
+      { deep: true },
+    )
+    const byId = new Map(recipes.map(r => [r.id, r]))
+    return ranked.map(r => byId.get(r.id)!).filter(Boolean)
   }, [recipes, search])
 
   const handleAddByUrl = async (url: string) => {

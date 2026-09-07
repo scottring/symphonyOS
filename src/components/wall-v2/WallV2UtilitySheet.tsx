@@ -2,14 +2,12 @@
 // Bottom sheet for the four wall utilities (was: floating corner buttons).
 // Touch-first: 80px rows, scrim tap closes, no fine targets.
 
-import { ChefHat, Eye, EyeOff, ImageOff, Moon, RefreshCw, Sun, X } from 'lucide-react';
+import { Eye, EyeOff, ImageOff, Moon, RefreshCw, Sun, X } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { WALL } from './wallTheme';
 
 interface Props {
   hideRoutines: boolean;
-  /** Opens the recipe picker. Omitted = the row isn't offered. */
-  onRecipes?: () => void;
   isDark: boolean;
   refreshing: boolean;
   onGuestMode: () => void;
@@ -20,12 +18,13 @@ interface Props {
 }
 
 export function WallV2UtilitySheet({
-  hideRoutines, isDark, refreshing, onRecipes,
+  hideRoutines, isDark, refreshing,
   onGuestMode, onRefresh, onToggleHideRoutines, onToggleTheme, onClose,
 }: Props) {
   const rows: { id: string; label: string; icon: LucideIcon; spin?: boolean; onTap: () => void }[] = [
-    // First, because it is the one row somebody stands here to reach.
-    ...(onRecipes ? [{ id: 'recipes', label: 'Recipes', icon: ChefHat, onTap: onRecipes }] : []),
+    // Recipes is NOT here: cooking is a thing you come to the wall to do, so
+    // it has its own tile in the strip (Scott, 2026-09-07). This drawer is for
+    // changing how the wall behaves.
     { id: 'guest', label: 'Guest mode', icon: ImageOff, onTap: onGuestMode },
     { id: 'refresh', label: 'Refresh', icon: RefreshCw, spin: refreshing, onTap: onRefresh },
     { id: 'routines', label: hideRoutines ? 'Show daily routines' : 'Hide daily routines', icon: hideRoutines ? Eye : EyeOff, onTap: onToggleHideRoutines },
