@@ -291,107 +291,71 @@ describe('what a row is allowed to draw', () => {
   })
 })
 
-describe('an everyday routine is words, not a bar', () => {
+describe('rhythm never draws on the board — only a rare routine is news', () => {
   const members = [member('s', 'Scott')]
-  const last = (b: ReturnType<typeof adaptGanttBoard>) => b.tracks[b.tracks.length - 1]
-  const routine = (title: string, h: number, m2 = 2) => item({
-    type: 'routine', title, startTime: at(h), endTime: at(h, m2),
+  const daily = (title: string, h: number) => item({
+    type: 'routine', title, assignedTo: 's', startTime: at(h), endTime: at(h, 2),
     recurrencePattern: { type: 'daily' },
   } as Partial<TimelineItem>)
 
-  it('never draws one as a bar, however it is assigned', () => {
-    // Measured on the real wall: these carry a nominal time and almost no
-    // duration, so as bars they came out 1-3px wide, stacked at one x.
-    const r = item({
-      type: 'routine', title: 'Brush teeth', assignedTo: 's',
-      startTime: at(20), endTime: at(20, 2), recurrencePattern: { type: 'daily' },
-    } as Partial<TimelineItem>)
-    const board = adaptGanttBoard(members, [day([r])], at(19))
-    expect(last(board).anytime).toContain('Brush teeth')
-    expect(last(board).blocks).toHaveLength(0)
-    expect(board.tracks[0].anytime).not.toContain('Brush teeth')
+  it('drops a timed everyday routine from every row, including Everyone', () => {
+    const board = adaptGanttBoard(members, [day([daily('Brush teeth', 20)])], at(19))
+    for (const t of board.tracks) {
+      expect(t.blocks).toHaveLength(0)
+      expect(t.anytime).toEqual([])
+    }
   })
 
-  it('reads the line in the order the day happens', () => {
-    // Both inside the horizon, so this tests the ordering and nothing else.
-    const board = adaptGanttBoard(members, [day([routine('Snack', 8), routine('Breakfast', 7)])], at(6))
-    expect(last(board).anytime).toEqual(['Breakfast', 'Snack'])
-  })
-
-  it('drops one whose hour has already passed', () => {
-    const board = adaptGanttBoard(members, [day([routine('Brush teeth', 6), routine('Snack', 9)])], at(8))
-    expect(last(board).anytime).toEqual(['Snack'])
-  })
-
-  it('drops one whose hour is still hours away', () => {
-    // The 7:53am board: six routines scheduled 18:00-19:06, eleven hours out,
-    // filling the Everyone row at breakfast. A tag earns the row by being near.
-    const board = adaptGanttBoard(
-      members,
-      [day([routine('Feed Jax dinner', 18), routine('Clean kitchen after dinner', 18, 45)])],
-      at(7, 53),
-    )
-    expect(last(board).anytime).toEqual([])
-  })
-
-  it('lets the evening block in once it is near', () => {
-    const board = adaptGanttBoard(members, [day([routine('Feed Jax dinner', 18)])], at(15, 30))
-    expect(last(board).anytime).toEqual(['Feed Jax dinner'])
-  })
-
-  it('measures the horizon from now, not from the start of the window', () => {
-    // The window opens an hour before now, so a rule written against
-    // axis.startMin would quietly stretch to four hours.
-    const board = adaptGanttBoard(members, [day([routine('Bedtime', 20)])], at(16, 30))
-    expect(last(board).anytime).toEqual([])
-    expect(last(adaptGanttBoard(members, [day([routine('Bedtime', 20)])], at(17, 30))).anytime)
-      .toEqual(['Bedtime'])
-  })
-
-  it('holds an untimed weekly routine regardless — the horizon needs an hour to measure', () => {
-    const weekly = item({
-      type: 'routine', title: 'Do kitchen Laundry', startTime: null,
-      recurrencePattern: { type: 'weekly', days: ['sat'] },
-    } as Partial<TimelineItem>)
-    const board = adaptGanttBoard(members, [day([weekly])], at(7, 53))
-    expect(last(board).anytime).toContain('Do kitchen Laundry')
-  })
-
-  it('keeps an untimed TASK regardless — an unfinished task still stands', () => {
-    const t = item({ type: 'task', title: 'Wash bookbags', allDay: true })
-    const board = adaptGanttBoard(members, [day([t])], at(20))
-    expect(last(board).anytime).toContain('Wash bookbags')
-  })
-
-  it('drops an everyday routine that carries no time at all', () => {
-    // The 7:33pm wall read "Eat breakfast · Read · Out the door · Camp
-    // dropoff" on the Everyone row. Those are Steps of a 7am collection whose
-    // own time_of_day is null, so the looks-forward rule below could never
-    // reach them: an untimed item sorts at MAX_SAFE_INTEGER, which is never
-    // "already passed". A daily habit with no hour cannot be still ahead of
-    // you, so it is not a tag.
+  it('drops an untimed everyday routine too', () => {
     const untimed = item({
-      type: 'routine', title: 'Pack bags', startTime: null,
+      type: 'routine', title: 'Pack bags', startTime: null, assignedTo: 's',
       recurrencePattern: { type: 'daily' },
     } as Partial<TimelineItem>)
     const board = adaptGanttBoard(members, [day([untimed])], at(19))
-    expect(last(board).anytime).not.toContain('Pack bags')
+    expect(board.tracks.flatMap((t) => t.anytime)).not.toContain('Pack bags')
   })
 
-  it('keeps an untimed routine that is NOT everyday — on its day it IS the day', () => {
-    // "Do kitchen Laundry", weekly:sat, no time. On a Saturday that is the
-    // day's distinguishing work, not background, and it stands all day.
-    const weekly = item({
-      type: 'routine', title: 'Do kitchen Laundry', startTime: null,
+  it("drops a three-days-a-week routine — that is a week's shape, not news", () => {
+    const mwf = item({
+      type: 'routine', title: 'Piano practice', assignedTo: 's', startTime: at(16), endTime: at(16, 30),
+      recurrencePattern: { type: 'weekly', days: ['mon', 'wed', 'fri'] },
+    } as Partial<TimelineItem>)
+    const board = adaptGanttBoard(members, [day([mwf])], at(15))
+    expect(board.tracks[0].blocks).toHaveLength(0)
+  })
+
+  it("draws a timed weekly routine as a bar on its owner's row, not on Everyone", () => {
+    const sat = item({
+      type: 'routine', title: 'Farmers market', assignedTo: 's', startTime: at(9), endTime: at(10),
       recurrencePattern: { type: 'weekly', days: ['sat'] },
     } as Partial<TimelineItem>)
-    const board = adaptGanttBoard(members, [day([weekly])], at(19))
-    expect(last(board).anytime).toContain('Do kitchen Laundry')
+    const board = adaptGanttBoard(members, [day([sat])], at(8, 30))
+    expect(board.tracks[0].blocks.map((b) => b.title)).toEqual(['Farmers market'])
   })
 
-  it('does not let an item that will never be drawn stretch the window', () => {
+  it('puts an untimed rare routine on the row, all day, whatever the hour', () => {
+    const weekly = item({
+      type: 'routine', title: 'Do kitchen Laundry', startTime: null, assignedTo: 's',
+      recurrencePattern: { type: 'weekly', days: ['sat'] },
+    } as Partial<TimelineItem>)
+    for (const hour of [7, 13, 21]) {
+      const board = adaptGanttBoard(members, [day([weekly])], at(hour))
+      expect(board.tracks[0].anytime).toContain('Do kitchen Laundry')
+    }
+  })
+
+  it('a monthly or every-other-week routine earns the row even with many days listed', () => {
+    const biweekly = item({
+      type: 'routine', title: 'Bins out', startTime: null, assignedTo: 's',
+      recurrencePattern: { type: 'weekly', days: ['mon', 'tue', 'wed'], interval: 2 },
+    } as Partial<TimelineItem>)
+    const board = adaptGanttBoard(members, [day([biweekly])], at(9))
+    expect(board.tracks[0].anytime).toContain('Bins out')
+  })
+
+  it('does not let a dropped routine stretch the window', () => {
     const real = item({ type: 'event', title: 'Dentist', startTime: at(9), endTime: at(10) })
-    const board = adaptGanttBoard(members, [day([routine('Bedtime', 21), real])], at(9))
+    const board = adaptGanttBoard(members, [day([daily('Bedtime', 21), real])], at(9))
     expect((board.axis.endMin - board.axis.startMin) / 60).toBe(MIN_SPAN_H)
   })
 })
