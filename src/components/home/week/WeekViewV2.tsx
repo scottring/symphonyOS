@@ -36,10 +36,9 @@ import { partitionWeekExtras } from '@/lib/week/weekExtras'
 import { unhomedRoutines } from '@/lib/week/unhomedRoutines'
 import { buildWeekRoutineItems } from './weekRoutineItems'
 import { useWeekInstances } from './useWeekInstances'
+import { edgeForPointer } from './edgeAdvance'
 import type { AssigneeFilter } from '@/lib/today/types'
 import type { Layer } from '@/lib/domains'
-
-const EDGE_PX = 40
 
 /** Does this calendar event span the whole day? Explicit flags win; otherwise
  *  a full-day span (midnight start, 24h+ duration — how a holiday reads from
@@ -269,6 +268,10 @@ export function WeekViewV2(props: WeekViewV2Props) {
   // Edge-hover state for cross-week auto-advance, measured against the grid box.
   const [edgeHover, setEdgeHover] = useState<'left' | 'right' | null>(null)
   const gridBoundsRef = useRef<HTMLDivElement>(null)
+  // Has this drag been on the grid yet? A pill dragged out of the list column
+  // starts LEFT of the grid; without this, it armed the back-a-week timer at
+  // pointer-down and the week flipped out from under the drop (edgeAdvance.ts).
+  const enteredGridRef = useRef(false)
 
   const handleDragMove = (e: DragMoveEvent) => {
     // activatorEvent is the pointer-down that started the drag; adding delta.x
@@ -278,21 +281,21 @@ export function WeekViewV2(props: WeekViewV2Props) {
     if (!rect) return
 
     const currentX = (activator?.clientX ?? 0) + (e.delta?.x ?? 0)
+    const { edge, entered } = edgeForPointer(currentX, rect, enteredGridRef.current)
+    enteredGridRef.current = entered
 
-    if (currentX > rect.right - EDGE_PX) {
-      if (edgeHover !== 'right') {
-        setEdgeHover('right')
-        drag.notifyEdge('right')
-      }
-    } else if (currentX < rect.left + EDGE_PX) {
-      if (edgeHover !== 'left') {
-        setEdgeHover('left')
-        drag.notifyEdge('left')
-      }
-    } else if (edgeHover !== null) {
-      setEdgeHover(null)
-      drag.notifyEdge(null)
+    if (edge !== edgeHover) {
+      setEdgeHover(edge)
+      drag.notifyEdge(edge)
     }
+  }
+
+  // Every drag starts fresh: the grid has not been entered until this one
+  // enters it.
+  const handleDragStart = (e: Parameters<typeof drag.dndHandlers.onDragStart>[0]) => {
+    enteredGridRef.current = false
+    setEdgeHover(null)
+    drag.dndHandlers.onDragStart(e)
   }
 
   // Week bounds: [weekStart, weekStart + dayCount days)
@@ -568,7 +571,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
 
       <DndContext
         sensors={sensors}
-        onDragStart={drag.dndHandlers.onDragStart}
+        onDragStart={handleDragStart}
         onDragEnd={drag.dndHandlers.onDragEnd}
         onDragCancel={drag.dndHandlers.onDragCancel}
         onDragMove={handleDragMove}
