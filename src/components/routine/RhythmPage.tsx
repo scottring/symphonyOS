@@ -64,7 +64,11 @@ export function RhythmPage(props: RhythmPageProps) {
     onAddToCollection, onCreateRoutineInSlot,
   } = props
 
-  const [memberId, setMemberId] = useState<string | null>(null)
+  // "Whose week" holds a SET of people; empty is Everyone. One name behaves
+  // exactly as the old single lens did (Scott, 2026-09-07).
+  const [memberIds, setMemberIds] = useState<string[]>([])
+  const toggleMember = (id: string) =>
+    setMemberIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
   // A focused Through-the-week day: the arc shows that day's full picture.
   const [focusDay, setFocusDay] = useState<DayKey | null>(null)
   const [query, setQuery] = useState('')
@@ -76,12 +80,18 @@ export function RhythmPage(props: RhythmPageProps) {
   const [draftId, setDraftId] = useState<string | null>(null)
   const [tendOpen, setTendOpen] = useState(false)
 
-  // A slot created while a member lens is locked in shares only with that
-  // person — the lens IS the "who" the user just clicked on.
+  // A slot created while a member lens is locked in shares only with those
+  // people — the lens IS the "who" the user just clicked on. One name rides
+  // the legacy single column; several ride assigned_to_all, which is what the
+  // routine's own Who control writes.
   const createRoutineInSlot = useMemo<CreateRoutineInSlot | undefined>(() => {
     if (!onCreateRoutineInSlot) return undefined
-    return (draft) => onCreateRoutineInSlot({ ...draft, assigned_to: memberId ?? undefined })
-  }, [onCreateRoutineInSlot, memberId])
+    return (draft) => onCreateRoutineInSlot({
+      ...draft,
+      assigned_to: memberIds.length === 1 ? memberIds[0] : undefined,
+      assigned_to_all: memberIds.length > 1 ? memberIds : undefined,
+    })
+  }, [onCreateRoutineInSlot, memberIds])
 
   // "Whose week" narrows by assignee (buildRhythmModel's `keep`), which misses
   // a routine YOU made but never explicitly assigned — under your own lens
@@ -93,18 +103,18 @@ export function RhythmPage(props: RhythmPageProps) {
   // before it ever reaches the model builder.
   const selfMember = useFamilyMembers().getCurrentUserMember()
   const routinesForModel = useMemo(() => {
-    const isSelfLens = !!selfMember && memberId === selfMember.id
+    const isSelfLens = !!selfMember && memberIds.includes(selfMember.id)
     if (!isSelfLens) return routines
     return routines.map((r) => {
       const hasAssignee = !!r.assigned_to || (r.assigned_to_all && r.assigned_to_all.length > 0)
       if (hasAssignee || r.user_id !== selfMember!.user_id) return r
       return { ...r, assigned_to: selfMember!.id }
     })
-  }, [routines, memberId, selfMember])
+  }, [routines, memberIds, selfMember])
 
   const model = useMemo(
-    () => buildRhythmModel(routinesForModel, { memberId, focusDay }),
-    [routinesForModel, memberId, focusDay],
+    () => buildRhythmModel(routinesForModel, { memberIds, focusDay }),
+    [routinesForModel, memberIds, focusDay],
   )
   // Twelve months rolling forward. `now` is pinned to the day so the ribbon
   // doesn't rebuild on every render, and so a session left open overnight
@@ -374,16 +384,16 @@ export function RhythmPage(props: RhythmPageProps) {
         {familyMembers.length > 0 && (
           <div className="mb-6 flex items-center gap-1.5 flex-wrap">
             <span className="mr-1 text-[11px] font-semibold uppercase tracking-wider text-neutral-400">Whose week</span>
-            <button onClick={() => setMemberId(null)}
+            <button onClick={() => setMemberIds([])} aria-pressed={memberIds.length === 0}
               className={`rounded-full px-3 py-1 text-sm transition-colors ${
-                memberId === null ? 'bg-[var(--color-primary-500,#3d5a44)] text-white' : 'border border-neutral-200 bg-white text-neutral-600'
+                memberIds.length === 0 ? 'bg-[var(--color-primary-500,#3d5a44)] text-white' : 'border border-neutral-200 bg-white text-neutral-600'
               }`}>
               Everyone
             </button>
             {[...familyMembers].sort((a, b) => a.display_order - b.display_order).map(m => (
-              <button key={m.id} onClick={() => setMemberId(memberId === m.id ? null : m.id)}
+              <button key={m.id} onClick={() => toggleMember(m.id)} aria-pressed={memberIds.includes(m.id)}
                 className={`rounded-full px-3 py-1 text-sm transition-colors ${
-                  memberId === m.id ? 'bg-[var(--color-primary-500,#3d5a44)] text-white' : 'border border-neutral-200 bg-white text-neutral-600'
+                  memberIds.includes(m.id) ? 'bg-[var(--color-primary-500,#3d5a44)] text-white' : 'border border-neutral-200 bg-white text-neutral-600'
                 }`}>
                 {m.name}
               </button>

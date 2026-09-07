@@ -89,4 +89,17 @@ describe('resolveSlotRoutineFields', () => {
   it('a domain lens wins over the family default', () => {
     expect(resolveSlotRoutineFields('work', undefined)).toMatchObject({ context: 'work' })
   })
+
+  // Scott, 2026-09-07: "Whose week" holds several people now, so a slot filled
+  // while two of them are selected belongs to both.
+  it('assigns to everyone in the lens when several are selected', () => {
+    const fields = resolveSlotRoutineFields(null, undefined, ['ella', 'kaleb'])
+    expect(fields).toMatchObject({ assigned_to_all: ['ella', 'kaleb'] })
+    // Named people is what drops the family default — not how many of them.
+    expect(fields.context).toBeUndefined()
+  })
+
+  it('still shares with the family when the lens is empty', () => {
+    expect(resolveSlotRoutineFields(null, undefined, [])).toMatchObject({ context: 'family' })
+  })
 })

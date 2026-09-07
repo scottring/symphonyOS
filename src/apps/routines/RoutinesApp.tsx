@@ -107,7 +107,7 @@ function RoutinesIndex() {
       name: draft.name,
       recurrence_pattern: draft.recurrence_pattern,
       time_of_day: draft.time_of_day,
-      ...resolveSlotRoutineFields(soleDomain, draft.assigned_to),
+      ...resolveSlotRoutineFields(soleDomain, draft.assigned_to, draft.assigned_to_all),
     })
   }, [addRoutine, soleDomain])
 

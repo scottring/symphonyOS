@@ -120,6 +120,43 @@ describe('RhythmPage', () => {
     expect(screen.getByTestId('arc-card-run')).toBeInTheDocument()
   })
 
+  // Scott, 2026-09-07: "can we multiselect whose week in Routines?" Two pills
+  // on means both weeks laid over each other, and clicking one off leaves the
+  // other standing rather than dropping back to Everyone.
+  it('holds several people at once, and drops one at a time', () => {
+    const members = [
+      { id: 'ella', user_id: 'u1', name: 'Ella', initials: 'E', color: '#888', avatar_url: null, is_full_user: true, display_order: 1, created_at: '' },
+      { id: 'kaleb', user_id: 'u1', name: 'Kaleb', initials: 'K', color: '#888', avatar_url: null, is_full_user: true, display_order: 2, created_at: '' },
+    ] as never[]
+    render(
+      <RhythmPage {...noop} onUpdateRoutine={vi.fn()}
+        familyMembers={members}
+        routines={[
+          mk('Ella piano', { id: 'piano', time_of_day: '09:00:00', assigned_to_all: ['ella'] }),
+          mk('Kaleb swim', { id: 'swim', time_of_day: '10:00:00', assigned_to_all: ['kaleb'] }),
+          mk('Walk Jax', { id: 'jax', time_of_day: '06:30:00' }),
+        ]} />
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Ella' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Kaleb' }))
+    expect(screen.getByTestId('arc-card-piano')).toBeInTheDocument()
+    expect(screen.getByTestId('arc-card-swim')).toBeInTheDocument()
+    expect(screen.queryByTestId('arc-card-jax')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Ella' })).toHaveAttribute('aria-pressed', 'true')
+
+    // Dropping Ella leaves Kaleb's week, not Everyone's.
+    fireEvent.click(screen.getByRole('button', { name: 'Ella' }))
+    expect(screen.queryByTestId('arc-card-piano')).not.toBeInTheDocument()
+    expect(screen.getByTestId('arc-card-swim')).toBeInTheDocument()
+    expect(screen.queryByTestId('arc-card-jax')).not.toBeInTheDocument()
+
+    // Everyone clears the whole set.
+    fireEvent.click(screen.getByRole('button', { name: 'Everyone' }))
+    expect(screen.getByTestId('arc-card-jax')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Kaleb' })).toHaveAttribute('aria-pressed', 'false')
+  })
+
   // Demo run 2026-09-06: switching "Whose week" to yourself hid your own
   // routines the moment they had no explicit assignee — an unassigned routine
   // you made is still yours under your own lens.

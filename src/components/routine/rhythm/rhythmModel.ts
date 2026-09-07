@@ -77,17 +77,22 @@ function suggestName(startMinutes: number): string {
 
 export function buildRhythmModel(
   routines: Routine[],
-  opts: { memberId?: string | null; focusDay?: DayKey | null } = {},
+  opts: { memberIds?: readonly string[] | null; focusDay?: DayKey | null } = {},
 ): RhythmModel {
   const { collections, standalone } = groupRoutineSteps(routines)
   const stepCounts: Record<string, number> = {}
   for (const c of collections) stepCounts[c.id] = c.steps.length
 
-  const memberId = opts.memberId ?? null
+  // "Whose week" holds a SET of people, empty meaning everyone (Scott,
+  // 2026-09-07). Several names selected reads as their weeks laid over each
+  // other — a routine survives if ANY of them is on it. Intersecting would
+  // answer a question nobody asked ("what do these two share?") and would
+  // make the second click empty the page.
+  const memberIds = opts.memberIds ?? null
   const focusDay = opts.focusDay ?? null
   const keep = (r: Routine, steps: Routine[] = []): boolean => {
-    if (!memberId) return true
-    return [r, ...steps].some(x => memberIdsOf(x).includes(memberId))
+    if (!memberIds || memberIds.length === 0) return true
+    return [r, ...steps].some(x => memberIdsOf(x).some(id => memberIds.includes(id)))
   }
 
   const topLevel: { routine: Routine; steps: Routine[] }[] = [

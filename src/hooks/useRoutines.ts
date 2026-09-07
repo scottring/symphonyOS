@@ -152,6 +152,7 @@ export interface CreateRoutineInput {
   visibility?: RoutineVisibility
   default_assignee?: string | null  // Used for generating recurring instances
   assigned_to?: string | null  // Current assignment (if null, uses defaultFallbackAssignee)
+  assigned_to_all?: string[] | null  // Multi-assignment, same column the Who control writes
   raw_input?: string | null
   prep_task_templates?: PrepFollowupTemplate[]
   followup_task_templates?: PrepFollowupTemplate[]
@@ -362,6 +363,7 @@ export function useRoutines() {
           visibility: input.visibility || 'active',
           default_assignee: input.default_assignee || null,
           assigned_to: effectiveAssignedTo,
+          assigned_to_all: input.assigned_to_all ?? null,
           raw_input: input.raw_input || null,
           prep_task_templates: input.prep_task_templates || [],
           followup_task_templates: input.followup_task_templates || [],
@@ -370,7 +372,14 @@ export function useRoutines() {
           // looks like household work and is readable only by its owner. 23 of
           // Scott's family routines were in exactly that state — "Iris laundry
           // and clothes processing" among them. It is DERIVED, never chosen.
-          scope: scopeForDomain(input.context ?? null, [effectiveAssignedTo], selfId),
+          // Every assignee counts, not just the legacy single column — a
+          // routine created for two people is shared with both (the update
+          // path already derives scope from the whole list).
+          scope: scopeForDomain(
+            input.context ?? null,
+            [effectiveAssignedTo, ...(input.assigned_to_all ?? [])],
+            selfId,
+          ),
           project_id: input.project_id ?? null,
           parent_routine_id: input.parent_routine_id ?? null,
           step_order: input.step_order ?? null,

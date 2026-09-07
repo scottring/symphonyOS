@@ -4,28 +4,39 @@ import type { RecurrencePattern } from '@/types/actionable'
 import type { DomainId } from '@/lib/domains'
 
 /** A routine born from a slot. The slot supplies the recurrence, so a name is
- *  the only thing left to ask for. `assigned_to` carries the Routines page's
- *  member lens, when one is locked in. */
+ *  the only thing left to ask for. `assigned_to` / `assigned_to_all` carry the
+ *  Routines page's member lens: one name rides the legacy single column,
+ *  several ride the list, exactly as the routine's own Who control writes. */
 export interface SlotRoutineDraft {
   name: string
   recurrence_pattern: RecurrencePattern
   time_of_day?: string
   assigned_to?: string | null
+  assigned_to_all?: string[] | null
 }
 
 export type CreateRoutineInSlot = (draft: SlotRoutineDraft) => void
 
-/** What a slot-created routine's context/assigned_to should be. A domain
- *  lens (soleDomain) always wins — same rule as a deliberate create. With no
- *  domain lens, a locked-in member lens shares only with that person;
- *  otherwise ("Everyone", no lens at all) it goes to the whole family. */
+/** What a slot-created routine's context/assignees should be. A domain lens
+ *  (soleDomain) always wins — same rule as a deliberate create. With no domain
+ *  lens, a locked-in member lens shares only with those people; otherwise
+ *  ("Everyone", no lens at all) it goes to the whole family. One selected name
+ *  and several are the same rule: what decides `context` is whether ANYONE is
+ *  named, not how many. */
 export function resolveSlotRoutineFields(
   soleDomain: DomainId | null,
   assignedTo: string | null | undefined,
-): { context: DomainId | undefined; assigned_to: string | null | undefined } {
+  assignedToAll?: string[] | null,
+): {
+  context: DomainId | undefined
+  assigned_to: string | null | undefined
+  assigned_to_all: string[] | null | undefined
+} {
+  const named = !!assignedTo || (assignedToAll?.length ?? 0) > 0
   return {
-    context: soleDomain ?? (assignedTo ? undefined : 'family'),
+    context: soleDomain ?? (named ? undefined : 'family'),
     assigned_to: assignedTo,
+    assigned_to_all: assignedToAll,
   }
 }
 

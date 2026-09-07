@@ -168,7 +168,7 @@ describe('buildRhythmModel person filter', () => {
         mk({ id: 'other', assigned_to_all: ['scott'], time_of_day: '11:00:00' }),
         mk({ id: 'nobody', time_of_day: '12:00:00' }),
       ],
-      { memberId: 'iris' },
+      { memberIds: ['iris'] },
     )
     const ids = m.daily.timed.flatMap(c => c.routines.map(r => r.id))
     expect(ids.sort()).toEqual(['legacy', 'multi'])
@@ -180,14 +180,40 @@ describe('buildRhythmModel person filter', () => {
         mk({ id: 'coll', time_of_day: '07:00:00' }),
         mk({ id: 'st', parent_routine_id: 'coll', assigned_to_all: ['kaleb'] }),
       ],
-      { memberId: 'kaleb' },
+      { memberIds: ['kaleb'] },
     )
     expect(m.daily.timed.map(c => c.id)).toEqual(['coll'])
   })
 
+  // Scott, 2026-09-07: "can we multiselect whose week in Routines?" Two names
+  // selected means both weeks laid over each other — anything either of them
+  // is on — not only what they share.
+  it('unions the selected people rather than intersecting them', () => {
+    const m = buildRhythmModel(
+      [
+        mk({ id: 'hers', assigned_to_all: ['iris'], time_of_day: '09:00:00' }),
+        mk({ id: 'his', assigned_to: 'kaleb', assigned_to_all: null, time_of_day: '10:00:00' }),
+        mk({ id: 'theirs', assigned_to_all: ['iris', 'kaleb'], time_of_day: '11:00:00' }),
+        mk({ id: 'someone-else', assigned_to_all: ['scott'], time_of_day: '12:00:00' }),
+      ],
+      { memberIds: ['iris', 'kaleb'] },
+    )
+    const ids = m.daily.timed.flatMap(c => c.routines.map(r => r.id))
+    expect(ids.sort()).toEqual(['hers', 'his', 'theirs'])
+  })
+
+  it('an empty selection is Everyone', () => {
+    const routines = [
+      mk({ id: 'a', assigned_to_all: ['iris'], time_of_day: '09:00:00' }),
+      mk({ id: 'b', time_of_day: '10:00:00' }),
+    ]
+    const ids = buildRhythmModel(routines, { memberIds: [] }).daily.timed.flatMap(c => c.routines.map(r => r.id))
+    expect(ids.sort()).toEqual(['a', 'b'])
+  })
+
   it('shows unassigned routines only under Everyone', () => {
     const all = buildRhythmModel([mk({ id: 'n', time_of_day: '08:00:00' })])
-    const iris = buildRhythmModel([mk({ id: 'n', time_of_day: '08:00:00' })], { memberId: 'iris' })
+    const iris = buildRhythmModel([mk({ id: 'n', time_of_day: '08:00:00' })], { memberIds: ['iris'] })
     expect(all.daily.timed).toHaveLength(1)
     expect(iris.daily.timed).toHaveLength(0)
   })
