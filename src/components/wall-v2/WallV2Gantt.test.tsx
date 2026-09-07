@@ -36,12 +36,12 @@ const track = (over: Partial<GanttTrack> = {}): GanttTrack => ({
   name: 'Ella',
   blocks: [block()],
   homework: [],
-  anytime: [],
+  zone: [],
   laterCount: 0,
   ...over,
 })
 
-const board = (tracks: GanttTrack[]): GanttBoard => ({ axis: axis(), tracks })
+const board = (tracks: GanttTrack[], zoneW = 0): GanttBoard => ({ axis: axis(), tracks, zoneW })
 
 describe('WallV2Gantt portrait tap', () => {
   it('calls onTapMember with the member id when a person track face/name is tapped', async () => {
@@ -100,30 +100,50 @@ describe('WallV2Gantt free events', () => {
   })
 })
 
-describe('WallV2Gantt homework chips', () => {
-  it('renders a homework chip as a button that opens the kid page', async () => {
-    const onTapMember = vi.fn()
-    const b = board([track({ blocks: [], homework: [{ id: 'h1', label: 'Blue sheet · Fri', late: false }] })])
-    const { user } = render(<WallV2Gantt board={b} onTapMember={onTapMember} />)
-    await user.click(screen.getByRole('button', { name: "Open Ella's homework: Blue sheet · Fri" }))
-    expect(onTapMember).toHaveBeenCalledWith('kid-1')
+describe('the zone column', () => {
+  it('lists a row\'s specials and rare routines as lines, capped, with "and N more"', () => {
+    const t = track({
+      blocks: [],
+      zone: [
+        { id: 'z1', title: 'Visual Art', kind: 'special' },
+        { id: 'z2', title: 'Laundry', kind: 'routine' },
+        { id: 'z3', title: 'Picture Day', kind: 'special' },
+        { id: 'z4', title: 'Bins out', kind: 'routine' },
+      ],
+    })
+    render(<WallV2Gantt board={board([t], 236)} />)
+    expect(screen.getByText('Visual Art')).toBeInTheDocument()
+    expect(screen.getByText('Laundry')).toBeInTheDocument()
+    expect(screen.getByText('Picture Day')).toBeInTheDocument()
+    expect(screen.queryByText('Bins out')).toBeNull()
+    expect(screen.getByText('and 1 more')).toBeInTheDocument()
     expect(screen.queryByText('Nothing scheduled')).toBeNull()
   })
 
-  it('household homework is not a button', () => {
-    const b = board([track({ memberId: HOUSEHOLD_ID, name: 'Everyone', blocks: [], homework: [{ id: 'h1', label: 'Nobody', late: false }] })])
-    render(<WallV2Gantt board={b} onTapMember={vi.fn()} />)
-    expect(screen.getByText('Nobody')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /homework/ })).toBeNull()
+  it('homework leads the zone and the whole zone opens the person\'s page', async () => {
+    const onTapMember = vi.fn()
+    const t = track({ blocks: [], homework: [{ id: 'h', label: 'Blue sheet · Fri', late: false }], zone: [{ id: 'z', title: 'PE', kind: 'special' }] })
+    const { user } = render(<WallV2Gantt board={board([t], 236)} onTapMember={onTapMember} />)
+    const zone = screen.getByRole('button', { name: "Ella's day, today" })
+    await user.click(zone)
+    expect(onTapMember).toHaveBeenCalledWith('kid-1')
+    expect(zone.textContent).toMatch(/Blue sheet · Fri.*PE/)
   })
 
-  it('caps at two chips and counts the rest', () => {
-    const b = board([track({ blocks: [], homework: [
-      { id: 'a', label: 'A', late: false }, { id: 'b', label: 'B', late: false }, { id: 'c', label: 'C', late: false },
-    ] })])
-    render(<WallV2Gantt board={b} />)
-    expect(screen.getByText('A')).toBeInTheDocument()
-    expect(screen.queryByText('C')).toBeNull()
-    expect(screen.getByText('+1')).toBeInTheDocument()
+  it('the household zone is words, not a button', () => {
+    const t = track({ memberId: HOUSEHOLD_ID, name: 'Everyone', blocks: [], zone: [{ id: 'z', title: 'Labor Day', kind: 'special' }] })
+    render(<WallV2Gantt board={board([t], 236)} onTapMember={vi.fn()} />)
+    expect(screen.getByText('Labor Day')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Everyone's day/ })).toBeNull()
+  })
+
+  it('draws no zone column at all when the board reserved none', () => {
+    render(<WallV2Gantt board={board([track()], 0)} />)
+    expect(screen.queryByTestId('zone')).toBeNull()
+  })
+
+  it('a bare row with no bars and no zone says so once', () => {
+    render(<WallV2Gantt board={board([track({ blocks: [] })], 0)} />)
+    expect(screen.getByText('Nothing scheduled')).toBeInTheDocument()
   })
 })

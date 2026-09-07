@@ -61,6 +61,15 @@ export const TRACK_PX = 780;
  */
 export const MIN_LABEL_PX = 170;
 /**
+ * Width of the zone column — the row's words that have no place on a clock.
+ * Sized for three lines of 0.95rem bold at ~24 characters, which is
+ * "Visual Art" or "Math sheet · Fri" with room to spare. Reserved only when
+ * some row uses it, so a quiet day keeps the whole track.
+ */
+export const ZONE_W = 236;
+/** Zone lines shown before "and N more". */
+export const ZONE_SHOWN = 3;
+/**
  * The sections the board reads.
  *
  * PREVIEW_SECTIONS deliberately omits 'unscheduled', because an untimed item
@@ -126,6 +135,14 @@ export interface GanttHomework {
   late: boolean;
 }
 
+/** One line in a row's zone. */
+export interface GanttZoneItem {
+  id: string;
+  title: string;
+  /** 'special' = all-day event (Specials, Picture Day, Labor Day); 'routine' = untimed rare routine. */
+  kind: 'special' | 'routine';
+}
+
 export interface GanttTrack {
   memberId: string;
   name: string;
@@ -138,10 +155,12 @@ export interface GanttTrack {
    */
   homework: GanttHomework[];
   /**
-   * What the row carries that cannot honestly be a bar, in time order:
-   * items with no clock time, which have no position on an axis.
+   * What the row says beside the name, off the axis: today's special (an
+   * all-day event) and any untimed routine rare enough to be news. In section
+   * order — all-day first, then the day. An untimed TASK is not here: the
+   * strip's "Due today" card lists it and the person's page holds it.
    */
-  anytime: string[];
+  zone: GanttZoneItem[];
   /** Items that start after the window closes — counted, not dropped. */
   laterCount: number;
   /** Something happening on this row RIGHT NOW that has no calendar slot —
@@ -161,6 +180,8 @@ export interface GanttAxis {
 export interface GanttBoard {
   axis: GanttAxis;
   tracks: GanttTrack[];
+  /** Px the tracks give up to the zone column; 0 when no row uses it. */
+  zoneW: number;
 }
 
 /**
@@ -337,14 +358,15 @@ export function adaptGanttBoard(
   const span = axis.endMin - axis.startMin;
   const nowMin = minutesOfDay(now);
 
-  const tracks: GanttTrack[] = roster.map((m) => {
-    const blocks: GanttBlock[] = [];
-    /** Kept with its time so the line can read in the order the day happens. */
-    const anytimeItems: { title: string; at: number }[] = [];
+  type Timed = { it: TimelineItem; title: string; s: number; e: number };
+  // First pass: sort each row's items into the zone (no clock position) and
+  // the timed list. The zone column is reserved board-wide or not at all —
+  // every track must start at the same x for the ruler to mean anything — so
+  // label fitting has to wait until every row has declared what it holds.
+  const collected = roster.map((m) => {
+    const zone: GanttZoneItem[] = [];
     /** Timed items, collected before drawing so stays can be known first. */
-    const timed: { it: TimelineItem; title: string; s: number; e: number }[] = [];
-    let laterCount = 0;
-
+    const timed: Timed[] = [];
     for (const it of today ? itemsFor(today, m.id, members) : []) {
       // One calendar row can carry the whole family's rotation — "Specials —
       // Ella: Visual Art · Kaleb: PE". Attribution rightly puts it in both
@@ -356,15 +378,28 @@ export function adaptGanttBoard(
         ? titleForMember(it.title, m.name)
         : withoutMemberList(titleForMember(it.title, m.name), members);
       if (isAnytimeItem(it)) {
-        const at = it.startTime ? minutesOfDay(it.startTime) : Number.MAX_SAFE_INTEGER;
-        anytimeItems.push({ title, at });
+        // An untimed task has no place on a clock and no place on this board:
+        // the strip's "Due today" card lists it, and the person's page holds
+        // it under Chores. A row says only what makes today different.
+        if (it.type === 'task') continue;
+        zone.push({ id: it.id, title, kind: it.type === 'routine' ? 'routine' : 'special' });
         continue;
       }
-
       const s = minutesOfDay(it.startTime!);
       const e = it.endTime ? minutesOfDay(it.endTime) : s + DEFAULT_DURATION_MIN;
       timed.push({ it, title, s, e });
     }
+    return { m, zone, timed };
+  });
+
+  const zoneW = collected.some(({ m, zone }) =>
+    zone.length > 0 || (homeworkByTrack.get(m.id)?.length ?? 0) > 0) ? ZONE_W : 0;
+  const fitPx = trackPx - zoneW;
+
+  const tracks: GanttTrack[] = [];
+  for (const { m, zone, timed } of collected) {
+    const blocks: GanttBlock[] = [];
+    let laterCount = 0;
 
     // Stays first, so a free scrap inside one can be dropped: "Ella & Kaleb
     // to FFG", fifteen free minutes at 2:10, sits entirely inside the FFG
@@ -417,7 +452,7 @@ export function adaptGanttBoard(
     //
     // gaps[i] is the clear track immediately BEFORE block i; gaps[n] is the
     // run from the last block to the end of the track.
-    const pxOf = (pct: number) => (pct / 100) * trackPx;
+    const pxOf = (pct: number) => (pct / 100) * fitPx;
     const gaps: number[] = [];
     for (let i = 0; i <= blocks.length; i++) {
       const from = i === 0 ? 0 : blocks[i - 1].leftPct + blocks[i - 1].widthPct;
@@ -454,20 +489,20 @@ export function adaptGanttBoard(
       if (b.labelSide === 'right') b.labelRoomPct = roomIn(i + 1, claims[i + 1]);
       else if (b.labelSide === 'left') b.labelRoomPct = roomIn(i, claims[i]);
     }
-    // Untimed things still happen in an order — breakfast before bedtime —
-    // and the line reads as the day when it is sorted, as noise when it isn't.
-    anytimeItems.sort((a, b) => a.at - b.at);
 
-    return {
-      memberId: m.id, name: m.name, blocks,
-      homework: sortHomework(homeworkByTrack.get(m.id) ?? [], now).map((t) => {
-        const due = homeworkDue(t.neededOn, now);
-        return { id: t.id, label: due.label ? `${t.title} · ${due.label}` : t.title, late: due.late };
-      }),
-      anytime: anytimeItems.map((a) => a.title),
-      laterCount,
-    };
-  });
+    const homework = sortHomework(homeworkByTrack.get(m.id) ?? [], now).map((t) => {
+      const due = homeworkDue(t.neededOn, now);
+      return { id: t.id, label: due.label ? `${t.title} · ${due.label}` : t.title, late: due.late };
+    });
 
-  return { axis, tracks };
+    // The household row is a home for what belongs to nobody in particular.
+    // A home with nothing in it is a row that says "Nothing scheduled" under
+    // a house icon, and on most days that was the wall's last line. Omit it,
+    // and the people's rows get the height.
+    if (m.id === HOUSEHOLD_ID && blocks.length === 0 && zone.length === 0 && homework.length === 0 && laterCount === 0) continue;
+
+    tracks.push({ memberId: m.id, name: m.name, blocks, homework, zone, laterCount });
+  }
+
+  return { axis, tracks, zoneW };
 }

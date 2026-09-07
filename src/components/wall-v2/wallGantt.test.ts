@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import {
-  computeAxis, adaptGanttBoard, titleForBlockId, MIN_SPAN_H, MAX_SPAN_H, MIN_LABEL_PX, TRACK_PX,
+  computeAxis, adaptGanttBoard, titleForBlockId, MIN_SPAN_H, MAX_SPAN_H, MIN_LABEL_PX, TRACK_PX, ZONE_W,
 } from './wallGantt'
+import { HOUSEHOLD_ID } from './wallEventAttribution'
 import type { WallDayData } from '@/hooks/useWallData'
 import type { TimelineItem } from '@/types/timeline'
 import type { FamilyMember } from '@/types/family'
@@ -154,7 +155,7 @@ describe('adaptGanttBoard', () => {
     const board = adaptGanttBoard(members, [day([
       item({ id: 'ad', title: 'Book festival', assignedTo: 'm-scott', allDay: true, startTime: at(0) }),
     ])], at(9))
-    expect(board.tracks[0].anytime).toEqual(['Book festival'])
+    expect(board.tracks[0].zone.map((z) => z.title)).toEqual(['Book festival'])
     expect(board.tracks[0].blocks).toEqual([])
   })
 
@@ -172,9 +173,14 @@ describe('adaptGanttBoard', () => {
     expect(board.tracks[0].blocks[0].free).toBe(true)
   })
 
-  it('always ends with the household track, so shared items have a home', () => {
-    const board = adaptGanttBoard(members, [day([])], at(9))
+  it('ends with the household track when a shared item needs a home', () => {
+    const board = adaptGanttBoard(members, [day([item({ title: 'Labor Day', allDay: true })])], at(9))
     expect(board.tracks.map((t) => t.name)).toEqual(['Scott', 'Everyone'])
+  })
+
+  it('omits the household track when it would say nothing', () => {
+    const board = adaptGanttBoard(members, [day([])], at(9))
+    expect(board.tracks.map((t) => t.name)).toEqual(['Scott'])
   })
 
   it('survives a day with no data at all', () => {
@@ -235,8 +241,8 @@ describe('a rotation written on one row still reads per person', () => {
       [day([item({ title: SPECIALS, allDay: true })])],
       at(9),
     )
-    expect(board.tracks[0].anytime).toEqual(['Visual Art'])
-    expect(board.tracks[1].anytime).toEqual(['PE'])
+    expect(board.tracks[0].zone.map((z) => z.title)).toEqual(['Visual Art'])
+    expect(board.tracks[1].zone.map((z) => z.title)).toEqual(['PE'])
   })
 
   it('a shared commitment keeps its words in both tracks — minus the name list the row already says', () => {
@@ -268,10 +274,11 @@ describe('what a row is allowed to draw', () => {
   it('gives an unassigned task to the household row instead of dropping it', () => {
     // The lanes drop it on purpose — a chore must not headline a person in the
     // wall's largest type. A board row is not a headline.
-    const t = item({ type: 'task', title: 'Wash bookbags', allDay: true })
+    const t = item({ type: 'task', title: 'Wash bookbags', startTime: at(10), endTime: at(11) })
     const board = adaptGanttBoard(members, [day([t])], at(9))
-    expect(household(board).anytime).toContain('Wash bookbags')
-    expect(board.tracks[0].anytime).not.toContain('Wash bookbags')
+    expect(household(board).memberId).toBe(HOUSEHOLD_ID)
+    expect(household(board).blocks.map((b) => b.title)).toContain('Wash bookbags')
+    expect(board.tracks[0].blocks.map((b) => b.title)).not.toContain('Wash bookbags')
   })
 
   it('still drops an event that attribution deliberately excluded', () => {
@@ -280,14 +287,14 @@ describe('what a row is allowed to draw', () => {
       originalEvent: { calendar_id: 'en.usa#holiday@group.v.calendar.google.com' },
     } as Partial<TimelineItem>)
     const board = adaptGanttBoard(members, [day([e])], at(9))
-    for (const track of board.tracks) expect(track.anytime).not.toContain('Thanksgiving')
+    for (const track of board.tracks) expect(track.zone.map((z) => z.title)).not.toContain('Thanksgiving')
   })
 
   it('leaves an assigned one-off task under the person it belongs to', () => {
-    const t = item({ type: 'task', title: 'Reference calls', assignedTo: 's', allDay: true })
+    const t = item({ type: 'task', title: 'Reference calls', assignedTo: 's', startTime: at(10), endTime: at(11) })
     const board = adaptGanttBoard(members, [day([t])], at(9))
-    expect(board.tracks[0].anytime).toContain('Reference calls')
-    expect(household(board).anytime).not.toContain('Reference calls')
+    expect(board.tracks[0].blocks.map((b) => b.title)).toContain('Reference calls')
+    expect(board.tracks.map((t) => t.memberId)).toEqual(['s'])
   })
 })
 
@@ -302,7 +309,7 @@ describe('rhythm never draws on the board — only a rare routine is news', () =
     const board = adaptGanttBoard(members, [day([daily('Brush teeth', 20)])], at(19))
     for (const t of board.tracks) {
       expect(t.blocks).toHaveLength(0)
-      expect(t.anytime).toEqual([])
+      expect(t.zone).toEqual([])
     }
   })
 
@@ -312,7 +319,7 @@ describe('rhythm never draws on the board — only a rare routine is news', () =
       recurrencePattern: { type: 'daily' },
     } as Partial<TimelineItem>)
     const board = adaptGanttBoard(members, [day([untimed])], at(19))
-    expect(board.tracks.flatMap((t) => t.anytime)).not.toContain('Pack bags')
+    expect(board.tracks.flatMap((t) => t.zone.map((z) => z.title))).not.toContain('Pack bags')
   })
 
   it("drops a three-days-a-week routine — that is a week's shape, not news", () => {
@@ -340,7 +347,7 @@ describe('rhythm never draws on the board — only a rare routine is news', () =
     } as Partial<TimelineItem>)
     for (const hour of [7, 13, 21]) {
       const board = adaptGanttBoard(members, [day([weekly])], at(hour))
-      expect(board.tracks[0].anytime).toContain('Do kitchen Laundry')
+      expect(board.tracks[0].zone.map((z) => z.title)).toContain('Do kitchen Laundry')
     }
   })
 
@@ -350,7 +357,7 @@ describe('rhythm never draws on the board — only a rare routine is news', () =
       recurrencePattern: { type: 'weekly', days: ['mon', 'tue', 'wed'], interval: 2 },
     } as Partial<TimelineItem>)
     const board = adaptGanttBoard(members, [day([biweekly])], at(9))
-    expect(board.tracks[0].anytime).toContain('Bins out')
+    expect(board.tracks[0].zone.map((z) => z.title)).toContain('Bins out')
   })
 
   it('does not let a dropped routine stretch the window', () => {
@@ -385,11 +392,11 @@ describe('a Step of a routine collection, end to end', () => {
   }
 
   it('never appears before its collection hour either — dropped, not merely time-gated', () => {
-    expect(last(boardAt(at(6))).anytime).not.toContain('Eat breakfast')
+    expect(last(boardAt(at(6))).zone.map((z) => z.title)).not.toContain('Eat breakfast')
   })
 
   it('never appears in the evening — still true, now for a different reason than before', () => {
-    expect(last(boardAt(at(19, 33))).anytime).not.toContain('Eat breakfast')
+    expect(last(boardAt(at(19, 33))).zone.map((z) => z.title)).not.toContain('Eat breakfast')
   })
 })
 
@@ -427,7 +434,7 @@ describe('collection steps never draw on the live board (Task 8a fix round 1)', 
 
     const board = adaptGanttBoard(members, [day([stepItem, parentItem])], at(9, 30));
     const track = board.tracks[0];
-    const allTitles = board.tracks.flatMap((t) => [...t.blocks.map((b) => b.title), ...t.anytime]);
+    const allTitles = board.tracks.flatMap((t) => [...t.blocks.map((b) => b.title), ...t.zone.map((z) => z.title)]);
 
     // Positive control: the parent (parent_routine_id: null) is unaffected by
     // this fix and still draws — specifically as a BAR, proving the board
@@ -469,19 +476,21 @@ describe('multi-owner attribution reaches every board row (Task 8a fix round 1)'
 
 describe('the board is TODAY', () => {
   const members = [member('s', 'Scott')]
-  const last = (b: ReturnType<typeof adaptGanttBoard>) => b.tracks[b.tracks.length - 1]
 
   it('reads the unscheduled section, which PREVIEW_SECTIONS leaves out', () => {
-    // An untimed task scheduled for today lives in 'unscheduled'. It can't be
+    // An untimed rare routine for today lives in 'unscheduled'. It can't be
     // "the next thing" in a preview, but it IS scheduled for today, so it
     // belongs on the board's untimed line.
     const d = {
       date: at(0), isToday: true,
-      items: { unscheduled: [item({ type: 'task', title: 'Finish the trip cleanup' })] },
+      items: { unscheduled: [item({
+        type: 'routine', title: 'Finish the trip cleanup', assignedTo: 's',
+        recurrencePattern: { type: 'weekly', days: ['sat'] },
+      } as Partial<TimelineItem>)] },
       birthdays: [], milestones: [],
     } as unknown as WallDayData
     const board = adaptGanttBoard(members, [d], at(17))
-    expect(last(board).anytime).toContain('Finish the trip cleanup')
+    expect(board.tracks[0].zone.map((z) => z.title)).toContain('Finish the trip cleanup')
   })
 
   it('draws only the day it was given — days[1..] never leak onto it', () => {
@@ -490,7 +499,7 @@ describe('the board is TODAY', () => {
     const today = day([item({ title: 'Today thing', startTime: at(10), endTime: at(11) })])
     const tomorrow = day([item({ title: 'Tomorrow thing', startTime: at(10), endTime: at(11) })])
     const board = adaptGanttBoard(members, [today, tomorrow], at(9))
-    const titles = board.tracks.flatMap((t) => [...t.blocks.map((b) => b.title), ...t.anytime])
+    const titles = board.tracks.flatMap((t) => [...t.blocks.map((b) => b.title), ...t.zone.map((z) => z.title)])
     expect(titles).toContain('Today thing')
     expect(titles).not.toContain('Tomorrow thing')
   })
@@ -540,7 +549,7 @@ describe('adaptGanttBoard — homework chips', () => {
     const ella = board.tracks.find((t) => t.memberId === 'k2')!
     expect(kaleb.homework).toEqual([{ id: expect.any(String), label: 'Blue sheet · Fri', late: false }])
     expect(ella.homework).toEqual([])
-    expect(kaleb.anytime).toEqual([])
+    expect(kaleb.zone).toEqual([])
   })
 
   // One row, both kids' tracks. Class-wide homework used to be written as one
@@ -554,10 +563,11 @@ describe('adaptGanttBoard — homework chips', () => {
     ])
     const kaleb = board.tracks.find((t) => t.memberId === 'k1')!
     const ella = board.tracks.find((t) => t.memberId === 'k2')!
-    const house = board.tracks.find((t) => t.memberId === HOUSEHOLD_ID)!
+    const house = board.tracks.find((t) => t.memberId === HOUSEHOLD_ID)
     expect(kaleb.homework.map((h) => h.label)).toEqual(['Blue sheet · Fri'])
     expect(ella.homework.map((h) => h.label)).toEqual(['Blue sheet · Fri'])
-    expect(house.homework).toEqual([])
+    // Nothing fell to the house, so the house row is not even drawn.
+    expect(house).toBeUndefined()
   })
 
   it('ignores ids in assignedToAll that are not on the roster', () => {
@@ -565,7 +575,7 @@ describe('adaptGanttBoard — homework chips', () => {
       hw({ assignedToAll: ['k2', 'zz'] }),
     ])
     expect(board.tracks.find((t) => t.memberId === 'k2')!.homework.map((h) => h.label)).toEqual(['Blue sheet'])
-    expect(board.tracks.find((t) => t.memberId === HOUSEHOLD_ID)!.homework).toEqual([])
+    expect(board.tracks.find((t) => t.memberId === HOUSEHOLD_ID)).toBeUndefined()
   })
 
   it('falls back to assignedTo when assignedToAll names nobody the wall knows', () => {
@@ -651,7 +661,7 @@ describe('an unclaimed handoff sits on the household row as an open question', (
     const board = adaptGanttBoard([scott, ella], [day([walk(scott.id)])], at(7))
     const mine = board.tracks.find((t) => t.memberId === scott.id)!
     expect(mine.blocks.find((b) => b.id === 'walk')?.openHandoff).toBeUndefined()
-    expect(board.tracks.find((t) => t.memberId === '__household__')!.blocks).toHaveLength(0)
+    expect(board.tracks.find((t) => t.memberId === '__household__')).toBeUndefined()
   })
 })
 
@@ -660,7 +670,7 @@ describe('completion hides a commitment, never information', () => {
   it('a completed all-day rotation still chips — the kid still had PE', () => {
     const sp = item({ title: 'Specials — Ella: PE · Kaleb: Music', startTime: at(8), endTime: at(20), allDay: true, completed: true })
     const board = adaptGanttBoard([ella], [day([sp])], at(14))
-    expect(board.tracks[0].anytime).toEqual(['PE'])
+    expect(board.tracks[0].zone.map((z) => z.title)).toEqual(['PE'])
   })
   it('a completed free stay still draws — they are still at school', () => {
     const school = item({ id: 'school', title: 'School — Ella', startTime: at(7, 30), endTime: at(14, 10), isFree: true, completed: true })
@@ -671,5 +681,55 @@ describe('completion hides a commitment, never information', () => {
     const dentist = item({ id: 'dentist', title: 'Ella dentist', startTime: at(10), endTime: at(11), completed: true })
     const board = adaptGanttBoard([ella], [day([dentist])], at(9))
     expect(board.tracks[0].blocks).toHaveLength(0)
+  })
+})
+
+describe('the zone — what a row says beside the name, off the axis', () => {
+  const members = [member('s', 'Scott'), member('e', 'Ella')]
+
+  it('an untimed TASK leaves the row — the strip carries it now', () => {
+    const t = item({ type: 'task', title: 'Wash bookbags', startTime: null, assignedTo: 's' })
+    const board = adaptGanttBoard(members, [day([t])], at(9))
+    expect(board.tracks[0].zone).toEqual([])
+    expect(board.tracks[0].blocks).toEqual([])
+  })
+
+  it('a timed task is still a bar — it is an appointment with yourself', () => {
+    const t = item({ type: 'task', title: 'Call the plumber', startTime: at(10), endTime: at(10, 30), assignedTo: 's' })
+    const board = adaptGanttBoard(members, [day([t])], at(9))
+    expect(board.tracks[0].blocks.map((b) => b.title)).toEqual(['Call the plumber'])
+  })
+
+  it('an all-day event is a special in the zone, split to each named person', () => {
+    const specials = item({ type: 'event', title: 'Specials — Ella: Visual Art · Kaleb: PE', allDay: true })
+    const board = adaptGanttBoard(members, [day([specials])], at(9))
+    const ella = board.tracks.find((t) => t.memberId === 'e')!
+    expect(ella.zone).toEqual([{ id: specials.id, title: 'Visual Art', kind: 'special' }])
+  })
+
+  it('an untimed rare routine is a routine in the zone', () => {
+    const r = item({
+      type: 'routine', title: 'Laundry', startTime: null, assignedTo: 's',
+      recurrencePattern: { type: 'weekly', days: ['sat'] },
+    } as Partial<TimelineItem>)
+    const board = adaptGanttBoard(members, [day([r])], at(9))
+    expect(board.tracks[0].zone).toEqual([{ id: r.id, title: 'Laundry', kind: 'routine' }])
+  })
+
+  it('reserves the zone column only when some row uses it', () => {
+    const bare = adaptGanttBoard(members, [day([item({ type: 'event', title: 'Dentist', startTime: at(9), endTime: at(10), assignedTo: 's' })])], at(9))
+    expect(bare.zoneW).toBe(0)
+    const withZone = adaptGanttBoard(members, [day([item({ type: 'event', title: 'Labor Day', allDay: true })])], at(9))
+    expect(withZone.zoneW).toBe(ZONE_W)
+  })
+
+  it('fits labels against the narrower track when the zone column is open', () => {
+    const special = item({ type: 'event', title: 'Labor Day', allDay: true })
+    const bar = item({ type: 'event', title: 'Dentist', startTime: at(9), endTime: at(10), assignedTo: 's' })
+    const wide = adaptGanttBoard(members, [day([bar])], at(9), 400)
+    const narrow = adaptGanttBoard(members, [day([bar, special])], at(9), 400)
+    // With 400px total and 236 reserved, 164px of track cannot hold a 170px label anywhere.
+    expect(wide.tracks[0].blocks[0].labelSide).toBe('right')
+    expect(narrow.tracks[0].blocks[0].labelSide).toBe('in')
   })
 })
