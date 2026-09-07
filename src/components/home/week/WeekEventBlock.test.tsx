@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { screen } from '@testing-library/react'
 import { DndContext, PointerSensor, useSensor, useSensors } from '@dnd-kit/core'
 import type { ReactNode } from 'react'
@@ -91,6 +91,41 @@ describe('WeekEventBlock', () => {
     const { left, width } = laneCalcStrings(0, 0, 1, 5)
     expect(left).toContain('/ 5')
     expect(width).toContain('/ 5')
+  })
+})
+
+// Scott, 2026-09-07: the card keeps the day it was given even when nobody
+// ticked it — that is how a week you look back at tells the truth — but it
+// reads as history, not as a commitment still standing.
+describe('WeekEventBlock — a day that passed', () => {
+  const weekStart = new Date(2026, 4, 17)
+  const blockOf = (el: HTMLElement) => el.closest('[role="button"]') as HTMLElement
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(2026, 4, 21, 9, 0)) // Thu May 21 — the day after
+  })
+  afterEach(() => { vi.useRealTimers() })
+
+  it('fades a task left on a day behind us', () => {
+    renderWithDnd(<WeekEventBlock placedItem={mkPlaced()} weekStart={weekStart} onSelect={vi.fn()} />)
+    expect(blockOf(screen.getByText('Therapy appt')).className).toMatch(/border-dashed/)
+  })
+
+  it('leaves a ticked task looking done, not missed', () => {
+    renderWithDnd(<WeekEventBlock placedItem={mkPlaced({ completed: true })} weekStart={weekStart} onSelect={vi.fn()} />)
+    expect(blockOf(screen.getByText('Therapy appt')).className).not.toMatch(/border-dashed/)
+  })
+
+  it('says nothing about a routine — a rhythm band is not a missed commitment', () => {
+    renderWithDnd(<WeekEventBlock placedItem={mkPlaced({ type: 'routine', title: 'Kids shower' })} weekStart={weekStart} onSelect={vi.fn()} />)
+    expect(blockOf(screen.getByText('Kids shower')).className).not.toMatch(/border-dashed/)
+  })
+
+  it('leaves a day still ahead alone', () => {
+    vi.setSystemTime(new Date(2026, 4, 19, 9, 0)) // Tue — the block is Wednesday
+    renderWithDnd(<WeekEventBlock placedItem={mkPlaced()} weekStart={weekStart} onSelect={vi.fn()} />)
+    expect(blockOf(screen.getByText('Therapy appt')).className).not.toMatch(/border-dashed/)
   })
 })
 

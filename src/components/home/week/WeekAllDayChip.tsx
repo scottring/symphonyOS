@@ -2,6 +2,7 @@ import { useDraggable } from '@dnd-kit/core'
 import type { Task } from '@/types/task'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import { hasExecutionContext } from '@/lib/week/readiness'
+import { isMissedPlacement } from '@/lib/week/missedPlacement'
 
 interface WeekAllDayChipProps {
   task: Task
@@ -30,6 +31,10 @@ export function WeekAllDayChip({ task, onSelect, displayLabel, ariaLabel }: Week
     id: `chip:${task.id}`,
     data: { kind: 'chip', taskId: task.id },
   })
+  // Its day came and went without a tick: the live copy is back on the week's
+  // list, and what stays here is the record of a day that didn't happen —
+  // faded and dashed, so it never reads as a commitment still standing.
+  const missed = isMissedPlacement(task.scheduledFor, task.completed, new Date())
 
   return (
     <button
@@ -44,6 +49,7 @@ export function WeekAllDayChip({ task, onSelect, displayLabel, ariaLabel }: Week
         w-full text-left px-2 py-1 rounded-md
         bg-bg-elevated border border-neutral-200 text-[11.5px] leading-snug text-neutral-700
         cursor-grab active:cursor-grabbing
+        ${missed ? 'opacity-60 border-dashed text-neutral-500' : ''}
         ${isDragging ? 'opacity-40' : ''}
       `}
     >

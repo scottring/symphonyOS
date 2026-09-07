@@ -25,4 +25,36 @@ describe('WeekAllDayChip', () => {
     expect(chip.className).not.toMatch(/\btruncate\b/)
     expect(chip.className).toMatch(/line-clamp-2/)
   })
+
+  // Scott, 2026-09-07: a card whose day passed without a tick is back on the
+  // week's list. What stays on the day is a record, not a commitment.
+  it('fades a chip whose day passed without a tick', () => {
+    const missed = { ...task, scheduledFor: new Date(Date.now() - 2 * 86_400_000) } as Task
+    render(
+      <DndContext>
+        <WeekAllDayChip task={missed} onSelect={vi.fn()} />
+      </DndContext>,
+    )
+    expect(screen.getByTitle(missed.title).className).toMatch(/border-dashed/)
+  })
+
+  it('leaves a chip on a day still ahead alone', () => {
+    const ahead = { ...task, scheduledFor: new Date(Date.now() + 2 * 86_400_000) } as Task
+    render(
+      <DndContext>
+        <WeekAllDayChip task={ahead} onSelect={vi.fn()} />
+      </DndContext>,
+    )
+    expect(screen.getByTitle(ahead.title).className).not.toMatch(/border-dashed/)
+  })
+
+  it('leaves a chip that was ticked on its day alone', () => {
+    const done = { ...task, completed: true, scheduledFor: new Date(Date.now() - 2 * 86_400_000) } as Task
+    render(
+      <DndContext>
+        <WeekAllDayChip task={done} onSelect={vi.fn()} />
+      </DndContext>,
+    )
+    expect(screen.getByTitle(done.title).className).not.toMatch(/border-dashed/)
+  })
 })
