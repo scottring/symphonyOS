@@ -13,7 +13,7 @@
 // and left is the reachable corner, and it keeps the dedicated always-visible
 // one-tap target the phone is owed.
 
-import { HelpCircle, MessageCircle, Phone, UtensilsCrossed } from 'lucide-react';
+import { HelpCircle, MessageCircle, Phone, Search, UtensilsCrossed } from 'lucide-react';
 import { WALL } from './wallTheme';
 import type { MealRow, DueRow, ComingUpRow } from './wallStrip';
 
@@ -105,13 +105,16 @@ export function WallV2CallTile({ onTap }: { onTap: () => void }) {
 }
 
 export function WallV2DinnerStripCard({
-  tonight, rows, onTap, onSelectDay,
+  tonight, rows, onTap, onSelectDay, onBrowseRecipes,
 }: {
   tonight: string | null;
   rows: MealRow[];
   onTap?: () => void;
   /** Opens another night's recipe — the prev/next arrows the hero used to carry. */
   onSelectDay?: (dateKey: string) => void;
+  /** Opens the recipe picker — cooking something that was never planned is
+   *  the other half of standing here (Scott, 2026-09-07). */
+  onBrowseRecipes?: () => void;
 }) {
   const rest = rows.filter((r) => !r.isToday).slice(0, 3);
   return (
@@ -144,6 +147,16 @@ export function WallV2DinnerStripCard({
           </button>
         ))}
       </div>
+      {onBrowseRecipes && (
+        <button
+          type="button"
+          onClick={onBrowseRecipes}
+          className={`mt-2 shrink-0 flex items-center gap-1.5 text-left active:scale-[.99] transition-transform ${WALL.dinnerLabel}`}
+        >
+          <Search className="w-3.5 h-3.5" />
+          All recipes
+        </button>
+      )}
     </div>
   );
 }
@@ -208,7 +221,7 @@ export function WallV2QuestionStripCard({ question, handoff, onTap }: { question
 }
 
 export function WallV2Strip({
-  tonight, meals, comingUp, question, handoff, onCall, onTapDinner, onSelectDinnerDay, onTapQuestion, onTapHandoff,
+  tonight, meals, comingUp, question, handoff, onCall, onTapDinner, onSelectDinnerDay, onBrowseRecipes, onTapQuestion, onTapHandoff,
 }: {
   tonight: string | null;
   meals: MealRow[];
@@ -217,6 +230,7 @@ export function WallV2Strip({
   handoff?: HandoffAsk | null;
   onCall: () => void;
   onTapDinner?: () => void;
+  onBrowseRecipes?: () => void;
   onSelectDinnerDay?: (dateKey: string) => void;
   onTapQuestion?: () => void;
   onTapHandoff?: () => void;
@@ -232,7 +246,7 @@ export function WallV2Strip({
     <div className="shrink-0 h-[188px] flex gap-3 min-w-0">
       <WallV2CallTile onTap={onCall} />
       <div className="flex-1 min-w-0 grid grid-cols-3 gap-3">
-        <WallV2DinnerStripCard tonight={tonight} rows={meals} onTap={onTapDinner} onSelectDay={onSelectDinnerDay} />
+        <WallV2DinnerStripCard tonight={tonight} rows={meals} onTap={onTapDinner} onSelectDay={onSelectDinnerDay} onBrowseRecipes={onBrowseRecipes} />
         <WallV2QuestionStripCard question={question} handoff={handoff} onTap={handoff ? onTapHandoff : onTapQuestion} />
         <WallV2ComingUpCard rows={comingUp} />
       </div>

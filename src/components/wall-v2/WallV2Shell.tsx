@@ -74,6 +74,8 @@ import type { CalendarEvent } from '@/hooks/useGoogleCalendar';
 import { extractRecipeNameHint, resolveRecipeUrl } from '@/lib/recipeDetection';
 import { getNextWeekend, getWeekendAfterNext, formatShortDate } from '@/lib/dateHelpers';
 import { WallRecipeViewer } from '@/components/wall/WallRecipeViewer';
+import { WallV2RecipeSheet } from './WallV2RecipeSheet';
+import { useWallRecipeIndex } from '@/hooks/useWallRecipeIndex';
 import { useRecipe } from '@/hooks/useRecipe';
 import { WallDiscussionOverlay } from '@/components/wall/WallDiscussionOverlay';
 import { useFamilyDiscussionItems, type DiscussionItem } from '@/hooks/useFamilyDiscussionItems';
@@ -298,6 +300,13 @@ export function WallV2Shell() {
   // behind a full-screen ambient clock/weather screen.
   const [guestMode, setGuestMode] = useState(false);
   const [recipeViewerMeal, setRecipeViewerMeal] = useState<'dinner' | 'breakfast' | null>(null);
+  // Cooking something that was never on the plan: the picker, and the one
+  // recipe it hands over (Scott, 2026-09-07). The index stays loaded while the
+  // viewer is open so Back lands on the shelf instantly instead of re-querying.
+  const [showRecipePicker, setShowRecipePicker] = useState(false);
+  const [pickedRecipeId, setPickedRecipeId] = useState<string | null>(null);
+  const recipeIndex = useWallRecipeIndex(showRecipePicker || pickedRecipeId !== null);
+  const { recipe: pickedRecipe } = useRecipe(pickedRecipeId);
   // Portrait tap on the board — a member's full-screen day page. Wrapped
   // handlers below (useCallback) so a parent re-render doesn't recreate
   // onClose/onTapMember and restart KidDayView's idle-close timer.
@@ -807,6 +816,7 @@ export function WallV2Shell() {
           handoff={handoffAsk}
           onCall={() => setShowPhone(true)}
           onTapDinner={handleTapDinnerCard}
+          onBrowseRecipes={() => setShowRecipePicker(true)}
           onSelectDinnerDay={(key) => setMealDayKey(key === todayKey ? null : key)}
           onTapQuestion={() => setShowQuestionSheet(true)}
           onTapHandoff={() => setShowWhoSheet(true)}
@@ -844,6 +854,7 @@ export function WallV2Shell() {
             void wallData.refetch();
             showFlash('Refreshing…');
           }}
+          onRecipes={() => { setShowUtilities(false); setShowRecipePicker(true); }}
           onToggleHideRoutines={toggleHideRoutines}
           onToggleTheme={toggleTheme}
           onClose={() => setShowUtilities(false)}
@@ -877,6 +888,34 @@ export function WallV2Shell() {
           onPrevDay={goToDay(prevNavDay)}
           onNextDay={goToDay(nextNavDay)}
           onClose={() => setRecipeViewerMeal(null)}
+        />
+      )}
+
+      {showRecipePicker && (
+        <WallV2RecipeSheet
+          recipes={recipeIndex.recipes}
+          loading={recipeIndex.loading}
+          onPick={(r) => { setPickedRecipeId(r.id); setShowRecipePicker(false); }}
+          onClose={() => setShowRecipePicker(false)}
+        />
+      )}
+
+      {/* A picked recipe cooks in the same full-screen view tonight's dinner
+          uses — no day rails, because a recipe reached by name has no
+          neighbouring night; closing goes back to the shelf you came from. */}
+      {pickedRecipeId && pickedRecipe && (
+        <WallRecipeViewer
+          content={{
+            title: pickedRecipe.title,
+            ingredients: pickedRecipe.ingredients,
+            instructions: pickedRecipe.instructions,
+          }}
+          url={pickedRecipe.ingredients.length === 0 && pickedRecipe.instructions.length === 0
+            ? pickedRecipe.sourceUrl
+            : undefined}
+          mealName={pickedRecipe.title}
+          mealIcon={getMealIcon(pickedRecipe.title)}
+          onClose={() => { setPickedRecipeId(null); setShowRecipePicker(true); }}
         />
       )}
 
