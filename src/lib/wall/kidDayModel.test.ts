@@ -187,6 +187,14 @@ describe('buildMemberDayModel', () => {
     expect(model.bands.morning[0].id).toBe('abc')
   })
 
+  it('an all-day task carries no time of day — its midnight start is a date, not an hour', () => {
+    const model = build([], [], {
+      allday: [taskItem({ id: 'task-ad', title: 'Wash bookbags', startTime: new Date(2026, 8, 7, 0, 0), allDay: true })],
+    })
+    const row = Object.values(model.bands).flat().find((r) => r.id === 'ad')!
+    expect(row.timeOfDay).toBeNull()
+  })
+
   it('isEmpty when nothing applies', () => {
     const model = build([])
     expect(model.isEmpty).toBe(true)

@@ -309,7 +309,11 @@ export function buildMemberDayModel(input: {
         id: item.id.replace(/^task-/, ''),
         title: item.title,
         done: item.completed,
-        timeOfDay: item.startTime ? formatHHMM(item.startTime) : null,
+        // An all-day task carries a midnight startTime from the adapter; that
+        // is a date, not an hour. Reading it as "00:00" made an adult's
+        // untimed chores vanish from their page (choresFor treats a timed
+        // task as an appointment).
+        timeOfDay: item.startTime && !item.allDay ? formatHHMM(item.startTime) : null,
         target: null,
       }
       bands[sectionBand(section)].push(row)
