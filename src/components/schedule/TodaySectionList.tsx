@@ -166,7 +166,7 @@ export function TodaySectionList({
     onToggleWaiting, onUpdateTask, onPushTask,
     onAssignTask, onAssignTaskAll, onAssignEvent, onAssignEventAll,
     onAssignRoutine, onAssignRoutineAll,
-    onSkipRoutine, onPushRoutine, onUpdateRoutine,
+    onSkipRoutine, onPushRoutine, onUpdateRoutine, onRegisterUndo,
     onSkipEvent, onPushEvent, onUpdateEventContext,
     onOpenTask,
     contactsMap, projectsMap, familyMembers = [],
@@ -471,9 +471,20 @@ export function TodaySectionList({
                             tomorrow.setDate(tomorrow.getDate() + 1)
                             onUpdateRoutine(parentId, { visibility: 'reference', paused_until: tomorrow.toISOString() })
                           } : undefined}
+                          // "Remove from Today" now does what it says: the
+                          // routine keeps running (and keeps its place on the
+                          // kitchen wall), it just stops taking a row here.
+                          // It used to write visibility:'reference', which is
+                          // Resting — it stopped the routine everywhere, which
+                          // is a bigger promise than the label makes (Scott,
+                          // 2026-09-07). Stopping a routine outright is the
+                          // Active switch in its panel.
                           onRemove={onUpdateRoutine ? () => {
                             const parentId = item.id.replace('routine-collection-', '')
-                            onUpdateRoutine(parentId, { visibility: 'reference' })
+                            onUpdateRoutine(parentId, { show_on_timeline: false })
+                            onRegisterUndo?.(`"${item.title}" is off Today`, () => {
+                              onUpdateRoutine(parentId, { show_on_timeline: true })
+                            })
                           } : undefined}
                         />
                         </div>

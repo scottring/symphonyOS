@@ -33,6 +33,40 @@ const eventItem = {
   originalEvent: { id: '9', title: 'Dentist' },
 } as unknown as TimelineItem
 
+describe('ScheduleItemActionsMenu — not on Today', () => {
+  // Scott, 2026-09-07: choosing that a routine doesn't take a row on Today,
+  // offered where the clutter actually is. It keeps running (and keeps its
+  // place on the kitchen wall), so this is not Delete and not Resting.
+  const onRoutine = { ...routineItem, originalRoutine: { id: '1', show_on_timeline: true } } as unknown as TimelineItem
+
+  it('turns the routine off Today and leaves an undo', () => {
+    const onUpdateRoutine = vi.fn()
+    const onRegisterUndo = vi.fn()
+    renderMenu(onRoutine, { onUpdateRoutine, onRegisterUndo })
+
+    fireEvent.click(screen.getByText('Not on Today'))
+    expect(onUpdateRoutine).toHaveBeenCalledWith('1', { show_on_timeline: false })
+
+    // The row vanishes the instant it is pressed, so the way back has to be
+    // offered, not looked for.
+    expect(onRegisterUndo).toHaveBeenCalledWith('"Trash" is off Today', expect.any(Function))
+    onRegisterUndo.mock.calls[0][1]()
+    expect(onUpdateRoutine).toHaveBeenLastCalledWith('1', { show_on_timeline: true })
+  })
+
+  it('does not offer it on a routine that is already off Today', () => {
+    const off = { ...routineItem, originalRoutine: { id: '1', show_on_timeline: false } } as unknown as TimelineItem
+    renderMenu(off, { onUpdateRoutine: vi.fn() })
+    expect(screen.queryByText('Not on Today')).not.toBeInTheDocument()
+  })
+
+  it('is a routine verb only — a task has no such row to drop', () => {
+    const task = { id: 'task-3', type: 'task', title: 'Call the vet', completed: false, originalTask: { id: '3' } } as unknown as TimelineItem
+    renderMenu(task, { onUpdateRoutine: vi.fn(), onUpdateTask: vi.fn() })
+    expect(screen.queryByText('Not on Today')).not.toBeInTheDocument()
+  })
+})
+
 describe('ScheduleItemActionsMenu', () => {
   it('shows Delete routine (but NOT Skip today) for a routine and fires the handler', () => {
     const onDeleteRoutine = vi.fn()

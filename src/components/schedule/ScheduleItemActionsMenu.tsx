@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react'
-import { MoreHorizontal, Redo2, Clock, Trash2, CalendarCog, Hourglass, MessageCircle, AlertCircle } from 'lucide-react'
+import { MoreHorizontal, Redo2, Clock, Trash2, CalendarCog, Hourglass, MessageCircle, AlertCircle, EyeOff } from 'lucide-react'
 import type { TimelineItem } from '@/types/timeline'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
 import { isSameDay } from '@/lib/dateUtils'
@@ -248,6 +248,28 @@ export function ScheduleItemActionsMenu({ item, onOpenDetail, onUpdateDiscussion
               >
                 <Trash2 className="w-4 h-4" />
                 Delete
+              </button>
+            )}
+
+            {/* Not on Today — the routine keeps running (and keeps showing on
+                the kitchen wall); it just stops taking a row here. Offered at
+                the moment the clutter is in front of you rather than only in
+                the Routines panel, and undoable, because the row disappears
+                the instant you press it. Writes resolveRoutine's rung 3. */}
+            {isRoutine && ctx.onUpdateRoutine && item.originalRoutine?.show_on_timeline !== false && (
+              <button
+                type="button"
+                role="menuitem"
+                onClick={run(() => {
+                  ctx.onUpdateRoutine?.(rid, { show_on_timeline: false })
+                  ctx.onRegisterUndo?.(`"${item.title}" is off Today`, () => {
+                    ctx.onUpdateRoutine?.(rid, { show_on_timeline: true })
+                  })
+                })}
+                className="flex w-full text-left items-center gap-2.5 px-3 py-2.5 text-sm text-neutral-700 hover:bg-neutral-50"
+              >
+                <EyeOff className="w-4 h-4 text-neutral-400" />
+                Not on Today
               </button>
             )}
 

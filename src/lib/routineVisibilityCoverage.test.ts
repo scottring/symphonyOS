@@ -79,6 +79,20 @@ const ALLOWED = new Map<string, string>([
   ['components/routine/RoutineForm.tsx', 'the editor UI that toggles the flags'],
   ['components/detail/DetailPanelRedesign.tsx', 'the detail panel that toggles the flags'],
   ['components/surface/TapRoutinePanel.tsx', 'the tap panel that toggles the flags'],
+  [
+    'components/schedule/ScheduleItemActionsMenu.tsx',
+    "the row's ⋯ menu WRITES the flag (\"Not on Today\") and reads it once — " +
+      'to decide whether to offer that verb on a routine already off Today. ' +
+      'Offering a verb is not deciding what renders; the row it sits on got ' +
+      'there through resolveRoutine like every other.',
+  ],
+  [
+    'components/schedule/TodaySectionList.tsx',
+    "a collection row's \"Remove from Today\" WRITES the flag (it used to " +
+      "write visibility:'reference', which stopped the routine everywhere — a " +
+      'bigger promise than the label makes). Write path only; nothing here ' +
+      'reads a primitive to decide what shows.',
+  ],
   ['components/routine/RhythmPage.tsx', 'Tend deliberately shows RESTING routines — opted out, see the comment there'],
   ['components/routine/rhythm/tendHeuristics.ts', 'same opt-out as RhythmPage'],
   [

@@ -519,6 +519,7 @@ export function RhythmPage(props: RhythmPageProps) {
                 onContextChange={context => updateRoutine(openRoutineItem.id, { context: context ?? null })}
                 onVisibilityChange={visibility => updateRoutine(openRoutineItem.id, { visibility })}
                 onRestUntilChange={pausedUntil => updateRoutine(openRoutineItem.id, { paused_until: pausedUntil })}
+                onShowOnTodayChange={next => updateRoutine(openRoutineItem.id, { show_on_timeline: next })}
                 onAssignChange={memberIds => updateRoutine(openRoutineItem.id, { assigned_to_all: memberIds })}
                 onScheduleChange={(pattern, timeOfDay) =>
                   updateRoutine(openRoutineItem.id, { recurrence_pattern: pattern, time_of_day: timeOfDay || null })}

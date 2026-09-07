@@ -41,6 +41,11 @@ interface TapRoutinePanelProps {
   onVisibilityChange: (visibility: RoutineVisibility) => void
   /** Persist a wake date for a resting routine (paused_until; null = rest indefinitely). */
   onRestUntilChange?: (pausedUntil: string | null) => void
+  /** Take the routine off Today (and the week/month grids) without stopping it:
+   *  writes show_on_timeline, resolveRoutine's rung 3. Rendered only when
+   *  provided, and only while the routine is Active — "off Today" says nothing
+   *  about a routine that is resting off everything. */
+  onShowOnTodayChange?: (next: boolean) => void
   onAssignChange?: (memberIds: string[]) => void
   /** Persist a recurrence/time-of-day change. time is '' (clear) or 'HH:MM'. */
   onScheduleChange?: (pattern: RecurrencePattern, timeOfDay: string) => void
@@ -80,6 +85,11 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
   useEffect(() => { if (props.autoOpenDiscussion) setAssistOpen(true) }, [props.autoOpenDiscussion])
   const discussionUnread = useThreadUnread('routine', props.routine.id)
   const onTimeline = routine.visibility === 'active'
+  // Two different questions, and they were being answered by one switch: is
+  // this routine running at all (Active/Resting), and does a running routine
+  // want a row on Today. A bedtime routine everybody knows by heart is still
+  // real — it just doesn't need reading back to you (Scott, 2026-09-07).
+  const onToday = routine.show_on_timeline !== false
 
   // Today-completion checklist for the steps — same instance keys as the
   // Today collection row, so checking here updates its progress too.
@@ -171,6 +181,40 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
             </div>
           )}
         </div>
+
+        {/* On Today — a running routine that doesn't need a row read back to
+            you. Separate from Active/Resting on purpose: this one keeps
+            running. */}
+        {onTimeline && props.onShowOnTodayChange && (
+          <div>
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-sm font-medium text-neutral-700">
+                {onToday ? 'On Today' : 'Off Today'}
+              </span>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={onToday}
+                aria-label="On Today"
+                onClick={() => props.onShowOnTodayChange!(!onToday)}
+                className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
+                  onToday ? 'bg-primary-600' : 'bg-neutral-300'
+                }`}
+              >
+                <span
+                  className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+                    onToday ? 'translate-x-[22px]' : 'translate-x-0.5'
+                  }`}
+                />
+              </button>
+            </div>
+            <p className="mt-1 text-xs text-neutral-400">
+              {onToday
+                ? 'Takes a row on Today and the week grid at its time.'
+                : "Still runs, still on the kitchen wall — it just doesn't take a row on Today or the week grid."}
+            </p>
+          </div>
+        )}
 
         {/* Schedule (recurrence + time) — collapsed summary, expands to edit */}
         {props.onScheduleChange && (

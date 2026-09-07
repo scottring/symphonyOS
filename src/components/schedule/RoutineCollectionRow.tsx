@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { ChevronDown, ChevronRight, Check, SkipForward, Clock, MoreHorizontal, EyeOff, Pencil, Archive } from 'lucide-react'
+import { ChevronDown, ChevronRight, Check, SkipForward, Clock, MoreHorizontal, EyeOff, Pencil, CalendarOff } from 'lucide-react'
 import type { TimelineItem, CollectionDose } from '@/types/timeline'
 
 interface Props {
@@ -155,7 +155,7 @@ export function RoutineCollectionRow({ item, onSelect, onSelectStep, onCompleteS
                     onClick={() => { onRemove(); setMgmtOpen(false) }}
                     className="w-full flex items-center gap-2 px-3 py-1.5 text-left text-sm text-neutral-700 hover:bg-neutral-50"
                   >
-                    <Archive className="w-4 h-4 text-neutral-400" /> Remove from Today
+                    <CalendarOff className="w-4 h-4 text-neutral-400" /> Remove from Today
                   </button>
                 )}
               </div>

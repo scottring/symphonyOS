@@ -68,6 +68,38 @@ describe('TapRoutinePanel', () => {
     expect(onVisibilityChange).toHaveBeenCalledWith('reference')
   })
 
+  // Scott, 2026-09-07: "make it so you can choose not to show particular
+  // routines on the Today page." Separate from Active/Resting: this one keeps
+  // the routine running (and on the kitchen wall), it just stops the row.
+  it('offers an On Today switch beside Active, and reports turning it off', () => {
+    const onShowOnTodayChange = vi.fn()
+    render(
+      <TapRoutinePanel routine={routine} onClose={vi.fn()} onNotesChange={vi.fn()} onContextChange={vi.fn()}
+        onVisibilityChange={vi.fn()} onShowOnTodayChange={onShowOnTodayChange} />,
+    )
+    const sw = screen.getByRole('switch', { name: /^on today$/i })
+    expect(sw).toHaveAttribute('aria-checked', 'true')
+    fireEvent.click(sw)
+    expect(onShowOnTodayChange).toHaveBeenCalledWith(false)
+  })
+
+  it('says what an off-Today routine still does', () => {
+    render(
+      <TapRoutinePanel routine={{ ...routine, show_on_timeline: false }} onClose={vi.fn()} onNotesChange={vi.fn()}
+        onContextChange={vi.fn()} onVisibilityChange={vi.fn()} onShowOnTodayChange={vi.fn()} />,
+    )
+    expect(screen.getByRole('switch', { name: /^on today$/i })).toHaveAttribute('aria-checked', 'false')
+    expect(screen.getByText(/still on the kitchen wall/i)).toBeInTheDocument()
+  })
+
+  it('says nothing about Today while the routine is resting off everything', () => {
+    render(
+      <TapRoutinePanel routine={{ ...routine, visibility: 'reference' }} onClose={vi.fn()} onNotesChange={vi.fn()}
+        onContextChange={vi.fn()} onVisibilityChange={vi.fn()} onShowOnTodayChange={vi.fn()} />,
+    )
+    expect(screen.queryByRole('switch', { name: /^on today$/i })).not.toBeInTheDocument()
+  })
+
   it('renders the assignee picker when members + onAssignChange are provided', () => {
     render(
       <TapRoutinePanel
