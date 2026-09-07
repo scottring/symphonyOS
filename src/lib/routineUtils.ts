@@ -54,6 +54,43 @@ export function isEverydayRoutine(rp?: RecurrencePattern | null): boolean {
 }
 
 /**
+ * Whether a routine is rare enough to be NEWS on the kitchen wall.
+ *
+ * The wall shows what is unusual about today. A thing that happens every
+ * day, or most days, is the shape of a week — brushing teeth, feeding the
+ * dog — and drawing it beside a dentist appointment teaches people to stop
+ * reading the wall. Two days a week or fewer is the line (Scott, 2026-09-07):
+ * "once or twice a week" is what he named as worth a glance. Anything on a
+ * longer cadence — every other week, monthly, since the last time — is by
+ * construction rarer than that and always earns its place.
+ *
+ * Distinct from `isEverydayRoutine`, which asks "does this run Mon–Fri?" for
+ * the Show-daily toggle. That meaning stays; this is a stricter question for
+ * a different surface.
+ */
+export function routineEarnsTheWall(rp?: RecurrencePattern | null): boolean {
+  if (!rp) return false
+  if ((rp.interval ?? 1) > 1) return true
+  switch (rp.type) {
+    case 'monthly':
+    case 'quarterly':
+    case 'yearly':
+    case 'since_last':
+      return true
+    case 'daily':
+      return false
+    case 'weekly':
+    case 'specific_days': {
+      if (rp.dates && rp.dates.length > 0) return true
+      if (!rp.days || rp.days.length === 0) return false
+      return rp.days.length <= 2
+    }
+    default:
+      return false
+  }
+}
+
+/**
  * When a routine actually happens, following a Step up to its collection.
  *
  * A routine collection carries the hour; its Steps carry the order. "Camp
