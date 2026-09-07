@@ -304,6 +304,7 @@ export function WallV2Shell() {
   // recipe it hands over (Scott, 2026-09-07). The index stays loaded while the
   // viewer is open so Back lands on the shelf instantly instead of re-querying.
   const [showRecipePicker, setShowRecipePicker] = useState(false);
+  const [recipeQuery, setRecipeQuery] = useState('');
   const [pickedRecipeId, setPickedRecipeId] = useState<string | null>(null);
   const recipeIndex = useWallRecipeIndex(showRecipePicker || pickedRecipeId !== null);
   const { recipe: pickedRecipe } = useRecipe(pickedRecipeId);
@@ -895,8 +896,12 @@ export function WallV2Shell() {
         <WallV2RecipeSheet
           recipes={recipeIndex.recipes}
           loading={recipeIndex.loading}
+          query={recipeQuery}
+          onQueryChange={setRecipeQuery}
           onPick={(r) => { setPickedRecipeId(r.id); setShowRecipePicker(false); }}
-          onClose={() => setShowRecipePicker(false)}
+          // Closing the shelf outright is done searching; Back from a recipe
+          // (below) is not, and keeps the query.
+          onClose={() => { setShowRecipePicker(false); setRecipeQuery(''); }}
         />
       )}
 

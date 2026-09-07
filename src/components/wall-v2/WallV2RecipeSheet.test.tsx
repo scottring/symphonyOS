@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
+import { useState } from 'react'
 import { render, screen, fireEvent, within } from '@testing-library/react'
 import { WallV2RecipeSheet } from './WallV2RecipeSheet'
 import type { WallRecipe } from '@/lib/wall/recipeSearch'
@@ -13,10 +14,21 @@ const SHELF = [
   'Grilled pizza night', 'Hummus', 'Israeli salad', 'Jerk chicken', 'Kale caesar', 'Lasagne',
 ].map((t) => r(t))
 
+/** The host owns the query (so Back from a recipe keeps it); stand in for it. */
+function Host(props: Partial<React.ComponentProps<typeof WallV2RecipeSheet>>) {
+  const [query, setQuery] = useState('')
+  return (
+    <WallV2RecipeSheet
+      recipes={SHELF} loading={false} onPick={vi.fn()} onClose={vi.fn()}
+      query={query} onQueryChange={setQuery} {...props}
+    />
+  )
+}
+
 function renderSheet(props: Partial<React.ComponentProps<typeof WallV2RecipeSheet>> = {}) {
   const onPick = vi.fn()
   const onClose = vi.fn()
-  render(<WallV2RecipeSheet recipes={SHELF} loading={false} onPick={onPick} onClose={onClose} {...props} />)
+  render(<Host onPick={onPick} onClose={onClose} {...props} />)
   return { onPick, onClose }
 }
 
@@ -84,6 +96,23 @@ describe('WallV2RecipeSheet', () => {
     }
   })
 
+  // Coming back from a recipe must land on the search you made. The sheet
+  // unmounts while the cooking view is up, so the query cannot live in it.
+  it('takes its query from the host and hands every change back', () => {
+    const onQueryChange = vi.fn()
+    render(
+      <WallV2RecipeSheet
+        recipes={SHELF} loading={false} onPick={vi.fn()} onClose={vi.fn()}
+        query="be" onQueryChange={onQueryChange}
+      />,
+    )
+    expect(screen.getByText('Beef stew')).toBeInTheDocument()
+    expect(screen.queryByText('Arugula salad')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'E' }))
+    expect(onQueryChange).toHaveBeenCalledWith('beE')
+  })
+
   it('closes on the scrim as well as the button', () => {
     const { onClose } = renderSheet()
     fireEvent.click(screen.getByTestId('recipe-scrim'))
@@ -101,7 +130,7 @@ describe('WallV2RecipeSheet', () => {
   })
 
   it('waits without lying when the shelf is still loading', () => {
-    render(<WallV2RecipeSheet recipes={[]} loading onPick={vi.fn()} onClose={vi.fn()} />)
+    render(<Host recipes={[]} loading />)
     expect(screen.getByText('Loading…')).toBeInTheDocument()
     expect(screen.queryByText('Nothing by that name.')).not.toBeInTheDocument()
   })
@@ -110,10 +139,7 @@ describe('WallV2RecipeSheet', () => {
 describe('WallV2RecipeSheet — what it shows about a recipe', () => {
   it('carries the minutes and when it was last cooked', () => {
     render(
-      <WallV2RecipeSheet
-        recipes={[r('Shakshuka', { prepMinutes: 25, lastCookedAt: new Date(2026, 8, 1) })]}
-        loading={false} onPick={vi.fn()} onClose={vi.fn()}
-      />,
+      <Host recipes={[r('Shakshuka', { prepMinutes: 25, lastCookedAt: new Date(2026, 8, 1) })]} />,
     )
     const tile = screen.getByText('Shakshuka').closest('button')!
     expect(within(tile).getByText('25 min · Cooked Sep 1')).toBeInTheDocument()

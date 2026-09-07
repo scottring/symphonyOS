@@ -22,17 +22,22 @@ interface Props {
   loading: boolean
   onPick: (recipe: WallRecipe) => void
   onClose: () => void
+  /** What was typed last time. Held by the host so coming BACK from a recipe
+   *  lands on the search you made, not on a blank shelf — the sheet unmounts
+   *  while the cooking view is up. */
+  query: string
+  onQueryChange: (next: string) => void
 }
 
-export function WallV2RecipeSheet({ recipes, loading, onPick, onClose }: Props) {
-  const [query, setQuery] = useState('')
+export function WallV2RecipeSheet({ recipes, loading, onPick, onClose, query, onQueryChange }: Props) {
+  const setQuery = onQueryChange
   const [page, setPage] = useState(0)
 
   const matches = useMemo(() => searchRecipes(recipes, query), [recipes, query])
   const { items, page: shownPage, pages } = pageOf(matches, page, PER_PAGE)
 
-  const type = (ch: string) => { setQuery((q) => q + ch); setPage(0) }
-  const backspace = () => { setQuery((q) => q.slice(0, -1)); setPage(0) }
+  const type = (ch: string) => { setQuery(query + ch); setPage(0) }
+  const backspace = () => { setQuery(query.slice(0, -1)); setPage(0) }
   const clear = () => { setQuery(''); setPage(0) }
 
   return (
