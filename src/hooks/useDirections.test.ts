@@ -60,4 +60,10 @@ describe('useDirections.buildMapsUrl origin handling', () => {
     expect(url).toContain('destination=3806%20Tudor%20Arms')
     expect(url).toContain('travelmode=driving')
   })
+
+  it('passes the bicycling mode through to Maps', () => {
+    const { result } = renderHook(() => useDirections())
+    const url = result.current.buildMapsUrl({ ...ctx('123 Real St, Town, ST'), travelMode: 'bicycling' as const })
+    expect(url).toContain('travelmode=bicycling')
+  })
 })

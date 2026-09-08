@@ -128,6 +128,7 @@ export function useDirections(): UseDirectionsResult {
       const travelModeMap: Record<TravelMode, google.maps.TravelMode> = {
         driving: google.maps.TravelMode.DRIVING,
         walking: google.maps.TravelMode.WALKING,
+        bicycling: google.maps.TravelMode.BICYCLING,
         transit: google.maps.TravelMode.TRANSIT,
       }
 
@@ -330,6 +331,7 @@ export function useDirections(): UseDirectionsResult {
     const travelModeMap: Record<TravelMode, string> = {
       driving: 'driving',
       walking: 'walking',
+      bicycling: 'bicycling',
       transit: 'transit',
     }
     url += `&travelmode=${travelModeMap[context.travelMode]}`

@@ -1,3 +1,4 @@
+import { Bike } from 'lucide-react'
 import type { TravelMode } from '@/types/directions'
 
 interface TravelModeSelectorProps {
@@ -24,6 +25,11 @@ const modes: { value: TravelMode; label: string; icon: React.ReactNode }[] = [
         <path d="M10 3.5a1.5 1.5 0 100-3 1.5 1.5 0 000 3zM10 5l-4 8h2l2-4v8h2v-8l2 4h2L10 5z" />
       </svg>
     ),
+  },
+  {
+    value: 'bicycling',
+    label: 'Bike',
+    icon: <Bike className="w-5 h-5" strokeWidth={1.75} />,
   },
   {
     value: 'transit',

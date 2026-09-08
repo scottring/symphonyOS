@@ -21,7 +21,7 @@ export interface DirectionsContext {
   cachedDistance?: number  // Distance in meters
 }
 
-export type TravelMode = 'driving' | 'walking' | 'transit'
+export type TravelMode = 'driving' | 'walking' | 'bicycling' | 'transit'
 
 export interface DirectionsResult {
   duration: number  // Total duration in seconds
