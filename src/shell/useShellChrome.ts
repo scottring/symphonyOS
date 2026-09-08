@@ -14,6 +14,8 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 import type { ConfirmationToastMessage } from '@/components/toast';
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
 import type { TaskCategory } from '@/types/task';
+import type { RecurrencePattern } from '@/types/actionable';
+import { recurrenceToRRule } from '@/lib/quickRecurrence';
 import { useProjects } from '@/hooks/useProjects';
 import { useContacts } from '@/hooks/useContacts';
 import { useRoutines } from '@/hooks/useRoutines';
@@ -39,6 +41,8 @@ interface QuickAddRichData {
   category?: TaskCategory;
   context?: 'work' | 'family' | 'personal';
   assignedMemberIds?: string[];
+  /** "every tuesday and thurs" — a calendar series for an event, a routine otherwise. */
+  recurrence?: RecurrencePattern;
 }
 
 interface QuickAddNoteData {
@@ -52,7 +56,7 @@ export function useShellChrome() {
   useDesktopBridge(tasks);
   const { projects } = useProjects();
   const { contacts } = useContacts();
-  const { routines: allRoutines } = useRoutines();
+  const { routines: allRoutines, addRoutine } = useRoutines();
   const { members: familyMembers, getCurrentUserMember } = useFamilyMembers();
   const { isConnected, createEvent, fetchEvents } = useGoogleCalendar();
   const { getCalendarForDomain } = useCalendarDomainMappings();
@@ -115,7 +119,11 @@ export function useShellChrome() {
   const onQuickAddRich = useCallback(
     async (data: QuickAddRichData) => {
       // Event with a date + connected calendar → create in Google Calendar only.
-      if (data.category === 'event' && data.scheduledFor && isConnected) {
+      // With a recurrence it's a series: the parsed date is the first
+      // occurrence, the RRULE carries the rest. A pattern the calendar can't
+      // express (since-last, specific dates) falls to the routine path below.
+      const rrule = data.recurrence ? recurrenceToRRule(data.recurrence) : null;
+      if (data.category === 'event' && data.scheduledFor && isConnected && (!data.recurrence || rrule)) {
         try {
           const startTime = new Date(data.scheduledFor);
           const endTime = new Date(startTime.getTime() + (data.durationMinutes ?? 60) * 60000);
@@ -126,8 +134,11 @@ export function useShellChrome() {
             title: data.title,
             startTime,
             endTime,
+            // A date with no time is a day, not midnight (the parser zeroes it).
+            allDay: data.isAllDay === true,
             timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
             calendarId: targetCalendar?.calendarId,
+            recurrence: rrule ?? undefined,
           });
 
           const today = new Date();
@@ -136,13 +147,33 @@ export function useShellChrome() {
           weekLater.setDate(weekLater.getDate() + 7);
           await fetchEvents(today, weekLater);
 
-          showToast('Event added to Google Calendar', 'success');
+          showToast(rrule ? 'Recurring event added to Google Calendar' : 'Event added to Google Calendar', 'success');
           return;
         } catch (err) {
           console.error('Failed to sync event to Google Calendar:', err);
           showToast('Event created locally (Calendar sync failed)', 'warning');
           // Fall through to create local task as fallback.
         }
+      }
+
+      // Anything else that repeats is a routine, not a task: a task has one
+      // day, and "take out trash every other monday" has a rule. The parsed
+      // date's clock time is the routine's hour; a date with no time is none.
+      if (data.recurrence) {
+        const timeOfDay =
+          data.scheduledFor && data.isAllDay !== true
+            ? `${String(data.scheduledFor.getHours()).padStart(2, '0')}:${String(data.scheduledFor.getMinutes()).padStart(2, '0')}`
+            : undefined;
+        const routine = await addRoutine({
+          name: data.title,
+          recurrence_pattern: data.recurrence,
+          time_of_day: timeOfDay,
+          context: data.context,
+          assigned_to: data.assignedMemberIds?.[0] ?? getCurrentUserMember()?.id ?? null,
+          assigned_to_all: data.assignedMemberIds?.length ? data.assignedMemberIds : undefined,
+        });
+        if (routine) showToast('Routine created', 'success');
+        return;
       }
 
       const explicitAssignment = data.assignedMemberIds?.length
@@ -163,7 +194,7 @@ export function useShellChrome() {
         else showCaptureConfirmation(taskId);
       }
     },
-    [addTask, isConnected, createEvent, fetchEvents, getCalendarForDomain, getCurrentUserMember, showToast, showCaptureConfirmation],
+    [addTask, addRoutine, isConnected, createEvent, fetchEvents, getCalendarForDomain, getCurrentUserMember, showToast, showCaptureConfirmation],
   );
 
   const onQuickAddNote = useCallback(

@@ -17,6 +17,8 @@ export interface CreateEventParams {
   requestId?: string
   /** Optional target calendar ID. Defaults to 'primary' server-side. */
   calendarId?: string
+  /** Optional recurrence lines ("RRULE:FREQ=WEEKLY;BYDAY=TU,TH") — makes a series. */
+  recurrence?: string[]
 }
 
 export interface MoveEventParams {
@@ -461,6 +463,7 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
         timeZone,
         requestId: params.requestId,
         calendarId: params.calendarId,
+        recurrence: params.recurrence,
       },
     })
 

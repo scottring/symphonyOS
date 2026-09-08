@@ -456,3 +456,47 @@ describe('allDayFromParse', () => {
     expect(allDayFromParse(parseQuickInput('Call mom', ctx))).toBeUndefined()
   })
 })
+
+describe('parseQuickInput recurrence (opt-in via ctx.recurrence)', () => {
+  const ctx = { ...mockContext, recurrence: true }
+
+  it('the screenshot case: "event: boxing every tuesday and thurs"', () => {
+    const r = parseQuickInput('event: boxing every tuesday and thurs', ctx)
+    expect(r.category).toBe('event')
+    expect(r.title).toBe('boxing')
+    expect(r.recurrence).toEqual({ type: 'weekly', days: ['tue', 'thu'] })
+    expect(r.recurrenceMatch).toBe('every tuesday and thurs')
+    expect(r.dueDate).toBeDefined()
+    expect([2, 4]).toContain(r.dueDate!.getDay())
+    expect(r.hasTime).toBe(false)
+    expect(hasParsedFields(r)).toBe(true)
+  })
+
+  it('a time inside the phrase becomes the event time', () => {
+    const r = parseQuickInput('event: boxing every tuesday at 6pm', ctx)
+    expect(r.title).toBe('boxing')
+    expect(r.recurrence).toEqual({ type: 'weekly', days: ['tue'] })
+    expect(r.hasTime).toBe(true)
+    expect(r.dueDate!.getHours()).toBe(18)
+    expect(r.dueDate!.getDay()).toBe(2)
+  })
+
+  it('a routine-shaped capture without a prefix still carries recurrence', () => {
+    const r = parseQuickInput('take out trash every other monday 7am #family', ctx)
+    expect(r.title).toBe('take out trash')
+    expect(r.recurrence).toMatchObject({ type: 'weekly', days: ['mon'], interval: 2 })
+    expect(r.context).toBe('family')
+  })
+
+  it('a bare weekday is still a one-off date, never a recurrence', () => {
+    const r = parseQuickInput('text Karen tuesday', ctx)
+    expect(r.recurrence).toBeUndefined()
+    expect(r.dueDate).toBeDefined()
+    expect(r.title).toBe('text Karen')
+  })
+
+  it('surfaces that did not opt in never see recurrence and keep the old parse', () => {
+    const r = parseQuickInput('boxing every tuesday', mockContext)
+    expect(r.recurrence).toBeUndefined()
+  })
+})

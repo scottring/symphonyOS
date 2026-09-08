@@ -17,6 +17,20 @@ describe('ParsedFieldChips', () => {
     expect(container).toBeEmptyDOMElement()
     expect(screen.queryByRole('button', { name: /clear project/i })).not.toBeInTheDocument()
   })
+  it('renders a repeat chip for a recurrence, with its own clear', async () => {
+    const onClearRecurrence = vi.fn()
+    const { user } = render(
+      <ParsedFieldChips
+        parsed={{ rawText:'', title:'', dueDate: new Date(2026,8,10), recurrence: { type:'weekly', days:['tue','thu'] } }}
+        contactName={null}
+        {...base}
+        onClearRecurrence={onClearRecurrence}
+      />,
+    )
+    expect(screen.getByText('Every Tue, Thu')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /clear repeat/i }))
+    expect(onClearRecurrence).toHaveBeenCalledTimes(1)
+  })
   it('renders a time chip when dueDate has a time', () => {
     const d = new Date(2026,4,19,18,15)
     render(<ParsedFieldChips parsed={{ rawText:'', title:'', dueDate:d }} contactName={null} {...base} />)

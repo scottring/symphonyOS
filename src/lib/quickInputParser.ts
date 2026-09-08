@@ -1,6 +1,8 @@
 import * as chrono from 'chrono-node'
 import { DOMAINS } from '@/lib/domains'
 import type { TaskContext } from '@/types/task'
+import type { RecurrencePattern } from '@/types/actionable'
+import { detectRecurrence, nextOccurrence } from './quickRecurrence'
 
 export interface ParsedQuickInput {
   rawText: string                    // Original input, always preserved
@@ -12,6 +14,8 @@ export interface ParsedQuickInput {
   dueDate?: Date                     // Parsed date
   dueDateMatch?: string              // What text matched (e.g., "tomorrow")
   hasTime: boolean                   // True only when chrono was certain of an hour (vs. a date-only match)
+  recurrence?: RecurrencePattern     // "every tuesday and thurs" — only when the surface opted in (ParserContext.recurrence)
+  recurrenceMatch?: string           // What text matched (e.g., "every tuesday and thurs")
   durationMinutes?: number           // Parsed duration ("45m", "1h30m", "for 45 minutes", or a chrono range)
   durationMatch?: string             // What text matched (e.g., "45m")
   priority?: 'high' | 'medium' | 'low'
@@ -43,6 +47,10 @@ export interface ParserContext {
   projects: Array<{ id: string; name: string }>
   contacts: Array<{ id: string; name: string }>
   familyMembers?: Array<{ id: string; name: string }>
+  /** Read "every tuesday" as a recurrence instead of a one-off date. Off by
+   *  default: a surface that can't act on a recurrence must not strip the
+   *  phrase from the title and silently drop the meaning. */
+  recurrence?: boolean
 }
 
 // Bare keywords chrono-node will happily read as a date but which are, far more
@@ -216,13 +224,36 @@ export function parseQuickInput(
     }
   }
 
+  const now = new Date()
+
+  // 0c. Recurrence, for surfaces that opted in. Runs BEFORE the date pass:
+  //     left to chrono, "boxing every tuesday and thurs" reads "tuesday" as a
+  //     single date and leaves "boxing every and thurs" as the title. The
+  //     phrase (and any clock time inside it) leaves the title here; the
+  //     first occurrence becomes the date, so the rest of the pipeline and
+  //     every caller see an ordinary scheduled capture plus a pattern.
+  if (context.recurrence) {
+    const rec = detectRecurrence(workingText, now)
+    if (rec) {
+      result.recurrence = rec.pattern
+      result.recurrenceMatch = rec.match
+      result.dueDate = nextOccurrence(rec.pattern, rec.time, now)
+      result.dueDateMatch = rec.match
+      result.hasTime = rec.time != null
+      workingText = rec.rest
+    }
+  }
+
   // 1. Extract dates using chrono-node — skipping weak/ambiguous bare keywords
   //    (see isWeakDateMatch) so topic words like "weekend" or "May" don't
   //    hijack scheduling and mangle the title. resolveDateMatch then applies
   //    the two household corrections chrono does not make on its own (bare
-  //    evening hours, and weekday names that resolve backwards).
-  const now = new Date()
-  const dateMatch = chrono.parse(workingText, now).find((m) => !isWeakDateMatch(m))
+  //    evening hours, and weekday names that resolve backwards). A recurrence
+  //    already fixed the date above, so the pass is skipped: "every tuesday
+  //    starting in October" is the routine builder's problem, not this line's.
+  const dateMatch = result.recurrence
+    ? undefined
+    : chrono.parse(workingText, now).find((m) => !isWeakDateMatch(m))
   if (dateMatch) {
     const forward = chrono.parse(workingText, now, { forwardDate: true }).find((m) => m.text === dateMatch.text)
     result.dueDate = resolveDateMatch(dateMatch, forward, now)
@@ -376,5 +407,5 @@ export function parseQuickInput(
 
 // Helper to check if anything was parsed beyond the title
 export function hasParsedFields(parsed: ParsedQuickInput): boolean {
-  return !!(parsed.projectId || parsed.contactId || parsed.dueDate || parsed.durationMinutes || parsed.priority || parsed.category || parsed.context || parsed.isNote || parsed.assignedMemberIds?.length)
+  return !!(parsed.projectId || parsed.contactId || parsed.dueDate || parsed.recurrence || parsed.durationMinutes || parsed.priority || parsed.category || parsed.context || parsed.isNote || parsed.assignedMemberIds?.length)
 }

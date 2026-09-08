@@ -12,6 +12,7 @@ import { ConceptIcon } from '@/lib/conceptIcons'
 import { DictationMicButton } from '@/components/common/DictationMicButton'
 import { MOBILE_TAB_BAR_HEIGHT } from '@/shell/mobileChrome'
 import { TaskKindBadge } from '@/components/task/TaskKindBadge'
+import type { RecurrencePattern } from '@/types/actionable'
 
 interface QuickCaptureProps {
   onAdd: (title: string) => void
@@ -27,6 +28,8 @@ interface QuickCaptureProps {
     category?: TaskCategory
     context?: TaskContext
     assignedMemberIds?: string[]
+    /** "every tuesday and thurs" — a calendar series for an event, a routine otherwise. */
+    recurrence?: RecurrencePattern
   }) => void
   // Note creation
   onAddNote?: (data: {
@@ -94,8 +97,9 @@ export function QuickCapture({
   }
 
   // Parser context — memoized so useQuickParse's parse memo stays stable
+  // ⌘K can act on a recurrence (series / routine), so it opts in.
   const parserCtx = useMemo(
-    () => ({ projects, contacts, familyMembers }),
+    () => ({ projects, contacts, familyMembers, recurrence: true }),
     [projects, contacts, familyMembers],
   )
 
@@ -108,6 +112,7 @@ export function QuickCapture({
     clearContact,
     clearDate,
     clearDuration,
+    clearRecurrence,
     clearCategory,
     clearContext,
     clearAssignment,
@@ -231,6 +236,7 @@ export function QuickCapture({
         category: effectiveParsed.category,
         context: effectiveParsed.context,
         assignedMemberIds: effectiveParsed.assignedMemberIds,
+        recurrence: effectiveParsed.recurrence,
       })
     } else {
       // Fallback if onAddRich not provided
@@ -490,6 +496,7 @@ export function QuickCapture({
                     onClearCategory={clearCategory}
                     onClearContext={clearContext}
                     onClearDuration={clearDuration}
+                    onClearRecurrence={clearRecurrence}
                   />
 
                   {/* Assignment chip(s) */}
@@ -597,8 +604,12 @@ export function QuickCapture({
                     ? 'Save Note'
                     : !showPreview
                     ? 'Add to My Inbox'
+                    : effectiveParsed.category === 'event' && effectiveParsed.recurrence
+                    ? 'Create Recurring Event'
                     : effectiveParsed.category === 'event' && effectiveParsed.dueDate
                     ? 'Create Event'
+                    : effectiveParsed.recurrence
+                    ? 'Create Routine'
                     : effectiveParsed.dueDate
                     ? 'Schedule Task'
                     : 'Save Task'}

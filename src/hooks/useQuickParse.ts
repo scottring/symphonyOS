@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { parseQuickInput, hasParsedFields, type ParsedQuickInput, type ParserContext } from '@/lib/quickInputParser'
 import { resolveContact, type ResolverContext, type ContactSuggestion } from '@/lib/entityResolver'
 import type { TaskCategory, TaskContext } from '@/types/task'
+import type { RecurrencePattern } from '@/types/actionable'
 
 /**
  * Parsed quick-input merged with per-field user overrides. Adds `context`
@@ -17,6 +18,7 @@ interface Overrides {
   projectId?: string | null
   contactId?: string | null
   dueDate?: Date | null
+  recurrence?: RecurrencePattern | null
   durationMinutes?: number | null
   category?: TaskCategory | null
   context?: TaskContext | null
@@ -70,6 +72,7 @@ export function useQuickParse(title: string, ctx: ParserContext, resolver?: Reso
     projectId: overrides.projectId === null ? undefined : (overrides.projectId ?? parsed.projectId),
     contactId: overrides.contactId === null ? undefined : (overrides.contactId ?? parsed.contactId ?? (suggestionApplied ? suggestion!.contactId : undefined)),
     dueDate: overrides.dueDate === null ? undefined : (overrides.dueDate ?? parsed.dueDate),
+    recurrence: overrides.recurrence === null ? undefined : (overrides.recurrence ?? parsed.recurrence),
     durationMinutes: overrides.durationMinutes === null ? undefined : (overrides.durationMinutes ?? parsed.durationMinutes),
     category: overrides.category === null ? undefined : (overrides.category ?? parsed.category),
     // No lens-driven default: captures land Unsorted unless the user explicitly
@@ -110,6 +113,7 @@ export function useQuickParse(title: string, ctx: ParserContext, resolver?: Reso
     clearProject: () => setOverrides(prev => ({ ...prev, projectId: null })),
     clearContact: () => setOverrides(prev => ({ ...prev, contactId: null })),
     clearDate: () => setOverrides(prev => ({ ...prev, dueDate: null })),
+    clearRecurrence: () => setOverrides(prev => ({ ...prev, recurrence: null })),
     clearDuration: () => setOverrides(prev => ({ ...prev, durationMinutes: null })),
     clearCategory: () => setOverrides(prev => ({ ...prev, category: null })),
     clearContext: () => setOverrides(prev => ({ ...prev, context: null })),

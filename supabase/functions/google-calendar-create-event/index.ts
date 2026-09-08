@@ -70,6 +70,7 @@ interface CreateEventRequest {
   timeZone?: string  // IANA timezone (e.g., 'America/New_York')
   requestId?: string // Idempotency key to prevent duplicate events
   calendarId?: string // Target calendar ID (defaults to 'primary')
+  recurrence?: string[] // RFC 5545 lines ("RRULE:FREQ=WEEKLY;BYDAY=TU,TH") — a series
 }
 
 interface UpdateEventRequest {
@@ -244,7 +245,7 @@ serve(async (req) => {
 
     // Handle create request
     const createBody: CreateEventRequest = body
-    const { title, description, startTime, endTime, location, allDay, timeZone, requestId, calendarId } = createBody
+    const { title, description, startTime, endTime, location, allDay, timeZone, requestId, calendarId, recurrence } = createBody
 
     if (!title || !startTime || !endTime) {
       return new Response(JSON.stringify({ error: 'Missing required fields: title, startTime, endTime' }), {
@@ -308,6 +309,7 @@ serve(async (req) => {
       location?: string
       start: { dateTime?: string; date?: string; timeZone?: string }
       end: { dateTime?: string; date?: string; timeZone?: string }
+      recurrence?: string[]
     }
 
     const eventBody: GoogleEventBody = {
@@ -322,6 +324,21 @@ serve(async (req) => {
 
     if (location) {
       eventBody.location = location
+    }
+
+    // A recurring series: RFC 5545 lines, passed through as Google takes them.
+    // Only the four line kinds Google accepts; anything else is a client bug.
+    if (Array.isArray(recurrence) && recurrence.length > 0) {
+      const lines = recurrence.filter(
+        (line): line is string => typeof line === 'string' && /^(RRULE|EXRULE|RDATE|EXDATE):/.test(line),
+      )
+      if (lines.length !== recurrence.length) {
+        return new Response(JSON.stringify({ error: 'recurrence lines must start with RRULE:, EXRULE:, RDATE:, or EXDATE:' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+      eventBody.recurrence = lines
     }
 
     // Use provided timezone or default to America/New_York

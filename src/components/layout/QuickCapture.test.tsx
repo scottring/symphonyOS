@@ -172,6 +172,47 @@ describe('QuickCapture', () => {
     })
   })
 
+  describe('recurrence', () => {
+    it('"event: boxing every tuesday and thurs" becomes a recurring event, title intact', async () => {
+      const onAddRich = vi.fn()
+      const { user } = render(<QuickCapture onAdd={vi.fn()} onAddRich={onAddRich} isOpen={true} showFab={false} />)
+      const input = screen.getByPlaceholderText('Try "call the vet tomorrow 2pm"')
+      await user.type(input, 'event: boxing every tuesday and thurs')
+
+      expect(screen.getByText('"boxing"')).toBeInTheDocument()
+      expect(screen.getByText('Every Tue, Thu')).toBeInTheDocument()
+      await user.click(screen.getByRole('button', { name: 'Create Recurring Event' }))
+
+      expect(onAddRich).toHaveBeenCalledTimes(1)
+      const data = onAddRich.mock.calls[0][0]
+      expect(data.title).toBe('boxing')
+      expect(data.category).toBe('event')
+      expect(data.recurrence).toEqual({ type: 'weekly', days: ['tue', 'thu'] })
+      expect(data.isAllDay).toBe(true)
+      expect([2, 4]).toContain(data.scheduledFor.getDay())
+    })
+
+    it('a repeating capture without event: offers a routine', async () => {
+      render(<QuickCapture onAdd={vi.fn()} onAddRich={vi.fn()} isOpen={true} showFab={false} />)
+      await (await import('@testing-library/user-event')).default.setup().type(
+        screen.getByPlaceholderText('Try "call the vet tomorrow 2pm"'),
+        'take out trash every other monday 7am',
+      )
+      expect(screen.getByText('Every other Mon')).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: 'Create Routine' })).toBeInTheDocument()
+    })
+
+    it('clearing the repeat chip leaves a one-off event', async () => {
+      const onAddRich = vi.fn()
+      const { user } = render(<QuickCapture onAdd={vi.fn()} onAddRich={onAddRich} isOpen={true} showFab={false} />)
+      await user.type(screen.getByPlaceholderText('Try "call the vet tomorrow 2pm"'), 'event: boxing every tuesday at 6pm')
+      await user.click(screen.getByRole('button', { name: /clear repeat/i }))
+      await user.click(screen.getByRole('button', { name: 'Create Event' }))
+      expect(onAddRich.mock.calls[0][0].recurrence).toBeUndefined()
+      expect(onAddRich.mock.calls[0][0].scheduledFor.getHours()).toBe(18)
+    })
+  })
+
   describe('capture lands Unsorted (no lens stamp)', () => {
     // A quick capture must never inherit the active domain lens — a stale
     // filter checkbox (left on "Work" from browsing) can't silently mislabel

@@ -1,6 +1,7 @@
 import type { EffectiveParsed } from '@/hooks/useQuickParse'
 import { ConceptIcon } from '@/lib/conceptIcons'
 import { AppliedDomainChip } from './AppliedDomainChip'
+import { describeRecurrence } from '@/lib/quickRecurrence'
 
 // The project chip is gone (2026-09-02 — see the note in Sidebar.tsx): Projects
 // are hidden from the product, so capture no longer offers to file into one.
@@ -14,6 +15,7 @@ interface Props {
   onClearCategory: () => void
   onClearContext: () => void
   onClearDuration?: () => void
+  onClearRecurrence?: () => void
 }
 
 // "45 min" / "1 hr" / "1 hr 30 min" — matches how the schedule rows label durations.
@@ -69,9 +71,11 @@ export function ParsedFieldChips({
   onClearCategory,
   onClearContext,
   onClearDuration,
+  onClearRecurrence,
 }: Props) {
   if (
     !parsed.dueDate &&
+    !parsed.recurrence &&
     !parsed.contactId &&
     !parsed.category &&
     !parsed.context &&
@@ -101,6 +105,28 @@ export function ParsedFieldChips({
             >
               ×
             </button>
+          </span>
+        </div>
+      )}
+
+      {/* Repeats chip — the pattern behind the date above ("Every Tue, Thu").
+          Clearing it leaves the date: the first occurrence stays a one-off. */}
+      {!parsed.isNote && parsed.recurrence && (
+        <div className="flex items-center gap-2">
+          <span className="text-base"><ConceptIcon name="routine" size={18} decorative /></span>
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-primary-50 text-primary-700 rounded-full text-xs font-medium border border-primary-100">
+            {describeRecurrence(parsed.recurrence)}
+            {onClearRecurrence && (
+              <button
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={onClearRecurrence}
+                aria-label="Clear repeat"
+                className="ml-1 text-primary-400 hover:text-primary-600"
+              >
+                ×
+              </button>
+            )}
           </span>
         </div>
       )}
