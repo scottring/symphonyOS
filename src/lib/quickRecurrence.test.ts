@@ -43,6 +43,26 @@ describe('detectRecurrence', () => {
     expect(r!.rest).toBe('rent')
   })
 
+  it('reads a time range as start + duration and leaves no preposition behind', () => {
+    const r = detectRecurrence('Boxing every Tuesday and Thursday from 9am to 10:15am')
+    expect(r!.pattern).toEqual({ type: 'weekly', days: ['tue', 'thu'] })
+    expect(r!.time).toBe('09:00')
+    expect(r!.durationMinutes).toBe(75)
+    expect(r!.rest).toBe('Boxing')
+  })
+
+  it('reads dash ranges and infers a missing meridiem from the end', () => {
+    expect(detectRecurrence('gym every mon 7-8am')).toMatchObject({ time: '07:00', durationMinutes: 60, rest: 'gym' })
+    expect(detectRecurrence('lunch every friday 11:30 to 1pm')).toMatchObject({ time: '11:30', durationMinutes: 90, rest: 'lunch' })
+    expect(detectRecurrence('piano on tuesdays 4–5:30pm')).toMatchObject({ time: '16:00', durationMinutes: 90, rest: 'piano' })
+  })
+
+  it('a bare number range is not a time', () => {
+    const r = detectRecurrence('read every day 2 to 3 chapters')
+    expect(r!.time).toBeNull()
+    expect(r!.durationMinutes).toBeUndefined()
+  })
+
   it('returns null with no recurrence cue — a bare weekday is a one-off date', () => {
     expect(detectRecurrence('text Karen tuesday')).toBeNull()
     expect(detectRecurrence('dentist next monday 3pm')).toBeNull()

@@ -481,6 +481,22 @@ describe('parseQuickInput recurrence (opt-in via ctx.recurrence)', () => {
     expect(r.dueDate!.getDay()).toBe(2)
   })
 
+  it('the second screenshot: "event: Boxing every Tuesday and Thursday from 9am to 10:15am"', () => {
+    const r = parseQuickInput('event: Boxing every Tuesday and Thursday from 9am to 10:15am', ctx)
+    expect(r.title).toBe('Boxing')
+    expect(r.recurrence).toEqual({ type: 'weekly', days: ['tue', 'thu'] })
+    expect(r.hasTime).toBe(true)
+    expect(r.dueDate!.getHours()).toBe(9)
+    expect(r.dueDate!.getMinutes()).toBe(0)
+    expect(r.durationMinutes).toBe(75)
+  })
+
+  it('an explicit duration token still wins over the range', () => {
+    const r = parseQuickInput('boxing every tuesday 9-10am for 45 min', ctx)
+    expect(r.durationMinutes).toBe(45)
+    expect(r.title).toBe('boxing')
+  })
+
   it('a routine-shaped capture without a prefix still carries recurrence', () => {
     const r = parseQuickInput('take out trash every other monday 7am #family', ctx)
     expect(r.title).toBe('take out trash')

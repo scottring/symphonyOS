@@ -240,6 +240,8 @@ export function parseQuickInput(
       result.dueDate = nextOccurrence(rec.pattern, rec.time, now)
       result.dueDateMatch = rec.match
       result.hasTime = rec.time != null
+      // A range's length, unless an explicit "for 45 min" already won above.
+      if (result.durationMinutes === undefined && rec.durationMinutes) result.durationMinutes = rec.durationMinutes
       workingText = rec.rest
     }
   }

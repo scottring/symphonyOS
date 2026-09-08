@@ -17,6 +17,8 @@ export interface DetectedRecurrence {
   pattern: RecurrencePattern
   /** HH:MM when the phrase carried a clock time, else null. */
   time: string | null
+  /** From a time range ("from 9am to 10:15am", "7-8am"); undefined otherwise. */
+  durationMinutes?: number
   /** The recurrence phrase as typed, for the preview chip and for tests. */
   match: string
   /** The line with the recurrence phrase and any time removed. */
@@ -48,6 +50,43 @@ const ADVERB_TO_PHRASE: Record<string, string> = {
   weekends: 'every weekend',
 }
 
+// A clock range: "from 9am to 10:15am", "7-8am", "11:30 to 1pm", "4–5:30pm".
+// At least one meridiem is required so "2 to 3 chapters" stays words.
+const RANGE_RE = /\b(?:from\s+)?(\d{1,2})(?::(\d{2}))?\s*(am?|pm?)?\s*(?:-|–|—|to|until|till)\s*(\d{1,2})(?::(\d{2}))?\s*(am?|pm?)?\b/i
+
+interface ClockRange { time: string; durationMinutes?: number; match: string }
+
+function to24(hour12: number, minutes: number, meridiem: string): number | null {
+  if (hour12 < 1 || hour12 > 12 || minutes > 59) return null
+  const pm = meridiem.toLowerCase().startsWith('p')
+  const h = pm ? (hour12 === 12 ? 12 : hour12 + 12) : hour12 === 12 ? 0 : hour12
+  return h * 60 + minutes
+}
+
+function hhmm(totalMinutes: number): string {
+  return `${String(Math.floor(totalMinutes / 60)).padStart(2, '0')}:${String(totalMinutes % 60).padStart(2, '0')}`
+}
+
+function readClockRange(input: string): ClockRange | null {
+  const m = input.match(RANGE_RE)
+  if (!m || (!m[3] && !m[6])) return null
+  const startHour = Number(m[1]), startMin = Number(m[2] ?? 0)
+  const endHour = Number(m[4]), endMin = Number(m[5] ?? 0)
+  const endMer = m[6] ?? m[3]!
+  // "11:30 to 1pm": a start with no meridiem borrows the end's, unless that
+  // would put it after the end — then it's the other half of the day.
+  let startMer = m[3] ?? endMer
+  if (!m[3] && startHour > endHour) startMer = endMer.toLowerCase().startsWith('p') ? 'am' : 'pm'
+  const start = to24(startHour, startMin, startMer)
+  const end = to24(endHour, endMin, endMer)
+  if (start == null) return null
+  return {
+    time: hhmm(start),
+    durationMinutes: end != null && end > start ? end - start : undefined,
+    match: m[0],
+  }
+}
+
 const DAY_KEYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'] as const
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const RRULE_DAYS: Record<string, string> = { sun: 'SU', mon: 'MO', tue: 'TU', wed: 'WE', thu: 'TH', fri: 'FR', sat: 'SA' }
@@ -59,10 +98,13 @@ export function detectRecurrence(input: string, now: Date = new Date()): Detecte
   const cue = every ?? adverb ?? plural
   if (!cue) return null
 
+  // A range goes first: parseRoutine reads one clock time, and its patterns
+  // are ordered by shape, not position — "from 9am to 10:15am" would come
+  // back as 10:15 with "from 9am to" still in the title.
+  const range = readClockRange(input)
+  let text = range ? input.replace(range.match, ' ') : input
   // parseRoutine speaks "every …"; hand it the adverb spelled out.
-  const text = adverb
-    ? input.replace(ADVERB_RE, (w) => ADVERB_TO_PHRASE[w.toLowerCase()])
-    : input
+  if (adverb) text = text.replace(ADVERB_RE, (w) => ADVERB_TO_PHRASE[w.toLowerCase()])
   const parsed = parseRoutine(text)
   let pattern = parsedRoutineToDb(parsed).recurrence_pattern as RecurrencePattern
 
@@ -74,9 +116,15 @@ export function detectRecurrence(input: string, now: Date = new Date()): Detecte
 
   return {
     pattern,
-    time: parsed.time,
+    time: range?.time ?? parsed.time,
+    durationMinutes: range?.durationMinutes,
     match: cue[0].trim(),
-    rest: parsed.action,
+    // The phrase is gone but the preposition that led into it often isn't.
+    rest: parsed.action
+      .replace(/\s+/g, ' ')
+      .replace(/^(?:from|at|on|by|to|until|till)\s+/i, '')
+      .replace(/\s+(?:from|at|on|by|to|until|till)$/i, '')
+      .trim(),
   }
 }
 
