@@ -114,6 +114,14 @@ export interface MemberDayModel {
 // every routine reaching this page is already family-context.
 const FAMILY_LAYER: ReadonlySet<Layer> = new Set(['family'])
 
+/** A collection parent with a wake date still ahead of the rendered day. */
+function isRestingOn(routine: Pick<Routine, 'paused_until'>, date: Date): boolean {
+  if (!routine.paused_until) return false
+  // `paused_until` is stored as UTC midnight; compare on calendar days so a
+  // wake date of June 21 hides June 20 and shows June 21.
+  return routine.paused_until.slice(0, 10) > toDateStr(date)
+}
+
 function toDateStr(date: Date): string {
   const y = date.getFullYear()
   const m = String(date.getMonth() + 1).padStart(2, '0')
@@ -272,9 +280,15 @@ export function buildMemberDayModel(input: {
   // Rule 3: collections — parent owners + recurrence, parent visibility
   // check deliberately skipped (collection parents are 'reference' on
   // purpose), at least one step must apply today.
+  //
+  // Because the parent is 'reference' either way, its `paused_until` is the
+  // only signal that the whole collection is resting ("Camp Mornings" is
+  // over until next June). A wake date still ahead of the rendered day
+  // hides it; once the date passes, useRoutines' auto-wake clears it.
   const collections: KidCollection[] = []
   for (const c of rawCollections) {
     if (!routineOwners(c).includes(member.id)) continue
+    if (isRestingOn(c, date)) continue
     if (!matchesRecurrenceForDate(c, date, null)) continue
     const applicableSteps = c.steps.filter((s) => s.visibility === 'active' && stepAppliesOnDate(s, date))
     if (applicableSteps.length === 0) continue

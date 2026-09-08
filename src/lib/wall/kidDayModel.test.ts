@@ -117,6 +117,29 @@ describe('buildMemberDayModel', () => {
     expect(model.collections[0].rows.every((r) => r.timeOfDay === '07:00')).toBe(true)
   })
 
+  it('hides a collection whose parent is resting until a future wake date', () => {
+    // A collection parent is 'reference' by design, so `paused_until` is
+    // the only thing that says "Camp Mornings is over for the year".
+    const parent = routine({
+      name: 'Camp Mornings', visibility: 'reference', time_of_day: '07:00',
+      paused_until: '2027-06-21T00:00:00.000Z',
+    })
+    const step = routine({ name: 'Camp dropoff', parent_routine_id: parent.id, time_of_day: null })
+    const model = build([parent, step])
+    expect(model.collections).toHaveLength(0)
+    expect(model.isEmpty).toBe(true)
+  })
+
+  it('shows a collection again once its wake date has passed', () => {
+    const parent = routine({
+      name: 'Camp Mornings', visibility: 'reference', time_of_day: '07:00',
+      paused_until: '2026-06-21T00:00:00.000Z',
+    })
+    const step = routine({ name: 'Camp dropoff', parent_routine_id: parent.id, time_of_day: null })
+    const model = build([parent, step])
+    expect(model.collections).toHaveLength(1)
+  })
+
   it('drops a collection whose steps none apply today', () => {
     const parent = routine({ name: 'Weekday Routine', visibility: 'reference', time_of_day: '07:00' })
     const step = routine({
