@@ -1,80 +1,22 @@
+// Reads events across EVERY calendar provider the user has connected (Google,
+// Outlook via Microsoft Graph) and returns them in one merged list. The name
+// is historical — the frontend calls this one function for all calendars.
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import {
+  fetchEventsAcross,
+  openConnections,
+  readProviderEnv,
+  type CalendarConnectionRow,
+} from '../_shared/calendar-providers/index.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Custom error class for token refresh failures
-class TokenRefreshError extends Error {
-  constructor(message: string, public readonly shouldDisconnect: boolean = false) {
-    super(message)
-    this.name = 'TokenRefreshError'
-  }
-}
-
-async function refreshAccessToken(
-  supabaseAdmin: ReturnType<typeof createClient>,
-  userId: string,
-  refreshToken: string
-): Promise<string> {
-  const clientId = Deno.env.get('GOOGLE_CLIENT_ID')
-  const clientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET')
-
-  const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({
-      client_id: clientId!,
-      client_secret: clientSecret!,
-      refresh_token: refreshToken,
-      grant_type: 'refresh_token',
-    }),
-  })
-
-  const tokenData = await tokenResponse.json()
-
-  if (tokenData.error) {
-    // Check for errors that mean the refresh token is permanently invalid
-    // These errors require user to re-authenticate
-    const permanentErrors = ['invalid_grant', 'invalid_client', 'unauthorized_client']
-    const shouldDisconnect = permanentErrors.includes(tokenData.error)
-
-    console.error('Token refresh failed:', tokenData.error, tokenData.error_description)
-
-    // Use Google's error description if available, otherwise use error code
-    const message = tokenData.error_description || tokenData.error
-    throw new TokenRefreshError(message, shouldDisconnect)
-  }
-
-  const expiresAt = new Date(Date.now() + tokenData.expires_in * 1000).toISOString()
-
-  await supabaseAdmin
-    .from('calendar_connections')
-    .update({
-      access_token: tokenData.access_token,
-      token_expires_at: expiresAt,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('user_id', userId)
-    .eq('provider', 'google')
-
-  return tokenData.access_token
-}
-
-// Known video-meeting domains whose join link may be buried in the event body.
-const MEETING_DOMAIN_RE =
-  /(teams\.microsoft\.com|teams\.live\.com|zoom\.us|meet\.google\.com|webex\.com|gotomeet|gotomeeting\.com|bluejeans\.com|whereby\.com|chime\.aws|meet\.lync\.com)/i
-
-/** Pull the first video-meeting join URL out of an event description (HTML body). */
-function extractMeetingUrlFromText(text?: string | null): string | null {
-  if (!text) return null
-  const urls = text.match(/https?:\/\/[^\s"'<>)]+/gi)
-  if (!urls) return null
-  const found = urls.find((u) => MEETING_DOMAIN_RE.test(u))
-  return found ? found.replace(/[.,;]+$/, '') : null
-}
+const json = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -90,10 +32,7 @@ serve(async (req) => {
 
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser()
     if (userError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+      return json({ error: 'Unauthorized' }, 401)
     }
 
     const { startDate, endDate, domain } = await req.json()
@@ -103,96 +42,33 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Get user's calendar connection
-    const { data: connection, error: connError } = await supabaseAdmin
+    // Every provider this user has connected — one row per provider.
+    const { data: connections, error: connError } = await supabaseAdmin
       .from('calendar_connections')
-      .select('*')
+      .select('user_id, provider, access_token, refresh_token, token_expires_at, calendar_id')
       .eq('user_id', user.id)
-      .eq('provider', 'google')
-      .single()
 
-    if (connError || !connection) {
-      return new Response(JSON.stringify({ error: 'No calendar connection found' }), {
-        status: 404,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+    if (connError || !connections || connections.length === 0) {
+      return json({ error: 'No calendar connection found' }, 404)
     }
 
-    // Check if token needs refresh
-    let accessToken = connection.access_token
-    const expiresAt = new Date(connection.token_expires_at)
-    const now = new Date()
-    const fiveMinutes = 5 * 60 * 1000
-
-    if (expiresAt.getTime() - now.getTime() < fiveMinutes) {
-      try {
-        accessToken = await refreshAccessToken(supabaseAdmin, user.id, connection.refresh_token)
-      } catch (err) {
-        if (err instanceof TokenRefreshError) {
-          // Return a structured error that the frontend can interpret
-          return new Response(JSON.stringify({
-            error: err.message,
-            errorCode: 'invalid_grant',
-            needsReconnect: err.shouldDisconnect,
-          }), {
-            status: 401,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          })
-        }
-        throw err
-      }
-    }
-
-    // First, get list of all calendars the user has access to
-    const calendarListResponse = await fetch(
-      'https://www.googleapis.com/calendar/v3/users/me/calendarList',
-      { headers: { Authorization: `Bearer ${accessToken}` } }
+    const opened = await openConnections(
+      supabaseAdmin,
+      connections as CalendarConnectionRow[],
+      readProviderEnv((n) => Deno.env.get(n)),
     )
-    const calendarListData = await calendarListResponse.json()
 
-    if (calendarListData.error) {
-      return new Response(JSON.stringify({ error: calendarListData.error.message }), {
-        status: calendarListResponse.status,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
-
-    // Fetch events from all calendars
-    interface GoogleCalendar {
-      id: string
-      summary?: string
-      selected?: boolean
-      backgroundColor?: string // Google Calendar color (hex)
-    }
-    interface GoogleCalendarAttendee {
-      email: string
-      displayName?: string
-      responseStatus?: string
-      self?: boolean
-    }
-    interface GoogleCalendarEvent {
-      id: string
-      summary?: string
-      description?: string
-      location?: string
-      start: { dateTime?: string; date?: string }
-      end: { dateTime?: string; date?: string }
-      attendees?: GoogleCalendarAttendee[]
-      recurringEventId?: string
-      // Google Meet shortcut URL (populated when the event was created with a Meet link)
-      hangoutLink?: string
-      // Conference data covers all video providers (Zoom add-on, Webex, etc.). The
-      // 'video' entryPoint has the join URL; other entryPoints are phone/sip/more.
-      conferenceData?: {
-        entryPoints?: Array<{
-          entryPointType?: string
-          uri?: string
-          label?: string
-        }>
-      }
+    // Every provider failed: surface it the way the single-provider path
+    // always has, so the hook's reconnect handling is unchanged.
+    if (opened.calendars.length === 0 && opened.errors.length > 0) {
+      const worst = opened.errors.find((e) => e.needsReconnect) ?? opened.errors[0]
+      return json(
+        { error: worst.message, errorCode: worst.needsReconnect ? 'invalid_grant' : undefined, needsReconnect: worst.needsReconnect, providerErrors: opened.errors },
+        401,
+      )
     }
 
-    let calendars: GoogleCalendar[] = calendarListData.items || []
+    let calendars = opened.calendars
 
     // Get all of this user's calendar domain mappings
     const { data: allMappings, error: mappingsError } = await supabaseAdmin
@@ -213,9 +89,7 @@ serve(async (req) => {
       // Specific domain: only show calendars mapped to this domain
       if (!hasMappings) {
         console.log(`No calendars assigned to domain: ${domain}`)
-        return new Response(JSON.stringify({ events: [] }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        })
+        return json({ events: [], providerErrors: opened.errors })
       }
 
       const domainCalendarIds = new Set(
@@ -224,9 +98,7 @@ serve(async (req) => {
 
       if (domainCalendarIds.size === 0) {
         console.log(`No calendars assigned to domain: ${domain}`)
-        return new Response(JSON.stringify({ events: [] }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        })
+        return json({ events: [], providerErrors: opened.errors })
       }
 
       calendars = calendars.filter(c => domainCalendarIds.has(c.id))
@@ -240,8 +112,8 @@ serve(async (req) => {
       const mapped = calendars.filter(c => allMappedCalendarIds.has(c.id))
       if (mapped.length === 0) {
         // Safety net: the mappings don't match ANY of this account's calendars
-        // (e.g. stale mappings left over from a previously-connected Google
-        // account). Rather than silently return zero events, show everything —
+        // (e.g. stale mappings left over from a previously-connected account).
+        // Rather than silently return zero events, show everything —
         // a blank "universal" view is never the right answer.
         console.log(`Mappings match no current calendars; falling back to all ${calendars.length} calendars (domain: universal)`)
       } else {
@@ -253,109 +125,27 @@ serve(async (req) => {
       console.log(`Fetching events from all ${calendars.length} calendars (no domain mappings configured)`)
     }
 
-    // Log which calendars we're fetching from
-    console.log('Fetching events from calendars:', calendars.map(c => ({ id: c.id, summary: c.summary })))
+    console.log('Fetching events from calendars:', calendars.map(c => ({ provider: c.provider, id: c.id, summary: c.summary })))
 
-    // Fetch events from each calendar in parallel
-    const eventPromises = calendars.map(async (calendar) => {
-      const eventsUrl = new URL(
-        `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendar.id)}/events`
-      )
-      eventsUrl.searchParams.set('timeMin', new Date(startDate).toISOString())
-      eventsUrl.searchParams.set('timeMax', new Date(endDate).toISOString())
-      eventsUrl.searchParams.set('singleEvents', 'true')
-      eventsUrl.searchParams.set('orderBy', 'startTime')
-      eventsUrl.searchParams.set('maxResults', '100')
-
-      try {
-        const eventsResponse = await fetch(eventsUrl.toString(), {
-          headers: { Authorization: `Bearer ${accessToken}` },
-        })
-        const eventsData = await eventsResponse.json()
-
-        if (eventsData.error) {
-          console.error(`Error fetching calendar ${calendar.id}:`, eventsData.error)
-          return []
-        }
-
-        const items = eventsData.items || []
-        console.log(`Calendar ${calendar.summary || calendar.id}: ${items.length} events found`)
-
-        return items.map((event: GoogleCalendarEvent) => {
-          const isAllDay = !event.start?.dateTime
-
-          // For all-day events, keep the date as noon UTC to avoid timezone issues
-          // This ensures the date doesn't shift when converted to/from ISO strings
-          // For timed events, preserve the original dateTime from Google (includes timezone)
-          const startTime = isAllDay
-            ? `${event.start.date}T12:00:00.000Z`
-            : event.start.dateTime!
-          const endTime = isAllDay
-            ? `${event.end.date}T12:00:00.000Z`
-            : event.end.dateTime!
-
-          // Extract the video join URL. Prefer hangoutLink (Google Meet, canonical
-          // for Google-managed video), then the first 'video' entryPoint for
-          // Zoom / Webex / Teams add-ons surfaced via conferenceData, then a join
-          // link found in the description body — Outlook-origin Teams invites often
-          // put the link ONLY in the description, not conferenceData.
-          const videoEntryPoint = event.conferenceData?.entryPoints?.find(
-            (ep) => ep.entryPointType === 'video' && ep.uri,
-          )
-          const meetingUrl =
-            event.hangoutLink || videoEntryPoint?.uri || extractMeetingUrlFromText(event.description) || null
-
-          return {
-            user_id: user.id,
-            google_event_id: event.id,
-            title: event.summary || '(No title)',
-            description: event.description || null,
-            start_time: startTime,
-            end_time: endTime,
-            all_day: isAllDay,
-            location: event.location || null,
-            meeting_url: meetingUrl,
-            calendar_id: calendar.id,
-            calendar_name: calendar.summary || null,
-            calendar_color: calendar.backgroundColor || null, // Google Calendar color
-            recurring_event_id: event.recurringEventId || null,
-            attendees: (event.attendees || []).map((a: GoogleCalendarAttendee) => ({
-              email: a.email,
-              displayName: a.displayName || undefined,
-              responseStatus: a.responseStatus || undefined,
-              self: a.self || false,
-            })),
-            updated_at: new Date().toISOString(),
-          }
-        })
-      } catch (err) {
-        console.error(`Error fetching calendar ${calendar.id}:`, err)
-        return []
-      }
+    const events = await fetchEventsAcross(opened, calendars, user.id, {
+      start: new Date(startDate).toISOString(),
+      end: new Date(endDate).toISOString(),
     })
 
-    // Wait for all calendar fetches to complete and flatten results
-    const eventArrays = await Promise.all(eventPromises)
-    const events = eventArrays.flat()
-
-    // Upsert events to cache
+    // Upsert events to cache. `provider` is not a column there; strip it.
     if (events.length > 0) {
+      const rows = events.map(({ provider: _provider, ...row }) => row)
       const { error: upsertError } = await supabaseAdmin
         .from('calendar_events')
-        .upsert(events, { onConflict: 'user_id,google_event_id' })
+        .upsert(rows, { onConflict: 'user_id,google_event_id' })
 
       if (upsertError) {
         console.error('Failed to cache events:', upsertError)
       }
     }
 
-    return new Response(JSON.stringify({ events }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+    return json({ events, providerErrors: opened.errors })
   } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+    return json({ error: error instanceof Error ? error.message : 'Unknown error' }, 500)
   }
 })

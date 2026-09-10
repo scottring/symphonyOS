@@ -11,9 +11,12 @@ const CALENDARS = [
 vi.mock('@/hooks/useGoogleCalendar', () => ({
   useGoogleCalendar: () => ({
     isConnected: true,
+    connectedProviders: ['google'],
     needsReconnect: false,
+    reconnectProviders: [],
     isLoading: false,
     error: null,
+    connect: vi.fn(),
     disconnect: vi.fn(),
     fetchCalendarList: vi.fn().mockResolvedValue(CALENDARS),
     defaultCalendarId: null,

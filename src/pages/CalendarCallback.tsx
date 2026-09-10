@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
+import { callbackFunctionFor, providerFromOAuthState, providerLabel } from '@/lib/calendarProviders'
 
 export function CalendarCallback() {
   const [searchParams] = useSearchParams()
@@ -11,9 +12,12 @@ export function CalendarCallback() {
     async function handleCallback() {
       const code = searchParams.get('code')
       const errorParam = searchParams.get('error')
+      // Which provider sent us back — stamped into `state` by the auth-url function.
+      const provider = providerFromOAuthState(searchParams.get('state'))
 
       if (errorParam) {
-        setError(`Google authorization failed: ${errorParam}`)
+        const detail = searchParams.get('error_description') ?? errorParam
+        setError(`${providerLabel(provider)} authorization failed: ${detail}`)
         return
       }
 
@@ -23,7 +27,7 @@ export function CalendarCallback() {
       }
 
       try {
-        const { error: fnError } = await supabase.functions.invoke('google-calendar-callback', {
+        const { error: fnError } = await supabase.functions.invoke(callbackFunctionFor(provider), {
           body: {
             code,
             redirectUri: `${window.location.origin}/calendar-callback`,

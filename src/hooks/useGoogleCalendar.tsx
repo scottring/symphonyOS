@@ -3,6 +3,9 @@ import { supabase, getAuthUser } from '@/lib/supabase'
 import { logger } from '@/lib/logger'
 import { getRecurringBaseId } from './useHiddenCalendarEvents'
 import { filterOutEvent } from './calendarEventCache'
+import { authUrlFunctionFor, isCalendarProvider, type CalendarProvider } from '@/lib/calendarProviders'
+
+export type { CalendarProvider }
 
 export interface CreateEventParams {
   title: string
@@ -72,6 +75,8 @@ export interface CalendarEvent {
   // Set on synthetic meal events (from the meal plan) so the wall can open the
   // linked recipe's stored ingredients/instructions, not just a source URL.
   recipeId?: string | null
+  /** Which account the event came from. Absent on cached/synthetic events = Google. */
+  provider?: CalendarProvider
 }
 
 export interface DeleteEventParams {
@@ -100,17 +105,25 @@ export interface GoogleCalendarInfo {
   accessRole: 'owner' | 'writer' | 'reader'
   primary: boolean
   backgroundColor?: string
+  /** Absent = Google (older mocks / callers). Outlook calendars are always 'reader'. */
+  provider?: CalendarProvider
 }
 
 interface GoogleCalendarContextValue {
+  /** True when ANY provider is connected. */
   isConnected: boolean
+  /** Which providers have a stored connection. */
+  connectedProviders: CalendarProvider[]
+  /** True when every connection is broken and the user must reconnect. */
   needsReconnect: boolean
+  /** Providers whose grant was revoked while another still works. */
+  reconnectProviders: CalendarProvider[]
   isLoading: boolean
   isFetching: boolean
   events: CalendarEvent[]
   error: string | null
-  connect: () => Promise<void>
-  disconnect: () => Promise<void>
+  connect: (provider?: CalendarProvider) => Promise<void>
+  disconnect: (provider?: CalendarProvider) => Promise<void>
   fetchEvents: (startDate: Date, endDate: Date, domainOverride?: string) => Promise<CalendarEvent[]>
   fetchTodayEvents: () => Promise<CalendarEvent[]>
   fetchWeekEvents: () => Promise<CalendarEvent[]>
@@ -134,7 +147,9 @@ const GoogleCalendarContext = createContext<GoogleCalendarContextValue | null>(n
 export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
 
   const [isConnected, setIsConnected] = useState(false)
+  const [connectedProviders, setConnectedProviders] = useState<CalendarProvider[]>([])
   const [needsReconnect, setNeedsReconnect] = useState(false)
+  const [reconnectProviders, setReconnectProviders] = useState<CalendarProvider[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isFetching, setIsFetching] = useState(false)
   const [events, setEvents] = useState<CalendarEvent[]>([])
@@ -175,32 +190,39 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
           return
         }
 
-        // Get connection with token expiry info.
+        // One row per connected provider (Google, Outlook).
         //
-        // maybeSingle, NOT single. `single()` asks PostgREST for exactly one
-        // row and returns 406 when it gets none — so "this user has no
-        // calendar connection" arrived as an ERROR, which is the one thing the
-        // line below promises to retry. The result was a signed-out or
+        // A plain list read, never `single()`. `single()` asks PostgREST for
+        // exactly one row and returns 406 when it gets none — so "this user
+        // has no calendar connection" arrived as an ERROR, which is the one
+        // thing the retry below is for. The result was a signed-out or
         // RLS-invisible session retrying 20 times over ten minutes and filling
         // the console with 406s, when the honest answer was "not connected"
-        // on the first try (2026-09-04, prod).
-        const { data: connection, error: connError } = await supabase
+        // on the first try (2026-09-04, prod). An empty list is an answer.
+        const { data: connections, error: connError } = await supabase
           .from('calendar_connections')
-          .select('id, token_expires_at, calendar_id')
+          .select('provider, token_expires_at, calendar_id')
           .eq('user_id', user.id)
-          .eq('provider', 'google')
-          .maybeSingle()
 
-        if (connError || !connection) {
+        const providers = (connections ?? [])
+          .map((c) => c.provider)
+          .filter(isCalendarProvider)
+
+        if (connError || providers.length === 0) {
           setIsConnected(false)
+          setConnectedProviders([])
           setNeedsReconnect(false)
+          setReconnectProviders([])
           setIsLoading(false)
-          // No row is a real answer; a failed read (network down) is not.
+          // No rows is a real answer; a failed read (network down) is not.
           if (connError) scheduleRetry()
           return
         }
 
-        setDefaultCalendarIdState(connection.calendar_id ?? null)
+        setConnectedProviders(providers)
+        // The default write calendar lives on the Google row — writes are Google-only.
+        const googleRow = (connections ?? []).find((c) => c.provider === 'google')
+        setDefaultCalendarIdState(googleRow?.calendar_id ?? null)
 
         // Connection exists - validate by making a test API call
         // Retry once before declaring connection broken (handles transient failures)
@@ -217,6 +239,8 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
 
           if (!validateError && !data?.error) {
             validated = true
+            const broken = (data?.providerErrors ?? []) as Array<{ provider: string; needsReconnect: boolean }>
+            setReconnectProviders(broken.filter((e) => e.needsReconnect).map((e) => e.provider).filter(isCalendarProvider))
             break
           }
 
@@ -275,10 +299,10 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  // Connect to Google Calendar
-  const connect = useCallback(async () => {
+  // Start the OAuth flow for a provider (Google by default).
+  const connect = useCallback(async (provider: CalendarProvider = 'google') => {
     try {
-      const { data, error } = await supabase.functions.invoke('google-calendar-auth-url', {
+      const { data, error } = await supabase.functions.invoke(authUrlFunctionFor(provider), {
         body: {
           redirectUri: `${window.location.origin}/calendar-callback`,
         },
@@ -304,7 +328,7 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
         throw new Error(data?.error || 'No auth URL returned')
       }
 
-      // Redirect to Google OAuth
+      // Redirect to the provider's sign-in
       window.location.href = data.url
     } catch (err) {
       console.error('Failed to connect:', err)
@@ -312,8 +336,8 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  // Disconnect from Google Calendar
-  const disconnect = useCallback(async () => {
+  // Disconnect ONE provider (Google by default). Other providers keep working.
+  const disconnect = useCallback(async (provider: CalendarProvider = 'google') => {
     try {
       const { data: { user } } = await getAuthUser()
       if (!user) return
@@ -322,17 +346,21 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
         .from('calendar_connections')
         .delete()
         .eq('user_id', user.id)
-        .eq('provider', 'google')
+        .eq('provider', provider)
 
-      setIsConnected(false)
+      const remaining = connectedProviders.filter((p) => p !== provider)
+      setConnectedProviders(remaining)
+      setReconnectProviders((prev) => prev.filter((p) => p !== provider))
+      setIsConnected(remaining.length > 0)
       setNeedsReconnect(false)
-      setEvents([])
+      // Events without a provider tag are Google's (cache / older shape).
+      setEvents((prev) => (remaining.length === 0 ? [] : prev.filter((e) => (e.provider ?? 'google') !== provider)))
       setError(null)
     } catch (err) {
       console.error('Failed to disconnect:', err)
       throw err
     }
-  }, [])
+  }, [connectedProviders])
 
   // Fetch events for a date range
   const fetchEvents = useCallback(async (startDate: Date, endDate: Date, domainOverride?: string) => {
@@ -694,7 +722,9 @@ export function GoogleCalendarProvider({ children }: { children: ReactNode }) {
 
   const value: GoogleCalendarContextValue = {
     isConnected,
+    connectedProviders,
     needsReconnect,
+    reconnectProviders,
     isLoading,
     isFetching,
     events,

@@ -25,7 +25,7 @@ export function CalendarConnect() {
           </div>
         </div>
         <button
-          onClick={connect}
+          onClick={() => void connect()}
           className="flex items-center gap-3 px-4 py-3 bg-white border border-neutral-200 rounded-xl
                      hover:bg-neutral-50 hover:border-neutral-300 hover:shadow-sm
                      transition-all touch-target w-full justify-center"
@@ -50,7 +50,7 @@ export function CalendarConnect() {
           <span className="text-sm text-neutral-600">Google Calendar connected</span>
         </div>
         <button
-          onClick={disconnect}
+          onClick={() => void disconnect()}
           className="text-sm text-neutral-500 hover:text-danger-500 transition-colors touch-target"
         >
           Disconnect
@@ -65,7 +65,7 @@ export function CalendarConnect() {
         Connect your Google Calendar to see events alongside your tasks.
       </p>
       <button
-        onClick={connect}
+        onClick={() => void connect()}
         className="flex items-center gap-3 px-4 py-3 bg-white border border-neutral-200 rounded-xl
                    hover:bg-neutral-50 hover:border-neutral-300 hover:shadow-sm
                    transition-all touch-target"
