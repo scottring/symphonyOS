@@ -50,6 +50,14 @@ describe('livePlacedCopyOf', () => {
     const orig = task({ bucket: 'month' })
     expect(livePlacedCopyOf(orig, [orig])).toBeUndefined()
   })
+  // source_id also threads a season GOAL to its own month steps, and those are
+  // different tasks — four of them under "Tried 3 things together" in prod.
+  // Placing the goal's row must not swallow one of its steps.
+  it('ignores a child that is its own task, not a copy', () => {
+    const goal = task({ bucket: 'quarter', title: 'Tried 3 things together' })
+    const step = task({ bucket: 'month', title: 'Look up music lessons', sourceId: goal.id })
+    expect(livePlacedCopyOf(goal, [goal, step])).toBeUndefined()
+  })
 })
 
 describe('placementFate', () => {
