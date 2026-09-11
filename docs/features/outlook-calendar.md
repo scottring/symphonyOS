@@ -22,7 +22,37 @@ Outlook events, and "Create events on" stays Google.
 
 Nothing works until this is done: `Connect Outlook` returns
 `MICROSOFT_CLIENT_ID not configured` and no Outlook events appear anywhere.
-Roughly 20 minutes, free, one time. Work top to bottom.
+One time, top to bottom.
+
+### 0. You need an Entra directory first — read this before starting
+
+A bare personal Microsoft account is **not enough**, and the portal only tells
+you once you are already deep in it. Registering an app requires a directory
+(tenant); an account without one gets "The ability to create applications
+outside of a directory has been deprecated" and a lone Cancel button where the
+registration form should be. Confirmed against `scottring@hotmail.com` on
+2026-09-11 — `New registration` offers no form, and the tenant-management blade
+errors outright because there is nothing to manage.
+
+- [ ] Check which case you are in: <https://portal.azure.com> → App
+      registrations. A yellow "not contained within any directory" banner means
+      you have no directory and must do one of the below first.
+- [ ] **Route A — sign up for Azure** (<https://azure.microsoft.com/free>).
+      Creates a "Default Directory" and is the normal path. The free tier costs
+      nothing, but Microsoft requires a **credit card on file** for identity
+      verification. This is the real price of Outlook support: a permanent
+      Microsoft account with a card attached, not the twenty free minutes the
+      rest of this checklist implies.
+- [ ] **Route B — an organizational tenant you already control.** If you have
+      Microsoft 365 for a business, register the app there instead and skip
+      Route A entirely. Do *not* register Symphony's app inside an employer's
+      tenant you do not own — the app would belong to them, not to you.
+- [ ] Route C, the M365 Developer Program, is what the portal banner suggests.
+      It is now gated behind a Visual Studio subscription, so treat it as
+      unavailable unless you already have one.
+
+Steps 1-6 assume you finished this one and are signed in to an account that has
+a directory.
 
 ### 1. Register the app
 
