@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { NotesApp } from './NotesApp'
 import type { DisplayNote } from '@/types/note'
@@ -28,6 +28,8 @@ const state = {
   addNote: vi.fn().mockResolvedValue({ id: 'new' }),
   updateNote: vi.fn().mockResolvedValue(undefined),
   deleteNote: vi.fn().mockResolvedValue(undefined),
+  deleteNotes: vi.fn().mockResolvedValue({ rows: [{ id: 'n1' }], links: [] }),
+  restoreNotes: vi.fn().mockResolvedValue(undefined),
   getNoteById: vi.fn(),
 }
 
@@ -47,6 +49,9 @@ function renderApp(initial = '/notes') {
 beforeEach(() => {
   navigate.mockClear()
   state.addNote.mockClear()
+  state.deleteNotes.mockClear()
+  state.restoreNotes.mockClear()
+  state.deleteNotes.mockResolvedValue({ rows: [{ id: 'n1' }], links: [] })
   state.notesByDate = []
   state.loading = false
 })
@@ -154,5 +159,98 @@ describe('NotesApp', () => {
     expect(state.addNote).not.toHaveBeenCalledWith(
       expect.objectContaining({ type: 'quick_capture' }),
     )
+  })
+})
+
+// Bulk select and delete. Notes arrive faster than they are read — a week of
+// school-digest imports, a paper page that parsed into twelve scraps — so the
+// stream needs a way to clear a run of them without opening each one.
+describe('NotesApp bulk delete', () => {
+  const two = () => [
+    note({ id: 'n1', content: '<p>Plumber quoted $400</p>' }),
+    note({ id: 'n2', content: '<p>Ask about the deductible</p>' }),
+  ]
+
+  function enterSelectMode() {
+    fireEvent.click(screen.getByRole('button', { name: /select notes/i }))
+  }
+
+  it('offers no selection until you ask for one', () => {
+    state.notesByDate = [{ date: 'today', label: 'Today', notes: two() }]
+    renderApp()
+    expect(screen.queryByText(/select all/i)).not.toBeInTheDocument()
+    expect(screen.getByPlaceholderText(/write a note/i)).toBeInTheDocument()
+  })
+
+  it('picks notes and deletes the ones picked', async () => {
+    state.notesByDate = [{ date: 'today', label: 'Today', notes: two() }]
+    renderApp()
+    enterSelectMode()
+    fireEvent.click(screen.getByText(/Plumber quoted/))
+    expect(screen.getByText('1 selected')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /delete 1/i }))
+    await waitFor(() => expect(state.deleteNotes).toHaveBeenCalledWith(['n1']))
+  })
+
+  it('selects every note the filter is showing, and no others', () => {
+    state.notesByDate = [{ date: 'today', label: 'Today', notes: two() }]
+    renderApp()
+    fireEvent.change(screen.getByPlaceholderText(/search notes/i), { target: { value: 'deductible' } })
+    enterSelectMode()
+    fireEvent.click(screen.getByRole('button', { name: /select all/i }))
+    expect(screen.getByText('1 selected')).toBeInTheDocument()
+  })
+
+  // A task note is a projection of `tasks.notes`. Deleting it from here would
+  // edit a task that isn't on screen, so it is never part of a selection.
+  it('leaves task notes out of a selection', () => {
+    state.notesByDate = [{
+      date: 'today', label: 'Today',
+      notes: [
+        note({ id: 'task-t1', source: 'task', type: 'task_note', sourceTaskId: 't1', sourceTaskTitle: 'Fix the sink' }),
+      ],
+    }]
+    renderApp()
+    enterSelectMode()
+    fireEvent.click(screen.getByText('Fix the sink'))
+    expect(screen.getByText(/pick the notes to delete/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /select all/i })).toBeDisabled()
+    expect(navigate).not.toHaveBeenCalled()
+  })
+
+  it('puts deleted notes back when you undo', async () => {
+    const deleted = { rows: [{ id: 'n1' }], links: [] }
+    state.deleteNotes.mockResolvedValue(deleted)
+    state.notesByDate = [{ date: 'today', label: 'Today', notes: two() }]
+    renderApp()
+    enterSelectMode()
+    fireEvent.click(screen.getByText(/Plumber quoted/))
+    fireEvent.click(screen.getByRole('button', { name: /delete 1/i }))
+
+    const undo = await screen.findByRole('button', { name: /undo/i })
+    expect(screen.getByText('1 note deleted')).toBeInTheDocument()
+    fireEvent.click(undo)
+    expect(state.restoreNotes).toHaveBeenCalledWith(deleted)
+  })
+
+  it('drops out of select mode on Escape, keeping every note', () => {
+    state.notesByDate = [{ date: 'today', label: 'Today', notes: two() }]
+    renderApp()
+    enterSelectMode()
+    fireEvent.click(screen.getByText(/Plumber quoted/))
+    fireEvent.keyDown(window, { key: 'Escape' })
+    expect(screen.queryByText(/selected/)).not.toBeInTheDocument()
+    expect(screen.getByPlaceholderText(/write a note/i)).toBeInTheDocument()
+    expect(state.deleteNotes).not.toHaveBeenCalled()
+  })
+
+  it('opens a note again once selection is over', () => {
+    state.notesByDate = [{ date: 'today', label: 'Today', notes: two() }]
+    renderApp()
+    enterSelectMode()
+    fireEvent.click(screen.getByRole('button', { name: /cancel/i }))
+    fireEvent.click(screen.getByText(/Plumber quoted/))
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
   })
 })

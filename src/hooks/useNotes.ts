@@ -53,6 +53,12 @@ export function mapDbNote(dbNote: DbNote): Note {
   }
 }
 
+/** A bulk delete, held open long enough for an undo. */
+export interface DeletedNotes {
+  rows: DbNote[]
+  links: DbNoteEntityLink[]
+}
+
 function dbEntityLinkToEntityLink(dbLink: DbNoteEntityLink): NoteEntityLink {
   return {
     id: dbLink.id,
@@ -311,6 +317,62 @@ export function useNotes() {
     [notes]
   )
 
+  /** What a bulk delete took away, and everything needed to put it back.
+   *  Deleting a note CASCADES its entity links (note_entity_links → ON DELETE
+   *  CASCADE), so an undo that only re-inserts the note quietly loses what it
+   *  was attached to. Both travel together. */
+  const deleteNotes = useCallback(
+    async (ids: string[]): Promise<DeletedNotes | null> => {
+      if (ids.length === 0) return null
+
+      // Read the exact rows first — an undo re-inserts them verbatim (same id,
+      // same created_at), so a restored note comes back where it was rather
+      // than at the top of the stream as a new scrap.
+      const { data: rows } = await supabase
+        .from('notes')
+        .select(NOTE_COLUMNS)
+        .in('id', ids)
+      const { data: links } = await supabase
+        .from('note_entity_links')
+        .select('*')
+        .in('note_id', ids)
+
+      const doomed = notes.filter((n) => ids.includes(n.id))
+      setNotes((prev) => prev.filter((n) => !ids.includes(n.id)))
+
+      const { error: deleteError } = await supabase.from('notes').delete().in('id', ids)
+
+      if (deleteError) {
+        setNotes((prev) => [...prev, ...doomed])
+        setError(deleteError.message)
+        return null
+      }
+
+      return { rows: (rows ?? []) as DbNote[], links: (links ?? []) as DbNoteEntityLink[] }
+    },
+    [notes],
+  )
+
+  const restoreNotes = useCallback(async (deleted: DeletedNotes): Promise<void> => {
+    if (deleted.rows.length === 0) return
+
+    setNotes((prev) => [...prev, ...deleted.rows.map(mapDbNote)])
+
+    const { error: insertError } = await supabase.from('notes').insert(deleted.rows)
+    if (insertError) {
+      // The rows never came back — take them out of the list again rather than
+      // showing notes that are not there.
+      const ids = deleted.rows.map((r) => r.id)
+      setNotes((prev) => prev.filter((n) => !ids.includes(n.id)))
+      setError(insertError.message)
+      return
+    }
+
+    if (deleted.links.length > 0) {
+      await supabase.from('note_entity_links').insert(deleted.links)
+    }
+  }, [])
+
   const appendToNote = useCallback(async (id: string, block: string, anchor: Date | null) => {
     const existing = notes.find(n => n.id === id)
     if (!existing) return null
@@ -545,6 +607,8 @@ export function useNotes() {
     addNote,
     updateNote,
     deleteNote,
+    deleteNotes,
+    restoreNotes,
     appendToNote,
     // Entity links
     addEntityLink,
