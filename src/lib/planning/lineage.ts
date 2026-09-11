@@ -21,6 +21,20 @@ export function placedCopyOf(task: Task, tasks: readonly Task[]): Task | undefin
   return best
 }
 
+/** The LIVE copy a placement should re-place instead of duplicating.
+ *
+ *  Placing a month row into a week copies it. Placing it AGAIN — dragged to a
+ *  different day, dropped on a different week, the pool chip clicked twice —
+ *  used to copy it again, and again: ten rows of "Maybe plan a block potluck
+ *  on the porch" landed in twenty seconds on 2026-09-10, each with its own
+ *  twin of the note. An original has at most ONE open copy in flight; a
+ *  finished copy is history, so a later placement is a genuinely new one. */
+export function livePlacedCopyOf(task: Task, tasks: readonly Task[]): Task | undefined {
+  const copy = placedCopyOf(task, tasks)
+  if (!copy || copy.completed) return undefined
+  return isDescent(task.bucket, copy.bucket) ? copy : undefined
+}
+
 /** Ticking the original is the stronger statement and wins over its copy. */
 export function placementFate(task: Task, tasks: readonly Task[]): PlacementFate {
   if (task.completed) return 'done'

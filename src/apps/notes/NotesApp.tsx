@@ -16,22 +16,62 @@
 //
 // Long-form thinking still belongs in the Obsidian vault. Nothing here writes
 // there — see the type='general' note on the composer below.
+//
+// THE SHAPE (2026-09-11): a ruled journal, not a stack of cards. Every other
+// Library page is a list of objects you manage; these are jottings, and a card
+// around each one implies filing work that this surface exists to refuse. So:
+// a date margin down the left, one hairline rule, entries hanging off it, and
+// the origin of each entry as a mark in the gutter rather than a chip on its
+// own line. The rule is the only furniture on the page.
 
 import { useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { NotebookPen, Search } from 'lucide-react'
+import { PenLine, ScanLine, Search, SquareCheck } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { useNotes } from '@/hooks/useNotes'
 import { useNoteTopics } from '@/hooks/useNoteTopics'
 import { NoteModal } from '@/components/notes/NoteModal'
+import { PageMasthead } from '@/components/layout/PageMasthead'
+import { PAGE_COLUMN } from '@/components/layout/pageLayout'
 import { stripHtml } from '@/lib/htmlUtils'
-import { formatRelativeTime } from '@/lib/timeUtils'
+import { noteHeading, noteExcerpt } from '@/lib/noteHeading'
 import type { DisplayNote } from '@/types/note'
 
-/** A row's heading: the note's own title, else its first legible line. */
+/** A note hanging off a task is that task's note: the task names it, and the
+ *  jotting itself is what you read underneath. Everything else names itself. */
 function headingFor(note: DisplayNote): string {
-  if (note.title?.trim()) return note.title.trim()
-  const text = stripHtml(note.content)
-  return text.split('\n')[0]?.trim() || 'Untitled note'
+  if (note.source === 'task' && note.sourceTaskTitle) return note.sourceTaskTitle
+  return noteHeading(note.title, note.content)
+}
+
+function excerptFor(note: DisplayNote): string {
+  const titled = note.source === 'task' ? true : Boolean(note.title?.trim())
+  return noteExcerpt(note.title, note.content, titled)
+}
+
+/** Where the note came from, as one mark in the margin. Three origins, and a
+ *  reader can tell them apart at a glance: typed here, read off a paper page,
+ *  or written against something you have to do. */
+const ORIGINS: Record<string, { icon: LucideIcon; label: string; tone: string }> = {
+  import: { icon: ScanLine, label: 'From a page', tone: 'text-amber-600' },
+  task: { icon: SquareCheck, label: 'On a task', tone: 'text-primary-600' },
+  manual: { icon: PenLine, label: 'Written here', tone: 'text-neutral-400' },
+}
+
+function originOf(note: DisplayNote) {
+  return ORIGINS[note.source === 'import' ? 'import' : note.source === 'task' ? 'task' : 'manual']
+}
+
+/** The entry's own date. The margin says which stretch of days you are in;
+ *  this says which one, so a week's worth of entries never blur together. */
+function stamp(when: Date): string {
+  const now = new Date()
+  const sameDay = when.toDateString() === now.toDateString()
+  if (sameDay) return when.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+  const sameYear = when.getFullYear() === now.getFullYear()
+  return when.toLocaleDateString(undefined, {
+    month: 'short', day: 'numeric', ...(sameYear ? {} : { year: 'numeric' }),
+  })
 }
 
 function matches(note: DisplayNote, query: string): boolean {
@@ -108,104 +148,129 @@ export function NotesApp() {
   }
 
   return (
-    <div className="max-w-3xl mr-auto px-6 md:px-10 lg:px-14 py-8">
-      <h1 className="text-3xl font-display text-neutral-900 mb-1">Notes</h1>
-      <p className="text-[15px] text-neutral-500 mb-6">
-        Everything you've jotted, newest first — typed here, attached to something, or read off a page.
-      </p>
-
-      {/* Composer — one line, Enter saves. Anything longer is written in the
-          note itself once it's open; asking for a title up front is the
-          friction that sent these notes elsewhere in the first place. */}
-      <div className="flex items-center gap-2 mb-5">
-        <NotebookPen className="w-5 h-5 text-neutral-400 shrink-0" />
-        <input
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') {
-              e.preventDefault()
-              void submitDraft()
-            }
-          }}
-          placeholder="Write a note…"
-          aria-label="Write a note"
-          className="input-base flex-1"
+    <div className="h-full overflow-auto">
+      <div className={PAGE_COLUMN}>
+        <PageMasthead
+          title="Notes"
+          description="Everything you've jotted, newest first — typed here, attached to something, or read off a page."
+          actions={
+            <label className="relative block">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-neutral-400 pointer-events-none" />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search notes…"
+                aria-label="Search notes"
+                className="w-36 sm:w-44 sm:focus:w-60 transition-[width] pl-8 pr-3 py-2 text-[14px] rounded-lg bg-transparent border border-neutral-200 placeholder:text-neutral-400 focus:outline-none focus:border-primary-400 focus:bg-white/70"
+              />
+            </label>
+          }
         />
-      </div>
 
-      <div className="flex items-center gap-2 mb-6">
-        <Search className="w-4 h-4 text-neutral-400 shrink-0" />
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search notes…"
-          aria-label="Search notes"
-          className="input-base flex-1"
-        />
-      </div>
-
-      {loading && groups.length === 0 && (
-        <p className="text-[15px] text-neutral-400">Loading…</p>
-      )}
-
-      {!loading && groups.length === 0 && (
-        <p className="text-[15px] text-neutral-400">
-          {query ? 'No notes match that.' : "Nothing here yet — write one above."}
-        </p>
-      )}
-
-      {groups.map((group) => (
-        <section key={group.date} className="mb-6">
-          <h2 className="text-[13px] uppercase tracking-wide text-neutral-400 mb-2">
-            {group.label}
-          </h2>
-          <div className="space-y-1">
-            {group.notes.map((note) => (
-              <button
-                key={note.id}
-                type="button"
-                onClick={() => onRowClick(note)}
-                className="card w-full text-left px-4 py-3 hover:bg-neutral-50 transition-colors"
-              >
-                <div className="flex items-baseline gap-2">
-                  <span className="flex-1 text-[15px] text-neutral-900 truncate">
-                    {headingFor(note)}
-                  </span>
-                  <span className="text-[12px] text-neutral-400 shrink-0">
-                    {formatRelativeTime(note.updatedAt)}
-                  </span>
-                </div>
-                <div className="mt-1 flex items-center gap-2">
-                  {note.source === 'import' && (
-                    <span className="text-[11px] px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-700 shrink-0">
-                      From a page
-                    </span>
-                  )}
-                  {note.source === 'task' && note.sourceTaskTitle && (
-                    <span className="text-[11px] px-1.5 py-0.5 rounded-md bg-neutral-100 text-neutral-600 shrink-0 truncate max-w-[40%]">
-                      {note.sourceTaskTitle}
-                    </span>
-                  )}
-                </div>
-              </button>
-            ))}
+        {/* Composer — one line on ruled paper, Enter saves. Anything longer is
+            written in the note itself once it's open; asking for a title up
+            front is the friction that sent these notes elsewhere. */}
+        <div className="mb-8">
+          <div className="flex items-center gap-3 border-b border-neutral-300 focus-within:border-primary-500 transition-colors pb-2">
+            <PenLine className="w-[18px] h-[18px] text-neutral-400 shrink-0" />
+            <input
+              value={draft}
+              onChange={(e) => setDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  void submitDraft()
+                }
+              }}
+              placeholder="Write a note…"
+              aria-label="Write a note"
+              className="flex-1 bg-transparent border-0 p-0 text-[19px] font-display text-neutral-900 placeholder:text-neutral-400 placeholder:font-normal focus:outline-none focus:ring-0"
+            />
+            <span
+              className={`text-[11px] uppercase tracking-[0.1em] text-neutral-400 shrink-0 transition-opacity ${draft.trim() ? 'opacity-100' : 'opacity-0'}`}
+              aria-hidden="true"
+            >
+              Enter saves
+            </span>
           </div>
-        </section>
-      ))}
+        </div>
 
-      <NoteModal
-        isOpen={Boolean(openNote)}
-        note={openNote}
-        topics={topics}
-        onClose={closeNote}
-        onUpdate={updateNote}
-        onDelete={async (id) => {
-          await deleteNote(id)
-          closeNote()
-        }}
-        onAddTopic={(name) => addTopic({ name })}
-      />
+        {loading && groups.length === 0 && (
+          <p className="text-[15px] text-neutral-400">Loading…</p>
+        )}
+
+        {!loading && groups.length === 0 && (
+          <p className="text-[15px] text-neutral-400">
+            {query ? 'No notes match that.' : "Nothing here yet — write one above."}
+          </p>
+        )}
+
+        {groups.map((group) => (
+          <section key={group.date} className="sm:grid sm:grid-cols-[7rem_1fr]">
+            {/* The date margin. It stays put while its own entries scroll, so
+                you always know which stretch of days you are reading. */}
+            <h2 className="sm:sticky sm:top-6 self-start h-fit py-2 text-[12px] font-display uppercase tracking-[0.14em] text-neutral-400">
+              {group.label}
+            </h2>
+
+            <div className="border-l border-neutral-200 pl-4 sm:pl-6 pb-6">
+              {group.notes.map((note) => {
+                const origin = originOf(note)
+                const Glyph = origin.icon
+                const excerpt = excerptFor(note)
+                return (
+                  <button
+                    key={note.id}
+                    type="button"
+                    onClick={() => onRowClick(note)}
+                    className="group w-full text-left grid grid-cols-[18px_1fr] gap-x-3 py-3 -ml-[1.05rem] sm:-ml-[1.55rem] pl-[1.05rem] sm:pl-[1.55rem] pr-3 rounded-r-lg hover:bg-bg-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/40 transition-colors"
+                  >
+                    <Glyph
+                      className={`w-[18px] h-[18px] mt-[3px] shrink-0 ${origin.tone}`}
+                      aria-hidden="true"
+                    />
+                    <div className="min-w-0">
+                      {/* The mark is the label for everyone who can see it;
+                          spell it out for everyone who can't — except where
+                          it is already written beside the date. */}
+                      {note.source !== 'import' && <span className="sr-only">{origin.label}. </span>}
+                      <div className="flex items-baseline gap-3">
+                        <h3 className="flex-1 min-w-0 truncate text-[16px] font-display text-neutral-900 group-hover:text-primary-800 transition-colors">
+                          {headingFor(note)}
+                        </h3>
+                        <span className="shrink-0 text-[12px] text-neutral-400 tabular-nums">
+                          {note.source === 'import' && (
+                            <span className="text-amber-600/90">From a page · </span>
+                          )}
+                          {stamp(note.updatedAt)}
+                        </span>
+                      </div>
+                      {excerpt && (
+                        <p className="mt-0.5 text-[13.5px] leading-relaxed text-neutral-500 line-clamp-2">
+                          {excerpt}
+                        </p>
+                      )}
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          </section>
+        ))}
+
+        <NoteModal
+          isOpen={Boolean(openNote)}
+          note={openNote}
+          topics={topics}
+          onClose={closeNote}
+          onUpdate={updateNote}
+          onDelete={async (id) => {
+            await deleteNote(id)
+            closeNote()
+          }}
+          onAddTopic={(name) => addTopic({ name })}
+        />
+      </div>
     </div>
   )
 }

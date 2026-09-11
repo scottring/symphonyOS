@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react'
 import type { Note, NoteEntityType } from '@/types/note'
 import { formatRelativeTime } from '@/lib/timeUtils'
+import { noteHeading } from '@/lib/noteHeading'
 import { EntityNoteCapture } from './EntityNoteCapture'
 
 interface EntityNotesSectionProps {
@@ -36,7 +37,7 @@ export function EntityNotesSection({
   )
 
   const getPreviewText = (content: string, maxLength = 100) => {
-    const firstLine = content.split('\n')[0]
+    const firstLine = noteHeading(null, content, '')
     if (firstLine.length <= maxLength) return firstLine
     return firstLine.substring(0, maxLength) + '...'
   }

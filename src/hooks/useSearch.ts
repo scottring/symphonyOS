@@ -8,6 +8,7 @@ import type { List } from '@/types/list'
 import type { Note } from '@/types/note'
 import { getCategoryLabel } from '@/types/list'
 import { parseFieldIntent } from '@/lib/search/fieldIntent'
+import { noteHeading } from '@/lib/noteHeading'
 
 export type SearchResultType = 'task' | 'project' | 'contact' | 'routine' | 'list' | 'note'
 
@@ -338,8 +339,10 @@ export function useSearch({ tasks, projects, contacts, routines, lists = [], not
     }))
 
     const notesResult: SearchResult[] = noteResults.map((r) => {
-      // Get the title or first line of content for display
-      const displayTitle = r.item.title || r.item.content.split('\n')[0].slice(0, 50) + (r.item.content.length > 50 ? '...' : '')
+      // Title, else the first legible line of the body — read out of the
+      // HTML, never sliced off the markup.
+      const heading = noteHeading(r.item.title, r.item.content)
+      const displayTitle = heading.length > 50 ? heading.slice(0, 50) + '...' : heading
       // Show topic name as subtitle if available
       const subtitle = r.item.topic?.name || undefined
 

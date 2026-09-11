@@ -11,7 +11,7 @@ import { scopeForDomain, memberForAuthUser, type Scope } from '@/lib/scope'
 import { localYmd, parseLocalYmd, weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
 import { weekStartForBucket } from '@/lib/today/weekPlacement'
 import { monthStartOf, monthStartForBucket, seasonStartForBucket, isPlacement } from '@/lib/planning/periodPlacement'
-import { isDescent } from '@/lib/planning/lineage'
+import { isDescent, livePlacedCopyOf } from '@/lib/planning/lineage'
 import { readSeasons, seasonStartFor } from '@/lib/cadence/seasons'
 import { onRealtimeResumed } from '@/lib/realtime/keepAlive'
 import { announceToBuyChanged } from '@/lib/lists/toBuy'
@@ -1168,7 +1168,7 @@ export function useSupabaseTasks() {
 
   const updateTask = useCallback(async (id: string, updates: Partial<Task>) => {
     logger.debug('[updateTask] Called with:', { id, updates })
-    const task = findTaskById(id)
+    let task = findTaskById(id)
     if (!task) {
       // Should be rare now that lookups read tasksRef — surface it loudly so a
       // dropped write is never silent again.
@@ -1190,9 +1190,21 @@ export function useSupabaseTasks() {
     // A month/season TASK stepping down the ladder is copied, not moved — see
     // copyDown. The original is untouched: no bucket change, no defer_count,
     // not even updated_at.
+    //
+    // But only the FIRST descent copies. Re-place a row that already has an
+    // open copy — dragged to another day, dropped on another week, the pool
+    // chip clicked twice — and we move that copy instead of leaving another
+    // twin behind. Without this every drag minted a row: ten identical
+    // potluck tasks (and ten identical notes) inside twenty seconds.
     if (isDescent(task.bucket, updates.bucket)) {
-      await copyDown(task, updates)
-      return
+      const openCopy = livePlacedCopyOf(task, tasksRef.current)
+      if (!openCopy) {
+        await copyDown(task, updates)
+        return
+      }
+      // Re-place the copy itself: same id, same lineage, one row.
+      id = openCopy.id
+      task = openCopy
     }
 
     // Scope is DERIVED. Recompute whenever anything it depends on moves; a
