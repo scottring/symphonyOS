@@ -18,25 +18,114 @@ Outlook events, and "Create events on" stays Google.
   new one back. A refresh without `scope` is rejected by Microsoft, so the
   refresh body always carries the scopes.
 
-## One-time setup (app registration)
+## One-time setup — Azure checklist
 
-1. https://entra.microsoft.com → App registrations → New registration.
-   - Supported account types: **Accounts in any organizational directory and
-     personal Microsoft accounts**.
-   - Redirect URI (Web): `https://app.symphony-os.com/calendar-callback`
-   - Add a second redirect URI: `http://localhost:5173/calendar-callback`
-2. Certificates & secrets → New client secret. Copy the **value** (not the id).
-3. API permissions → Add → Microsoft Graph → Delegated:
-   `Calendars.Read`, `User.Read`, `offline_access`.
-4. Store the credentials as edge-function secrets:
+Nothing works until this is done: `Connect Outlook` returns
+`MICROSOFT_CLIENT_ID not configured` and no Outlook events appear anywhere.
+Roughly 20 minutes, free, one time. Work top to bottom.
 
-   ```bash
-   supabase secrets set MICROSOFT_CLIENT_ID=<application (client) id> MICROSOFT_CLIENT_SECRET=<secret value>
-   ```
+### 1. Register the app
 
-Personal outlook.com accounts connect immediately. Work / school accounts on
-Microsoft 365 need the app to be publisher-verified before people in other
-tenants can consent, and some tenants require admin approval regardless.
+- [ ] Sign in to <https://entra.microsoft.com> with the Microsoft account that
+      should **own** the registration. This is not the calendar account — it is
+      the developer account. A personal outlook.com account is fine.
+- [ ] **App registrations → New registration.**
+- [ ] Name: `Symphony OS` (users see this on the consent screen).
+- [ ] Supported account types: **Accounts in any organizational directory (any
+      Microsoft Entra ID tenant — multitenant) and personal Microsoft
+      accounts**. This one is load-bearing: the code signs in through the
+      `/common` authority (`MICROSOFT_AUTHORITY` in
+      `_shared/calendar-providers/microsoft.ts`). A single-tenant registration
+      fails at sign-in with `AADSTS50194`.
+- [ ] Redirect URI → platform **Web** → `https://app.symphony-os.com/calendar-callback`
+- [ ] **Register**, then copy the **Application (client) ID** from the overview
+      page. That is `MICROSOFT_CLIENT_ID`.
+
+### 2. Add the dev redirect URI
+
+- [ ] **Authentication → Web → Add URI** → `http://localhost:5173/calendar-callback`
+- [ ] Save.
+
+The frontend sends `window.location.origin + '/calendar-callback'`
+(`useGoogleCalendar.tsx`, `CalendarCallback.tsx`), and Microsoft demands an
+exact string match — scheme, port, no trailing slash. Miss it and sign-in dies
+with `AADSTS50011: redirect URI does not match`. Add any other origin you plan
+to connect from (a Vercel preview URL, a second dev port) the same way.
+
+### 3. Create the client secret
+
+- [ ] **Certificates & secrets → Client secrets → New client secret.**
+- [ ] Expires: **24 months** (the maximum). Shorter means an earlier silent
+      outage.
+- [ ] Copy the **Value** column, not **Secret ID**. The value is shown once; if
+      you navigate away it is gone and you create a new one.
+- [ ] Write the expiry date down — step 6.
+
+### 4. Grant the Graph permissions
+
+- [ ] **API permissions → Add a permission → Microsoft Graph → Delegated
+      permissions.**
+- [ ] Tick `Calendars.Read`, `User.Read`, `offline_access`. These are exactly
+      `MICROSOFT_SCOPES` in `microsoft.ts` — if that list ever changes, this
+      list changes with it.
+- [ ] Add permissions. No admin consent needed: all three are user-consentable,
+      and a personal account consents on first sign-in.
+
+Read-only by design. Do not add `Calendars.ReadWrite` — Symphony never writes to
+Outlook, and the wider scope buys a scarier consent screen for nothing.
+
+### 5. Hand the credentials to the edge functions
+
+- [ ] Run:
+
+      npx supabase secrets set --project-ref mwadppyrqzuzgstmwpuy \
+        MICROSOFT_CLIENT_ID='<application (client) id>' \
+        MICROSOFT_CLIENT_SECRET='<secret value>'
+
+- [ ] Confirm both land: `npx supabase secrets list --project-ref mwadppyrqzuzgstmwpuy`
+      (values show as hashes — you are checking the names are present).
+- [ ] If `Connect Outlook` still says `not configured`, the running instances
+      have stale env. Redeploy the two functions:
+
+      npx supabase functions deploy microsoft-calendar-auth-url --use-api
+      npx supabase functions deploy microsoft-calendar-callback --use-api
+
+### 6. Prove it against a real account
+
+Everything above is untested against Microsoft's servers — the adapters have
+only ever seen mocks. Do not skip this.
+
+- [ ] Sign up for a throwaway <https://outlook.com> account if you have no
+      Outlook calendar yet (5 minutes, free, works through `/common`).
+- [ ] Put two events on it: one one-off at a distinctive time, one weekly
+      recurring. Add an all-day event as a third if you want the full sweep.
+- [ ] **Settings → Calendar → Connect Outlook.** Expect the account chooser —
+      `prompt=select_account` is deliberate, connecting the wrong account is
+      the failure mode this prevents.
+- [ ] Check the events land on Today **at the right clock time**. The
+      `calendarView` + `Prefer: outlook.timezone="UTC"` path returns a
+      `dateTime` with no offset and the adapter appends `Z`; if that ever
+      breaks, events arrive intact but shifted by your UTC offset, not
+      missing. A whole-hours shift is the tell.
+- [ ] Open one in the panel: move, delete, and edit must all be absent
+      (`accessRole: 'reader'`).
+- [ ] Leave it connected for an hour and reload. That exercises the refresh
+      path, which is where Microsoft differs from Google twice over: the
+      refresh body must carry `scope`, and the refresh token **rotates** on
+      every use. A second-hour failure means `tokens.ts` is not persisting the
+      returned token.
+- [ ] Add the secret's expiry date (step 3) to the calendar, a month early.
+      When it lapses, refreshes start failing and Outlook events quietly stop
+      updating — it does not announce itself.
+
+### Work / school accounts
+
+Personal outlook.com accounts connect immediately. A Microsoft 365 tenant is a
+different story: cross-tenant consent needs the app to be **publisher
+verified** (an MPN account linked to the registration), and plenty of tenants
+require admin approval no matter what. Worth doing when there is an actual
+employer tenant to connect — the rules are the tenant's, so guessing at them
+in advance is wasted work.
 
 ## Known limits
 
