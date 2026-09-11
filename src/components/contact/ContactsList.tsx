@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react'
-import { PAGE_COLUMN } from '@/components/layout/pageLayout'
-import { PageMasthead, QuietAction } from '@/components/layout/PageMasthead'
+import { PAGE_COLUMN_WIDE } from '@/components/layout/pageLayout'
+import { QuietAction } from '@/components/layout/PageMasthead'
+import { MastheadCard } from '@/components/layout/MastheadCard'
 import { Plus } from 'lucide-react'
 import type { Contact, ContactCategory } from '@/types/contact'
 
@@ -60,13 +61,14 @@ export function ContactsList({ contacts, onSelectContact, onAddContact }: Contac
   }
 
   return (
-    <div className={PAGE_COLUMN}>
+    <div className={PAGE_COLUMN_WIDE}>
       {/* Header — shared Library masthead (design-unification 2026-09-01).
           The back arrow died with it: Contacts is a page, not a drill-in. */}
-      <PageMasthead
+      <MastheadCard
         title="Contacts"
-        description={`${contacts.length} people and places the household calls on`}
-        actions={<QuietAction icon={Plus} label="Add" ariaLabel="Add a contact" onClick={() => setAdding(true)} />}
+        motif="contacts"
+        subline={`${contacts.length} people and places the household calls on`}
+        footer={<QuietAction icon={Plus} label="Add" ariaLabel="Add a contact" onClick={() => setAdding(true)} />}
       />
 
       {/* Add form */}

@@ -7,6 +7,8 @@ import { AddRecipeButton } from './AddRecipeButton'
 import { RecipeUrlPasteDialog } from './RecipeUrlPasteDialog'
 import { RecipeManualEditor } from './RecipeManualEditor'
 import { RecipeDetailModal } from './RecipeDetailModal'
+import { MastheadCard } from '@/components/layout/MastheadCard'
+import { PAGE_COLUMN_WIDE } from '@/components/layout/pageLayout'
 import { MealsTabs } from '../MealsTabs'
 
 export function MemoryShelfPage() {
@@ -46,25 +48,23 @@ export function MemoryShelfPage() {
   }
 
   return (
-    <div className="px-12 py-12 max-w-6xl mx-auto">
-      <MealsTabs />
-      <div className="flex items-start justify-between mb-8">
-        <div>
-          <div className="text-[0.7rem] font-bold uppercase tracking-[0.25em] text-neutral-500 mb-2">
-            MEMORY SHELF · {recipes.length} {recipes.length === 1 ? 'RECIPE' : 'RECIPES'}
-          </div>
-          <h1 className="font-display text-[3.25rem] leading-[1.05] text-neutral-800">
-            What we cook <span className="italic text-primary-500">together.</span>
-          </h1>
-          <p className="font-display italic text-[1.25rem] text-neutral-500 mt-3">
-            Default sort: recently cooked.
-          </p>
-        </div>
-        <AddRecipeButton
-          onPasteUrl={() => setPasteOpen(true)}
-          onManualEntry={() => setManualOpen(true)}
-        />
-      </div>
+    <div className={PAGE_COLUMN_WIDE}>
+      <MastheadCard
+        title={<>What we cook <span className="italic text-primary-600">together.</span></>}
+        motif="meals"
+        eyebrow={
+          <span className="text-[12px] font-semibold uppercase tracking-[0.14em] text-neutral-500">
+            Memory shelf · {recipes.length} {recipes.length === 1 ? 'recipe' : 'recipes'}
+          </span>
+        }
+        subline={<MealsTabs className="-mb-1" />}
+        footer={
+          <AddRecipeButton
+            onPasteUrl={() => setPasteOpen(true)}
+            onManualEntry={() => setManualOpen(true)}
+          />
+        }
+      />
 
       <div className="mb-5 relative">
         <input

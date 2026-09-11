@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useEscapeKey } from '@/hooks/useEscapeKey'
+import { MastheadCard } from '@/components/layout/MastheadCard'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { Plus, Search, Sparkles, RefreshCw, Wrench } from 'lucide-react'
 import type { RecurrencePattern, Routine } from '@/types/actionable'
@@ -328,12 +329,12 @@ export function RhythmPage(props: RhythmPageProps) {
       {/* Full-width canvas (keeps the shared gutter, drops the 940px cap) —
           the staggered timeline needs the room; approved deviation from PAGE_COLUMN. */}
       <div className="relative w-full px-6 md:px-10 lg:px-14 py-8">
-        {/* Masthead */}
-        <div className="flex items-start justify-between gap-4 mb-4 flex-wrap">
-          <div>
-            <h1 className="font-display text-3xl font-semibold tracking-tight text-neutral-800">Routines</h1>
-            <p className="mt-1 text-sm text-neutral-500">How your family runs — {subtitle}</p>
-          </div>
+        {/* The shared masthead card — the same anchor every other page wears. */}
+        <MastheadCard
+          title="Routines"
+          motif="routines"
+          subline={`How your family runs — ${subtitle}`}
+          footer={
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-2 rounded-xl border border-neutral-200 bg-white px-3 py-2 shadow-sm">
               <Search className="w-4 h-4 text-neutral-400" />
@@ -378,7 +379,8 @@ export function RhythmPage(props: RhythmPageProps) {
               New routine
             </button>
           </div>
-        </div>
+          }
+        />
 
         {/* People pills */}
         {familyMembers.length > 0 && (

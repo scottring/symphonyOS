@@ -1,4 +1,4 @@
-import { PageMasthead } from '@/components/layout/PageMasthead'
+import { MastheadCard } from '@/components/layout/MastheadCard'
 import { useState, useMemo } from 'react'
 import type { Task } from '@/types/task'
 import type { Contact } from '@/types/contact'
@@ -107,9 +107,10 @@ export function CompletedTasksView({
       <div className="p-6 max-w-2xl mx-auto">
         {/* Header — shared Library masthead (design-unification 2026-09-01).
             The Back link and icon medallion died with it: History is a page. */}
-        <PageMasthead
+        <MastheadCard
           title="History"
-          description={`${completedTasks.length} completed task${completedTasks.length !== 1 ? 's' : ''}`}
+          motif="history"
+          subline={`${completedTasks.length} completed task${completedTasks.length !== 1 ? 's' : ''}`}
         />
 
         {/* Search */}

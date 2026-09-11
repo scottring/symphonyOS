@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback } from 'react'
-import { ChevronLeft, ChevronRight, ShoppingBasket, MessageCircle, SlidersHorizontal } from 'lucide-react'
+import { ShoppingBasket, MessageCircle, SlidersHorizontal } from 'lucide-react'
 import { useMealPlan } from '@/hooks/useMealPlan'
 import { useRecipes, type ManualRecipeInput } from '@/hooks/useRecipes'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
@@ -13,6 +13,7 @@ import { RecipePickerModal, type LeftoverCandidate } from './RecipePickerModal'
 import { MealPreferencesModal } from './MealPreferencesModal'
 import { MealChatRail } from '../chat/MealChatRail'
 import { MealChatSheet } from '../chat/MealChatSheet'
+import { MastheadCard, PeriodNavEyebrow } from '@/components/layout/MastheadCard'
 import { MealsTabs } from '../MealsTabs'
 import { SendToGroceriesModalV2 } from '../groceries-v2/SendToGroceriesModalV2'
 import type { MealPlanEntry, MealSlot } from '@/types/meal-planner'
@@ -149,37 +150,34 @@ export function PlanPage() {
 
   return (
     <div className="px-6 md:px-10 lg:px-14 py-6 max-w-7xl mr-auto">
-      <MealsTabs />
-
-      <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setWeekOffset(o => o - 1)}
-            aria-label="Previous week"
-            className="p-2 rounded-full hover:bg-neutral-100 text-neutral-500"
-          >
-            <ChevronLeft className="w-5 h-5" />
-          </button>
-          <h1 className="font-display text-[1.75rem] text-neutral-800 px-1">
-            {isPartial ? (
-              <span className="italic text-primary-500">
-                {formatDateMonthDay(dateForDayOfWeek(weekStart, activeRange.firstDay))}
-                {' – '}
-                {formatDateMonthDay(dateForDayOfWeek(weekStart, activeRange.lastDay))}
-              </span>
-            ) : (
-              <>Week of <span className="italic text-primary-500">{weekLabel}</span></>
-            )}
-          </h1>
-          <WeekRangePopover weekStart={weekStart} activeRange={activeRange} onChange={setWeekRange} />
-          <button
-            onClick={() => setWeekOffset(o => o + 1)}
-            aria-label="Next week"
-            className="p-2 rounded-full hover:bg-neutral-100 text-neutral-500"
-          >
-            <ChevronRight className="w-5 h-5" />
-          </button>
-        </div>
+      {/* The shared masthead card. Meals is a WEEK, so the week nav rides the
+          eyebrow the way /week and /month do, and the week itself is the
+          title — the page's headline never changed, only what holds it. */}
+      <MastheadCard
+        title={
+          isPartial ? (
+            <span className="italic text-primary-600">
+              {formatDateMonthDay(dateForDayOfWeek(weekStart, activeRange.firstDay))}
+              {' – '}
+              {formatDateMonthDay(dateForDayOfWeek(weekStart, activeRange.lastDay))}
+            </span>
+          ) : (
+            <>Week of <span className="italic text-primary-600">{weekLabel}</span></>
+          )
+        }
+        motif="meals"
+        eyebrow={
+          <PeriodNavEyebrow
+            label="Meals"
+            onPrev={() => setWeekOffset(o => o - 1)}
+            onNext={() => setWeekOffset(o => o + 1)}
+            prevLabel="Previous week"
+            nextLabel="Next week"
+            trailing={<WeekRangePopover weekStart={weekStart} activeRange={activeRange} onChange={setWeekRange} />}
+          />
+        }
+        subline={<MealsTabs className="-mb-1" />}
+        footer={
         <div className="flex items-center gap-2">
           <button
             onClick={() => setPrefsOpen(true)}
@@ -196,7 +194,8 @@ export function PlanPage() {
             Build shopping list
           </button>
         </div>
-      </div>
+        }
+      />
 
       {loading && <div className="text-[12px] uppercase tracking-widest text-neutral-400">Loading…</div>}
       {error && <div className="text-accent-500">{error}</div>}

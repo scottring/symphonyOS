@@ -1,4 +1,6 @@
 import { useMemo, useRef, useState, type ChangeEvent } from 'react'
+import { MastheadCard } from '@/components/layout/MastheadCard'
+import { PAGE_COLUMN_WIDE } from '@/components/layout/pageLayout'
 import { Plus } from 'lucide-react'
 import { useDocuments, type SymphonyDocument } from '@/hooks/useDocuments'
 import { useAuth } from '@/hooks/useAuth'
@@ -49,22 +51,23 @@ export function DocumentsApp() {
   }
 
   return (
-    <div className="max-w-3xl mr-auto px-6 md:px-10 lg:px-14 py-8">
-      <div className="flex items-center justify-between mb-1">
-        <h1 className="text-3xl font-display text-neutral-900">Documents</h1>
-        <button
-          onClick={() => fileInput.current?.click()}
-          disabled={uploading}
-          aria-label="Add a document"
-          className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[14px] text-primary-700 hover:bg-primary-50 disabled:opacity-50"
-        >
-          <Plus className="w-4 h-4" />
-          {uploading ? 'Uploading…' : 'Add'}
-        </button>
-      </div>
-      <p className="text-[14px] text-neutral-500 mb-6">
-        Things you'll need again. Private unless you share them.
-      </p>
+    <div className={PAGE_COLUMN_WIDE}>
+      <MastheadCard
+        title="Documents"
+        motif="documents"
+        subline="Things you'll need again. Private unless you share them."
+        footer={
+          <button
+            onClick={() => fileInput.current?.click()}
+            disabled={uploading}
+            aria-label="Add a document"
+            className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[14px] text-primary-700 hover:bg-primary-50 disabled:opacity-50"
+          >
+            <Plus className="w-4 h-4" />
+            {uploading ? 'Uploading…' : 'Add'}
+          </button>
+        }
+      />
       <input
         ref={fileInput}
         type="file"

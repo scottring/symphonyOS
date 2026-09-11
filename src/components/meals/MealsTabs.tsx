@@ -6,7 +6,7 @@ const TABS: { key: 'plan' | 'recipes'; path: string; label: string }[] = [
 ]
 
 /** Editorial-calm tab strip used at the top of every meals surface. */
-export function MealsTabs() {
+export function MealsTabs({ className = 'mb-6' }: { className?: string }) {
   const location = useLocation()
   const navigate = useNavigate()
 
@@ -14,7 +14,7 @@ export function MealsTabs() {
     location.pathname.startsWith('/meals/shelf') ? 'recipes' : 'plan'
 
   return (
-    <nav aria-label="Meals sections" className="mb-6 flex items-center gap-1 border-b border-neutral-200">
+    <nav aria-label="Meals sections" className={`flex items-center gap-1 border-b border-neutral-200 ${className}`}>
       {TABS.map(t => {
         const isActive = t.key === active
         return (
