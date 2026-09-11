@@ -30,9 +30,20 @@ export function placedCopyOf(task: Task, tasks: readonly Task[]): Task | undefin
  *  twin of the note. An original has at most ONE open copy in flight; a
  *  finished copy is history, so a later placement is a genuinely new one. */
 export function livePlacedCopyOf(task: Task, tasks: readonly Task[]): Task | undefined {
-  const copy = placedCopyOf(task, tasks)
-  if (!copy || copy.completed) return undefined
-  return isDescent(task.bucket, copy.bucket) ? copy : undefined
+  let best: Task | undefined
+  for (const t of tasks) {
+    if (t.id === task.id || t.sourceId !== task.id) continue
+    if (t.completed) continue
+    if (!isDescent(task.bucket, t.bucket)) continue
+    // source_id says "came from", which is not always "is a copy of": a
+    // season goal threads its own month steps this way, and those are four
+    // DIFFERENT tasks ("Look up music lessons" under "Tried 3 things
+    // together"). copyDown carries the title over verbatim, so the title is
+    // what separates a copy of this row from a child of it.
+    if (t.title !== task.title) continue
+    if (!best || t.createdAt.getTime() > best.createdAt.getTime()) best = t
+  }
+  return best
 }
 
 /** Ticking the original is the stronger statement and wins over its copy. */
