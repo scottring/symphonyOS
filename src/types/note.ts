@@ -8,6 +8,10 @@ export type NoteEntityType = 'event' | 'project' | 'contact' | 'task' | 'routine
 export interface DisplayNote extends Note {
   sourceTaskId?: string // If this is from a task note
   sourceTaskTitle?: string // Task title for display
+  // The task this task's row was copied down from (tasks.source_id). Placing a
+  // month item into a week copies the task — notes and all — so without this
+  // the stream shows the same jotting once per copy.
+  lineageTaskId?: string
 }
 
 // ============================================================================

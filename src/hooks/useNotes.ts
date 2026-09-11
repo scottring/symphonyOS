@@ -74,7 +74,25 @@ function taskToDisplayNote(task: Task): DisplayNote {
     updatedAt: task.updatedAt,
     sourceTaskId: task.id,
     sourceTaskTitle: task.title,
+    lineageTaskId: task.sourceId,
   }
+}
+
+/** One row per jotting, not one per copy.
+ *
+ *  Placing a month task into a week copies the task and its notes, so a single
+ *  note arrived in the stream once for the original and once for every copy —
+ *  ten identical rows of the same potluck note. Copies that still say exactly
+ *  what their original says are the same note; a copy whose notes were edited
+ *  has become its own and stays. */
+function collapseLineage(taskNotes: DisplayNote[]): DisplayNote[] {
+  const byTaskId = new Map(taskNotes.map((n) => [n.sourceTaskId, n]))
+  return taskNotes.filter((n) => {
+    if (!n.lineageTaskId) return true
+    const original = byTaskId.get(n.lineageTaskId)
+    if (!original) return true
+    return original.content.trim() !== n.content.trim()
+  })
 }
 
 // ============================================================================
@@ -146,14 +164,17 @@ export function useNotes() {
         .map(mapDbNote)
         .filter(n => n.source !== 'vault')
 
-      const taskNotesConverted = (tasksData || []).map((task: any) =>
-        taskToDisplayNote({
-          id: task.id,
-          title: task.title,
-          notes: task.notes,
-          createdAt: new Date(task.created_at),
-          updatedAt: new Date(task.updated_at),
-        } as Task)
+      const taskNotesConverted = collapseLineage(
+        (tasksData || []).map((task: any) =>
+          taskToDisplayNote({
+            id: task.id,
+            title: task.title,
+            notes: task.notes,
+            sourceId: task.source_id ?? undefined,
+            createdAt: new Date(task.created_at),
+            updatedAt: new Date(task.updated_at),
+          } as Task)
+        )
       )
 
       logger.debug('[useNotes] Fetched', supabaseNotes.length, 'notes,', taskNotesConverted.length, 'task notes')

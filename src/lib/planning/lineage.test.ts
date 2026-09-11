@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { placedCopyOf, placementFate, isDescent, openPool } from './lineage'
+import { placedCopyOf, livePlacedCopyOf, placementFate, isDescent, openPool } from './lineage'
 import type { Task } from '@/types/task'
 
 let n = 0
@@ -24,6 +24,31 @@ describe('placedCopyOf', () => {
     const older = task({ bucket: 'week', sourceId: orig.id, createdAt: new Date(2026, 8, 2) })
     const newer = task({ bucket: 'timed', sourceId: orig.id, createdAt: new Date(2026, 8, 5) })
     expect(placedCopyOf(orig, [orig, older, newer])).toBe(newer)
+  })
+})
+
+// Ten identical "Maybe plan a block potluck on the porch" rows landed inside
+// twenty seconds on 2026-09-10, one per re-placement. A row has at most one
+// copy in flight, and that copy is what a later placement moves.
+describe('livePlacedCopyOf', () => {
+  it('is the open copy a re-placement should move', () => {
+    const orig = task({ bucket: 'month' })
+    const copy = task({ bucket: 'week', sourceId: orig.id })
+    expect(livePlacedCopyOf(orig, [orig, copy])).toBe(copy)
+  })
+  it('ignores a finished copy — doing it again is a new placement', () => {
+    const orig = task({ bucket: 'month' })
+    const copy = task({ bucket: 'week', sourceId: orig.id, completed: true })
+    expect(livePlacedCopyOf(orig, [orig, copy])).toBeUndefined()
+  })
+  it('ignores a sideways copy — "Keep" carries a month row into the next month', () => {
+    const orig = task({ bucket: 'month' })
+    const kept = task({ bucket: 'month', sourceId: orig.id })
+    expect(livePlacedCopyOf(orig, [orig, kept])).toBeUndefined()
+  })
+  it('is nothing when the row has never been placed', () => {
+    const orig = task({ bucket: 'month' })
+    expect(livePlacedCopyOf(orig, [orig])).toBeUndefined()
   })
 })
 

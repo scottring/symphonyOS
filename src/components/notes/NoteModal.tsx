@@ -5,6 +5,7 @@ import type { Task } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { Contact } from '@/types/contact'
 import { formatRelativeTime } from '@/lib/timeUtils'
+import { noteHeading } from '@/lib/noteHeading'
 import { noteTypeLabels, noteTypeDotColors } from '@/types/note'
 import { TiptapEditor } from './TiptapEditor'
 import { TopicPicker } from './TopicPicker'
@@ -184,7 +185,7 @@ export function NoteModal({
   if (!isOpen || !note) return null
 
   const topic = note.topicId ? topics.find((t) => t.id === note.topicId) : undefined
-  const displayTitle = note.title || note.content.split('\n')[0] || 'Untitled'
+  const displayTitle = noteHeading(note.title, note.content, 'Untitled')
 
   return (
     <div
