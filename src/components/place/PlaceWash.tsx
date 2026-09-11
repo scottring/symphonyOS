@@ -1,4 +1,5 @@
 import { PlaceMedallion } from './PlaceMedallion'
+import { PageMotif, type MotifId } from './motifs/PageMotif'
 
 /**
  * The active Place (Settings → the five illustrated worlds), worn by a surface:
@@ -31,6 +32,7 @@ export function PlaceWash({
   anchor = 'right',
   opacity = 0.22,
   tint = 'soft',
+  motif,
 }: {
   /** 'right' for wide surfaces (the day card); 'top' for tall narrow panes,
    *  where a centred medallion would sit behind the reading column. */
@@ -40,6 +42,11 @@ export function PlaceWash({
    *  sitting on the warm paper ground, where a little goes a long way;
    *  'strong' for a pane on flat white, which otherwise reads as untouched. */
   tint?: 'soft' | 'strong'
+  /** What this surface is, when it is a KIND of thing rather than a stretch of
+   *  time: Notes wears a sheet and a pen, Meals a pot. Left out, the surface
+   *  wears the place itself — which is what the rhythm pages want, since
+   *  Today, Week, Month, Season and Year are all one continuous place. */
+  motif?: MotifId
 }) {
   const position =
     anchor === 'right'
@@ -63,7 +70,7 @@ export function PlaceWash({
         className={`absolute hidden sm:block ${position}`}
         style={{ opacity, maskImage: fade, WebkitMaskImage: fade }}
       >
-        <PlaceMedallion className="h-full w-full" />
+        {motif ? <PageMotif motif={motif} className="h-full w-full" /> : <PlaceMedallion className="h-full w-full" />}
       </div>
     </div>
   )

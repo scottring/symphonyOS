@@ -34,8 +34,9 @@ import { useUndo } from '@/hooks/useUndo'
 import { UndoToast } from '@/components/undo/UndoToast'
 import { useNoteTopics } from '@/hooks/useNoteTopics'
 import { NoteModal } from '@/components/notes/NoteModal'
-import { PageMasthead, QuietAction } from '@/components/layout/PageMasthead'
-import { PAGE_COLUMN } from '@/components/layout/pageLayout'
+import { QuietAction } from '@/components/layout/PageMasthead'
+import { MastheadCard } from '@/components/layout/MastheadCard'
+import { PAGE_COLUMN_WIDE } from '@/components/layout/pageLayout'
 import { stripHtml } from '@/lib/htmlUtils'
 import { noteHeading, noteExcerpt } from '@/lib/noteHeading'
 import { pickNotes } from './selection'
@@ -222,11 +223,12 @@ export function NotesApp() {
 
   return (
     <div className="h-full overflow-auto">
-      <div className={PAGE_COLUMN}>
-        <PageMasthead
+      <div className={PAGE_COLUMN_WIDE}>
+        <MastheadCard
           title="Notes"
-          description="Everything you've jotted, newest first — typed here, attached to something, or read off a page."
-          actions={
+          motif="notes"
+          subline="Everything you've jotted, newest first — typed here, attached to something, or read off a page."
+          footer={
             <>
             {selecting ? (
               <button

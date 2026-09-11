@@ -1,4 +1,6 @@
 // src/apps/home/HomeOverview.tsx
+import { MastheadCard } from '@/components/layout/MastheadCard'
+import { PAGE_COLUMN_WIDE } from '@/components/layout/pageLayout'
 import { useState, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useHomes } from '@/hooks/useHomes'
@@ -61,9 +63,12 @@ export function HomeOverview() {
   }
 
   return (
-    <div className="py-6 px-6 md:px-10 lg:px-14 max-w-6xl mr-auto">
-      <header className="flex items-center justify-between mb-6">
-        <h1 className="font-display text-3xl">Home</h1>
+    <div className={PAGE_COLUMN_WIDE}>
+      <MastheadCard
+        title="House"
+        motif="house"
+        subline="Rooms, the things in them, and what each one needs next."
+        footer={
         <div className="flex gap-2">
           <button
             className="btn-primary"
@@ -77,7 +82,8 @@ export function HomeOverview() {
             }}
           >+ Room</button>
         </div>
-      </header>
+        }
+      />
 
       {needsDetailsAssets.length > 0 && (
         <div className="card p-4 mb-6 flex items-center justify-between bg-amber-50 border-amber-200">

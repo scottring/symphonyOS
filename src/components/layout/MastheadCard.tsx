@@ -16,13 +16,18 @@
 import type { ReactNode } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { PlaceWash } from '@/components/place/PlaceWash'
+import type { MotifId } from '@/components/place/motifs/PageMotif'
 
-export function MastheadCard({ eyebrow, title, subline, controls, footer, className = '' }: {
+export function MastheadCard({ eyebrow, title, subline, controls, footer, motif, className = '' }: {
   eyebrow?: ReactNode
   title: ReactNode
   subline?: ReactNode
   controls?: ReactNode
   footer?: ReactNode
+  /** The surface's own icon. Omitted on the rhythm pages, which wear the
+   *  place — they are one continuous stretch of the same life, not different
+   *  kinds of thing. */
+  motif?: MotifId
   className?: string
 }) {
   return (
@@ -30,7 +35,7 @@ export function MastheadCard({ eyebrow, title, subline, controls, footer, classN
       data-testid="masthead-card"
       className={`relative mx-3 mb-4 rounded-2xl border border-neutral-200/80 bg-bg-elevated shadow-sm md:mx-0 ${className}`}
     >
-      <PlaceWash />
+      <PlaceWash motif={motif} />
       <div className="relative px-4 py-4 md:px-5">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">

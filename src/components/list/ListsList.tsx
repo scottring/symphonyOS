@@ -1,8 +1,9 @@
 import { useState, useRef, useEffect } from 'react'
-import { PAGE_COLUMN } from '@/components/layout/pageLayout'
+import { PAGE_COLUMN_WIDE } from '@/components/layout/pageLayout'
 import type { List, ListCategory } from '@/types/list'
 import { getCategoryLabel, LIST_CATEGORIES } from '@/types/list'
-import { PageMasthead, QuietAction } from '@/components/layout/PageMasthead'
+import { QuietAction } from '@/components/layout/PageMasthead'
+import { MastheadCard } from '@/components/layout/MastheadCard'
 import { Clapperboard, UtensilsCrossed, ShoppingBag, Plane, Users2, Home, ClipboardList, Plus } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -74,12 +75,13 @@ export function ListsList({ lists, loading = false, listsByCategory, onSelectLis
 
   return (
     <div className="h-full overflow-auto">
-      <div className={PAGE_COLUMN}>
+      <div className={PAGE_COLUMN_WIDE}>
         {/* Header — shared Library masthead (design-unification 2026-09-01) */}
-        <PageMasthead
+        <MastheadCard
           title="Lists"
-          description={`${lists.length} list${lists.length !== 1 ? 's' : ''}`}
-          actions={
+          motif="lists"
+          subline={`${lists.length} list${lists.length !== 1 ? 's' : ''}`}
+          footer={
             onAddList && !isCreating ? (
               <QuietAction icon={Plus} label="New" ariaLabel="New list" onClick={() => setIsCreating(true)} />
             ) : undefined

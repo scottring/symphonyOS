@@ -1,3 +1,5 @@
+import { MastheadCard } from '@/components/layout/MastheadCard'
+import { PAGE_COLUMN_WIDE } from '@/components/layout/pageLayout'
 import { useState } from 'react'
 import { useIsAppAdmin } from '@/hooks/useIsAppAdmin'
 import { useWaitlistAdmin } from '@/hooks/useWaitlistAdmin'
@@ -281,19 +283,23 @@ export function SettingsPage({
 
   return (
     <div className="h-full overflow-auto">
-      <div className="max-w-2xl mx-auto px-6 py-8">
-        {/* Header */}
-        <div className="flex items-center gap-3 mb-6">
-          <button
-            onClick={onBack}
-            className="p-2 -ml-2 rounded-lg text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-colors"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
-            </svg>
-          </button>
-          <h1 className="font-display text-2xl font-semibold text-neutral-800">Settings</h1>
-        </div>
+      <div className={PAGE_COLUMN_WIDE}>
+        <MastheadCard
+          title="Settings"
+          motif="settings"
+          eyebrow={
+            <button
+              onClick={onBack}
+              aria-label="Back"
+              className="flex items-center gap-1.5 p-1.5 -ml-1.5 rounded-lg text-[12px] font-semibold uppercase tracking-[0.08em] text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
+              </svg>
+              Back
+            </button>
+          }
+        />
 
         {/* Tab Navigation */}
         <div className="flex gap-1 mb-8 p-1 bg-neutral-100 rounded-lg">

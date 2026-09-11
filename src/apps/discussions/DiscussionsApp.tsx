@@ -38,6 +38,7 @@ export function DiscussionsApp() {
       {/* The same masthead card the rest of the top group wears. */}
       <MastheadCard
         title="Discussions"
+        motif="discussions"
         subline="Conversations on your tasks, routines, and events — newest first."
         controls={chrome ? <HomeChromeControls className="flex" /> : undefined}
       />
