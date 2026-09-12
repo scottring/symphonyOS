@@ -2,6 +2,11 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import type { User } from '@supabase/supabase-js'
 import * as Sentry from '@sentry/react'
+import { INVITE_ONLY_MESSAGE, isInviteGateFailure } from '@/lib/signupGate'
+
+/** A sign-up that failed. `inviteOnly` marks the invite gate, which is not a
+ *  fault the user can fix by retrying — the form offers the waitlist instead. */
+export type SignUpFailure = { message: string; inviteOnly?: boolean }
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null)
@@ -129,11 +134,32 @@ export function useAuth() {
     return { error }
   }
 
-  const signUpWithEmail = async (email: string, password: string) => {
+  const signUpWithEmail = async (
+    email: string,
+    password: string
+  ): Promise<{ error: SignUpFailure | null }> => {
+    // Ask the gate before trying. The trigger on auth.users enforces the same
+    // rule, but it can only refuse by throwing, and GoTrue turns that into
+    // "Database error saving new user" — which reads as a broken product to
+    // somebody who just hasn't been invited yet. If the question itself fails
+    // (offline, PostgREST down), fall through and let the server decide: the
+    // gate is advisory, the trigger is the wall.
+    const { data: allowed, error: gateError } = await supabase.rpc('signup_allowed', {
+      p_email: email,
+    })
+    if (!gateError && allowed === false) {
+      return { error: { message: INVITE_ONLY_MESSAGE, inviteOnly: true } }
+    }
+
     const { error } = await supabase.auth.signUp({
       email,
       password,
     })
+    // Belt and braces: the gate may have raced (an invite revoked between the
+    // question and the answer), or the question may have failed above.
+    if (isInviteGateFailure(error)) {
+      return { error: { message: INVITE_ONLY_MESSAGE, inviteOnly: true } }
+    }
     return { error }
   }
 

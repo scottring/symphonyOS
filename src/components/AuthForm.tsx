@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useAuth } from '@/hooks/useAuth'
+import { WAITLIST_URL } from '@/lib/signupGate'
 
 interface AuthFormProps {
   /** A banner shown above the form fields — e.g. after a session ended
@@ -13,12 +14,16 @@ export function AuthForm({ message }: AuthFormProps = {}) {
   const [isSignUp, setIsSignUp] = useState(false)
   const [isForgotPassword, setIsForgotPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // The invite gate is not a fault the user can retry away, so it reads as
+  // an explanation with a way forward rather than a red failure.
+  const [inviteOnly, setInviteOnly] = useState(false)
   const [loading, setLoading] = useState(false)
   const { signInWithEmail, signUpWithEmail, resetPassword } = useAuth()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
+    setInviteOnly(false)
     setLoading(true)
 
     if (isForgotPassword) {
@@ -32,14 +37,21 @@ export function AuthForm({ message }: AuthFormProps = {}) {
       return
     }
 
-    const { error } = isSignUp
-      ? await signUpWithEmail(email, password)
-      : await signInWithEmail(email, password)
+    if (isSignUp) {
+      const { error } = await signUpWithEmail(email, password)
+      if (error) {
+        setError(error.message)
+        setInviteOnly(Boolean(error.inviteOnly))
+      } else {
+        setError('Check your email for a confirmation link!')
+      }
+      setLoading(false)
+      return
+    }
 
+    const { error } = await signInWithEmail(email, password)
     if (error) {
       setError(error.message)
-    } else if (isSignUp) {
-      setError('Check your email for a confirmation link!')
     }
 
     setLoading(false)
@@ -107,7 +119,21 @@ export function AuthForm({ message }: AuthFormProps = {}) {
               </div>
             )}
 
-            {error && (
+            {error && inviteOnly && (
+              <div role="status" className="p-3 rounded-lg text-sm bg-primary-50 text-primary-700">
+                <p>{error}</p>
+                <a
+                  href={WAITLIST_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-2 inline-block font-medium underline hover:no-underline"
+                >
+                  Request an invite
+                </a>
+              </div>
+            )}
+
+            {error && !inviteOnly && (
               <div className={`p-3 rounded-lg text-sm ${
                 error.includes('Check your email')
                   ? 'bg-success-50 text-success-700'

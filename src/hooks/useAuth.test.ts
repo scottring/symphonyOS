@@ -3,6 +3,8 @@ import { renderHook, waitFor, act } from '@testing-library/react'
 import { useAuth } from './useAuth'
 import { createMockUser, createMockSession } from '@/test/mocks/factories'
 import * as Sentry from '@sentry/react'
+import { INVITE_ONLY_MESSAGE } from '@/lib/signupGate'
+import type { SignUpFailure } from './useAuth'
 
 vi.mock('@sentry/react', () => ({
   captureEvent: vi.fn(),
@@ -14,6 +16,9 @@ let mockSession: ReturnType<typeof createMockSession> | null = null
 let mockSignInError: { message: string } | null = null
 let mockSignUpError: { message: string } | null = null
 let mockSignOutError: { message: string } | null = null
+// What public.signup_allowed() answers, and whether asking it even worked.
+let mockSignupAllowed: boolean | null = true
+let mockSignupAllowedError: { message: string } | null = null
 let authStateCallback: ((event: string, session: ReturnType<typeof createMockSession> | null) => void) | null = null
 let mockGetSession: () => Promise<{ data: { session: ReturnType<typeof createMockSession> | null }; error: { message: string } | null }>
 const mockUnsubscribe = vi.fn()
@@ -68,6 +73,12 @@ vi.mock('@/lib/supabase', () => ({
         }
       }),
     },
+    rpc: vi.fn((fn: string) => {
+      if (fn === 'signup_allowed') {
+        return Promise.resolve({ data: mockSignupAllowed, error: mockSignupAllowedError })
+      }
+      return Promise.resolve({ data: null, error: null })
+    }),
   },
 }))
 
@@ -78,6 +89,8 @@ describe('useAuth', () => {
     mockSignInError = null
     mockSignUpError = null
     mockSignOutError = null
+    mockSignupAllowed = true
+    mockSignupAllowedError = null
     authStateCallback = null
     // Default getSession implementation
     mockGetSession = () => Promise.resolve({
@@ -371,6 +384,108 @@ describe('useAuth', () => {
       })
 
       expect(signUpResult?.error).toEqual({ message: 'Password should be at least 6 characters' })
+    })
+
+    describe('the invite gate', () => {
+      const renderReady = async () => {
+        const { result } = renderHook(() => useAuth())
+        await waitFor(() => {
+          expect(result.current.loading).toBe(false)
+        })
+        return result
+      }
+
+      it('explains an uninvited email instead of attempting the sign-up', async () => {
+        mockSignupAllowed = false
+        const result = await renderReady()
+        const { supabase } = await import('@/lib/supabase')
+
+        let signUpResult: { error: SignUpFailure | null } | undefined
+        await act(async () => {
+          signUpResult = await result.current.signUpWithEmail('stranger@example.com', 'password123')
+        })
+
+        expect(signUpResult?.error?.inviteOnly).toBe(true)
+        expect(signUpResult?.error?.message).toBe(INVITE_ONLY_MESSAGE)
+        // No point burning a sign-up attempt we know the trigger will refuse.
+        expect(supabase.auth.signUp).not.toHaveBeenCalled()
+      })
+
+      it('asks the gate with the address the user typed', async () => {
+        mockSignupAllowed = false
+        const result = await renderReady()
+        const { supabase } = await import('@/lib/supabase')
+
+        await act(async () => {
+          await result.current.signUpWithEmail('stranger@example.com', 'password123')
+        })
+
+        expect(supabase.rpc).toHaveBeenCalledWith('signup_allowed', {
+          p_email: 'stranger@example.com',
+        })
+      })
+
+      it('proceeds normally for an invited email', async () => {
+        mockSignupAllowed = true
+        const result = await renderReady()
+        const { supabase } = await import('@/lib/supabase')
+
+        let signUpResult: { error: SignUpFailure | null } | undefined
+        await act(async () => {
+          signUpResult = await result.current.signUpWithEmail('invited@example.com', 'password123')
+        })
+
+        expect(signUpResult?.error).toBeNull()
+        expect(supabase.auth.signUp).toHaveBeenCalled()
+      })
+
+      it('translates the generic GoTrue failure the trigger causes', async () => {
+        // The exact shape Josh Glazer hit: the gate said yes (or could not be
+        // reached) but the trigger still refused, and GoTrue flattened it.
+        mockSignupAllowed = true
+        mockSignUpError = { message: 'Database error saving new user' }
+        const result = await renderReady()
+
+        let signUpResult: { error: SignUpFailure | null } | undefined
+        await act(async () => {
+          signUpResult = await result.current.signUpWithEmail('stranger@example.com', 'password123')
+        })
+
+        expect(signUpResult?.error?.inviteOnly).toBe(true)
+        expect(signUpResult?.error?.message).toBe(INVITE_ONLY_MESSAGE)
+        expect(signUpResult?.error?.message).not.toContain('Database error')
+      })
+
+      it('still tries the sign-up when the gate cannot be reached', async () => {
+        // Offline or PostgREST down: the gate is advisory, the trigger is the
+        // wall. Refusing here would lock out a legitimately invited user.
+        mockSignupAllowed = null
+        mockSignupAllowedError = { message: 'Failed to fetch' }
+        const result = await renderReady()
+        const { supabase } = await import('@/lib/supabase')
+
+        let signUpResult: { error: SignUpFailure | null } | undefined
+        await act(async () => {
+          signUpResult = await result.current.signUpWithEmail('invited@example.com', 'password123')
+        })
+
+        expect(supabase.auth.signUp).toHaveBeenCalled()
+        expect(signUpResult?.error).toBeNull()
+      })
+
+      it('leaves a real sign-up error untouched', async () => {
+        mockSignupAllowed = true
+        mockSignUpError = { message: 'User already registered' }
+        const result = await renderReady()
+
+        let signUpResult: { error: SignUpFailure | null } | undefined
+        await act(async () => {
+          signUpResult = await result.current.signUpWithEmail('existing@example.com', 'password123')
+        })
+
+        expect(signUpResult?.error?.message).toBe('User already registered')
+        expect(signUpResult?.error?.inviteOnly).toBeUndefined()
+      })
     })
   })
 

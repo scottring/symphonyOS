@@ -52,8 +52,16 @@ struct AuthView: View {
                         if let error = auth.error {
                             Text(error)
                                 .font(.bodySmall)
-                                .foregroundStyle(.red)
+                                .foregroundStyle(auth.inviteOnly ? Color.textSecondary : .red)
                                 .multilineTextAlignment(.center)
+                        }
+
+                        // The invite gate is not a fault to retry — offer the
+                        // waitlist instead of a dead end.
+                        if auth.inviteOnly, let url = URL(string: "https://www.symphony-os.com/#waitlist") {
+                            Link("Request an invite", destination: url)
+                                .font(.bodySmall)
+                                .foregroundStyle(Color.primaryTint)
                         }
 
                         Button {

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import { AuthForm } from './AuthForm'
+import { INVITE_ONLY_MESSAGE, WAITLIST_URL } from '@/lib/signupGate'
 
 const { mockSignInWithEmail, mockSignUpWithEmail } = vi.hoisted(() => ({
   mockSignInWithEmail: vi.fn(),
@@ -273,6 +274,104 @@ describe('AuthForm', () => {
         const message = screen.getByText('Invalid credentials')
         expect(message.closest('div')).toHaveClass('bg-danger-50')
       })
+    })
+  })
+
+  describe('the invite gate', () => {
+    const submitSignUp = async () => {
+      render(<AuthForm />)
+      fireEvent.click(screen.getByRole('button', { name: 'Sign Up' }))
+      fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'stranger@example.com' } })
+      fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'password123' } })
+      const form = screen.getByRole('button', { name: 'Create Account' }).closest('form')!
+      await act(async () => {
+        fireEvent.submit(form)
+      })
+    }
+
+    it('explains the invite gate and offers a way in', async () => {
+      mockSignUpWithEmail.mockImplementation(() =>
+        Promise.resolve({ error: { message: INVITE_ONLY_MESSAGE, inviteOnly: true } })
+      )
+
+      await submitSignUp()
+
+      await waitFor(() => {
+        expect(screen.getByText(INVITE_ONLY_MESSAGE)).toBeInTheDocument()
+      })
+      const link = screen.getByRole('link', { name: 'Request an invite' })
+      expect(link).toHaveAttribute('href', WAITLIST_URL)
+    })
+
+    it('does not dress the invite gate up as a failure', async () => {
+      mockSignUpWithEmail.mockImplementation(() =>
+        Promise.resolve({ error: { message: INVITE_ONLY_MESSAGE, inviteOnly: true } })
+      )
+
+      await submitSignUp()
+
+      await waitFor(() => {
+        const block = screen.getByText(INVITE_ONLY_MESSAGE).closest('div')!
+        expect(block).not.toHaveClass('bg-danger-50')
+        expect(block).toHaveClass('bg-primary-50')
+      })
+    })
+
+    it('never shows the raw database wording', async () => {
+      mockSignUpWithEmail.mockImplementation(() =>
+        Promise.resolve({ error: { message: INVITE_ONLY_MESSAGE, inviteOnly: true } })
+      )
+
+      await submitSignUp()
+
+      await waitFor(() => {
+        expect(screen.getByText(INVITE_ONLY_MESSAGE)).toBeInTheDocument()
+      })
+      expect(screen.queryByText(/Database error saving new user/i)).not.toBeInTheDocument()
+    })
+
+    it('still shows an ordinary sign-up error as an error, with no invite link', async () => {
+      mockSignUpWithEmail.mockImplementation(() =>
+        Promise.resolve({ error: { message: 'User already registered' } })
+      )
+
+      await submitSignUp()
+
+      await waitFor(() => {
+        const message = screen.getByText('User already registered')
+        expect(message.closest('div')).toHaveClass('bg-danger-50')
+      })
+      expect(screen.queryByRole('link', { name: 'Request an invite' })).not.toBeInTheDocument()
+    })
+
+    it('clears the invite notice when the user submits again', async () => {
+      mockSignUpWithEmail.mockImplementation(() =>
+        Promise.resolve({ error: { message: INVITE_ONLY_MESSAGE, inviteOnly: true } })
+      )
+
+      render(<AuthForm />)
+      fireEvent.click(screen.getByRole('button', { name: 'Sign Up' }))
+      fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'stranger@example.com' } })
+      fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'password123' } })
+      const form = screen.getByRole('button', { name: 'Create Account' }).closest('form')!
+
+      await act(async () => {
+        fireEvent.submit(form)
+      })
+      await waitFor(() => {
+        expect(screen.getByRole('link', { name: 'Request an invite' })).toBeInTheDocument()
+      })
+
+      // Second attempt, now with an invite in place.
+      mockSignUpWithEmail.mockImplementation(() => Promise.resolve({ error: null }))
+      await act(async () => {
+        fireEvent.submit(form)
+      })
+
+      await waitFor(() => {
+        expect(screen.getByText('Check your email for a confirmation link!')).toBeInTheDocument()
+      })
+      expect(screen.queryByRole('link', { name: 'Request an invite' })).not.toBeInTheDocument()
     })
   })
 })
