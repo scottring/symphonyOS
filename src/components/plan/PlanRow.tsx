@@ -14,6 +14,9 @@ export interface PlanRowModel {
   isGoal: boolean
   fate: PlacementFate
   kind: 'task' | 'goal'
+  /** Where this row's copy went, when it has been taken down a level. The
+   *  row's ONE status line; the tick says whether it is finished. */
+  placed?: { label: string; id: string } | null
 }
 
 const ACTION_LABEL: Record<Exclude<RowAction, 'complete'>, string> = {
@@ -31,14 +34,19 @@ function ActionIcon({ action }: { action: Exclude<RowAction, 'complete'> }) {
   return <Repeat className="w-3.5 h-3.5" />
 }
 
-export function PlanRow({ row, actions, onAction, onOpen }: {
+export function PlanRow({ row, actions, onAction, onOpen, onOpenPlaced }: {
   row: PlanRowModel
   actions: RowAction[]
   onAction: (action: RowAction, row: PlanRowModel) => void
   onOpen: (row: PlanRowModel) => void
+  /** Follow the row's status to the copy that carries it. */
+  onOpenPlaced?: (taskId: string) => void
 }) {
-  const done = row.fate === 'done'
-  const canTick = actions.includes('complete') || done
+  // A row whose copy is finished reads as finished — one status, not a tick
+  // that disagrees with an annotation beside it. The tick is not clickable
+  // there: completion belongs to the copy that did the work.
+  const done = row.fate === 'done' || row.fate === 'placed-done'
+  const canTick = actions.includes('complete')
   const verbs = actions.filter((a): a is Exclude<RowAction, 'complete'> => a !== 'complete')
   return (
     <li className="group flex items-start gap-2.5 rounded-lg px-2 py-1.5 hover:bg-neutral-50 transition-colors">
@@ -61,8 +69,20 @@ export function PlanRow({ row, actions, onAction, onOpen }: {
       >
         {row.title}
       </button>
-      {row.fate === 'placed-open' && <span className="shrink-0 text-xs text-neutral-400 mt-0.5">→ placed</span>}
-      {row.fate === 'placed-done' && <span className="shrink-0 text-xs text-primary-700 mt-0.5">→ done</span>}
+      {row.placed && (
+        onOpenPlaced ? (
+          <button
+            type="button"
+            onClick={() => onOpenPlaced(row.placed!.id)}
+            title={`Open this task where it now lives — ${row.placed.label}`}
+            className="shrink-0 mt-0.5 text-xs text-neutral-400 hover:text-primary-700 hover:underline transition-colors"
+          >
+            {row.placed.label}
+          </button>
+        ) : (
+          <span className="shrink-0 text-xs text-neutral-400 mt-0.5">{row.placed.label}</span>
+        )
+      )}
       {verbs.length > 0 && (
         <span className="shrink-0 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
           {verbs.map((a) => (

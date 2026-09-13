@@ -72,3 +72,26 @@ export function isDescent(from: TaskBucket | undefined, to: TaskBucket | undefin
 export function openPool(pool: readonly Task[], tasks: readonly Task[]): Task[] {
   return pool.filter((t) => placementFate(t, tasks) === 'open')
 }
+
+/** Where an upper-list row's copy now lives, for the ONE status a placed row
+ *  shows. Two annotations ("→ placed" AND "→ done") read as competing
+ *  statuses (Scott, 2026-09-13: "it's unclear whether the checkbox or the
+ *  annotation is authoritative"), so the row says one thing — where the work
+ *  went — and the tick says whether it's finished. Null when nothing was
+ *  copied down. */
+export function placedWhere(task: Task, tasks: readonly Task[]): { label: string; id: string } | null {
+  const copy = placedCopyOf(task, tasks)
+  if (!copy) return null
+  const done = copy.completed
+  if (copy.scheduledFor) {
+    const day = copy.scheduledFor.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    return { label: done ? `done ${day}` : `on ${day}`, id: copy.id }
+  }
+  if (copy.bucket === 'week') {
+    const week = copy.weekStart
+      ? `the week of ${copy.weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+      : 'this week'
+    return { label: done ? `done in ${week}` : `in ${week}`, id: copy.id }
+  }
+  return { label: done ? 'done' : 'placed', id: copy.id }
+}

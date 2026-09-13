@@ -10,15 +10,7 @@
 import { useEffect, useState } from 'react'
 import { ArrowRight, ChevronDown, ChevronRight, Target } from 'lucide-react'
 import type { PlanRowModel } from './PlanRow'
-
-function readOpen(key: string | undefined): boolean {
-  if (!key) return false
-  try { return localStorage.getItem(key) === 'open' } catch { return false }
-}
-function writeOpen(key: string | undefined, open: boolean): void {
-  if (!key) return
-  try { localStorage.setItem(key, open ? 'open' : 'collapsed') } catch { /* private browsing */ }
-}
+import { readOpen, writeOpen } from './foldState'
 
 // The hint is a one-time nudge toward the pull-down arrow (demo run
 // 2026-09-06: the arrow was hover-only AND unlabeled, so no one found it).

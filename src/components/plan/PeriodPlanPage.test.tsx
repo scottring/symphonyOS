@@ -61,17 +61,18 @@ describe('PeriodPlanPage', () => {
   beforeEach(() => {
     state.tasks = []; state.goals = []; state.loading = false
     seasonsState.seasons = DEFAULT_SEASONS; seasonsState.loading = false
+    localStorage.clear()
     Object.values(hook).forEach((f) => f.mockClear())
     Object.values(goalsApi).forEach((f) => f.mockClear())
     mockNavigate.mockClear()
   })
 
-  it("This Month: goals first, then tasks, each with its fate; Iris's rows stay out", () => {
+  it("This Month: goals first, then tasks, each under its own heading; Iris's rows stay out", () => {
     const placed = task({ title: 'Repaint the porch', monthStart: thisMonth })
     state.tasks = [
       placed,
       task({ title: 'Read more', monthStart: thisMonth, isGoal: true }),
-      task({ title: 'Repaint the porch', bucket: 'week', sourceId: placed.id }),
+      task({ title: 'Repaint the porch', bucket: 'week', sourceId: placed.id, weekStart: new Date(now.getFullYear(), now.getMonth(), 13) }),
       task({ title: "Iris's thing", monthStart: thisMonth, assignedTo: 'iris' }),
       task({ title: 'Legacy row' }),
     ]
@@ -80,30 +81,69 @@ describe('PeriodPlanPage', () => {
     const list = screen.getByRole('region', { name: /list$/ })
     const titles = within(list).getAllByRole('listitem').map((li) => li.textContent)
     expect(titles[0]).toContain('Read more')
-    expect(within(list).getByText('→ placed')).toBeInTheDocument()
     expect(within(list).getByText('Legacy row')).toBeInTheDocument()
     expect(within(list).queryByText("Iris's thing")).not.toBeInTheDocument()
+    // Goals and tasks each say which they are — the month name, not "list".
+    const monthName = now.toLocaleDateString('en-US', { month: 'long' })
+    expect(within(list).getByRole('heading', { name: `${monthName} goals` })).toBeInTheDocument()
+    expect(within(list).getByRole('heading', { name: `${monthName} tasks` })).toBeInTheDocument()
   })
 
-  it('shows dated items "on the calendar" above the list — the pool question was hiding them (demo run 2026-09-06)', () => {
+  it('a placed row says ONE thing — where the work went — and follows to it', () => {
+    const original = task({ title: 'Repaint the porch', monthStart: thisMonth })
+    const copy = task({ title: 'Repaint the porch', bucket: 'week', sourceId: original.id, weekStart: new Date(now.getFullYear(), now.getMonth(), 13) })
+    state.tasks = [original, copy]
+    renderPage('month')
+    const list = screen.getByRole('region', { name: /list$/ })
+    // The competing "→ placed" / "→ done" pair is gone.
+    expect(within(list).queryByText('→ placed')).not.toBeInTheDocument()
+    expect(within(list).queryByText('→ done')).not.toBeInTheDocument()
+    const status = within(list).getByText(/in the week of/)
+    fireEvent.click(status)
+    expect(mockNavigate).toHaveBeenCalledWith(`/task/${copy.id}`)
+  })
+
+  it('a placed row whose copy is finished reads as finished, and its tick is not clickable', () => {
+    const original = task({ title: 'Trade in the bike', monthStart: thisMonth })
+    state.tasks = [
+      original,
+      task({ title: 'Trade in the bike', bucket: 'week', sourceId: original.id, completed: true }),
+    ]
+    renderPage('month')
+    const list = screen.getByRole('region', { name: /list$/ })
+    expect(within(list).getByText('done in this week')).toBeInTheDocument()
+    // Completion belongs to the copy that did the work.
+    expect(within(list).getByRole('button', { name: /Reopen Trade in the bike/ })).toBeDisabled()
+  })
+
+  it('the calendar is a fold BENEATH the plan — closed until you open it (Scott, 2026-09-13)', () => {
     const scheduledFor = new Date(now.getFullYear(), now.getMonth(), 15, 18, 30)
     const dated = task({ title: 'Back to school night', scheduledFor, bucket: 'week' })
     state.tasks = [dated]
     renderPage('month')
-    expect(screen.getByRole('heading', { name: 'On the calendar' })).toBeInTheDocument()
     const expectedDate = scheduledFor.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
     const expectedTime = scheduledFor.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })
+    expect(screen.getByRole('heading', { name: 'On the calendar' })).toBeInTheDocument()
+    // Closed: the plan greets you, the calendar waits.
+    expect(screen.queryByText(`${expectedDate} · Back to school night · ${expectedTime}`)).not.toBeInTheDocument()
+    // …and the plan comes first in the document.
+    const plan = screen.getByRole('region', { name: /list$/ })
+    const calendar = screen.getByRole('region', { name: 'On the calendar' })
+    expect(plan.compareDocumentPosition(calendar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+
+    fireEvent.click(screen.getByRole('button', { name: /On the calendar/ }))
     expect(screen.getByText(`${expectedDate} · Back to school night · ${expectedTime}`)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: new RegExp(`${expectedDate} · Back to school night`) }))
     expect(mockNavigate).toHaveBeenCalledWith(`/task/${dated.id}`)
   })
 
-  it('an all-day dated item shows no time, and the strip is absent when nothing is dated', () => {
+  it('an all-day dated item shows no time, and the fold is absent when nothing is dated', () => {
     renderPage('month')
     expect(screen.queryByRole('heading', { name: 'On the calendar' })).not.toBeInTheDocument()
     const scheduledFor = new Date(now.getFullYear(), now.getMonth(), 15)
     state.tasks = [task({ title: 'Picture day', scheduledFor, isAllDay: true, bucket: 'week' })]
     renderPage('month')
+    fireEvent.click(screen.getByRole('button', { name: /On the calendar/ }))
     const expectedDate = scheduledFor.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
     expect(screen.getByText(`${expectedDate} · Picture day`)).toBeInTheDocument()
   })
@@ -196,6 +236,7 @@ describe('PeriodPlanPage — planningPeriod wiring', () => {
   beforeEach(() => {
     state.tasks = []; state.goals = []; state.loading = false
     seasonsState.seasons = DEFAULT_SEASONS; seasonsState.loading = false
+    localStorage.clear()
     Object.values(hook).forEach((f) => f.mockClear())
     Object.values(goalsApi).forEach((f) => f.mockClear())
     mockNavigate.mockClear()

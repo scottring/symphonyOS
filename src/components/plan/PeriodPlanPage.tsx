@@ -13,7 +13,7 @@
 
 import { useMemo, useState, useCallback, useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Plus, Target } from 'lucide-react'
+import { Plus, Target, ChevronDown, ChevronRight } from 'lucide-react'
 import { MastheadCard, PeriodNavEyebrow } from '@/components/layout/MastheadCard'
 import { HomeChromeControls } from '@/components/home/HomeChromeControls'
 import { DomainSwitcher } from '@/components/domain/DomainSwitcher'
@@ -26,7 +26,7 @@ import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { useHouseholdSeasons } from '@/hooks/useHouseholdSeasons'
 import { GoalsProvider, useGoalsContext } from '@/contexts/GoalsContext'
 import { filterTasksForLayers, matchesLayers } from '@/lib/today/domainFilter'
-import { placementFate } from '@/lib/planning/lineage'
+import { placementFate, placedWhere } from '@/lib/planning/lineage'
 import { parseLocalYmd } from '@/lib/cadence/config'
 import { formatShortDate } from '@/lib/dateHelpers'
 import {
@@ -37,12 +37,13 @@ import type { Task } from '@/types/task'
 import type { Goal } from '@/types/goal'
 import { PlanRow, type PlanRowModel } from './PlanRow'
 import { PlanRail } from './PlanRail'
+import { readOpen, writeOpen } from './foldState'
 
 const TITLE: Record<PlanLevel, string> = { month: 'This Month', season: 'This Season', year: 'This Year' }
 const NOUN: Record<PlanLevel, string> = { month: 'month', season: 'season', year: 'year' }
 
 function taskRow(t: Task, all: readonly Task[]): PlanRowModel {
-  return { id: t.id, title: t.title, isGoal: !!t.isGoal, fate: placementFate(t, all), kind: 'task' }
+  return { id: t.id, title: t.title, isGoal: !!t.isGoal, fate: placementFate(t, all), kind: 'task', placed: placedWhere(t, all) }
 }
 function goalRow(g: Goal): PlanRowModel {
   return { id: g.id, title: g.name, isGoal: true, fate: g.status === 'completed' ? 'done' : 'open', kind: 'goal' }
@@ -183,6 +184,15 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
     void gated.pushTask(row.id, 'month')
   }, [gated])
 
+  // The calendar is a view you OPEN, not the thing that greets you: the page
+  // answers "what do we want from this month?" first (Scott, 2026-09-13: the
+  // calendar came first and pushed the plan below it).
+  const calendarKey = `symphony-plan-calendar-${level}`
+  const [calendarOpen, setCalendarOpen] = useState(() => readOpen(calendarKey))
+  const toggleCalendar = useCallback(() => {
+    setCalendarOpen((v) => { writeOpen(calendarKey, !v); return !v })
+  }, [calendarKey])
+
   // ── Add ──────────────────────────────────────────────────────────────────
   const [draft, setDraft] = useState('')
   const [asGoal, setAsGoal] = useState(level === 'year')
@@ -206,6 +216,16 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
       context: soleDomain,
     })
   }, [draft, level, areas, addArea, addGoal, soleDomain, bounds.start, updateGoal, addTask, asGoal])
+
+  // Goals and tasks are different promises and get their own headings — one
+  // list with an icon on some rows didn't say which was which.
+  const goalRows = useMemo(() => rows.filter((r) => r.isGoal), [rows])
+  const taskRows = useMemo(() => rows.filter((r) => !r.isGoal), [rows])
+  const shortLabel = level === 'month'
+    ? bounds.start.toLocaleDateString('en-US', { month: 'long' })
+    : bounds.label
+
+  const openPlaced = useCallback((taskId: string) => { navigate(`/task/${taskId}`) }, [navigate])
 
   const noun = NOUN[level]
   const emptyCopy = isPast ? `Nothing was on this ${noun}'s list.` : `Nothing on this ${noun}'s list yet.`
@@ -250,35 +270,34 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
       />
 
       <div className="flex flex-col gap-3">
-        {dated.length > 0 && (
-          <section aria-label="On the calendar" className="min-w-0 rounded-xl border border-neutral-200 bg-white px-3 py-2.5 shadow-sm">
-            <h2 className="text-xs font-semibold tracking-wide uppercase text-neutral-500">On the calendar</h2>
-            <ul className="mt-1.5 space-y-0.5">
-              {dated.map((t) => (
-                <li key={t.id}>
-                  <button
-                    type="button"
-                    onClick={() => navigate(`/task/${t.id}`)}
-                    className="w-full rounded-md px-1.5 py-1 text-left text-[13px] text-neutral-700 hover:bg-neutral-50 transition-colors"
-                  >
-                    {formatShortDate(t.scheduledFor!)} · {t.title}
-                    {!t.isAllDay && ` · ${t.scheduledFor!.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
         <section aria-label={`${bounds.label} list`} className="min-w-0 rounded-xl border border-neutral-200 bg-white px-3 py-3 shadow-sm">
           {rows.length === 0 ? (
             <p className="px-2 py-3 text-sm text-neutral-400">{emptyCopy}</p>
           ) : (
-            <ul className="space-y-0.5">
-              {rows.map((row) => (
-                <PlanRow key={row.id} row={row} onOpen={open} onAction={(a, r) => { void act(a, r) }}
-                  actions={actionsFor({ fate: row.fate, isGoal: row.isGoal, isPast })} />
-              ))}
-            </ul>
+            <>
+              {goalRows.length > 0 && (
+                <div>
+                  <h2 className="px-2 text-xs font-semibold tracking-wide uppercase text-neutral-500">{shortLabel} goals</h2>
+                  <ul className="mt-1.5 space-y-0.5">
+                    {goalRows.map((row) => (
+                      <PlanRow key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onAction={(a, r) => { void act(a, r) }}
+                        actions={actionsFor({ fate: row.fate, isGoal: row.isGoal, isPast })} />
+                    ))}
+                  </ul>
+                </div>
+              )}
+              {taskRows.length > 0 && (
+                <div className={goalRows.length > 0 ? 'mt-3 border-t border-neutral-100 pt-3' : ''}>
+                  <h2 className="px-2 text-xs font-semibold tracking-wide uppercase text-neutral-500">{shortLabel} tasks</h2>
+                  <ul className="mt-1.5 space-y-0.5">
+                    {taskRows.map((row) => (
+                      <PlanRow key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onAction={(a, r) => { void act(a, r) }}
+                        actions={actionsFor({ fate: row.fate, isGoal: row.isGoal, isPast })} />
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </>
           )}
 
           {!isPast && (
@@ -311,6 +330,39 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
             </form>
           )}
         </section>
+
+        {dated.length > 0 && (
+          <section aria-label="On the calendar" className="min-w-0 rounded-xl border border-neutral-200 bg-white px-3 py-2.5 shadow-sm">
+            <button
+              type="button"
+              onClick={toggleCalendar}
+              aria-expanded={calendarOpen}
+              className="flex w-full items-center gap-1.5 text-left"
+            >
+              {calendarOpen
+                ? <ChevronDown className="w-3.5 h-3.5 shrink-0 text-neutral-400" />
+                : <ChevronRight className="w-3.5 h-3.5 shrink-0 text-neutral-400" />}
+              <h2 className="text-xs font-semibold tracking-wide uppercase text-neutral-500">On the calendar</h2>
+              <span className="text-xs text-neutral-400">· {dated.length}</span>
+            </button>
+            {calendarOpen && (
+              <ul className="mt-1.5 space-y-0.5">
+                {dated.map((t) => (
+                  <li key={t.id}>
+                    <button
+                      type="button"
+                      onClick={() => navigate(`/task/${t.id}`)}
+                      className="w-full rounded-md px-1.5 py-1 text-left text-[13px] text-neutral-700 hover:bg-neutral-50 transition-colors"
+                    >
+                      {formatShortDate(t.scheduledFor!)} · {t.title}
+                      {!t.isAllDay && ` · ${t.scheduledFor!.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        )}
 
         {above && railBounds && (
           <PlanRail
