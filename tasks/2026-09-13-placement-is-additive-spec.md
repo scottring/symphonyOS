@@ -134,9 +134,22 @@ memberships (append-only truth)
 
 So nothing in §1 changes: the stamps are still what every surface reads, the 33-site membership sweep is unaffected, and `bucket` stays a cache. Memberships sit behind the stamps as the log the stamps summarize. "Placement is additive" simply becomes true over time as well as across grains.
 
-**Requires:** a `task_plan_memberships` table (task_id, grain, period_start, added_at, resolution: `completed_in_period` | `carried` | `dropped` | `open`, resolved_at) and **`tasks.completed_at`**. Storage shape is negotiable; the behavior is a requirement.
+**Requires:** a `task_plan_memberships` table (task_id, grain, period_start, added_at, state, resolved_at, successor_id) and **`tasks.completed_at`**. Storage shape is negotiable; the behavior is a requirement.
 
-**Attribution caveat, so rev 2's cleanup isn't undone immediately.** Codex describes flipping back to a week as something Scott "explicitly asked" for. Reading the transcript, Scott didn't state it in words — *Previous week / This week / Next week* navigation appears in the mockup Scott shared as "basic flow tweaks," and he shared it approvingly. That's real standing, but it is not the same as a stated requirement, and rev 2 exists partly to stop reviewer preferences from being recorded as Scott's decisions. Logged as Open question 5.
+**The append-only log needs explicit resolution semantics — "latest date wins" is not enough.** A membership is in exactly one state:
+
+| State | Means | Effect on the derived stamp |
+|---|---|---|
+| `open` | the live commitment at this grain | it IS the stamp |
+| `completed_in_period` | finished while committed here | stamp cleared on completion |
+| `carried` | superseded by a successor (`successor_id`) | successor becomes the stamp |
+| `dropped` | deliberately un-committed, no successor | stamp goes NULL at this grain |
+
+**Invariant: at most ONE `open` membership per (task, grain)**, enforced by a partial unique index — not by convention. Carrying forward resolves the old row (`carried`, pointing at its successor) and opens the new one **in the same transaction**; dropping resolves with no successor. So `deriveStamps` reads the single open row per grain, and a dropped commitment doesn't leave a stale stamp behind.
+
+**Historical views read the log, never the stamps.** Codex is right that stamps can only ever summarize the *current* placement: "what was committed to Sep 6–12, and how did each one end" is a query over memberships filtered by period, joined to `tasks.completed_at`. The stamps are a read-cache for today's surfaces and must not be consulted for any past period.
+
+**Attribution: settled.** Rev 3 flagged that the requirement appeared in the shared mockup rather than in Scott's words. Codex supplied the source — Scott's original notes in the Codex session, which this session's transcript doesn't contain: *"the next week we look at last week's list to see what has or hasn't been ticked off"* and *"you could flip to the week to look at what's planned for that week."* It is Scott's requirement, not a reviewer's. Only its **priority** is open (Open question 5).
 
 ---
 
@@ -195,9 +208,26 @@ So instances **do** mirror the routine's scope: a shared routine's occurrences a
 **The dedupe discards nothing.** Existing per-member rows may disagree on `status`, `progress`, `assigned_to_override`, and may each own `instance_notes`. Rules, explicitly:
 
 - The surviving occurrence is a **parent** row owning identity (entity + period + grain) and the placement stamps.
-- **Per-member status stays per-member**, on a child row — which is semantically right anyway ("did Iris do her part" is a real question on a shared routine), not merely a migration convenience.
+- **Per-member rows are preserved as history, but they do NOT decide future behavior** — see "What does a shared occurrence mean?" below. Rev 3 made per-member status the default and was wrong to: it silently picks "each does their part" for every shared routine.
 - All `instance_notes` and `coverage_requests` are **re-parented** to the surviving row; none are dropped.
 - A collision that can't be reconciled by those rules stops the migration and is reported. No silent winner.
+
+### What does a shared occurrence mean? — THE open decision
+
+Codex is right that this is the one substantive question left, and rev 3 answered it by accident. Two household routines that look identical need opposite completion models:
+
+| Routine | Reading | Needs |
+|---|---|---|
+| "Kitchen laundry, weekly" | **either** Scott or Iris does it | ONE shared completion state, plus who did it |
+| "Take your vitamins, daily" | **each** does their own | one contribution per member, done when each is done |
+
+A single model cannot serve both. Under "either of us," per-member status means the card never reads as done; under "each does their part," one shared tick lets one person close the other's obligation.
+
+**Proposal: `routines.completion_mode`** — `shared` (one occurrence, one completion, records `completed_by`) or `per_member` (one occurrence, a contribution row per assignee, complete when all are in). Occurrence identity and placement are unchanged in both; only completion differs.
+
+**Default `shared`**, because the common household case is "either of us" (trash, laundry, dishes, meals) and because it is the reading that makes a checkbox mean what it looks like. Existing per-member instance rows migrate to history and do not set the mode — Scott flips the handful that are genuinely per-member.
+
+**This is Scott's call, not a reviewer's** — Open question 6. It gates step 3 only; steps 1, 2 and 4 don't touch it.
 
 **Still verify by test, not by reading.** Two accounts (Scott + Iris): a private routine's occurrence must be invisible; a shared routine's completion must be visible to both. The policy text above is evidence, not proof.
 
@@ -279,11 +309,19 @@ Codex recommended on all four; Claude agrees with all four. Each still needs Sco
 2. **All tasks: Library or sidebar?** → **Start in Library plus empty-⌘K.** Cheap to promote later if Scott reaches for it daily; expensive to demote once it's a habit.
 3. **An unfinished untimed weekly occurrence?** → **Stays in its original week, with an explicit review decision.** Never silently merged into the next occurrence.
 4. **`quarter` vs `season`?** → **Keep `quarter` in the column, display "Season."** A rename is an unrelated compatibility migration across iOS, the wall and MCP; it doesn't belong in this change.
-5. **NEW — is flipping back to a past week and seeing what was planned/completed a requirement you want?** It's in the mockup you shared, not in anything you said, and it's the largest single addition on the table (a memberships table + `completed_at` + a look-back surface). Rev 3 treats it as in scope on the strength of the mockup. Say if it's lower priority than the rest.
+5. **Weekly look-back — priority only.** Confirmed as your requirement (quoted in §1). Both reviewers' working answer: **keep it in scope, but let the month layout and All tasks land first** for immediate clarity. It's the largest single addition (memberships + `completed_at` + a look-back surface).
+6. **NEW, and the only substantive one left — what does a shared routine mean?** One household completion ("either of us does the laundry"), individual contributions ("each does their part"), or both via a per-routine setting? Claude and Codex both say **support both, default to shared**; the recommendation and reasoning are in §3. Gates step 3 only.
 
 ---
 
 ## Changelog
+
+**2026-09-13, rev 4** — Codex review of rev 3:
+
+- **Attribution settled.** The weekly look-back is Scott's own requirement, quoted from his original notes in the Codex session (not in this session's transcript). Rev 3's caveat withdrawn; only priority stays open.
+- **Rev 3's per-member completion default was wrong** and is withdrawn. "Either of us does the laundry" and "each does their part" need opposite completion models, so `routines.completion_mode` is proposed with `shared` as the default — and it's Scott's decision, now Open question 6.
+- **The append-only log gets a state machine.** `open` / `completed_in_period` / `carried` / `dropped`, with **at most one `open` membership per (task, grain)** enforced by a partial unique index, carry-forward resolving old and opening new in one transaction. "Latest date wins" was not enough — a dropped commitment would have left a stale stamp.
+- **Historical views read memberships, never stamps.** Stamps summarize only the current placement, by construction.
 
 **2026-09-13, rev 3** — Codex review of rev 2:
 
