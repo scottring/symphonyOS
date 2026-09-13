@@ -32,13 +32,15 @@ describe('WeekMonthRail', () => {
     expect(screen.getByText('Legacy row')).toBeInTheDocument()
   })
 
-  it('marks placed originals and strikes done ones', () => {
+  it('says where a placed original went and strikes done ones', () => {
     const placed = task({ title: 'Repaint the porch', monthStart: thisMonth })
     const copy = task({ title: 'Repaint the porch', bucket: 'week', sourceId: placed.id })
     const done = task({ title: 'Book dentist', monthStart: thisMonth, completed: true })
     render(<WeekMonthRail onSelectItem={() => {}} tasks={[placed, copy, done]} />)
     unfold()
-    expect(screen.getByText('→ placed')).toBeInTheDocument()
+    // The same one status the list shows — not a second "→ placed" vocabulary.
+    expect(screen.getByText('in this week')).toBeInTheDocument()
+    expect(screen.queryByText('→ placed')).not.toBeInTheDocument()
     expect(screen.getByText('Book dentist')).toHaveClass('line-through')
     // The copy itself (a week row) is not on the month list.
     expect(screen.getAllByText('Repaint the porch')).toHaveLength(1)

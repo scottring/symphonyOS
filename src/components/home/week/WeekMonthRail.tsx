@@ -16,7 +16,7 @@
 
 import type { Task } from '@/types/task'
 import { belongsToMonth, monthStartOf } from '@/lib/planning/periodPlacement'
-import { placementFate } from '@/lib/planning/lineage'
+import { placementFate, placedWhere } from '@/lib/planning/lineage'
 import { doableBy } from '@/lib/planning/poolViews'
 import { PlanRail } from '@/components/plan/PlanRail'
 import type { PlanRowModel } from '@/components/plan/PlanRow'
@@ -40,7 +40,7 @@ export function WeekMonthRail({ tasks, onSelectItem, onAddToWeek, meId, now = ne
   // not isPlacedOnMonth: a legacy NULL row is this month's.
   const rows: PlanRowModel[] = tasks
     .filter((t) => t.bucket === 'month' && belongsToMonth(t, monthStart) && (!meId || doableBy(t, meId)))
-    .map((t) => ({ id: t.id, title: t.title, isGoal: !!t.isGoal, fate: placementFate(t, tasks), kind: 'task' as const }))
+    .map((t) => ({ id: t.id, title: t.title, isGoal: !!t.isGoal, fate: placementFate(t, tasks), kind: 'task' as const, placed: placedWhere(t, tasks) }))
   const label = now.toLocaleDateString('en-US', { month: 'long' })
 
   return (

@@ -5,7 +5,8 @@
 // starts closed — a reference you unfold when you want to glance up — and
 // remembers its state when given a storage key. The one verb is the arrow on
 // an open task (a copy-down: "→ this month" on a season task, "→ this week"
-// on a month task); goals, placed and done rows are look-only.
+// on a month task); goals, placed and done rows are look-only. A placed row
+// says the one thing the list says — where the work went.
 
 import { useEffect, useState } from 'react'
 import { ArrowRight, ChevronDown, ChevronRight, Target } from 'lucide-react'
@@ -72,8 +73,7 @@ export function PlanRail({ title, subtitle, rows, onOpen, onPullDown, pullLabel,
           <span className={`min-w-0 flex-1 text-[13px] leading-snug ${row.fate === 'done' ? 'line-through text-neutral-400' : 'text-neutral-700'}`}>
             {row.title}
           </span>
-          {row.fate === 'placed-open' && <span className="shrink-0 text-[11px] text-neutral-400">→ placed</span>}
-          {row.fate === 'placed-done' && <span className="shrink-0 text-[11px] text-primary-700">→ done</span>}
+          {row.placed && <span className="shrink-0 text-[11px] text-neutral-400">{row.placed.label}</span>}
         </button>
         {canPull && (
           <button
