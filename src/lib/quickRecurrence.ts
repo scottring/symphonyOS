@@ -265,7 +265,18 @@ export function describeRecurrence(pattern: RecurrencePattern): string {
     case 'quarterly':
       return 'Every quarter'
     case 'yearly':
-      return 'Every year'
+      return pattern.interval && pattern.interval > 1 ? `${every} years` : 'Every year'
+    case 'since_last': {
+      // NOT "every 6 weeks": the clock starts when you last did it, which is a
+      // different promise from a fixed schedule. Said plainly, because
+      // 'Repeats' told the reader nothing at all.
+      const n = pattern.interval && pattern.interval > 0 ? pattern.interval : 1
+      const unit = pattern.unit ?? 'days'
+      const noun = n === 1 ? unit.replace(/s$/, '') : unit
+      return `${n} ${noun} after the last time`
+    }
+    case 'specific_days':
+      return pattern.dates?.length ? `${pattern.dates.length} set dates` : 'On set dates'
     default:
       return 'Repeats'
   }

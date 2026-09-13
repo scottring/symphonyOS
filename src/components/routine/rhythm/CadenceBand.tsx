@@ -9,12 +9,11 @@
 // A band says three things per row: what it is, how often, and when it next
 // lands. Nothing here is ticked — an occurrence is ticked on Week or Today.
 
-import { Repeat, Moon } from 'lucide-react'
 import type { Routine } from '@/types/actionable'
 import type { FamilyMember } from '@/types/family'
-import { describeRecurrence, nextOccurrence } from '@/lib/quickRecurrence'
+import { nextOccurrence } from '@/lib/quickRecurrence'
 import { SlotAdd, type CreateRoutineInSlot } from './SlotAdd'
-import { memberIdsOf } from './rhythmModel'
+import { RoutineRow } from './RoutineRow'
 
 /** When this routine next lands, as a person would say it. A resting routine
  *  answers with its wake date instead — `paused_until` is stored at UTC
@@ -64,55 +63,36 @@ export function CadenceBand({
 }) {
   if (routines.length === 0 && !onCreateInSlot) return null
 
-  const Icon = resting ? Moon : Repeat
-
   return (
     <section aria-label={heading} className="min-w-0">
-      <div className="flex items-baseline gap-2 px-1">
-        <h2 className="font-display text-lg text-neutral-700">{heading}</h2>
-        <span className="text-xs tabular-nums text-neutral-400">{routines.length}</span>
+      <div className="flex items-baseline gap-2">
+        <h2 className="font-display text-2xl text-neutral-800">{heading}</h2>
+        {hint && <p className="text-[13px] text-neutral-500">{hint}</p>}
       </div>
-      {hint && <p className="px-1 text-[12px] text-neutral-500">{hint}</p>}
 
-      <ul className="mt-1.5 space-y-0.5">
-        {routines.map((r) => {
-          const dim = matches ? !matches(r) : false
-          const steps = stepCounts[r.id] ?? 0
-          const owners = memberIdsOf(r)
-            .map((id) => familyMembers.find((m) => m.id === id)?.name)
-            .filter((name): name is string => !!name)
-          const next = nextLabel(r, now, resting)
-          return (
-            <li key={r.id}>
-              <button
-                type="button"
-                onClick={() => onOpenRoutine(r)}
-                className={`flex w-full items-start gap-2 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-neutral-50 ${dim ? 'opacity-40' : ''}`}
-              >
-                <Icon className={`mt-[3px] h-3.5 w-3.5 shrink-0 ${resting ? 'text-neutral-300' : 'text-primary-300'}`} />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-[14px] leading-snug text-neutral-800">
-                    {r.name}
-                    {steps > 0 && <span className="text-neutral-400"> · {steps} steps</span>}
-                  </span>
-                  <span className="mt-0.5 block text-[12px] leading-snug text-neutral-500">
-                    {describeRecurrence(r.recurrence_pattern)}
-                    {next && <span className="text-neutral-400"> · {next}</span>}
-                    {owners.length > 0 && <span className="text-neutral-400"> · {owners.join(', ')}</span>}
-                  </span>
-                </span>
-              </button>
-            </li>
-          )
-        })}
-      </ul>
+      {routines.length > 0 && (
+        <ul className="mt-2 overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
+          {routines.map((r) => (
+            <RoutineRow
+              key={r.id}
+              routine={r}
+              familyMembers={familyMembers}
+              steps={stepCounts[r.id] ?? 0}
+              dimmed={matches ? !matches(r) : false}
+              when={resting ? nextLabel(r, now, true) : undefined}
+              detail={resting ? undefined : nextLabel(r, now, false)}
+              onOpen={onOpenRoutine}
+            />
+          ))}
+        </ul>
+      )}
 
       {routines.length === 0 && (
-        <p className="px-2 py-1 text-[13px] text-neutral-400">Nothing on this rung.</p>
+        <p className="mt-2 px-1 text-[13px] text-neutral-400">Nothing on this rung.</p>
       )}
 
       {onCreateInSlot && createPattern && (
-        <div className="mt-1 px-1">
+        <div className="mt-1.5 px-1">
           <SlotAdd
             label={addLabel ?? `Add a ${heading.toLowerCase()} routine`}
             onCreate={(name) => onCreateInSlot({ name, recurrence_pattern: createPattern })}

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useEscapeKey } from '@/hooks/useEscapeKey'
 import { MastheadCard } from '@/components/layout/MastheadCard'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
-import { Plus, Search, Sparkles, RefreshCw, Wrench } from 'lucide-react'
+import { Plus, Search, Sparkles, RefreshCw, Wrench, ChevronRight, ChevronDown } from 'lucide-react'
 import type { RecurrencePattern, Routine } from '@/types/actionable'
 import type { Contact } from '@/types/contact'
 import type { FamilyMember } from '@/types/family'
@@ -10,19 +10,11 @@ import type { UpdateRoutineInput } from '@/hooks/useRoutines'
 import { groupRoutineSteps } from '@/lib/today/routineCollections'
 import { TapRoutinePanel } from '@/components/surface/TapRoutinePanel'
 import { TapStepPanel } from '@/components/surface/TapStepPanel'
-import { buildRhythmModel, DAY_ORDER, minutesOf, type DayKey, type RhythmCard } from './rhythm/rhythmModel'
-import { readCadenceConfig } from '@/lib/cadence/config'
+import { buildRhythmModel } from './rhythm/rhythmModel'
 
-const DAY_FULL: Record<DayKey, string> = {
-  sun: 'Sunday', mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday',
-  thu: 'Thursday', fri: 'Friday', sat: 'Saturday',
-}
 import { findTend, tendFindingKey } from './rhythm/tendHeuristics'
-import { DailyArc } from './rhythm/DailyArc'
-import { WeekStrip } from './rhythm/WeekStrip'
 import { CadenceBand } from './rhythm/CadenceBand'
 import { TendDrawer } from './rhythm/TendDrawer'
-import type { DropIntent } from './rhythm/dropRules'
 import type { CreateRoutineInSlot } from './rhythm/SlotAdd'
 
 interface RhythmPageProps {
@@ -43,6 +35,10 @@ interface RhythmPageProps {
   /** Delete a top-level routine (RoutinesApp already passes this — it was silently dropped before). */
   onDelete?: (id: string) => void
   onCreateCollection?: (name: string) => Promise<Routine | null> | void
+  /** Fold several routines into a NEW collection. Kept on the contract (the
+   *  app passes it) but currently unreachable: its only entry point was naming
+   *  a cluster on the daily arc, which the uniform list retired. Tend's
+   *  grouping finding is where it belongs next. */
   onGroupIntoCollection?: (
     name: string,
     routineIds: string[],
@@ -60,7 +56,7 @@ interface RhythmPageProps {
 export function RhythmPage(props: RhythmPageProps) {
   const {
     routines, loading = false, familyMembers = [],
-    onUpdateRoutine, onDelete, onGroupIntoCollection, onBuildWithAI, onCreateCollection,
+    onUpdateRoutine, onDelete, onBuildWithAI, onCreateCollection,
     onAddToCollection, onCreateRoutineInSlot,
   } = props
 
@@ -70,7 +66,6 @@ export function RhythmPage(props: RhythmPageProps) {
   const toggleMember = (id: string) =>
     setMemberIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]))
   // A focused Through-the-week day: the arc shows that day's full picture.
-  const [focusDay, setFocusDay] = useState<DayKey | null>(null)
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState<{ kind: 'routine' | 'standalone-step' | 'step'; id: string } | null>(null)
   // "New routine" writes a row before the user has typed a name, so the panel
@@ -78,6 +73,7 @@ export function RhythmPage(props: RhythmPageProps) {
   // is let go — otherwise every abandoned click leaves a "New routine" behind
   // (demo walkthrough 2026-09-04). Any edit clears the draft mark.
   const [draftId, setDraftId] = useState<string | null>(null)
+  const [restingOpen, setRestingOpen] = useState(false)
   const [tendOpen, setTendOpen] = useState(false)
 
   // A slot created while a member lens is locked in shares only with those
@@ -113,8 +109,8 @@ export function RhythmPage(props: RhythmPageProps) {
   }, [routines, memberIds, selfMember])
 
   const model = useMemo(
-    () => buildRhythmModel(routinesForModel, { memberIds, focusDay }),
-    [routinesForModel, memberIds, focusDay],
+    () => buildRhythmModel(routinesForModel, { memberIds }),
+    [routinesForModel, memberIds],
   )
   // Pinned to the day, so "next lands" doesn't recompute on every render and
   // a session left open overnight still rolls when the date changes.
@@ -145,11 +141,6 @@ export function RhythmPage(props: RhythmPageProps) {
   )
   const tendCount = findings.length
   const { collections } = useMemo(() => groupRoutineSteps(routines), [routines])
-  const collectionSteps = useMemo(
-    () => Object.fromEntries(collections.map(c => [c.id, c.steps])),
-    [collections],
-  )
-
   // Type-anywhere search
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -173,103 +164,8 @@ export function RhythmPage(props: RhythmPageProps) {
   }
 
   const now = new Date()
-  const nowMinutes = now.getHours() * 60 + now.getMinutes()
-  const todayKey = DAY_ORDER[now.getDay()]
   const subtitle = now.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
 
-  const handleNameCluster = (card: RhythmCard, name: string) => {
-    // Stamp the cluster's start time + daily recurrence on the new collection
-    // so it stays in place on the arc instead of landing untimed at the end.
-    onGroupIntoCollection?.(name, card.routines.map(r => r.id), {
-      time_of_day: card.startTime?.slice(0, 5) ?? undefined,
-      recurrence_pattern: { type: 'daily' },
-    })
-  }
-  const routineById = useMemo(() => new Map(routines.map(r => [r.id, r])), [routines])
-  const isDailyZone = (r: Routine) => {
-    const p = r.recurrence_pattern
-    return p.type === 'daily' || (p.type === 'weekly' && (p.days?.length ?? 0) >= 5)
-  }
-  const fmtMinutes = (n: number) => {
-    const clamped = Math.min(Math.max(n, 0), 24 * 60 - 5)
-    return `${String(Math.floor(clamped / 60)).padStart(2, '0')}:${String(clamped % 60).padStart(2, '0')}`
-  }
-  const executeDropIntent = (intent: DropIntent) => {
-    switch (intent.type) {
-      case 'add-steps': {
-        const ids = intent.ids.filter(id => routineById.get(id)?.parent_routine_id !== intent.collectionId)
-        if (ids.length > 0) onAddToCollection?.(intent.collectionId, ids)
-        return
-      }
-      case 'stand-alone-at':
-        props.onPromoteStep(intent.id)
-        onUpdateRoutine(intent.id, { time_of_day: intent.time, recurrence_pattern: { type: 'daily' } })
-        return
-      case 'retime': {
-        const r = routineById.get(intent.id)
-        if (!r) return
-        onUpdateRoutine(intent.id, isDailyZone(r)
-          ? { time_of_day: intent.time }
-          : { time_of_day: intent.time, recurrence_pattern: { type: 'daily' } })
-        return
-      }
-      case 'shift-group': {
-        const members = intent.ids
-          .map(id => routineById.get(id))
-          .filter((r): r is Routine => !!r && minutesOf(r.time_of_day) != null)
-        if (members.length === 0) return
-        const earliest = Math.min(...members.map(m => minutesOf(m.time_of_day)!))
-        const delta = (minutesOf(intent.time) ?? earliest) - earliest
-        for (const m of members) {
-          onUpdateRoutine(m.id, { time_of_day: fmtMinutes(minutesOf(m.time_of_day)! + delta) })
-        }
-        return
-      }
-      case 'weekly-on': {
-        for (const id of intent.ids) {
-          if (routineById.get(id)?.parent_routine_id) props.onPromoteStep(id)
-          onUpdateRoutine(id, { recurrence_pattern: { type: 'weekly', days: [intent.day] } })
-        }
-        return
-      }
-      case 'yearly-in': {
-        for (const id of intent.ids) {
-          if (routineById.get(id)?.parent_routine_id) props.onPromoteStep(id)
-          const existing = routineById.get(id)?.recurrence_pattern
-          onUpdateRoutine(id, {
-            recurrence_pattern: {
-              type: 'yearly',
-              month_of_year: intent.month,
-              // Keep the day it already lands on; a routine arriving from the
-              // week or the arc has none, so the 1st is the honest default.
-              day_of_month: existing?.day_of_month ?? 1,
-            },
-          })
-        }
-        return
-      }
-      case 'wake-in': {
-        // Dropping a sleeper names when it wakes. UTC midnight, matching how
-        // every other `paused_until` in the app is stored and read back.
-        const wake = new Date(Date.UTC(intent.year, intent.month - 1, 1)).toISOString()
-        onUpdateRoutine(intent.id, { paused_until: wake })
-        return
-      }
-      case 'move-day': {
-        const r = routineById.get(intent.id)
-        if (!r) return
-        const p = r.recurrence_pattern
-        if (!p.days || p.days.length === 0) {
-          onUpdateRoutine(intent.id, { recurrence_pattern: { type: 'weekly', days: [intent.toDay] } })
-          return
-        }
-        const set = new Set(p.days.filter(d => d !== intent.fromDay))
-        set.add(intent.toDay)
-        onUpdateRoutine(intent.id, { recurrence_pattern: { ...p, days: DAY_ORDER.filter(d => set.has(d)) } })
-        return
-      }
-    }
-  }
   // Any active top-level routine can absorb others as steps (an empty shell
   // like a step-less collection counts — folding in gives it its steps).
   const foldTargets = useMemo(
@@ -428,49 +324,30 @@ export function RhythmPage(props: RhythmPageProps) {
           </div>
         )}
 
-        <div>
-          <DailyArc
-            cards={model.daily.timed}
-            anytime={model.daily.anytime}
-            familyMembers={familyMembers}
-            matches={matches}
-            nowMinutes={nowMinutes}
-            heading={focusDay ? `${DAY_FULL[focusDay]} — the whole day` : undefined}
-            onOpenCollection={id => setOpen({ kind: 'routine', id })}
-            onOpenRoutine={openRoutine}
-            onDropIntent={executeDropIntent}
-            onCreateInSlot={createRoutineInSlot}
-            foldTargets={foldTargets}
-            onNameGroup={handleNameCluster}
-            onFoldInto={(targetId, ids) => onAddToCollection?.(targetId, ids)}
-          />
-        </div>
-
-        <div>
-          <WeekStrip
-            days={model.week.days}
-            sometime={model.week.sometime}
-            stepCounts={model.stepCounts}
-            matches={matches}
-            todayKey={todayKey}
-            onOpenRoutine={openRoutine}
-            familyMembers={familyMembers}
-            collectionSteps={collectionSteps}
-            onDropIntent={executeDropIntent}
-            selectedDay={focusDay}
-            onSelectDay={day => setFocusDay(cur => (cur === day ? null : day))}
-            weekStartsOn={readCadenceConfig().weekStartsOn}
-            onCreateInSlot={createRoutineInSlot}
-          />
-        </div>
-
-        {/* Past the week, the ladder names the cadence instead of plotting it
-            on a calendar: a monthly routine belongs in every month cell, and
-            four different cadences on one strip read as one kind of thing
-            (Scott, 2026-09-13). */}
-        <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+        {/* Every rung the same shape — name · when · who · a way in. The arc
+            and the day strip drew the top two rungs as bespoke canvases, so
+            "every day" and "once a season" looked like different kinds of
+            thing, and a Tue/Thu/Sat routine appeared three times (Scott,
+            2026-09-13). */}
+        <div className="flex max-w-[860px] flex-col gap-7">
           <CadenceBand
-            heading="Monthly" hint="Once a month or thereabouts"
+            heading="Daily" hint="A little, every day"
+            routines={model.daily} familyMembers={familyMembers} stepCounts={model.stepCounts}
+            matches={matches} now={dayStart} onOpenRoutine={openRoutine}
+            onCreateInSlot={createRoutineInSlot}
+            createPattern={{ type: 'daily' }}
+            addLabel="Add a daily routine"
+          />
+          <CadenceBand
+            heading="Weekly" hint="With a day, or whenever it fits"
+            routines={model.week} familyMembers={familyMembers} stepCounts={model.stepCounts}
+            matches={matches} now={dayStart} onOpenRoutine={openRoutine}
+            onCreateInSlot={createRoutineInSlot}
+            createPattern={{ type: 'weekly' }}
+            addLabel="Add a weekly routine"
+          />
+          <CadenceBand
+            heading="Monthly" hint="Once a month"
             routines={model.month} familyMembers={familyMembers} stepCounts={model.stepCounts}
             matches={matches} now={dayStart} onOpenRoutine={openRoutine}
             onCreateInSlot={createRoutineInSlot}
@@ -478,7 +355,7 @@ export function RhythmPage(props: RhythmPageProps) {
             addLabel="Add a monthly routine"
           />
           <CadenceBand
-            heading="Seasonal" hint="Turns with the season"
+            heading="Seasonal" hint="As the season changes"
             routines={model.season} familyMembers={familyMembers} stepCounts={model.stepCounts}
             matches={matches} now={dayStart} onOpenRoutine={openRoutine}
             onCreateInSlot={createRoutineInSlot}
@@ -501,18 +378,33 @@ export function RhythmPage(props: RhythmPageProps) {
             createPattern={{ type: 'yearly', interval: 2 }}
             addLabel="Add a rarer routine"
           />
+
+          {/* Resting is not a commitment — it waits behind a disclosure rather
+              than sitting among the things you actually do. */}
+          {model.resting.length > 0 && (
+            <div>
+              <button
+                type="button"
+                aria-expanded={restingOpen}
+                onClick={() => setRestingOpen(v => !v)}
+                className="flex items-center gap-1.5 text-[13px] font-medium text-neutral-500 transition-colors hover:text-neutral-700"
+              >
+                {restingOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                Resting routines
+                <span className="tabular-nums text-neutral-400">{model.resting.length}</span>
+              </button>
+              {restingOpen && (
+                <div className="mt-2">
+                  <CadenceBand
+                    heading="Resting" hint="Not a commitment right now — it wakes on its own"
+                    routines={model.resting} familyMembers={familyMembers} stepCounts={model.stepCounts}
+                    matches={matches} now={dayStart} resting onOpenRoutine={openRoutine}
+                  />
+                </div>
+              )}
+            </div>
+          )}
         </div>
-
-        {model.resting.length > 0 && (
-          <div>
-            <CadenceBand
-              heading="Resting" hint="Not a commitment right now — it wakes on its own"
-              routines={model.resting} familyMembers={familyMembers} stepCounts={model.stepCounts}
-              matches={matches} now={dayStart} resting onOpenRoutine={openRoutine}
-            />
-          </div>
-        )}
-
       </div>
 
       <TendDrawer

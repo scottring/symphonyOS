@@ -36,9 +36,6 @@ function mk(name: string, over: Partial<Routine> = {}): Routine {
 
 const noop = { onCreateRoutine: vi.fn(), onAddStep: vi.fn(), onReorderSteps: vi.fn(), onPromoteStep: vi.fn() }
 
-function mkDT(): DataTransfer {
-  return new DataTransfer()
-}
 
 /** UTC midnight on the 1st, N months from now — the shape `paused_until` stores. */
 function wakeInMonths(n: number): string {
@@ -64,15 +61,18 @@ describe('RhythmPage', () => {
         ]} />
     )
     expect(screen.getByRole('heading', { name: 'Routines' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Every day' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Through the week' })).toBeInTheDocument()
+    // Every rung the same shape now — the arc and the day strip are gone.
+    expect(screen.getByRole('heading', { name: 'Daily' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Weekly' })).toBeInTheDocument()
     // Past the week, each cadence is its own rung — a monthly routine and a
     // once-every-three-years one are not the same commitment.
     expect(within(screen.getByRole('region', { name: 'Monthly' })).getByText('Pay FFG')).toBeInTheDocument()
     expect(within(screen.getByRole('region', { name: 'Seasonal' })).getByText('Swap the closets')).toBeInTheDocument()
     expect(within(screen.getByRole('region', { name: 'Yearly' })).getByText('Renew passports')).toBeInTheDocument()
     expect(within(screen.getByRole('region', { name: 'Less often' })).getByText('Repaint the deck')).toBeInTheDocument()
-    // A sleeper isn't a commitment — it rests at the foot, saying when it wakes.
+    // A sleeper isn't a commitment — it waits behind a disclosure at the foot,
+    // and says when it wakes.
+    fireEvent.click(screen.getByRole('button', { name: /Resting routines/ }))
     const resting = screen.getByRole('region', { name: 'Resting' })
     expect(within(resting).getByText('Walk to school')).toBeInTheDocument()
     const wake = new Date()
@@ -91,8 +91,10 @@ describe('RhythmPage', () => {
     fireEvent.keyDown(window, { key: 'j' })
     fireEvent.keyDown(window, { key: 'a' })
     fireEvent.keyDown(window, { key: 'x' })
-    expect(screen.getByTestId('arc-card-dish').className).toContain('opacity-30')
-    expect(screen.getByTestId('arc-card-jax').className).not.toContain('opacity-30')
+    const dish = screen.getByText('Wash dishes').closest('li')!
+    const jax = screen.getByText('Walk Jax').closest('li')!
+    expect(dish.className).toContain('opacity-40')
+    expect(jax.className).not.toContain('opacity-40')
   })
 
   it('wake-all updates every seasonal routine', async () => {
@@ -111,7 +113,7 @@ describe('RhythmPage', () => {
     expect(onUpdateRoutine).toHaveBeenCalledWith('b', { visibility: 'active', paused_until: null })
   })
 
-  it('person pill filters the arc', () => {
+  it('person pill filters the list', () => {
     render(
       <RhythmPage {...noop} onUpdateRoutine={vi.fn()}
         familyMembers={[{ id: 'iris', user_id: 'u1', name: 'Iris', initials: 'I', color: '#888', avatar_url: null, is_full_user: true, display_order: 1, created_at: '' } as never]}
@@ -121,8 +123,8 @@ describe('RhythmPage', () => {
         ]} />
     )
     fireEvent.click(screen.getByRole('button', { name: 'Iris' }))
-    expect(screen.queryByTestId('arc-card-jax')).not.toBeInTheDocument()
-    expect(screen.getByTestId('arc-card-run')).toBeInTheDocument()
+    expect(screen.queryByText('Walk Jax')).not.toBeInTheDocument()
+    expect(screen.getByText('Iris run')).toBeInTheDocument()
   })
 
   // Scott, 2026-09-07: "can we multiselect whose week in Routines?" Two pills
@@ -145,20 +147,20 @@ describe('RhythmPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Ella' }))
     fireEvent.click(screen.getByRole('button', { name: 'Kaleb' }))
-    expect(screen.getByTestId('arc-card-piano')).toBeInTheDocument()
-    expect(screen.getByTestId('arc-card-swim')).toBeInTheDocument()
-    expect(screen.queryByTestId('arc-card-jax')).not.toBeInTheDocument()
+    expect(screen.getByText('Ella piano')).toBeInTheDocument()
+    expect(screen.getByText('Kaleb swim')).toBeInTheDocument()
+    expect(screen.queryByText('Walk Jax')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Ella' })).toHaveAttribute('aria-pressed', 'true')
 
     // Dropping Ella leaves Kaleb's week, not Everyone's.
     fireEvent.click(screen.getByRole('button', { name: 'Ella' }))
-    expect(screen.queryByTestId('arc-card-piano')).not.toBeInTheDocument()
-    expect(screen.getByTestId('arc-card-swim')).toBeInTheDocument()
-    expect(screen.queryByTestId('arc-card-jax')).not.toBeInTheDocument()
+    expect(screen.queryByText('Ella piano')).not.toBeInTheDocument()
+    expect(screen.getByText('Kaleb swim')).toBeInTheDocument()
+    expect(screen.queryByText('Walk Jax')).not.toBeInTheDocument()
 
     // Everyone clears the whole set.
     fireEvent.click(screen.getByRole('button', { name: 'Everyone' }))
-    expect(screen.getByTestId('arc-card-jax')).toBeInTheDocument()
+    expect(screen.getByText('Walk Jax')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Kaleb' })).toHaveAttribute('aria-pressed', 'false')
   })
 
@@ -175,8 +177,8 @@ describe('RhythmPage', () => {
         ]} />
     )
     fireEvent.click(screen.getByRole('button', { name: 'Scott' }))
-    expect(screen.getByTestId('arc-card-mine')).toBeInTheDocument()
-    expect(screen.queryByTestId('arc-card-other')).not.toBeInTheDocument()
+    expect(screen.getByText('My unassigned chore')).toBeInTheDocument()
+    expect(screen.queryByText('Someone else made this')).not.toBeInTheDocument()
   })
 
   // Demo run 2026-09-06: the routine panel was taller than the viewport and
@@ -188,51 +190,13 @@ describe('RhythmPage', () => {
           mk('Water plants', { id: 'x', time_of_day: '09:00:00' }),
         ]} />
     )
-    fireEvent.click(within(screen.getByTestId('arc-card-x')).getByRole('button', { name: /Water plants/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Water plants' }))
     const dialog = screen.getByTestId('routine-panel-dialog')
     expect(dialog.className).toContain('max-h-[calc(100vh-2rem)]')
     expect(dialog.className).toContain('flex-col')
     const body = screen.getByTestId('routine-panel-body')
     expect(body.className).toContain('overflow-y-auto')
     expect(body.className).toContain('min-h-0')
-  })
-
-  it('naming a group via the canvas popover calls onGroupIntoCollection with time opts', () => {
-    const onGroupIntoCollection = vi.fn()
-    render(
-      <RhythmPage {...noop} onUpdateRoutine={vi.fn()} onGroupIntoCollection={onGroupIntoCollection}
-        routines={[
-          mk('Hamper', { id: 'a', time_of_day: '19:01:00' }),
-          mk('Pajamas', { id: 'b', time_of_day: '19:02:00' }),
-          mk('Reading', { id: 'c', time_of_day: '19:06:00' }),
-        ]} />
-    )
-    fireEvent.click(screen.getByRole('button', { name: 'Bedtime' }))
-    const input = screen.getByPlaceholderText('Name this rhythm')
-    fireEvent.change(input, { target: { value: 'Wind-down' } })
-    fireEvent.keyDown(input, { key: 'Enter' })
-    expect(onGroupIntoCollection).toHaveBeenCalledWith('Wind-down', ['a', 'b', 'c'],
-      { time_of_day: '19:01', recurrence_pattern: { type: 'daily' } })
-  })
-
-  it('folding a group into an existing routine via the canvas popover calls onAddToCollection', () => {
-    const onAddToCollection = vi.fn()
-    render(
-      <RhythmPage {...noop} onUpdateRoutine={vi.fn()} onAddToCollection={onAddToCollection}
-        routines={[
-          mk('Hamper', { id: 'a', time_of_day: '19:01:00' }),
-          mk('Pajamas', { id: 'b', time_of_day: '19:02:00' }),
-          mk('Reading', { id: 'c', time_of_day: '19:06:00' }),
-          mk('Kids Bedtime Routine', { id: 'bed', recurrence_pattern: { type: 'weekly', days: ['sun'] } }),
-        ]} />
-    )
-    fireEvent.click(screen.getByRole('button', { name: 'Bedtime' }))
-    fireEvent.change(screen.getByPlaceholderText('Name this rhythm'), { target: { value: 'Kids Bedtime' } })
-    // "Kids Bedtime Routine" also renders as a WeekStrip chip (untimed, Sunday
-    // only) — disambiguate to the popover's fold suggestion button.
-    const foldButtons = screen.getAllByRole('button', { name: 'Kids Bedtime Routine' })
-    fireEvent.click(foldButtons.find(b => b.className.includes('bg-emerald-50'))!)
-    expect(onAddToCollection).toHaveBeenCalledWith('bed', ['a', 'b', 'c'])
   })
 
   it('shows a Tend badge counting findings only (not nameable groups)', () => {
@@ -257,42 +221,6 @@ describe('RhythmPage', () => {
     expect(within(screen.getByRole('button', { name: /tend/i })).queryByText(/^\d+$/)).not.toBeInTheDocument()
   })
 
-  it('executes an add-steps drop end to end', () => {
-    const onAddToCollection = vi.fn()
-    render(
-      <RhythmPage {...noop} onUpdateRoutine={vi.fn()} onAddToCollection={onAddToCollection}
-        routines={[
-          mk('Hamper', { id: 'a', time_of_day: '19:01:00' }),
-          mk('Kids Bedtime', { id: 'bed', time_of_day: '19:15:00' }),
-          mk('Read', { id: 'read', time_of_day: null, parent_routine_id: 'bed' }),
-        ]} />
-    )
-    const dt = mkDT()
-    dt.setData('text/rhythm-payload', JSON.stringify({ kind: 'routine', id: 'a' }))
-    dt.setData('text/rhythm-kind-routine', '1')
-    fireEvent.drop(screen.getByTestId('arc-card-bed'), { dataTransfer: dt })
-    expect(onAddToCollection).toHaveBeenCalledWith('bed', ['a'])
-  })
-
-  it('executes a stand-alone-at drop: promote then retime daily', () => {
-    const onPromoteStep = vi.fn()
-    const onUpdateRoutine = vi.fn()
-    render(
-      <RhythmPage {...noop} onPromoteStep={onPromoteStep} onUpdateRoutine={onUpdateRoutine}
-        routines={[
-          mk('Walk Jax', { id: 'walk', time_of_day: '06:30:00' }),
-          mk('Camp Mornings', { id: 'camp', time_of_day: '07:00:00' }),
-          mk('Pack bags', { id: 'pack', parent_routine_id: 'camp' }),
-        ]} />
-    )
-    const dt = mkDT()
-    dt.setData('text/rhythm-payload', JSON.stringify({ kind: 'step', id: 'pack' }))
-    dt.setData('text/rhythm-kind-step', '1')
-    fireEvent.drop(screen.getByTestId('arc-axis'), { dataTransfer: dt })
-    expect(onPromoteStep).toHaveBeenCalledWith('pack')
-    expect(onUpdateRoutine).toHaveBeenCalledWith('pack', { time_of_day: '06:00', recurrence_pattern: { type: 'daily' } })
-  })
-
   it('dismissing a tend suggestion hides it and persists to localStorage', () => {
     localStorage.removeItem('rhythm-tend-dismissed')
     render(
@@ -311,27 +239,6 @@ describe('RhythmPage', () => {
   })
 })
 
-describe('day focus', () => {
-  it("clicking a week day shows that day's weekly routines on the arc", () => {
-    render(
-      <RhythmPage {...noop} onUpdateRoutine={vi.fn()}
-        routines={[
-          mk('Walk Jax', { id: 'walk', time_of_day: '06:30:00' }),
-          mk('Kids Bedtime', { id: 'bed', recurrence_pattern: { type: 'weekly', days: ['wed'] }, time_of_day: '19:15:00' }),
-        ]} />
-    )
-    // before focusing, the weekly routine appears only as a week chip
-    expect(screen.getByRole('heading', { name: 'Every day' })).toBeInTheDocument()
-    expect(screen.getAllByText('Kids Bedtime')).toHaveLength(1)
-
-    fireEvent.click(screen.getByRole('button', { name: /^WED/ }))
-    expect(screen.getByRole('heading', { name: /wednesday — the whole day/i })).toBeInTheDocument()
-    expect(screen.getAllByText('Kids Bedtime').length).toBeGreaterThan(1)
-
-    fireEvent.click(screen.getByRole('button', { name: /^WED/ }))
-    expect(screen.getByRole('heading', { name: 'Every day' })).toBeInTheDocument()
-  })
-})
 
 describe('first step on a step-less routine', () => {
   it('Escape closes an open routine panel and keeps the routine', () => {

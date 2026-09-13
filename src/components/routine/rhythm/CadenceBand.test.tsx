@@ -30,7 +30,10 @@ describe('CadenceBand', () => {
     band({ routines: [mk({ name: 'Change the filter', recurrence_pattern: { type: 'monthly', day_of_month: 3 } })] })
     const section = screen.getByRole('region', { name: 'Monthly' })
     expect(within(section).getByText('Change the filter')).toBeInTheDocument()
-    // The app's one cadence vocabulary, plus the next date.
+    // WHEN it happens in the row; HOW OFTEN is the band's own heading. The
+    // full pattern and the next date live in the expansion.
+    expect(section.textContent).toContain('On the 3rd')
+    fireEvent.click(within(section).getByRole('button', { name: /Show details for Change the filter/ }))
     expect(section.textContent).toContain('Monthly on the 3rd')
     expect(section.textContent).toMatch(/next Oct 3/)
   })
@@ -61,11 +64,11 @@ describe('CadenceBand', () => {
     expect(onCreateInSlot).toHaveBeenCalledWith({ name: 'Swap the closets', recurrence_pattern: { type: 'quarterly' } })
   })
 
-  it('a count that disagrees with the rows is not representable', () => {
-    band({ routines: [mk({ name: 'A' }), mk({ name: 'B' })] })
+  it('draws one row per routine — no duplicates across days', () => {
+    band({ routines: [mk({ name: 'A' }), mk({ name: 'B', recurrence_pattern: { type: 'weekly', days: ['tue', 'thu', 'sat'] } })] })
     const section = screen.getByRole('region', { name: 'Monthly' })
     expect(within(section).getAllByRole('listitem')).toHaveLength(2)
-    expect(within(section).getByText('2')).toBeInTheDocument()
+    expect(section.textContent).toContain('Tuesday, Thursday, Saturday')
   })
 })
 

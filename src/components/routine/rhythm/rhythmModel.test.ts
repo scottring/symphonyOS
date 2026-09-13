@@ -34,45 +34,44 @@ describe('minutesOf', () => {
 })
 
 describe('buildRhythmModel bucketing', () => {
-  it('puts timed daily routines on the arc and untimed in anytime', () => {
+  it('the day reads in order: timed by the clock, then whatever has no time', () => {
     const m = buildRhythmModel([
-      mk({ id: 'a', time_of_day: '06:30:00' }),
-      mk({ id: 'b', time_of_day: null }),
+      mk({ id: 'late', time_of_day: '18:00:00' }),
+      mk({ id: 'anytime', time_of_day: null }),
+      mk({ id: 'early', time_of_day: '06:30:00' }),
     ])
-    expect(m.daily.timed.flatMap(c => c.routines.map(r => r.id))).toEqual(['a'])
-    expect(m.daily.anytime.map(r => r.id)).toEqual(['b'])
+    expect(m.daily.map(r => r.id)).toEqual(['early', 'late', 'anytime'])
   })
 
-  it('treats weekly with >=5 days as daily, fewer as week-strip', () => {
+  it('treats weekly with >=5 days as daily, fewer as weekly', () => {
     const m = buildRhythmModel([
       mk({ id: 'wd', recurrence_pattern: { type: 'weekly', days: ['mon','tue','wed','thu','fri'] }, time_of_day: '17:15:00' }),
       mk({ id: 'w2', recurrence_pattern: { type: 'weekly', days: ['mon','wed'] } }),
     ])
-    expect(m.daily.timed.flatMap(c => c.routines.map(r => r.id))).toEqual(['wd'])
-    expect(m.week.days.mon.map(r => r.id)).toEqual(['w2'])
-    expect(m.week.days.wed.map(r => r.id)).toEqual(['w2'])
+    expect(m.daily.map(r => r.id)).toEqual(['wd'])
+    expect(m.week.map(r => r.id)).toEqual(['w2'])
   })
 
-  it('puts weekly-without-days into sometime-this-week', () => {
+  it('a routine on several days is ONE row, not one per day', () => {
+    // The day strip repeated a Tue/Thu/Sat routine into three columns; a row
+    // says "Tuesday, Thursday, Saturday" once (Scott, 2026-09-13).
+    const m = buildRhythmModel([
+      mk({ id: 'shower', recurrence_pattern: { type: 'weekly', days: ['tue', 'thu', 'sat'] } }),
+    ])
+    expect(m.week.map(r => r.id)).toEqual(['shower'])
+  })
+
+  it('a weekly routine with no day chosen is still a weekly commitment', () => {
     const m = buildRhythmModel([mk({ id: 'w', recurrence_pattern: { type: 'weekly' } })])
-    expect(m.week.sometime.map(r => r.id)).toEqual(['w'])
+    expect(m.week.map(r => r.id)).toEqual(['w'])
   })
 
-  it('sends resting weekly routines to Resting only, not the week columns', () => {
+  it('sends resting weekly routines to Resting only', () => {
     const m = buildRhythmModel([
       mk({ id: 'p', visibility: 'reference', recurrence_pattern: { type: 'weekly', days: ['mon'] } }),
     ])
     expect(m.resting.map(r => r.id)).toEqual(['p'])
-    expect(m.week.days.mon).toHaveLength(0)
-  })
-
-  it('derives the day column from start_date when weekly days are empty', () => {
-    // 2026-07-25 is a Saturday — the real "library every 2 weeks" shape.
-    const m = buildRhythmModel([
-      mk({ id: 'lib', recurrence_pattern: { type: 'weekly', days: [], interval: 2, start_date: '2026-07-25' } }),
-    ])
-    expect(m.week.days.sat.map(r => r.id)).toEqual(['lib'])
-    expect(m.week.sometime).toHaveLength(0)
+    expect(m.week).toHaveLength(0)
   })
 
   // Past the week the ladder has four rungs, not one: a monthly routine and a
@@ -96,7 +95,7 @@ describe('buildRhythmModel bucketing', () => {
     const m = buildRhythmModel([
       mk({ id: 'bi', recurrence_pattern: { type: 'weekly', days: ['tue'], interval: 2 } }),
     ])
-    expect(m.week.days.tue.map(r => r.id)).toEqual(['bi'])
+    expect(m.week.map(r => r.id)).toEqual(['bi'])
     expect(m.month).toHaveLength(0)
   })
 
@@ -115,7 +114,7 @@ describe('buildRhythmModel bucketing', () => {
       mk({ id: 'm', recurrence_pattern: { type: 'since_last', interval: 6, unit: 'weeks' } }),
       mk({ id: 'y', recurrence_pattern: { type: 'since_last', interval: 12, unit: 'months' } }),
     ])
-    expect(m.week.sometime.map(r => r.id)).toEqual(['w'])
+    expect(m.week.map(r => r.id)).toEqual(['w'])
     expect(m.month.map(r => r.id)).toEqual(['m'])
     expect(m.year.map(r => r.id)).toEqual(['y'])
   })
@@ -125,7 +124,7 @@ describe('buildRhythmModel bucketing', () => {
       mk({ id: 'p', visibility: 'reference', time_of_day: '07:00:00' }),
     ])
     expect(m.resting.map(r => r.id)).toEqual(['p'])
-    expect(m.daily.timed).toHaveLength(0)
+    expect(m.daily).toHaveLength(0)
   })
 
   it('never buckets steps as their own items but counts them per collection', () => {
@@ -135,9 +134,8 @@ describe('buildRhythmModel bucketing', () => {
       mk({ id: 's2', parent_routine_id: 'parent' }),
     ])
     const all = [
-      ...m.daily.timed.map(c => c.id),
-      ...m.daily.anytime.map(r => r.id),
-      ...m.week.sometime.map(r => r.id),
+      ...m.daily.map(r => r.id),
+      ...m.week.map(r => r.id),
       ...m.month.map(r => r.id),
       ...m.season.map(r => r.id),
       ...m.year.map(r => r.id),
@@ -146,55 +144,8 @@ describe('buildRhythmModel bucketing', () => {
     ]
     expect(all).not.toContain('s1')
     expect(m.stepCounts['parent']).toBe(2)
-    const card = m.daily.timed.find(c => c.id === 'parent')
-    expect(card?.kind).toBe('collection')
-    expect(card?.routines.map(r => r.id)).toEqual(['s1', 's2'])
-    expect(card?.routine?.id).toBe('parent')
-  })
-})
-
-describe('buildRhythmModel clustering', () => {
-  it('clusters loose daily routines within 45 minutes, splits on bigger gaps', () => {
-    const m = buildRhythmModel([
-      mk({ id: 'a', time_of_day: '06:30:00' }),
-      mk({ id: 'b', time_of_day: '07:00:00' }),
-      mk({ id: 'c', time_of_day: '09:00:00' }),
-    ])
-    expect(m.daily.timed).toHaveLength(2)
-    expect(m.daily.timed[0]).toMatchObject({ kind: 'cluster', startTime: '06:30:00', endTime: '07:00:00' })
-    expect(m.daily.timed[1]).toMatchObject({ kind: 'single' })
-  })
-
-  it('suggests a daypart name for every cluster', () => {
-    const m = buildRhythmModel([
-      mk({ time_of_day: '19:00:00' }),
-      mk({ time_of_day: '19:05:00' }),
-      mk({ time_of_day: '19:10:00' }),
-    ])
-    expect(m.daily.timed[0].suggestedName).toBe('Bedtime')
-    const m2 = buildRhythmModel([
-      mk({ time_of_day: '06:00:00' }),
-      mk({ time_of_day: '06:10:00' }),
-    ])
-    expect(m2.daily.timed[0].suggestedName).toBe('Morning')
-  })
-
-  it('never merges a collection into a cluster', () => {
-    const m = buildRhythmModel([
-      mk({ id: 'coll', time_of_day: '06:45:00' }),
-      mk({ id: 'st', parent_routine_id: 'coll' }),
-      mk({ id: 'loose', time_of_day: '06:50:00' }),
-    ])
-    expect(m.daily.timed).toHaveLength(2)
-    expect(m.daily.timed.find(c => c.id === 'coll')?.kind).toBe('collection')
-  })
-
-  it('sorts arc cards by start time', () => {
-    const m = buildRhythmModel([
-      mk({ id: 'late', time_of_day: '18:00:00' }),
-      mk({ id: 'early', time_of_day: '06:00:00' }),
-    ])
-    expect(m.daily.timed.map(c => c.routines[0].id)).toEqual(['early', 'late'])
+    // A collection is ONE row, counted by its steps — not a card of children.
+    expect(m.daily.map(r => r.id)).toContain('parent')
   })
 })
 
@@ -209,7 +160,7 @@ describe('buildRhythmModel person filter', () => {
       ],
       { memberIds: ['iris'] },
     )
-    const ids = m.daily.timed.flatMap(c => c.routines.map(r => r.id))
+    const ids = m.daily.map(r => r.id)
     expect(ids.sort()).toEqual(['legacy', 'multi'])
   })
 
@@ -221,7 +172,7 @@ describe('buildRhythmModel person filter', () => {
       ],
       { memberIds: ['kaleb'] },
     )
-    expect(m.daily.timed.map(c => c.id)).toEqual(['coll'])
+    expect(m.daily.map(c => c.id)).toEqual(['coll'])
   })
 
   // Scott, 2026-09-07: "can we multiselect whose week in Routines?" Two names
@@ -237,7 +188,7 @@ describe('buildRhythmModel person filter', () => {
       ],
       { memberIds: ['iris', 'kaleb'] },
     )
-    const ids = m.daily.timed.flatMap(c => c.routines.map(r => r.id))
+    const ids = m.daily.map(r => r.id)
     expect(ids.sort()).toEqual(['hers', 'his', 'theirs'])
   })
 
@@ -246,37 +197,14 @@ describe('buildRhythmModel person filter', () => {
       mk({ id: 'a', assigned_to_all: ['iris'], time_of_day: '09:00:00' }),
       mk({ id: 'b', time_of_day: '10:00:00' }),
     ]
-    const ids = buildRhythmModel(routines, { memberIds: [] }).daily.timed.flatMap(c => c.routines.map(r => r.id))
+    const ids = buildRhythmModel(routines, { memberIds: [] }).daily.map(r => r.id)
     expect(ids.sort()).toEqual(['a', 'b'])
   })
 
   it('shows unassigned routines only under Everyone', () => {
     const all = buildRhythmModel([mk({ id: 'n', time_of_day: '08:00:00' })])
     const iris = buildRhythmModel([mk({ id: 'n', time_of_day: '08:00:00' })], { memberIds: ['iris'] })
-    expect(all.daily.timed).toHaveLength(1)
-    expect(iris.daily.timed).toHaveLength(0)
-  })
-})
-
-describe('buildRhythmModel focus day', () => {
-  it("adds the focused day's weekly routines to the arc, at their times", () => {
-    const bedtime = mk({ id: 'bed', name: 'Kids Bedtime', recurrence_pattern: { type: 'weekly', days: ['wed', 'fri'] }, time_of_day: '19:15:00' })
-    const errand = mk({ id: 'err', name: 'Recycling out', recurrence_pattern: { type: 'weekly', days: ['wed'] } })
-    const daily = mk({ id: 'walk', name: 'Walk Jax', time_of_day: '06:30:00' })
-
-    const plain = buildRhythmModel([bedtime, errand, daily])
-    expect(plain.daily.timed.flatMap(c => c.routines.map(r => r.id))).toEqual(['walk'])
-    expect(plain.daily.anytime).toEqual([])
-
-    const wed = buildRhythmModel([bedtime, errand, daily], { focusDay: 'wed' })
-    expect(wed.daily.timed.flatMap(c => c.routines.map(r => r.id))).toEqual(expect.arrayContaining(['walk', 'bed']))
-    expect(wed.daily.anytime.map(r => r.id)).toEqual(['err'])
-    // still present in the week columns — focus augments the arc, not the strip
-    expect(wed.week.days.wed.map(r => r.id)).toEqual(expect.arrayContaining(['bed', 'err']))
-
-    const fri = buildRhythmModel([bedtime, errand, daily], { focusDay: 'fri' })
-    expect(fri.daily.anytime).toEqual([])
-    expect(fri.daily.timed.flatMap(c => c.routines.map(r => r.id))).toEqual(expect.arrayContaining(['walk', 'bed']))
-    expect(fri.daily.timed.flatMap(c => c.routines.map(r => r.id))).not.toContain('err')
+    expect(all.daily).toHaveLength(1)
+    expect(iris.daily).toHaveLength(0)
   })
 })
