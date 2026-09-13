@@ -41,6 +41,12 @@ import { PlanRow, rowIsDone, type PlanRowModel } from './PlanRow'
 import { PlanRail } from './PlanRail'
 import { readOpen, readFoldPref, writeOpen } from './foldState'
 
+/** How many tasks a period's list shows before it asks. A long plan is still
+ *  a plan, but a page that opens with twenty rows is a page you scroll rather
+ *  than read (Scott, 2026-09-13). Same number the review drawer paces itself
+ *  by, deliberately. */
+const TASK_PREVIEW_CAP = 5
+
 const TITLE: Record<PlanLevel, string> = { month: 'This Month', season: 'This Season', year: 'This Year' }
 const NOUN: Record<PlanLevel, string> = { month: 'month', season: 'season', year: 'year' }
 /** "September 2026" with the year set back — the period is the page's name,
@@ -253,6 +259,17 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   // Hidden finished work stays hidden — across periods and across visits.
   // A look-back starts open, because that is what a look-back is for, but the
   // reader can still close it and it will stay closed.
+  // Showing the whole list is a choice that sticks, the same way hiding
+  // finished work does.
+  const allKey = `symphony-plan-all-${level}`
+  const [showAllPref, setShowAllPref] = useState<boolean | null>(() => readFoldPref(allKey))
+  const showAll = showAllPref ?? false
+  const toggleShowAll = useCallback(() => {
+    const next = !showAll
+    writeOpen(allKey, next)
+    setShowAllPref(next)
+  }, [allKey, showAll])
+
   const doneKey = `symphony-plan-done-${level}`
   const [donePref, setDonePref] = useState<boolean | null>(() => readFoldPref(doneKey))
   // No preference yet → follow the period on screen. A look-back is about
@@ -305,6 +322,11 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   // done (Scott, 2026-09-13).
   const openTaskRows = useMemo(() => rows.filter((r) => !r.isGoal && !rowIsDone(r.fate)), [rows])
   const doneTaskRows = useMemo(() => rows.filter((r) => !r.isGoal && rowIsDone(r.fate)), [rows])
+  const visibleTaskRows = showAll ? openTaskRows : openTaskRows.slice(0, TASK_PREVIEW_CAP)
+  // Gated on the LIST being long, not on rows being hidden right now —
+  // otherwise expanding removes the only way back to five.
+  const overCap = openTaskRows.length > TASK_PREVIEW_CAP
+  const hiddenTaskCount = openTaskRows.length - visibleTaskRows.length
 
   const openPlaced = useCallback((taskId: string) => { navigate(`/task/${taskId}`) }, [navigate])
 
@@ -432,12 +454,24 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                   </p>
                 ) : (
                   <ul className="space-y-0.5">
-                    {openTaskRows.map((row) => (
+                    {visibleTaskRows.map((row) => (
                       <PlanRow key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onAction={(a, r) => { void act(a, r) }}
                         actions={actionsFor({ fate: row.fate, isGoal: row.isGoal, isPast })} />
                     ))}
                   </ul>
                 )}
+                {overCap && (
+                  <button
+                    type="button"
+                    onClick={toggleShowAll}
+                    className="mt-1 w-full px-2 py-1 text-left text-[13px] text-neutral-500 transition-colors hover:text-primary-700"
+                  >
+                    {showAll
+                      ? `Show the first ${TASK_PREVIEW_CAP}`
+                      : `Show all ${openTaskRows.length} — ${hiddenTaskCount} more`}
+                  </button>
+                )}
+
                 {!isPast && (
                   <form
                     className="mt-1 flex items-center gap-2 px-2"

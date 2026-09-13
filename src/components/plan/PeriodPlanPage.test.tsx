@@ -271,6 +271,43 @@ describe('PeriodPlanPage', () => {
     expect(screen.queryByText('Washed the car')).not.toBeInTheDocument()
   })
 
+  it('shows the first five tasks and offers the rest — and that choice sticks', () => {
+    state.tasks = Array.from({ length: 8 }, (_, i) => task({ title: `Task ${i + 1}`, monthStart: thisMonth }))
+    const first = renderPage('month')
+    const list = screen.getByRole('region', { name: /list$/ })
+    expect(within(list).getAllByRole('listitem')).toHaveLength(5)
+    expect(within(list).getByText('Task 5')).toBeInTheDocument()
+    expect(within(list).queryByText('Task 6')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show all 8 — 3 more' }))
+    expect(within(screen.getByRole('region', { name: /list$/ })).getAllByRole('listitem')).toHaveLength(8)
+    first.unmount()
+
+    // Still expanded next visit, and collapsible back to five.
+    renderPage('month')
+    expect(within(screen.getByRole('region', { name: /list$/ })).getAllByRole('listitem')).toHaveLength(8)
+    fireEvent.click(screen.getByRole('button', { name: 'Show the first 5' }))
+    expect(within(screen.getByRole('region', { name: /list$/ })).getAllByRole('listitem')).toHaveLength(5)
+  })
+
+  it('a list that fits is not asked about', () => {
+    state.tasks = Array.from({ length: 5 }, (_, i) => task({ title: `Task ${i + 1}`, monthStart: thisMonth }))
+    renderPage('month')
+    expect(screen.queryByRole('button', { name: /Show all/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Show the first/ })).not.toBeInTheDocument()
+  })
+
+  it('the cap counts only what is LEFT to do — finished work is already hidden', () => {
+    state.tasks = [
+      ...Array.from({ length: 4 }, (_, i) => task({ title: `Open ${i + 1}`, monthStart: thisMonth })),
+      ...Array.from({ length: 6 }, (_, i) => task({ title: `Done ${i + 1}`, monthStart: thisMonth, completed: true })),
+    ]
+    renderPage('month')
+    // Four open rows is under the cap, so nothing is elided despite ten rows.
+    expect(screen.queryByRole('button', { name: /Show all/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Completed this month/ }).textContent).toContain('6')
+  })
+
   it('the page says whose plan it is, and offers the period just ended', () => {
     renderPage('month')
     expect(screen.getByText(/Everyone/)).toBeInTheDocument()
