@@ -138,6 +138,19 @@ export function formatDateLabel(date: Date): string {
 }
 
 /** Non-relative compact label, e.g. "Sat, Jun 6". Unlike formatDateLabel, never returns Today/Tomorrow. */
+/** The week starting `start`, named the way a person names it: "September
+ *  13–19", or "September 28 – October 4" when it straddles two months. The
+ *  label a placement chip shows, so a row says which week it is on rather
+ *  than "this week" (Codex, 2026-09-13: use actual labels). */
+export function formatWeekRange(start: Date): string {
+  const end = new Date(start)
+  end.setDate(end.getDate() + 6)
+  const month = start.toLocaleDateString('en-US', { month: 'long' })
+  if (start.getMonth() === end.getMonth()) return `${month} ${start.getDate()}–${end.getDate()}`
+  const endMonth = end.toLocaleDateString('en-US', { month: 'long' })
+  return `${month} ${start.getDate()} – ${endMonth} ${end.getDate()}`
+}
+
 export function formatShortDate(date: Date): string {
   return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
 }

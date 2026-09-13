@@ -13,7 +13,7 @@
 
 import { useMemo, useState, useCallback, useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Plus, Target, ChevronDown, ChevronRight } from 'lucide-react'
+import { Plus, Target, ChevronDown, ChevronRight, Repeat } from 'lucide-react'
 import { MastheadCard, PeriodNavEyebrow } from '@/components/layout/MastheadCard'
 import { HomeChromeControls } from '@/components/home/HomeChromeControls'
 import { DomainSwitcher } from '@/components/domain/DomainSwitcher'
@@ -24,6 +24,8 @@ import { useGatedTaskActions } from '@/hooks/useGatedTaskActions'
 import { useDomain } from '@/hooks/useDomain'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { useHouseholdSeasons } from '@/hooks/useHouseholdSeasons'
+import { useRoutines } from '@/hooks/useRoutines'
+import { routinePatterns } from '@/lib/planning/routinePatterns'
 import { GoalsProvider, useGoalsContext } from '@/contexts/GoalsContext'
 import { filterTasksForLayers, matchesLayers } from '@/lib/today/domainFilter'
 import { placementFate, placedWhere } from '@/lib/planning/lineage'
@@ -41,12 +43,51 @@ import { readOpen, writeOpen } from './foldState'
 
 const TITLE: Record<PlanLevel, string> = { month: 'This Month', season: 'This Season', year: 'This Year' }
 const NOUN: Record<PlanLevel, string> = { month: 'month', season: 'season', year: 'year' }
+// What each list is FOR, said once under its heading. The month page used to
+// name the two halves and leave the reader to infer the difference.
+const GOALS_SUB: Record<PlanLevel, string> = {
+  month: 'What you want from the month',
+  season: 'What you want from the season',
+  year: 'What you want from the year',
+}
+const TASKS_SUB = 'Concrete things you intend to do'
+
+/** "September 2026" with the year set back — the period is the page's name,
+ *  not a category label like "This Month" (Scott, 2026-09-13). */
+function periodTitle(level: PlanLevel, label: string) {
+  const parts = label.match(/^(.*?)\s+(\d{4})$/)
+  if (level === 'year' || !parts) return label
+  return <>{parts[1]} <span className="text-neutral-400">{parts[2]}</span></>
+}
+
+/** The first line of a note, as one quiet line of intent. Notes render
+ *  markdown: a HEADING is structure rather than intent ("## Why" is a label
+ *  for the sentence under it), so headings are skipped and the first real
+ *  line wins. Bullet and number markers come off the line they lead.
+ *  Anything long is left for the row's own page. */
+function firstLine(notes: string | undefined): string | undefined {
+  if (!notes) return undefined
+  for (const raw of notes.split(/\r?\n/)) {
+    const bare = raw.replace(/<[^>]*>/g, '').trim()
+    if (!bare || /^#{1,6}\s/.test(bare)) continue
+    const line = bare.replace(/^\s*([-*+]|\d+\.)\s*/, '').trim()
+    if (line) return line.length > 120 ? `${line.slice(0, 119)}…` : line
+  }
+  return undefined
+}
 
 function taskRow(t: Task, all: readonly Task[]): PlanRowModel {
-  return { id: t.id, title: t.title, isGoal: !!t.isGoal, fate: placementFate(t, all), kind: 'task', placed: placedWhere(t, all) }
+  return {
+    id: t.id, title: t.title, isGoal: !!t.isGoal, fate: placementFate(t, all), kind: 'task',
+    placed: placedWhere(t, all),
+    subtitle: t.isGoal ? firstLine(t.notes) : undefined,
+  }
 }
 function goalRow(g: Goal): PlanRowModel {
-  return { id: g.id, title: g.name, isGoal: true, fate: g.status === 'completed' ? 'done' : 'open', kind: 'goal' }
+  return {
+    id: g.id, title: g.name, isGoal: true, fate: g.status === 'completed' ? 'done' : 'open', kind: 'goal',
+    subtitle: g.strategy?.trim() || firstLine(g.notes),
+  }
 }
 
 function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
@@ -57,6 +98,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   const { getCurrentUserMember } = useFamilyMembers()
   const meId = getCurrentUserMember()?.id ?? null
   const { seasons, loading: seasonsLoading } = useHouseholdSeasons()
+  const { activeRoutines } = useRoutines()
   const { goals, areas, addGoal, updateGoal, deleteGoal, addArea } = useGoalsContext()
 
   const [searchParams] = useSearchParams()
@@ -193,42 +235,68 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
     setCalendarOpen((v) => { writeOpen(calendarKey, !v); return !v })
   }, [calendarKey])
 
+  // ── Routines this period ─────────────────────────────────────────────────
+  // PATTERNS, not occurrences: what already takes up time, so the plan is
+  // written against real capacity. No checkboxes — an occurrence is ticked on
+  // Week or Today, and the pattern itself is edited in Routines (Scott,
+  // 2026-09-13). Eligibility runs the one resolver, date-agnostically: a
+  // month is not a day, so rung 2 must not filter by one date's recurrence.
+  const patterns = useMemo(
+    () => (level === 'year' ? [] : routinePatterns(activeRoutines, layers)),
+    [activeRoutines, layers, level],
+  )
+
+  const routinesHeading = isCurrent ? `Routines this ${NOUN[level]}` : 'Current routines'
+  const routinesKey = `symphony-plan-routines-${level}`
+  const [routinesOpen, setRoutinesOpen] = useState(() => readOpen(routinesKey))
+  const toggleRoutines = useCallback(() => {
+    setRoutinesOpen((v) => { writeOpen(routinesKey, !v); return !v })
+  }, [routinesKey])
+
   // ── Add ──────────────────────────────────────────────────────────────────
-  const [draft, setDraft] = useState('')
-  const [asGoal, setAsGoal] = useState(level === 'year')
-  const submit = useCallback(async () => {
-    const title = draft.trim()
-    if (!title) return
-    setDraft('')
+  // Two affordances, one writer. The shared input with a "Goal" toggle made
+  // you set a mode before typing; a "+" on each list says which list you are
+  // writing to (Scott, 2026-09-13).
+  const [goalDraft, setGoalDraft] = useState('')
+  const [taskDraft, setTaskDraft] = useState('')
+  const [addingGoal, setAddingGoal] = useState(false)
+
+  const addRow = useCallback(async (title: string, asGoal: boolean) => {
+    const t = title.trim()
+    if (!t) return
     if (level === 'year') {
       const areaId = areas[0]?.id ?? (await addArea('General'))?.id
       if (!areaId) return
-      const g = await addGoal(areaId, title, soleDomain ?? undefined)
+      const g = await addGoal(areaId, t, soleDomain ?? undefined)
       const year = bounds.start.getFullYear()
       if (g && g.year !== year) await updateGoal(g.id, { year })
       return
     }
-    await addTask(title, undefined, undefined, undefined, {
+    await addTask(t, undefined, undefined, undefined, {
       bucket: level === 'month' ? 'month' : 'quarter',
       monthStart: level === 'month' ? bounds.start : undefined,
       seasonStart: level === 'season' ? bounds.start : undefined,
       isGoal: asGoal,
       context: soleDomain,
     })
-  }, [draft, level, areas, addArea, addGoal, soleDomain, bounds.start, updateGoal, addTask, asGoal])
+  }, [level, areas, addArea, addGoal, soleDomain, bounds.start, updateGoal, addTask])
 
-  // Goals and tasks are different promises and get their own headings — one
+  // Goals and tasks are different promises and get their own lists — one
   // list with an icon on some rows didn't say which was which.
   const goalRows = useMemo(() => rows.filter((r) => r.isGoal), [rows])
   const taskRows = useMemo(() => rows.filter((r) => !r.isGoal), [rows])
-  const shortLabel = level === 'month'
-    ? bounds.start.toLocaleDateString('en-US', { month: 'long' })
-    : bounds.label
 
   const openPlaced = useCallback((taskId: string) => { navigate(`/task/${taskId}`) }, [navigate])
 
   const noun = NOUN[level]
-  const emptyCopy = isPast ? `Nothing was on this ${noun}'s list.` : `Nothing on this ${noun}'s list yet.`
+  const shortLabel = level === 'month'
+    ? bounds.start.toLocaleDateString('en-US', { month: 'long' })
+    : bounds.label
+  // "Review August" says which period the look-back is of; "Last month" made
+  // the reader work it out.
+  const prevPeriodLabel = level === 'month'
+    ? bounds.prev.toLocaleDateString('en-US', { month: 'long' })
+    : periodBounds(level, bounds.prev, seasons).label
   const daysUntilStart = useMemo(() => Math.round((bounds.start.getTime() - today.getTime()) / 86_400_000), [bounds.start, today])
 
   return (
@@ -239,15 +307,16 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
       <MastheadCard
         eyebrow={(
           <PeriodNavEyebrow
-            label={bounds.label}
+            label={noun}
             onPrev={() => goTo(bounds.prev)}
             onNext={() => goTo(bounds.next)}
             prevLabel={`Previous ${noun}`}
             nextLabel={`Next ${noun}`}
             trailing={isCurrent ? (
               <button type="button" onClick={() => goTo(bounds.prev)}
+                title={`Look back at ${prevPeriodLabel}`}
                 className="ml-1 rounded-full border border-neutral-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-neutral-500 hover:text-neutral-700 hover:bg-neutral-50 transition-colors">
-                Last {noun}
+                Review {prevPeriodLabel}
               </button>
             ) : (
               <button type="button" onClick={() => goTo(today)}
@@ -257,124 +326,209 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
             )}
           />
         )}
-        title={TITLE[level]}
+        title={periodTitle(level, bounds.label)}
         subline={isPast
           ? 'Look back: what got done, what didn\'t. Keep what still matters, drop the rest.'
           : lookingAhead
             ? <p className="text-[12px] text-neutral-500">{bounds.label} starts in {daysUntilStart} days · you&rsquo;re looking ahead</p>
-            : undefined}
+            : <p className="text-[12px] text-neutral-500">This {noun} · a plan to return to.</p>}
         // The plan pages mount outside TasksApp's chrome context, so the
         // assistant toggle isn't reachable here; the domain lens still is,
         // and this page scopes by it (soleDomain).
         controls={chrome ? <HomeChromeControls className="flex" /> : <DomainSwitcher />}
       />
 
-      <div className="flex flex-col gap-3">
-        <section aria-label={`${bounds.label} list`} className="min-w-0 rounded-xl border border-neutral-200 bg-white px-3 py-3 shadow-sm">
-          {rows.length === 0 ? (
-            <p className="px-2 py-3 text-sm text-neutral-400">{emptyCopy}</p>
-          ) : (
-            <>
-              {goalRows.length > 0 && (
-                <div>
-                  <h2 className="px-2 text-xs font-semibold tracking-wide uppercase text-neutral-500">{shortLabel} goals</h2>
-                  <ul className="mt-1.5 space-y-0.5">
-                    {goalRows.map((row) => (
-                      <PlanRow key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onAction={(a, r) => { void act(a, r) }}
-                        actions={actionsFor({ fate: row.fate, isGoal: row.isGoal, isPast })} />
-                    ))}
-                  </ul>
-                </div>
+      {/* The plan on the left, what you consult while writing it on the
+          right — the calendar included. Reference sits WITH reference instead
+          of interrupting the list (Scott, 2026-09-13). One column on a phone. */}
+      <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="min-w-0 flex flex-col gap-4">
+          {/* Goals — what you want from the period. */}
+          <section aria-label={`${bounds.label} goals`} className="min-w-0">
+            <div className="flex items-start gap-2 px-1">
+              <div className="min-w-0 flex-1">
+                <h2 className="font-display text-xl text-neutral-800">{shortLabel} goals</h2>
+                <p className="text-[12px] text-neutral-500">{GOALS_SUB[level]}</p>
+              </div>
+              {!isPast && (
+                <button
+                  type="button"
+                  aria-label={`Add a goal for ${shortLabel}`}
+                  onClick={() => setAddingGoal((v) => !v)}
+                  className="mt-1 shrink-0 rounded-md p-1 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700"
+                >
+                  <Plus className="h-4 w-4" />
+                </button>
               )}
-              {taskRows.length > 0 && (
-                <div className={goalRows.length > 0 ? 'mt-3 border-t border-neutral-100 pt-3' : ''}>
-                  <h2 className="px-2 text-xs font-semibold tracking-wide uppercase text-neutral-500">{shortLabel} tasks</h2>
-                  <ul className="mt-1.5 space-y-0.5">
+            </div>
+            <div className="mt-2 rounded-xl border border-primary-100 border-l-[3px] border-l-primary-500 bg-primary-50/40 px-3 py-2.5 shadow-sm">
+              {goalRows.length === 0 ? (
+                <p className="px-2 py-2 text-sm text-neutral-400">
+                  {isPast ? `Nothing was on this ${noun}'s goals.` : `No goals for this ${noun} yet.`}
+                </p>
+              ) : (
+                <ul className="space-y-0.5">
+                  {goalRows.map((row) => (
+                    <PlanRow key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onAction={(a, r) => { void act(a, r) }}
+                      actions={actionsFor({ fate: row.fate, isGoal: row.isGoal, isPast })} />
+                  ))}
+                </ul>
+              )}
+              {!isPast && addingGoal && (
+                <form
+                  className="mt-1 flex items-center gap-2 px-2"
+                  onSubmit={(e) => { e.preventDefault(); const t = goalDraft; setGoalDraft(''); void addRow(t, true) }}
+                >
+                  <Target className="h-4 w-4 shrink-0 text-amber-600" />
+                  <input
+                    autoFocus
+                    aria-label={`New goal for ${shortLabel}`}
+                    value={goalDraft}
+                    onChange={(e) => setGoalDraft(e.target.value)}
+                    placeholder={`What do you want from this ${noun}?`}
+                    className="min-w-0 flex-1 bg-transparent py-1.5 text-sm text-neutral-800 placeholder:text-neutral-400 focus:outline-none"
+                  />
+                </form>
+              )}
+            </div>
+          </section>
+
+          {/* Tasks — the concrete things. The year plans in goals alone. */}
+          {level !== 'year' && (
+            <section aria-label={`${bounds.label} list`} className="min-w-0">
+              <div className="px-1">
+                <h2 className="font-display text-xl text-neutral-800">{shortLabel} tasks</h2>
+                <p className="text-[12px] text-neutral-500">{TASKS_SUB}</p>
+              </div>
+              <div className="mt-2 rounded-xl border border-neutral-200 bg-white px-3 py-2.5 shadow-sm">
+                {taskRows.length === 0 ? (
+                  <p className="px-2 py-2 text-sm text-neutral-400">
+                    {isPast ? `Nothing was on this ${noun}'s list.` : `Nothing on this ${noun}'s list yet.`}
+                  </p>
+                ) : (
+                  <ul className="space-y-0.5">
                     {taskRows.map((row) => (
                       <PlanRow key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onAction={(a, r) => { void act(a, r) }}
                         actions={actionsFor({ fate: row.fate, isGoal: row.isGoal, isPast })} />
                     ))}
                   </ul>
-                </div>
-              )}
-            </>
+                )}
+                {!isPast && (
+                  <form
+                    className="mt-1 flex items-center gap-2 px-2"
+                    onSubmit={(e) => { e.preventDefault(); const t = taskDraft; setTaskDraft(''); void addRow(t, false) }}
+                  >
+                    <Plus className="h-4 w-4 shrink-0 text-neutral-400" />
+                    <input
+                      aria-label={`Add to this ${noun}`}
+                      value={taskDraft}
+                      onChange={(e) => setTaskDraft(e.target.value)}
+                      placeholder={`Add a task for ${shortLabel}`}
+                      className="min-w-0 flex-1 bg-transparent py-1.5 text-sm text-neutral-800 placeholder:text-neutral-400 focus:outline-none"
+                    />
+                  </form>
+                )}
+              </div>
+            </section>
           )}
+        </div>
 
-          {!isPast && (
-            <form
-              className="mt-2 flex items-center gap-2 px-2"
-              onSubmit={(e) => { e.preventDefault(); void submit() }}
-            >
-              <Plus className="w-4 h-4 shrink-0 text-neutral-400" />
-              <input
-                aria-label={`Add to this ${noun}`}
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                placeholder={level === 'year' ? 'Add a goal for the year…' : `Add to this ${noun}…`}
-                className="min-w-0 flex-1 bg-transparent text-sm text-neutral-800 placeholder:text-neutral-400 focus:outline-none py-1.5"
+        {/* The bigger picture — the rung above, and the dates, both look-only. */}
+        {(above || dated.length > 0 || patterns.length > 0) && (
+          <aside className="min-w-0 flex flex-col gap-3 lg:pt-1">
+            <p className="px-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-400">The bigger picture</p>
+            {above && railBounds && (
+              <PlanRail
+                title={TITLE[above]}
+                subtitle={railBounds.label}
+                rows={railRows}
+                onOpen={open}
+                onPullDown={level === 'month' ? pullDown : undefined}
+                pullLabel="Add to this month:"
+                emptyCopy={`Nothing on this ${NOUN[above]}'s list.`}
+                storageKey={`symphony-plan-rail-${level}`}
               />
-              {level !== 'year' && (
+            )}
+            {patterns.length > 0 && (
+              <section aria-label={routinesHeading} className="min-w-0 rounded-xl border border-neutral-200 bg-white px-3 py-2.5 shadow-sm">
                 <button
                   type="button"
-                  aria-pressed={asGoal}
-                  aria-label="Add as a goal"
-                  title={asGoal ? 'Adding as a goal' : 'Adding as a task'}
-                  onClick={() => setAsGoal((v) => !v)}
-                  className={`inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-colors ${
-                    asGoal ? 'bg-amber-50 text-amber-700' : 'text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100'
-                  }`}
+                  onClick={toggleRoutines}
+                  aria-expanded={routinesOpen}
+                  className="flex w-full items-center gap-1.5 text-left"
                 >
-                  <Target className="w-3.5 h-3.5" /> Goal
+                  {routinesOpen
+                    ? <ChevronDown className="h-3.5 w-3.5 shrink-0 text-neutral-400" />
+                    : <ChevronRight className="h-3.5 w-3.5 shrink-0 text-neutral-400" />}
+                  {/* Routines carry no history — there is no record of which
+                      patterns were active in August — so only the CURRENT
+                      period may claim to be showing its own (review
+                      2026-09-13). Elsewhere the heading says what this
+                      truthfully is. */}
+                  <h2 className="text-xs font-semibold uppercase tracking-wide text-neutral-500">{routinesHeading}</h2>
+                  <span className="text-xs text-neutral-400">{`· ${patterns.length}`}</span>
                 </button>
-              )}
-            </form>
-          )}
-        </section>
-
-        {dated.length > 0 && (
-          <section aria-label="On the calendar" className="min-w-0 rounded-xl border border-neutral-200 bg-white px-3 py-2.5 shadow-sm">
-            <button
-              type="button"
-              onClick={toggleCalendar}
-              aria-expanded={calendarOpen}
-              className="flex w-full items-center gap-1.5 text-left"
-            >
-              {calendarOpen
-                ? <ChevronDown className="w-3.5 h-3.5 shrink-0 text-neutral-400" />
-                : <ChevronRight className="w-3.5 h-3.5 shrink-0 text-neutral-400" />}
-              <h2 className="text-xs font-semibold tracking-wide uppercase text-neutral-500">On the calendar</h2>
-              <span className="text-xs text-neutral-400">· {dated.length}</span>
-            </button>
-            {calendarOpen && (
-              <ul className="mt-1.5 space-y-0.5">
-                {dated.map((t) => (
-                  <li key={t.id}>
-                    <button
-                      type="button"
-                      onClick={() => navigate(`/task/${t.id}`)}
-                      className="w-full rounded-md px-1.5 py-1 text-left text-[13px] text-neutral-700 hover:bg-neutral-50 transition-colors"
-                    >
-                      {formatShortDate(t.scheduledFor!)} · {t.title}
-                      {!t.isAllDay && ` · ${t.scheduledFor!.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`}
-                    </button>
-                  </li>
-                ))}
-              </ul>
+                {routinesOpen && (
+                  <>
+                    <ul className="mt-1.5 space-y-0.5">
+                      {patterns.map((r) => (
+                        <li key={r.id}>
+                          <button
+                            type="button"
+                            onClick={() => navigate(`/routines/${r.id}`)}
+                            className="flex w-full items-start gap-1.5 rounded-md px-1.5 py-1 text-left transition-colors hover:bg-neutral-50"
+                          >
+                            <Repeat className="mt-[3px] h-3 w-3 shrink-0 text-neutral-300" />
+                            <span className="min-w-0 flex-1 text-[13px] leading-snug text-neutral-700">
+                              {r.name}
+                              <span className="text-neutral-400"> · {r.cadence}</span>
+                            </span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                    <p className="mt-1.5 px-1.5 text-[11px] leading-snug text-neutral-400">
+                      {/* No promise that an occurrence can be ticked: an
+                          untimed routine has no occurrence anywhere yet. */}
+                      Time already committed. Patterns are changed in Routines.
+                    </p>
+                  </>
+                )}
+              </section>
             )}
-          </section>
-        )}
-
-        {above && railBounds && (
-          <PlanRail
-            title={TITLE[above]}
-            subtitle={railBounds.label}
-            rows={railRows}
-            onOpen={open}
-            onPullDown={level === 'month' ? pullDown : undefined}
-            pullLabel="Add to this month:"
-            emptyCopy={`Nothing on this ${NOUN[above]}'s list.`}
-            storageKey={`symphony-plan-rail-${level}`}
-          />
+            {dated.length > 0 && (
+              <section aria-label="On the calendar" className="min-w-0 rounded-xl border border-neutral-200 bg-white px-3 py-2.5 shadow-sm">
+                <button
+                  type="button"
+                  onClick={toggleCalendar}
+                  aria-expanded={calendarOpen}
+                  className="flex w-full items-center gap-1.5 text-left"
+                >
+                  {calendarOpen
+                    ? <ChevronDown className="w-3.5 h-3.5 shrink-0 text-neutral-400" />
+                    : <ChevronRight className="w-3.5 h-3.5 shrink-0 text-neutral-400" />}
+                  <h2 className="text-xs font-semibold tracking-wide uppercase text-neutral-500">On the calendar</h2>
+                  <span className="text-xs text-neutral-400">{`· ${dated.length}`}</span>
+                </button>
+                {calendarOpen && (
+                  <ul className="mt-1.5 space-y-0.5">
+                    {dated.map((t) => (
+                      <li key={t.id}>
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/task/${t.id}`)}
+                          className="w-full rounded-md px-1.5 py-1 text-left text-[13px] text-neutral-700 transition-colors hover:bg-neutral-50"
+                        >
+                          {formatShortDate(t.scheduledFor!)} · {t.title}
+                          {!t.isAllDay && ` · ${t.scheduledFor!.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}`}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+            )}
+          </aside>
         )}
       </div>
     </div>

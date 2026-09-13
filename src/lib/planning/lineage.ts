@@ -7,6 +7,7 @@
 // linking, not the sub-goal alignment refused in July.
 
 import type { Task, TaskBucket } from '@/types/task'
+import { formatWeekRange } from '@/lib/dateHelpers'
 
 export type PlacementFate = 'open' | 'placed-open' | 'placed-done' | 'done'
 
@@ -79,7 +80,7 @@ export function openPool(pool: readonly Task[], tasks: readonly Task[]): Task[] 
  *  annotation is authoritative"), so the row says one thing — where the work
  *  went — and the tick says whether it's finished. Null when nothing was
  *  copied down. */
-export function placedWhere(task: Task, tasks: readonly Task[]): { label: string; id: string } | null {
+export function placedWhere(task: Task, tasks: readonly Task[]): { label: string; id: string; kind: 'week' | 'date' | 'done' | 'placed' } | null {
   const copy = placedCopyOf(task, tasks)
   if (!copy) return null
   // A finished copy says only that it is finished. `tasks` stores no
@@ -88,16 +89,12 @@ export function placedWhere(task: Task, tasks: readonly Task[]): { label: string
   // 2026-09-13). The row links to the copy; the date lives there, correctly
   // labelled. Until tasks carry `completed_at`, this says nothing it can't
   // support.
-  if (copy.completed) return { label: 'done', id: copy.id }
+  if (copy.completed) return { label: 'done', id: copy.id, kind: 'done' }
   if (copy.scheduledFor) {
-    const day = copy.scheduledFor.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-    return { label: `on ${day}`, id: copy.id }
+    return { label: copy.scheduledFor.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' }), id: copy.id, kind: 'date' }
   }
   if (copy.bucket === 'week') {
-    const week = copy.weekStart
-      ? `the week of ${copy.weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
-      : 'this week'
-    return { label: `in ${week}`, id: copy.id }
+    return { label: copy.weekStart ? formatWeekRange(copy.weekStart) : 'This week', id: copy.id, kind: 'week' }
   }
-  return { label: 'placed', id: copy.id }
+  return { label: 'placed', id: copy.id, kind: 'placed' }
 }

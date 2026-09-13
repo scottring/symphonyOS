@@ -171,8 +171,8 @@ What happens instead is stated plainly by `src/lib/week/unhomedRoutines.ts:2-3`:
 
 Give an occurrence the same additive stamps a task gets:
 
-- `date` becomes **nullable**; add `week_start date` and an explicit `grain` ('day' | 'week').
-- **Identity is the recurrence period, never the chosen day.** Uniqueness is `(entity_type, entity_id, period_start, grain)` — where `period_start` is the week start for a weekly routine and the date itself for a daily one — plus the scope-dependent owner key from §3. `date` is a **mutable attribute** of that row and must not appear in its key: a key that changes when a day is picked would leave the materializer unable to see the occurrence it already created, and it would make a second one. That is the ten-duplicate-rows failure of 2026-09-10, re-entered through the routine door.
+- `date` becomes **nullable**; add **`period_start date`** and an explicit **`grain` ('day' | 'week' | 'month')**. An earlier draft said `week_start` + a day/week grain, which cannot represent an untimed MONTHLY occurrence at all — the very case that needs a checkbox on the month page (review 2026-09-13). One period column with a grain covers week, month, and any later rung; a `week_start` column would need a `month_start` beside it and then a rule about which one wins.
+- **Identity is the recurrence period, never the chosen day.** Uniqueness is `(entity_type, entity_id, period_start, grain)` — `period_start` is the week's start for a weekly routine, the month's 1st for a monthly one, the date itself for a daily one — plus the scope-dependent owner key from §3. `date` is a **mutable attribute** of that row and must not appear in its key: a key that changes when a day is picked would leave the materializer unable to see the occurrence it already created, and it would make a second one. That is the ten-duplicate-rows failure of 2026-09-10, re-entered through the routine door.
 - An untimed weekly routine materializes a **week-grained occurrence** for the current week: its own checkbox, on the weekly checklist, **already a valid commitment while untimed**.
 - **Choosing Tuesday adds `date` to that same occurrence row.** It does not create a second occurrence, and it does not touch the recurrence pattern.
 - **"Every Tuesday from now on" is a different action** on a different object (the routine), and must be worded differently in the UI — "this week only" vs "from now on."
@@ -211,6 +211,17 @@ So instances **do** mirror the routine's scope: a shared routine's occurrences a
 - **Per-member rows are preserved as history, but they do NOT decide future behavior** — see "What does a shared occurrence mean?" below. Rev 3 made per-member status the default and was wrong to: it silently picks "each does their part" for every shared routine.
 - All `instance_notes` and `coverage_requests` are **re-parented** to the surviving row; none are dropped.
 - A collision that can't be reconciled by those rules stops the migration and is reported. No silent winner.
+
+### "Recurring this month" — what the month page is still missing
+
+A routine that happens **once a month** is a commitment of that month, so it needs a checkable monthly occurrence — its own section beneath the month's tasks, distinct from the reference list. Daily and weekly occurrences must NOT flood it; they belong to Week and Today.
+
+That section is blocked on this step, not on layout:
+
+- A monthly routine **with** a `day_of_month` already resolves to a real date, so it *could* be ticked today via an existing day-grained instance.
+- A monthly routine **without** one has no representable occurrence at all — hence `period_start` + `grain: 'month'` above.
+
+It is deliberately not half-built. A checkable occurrence in a third place means a third copy of completion logic beside Today's and Week's, and per-user uniqueness (§3) means two people ticking a shared monthly routine each tick their own invisible row. Both are fixed here; the section lands with them.
 
 ### What does a shared occurrence mean? — THE open decision
 
@@ -318,6 +329,14 @@ Codex recommended on all four; Claude agrees with all four. Each still needs Sco
 ---
 
 ## Changelog
+
+**2026-09-13, rev 6** — the month page's reference column shipped; Codex review of it:
+
+- **§2 identity corrected**: `period_start` + `grain` ('day' | 'week' | 'month'), not `week_start` + day/week. The old shape could not represent an untimed monthly occurrence — the exact case "Recurring this month" needs.
+- **"Recurring this month" recorded** as part of this step, with the reason it isn't half-built now.
+- **Routines have no history.** Nothing records which patterns were active in August, so only the current period's heading may claim its own; elsewhere it reads "Current routines". Shipped that way.
+- **The reference list promises nothing untrue.** Its closing line no longer says "tick an occurrence on Week or Today" — for an untimed routine there is no occurrence to tick yet.
+- **The lens is now observable.** `routinePatterns` became a pure selector because `PeriodPlanPage.test.tsx` stubs `matchesLayers` to a pass-through — a filter written inline in the component looked tested and was not. Entries and count come from one array, so they cannot disagree.
 
 **2026-09-13, rev 5** — step 1 shipped; Codex review of the shipped code:
 

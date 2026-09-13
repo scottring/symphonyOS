@@ -3,6 +3,7 @@ import { render, screen, fireEvent, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import type { Task } from '@/types/task'
 import type { Goal } from '@/types/goal'
+import type { Routine } from '@/types/actionable'
 import { DEFAULT_SEASONS, type Seasons } from '@/lib/cadence/seasons'
 
 // ── Hook mocks: the page is a pure function of these ─────────────────────────
@@ -27,12 +28,24 @@ vi.mock('@/hooks/useSupabaseTasks', () => ({ useSupabaseTasks: () => ({ tasks: s
 vi.mock('@/hooks/useGatedTaskActions', () => ({
   useGatedTaskActions: (raw: Record<string, unknown>) => raw,
 }))
-vi.mock('@/hooks/useDomain', () => ({ useDomain: () => ({ layers: new Set(['work', 'family', 'personal', 'unsorted']), soleDomain: null }) }))
+const domainState: { layers: Set<string>; soleDomain: string | null } = {
+  layers: new Set(['work', 'family', 'personal', 'unsorted']), soleDomain: null,
+}
+vi.mock('@/hooks/useDomain', () => ({ useDomain: () => ({ layers: domainState.layers, soleDomain: domainState.soleDomain }) }))
 vi.mock('@/hooks/useFamilyMembers', () => ({ useFamilyMembers: () => ({ getCurrentUserMember: () => ({ id: 'me' }) }) }))
 const seasonsState: { seasons: Seasons; loading: boolean } = { seasons: DEFAULT_SEASONS, loading: false }
 vi.mock('@/hooks/useHouseholdSeasons', () => ({
   useHouseholdSeasons: () => ({ seasons: seasonsState.seasons, loading: seasonsState.loading, canEdit: true, setSeasons: vi.fn() }),
 }))
+const routinesState: { routines: Routine[] } = { routines: [] }
+vi.mock('@/hooks/useRoutines', () => ({
+  useRoutines: () => ({ activeRoutines: routinesState.routines, routines: routinesState.routines, loading: false }),
+}))
+const routine = (over: Partial<Routine>): Routine => ({
+  id: `r${++n}`, name: 'R', is_active: true, recurrence_pattern: { type: 'weekly' }, visibility: 'active',
+  context: 'family', scope: 'compound',
+  ...over,
+} as Routine)
 const goalsApi = {
   addGoal: vi.fn(async (_a: string, name: string) => goal({ name })), updateGoal: vi.fn(), deleteGoal: vi.fn(), addArea: vi.fn(async () => ({ id: 'a1' })),
 }
@@ -59,7 +72,8 @@ const renderPageAt = (level: 'month' | 'season' | 'year', path: string) =>
 
 describe('PeriodPlanPage', () => {
   beforeEach(() => {
-    state.tasks = []; state.goals = []; state.loading = false
+    state.tasks = []; state.goals = []; state.loading = false; routinesState.routines = []
+    domainState.layers = new Set(['work', 'family', 'personal', 'unsorted']); domainState.soleDomain = null
     seasonsState.seasons = DEFAULT_SEASONS; seasonsState.loading = false
     localStorage.clear()
     Object.values(hook).forEach((f) => f.mockClear())
@@ -77,16 +91,36 @@ describe('PeriodPlanPage', () => {
       task({ title: 'Legacy row' }),
     ]
     renderPage('month')
-    expect(screen.getByRole('heading', { name: 'This Month' })).toBeInTheDocument()
+    const monthName = now.toLocaleDateString('en-US', { month: 'long' })
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toContain(monthName)
+
+    // Two lists, each saying what it is — not one list where an icon was the
+    // only tell. Goals come first, and the goal is in the GOALS list.
+    const goals = screen.getByRole('region', { name: /goals$/ })
     const list = screen.getByRole('region', { name: /list$/ })
-    const titles = within(list).getAllByRole('listitem').map((li) => li.textContent)
-    expect(titles[0]).toContain('Read more')
+    expect(within(goals).getByRole('heading', { name: `${monthName} goals` })).toBeInTheDocument()
+    expect(within(list).getByRole('heading', { name: `${monthName} tasks` })).toBeInTheDocument()
+    expect(goals.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(within(goals).getByText('Read more')).toBeInTheDocument()
+    expect(within(list).queryByText('Read more')).not.toBeInTheDocument()
+
     expect(within(list).getByText('Legacy row')).toBeInTheDocument()
     expect(within(list).queryByText("Iris's thing")).not.toBeInTheDocument()
-    // Goals and tasks each say which they are — the month name, not "list".
-    const monthName = now.toLocaleDateString('en-US', { month: 'long' })
-    expect(within(list).getByRole('heading', { name: `${monthName} goals` })).toBeInTheDocument()
-    expect(within(list).getByRole('heading', { name: `${monthName} tasks` })).toBeInTheDocument()
+    expect(within(goals).queryByText("Iris's thing")).not.toBeInTheDocument()
+  })
+
+  it('a goal carries one line of intent from its notes; a task stays one line', () => {
+    state.tasks = [
+      task({ title: 'A home easier to care for', monthStart: thisMonth, isGoal: true, notes: '## Why\nMake progress on the repairs we keep putting off.\n\nmore detail' }),
+      task({ title: 'Fix up holes in wall', monthStart: thisMonth, notes: 'bathroom and stairs' }),
+    ]
+    renderPage('month')
+    expect(screen.getByText('Make progress on the repairs we keep putting off.')).toBeInTheDocument()
+    // The markdown heading above it is not the intent line.
+    expect(screen.queryByText('## Why')).not.toBeInTheDocument()
+    expect(screen.queryByText('Why')).not.toBeInTheDocument()
+    // A task's notes stay on the task's own page.
+    expect(screen.queryByText('bathroom and stairs')).not.toBeInTheDocument()
   })
 
   it('a placed row says ONE thing — where the work went — and follows to it', () => {
@@ -98,7 +132,7 @@ describe('PeriodPlanPage', () => {
     // The competing "→ placed" / "→ done" pair is gone.
     expect(within(list).queryByText('→ placed')).not.toBeInTheDocument()
     expect(within(list).queryByText('→ done')).not.toBeInTheDocument()
-    const status = within(list).getByText(/in the week of/)
+    const status = within(list).getByText(/September 13–19|September 13 – /)
     fireEvent.click(status)
     expect(mockNavigate).toHaveBeenCalledWith(`/task/${copy.id}`)
   })
@@ -146,6 +180,46 @@ describe('PeriodPlanPage', () => {
     const day = scheduledFor.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
     expect(within(list).queryByText(`done ${day}`)).not.toBeInTheDocument()
     expect(within(list).getByText('done')).toBeInTheDocument()
+  })
+
+  it('lists the month\'s routine PATTERNS in the reference column — no checkboxes', () => {
+    routinesState.routines = [
+      routine({ name: 'Kitchen laundry', recurrence_pattern: { type: 'weekly' } }),
+      routine({ name: 'Family planning', recurrence_pattern: { type: 'weekly', days: ['sun'] } }),
+    ]
+    renderPage('month')
+    const panel = screen.getByRole('region', { name: 'Routines this month' })
+    // Folded by default, with a count.
+    expect(within(panel).queryByText('Kitchen laundry')).not.toBeInTheDocument()
+    fireEvent.click(within(panel).getByRole('button', { name: /Routines this month/ }))
+    expect(within(panel).getByText('Kitchen laundry')).toBeInTheDocument()
+    expect(within(panel).getByText(/Every week/)).toBeInTheDocument()
+    // describeRecurrence is the app's one cadence vocabulary — the page does
+    // not invent a second one.
+    expect(within(panel).getByText(/Every Sun$/)).toBeInTheDocument()
+    // A pattern is reference: nothing here can be ticked off.
+    expect(within(panel).queryByRole('button', { name: /^Complete/ })).not.toBeInTheDocument()
+    expect(within(panel).queryByRole('checkbox')).not.toBeInTheDocument()
+    // Each entry opens the routine itself.
+    fireEvent.click(within(panel).getByText('Kitchen laundry'))
+    expect(mockNavigate).toHaveBeenCalledWith(`/routines/${routinesState.routines[0].id}`)
+  })
+
+  it('only the CURRENT period claims the routines are its own — there is no routine history', () => {
+    routinesState.routines = [routine({ name: 'Kitchen laundry' })]
+    renderPage('month')
+    expect(screen.getByRole('region', { name: 'Routines this month' })).toBeInTheDocument()
+    // Page back: the same patterns are all we know, so the heading stops
+    // claiming they were August's.
+    fireEvent.click(screen.getByRole('button', { name: `Review ${lastMonth.toLocaleDateString('en-US', { month: 'long' })}` }))
+    expect(screen.queryByRole('region', { name: 'Routines this month' })).not.toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Current routines' })).toBeInTheDocument()
+  })
+
+  it('the year plans in goals alone — no routine patterns, no calendar', () => {
+    routinesState.routines = [routine({ name: 'Kitchen laundry' })]
+    renderPage('year')
+    expect(screen.queryByRole('region', { name: /^Routines this/ })).not.toBeInTheDocument()
   })
 
   it('the calendar is a fold BENEATH the plan — closed until you open it (Scott, 2026-09-13)', () => {
@@ -208,7 +282,7 @@ describe('PeriodPlanPage', () => {
     const open = task({ title: 'Call the plumber', monthStart: lastMonth })
     state.tasks = [open, task({ title: 'Washed the car', monthStart: lastMonth, completed: true })]
     renderPage('month')
-    fireEvent.click(screen.getByRole('button', { name: 'Last month' }))
+    fireEvent.click(screen.getByRole('button', { name: `Review ${lastMonth.toLocaleDateString('en-US', { month: 'long' })}` }))
     expect(screen.getByText(/Look back/)).toBeInTheDocument()
     expect(screen.getByText('Washed the car')).toHaveClass('line-through')
     fireEvent.click(screen.getByRole('button', { name: 'Keep Call the plumber' }))
@@ -221,16 +295,19 @@ describe('PeriodPlanPage', () => {
     expect(screen.queryByLabelText('Add to this month')).not.toBeInTheDocument()
   })
 
-  it('adds to the viewed period, as a task or a goal', () => {
+  it('each list has its own add — no mode to set before typing', () => {
+    const monthName = now.toLocaleDateString('en-US', { month: 'long' })
     renderPage('month')
     const input = screen.getByLabelText('Add to this month')
     fireEvent.change(input, { target: { value: 'Repaint the porch' } })
     fireEvent.submit(input.closest('form')!)
     expect(hook.addTask).toHaveBeenCalledWith('Repaint the porch', undefined, undefined, undefined,
       expect.objectContaining({ bucket: 'month', monthStart: thisMonth, isGoal: false }))
-    fireEvent.click(screen.getByRole('button', { name: 'Add as a goal' }))
-    fireEvent.change(input, { target: { value: 'Read more' } })
-    fireEvent.submit(input.closest('form')!)
+    // The goals list has its own "+", and what you type there IS a goal.
+    fireEvent.click(screen.getByRole('button', { name: `Add a goal for ${monthName}` }))
+    const goalInput = screen.getByLabelText(`New goal for ${monthName}`)
+    fireEvent.change(goalInput, { target: { value: 'Read more' } })
+    fireEvent.submit(goalInput.closest('form')!)
     expect(hook.addTask).toHaveBeenLastCalledWith('Read more', undefined, undefined, undefined,
       expect.objectContaining({ bucket: 'month', isGoal: true }))
   })
@@ -238,11 +315,11 @@ describe('PeriodPlanPage', () => {
   it('This Year lists the goals, with the year rail absent and a goal look-back', () => {
     state.goals = [goal({ name: 'Run a half marathon' }), goal({ name: 'Old goal', year: now.getFullYear() - 1, status: 'completed' })]
     renderPage('year')
-    expect(screen.getByRole('heading', { name: 'This Year' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: String(now.getFullYear()) })).toBeInTheDocument()
     expect(screen.getByText('Run a half marathon')).toBeInTheDocument()
     expect(screen.queryByRole('complementary')).not.toBeInTheDocument()
     // no Someday for a goal, ever
-    fireEvent.click(screen.getByRole('button', { name: 'Last year' }))
+    fireEvent.click(screen.getByRole('button', { name: `Review ${now.getFullYear() - 1}` }))
     expect(screen.getByText('Old goal')).toHaveClass('line-through')
     expect(screen.queryByRole('button', { name: /Someday/ })).not.toBeInTheDocument()
   })
@@ -251,7 +328,7 @@ describe('PeriodPlanPage', () => {
     state.tasks = [task({ title: 'Fall trips', bucket: 'quarter' })]
     state.goals = [goal({ name: 'Run a half marathon' })]
     renderPage('season')
-    expect(screen.getByRole('heading', { name: 'This Season' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toMatch(/\d{4}$/)
     expect(within(screen.getByRole('region', { name: /list$/ })).getByText('Fall trips')).toBeInTheDocument()
     const rail = screen.getByRole('complementary', { name: 'This Year' })
     fireEvent.click(within(rail).getByRole('button', { name: /This Year/ }))
@@ -266,7 +343,8 @@ describe('PeriodPlanPage', () => {
 // look-ahead all need coverage beyond the pure periodPage.test.ts.
 describe('PeriodPlanPage — planningPeriod wiring', () => {
   beforeEach(() => {
-    state.tasks = []; state.goals = []; state.loading = false
+    state.tasks = []; state.goals = []; state.loading = false; routinesState.routines = []
+    domainState.layers = new Set(['work', 'family', 'personal', 'unsorted']); domainState.soleDomain = null
     seasonsState.seasons = DEFAULT_SEASONS; seasonsState.loading = false
     localStorage.clear()
     Object.values(hook).forEach((f) => f.mockClear())
@@ -281,15 +359,15 @@ describe('PeriodPlanPage — planningPeriod wiring', () => {
 
   it('an explicit ?start= wins over the current period', () => {
     renderPageAt('season', '/season?start=2026-12-01')
-    expect(screen.getByRole('heading', { name: 'This Season' })).toBeInTheDocument()
-    expect(screen.getByText('Winter 2026')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toMatch(/\d{4}$/)
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Winter 2026')
   })
 
   it('opens on the coming season and shows the "looking ahead" line when the current one is nearly over', () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date(2026, 10, 20)) // Nov 20 — 11 days left in Fall
     renderPage('season')
-    expect(screen.getByText('Winter 2026')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Winter 2026')
     expect(screen.getByText(/Winter 2026 starts in 11 days/)).toBeInTheDocument()
     expect(screen.getByText(/looking ahead/)).toBeInTheDocument()
   })
@@ -299,14 +377,14 @@ describe('PeriodPlanPage — planningPeriod wiring', () => {
     vi.setSystemTime(new Date(2026, 10, 20)) // Nov 20 — would look ahead to Winter once tasks load
     state.loading = true // tasks haven't loaded yet — the initial computation is deferred
     const { rerender } = renderPage('season')
-    expect(screen.getByText('Fall 2026')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Fall 2026')
     fireEvent.click(screen.getByLabelText('Previous season'))
-    expect(screen.getByText('Summer 2026')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Summer 2026')
     // Tasks finish loading — re-rendering the SAME instance must not let the
     // guarded effect override where the user navigated to.
     state.loading = false
     rerender(<MemoryRouter><PeriodPlanPage level="season" /></MemoryRouter>)
-    expect(screen.getByText('Summer 2026')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Summer 2026')
   })
 
   // A stale localStorage-cached season boundary must not get baked into the
@@ -330,7 +408,7 @@ describe('PeriodPlanPage — planningPeriod wiring', () => {
     seasonsState.seasons = DEFAULT_SEASONS
     seasonsState.loading = false
     rerender(<MemoryRouter><PeriodPlanPage level="season" /></MemoryRouter>)
-    expect(screen.getByText('Fall 2026')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Fall 2026')
     expect(screen.queryByText('Summer 2026')).not.toBeInTheDocument()
   })
 
@@ -346,10 +424,12 @@ describe('PeriodPlanPage — planningPeriod wiring', () => {
 })
 
 describe('PeriodPlanPage masthead', () => {
-  it('wears the shared masthead card with the period in the eyebrow and the page name as the title', () => {
+  it('wears the shared masthead card with the period AS the title and the nav in the eyebrow', () => {
     renderPage('month')
     const card = screen.getByTestId('masthead-card')
-    expect(within(card).getByRole('heading', { level: 1, name: 'This Month' })).toBeInTheDocument()
+    // The PERIOD is the page's name; "month" is the nav's subject in the eyebrow.
+    const monthName = now.toLocaleDateString('en-US', { month: 'long' })
+    expect(within(card).getByRole('heading', { level: 1 }).textContent).toContain(monthName)
     const eyebrow = screen.getByTestId('masthead-eyebrow')
     expect(within(eyebrow).getByLabelText('Previous month')).toBeInTheDocument()
     expect(within(eyebrow).getByLabelText('Next month')).toBeInTheDocument()

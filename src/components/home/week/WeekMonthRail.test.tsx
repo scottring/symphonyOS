@@ -39,7 +39,8 @@ describe('WeekMonthRail', () => {
     render(<WeekMonthRail onSelectItem={() => {}} tasks={[placed, copy, done]} />)
     unfold()
     // The same one status the list shows — not a second "→ placed" vocabulary.
-    expect(screen.getByText('in this week')).toBeInTheDocument()
+    // No week_start on the copy, so it can only say which week generically.
+    expect(screen.getByText('This week')).toBeInTheDocument()
     expect(screen.queryByText('→ placed')).not.toBeInTheDocument()
     expect(screen.getByText('Book dentist')).toHaveClass('line-through')
     // The copy itself (a week row) is not on the month list.

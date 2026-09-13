@@ -4,7 +4,7 @@
 // offers right now. Shared by This Month / This Season / This Year so the
 // three pages read as one surface.
 
-import { Check, Target, ArrowRight, Archive, Trash2, Repeat } from 'lucide-react'
+import { Check, Target, ArrowRight, ArrowUpRight, CalendarDays, Archive, Trash2, Repeat } from 'lucide-react'
 import type { PlacementFate } from '@/lib/planning/lineage'
 import type { RowAction } from '@/lib/planning/periodPage'
 
@@ -14,9 +14,12 @@ export interface PlanRowModel {
   isGoal: boolean
   fate: PlacementFate
   kind: 'task' | 'goal'
+  /** One quiet line of intent under a goal — its first line of notes. Goals
+   *  carry a "why"; tasks stay one line. */
+  subtitle?: string
   /** Where this row's copy went, when it has been taken down a level. The
    *  row's ONE status line; the tick says whether it is finished. */
-  placed?: { label: string; id: string } | null
+  placed?: { label: string; id: string; kind: 'week' | 'date' | 'done' | 'placed' } | null
 }
 
 /** Is this row finished? Own completion or its copy's — the distinction
@@ -51,6 +54,33 @@ function ActionIcon({ action }: { action: Exclude<RowAction, 'complete'> }) {
   return <Repeat className="w-3.5 h-3.5" />
 }
 
+function PlacementChip({ placed, onOpenPlaced }: {
+  placed: NonNullable<PlanRowModel['placed']>
+  onOpenPlaced?: (taskId: string) => void
+}) {
+  const Icon = placed.kind === 'date' ? CalendarDays : placed.kind === 'done' ? Check : ArrowUpRight
+  const tone = placed.kind === 'done' ? 'text-neutral-400' : 'text-primary-700'
+  const body = (
+    <>
+      <Icon className="w-3 h-3 shrink-0" />
+      <span className="truncate">{placed.label}</span>
+    </>
+  )
+  const base = `mt-0.5 inline-flex max-w-full items-center gap-1 text-[12px] ${tone}`
+  return onOpenPlaced ? (
+    <button
+      type="button"
+      onClick={() => onOpenPlaced(placed.id)}
+      title={`Open this task where it now lives — ${placed.label}`}
+      className={`${base} rounded hover:underline transition-colors`}
+    >
+      {body}
+    </button>
+  ) : (
+    <span className={base}>{body}</span>
+  )
+}
+
 export function PlanRow({ row, actions, onAction, onOpen, onOpenPlaced }: {
   row: PlanRowModel
   actions: RowAction[]
@@ -83,27 +113,23 @@ export function PlanRow({ row, actions, onAction, onOpen, onOpenPlaced }: {
         <Check className="w-3 h-3" strokeWidth={3} />
       </button>
       {row.isGoal && <Target className="w-3.5 h-3.5 mt-[3px] shrink-0 text-amber-600" aria-label="Goal" />}
-      <button
-        type="button"
-        onClick={() => onOpen(row)}
-        className={`min-w-0 flex-1 text-left text-[14px] leading-snug ${done ? 'line-through text-neutral-400' : 'text-neutral-800'}`}
-      >
-        {row.title}
-      </button>
-      {row.placed && (
-        onOpenPlaced ? (
-          <button
-            type="button"
-            onClick={() => onOpenPlaced(row.placed!.id)}
-            title={`Open this task where it now lives — ${row.placed.label}`}
-            className="shrink-0 mt-0.5 text-xs text-neutral-400 hover:text-primary-700 hover:underline transition-colors"
-          >
-            {row.placed.label}
-          </button>
-        ) : (
-          <span className="shrink-0 text-xs text-neutral-400 mt-0.5">{row.placed.label}</span>
-        )
-      )}
+      <span className="min-w-0 flex-1">
+        <button
+          type="button"
+          onClick={() => onOpen(row)}
+          className={`block w-full min-w-0 text-left leading-snug ${row.isGoal ? 'font-display text-[17px]' : 'text-[14px]'} ${done ? 'line-through text-neutral-400' : 'text-neutral-800'}`}
+        >
+          {row.title}
+        </button>
+        {row.subtitle && (
+          <span className="mt-0.5 block text-[12px] leading-snug text-neutral-500">{row.subtitle}</span>
+        )}
+        {/* Where this row is committed, on its own line beneath the title —
+            the chip a reader scans down, not a whisper in the right margin. */}
+        {row.placed && (
+          <PlacementChip placed={row.placed} onOpenPlaced={onOpenPlaced} />
+        )}
+      </span>
       {verbs.length > 0 && (
         <span className="shrink-0 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
           {verbs.map((a) => (
