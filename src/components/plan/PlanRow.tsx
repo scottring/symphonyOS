@@ -19,6 +19,23 @@ export interface PlanRowModel {
   placed?: { label: string; id: string } | null
 }
 
+/** Is this row finished? Own completion or its copy's — the distinction
+ *  matters for who may REOPEN it, never for how it reads. The list and the
+ *  rails both ask here: reading it in two places is how the rail came to show
+ *  finished work as outstanding (review 2026-09-13). */
+export function rowIsDone(fate: PlacementFate): boolean {
+  return fate === 'done' || fate === 'placed-done'
+}
+
+/** May this row be reopened HERE? Only when the completion is its own. A
+ *  placed-and-done row reads as finished (rowIsDone) but is reopened on the
+ *  copy that did the work — two questions that look alike and are not, which
+ *  is why each has a name. Conflating them stranded every completed row as
+ *  unreopenable (review 2026-09-13). */
+export function rowOwnsCompletion(fate: PlacementFate): boolean {
+  return fate === 'done'
+}
+
 const ACTION_LABEL: Record<Exclude<RowAction, 'complete'>, string> = {
   keep: 'Keep',
   someday: 'Someday',
@@ -44,13 +61,13 @@ export function PlanRow({ row, actions, onAction, onOpen, onOpenPlaced }: {
 }) {
   // A row whose copy is finished reads as finished — one status, not a tick
   // that disagrees with an annotation beside it.
-  const done = row.fate === 'done' || row.fate === 'placed-done'
+  const done = rowIsDone(row.fate)
   // A row YOU ticked can always be un-ticked: actionsFor offers no verbs on a
   // finished row, so gating the tick on `complete` alone stranded every
   // completed task and goal as unreopenable (regression, caught in review
   // 2026-09-13). Only `placed-done` stays locked — that completion belongs to
   // the copy that did the work, and is reopened there.
-  const canTick = actions.includes('complete') || row.fate === 'done'
+  const canTick = actions.includes('complete') || rowOwnsCompletion(row.fate)
   const verbs = actions.filter((a): a is Exclude<RowAction, 'complete'> => a !== 'complete')
   return (
     <li className="group flex items-start gap-2.5 rounded-lg px-2 py-1.5 hover:bg-neutral-50 transition-colors">

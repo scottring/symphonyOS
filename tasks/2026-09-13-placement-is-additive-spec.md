@@ -229,7 +229,10 @@ A single model cannot serve both. Under "either of us," per-member status means 
 
 **This is Scott's call, not a reviewer's** — Open question 6. It gates step 3 only; steps 1, 2 and 4 don't touch it.
 
-**Still verify by test, not by reading.** Two accounts (Scott + Iris): a private routine's occurrence must be invisible; a shared routine's completion must be visible to both. The policy text above is evidence, not proof.
+**Still verify by test, not by reading.** The policy text above is evidence, not proof. Two gates, at different steps:
+
+- **Tasks — gates step 2 (stamps) AND step 4 (All tasks).** Two accounts, Scott + Iris: Iris's private Work and Personal tasks must not appear in Scott's month/week/day surfaces, in All tasks, or in any grouping count. This is *not* covered by the existing tests — `PeriodPlanPage.test.tsx`'s "Iris's rows stay out" asserts assignee filtering against a mocked hook and says nothing about what the database returns for another user. A stamps change rewrites the membership queries and All tasks reads every open task, so both need the real two-account test first.
+- **Routine occurrences — gates step 3.** A private routine's occurrence invisible; a shared routine's completion visible to both.
 
 **Counts are computed after the domain/scope filter, never before** — counts that don't mirror what renders is a bug this codebase has already shipped once.
 
@@ -282,10 +285,10 @@ Not reopened here. Reopening any of them is Scott's call, not a reviewer's.
 
 ## §7 Sequence
 
-1. **§5 month page** — hierarchy, labels, look-back kept. No data change. ~1 day.
-2. **§1 tasks** — `task_plan_memberships` + `tasks.completed_at`, `deriveStamps` + `deriveBucket` + tripwires, writers stop clearing, the 33 membership sites classified and converted (parity tests FIRST), `belongsTo*` NULL branch retired with the Unplanned review prompt, `PlanRow` fate read from stamps, `lineage` copy-down retired for placement (kept for threading). **The big one** — the risk is the membership sweep and the iOS/wall/MCP readers, not the migration. No inference backfill.
+1. ~~**§5 month page** — hierarchy, labels, look-back kept. No data change.~~ **SHIPPED 2026-09-13** (`31ddcacd`, fixes `58766fc0`): plan leads, goals/tasks headed separately, calendar folded beneath and persistent, one status that links to the copy. Applies to `/month`, `/season` and `/year` (one component) and to both reference rails. Review caught three defects in it — no reopening a completed row, a scheduled date labelled as a completion date, and the rail reading finished work as outstanding — all fixed with regression tests plus a `rowIsDone`/`rowOwnsCompletion` parity tripwire.
+2. **§1 tasks** — **blocked on the two-account task-privacy test** (§3); then `task_plan_memberships` + `tasks.completed_at`, `deriveStamps` + `deriveBucket` + tripwires, writers stop clearing, the 33 membership sites classified and converted (parity tests FIRST), `belongsTo*` NULL branch retired with the Unplanned review prompt, `PlanRow` fate read from stamps, `lineage` copy-down retired for placement (kept for threading). **The big one** — the risk is the membership sweep and the iOS/wall/MCP readers, not the migration. No inference backfill.
 3. **§2 routine occurrences** — nullable `date` + `week_start` + `grain`, period-keyed identity, week-grained materialization, day-choice adds a date, occurrence-vs-pattern vocabulary. **Blocked on the §3 identity migration** (household-scoped uniqueness + dedupe) and on the two-account privacy test.
-4. **§4 All tasks** — grouped by placement, real labels.
+4. **§4 All tasks** — grouped by placement, real labels. Also gated on the two-account task-privacy test, including counts.
 5. **Week look-back** — flip to any past week and see what was committed, completed, carried or dropped. Reads memberships; no new writes.
 6. **Decide §4's home** on evidence.
 
@@ -315,6 +318,11 @@ Codex recommended on all four; Claude agrees with all four. Each still needs Sco
 ---
 
 ## Changelog
+
+**2026-09-13, rev 5** — step 1 shipped; Codex review of the shipped code:
+
+- **§5 marked SHIPPED** with the three review findings and their fixes recorded.
+- **Task privacy promoted to a gate on steps 2 and 4**, not just step 3 (Codex, and correctly): the existing "Iris's rows stay out" test asserts assignee filtering against a mocked hook and establishes nothing about cross-user reads. The stamps work rewrites exactly the membership queries that would leak, and All tasks reads everything.
 
 **2026-09-13, rev 4** — Codex review of rev 3:
 

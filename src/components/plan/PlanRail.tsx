@@ -10,7 +10,7 @@
 
 import { useEffect, useState } from 'react'
 import { ArrowRight, ChevronDown, ChevronRight, Target } from 'lucide-react'
-import type { PlanRowModel } from './PlanRow'
+import { rowIsDone, type PlanRowModel } from './PlanRow'
 import { readOpen, writeOpen } from './foldState'
 
 // The hint is a one-time nudge toward the pull-down arrow (demo run
@@ -60,10 +60,9 @@ export function PlanRail({ title, subtitle, rows, onOpen, onPullDown, pullLabel,
   const items = rows.filter((r) => !r.isGoal)
   const Row = ({ row }: { row: PlanRowModel }) => {
     const canPull = !!onPullDown && !row.isGoal && row.fate === 'open'
-    // Finished is finished, however it was finished — the rail used to read
-    // only its own completion and showed a placed-and-done row as outstanding
-    // work (caught in review 2026-09-13).
-    const rowDone = row.fate === 'done' || row.fate === 'placed-done'
+    // Finished is finished, however it was finished — asked of the one helper
+    // the list uses, so the two can't drift apart again.
+    const rowDone = rowIsDone(row.fate)
     return (
       <li className="group flex items-start gap-1">
         <button
