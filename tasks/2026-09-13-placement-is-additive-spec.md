@@ -82,11 +82,39 @@ September's look-back shows every `month_start = September` row with that readin
 - It is **computed from the stamps by exactly one function** (`deriveBucket(stamps)`) called by every writer. No caller sets it directly.
 - A **tripwire test** asserts no code outside that writer assigns `bucket`, the way `scopeDefaultCoverage.test.ts` guards literal `scope:`.
 
-Every existing reader keeps working unchanged, because the narrowest-grain value is exactly what they already read. What changes is that the *wider* stamps are still there to be read by the surfaces that want them.
+Readers asking **"what grain is this row at?"** keep working unchanged — the narrowest-grain value is exactly what they already read.
 
-### Backfill kills the August/September bleed
+**Readers asking "does this row belong to September / to this week?" do NOT, and an earlier draft was wrong to claim otherwise.** Under copy-down, the September original kept `bucket='month'` forever, so `bucket === 'month'` doubled as a membership test. Under additive stamps, that same row acquires a day and derives `bucket='timed'` — and every membership query gated on the bucket silently drops it. The canonical case is `src/lib/planning/poolViews.ts:106`:
 
-Scott's "August-specific items appear under September" is the NULL-means-current rule, not a layout problem. Backfill `month_start` / `season_start` / `week_start` from `created_at` (and from `scheduled_for` where present) so every row is explicitly stamped, then **retire `belongsTo*`'s NULL-is-true branch** and keep one predicate per period instead of two. Real labels ("September 13–19") become readable off the data rather than assumed from what you're looking at.
+```ts
+if (t.bucket === 'week') return belongsToWeek(t, currentWeek) || isStaleWeekPlacement(t, currentWeek)
+```
+
+It gates on the bucket and only *then* consults the stamp — so a week row given a Tuesday falls out of the week pool entirely.
+
+**Every membership question must read its stamp directly** (`isPlacedOnMonth` / `belongsToWeek` / …) with no bucket gate in front of it. Measured: **33 such comparisons across 14 non-test files** — `poolViews`, `taskPools`, `horizons`, `weekPlacement`, `attention`, `betPulse`, `periodPlacement`, `useSupabaseTasks`, `useSystemHealth`, `WeekMonthRail`, `WeekPoolLane`, `InboxView`, `TodayView`, `WhenPicker`. That is the real sweep: bounded and enumerable, but not zero. Each site must be classified as grain-question (leave) or membership-question (convert), and the conversions need parity tests before the writers change.
+
+### No backfill from creation dates
+
+Scott's "August-specific items appear under September" is the NULL-means-current rule, not a layout problem — `belongsToMonth` returns `true` for a NULL row, so unstamped rows follow you into whatever month you page to.
+
+The fix is **not** to infer the missing stamps. Backfilling `month_start` from `created_at` would invent planning decisions the user never made — a task written on August 3rd was not thereby assigned to August's plan. Instead:
+
+- **NULL stops meaning "the current period" and starts meaning "not assigned to one."** `belongsTo*`'s NULL-is-true branch is retired; one predicate per period replaces the pair.
+- Unstamped rows surface in All tasks' **Unplanned** group, explicitly, for review.
+- Stamp only where the evidence is reliable — e.g. a row with `scheduled_for` genuinely belongs to that date's week and month.
+
+**Consequence to accept deliberately:** legacy rows currently printing on the September page will leave it (they were never assigned to September) and reappear under Unplanned. On Scott's live account that will look like data loss on first load, so step 2 ships with a one-time review prompt naming the count — nothing disappears silently.
+
+Real labels ("September 13–19") then become readable off the data rather than assumed from what you happen to be looking at.
+
+### Carry-forward history — out of scope, deliberately
+
+A single `week_start` cannot record that a row was committed to Sep 6–12, slipped, and was re-committed to Sep 13–19. Worth being precise about what that costs, because it is **not a regression this spec introduces**: week→week is already a *move* today, not a copy (`lineage.ts:58-60` — "the week list is a checklist, not a reference list"), so that history doesn't exist now either.
+
+- The **month** association survives under additive stamps, so "carried forward inside September" becomes visible for the first time.
+- A cheap slip record already exists in the schema — `defer_count` and `weekDeferredAt` — and one more field (`last_week_start`) would answer "where did this come from" without new rows.
+- **Durable plan-membership rows are rejected for now.** A `task_placements` table is the theoretically right model, but it re-fragments the row this spec just unified, and every surface would again have to ask "which membership is authoritative" — the exact question `→ placed` existed to answer. If a week-level look-back is ever wanted, that is the design to reopen, as its own spec.
 
 ---
 
@@ -108,7 +136,8 @@ What happens instead is stated plainly by `src/lib/week/unhomedRoutines.ts:2-3`:
 
 Give an occurrence the same additive stamps a task gets:
 
-- `date` becomes **nullable**; add `week_start date`. Uniqueness becomes `(user_id, entity_type, entity_id, coalesce(date, week_start), grain)` — or an equivalent partial-unique pair, decided at implementation.
+- `date` becomes **nullable**; add `week_start date` and an explicit `grain` ('day' | 'week').
+- **Identity is the recurrence period, never the chosen day.** Uniqueness is `(entity_type, entity_id, period_start, grain)` — where `period_start` is the week start for a weekly routine and the date itself for a daily one — plus the scope-dependent owner key from §3. `date` is a **mutable attribute** of that row and must not appear in its key: a key that changes when a day is picked would leave the materializer unable to see the occurrence it already created, and it would make a second one. That is the ten-duplicate-rows failure of 2026-09-10, re-entered through the routine door.
 - An untimed weekly routine materializes a **week-grained occurrence** for the current week: its own checkbox, on the weekly checklist, **already a valid commitment while untimed**.
 - **Choosing Tuesday adds `date` to that same occurrence row.** It does not create a second occurrence, and it does not touch the recurrence pattern.
 - **"Every Tuesday from now on" is a different action** on a different object (the routine), and must be worded differently in the UI — "this week only" vs "from now on."
@@ -125,7 +154,23 @@ Codex's requirement is right: Iris's private Work and Personal items — and the
 
 **The task half is already correct** and must not be routed around: the All tasks surface reads through the same RLS as every other surface, via the normal client. No service-role path, ever.
 
-**The occurrence half is wrong today, in the strict direction.** `actionable_instances` RLS is owner-only (`auth.uid() = user_id`, migration `009:82-96`) and the uniqueness key is per `user_id`. It does **not** mirror the routine's `scope`. Routines share on scope (that was fixed); their instances don't. Promoting occurrences to first-class planning objects therefore requires the instance policies to mirror the routine's own scope — the same "mirror each table's OWN RLS" rule that fixed context-graph blindness. Until that lands, a shared family occurrence ticked by Iris is invisible to Scott. **Verify before building any shared-occurrence UI.**
+**The occurrence half: the policies are fine; the IDENTITY isn't.** An earlier draft of this spec claimed instance RLS was owner-only, reading migration `009:82-96`. That was wrong — migrations are not the source of truth here (DDL is applied by hand via the Management API), and the live policies were replaced. Queried on 2026-09-13, all three of SELECT / UPDATE / DELETE on `actionable_instances` read:
+
+```sql
+auth.uid() = user_id
+OR (users_share_household(auth.uid(), user_id)
+    AND (entity_type = 'calendar_event'
+         OR (entity_type = 'routine'
+             AND EXISTS (SELECT 1 FROM routines r
+                         WHERE r.id::text = actionable_instances.entity_id
+                           AND r.scope IN ('couple', 'compound')))))
+```
+
+So instances **do** mirror the routine's scope: a shared routine's occurrences are visible household-wide, a private one's are not. Iris's private Work and Personal occurrences are already invisible to Scott, by the table's own policy. Nothing to fix.
+
+**What is broken is uniqueness.** The key is `(user_id, entity_type, entity_id, date)` — per user. A shared family occurrence therefore has **one row per member who touches it**, with no single agreed identity: two people can tick "their" copy of the same commitment and neither sees the other's. That's tolerable while an occurrence is a private checkmark on a shared routine; it is not tolerable once an occurrence is a **planning object on a shared weekly list**, which is what §2 makes it. Household-scoped identity for `couple`/`compound` routines (drop `user_id` from the key at those scopes, dedupe existing rows, keep per-member *status* on a child row or a status map) is therefore in scope for step 3 — and it is a genuine migration with a dedupe, not a column add.
+
+**Still verify by test, not by reading.** Two accounts (Scott + Iris): a private routine's occurrence must be invisible; a shared routine's completion must be visible to both. The policy text above is evidence, not proof.
 
 **Counts are computed after the domain/scope filter, never before** — counts that don't mirror what renders is a bug this codebase has already shipped once.
 
@@ -156,22 +201,31 @@ Independent of the model work, and worth doing first because it's the visible ha
 
 ## §6 What is NOT in this spec
 
-Rejected or deferred, with reasons, so they don't come back by accident:
+An earlier draft ran two different kinds of "no" together. Split, because only one kind is settled.
 
-- **"Carry forward" on every row.** The missed-placement rule already returns a slipped card to the week's list next morning. `keep` is deliberately scoped to a PAST period's look-back (`periodPage.ts:141`, gated on `isPast`), where re-committing is a real decision. Keep it there.
-- **"1 of 5 complete" on the weekly list.** Scoreboard; and the weekly list isn't meant to be finished. Two peers, no scoreboards; no counts on Today.
-- **Two text links under every row.** Reads as a form. Hover/press-reveal, as the row action rail already does.
-- **Three always-visible domain checkboxes.** Shipped is `DomainSwitcher` — a lens that reads as a tag and derives scope. A tri-checked filter panel trains people to ignore it.
-- **Today split into "Chosen for today" + "Appointments" + an embedded weekly list.** Today is flat, one agenda, in time order; the embedded panel duplicates /week inside Today.
-- **Someday / Unplanned / Completed as filter chips.** A view, not a bucket — the distinction custom spans were killed over. They're groupings in §4, not buckets.
+### Settled — Scott's own recorded product decisions
+
+Not reopened here. Reopening any of them is Scott's call, not a reviewer's.
+
+- **No counts on the weekly list or Today** ("1 of 5 complete"). Two peers, no scoreboards; and the weekly list isn't meant to be finished.
+- **`keep` stays scoped to a PAST period's look-back** (`periodPage.ts:141`, gated on `isPast`), where re-committing is a real decision. A per-row "Carry forward" on the current week duplicates the missed-placement rule, which already returns a slipped card to the week's list next morning.
+- **The domain lens is `DomainSwitcher`** — reads as a tag, derives scope — not three always-visible checkboxes. A tri-checked filter panel trains people to ignore it.
+- **Today is flat: one agenda, in time order.** It was deliberately un-split.
+- **Someday / Unplanned / Completed are groupings, not buckets.** A view is not a bucket — the distinction custom spans were killed over. They group in §4; they don't become placement states.
+
+### Open — design questions this spec does not settle
+
+- **How Today offers the weekly list.** Codex is right that Today must let you choose from the week; an earlier draft read as rejecting the requirement when the objection was only to *duplicating /week as a panel inside Today*. The shipped mechanism is `HorizonPoolDropdown` in Today's controls strip — week and month pools as dropdowns, deliberately outside the daily review. Whether that presentation is good enough is a fair question and belongs with the §5 layout work, not here.
+- **Two text links under every row** vs hover/press-reveal. The row action rail is the shipped pattern; the proposal's always-visible links read as a form. A preference, not a finding.
+- **All tasks' home** — §4, and Open question 2.
 
 ---
 
 ## §7 Sequence
 
 1. **§5 month page** — hierarchy, labels, look-back kept. No data change. ~1 day.
-2. **§1 tasks** — migration (backfill stamps), `deriveBucket` + tripwire, writers stop clearing, `belongsTo*` NULL branch retired, `PlanRow` fate read from stamps, `lineage` copy-down retired for placement (kept for threading). **The big one** — the risk is the writer sweep and the iOS/wall/MCP readers, not the migration.
-3. **§2 routine occurrences** — nullable `date` + `week_start` + grain, week-grained materialization, day-choice adds a date, occurrence-vs-pattern vocabulary. **Blocked on the §3 RLS verification.**
+2. **§1 tasks** — `deriveBucket` + tripwire, writers stop clearing, the 33 membership sites classified and converted (parity tests FIRST), `belongsTo*` NULL branch retired with the Unplanned review prompt, `PlanRow` fate read from stamps, `lineage` copy-down retired for placement (kept for threading). **The big one** — the risk is the membership sweep and the iOS/wall/MCP readers, not the migration. No inference backfill.
+3. **§2 routine occurrences** — nullable `date` + `week_start` + `grain`, period-keyed identity, week-grained materialization, day-choice adds a date, occurrence-vs-pattern vocabulary. **Blocked on the §3 identity migration** (household-scoped uniqueness + dedupe) and on the two-account privacy test.
 4. **§4 All tasks** — grouped by placement, real labels.
 5. **Decide §4's home** on evidence.
 
@@ -189,10 +243,26 @@ Each step ships to `main` green and browser-verified before the next starts.
 
 ## §9 Open questions for Scott
 
-1. **Does a placed row still belong to its month's *list*, or only to its look-back?** i.e. after "Get extender" goes into the week of Sep 13, does it still print on the September page? (Claude: yes, marked — that's the trust fix. Say if you'd rather it leave the list and appear only in the look-back.)
-2. **All tasks: Library or sidebar?** Unsettled between Codex and Claude; §4 records both positions.
-3. **Does an untimed weekly occurrence that goes unfinished get offered to next week, or just stay in its week?** (Spec says it stays and is reviewable; the offer would be a Review-drawer verdict, not an automatic move.)
-4. **`quarter` vs `season`:** the bucket is still named `quarter` while the product says Season. Rename in step 2, or leave the column alone?
+Codex recommended on all four; Claude agrees with all four. Each still needs Scott's yes — they are recorded as the spec's working answers, not as approval.
+
+1. **Does a placed row still print on September's list?** → **Yes, with its week/day association shown and one checkbox.** That IS the trust fix; a row that vanishes from the list when you take it into a week is the thing Scott doesn't trust.
+2. **All tasks: Library or sidebar?** → **Start in Library plus empty-⌘K.** Cheap to promote later if Scott reaches for it daily; expensive to demote once it's a habit.
+3. **An unfinished untimed weekly occurrence?** → **Stays in its original week, with an explicit review decision.** Never silently merged into the next occurrence.
+4. **`quarter` vs `season`?** → **Keep `quarter` in the column, display "Season."** A rename is an unrelated compatibility migration across iOS, the wall and MCP; it doesn't belong in this change.
+
+---
+
+## Changelog
+
+**2026-09-13, rev 2** — Codex review of rev 1. Corrections applied:
+
+- **§3 rewritten. Rev 1 was wrong**: it read instance RLS off migration `009` and reported owner-only policies. The live policies mirror the routine's scope (queried 2026-09-13). The real occurrence-privacy defect is per-`user_id` uniqueness — no single agreed identity for a shared occurrence.
+- **§1's "no sweep" claim corrected.** Membership queries gated on `bucket` break under additive stamps; 33 comparisons across 14 non-test files must be classified and converted.
+- **§1 backfill reversed.** No inference from `created_at` — that invents planning decisions. NULL becomes "unassigned," surfaced in Unplanned, with a one-time review prompt so nothing vanishes silently.
+- **§2 identity fixed.** Uniqueness keys the recurrence period, never the chosen day; `date` is a mutable attribute. Rev 1's `coalesce(date, week_start)` key would have let the materializer duplicate an occurrence the moment a day was picked.
+- **§6 split** into Scott's recorded decisions vs open design questions; the Today→weekly-list presentation moved to open.
+- **Carry-forward history** addressed explicitly and scoped out, with the reason and the cheap alternative.
+- **§9** records the four working answers.
 
 ---
 
@@ -215,7 +285,8 @@ Findings behind the claims above, all on `origin/main` @ `5a67d4a0`.
 
 **Routines:**
 - `supabase/migrations/009_actionable_system.sql:56` — `actionable_instances`, `date date not null`, unique `(user_id, entity_type, entity_id, date)`.
-- `supabase/migrations/009_actionable_system.sql:82-96` — instance RLS is owner-only; it does not mirror the routine's scope.
+- Live policies on `actionable_instances`, queried 2026-09-13 via `pg_policy`: SELECT / UPDATE / DELETE all read `auth.uid() = user_id OR (users_share_household(...) AND (entity_type='calendar_event' OR (entity_type='routine' AND EXISTS(... r.scope IN ('couple','compound')))))`. They **do** mirror the routine's scope; migration `009:82-96`'s owner-only policies were superseded live. Migrations are not the source of truth in this repo.
+- Live columns, same date: `date` is still `date NOT NULL`; there is no `week_start`. Uniqueness remains `(user_id, entity_type, entity_id, date)` — per user, hence no agreed identity for a shared occurrence.
 - `src/lib/week/unhomedRoutines.ts:2-3,14-19` — untimed / dayless-weekly routines are classified as having "NO HOME yet — nothing the week grid can place."
 
 **The month page:**
