@@ -43,10 +43,14 @@ export function PlanRow({ row, actions, onAction, onOpen, onOpenPlaced }: {
   onOpenPlaced?: (taskId: string) => void
 }) {
   // A row whose copy is finished reads as finished — one status, not a tick
-  // that disagrees with an annotation beside it. The tick is not clickable
-  // there: completion belongs to the copy that did the work.
+  // that disagrees with an annotation beside it.
   const done = row.fate === 'done' || row.fate === 'placed-done'
-  const canTick = actions.includes('complete')
+  // A row YOU ticked can always be un-ticked: actionsFor offers no verbs on a
+  // finished row, so gating the tick on `complete` alone stranded every
+  // completed task and goal as unreopenable (regression, caught in review
+  // 2026-09-13). Only `placed-done` stays locked — that completion belongs to
+  // the copy that did the work, and is reopened there.
+  const canTick = actions.includes('complete') || row.fate === 'done'
   const verbs = actions.filter((a): a is Exclude<RowAction, 'complete'> => a !== 'complete')
   return (
     <li className="group flex items-start gap-2.5 rounded-lg px-2 py-1.5 hover:bg-neutral-50 transition-colors">

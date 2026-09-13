@@ -10,6 +10,30 @@ const row = (over: Partial<PlanRowModel> = {}): PlanRowModel => ({
 describe('PlanRail arrow', () => {
   beforeEach(() => localStorage.clear())
 
+  it('reads a placed-and-done row as finished, like the list does', () => {
+    render(
+      <PlanRail
+        title="This Season" rows={[row({ title: 'Trade in the bike', fate: 'placed-done', placed: { label: 'done', id: 'c1' } })]}
+        onOpen={vi.fn()} emptyCopy="Nothing." storageKey="kdone"
+      />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: /This Season/ }))
+    // Struck through — the rail used to show finished work as outstanding.
+    expect(screen.getByText('Trade in the bike').className).toContain('line-through')
+    expect(screen.getByText('done')).toBeInTheDocument()
+  })
+
+  it('a placed-and-done row offers no pull-down arrow', () => {
+    render(
+      <PlanRail
+        title="This Season" rows={[row({ fate: 'placed-done' })]} onOpen={vi.fn()} onPullDown={vi.fn()}
+        pullLabel="Add to this month:" emptyCopy="Nothing." storageKey="kdone2"
+      />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: /This Season/ }))
+    expect(screen.queryByRole('button', { name: /Add to this month/ })).not.toBeInTheDocument()
+  })
+
   it('is visible at reduced opacity, not hover-only (demo run 2026-09-06)', () => {
     render(
       <PlanRail

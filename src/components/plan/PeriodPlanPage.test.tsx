@@ -111,9 +111,41 @@ describe('PeriodPlanPage', () => {
     ]
     renderPage('month')
     const list = screen.getByRole('region', { name: /list$/ })
-    expect(within(list).getByText('done in this week')).toBeInTheDocument()
+    expect(within(list).getByText('done')).toBeInTheDocument()
     // Completion belongs to the copy that did the work.
     expect(within(list).getByRole('button', { name: /Reopen Trade in the bike/ })).toBeDisabled()
+  })
+
+  it('a task you completed HERE can be reopened from its own tick', () => {
+    state.tasks = [task({ title: 'Book dentist', monthStart: thisMonth, completed: true })]
+    renderPage('month')
+    const tick = screen.getByRole('button', { name: 'Reopen Book dentist' })
+    expect(tick).not.toBeDisabled()
+    fireEvent.click(tick)
+    expect(hook.toggleTask).toHaveBeenCalledWith(state.tasks[0].id)
+  })
+
+  it('a goal you completed can be reopened from its own tick', () => {
+    state.goals = [goal({ name: 'Read more', status: 'completed' })]
+    renderPage('year')
+    const tick = screen.getByRole('button', { name: 'Reopen Read more' })
+    expect(tick).not.toBeDisabled()
+    fireEvent.click(tick)
+    expect(goalsApi.updateGoal).toHaveBeenCalledWith(state.goals[0].id, { status: 'active' })
+  })
+
+  it("never dresses a copy's SCHEDULED date up as the day it was done", () => {
+    const original = task({ title: 'Fix the gate', monthStart: thisMonth })
+    const scheduledFor = new Date(now.getFullYear(), now.getMonth(), 15, 9, 0)
+    state.tasks = [
+      original,
+      task({ title: 'Fix the gate', bucket: 'timed', scheduledFor, sourceId: original.id, completed: true }),
+    ]
+    renderPage('month')
+    const list = screen.getByRole('region', { name: /list$/ })
+    const day = scheduledFor.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    expect(within(list).queryByText(`done ${day}`)).not.toBeInTheDocument()
+    expect(within(list).getByText('done')).toBeInTheDocument()
   })
 
   it('the calendar is a fold BENEATH the plan — closed until you open it (Scott, 2026-09-13)', () => {

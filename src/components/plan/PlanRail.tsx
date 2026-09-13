@@ -60,6 +60,10 @@ export function PlanRail({ title, subtitle, rows, onOpen, onPullDown, pullLabel,
   const items = rows.filter((r) => !r.isGoal)
   const Row = ({ row }: { row: PlanRowModel }) => {
     const canPull = !!onPullDown && !row.isGoal && row.fate === 'open'
+    // Finished is finished, however it was finished — the rail used to read
+    // only its own completion and showed a placed-and-done row as outstanding
+    // work (caught in review 2026-09-13).
+    const rowDone = row.fate === 'done' || row.fate === 'placed-done'
     return (
       <li className="group flex items-start gap-1">
         <button
@@ -69,8 +73,8 @@ export function PlanRail({ title, subtitle, rows, onOpen, onPullDown, pullLabel,
         >
           {row.isGoal
             ? <Target className="w-3.5 h-3.5 mt-0.5 shrink-0 text-amber-600" />
-            : <span className={`mt-1.5 w-1.5 h-1.5 shrink-0 rounded-full ${row.fate === 'done' ? 'bg-primary-500' : 'bg-neutral-300'}`} />}
-          <span className={`min-w-0 flex-1 text-[13px] leading-snug ${row.fate === 'done' ? 'line-through text-neutral-400' : 'text-neutral-700'}`}>
+            : <span className={`mt-1.5 w-1.5 h-1.5 shrink-0 rounded-full ${rowDone ? 'bg-primary-500' : 'bg-neutral-300'}`} />}
+          <span className={`min-w-0 flex-1 text-[13px] leading-snug ${rowDone ? 'line-through text-neutral-400' : 'text-neutral-700'}`}>
             {row.title}
           </span>
           {row.placed && <span className="shrink-0 text-[11px] text-neutral-400">{row.placed.label}</span>}

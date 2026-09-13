@@ -82,16 +82,22 @@ export function openPool(pool: readonly Task[], tasks: readonly Task[]): Task[] 
 export function placedWhere(task: Task, tasks: readonly Task[]): { label: string; id: string } | null {
   const copy = placedCopyOf(task, tasks)
   if (!copy) return null
-  const done = copy.completed
+  // A finished copy says only that it is finished. `tasks` stores no
+  // completion time — only a boolean — so "done Sep 15" would be dressing a
+  // SCHEDULED date up as the day the work happened (caught in review
+  // 2026-09-13). The row links to the copy; the date lives there, correctly
+  // labelled. Until tasks carry `completed_at`, this says nothing it can't
+  // support.
+  if (copy.completed) return { label: 'done', id: copy.id }
   if (copy.scheduledFor) {
     const day = copy.scheduledFor.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-    return { label: done ? `done ${day}` : `on ${day}`, id: copy.id }
+    return { label: `on ${day}`, id: copy.id }
   }
   if (copy.bucket === 'week') {
     const week = copy.weekStart
       ? `the week of ${copy.weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
       : 'this week'
-    return { label: done ? `done in ${week}` : `in ${week}`, id: copy.id }
+    return { label: `in ${week}`, id: copy.id }
   }
-  return { label: done ? 'done' : 'placed', id: copy.id }
+  return { label: 'placed', id: copy.id }
 }
