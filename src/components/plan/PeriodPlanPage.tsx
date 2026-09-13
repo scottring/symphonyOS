@@ -13,7 +13,7 @@
 
 import { useMemo, useState, useCallback, useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Plus, Target, ChevronDown, ChevronRight, Repeat } from 'lucide-react'
+import { Plus, Target, ChevronDown, ChevronRight, Repeat, ArrowUpRight } from 'lucide-react'
 import { MastheadCard, PeriodNavEyebrow } from '@/components/layout/MastheadCard'
 import { HomeChromeControls } from '@/components/home/HomeChromeControls'
 import { DomainSwitcher } from '@/components/domain/DomainSwitcher'
@@ -37,21 +37,12 @@ import {
 } from '@/lib/planning/periodPage'
 import type { Task } from '@/types/task'
 import type { Goal } from '@/types/goal'
-import { PlanRow, type PlanRowModel } from './PlanRow'
+import { PlanRow, rowIsDone, type PlanRowModel } from './PlanRow'
 import { PlanRail } from './PlanRail'
-import { readOpen, writeOpen } from './foldState'
+import { readOpen, readFoldPref, writeOpen } from './foldState'
 
 const TITLE: Record<PlanLevel, string> = { month: 'This Month', season: 'This Season', year: 'This Year' }
 const NOUN: Record<PlanLevel, string> = { month: 'month', season: 'season', year: 'year' }
-// What each list is FOR, said once under its heading. The month page used to
-// name the two halves and leave the reader to infer the difference.
-const GOALS_SUB: Record<PlanLevel, string> = {
-  month: 'What you want from the month',
-  season: 'What you want from the season',
-  year: 'What you want from the year',
-}
-const TASKS_SUB = 'Concrete things you intend to do'
-
 /** "September 2026" with the year set back — the period is the page's name,
  *  not a category label like "This Month" (Scott, 2026-09-13). */
 function periodTitle(level: PlanLevel, label: string) {
@@ -246,7 +237,32 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
     [activeRoutines, layers, level],
   )
 
-  const routinesHeading = isCurrent ? `Routines this ${NOUN[level]}` : 'Current routines'
+  // "Recurring commitments" rather than "Routines this month": what the
+  // reader needs to know is that this time is already spoken for, and the
+  // page carries no routine HISTORY — nothing records which patterns were
+  // active in August — so only the current period may imply it is showing
+  // its own (review 2026-09-13).
+  // Says whose plan this is, because the domain lens and the assignee lens
+  // both narrow it and a page that silently hides rows is the complaint that
+  // started all of this.
+  const lensLabel = soleDomain
+    ? `Everyone in ${soleDomain}`
+    : layers.size >= 4 ? 'Everyone, every domain' : 'Everyone in selected domains'
+
+  const routinesHeading = isCurrent ? 'Recurring commitments' : 'Current recurring commitments'
+  // Hidden finished work stays hidden — across periods and across visits.
+  // A look-back starts open, because that is what a look-back is for, but the
+  // reader can still close it and it will stay closed.
+  const doneKey = `symphony-plan-done-${level}`
+  const [donePref, setDonePref] = useState<boolean | null>(() => readFoldPref(doneKey))
+  // No preference yet → follow the period on screen. A look-back is about
+  // what got done; this month's plan is about what is left.
+  const doneOpen = donePref ?? isPast
+  const toggleDone = useCallback(() => {
+    const next = !doneOpen
+    writeOpen(doneKey, next)
+    setDonePref(next)
+  }, [doneKey, doneOpen])
   const routinesKey = `symphony-plan-routines-${level}`
   const [routinesOpen, setRoutinesOpen] = useState(() => readOpen(routinesKey))
   const toggleRoutines = useCallback(() => {
@@ -284,7 +300,11 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   // Goals and tasks are different promises and get their own lists — one
   // list with an icon on some rows didn't say which was which.
   const goalRows = useMemo(() => rows.filter((r) => r.isGoal), [rows])
-  const taskRows = useMemo(() => rows.filter((r) => !r.isGoal), [rows])
+  // Finished work leaves the working list and waits behind a fold. On a PAST
+  // period the fold opens by default: a look-back is precisely about what got
+  // done (Scott, 2026-09-13).
+  const openTaskRows = useMemo(() => rows.filter((r) => !r.isGoal && !rowIsDone(r.fate)), [rows])
+  const doneTaskRows = useMemo(() => rows.filter((r) => !r.isGoal && rowIsDone(r.fate)), [rows])
 
   const openPlaced = useCallback((taskId: string) => { navigate(`/task/${taskId}`) }, [navigate])
 
@@ -312,13 +332,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
             onNext={() => goTo(bounds.next)}
             prevLabel={`Previous ${noun}`}
             nextLabel={`Next ${noun}`}
-            trailing={isCurrent ? (
-              <button type="button" onClick={() => goTo(bounds.prev)}
-                title={`Look back at ${prevPeriodLabel}`}
-                className="ml-1 rounded-full border border-neutral-200 bg-white px-2 py-0.5 text-[11px] font-semibold text-neutral-500 hover:text-neutral-700 hover:bg-neutral-50 transition-colors">
-                Review {prevPeriodLabel}
-              </button>
-            ) : (
+            trailing={isCurrent ? undefined : (
               <button type="button" onClick={() => goTo(today)}
                 className="ml-1 inline-flex shrink-0 items-center gap-1 rounded-full border border-primary-100 bg-primary-50 px-2 py-0.5 text-[11px] font-semibold text-primary-600 transition-colors hover:bg-primary-100">
                 Back to this {noun}
@@ -331,12 +345,27 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
           ? 'Look back: what got done, what didn\'t. Keep what still matters, drop the rest.'
           : lookingAhead
             ? <p className="text-[12px] text-neutral-500">{bounds.label} starts in {daysUntilStart} days · you&rsquo;re looking ahead</p>
-            : <p className="text-[12px] text-neutral-500">This {noun} · a plan to return to.</p>}
+            : <p className="text-[12px] text-neutral-500">What matters this {noun}.</p>}
         // The plan pages mount outside TasksApp's chrome context, so the
         // assistant toggle isn't reachable here; the domain lens still is,
         // and this page scopes by it (soleDomain).
         controls={chrome ? <HomeChromeControls className="flex" /> : <DomainSwitcher />}
       />
+
+      {/* Who this page is showing, and the door to the period just ended —
+          a quiet line rather than chrome crowded into the eyebrow. */}
+      <div className="mb-3 flex items-baseline justify-between gap-3 border-b border-neutral-200/70 pb-2">
+        <p className="text-[12px] text-neutral-500">{lensLabel}</p>
+        {isCurrent && (
+          <button
+            type="button"
+            onClick={() => goTo(bounds.prev)}
+            className="shrink-0 text-[13px] font-medium text-primary-700 transition-colors hover:underline"
+          >
+            Review {prevPeriodLabel} <ArrowUpRight className="mb-0.5 inline h-3 w-3" />
+          </button>
+        )}
+      </div>
 
       {/* The plan on the left, what you consult while writing it on the
           right — the calendar included. Reference sits WITH reference instead
@@ -346,18 +375,15 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
           {/* Goals — what you want from the period. */}
           <section aria-label={`${bounds.label} goals`} className="min-w-0">
             <div className="flex items-start gap-2 px-1">
-              <div className="min-w-0 flex-1">
-                <h2 className="font-display text-xl text-neutral-800">{shortLabel} goals</h2>
-                <p className="text-[12px] text-neutral-500">{GOALS_SUB[level]}</p>
-              </div>
+              <h2 className="min-w-0 flex-1 font-display text-2xl text-neutral-800">{shortLabel} goals</h2>
               {!isPast && (
                 <button
                   type="button"
                   aria-label={`Add a goal for ${shortLabel}`}
                   onClick={() => setAddingGoal((v) => !v)}
-                  className="mt-1 shrink-0 rounded-md p-1 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-700"
+                  className="mt-1.5 shrink-0 text-[13px] text-neutral-500 transition-colors hover:text-primary-700"
                 >
-                  <Plus className="h-4 w-4" />
+                  + Add a goal
                 </button>
               )}
             </div>
@@ -396,18 +422,17 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
           {/* Tasks — the concrete things. The year plans in goals alone. */}
           {level !== 'year' && (
             <section aria-label={`${bounds.label} list`} className="min-w-0">
-              <div className="px-1">
-                <h2 className="font-display text-xl text-neutral-800">{shortLabel} tasks</h2>
-                <p className="text-[12px] text-neutral-500">{TASKS_SUB}</p>
-              </div>
+              <h2 className="px-1 font-display text-2xl text-neutral-800">{shortLabel} tasks</h2>
               <div className="mt-2 rounded-xl border border-neutral-200 bg-white px-3 py-2.5 shadow-sm">
-                {taskRows.length === 0 ? (
+                {openTaskRows.length === 0 ? (
                   <p className="px-2 py-2 text-sm text-neutral-400">
-                    {isPast ? `Nothing was on this ${noun}'s list.` : `Nothing on this ${noun}'s list yet.`}
+                    {doneTaskRows.length > 0
+                      ? `Everything on this ${noun}'s list is done.`
+                      : isPast ? `Nothing was on this ${noun}'s list.` : `Nothing on this ${noun}'s list yet.`}
                   </p>
                 ) : (
                   <ul className="space-y-0.5">
-                    {taskRows.map((row) => (
+                    {openTaskRows.map((row) => (
                       <PlanRow key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onAction={(a, r) => { void act(a, r) }}
                         actions={actionsFor({ fate: row.fate, isGoal: row.isGoal, isPast })} />
                     ))}
@@ -429,6 +454,31 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                   </form>
                 )}
               </div>
+
+              {doneTaskRows.length > 0 && (
+                <div className="mt-2">
+                  <button
+                    type="button"
+                    aria-expanded={doneOpen}
+                    onClick={toggleDone}
+                    className="flex items-center gap-1.5 px-1 text-[13px] text-neutral-500 transition-colors hover:text-neutral-700"
+                  >
+                    {doneOpen
+                      ? <ChevronDown className="h-3.5 w-3.5" />
+                      : <ChevronRight className="h-3.5 w-3.5" />}
+                    Completed this {noun}
+                    <span className="tabular-nums text-neutral-400">{doneTaskRows.length}</span>
+                  </button>
+                  {doneOpen && (
+                    <ul className="mt-1 rounded-xl border border-neutral-200 bg-white px-3 py-2 shadow-sm space-y-0.5">
+                      {doneTaskRows.map((row) => (
+                        <PlanRow key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onAction={(a, r) => { void act(a, r) }}
+                          actions={actionsFor({ fate: row.fate, isGoal: row.isGoal, isPast })} />
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
             </section>
           )}
         </div>

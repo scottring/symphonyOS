@@ -144,15 +144,18 @@ describe('PeriodPlanPage', () => {
       task({ title: 'Trade in the bike', bucket: 'week', sourceId: original.id, completed: true }),
     ]
     renderPage('month')
-    const list = screen.getByRole('region', { name: /list$/ })
-    expect(within(list).getByText('done')).toBeInTheDocument()
+    // A placed-and-done row reads as finished, so it waits with the finished
+    // work rather than padding the list you're working from.
+    fireEvent.click(screen.getByRole('button', { name: /Completed this month/ }))
+    expect(screen.getByText('done')).toBeInTheDocument()
     // Completion belongs to the copy that did the work.
-    expect(within(list).getByRole('button', { name: /Reopen Trade in the bike/ })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /Reopen Trade in the bike/ })).toBeDisabled()
   })
 
   it('a task you completed HERE can be reopened from its own tick', () => {
     state.tasks = [task({ title: 'Book dentist', monthStart: thisMonth, completed: true })]
     renderPage('month')
+    fireEvent.click(screen.getByRole('button', { name: /Completed this month/ }))
     const tick = screen.getByRole('button', { name: 'Reopen Book dentist' })
     expect(tick).not.toBeDisabled()
     fireEvent.click(tick)
@@ -176,10 +179,10 @@ describe('PeriodPlanPage', () => {
       task({ title: 'Fix the gate', bucket: 'timed', scheduledFor, sourceId: original.id, completed: true }),
     ]
     renderPage('month')
-    const list = screen.getByRole('region', { name: /list$/ })
+    fireEvent.click(screen.getByRole('button', { name: /Completed this month/ }))
     const day = scheduledFor.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-    expect(within(list).queryByText(`done ${day}`)).not.toBeInTheDocument()
-    expect(within(list).getByText('done')).toBeInTheDocument()
+    expect(screen.queryByText(`done ${day}`)).not.toBeInTheDocument()
+    expect(screen.getByText('done')).toBeInTheDocument()
   })
 
   it('lists the month\'s routine PATTERNS in the reference column — no checkboxes', () => {
@@ -188,10 +191,10 @@ describe('PeriodPlanPage', () => {
       routine({ name: 'Family planning', recurrence_pattern: { type: 'weekly', days: ['sun'] } }),
     ]
     renderPage('month')
-    const panel = screen.getByRole('region', { name: 'Routines this month' })
+    const panel = screen.getByRole('region', { name: 'Recurring commitments' })
     // Folded by default, with a count.
     expect(within(panel).queryByText('Kitchen laundry')).not.toBeInTheDocument()
-    fireEvent.click(within(panel).getByRole('button', { name: /Routines this month/ }))
+    fireEvent.click(within(panel).getByRole('button', { name: /Recurring commitments/ }))
     expect(within(panel).getByText('Kitchen laundry')).toBeInTheDocument()
     expect(within(panel).getByText(/Every week/)).toBeInTheDocument()
     // describeRecurrence is the app's one cadence vocabulary — the page does
@@ -208,18 +211,70 @@ describe('PeriodPlanPage', () => {
   it('only the CURRENT period claims the routines are its own — there is no routine history', () => {
     routinesState.routines = [routine({ name: 'Kitchen laundry' })]
     renderPage('month')
-    expect(screen.getByRole('region', { name: 'Routines this month' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Recurring commitments' })).toBeInTheDocument()
     // Page back: the same patterns are all we know, so the heading stops
     // claiming they were August's.
     fireEvent.click(screen.getByRole('button', { name: `Review ${lastMonth.toLocaleDateString('en-US', { month: 'long' })}` }))
-    expect(screen.queryByRole('region', { name: 'Routines this month' })).not.toBeInTheDocument()
-    expect(screen.getByRole('region', { name: 'Current routines' })).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Recurring commitments' })).not.toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Current recurring commitments' })).toBeInTheDocument()
   })
 
   it('the year plans in goals alone — no routine patterns, no calendar', () => {
     routinesState.routines = [routine({ name: 'Kitchen laundry' })]
     renderPage('year')
-    expect(screen.queryByRole('region', { name: /^Routines this/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: /recurring commitments$/i })).not.toBeInTheDocument()
+  })
+
+  it('finished work waits behind a fold — the working list is what is left to do', () => {
+    state.tasks = [
+      task({ title: 'Fix the light in the kitchen', monthStart: thisMonth, completed: true }),
+      task({ title: 'Fix up holes in wall', monthStart: thisMonth }),
+    ]
+    renderPage('month')
+    const list = screen.getByRole('region', { name: /list$/ })
+    expect(within(list).getByText('Fix up holes in wall')).toBeInTheDocument()
+    expect(within(list).queryByText('Fix the light in the kitchen')).not.toBeInTheDocument()
+
+    const fold = screen.getByRole('button', { name: /Completed this month/ })
+    expect(fold.textContent).toContain('1')
+    fireEvent.click(fold)
+    expect(screen.getByText('Fix the light in the kitchen')).toBeInTheDocument()
+  })
+
+  it('a look-back opens its finished work — that is what a look-back is about', () => {
+    state.tasks = [task({ title: 'Washed the car', monthStart: lastMonth, completed: true })]
+    renderPage('month')
+    fireEvent.click(screen.getByRole('button', { name: `Review ${lastMonth.toLocaleDateString('en-US', { month: 'long' })}` }))
+    // No click needed: on a past period the finished work is already showing.
+    expect(screen.getByText('Washed the car')).toBeInTheDocument()
+  })
+
+  it('hiding finished work STICKS — across periods and across visits', () => {
+    state.tasks = [
+      task({ title: 'Washed the car', monthStart: lastMonth, completed: true }),
+      task({ title: 'Fix the light', monthStart: thisMonth, completed: true }),
+    ]
+    const first = renderPage('month')
+    // This month: collapsed by default — the plan is about what is left.
+    expect(screen.queryByText('Fix the light')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Completed this month/ }))
+    expect(screen.getByText('Fix the light')).toBeInTheDocument()
+    first.unmount()
+
+    // The choice survives the next visit.
+    renderPage('month')
+    expect(screen.getByText('Fix the light')).toBeInTheDocument()
+    // …and closing it survives too, even on a look-back, where the default
+    // would otherwise be open.
+    fireEvent.click(screen.getByRole('button', { name: /Completed this month/ }))
+    fireEvent.click(screen.getByRole('button', { name: `Review ${lastMonth.toLocaleDateString('en-US', { month: 'long' })}` }))
+    expect(screen.queryByText('Washed the car')).not.toBeInTheDocument()
+  })
+
+  it('the page says whose plan it is, and offers the period just ended', () => {
+    renderPage('month')
+    expect(screen.getByText(/Everyone/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: new RegExp(`Review ${lastMonth.toLocaleDateString('en-US', { month: 'long' })}`) })).toBeInTheDocument()
   })
 
   it('the calendar is a fold BENEATH the plan — closed until you open it (Scott, 2026-09-13)', () => {
