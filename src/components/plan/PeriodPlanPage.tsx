@@ -32,7 +32,7 @@ import { placementFate, placedWhere } from '@/lib/planning/lineage'
 import { parseLocalYmd } from '@/lib/cadence/config'
 import { formatShortDate } from '@/lib/dateHelpers'
 import {
-  periodBounds, isCurrentPeriod, selectPeriodTasks, selectDatedInPeriod, actionsFor, railLevel, planningPeriod,
+  periodBounds, isCurrentPeriod, selectPeriodTasks, selectDatedInPeriod, actionsFor, railLevel, lowerLevel, planningPeriod,
   type PlanLevel, type RowAction,
 } from '@/lib/planning/periodPage'
 import type { Task } from '@/types/task'
@@ -216,6 +216,16 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
     else if (action === 'keep') {
       await keepForward(row.id, level === 'month' ? { monthStart: bounds.next } : { seasonStart: bounds.next })
     }
+    // Taking a row down a rung COPIES it (isDescent): the period's list keeps
+    // the row, marked with where the work went, so the look-back still sees
+    // the whole plan. That is the whole point of the placement model.
+    else if (action === 'to-lower') {
+      const lower = lowerLevel(level)
+      if (lower) await gated.pushTask(row.id, lower)
+    }
+    else if (action === 'today') {
+      await gated.pushTask(row.id, new Date())
+    }
   }, [goals, updateGoal, deleteGoal, addGoal, bounds.next, toggleTask, deleteTask, gated, setGoal, keepForward, level])
 
   // The rail's one verb: copy an open season task down into this month.
@@ -322,6 +332,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   // done (Scott, 2026-09-13).
   const openTaskRows = useMemo(() => rows.filter((r) => !r.isGoal && !rowIsDone(r.fate)), [rows])
   const doneTaskRows = useMemo(() => rows.filter((r) => !r.isGoal && rowIsDone(r.fate)), [rows])
+  const lowerLabelText = lowerLevel(level) === 'week' ? 'this week' : 'this month'
   const visibleTaskRows = showAll ? openTaskRows : openTaskRows.slice(0, TASK_PREVIEW_CAP)
   // Gated on the LIST being long, not on rows being hidden right now —
   // otherwise expanding removes the only way back to five.
@@ -415,10 +426,11 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                   {isPast ? `Nothing was on this ${noun}'s goals.` : `No goals for this ${noun} yet.`}
                 </p>
               ) : (
-                <ul className="space-y-0.5">
+                <ul>
                   {goalRows.map((row) => (
                     <PlanRow key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onAction={(a, r) => { void act(a, r) }}
-                      actions={actionsFor({ fate: row.fate, isGoal: row.isGoal, isPast })} />
+                      lowerLabel={lowerLabelText}
+                        actions={actionsFor({ fate: row.fate, isGoal: row.isGoal, isPast, level })} />
                   ))}
                 </ul>
               )}
@@ -453,10 +465,11 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                       : isPast ? `Nothing was on this ${noun}'s list.` : `Nothing on this ${noun}'s list yet.`}
                   </p>
                 ) : (
-                  <ul className="space-y-0.5">
+                  <ul>
                     {visibleTaskRows.map((row) => (
                       <PlanRow key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onAction={(a, r) => { void act(a, r) }}
-                        actions={actionsFor({ fate: row.fate, isGoal: row.isGoal, isPast })} />
+                        lowerLabel={lowerLabelText}
+                        actions={actionsFor({ fate: row.fate, isGoal: row.isGoal, isPast, level })} />
                     ))}
                   </ul>
                 )}
@@ -504,10 +517,11 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                     <span className="tabular-nums text-neutral-400">{doneTaskRows.length}</span>
                   </button>
                   {doneOpen && (
-                    <ul className="mt-1 rounded-xl border border-neutral-200 bg-white px-3 py-2 shadow-sm space-y-0.5">
+                    <ul className="mt-1 rounded-xl border border-neutral-200 bg-white px-3 py-1 shadow-sm">
                       {doneTaskRows.map((row) => (
                         <PlanRow key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onAction={(a, r) => { void act(a, r) }}
-                          actions={actionsFor({ fate: row.fate, isGoal: row.isGoal, isPast })} />
+                          lowerLabel={lowerLabelText}
+                        actions={actionsFor({ fate: row.fate, isGoal: row.isGoal, isPast, level })} />
                       ))}
                     </ul>
                   )}
@@ -554,7 +568,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                 </button>
                 {routinesOpen && (
                   <>
-                    <ul className="mt-1.5 space-y-0.5">
+                    <ul className="mt-1.5 divide-y divide-neutral-100">
                       {patterns.map((r) => (
                         <li key={r.id}>
                           <button
@@ -595,7 +609,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                   <span className="text-xs text-neutral-400">{`· ${dated.length}`}</span>
                 </button>
                 {calendarOpen && (
-                  <ul className="mt-1.5 space-y-0.5">
+                  <ul className="mt-1.5 divide-y divide-neutral-100">
                     {dated.map((t) => (
                       <li key={t.id}>
                         <button

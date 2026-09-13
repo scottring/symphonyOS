@@ -93,11 +93,20 @@ describe('selectDatedInPeriod', () => {
 
 describe('actionsFor', () => {
   // The verbs a row offers, by fate × kind × whether the period is over.
-  it('an open task in the current period: tick, make it a goal', () => {
-    expect(actionsFor({ fate: 'open', isGoal: false, isPast: false })).toEqual(['complete', 'make-goal'])
+  it('an open task in the current period can be TRIAGED, not just ticked', () => {
+    // Referencing this list to choose the week's work is the motion the whole
+    // cadence rests on, and the page had no way to do it (Scott, 2026-09-13).
+    expect(actionsFor({ fate: 'open', isGoal: false, isPast: false, level: 'month' }))
+      .toEqual(['complete', 'to-lower', 'today', 'make-goal', 'drop'])
+    expect(actionsFor({ fate: 'open', isGoal: false, isPast: false, level: 'season' }))
+      .toEqual(['complete', 'to-lower', 'today', 'make-goal', 'drop'])
+    // A year row has no rung below it on this page.
+    expect(actionsFor({ fate: 'open', isGoal: false, isPast: false, level: 'year' }))
+      .toEqual(['complete', 'make-goal', 'drop'])
   })
-  it('an open goal in the current period: tick, make it a task', () => {
-    expect(actionsFor({ fate: 'open', isGoal: true, isPast: false })).toEqual(['complete', 'make-task'])
+  it('a GOAL is never offered a rung — every placement writer refuses it', () => {
+    expect(actionsFor({ fate: 'open', isGoal: true, isPast: false, level: 'month' }))
+      .toEqual(['complete', 'make-task', 'drop'])
   })
   it('an open task in a PAST period: the look-back verbs', () => {
     expect(actionsFor({ fate: 'open', isGoal: false, isPast: true })).toEqual(['complete', 'keep', 'someday', 'make-goal', 'drop'])

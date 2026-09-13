@@ -4,7 +4,7 @@
 // offers right now. Shared by This Month / This Season / This Year so the
 // three pages read as one surface.
 
-import { Check, Target, ArrowRight, ArrowUpRight, CalendarDays, Archive, Trash2, Repeat } from 'lucide-react'
+import { Check, Target, ArrowRight, ArrowUpRight, ArrowDownRight, Sun, CalendarDays, Archive, Trash2, Repeat } from 'lucide-react'
 import type { PlacementFate } from '@/lib/planning/lineage'
 import type { RowAction } from '@/lib/planning/periodPage'
 
@@ -45,12 +45,21 @@ const ACTION_LABEL: Record<Exclude<RowAction, 'complete'>, string> = {
   drop: 'Drop',
   'make-goal': 'Make it a goal',
   'make-task': 'Make it a task',
+  'to-lower': 'Take it into',
+  today: 'Do it today',
+}
+
+/** 'to-lower' names the rung it lands on, so a hover says where it goes. */
+function label(a: Exclude<RowAction, 'complete'>, lowerLabel: string): string {
+  return a === 'to-lower' ? `${ACTION_LABEL[a]} ${lowerLabel}` : ACTION_LABEL[a]
 }
 
 function ActionIcon({ action }: { action: Exclude<RowAction, 'complete'> }) {
   if (action === 'keep') return <ArrowRight className="w-3.5 h-3.5" />
   if (action === 'someday') return <Archive className="w-3.5 h-3.5" />
   if (action === 'drop') return <Trash2 className="w-3.5 h-3.5" />
+  if (action === 'to-lower') return <ArrowDownRight className="w-3.5 h-3.5" />
+  if (action === 'today') return <Sun className="w-3.5 h-3.5" />
   return <Repeat className="w-3.5 h-3.5" />
 }
 
@@ -81,13 +90,15 @@ function PlacementChip({ placed, onOpenPlaced }: {
   )
 }
 
-export function PlanRow({ row, actions, onAction, onOpen, onOpenPlaced }: {
+export function PlanRow({ row, actions, onAction, onOpen, onOpenPlaced, lowerLabel = 'this week' }: {
   row: PlanRowModel
   actions: RowAction[]
   onAction: (action: RowAction, row: PlanRowModel) => void
   onOpen: (row: PlanRowModel) => void
   /** Follow the row's status to the copy that carries it. */
   onOpenPlaced?: (taskId: string) => void
+  /** The rung 'to-lower' lands on, named so a hover says where it goes. */
+  lowerLabel?: string
 }) {
   // A row whose copy is finished reads as finished — one status, not a tick
   // that disagrees with an annotation beside it.
@@ -100,7 +111,11 @@ export function PlanRow({ row, actions, onAction, onOpen, onOpenPlaced }: {
   const canTick = actions.includes('complete') || rowOwnsCompletion(row.fate)
   const verbs = actions.filter((a): a is Exclude<RowAction, 'complete'> => a !== 'complete')
   return (
-    <li className="group flex items-start gap-2.5 rounded-lg px-2 py-1.5 hover:bg-neutral-50 transition-colors">
+    // A hairline between rows, and the hover runs the full width of the card:
+    // inside a divided list a rounded, inset hover reads as a floating chip
+    // (Scott, 2026-09-13). The last row leaves its border off so the card's
+    // own edge is the one you see.
+    <li className="group flex items-start gap-2.5 border-b border-neutral-100 px-2 py-2 transition-colors last:border-0 hover:bg-neutral-50">
       <button
         type="button"
         aria-label={`${done ? 'Reopen' : 'Complete'} ${row.title}`}
@@ -136,8 +151,8 @@ export function PlanRow({ row, actions, onAction, onOpen, onOpenPlaced }: {
             <button
               key={a}
               type="button"
-              aria-label={`${ACTION_LABEL[a]} ${row.title}`}
-              title={ACTION_LABEL[a]}
+              aria-label={`${label(a, lowerLabel)} ${row.title}`}
+              title={label(a, lowerLabel)}
               onClick={() => onAction(a, row)}
               className={`p-1 rounded transition-colors ${
                 a === 'drop' ? 'text-neutral-300 hover:text-red-600 hover:bg-red-50'

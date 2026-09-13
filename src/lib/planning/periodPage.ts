@@ -126,22 +126,56 @@ export function selectDatedInPeriod(tasks: readonly Task[], bounds: PeriodBounds
     })
 }
 
-export type RowAction = 'complete' | 'keep' | 'someday' | 'drop' | 'make-goal' | 'make-task'
+export type RowAction =
+  | 'complete' | 'keep' | 'someday' | 'drop' | 'make-goal' | 'make-task'
+  /** Take this row down a rung — month → this week, season → this month. The
+   *  motion the whole cadence rests on (Scott: "we reference the monthly list
+   *  to decide what to do for the week"), which the page had no way to do:
+   *  the rail could pull DOWN into the page, but a row on the page itself
+   *  could not go anywhere. */
+  | 'to-lower'
+  /** Straight onto today. An urgent thing shouldn't have to walk every rung. */
+  | 'today'
 
 /**
- * The verbs a row offers. In the current period a row is written and ticked;
- * once the period is over it gets its look-back fate: keep (copy forward),
- * drop, Someday (tasks only — a goal is an outcome, not a thing you postpone),
- * or change kind. Done rows are the win column and offer nothing. A row
- * already placed lower can still be kept or dropped in a look-back — its
- * copy carries on regardless — but it is not re-placed from here.
+ * The verbs a row offers.
+ *
+ * In the current period a TASK can be ticked, taken down a rung, taken
+ * straight to today, converted, or dropped. Once the period is over it gets
+ * its look-back fate instead: keep (copy forward), drop, Someday (tasks only
+ * — a goal is an outcome, not a thing you postpone), or change kind.
+ *
+ * A GOAL is never placed. It is ticked, kept or dropped, and every placement
+ * writer refuses it anyway (periodPlacement's is_goal refusal) — so offering
+ * it a rung would be offering a no-op.
+ *
+ * Done rows are the win column and offer nothing. A row already placed lower
+ * can still be kept or dropped in a look-back — its copy carries on
+ * regardless — but it is not re-placed from here, which is what kept ten
+ * copies of the same task from landing in twenty seconds.
  */
-export function actionsFor({ fate, isGoal, isPast }: { fate: PlacementFate; isGoal: boolean; isPast: boolean }): RowAction[] {
+export function actionsFor(
+  { fate, isGoal, isPast, level = 'month' }:
+  { fate: PlacementFate; isGoal: boolean; isPast: boolean; level?: PlanLevel },
+): RowAction[] {
   if (fate === 'done' || fate === 'placed-done') return []
   if (fate === 'placed-open') return isPast ? ['keep', 'drop'] : []
   const kind: RowAction = isGoal ? 'make-task' : 'make-goal'
-  if (!isPast) return ['complete', kind]
+  // A year row is a goal entity and has no rung below it on this page.
+  const canDescend = !isGoal && level !== 'year'
+  if (!isPast) {
+    return canDescend
+      ? ['complete', 'to-lower', 'today', kind, 'drop']
+      : ['complete', kind, 'drop']
+  }
   return isGoal ? ['complete', 'keep', kind, 'drop'] : ['complete', 'keep', 'someday', kind, 'drop']
+}
+
+/** The rung a row drops into from this page. */
+export function lowerLevel(level: PlanLevel): 'week' | 'month' | null {
+  if (level === 'month') return 'week'
+  if (level === 'season') return 'month'
+  return null
 }
 
 /** The level a page looks at while it plans — the rung above. */

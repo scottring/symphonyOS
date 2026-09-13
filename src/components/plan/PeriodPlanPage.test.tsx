@@ -308,6 +308,33 @@ describe('PeriodPlanPage', () => {
     expect(screen.getByRole('button', { name: /Completed this month/ }).textContent).toContain('6')
   })
 
+  it('a month row can be taken into the week, or straight to today', () => {
+    const t = task({ title: 'Fix the back door', monthStart: thisMonth })
+    state.tasks = [t]
+    renderPage('month')
+    // Down a rung: a COPY, so September's list keeps the row and its look-back
+    // still sees the whole plan.
+    fireEvent.click(screen.getByRole('button', { name: 'Take it into this week Fix the back door' }))
+    expect(hook.pushTask).toHaveBeenCalledWith(t.id, 'week')
+    fireEvent.click(screen.getByRole('button', { name: 'Do it today Fix the back door' }))
+    expect(hook.pushTask).toHaveBeenLastCalledWith(t.id, expect.any(Date))
+  })
+
+  it('a season row goes into the MONTH — each page names the rung below it', () => {
+    const t = task({ title: 'Swap the closets', bucket: 'quarter', seasonStart: undefined })
+    state.tasks = [t]
+    renderPage('season')
+    fireEvent.click(screen.getByRole('button', { name: 'Take it into this month Swap the closets' }))
+    expect(hook.pushTask).toHaveBeenCalledWith(t.id, 'month')
+  })
+
+  it('a goal is never offered a rung', () => {
+    state.tasks = [task({ title: 'A home easier to care for', monthStart: thisMonth, isGoal: true })]
+    renderPage('month')
+    expect(screen.queryByRole('button', { name: /Take it into/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Do it today/ })).not.toBeInTheDocument()
+  })
+
   it('the page says whose plan it is, and offers the period just ended', () => {
     renderPage('month')
     expect(screen.getByText(/Everyone/)).toBeInTheDocument()
