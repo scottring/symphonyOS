@@ -146,3 +146,37 @@ describe('describeRecurrence', () => {
     expect(describeRecurrence({ type: 'yearly' })).toBe('Every year')
   })
 })
+
+// Before the cadence bands, nextOccurrence answered only weekly-with-days and
+// monthly-with-a-day; everything coarser fell through to "today or tomorrow"
+// and would have printed a confidently wrong date beside a yearly routine
+// (2026-09-13).
+describe('nextOccurrence past the month', () => {
+  const NOW = new Date(2026, 8, 13) // Sun Sep 13 2026
+
+  it('a yearly pattern lands in its own month, next year when this year has passed', () => {
+    expect(nextOccurrence({ type: 'yearly', month_of_year: 3, day_of_month: 4 }, null, NOW))
+      .toEqual(new Date(2027, 2, 4))
+    expect(nextOccurrence({ type: 'yearly', month_of_year: 11, day_of_month: 2 }, null, NOW))
+      .toEqual(new Date(2026, 10, 2))
+  })
+
+  it('a yearly pattern with no day lands on the 1st', () => {
+    expect(nextOccurrence({ type: 'yearly', month_of_year: 12 }, null, NOW)).toEqual(new Date(2026, 11, 1))
+  })
+
+  it('a quarterly pattern steps in threes from its start month', () => {
+    expect(nextOccurrence({ type: 'quarterly', start_date: '2026-02-01' }, null, NOW))
+      .toEqual(new Date(2026, 10, 1))
+  })
+
+  it('a quarterly pattern past its last anchor wraps to next year', () => {
+    expect(nextOccurrence({ type: 'quarterly', start_date: '2026-01-15' }, null, new Date(2026, 11, 20)))
+      .toEqual(new Date(2027, 0, 15))
+  })
+
+  it('specific days answers with the next date still ahead', () => {
+    expect(nextOccurrence({ type: 'specific_days', dates: ['2026-02-01', '2026-10-05', '2027-01-09'] }, null, NOW))
+      .toEqual(new Date(2026, 9, 5))
+  })
+})

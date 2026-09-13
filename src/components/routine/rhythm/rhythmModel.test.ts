@@ -58,11 +58,11 @@ describe('buildRhythmModel bucketing', () => {
     expect(m.week.sometime.map(r => r.id)).toEqual(['w'])
   })
 
-  it('sends resting weekly routines to the year zone only, not the week columns', () => {
+  it('sends resting weekly routines to Resting only, not the week columns', () => {
     const m = buildRhythmModel([
       mk({ id: 'p', visibility: 'reference', recurrence_pattern: { type: 'weekly', days: ['mon'] } }),
     ])
-    expect(m.year.resting.map(r => r.id)).toEqual(['p'])
+    expect(m.resting.map(r => r.id)).toEqual(['p'])
     expect(m.week.days.mon).toHaveLength(0)
   })
 
@@ -75,20 +75,56 @@ describe('buildRhythmModel bucketing', () => {
     expect(m.week.sometime).toHaveLength(0)
   })
 
-  it('puts monthly/quarterly/yearly/specific_days into the year zone', () => {
+  // Past the week the ladder has four rungs, not one: a monthly routine and a
+  // once-every-five-years one are not the same kind of commitment (Scott,
+  // 2026-09-13).
+  it('gives each cadence past the week its own rung', () => {
     const m = buildRhythmModel([
       mk({ id: 'mo', recurrence_pattern: { type: 'monthly', day_of_month: 1 } }),
       mk({ id: 'qu', recurrence_pattern: { type: 'quarterly', day_of_month: 1 } }),
+      mk({ id: 'yr', recurrence_pattern: { type: 'yearly', month_of_year: 3 } }),
+      mk({ id: 'rare', recurrence_pattern: { type: 'yearly', interval: 3 } }),
       mk({ id: 'sp', recurrence_pattern: { type: 'specific_days', dates: ['2026-08-01'] } }),
     ])
-    expect(m.year.active.map(r => r.id).sort()).toEqual(['mo', 'qu', 'sp'])
+    expect(m.month.map(r => r.id)).toEqual(['mo'])
+    expect(m.season.map(r => r.id)).toEqual(['qu'])
+    expect(m.year.map(r => r.id).sort()).toEqual(['sp', 'yr'])
+    expect(m.rare.map(r => r.id)).toEqual(['rare'])
   })
 
-  it('sends paused (reference) top-level routines to the year zone regardless of recurrence', () => {
+  it('a biweekly routine stays on the WEEK rung — it still happens on a weekday', () => {
+    const m = buildRhythmModel([
+      mk({ id: 'bi', recurrence_pattern: { type: 'weekly', days: ['tue'], interval: 2 } }),
+    ])
+    expect(m.week.days.tue.map(r => r.id)).toEqual(['bi'])
+    expect(m.month).toHaveLength(0)
+  })
+
+  it("'every 3 months' is seasonal and 'every 18 months' is rarer than a year", () => {
+    const m = buildRhythmModel([
+      mk({ id: 'q', recurrence_pattern: { type: 'monthly', interval: 3 } }),
+      mk({ id: 'r', recurrence_pattern: { type: 'monthly', interval: 18 } }),
+    ])
+    expect(m.season.map(r => r.id)).toEqual(['q'])
+    expect(m.rare.map(r => r.id)).toEqual(['r'])
+  })
+
+  it('a since_last routine lands by the span it names', () => {
+    const m = buildRhythmModel([
+      mk({ id: 'w', recurrence_pattern: { type: 'since_last', interval: 1, unit: 'weeks' } }),
+      mk({ id: 'm', recurrence_pattern: { type: 'since_last', interval: 6, unit: 'weeks' } }),
+      mk({ id: 'y', recurrence_pattern: { type: 'since_last', interval: 12, unit: 'months' } }),
+    ])
+    expect(m.week.sometime.map(r => r.id)).toEqual(['w'])
+    expect(m.month.map(r => r.id)).toEqual(['m'])
+    expect(m.year.map(r => r.id)).toEqual(['y'])
+  })
+
+  it('sends paused (reference) top-level routines to Resting regardless of recurrence', () => {
     const m = buildRhythmModel([
       mk({ id: 'p', visibility: 'reference', time_of_day: '07:00:00' }),
     ])
-    expect(m.year.resting.map(r => r.id)).toEqual(['p'])
+    expect(m.resting.map(r => r.id)).toEqual(['p'])
     expect(m.daily.timed).toHaveLength(0)
   })
 
@@ -102,8 +138,11 @@ describe('buildRhythmModel bucketing', () => {
       ...m.daily.timed.map(c => c.id),
       ...m.daily.anytime.map(r => r.id),
       ...m.week.sometime.map(r => r.id),
-      ...m.year.active.map(r => r.id),
-      ...m.year.resting.map(r => r.id),
+      ...m.month.map(r => r.id),
+      ...m.season.map(r => r.id),
+      ...m.year.map(r => r.id),
+      ...m.rare.map(r => r.id),
+      ...m.resting.map(r => r.id),
     ]
     expect(all).not.toContain('s1')
     expect(m.stepCounts['parent']).toBe(2)

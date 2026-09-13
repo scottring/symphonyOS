@@ -55,24 +55,29 @@ describe('RhythmPage', () => {
           mk('PT Exercises'),
           mk('Food shopping', { recurrence_pattern: { type: 'weekly', days: ['sun'] } }),
           mk('Pay FFG', { recurrence_pattern: { type: 'monthly', day_of_month: 1 } }),
-          // Two months out, derived from the wall clock rather than hardcoded —
-          // a fixed date here rots the suite the moment it drifts out of the
-          // rolling twelve-month window.
+          mk('Swap the closets', { recurrence_pattern: { type: 'quarterly' } }),
+          mk('Renew passports', { recurrence_pattern: { type: 'yearly', month_of_year: 3 } }),
+          mk('Repaint the deck', { recurrence_pattern: { type: 'yearly', interval: 3 } }),
+          // Derived from the wall clock rather than hardcoded, so the suite
+          // can't rot on a date drifting past.
           mk('Walk to school', { visibility: 'reference', paused_until: wakeInMonths(2) }),
         ]} />
     )
     expect(screen.getByRole('heading', { name: 'Routines' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Every day' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Through the week' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Through the year' })).toBeInTheDocument()
-    // A monthly routine pools above the columns; a sleeper with a wake date
-    // inside the window shows in the month it wakes, no longer buried in Tend.
-    expect(screen.getByTestId('every-month').textContent).toContain('Pay FFG')
+    // Past the week, each cadence is its own rung — a monthly routine and a
+    // once-every-three-years one are not the same commitment.
+    expect(within(screen.getByRole('region', { name: 'Monthly' })).getByText('Pay FFG')).toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: 'Seasonal' })).getByText('Swap the closets')).toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: 'Yearly' })).getByText('Renew passports')).toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: 'Less often' })).getByText('Repaint the deck')).toBeInTheDocument()
+    // A sleeper isn't a commitment — it rests at the foot, saying when it wakes.
+    const resting = screen.getByRole('region', { name: 'Resting' })
+    expect(within(resting).getByText('Walk to school')).toBeInTheDocument()
     const wake = new Date()
     wake.setMonth(wake.getMonth() + 2)
-    expect(
-      screen.getByTestId(`year-month-${wake.getFullYear()}-${wake.getMonth() + 1}`).textContent,
-    ).toContain('Walk to school')
+    expect(resting.textContent).toContain(`wakes ${wake.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`)
   })
 
   it('type-anywhere search dims non-matching routines', () => {

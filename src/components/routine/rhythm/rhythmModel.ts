@@ -23,12 +23,19 @@ export interface RhythmModel {
     days: Record<DayKey, Routine[]>
     sometime: Routine[]
   }
-  /** Everything the year ribbon owns, split here because this is the one file
-   *  sanctioned to read `visibility` directly: `active` carries the
-   *  monthly/quarterly/yearly/specific_days/since_last recurrences, `resting`
-   *  the sleepers the ribbon places by the month they wake. `buildYearModel`
-   *  only places what this hands it. */
-  year: { active: Routine[]; resting: Routine[] }
+  /** The rungs past the week, each its own band (Scott, 2026-09-13: "monthly,
+   *  seasonal, and yearly and also > year"). A twelve-month calendar could not
+   *  show a MONTHLY routine — it belongs in every cell — so the ladder names
+   *  the cadence instead of plotting it.
+   *
+   *  `resting` is the sleepers; this is the one file sanctioned to read
+   *  `visibility` directly. */
+  month: Routine[]
+  season: Routine[]
+  year: Routine[]
+  /** Rarer than once a year — every third spring, every five years. */
+  rare: Routine[]
+  resting: Routine[]
   stepCounts: Record<string, number>
 }
 
@@ -46,14 +53,60 @@ export function memberIdsOf(r: Routine): string[] {
   return r.assigned_to ? [r.assigned_to] : []
 }
 
-/** Which zone a recurrence pattern belongs to. Weekly with >=5 days is daily-ish. */
-function zoneOf(p: RecurrencePattern): 'daily' | 'week' | 'year' {
-  if (p.type === 'daily') return 'daily'
-  if (p.type === 'weekly') {
-    if (p.days && p.days.length >= 5) return 'daily'
-    return 'week'
+export type Zone = 'daily' | 'week' | 'month' | 'season' | 'year' | 'rare'
+
+const UNIT_DAYS: Record<string, number> = { days: 1, weeks: 7, months: 30 }
+
+/** A rung from a span in days — the fallback for patterns that state a period
+ *  rather than a calendar slot ('since_last'). */
+function zoneForDays(days: number): Zone {
+  if (days <= 1) return 'daily'
+  if (days <= 10) return 'week'
+  if (days <= 45) return 'month'
+  if (days <= 150) return 'season'
+  if (days <= 400) return 'year'
+  return 'rare'
+}
+
+/** Which rung a recurrence belongs to.
+ *
+ *  Weekly with >=5 days is daily-ish. Every weekly pattern stays on the week
+ *  rung whatever its interval — a biweekly routine still happens on a WEEKDAY,
+ *  and the strip is what places it; bucketing it by its 14-day span would file
+ *  it under Monthly, where it has no column to live in. */
+export function zoneOf(p: RecurrencePattern): Zone {
+  const every = p.interval && p.interval > 0 ? p.interval : 1
+  switch (p.type) {
+    case 'daily':
+      return every <= 1 ? 'daily' : zoneForDays(every)
+    case 'weekly':
+      return p.days && p.days.length >= 5 && every <= 1 ? 'daily' : 'week'
+    case 'monthly':
+      return zoneForDays(30 * every)
+    case 'quarterly':
+      return zoneForDays(91 * every)
+    case 'yearly':
+      return every <= 1 ? 'year' : 'rare'
+    case 'since_last':
+      return zoneForDays(every * (UNIT_DAYS[p.unit ?? 'days'] ?? 1))
+    case 'specific_days':
+      // A list of dates: the rung is how far apart the nearest two fall, so a
+      // "Feb 1, Aug 1" pattern reads as seasonal rather than annual.
+      return specificDaysZone(p)
+    default:
+      return 'year'
   }
-  return 'year'
+}
+
+function specificDaysZone(p: RecurrencePattern): Zone {
+  const times = (p.dates ?? [])
+    .map((d) => new Date(`${d}T00:00:00`).getTime())
+    .filter((t) => !Number.isNaN(t))
+    .sort((a, b) => a - b)
+  if (times.length < 2) return 'year'
+  let closest = Infinity
+  for (let i = 1; i < times.length; i++) closest = Math.min(closest, times[i] - times[i - 1])
+  return zoneForDays(closest / 86_400_000)
 }
 
 /** Day columns a weekly routine occupies: listed days, else the weekday
@@ -106,7 +159,11 @@ export function buildRhythmModel(
   const model: RhythmModel = {
     daily: { timed: [], anytime: [] },
     week: { days: emptyDays(), sometime: [] },
-    year: { active: [], resting: [] },
+    month: [],
+    season: [],
+    year: [],
+    rare: [],
+    resting: [],
     stepCounts,
   }
 
@@ -114,7 +171,7 @@ export function buildRhythmModel(
 
   for (const { routine, steps } of topLevel) {
     if (routine.visibility === 'reference') {
-      model.year.resting.push(routine)
+      model.resting.push(routine)
       continue
     }
     const zone = zoneOf(routine.recurrence_pattern)
@@ -158,7 +215,7 @@ export function buildRhythmModel(
         }
       }
     } else {
-      model.year.active.push(routine)
+      model[zone].push(routine)
     }
   }
 

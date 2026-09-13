@@ -192,6 +192,43 @@ export function nextOccurrence(pattern: RecurrencePattern, time: string | null, 
     }
   }
 
+  if (pattern.type === 'yearly' && pattern.month_of_year) {
+    const day = pattern.day_of_month ?? 1
+    for (let years = 0; years < 2; years++) {
+      const at = new Date(today.getFullYear() + years, pattern.month_of_year - 1, day)
+      if (at.getTime() < today.getTime()) continue
+      const candidate = atTime(at, time)
+      if (at.getTime() > today.getTime() || stillAhead(candidate)) return candidate
+    }
+  }
+
+  if (pattern.type === 'quarterly') {
+    // Anchored on the pattern's own start month when it has one, so "every
+    // quarter from February" lands Feb/May/Aug/Nov rather than on the calendar
+    // quarters.
+    const anchor = pattern.start_date ? new Date(`${pattern.start_date}T00:00:00`) : null
+    const anchorMonth = anchor && !Number.isNaN(anchor.getTime()) ? anchor.getMonth() : 0
+    // The anchor carries the DAY as well as the month: "every quarter from
+    // Jan 15" means the 15th, not the 1st.
+    const day = pattern.day_of_month ?? (anchor && !Number.isNaN(anchor.getTime()) ? anchor.getDate() : 1)
+    for (let step = 0; step < 5; step++) {
+      const at = new Date(today.getFullYear(), anchorMonth + step * 3, day)
+      if (at.getTime() < today.getTime()) continue
+      const candidate = atTime(at, time)
+      if (at.getTime() > today.getTime() || stillAhead(candidate)) return candidate
+    }
+    // Past the last anchor this year — wrap to the first one next year.
+    return atTime(new Date(today.getFullYear() + 1, anchorMonth, day), time)
+  }
+
+  if (pattern.type === 'specific_days' && pattern.dates?.length) {
+    const ahead = pattern.dates
+      .map((d) => new Date(`${d}T00:00:00`))
+      .filter((d) => !Number.isNaN(d.getTime()) && d.getTime() >= today.getTime())
+      .sort((a, b) => a.getTime() - b.getTime())
+    if (ahead.length > 0) return atTime(ahead[0], time)
+  }
+
   const todayCandidate = atTime(today, time)
   if (stillAhead(todayCandidate)) return todayCandidate
   const tomorrow = new Date(today)

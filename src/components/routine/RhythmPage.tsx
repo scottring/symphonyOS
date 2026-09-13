@@ -20,8 +20,7 @@ const DAY_FULL: Record<DayKey, string> = {
 import { findTend, tendFindingKey } from './rhythm/tendHeuristics'
 import { DailyArc } from './rhythm/DailyArc'
 import { WeekStrip } from './rhythm/WeekStrip'
-import { YearRibbon } from './rhythm/YearRibbon'
-import { buildYearModel } from './rhythm/yearModel'
+import { CadenceBand } from './rhythm/CadenceBand'
 import { TendDrawer } from './rhythm/TendDrawer'
 import type { DropIntent } from './rhythm/dropRules'
 import type { CreateRoutineInSlot } from './rhythm/SlotAdd'
@@ -117,14 +116,13 @@ export function RhythmPage(props: RhythmPageProps) {
     () => buildRhythmModel(routinesForModel, { memberIds, focusDay }),
     [routinesForModel, memberIds, focusDay],
   )
-  // Twelve months rolling forward. `now` is pinned to the day so the ribbon
-  // doesn't rebuild on every render, and so a session left open overnight
-  // still rolls when the date changes.
+  // Pinned to the day, so "next lands" doesn't recompute on every render and
+  // a session left open overnight still rolls when the date changes.
   const today = new Date().toDateString()
-  const yearModel = useMemo(
-    () => buildYearModel(model.year, { now: new Date(today) }),
-    [model.year, today],
-  )
+  const dayStart = useMemo(() => new Date(today), [today])
+  // A sleeper with no wake date is the one that needs a decision — the ribbon
+  // used to collect these; Tend still asks about them.
+  const sleepers = useMemo(() => model.resting.filter((r) => !r.paused_until), [model.resting])
 
   // Dismissed tend suggestions persist so a rejected grouping stays gone.
   const [dismissedTend, setDismissedTend] = useState<string[]>(() => {
@@ -287,7 +285,7 @@ export function RhythmPage(props: RhythmPageProps) {
   const handleWake = (id: string) =>
     onUpdateRoutine(id, { visibility: 'active', paused_until: null })
   const handleWakeAll = () => {
-    for (const r of yearModel.unplaced) handleWake(r.id)
+    for (const r of sleepers) handleWake(r.id)
   }
   const handleMerge = (_survivorId: string, loserIds: string[]) => {
     for (const id of loserIds) onDelete?.(id)
@@ -466,18 +464,55 @@ export function RhythmPage(props: RhythmPageProps) {
           />
         </div>
 
-        <div>
-          <YearRibbon
-            model={yearModel}
-            matches={matches}
-            stepCounts={model.stepCounts}
-            familyMembers={familyMembers}
-            onOpenRoutine={openRoutine}
-            onWake={handleWake}
-            onDropIntent={executeDropIntent}
+        {/* Past the week, the ladder names the cadence instead of plotting it
+            on a calendar: a monthly routine belongs in every month cell, and
+            four different cadences on one strip read as one kind of thing
+            (Scott, 2026-09-13). */}
+        <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+          <CadenceBand
+            heading="Monthly" hint="Once a month or thereabouts"
+            routines={model.month} familyMembers={familyMembers} stepCounts={model.stepCounts}
+            matches={matches} now={dayStart} onOpenRoutine={openRoutine}
             onCreateInSlot={createRoutineInSlot}
+            createPattern={{ type: 'monthly' }}
+            addLabel="Add a monthly routine"
+          />
+          <CadenceBand
+            heading="Seasonal" hint="Turns with the season"
+            routines={model.season} familyMembers={familyMembers} stepCounts={model.stepCounts}
+            matches={matches} now={dayStart} onOpenRoutine={openRoutine}
+            onCreateInSlot={createRoutineInSlot}
+            createPattern={{ type: 'quarterly' }}
+            addLabel="Add a seasonal routine"
+          />
+          <CadenceBand
+            heading="Yearly" hint="Once a year, on its date"
+            routines={model.year} familyMembers={familyMembers} stepCounts={model.stepCounts}
+            matches={matches} now={dayStart} onOpenRoutine={openRoutine}
+            onCreateInSlot={createRoutineInSlot}
+            createPattern={{ type: 'yearly' }}
+            addLabel="Add a yearly routine"
+          />
+          <CadenceBand
+            heading="Less often" hint="Rarer than once a year"
+            routines={model.rare} familyMembers={familyMembers} stepCounts={model.stepCounts}
+            matches={matches} now={dayStart} onOpenRoutine={openRoutine}
+            onCreateInSlot={createRoutineInSlot}
+            createPattern={{ type: 'yearly', interval: 2 }}
+            addLabel="Add a rarer routine"
           />
         </div>
+
+        {model.resting.length > 0 && (
+          <div>
+            <CadenceBand
+              heading="Resting" hint="Not a commitment right now — it wakes on its own"
+              routines={model.resting} familyMembers={familyMembers} stepCounts={model.stepCounts}
+              matches={matches} now={dayStart} resting onOpenRoutine={openRoutine}
+            />
+          </div>
+        )}
+
       </div>
 
       <TendDrawer
@@ -485,7 +520,7 @@ export function RhythmPage(props: RhythmPageProps) {
         onClose={() => setTendOpen(false)}
         findings={findings}
         routines={routines}
-        sleepers={yearModel.unplaced}
+        sleepers={sleepers}
         onDismiss={dismissTend}
         onMerge={handleMerge}
         onStampDomain={(id, context) => onUpdateRoutine(id, { context })}
