@@ -104,17 +104,39 @@ The fix is **not** to infer the missing stamps. Backfilling `month_start` from `
 - Unstamped rows surface in All tasks' **Unplanned** group, explicitly, for review.
 - Stamp only where the evidence is reliable — e.g. a row with `scheduled_for` genuinely belongs to that date's week and month.
 
-**Consequence to accept deliberately:** legacy rows currently printing on the September page will leave it (they were never assigned to September) and reappear under Unplanned. On Scott's live account that will look like data loss on first load, so step 2 ships with a one-time review prompt naming the count — nothing disappears silently.
+**Consequence to accept deliberately:** legacy rows currently printing on the September page will leave it (they were never assigned to September) and reappear under Unplanned. On Scott's live account that will look like data loss on first load. A count alone won't fix that feeling, so step 2 ships a notice that **links straight to the affected rows** — the Unplanned group, filtered to them — with a period picker on each row, so assigning them is one gesture from the notice.
 
 Real labels ("September 13–19") then become readable off the data rather than assumed from what you happen to be looking at.
 
-### Carry-forward history — out of scope, deliberately
+### Plan memberships — the history layer (IN scope)
 
-A single `week_start` cannot record that a row was committed to Sep 6–12, slipped, and was re-committed to Sep 13–19. Worth being precise about what that costs, because it is **not a regression this spec introduces**: week→week is already a *move* today, not a copy (`lineage.ts:58-60` — "the week list is a checklist, not a reference list"), so that history doesn't exist now either.
+Rev 2 scoped this out. Codex was right that it shouldn't be, and the objection I raised doesn't survive contact with their shape.
 
-- The **month** association survives under additive stamps, so "carried forward inside September" becomes visible for the first time.
-- A cheap slip record already exists in the schema — `defer_count` and `weekDeferredAt` — and one more field (`last_week_start`) would answer "where did this come from" without new rows.
-- **Durable plan-membership rows are rejected for now.** A `task_placements` table is the theoretically right model, but it re-fragments the row this spec just unified, and every surface would again have to ask "which membership is authoritative" — the exact question `→ placed` existed to answer. If a week-level look-back is ever wanted, that is the design to reopen, as its own spec.
+A single `week_start` records only where a row is committed **now**. `last_week_start` adds exactly one hop, so a task carried forward twice loses its first week again. And the week look-back needs a second thing the schema also lacks: **`tasks` has no `completed_at`** — only a boolean `completed` (verified live, 2026-09-13). So "what did we finish in the week of Sep 6–12" is unanswerable today by any arrangement of the existing columns.
+
+**Why this isn't copy-down again.** My objection was that a membership record revives the "which row is authoritative" question `→ placed` existed to answer. It doesn't, because a membership is not a task:
+
+| Layer | Holds | Authority |
+|---|---|---|
+| **Task** | identity, title, notes, **completion** | the only place completion lives |
+| **Plan membership** | "this task was committed to September 13–19" | append-only record of a commitment |
+| **Review decision** | "carried forward to September 20–26" / dropped | append-only record of a decision |
+
+No second checkbox, no competing status, because a membership never carries completion. Copy-down duplicated the *task*; this duplicates nothing.
+
+**And it makes the model more consistent, not less.** Stamps stay exactly as §1 specifies — the three layers are each a cache of the one above, written by one function:
+
+```
+memberships (append-only truth)
+    ↓ deriveStamps  → week_start / month_start / season_start / scheduled_for  (current commitment per grain)
+    ↓ deriveBucket  → bucket                                                   (narrowest grain)
+```
+
+So nothing in §1 changes: the stamps are still what every surface reads, the 33-site membership sweep is unaffected, and `bucket` stays a cache. Memberships sit behind the stamps as the log the stamps summarize. "Placement is additive" simply becomes true over time as well as across grains.
+
+**Requires:** a `task_plan_memberships` table (task_id, grain, period_start, added_at, resolution: `completed_in_period` | `carried` | `dropped` | `open`, resolved_at) and **`tasks.completed_at`**. Storage shape is negotiable; the behavior is a requirement.
+
+**Attribution caveat, so rev 2's cleanup isn't undone immediately.** Codex describes flipping back to a week as something Scott "explicitly asked" for. Reading the transcript, Scott didn't state it in words — *Previous week / This week / Next week* navigation appears in the mockup Scott shared as "basic flow tweaks," and he shared it approvingly. That's real standing, but it is not the same as a stated requirement, and rev 2 exists partly to stop reviewer preferences from being recorded as Scott's decisions. Logged as Open question 5.
 
 ---
 
@@ -168,7 +190,14 @@ OR (users_share_household(auth.uid(), user_id)
 
 So instances **do** mirror the routine's scope: a shared routine's occurrences are visible household-wide, a private one's are not. Iris's private Work and Personal occurrences are already invisible to Scott, by the table's own policy. Nothing to fix.
 
-**What is broken is uniqueness.** The key is `(user_id, entity_type, entity_id, date)` — per user. A shared family occurrence therefore has **one row per member who touches it**, with no single agreed identity: two people can tick "their" copy of the same commitment and neither sees the other's. That's tolerable while an occurrence is a private checkmark on a shared routine; it is not tolerable once an occurrence is a **planning object on a shared weekly list**, which is what §2 makes it. Household-scoped identity for `couple`/`compound` routines (drop `user_id` from the key at those scopes, dedupe existing rows, keep per-member *status* on a child row or a status map) is therefore in scope for step 3 — and it is a genuine migration with a dedupe, not a column add.
+**What is broken is uniqueness.** The key is `(user_id, entity_type, entity_id, date)` — per user. A shared family occurrence therefore has **one row per member who touches it**, with no single agreed identity: two people can tick "their" copy of the same commitment and neither sees the other's. That's tolerable while an occurrence is a private checkmark on a shared routine; it is not tolerable once an occurrence is a **planning object on a shared weekly list**, which is what §2 makes it. Household-scoped identity for `couple`/`compound` routines is therefore in scope for step 3 — a genuine migration, not a column add.
+
+**The dedupe discards nothing.** Existing per-member rows may disagree on `status`, `progress`, `assigned_to_override`, and may each own `instance_notes`. Rules, explicitly:
+
+- The surviving occurrence is a **parent** row owning identity (entity + period + grain) and the placement stamps.
+- **Per-member status stays per-member**, on a child row — which is semantically right anyway ("did Iris do her part" is a real question on a shared routine), not merely a migration convenience.
+- All `instance_notes` and `coverage_requests` are **re-parented** to the surviving row; none are dropped.
+- A collision that can't be reconciled by those rules stops the migration and is reported. No silent winner.
 
 **Still verify by test, not by reading.** Two accounts (Scott + Iris): a private routine's occurrence must be invisible; a shared routine's completion must be visible to both. The policy text above is evidence, not proof.
 
@@ -224,10 +253,11 @@ Not reopened here. Reopening any of them is Scott's call, not a reviewer's.
 ## §7 Sequence
 
 1. **§5 month page** — hierarchy, labels, look-back kept. No data change. ~1 day.
-2. **§1 tasks** — `deriveBucket` + tripwire, writers stop clearing, the 33 membership sites classified and converted (parity tests FIRST), `belongsTo*` NULL branch retired with the Unplanned review prompt, `PlanRow` fate read from stamps, `lineage` copy-down retired for placement (kept for threading). **The big one** — the risk is the membership sweep and the iOS/wall/MCP readers, not the migration. No inference backfill.
+2. **§1 tasks** — `task_plan_memberships` + `tasks.completed_at`, `deriveStamps` + `deriveBucket` + tripwires, writers stop clearing, the 33 membership sites classified and converted (parity tests FIRST), `belongsTo*` NULL branch retired with the Unplanned review prompt, `PlanRow` fate read from stamps, `lineage` copy-down retired for placement (kept for threading). **The big one** — the risk is the membership sweep and the iOS/wall/MCP readers, not the migration. No inference backfill.
 3. **§2 routine occurrences** — nullable `date` + `week_start` + `grain`, period-keyed identity, week-grained materialization, day-choice adds a date, occurrence-vs-pattern vocabulary. **Blocked on the §3 identity migration** (household-scoped uniqueness + dedupe) and on the two-account privacy test.
 4. **§4 All tasks** — grouped by placement, real labels.
-5. **Decide §4's home** on evidence.
+5. **Week look-back** — flip to any past week and see what was committed, completed, carried or dropped. Reads memberships; no new writes.
+6. **Decide §4's home** on evidence.
 
 Each step ships to `main` green and browser-verified before the next starts.
 
@@ -249,10 +279,19 @@ Codex recommended on all four; Claude agrees with all four. Each still needs Sco
 2. **All tasks: Library or sidebar?** → **Start in Library plus empty-⌘K.** Cheap to promote later if Scott reaches for it daily; expensive to demote once it's a habit.
 3. **An unfinished untimed weekly occurrence?** → **Stays in its original week, with an explicit review decision.** Never silently merged into the next occurrence.
 4. **`quarter` vs `season`?** → **Keep `quarter` in the column, display "Season."** A rename is an unrelated compatibility migration across iOS, the wall and MCP; it doesn't belong in this change.
+5. **NEW — is flipping back to a past week and seeing what was planned/completed a requirement you want?** It's in the mockup you shared, not in anything you said, and it's the largest single addition on the table (a memberships table + `completed_at` + a look-back surface). Rev 3 treats it as in scope on the strength of the mockup. Say if it's lower priority than the rest.
 
 ---
 
 ## Changelog
+
+**2026-09-13, rev 3** — Codex review of rev 2:
+
+- **Carry-forward history brought back IN scope**, as a three-layer model: append-only `task_plan_memberships` → stamps → `bucket`, each a cache of the one above. My "competing authority" objection doesn't apply — a membership never carries completion, so there is no second checkbox. Nothing in §1 changes.
+- **Found while checking: `tasks` has no `completed_at`** (live, 2026-09-13) — only a boolean. So the week look-back was impossible on the existing columns for a second, independent reason. Column added to step 2.
+- **Occurrence dedupe now has explicit conflict rules** — parent identity + per-member status children, notes and coverage re-parented, unreconcilable collisions abort the migration. Nothing discarded silently.
+- **The legacy-period notice links to the affected rows** with a per-row period picker, not just a count.
+- **Attribution caveat recorded** (Open question 5): the week-history requirement comes from the mockup Scott shared, not from Scott's stated words.
 
 **2026-09-13, rev 2** — Codex review of rev 1. Corrections applied:
 
