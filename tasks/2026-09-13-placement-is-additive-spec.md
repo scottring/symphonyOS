@@ -242,7 +242,11 @@ A single model cannot serve both. Under "either of us," per-member status means 
 
 **Still verify by test, not by reading.** The policy text above is evidence, not proof. Two gates, at different steps:
 
-- **Tasks — gates step 2 (stamps) AND step 4 (All tasks).** Two accounts, Scott + Iris: Iris's private Work and Personal tasks must not appear in Scott's month/week/day surfaces, in All tasks, or in any grouping count. This is *not* covered by the existing tests — `PeriodPlanPage.test.tsx`'s "Iris's rows stay out" asserts assignee filtering against a mocked hook and says nothing about what the database returns for another user. A stamps change rewrites the membership queries and All tasks reads every open task, so both need the real two-account test first.
+- **Tasks — gates step 2 (stamps) AND step 4 (All tasks). ✅ SHIPPED 2026-09-13.** Two accounts, Scott + Iris: Iris's private Work and Personal tasks must not appear in Scott's month/week/day surfaces, in All tasks, or in any grouping count. This was *not* covered by the existing tests — `PeriodPlanPage.test.tsx`'s "Iris's rows stay out" asserts assignee filtering against a mocked hook and says nothing about what the database returns for another user.
+
+  `tests/integration/task-privacy.integration.test.ts` now asks the real database, as two real accounts in one real household (`npm run test:integration`; separate config, kept out of the unit suite and the pre-push gate because it needs the service key and the network). Nine cases, all green: her private rows absent from the app's own `select('*')`; unreachable by id (so it's the row that's invisible, not the page); absent from the `month_start` / `week_start` stamp queries §1 rewrites; absent from a database `count`; not writable or deletable by Scott; symmetric the other way. The ninth is the one that makes the other eight evidence — it flips that same row's `scope` to `compound`, watches it appear in Scott's read, and flips it back. **Provisioning runs against prod** (no staging project): throwaway users on the `symphony%@gmail.com` allowlist pattern, torn down via `ON DELETE CASCADE`, swept on the next run if a run crashes. Verified zero residue afterwards.
+
+  What it does NOT cover: it asserts the boundary the app actually depends on (`loadTasks` is a bare `select('*')` and every surface derives from that one array), not each surface's own rendering. A surface that re-queried the database itself would need its own case.
 - **Routine occurrences — gates step 3.** A private routine's occurrence invisible; a shared routine's completion visible to both.
 
 **Counts are computed after the domain/scope filter, never before** — counts that don't mirror what renders is a bug this codebase has already shipped once.
@@ -297,7 +301,7 @@ Not reopened here. Reopening any of them is Scott's call, not a reviewer's.
 ## §7 Sequence
 
 1. ~~**§5 month page** — hierarchy, labels, look-back kept. No data change.~~ **SHIPPED 2026-09-13** (`31ddcacd`, fixes `58766fc0`): plan leads, goals/tasks headed separately, calendar folded beneath and persistent, one status that links to the copy. Applies to `/month`, `/season` and `/year` (one component) and to both reference rails. Review caught three defects in it — no reopening a completed row, a scheduled date labelled as a completion date, and the rail reading finished work as outstanding — all fixed with regression tests plus a `rowIsDone`/`rowOwnsCompletion` parity tripwire.
-2. **§1 tasks** — **blocked on the two-account task-privacy test** (§3); then `task_plan_memberships` + `tasks.completed_at`, `deriveStamps` + `deriveBucket` + tripwires, writers stop clearing, the 33 membership sites classified and converted (parity tests FIRST), `belongsTo*` NULL branch retired with the Unplanned review prompt, `PlanRow` fate read from stamps, `lineage` copy-down retired for placement (kept for threading). **The big one** — the risk is the membership sweep and the iOS/wall/MCP readers, not the migration. No inference backfill.
+2. **§1 tasks** — ~~blocked on the two-account task-privacy test~~ **unblocked 2026-09-13** (§3; `tests/integration/task-privacy.integration.test.ts`, 9 green); then `task_plan_memberships` + `tasks.completed_at`, `deriveStamps` + `deriveBucket` + tripwires, writers stop clearing, the 33 membership sites classified and converted (parity tests FIRST), `belongsTo*` NULL branch retired with the Unplanned review prompt, `PlanRow` fate read from stamps, `lineage` copy-down retired for placement (kept for threading). **The big one** — the risk is the membership sweep and the iOS/wall/MCP readers, not the migration. No inference backfill.
 3. **§2 routine occurrences** — nullable `date` + `week_start` + `grain`, period-keyed identity, week-grained materialization, day-choice adds a date, occurrence-vs-pattern vocabulary. **Blocked on the §3 identity migration** (household-scoped uniqueness + dedupe) and on the two-account privacy test.
 4. **§4 All tasks** — grouped by placement, real labels. Also gated on the two-account task-privacy test, including counts.
 5. **Week look-back** — flip to any past week and see what was committed, completed, carried or dropped. Reads memberships; no new writes.
@@ -329,6 +333,12 @@ Codex recommended on all four; Claude agrees with all four. Each still needs Sco
 ---
 
 ## Changelog
+
+**2026-09-13, rev 7** — the task half of the privacy gate is real:
+
+- **`tests/integration/task-privacy.integration.test.ts`** — two accounts, one household, the real database. Steps 2 and 4 are unblocked; step 3 still needs the occurrence half.
+- **A second suite exists now.** `npm run test:integration` (`vitest.integration.config.ts` + `tsconfig.integration.json`), deliberately outside the unit suite and the pre-push gate. Nothing in `src/**` changed.
+- **The gate proved it can fail.** The last case flips one row's scope and watches it become visible, so the eight absences above it are evidence rather than an empty query.
 
 **2026-09-13, rev 6** — the month page's reference column shipped; Codex review of it:
 

@@ -63,4 +63,12 @@ export default defineConfig([
       'react-refresh/only-export-components': 'off',
     },
   },
+  {
+    // The integration suite is Node: it reads `process.env` for the service
+    // key and never touches a DOM.
+    files: ['tests/**/*.ts', 'vitest.integration.config.ts'],
+    languageOptions: {
+      globals: globals.node,
+    },
+  },
 ])

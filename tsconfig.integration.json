@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.app.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.integration.tsbuildinfo",
+    "types": ["node", "vite/client", "vitest/globals"]
+  },
+  "include": ["tests/integration", "vitest.integration.config.ts"],
+  "exclude": []
+}
