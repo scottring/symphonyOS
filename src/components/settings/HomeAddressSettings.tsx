@@ -3,6 +3,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/hooks/useAuth'
 import { geocodePlace } from '@/lib/geocode'
 import { setHomeCoords } from '@/hooks/useWeather'
+import { resetHomeLocationCache } from '@/lib/homeLocation'
 
 // Local storage key for home location (shared with DirectionsBuilder)
 const HOME_LOCATION_KEY = 'symphony_home_location'
@@ -92,6 +93,9 @@ export function HomeAddressSettings() {
     }
 
     saveHomeLocation(newLocation)
+    // Travel-time chips memoize the home address; a new one has to take effect
+    // without a reload.
+    resetHomeLocationCache()
     setHomeLocation(newLocation)
     saveToSupabase(address)
     setIsEditing(false)
@@ -100,6 +104,7 @@ export function HomeAddressSettings() {
 
   const handleClear = () => {
     clearHomeLocation()
+    resetHomeLocationCache()
     setHomeLocation(null)
     clearFromSupabase()
   }

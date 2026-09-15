@@ -7,7 +7,7 @@ import { isSameDay } from '@/lib/dateUtils'
 import { SchedulePopover, type ScheduleContextItem } from '@/components/triage'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
 import { AssigneeDropdown, MultiAssigneeDropdown } from '@/components/family'
-import { Video, Check, Pencil, Hourglass, ListChecks, ChevronUp, ChevronDown, MessageCircle, AlertCircle, Mail } from 'lucide-react'
+import { Video, Check, Pencil, Hourglass, ListChecks, ChevronUp, ChevronDown, MessageCircle, AlertCircle, Mail, Car } from 'lucide-react'
 import { ScheduleItemItems } from './ScheduleItemItems'
 import { RowActionRail } from './RowActionRail'
 import { useMobile } from '@/hooks/useMobile'
@@ -18,6 +18,7 @@ import { DOMAIN_COLORS } from '@/lib/domainColors'
 import { rowSubtitle } from '@/lib/rowSubtitle'
 import { TimelineSpine } from './TimelineSpine'
 import { locationLink } from '@/lib/locationLink'
+import { useTravelTime } from '@/hooks/useTravelTime'
 
 // Nordic Journal calendar icon - minimal, elegant design
 // Uses the event's context color (Work/Family/Personal) or falls back to primary teal-forest
@@ -229,6 +230,10 @@ export const ScheduleItem = memo(function ScheduleItem({
   // On mobile we never expand — preserves the pre-existing behavior where
   // these were never visible without hover.
   const [isHovered, setIsHovered] = useState(false)
+  // "18 min drive" for a row with a real address — null for a video meeting,
+  // an unset home address, or anything already done. Cached per address, so a
+  // recurring destination is looked up once, not once per render.
+  const travelLabel = useTravelTime(item, { enabled: !item.completed && !item.skipped })
   const isTask = item.type === 'task'
   const isRoutine = item.type === 'routine'
   const isEvent = item.type === 'event'
@@ -448,6 +453,12 @@ export const ScheduleItem = memo(function ScheduleItem({
               )}
               {dotColor && <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: dotColor }} />}
               {contextLabel && <span className="truncate">{contextLabel}</span>}
+              {travelLabel && (
+                <span className="shrink-0 inline-flex items-center gap-1 text-neutral-500">
+                  <Car className="w-3 h-3 shrink-0" aria-hidden />
+                  {travelLabel.replace(/ drive$/, '')}
+                </span>
+              )}
             </div>
           )}
           {fromEmail && (
@@ -840,7 +851,7 @@ export const ScheduleItem = memo(function ScheduleItem({
 
       {/* Metadata row — location on hover, contact/parentTask/Free always compact */}
       {(item.location || hasContactChip || parentTaskName || isFree) && (() => {
-        const onlyLocation = !hasContactChip && !parentTaskName && !isFree
+        const onlyLocation = !hasContactChip && !parentTaskName && !isFree && !travelLabel
         const metadataContent = (
           <div className={`flex items-center gap-2 ml-[5.75rem] flex-wrap ${onlyLocation ? 'pt-1' : 'mt-1'}`}>
             {/* Free chip — informational-only: no prep/handoff expected. */}
@@ -888,6 +899,19 @@ export const ScheduleItem = memo(function ScheduleItem({
                 </a>
               )
             })()}
+
+            {/* Travel estimate — unlike the address, this stays visible at
+                rest: knowing the place is 18 minutes away is what makes the
+                row plannable. */}
+            {travelLabel && (
+              <span
+                className="inline-flex items-center gap-1 text-[11px] text-neutral-500"
+                title={`Estimated ${travelLabel} from your home address`}
+              >
+                <Car className="w-3 h-3 shrink-0" aria-hidden />
+                {travelLabel}
+              </span>
+            )}
 
             {/* Contact chip - desktop only */}
             {hasContactChip && (

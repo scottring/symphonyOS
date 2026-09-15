@@ -5,6 +5,8 @@ import { hasExecutionContext } from '@/lib/week/readiness'
 import { isMissedPlacement } from '@/lib/week/missedPlacement'
 import { FIRST_HOUR, HOUR_ROW_HEIGHT, TIME_COL_WIDTH } from './WeekGrid'
 import { useBlockResize } from './useBlockResize'
+import { useTravelTime } from '@/hooks/useTravelTime'
+import { Car } from 'lucide-react'
 
 // Resize handles are hidden until `tasks.end_time` becomes a real DB
 // column. Today, drag-resizing an item works visually but the new
@@ -27,6 +29,10 @@ export function laneCalcStrings(dayIdx: number, laneIdx: number, laneCount: numb
 
 // Horizontal breathing room for a card nested inside a container block.
 const EMBED_INSET_PX = 6
+
+// A travel line only earns its place once the block is tall enough to carry
+// a second line without eating the title.
+const MIN_TRAVEL_BLOCK_PX = 40
 
 // Readability floor: nothing renders shorter than one full text line
 // (This Week redesign) — a 15-min event gets 24px, not a clipped sliver.
@@ -92,6 +98,9 @@ export function WeekEventBlock({ placedItem, weekStart, dayCount = 7, onSelect, 
     data: { kind: 'block', itemId: placedItem.item.id, originStartIso: placedItem.item.startTime?.toISOString() },
   })
 
+  // Travel time from home for a block with a real address (null otherwise).
+  const travelLabel = useTravelTime(placedItem.item, { enabled: !placedItem.item.completed })
+
   const placement = computePlacementFromLane(placedItem, weekStart)
   if (!placement) {
     // During an active drag, keep a hidden DOM node mounted so dnd-kit's
@@ -141,7 +150,11 @@ export function WeekEventBlock({ placedItem, weekStart, dayCount = 7, onSelect, 
     : 0
   const clearancePx = Math.max(0, floorPx - top)
   const blockHeight = Math.max(MIN_BLOCK_PX, height - clearancePx - previewTopOffset + previewBottomOffset)
-  const titleLines = titleLinesFor(blockHeight, { hasSubtitle: !!placedItem.item.subtitle, isRoutine })
+  // The travel line occupies the subtitle's slot, so the title clamps for it
+  // the same way — and it is dropped entirely on a block too short to spare
+  // the line.
+  const showTravel = !!travelLabel && blockHeight >= MIN_TRAVEL_BLOCK_PX && !placedItem.item.subtitle
+  const titleLines = titleLinesFor(blockHeight, { hasSubtitle: !!placedItem.item.subtitle || showTravel, isRoutine })
 
 
   return (
@@ -218,6 +231,12 @@ export function WeekEventBlock({ placedItem, weekStart, dayCount = 7, onSelect, 
       </div>
       {placedItem.item.subtitle && (
         <div className="truncate text-[11px] opacity-75">{placedItem.item.subtitle}</div>
+      )}
+      {showTravel && (
+        <div className="truncate text-[11px] opacity-75 flex items-center gap-1">
+          <Car className="w-2.5 h-2.5 shrink-0" aria-hidden />
+          {travelLabel.replace(/ drive$/, '')}
+        </div>
       )}
     </div>
   )
