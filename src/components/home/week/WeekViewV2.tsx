@@ -17,6 +17,7 @@ import { useGoogleCalendar } from '@/hooks/useGoogleCalendar'
 import type { Routine, ActionableInstance } from '@/types/actionable'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
 import { taskToTimelineItem, eventToTimelineItem } from '@/types/timeline'
+import { goalTitleMap } from '@/lib/planning/goalSteps'
 import { WeekGrid, dayKey } from './WeekGrid'
 import { WeekAllDayChip, WeekAllDayEventChip } from './WeekAllDayChip'
 import { WeekEventBlock } from './WeekEventBlock'
@@ -412,8 +413,16 @@ export function WeekViewV2(props: WeekViewV2Props) {
   // day's School block subtitle (or stay grid material without one).
   const extras = useMemo(() => partitionWeekExtras(weekEvents), [weekEvents])
 
+  // From the FULL task list, not the week's subset: a step placed on this week
+  // whose goal sits on the month list would otherwise lose its label.
+  const goalTitles = useMemo(() => goalTitleMap(tasks), [tasks])
+  const labelFor = useCallback(
+    (t: Task) => (t.goalTaskId ? goalTitles.get(t.goalTaskId) : undefined),
+    [goalTitles],
+  )
+
   const allItems = useMemo(() => {
-    const taskItems = scheduledTasks.map(taskToTimelineItem)
+    const taskItems = scheduledTasks.map((t) => taskToTimelineItem(t, labelFor(t)))
     const eventItems = extras.rest.map(eventToTimelineItem)
     const schoolByDay = new Map<string, (typeof eventItems)[number]>()
     for (const item of eventItems) {
@@ -458,7 +467,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
           if (itemId.startsWith('task-')) {
             const taskId = itemId.slice('task-'.length)
             const task = tasks.find((t) => t.id === taskId)
-            if (task) blocks.push(taskToTimelineItem(task))
+            if (task) blocks.push(taskToTimelineItem(task, labelFor(task)))
           } else if (itemId.startsWith('event-')) {
             const event = events.find((ev) => {
               const id = ev.google_event_id || ev.id

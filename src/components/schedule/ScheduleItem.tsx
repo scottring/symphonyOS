@@ -7,7 +7,7 @@ import { isSameDay } from '@/lib/dateUtils'
 import { SchedulePopover, type ScheduleContextItem } from '@/components/triage'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
 import { AssigneeDropdown, MultiAssigneeDropdown } from '@/components/family'
-import { Video, Check, Pencil, Hourglass, ListChecks, ChevronUp, ChevronDown, MessageCircle, AlertCircle, Mail, Car } from 'lucide-react'
+import { Video, Check, Pencil, Hourglass, ListChecks, ChevronUp, ChevronDown, MessageCircle, AlertCircle, Mail, Car, Target } from 'lucide-react'
 import { ScheduleItemItems } from './ScheduleItemItems'
 import { RowActionRail } from './RowActionRail'
 import { useMobile } from '@/hooks/useMobile'
@@ -265,6 +265,7 @@ export const ScheduleItem = memo(function ScheduleItem({
   /** Anything rendering beneath the title makes the title column taller — the
    *  leading columns then need pinning to the title's first line. */
   const hasBelowTitleContent = !!belowTitleAccessory
+    || !!(item.goalLabel && !item.completed)
     || !!(item.isWaiting && item.waitingFor && !item.completed)
     || hasPerPersonItems
     || fromEmail
@@ -463,6 +464,14 @@ export const ScheduleItem = memo(function ScheduleItem({
           )}
           {fromEmail && (
             <div className="text-[12px] text-neutral-500 mt-0.5">{emailBadge}</div>
+          )}
+          {/* What this step is for, on the phone too — a phone has no hover to
+              reveal it, so the commitment has to be on the row itself. */}
+          {item.goalLabel && !item.completed && (
+            <div className="flex items-center gap-1.5 text-[12px] text-neutral-500 mt-0.5 min-w-0">
+              <Target className="w-3 h-3 shrink-0" aria-hidden />
+              <span className="truncate">{item.goalLabel}</span>
+            </div>
           )}
           {/* Per-person items — inline on the phone too. This is where a
               parent actually reads "who needs what tomorrow". */}
@@ -782,6 +791,15 @@ export const ScheduleItem = memo(function ScheduleItem({
               <span className="truncate" title={item.waitingFor}>
                 Waiting on {item.waitingFor}
               </span>
+            </div>
+          )}
+          {/* What this step is FOR. A commitment made at the month's altitude
+              should still be legible on the day you act on it. No count and no
+              progress — just the goal's name. */}
+          {item.goalLabel && !item.completed && (
+            <div className="flex items-baseline gap-1.5 text-[12px] text-neutral-500 leading-tight mt-0.5 min-w-0">
+              <Target className="w-3 h-3 shrink-0 translate-y-[1px]" aria-hidden />
+              <span className="truncate" title={item.goalLabel}>{item.goalLabel}</span>
             </div>
           )}
           {/* Subtitle: category + duration, plus provenance. Empty for plain

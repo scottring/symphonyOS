@@ -35,6 +35,11 @@ export interface TimelineItem {
   isWaiting?: boolean
   /** What the wait is ON, in the user's words. Rendered beneath the title. */
   waitingFor?: string
+  /** The month/season goal a step serves, by name. Planning a task for today
+   *  should preserve its broader commitment, so Today says what it is for.
+   *  Resolved by the caller from an already-filtered task list — a goal the
+   *  reader cannot see contributes no label. */
+  goalLabel?: string
   waitingSince?: Date
   needsDiscussion?: boolean
   discussionNote?: string
@@ -90,7 +95,7 @@ export interface TimelineItem {
 
 export type TimeSection = 'now' | 'soon' | 'later' | 'unscheduled'
 
-export function taskToTimelineItem(task: Task): TimelineItem {
+export function taskToTimelineItem(task: Task, goalLabel?: string): TimelineItem {
   const subtaskCount = task.subtasks?.length
   const subtaskCompletedCount = task.subtasks?.filter(s => s.completed).length
 
@@ -103,6 +108,7 @@ export function taskToTimelineItem(task: Task): TimelineItem {
     completed: task.completed,
     isWaiting: task.isWaiting,
     waitingFor: task.waitingFor,
+    goalLabel,
     waitingSince: task.waitingSince,
     needsDiscussion: task.needsDiscussion,
     discussionNote: task.discussionNote,

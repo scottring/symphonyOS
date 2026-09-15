@@ -52,7 +52,7 @@ export function PrintableDayList({ date, sectionsOrder, grouped, overdue = [] }:
     .map((section) => ({ section, items: (grouped[section] ?? []).filter(isOpen) }))
     .filter(({ items }) => items.length > 0)
 
-  const openOverdue = overdue.map(taskToTimelineItem).filter(isOpen)
+  const openOverdue = overdue.map((t) => taskToTimelineItem(t)).filter(isOpen)
   const total =
     sections.reduce((n, s) => n + s.items.length, 0) + openOverdue.length
   const done = sectionsOrder.reduce(

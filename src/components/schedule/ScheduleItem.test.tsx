@@ -288,3 +288,24 @@ describe('ScheduleItem — Projects hidden (mobile card)', () => {
     expect(queryByText('Kitchen renovation')).toBeNull()
   })
 })
+
+// Planning a task for today should preserve its broader commitment.
+describe('ScheduleItem — the goal a step serves', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('names the goal under the title', () => {
+    const { getByText } = renderRow({ title: 'Hang plants', goalLabel: 'Transform the porch' })
+    expect(getByText('Transform the porch')).toBeInTheDocument()
+  })
+
+  it('says nothing extra for a loose task', () => {
+    const { queryByText } = renderRow({ title: 'Call the roofer' })
+    expect(queryByText('Transform the porch')).not.toBeInTheDocument()
+  })
+
+  // A finished row is the win column; the reason it existed is no longer news.
+  it('drops the line once the step is done', () => {
+    const { queryByText } = renderRow({ title: 'Hang plants', goalLabel: 'Transform the porch', completed: true })
+    expect(queryByText('Transform the porch')).not.toBeInTheDocument()
+  })
+})

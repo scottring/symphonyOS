@@ -23,6 +23,9 @@ export interface GroupingInput {
   eventNotesMap?: Map<string, { notes?: string; assignedTo?: string | null; isFree?: boolean }>
   eventContextOverrides?: Map<string, 'work' | 'family' | 'personal'>
   getDomainForCalendar?: (calendarId?: string, calendarName?: string) => 'work' | 'family' | 'personal' | null
+  /** goalTaskId → the goal's title, for the line a step draws under itself.
+   *  Built from the caller's own (RLS-filtered) task list. */
+  goalTitles?: Map<string, string>
 }
 
 /** Ports TodaySchedule.grouped (~830-954) verbatim. */
@@ -30,10 +33,11 @@ export function buildGroupedSections(input: GroupingInput): Record<DaySection, T
   const {
     timedTasks, events, routines, viewedDate,
     routineStatusMap, eventStatusMap, match,
-    eventNotesMap, eventContextOverrides, getDomainForCalendar,
+    eventNotesMap, eventContextOverrides, getDomainForCalendar, goalTitles,
   } = input
 
-  const taskItems = timedTasks.map(taskToTimelineItem)
+  const taskItems = timedTasks.map((t) =>
+    taskToTimelineItem(t, t.goalTaskId ? goalTitles?.get(t.goalTaskId) : undefined))
 
   const eventItems = events
     .map((event) => {

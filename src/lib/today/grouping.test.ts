@@ -159,3 +159,38 @@ describe('buildGroupedSections', () => {
     expect(Object.values(sections).flat().filter(i => i.id === 'task-w1')).toHaveLength(1)
   })
 })
+
+// A commitment made at the month's altitude should still be legible on the day
+// you act on it.
+describe('a step carries the goal it serves', () => {
+  it('labels a step with its goal', () => {
+    const t = task({ id: 's1', title: 'Hang plants', goalTaskId: 'g1', scheduledFor: new Date('2026-05-19T08:00:00') })
+    const g = buildGroupedSections({
+      timedTasks: [t], events: [], routines: [], viewedDate: new Date('2026-05-19T00:00:00'),
+      routineStatusMap: new Map(), eventStatusMap: new Map(), match: matchAll,
+      goalTitles: new Map([['g1', 'Transform the porch']]),
+    })
+    expect(g.morning.find(i => i.title === 'Hang plants')?.goalLabel).toBe('Transform the porch')
+  })
+
+  it('leaves a loose task unlabelled', () => {
+    const t = task({ id: 'l1', title: 'Call the roofer', scheduledFor: new Date('2026-05-19T08:00:00') })
+    const g = buildGroupedSections({
+      timedTasks: [t], events: [], routines: [], viewedDate: new Date('2026-05-19T00:00:00'),
+      routineStatusMap: new Map(), eventStatusMap: new Map(), match: matchAll,
+      goalTitles: new Map([['g1', 'Transform the porch']]),
+    })
+    expect(g.morning.find(i => i.title === 'Call the roofer')?.goalLabel).toBeUndefined()
+  })
+
+  // RLS filtered the goal out of this reader's list, so there is no title to show.
+  it('says nothing when the goal is not in the map', () => {
+    const t = task({ id: 's2', title: 'Hang plants', goalTaskId: 'private', scheduledFor: new Date('2026-05-19T08:00:00') })
+    const g = buildGroupedSections({
+      timedTasks: [t], events: [], routines: [], viewedDate: new Date('2026-05-19T00:00:00'),
+      routineStatusMap: new Map(), eventStatusMap: new Map(), match: matchAll,
+      goalTitles: new Map(),
+    })
+    expect(g.morning.find(i => i.title === 'Hang plants')?.goalLabel).toBeUndefined()
+  })
+})

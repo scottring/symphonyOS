@@ -5,6 +5,7 @@ import { selectCarriedOver, selectSlipped, selectCompletedInbox, selectTimed } f
 import { selectNeedsAttention } from './attention'
 import { buildRoutineStatusMap, buildEventStatusMap, selectVisibleRoutines } from './statusMaps'
 import { buildGroupedSections } from './grouping'
+import { goalTitleMap } from '@/lib/planning/goalSteps'
 import { countRoutineUnits } from './routineCollections'
 import { deferredInRoutineIds } from './deferredRoutines'
 import type { ResolveRoutineCtx } from '@/lib/routineUtils'
@@ -89,6 +90,10 @@ export function computeTodayData(input: TodayDataInput): TodayData {
     eventNotesMap: input.eventNotesMap,
     eventContextOverrides: input.eventContextOverrides,
     getDomainForCalendar: input.getDomainForCalendar,
+    // Built from the reader's OWN task list, which RLS has already filtered:
+    // a goal they cannot see contributes no title, so a shared step can never
+    // leak a private goal's name onto Today.
+    goalTitles: goalTitleMap(input.tasks),
   })
 
   // Counts. The denominator has to be the actionable rows the user can see, or

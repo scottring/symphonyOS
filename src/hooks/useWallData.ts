@@ -470,7 +470,7 @@ export function useWallData(): UseWallDataReturn {
         })
 
         // Convert to timeline items
-        const taskItems = dayTasks.map(taskToTimelineItem)
+        const taskItems = dayTasks.map((t) => taskToTimelineItem(t))
         const eventItems = dayEvents.map(eventToTimelineItem)
         const routineItems = dayRoutines.map(r => {
           const item = routineToTimelineItem(r, date)
