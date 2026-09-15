@@ -111,3 +111,19 @@ describe('a goal holds the steps that serve it', () => {
     expect(screen.getByRole('button', { name: /Do it today Hang plants/i })).toBeInTheDocument()
   })
 })
+
+// A JS comment sitting directly inside a fragment is not a comment — it is
+// text, and it rendered on every planning row until someone looked at the
+// page (2026-09-15). The row's own source comments must never reach the DOM.
+describe('the row renders no source comments', () => {
+  it('shows no // text on a plain row', () => {
+    const { container } = render(<ul><PlanRow row={row({ title: 'Fix the back door' })} actions={[]} onAction={vi.fn()} onOpen={vi.fn()} /></ul>)
+    expect(container.textContent).not.toContain('//')
+  })
+
+  it('shows no // text on an expanded goal with steps', () => {
+    const goal = row({ id: 'g9', title: 'Transform the porch', isGoal: true, steps: [row({ id: 's9', title: 'Hang plants' })] })
+    const { container } = render(<ul><PlanRow row={goal} actions={[]} onAction={vi.fn()} onOpen={vi.fn()} expanded onAddStep={vi.fn()} /></ul>)
+    expect(container.textContent).not.toContain('//')
+  })
+})

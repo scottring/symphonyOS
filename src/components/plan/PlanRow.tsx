@@ -132,12 +132,12 @@ export function PlanRow({
   // with no steps still gets one when it can TAKE them — that is the way in.
   const canHoldSteps = row.isGoal && row.kind === 'task' && (!!onAddStep || (row.steps?.length ?? 0) > 0)
   const [stepDraft, setStepDraft] = useState('')
+  // A hairline between rows, and the hover runs the full width of the card:
+  // inside a divided list a rounded, inset hover reads as a floating chip
+  // (Scott, 2026-09-13). The last row leaves its border off so the card's
+  // own edge is the one you see.
   return (
     <>
-    // A hairline between rows, and the hover runs the full width of the card:
-    // inside a divided list a rounded, inset hover reads as a floating chip
-    // (Scott, 2026-09-13). The last row leaves its border off so the card's
-    // own edge is the one you see.
     <li className="group flex items-start gap-2.5 border-b border-neutral-100 px-2 py-2 transition-colors last:border-0 hover:bg-neutral-50">
       <button
         type="button"
