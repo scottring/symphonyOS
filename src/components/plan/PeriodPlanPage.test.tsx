@@ -556,3 +556,74 @@ describe('PeriodPlanPage masthead', () => {
     expect(card.parentElement?.className).toMatch(/max-w-\[1152px\]/)
   })
 })
+
+// "Transform the porch" is a September goal; "hang plants" and "buy new chairs"
+// are the work it takes. The goal holds them, and they leave the loose list.
+describe('steps under a goal', () => {
+  beforeEach(() => {
+    state.tasks = []; state.goals = []; state.loading = false; routinesState.routines = []
+    domainState.layers = new Set(['work', 'family', 'personal', 'unsorted']); domainState.soleDomain = null
+    vi.clearAllMocks()
+  })
+
+  const porchPlan = () => {
+    state.tasks = [
+      task({ id: 'g1', title: 'Transform the porch', isGoal: true, monthStart: thisMonth }),
+      task({ id: 's1', title: 'Hang plants', goalTaskId: 'g1', monthStart: thisMonth }),
+      task({ id: 'l1', title: 'Renew car registration', monthStart: thisMonth }),
+    ]
+  }
+
+  it('draws a step under its goal and not in the task list', () => {
+    porchPlan()
+    renderPage('month')
+    fireEvent.click(screen.getByRole('button', { name: /Show steps under Transform the porch/i }))
+    const goals = screen.getByRole('region', { name: /goals$/ })
+    expect(within(goals).getByText('Hang plants')).toBeInTheDocument()
+    const list = screen.getByRole('region', { name: /list$/ })
+    expect(within(list).queryByText('Hang plants')).not.toBeInTheDocument()
+    expect(within(list).getByText('Renew car registration')).toBeInTheDocument()
+  })
+
+  it('keeps the step hidden until the goal is opened', () => {
+    porchPlan()
+    renderPage('month')
+    expect(screen.queryByText('Hang plants')).not.toBeInTheDocument()
+  })
+
+  it('adding a step writes the goal it serves', () => {
+    porchPlan()
+    renderPage('month')
+    fireEvent.click(screen.getByRole('button', { name: /Show steps under Transform the porch/i }))
+    const input = screen.getByLabelText(/New step for Transform the porch/i)
+    fireEvent.change(input, { target: { value: 'Buy new chairs' } })
+    fireEvent.submit(input)
+    expect(hook.addTask).toHaveBeenCalledWith('Buy new chairs', undefined, undefined, undefined,
+      expect.objectContaining({ bucket: 'month', goalTaskId: 'g1' }))
+  })
+
+  it('files a loose row under a goal you pick', () => {
+    porchPlan()
+    renderPage('month')
+    fireEvent.click(screen.getByRole('button', { name: /Put it under a goal Renew car registration/i }))
+    const picker = screen.getByRole('dialog', { name: /Put it under a goal/i })
+    fireEvent.click(within(picker).getByRole('button', { name: /Transform the porch/i }))
+    expect(hook.updateTask).toHaveBeenCalledWith('l1', { goalTaskId: 'g1' })
+  })
+
+  it('offers no "under a goal" verb when the period has no goals', () => {
+    state.tasks = [task({ id: 'l1', title: 'Renew car registration', monthStart: thisMonth })]
+    renderPage('month')
+    expect(screen.queryByRole('button', { name: /Put it under a goal/i })).not.toBeInTheDocument()
+  })
+
+  it('the season page holds steps the same way', () => {
+    state.tasks = [
+      task({ id: 'g2', title: 'Make the house ours', isGoal: true, bucket: 'quarter' }),
+      task({ id: 's2', title: 'Clear the garage', goalTaskId: 'g2', bucket: 'quarter' }),
+    ]
+    renderPage('season')
+    fireEvent.click(screen.getByRole('button', { name: /Show steps under Make the house ours/i }))
+    expect(screen.getByText('Clear the garage')).toBeInTheDocument()
+  })
+})

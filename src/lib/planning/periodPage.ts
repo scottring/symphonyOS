@@ -136,6 +136,9 @@ export type RowAction =
   | 'to-lower'
   /** Straight onto today. An urgent thing shouldn't have to walk every rung. */
   | 'today'
+  /** File a loose row under one of the period's goals. You write "call the
+   *  roofer" and only then realise it is porch work. */
+  | 'under-goal'
 
 /**
  * The verbs a row offers.
@@ -155,18 +158,21 @@ export type RowAction =
  * copies of the same task from landing in twenty seconds.
  */
 export function actionsFor(
-  { fate, isGoal, isPast, level = 'month' }:
-  { fate: PlacementFate; isGoal: boolean; isPast: boolean; level?: PlanLevel },
+  { fate, isGoal, isPast, level = 'month', hasGoals = false }:
+  { fate: PlacementFate; isGoal: boolean; isPast: boolean; level?: PlanLevel; hasGoals?: boolean },
 ): RowAction[] {
   if (fate === 'done' || fate === 'placed-done') return []
   if (fate === 'placed-open') return isPast ? ['keep', 'drop'] : []
   const kind: RowAction = isGoal ? 'make-task' : 'make-goal'
   // A year row is a goal entity and has no rung below it on this page.
   const canDescend = !isGoal && level !== 'year'
+  // Only a loose row, and only where there is a goal to file it under. A goal
+  // never goes under a goal: one level, on purpose.
+  const underGoal: RowAction[] = !isGoal && hasGoals ? ['under-goal'] : []
   if (!isPast) {
     return canDescend
-      ? ['complete', 'to-lower', 'today', kind, 'drop']
-      : ['complete', kind, 'drop']
+      ? ['complete', 'to-lower', 'today', ...underGoal, kind, 'drop']
+      : ['complete', ...underGoal, kind, 'drop']
   }
   return isGoal ? ['complete', 'keep', kind, 'drop'] : ['complete', 'keep', 'someday', kind, 'drop']
 }

@@ -29,6 +29,7 @@ import { routinePatterns } from '@/lib/planning/routinePatterns'
 import { GoalsProvider, useGoalsContext } from '@/contexts/GoalsContext'
 import { filterTasksForLayers, matchesLayers } from '@/lib/today/domainFilter'
 import { placementFate, placedWhere } from '@/lib/planning/lineage'
+import { splitGoalRows } from '@/lib/planning/goalSteps'
 import { parseLocalYmd } from '@/lib/cadence/config'
 import { formatShortDate } from '@/lib/dateHelpers'
 import {
@@ -226,6 +227,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
     else if (action === 'today') {
       await gated.pushTask(row.id, new Date())
     }
+    else if (action === 'under-goal') setPickingGoalFor(row.id)
   }, [goals, updateGoal, deleteGoal, addGoal, bounds.next, toggleTask, deleteTask, gated, setGoal, keepForward, level])
 
   // The rail's one verb: copy an open season task down into this month.
@@ -324,14 +326,67 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
     })
   }, [level, areas, addArea, addGoal, soleDomain, bounds.start, updateGoal, addTask])
 
+  // ── Steps under a goal ───────────────────────────────────────────────────
+  const [expandedGoals, setExpandedGoals] = useState<Set<string>>(new Set())
+  const toggleGoal = useCallback((row: PlanRowModel) => {
+    setExpandedGoals((prev) => {
+      const next = new Set(prev)
+      if (next.has(row.id)) next.delete(row.id)
+      else next.add(row.id)
+      return next
+    })
+  }, [])
+
+  const addStep = useCallback(async (goalRow: PlanRowModel, title: string) => {
+    const t = title.trim()
+    if (!t) return
+    await addTask(t, undefined, undefined, undefined, {
+      bucket: level === 'month' ? 'month' : 'quarter',
+      monthStart: level === 'month' ? bounds.start : undefined,
+      seasonStart: level === 'season' ? bounds.start : undefined,
+      goalTaskId: goalRow.id,
+      context: soleDomain,
+    })
+  }, [level, bounds.start, soleDomain, addTask])
+
+  const [pickingGoalFor, setPickingGoalFor] = useState<string | null>(null)
+  const fileUnderGoal = useCallback(async (taskId: string, goalId: string) => {
+    setPickingGoalFor(null)
+    await gated.updateTask(taskId, { goalTaskId: goalId })
+    // Open the goal it went into, or the row appears to vanish from the task
+    // list with nowhere visible to have gone.
+    setExpandedGoals((prev) => new Set(prev).add(goalId))
+  }, [gated])
+
   // Goals and tasks are different promises and get their own lists — one
   // list with an icon on some rows didn't say which was which.
-  const goalRows = useMemo(() => rows.filter((r) => r.isGoal), [rows])
+  //
+  // A STEP renders once, under its goal, and never also in the task list.
+  // selectPeriodTasks still returns it — the look-back and the period's record
+  // need the whole list — so the split happens here, via the one module that
+  // knows what goal_task_id means.
+  const split = useMemo(() => {
+    if (level === 'year') return null
+    return splitGoalRows(selectPeriodTasks(layered, level, bounds.start, isCurrent, meId, seasons))
+  }, [level, layered, bounds.start, isCurrent, meId, seasons])
+
+  const goalRows = useMemo(() => {
+    if (!split) return rows.filter((r) => r.isGoal)
+    return split.goals.map((g) => ({
+      ...taskRow(g, tasks),
+      steps: (split.stepsByGoal.get(g.id) ?? []).map((st) => taskRow(st, tasks)),
+    }))
+  }, [split, rows, tasks])
+
+  const looseRows = useMemo(
+    () => (split ? split.loose.map((t) => taskRow(t, tasks)) : rows.filter((r) => !r.isGoal)),
+    [split, rows, tasks],
+  )
   // Finished work leaves the working list and waits behind a fold. On a PAST
   // period the fold opens by default: a look-back is precisely about what got
   // done (Scott, 2026-09-13).
-  const openTaskRows = useMemo(() => rows.filter((r) => !r.isGoal && !rowIsDone(r.fate)), [rows])
-  const doneTaskRows = useMemo(() => rows.filter((r) => !r.isGoal && rowIsDone(r.fate)), [rows])
+  const openTaskRows = useMemo(() => looseRows.filter((r) => !rowIsDone(r.fate)), [looseRows])
+  const doneTaskRows = useMemo(() => looseRows.filter((r) => rowIsDone(r.fate)), [looseRows])
   const lowerLabelText = lowerLevel(level) === 'week' ? 'this week' : 'this month'
   const visibleTaskRows = showAll ? openTaskRows : openTaskRows.slice(0, TASK_PREVIEW_CAP)
   // Gated on the LIST being long, not on rows being hidden right now —
@@ -430,6 +485,10 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                   {goalRows.map((row) => (
                     <PlanRow key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onAction={(a, r) => { void act(a, r) }}
                       lowerLabel={lowerLabelText}
+                      expanded={expandedGoals.has(row.id)}
+                      onToggleExpand={toggleGoal}
+                      onAddStep={isPast ? undefined : (g, t) => { void addStep(g, t) }}
+                      stepActionsFor={(st) => actionsFor({ fate: st.fate, isGoal: false, isPast, level })}
                         actions={actionsFor({ fate: row.fate, isGoal: row.isGoal, isPast, level })} />
                   ))}
                 </ul>
@@ -469,9 +528,41 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                     {visibleTaskRows.map((row) => (
                       <PlanRow key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onAction={(a, r) => { void act(a, r) }}
                         lowerLabel={lowerLabelText}
-                        actions={actionsFor({ fate: row.fate, isGoal: row.isGoal, isPast, level })} />
+                        actions={actionsFor({ fate: row.fate, isGoal: row.isGoal, isPast, level, hasGoals: goalRows.length > 0 })} />
                     ))}
                   </ul>
+                )}
+                {/* One picker, not one per row. Rendered where the row you are
+                    filing lives, so the answer appears next to the question. */}
+                {pickingGoalFor && (
+                  <div
+                    role="dialog"
+                    aria-label="Put it under a goal"
+                    className="mt-2 rounded-xl border border-neutral-200 bg-neutral-50/60 p-2"
+                  >
+                    <p className="px-2 py-1 text-[12px] text-neutral-500">Put it under…</p>
+                    <ul>
+                      {goalRows.map((g) => (
+                        <li key={g.id}>
+                          <button
+                            type="button"
+                            onClick={() => { void fileUnderGoal(pickingGoalFor, g.id) }}
+                            className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm text-neutral-800 transition-colors hover:bg-white"
+                          >
+                            <Target className="h-3.5 w-3.5 shrink-0 text-amber-600" />
+                            <span className="truncate">{g.title}</span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                    <button
+                      type="button"
+                      onClick={() => setPickingGoalFor(null)}
+                      className="mt-1 px-2 py-1 text-[12px] text-neutral-500 transition-colors hover:text-neutral-800"
+                    >
+                      Cancel
+                    </button>
+                  </div>
                 )}
                 {overCap && (
                   <button

@@ -115,6 +115,22 @@ describe('actionsFor', () => {
   it('an open goal in a PAST period: keep, make it a task, drop — never someday', () => {
     expect(actionsFor({ fate: 'open', isGoal: true, isPast: true })).toEqual(['complete', 'keep', 'make-task', 'drop'])
   })
+  // You write "call the roofer" and only then realise it is porch work.
+  it('offers "under a goal" to a loose task only when the period has goals', () => {
+    expect(actionsFor({ fate: 'open', isGoal: false, isPast: false, level: 'month', hasGoals: true }))
+      .toEqual(['complete', 'to-lower', 'today', 'under-goal', 'make-goal', 'drop'])
+    expect(actionsFor({ fate: 'open', isGoal: false, isPast: false, level: 'month', hasGoals: false }))
+      .not.toContain('under-goal')
+  })
+  it('never offers "under a goal" to a goal — one level only', () => {
+    expect(actionsFor({ fate: 'open', isGoal: true, isPast: false, level: 'month', hasGoals: true }))
+      .not.toContain('under-goal')
+  })
+  // A look-back is read, not re-filed.
+  it('never offers "under a goal" in a past period', () => {
+    expect(actionsFor({ fate: 'open', isGoal: false, isPast: true, hasGoals: true }))
+      .not.toContain('under-goal')
+  })
   it('done and placed-done rows are the win column: nothing to do', () => {
     expect(actionsFor({ fate: 'done', isGoal: false, isPast: true })).toEqual([])
     expect(actionsFor({ fate: 'placed-done', isGoal: false, isPast: true })).toEqual([])

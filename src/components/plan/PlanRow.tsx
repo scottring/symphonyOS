@@ -51,6 +51,7 @@ const ACTION_LABEL: Record<Exclude<RowAction, 'complete'>, string> = {
   'make-goal': 'Make it a goal',
   'make-task': 'Make it a task',
   'to-lower': 'Take it into',
+  'under-goal': 'Put it under a goal',
   today: 'Do it today',
 }
 
@@ -65,6 +66,7 @@ function ActionIcon({ action }: { action: Exclude<RowAction, 'complete'> }) {
   if (action === 'drop') return <Trash2 className="w-3.5 h-3.5" />
   if (action === 'to-lower') return <ArrowDownRight className="w-3.5 h-3.5" />
   if (action === 'today') return <Sun className="w-3.5 h-3.5" />
+  if (action === 'under-goal') return <Target className="w-3.5 h-3.5" />
   return <Repeat className="w-3.5 h-3.5" />
 }
 
