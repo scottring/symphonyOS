@@ -6,7 +6,7 @@
 // Its own module (rather than living in index.ts) so it can be tested without
 // importing the whole Deno edge function. The app has a parallel helper for
 // the same hazard in src/lib/scheduledFor.ts — that one serves the MCP server.
-const APP_TZ = 'America/New_York'
+export const APP_TZ = 'America/New_York'
 
 export function etOffsetMinutes(dateStr: string): number {
   const [y, m, d] = dateStr.split('-').map(Number)

@@ -8,7 +8,7 @@ import {
   isWebBlock,
   toolsForTurn,
 } from './webAccess.ts'
-import { normalizeSchedule, etOffsetMinutes } from './schedule.ts'
+import { normalizeSchedule, etOffsetMinutes, APP_TZ } from './schedule.ts'
 
 // ════════════════════════════════════════════════════════════════
 // SYMPHONY AGENT — a smart, Symphony-scoped assistant.
