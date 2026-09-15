@@ -4,7 +4,8 @@
 // offers right now. Shared by This Month / This Season / This Year so the
 // three pages read as one surface.
 
-import { Check, Target, ArrowRight, ArrowUpRight, ArrowDownRight, Sun, CalendarDays, Archive, Trash2, Repeat } from 'lucide-react'
+import { useState } from 'react'
+import { Check, Target, ArrowRight, ArrowUpRight, ArrowDownRight, Sun, CalendarDays, Archive, Trash2, Repeat, ChevronRight, ChevronDown, Plus } from 'lucide-react'
 import type { PlacementFate } from '@/lib/planning/lineage'
 import type { RowAction } from '@/lib/planning/periodPage'
 
@@ -20,6 +21,10 @@ export interface PlanRowModel {
   /** Where this row's copy went, when it has been taken down a level. The
    *  row's ONE status line; the tick says whether it is finished. */
   placed?: { label: string; id: string; kind: 'week' | 'date' | 'done' | 'placed' } | null
+  /** The tasks filed under this goal — "hang plants" under "Transform the
+   *  porch". Month and season goals only, and one level deep: a step never
+   *  carries steps of its own. */
+  steps?: PlanRowModel[]
 }
 
 /** Is this row finished? Own completion or its copy's — the distinction
@@ -90,7 +95,10 @@ function PlacementChip({ placed, onOpenPlaced }: {
   )
 }
 
-export function PlanRow({ row, actions, onAction, onOpen, onOpenPlaced, lowerLabel = 'this week' }: {
+export function PlanRow({
+  row, actions, onAction, onOpen, onOpenPlaced, lowerLabel = 'this week',
+  expanded = false, onToggleExpand, onAddStep, stepActionsFor,
+}: {
   row: PlanRowModel
   actions: RowAction[]
   onAction: (action: RowAction, row: PlanRowModel) => void
@@ -99,6 +107,13 @@ export function PlanRow({ row, actions, onAction, onOpen, onOpenPlaced, lowerLab
   onOpenPlaced?: (taskId: string) => void
   /** The rung 'to-lower' lands on, named so a hover says where it goes. */
   lowerLabel?: string
+  /** Goal rows only: whether the steps beneath are showing. */
+  expanded?: boolean
+  onToggleExpand?: (row: PlanRowModel) => void
+  /** Omitted on a past period — a look-back is read, not written into. */
+  onAddStep?: (row: PlanRowModel, title: string) => void
+  /** The verbs each step offers; a step is a task, so it is not the goal's. */
+  stepActionsFor?: (step: PlanRowModel) => RowAction[]
 }) {
   // A row whose copy is finished reads as finished — one status, not a tick
   // that disagrees with an annotation beside it.
@@ -110,7 +125,13 @@ export function PlanRow({ row, actions, onAction, onOpen, onOpenPlaced, lowerLab
   // the copy that did the work, and is reopened there.
   const canTick = actions.includes('complete') || rowOwnsCompletion(row.fate)
   const verbs = actions.filter((a): a is Exclude<RowAction, 'complete'> => a !== 'complete')
+  // Only a month/season goal holds steps. A year row is a goals-table entity,
+  // and a step never nests further, so neither offers a disclosure. A goal
+  // with no steps still gets one when it can TAKE them — that is the way in.
+  const canHoldSteps = row.isGoal && row.kind === 'task' && (!!onAddStep || (row.steps?.length ?? 0) > 0)
+  const [stepDraft, setStepDraft] = useState('')
   return (
+    <>
     // A hairline between rows, and the hover runs the full width of the card:
     // inside a divided list a rounded, inset hover reads as a floating chip
     // (Scott, 2026-09-13). The last row leaves its border off so the card's
@@ -127,6 +148,17 @@ export function PlanRow({ row, actions, onAction, onOpen, onOpenPlaced, lowerLab
       >
         <Check className="w-3 h-3" strokeWidth={3} />
       </button>
+      {canHoldSteps && (
+        <button
+          type="button"
+          aria-label={`${expanded ? 'Hide' : 'Show'} steps under ${row.title}`}
+          aria-expanded={expanded}
+          onClick={() => onToggleExpand?.(row)}
+          className="mt-[3px] shrink-0 text-neutral-400 transition-colors hover:text-neutral-700"
+        >
+          {expanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+        </button>
+      )}
       {row.isGoal && <Target className="w-3.5 h-3.5 mt-[3px] shrink-0 text-amber-600" aria-label="Goal" />}
       <span className="min-w-0 flex-1">
         <button
@@ -166,5 +198,45 @@ export function PlanRow({ row, actions, onAction, onOpen, onOpenPlaced, lowerLab
         </span>
       )}
     </li>
+    {canHoldSteps && expanded && (
+      /* The steps are their own list items in the same <ul>, indented rather
+         than nested in a second list, so a screen reader reads one flat plan. */
+      <li className="border-b border-neutral-100 last:border-0">
+        <ul className="pl-7">
+          {(row.steps ?? []).map((step) => (
+            <PlanRow
+              key={step.id}
+              row={step}
+              actions={stepActionsFor?.(step) ?? []}
+              onAction={onAction}
+              onOpen={onOpen}
+              onOpenPlaced={onOpenPlaced}
+              lowerLabel={lowerLabel}
+            />
+          ))}
+        </ul>
+        {onAddStep && (
+          <form
+            className="flex items-center gap-2 py-1.5 pl-7 pr-2"
+            onSubmit={(e) => {
+              e.preventDefault()
+              const t = stepDraft.trim()
+              setStepDraft('')
+              if (t) onAddStep(row, t)
+            }}
+          >
+            <Plus className="h-3.5 w-3.5 shrink-0 text-neutral-400" />
+            <input
+              aria-label={`New step for ${row.title}`}
+              value={stepDraft}
+              onChange={(e) => setStepDraft(e.target.value)}
+              placeholder="Add a step"
+              className="min-w-0 flex-1 bg-transparent py-1 text-[13px] text-neutral-800 placeholder:text-neutral-400 focus:outline-none"
+            />
+          </form>
+        )}
+      </li>
+    )}
+    </>
   )
 }
