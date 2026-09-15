@@ -55,19 +55,64 @@ export function WallV2MealsCard({ rows }: { rows: MealRow[] }) {
   );
 }
 
-export function WallV2DueTodayCard({ rows }: { rows: DueRow[] }) {
+function DueTodayRow({ row }: { row: DueRow }) {
   return (
-    <StripCard title="Due today">
-      {rows.length === 0 && <EmptyRow>Nothing due — nice</EmptyRow>}
-      {rows.map((r) => (
-        <div key={r.id} className="flex items-baseline gap-2 min-w-0">
-          <span className={`${ROW} ${WALL.ink} flex-1`}>{r.title}</span>
-          {r.who && (
-            <span className={`text-[0.85rem] font-bold shrink-0 ${WALL.muted}`}>{r.who}</span>
-          )}
-        </div>
-      ))}
-    </StripCard>
+    <div className="flex items-baseline gap-2 min-w-0">
+      <span className={`${ROW} ${WALL.ink} flex-1`}>{row.title}</span>
+      {row.who && (
+        <span className={`text-[0.85rem] font-bold shrink-0 ${WALL.muted}`}>{row.who}</span>
+      )}
+    </div>
+  );
+}
+
+/** How many due rows fit above the question and stay readable at eight feet. */
+const DUE_ROWS_WITH_QUESTION = 2;
+
+/**
+ * The cell when both have a claim on it. Due today keeps the top — it is work
+ * someone in this house has to do — and the question keeps the bottom, in the
+ * serif, still tappable.
+ *
+ * It used to be either/or, and on a normal Monday with two open tasks that
+ * meant the question was simply gone from the wall all evening with no trace
+ * and no way to reach it (Scott, 2026-09-15). Displacing the one thing on this
+ * wall that isn't a schedule is worse than showing two due rows instead of
+ * five: the label carries the true count, and the rest of the list has a home
+ * on Today.
+ */
+export function WallV2DueAndQuestionCard({
+  rows, question, onTapQuestion,
+}: {
+  rows: DueRow[];
+  question: string | null;
+  onTapQuestion?: () => void;
+}) {
+  const shown = rows.slice(0, DUE_ROWS_WITH_QUESTION);
+  return (
+    <div className={`${WALL.card} flex flex-col min-w-0 px-4 py-3 overflow-hidden`}>
+      <div className={`${WALL.label} shrink-0 mb-2`}>{`Due today · ${rows.length}`}</div>
+      <div className="flex flex-col gap-1.5 shrink-0">
+        {shown.map((r) => <DueTodayRow key={r.id} row={r} />)}
+      </div>
+      {/* flex-1 hands the question whatever the due rows didn't take, so the
+          hairline sits lower when only one thing is due. Even at two rows this
+          clears the 80px kiosk touch minimum. */}
+      <button
+        type="button"
+        onClick={onTapQuestion}
+        className="mt-2 pt-2.5 flex-1 min-h-0 flex items-start gap-1.5 text-left border-t border-[#E5DAC5] dark:border-[#3E362A] active:scale-[.99] transition-transform"
+      >
+        <MessageCircle className={`w-3.5 h-3.5 mt-[0.3rem] shrink-0 ${WALL.muted}`} />
+        {question ? (
+          <p className={`font-display italic text-[1.1rem] leading-snug line-clamp-3 ${WALL.ink}`}>
+            &ldquo;{question}&rdquo;
+          </p>
+        ) : (
+          <p className={`${ROW} ${WALL.muted}`}>Done for tonight</p>
+        )}
+      </button>
+    </div>
   );
 }
 
@@ -256,15 +301,15 @@ export function WallV2Strip({
       {onBrowseRecipes && <WallV2RecipesTile onTap={onBrowseRecipes} />}
       <div className="flex-1 min-w-0 grid grid-cols-3 gap-3">
         <WallV2DinnerStripCard tonight={tonight} rows={meals} onTap={onTapDinner} onSelectDay={onSelectDinnerDay} />
-        {/* The cell has a ladder. A handoff nobody has claimed is a question the
-            house needs answered by 7am. Below that, what is due today outranks a
-            conversation starter — untimed tasks left the board (they have no
-            place on a clock) and this is where they live now. The question
-            returns when the list is clear. */}
+        {/* The cell has a ladder. A handoff nobody has claimed takes the whole
+            card — it is a question the house needs answered by 7am, and a face
+            answers it. Otherwise the cell is shared: what is due today above
+            (untimed tasks left the board — they have no place on a clock), the
+            question below. Nothing displaces the question except a handoff. */}
         {handoff
           ? <WallV2QuestionStripCard question={question} handoff={handoff} onTap={onTapHandoff} />
           : due.length > 0
-            ? <WallV2DueTodayCard rows={due} />
+            ? <WallV2DueAndQuestionCard rows={due} question={question} onTapQuestion={onTapQuestion} />
             : <WallV2QuestionStripCard question={question} onTap={onTapQuestion} />}
         <WallV2ComingUpCard rows={comingUp} />
       </div>
