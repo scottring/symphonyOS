@@ -12,6 +12,7 @@ import { localYmd, parseLocalYmd, weekStartAnchor, readCadenceConfig } from '@/l
 import { weekStartForBucket } from '@/lib/today/weekPlacement'
 import { monthStartOf, monthStartForBucket, seasonStartForBucket, isPlacement } from '@/lib/planning/periodPlacement'
 import { isDescent, livePlacedCopyOf } from '@/lib/planning/lineage'
+import { stepsThatCarryForward } from '@/lib/planning/goalSteps'
 import { readSeasons, seasonStartFor } from '@/lib/cadence/seasons'
 import { onRealtimeResumed } from '@/lib/realtime/keepAlive'
 import { announceToBuyChanged } from '@/lib/lists/toBuy'
@@ -1167,11 +1168,32 @@ export function useSupabaseTasks() {
    * The look-back's "Keep": copy a month/season row — task OR goal — into the
    * next period, leaving the original on the list it was reviewed from. Same
    * copy as copyDown, same lineage (source_id), no descent: the bucket stays.
+   *
+   * A GOAL keeps its open steps too. Carrying "Transform the porch" into
+   * October and leaving "buy new chairs" behind in September would empty the
+   * goal of the work that defines it, and re-deciding four steps one at a time
+   * is deliberation the cadence already spent on the goal itself. The steps
+   * attach to the COPY, not the original — otherwise October's goal would show
+   * nothing and September's would grow a second set.
+   *
+   * Finished steps stay behind: they are September's record. So does a step
+   * already placed lower, whose copy is carrying on without it.
    */
   const keepForward = useCallback(async (id: string, period: { monthStart?: Date; seasonStart?: Date }): Promise<string | undefined> => {
     const task = findTaskById(id)
     if (!task || (task.bucket !== 'month' && task.bucket !== 'quarter')) return undefined
-    return copyDown(task, { bucket: task.bucket, monthStart: period.monthStart, seasonStart: period.seasonStart })
+    const copyId = await copyDown(task, { bucket: task.bucket, monthStart: period.monthStart, seasonStart: period.seasonStart })
+    if (copyId && task.isGoal) {
+      for (const step of stepsThatCarryForward(task.id, tasksRef.current)) {
+        await copyDown(step, {
+          bucket: step.bucket,
+          monthStart: period.monthStart,
+          seasonStart: period.seasonStart,
+          goalTaskId: copyId,
+        })
+      }
+    }
+    return copyId
   }, [findTaskById, copyDown])
 
   const updateTask = useCallback(async (id: string, updates: Partial<Task>) => {

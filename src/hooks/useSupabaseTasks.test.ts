@@ -786,6 +786,38 @@ describe('useSupabaseTasks', () => {
       await act(async () => { await result.current.keepForward('g1', { seasonStart: new Date(2026, 9, 1) }) })
       expect(mockInsert).toHaveBeenCalledWith(expect.objectContaining({ bucket: 'quarter', season_start: '2026-10-01', is_goal: true, source_id: 'g1' }))
     })
+
+    // Carrying "Transform the porch" into October and leaving "buy new chairs"
+    // behind would empty the goal of the work that defines it.
+    it('brings a goal\'s OPEN steps with it, and attaches them to the copy', async () => {
+      mockSupabaseData.push(
+        createMockDbTask({ id: 'g1', title: 'Transform the porch', bucket: 'month', month_start: '2026-09-01', is_goal: true }),
+        createMockDbTask({ id: 's1', title: 'Buy new chairs', bucket: 'month', month_start: '2026-09-01', goal_task_id: 'g1' }),
+        createMockDbTask({ id: 's2', title: 'Hang plants', bucket: 'month', month_start: '2026-09-01', goal_task_id: 'g1', completed: true }),
+      )
+      const { result } = renderHook(() => useSupabaseTasks())
+      await waitFor(() => expect(result.current.tasks).toHaveLength(3))
+      mockInsert.mockClear()
+      let copyId: string | undefined
+      await act(async () => { copyId = await result.current.keepForward('g1', { monthStart: new Date(2026, 9, 1) }) })
+      const inserted = mockInsert.mock.calls.map((c) => c[0] as Record<string, unknown>)
+      const goalCopy = inserted.find((r) => r.title === 'Transform the porch')
+      const stepCopy = inserted.find((r) => r.title === 'Buy new chairs')
+      expect(goalCopy).toMatchObject({ is_goal: true, month_start: '2026-10-01' })
+      // The step attaches to the NEW goal, not the one left behind in September.
+      expect(stepCopy).toMatchObject({ month_start: '2026-10-01', goal_task_id: copyId })
+      // A finished step is September's record and stays there.
+      expect(inserted.find((r) => r.title === 'Hang plants')).toBeUndefined()
+    })
+
+    it('a plain task copies only itself', async () => {
+      mockSupabaseData.push(createMockDbTask({ id: 'm1', title: 'Repaint', bucket: 'month', month_start: '2026-09-01' }))
+      const { result } = renderHook(() => useSupabaseTasks())
+      await waitFor(() => expect(result.current.tasks).toHaveLength(1))
+      mockInsert.mockClear()
+      await act(async () => { await result.current.keepForward('m1', { monthStart: new Date(2026, 9, 1) }) })
+      expect(mockInsert).toHaveBeenCalledTimes(1)
+    })
   })
 
   describe('updateTask', () => {
