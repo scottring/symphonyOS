@@ -123,6 +123,11 @@ export interface Task {
   /** The annual goal this task ultimately serves. Stamped on goal promotion,
    *  inherited by every copy below, so goal roll-up is a flat filter. */
   goalId?: string
+  /** The month/season GOAL this task serves — an is_goal task row on the same
+   *  list. Distinct from sourceId (copied down FROM) and goalId (the annual
+   *  goals-table row): this one says "belongs under", and it is what lets a
+   *  goal hold the work that serves it. One level only; a step has no steps. */
+  goalTaskId?: string
   /** Fun-audit mark (Best Laid Plans): this item exists because it's fun. */
   isFun?: boolean
   /** Manual position among items with no time (all-day, unscheduled, group

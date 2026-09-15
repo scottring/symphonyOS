@@ -96,6 +96,7 @@ export interface DbTask {
   capture_meta: { status?: string; storage_path?: string; suggested_task_id?: string } | null
   source_id: string | null
   goal_id: string | null
+  goal_task_id: string | null
   is_fun: boolean | null
   sort_order: number | null
   created_at: string
@@ -179,6 +180,7 @@ export function dbTaskToTask(dbTask: DbTask): Task {
     pickedAt: dbTask.picked_at ? new Date(dbTask.picked_at) : undefined,
     sourceId: dbTask.source_id ?? undefined,
     goalId: dbTask.goal_id ?? undefined,
+    goalTaskId: dbTask.goal_task_id ?? undefined,
     isFun: dbTask.is_fun ?? undefined,
     sortOrder: dbTask.sort_order ?? null,
     captureMeta: dbTask.capture_meta
@@ -590,6 +592,7 @@ export function useSupabaseTasks() {
     pickedAt?: Date
     /** Cascade lineage: the annual goal this task serves (inherited by copies). */
     goalId?: string
+    goalTaskId?: string
     /** Fun-audit mark. */
     isFun?: boolean
     /** Rich context carried on the INSERT. Same race rationale as `bucket`: a
@@ -707,6 +710,7 @@ export function useSupabaseTasks() {
         email: options?.email ?? null,
         source_id: options?.sourceId ?? null,
         goal_id: options?.goalId ?? null,
+        goal_task_id: options?.goalTaskId ?? null,
         is_fun: options?.isFun ?? false,
         picked_at: options?.pickedAt?.toISOString() ?? null,
         notes: options?.notes ?? null,
@@ -1142,6 +1146,10 @@ export function useSupabaseTasks() {
       isGoal: to === original.bucket ? original.isGoal === true : false,
       sourceId: original.id,
       goalId: original.goalId,
+      // A copy serves the same goal as the row it came from — that is how a
+      // step taken down to a week still knows what it is for. An explicit
+      // override wins, so a goal's Keep can re-point its steps at the copy.
+      goalTaskId: updates.goalTaskId ?? original.goalTaskId,
       context: original.context ?? null,
       assignedTo: original.assignedTo ?? null,
       assignedToAll: original.assignedToAll ?? undefined,
@@ -1355,6 +1363,7 @@ export function useSupabaseTasks() {
     if ('neededOn' in updates) dbUpdates.needed_on = updates.neededOn ? localYmd(updates.neededOn) : null
     if ('sourceId' in updates) dbUpdates.source_id = updates.sourceId ?? null
     if ('goalId' in updates) dbUpdates.goal_id = updates.goalId ?? null
+    if ('goalTaskId' in updates) dbUpdates.goal_task_id = updates.goalTaskId ?? null
     if ('isFun' in updates) dbUpdates.is_fun = updates.isFun ?? false
     if ('weekDeferredAt' in updates) dbUpdates.week_deferred_at = updates.weekDeferredAt?.toISOString() ?? null
     // `week_start` is a DATE column — localYmd, not toISOString (which shifts the day west of Greenwich).
@@ -1547,6 +1556,7 @@ export function useSupabaseTasks() {
     if ('neededOn' in updates) dbUpdates.needed_on = updates.neededOn ? localYmd(updates.neededOn) : null
     if ('sourceId' in updates) dbUpdates.source_id = updates.sourceId ?? null
     if ('goalId' in updates) dbUpdates.goal_id = updates.goalId ?? null
+    if ('goalTaskId' in updates) dbUpdates.goal_task_id = updates.goalTaskId ?? null
     if ('isFun' in updates) dbUpdates.is_fun = updates.isFun ?? false
     if ('weekDeferredAt' in updates) dbUpdates.week_deferred_at = updates.weekDeferredAt?.toISOString() ?? null
     // `week_start` is a DATE column — localYmd, not toISOString (which shifts the day west of Greenwich).

@@ -353,6 +353,26 @@ describe('useSupabaseTasks', () => {
       expect(mockInsert).toHaveBeenCalledWith(expect.objectContaining({ bucket: 'week', is_goal: false, month_start: null }))
     })
 
+    it('writes goal_task_id when a step names the goal it serves', async () => {
+      const { result } = renderHook(() => useSupabaseTasks())
+      await waitFor(() => expect(result.current.loading).toBe(false))
+      await act(async () => {
+        await result.current.addTask('Hang plants', undefined, undefined, undefined, {
+          bucket: 'month', monthStart: new Date(2026, 8, 1), goalTaskId: 'g1',
+        })
+      })
+      expect(mockInsert).toHaveBeenCalledWith(expect.objectContaining({ goal_task_id: 'g1' }))
+    })
+
+    it('leaves goal_task_id null for a loose task', async () => {
+      const { result } = renderHook(() => useSupabaseTasks())
+      await waitFor(() => expect(result.current.loading).toBe(false))
+      await act(async () => {
+        await result.current.addTask('Call the roofer', undefined, undefined, undefined, { bucket: 'month' })
+      })
+      expect(mockInsert).toHaveBeenCalledWith(expect.objectContaining({ goal_task_id: null }))
+    })
+
     it('creates task with just title', async () => {
       const { result } = renderHook(() => useSupabaseTasks())
 
@@ -550,6 +570,24 @@ describe('useSupabaseTasks', () => {
 
   describe('a goal cannot be placed', () => {
     const goal = () => createMockDbTask({ id: 'g1', title: 'Read more', bucket: 'month', month_start: '2026-09-01', is_goal: true })
+
+    it('maps goal_task_id onto the task it reads back', async () => {
+      mockSupabaseData.push(createMockDbTask({ id: 's1', title: 'Hang plants', bucket: 'month', month_start: '2026-09-01', goal_task_id: 'g1' }))
+      const { result } = renderHook(() => useSupabaseTasks())
+      await waitFor(() => expect(result.current.tasks).toHaveLength(1))
+      expect(result.current.tasks[0].goalTaskId).toBe('g1')
+    })
+
+    // A step taken down to a week is still porch work. The copy carries the
+    // goal so Today can say what it is for.
+    it('a copy taken down a rung keeps the goal it serves', async () => {
+      mockSupabaseData.push(createMockDbTask({ id: 's1', title: 'Hang plants', bucket: 'month', month_start: '2026-09-01', goal_task_id: 'g1' }))
+      const { result } = renderHook(() => useSupabaseTasks())
+      await waitFor(() => expect(result.current.tasks).toHaveLength(1))
+      mockInsert.mockClear()
+      await act(async () => { await result.current.pushTask('s1', 'week') })
+      expect(mockInsert).toHaveBeenCalledWith(expect.objectContaining({ goal_task_id: 'g1', source_id: 's1' }))
+    })
 
     it('pushTask to a week is a no-op with a toast', async () => {
       mockSupabaseData.push(goal())
