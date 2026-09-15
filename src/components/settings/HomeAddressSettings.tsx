@@ -4,6 +4,8 @@ import { useAuth } from '@/hooks/useAuth'
 import { geocodePlace } from '@/lib/geocode'
 import { setHomeCoords } from '@/hooks/useWeather'
 import { resetHomeLocationCache } from '@/lib/homeLocation'
+import { PlacesAutocomplete, type PlaceSelection } from '@/components/location/PlacesAutocomplete'
+import { useDirections } from '@/hooks/useDirections'
 
 // Local storage key for home location (shared with DirectionsBuilder)
 const HOME_LOCATION_KEY = 'symphony_home_location'
@@ -47,13 +49,17 @@ export function HomeAddressSettings() {
   const [homeLocation, setHomeLocation] = useState<SavedLocation | null>(null)
   const [isEditing, setIsEditing] = useState(false)
   const [addressInput, setAddressInput] = useState('')
+  /** Escape hatch: Places is blocked on some networks, and someone with no
+   *  suggestions still has to be able to set an address. */
+  const [manualEntry, setManualEntry] = useState(false)
+  const { searchPlaces, getPlaceDetails, placesError } = useDirections()
 
   // Load saved home location on mount
   useEffect(() => {
     setHomeLocation(getSavedHomeLocation())
   }, [])
 
-  const saveToSupabase = async (address: string) => {
+  const saveToSupabase = async (address: string, placeId?: string) => {
     if (!user) return
     // Coordinates feed the weather chip; best effort, the address saves regardless.
     let coords: { home_lat: number; home_lng: number } | null = null
@@ -67,6 +73,8 @@ export function HomeAddressSettings() {
     await supabase.from('user_profiles').upsert({
       user_id: user.id,
       home_location: address,
+      // A picked place routes exactly; a typed address clears any stale id.
+      home_place_id: placeId ?? null,
       ...(coords ?? {}),
       updated_at: new Date().toISOString(),
     }, { onConflict: 'user_id' })
@@ -83,29 +91,35 @@ export function HomeAddressSettings() {
     }).eq('user_id', user.id)
   }
 
-  const handleSave = () => {
-    const address = addressInput.trim()
-    if (!address) return
-
-    const newLocation: SavedLocation = {
-      name: 'Home',
-      address,
-    }
+  const commit = (address: string, placeId?: string) => {
+    const newLocation: SavedLocation = { name: 'Home', address, placeId }
 
     saveHomeLocation(newLocation)
     // Travel-time chips memoize the home address; a new one has to take effect
     // without a reload.
     resetHomeLocationCache()
     setHomeLocation(newLocation)
-    saveToSupabase(address)
+    saveToSupabase(address, placeId)
     setIsEditing(false)
+    setManualEntry(false)
     setAddressInput('')
+  }
+
+  const handleSelectPlace = (place: PlaceSelection) => {
+    commit(place.address, place.placeId)
+  }
+
+  const handleSave = () => {
+    const address = addressInput.trim()
+    if (!address) return
+    commit(address)
   }
 
   const handleClear = () => {
     clearHomeLocation()
     resetHomeLocationCache()
     setHomeLocation(null)
+    setManualEntry(false)
     clearFromSupabase()
   }
 
@@ -118,35 +132,70 @@ export function HomeAddressSettings() {
 
       {isEditing ? (
         <div className="p-4 bg-neutral-50 rounded-lg border border-neutral-200">
-          <input
-            type="text"
-            value={addressInput}
-            onChange={(e) => setAddressInput(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') handleSave() }}
-            placeholder="Enter your home address..."
-            className="w-full px-3 py-2.5 text-sm rounded-lg border border-neutral-200 bg-white
-                       focus:outline-none focus:ring-2 focus:ring-primary-500"
-            autoFocus
-          />
+          {manualEntry ? (
+            <>
+              <input
+                type="text"
+                value={addressInput}
+                onChange={(e) => setAddressInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleSave() }}
+                placeholder="Enter your home address..."
+                className="w-full px-3 py-2.5 text-sm rounded-lg border border-neutral-200 bg-white
+                           focus:outline-none focus:ring-2 focus:ring-primary-500"
+                autoFocus
+              />
 
-          <div className="flex gap-2 mt-3">
-            <button
-              onClick={handleSave}
-              disabled={!addressInput.trim()}
-              className="btn-primary flex-1 disabled:opacity-50"
-            >
-              Save
-            </button>
-            <button
-              onClick={() => {
-                setIsEditing(false)
-                setAddressInput('')
-              }}
-              className="btn-secondary flex-1"
-            >
-              Cancel
-            </button>
-          </div>
+              <div className="flex gap-2 mt-3">
+                <button
+                  onClick={handleSave}
+                  disabled={!addressInput.trim()}
+                  className="btn-primary flex-1 disabled:opacity-50"
+                >
+                  Save
+                </button>
+                <button
+                  onClick={() => {
+                    setIsEditing(false)
+                    setManualEntry(false)
+                    setAddressInput('')
+                  }}
+                  className="btn-secondary flex-1"
+                >
+                  Cancel
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Picking a real place stores its Google place id, so directions
+                  and travel estimates start from an exact point rather than a
+                  re-geocoded string. */}
+              <PlacesAutocomplete
+                value={null}
+                onSelect={handleSelectPlace}
+                onClear={() => {}}
+                onSearch={searchPlaces}
+                onGetDetails={getPlaceDetails}
+                error={placesError}
+                placeholder="Search for your home address…"
+              />
+
+              <div className="flex items-center justify-between gap-2 mt-3">
+                <button
+                  onClick={() => setManualEntry(true)}
+                  className="text-xs text-neutral-500 hover:text-neutral-700 underline"
+                >
+                  Enter it manually
+                </button>
+                <button
+                  onClick={() => setIsEditing(false)}
+                  className="btn-secondary"
+                >
+                  Cancel
+                </button>
+              </div>
+            </>
+          )}
         </div>
       ) : homeLocation ? (
         <div className="flex items-start gap-3 p-4 bg-white rounded-lg border border-neutral-100">
