@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { synthesizeMealEvents } from '@/shell/providers/MealEventsProvider'
 import { findDinnerEvent, findBreakfastEvent } from './WallDinnerWidget'
+import { extractRecipeNameHint, resolveRecipeUrl } from '@/lib/recipeDetection'
 import type { MealPlan } from '@/types/meal-planner'
 
 /** Regression lock for the wall meal-plan dinner fix.
@@ -117,5 +118,48 @@ describe('wall breakfast ⟵ structured meal plan', () => {
       viewedDate: today, mealPlan: plan, recipes: [], familyMembers: [], currentMemberId: null,
     })
     expect(findBreakfastEvent(mealEvents, today)).toBeNull()
+  })
+})
+
+/** End-to-end lock on the row that broke the Tonight card (Scott, 2026-09-15).
+ *
+ * The wall composes the card exactly this way: findDinnerEvent over the
+ * synthesized events, then `extractRecipeNameHint(title) || title` for the name
+ * and `resolveRecipeUrl(description)` for the tap (WallV2Shell.useMealCardData,
+ * whose tap handler opens the viewer only when a URL or stored body exists).
+ * Every link in that chain is asserted here, so a regression in any one of them
+ * fails rather than silently printing a URL across the kitchen wall. */
+describe('a dinner whose recipe link was pasted into the title', () => {
+  const REAL_TITLE = 'Golden tofu noodle bowl https://cooking.nytimes.com/recipes/786478904-golden-tofu-noodle-bowl)'
+  const REAL_URL = 'https://cooking.nytimes.com/recipes/786478904-golden-tofu-noodle-bowl'
+
+  function cardFor(adHocTitle: string) {
+    const today = new Date()
+    const plan = {
+      id: 'mp1',
+      entries: [{ id: 'e1', dayOfWeek: today.getDay(), slot: 'dinner', adHocTitle }],
+    } as unknown as MealPlan
+    const events = synthesizeMealEvents({
+      viewedDate: today, mealPlan: plan, recipes: [], familyMembers: [], currentMemberId: null,
+    })
+    const dinner = findDinnerEvent(events, today)!
+    expect(dinner).toBeTruthy()
+    return {
+      mealName: extractRecipeNameHint(dinner.title) || dinner.title,
+      recipeUrl: resolveRecipeUrl(dinner.description),
+    }
+  }
+
+  it('shows the dish name with no URL in it, and the tap has a recipe to open', () => {
+    const card = cardFor(REAL_TITLE)
+    expect(card.mealName).toBe('Golden tofu noodle bowl')
+    expect(card.mealName).not.toMatch(/https?:/)
+    expect(card.recipeUrl).toBe(REAL_URL)
+  })
+
+  it('an ordinary planned dinner still reads plainly and simply has nothing to open', () => {
+    const card = cardFor('Salmon, broccoli and sweet potatoes')
+    expect(card.mealName).toBe('Salmon, broccoli and sweet potatoes')
+    expect(card.recipeUrl).toBeNull()
   })
 })

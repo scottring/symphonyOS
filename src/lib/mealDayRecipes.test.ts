@@ -239,3 +239,28 @@ describe('localDateKey', () => {
     expect(localDateKey(new Date(2026, 7, 5, 23, 30))).toBe('2026-08-05')
   })
 })
+
+describe('an ad-hoc meal whose title carries the recipe link', () => {
+  const REAL = 'Golden tofu noodle bowl https://cooking.nytimes.com/recipes/786478904-golden-tofu-noodle-bowl)'
+
+  it('is cookable: the link becomes the source URL and the title loses it', () => {
+    const days = buildMealDayRecipes({
+      plans: [plan({ weekStartIso: THIS_WEEK, entries: [entry({ id: 'e1', dayOfWeek: 3, adHocTitle: REAL })] })],
+      recipes: [],
+      centerDate: WED,
+      slot: 'dinner',
+    })
+    expect(days.map((d) => [d.dateKey, d.title])).toEqual([['2026-08-05', 'Golden tofu noodle bowl']])
+    expect(days[0].sourceUrl).toBe('https://cooking.nytimes.com/recipes/786478904-golden-tofu-noodle-bowl')
+  })
+
+  it('still skips an ad-hoc day with no link and no body', () => {
+    const days = buildMealDayRecipes({
+      plans: [plan({ weekStartIso: THIS_WEEK, entries: [entry({ id: 'e1', dayOfWeek: 3, adHocTitle: 'Takeout' })] })],
+      recipes: [],
+      centerDate: WED,
+      slot: 'dinner',
+    })
+    expect(days).toEqual([])
+  })
+})

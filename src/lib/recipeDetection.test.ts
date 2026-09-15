@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { detectRecipeUrl, isRecipeDomain, extractRecipeNameHint, resolveRecipeUrl } from './recipeDetection'
+import { detectRecipeUrl, isRecipeDomain, extractRecipeNameHint, resolveRecipeUrl, splitRecipeTitleUrl } from './recipeDetection'
 
 describe('recipeDetection', () => {
   describe('detectRecipeUrl', () => {
@@ -120,6 +120,60 @@ describe('recipeDetection', () => {
       expect(resolveRecipeUrl(null)).toBeNull()
       expect(resolveRecipeUrl('')).toBeNull()
       expect(resolveRecipeUrl('just a plain note')).toBeNull()
+    })
+  })
+
+  describe('splitRecipeTitleUrl — a link pasted into a meal title', () => {
+    // The real row that broke the wall's Tonight card (Scott, 2026-09-15). Note
+    // the stray ")" left over from a pasted markdown link.
+    const REAL = 'Golden tofu noodle bowl https://cooking.nytimes.com/recipes/786478904-golden-tofu-noodle-bowl)'
+
+    it('splits the name from the link and drops the markdown litter', () => {
+      expect(splitRecipeTitleUrl(REAL)).toEqual({
+        name: 'Golden tofu noodle bowl',
+        url: 'https://cooking.nytimes.com/recipes/786478904-golden-tofu-noodle-bowl',
+      })
+    })
+
+    it('keeps a full markdown link readable', () => {
+      expect(splitRecipeTitleUrl('[Golden tofu noodle bowl](https://cooking.nytimes.com/recipes/786478904-x)')).toEqual({
+        name: 'Golden tofu noodle bowl',
+        url: 'https://cooking.nytimes.com/recipes/786478904-x',
+      })
+    })
+
+    it('handles a dash or bullet between the name and the link', () => {
+      expect(splitRecipeTitleUrl('Sheet-pan tofu — https://www.budgetbytes.com/recipe/tofu/')).toEqual({
+        name: 'Sheet-pan tofu',
+        url: 'https://www.budgetbytes.com/recipe/tofu/',
+      })
+    })
+
+    it('leaves a title with no link completely alone', () => {
+      expect(splitRecipeTitleUrl('Salmon, broccoli and sweet potatoes')).toEqual({
+        name: 'Salmon, broccoli and sweet potatoes',
+        url: null,
+      })
+    })
+
+    it('keeps the hyphens inside a name that has no link', () => {
+      expect(splitRecipeTitleUrl('Sheet-Pan Sesame-Ginger Tofu')).toEqual({
+        name: 'Sheet-Pan Sesame-Ginger Tofu',
+        url: null,
+      })
+    })
+
+    it('falls back to the URL itself when the title is nothing but a link', () => {
+      expect(splitRecipeTitleUrl('https://cooking.nytimes.com/recipes/1-x')).toEqual({
+        name: 'cooking.nytimes.com',
+        url: 'https://cooking.nytimes.com/recipes/1-x',
+      })
+    })
+
+    it('takes a non-recipe link out of the name even when it cannot vouch for the domain', () => {
+      const out = splitRecipeTitleUrl('Grandma\'s stew https://example.com/whatever')
+      expect(out.name).toBe("Grandma's stew")
+      expect(out.url).toBe('https://example.com/whatever')
     })
   })
 })

@@ -10,7 +10,7 @@
 // arrow lands on a screen with ingredients or steps on it.
 
 import { sundayOfWeek, toIsoDate } from '@/lib/weekHelpers'
-import { resolveMealTitle } from '@/lib/mealTitle'
+import { adHocRecipeUrl, resolveMealTitle } from '@/lib/mealTitle'
 import type { MealPlanEntry, MealSlot, Recipe } from '@/types/meal-planner'
 
 /**
@@ -129,7 +129,9 @@ export function buildMealDayRecipes(params: {
     const recipe = bodyEntry?.recipeId ? recipesById.get(bodyEntry.recipeId) : undefined
     const ingredients = recipe?.ingredients ?? []
     const instructions = recipe?.instructions ?? []
-    const sourceUrl = recipe?.sourceUrl
+    // A link pasted into an ad-hoc title counts: it is the only recipe such an
+    // entry can have, and it is enough to cook from.
+    const sourceUrl = recipe?.sourceUrl ?? adHocRecipeUrl(entry, entriesById) ?? undefined
 
     // Nothing to cook from — skip, so an arrow never lands on an empty screen.
     if (ingredients.length === 0 && instructions.length === 0 && !sourceUrl) continue

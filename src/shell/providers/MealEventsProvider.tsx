@@ -24,7 +24,7 @@ import { useMealPlan } from '@/hooks/useMealPlan';
 import { useRecipes } from '@/hooks/useRecipes';
 import { sundayOfWeek } from '@/lib/weekHelpers';
 import { SHOW_PLANNED_MEALS_ON_TIMELINE } from '@/lib/mealsVisibility';
-import { resolveMealTitle } from '@/lib/mealTitle';
+import { adHocRecipeUrl, resolveMealTitle } from '@/lib/mealTitle';
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar';
 import type { MealPlan, Recipe } from '@/types/meal-planner';
 import type { FamilyMember } from '@/types/family';
@@ -59,7 +59,12 @@ export function synthesizeMealEvents(params: {
     if (e.dayOfWeek !== dow) continue;
     if (!SLOT_TIMES[e.slot]) continue;
     const title = resolveMealTitle(e, entriesById, recipesById);
-    const recipeUrl = e.recipeId ? (recipeUrlById.get(e.recipeId) ?? undefined) : undefined;
+    // An ad-hoc entry has no recipe row, so its link can only have been pasted
+    // into the title. The wall's Tonight card resolves its URL off this
+    // description, so put it where that already looks.
+    const recipeUrl = e.recipeId
+      ? (recipeUrlById.get(e.recipeId) ?? undefined)
+      : (adHocRecipeUrl(e, entriesById) ?? undefined);
     const key = `${e.slot}|${title}`;
     const existing = groups.get(key);
     if (existing) existing.entryIds.push(e.id);

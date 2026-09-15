@@ -85,3 +85,25 @@ describe('resolveMealTitle', () => {
     expect(resolveMealTitle(leftover, entriesById, recipesById)).toBe('Leftovers')
   })
 })
+
+describe('a link pasted into an ad-hoc meal title', () => {
+  const entry = (adHocTitle: string): MealPlanEntry =>
+    ({ id: 'e1', mealPlanId: 'p1', dayOfWeek: 2, slot: 'dinner', adHocTitle })
+
+  it('shows the dish, not the URL', () => {
+    const e = entry('Golden tofu noodle bowl https://cooking.nytimes.com/recipes/786478904-golden-tofu-noodle-bowl)')
+    expect(resolveMealTitle(e, new Map(), new Map())).toBe('Golden tofu noodle bowl')
+  })
+
+  it('carries the clean name into a leftovers title too', () => {
+    const source = entry('Golden tofu noodle bowl https://cooking.nytimes.com/recipes/1-x')
+    const left: MealPlanEntry = { id: 'e2', mealPlanId: 'p1', dayOfWeek: 3, slot: 'dinner', leftoverFrom: 'e1' }
+    const byId = new Map([[source.id, source]])
+    expect(resolveMealTitle(left, byId, new Map())).toBe('Leftovers: Golden tofu noodle bowl')
+  })
+
+  it('leaves an ordinary ad-hoc title untouched', () => {
+    expect(resolveMealTitle(entry('Salmon, broccoli and sweet potatoes'), new Map(), new Map()))
+      .toBe('Salmon, broccoli and sweet potatoes')
+  })
+})

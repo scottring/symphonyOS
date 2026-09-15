@@ -1,3 +1,4 @@
+import { splitRecipeTitleUrl } from '@/lib/recipeDetection'
 import type { MealPlanEntry, Recipe } from '@/types/meal-planner'
 
 const MEAL_PREFIXES = ['Dinner', 'Lunch', 'Breakfast', 'Snack']
@@ -56,5 +57,26 @@ export function resolveMealTitle(
 
 function ownMealTitle(entry: MealPlanEntry, recipesById: Map<string, Recipe>): string | undefined {
   if (entry.recipeId) return recipesById.get(entry.recipeId)?.title
-  return entry.adHocTitle ?? undefined
+  // An ad-hoc entry has no URL column, so a pasted recipe link lives in the
+  // title. Show the dish; adHocRecipeUrl() is where the link is picked up.
+  return adHocMealName(entry)
+}
+
+/** The dish name from an ad-hoc title, with any pasted link taken out. */
+export function adHocMealName(entry: MealPlanEntry): string | undefined {
+  if (!entry.adHocTitle) return undefined
+  return splitRecipeTitleUrl(entry.adHocTitle).name || undefined
+}
+
+/** A recipe link pasted into an ad-hoc title — the only place one can live for
+ *  an entry with no recipe row. Resolves through a leftover, one hop, so
+ *  "Leftovers: Golden tofu noodle bowl" still opens the noodle bowl. */
+export function adHocRecipeUrl(
+  entry: MealPlanEntry,
+  entriesById: Map<string, MealPlanEntry>,
+): string | null {
+  const own = entry.leftoverFrom ? entriesById.get(entry.leftoverFrom) : entry
+  if (!own || (entry.leftoverFrom && own.leftoverFrom)) return null
+  if (own.recipeId) return null
+  return splitRecipeTitleUrl(own.adHocTitle).url
 }

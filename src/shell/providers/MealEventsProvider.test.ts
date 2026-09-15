@@ -88,3 +88,33 @@ describe('synthesizeMealEvents — leftover title resolution', () => {
     expect(evt.title).not.toContain('(unnamed)')
   })
 })
+
+/** The wall's Tonight card reads its recipe URL off the synthesized event's
+ *  DESCRIPTION (resolveRecipeUrl) and its name off the TITLE. An ad-hoc entry
+ *  has no recipe row, so before 2026-09-15 it could carry neither: the pasted
+ *  link rendered as title text and the tap had nothing to open. */
+describe('synthesizeMealEvents — a link pasted into an ad-hoc title', () => {
+  const REAL = 'Golden tofu noodle bowl https://cooking.nytimes.com/recipes/786478904-golden-tofu-noodle-bowl)'
+  const tuesday = new Date(2026, 6, 21)
+  const planWith = (adHocTitle: string): MealPlan => ({
+    id: 'plan1', userId: 'u1', weekStart: new Date(2026, 6, 19),
+    entries: [{ id: 'e1', mealPlanId: 'plan1', dayOfWeek: tuesday.getDay(), slot: 'dinner', adHocTitle }],
+    createdAt: new Date(), updatedAt: new Date(),
+  })
+
+  it('titles the event with the dish and hands the link to the description', () => {
+    const [evt] = synthesizeMealEvents({
+      viewedDate: tuesday, mealPlan: planWith(REAL), recipes: [], familyMembers: [], currentMemberId: null,
+    })
+    expect(evt.title).toBe('Dinner · Golden tofu noodle bowl')
+    expect(evt.description).toBe('https://cooking.nytimes.com/recipes/786478904-golden-tofu-noodle-bowl')
+  })
+
+  it('leaves an ad-hoc meal with no link with no description', () => {
+    const [evt] = synthesizeMealEvents({
+      viewedDate: tuesday, mealPlan: planWith('Salmon, broccoli and sweet potatoes'), recipes: [], familyMembers: [], currentMemberId: null,
+    })
+    expect(evt.title).toBe('Dinner · Salmon, broccoli and sweet potatoes')
+    expect(evt.description).toBeNull()
+  })
+})

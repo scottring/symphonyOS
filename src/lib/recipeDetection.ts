@@ -109,6 +109,51 @@ export function isRecipeDomain(url: string): boolean {
 }
 
 /**
+ * Split a meal title that has a recipe link pasted into it.
+ *
+ * `meal_plan_entries` has no URL column, so an ad-hoc meal (no recipe row) has
+ * nowhere to keep its link except the title — and people paste one, brackets
+ * and all: "Golden tofu noodle bowl https://cooking.nytimes.com/...)". Left
+ * alone that URL renders as title text on the wall and the tap has nothing to
+ * open (Scott, 2026-09-15).
+ *
+ * Any URL counts here, not just a known recipe domain: the user putting a link
+ * next to a dish name has already told us what it is, and being wrong about a
+ * domain is better than printing a URL across the kitchen wall.
+ */
+export function splitRecipeTitleUrl(
+  title: string | null | undefined,
+): { name: string; url: string | null } {
+  const raw = (title ?? '').trim()
+  if (!raw) return { name: '', url: null }
+
+  const match = raw.match(/https?:\/\/[^\s<>"')\]]+/i)
+  if (!match) return { name: raw, url: null }
+
+  const url = cleanUrl(match[0])
+  const name = raw
+    .replace(match[0], ' ')
+    // What a stripped markdown link leaves behind: "[Dish]( )" → "Dish".
+    .replace(/[[\]()]/g, ' ')
+    // Separators that only existed to hold the link off the name. Hyphens are
+    // matched with surrounding space so "Sheet-Pan" keeps its own.
+    .replace(/\s+[-–—·:|]+\s*$/, '')
+    .replace(/[\s,;]+$/, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+
+  // A title that was nothing but a link still needs something to read.
+  if (!name) {
+    try {
+      return { name: new URL(url).hostname.replace(/^www\./, ''), url }
+    } catch {
+      return { name: url, url }
+    }
+  }
+  return { name, url }
+}
+
+/**
  * Extract recipe title hint from event title
  * Removes common prefixes like "Dinner:", "Make:", etc.
  */
