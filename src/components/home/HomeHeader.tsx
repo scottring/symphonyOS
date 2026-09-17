@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { ChevronLeft, ChevronRight } from 'lucide-react'
+
 import type { HomeViewType } from '@/types/homeView'
 import { HomeChromeControls } from './HomeChromeControls'
 import { mondayOfWeek } from '@/lib/workweekHelpers'
@@ -197,10 +197,10 @@ export function HomeHeader(props: HomeHeaderProps) {
     </div>
   ) : null
 
-  // /week wears the same card Today does: the run of days in the eyebrow
-  // ("Week", "3 days"), the dates as the serif title, the range presets on
-  // the quiet line, chrome in the corner (Scott, 2026-09-06: the day bar is
-  // the anchor; bring its shape to every planning page).
+  // /week wears the same OPEN masthead Today does (parity pass 2026-09-17):
+  // the run of days in the eyebrow ("Week", "3 days"), the dates as the serif
+  // title, the range presets on the quiet line, chrome in the corner. No date
+  // numeral — a range of days has no single one.
   if (currentView === 'week') {
     const eyebrowLabel =
       activePreset === 'weekend' ? 'Weekend'
@@ -209,6 +209,7 @@ export function HomeHeader(props: HomeHeaderProps) {
       : `${rangeDays} days`
     return (
       <MastheadCard
+        variant="page"
         eyebrow={<PeriodNavEyebrow label={eyebrowLabel} onPrev={onPrev} onNext={onNext} prevLabel={prevLabel} nextLabel={nextLabel} />}
         title={label.long}
         subline={rangeControl}
@@ -218,43 +219,16 @@ export function HomeHeader(props: HomeHeaderProps) {
   }
 
   return (
-    <header className="mb-6 px-3 md:px-0">
-      {/* Wraps rather than competing for one line. Every part of the date
-          cluster is shrink-0 except the <h1> itself, and this right-hand group
-          is shrink-0 too — so when the detail panel narrows the column, the
-          title was the only thing that could give and "August 7, 2026"
-          collapsed to "Au…". The controls drop to their own line instead. */}
-      <div className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-end md:justify-between md:gap-4">
-        <div className="flex items-center gap-2 min-w-0 justify-center md:justify-start">
-            <button
-              aria-label={prevLabel}
-              onClick={onPrev}
-              className="p-1.5 rounded text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors shrink-0"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <h1 className="font-display text-2xl md:text-[32px] leading-tight text-neutral-900 min-w-0 text-center md:text-left">
-              <span className="md:hidden">{label.short}</span>
-              <span className="hidden md:inline">{label.long}</span>
-            </h1>
-            <button
-              aria-label={nextLabel}
-              onClick={onNext}
-              className="p-1.5 rounded text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100 transition-colors shrink-0"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-        </div>
-
-      {/* D/W/M switcher, "Plan the week", and the horizon explainer left with
-          the 2026-08 analog-planning pivot — the masthead keeps only the
-          domain chooser and the assistant toggle. */}
-      <HomeChromeControls className="hidden md:flex md:shrink-0 md:pb-1" />
-      </div>
-
-      {/* Hairline rule anchors the masthead and separates it from the content
-          below. Today's day card draws its own border, so it doesn't need one. */}
-      <div className="hidden md:block mt-4 h-px bg-gradient-to-r from-neutral-200 to-transparent" />
-    </header>
+    <MastheadCard
+      variant="page"
+      eyebrow={<PeriodNavEyebrow label={currentView === 'workweek' ? 'Workweek' : 'Month'} onPrev={onPrev} onNext={onNext} prevLabel={prevLabel} nextLabel={nextLabel} />}
+      title={(
+        <>
+          <span className="md:hidden">{label.short}</span>
+          <span className="hidden md:inline">{label.long}</span>
+        </>
+      )}
+      controls={<HomeChromeControls className="flex" />}
+    />
   )
 }

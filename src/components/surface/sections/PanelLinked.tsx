@@ -31,7 +31,7 @@ export function PanelLinked({ linkedEvent, siblingTasks, onOpenEvent, onOpenTask
           onClick={() => onOpenEvent(linkedEvent.id)}
           icon={<span className="w-6 h-6 flex items-center justify-center rounded-md bg-amber-100"><ConceptIcon name="when" decorative /></span>}
         >
-          <span className="block text-sm text-neutral-800">{linkedEvent.title}</span>
+          <span className="block text-[15px] text-neutral-800">{linkedEvent.title}</span>
           <span className="block text-xs text-neutral-500">{formatEventTime((linkedEvent as { start_time?: string; startTime?: string }).start_time || (linkedEvent as { start_time?: string; startTime?: string }).startTime)}</span>
         </PanelRow>
       )}
@@ -41,7 +41,7 @@ export function PanelLinked({ linkedEvent, siblingTasks, onOpenEvent, onOpenTask
           onClick={() => onOpenTask(t.id)}
           icon={<span className="w-6 h-6 flex items-center justify-center rounded-md bg-neutral-100"><ConceptIcon name="list" decorative /></span>}
         >
-          <span className="block text-sm text-neutral-800">{t.title}</span>
+          <span className="block text-[15px] text-neutral-800">{t.title}</span>
         </PanelRow>
       ))}
     </PanelSection>

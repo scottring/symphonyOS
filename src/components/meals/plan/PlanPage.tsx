@@ -154,6 +154,7 @@ export function PlanPage() {
           eyebrow the way /week and /month do, and the week itself is the
           title — the page's headline never changed, only what holds it. */}
       <MastheadCard
+        variant="page"
         title={
           isPartial ? (
             <span className="italic text-primary-600">
@@ -181,7 +182,7 @@ export function PlanPage() {
         <div className="flex items-center gap-2">
           <button
             onClick={() => setPrefsOpen(true)}
-            className="flex items-center gap-2 text-[14px] text-neutral-600 hover:text-neutral-900 px-3 py-2 rounded-2xl hover:bg-neutral-100"
+            className="flex items-center gap-2 rounded-md px-3 py-2 text-[14px] text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900"
           >
             <SlidersHorizontal className="w-4 h-4" />
             Preferences
@@ -220,7 +221,7 @@ export function PlanPage() {
 
           {!isMobile && (
             <div
-              className="w-[380px] shrink-0 sticky top-6 card"
+              className="sticky top-6 w-[380px] shrink-0 border-l border-neutral-200 pl-4"
               style={{ height: 'calc(100vh - 8rem)' }}
             >
               <MealChatRail

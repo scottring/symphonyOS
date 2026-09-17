@@ -36,7 +36,7 @@ export function PanelAddRow({ fields, onReveal }: Props) {
   return (
     <section>
       <div className="flex flex-wrap items-center gap-1.5">
-        <span className="text-[10px] uppercase tracking-wider font-semibold text-neutral-300 mr-1">
+        <span className="text-[11px] uppercase tracking-[0.08em] font-semibold text-neutral-300 mr-1">
           Add
         </span>
         {fields.map((field) => {

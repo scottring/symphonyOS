@@ -27,8 +27,9 @@ function expiryNote(expiresOn: string | null): { text: string; tone: 'warn' | 'e
 }
 
 const iconBtn = 'p-1.5 rounded-lg text-neutral-400 hover:text-neutral-700 hover:bg-neutral-100'
+// The focus ring was a hardcoded sage green left over from an older palette.
 const field =
-  'w-full px-2.5 py-1.5 rounded-lg text-sm bg-white shadow-[inset_0_0_0_1px_#d4d4d4] focus:outline-none focus:shadow-[inset_0_0_0_2px_#5c8a5c]'
+  'w-full px-2.5 py-1.5 rounded-md text-[15px] bg-bg-elevated border border-neutral-300 focus:outline-none focus:border-primary-500 focus:ring-1 focus:ring-primary-500'
 const fieldLabel = 'block text-[11px] uppercase tracking-wide text-neutral-400 mb-1'
 
 export function DocumentRow({ document, onToggleScope, onDelete, onSave }: Props) {
@@ -77,7 +78,7 @@ export function DocumentRow({ document, onToggleScope, onDelete, onSave }: Props
 
   if (editing) {
     return (
-      <div className="px-4 py-3 rounded-xl bg-white shadow-[inset_0_0_0_1px_#c9dcc9]">
+      <div className="border-b border-neutral-200 bg-primary-50/40 px-4 py-3">
         <div className="grid grid-cols-1 sm:grid-cols-[2fr_1fr_1fr] gap-3">
           <div>
             <label className={fieldLabel} htmlFor={`name-${document.id}`}>Document name</label>
@@ -133,11 +134,11 @@ export function DocumentRow({ document, onToggleScope, onDelete, onSave }: Props
   }
 
   return (
-    <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-white shadow-[inset_0_0_0_1px_#e5e7eb]">
+    <div className="flex items-center gap-3 border-b border-neutral-200 px-4 py-3.5 transition-colors hover:bg-neutral-50">
       <FileText className="w-5 h-5 shrink-0 text-neutral-400" />
       <div className="flex-1 min-w-0">
-        <div className="text-[15px] text-neutral-800 truncate">{document.label}</div>
-        <div className="flex items-center gap-2 text-[12px] text-neutral-500">
+        <div className="truncate text-[19px] leading-snug text-neutral-800">{document.label}</div>
+        <div className="mt-0.5 flex items-center gap-2 text-[12px] text-neutral-500">
           <span>{documentKindLabel(document.kind)}</span>
           {note && (
             <>

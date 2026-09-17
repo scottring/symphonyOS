@@ -31,6 +31,28 @@ describe('MastheadCard', () => {
     expect(screen.getByRole('heading', { level: 1, name: 'This Month' })).toBeInTheDocument()
     expect(screen.queryByTestId('masthead-eyebrow')).not.toBeInTheDocument()
   })
+
+  // Today keeps the date numeral; every other surface gets the same open rule
+  // and serif heading one step down, with no wash behind it.
+  it('draws Today as an open daybook masthead with the date in the margin', () => {
+    render(<MastheadCard variant="daybook" date={new Date(2026, 8, 17)} title="Good morning" />)
+    const card = screen.getByTestId('masthead-card')
+    expect(card.className).toContain('daybook-masthead')
+    expect(card.className).not.toContain('daybook-masthead-page')
+    expect(within(card).getByText('17')).toBeInTheDocument()
+    expect(within(card).queryByTestId('place-wash')).not.toBeInTheDocument()
+  })
+
+  it('draws every other page open too — motif as a stamp, no date, no wash', () => {
+    render(<MastheadCard variant="page" motif="notes" date={new Date(2026, 8, 17)} title="Notes" />)
+    const card = screen.getByTestId('masthead-card')
+    expect(card.className).toContain('daybook-masthead-page')
+    expect(within(card).queryByTestId('place-wash')).not.toBeInTheDocument()
+    expect(within(card).queryByText('17')).not.toBeInTheDocument()
+    // The stamp is decorative — the heading beside it already says "Notes".
+    expect(card.querySelector('.daybook-stamp')).not.toBeNull()
+    expect(within(card).queryByRole('img')).not.toBeInTheDocument()
+  })
 })
 
 describe('PeriodNavEyebrow', () => {

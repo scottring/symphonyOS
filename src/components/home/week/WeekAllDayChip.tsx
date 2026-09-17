@@ -89,7 +89,7 @@ export function WeekAllDayEventChip({ event, onSelect }: WeekAllDayEventChipProp
       type="button"
       onClick={() => onSelect(`event-${id}`)}
       title={event.title}
-      className="w-full text-left px-2 py-1 rounded-md bg-[hsl(214_60%_96%)] border border-[hsl(214_50%_85%)] text-[11.5px] leading-snug text-[hsl(214_50%_30%)]"
+      className="w-full text-left px-2 py-1 rounded-md border border-primary-200 bg-primary-50 text-[11.5px] leading-snug text-primary-800"
     >
       <span className="line-clamp-2 break-words">{event.title}</span>
     </button>

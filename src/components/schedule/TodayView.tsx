@@ -1084,14 +1084,10 @@ export function TodayView({
         </div>
       )}
 
-      {/* The day card wears the user's Place (Settings → the five illustrated
-          worlds). The place already re-tints primary/accent globally via
-          [data-place]; here that tinting becomes visible — a soft wash in
-          those hues, and the place's own medallion bleeding off the right
-          edge, faint enough to read as paper texture rather than a sticker.
-          Purely decorative: aria-hidden, pointer-events-none, and every piece
-          of text above it keeps the unchanged neutral palette. */}
+      {/* An open masthead and continuous agenda give Today the shape of a daybook. */}
       <MastheadCard
+        variant="daybook"
+        date={viewedDate}
         eyebrow={<DayNavCluster viewedDate={viewedDate} onDateChange={onDateChange} variant="inline" />}
         title={data.isToday ? greeting : relativeDayLabel}
         subline={heroLine}
@@ -1114,6 +1110,8 @@ export function TodayView({
                   list — with the triage verbs behind ⋯ (planning lists, Step 4). */}
               <HorizonPoolDropdown
                 label="This week"
+                referenceKind="week"
+                referenceDate={currentWeekStart}
                 tasks={weekPool}
                 offer={['today', 'tomorrow', 'someday', 'deleted']}
                 lead="today"
@@ -1128,6 +1126,7 @@ export function TodayView({
               />
               <HorizonPoolDropdown
                 label="This month"
+                referenceKind="month"
                 tasks={monthPool}
                 offer={['week', 'today', 'someday', 'deleted']}
                 lead="week"
@@ -1157,13 +1156,13 @@ export function TodayView({
 
       {/* The rail column only exists when the rail does; otherwise the day gets
           the full width instead of a 320px empty gutter. */}
-      <div className={`@container px-3 md:px-0 ${decisionCount > 0 ? '@[62rem]:grid @[62rem]:grid-cols-[minmax(0,1fr)_320px] @[62rem]:items-start @[62rem]:gap-4' : ''}`}>
+      <div className={`px-3 md:px-0 ${decisionCount > 0 ? '@[62rem]:grid @[62rem]:grid-cols-[minmax(0,1fr)_320px] @[62rem]:items-start @[62rem]:gap-8' : ''}`}>
         <main className="min-w-0">
           {decisionCount > 0 && (
             <button
               type="button"
               onClick={() => navigate('/inbox')}
-              className="mb-3 flex w-full items-center justify-between gap-3 rounded-xl border border-neutral-200/80 bg-bg-elevated px-3 py-2 text-left text-sm text-neutral-700 shadow-sm transition-colors hover:bg-neutral-50 @[62rem]:hidden"
+              className="mb-5 flex w-full items-center justify-between gap-3 border-l-2 border-accent-500 bg-accent-50/40 px-3 py-3 text-left text-sm text-neutral-800 transition-colors hover:bg-accent-50 @[62rem]:hidden"
             >
               <span className="min-w-0 truncate">
                 {decisionCount} need{decisionCount === 1 ? 's' : ''} a decision
@@ -1171,15 +1170,8 @@ export function TodayView({
               <ArrowRight className="h-4 w-4 shrink-0 text-neutral-400" />
             </button>
           )}
-      {/* Task list — wrapped in a card on desktop; on mobile the rows go
-          full-width (no card, no border, no inner padding) to match the
-          compact list the pre-redesign mobile had.
-
-          The add input and the assistant line live INSIDE the card, at its
-          top: floating between the masthead and the card they read as
-          orphaned chrome and cost a band of empty page ("hanging in mid
-          air" — Scott, 2026-08-18). Anchored here they are part of the day. */}
-      <div ref={listRef} className="md:card md:rounded-2xl md:border md:border-neutral-200/70 md:px-5 md:py-4">
+      {/* The agenda is part of the page, with no enclosing card. */}
+      <div ref={listRef} className="daybook-agenda">
         {/* Needed today — hand-curated, silent when empty. Placed first so a
             marked item reads as the day's opening note, not buried under the
             timeline. Safe at the top only because it renders nothing when
@@ -1379,10 +1371,10 @@ export function TodayView({
             still costs a third of the page. */}
         {decisionCount > 0 && (
         <aside className="mt-4 hidden space-y-3 @[62rem]:mt-0 @[62rem]:block">
-          <section className="rounded-2xl border border-neutral-200/80 bg-bg-elevated p-4 shadow-sm">
+          <section className="daybook-decisions">
             <div className="mb-3 flex items-center justify-between gap-3">
               <div>
-                <p className="text-[12px] font-semibold uppercase tracking-[0.08em] text-neutral-400">Needs a Decision</p>
+                <p className="text-[12px] font-semibold uppercase tracking-[0.08em] text-accent-600">Needs a Decision</p>
                 <h2 className="font-display text-lg font-semibold text-neutral-900">
                   {decisionCount} item{decisionCount === 1 ? '' : 's'}
                 </h2>
@@ -1398,19 +1390,19 @@ export function TodayView({
             </div>
             <div className="space-y-2 text-sm">
               {data.attentionItems.length > 0 && (
-                <button type="button" onClick={() => setReviewMode('morning')} className="flex w-full items-center justify-between rounded-xl border border-amber-100 bg-amber-50/70 px-3 py-2 text-left text-amber-900 transition-colors hover:bg-amber-100/70">
+                <button type="button" onClick={() => setReviewMode('morning')} className="flex w-full items-center justify-between border-b border-neutral-200 px-3 py-2 text-left text-amber-900 transition-colors hover:bg-amber-100/70">
                   <span className="min-w-0 truncate">Review attention queue</span>
                   <span className="ml-3 shrink-0 text-xs font-semibold tabular-nums">{data.attentionItems.length}</span>
                 </button>
               )}
               {emailCaptures.length > 0 && (
-                <button type="button" onClick={() => setEmailReviewOpen(true)} className="flex w-full items-center justify-between rounded-xl border border-primary-100 bg-primary-50/70 px-3 py-2 text-left text-primary-900 transition-colors hover:bg-primary-100/70">
+                <button type="button" onClick={() => setEmailReviewOpen(true)} className="flex w-full items-center justify-between border-b border-neutral-200 px-3 py-2 text-left text-primary-900 transition-colors hover:bg-primary-100/70">
                   <span className="min-w-0 truncate">Review captured email</span>
                   <span className="ml-3 shrink-0 text-xs font-semibold tabular-nums">{emailCaptures.length}</span>
                 </button>
               )}
               {visibleUnpromptedItems.length > 0 && (
-                <button type="button" onClick={() => setSuggestionsEnabled(true)} className="flex w-full items-center justify-between rounded-xl border border-neutral-200 bg-white px-3 py-2 text-left text-neutral-700 transition-colors hover:bg-neutral-50">
+                <button type="button" onClick={() => setSuggestionsEnabled(true)} className="flex w-full items-center justify-between border-b border-neutral-200 px-3 py-2 text-left text-neutral-700 transition-colors hover:bg-neutral-50">
                   <span className="min-w-0 truncate">Show assistant suggestions</span>
                   <span className="ml-3 shrink-0 text-xs font-semibold tabular-nums">{visibleUnpromptedItems.length}</span>
                 </button>

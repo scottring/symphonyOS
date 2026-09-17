@@ -68,12 +68,12 @@ export function PlanRail({ title, subtitle, rows, onOpen, onPullDown, pullLabel,
         <button
           type="button"
           onClick={() => onOpen(row)}
-          className="min-w-0 flex-1 flex items-start gap-2 rounded-md px-1.5 py-1 text-left hover:bg-neutral-50 transition-colors"
+          className="min-w-0 flex-1 flex items-start gap-2 px-1.5 py-1.5 text-left hover:bg-neutral-50 transition-colors"
         >
           {row.isGoal
-            ? <Target className="w-3.5 h-3.5 mt-0.5 shrink-0 text-amber-600" />
+            ? <Target className="w-3.5 h-3.5 mt-0.5 shrink-0 text-accent-600" />
             : <span className={`mt-1.5 w-1.5 h-1.5 shrink-0 rounded-full ${rowDone ? 'bg-primary-500' : 'bg-neutral-300'}`} />}
-          <span className={`min-w-0 flex-1 text-[13px] leading-snug ${rowDone ? 'line-through text-neutral-400' : 'text-neutral-700'}`}>
+          <span className={`min-w-0 flex-1 text-[15px] leading-snug ${rowDone ? 'line-through text-neutral-400' : 'text-neutral-700'}`}>
             {row.title}
           </span>
           {row.placed && <span className="shrink-0 text-[11px] text-neutral-400">{row.placed.label}</span>}
@@ -93,7 +93,7 @@ export function PlanRail({ title, subtitle, rows, onOpen, onPullDown, pullLabel,
     )
   }
   return (
-    <aside aria-label={title} className="rounded-xl border border-neutral-200 bg-white px-3 py-2.5 shadow-sm">
+    <aside aria-label={title} className="min-w-0 border-t border-neutral-200 pt-2.5">
       <button
         type="button"
         aria-expanded={open}
@@ -114,7 +114,7 @@ export function PlanRail({ title, subtitle, rows, onOpen, onPullDown, pullLabel,
         <div className="mt-1.5">
           {goals.length > 0 && (
             <>
-              <p className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-amber-700/80">Goals</p>
+              <p className="mt-1 text-[11px] font-semibold uppercase tracking-wide text-accent-700/80">Goals</p>
               <ul className="mb-2">{goals.map((r) => <Row key={r.id} row={r} />)}</ul>
             </>
           )}

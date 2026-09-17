@@ -77,8 +77,8 @@ export function SlotAddInput({ placeholder, onCreate, onCancel }: {
         onCreate(name)
         setValue('')
       }}
-      className="w-full rounded-lg border border-emerald-300 bg-white px-2 py-1 text-xs
-                 text-neutral-700 outline-none focus:border-emerald-500"
+      className="w-full rounded-lg border border-primary-300 bg-white px-2 py-1 text-xs
+                 text-neutral-700 outline-none focus:border-primary-500"
     />
   )
 }
@@ -113,7 +113,7 @@ export function SlotAdd({ label, onCreate, alwaysVisible = false }: {
       aria-label={label}
       title={label}
       className={`flex w-full items-center gap-1 rounded-lg px-2 py-1 text-[11px] text-neutral-400
-                  transition-opacity hover:bg-emerald-50/60 hover:text-emerald-700
+                  transition-opacity hover:bg-primary-50/60 hover:text-primary-700
                   ${alwaysVisible ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus:opacity-100'}`}
     >
       <Plus className="h-3 w-3" />

@@ -65,6 +65,7 @@ export function ContactsList({ contacts, onSelectContact, onAddContact }: Contac
       {/* Header — shared Library masthead (design-unification 2026-09-01).
           The back arrow died with it: Contacts is a page, not a drill-in. */}
       <MastheadCard
+        variant="page"
         title="Contacts"
         motif="contacts"
         subline={`${contacts.length} people and places the household calls on`}
@@ -73,17 +74,17 @@ export function ContactsList({ contacts, onSelectContact, onAddContact }: Contac
 
       {/* Add form */}
       {adding && (
-        <div className="card p-3 mb-4 flex items-center gap-2">
+        <div className="mb-4 flex items-center gap-2 border-b border-neutral-200 pb-3">
           <input
             autoFocus
             value={newName}
             onChange={e => setNewName(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') handleAdd(); if (e.key === 'Escape') setAdding(false) }}
             placeholder="Contact name..."
-            className="input-base flex-1 text-sm"
+            className="flex-1 px-3 w-full rounded-md border border-neutral-300 bg-bg-elevated py-2.5 text-[15px] text-neutral-800 placeholder:text-neutral-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
           />
-          <button onClick={handleAdd} className="btn-primary px-3 py-1.5 text-sm rounded-lg">Save</button>
-          <button onClick={() => { setAdding(false); setNewName('') }} className="text-sm text-neutral-400 hover:text-neutral-600">Cancel</button>
+          <button onClick={handleAdd} className="btn-primary rounded-md px-3 py-1.5 text-[14px]">Save</button>
+          <button onClick={() => { setAdding(false); setNewName('') }} className="text-[14px] text-neutral-500 hover:text-neutral-700">Cancel</button>
         </div>
       )}
 
@@ -96,37 +97,37 @@ export function ContactsList({ contacts, onSelectContact, onAddContact }: Contac
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="Search contacts..."
-          className="input-base pl-9 w-full text-sm"
+          className="pl-9 pr-3 w-full rounded-md border border-neutral-300 bg-bg-elevated py-2.5 text-[15px] text-neutral-800 placeholder:text-neutral-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
         />
       </div>
 
       {/* Contact groups */}
       {filtered.length === 0 ? (
-        <div className="text-center py-12 text-neutral-400">
+        <div className="py-12 text-center text-[15px] text-neutral-400">
           {search ? 'No contacts match your search' : 'No contacts yet'}
         </div>
       ) : (
         <div className="space-y-6">
           {CATEGORY_ORDER.filter(cat => grouped[cat]?.length).map(cat => (
             <div key={cat}>
-              <h2 className="text-xs font-medium text-neutral-400 uppercase tracking-wider mb-2 px-1">
+              <h2 className="mb-2 px-1 text-[12px] font-semibold uppercase tracking-[0.08em] text-neutral-400">
                 {CATEGORY_LABELS[cat] || cat}
               </h2>
-              <div className="space-y-1">
+              <div className="border-t border-neutral-300">
                 {grouped[cat].map(contact => (
                   <button
                     key={contact.id}
                     onClick={() => onSelectContact(contact.id)}
-                    className="w-full card px-4 py-3 flex items-center justify-between hover:bg-neutral-50 transition-colors text-left"
+                    className="flex w-full items-center justify-between border-b border-neutral-200 px-4 py-3.5 text-left transition-colors hover:bg-neutral-50"
                   >
                     <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center text-sm font-medium">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary-100 text-[15px] font-medium text-primary-700">
                         {contact.name.charAt(0).toUpperCase()}
                       </div>
                       <div>
-                        <div className="text-sm font-medium text-neutral-800">{contact.name}</div>
+                        <div className="text-[19px] leading-snug text-neutral-800">{contact.name}</div>
                         {contact.phone && (
-                          <div className="text-xs text-neutral-400">{contact.phone}</div>
+                          <div className="text-[12px] text-neutral-400">{contact.phone}</div>
                         )}
                       </div>
                     </div>

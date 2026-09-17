@@ -138,34 +138,34 @@ export function Sidebar({
 
   // Nav item helper
   function navItemClass(active: boolean): string {
-    return `w-full flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 text-[15px] ${
+    return `symphony-nav-item w-full flex items-center gap-3 px-3 py-2.5 transition-colors duration-200 text-[15px] ${
       active
-        ? 'bg-primary-50 text-primary-700 font-medium'
-        : 'text-neutral-600 hover:bg-neutral-100/70'
+        ? 'symphony-nav-active text-neutral-950 font-semibold'
+        : 'text-neutral-600 hover:bg-neutral-200/40 hover:text-neutral-950'
     } ${collapsed ? 'justify-center' : ''}`
   }
 
   return (
     <aside
       className={`
-        h-full bg-[hsl(38_40%_96%)] border-r border-neutral-200/60
+        symphony-sidebar h-full border-r border-neutral-300/60
         flex flex-col
         transition-all duration-500
         ${collapsed ? 'w-[68px]' : 'w-64'}
       `}
     >
       {/* Header: logo + name */}
-      <div className="p-5 flex items-center justify-between">
+      <div className="px-5 pt-7 pb-6 flex items-center justify-between">
         <div className={`flex items-center gap-2 ${collapsed ? 'justify-center w-full' : ''}`}>
           <img src="/symphony-logo.jpg" alt="Symphony" className="w-7 h-7 rounded-full object-cover shrink-0" />
           {!collapsed && (
-            <span className="font-brand text-[22px] tracking-[0.01em] text-neutral-900">Symphony</span>
+            <span className="symphony-wordmark">Symphony</span>
           )}
         </div>
         {!collapsed && (
           <button
             onClick={onToggle}
-            className="p-1.5 rounded-md text-neutral-300 hover:text-neutral-500 transition-colors"
+            className="p-1.5 rounded-md text-neutral-500 hover:text-neutral-900 transition-colors"
             aria-label="Collapse sidebar"
           >
             <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
@@ -179,7 +179,7 @@ export function Sidebar({
       {collapsed && (
         <button
           onClick={onToggle}
-          className="mx-auto mt-1 p-1.5 rounded-md text-neutral-300 hover:text-neutral-500 transition-colors"
+          className="mx-auto mt-1 p-1.5 rounded-md text-neutral-500 hover:text-neutral-900 transition-colors"
           aria-label="Expand sidebar"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
@@ -191,7 +191,7 @@ export function Sidebar({
       {/* Greeting block */}
       {!collapsed && (
         <div className="px-5 pb-3 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-full bg-primary-100 text-primary-700 grid place-items-center text-sm font-semibold shrink-0">
+          <div className="w-8 h-8 rounded-sm border border-neutral-300 text-neutral-700 grid place-items-center text-sm font-semibold shrink-0">
             {(userName ?? userEmail ?? 'S').charAt(0).toUpperCase()}
           </div>
           <div className="min-w-0">
@@ -524,14 +524,7 @@ export function Sidebar({
       <div className={`p-3 border-t border-neutral-100 ${collapsed ? 'text-center' : ''}`}>
         <button
           onClick={() => navigate('/settings')}
-          className={`
-            flex items-center gap-3 px-3 py-2.5 rounded-lg w-full transition-all duration-200 text-[15px]
-            ${location.pathname.startsWith('/settings')
-              ? 'bg-primary-50 text-primary-700 font-medium'
-              : 'text-neutral-600 hover:bg-neutral-100/70'
-            }
-            ${collapsed ? 'justify-center' : ''}
-          `}
+          className={navItemClass(location.pathname.startsWith('/settings'))}
         >
           <Settings className="w-5 h-5 shrink-0" />
           {!collapsed && <span>Settings</span>}
@@ -554,11 +547,11 @@ export function Sidebar({
         {/* Illustration + tagline */}
         {!collapsed && (
           <div className="mt-4 px-3">
-            <div aria-hidden="true" className="w-32 h-32 select-none pointer-events-none">
+            <div aria-hidden="true" className="w-20 h-20 select-none pointer-events-none">
               <PlaceMedallion className="w-full h-full" />
             </div>
-            <p className="text-xs text-neutral-400 mt-2 leading-relaxed">
-              Everything in its Right Place
+            <p className="text-xs text-neutral-600 mt-2 leading-relaxed">
+              Everything in its right place.
             </p>
           </div>
         )}

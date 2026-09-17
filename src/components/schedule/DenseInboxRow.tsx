@@ -105,11 +105,13 @@ export const DenseInboxRow = memo(function DenseInboxRow({
     <div
       data-row
       data-task-id={task.id}
+      // A ruled row on the page, not a floating card: the inbox is a list to
+      // read down, and twenty shadowed tiles read as twenty separate things.
       className={`
-        group flex flex-wrap items-start gap-2 rounded-lg border
-        px-3 py-2 shadow-sm transition-all duration-200
-        ${isSelected ? 'bg-primary-50/50 border-primary-300' : 'bg-white border-neutral-100'}
-        ${isLeaving ? 'opacity-0 translate-x-2 max-h-0 py-0 my-0 overflow-hidden border-transparent' : 'hover:shadow-md hover:border-amber-300'}
+        group flex flex-wrap items-start gap-2 border-b border-neutral-200
+        px-3 py-3 transition-colors duration-200
+        ${isSelected ? 'bg-primary-50/50' : ''}
+        ${isLeaving ? 'opacity-0 translate-x-2 max-h-0 py-0 my-0 overflow-hidden border-transparent' : 'hover:bg-neutral-50'}
       `}
     >
       {/* Grip handle — the ONLY draggable surface on the row. Drag must not
@@ -178,7 +180,7 @@ export const DenseInboxRow = memo(function DenseInboxRow({
       <button
         type="button"
         onClick={onSelect}
-        className={`flex-1 min-w-[16rem] text-left text-sm leading-snug break-words py-0.5 ${
+        className={`flex-1 min-w-[16rem] text-left text-[19px] leading-snug break-words py-0.5 ${
           task.completed
             ? 'text-neutral-400 line-through'
             : task.isWaiting
@@ -188,7 +190,7 @@ export const DenseInboxRow = memo(function DenseInboxRow({
       >
         {task.title}
         {lineage && (
-          <span className="block text-[11px] leading-tight text-neutral-400 font-normal no-underline mt-0.5 truncate">
+          <span className="mt-1 block truncate text-[12px] font-normal leading-tight text-neutral-400 no-underline">
             {lineage}
           </span>
         )}
@@ -266,7 +268,7 @@ export const DenseInboxRow = memo(function DenseInboxRow({
                 type="button"
                 aria-label="Send to note"
                 onClick={() => onQuickAction(action)}
-                className="text-xs px-2.5 py-1 rounded-md font-medium bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors"
+                className="rounded-md bg-neutral-100 px-2.5 py-1 text-xs font-medium text-neutral-600 transition-colors hover:bg-neutral-200"
               >
                 <ConceptIcon name="note" decorative /> Note
               </button>

@@ -66,12 +66,12 @@ export function CadenceBand({
   return (
     <section aria-label={heading} className="min-w-0">
       <div className="flex items-baseline gap-2">
-        <h2 className="font-display text-2xl text-neutral-800">{heading}</h2>
+        <h2 className="font-display text-2xl text-neutral-900">{heading}</h2>
         {hint && <p className="text-[13px] text-neutral-500">{hint}</p>}
       </div>
 
       {routines.length > 0 && (
-        <ul className="mt-2 overflow-hidden rounded-xl border border-neutral-200 bg-white shadow-sm">
+        <ul className="mt-2 border-t border-neutral-300">
           {routines.map((r) => (
             <RoutineRow
               key={r.id}

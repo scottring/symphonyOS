@@ -1,10 +1,9 @@
 //
-// The one masthead every Library page shares (design-unification 2026-09-01).
-// Grammar taken from Documents/Notes — the pages that already looked like the
-// app: a Source Serif title, a muted one-line description under it, and a
-// QUIET action on the right (text + icon, no filled pill). Today and This
-// Week keep their bespoke date mastheads (HomeHeader); everything else that
-// is a page uses this.
+// The masthead for a page that is neither a period nor a library surface —
+// Goals, and whatever else still mounts it. Since the parity pass
+// (2026-09-17) every OTHER page wears MastheadCard's open variant, so this
+// wears the same shell: the rule above, the serif title, the hairline below,
+// and a QUIET action on the right (text + icon, no filled pill).
 import type { ReactNode } from 'react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -16,12 +15,14 @@ export function PageMasthead({ title, description, actions }: {
   actions?: ReactNode
 }) {
   return (
-    <div className="mb-6">
-      <div className="flex items-center justify-between gap-3 mb-1">
-        <h1 className="text-3xl font-display text-neutral-900">{title}</h1>
-        {actions && <div className="flex items-center gap-2 shrink-0">{actions}</div>}
+    <div className="daybook-masthead daybook-masthead-page">
+      <div className="daybook-masthead-inner">
+        <div className="flex items-start justify-between gap-3">
+          <h1 className="daybook-title min-w-0 flex-1">{title}</h1>
+          {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
+        </div>
+        {description && <p className="mt-1 text-[14px] text-neutral-500">{description}</p>}
       </div>
-      {description && <p className="text-[14px] text-neutral-500">{description}</p>}
     </div>
   )
 }
@@ -40,7 +41,7 @@ export function QuietAction({ icon: Icon, label, onClick, disabled, ariaLabel }:
       onClick={onClick}
       disabled={disabled}
       aria-label={ariaLabel ?? label}
-      className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-[14px] text-primary-700 hover:bg-primary-50 disabled:opacity-50 transition-colors"
+      className="flex items-center gap-1.5 rounded-md px-3 py-2 text-[14px] text-primary-700 transition-colors hover:bg-primary-50 disabled:opacity-50"
     >
       <Icon className="w-4 h-4" />
       {label}

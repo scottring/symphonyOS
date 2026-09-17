@@ -106,15 +106,15 @@ export function RoutineRow({ routine, familyMembers, steps = 0, dimmed = false, 
     .filter((name): name is string => !!name)
 
   return (
-    <li className={`border-b border-neutral-100 last:border-0 ${dimmed ? 'opacity-40' : ''}`}>
-      <div className="flex items-start gap-3 px-4 py-3">
+    <li className={`border-b border-neutral-200 ${dimmed ? 'opacity-40' : ''}`}>
+      <div className="flex items-start gap-3 px-4 py-3.5">
         <button
           type="button"
           onClick={() => onOpen(routine)}
-          className="min-w-0 flex-1 text-left text-[14px] leading-snug text-neutral-800 hover:text-primary-700 transition-colors"
+          className="min-w-0 flex-1 text-left text-[19px] leading-snug text-neutral-800 hover:text-primary-700 transition-colors"
         >
           {routine.name}
-          {steps > 0 && <span className="text-neutral-400"> · {steps} steps</span>}
+          {steps > 0 && <span className="text-[13px] text-neutral-400"> · {steps} steps</span>}
         </button>
         <span className="hidden w-40 shrink-0 text-[13px] leading-snug text-neutral-500 sm:block">
           {whenText}

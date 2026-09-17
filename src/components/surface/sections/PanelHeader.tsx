@@ -28,12 +28,12 @@ export function PanelHeader({ title, onTitleChange, onClose }: PanelHeaderProps)
             // Escape cancels the edit; consumed so the panel itself stays open.
             if (e.key === 'Escape') { e.preventDefault(); setDraft(title); setEditing(false) }
           }}
-          className="flex-1 text-lg font-display font-semibold bg-transparent border-b border-neutral-300 focus:outline-none focus:border-primary-500"
+          className="flex-1 border-b border-neutral-300 bg-transparent font-display text-[22px] leading-tight focus:border-primary-500 focus:outline-none"
         />
       ) : (
         <button
           onClick={() => { setDraft(title); setEditing(true) }}
-          className="flex-1 text-left text-lg font-display font-semibold text-neutral-900 hover:text-primary-700"
+          className="flex-1 text-left font-display text-[22px] leading-tight text-neutral-900 hover:text-primary-700"
         >
           {title}
         </button>
@@ -41,7 +41,7 @@ export function PanelHeader({ title, onTitleChange, onClose }: PanelHeaderProps)
       <button
         onClick={onClose}
         aria-label="Close"
-        className="text-neutral-400 hover:text-neutral-700 text-xl leading-none mt-1"
+        className="mt-1 text-xl leading-none text-neutral-400 hover:text-neutral-700"
       >
         ×
       </button>

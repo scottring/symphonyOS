@@ -82,7 +82,7 @@ export function PanelConversations({ taskId }: PanelConversationsProps) {
               >
                 {open ? <ChevronDown className="w-3.5 h-3.5 text-neutral-400 shrink-0" /> : <ChevronRight className="w-3.5 h-3.5 text-neutral-400 shrink-0" />}
                 <MessageCircle className="w-3.5 h-3.5 text-primary-500 shrink-0" />
-                <span className="flex-1 text-sm text-neutral-800 truncate">{c.title}</span>
+                <span className="flex-1 text-[15px] text-neutral-800 truncate">{c.title}</span>
                 <span className="text-[11px] text-neutral-400 shrink-0">
                   {c.updatedAt.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                 </span>

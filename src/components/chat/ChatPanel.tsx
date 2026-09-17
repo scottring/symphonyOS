@@ -1,5 +1,4 @@
 import { useRef, useEffect, useCallback, useState } from 'react'
-import { PlaceWash } from '@/components/place/PlaceWash'
 import { PlaceMedallion } from '@/components/place/PlaceMedallion'
 import { ChatMessage } from './ChatMessage'
 import { ChatInput } from './ChatInput'
@@ -129,11 +128,9 @@ export function ChatPanel({
       className="relative flex flex-col h-full min-h-0 bg-white border-l border-neutral-200"
       onKeyDown={handleKeyDown}
     >
-      {/* The pane wears the user's Place, same as Today's day card. Anchored to
-          the top so the medallion sits behind the header rather than behind the
-          conversation. */}
-      <PlaceWash anchor="top" opacity={0.24} tint="strong" motif="assistant" />
-
+      {/* No place wash: a strong tinted gradient down the assistant column
+          fought the paper-white work beside it (parity pass 2026-09-17). The
+          header's own mark says whose pane this is. */}
       {/* Header */}
       <div className="relative flex items-center justify-between px-4 py-3 border-b border-neutral-200">
         <div className="flex items-center gap-2">
@@ -143,11 +140,11 @@ export function ChatPanel({
             </svg>
           </div>
           <div>
-            <h3 className="text-sm font-medium text-neutral-800">
+            <h3 className="text-[15px] font-medium text-neutral-800">
               {heading ?? (mode === 'guided_reflection' ? 'Think It Through' : 'Symphony AI')}
             </h3>
             {entityContext && (
-              <p className="text-[10px] text-neutral-400">
+              <p className="text-[11px] text-neutral-400">
                 {entityContext.name}
               </p>
             )}

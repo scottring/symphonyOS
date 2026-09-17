@@ -1,5 +1,6 @@
+import { useReferenceLists, type ReferenceKind } from '@/components/reference/ReferenceListsContext'
 import { useState, useCallback } from 'react'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, Pin } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import type { Task } from '@/types/task'
 import { TriageRow, applyTriageVerdict, type Verdict } from './TriageRow'
@@ -20,6 +21,8 @@ import type { PlacementFate } from '@/lib/planning/lineage'
 interface HorizonPoolDropdownProps {
   /** Trigger text, e.g. "Week" / "Month". */
   label: string
+  referenceDate?: Date
+  referenceKind?: ReferenceKind
   tasks: Task[]
   /** Verbs each row offers — the week pool doesn't offer "This wk". */
   offer: Verdict[]
@@ -58,8 +61,9 @@ interface HorizonPoolDropdownProps {
 
 export function HorizonPoolDropdown({
   label, tasks, offer, lead, emptyCopy, viewedDate, onUpdateTask, onPushTask, onDeleteTask, onCompleteTask, benchRoute, benchLabel,
-  metaFor, isNewFor, hasNew, onOpenChange, placedFor,
+  metaFor, isNewFor, hasNew, onOpenChange, placedFor, referenceKind, referenceDate,
 }: HorizonPoolDropdownProps) {
+  const references = useReferenceLists()
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   // taskId → verdict, for resolved-row rendering. Cleared on close so a
@@ -129,6 +133,10 @@ export function HorizonPoolDropdown({
             className="fixed inset-0 z-40 cursor-default"
           />
           <div className="absolute right-0 top-full z-50 mt-1 w-[440px] max-w-[90vw] max-h-[60vh] overflow-auto rounded-xl border border-neutral-200 bg-white p-2 shadow-lg">
+            {referenceKind && references && <button type="button"
+              onClick={() => { references.pin(referenceKind, referenceDate ?? viewedDate); close() }}
+              className="hidden md:flex items-center gap-2 px-2 py-3 text-sm text-primary-700"
+              aria-label={`Pin ${referenceKind} list`}><Pin className="w-4 h-4" />Keep beside my work</button>}
             {tasks.length === 0 ? (
               <p className="px-2 py-1.5 text-sm text-neutral-400">{emptyCopy ?? 'Nothing here right now.'}</p>
             ) : (

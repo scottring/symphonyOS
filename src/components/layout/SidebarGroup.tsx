@@ -22,7 +22,7 @@ export function SidebarGroup({ label, open, onToggle, children, forceOpen, colla
         type="button"
         onClick={onToggle}
         aria-expanded={isOpen}
-        className="w-full flex items-center gap-2 px-3.5 pt-4 pb-1 text-[11px] font-medium text-neutral-400 uppercase tracking-wider hover:text-neutral-600 transition-colors"
+        className="w-full flex items-center gap-2 px-3.5 pt-4 pb-1 text-[11px] font-medium text-neutral-600 uppercase tracking-wider hover:text-neutral-600 transition-colors"
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"

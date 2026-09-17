@@ -46,13 +46,13 @@ export function TapStepPanel(props: TapStepPanelProps) {
       {props.onTimeChange && (
         <section className="pb-4 mb-4 border-b border-neutral-200">
           <div className="flex items-center justify-between gap-3">
-            <label htmlFor="step-time" className="text-sm font-medium text-neutral-700">At</label>
+            <label htmlFor="step-time" className="text-[15px] font-medium text-neutral-700">At</label>
             <input
               id="step-time"
               type="time"
               value={(step.time_of_day ?? '').slice(0, 5)}
               onChange={e => props.onTimeChange!(e.target.value || null)}
-              className="rounded-lg border border-neutral-200 px-2 py-1 text-sm text-neutral-700"
+              className="rounded-lg border border-neutral-200 px-2 py-1 text-[15px] text-neutral-700"
             />
           </div>
           <p className="mt-1 text-xs text-neutral-400">
@@ -72,13 +72,13 @@ export function TapStepPanel(props: TapStepPanelProps) {
       )}
 
       <section className="pb-4 mb-4 border-b border-neutral-200">
-        <h3 className="text-sm font-medium text-neutral-700 mb-2">Dose times</h3>
+        <h3 className="text-[15px] font-medium text-neutral-700 mb-2">Dose times</h3>
         <DosePills times={times} onChange={props.onDosesChange} />
       </section>
 
       {props.onScheduleChange && (
         <section className="pb-4 mb-4 border-b border-neutral-200">
-          <h3 className="text-sm font-medium text-neutral-700 mb-2">Days</h3>
+          <h3 className="text-[15px] font-medium text-neutral-700 mb-2">Days</h3>
           <div className="flex gap-2 mb-3">
             <button
               type="button"
@@ -88,7 +88,7 @@ export function TapStepPanel(props: TapStepPanelProps) {
                 setDays([])
                 props.onScheduleChange!({ type: 'daily' })
               }}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium ${!overridden ? 'bg-primary-600 text-white' : 'bg-neutral-100 text-neutral-700'}`}
+              className={`px-3 py-1.5 rounded-lg text-[15px] font-medium ${!overridden ? 'bg-primary-600 text-white' : 'bg-neutral-100 text-neutral-700'}`}
             >
               Same as routine
             </button>
@@ -100,7 +100,7 @@ export function TapStepPanel(props: TapStepPanelProps) {
                 // Do NOT persist: entering "Specific days" with no days chosen is
                 // a transient local mode. Only persist once the user picks a day.
               }}
-              className={`px-3 py-1.5 rounded-lg text-sm font-medium ${overridden ? 'bg-primary-600 text-white' : 'bg-neutral-100 text-neutral-700'}`}
+              className={`px-3 py-1.5 rounded-lg text-[15px] font-medium ${overridden ? 'bg-primary-600 text-white' : 'bg-neutral-100 text-neutral-700'}`}
             >
               Specific days
             </button>
@@ -147,7 +147,7 @@ export function TapStepPanel(props: TapStepPanelProps) {
         <button
           type="button"
           onClick={props.onPromote}
-          className="inline-flex items-center gap-2 text-sm font-medium text-neutral-600 hover:text-red-600"
+          className="inline-flex items-center gap-2 text-[15px] font-medium text-neutral-600 hover:text-red-600"
         >
           <Link2Off className="w-4 h-4" /> Remove from routine
         </button>
@@ -155,7 +155,7 @@ export function TapStepPanel(props: TapStepPanelProps) {
           <button
             type="button"
             onClick={props.onDelete}
-            className="inline-flex items-center gap-2 text-sm font-medium text-neutral-600 hover:text-red-600"
+            className="inline-flex items-center gap-2 text-[15px] font-medium text-neutral-600 hover:text-red-600"
           >
             <Trash2 className="w-4 h-4" /> Delete step
           </button>

@@ -285,6 +285,7 @@ export function SettingsPage({
     <div className="h-full overflow-auto">
       <div className={PAGE_COLUMN_WIDE}>
         <MastheadCard
+          variant="page"
           title="Settings"
           motif="settings"
           eyebrow={
@@ -302,15 +303,15 @@ export function SettingsPage({
         />
 
         {/* Tab Navigation */}
-        <div className="flex gap-1 mb-8 p-1 bg-neutral-100 rounded-lg">
+        <div className="mb-8 flex gap-1 border-b border-neutral-300">
           {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              className={`-mb-px flex flex-1 items-center justify-center gap-2 border-b-2 px-4 py-2.5 text-[14px] font-medium transition-colors ${
                 activeTab === tab.id
-                  ? 'bg-white text-neutral-800 shadow-sm'
-                  : 'text-neutral-500 hover:text-neutral-700'
+                  ? 'border-accent-500 text-neutral-900'
+                  : 'border-transparent text-neutral-500 hover:text-neutral-700'
               }`}
             >
               {tab.icon}
@@ -330,11 +331,11 @@ export function SettingsPage({
 
             {/* Text Size */}
             <section>
-              <h2 className="text-lg font-semibold text-neutral-700 mb-2">Text Size</h2>
-              <div className="flex items-center justify-between p-4 bg-white rounded-lg border border-neutral-100">
+              <h2 className="mb-2 font-display text-[22px] text-neutral-900">Text Size</h2>
+              <div className="flex items-center justify-between border-y border-neutral-200 px-1 py-4">
                 <div>
-                  <p className="text-neutral-700 font-medium">Large text</p>
-                  <p className="text-sm text-neutral-500">Increase font sizes for easier reading</p>
+                  <p className="text-[19px] leading-snug text-neutral-800">Large text</p>
+                  <p className="text-[13px] text-neutral-500">Increase font sizes for easier reading</p>
                 </div>
                 <button
                   onClick={() => setLargeText(!largeText)}
@@ -362,7 +363,7 @@ export function SettingsPage({
 
             {/* People Section */}
             <section>
-              <h2 className="text-lg font-semibold text-neutral-700 mb-2">People</h2>
+              <h2 className="mb-2 font-display text-[22px] text-neutral-900">People</h2>
               <p className="text-sm text-neutral-500 mb-6">
                 Add family members to assign tasks, routines, and events. People don't need an account to be assignees.
               </p>
@@ -413,7 +414,7 @@ export function SettingsPage({
                       </div>
                     </div>
                   ) : (
-                    <div className="flex items-center gap-3 p-4 bg-white rounded-lg border border-neutral-100">
+                    <div className="flex items-center gap-3 border-b border-neutral-200 px-1 py-3.5">
                       <div className={`w-10 h-10 rounded-full ${getColorClass(mainUser.color)} flex items-center justify-center text-white font-medium`}>
                         {mainUser.initials}
                       </div>
@@ -483,7 +484,7 @@ export function SettingsPage({
                             </div>
                           </div>
                         ) : (
-                          <div className="flex items-center gap-3 p-4 bg-white rounded-lg border border-neutral-100">
+                          <div className="flex items-center gap-3 border-b border-neutral-200 px-1 py-3.5">
                             <div className={`w-10 h-10 rounded-full ${getColorClass(member.color)} flex items-center justify-center text-white font-medium`}>
                               {member.initials}
                             </div>
@@ -630,7 +631,7 @@ export function SettingsPage({
                       return (
                         <div
                           key={inv.id}
-                          className="flex items-center gap-3 p-3 bg-white rounded-lg border border-neutral-100"
+                          className="flex items-center gap-3 border-b border-neutral-200 px-1 py-3"
                         >
                           <div className="flex-1 min-w-0">
                             <p className="text-sm text-neutral-700 truncate">{inv.email}</p>
@@ -675,7 +676,7 @@ export function SettingsPage({
         {activeTab === 'admin' && isAppAdmin && (
           <div className="space-y-8">
             <section>
-              <h2 className="text-lg font-semibold text-neutral-700 mb-2">Demo Controls</h2>
+              <h2 className="mb-2 font-display text-[22px] text-neutral-900">Demo Controls</h2>
               <p className="text-sm text-neutral-500 mb-6">
                 Set up and reset demo data for presentations.
               </p>
@@ -683,7 +684,7 @@ export function SettingsPage({
             </section>
 
             <section>
-              <h2 className="text-lg font-semibold text-neutral-700 mb-2">Founding households</h2>
+              <h2 className="mb-2 font-display text-[22px] text-neutral-900">Founding households</h2>
               <p className="text-sm text-neutral-500 mb-6">
                 Signups are gated on an approved waitlist row. Approve one to let that email create an account.
               </p>
@@ -728,7 +729,7 @@ export function SettingsPage({
             </section>
 
             <section>
-              <h2 className="text-lg font-semibold text-neutral-700 mb-2">Waitlist</h2>
+              <h2 className="mb-2 font-display text-[22px] text-neutral-900">Waitlist</h2>
               <p className="text-sm text-neutral-500 mb-6">
                 Manage waitlist signups from the landing page.
               </p>

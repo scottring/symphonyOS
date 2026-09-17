@@ -17,7 +17,7 @@ export function DocumentProposalRow({ kind, label, onKeep, onDismiss }: Props) {
       {/* Label leads. Two proposals of the same kind (a licence front and back)
           would otherwise render as two identical-looking rows. */}
       <div className="flex-1 min-w-0">
-        <div className="text-sm font-medium text-neutral-800 truncate">{label}</div>
+        <div className="text-[15px] font-medium text-neutral-800 truncate">{label}</div>
         <div className="text-[12px] text-neutral-500 truncate">
           Looks like a {documentKindLabel(kind).toLowerCase()}
         </div>

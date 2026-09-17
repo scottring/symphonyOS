@@ -37,6 +37,7 @@ export function DiscussionsApp() {
     <div className={PAGE_COLUMN_WIDE}>
       {/* The same masthead card the rest of the top group wears. */}
       <MastheadCard
+        variant="page"
         title="Discussions"
         motif="discussions"
         subline="Conversations on your tasks, routines, and events — newest first."
@@ -53,13 +54,13 @@ export function DiscussionsApp() {
         </p>
       )}
 
-      <div className="space-y-1">
+      <div className="border-t border-neutral-300">
         {rows.map((row) => (
           <button
             key={row.sessionId}
             type="button"
             onClick={() => navigate(discussionHref(row))}
-            className="card w-full text-left px-4 py-3 hover:bg-neutral-50 transition-colors"
+            className="w-full border-b border-neutral-200 px-4 py-3.5 text-left transition-colors hover:bg-neutral-50"
           >
             <div className="flex items-start gap-3">
               <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-neutral-100 text-neutral-500">
@@ -67,7 +68,7 @@ export function DiscussionsApp() {
               </span>
               <span className="min-w-0 flex-1">
                 <span className="flex items-baseline gap-2">
-                  <span className={`flex-1 truncate text-[15px] ${row.unread ? 'font-semibold text-neutral-900' : 'text-neutral-800'}`}>
+                  <span className={`flex-1 truncate text-[19px] leading-snug ${row.unread ? 'font-semibold text-neutral-900' : 'text-neutral-800'}`}>
                     {row.title}
                   </span>
                   <span className="shrink-0 text-[12px] text-neutral-400">{formatRelativeTime(row.lastAt)}</span>

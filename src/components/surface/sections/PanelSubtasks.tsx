@@ -110,7 +110,7 @@ export function PanelSubtasks({ subtasks, onToggleSubtask, onAddSubtask, onOpenS
               <button
                 onClick={() => onOpenSubtask(sub.id)}
                 aria-label={`Open ${sub.title}`}
-                className={`text-sm flex-1 text-left ${sub.completed ? 'line-through text-neutral-400' : 'text-neutral-700'}`}
+                className={`text-[15px] flex-1 text-left ${sub.completed ? 'line-through text-neutral-400' : 'text-neutral-700'}`}
               >
                 {sub.title}
               </button>
@@ -139,7 +139,7 @@ export function PanelSubtasks({ subtasks, onToggleSubtask, onAddSubtask, onOpenS
               className="flex items-center gap-2 px-2 py-1.5 rounded-md hover:bg-neutral-100/60 text-left"
             >
               <Checkmark completed={!!sub.completed} />
-              <span className={`text-sm flex-1 ${sub.completed ? 'line-through text-neutral-400' : 'text-neutral-700'}`}>
+              <span className={`text-[15px] flex-1 ${sub.completed ? 'line-through text-neutral-400' : 'text-neutral-700'}`}>
                 {sub.title}
               </span>
             </button>
@@ -153,7 +153,7 @@ export function PanelSubtasks({ subtasks, onToggleSubtask, onAddSubtask, onOpenS
             onKeyDown={(e) => { if (e.key === 'Enter') commit() }}
             onBlur={commit}
             placeholder="+ Add a subtask…"
-            className="text-sm px-2 py-1.5 rounded-md bg-transparent text-neutral-500 placeholder:text-neutral-400 focus:outline-none focus:bg-neutral-50 hover:bg-neutral-50"
+            className="text-[15px] px-2 py-1.5 rounded-md bg-transparent text-neutral-500 placeholder:text-neutral-400 focus:outline-none focus:bg-neutral-50 hover:bg-neutral-50"
           />
         )}
       </div>

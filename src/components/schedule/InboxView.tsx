@@ -635,10 +635,11 @@ export function InboxView({
   return (
     <div className="h-full overflow-y-auto">
       <div className={PAGE_COLUMN_WIDE}>
-      {/* The same masthead card the rest of the top group wears (Today, This
+      {/* The same open masthead the rest of the top group wears (Today, This
           Week, the period pages). No eyebrow — the inbox has no period to step
           through. Its own controls ride along the foot, as Today's do. */}
       <MastheadCard
+        variant="page"
         title="Inbox"
         subline={
           totalCount === 0
@@ -681,14 +682,12 @@ export function InboxView({
           <p className="font-display text-xl text-neutral-700">Loading your inbox…</p>
         </div>
       ) : totalCount === 0 ? (
-        <div className="mx-auto max-w-xl text-center py-16">
-          <div className="w-16 h-16 mx-auto mb-6 rounded-2xl bg-primary-50 flex items-center justify-center">
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 text-primary-400" viewBox="0 0 20 20" fill="currentColor">
-              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-            </svg>
-          </div>
-          <p className="font-display text-xl text-neutral-700 mb-2">Inbox zero</p>
-          <p className="text-neutral-500">Nothing is waiting for a decision.</p>
+        <div className="mx-auto max-w-xl py-16 text-center">
+          <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" className="mx-auto mb-5 h-8 w-8 text-primary-400" viewBox="0 0 20 20" fill="currentColor">
+            <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+          </svg>
+          <p className="mb-2 font-display text-[24px] text-neutral-800">Inbox zero</p>
+          <p className="text-[15px] text-neutral-500">Nothing is waiting for a decision.</p>
           <div className="mt-5 flex flex-wrap justify-center gap-2">
             <button
               type="button"
@@ -722,7 +721,7 @@ export function InboxView({
           sending={sendingTaskId !== null}
         />
       ) : (
-        <div className="space-y-2">
+        <div className="border-t border-neutral-300">
           {inboxTasks.map(renderRow)}
         </div>
       )}

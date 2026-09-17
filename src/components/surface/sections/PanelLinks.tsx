@@ -41,8 +41,8 @@ export function PanelLinks({ links, onAddLink, facetPromotions }: PanelLinksProp
             rel="noopener noreferrer"
             className="flex items-center gap-2 w-full text-left py-1.5 px-2 rounded-md bg-white shadow-[inset_0_0_0_1px_#e5e7eb] hover:bg-neutral-50"
           >
-            <span className="w-6 h-6 flex items-center justify-center rounded-md bg-sky-100 text-sm"><ConceptIcon name="attachment" decorative /></span>
-            <span className="flex-1 text-sm text-neutral-800 truncate">
+            <span className="w-6 h-6 flex items-center justify-center rounded-md bg-sky-100 text-[15px]"><ConceptIcon name="attachment" decorative /></span>
+            <span className="flex-1 text-[15px] text-neutral-800 truncate">
               {link.title || hostname(link.url)}
             </span>
           </a>
@@ -64,7 +64,7 @@ export function PanelLinks({ links, onAddLink, facetPromotions }: PanelLinksProp
           onKeyDown={(e) => { if (e.key === 'Enter') commit() }}
           onBlur={commit}
           placeholder="Paste a URL…"
-          className="w-full text-sm px-2 py-1.5 rounded-md bg-transparent text-neutral-500 placeholder:text-neutral-400 focus:outline-none focus:bg-neutral-50 hover:bg-neutral-50"
+          className="w-full text-[15px] px-2 py-1.5 rounded-md bg-transparent text-neutral-500 placeholder:text-neutral-400 focus:outline-none focus:bg-neutral-50 hover:bg-neutral-50"
         />
       )}
     </PanelSection>

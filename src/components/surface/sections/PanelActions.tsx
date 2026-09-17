@@ -34,7 +34,7 @@ export interface PanelActionsProps {
 }
 
 const BASE =
-  'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors'
+  'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[15px] font-medium transition-colors'
 export const ACTION_CHIP = `${BASE} bg-neutral-100 text-neutral-700 hover:bg-neutral-200`
 const PRIMARY_CHIP = `${BASE} border border-primary-600 text-primary-700 hover:bg-primary-50`
 const COMPLETED_CHIP = `${BASE} border border-neutral-200 bg-neutral-100 text-neutral-400 hover:bg-neutral-200`
@@ -137,7 +137,7 @@ export function PanelActions({ actions, overflow }: PanelActionsProps) {
                     setOpen(false)
                     a.onClick?.()
                   }}
-                  className="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-neutral-700 hover:bg-neutral-50"
+                  className="flex w-full items-center gap-2 px-4 py-2 text-left text-[15px] text-neutral-700 hover:bg-neutral-50"
                 >
                   {a.icon && <ConceptIcon name={a.icon} decorative />}
                   {a.label}

@@ -1,0 +1,109 @@
+import { useCallback, useMemo, useState } from 'react'
+import { useLocation } from 'react-router-dom'
+import { Pin, X } from 'lucide-react'
+import { useReferenceLists, type ReferencePin } from './ReferenceListsContext'
+import { pinIsOnPage } from './periodsOnPage'
+import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
+import { useDomain } from '@/hooks/useDomain'
+import { useFamilyMembers } from '@/hooks/useFamilyMembers'
+import { useGatedTaskActions } from '@/hooks/useGatedTaskActions'
+import { filterTasksForLayers } from '@/lib/today/domainFilter'
+import { selectHorizonPool } from '@/lib/today/horizons'
+import { doableBy } from '@/lib/planning/poolViews'
+import { monthStartOf } from '@/lib/planning/periodPlacement'
+import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
+import { placementFate } from '@/lib/planning/lineage'
+import { TriageRow, applyTriageVerdict, type Verdict } from '@/components/schedule/TriageRow'
+import type { Task } from '@/types/task'
+
+export function ReferenceListControls({ paused = false }: { paused?: boolean }) {
+  const ref = useReferenceLists()
+  const { pathname } = useLocation()
+  if (!ref) return null
+  return <div className="reference-controls flex flex-wrap items-center gap-2 px-5 py-3 text-[13px] text-neutral-500">
+    <Pin className="h-3.5 w-3.5" aria-hidden="true" />
+    <span>Reference</span>
+    {(['week', 'month'] as const).map(kind => {
+      const pinned = ref.pins.some(p => p.kind === kind)
+      // This page is already showing that list, so the pin has no panel to
+      // draw here. It is kept, and says so, rather than reading as broken.
+      const onPage = pinned && pinIsOnPage(pathname, kind)
+      return <button key={kind} type="button" aria-pressed={pinned}
+        aria-label={`${pinned ? 'Unpin' : 'Pin'} ${kind} list`}
+        onClick={() => pinned ? ref.unpin(kind) : ref.pin(kind)}
+        className={`rounded px-3 py-1 ${pinned ? 'bg-primary-50 text-primary-800' : 'hover:bg-neutral-100'}`}>
+        {kind === 'week' ? 'Week' : 'Month'}{onPage ? ' · on this page' : pinned ? ' · pinned' : ''}
+      </button>
+    })}
+    {paused && ref.pins.length > 0 && <span className="text-xs text-neutral-500">Lists return when you close the side panel.</span>}
+  </div>
+}
+
+export function ReferenceListsDock() {
+  const ref = useReferenceLists()
+  const { pathname } = useLocation()
+  // A pin whose period this page already shows is skipped, not unpinned: the
+  // page holds the period's whole record (completed and placed rows and all),
+  // and a pooled copy beside it would be both redundant and less complete.
+  const showing = useMemo(
+    () => (ref?.pins ?? []).filter(pin => !pinIsOnPage(pathname, pin.kind)),
+    [ref?.pins, pathname])
+  if (!showing.length) return null
+  return <aside aria-label="Pinned reference lists" className="reference-dock">
+    {showing.map(pin => <ReferenceList key={`${pin.kind}:${pin.date}`} pin={pin} onClose={() => ref!.unpin(pin.kind)} />)}
+  </aside>
+}
+
+function ReferenceList({ pin, onClose }: { pin: ReferencePin; onClose: () => void }) {
+  const { tasks, loading, error: loadError, updateTask, updateTasksBulk, pushTask, toggleTask } = useSupabaseTasks()
+  const { layers } = useDomain()
+  const { getCurrentUserMember } = useFamilyMembers()
+  const me = getCurrentUserMember()?.id
+  const raw = useMemo(() => ({ updateTask, updateTasksBulk, pushTask }), [updateTask, updateTasksBulk, pushTask])
+  const findTask = useCallback((id: string) => tasks.find(t => t.id === id), [tasks])
+  const gated = useGatedTaskActions(raw, findTask)
+  const visible = useMemo(() => filterTasksForLayers(tasks, layers), [tasks, layers])
+  const date = new Date(pin.date)
+  const week = weekStartAnchor(date, readCadenceConfig().weekStartsOn)
+  const pool = selectHorizonPool(visible, pin.kind,
+    (assignedTo, assignedToAll) => !me || doableBy({ assignedTo: assignedTo ?? undefined, assignedToAll: assignedToAll ? [...assignedToAll] : undefined }, me),
+    week, monthStartOf(date))
+  const label = pin.kind === 'week' ? 'Week list' : 'Month list'
+  const period = pin.kind === 'month'
+    ? date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+    : `Week of ${week.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [resolved, setResolved] = useState<Record<string, Verdict>>({})
+  async function act(task: Task, verdict: Verdict) {
+    if (busy) return
+    setBusy(true); setError(null)
+    try {
+      if (verdict === 'completed') await toggleTask(task.id)
+      else {
+        const written = await applyTriageVerdict(task, verdict, {
+          viewedDate: new Date(), onUpdateTask: gated.updateTask, onPushTask: gated.pushTask,
+        })
+        if (!written) return
+      }
+      setResolved(prev => ({ ...prev, [task.id]: verdict }))
+    } catch { setError('Could not save that change. Please try again.') }
+    finally { setBusy(false) }
+  }
+  return <section aria-label={`${label}: ${period}`} className="reference-list">
+    <header className="flex items-start justify-between gap-3 border-b border-neutral-300 pb-4">
+      <div><h2 className="font-display text-[22px] leading-tight text-neutral-900">{label}</h2><p className="mt-1 text-[13px] text-neutral-500">{period}</p></div>
+      <button type="button" onClick={onClose} aria-label={`Unpin ${pin.kind} list`} className="p-2 text-neutral-500 hover:bg-neutral-100 rounded"><X className="w-4 h-4" /></button>
+    </header>
+    {error && <p role="alert" className="py-3 text-sm text-danger-600">{error}</p>}
+    {loading ? <p className="py-5 text-[15px] text-neutral-500">Loading list…</p> : loadError ? <p role="alert" className="py-5 text-[15px] text-danger-600">Could not load this list.</p> : pool.length === 0 ? <p className="py-5 text-[15px] text-neutral-500">Nothing on this list yet.</p> :
+      <fieldset disabled={busy} className="min-w-0" aria-busy={busy}>
+        <ul className="divide-y divide-neutral-200">{pool.map(task => <TriageRow key={task.id} task={task}
+          offer={pin.kind === 'week' ? ['today'] : ['week', 'today']}
+          lead={pin.kind === 'week' ? 'today' : 'week'}
+          placed={pin.kind === 'month' ? placementFate(task, visible) : undefined}
+          verdict={resolved[task.id]} canDelete={false}
+          onVerdict={(t, v) => void act(t, v)} onComplete={t => void act(t, 'completed')} />)}</ul>
+      </fieldset>}
+  </section>
+}

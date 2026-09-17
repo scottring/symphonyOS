@@ -21,10 +21,10 @@ export function PanelWhatToBring({ notes, onChange }: PanelWhatToBringProps) {
           onBlur={() => { if (draft !== (notes ?? '')) onChange(draft) }}
           placeholder="Add notes…"
           rows={2}
-          className="w-full text-sm px-2 py-1.5 rounded-md bg-transparent text-neutral-700 placeholder:text-neutral-400 focus:outline-none focus:bg-neutral-50 hover:bg-neutral-50 resize-none"
+          className="w-full text-[15px] px-2 py-1.5 rounded-md bg-transparent text-neutral-700 placeholder:text-neutral-400 focus:outline-none focus:bg-neutral-50 hover:bg-neutral-50 resize-none"
         />
       ) : (
-        <p className="text-sm text-neutral-700 whitespace-pre-wrap">{notes}</p>
+        <p className="text-[15px] text-neutral-700 whitespace-pre-wrap">{notes}</p>
       )}
     </PanelSection>
   )

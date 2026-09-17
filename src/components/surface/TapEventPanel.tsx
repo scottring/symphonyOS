@@ -234,7 +234,7 @@ export function TapEventPanel(props: TapEventPanelProps) {
                 onClick={() => setShowDurationMenu((v) => !v)}
                 aria-expanded={showDurationMenu}
                 aria-label="Change duration"
-                className="px-3 py-1.5 rounded-lg text-sm font-medium bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition-colors"
+                className="px-3 py-1.5 rounded-lg text-[15px] font-medium bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition-colors"
               >
                 <ConceptIcon name="time" decorative /> {formatDuration(durationMinutes)} {showDurationMenu ? '▾' : '▸'}
               </button>
@@ -244,7 +244,7 @@ export function TapEventPanel(props: TapEventPanelProps) {
                     <button
                       key={m}
                       onClick={() => handleDurationChange(m)}
-                      className={`block w-full text-left px-4 py-2 text-sm transition-colors hover:bg-neutral-50 ${
+                      className={`block w-full text-left px-4 py-2 text-[15px] transition-colors hover:bg-neutral-50 ${
                         m === durationMinutes ? 'text-primary-700 font-medium' : 'text-neutral-700'
                       }`}
                     >
@@ -442,7 +442,7 @@ export function TapEventPanel(props: TapEventPanelProps) {
                 }}
                 placeholder="What's the question?"
                 rows={2}
-                className="w-full px-2 py-1.5 text-sm rounded-md bg-white text-neutral-700 placeholder:text-neutral-400 shadow-[inset_0_0_0_1px_#e5e7eb] focus:outline-none focus:shadow-[inset_0_0_0_1px_#d97706] resize-none"
+                className="w-full px-2 py-1.5 text-[15px] rounded-md bg-white text-neutral-700 placeholder:text-neutral-400 shadow-[inset_0_0_0_1px_#e5e7eb] focus:outline-none focus:shadow-[inset_0_0_0_1px_#d97706] resize-none"
               />
             </PanelSection>
           )}
@@ -460,7 +460,7 @@ export function TapEventPanel(props: TapEventPanelProps) {
                   onClick={() => props.onOpenTask(t.id)}
                   icon={<span className="w-6 h-6 flex items-center justify-center rounded-md bg-amber-100"><ConceptIcon name="list" decorative /></span>}
                 >
-                  <span className="block text-sm text-neutral-800">{t.title}</span>
+                  <span className="block text-[15px] text-neutral-800">{t.title}</span>
                 </PanelRow>
               ))}
               {!props.free && (
@@ -471,7 +471,7 @@ export function TapEventPanel(props: TapEventPanelProps) {
                   onKeyDown={(e) => { if (e.key === 'Enter') commitPrepTask() }}
                   onBlur={commitPrepTask}
                   placeholder="+ Add a prep task…"
-                  className="text-sm px-2 py-1.5 rounded-md bg-transparent text-neutral-500 placeholder:text-neutral-400 focus:outline-none focus:bg-neutral-50 hover:bg-neutral-50"
+                  className="text-[15px] px-2 py-1.5 rounded-md bg-transparent text-neutral-500 placeholder:text-neutral-400 focus:outline-none focus:bg-neutral-50 hover:bg-neutral-50"
                 />
               )}
             </div>

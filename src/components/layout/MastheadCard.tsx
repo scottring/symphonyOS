@@ -10,15 +10,20 @@
 //   controls  page chrome in the corner (domain chooser, assistant toggle)
 //   footer    the page's own controls along the foot (Today's dropdowns)
 //
-// It wears the user's Place (PlaceWash) the way Today's card did, so the
-// anchor reads the same on every page. Library pages keep PageMasthead —
-// they are lists, not periods.
+// The masthead is now an OPEN heading rather than a rounded illustrated card
+// (parity pass 2026-09-17): a rule above, the serif headline, a hairline
+// below. Three variants, all the same shell:
+//
+//   'daybook'  Today — plus the big date numeral in the left margin
+//   'page'     every other surface — the period pages, Inbox, the library;
+//              the surface's motif rides along as a small stamp, not a wash
+//   'card'     the older illustrated card, kept for anything still on it
 import type { ReactNode } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { PlaceWash } from '@/components/place/PlaceWash'
-import type { MotifId } from '@/components/place/motifs/PageMotif'
+import { PageMotif, type MotifId } from '@/components/place/motifs/PageMotif'
 
-export function MastheadCard({ eyebrow, title, subline, controls, footer, motif, className = '' }: {
+export function MastheadCard({ eyebrow, title, subline, controls, footer, motif, variant = 'card', date, className = '' }: {
   eyebrow?: ReactNode
   title: ReactNode
   subline?: ReactNode
@@ -28,26 +33,45 @@ export function MastheadCard({ eyebrow, title, subline, controls, footer, motif,
    *  place — they are one continuous stretch of the same life, not different
    *  kinds of thing. */
   motif?: MotifId
+  /** Today uses an open daybook masthead; other surfaces keep their card. */
+  variant?: 'card' | 'daybook' | 'page'
+  date?: Date
   className?: string
 }) {
+  const open = variant !== 'card'
   return (
     <section
       data-testid="masthead-card"
-      className={`relative mx-3 mb-4 rounded-2xl border border-neutral-200/80 bg-bg-elevated shadow-sm md:mx-0 ${className}`}
+      className={`${open
+        ? `daybook-masthead${variant === 'page' ? ' daybook-masthead-page' : ''}`
+        : 'relative mx-3 mb-4 rounded-2xl border border-neutral-200/80 bg-bg-elevated shadow-sm md:mx-0'} ${className}`}
     >
-      <PlaceWash motif={motif} />
-      <div className="relative px-4 py-4 md:px-5">
+      {variant === 'card' && <PlaceWash motif={motif} />}
+      <div className={open ? 'daybook-masthead-inner' : 'relative px-4 py-4 md:px-5'}>
         <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0">
+          {variant === 'daybook' && date && (
+            <div aria-hidden="true" className="daybook-date">
+              <span>{date.toLocaleDateString('en-US', { month: 'short' })}</span>
+              <strong>{date.getDate().toString().padStart(2, '0')}</strong>
+            </div>
+          )}
+          {/* The motif keeps the page's identity without the wash it used to
+              sit behind: one small stamp, at full strength, beside the name. */}
+          {variant === 'page' && motif && (
+            /* Decorative: the heading beside it already names the page, so the
+               motif's own label would just be read out twice. */
+            <span aria-hidden="true" className="contents"><PageMotif motif={motif} className="daybook-stamp" /></span>
+          )}
+          <div className="min-w-0 flex-1">
             {eyebrow && <div data-testid="masthead-eyebrow" className="mb-1 -ml-1.5">{eyebrow}</div>}
-            <h1 className="font-display text-[28px] font-semibold leading-tight text-neutral-950 md:text-[34px]">
+            <h1 className={open ? 'daybook-title' : 'font-display text-[28px] font-semibold leading-tight text-neutral-950 md:text-[34px]'}>
               {title}
             </h1>
             {subline && <div className="mt-1 max-w-2xl text-sm text-neutral-500 md:text-[15px]">{subline}</div>}
           </div>
           {controls && <div className="hidden shrink-0 md:block">{controls}</div>}
         </div>
-        {footer && <div className="mt-4 flex flex-wrap items-end justify-end gap-3">{footer}</div>}
+        {footer && <div className={open ? 'daybook-tools' : 'mt-4 flex flex-wrap items-end justify-end gap-3'}>{footer}</div>}
       </div>
     </section>
   )

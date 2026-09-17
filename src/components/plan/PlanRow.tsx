@@ -138,13 +138,13 @@ export function PlanRow({
   // own edge is the one you see.
   return (
     <>
-    <li className="group flex items-start gap-2.5 border-b border-neutral-100 px-2 py-2 transition-colors last:border-0 hover:bg-neutral-50">
+    <li className="group flex items-start gap-2.5 border-b border-neutral-200 px-2 py-3 transition-colors last:border-0 hover:bg-neutral-50">
       <button
         type="button"
         aria-label={`${done ? 'Reopen' : 'Complete'} ${row.title}`}
         disabled={!canTick}
         onClick={() => onAction('complete', row)}
-        className={`mt-0.5 shrink-0 w-4 h-4 rounded-full border-2 grid place-items-center transition-colors ${
+        className={`mt-1 shrink-0 w-[18px] h-[18px] rounded-full border-2 grid place-items-center transition-colors ${
           done ? 'border-primary-500 bg-primary-500 text-white' : canTick ? 'border-neutral-300 hover:border-primary-500 text-transparent' : 'border-neutral-200 text-transparent'
         }`}
       >
@@ -161,17 +161,19 @@ export function PlanRow({
           {expanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
         </button>
       )}
-      {row.isGoal && <Target className="w-3.5 h-3.5 mt-[3px] shrink-0 text-amber-600" aria-label="Goal" />}
+      {/* The glyph is a desktop convenience; on a phone the section heading
+          already says these are goals, and 24px of row is worth more. */}
+      {row.isGoal && <Target className="mt-[3px] hidden h-3.5 w-3.5 shrink-0 text-accent-600 sm:block" aria-label="Goal" />}
       <span className="min-w-0 flex-1">
         <button
           type="button"
           onClick={() => onOpen(row)}
-          className={`block w-full min-w-0 text-left leading-snug ${row.isGoal ? 'font-display text-[17px]' : 'text-[14px]'} ${done ? 'line-through text-neutral-400' : 'text-neutral-800'}`}
+          className={`block w-full min-w-0 text-left leading-snug ${row.isGoal ? 'font-display text-[20px]' : 'text-[19px]'} ${done ? 'line-through text-neutral-400' : 'text-neutral-800'}`}
         >
           {row.title}
         </button>
         {row.subtitle && (
-          <span className="mt-0.5 block text-[12px] leading-snug text-neutral-500">{row.subtitle}</span>
+          <span className="mt-1 block text-[13px] leading-snug text-neutral-500">{row.subtitle}</span>
         )}
         {/* Where this row is committed, on its own line beneath the title —
             the chip a reader scans down, not a whisper in the right margin. */}
@@ -179,8 +181,12 @@ export function PlanRow({
           <PlacementChip placed={row.placed} onOpenPlaced={onOpenPlaced} />
         )}
       </span>
+      {/* Hover verbs, desktop only. On a phone they were invisible (no hover)
+          yet still took the width of four 48px touch buttons, which squeezed a
+          19px title down to one word a line — and an unseen "Drop" was still
+          tappable. A phone opens the row instead. */}
       {verbs.length > 0 && (
-        <span className="shrink-0 flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
+        <span className="hidden shrink-0 sm:flex items-center gap-0.5 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
           {verbs.map((a) => (
             <button
               key={a}
@@ -203,7 +209,7 @@ export function PlanRow({
     {canHoldSteps && expanded && (
       /* The steps are their own list items in the same <ul>, indented rather
          than nested in a second list, so a screen reader reads one flat plan. */
-      <li className="border-b border-neutral-100 last:border-0">
+      <li className="border-b border-neutral-200 last:border-0">
         <ul className="pl-7">
           {(row.steps ?? []).map((step) => (
             <PlanRow
@@ -233,7 +239,7 @@ export function PlanRow({
               value={stepDraft}
               onChange={(e) => setStepDraft(e.target.value)}
               placeholder="Add a step"
-              className="min-w-0 flex-1 bg-transparent py-1 text-[13px] text-neutral-800 placeholder:text-neutral-400 focus:outline-none"
+              className="min-w-0 flex-1 bg-transparent py-1.5 text-[15px] text-neutral-800 placeholder:text-neutral-400 focus:outline-none"
             />
           </form>
         )}

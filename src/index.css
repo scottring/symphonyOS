@@ -16,42 +16,44 @@
 @theme {
   /* ---------------------------------------------------------------------------
      COLORS - Refined, confident palette
-     Ink black, warm paper, single accent
+     Ink blue, paper white, vermilion accent
      --------------------------------------------------------------------------- */
 
-  /* Paper tones - warmer, more distinct */
-  --color-neutral-50: hsl(45 30% 98%);
-  --color-neutral-100: hsl(43 25% 95%);
-  --color-neutral-200: hsl(40 18% 88%);
-  --color-neutral-300: hsl(38 14% 75%);
-  --color-neutral-400: hsl(36 10% 55%);
-  --color-neutral-500: hsl(34 8% 42%);
-  --color-neutral-600: hsl(30 10% 32%);
-  --color-neutral-700: hsl(28 14% 22%);
-  --color-neutral-800: hsl(25 18% 15%);
-  --color-neutral-900: hsl(22 22% 10%);
-  --color-neutral-950: hsl(20 25% 6%);
+  /* Paper white and blue-black ink. Color belongs to actions and people. */
+  --color-neutral-50: #f8fafc;
+  --color-neutral-100: #f0f3f7;
+  --color-neutral-200: #dce2ea;
+  --color-neutral-300: #b7c2d1;
+  --color-neutral-400: #7e8ca2;
+  --color-neutral-500: #586981;
+  --color-neutral-600: #40536e;
+  --color-neutral-700: #2c405e;
+  --color-neutral-800: #1c304f;
+  --color-neutral-900: #142744;
+  --color-neutral-950: #0e1d35;
 
-  /* Primary - Deep teal-forest (more sophisticated than pure green) */
-  --color-primary-50: hsl(168 30% 96%);
-  --color-primary-100: hsl(168 28% 90%);
-  --color-primary-200: hsl(168 26% 78%);
-  --color-primary-300: hsl(168 28% 62%);
-  --color-primary-400: hsl(168 35% 45%);
-  --color-primary-500: hsl(168 45% 30%);
-  --color-primary-600: hsl(168 50% 24%);
-  --color-primary-700: hsl(168 52% 20%);
-  --color-primary-800: hsl(168 50% 16%);
-  --color-primary-900: hsl(168 48% 12%);
-  --color-primary-950: hsl(168 50% 7%);
+  /* Primary — deep ink blue. */
+  --color-primary-50: #f1f5fb;
+  --color-primary-100: #e1eaf6;
+  --color-primary-200: #c0d1e8;
+  --color-primary-300: #91afd5;
+  --color-primary-400: #6089bc;
+  --color-primary-500: #3e6598;
+  --color-primary-600: #2b4c79;
+  --color-primary-700: #203b62;
+  --color-primary-800: #192f50;
+  --color-primary-900: #142744;
+  --color-primary-950: #0e1d35;
 
-  /* Accent - Warm terracotta (for warmth, used sparingly) */
-  --color-accent-50: hsl(18 60% 97%);
-  --color-accent-100: hsl(18 55% 92%);
-  --color-accent-200: hsl(18 50% 82%);
-  --color-accent-300: hsl(18 48% 68%);
-  --color-accent-400: hsl(18 50% 55%);
-  --color-accent-500: hsl(18 55% 45%);
+  /* Accent — vermilion, reserved for small directional marks. */
+  --color-accent-50: #fff4f0;
+  --color-accent-100: #ffe4db;
+  --color-accent-200: #ffc6b5;
+  --color-accent-300: #ff9c80;
+  --color-accent-400: #f9704e;
+  --color-accent-500: #dc482b;
+  --color-accent-600: #b9321b;
+  --color-accent-700: #942916;
 
   /* Sage - Secondary muted green */
   --color-sage-50: hsl(145 20% 96%);
@@ -83,8 +85,8 @@
   --color-review-600: hsl(30 45% 38%);
 
   /* Background Tiers */
-  --color-bg-base: hsl(45 25% 96%);
-  --color-bg-elevated: hsl(48 35% 99%);
+  --color-bg-base: #ffffff;
+  --color-bg-elevated: #ffffff;
   --color-bg-overlay: hsl(0 0% 100%);
 
   /* ---------------------------------------------------------------------------
@@ -151,16 +153,18 @@
      SHADOWS - More dramatic, layered
      --------------------------------------------------------------------------- */
 
-  --shadow-sm: 0 1px 2px 0 hsl(25 20% 20% / 0.04);
-  --shadow-md: 0 4px 8px -2px hsl(25 20% 20% / 0.06), 0 2px 4px -1px hsl(25 20% 20% / 0.04);
-  --shadow-lg: 0 12px 24px -4px hsl(25 20% 20% / 0.08), 0 4px 8px -2px hsl(25 20% 20% / 0.04);
-  --shadow-xl: 0 24px 48px -8px hsl(25 20% 20% / 0.12), 0 8px 16px -4px hsl(25 20% 20% / 0.06);
-  --shadow-card: 0 0 0 1px hsl(38 20% 88% / 0.6), 0 2px 8px -2px hsl(25 20% 20% / 0.04);
-  --shadow-elevated: 0 0 0 1px hsl(38 20% 88% / 0.4), 0 8px 24px -4px hsl(25 20% 20% / 0.08);
+  /* Ink-tinted, not warm-tinted: the paper is white now, so a brown shadow
+     read as a smudge under every card. */
+  --shadow-sm: 0 1px 2px 0 rgb(20 39 68 / 0.05);
+  --shadow-md: 0 4px 8px -2px rgb(20 39 68 / 0.07), 0 2px 4px -1px rgb(20 39 68 / 0.05);
+  --shadow-lg: 0 12px 24px -4px rgb(20 39 68 / 0.09), 0 4px 8px -2px rgb(20 39 68 / 0.05);
+  --shadow-xl: 0 24px 48px -8px rgb(20 39 68 / 0.13), 0 8px 16px -4px rgb(20 39 68 / 0.07);
+  --shadow-card: 0 0 0 1px rgb(220 226 234 / 0.9), 0 2px 8px -2px rgb(20 39 68 / 0.05);
+  --shadow-elevated: 0 0 0 1px rgb(220 226 234 / 0.7), 0 8px 24px -4px rgb(20 39 68 / 0.09);
 
   /* Colored shadows */
-  --shadow-primary: 0 8px 24px -6px hsl(168 45% 30% / 0.3);
-  --shadow-accent: 0 8px 24px -6px hsl(18 55% 45% / 0.25);
+  --shadow-primary: 0 8px 24px -6px rgb(20 39 68 / 0.2);
+  --shadow-accent: 0 8px 24px -6px rgb(220 72 43 / 0.2);
 
   /* ---------------------------------------------------------------------------
      TRANSITIONS
@@ -175,9 +179,9 @@
 /* =============================================================================
    PLACE THEMES — accent-deep re-tints keyed by html[data-place]
    Five illustrated "places" (see src/config/places.ts). Each shifts the
-   primary + accent hue families; the warm paper neutrals never move, so
-   every place keeps Nordic Journal's calm. Woodsy Cabin (the default) IS
-   the base palette — no override block needed.
+   primary + accent hue families; the paper-white and ink neutrals stay
+   consistent. The default cabin illustration uses the base ink/vermilion
+   palette; explicit alternate place selections retain their accent hues.
    ============================================================================= */
 
 /* Densely Urban — steel blue + streetlight amber */
@@ -368,12 +372,13 @@ body {
   border-radius: 0 0 4px 4px;
 }
 
-/* Gradient mesh for auth page */
+/* Gradient mesh for the auth page. Ink and vermilion at a whisper on paper
+   white — the old mesh was teal and warm cream from the previous palette. */
 .gradient-mesh {
   background:
-    radial-gradient(ellipse at 15% 25%, hsl(168 35% 92% / 0.5) 0%, transparent 45%),
-    radial-gradient(ellipse at 85% 75%, hsl(45 40% 94% / 0.6) 0%, transparent 45%),
-    radial-gradient(ellipse at 50% 50%, hsl(18 40% 96% / 0.3) 0%, transparent 50%),
+    radial-gradient(ellipse at 15% 25%, rgb(225 234 246 / 0.7) 0%, transparent 45%),
+    radial-gradient(ellipse at 85% 75%, rgb(240 243 247 / 0.9) 0%, transparent 45%),
+    radial-gradient(ellipse at 50% 50%, rgb(255 244 240 / 0.5) 0%, transparent 50%),
     var(--color-bg-base);
 }
 
@@ -925,7 +930,7 @@ body {
 .input-base:focus {
   outline: none;
   border-color: var(--color-primary-400);
-  box-shadow: 0 0 0 3px hsl(168 45% 30% / 0.08);
+  box-shadow: 0 0 0 3px rgb(62 101 152 / 0.12);
 }
 
 /* =============================================================================
@@ -1398,4 +1403,165 @@ html.desktop-shell a {
   .day-print-title { flex: 1; }
   .day-print-empty { font-style: italic; color: #555; }
   @page { margin: 14mm; }
+}
+
+/* Today's daybook: ink, ruled edges, and a single reading surface. Scoped so
+   calendar, wall, and library surfaces can retain their own density. */
+.symphony-sidebar {
+  background: #fdfdfd;
+}
+.symphony-nav-item {
+  position: relative;
+  border-radius: 3px;
+}
+.symphony-nav-active {
+  background: var(--color-bg-elevated);
+}
+.symphony-nav-active::before {
+  content: '';
+  position: absolute;
+  inset: 8px auto 8px 0;
+  width: 3px;
+  background: var(--color-accent-500);
+}
+.symphony-nav-item:focus-visible {
+  outline: 2px solid var(--color-primary-600);
+  outline-offset: 2px;
+}
+.daybook-masthead {
+  position: relative;
+  margin: 0 12px 24px;
+  border-top: 3px solid var(--color-neutral-900);
+  border-bottom: 1px solid var(--color-neutral-300);
+}
+.daybook-masthead-inner {
+  padding: 20px 0 0;
+}
+.daybook-date {
+  display: none;
+}
+.daybook-title,
+.symphony-wordmark {
+  font-family: var(--font-family-display);
+  font-weight: 400;
+  line-height: 1.12;
+  letter-spacing: -0.035em;
+  color: var(--color-neutral-950);
+}
+.daybook-title { font-size: clamp(30px, 3.5vw, 46px); }
+.symphony-wordmark { font-size: 25px; }
+/* A library page or a period page is not the day: same rule, same serif, one
+   step down, and no date numeral in the margin. */
+.daybook-masthead-page .daybook-title { font-size: clamp(27px, 2.3vw, 34px); }
+.daybook-masthead-page .daybook-tools {
+  justify-content: flex-start;
+}
+.daybook-stamp {
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  margin-top: 4px;
+}
+@media (max-width: 767px) {
+  .daybook-stamp { width: 30px; height: 30px; }
+}
+.daybook-tools {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 20px;
+  padding: 8px 0;
+  border-top: 1px solid var(--color-neutral-200);
+}
+.daybook-agenda {
+  padding: 0 0 24px;
+}
+.daybook-decisions {
+  border-top: 2px solid var(--color-accent-600);
+  padding: 16px 0;
+}
+@media (min-width: 768px) {
+  .daybook-masthead {
+    margin: 0 0 28px;
+  }
+  .daybook-masthead-inner {
+    padding-top: 24px;
+  }
+  .daybook-date {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex-shrink: 0;
+    min-width: 92px;
+    padding-right: 20px;
+    margin-right: 4px;
+    border-right: 1px solid var(--color-neutral-300);
+    color: var(--color-neutral-900);
+  }
+  .daybook-date span {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+  .daybook-date strong {
+    font-size: 64px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.07em;
+    line-height: 1;
+  }
+}
+@media (max-width: 767px) {
+  .daybook-tools {
+    margin-top: 20px;
+    padding: 0;
+    border-top: 0;
+  }
+}
+
+/* Keep swipe foregrounds opaque: the edit/complete panels live behind them. */
+.daybook-agenda .schedule-mobile-swipe {
+  border-radius: 4px;
+  margin-bottom: 0;
+}
+.daybook-agenda .schedule-mobile-row {
+  border-radius: 0;
+  border-width: 0 0 1px;
+  border-color: var(--color-neutral-200);
+  background: var(--color-bg-base);
+  padding-top: 16px;
+  padding-bottom: 16px;
+}
+.daybook-agenda .schedule-mobile-row:not([aria-pressed="true"]) {
+  box-shadow: none;
+}
+
+/* References stay in the desktop workspace across route changes. */
+.reference-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(290px, 340px);
+  align-items: start;
+}
+.reference-dock {
+  position: sticky;
+  top: 12px;
+  max-height: calc(100dvh - 84px);
+  overflow-y: auto;
+  padding: 16px 20px 80px;
+  border-left: 1px solid var(--color-neutral-200);
+}
+.reference-list + .reference-list { margin-top: 32px; }
+.reference-list li { padding-block: 14px; }
+/* A small tablet still has access to the references, below its work. Phones
+   never mount these controls or panels. */
+@media (max-width: 1100px) {
+  .reference-workspace { grid-template-columns: minmax(0, 1fr); }
+  .reference-dock { position: static; max-height: none; border-left: 0; border-top: 1px solid var(--color-neutral-200); }
+}
+.reference-list li {
+  border-width: 0 0 1px;
+  border-radius: 0;
+  padding-inline: 0;
 }

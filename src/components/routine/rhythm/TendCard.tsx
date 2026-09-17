@@ -12,11 +12,11 @@ function LookalikeRow({ finding, onMerge }: {
   const [picking, setPicking] = useState(false)
   const [survivor, setSurvivor] = useState<string | null>(null)
   return (
-    <div className="rounded-lg bg-emerald-900/40 px-3 py-2">
+    <div className="rounded-lg bg-primary-900/40 px-3 py-2">
       <div className="flex items-center justify-between gap-3">
         <span className="text-sm min-w-0 truncate">{finding.names.join(' / ')} — same job?</span>
         <button onClick={() => setPicking(v => !v)}
-          className="rounded-md bg-emerald-600 px-2.5 py-1 text-xs font-semibold hover:bg-emerald-500 transition-colors flex-shrink-0">
+          className="rounded-md bg-primary-600 px-2.5 py-1 text-xs font-semibold hover:bg-primary-500 transition-colors flex-shrink-0">
           Merge
         </button>
       </div>
@@ -32,8 +32,8 @@ function LookalikeRow({ finding, onMerge }: {
           <button
             disabled={!survivor || !finding.ids.includes(survivor)}
             onClick={() => survivor && finding.ids.includes(survivor) && onMerge(survivor, finding.ids.filter(id => id !== survivor))}
-            className="mt-1 self-start rounded-md bg-emerald-600 px-2.5 py-1 text-xs font-semibold
-                       disabled:opacity-40 hover:bg-emerald-500 transition-colors"
+            className="mt-1 self-start rounded-md bg-primary-600 px-2.5 py-1 text-xs font-semibold
+                       disabled:opacity-40 hover:bg-primary-500 transition-colors"
           >
             Keep this one, remove {finding.ids.length - 1}
           </button>
@@ -53,12 +53,12 @@ function StampRow({ finding, routines, onStampDomain }: {
     .map(id => routines.find(r => r.id === id))
     .find((r): r is Routine => !!r && r.context == null)
   return (
-    <div className="rounded-lg bg-emerald-900/40 px-3 py-2">
+    <div className="rounded-lg bg-primary-900/40 px-3 py-2">
       <div className="flex items-center justify-between gap-3">
         <span className="text-sm">{finding.ids.length} routines have no domain — stamp them?</span>
         {!reviewing && (
           <button onClick={() => setReviewing(true)}
-            className="rounded-md bg-emerald-600 px-2.5 py-1 text-xs font-semibold hover:bg-emerald-500 transition-colors">
+            className="rounded-md bg-primary-600 px-2.5 py-1 text-xs font-semibold hover:bg-primary-500 transition-colors">
             Review
           </button>
         )}
@@ -70,14 +70,14 @@ function StampRow({ finding, routines, onStampDomain }: {
             {DOMAINS.map(d => (
               <button key={d}
                 onClick={() => onStampDomain(current.id, d)}
-                className="rounded-md bg-emerald-700 px-2 py-1 text-xs capitalize hover:bg-emerald-600 transition-colors">
+                className="rounded-md bg-primary-700 px-2 py-1 text-xs capitalize hover:bg-primary-600 transition-colors">
                 {d}
               </button>
             ))}
           </span>
         </div>
       )}
-      {reviewing && !current && <p className="mt-2 text-xs text-emerald-300">All stamped.</p>}
+      {reviewing && !current && <p className="mt-2 text-xs text-primary-300">All stamped.</p>}
     </div>
   )
 }
@@ -90,14 +90,14 @@ function UnfinishedRow({ finding, onRename, onLetGo }: {
   const [name, setName] = useState(finding.name)
   const [confirming, setConfirming] = useState(false)
   return (
-    <div className="rounded-lg bg-emerald-900/40 px-3 py-2 flex items-center gap-2">
+    <div className="rounded-lg bg-primary-900/40 px-3 py-2 flex items-center gap-2">
       <input value={name} onChange={e => setName(e.target.value)}
              onKeyDown={e => { if (e.key === 'Enter' && name.trim()) onRename(finding.id, name.trim()) }}
-             className="min-w-0 flex-1 rounded-md bg-emerald-950/50 px-2 py-1 text-sm focus:outline-none
-                        focus:ring-1 focus:ring-emerald-400" />
+             className="min-w-0 flex-1 rounded-md bg-primary-950/50 px-2 py-1 text-sm focus:outline-none
+                        focus:ring-1 focus:ring-primary-400" />
       <button
         onClick={() => (confirming ? onLetGo(finding.id) : setConfirming(true))}
-        className="rounded-md bg-emerald-700 px-2.5 py-1 text-xs hover:bg-red-800 transition-colors flex-shrink-0"
+        className="rounded-md bg-primary-700 px-2.5 py-1 text-xs hover:bg-red-800 transition-colors flex-shrink-0"
       >
         {confirming ? 'Sure? Remove' : 'Let go'}
       </button>
@@ -118,10 +118,10 @@ export function TendCard({ findings, routines, onMerge, onStampDomain, onRename,
   if (findings.length === 0) return null
   const shown = findings.slice(0, 3)
   return (
-    <section className="mb-6 rounded-2xl bg-[#33413a] p-4 text-emerald-50">
+    <section className="mb-6 rounded-2xl bg-primary-900 p-4 text-primary-50">
       <div className="flex items-center justify-between mb-2.5">
         <h2 className="font-display font-semibold">Worth tending</h2>
-        <span className="rounded-full bg-emerald-800/70 px-2.5 py-0.5 text-[11px]">
+        <span className="rounded-full bg-primary-800/70 px-2.5 py-0.5 text-[11px]">
           {findings.length} suggestion{findings.length === 1 ? '' : 's'}
         </span>
       </div>
@@ -140,7 +140,7 @@ export function TendCard({ findings, routines, onMerge, onStampDomain, onRename,
                   onClick={() => onDismiss(key)}
                   aria-label="Dismiss suggestion"
                   title="Dismiss — don't suggest this again"
-                  className="mt-2 rounded-md p-1 text-emerald-300/70 hover:bg-emerald-800/60 hover:text-emerald-100 transition-colors flex-shrink-0"
+                  className="mt-2 rounded-md p-1 text-primary-300/70 hover:bg-primary-800/60 hover:text-primary-100 transition-colors flex-shrink-0"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>

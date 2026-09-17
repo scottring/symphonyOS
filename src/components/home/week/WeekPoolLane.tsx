@@ -80,7 +80,7 @@ function PoolPill({ task, onSelect, onCompleteTask, onNotThisWeek, onPushTask, s
       // opened no panel at all.
       onClick={() => onSelect(`task-${task.id}`)}
       title={task.title}
-      className={`group flex w-full flex-col gap-1 rounded-lg border border-neutral-200 bg-white px-2 py-1.5 text-[13px] text-neutral-700 touch-none hover:border-neutral-300 hover:shadow-sm transition-all ${
+      className={`group flex w-full flex-col gap-1 rounded-md border border-neutral-200 bg-bg-elevated px-2 py-2 text-[15px] text-neutral-700 touch-none hover:border-neutral-300 transition-colors ${
         draggable ? 'cursor-grab active:cursor-grabbing' : 'cursor-pointer'
       } ${isDragging ? 'opacity-40' : ''}`}
     >
@@ -166,14 +166,14 @@ function RoutinePill({ routine, onSelect }: { routine: Routine; onSelect: (id: s
       {...listeners}
       onClick={() => onSelect(`routine-${routine.id}`)}
       title={routine.name}
-      className={`flex w-full items-start gap-1.5 rounded-lg border border-[hsl(42_50%_80%)] bg-[hsl(45_75%_90%)] pl-1.5 pr-2.5 py-1.5 touch-none cursor-grab active:cursor-grabbing hover:shadow-sm transition-all ${
+      className={`flex w-full items-start gap-1.5 rounded-md border border-primary-200 bg-primary-50 pl-1.5 pr-2.5 py-2 touch-none cursor-grab active:cursor-grabbing transition-colors ${
         isDragging ? 'opacity-40' : ''
       }`}
     >
-      <GripVertical className="mt-[3px] w-3.5 h-3.5 shrink-0 text-[hsl(40_30%_60%)]" />
+      <GripVertical className="mt-[5px] w-3.5 h-3.5 shrink-0 text-primary-300" />
       <span className="min-w-0 flex-1 flex flex-col">
-        <span className="leading-snug break-words text-[12.5px] font-semibold text-[hsl(40_60%_30%)]">{routine.name}</span>
-        <span className="text-[11px] text-[hsl(38_25%_45%)]">{routineTemporalLabel(routine)}</span>
+        <span className="leading-snug break-words text-[15px] font-semibold text-primary-800">{routine.name}</span>
+        <span className="text-[11px] text-primary-600/80">{routineTemporalLabel(routine)}</span>
       </span>
     </div>
   )
@@ -264,7 +264,7 @@ export function WeekPoolLane({
 
   return (
     <>
-    <div className="rounded-xl border border-neutral-200 bg-white px-3 py-2.5 shadow-sm">
+    <div className="border-t border-neutral-300 pt-2.5">
       <div className="flex items-center gap-2">
         <button
           type="button"
@@ -352,7 +352,7 @@ function WeekFold({ weekStart, tasks, onSelectItem, pillProps }: {
   const rows = tasks.filter((t) => t.bucket === 'week' && !t.completed && isPlacedOnWeek(t, weekStart))
   const label = `Week of ${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
   return (
-    <div className="rounded-xl border border-neutral-200 bg-white px-3 py-2.5 shadow-sm">
+    <div className="border-t border-neutral-200 pt-2.5">
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}

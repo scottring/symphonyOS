@@ -131,7 +131,7 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
             <button
               type="button"
               onClick={() => setAssistOpen(true)}
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-sm font-medium bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition-colors"
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[15px] font-medium bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition-colors"
             >
               <ConceptIcon name="discussion" size={14} decorative /> Discussion
               {discussionUnread && <span className="h-1.5 w-1.5 rounded-full bg-primary-500" aria-label="Unread" />}
@@ -143,7 +143,7 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
             (visibility "reference"), optionally with an automatic wake date. */}
         <div>
           <div className="flex items-center justify-between gap-3">
-            <span className="text-sm font-medium text-neutral-700">
+            <span className="text-[15px] font-medium text-neutral-700">
               {onTimeline ? 'Active' : 'Resting'}
             </span>
             <button
@@ -188,7 +188,7 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
         {onTimeline && props.onShowOnTodayChange && (
           <div>
             <div className="flex items-center justify-between gap-3">
-              <span className="text-sm font-medium text-neutral-700">
+              <span className="text-[15px] font-medium text-neutral-700">
                 {onToday ? 'On Today' : 'Off Today'}
               </span>
               <button
@@ -239,7 +239,7 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
             ) : (
               <button
                 onClick={() => setEditingSchedule(true)}
-                className="flex items-center justify-between w-full px-3 py-2 rounded-lg bg-neutral-100 text-sm text-neutral-700 hover:bg-neutral-200 transition-colors"
+                className="flex items-center justify-between w-full px-3 py-2 rounded-lg bg-neutral-100 text-[15px] text-neutral-700 hover:bg-neutral-200 transition-colors"
               >
                 <span>{recurrenceSummary(routine)}</span>
                 <span className="text-xs text-neutral-500">Edit schedule</span>
@@ -280,7 +280,7 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
             <button
               onClick={() => setShowDirections((v) => !v)}
               aria-expanded={showDirections}
-              className="mb-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition-colors"
+              className="mb-2 px-3 py-1.5 rounded-lg text-[15px] font-medium bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition-colors"
             >
               <ConceptIcon name="location" decorative /> Directions {showDirections ? '▾' : '▸'}
             </button>
@@ -337,7 +337,7 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
             id="move-into"
             value=""
             onChange={e => { if (e.target.value) props.onMoveInto!(e.target.value) }}
-            className="min-w-0 flex-1 rounded-lg border border-neutral-200 bg-white px-2 py-1.5 text-sm text-neutral-700"
+            className="min-w-0 flex-1 rounded-lg border border-neutral-200 bg-white px-2 py-1.5 text-[15px] text-neutral-700"
           >
             <option value="">Choose a routine…</option>
             {props.moveTargets.map(t => (
@@ -351,19 +351,19 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
         <div className="px-1 pb-2">
           {confirmDelete ? (
             <div className="flex items-center gap-2">
-              <span className="text-sm text-neutral-600">Delete this routine and its history?</span>
+              <span className="text-[15px] text-neutral-600">Delete this routine and its history?</span>
               <button type="button" onClick={props.onDelete}
-                className="text-sm font-medium text-white bg-red-500 hover:bg-red-600 rounded-lg px-3 py-1.5">
+                className="text-[15px] font-medium text-white bg-red-500 hover:bg-red-600 rounded-lg px-3 py-1.5">
                 Delete
               </button>
               <button type="button" onClick={() => setConfirmDelete(false)}
-                className="text-sm font-medium text-neutral-500 hover:text-neutral-700 px-2 py-1.5">
+                className="text-[15px] font-medium text-neutral-500 hover:text-neutral-700 px-2 py-1.5">
                 Cancel
               </button>
             </div>
           ) : (
             <button type="button" onClick={() => setConfirmDelete(true)}
-              className="inline-flex items-center gap-2 text-sm font-medium text-neutral-600 hover:text-red-600">
+              className="inline-flex items-center gap-2 text-[15px] font-medium text-neutral-600 hover:text-red-600">
               <Trash2 className="w-4 h-4" /> Delete routine
             </button>
           )}
@@ -377,7 +377,7 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
         <button
           type="button"
           onClick={props.onClose}
-          className="rounded-xl bg-[var(--color-primary-500,#3d5a44)] px-4 py-2 text-sm font-medium text-white
+          className="rounded-xl bg-[var(--color-primary-500,#3d5a44)] px-4 py-2 text-[15px] font-medium text-white
                      hover:opacity-90 transition-opacity"
         >
           Save & close

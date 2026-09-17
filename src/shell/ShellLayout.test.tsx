@@ -3,6 +3,7 @@ import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import type { ReactNode } from 'react'
 import { DomainProvider } from '@/hooks/useDomain'
+import { DomainGateProvider } from '@/components/domain/DomainGate'
 import { deriveActiveView, ShellLayout } from './ShellLayout'
 
 // Regression test for the House sidebar link: it navigated to '/home' but
@@ -40,7 +41,9 @@ describe('deriveActiveView', () => {
 const mobileState = vi.hoisted(() => ({ isMobile: false }))
 vi.mock('@/hooks/useMobile', () => ({ useMobile: () => mobileState.isMobile }))
 vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: null, signOut: vi.fn() }) }))
-vi.mock('@/hooks/useSupabaseTasks', () => ({ useSupabaseTasks: () => ({ tasks: [] }) }))
+vi.mock('@/hooks/useSupabaseTasks', () => ({ useSupabaseTasks: () => ({
+  tasks: [], loading: false, updateTask: vi.fn(), updateTasksBulk: vi.fn(), pushTask: vi.fn(), toggleTask: vi.fn(),
+}) }))
 vi.mock('@/hooks/useScratchpadHidden', () => ({ useScratchpadHidden: () => ({ hidden: true }) }))
 vi.mock('@/hooks/useSymphonyAssistant', () => ({
   useSymphonyAssistant: () => ({
@@ -56,7 +59,8 @@ vi.mock('./useShellChrome', () => ({
     toast: null, dismissToast: vi.fn(), confirmationToast: null, dismissConfirmationToast: vi.fn(),
   }),
 }))
-vi.mock('./providers/SelectionProvider', () => ({ useSelection: () => ({ selection: null }) }))
+const selectionState = vi.hoisted(() => ({ selection: null as unknown }))
+vi.mock('./providers/SelectionProvider', () => ({ useSelection: () => ({ selection: selectionState.selection }) }))
 
 vi.mock('@/contexts/NotesContext', () => ({ NotesProvider: ({ children }: { children: ReactNode }) => <>{children}</> }))
 vi.mock('@/contexts/ListsContext', () => ({ ListsProvider: ({ children }: { children: ReactNode }) => <>{children}</> }))
@@ -74,7 +78,9 @@ function renderAt(path: string) {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <DomainProvider>
-        <ShellLayout><div data-testid="app-content" /></ShellLayout>
+        <DomainGateProvider>
+          <ShellLayout><div data-testid="app-content" /></ShellLayout>
+        </DomainGateProvider>
       </DomainProvider>
     </MemoryRouter>,
   )
@@ -109,5 +115,49 @@ describe('ShellLayout domain switcher', () => {
     second.unmount()
     renderAt('/routines')
     expect(screen.getByRole('button', { name: 'Layers: All' })).toBeInTheDocument()
+  })
+})
+
+
+// The brief: a task detail or the assistant takes precedence over the pinned
+// reference panels, and the pins come BACK when that panel closes.
+describe('References and the side panels', () => {
+  beforeEach(() => { mobileState.isMobile = false; selectionState.selection = null; sessionStorage.clear() })
+
+  it('yields the reference panel to a task detail and returns it when the detail closes', () => {
+    sessionStorage.setItem('symphony-reference-lists:anonymous', JSON.stringify([{ kind: 'week', date: new Date().toISOString() }]))
+    const open = renderAt('/today')
+    expect(screen.getByRole('complementary', { name: 'Pinned reference lists' })).toBeInTheDocument()
+    expect(screen.queryByText(/Lists return when you close/)).not.toBeInTheDocument()
+    open.unmount()
+
+    selectionState.selection = { kind: 'task', id: 't1' }
+    const withDetail = renderAt('/today')
+    expect(screen.queryByRole('complementary', { name: 'Pinned reference lists' })).not.toBeInTheDocument()
+    // The pin is kept and says so, rather than reading as having been dropped.
+    expect(screen.getByText(/Lists return when you close the side panel/)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Unpin week list' })).toBeInTheDocument()
+    withDetail.unmount()
+
+    selectionState.selection = null
+    renderAt('/today')
+    expect(screen.getByRole('complementary', { name: 'Pinned reference lists' })).toBeInTheDocument()
+    sessionStorage.clear()
+  })
+})
+
+describe('Phone execution chrome', () => {
+  it('keeps references off the phone even when desktop lists were pinned', () => {
+    mobileState.isMobile = true
+    sessionStorage.setItem('symphony-reference-lists:anonymous', JSON.stringify([{ kind: 'week', date: new Date().toISOString() }]))
+    renderAt('/today')
+    expect(screen.queryByRole('complementary', { name: 'Pinned reference lists' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Pin month list' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Today' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Inbox' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'More' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Week' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Month' })).not.toBeInTheDocument()
+    sessionStorage.clear()
   })
 })

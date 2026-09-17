@@ -225,38 +225,39 @@ export function RhythmPage(props: RhythmPageProps) {
       <div className="relative w-full px-6 md:px-10 lg:px-14 py-8">
         {/* The shared masthead card — the same anchor every other page wears. */}
         <MastheadCard
+          variant="page"
           title="Routines"
           motif="routines"
           subline={`How your family runs — ${subtitle}`}
           footer={
           <div className="flex items-center gap-2">
-            <div className="flex items-center gap-2 rounded-xl border border-neutral-200 bg-white px-3 py-2 shadow-sm">
+            <div className="flex items-center gap-2 rounded-md border border-neutral-300 bg-bg-elevated px-3 py-2 focus-within:border-primary-500">
               <Search className="w-4 h-4 text-neutral-400" />
               <input
                 type="search"
                 value={query}
                 onChange={e => setQuery(e.target.value)}
                 placeholder="Type anywhere to find"
-                className="w-40 bg-transparent text-sm focus:outline-none placeholder:text-neutral-400"
+                className="w-40 bg-transparent text-[14px] focus:outline-none placeholder:text-neutral-400"
               />
             </div>
             {onBuildWithAI && (
               <button onClick={onBuildWithAI}
-                className="flex items-center gap-2 rounded-xl border border-neutral-200 bg-white px-4 py-2.5
-                           font-medium text-neutral-700 shadow-sm hover:border-amber-300 transition-colors">
-                <Sparkles className="w-4 h-4 text-amber-500" />
+                className="flex items-center gap-2 rounded-md border border-neutral-300 bg-bg-elevated px-4 py-2.5
+                           text-[14px] font-medium text-neutral-700 transition-colors hover:border-primary-400">
+                <Sparkles className="w-4 h-4 text-accent-500" />
                 Build with AI
               </button>
             )}
             <button
               onClick={() => setTendOpen(true)}
-              className="relative flex items-center gap-2 rounded-xl border border-neutral-200 bg-white px-4 py-2.5
-                         font-medium text-neutral-700 shadow-sm hover:border-emerald-400 transition-colors"
+              className="relative flex items-center gap-2 rounded-md border border-neutral-300 bg-bg-elevated px-4 py-2.5
+                         text-[14px] font-medium text-neutral-700 transition-colors hover:border-primary-400"
             >
-              <Wrench className="w-4 h-4 text-emerald-700" />
+              <Wrench className="w-4 h-4 text-primary-600" />
               Tend
               {tendCount > 0 && (
-                <span className="ml-0.5 rounded-full bg-emerald-700 px-1.5 py-0.5 text-[10px] font-bold text-white">
+                <span className="ml-0.5 rounded-full bg-primary-700 px-1.5 py-0.5 text-[10px] font-bold text-white">
                   {tendCount}
                 </span>
               )}
@@ -267,8 +268,8 @@ export function RhythmPage(props: RhythmPageProps) {
                 const created = await onCreateCollection('New routine')
                 if (created) { setDraftId(created.id); setOpen({ kind: 'standalone-step', id: created.id }) }
               }}
-              className="flex items-center gap-2 rounded-xl bg-primary-600 px-4 py-2.5 font-medium text-white
-                         shadow-sm hover:bg-primary-700 active:bg-primary-800 transition-colors">
+              className="flex items-center gap-2 rounded-md bg-primary-700 px-4 py-2.5 text-[14px] font-medium text-white
+                         transition-colors hover:bg-primary-800 active:bg-primary-900">
               <Plus className="w-5 h-5" />
               New routine
             </button>
@@ -281,15 +282,15 @@ export function RhythmPage(props: RhythmPageProps) {
           <div className="mb-6 flex items-center gap-1.5 flex-wrap">
             <span className="mr-1 text-[11px] font-semibold uppercase tracking-wider text-neutral-400">Whose week</span>
             <button onClick={() => setMemberIds([])} aria-pressed={memberIds.length === 0}
-              className={`rounded-full px-3 py-1 text-sm transition-colors ${
-                memberIds.length === 0 ? 'bg-[var(--color-primary-500,#3d5a44)] text-white' : 'border border-neutral-200 bg-white text-neutral-600'
+              className={`rounded-full px-3 py-1 text-[14px] transition-colors ${
+                memberIds.length === 0 ? 'bg-primary-700 text-white' : 'border border-neutral-300 text-neutral-600'
               }`}>
               Everyone
             </button>
             {[...familyMembers].sort((a, b) => a.display_order - b.display_order).map(m => (
               <button key={m.id} onClick={() => toggleMember(m.id)} aria-pressed={memberIds.includes(m.id)}
-                className={`rounded-full px-3 py-1 text-sm transition-colors ${
-                  memberIds.includes(m.id) ? 'bg-[var(--color-primary-500,#3d5a44)] text-white' : 'border border-neutral-200 bg-white text-neutral-600'
+                className={`rounded-full px-3 py-1 text-[14px] transition-colors ${
+                  memberIds.includes(m.id) ? 'bg-primary-700 text-white' : 'border border-neutral-300 text-neutral-600'
                 }`}>
                 {m.name}
               </button>
@@ -298,16 +299,14 @@ export function RhythmPage(props: RhythmPageProps) {
         )}
 
         {loading && routines.length === 0 && (
-          <p className="py-16 text-center text-neutral-400">Loading your week…</p>
+          <p className="py-16 text-center text-[15px] text-neutral-400">Loading your week…</p>
         )}
 
         {!loading && routines.length === 0 && (
           <div className="py-16 text-center">
-            <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-2xl bg-amber-100">
-              <RefreshCw className="h-10 w-10 text-amber-600" />
-            </div>
-            <h2 className="font-display mb-2 text-xl font-semibold text-neutral-700">No routines yet</h2>
-            <p className="mx-auto mb-6 max-w-sm text-neutral-500">
+            <RefreshCw aria-hidden="true" className="mx-auto mb-5 h-8 w-8 text-primary-400" />
+            <h2 className="mb-2 font-display text-[24px] text-neutral-800">No routines yet</h2>
+            <p className="mx-auto mb-6 max-w-sm text-[15px] text-neutral-500">
               Capture your first routine and Symphony will start painting your week.
             </p>
             <button
@@ -316,8 +315,8 @@ export function RhythmPage(props: RhythmPageProps) {
                 const created = await onCreateCollection('New routine')
                 if (created) { setDraftId(created.id); setOpen({ kind: 'standalone-step', id: created.id }) }
               }}
-              className="inline-flex items-center gap-2 rounded-xl bg-primary-600 px-5 py-2.5 font-medium text-white
-                         shadow-sm hover:bg-amber-600 transition-colors">
+              className="inline-flex items-center gap-2 rounded-md bg-primary-700 px-5 py-2.5 text-[15px] font-medium text-white
+                         transition-colors hover:bg-primary-800">
               <Plus className="h-5 w-5" />
               Create your first routine
             </button>

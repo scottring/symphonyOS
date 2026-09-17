@@ -1,8 +1,9 @@
+import { useNavigate } from 'react-router-dom'
 // MoreSheet — Mobile slide-up menu for secondary nav items
 // Opens from the "More" tab in the bottom nav
 
 import type { ReactElement } from 'react'
-import { MessageCircle } from 'lucide-react'
+import { MessageCircle, CalendarRange, CalendarDays } from 'lucide-react'
 import type { ViewType } from './Sidebar'
 
 interface MoreSheetProps {
@@ -23,6 +24,7 @@ interface NavItem {
 }
 
 export function MoreSheet({ isOpen, onClose, onNavigate, activeView, discussionsUnread }: MoreSheetProps) {
+  const navigate = useNavigate()
   const items: NavItem[] = [
     {
       view: 'discussions',
@@ -120,6 +122,11 @@ export function MoreSheet({ isOpen, onClose, onNavigate, activeView, discussions
 
         {/* Grid of items */}
         <div className="grid grid-cols-3 gap-1 px-4 pb-4">
+          {[{ label: 'Week', route: '/week', Icon: CalendarRange }, { label: 'Month', route: '/month', Icon: CalendarDays }].map(({ label, route, Icon }) => (
+            <button key={route} onClick={() => { navigate(route); onClose() }} className="flex flex-col items-center gap-1.5 py-4 px-2 rounded-xl text-neutral-600 hover:bg-neutral-100">
+              <Icon className="w-5 h-5" /><span className="text-sm">{label}</span>
+            </button>
+          ))}
           {items.map(item => (
             <button
               key={item.view}

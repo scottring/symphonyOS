@@ -418,7 +418,7 @@ export const ScheduleItem = memo(function ScheduleItem({
         // card, away from the title they label. Same rule the desktop branch
         // applies to its leading column via hasBelowTitleContent/self-start.
         cardClassName={`
-          relative flex ${hasPerPersonItems || fromEmail ? 'items-start' : 'items-center'} gap-3 bg-bg-elevated rounded-2xl border border-neutral-200/70
+          schedule-mobile-row relative flex ${hasPerPersonItems || fromEmail ? 'items-start' : 'items-center'} gap-3 bg-bg-elevated rounded-2xl border border-neutral-200/70
           px-3 py-3 shadow-card
           ${selected ? 'ring-2 ring-primary-300 shadow-md' : ''}
           ${item.completed || item.skipped || isFree ? 'opacity-60' : ''}
@@ -440,7 +440,7 @@ export const ScheduleItem = memo(function ScheduleItem({
 
         {/* Title + context line */}
         <div className="flex-1 min-w-0">
-          <div className={`text-[15px] font-semibold leading-tight line-clamp-2 break-words ${item.completed || item.skipped ? 'line-through text-neutral-400' : 'text-neutral-800'}`}>
+          <div className={`text-[19px] font-semibold leading-snug line-clamp-2 break-words ${item.completed || item.skipped ? 'line-through text-neutral-400' : 'text-neutral-800'}`}>
             {item.title}
           </div>
           {(contextLabel || isFree) && (
@@ -708,7 +708,7 @@ export const ScheduleItem = memo(function ScheduleItem({
             <span
               className={`
                 flex-1 min-w-0
-                ${variant === 'minimal' ? 'text-sm' : 'text-base'} font-medium line-clamp-2 transition-colors
+                text-[20px] leading-snug font-medium line-clamp-2 transition-colors
                 ${item.completed || item.skipped
                   ? 'line-through text-neutral-400'
                   : item.isWaiting
@@ -1084,7 +1084,7 @@ function ScheduleItemMobileCard({
   }
 
   return (
-    <div className="relative mb-3 overflow-hidden rounded-2xl">
+    <div className="schedule-mobile-swipe relative mb-3 overflow-hidden rounded-2xl">
       {/* Complete action — right side, revealed on right-to-left swipe. */}
       <div
         ref={completePanelEl}

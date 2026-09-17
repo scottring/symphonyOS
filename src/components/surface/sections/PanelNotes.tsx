@@ -82,7 +82,7 @@ export function PanelNotes({
       type="button"
       onClick={handleSaveToVault}
       disabled={vaultStatus === 'saving'}
-      className="text-[10px] uppercase tracking-wider font-semibold text-neutral-400 hover:text-primary-600 disabled:opacity-40 transition-colors"
+      className="text-[11px] uppercase tracking-[0.08em] font-semibold text-neutral-400 hover:text-primary-600 disabled:opacity-40 transition-colors"
       title="Save these notes as a permanent note in your vault, linked to this task"
     >
       {vaultStatus === 'saved'
@@ -114,7 +114,7 @@ export function PanelNotes({
   ) : (
     <>
       <div
-        className="panel-notes-read text-sm text-neutral-600 border-l-2 border-neutral-300 pl-3 py-1"
+        className="panel-notes-read text-[15px] text-neutral-600 border-l-2 border-neutral-300 pl-3 py-1"
         dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(notesToHtml(notes)) }}
       />
       {/* The editor carries its own spacing; the read-only branch has to say it
@@ -175,7 +175,7 @@ export function PanelNotes({
         }
       >
         {wide ? (
-          <div className="text-sm italic text-neutral-400 border-l-2 border-neutral-300 pl-3 py-1">
+          <div className="text-[15px] italic text-neutral-400 border-l-2 border-neutral-300 pl-3 py-1">
             Editing — widened
           </div>
         ) : (
@@ -198,7 +198,7 @@ export function PanelNotes({
             }}
           >
             <div className="flex items-center justify-between px-4 py-3 border-b border-neutral-200/70">
-              <div className="text-[10px] uppercase tracking-wider font-semibold text-neutral-400">
+              <div className="text-[11px] uppercase tracking-[0.08em] font-semibold text-neutral-400">
                 {label}
               </div>
               <div className="flex items-center gap-3">

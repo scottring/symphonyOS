@@ -58,20 +58,20 @@ export function EveningMealCard({
       tabIndex={0}
       onClick={onSelect}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect() } }}
-      className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-[hsl(28_55%_95%)] cursor-pointer hover:bg-[hsl(28_55%_92%)] transition-colors"
+      className="flex items-center gap-3 px-3 py-2.5 rounded-xl cursor-pointer bg-accent-50 hover:bg-accent-100 transition-colors"
     >
-      <span className="shrink-0 w-10 h-10 rounded-lg overflow-hidden bg-[hsl(28_45%_88%)] flex items-center justify-center">
+      <span className="shrink-0 w-10 h-10 rounded-lg overflow-hidden bg-accent-100 flex items-center justify-center">
         {imageUrl
           ? <img src={imageUrl} alt="" className="w-full h-full object-cover" />
-          : <UtensilsCrossed className="w-[18px] h-[18px] text-[hsl(14_45%_50%)]" />}
+          : <UtensilsCrossed className="w-[18px] h-[18px] text-accent-500" />}
       </span>
       <div className="min-w-0 flex-1">
         {/* One eyebrow carries the whole metadata row the card used to spend a
             line of chips on. */}
         {(timeLabel || hasMeta) && (
-          <p className="text-[11px] font-medium uppercase tracking-wide text-[hsl(14_40%_45%)]">
+          <p className="text-[11px] font-medium uppercase tracking-wide text-accent-600">
             {timeLabel ? <>Dinner at <span>{timeLabel}</span></> : 'Dinner'}
-            {hasMeta && <span className="text-[hsl(14_25%_60%)]">
+            {hasMeta && <span className="text-neutral-400">
               {fromPlan && ' · Meal plan'}
               {servesCount != null && ` · Serves ${servesCount}`}
             </span>}
@@ -105,7 +105,7 @@ export function EveningMealCard({
           target="_blank"
           rel="noreferrer"
           onClick={(e) => e.stopPropagation()}
-          className="shrink-0 text-xs px-3 py-1.5 rounded-lg font-medium bg-white/70 text-[hsl(14_40%_40%)] hover:bg-white"
+          className="shrink-0 text-xs px-3 py-1.5 rounded-lg font-medium bg-white/70 text-accent-700 hover:bg-white"
         >
           View recipe →
         </a>

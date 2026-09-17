@@ -81,13 +81,13 @@ export function PanelReach({ kind, value, onChange, autoFocus, asLink = true }: 
           {asLink ? (
             <a
               href={meta.href(value)}
-              className="flex flex-1 items-center gap-2 rounded-md px-1 py-1.5 text-sm text-neutral-800 hover:bg-neutral-100/60"
+              className="flex flex-1 items-center gap-2 rounded-md px-1 py-1.5 text-[15px] text-neutral-800 hover:bg-neutral-100/60"
             >
               <Icon className="h-4 w-4 shrink-0 text-neutral-400" aria-hidden />
               <span className="truncate">{value}</span>
             </a>
           ) : (
-            <span className="flex flex-1 items-center gap-2 px-1 py-1.5 text-sm text-neutral-800">
+            <span className="flex flex-1 items-center gap-2 px-1 py-1.5 text-[15px] text-neutral-800">
               <Icon className="h-4 w-4 shrink-0 text-neutral-400" aria-hidden />
               <span className="truncate">{value}</span>
             </span>
@@ -119,7 +119,7 @@ export function PanelReach({ kind, value, onChange, autoFocus, asLink = true }: 
             onBlur={() => commit()}
             placeholder={meta.placeholder}
             aria-label={meta.label}
-            className="min-w-0 flex-1 border-b border-neutral-200 bg-transparent py-1 text-sm text-neutral-800 placeholder:text-neutral-300 focus:border-primary-300 focus:outline-none"
+            className="min-w-0 flex-1 border-b border-neutral-200 bg-transparent py-1 text-[15px] text-neutral-800 placeholder:text-neutral-300 focus:border-primary-300 focus:outline-none"
           />
         </form>
       )}

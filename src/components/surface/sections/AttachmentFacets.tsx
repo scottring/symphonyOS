@@ -13,7 +13,7 @@ export interface FacetPromotions {
   onSetPhone?: (number: string) => void
 }
 
-const chip = 'inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white shadow-[inset_0_0_0_1px_#e5e7eb] text-sm text-neutral-700'
+const chip = 'inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white shadow-[inset_0_0_0_1px_#e5e7eb] text-[15px] text-neutral-700'
 const promoteBtn = 'text-[11px] text-primary-600 hover:text-primary-700 font-medium'
 
 function fmtDatetime(iso: string): string {
@@ -182,7 +182,7 @@ export function AttachmentFacets({ facets, promotions }: { facets: Facet[]; prom
                 </span>
                 {f.items.map((item) => (
                   <div key={item} className="flex items-center gap-2 pl-5">
-                    <span className="text-sm text-neutral-700">{item}</span>
+                    <span className="text-[15px] text-neutral-700">{item}</span>
                     {promotions?.onAddPrepTask && (
                       <button
                         type="button"

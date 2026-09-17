@@ -94,10 +94,10 @@ export function WeekGrid({ weekStart, dayCount = 7, children, onCreateGesture, s
       {/* Dinner row — meal events out of the time grid */}
       {renderDinner && (
         <div
-          className="grid border-b border-neutral-200 bg-[hsl(28_55%_90%/0.28)]"
+          className="grid border-b border-neutral-200 bg-accent-50/70"
           style={{ gridTemplateColumns: `${TIME_COL_WIDTH}px repeat(${dayCount}, 1fr)`, minHeight: 30 }}
         >
-          <div className="px-2 py-2 text-[10px] uppercase tracking-wide text-[hsl(14_45%_35%/0.8)]">dinner</div>
+          <div className="px-2 py-2 text-[10px] uppercase tracking-wide text-accent-700/80">dinner</div>
           {days.map((d, i) => (
             <div key={i} className="border-l border-neutral-200/60 px-2 py-1 min-w-0 overflow-hidden flex items-center">
               {renderDinner(d)}

@@ -53,6 +53,7 @@ export function DocumentsApp() {
   return (
     <div className={PAGE_COLUMN_WIDE}>
       <MastheadCard
+        variant="page"
         title="Documents"
         motif="documents"
         subline="Things you'll need again. Private unless you share them."
@@ -94,17 +95,17 @@ export function DocumentsApp() {
       )}
 
       {isLoading ? (
-        <div className="text-sm text-neutral-400">Loading…</div>
+        <div className="text-[15px] text-neutral-400">Loading…</div>
       ) : documents.length === 0 ? (
-        <div className="text-sm text-neutral-500">
+        <div className="max-w-xl text-[15px] text-neutral-500">
           No documents yet. When you attach something like a license or an insurance card,
           Symphony will offer to keep it here.
         </div>
       ) : (
         groups.map(([owner, docs]) => (
           <section key={owner} className="mb-8">
-            <h2 className="text-[12px] uppercase tracking-wide text-neutral-400 mb-2">{owner}</h2>
-            <div className="space-y-2">
+            <h2 className="mb-2 text-[12px] font-semibold uppercase tracking-[0.08em] text-neutral-400">{owner}</h2>
+            <div className="border-t border-neutral-300">
               {docs.map((d) => (
                 <DocumentRow
                   key={d.id}

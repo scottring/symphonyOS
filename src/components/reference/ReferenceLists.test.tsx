@@ -1,0 +1,98 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { MemoryRouter, Link, useLocation } from 'react-router-dom'
+import { ReferenceListsProvider } from './ReferenceListsContext'
+import { ReferenceListControls, ReferenceListsDock } from './ReferenceLists'
+import type { Task } from '@/types/task'
+
+const data = vi.hoisted(() => ({ tasks: [] as Task[], allow: true, push: vi.fn(), update: vi.fn(), complete: vi.fn() }))
+vi.mock('@/hooks/useSupabaseTasks', () => ({ useSupabaseTasks: () => ({ tasks: data.tasks, loading: false, updateTask: data.update, updateTasksBulk: vi.fn(), pushTask: data.push, toggleTask: data.complete }) }))
+vi.mock('@/hooks/useFamilyMembers', () => ({ useFamilyMembers: () => ({ getCurrentUserMember: () => ({ id: 'me' }) }) }))
+vi.mock('@/hooks/useDomain', () => ({ useDomain: () => ({ layers: new Set(['personal']) }) }))
+vi.mock('@/hooks/useGatedTaskActions', async (importOriginal) => ({ ...await importOriginal<typeof import('@/hooks/useGatedTaskActions')>(), useGatedTaskActions: () => ({ updateTask: data.update, pushTask: async (...args: unknown[]) => { if (!data.allow) return false; await data.push(...args); return true } }) }))
+function task(id: string, bucket: 'week' | 'month', extra = {}): Task {
+  return { id, title: id, bucket, context: 'personal', completed: false, createdAt: new Date(), updatedAt: new Date(), ...extra } as Task
+}
+function Page() {
+  const location = useLocation()
+  return <><Link to="/notes">Notes page</Link><Link to="/week">Week page</Link><p>{location.pathname}</p><ReferenceListControls /><ReferenceListsDock /></>
+}
+function mount(userId = 'one', initial = '/today') {
+  return render(<MemoryRouter initialEntries={[initial]}><ReferenceListsProvider userId={userId}><Page /></ReferenceListsProvider></MemoryRouter>)
+}
+beforeEach(() => {
+  sessionStorage.clear(); vi.clearAllMocks(); data.allow = true
+  data.tasks = [task('Book a service visit', 'week'), task('Read a book', 'month')]
+})
+afterEach(() => vi.useRealTimers())
+
+describe('Pinned reference lists', () => {
+  it('keeps both lists alongside a different page without writing or navigating on pin', () => {
+    mount()
+    fireEvent.click(screen.getByRole('button', { name: 'Pin week list' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Pin month list' }))
+    fireEvent.click(screen.getByText('Notes page'))
+    expect(screen.getByText('/notes')).toBeInTheDocument()
+    expect(screen.getByText('Book a service visit')).toBeInTheDocument()
+    expect(screen.getByText('Read a book')).toBeInTheDocument()
+    expect(data.push).not.toHaveBeenCalled(); expect(data.update).not.toHaveBeenCalled(); expect(data.complete).not.toHaveBeenCalled()
+  })
+  it('restores period pins for the same user, never another account', () => {
+    const view = mount(); fireEvent.click(screen.getByRole('button', { name: 'Pin month list' })); view.unmount()
+    const restored = mount(); expect(screen.getByText('Read a book')).toBeInTheDocument(); restored.unmount()
+    mount('two'); expect(screen.queryByText('Read a book')).not.toBeInTheDocument()
+    expect(sessionStorage.getItem('symphony-reference-lists:one')).not.toContain('Read a book')
+  })
+  it('uses domain, assignee and period filtering', () => {
+    data.tasks.push(task('Private work', 'week', { context: 'work' }), task('Someone else', 'week', { assignedTo: 'other' }), task('Future month', 'month', { monthStart: new Date(2099, 0, 1) }))
+    mount(); fireEvent.click(screen.getByRole('button', { name: 'Pin week list' })); fireEvent.click(screen.getByRole('button', { name: 'Pin month list' }))
+    expect(screen.queryByText('Private work')).not.toBeInTheDocument()
+    expect(screen.queryByText('Someone else')).not.toBeInTheDocument()
+    expect(screen.queryByText('Future month')).not.toBeInTheDocument()
+  })
+  it('schedules only on explicit action, to actual today, and stays on the current page', async () => {
+    mount(); fireEvent.click(screen.getByRole('button', { name: 'Pin week list' })); fireEvent.click(screen.getByText('Notes page'))
+    fireEvent.click(screen.getByRole('button', { name: 'Do today' }))
+    await waitFor(() => expect(data.push).toHaveBeenCalledTimes(1))
+    const today = new Date(); today.setHours(0, 0, 0, 0)
+    expect(data.push).toHaveBeenCalledWith('Book a service visit', today)
+    expect(screen.getByText('/notes')).toBeInTheDocument()
+  })
+  it('does not resolve a cancelled placement, and reports failed saves', async () => {
+    data.allow = false; mount(); fireEvent.click(screen.getByRole('button', { name: 'Pin week list' })); fireEvent.click(screen.getByRole('button', { name: 'Do today' }))
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Do today' })).toBeEnabled())
+    expect(data.push).not.toHaveBeenCalled()
+    data.allow = true; data.push.mockRejectedValueOnce(new Error('offline'))
+    fireEvent.click(screen.getByRole('button', { name: 'Do today' }))
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Could not save'))
+    expect(screen.getByRole('button', { name: 'Do today' })).toBeEnabled()
+  })
+  it('does not draw a second copy of a list the page is already showing', () => {
+    mount()
+    fireEvent.click(screen.getByRole('button', { name: 'Pin week list' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Pin month list' }))
+    expect(screen.getByText('Book a service visit')).toBeInTheDocument()
+    fireEvent.click(screen.getByText('Week page'))
+    // /week holds the week list and folds the month beneath it, so BOTH pinned
+    // panels stand down — and the pins are kept, not dropped.
+    expect(screen.queryByRole('complementary', { name: 'Pinned reference lists' })).not.toBeInTheDocument()
+    expect(screen.getAllByText(/on this page/)).toHaveLength(2)
+    expect(data.push).not.toHaveBeenCalled(); expect(data.update).not.toHaveBeenCalled()
+    // Navigating away brings the same pins straight back.
+    fireEvent.click(screen.getByText('Notes page'))
+    expect(screen.getByText('Book a service visit')).toBeInTheDocument()
+    expect(screen.getByText('Read a book')).toBeInTheDocument()
+  })
+  it('keeps a pinned week list on /month, which does not show one', () => {
+    mount('one', '/month')
+    fireEvent.click(screen.getByRole('button', { name: 'Pin week list' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Pin month list' }))
+    expect(screen.getByText('Book a service visit')).toBeInTheDocument()
+    expect(screen.queryByText('Read a book')).not.toBeInTheDocument()
+  })
+  it('unpins without changing tasks', () => {
+    mount(); fireEvent.click(screen.getByRole('button', { name: 'Pin week list' })); fireEvent.click(screen.getAllByRole('button', { name: 'Unpin week list' })[0])
+    expect(screen.queryByRole('complementary', { name: 'Pinned reference lists' })).not.toBeInTheDocument()
+    expect(data.update).not.toHaveBeenCalled()
+  })
+})

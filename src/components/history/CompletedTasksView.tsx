@@ -108,6 +108,7 @@ export function CompletedTasksView({
         {/* Header — shared Library masthead (design-unification 2026-09-01).
             The Back link and icon medallion died with it: History is a page. */}
         <MastheadCard
+          variant="page"
           title="History"
           motif="history"
           subline={`${completedTasks.length} completed task${completedTasks.length !== 1 ? 's' : ''}`}
@@ -129,9 +130,9 @@ export function CompletedTasksView({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search completed tasks..."
-              className="w-full pl-10 pr-4 py-3 rounded-xl border border-neutral-200 bg-white
-                         focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent
-                         text-sm placeholder:text-neutral-400"
+              className="w-full rounded-md border border-neutral-300 bg-bg-elevated py-3 pl-10 pr-4
+                         text-[15px] placeholder:text-neutral-400
+                         focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
             />
             {searchQuery && (
               <button
@@ -151,10 +152,10 @@ export function CompletedTasksView({
           <div className="space-y-6">
             {visibleGroups.map((group) => (
               <div key={group.key}>
-                <h2 className="text-sm font-medium text-neutral-500 uppercase tracking-wide mb-3">
+                <h2 className="mb-2 text-[12px] font-semibold uppercase tracking-[0.08em] text-neutral-400">
                   {group.label}
                 </h2>
-                <div className="bg-white rounded-xl border border-neutral-100 divide-y divide-neutral-100">
+                <div className="divide-y divide-neutral-200 border-y border-neutral-300">
                   {group.tasks.map((task) => (
                     <TaskHistoryRow
                       key={task.id}
@@ -172,7 +173,7 @@ export function CompletedTasksView({
               <div className="text-center py-4">
                 <button
                   onClick={() => setVisibleMonths((prev) => prev + 3)}
-                  className="text-sm font-medium text-primary-600 hover:text-primary-700 transition-colors"
+                  className="text-[14px] font-medium text-primary-700 transition-colors hover:underline"
                 >
                   Load more...
                 </button>
@@ -180,16 +181,16 @@ export function CompletedTasksView({
             )}
           </div>
         ) : (
-          <div className="text-center py-12">
-            <div className="w-16 h-16 rounded-full bg-neutral-100 flex items-center justify-center mx-auto mb-4">
-              <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 text-neutral-400" viewBox="0 0 20 20" fill="currentColor">
+          <div className="py-12 text-center">
+            <div className="mx-auto mb-4 flex items-center justify-center">
+              <svg xmlns="http://www.w3.org/2000/svg" aria-hidden="true" className="h-8 w-8 text-neutral-400" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
               </svg>
             </div>
-            <h3 className="text-lg font-medium text-neutral-800 mb-1">
+            <h3 className="mb-1 font-display text-[24px] text-neutral-800">
               {searchQuery ? 'No matching tasks' : 'No completed tasks yet'}
             </h3>
-            <p className="text-sm text-neutral-500">
+            <p className="text-[15px] text-neutral-500">
               {searchQuery
                 ? 'Try a different search term'
                 : 'Completed tasks will appear here'}
@@ -221,7 +222,7 @@ function TaskHistoryRow({
   return (
     <button
       onClick={onSelect}
-      className="w-full flex flex-col gap-1 p-4 hover:bg-neutral-50 transition-colors text-left"
+      className="flex w-full flex-col gap-1 px-4 py-3.5 text-left transition-colors hover:bg-neutral-50"
     >
       <div className="flex items-center gap-3">
         {/* Completed checkbox */}
@@ -232,12 +233,12 @@ function TaskHistoryRow({
         </span>
 
         {/* Title */}
-        <span className="flex-1 text-sm text-neutral-800 font-medium truncate">
+        <span className="flex-1 truncate text-[19px] leading-snug text-neutral-800">
           {task.title}
         </span>
 
         {/* Date */}
-        <span className="text-xs text-neutral-400 flex-shrink-0">
+        <span className="shrink-0 text-[12px] text-neutral-400">
           {formatCompletionDate(task.updatedAt)}
         </span>
 
@@ -250,7 +251,7 @@ function TaskHistoryRow({
       {/* Metadata row: contact, notes. The project chip lived between them
           until Projects were hidden (2026-09-02 — see the note in Sidebar.tsx). */}
       {(contact || notesSnippet) && (
-        <div className="ml-8 flex flex-wrap items-center gap-2 text-xs text-neutral-500">
+        <div className="ml-8 flex flex-wrap items-center gap-2 text-[12px] text-neutral-500">
           {contact && (
             <span className="flex items-center gap-1">
               <svg xmlns="http://www.w3.org/2000/svg" className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">

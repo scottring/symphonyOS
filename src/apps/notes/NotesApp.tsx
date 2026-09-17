@@ -225,6 +225,7 @@ export function NotesApp() {
     <div className="h-full overflow-auto">
       <div className={PAGE_COLUMN_WIDE}>
         <MastheadCard
+          variant="page"
           title="Notes"
           motif="notes"
           subline="Everything you've jotted, newest first — typed here, attached to something, or read off a page."
@@ -392,7 +393,7 @@ export function NotesApp() {
                         <span className="sr-only">Lives on its task — delete it there. </span>
                       )}
                       <div className="flex items-baseline gap-3">
-                        <h3 className="flex-1 min-w-0 truncate text-[16px] font-display text-neutral-900 group-hover:text-primary-800 transition-colors">
+                        <h3 className="flex-1 min-w-0 truncate text-[19px] font-display text-neutral-900 group-hover:text-primary-800 transition-colors">
                           {headingFor(note)}
                         </h3>
                         <span className="shrink-0 text-[12px] text-neutral-400 tabular-nums">
@@ -403,7 +404,7 @@ export function NotesApp() {
                         </span>
                       </div>
                       {excerpt && (
-                        <p className="mt-0.5 text-[13.5px] leading-relaxed text-neutral-500 line-clamp-2">
+                        <p className="mt-1 text-[14px] leading-relaxed text-neutral-500 line-clamp-2">
                           {excerpt}
                         </p>
                       )}

@@ -3,6 +3,7 @@ import { MastheadCard } from '@/components/layout/MastheadCard'
 import { PAGE_COLUMN_WIDE } from '@/components/layout/pageLayout'
 import { useState, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
+import { AlertTriangle, House } from 'lucide-react'
 import { useHomes } from '@/hooks/useHomes'
 import { useSpaces } from '@/hooks/useSpaces'
 import { useAssets } from '@/hooks/useAssets'
@@ -45,9 +46,9 @@ export function HomeOverview() {
   if (!home) {
     return (
       <div className="py-6 px-6 md:px-10 lg:px-14 max-w-2xl mr-auto">
-        <h1 className="font-display text-3xl mb-4">Home</h1>
-        <div className="card p-6">
-          <p className="mb-4">You don't have a home set up yet.</p>
+        <h1 className="mb-4 font-display text-3xl text-neutral-900">Home</h1>
+        <div className="border-y border-neutral-200 py-6">
+          <p className="mb-4 text-[15px] text-neutral-700">You don't have a home set up yet.</p>
           <button
             className="btn-primary"
             onClick={async () => {
@@ -65,6 +66,7 @@ export function HomeOverview() {
   return (
     <div className={PAGE_COLUMN_WIDE}>
       <MastheadCard
+        variant="page"
         title="House"
         motif="house"
         subline="Rooms, the things in them, and what each one needs next."
@@ -86,22 +88,25 @@ export function HomeOverview() {
       />
 
       {needsDetailsAssets.length > 0 && (
-        <div className="card p-4 mb-6 flex items-center justify-between bg-amber-50 border-amber-200">
-          <span>⚠ {needsDetailsAssets.length} asset{needsDetailsAssets.length === 1 ? '' : 's'} need details</span>
-          <Link to="/inbox?section=home" className="text-primary-700 underline">Triage now →</Link>
+        <div className="mb-6 flex items-center justify-between gap-3 border-l-2 border-warning-500 bg-amber-50 px-4 py-3">
+          <span className="flex items-center gap-2 text-[15px] text-neutral-800">
+            <AlertTriangle aria-hidden="true" className="h-4 w-4 shrink-0 text-warning-600" />
+            {needsDetailsAssets.length} asset{needsDetailsAssets.length === 1 ? '' : 's'} need details
+          </span>
+          <Link to="/inbox?section=home" className="shrink-0 text-[14px] text-primary-700 hover:underline">Triage now</Link>
         </div>
       )}
 
       <input
-        className="input-base w-full mb-6"
+        className="mb-6 w-full rounded-md border border-neutral-300 bg-bg-elevated px-3 py-2.5 text-[15px] text-neutral-800 placeholder:text-neutral-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
         placeholder="Search assets…"
         value={search}
         onChange={(e) => setSearch(e.target.value)}
       />
 
-      <h2 className="font-display text-xl mb-3">Rooms</h2>
+      <h2 className="mb-3 font-display text-[22px] text-neutral-900">Rooms</h2>
       {rooms.length === 0 ? (
-        <p className="text-neutral-500 mb-6">No rooms yet. Add one to get started.</p>
+        <p className="mb-6 text-[15px] text-neutral-500">No rooms yet. Add one to get started.</p>
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 mb-8">
           {rooms.map((r) => (
@@ -110,17 +115,17 @@ export function HomeOverview() {
         </div>
       )}
 
-      <h2 className="font-display text-xl mb-3">Recent</h2>
-      <ul className="space-y-2">
+      <h2 className="mb-3 font-display text-[22px] text-neutral-900">Recent</h2>
+      <ul className="border-t border-neutral-300">
         {filteredAssets.map((a) => (
-          <li key={a.id}>
+          <li key={a.id} className="border-b border-neutral-200">
             <Link
               to={`/home/asset/${a.id}`}
-              className="block card p-3 hover:bg-neutral-50"
+              className="block px-3 py-3.5 transition-colors hover:bg-neutral-50"
             >
-              <div className="flex items-center justify-between">
-                <span>{a.name}</span>
-                <span className="text-sm text-neutral-500">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-[19px] leading-snug text-neutral-800">{a.name}</span>
+                <span className="shrink-0 text-[13px] text-neutral-500">
                   {(() => {
                     const roomName = rooms.find((r) => r.id === a.spaceId)?.name
                     return roomName ? `in ${roomName}` : '—'
@@ -137,17 +142,17 @@ export function HomeOverview() {
 
 function RoomTile({ room, count }: { room: Space; count: number }) {
   return (
-    <Link to={`/home/space/${room.id}`} className="block card p-0 overflow-hidden hover:shadow-md transition-shadow">
-      <div className="aspect-[4/3] bg-neutral-200 flex items-center justify-center">
+    <Link to={`/home/space/${room.id}`} className="block overflow-hidden rounded-md border border-neutral-200 transition-colors hover:border-neutral-300">
+      <div className="flex aspect-[4/3] items-center justify-center bg-neutral-100">
         {room.photoUrl ? (
-          <img src={room.photoUrl} alt={room.name} className="w-full h-full object-cover" />
+          <img src={room.photoUrl} alt={room.name} className="h-full w-full object-cover" />
         ) : (
-          <span className="text-4xl">🏠</span>
+          <House aria-hidden="true" className="h-8 w-8 text-neutral-300" />
         )}
       </div>
       <div className="p-3">
-        <div className="font-medium">{room.name}</div>
-        <div className="text-sm text-neutral-500">{count} item{count === 1 ? '' : 's'}</div>
+        <div className="text-[17px] leading-snug text-neutral-800">{room.name}</div>
+        <div className="text-[13px] text-neutral-500">{count} item{count === 1 ? '' : 's'}</div>
       </div>
     </Link>
   )

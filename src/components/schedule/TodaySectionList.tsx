@@ -61,14 +61,14 @@ function isMealItem(id: string, type: string, title: string): boolean {
 function UpNextMarker({ status }: { status?: string }) {
   return (
     <div className="flex items-center gap-2 px-3 md:px-0 pt-1.5 pb-1" data-testid="up-next-marker">
-      <span className="text-[11px] uppercase tracking-wider font-bold text-amber-600">Up next</span>
+      <span className="text-[11px] uppercase tracking-wider font-bold text-accent-600">Up next</span>
       {status && <span className="text-[12px] text-neutral-500">· {status}</span>}
     </div>
   )
 }
 
 /** Row tint for the up-next commitment — subtle, no layout shift. */
-const UP_NEXT_ROW_CLASS = 'rounded-xl bg-primary-50/60 ring-1 ring-primary-100'
+const UP_NEXT_ROW_CLASS = 'rounded-r-md border-l-2 border-primary-600 bg-primary-50/40'
 
 /** Locate a rendered timeline item by id across every section. */
 export function findTimelineItem(
@@ -411,7 +411,7 @@ export function TodaySectionList({
                               <div className="w-5 shrink-0 flex items-center justify-center relative z-[1]">
                                 <span
                                   aria-hidden
-                                  className="w-[18px] h-[18px] rounded-full border-2 border-[hsl(14_45%_62%)]"
+                                  className="w-[18px] h-[18px] rounded-full border-2 border-accent-300"
                                 />
                               </div>
                               <div className="flex-1 min-w-0">

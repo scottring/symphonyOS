@@ -33,7 +33,7 @@ export function PanelSource({ captureId }: PanelSourceProps) {
     if (!error) return null
     return (
       <PanelSection id="source" label="Source">
-        <p className="text-sm text-neutral-500">Couldn’t load the source email.</p>
+        <p className="text-[15px] text-neutral-500">Couldn’t load the source email.</p>
       </PanelSection>
     )
   }
@@ -52,7 +52,7 @@ export function PanelSource({ captureId }: PanelSourceProps) {
           <Mail className="h-3.5 w-3.5 text-neutral-500" aria-hidden />
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block text-sm text-neutral-800 break-words">
+          <span className="block text-[15px] text-neutral-800 break-words">
             {headline || capture.sourceLabel || 'Forwarded email'}
           </span>
           {received && <span className="block text-xs text-neutral-500">{received}</span>}

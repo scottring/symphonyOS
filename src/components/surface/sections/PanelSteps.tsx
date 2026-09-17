@@ -10,7 +10,7 @@ export function PanelSteps({ steps }: PanelStepsProps) {
 
   return (
     <PanelSection id="steps" label="Steps" preview={`${list.length} step${list.length === 1 ? '' : 's'}`}>
-      <ol className="space-y-1.5 list-decimal list-inside text-sm text-neutral-700 marker:text-neutral-400">
+      <ol className="space-y-1.5 list-decimal list-inside text-[15px] text-neutral-700 marker:text-neutral-400">
         {list.map((step, i) => (
           <li key={i} className="pl-1 leading-snug">{step}</li>
         ))}

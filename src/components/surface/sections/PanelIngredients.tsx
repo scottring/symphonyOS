@@ -30,7 +30,7 @@ export function PanelIngredients({ ingredients }: PanelIngredientsProps) {
               onChange={() => toggle(i)}
               className="w-4 h-4 rounded border-neutral-300 text-primary-600 focus:ring-primary-500"
             />
-            <span className={`text-sm ${checked.has(i) ? 'text-neutral-400 line-through' : 'text-neutral-800'}`}>
+            <span className={`text-[15px] ${checked.has(i) ? 'text-neutral-400 line-through' : 'text-neutral-800'}`}>
               {item}
             </span>
           </li>

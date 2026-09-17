@@ -673,7 +673,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
                       type="button"
                       title={label}
                       onClick={() => onSelectItem(`event-${event.google_event_id || event.id}`)}
-                      className="block w-full min-w-0 text-left text-[11.5px] leading-tight text-[hsl(14_45%_35%)] truncate hover:underline cursor-pointer"
+                      className="block w-full min-w-0 text-left text-[11.5px] leading-tight text-accent-700 truncate hover:underline cursor-pointer"
                     >
                       {label}
                     </button>
@@ -787,7 +787,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
                   const routine = routines.find((r) => r.id === drag.activeDragId!.slice('poolroutine:'.length))
                   if (!routine) return null
                   return (
-                    <div className="pointer-events-none max-w-[260px] rounded-lg border border-[hsl(42_50%_70%)] bg-[hsl(45_75%_90%)] px-2 py-1.5 text-[12.5px] font-semibold text-[hsl(40_60%_30%)] shadow-lg">
+                    <div className="pointer-events-none max-w-[260px] rounded-lg border border-primary-200 bg-primary-50 px-2 py-1.5 text-[12.5px] font-semibold text-primary-800 shadow-lg">
                       {routine.name}
                     </div>
                   )

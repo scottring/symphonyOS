@@ -163,7 +163,7 @@ export function ListItemRow({
         {/* Content */}
         <div className="flex-1 min-w-0">
           <div
-            className={`text-sm transition-colors ${
+            className={`text-[19px] leading-snug transition-colors ${
               item.completed ? 'text-neutral-400 line-through' : 'text-neutral-800'
             }`}
           >

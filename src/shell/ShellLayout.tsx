@@ -1,7 +1,9 @@
+import { ReferenceListsProvider, useReferenceLists } from '@/components/reference/ReferenceListsContext';
+import { ReferenceListControls, ReferenceListsDock } from '@/components/reference/ReferenceLists';
 // src/shell/ShellLayout.tsx
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Sparkles, Sun, CalendarRange, CalendarDays, Inbox as InboxIcon, MoreHorizontal } from 'lucide-react';
+import { Sparkles, Sun, Inbox as InboxIcon, MoreHorizontal } from 'lucide-react';
 import { Sidebar, type ViewType } from '@/components/layout/Sidebar';
 import { MoreSheet } from '@/components/layout/MoreSheet';
 import { QuickCapture } from '@/components/layout/QuickCapture';
@@ -95,6 +97,7 @@ function ShellLayoutInner({ children }: Props) {
     localStorage.setItem(SIDEBAR_STORAGE_KEY, String(sidebarCollapsed));
   }, [sidebarCollapsed]);
 
+  const references = useReferenceLists();
   const activeView = useMemo(() => deriveActiveView(location.pathname), [location.pathname]);
   const isToday = TODAY_PATHS.has(location.pathname);
 
@@ -329,7 +332,11 @@ function ShellLayoutInner({ children }: Props) {
           </div>
         )}
 
-        {children}
+        {!isMobile && <ReferenceListControls paused={!!selection || rightRailVisible || todayRailVisible} />}
+        <div className={!isMobile && references?.pins.length && !selection && !rightRailVisible && !todayRailVisible ? 'reference-workspace' : ''}>
+          <div className="min-w-0">{children}</div>
+          {!isMobile && !selection && !rightRailVisible && !todayRailVisible && <ReferenceListsDock />}
+        </div>
       </div>
 
       {/* QuickCapture FAB — all routes except the agent view (which has its own input) */}
@@ -404,10 +411,7 @@ function ShellLayoutInner({ children }: Props) {
         </div>
       )}
 
-      {/* Mobile bottom navigation — the rhythm spine: Today · Week · Month ·
-          Inbox · More. Horizon tabs route directly (they're URL routes, not
-          ViewTypes); active state reads from the pathname. The capture FAB
-          floats separately. Season/Year/Someday + the library live in More. */}
+      {/* Phone execution: Today, Inbox, More. Week/month lookup lives in More. */}
       {isMobile && (
         <nav
           className="fixed bottom-0 left-0 right-0 z-40 bg-bg-elevated/95 backdrop-blur-lg border-t border-neutral-200/50"
@@ -416,8 +420,6 @@ function ShellLayoutInner({ children }: Props) {
           <div className="flex items-stretch px-1 py-0.5">
             {[
               { label: 'Today', Icon: Sun, route: '/today', active: location.pathname === '/' || location.pathname === '/today' },
-              { label: 'Week', Icon: CalendarRange, route: '/week', active: location.pathname.startsWith('/week') },
-              { label: 'Month', Icon: CalendarDays, route: '/month', active: location.pathname.startsWith('/month') },
             ].map((tab) => (
               <button
                 key={tab.route}
@@ -489,6 +491,7 @@ function ShellLayoutInner({ children }: Props) {
 }
 
 export function ShellLayout({ children }: Props) {
+  const { user } = useAuth();
   // Wrap the chrome's data needs (note quick-add, pinned lists) in the same
   // contexts the legacy AppShell relied on. Apps that render their own copies
   // (e.g. TasksApp) nest harmlessly inside these.
@@ -496,7 +499,7 @@ export function ShellLayout({ children }: Props) {
     <ListsProvider>
       <NotesProvider>
         <PinsProvider>
-          <ShellLayoutInner>{children}</ShellLayoutInner>
+          <ReferenceListsProvider key={user?.id ?? "anonymous"} userId={user?.id ?? "anonymous"}><ShellLayoutInner>{children}</ShellLayoutInner></ReferenceListsProvider>
         </PinsProvider>
       </NotesProvider>
     </ListsProvider>

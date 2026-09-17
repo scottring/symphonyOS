@@ -62,7 +62,7 @@ export function PanelPeople({
           <span className="w-7 h-7 rounded-full bg-amber-100 text-amber-800 flex items-center justify-center text-xs font-medium">
             {contact.name.split(' ').map(n => n[0]).slice(0, 2).join('')}
           </span>
-          <span className="flex-1 text-sm">
+          <span className="flex-1 text-[15px]">
             <div className="text-neutral-800">{contact.name}</div>
             {contact.phone && <div className="text-xs text-neutral-500"><ConceptIcon name="call" decorative /> {contact.phone}</div>}
           </span>

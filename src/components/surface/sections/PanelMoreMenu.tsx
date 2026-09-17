@@ -58,7 +58,7 @@ export function PanelMoreMenu({ isPinned, onTogglePin, onDelete, onUngroup, onDe
         ref={buttonRef}
         onClick={() => setOpen(prev => !prev)}
         aria-label="More actions"
-        className="px-3 py-1.5 rounded-lg text-sm font-medium bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition-colors"
+        className="px-3 py-1.5 rounded-lg text-[15px] font-medium bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition-colors"
       >
         <MoreHorizontal className="w-4 h-4" />
       </button>
@@ -71,7 +71,7 @@ export function PanelMoreMenu({ isPinned, onTogglePin, onDelete, onUngroup, onDe
         >
           <button
             onClick={() => { onTogglePin(); close() }}
-            className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm text-neutral-700 hover:bg-neutral-100 transition-colors"
+            className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-[15px] text-neutral-700 hover:bg-neutral-100 transition-colors"
           >
             {isPinned ? <PinOff className="w-4 h-4" /> : <Pin className="w-4 h-4" />}
             <span>{isPinned ? 'Unpin' : 'Pin'}</span>
@@ -82,7 +82,7 @@ export function PanelMoreMenu({ isPinned, onTogglePin, onDelete, onUngroup, onDe
           {isGroup && onUngroup && (
             <button
               onClick={() => { onUngroup(); close() }}
-              className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm text-neutral-700 hover:bg-neutral-100 transition-colors"
+              className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-[15px] text-neutral-700 hover:bg-neutral-100 transition-colors"
             >
               <FolderMinus className="w-4 h-4" />
               <span>Ungroup (keep tasks)</span>
@@ -96,7 +96,7 @@ export function PanelMoreMenu({ isPinned, onTogglePin, onDelete, onUngroup, onDe
               confirmingGroup ? (
                 <button
                   onClick={() => { onDeleteGroup(); close() }}
-                  className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm text-rose-700 bg-rose-50 hover:bg-rose-100 transition-colors font-semibold"
+                  className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-[15px] text-rose-700 bg-rose-50 hover:bg-rose-100 transition-colors font-semibold"
                 >
                   <Trash2 className="w-4 h-4" />
                   <span>Delete group + tasks</span>
@@ -104,7 +104,7 @@ export function PanelMoreMenu({ isPinned, onTogglePin, onDelete, onUngroup, onDe
               ) : (
                 <button
                   onClick={() => setConfirmingGroup(true)}
-                  className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm text-rose-600 hover:bg-rose-50 transition-colors"
+                  className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-[15px] text-rose-600 hover:bg-rose-50 transition-colors"
                 >
                   <Trash2 className="w-4 h-4" />
                   <span>Delete group + tasks</span>
@@ -114,7 +114,7 @@ export function PanelMoreMenu({ isPinned, onTogglePin, onDelete, onUngroup, onDe
           ) : confirming ? (
             <button
               onClick={() => { onDelete(); close() }}
-              className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm text-rose-700 bg-rose-50 hover:bg-rose-100 transition-colors font-semibold"
+              className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-[15px] text-rose-700 bg-rose-50 hover:bg-rose-100 transition-colors font-semibold"
             >
               <Trash2 className="w-4 h-4" />
               <span>Confirm delete</span>
@@ -122,7 +122,7 @@ export function PanelMoreMenu({ isPinned, onTogglePin, onDelete, onUngroup, onDe
           ) : (
             <button
               onClick={() => setConfirming(true)}
-              className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-sm text-rose-600 hover:bg-rose-50 transition-colors"
+              className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-[15px] text-rose-600 hover:bg-rose-50 transition-colors"
             >
               <Trash2 className="w-4 h-4" />
               <span>Delete</span>

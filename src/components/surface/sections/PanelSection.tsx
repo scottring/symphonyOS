@@ -44,7 +44,7 @@ export function PanelSection({ id, label, preview, actions, children }: PanelSec
           aria-label={`${collapsed ? 'Expand' : 'Collapse'} ${label}`}
           className="flex min-w-0 flex-1 items-center gap-1.5 text-left group"
         >
-          <span className="shrink-0 text-[10px] uppercase tracking-wider font-semibold text-neutral-400 group-hover:text-neutral-600 transition-colors">
+          <span className="shrink-0 text-[11px] uppercase tracking-[0.08em] font-semibold text-neutral-400 group-hover:text-neutral-600 transition-colors">
             {label}
           </span>
           {collapsed && preview && (

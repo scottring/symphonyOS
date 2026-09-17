@@ -24,7 +24,7 @@ const ROW_CLASS =
 export function PanelRow({ icon, onClick, href, external = true, children }: PanelRowProps) {
   const body = (
     <>
-      <span className="w-6 h-6 flex shrink-0 items-center justify-center rounded-md text-sm">
+      <span className="w-6 h-6 flex shrink-0 items-center justify-center rounded-md text-[15px]">
         {icon}
       </span>
       <span className="min-w-0 flex-1">{children}</span>

@@ -409,10 +409,11 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
 
   return (
     <div className={`${PAGE_COLUMN_WIDE} py-6`}>
-      {/* The same masthead card Today and Week wear: the period in the
-          eyebrow, the page name as the title, the look-back cue on the quiet
-          line when the period has ended. */}
+      {/* The same open masthead Today wears: the period in the eyebrow, the
+          page name as the title, the look-back cue on the quiet line when the
+          period has ended. No date numeral — a month is not a day. */}
       <MastheadCard
+        variant="page"
         eyebrow={(
           <PeriodNavEyebrow
             label={noun}
@@ -475,7 +476,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                 </button>
               )}
             </div>
-            <div className="mt-2 rounded-xl border border-primary-100 border-l-[3px] border-l-primary-500 bg-primary-50/40 px-3 py-2.5 shadow-sm">
+            <div className="mt-2 border-t-2 border-primary-700 pt-1">
               {goalRows.length === 0 ? (
                 <p className="px-2 py-2 text-sm text-neutral-400">
                   {isPast ? `Nothing was on this ${noun}'s goals.` : `No goals for this ${noun} yet.`}
@@ -498,7 +499,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                   className="mt-1 flex items-center gap-2 px-2"
                   onSubmit={(e) => { e.preventDefault(); const t = goalDraft; setGoalDraft(''); void addRow(t, true) }}
                 >
-                  <Target className="h-4 w-4 shrink-0 text-amber-600" />
+                  <Target className="h-4 w-4 shrink-0 text-accent-600" />
                   <input
                     autoFocus
                     aria-label={`New goal for ${shortLabel}`}
@@ -516,7 +517,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
           {level !== 'year' && (
             <section aria-label={`${bounds.label} list`} className="min-w-0">
               <h2 className="px-1 font-display text-2xl text-neutral-800">{shortLabel} tasks</h2>
-              <div className="mt-2 rounded-xl border border-neutral-200 bg-white px-3 py-2.5 shadow-sm">
+              <div className="mt-2 border-t border-neutral-300 pt-1">
                 {openTaskRows.length === 0 ? (
                   <p className="px-2 py-2 text-sm text-neutral-400">
                     {doneTaskRows.length > 0
@@ -538,7 +539,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                   <div
                     role="dialog"
                     aria-label="Put it under a goal"
-                    className="mt-2 rounded-xl border border-neutral-200 bg-neutral-50/60 p-2"
+                    className="mt-2 rounded-lg border border-neutral-200 bg-bg-elevated p-2 shadow-md"
                   >
                     <p className="px-2 py-1 text-[12px] text-neutral-500">Put it under…</p>
                     <ul>
@@ -549,7 +550,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                             onClick={() => { void fileUnderGoal(pickingGoalFor, g.id) }}
                             className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm text-neutral-800 transition-colors hover:bg-white"
                           >
-                            <Target className="h-3.5 w-3.5 shrink-0 text-amber-600" />
+                            <Target className="h-3.5 w-3.5 shrink-0 text-accent-600" />
                             <span className="truncate">{g.title}</span>
                           </button>
                         </li>
@@ -608,7 +609,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                     <span className="tabular-nums text-neutral-400">{doneTaskRows.length}</span>
                   </button>
                   {doneOpen && (
-                    <ul className="mt-1 rounded-xl border border-neutral-200 bg-white px-3 py-1 shadow-sm">
+                    <ul className="mt-1 border-t border-neutral-200">
                       {doneTaskRows.map((row) => (
                         <PlanRow key={row.id} row={row} onOpen={open} onOpenPlaced={openPlaced} onAction={(a, r) => { void act(a, r) }}
                           lowerLabel={lowerLabelText}
@@ -639,7 +640,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
               />
             )}
             {patterns.length > 0 && (
-              <section aria-label={routinesHeading} className="min-w-0 rounded-xl border border-neutral-200 bg-white px-3 py-2.5 shadow-sm">
+              <section aria-label={routinesHeading} className="min-w-0 border-t border-neutral-200 pt-2.5">
                 <button
                   type="button"
                   onClick={toggleRoutines}
@@ -686,7 +687,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
               </section>
             )}
             {dated.length > 0 && (
-              <section aria-label="On the calendar" className="min-w-0 rounded-xl border border-neutral-200 bg-white px-3 py-2.5 shadow-sm">
+              <section aria-label="On the calendar" className="min-w-0 border-t border-neutral-200 pt-2.5">
                 <button
                   type="button"
                   onClick={toggleCalendar}

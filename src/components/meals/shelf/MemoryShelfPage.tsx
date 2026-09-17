@@ -50,6 +50,7 @@ export function MemoryShelfPage() {
   return (
     <div className={PAGE_COLUMN_WIDE}>
       <MastheadCard
+        variant="page"
         title={<>What we cook <span className="italic text-primary-600">together.</span></>}
         motif="meals"
         eyebrow={
@@ -72,7 +73,7 @@ export function MemoryShelfPage() {
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="Search the shelf — title, tags, ingredients…"
-          className="w-full pl-10 pr-10 py-2.5 rounded-2xl border border-neutral-200 bg-bg-base text-[14px] focus:outline-none focus:border-primary-500"
+          className="w-full rounded-md border border-neutral-300 bg-bg-elevated py-2.5 pl-10 pr-10 text-[15px] focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
         />
         <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400 text-[15px]" aria-hidden>⌕</span>
         {search && (

@@ -321,7 +321,7 @@ export function PanelPhotos({ entityType, entityId, entityContext, promotions, d
                 target="_blank"
                 rel="noopener noreferrer"
                 title={doc.fileName}
-                className="inline-flex items-center gap-1.5 max-w-full px-2.5 py-1.5 rounded-lg bg-white shadow-[inset_0_0_0_1px_#e5e7eb] text-sm text-neutral-700 hover:bg-neutral-50"
+                className="inline-flex items-center gap-1.5 max-w-full px-2.5 py-1.5 rounded-lg bg-white shadow-[inset_0_0_0_1px_#e5e7eb] text-[15px] text-neutral-700 hover:bg-neutral-50"
               >
                 <FileText className="w-4 h-4 text-neutral-400 shrink-0" aria-hidden />
                 <span className="truncate">{doc.fileName}</span>

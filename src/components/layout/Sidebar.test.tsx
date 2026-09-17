@@ -92,7 +92,7 @@ describe('Sidebar', () => {
       </MemoryRouter>,
     )
     // navItemClass() adds this active styling only when the item matches activeView.
-    expect(screen.getByRole('button', { name: 'House' }).className).toContain('bg-primary-50')
+    expect(screen.getByRole('button', { name: 'House' }).className).toContain('symphony-nav-active')
   })
   // Projects is HIDDEN from the product (2026-09-02): the noun read as GTD
   // jargon and confused the household-OS pitch. The data, hooks, types and the

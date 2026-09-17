@@ -1,5 +1,4 @@
 import type { ReactNode, Ref } from 'react'
-import { PlaceWash } from '@/components/place/PlaceWash'
 
 /**
  * Hairline rules with even vertical padding, and no padding at the ends. Applied
@@ -7,7 +6,7 @@ import { PlaceWash } from '@/components/place/PlaceWash'
  * them exactly the way the zones themselves are spaced.
  */
 const RHYTHM =
-  'divide-y divide-neutral-200/60 [&>*]:py-4 [&>*:first-child]:pt-0 [&>*:last-child]:pb-0'
+  'divide-y divide-neutral-200 [&>*]:py-4 [&>*:first-child]:pt-0 [&>*:last-child]:pb-0'
 
 export interface PanelShellProps {
   identity: ReactNode
@@ -49,11 +48,8 @@ export function PanelShell({
   return (
     <article
       ref={innerRef}
-      className={`relative bg-bg-elevated max-w-md w-full rounded-2xl px-4 md:px-5 py-3 md:py-5 ${RHYTHM}`}
+      className={`relative w-full max-w-md rounded-lg border border-neutral-200 bg-bg-elevated px-4 py-4 md:px-5 md:py-5 ${RHYTHM}`}
     >
-      {/* The panel wears the user's Place, same as Today's day card. Top-anchored
-          so the medallion sits behind the identity zone, not the reading column. */}
-      <PlaceWash anchor="top" opacity={0.14} />
 
       {zones.map((zone, i) =>
         // The rhythm repeats INSIDE a zone: `details` holds many sections, and
@@ -65,10 +61,9 @@ export function PanelShell({
           // render — `related` on a task with no project and no suggestions is a
           // truthy fragment that produces nothing — and a wrapper with no
           // children still draws a divider and a chunk of padding.
-          // `relative` puts the zone above the place wash, which is an
-          // unpositioned-looking sibling drawn before it. Both stay at the
-          // default z-index so neither becomes a stacking context that would
-          // trap a popover opened from inside a zone.
+          // `relative` stays: it keeps each zone at the default z-index rather
+          // than making it a stacking context, which would trap a popover
+          // opened from inside a zone.
           <div key={i} className={`relative ${RHYTHM} empty:hidden`}>
             {zone}
           </div>

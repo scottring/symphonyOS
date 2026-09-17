@@ -20,7 +20,7 @@ export function PanelMedia({ imageUrl, sourceDoc }: PanelMediaProps) {
           <span className="w-6 h-6 flex items-center justify-center rounded-md bg-sky-100">
             <FileText className="w-4 h-4 text-sky-700" />
           </span>
-          <span className="flex-1 text-sm text-neutral-800 truncate">{sourceDoc.fileName}</span>
+          <span className="flex-1 text-[15px] text-neutral-800 truncate">{sourceDoc.fileName}</span>
         </button>
       )}
     </div>

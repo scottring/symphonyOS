@@ -59,7 +59,7 @@ function StepRow({
       <button
         type="button"
         onClick={onSelect}
-        className={`flex-1 text-left text-sm ${checked ? 'text-neutral-400 line-through' : 'text-neutral-800'}`}
+        className={`flex-1 text-left text-[15px] ${checked ? 'text-neutral-400 line-through' : 'text-neutral-800'}`}
       >
         {step.name}
         {dosed.length > 0 && <span className="ml-2 text-xs text-neutral-500">{dosed.join(', ')}</span>}
@@ -111,9 +111,9 @@ export function RoutineStepsSection({ steps, onSelectStep, onAddStep, onReorderS
           onChange={e => setDraft(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') addStep() }}
           placeholder="New step name"
-          className="input-base text-sm py-1 px-2 flex-1"
+          className="input-base text-[15px] py-1 px-2 flex-1"
         />
-        <button type="button" onClick={addStep} className="inline-flex items-center gap-1 text-sm font-medium text-primary-700 hover:text-primary-900">
+        <button type="button" onClick={addStep} className="inline-flex items-center gap-1 text-[15px] font-medium text-primary-700 hover:text-primary-900">
           <Plus className="w-4 h-4" /> Add step
         </button>
       </div>
