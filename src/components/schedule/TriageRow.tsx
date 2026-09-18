@@ -139,7 +139,7 @@ export function TriageRow({ task, meta, metaTitle, isNew, offer, verdict, canDel
           </button>
         )}
         <span className="flex-1 min-w-0">
-          <span className={`block text-[19px] leading-snug ${verdict ? 'text-neutral-400' : 'text-neutral-700'} ${verdict === 'completed' ? 'line-through' : ''}`}>
+          <span className={`block text-[16px] leading-snug ${verdict ? 'text-neutral-400' : 'text-neutral-700'} ${verdict === 'completed' ? 'line-through' : ''}`}>
             {isGoal && <Target aria-label="Goal" className="mr-1.5 inline-block w-3.5 h-3.5 -mt-0.5 text-amber-600" />}
             {task.title}
             {isNew && !verdict && (

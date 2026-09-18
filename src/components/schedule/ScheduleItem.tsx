@@ -440,7 +440,7 @@ export const ScheduleItem = memo(function ScheduleItem({
 
         {/* Title + context line */}
         <div className="flex-1 min-w-0">
-          <div className={`text-[19px] font-semibold leading-snug line-clamp-2 break-words ${item.completed || item.skipped ? 'line-through text-neutral-400' : 'text-neutral-800'}`}>
+          <div className={`text-[16px] font-semibold leading-snug line-clamp-2 break-words ${item.completed || item.skipped ? 'line-through text-neutral-400' : 'text-neutral-800'}`}>
             {item.title}
           </div>
           {(contextLabel || isFree) && (
@@ -708,7 +708,7 @@ export const ScheduleItem = memo(function ScheduleItem({
             <span
               className={`
                 flex-1 min-w-0
-                text-[20px] leading-snug font-medium line-clamp-2 transition-colors
+                text-[16px] leading-snug font-medium line-clamp-2 transition-colors
                 ${item.completed || item.skipped
                   ? 'line-through text-neutral-400'
                   : item.isWaiting

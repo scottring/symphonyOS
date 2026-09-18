@@ -178,7 +178,7 @@ export function ListsList({ lists, loading = false, listsByCategory, onSelectLis
                         {list.icon || (() => { const Icon = CATEGORY_ICONS[list.category]; return <Icon className="w-5 h-5 text-primary-500" /> })()}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="truncate text-[19px] leading-snug text-neutral-800">{list.title}</div>
+                        <div className="truncate text-[16px] leading-snug text-neutral-800">{list.title}</div>
                         <div className="mt-0.5 text-[12px] text-neutral-400">
                           {list.visibility === 'family' && (
                             <span className="inline-flex items-center gap-1 mr-2">

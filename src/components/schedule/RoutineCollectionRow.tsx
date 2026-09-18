@@ -106,7 +106,7 @@ export function RoutineCollectionRow({ item, onSelect, onSelectStep, onCompleteS
           {open ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
         </button>
         <button onClick={() => setOpen(o => !o)} className="flex-1 flex items-center gap-2 py-1.5 text-left min-w-0">
-          <span className="text-[20px] leading-snug font-medium text-neutral-800 truncate shrink-0 max-w-[50%]">{item.title}</span>
+          <span className="text-[16px] leading-snug font-medium text-neutral-800 truncate shrink-0 max-w-[50%]">{item.title}</span>
           <span className="text-xs text-neutral-400 tabular-nums shrink-0">{p.done}/{p.total}</span>
           {item.completed
             ? <span className="text-xs text-neutral-400 truncate">· done</span>
@@ -210,7 +210,7 @@ export function RoutineCollectionRow({ item, onSelect, onSelectStep, onCompleteS
               <div key={group.stepId}>
                 <div className="flex items-center justify-between gap-2">
                   <span
-                    className={`text-[18px] leading-snug truncate cursor-pointer ${stepDone ? 'text-neutral-400' : 'text-neutral-700'}`}
+                    className={`text-[15px] leading-snug truncate cursor-pointer ${stepDone ? 'text-neutral-400' : 'text-neutral-700'}`}
                     onClick={() => onSelectStep(`routine-${group.stepId}`)}
                   >
                     {group.name}

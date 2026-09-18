@@ -111,7 +111,7 @@ export function RoutineRow({ routine, familyMembers, steps = 0, dimmed = false, 
         <button
           type="button"
           onClick={() => onOpen(routine)}
-          className="min-w-0 flex-1 text-left text-[19px] leading-snug text-neutral-800 hover:text-primary-700 transition-colors"
+          className="min-w-0 flex-1 text-left text-[16px] leading-snug text-neutral-800 hover:text-primary-700 transition-colors"
         >
           {routine.name}
           {steps > 0 && <span className="text-[13px] text-neutral-400"> · {steps} steps</span>}

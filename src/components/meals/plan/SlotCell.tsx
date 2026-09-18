@@ -140,7 +140,7 @@ export function SlotCell({
       {/* Shared row (or a "split by person" placeholder when there's no shared meal). */}
       <div className="grid grid-cols-[80px_1fr_auto] items-start gap-3">
         <div className="text-[10px] font-bold uppercase tracking-[0.18em] text-neutral-400 pt-1">{slotLabel}</div>
-        <div className="font-display text-[19px] leading-snug text-neutral-800">
+        <div className="font-display text-[17px] leading-snug text-neutral-800">
           {entry ? title : <span className="text-[15px] italic text-neutral-400">Just for specific people</span>}
         </div>
         <div className="flex items-center gap-0.5">
@@ -203,7 +203,7 @@ export function SlotCell({
           </span>
           <button
             onClick={() => onChangeRecipe(m.entry)}
-            className="text-left font-display text-[18px] leading-snug text-neutral-700 hover:text-neutral-900"
+            className="text-left font-display text-[16px] leading-snug text-neutral-700 hover:text-neutral-900"
           >
             {m.title}
           </button>

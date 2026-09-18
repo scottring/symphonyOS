@@ -168,7 +168,7 @@ export function PlanRow({
         <button
           type="button"
           onClick={() => onOpen(row)}
-          className={`block w-full min-w-0 text-left leading-snug ${row.isGoal ? 'font-display text-[20px]' : 'text-[19px]'} ${done ? 'line-through text-neutral-400' : 'text-neutral-800'}`}
+          className={`block w-full min-w-0 text-left leading-snug ${row.isGoal ? 'font-display text-[17px]' : 'text-[16px]'} ${done ? 'line-through text-neutral-400' : 'text-neutral-800'}`}
         >
           {row.title}
         </button>

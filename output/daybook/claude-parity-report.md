@@ -35,11 +35,8 @@ stamp at full strength instead of a faded medallion behind a card, and they are
   routines, calendar) lost their borders and shadows. Same in `/week`'s list
   column (`WeekPoolLane`, `PlanRail`) and in the Inbox list, where
   `DenseInboxRow` is now a ruled row rather than a shadowed tile.
-- Type: planning rows went 14px → 19px (20px serif for a goal), reference-fold
-  rows 13px → 15px, /week pool pills 13px → 15px, Inbox titles 14px → 19px,
-  metadata held at 11–13px. The /week pool stays denser than Today on purpose:
-  it is a 288px planning column beside the grid, and 19px there wraps every
-  pill. That is the "page organisations stay appropriate to their jobs" call.
+- Type: see **Entry size** below. Metadata and controls are held at 11–13px
+  everywhere.
 
 ### Reconciling the folded lists with desktop pinning
 
@@ -60,6 +57,37 @@ shows a period's list does not also draw it pinned.**
 - Nothing about pinning writes or navigates; the gated placement writers and
   copy-down lineage are untouched.
 
+## Entry size — revised after a live look (2026-09-18)
+
+The handoff specified roughly 19–20px for primary content, and the first pass
+built that. Seeing it in the running app, Scott didn't like it, and chose 16px
+from a four-way comparison (`output/daybook/type-scale-compare.png`, 14 / 16 /
+17 / 19px). **Entries are now 16px across the whole app, Today included** —
+that scope was his call too, so nothing reads louder than anything else.
+
+What moved down:
+
+| surface | was | now |
+|---|---|---|
+| Today rows (`ScheduleItem`, both branches) | 19 / 20px | 16px |
+| Routine collection row / its steps | 20 / 18px | 16 / 15px |
+| List items, triage rows | 19px | 16px |
+| Plan rows — task / goal | 19 / 20px serif | 16 / 17px serif |
+| Inbox rows | 19px | 16px |
+| Notes, Documents, Contacts, Lists, Discussions, History, House, Routines | 19px | 16px |
+| Meal slot — shared / per person | 19 / 18px serif | 17 / 16px serif |
+| Reference folds (`PlanRail`) | 15px | 14px |
+
+Left where they were: /week's pool pills at 15px (a 288px column beside the
+grid — one step down from the app scale rather than four, which is tighter
+than the 13px they started at), detail-panel body copy at 15px (body text, not
+an entry), and the note composer's 19px serif input, which predates both
+passes. Goal rows landed back on the 17px serif they had *before* this work,
+so the goal-vs-task step survives.
+
+Everything in this section is a size literal in a className — trivially
+re-dialled if 16 turns out to be a notch too far either way.
+
 ## 2 — Detail panels
 
 - `PanelShell` lost its place wash and its 2xl radius; it is a hairline-bordered
@@ -67,6 +95,7 @@ shows a period's list does not also draw it pinned.**
 - `PanelHeader`'s title is 22px serif (was 18px semibold), still click-to-edit
   with the same Enter/Escape/blur behaviour.
 - One body size across every section: `text-sm` → `text-[15px]` in 25 files.
+  Kept at 15px in the 16px revision — this is body copy, not a list entry.
   Section labels standardised from 10px/`tracking-wider` to 11px/`0.08em`,
   matching Today's quiet-label grammar.
 - Phones keep the app's 48px touch buttons, so the action row and field rows
@@ -75,7 +104,7 @@ shows a period's list does not also draw it pinned.**
 ## 3 — Library pages
 
 Notes, Documents, Lists, Contacts, Meals (plan + recipe shelf), Routines,
-Discussions, House and History: open masthead, primary entries at 19px, quieter
+Discussions, House and History: open masthead, primary entries at 16px, quieter
 12–13px metadata, and card nesting replaced by ruled rows. Specifics worth
 knowing:
 
@@ -129,6 +158,9 @@ fictional data, then photographed with Playwright. All in `output/daybook/`:
 | `parity-contacts-1600.png` / `-390.png` | a library page |
 | `parity-panel-1600.png` / `-390.png` | detail panel |
 | `parity-dinner-1600.png` | the retinted dinner chip |
+| `type-scale-compare.png` | the 14 / 16 / 17 / 19px comparison the size decision came from |
+
+All previews were re-rendered after the 16px revision, so they match the code.
 
 The `.html` source for each sits beside it. The temporary fixture files used to
 render them were deleted; re-running them means re-writing them.
@@ -137,8 +169,10 @@ Two phone defects found and fixed while checking 390px:
 
 1. `PlanRow`'s hover verb rail (Keep / Someday / Drop / take-down) is now
    `hidden sm:flex`. On a phone it was invisible — there is no hover — yet took
-   the width of four 48px touch buttons, squeezing a 19px title to one word a
-   line, and an unseen "Drop" was still tappable. A phone opens the row.
+   the width of four 48px touch buttons, squeezing the title to one word a
+   line, and an unseen "Drop" was still tappable. A phone opens the row. The
+   16px revision eases the squeeze but not the reason: without hover those
+   buttons are unreachable chrome either way.
 2. The goal target glyph is desktop-only for the same reason; the section
    heading already says the rows are goals.
 

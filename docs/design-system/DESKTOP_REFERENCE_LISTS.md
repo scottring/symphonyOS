@@ -29,8 +29,11 @@ At tablet widths references stack below the work. Phones do not mount reference
 controls or panels. Phone navigation emphasizes Today and Inbox; Week and Month
 remain available for lookup through More.
 
-Task, routine, and list entries use larger body type, with smaller metadata and
-controls. The approved paper-white, ink-blue and vermilion palette is retained,
+Task, routine, and list entries are 16px across the whole app, Today included,
+with metadata and controls held quieter at 11-13px (Scott, 2026-09-18, after a
+live look: the earlier 19-20px scale read as too loud). Reference folds sit one
+step below at 14px; /week's pool pills stay at 15px because that column is
+288px wide. Detail-panel body copy is 15px — body text, not an entry. The approved paper-white, ink-blue and vermilion palette is retained,
 with an almost-white neutral sidebar. Reference screenshots and fixtures use
 fictional data only.
 

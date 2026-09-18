@@ -125,7 +125,7 @@ export function ContactsList({ contacts, onSelectContact, onAddContact }: Contac
                         {contact.name.charAt(0).toUpperCase()}
                       </div>
                       <div>
-                        <div className="text-[19px] leading-snug text-neutral-800">{contact.name}</div>
+                        <div className="text-[16px] leading-snug text-neutral-800">{contact.name}</div>
                         {contact.phone && (
                           <div className="text-[12px] text-neutral-400">{contact.phone}</div>
                         )}

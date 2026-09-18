@@ -393,7 +393,7 @@ export function NotesApp() {
                         <span className="sr-only">Lives on its task — delete it there. </span>
                       )}
                       <div className="flex items-baseline gap-3">
-                        <h3 className="flex-1 min-w-0 truncate text-[19px] font-display text-neutral-900 group-hover:text-primary-800 transition-colors">
+                        <h3 className="flex-1 min-w-0 truncate text-[16px] font-display text-neutral-900 group-hover:text-primary-800 transition-colors">
                           {headingFor(note)}
                         </h3>
                         <span className="shrink-0 text-[12px] text-neutral-400 tabular-nums">

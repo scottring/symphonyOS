@@ -68,7 +68,7 @@ export function DiscussionsApp() {
               </span>
               <span className="min-w-0 flex-1">
                 <span className="flex items-baseline gap-2">
-                  <span className={`flex-1 truncate text-[19px] leading-snug ${row.unread ? 'font-semibold text-neutral-900' : 'text-neutral-800'}`}>
+                  <span className={`flex-1 truncate text-[16px] leading-snug ${row.unread ? 'font-semibold text-neutral-900' : 'text-neutral-800'}`}>
                     {row.title}
                   </span>
                   <span className="shrink-0 text-[12px] text-neutral-400">{formatRelativeTime(row.lastAt)}</span>

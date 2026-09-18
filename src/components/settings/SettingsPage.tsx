@@ -334,7 +334,7 @@ export function SettingsPage({
               <h2 className="mb-2 font-display text-[22px] text-neutral-900">Text Size</h2>
               <div className="flex items-center justify-between border-y border-neutral-200 px-1 py-4">
                 <div>
-                  <p className="text-[19px] leading-snug text-neutral-800">Large text</p>
+                  <p className="text-[16px] leading-snug text-neutral-800">Large text</p>
                   <p className="text-[13px] text-neutral-500">Increase font sizes for easier reading</p>
                 </div>
                 <button

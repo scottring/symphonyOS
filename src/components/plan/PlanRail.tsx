@@ -73,7 +73,7 @@ export function PlanRail({ title, subtitle, rows, onOpen, onPullDown, pullLabel,
           {row.isGoal
             ? <Target className="w-3.5 h-3.5 mt-0.5 shrink-0 text-accent-600" />
             : <span className={`mt-1.5 w-1.5 h-1.5 shrink-0 rounded-full ${rowDone ? 'bg-primary-500' : 'bg-neutral-300'}`} />}
-          <span className={`min-w-0 flex-1 text-[15px] leading-snug ${rowDone ? 'line-through text-neutral-400' : 'text-neutral-700'}`}>
+          <span className={`min-w-0 flex-1 text-[14px] leading-snug ${rowDone ? 'line-through text-neutral-400' : 'text-neutral-700'}`}>
             {row.title}
           </span>
           {row.placed && <span className="shrink-0 text-[11px] text-neutral-400">{row.placed.label}</span>}

@@ -233,7 +233,7 @@ function TaskHistoryRow({
         </span>
 
         {/* Title */}
-        <span className="flex-1 truncate text-[19px] leading-snug text-neutral-800">
+        <span className="flex-1 truncate text-[16px] leading-snug text-neutral-800">
           {task.title}
         </span>
 

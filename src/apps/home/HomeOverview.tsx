@@ -124,7 +124,7 @@ export function HomeOverview() {
               className="block px-3 py-3.5 transition-colors hover:bg-neutral-50"
             >
               <div className="flex items-center justify-between gap-3">
-                <span className="text-[19px] leading-snug text-neutral-800">{a.name}</span>
+                <span className="text-[16px] leading-snug text-neutral-800">{a.name}</span>
                 <span className="shrink-0 text-[13px] text-neutral-500">
                   {(() => {
                     const roomName = rooms.find((r) => r.id === a.spaceId)?.name
@@ -151,7 +151,7 @@ function RoomTile({ room, count }: { room: Space; count: number }) {
         )}
       </div>
       <div className="p-3">
-        <div className="text-[17px] leading-snug text-neutral-800">{room.name}</div>
+        <div className="text-[16px] leading-snug text-neutral-800">{room.name}</div>
         <div className="text-[13px] text-neutral-500">{count} item{count === 1 ? '' : 's'}</div>
       </div>
     </Link>

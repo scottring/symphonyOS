@@ -137,7 +137,7 @@ export function DocumentRow({ document, onToggleScope, onDelete, onSave }: Props
     <div className="flex items-center gap-3 border-b border-neutral-200 px-4 py-3.5 transition-colors hover:bg-neutral-50">
       <FileText className="w-5 h-5 shrink-0 text-neutral-400" />
       <div className="flex-1 min-w-0">
-        <div className="truncate text-[19px] leading-snug text-neutral-800">{document.label}</div>
+        <div className="truncate text-[16px] leading-snug text-neutral-800">{document.label}</div>
         <div className="mt-0.5 flex items-center gap-2 text-[12px] text-neutral-500">
           <span>{documentKindLabel(document.kind)}</span>
           {note && (
