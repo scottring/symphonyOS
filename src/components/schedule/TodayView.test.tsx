@@ -5,6 +5,7 @@ import { render } from '@/test/test-utils'
 import { ScheduleActionsProvider } from '@/contexts/ScheduleActionsContext'
 import { createMockRoutine } from '@/test/mocks/factories'
 import { TodayView } from './TodayView'
+import { DesktopFooterActionContext } from '@/components/layout/DesktopFooter'
 
 // File-wide mock: every test in this file renders TodayView's mobile branch.
 // This affects the EveningMealCard branch (TodayView.tsx ~line 651) and WHERE
@@ -674,5 +675,54 @@ describe('TodayView — the day card carries the date nav', () => {
   it('renders exactly one date nav — the mobile masthead no longer repeats it', () => {
     renderView()
     expect(screen.getAllByRole('button', { name: /previous day/i })).toHaveLength(1)
+  })
+})
+
+describe('TodayView — desktop footer review', () => {
+  afterEach(() => { mockUseMobile.mockReturnValue(true) })
+
+  function renderWithFooter(props: Record<string, unknown> = {}) {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const result = render(
+      <DesktopFooterActionContext.Provider value={host}>
+        <ScheduleActionsProvider value={ctxValue as never}>
+          <TodayView
+            tasks={[]} events={[]} routines={[]} dateInstances={[]}
+            selectedItemId={null} onSelectItem={vi.fn()} onToggleTask={vi.fn()}
+            onCompleteRoutine={vi.fn()} onCompleteEvent={vi.fn()} loading={false}
+            viewedDate={TODAY} onDateChange={vi.fn()} projects={[]} {...props}
+          />
+        </ScheduleActionsProvider>
+      </DesktopFooterActionContext.Provider>,
+    )
+    return { ...result, host }
+  }
+
+  it('moves the day review into the footer, once, and opens the existing review', async () => {
+    mockUseMobile.mockReturnValue(false)
+    const { user, host } = renderWithFooter()
+    const review = within(host).getByRole('button', { name: 'Review today' })
+    await openOverflow(user)
+    expect(screen.queryByRole('button', { name: /End of day review/i })).not.toBeInTheDocument()
+    await user.click(review)
+    expect(screen.getByRole('dialog', { name: 'End of day review' })).toBeInTheDocument()
+    host.remove()
+  })
+
+  it('offers no footer review on another day', () => {
+    mockUseMobile.mockReturnValue(false)
+    const yesterday = new Date(TODAY); yesterday.setDate(yesterday.getDate() - 1)
+    const { host } = renderWithFooter({ viewedDate: yesterday })
+    expect(within(host).queryByRole('button', { name: 'Review today' })).not.toBeInTheDocument()
+    host.remove()
+  })
+
+  it('keeps the ⋯ menu entry on phones', async () => {
+    const { user, host } = renderWithFooter()
+    expect(within(host).queryByRole('button', { name: 'Review today' })).not.toBeInTheDocument()
+    await openOverflow(user)
+    expect(screen.getByRole('button', { name: /End of day review/i })).toBeInTheDocument()
+    host.remove()
   })
 })

@@ -7,8 +7,6 @@ import { useSidebarGroupState } from '@/hooks/useSidebarGroupState'
 import { useHomes } from '@/hooks/useHomes'
 import { useSpaces } from '@/hooks/useSpaces'
 import { useLists } from '@/hooks/useLists'
-import { WeatherChip } from '@/components/schedule/WeatherChip'
-import { PlaceMedallion } from '@/components/place/PlaceMedallion'
 import { ConceptIcon } from '@/lib/conceptIcons'
 import {
   Sun,
@@ -49,13 +47,6 @@ interface SidebarProps {
   inboxCount?: number
   /** Discussions waiting on the viewer — unread threads, never a count of work. */
   discussionsUnread?: number
-}
-
-function getGreetingWord(): string {
-  const h = new Date().getHours()
-  if (h < 12) return 'morning'
-  if (h < 18) return 'afternoon'
-  return 'evening'
 }
 
 // Derive a friendly first name for the greeting. A stored display name with a
@@ -134,13 +125,12 @@ export function Sidebar({
   const moreListsCount = listsActive ? Math.max(0, allLists.length - 5) : 0
 
   const firstName = deriveFirstName(userName, userEmail)
-  const greetingWord = getGreetingWord()
 
   // Nav item helper
   function navItemClass(active: boolean): string {
-    return `symphony-nav-item w-full flex items-center gap-3 px-3 py-2.5 transition-colors duration-200 text-[15px] ${
+    return `symphony-nav-item w-full flex items-center gap-3 px-3 py-2.5 transition-colors duration-200 text-[14px] ${
       active
-        ? 'symphony-nav-active text-neutral-950 font-semibold'
+        ? 'symphony-nav-active text-neutral-950'
         : 'text-neutral-600 hover:bg-neutral-200/40 hover:text-neutral-950'
     } ${collapsed ? 'justify-center' : ''}`
   }
@@ -155,9 +145,9 @@ export function Sidebar({
       `}
     >
       {/* Header: logo + name */}
-      <div className="px-5 pt-7 pb-6 flex items-center justify-between">
+      <div className={`pt-6 pb-5 flex items-center justify-between ${collapsed ? 'px-3' : 'px-4'}`}>
         <div className={`flex items-center gap-2 ${collapsed ? 'justify-center w-full' : ''}`}>
-          <img src="/symphony-logo.jpg" alt="Symphony" className="w-7 h-7 rounded-full object-cover shrink-0" />
+          <img src="/symphony-logo.jpg" alt={collapsed ? "Symphony" : ""} className="w-10 h-10 rounded-full object-cover shrink-0" />
           {!collapsed && (
             <span className="symphony-wordmark">Symphony</span>
           )}
@@ -188,29 +178,6 @@ export function Sidebar({
         </button>
       )}
 
-      {/* Greeting block */}
-      {!collapsed && (
-        <div className="px-5 pb-3 flex items-center gap-3">
-          <div className="w-8 h-8 rounded-sm border border-neutral-300 text-neutral-700 grid place-items-center text-sm font-semibold shrink-0">
-            {(userName ?? userEmail ?? 'S').charAt(0).toUpperCase()}
-          </div>
-          <div className="min-w-0">
-            <p className="text-xs text-neutral-500">Good {greetingWord},</p>
-            <p className="text-base font-medium text-neutral-900 leading-tight">
-              {firstName}
-              <Sun className="w-3.5 h-3.5 text-amber-500 inline ml-1" />
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* Weather — moved here from the Today header (single home, always visible) */}
-      {!collapsed && (
-        <div className="px-5 pb-2">
-          <WeatherChip />
-        </div>
-      )}
-
       {/* Search row. Chat + Wall icons removed in Phase 1 (sidebar restraint);
           chat has its own surfaces and Wall is a rarely-used cross-tab action. */}
       <div className={`px-3 mt-1 flex items-center gap-1 ${collapsed ? 'flex-col' : ''}`}>
@@ -219,7 +186,7 @@ export function Sidebar({
             onClick={onOpenSearch}
             className={`
               flex-1 flex items-center gap-2 px-3 py-2 rounded-lg
-              text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100/70
+              text-neutral-600 hover:text-neutral-900 hover:bg-neutral-100/70
               transition-all duration-200 text-[13px]
               ${collapsed ? 'justify-center flex-none' : ''}
             `}
@@ -230,7 +197,7 @@ export function Sidebar({
             </svg>
             {!collapsed && <span className="flex-1 text-left">Search</span>}
             {!collapsed && (
-              <kbd className="text-[10px] text-neutral-300 border border-neutral-200 rounded px-1 py-0.5 font-sans">
+              <kbd className="text-[11px] text-neutral-500 font-sans">
                 ⌘K
               </kbd>
             )}
@@ -238,16 +205,12 @@ export function Sidebar({
         )}
       </div>
 
-      {/* Navigation — the loop, in order (pare-down 2026-09-01): capture
-          lands in Inbox, executes on Today, provisions on This Week.
-          Everything else is reference and lives in the Library. Five rows
-          total — every pixel has a sentence. */}
-      <nav className="flex-1 px-3 mt-2 space-y-0.5 overflow-y-auto">
-        <div className="border-t border-neutral-200/60 mb-1" />
-
+      {/* Daily tools and planning horizons are separated by space. */}
+      <nav aria-label="Main navigation" className="flex-1 min-h-0 px-3 mt-4 space-y-0.5 overflow-y-auto">
         {/* Inbox — where capture lands; the loop starts here. */}
         <button
           onClick={() => onViewChange('inbox')}
+          aria-label="Inbox"
           className={`${navItemClass(activeView === 'inbox')} mt-2`}
         >
           {createElement(Inbox, { className: 'w-5 h-5 shrink-0' })}
@@ -263,9 +226,11 @@ export function Sidebar({
           )}
         </button>
 
+        <div role="group" aria-label="Planning" className="symphony-nav-section">
         {/* Today — the execution surface. */}
         <button
           onClick={() => onViewChange('today')}
+          aria-label="Today"
           className={navItemClass(isTodayActive())}
         >
           <Sun className="w-5 h-5 shrink-0" />
@@ -277,10 +242,11 @@ export function Sidebar({
             needs. A surface with its own route, NOT a horizon rung. */}
         <button
           onClick={() => navigate('/week')}
+          aria-label="Week"
           className={navItemClass(location.pathname === '/week' || location.pathname.startsWith('/week/'))}
         >
           <CalendarRange className="w-5 h-5 shrink-0" />
-          {!collapsed && <span>This Week</span>}
+          {!collapsed && <span>Week</span>}
         </button>
 
         {/* The planning ladder above the week — one page per level, the same
@@ -290,26 +256,31 @@ export function Sidebar({
             with a rail of the season". */}
         <button
           onClick={() => navigate('/month')}
+          aria-label="Month"
           className={navItemClass(location.pathname === '/month')}
         >
           <CalendarDays className="w-5 h-5 shrink-0" />
-          {!collapsed && <span>This Month</span>}
+          {!collapsed && <span>Month</span>}
         </button>
         <button
           onClick={() => navigate('/season')}
+          aria-label="Season"
           className={navItemClass(location.pathname === '/season')}
         >
           <Leaf className="w-5 h-5 shrink-0" />
-          {!collapsed && <span>This Season</span>}
+          {!collapsed && <span>Season</span>}
         </button>
         <button
           onClick={() => navigate('/year')}
+          aria-label="Year"
           className={navItemClass(location.pathname === '/year')}
         >
           {createElement(Target, { className: 'w-5 h-5 shrink-0' })}
-          {!collapsed && <span>This Year</span>}
+          {!collapsed && <span>Year</span>}
         </button>
 
+        </div>
+        <div role="group" aria-label="Tools" className="symphony-nav-section">
         {/* Plan from paper — the verb that starts the day and the week. From
             any page (Scott, 2026-09-03: it is too important to hide). A Home
             view that is mounted opens the flow in place; otherwise Today
@@ -324,13 +295,14 @@ export function Sidebar({
           className={navItemClass(false)}
         >
           <NotebookPen className="w-5 h-5 shrink-0" />
-          {!collapsed && <span className="font-semibold">Plan from paper</span>}
+          {!collapsed && <span>Plan from paper</span>}
         </button>
 
         {/* Discussions — the inbox of item conversations. Part of the loop, not
             the Library: a message on a task is addressed to you. */}
         <button
           onClick={() => navigate('/discussions')}
+          aria-label="Discussions"
           className={navItemClass(location.pathname.startsWith('/discussions'))}
         >
           <MessageCircle className="w-5 h-5 shrink-0" />
@@ -346,9 +318,11 @@ export function Sidebar({
           )}
         </button>
 
+        </div>
+
         {/* ── Library ── everything that is reference, not a daily surface.
             Collapsible on purpose: the loop is Inbox → Today → This Week. */}
-        <div className="border-t border-neutral-200/60 my-2" />
+        <div className="h-3" aria-hidden="true" />
         <SidebarGroup
           label="Library"
           open={groupState.library}
@@ -520,10 +494,16 @@ export function Sidebar({
 
       </nav>
 
-      {/* Footer: Settings + Sign out + illustration + tagline */}
-      <div className={`p-3 border-t border-neutral-100 ${collapsed ? 'text-center' : ''}`}>
+      {/* Account and settings stay together at the foot of the navigation. */}
+      <div className={`symphony-sidebar-footer p-3 border-t border-neutral-200/60 ${collapsed ? 'text-center' : ''}`}>
+        {!collapsed && (userName || userEmail) && (
+          <div className="px-3 pt-2 pb-3 text-sm font-medium text-neutral-800 truncate" title={userEmail}>
+            {firstName}
+          </div>
+        )}
         <button
           onClick={() => navigate('/settings')}
+          aria-label="Settings"
           className={navItemClass(location.pathname.startsWith('/settings'))}
         >
           <Settings className="w-5 h-5 shrink-0" />
@@ -532,29 +512,15 @@ export function Sidebar({
         {onSignOut && (
           <button
             onClick={onSignOut}
-            className={`
-              flex items-center gap-3 px-3 py-2.5 rounded-lg w-full
-              text-neutral-600 hover:bg-neutral-100/70
-              transition-all duration-200 text-[15px]
-              ${collapsed ? 'justify-center' : ''}
-            `}
+            className={navItemClass(false)}
+            aria-label="Sign out"
           >
             <LogOut className="w-5 h-5 shrink-0" />
             {!collapsed && <span>Sign out</span>}
           </button>
         )}
 
-        {/* Illustration + tagline */}
-        {!collapsed && (
-          <div className="mt-4 px-3">
-            <div aria-hidden="true" className="w-20 h-20 select-none pointer-events-none">
-              <PlaceMedallion className="w-full h-full" />
-            </div>
-            <p className="text-xs text-neutral-600 mt-2 leading-relaxed">
-              Everything in its right place.
-            </p>
-          </div>
-        )}
+
       </div>
     </aside>
   )

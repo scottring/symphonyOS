@@ -1409,24 +1409,64 @@ html.desktop-shell a {
    calendar, wall, and library surfaces can retain their own density. */
 .symphony-sidebar {
   background: #fdfdfd;
+  border-color: var(--color-neutral-200);
+}
+.symphony-sidebar .symphony-wordmark {
+  font-size: 30px;
+  color: var(--color-neutral-950);
+}
+.symphony-nav-item,
+.symphony-nav-group {
+  font-family: var(--font-family-sans);
+  font-weight: 400;
+  letter-spacing: normal;
+  line-height: 1.4;
 }
 .symphony-nav-item {
   position: relative;
-  border-radius: 3px;
+  border-radius: 2px;
+  font-size: 17px;
+  padding-block: 9px;
+  color: var(--color-neutral-700);
 }
-.symphony-nav-active {
-  background: var(--color-bg-elevated);
+.symphony-nav-group { font-size: 15px; }
+.symphony-nav-item > svg {
+  width: 18px;
+  height: 18px;
+  stroke-width: 1.6;
+  color: var(--color-neutral-400);
+}
+.symphony-nav-item:hover {
+  background: #f7f7f7;
+  color: var(--color-neutral-950);
+}
+.symphony-nav-active,
+.symphony-nav-active:hover {
+  background: transparent;
+  color: var(--color-neutral-950);
+  font-weight: 600;
 }
 .symphony-nav-active::before {
   content: '';
   position: absolute;
-  inset: 8px auto 8px 0;
+  left: 0;
+  top: 50%;
   width: 3px;
+  height: 20px;
+  transform: translateY(-50%);
   background: var(--color-accent-500);
 }
+.symphony-nav-active > svg { color: var(--color-neutral-700); }
+.symphony-sidebar .symphony-nav-section { margin-top: 16px; }
 .symphony-nav-item:focus-visible {
   outline: 2px solid var(--color-primary-600);
   outline-offset: 2px;
+}
+.symphony-sidebar-footer .symphony-nav-item {
+  font-family: var(--font-family-sans);
+  font-size: 14px;
+  letter-spacing: normal;
+  padding-block: 10px;
 }
 .daybook-masthead {
   position: relative;
@@ -1538,30 +1578,208 @@ html.desktop-shell a {
   box-shadow: none;
 }
 
-/* References stay in the desktop workspace across route changes. */
-.reference-workspace {
+/* Desktop workspace: navigation, page, and footer share one readable column,
+   centred in whatever width the side panes and reference lists leave. The
+   shell only renders this on desktop, so phones never see these rules. */
+.desktop-workspace {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(290px, 340px);
-  align-items: start;
+  min-height: 100%;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto 1fr auto;
+  grid-template-areas: "nav" "page" "footer";
+}
+.desktop-workspace-nav,
+.desktop-workspace-page,
+.desktop-footer {
+  width: 100%;
+  max-width: 1152px;
+  justify-self: center;
+  min-width: 0;
+}
+.desktop-workspace-nav { grid-area: nav; }
+.desktop-workspace-page { grid-area: page; }
+.desktop-footer { grid-area: footer; }
+.desktop-workspace-dock { grid-area: dock; align-self: stretch; min-width: 0; }
+/* References stay in the desktop workspace across route changes. */
+.desktop-workspace.has-references {
+  grid-template-columns: minmax(290px, 340px) minmax(0, 1fr);
+  grid-template-areas: "dock nav" "dock page" "dock footer";
 }
 .reference-dock {
   position: sticky;
-  top: 12px;
-  max-height: calc(100dvh - 84px);
+  top: 0;
+  max-height: 100dvh;
   overflow-y: auto;
-  padding: 16px 20px 80px;
-  border-left: 1px solid var(--color-neutral-200);
+  padding: 36px 20px 80px;
+  border-right: 1px solid var(--color-neutral-200);
 }
 .reference-list + .reference-list { margin-top: 32px; }
 .reference-list li { padding-block: 14px; }
 /* A small tablet still has access to the references, below its work. Phones
    never mount these controls or panels. */
 @media (max-width: 1100px) {
-  .reference-workspace { grid-template-columns: minmax(0, 1fr); }
-  .reference-dock { position: static; max-height: none; border-left: 0; border-top: 1px solid var(--color-neutral-200); }
+  .desktop-workspace.has-references {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto 1fr auto auto;
+    grid-template-areas: "nav" "page" "dock" "footer";
+  }
+  .reference-dock { position: static; max-height: none; border-right: 0; border-top: 1px solid var(--color-neutral-200); }
 }
 .reference-list li {
   border-width: 0 0 1px;
   border-radius: 0;
   padding-inline: 0;
 }
+
+/* One quiet menu row, aligned with the open page masthead. */
+.page-navigation {
+  max-width: 1152px;
+  padding: 26px 56px 18px;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 20px;
+  color: var(--color-neutral-500);
+  font-size: 14px;
+}
+.page-navigation > a, .page-navigation-menu > button,
+.page-navigation-utilities > a, .page-navigation-utilities > button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 0;
+  cursor: pointer;
+  text-decoration: none;
+}
+.page-navigation a:hover, .page-navigation button:hover, .page-navigation .is-current { color: var(--color-neutral-950); }
+.page-navigation .is-current { font-weight: 600; }
+.page-navigation-menu { position: relative; }
+.page-navigation-utilities { margin-left: auto; display: flex; align-items: center; gap: 18px; }
+.page-navigation-page-controls { display: flex; align-items: center; }
+.page-navigation-popover {
+  position: absolute; top: 100%; left: 0; z-index: 40;
+  min-width: 210px; max-height: 65vh; overflow-y: auto;
+  background: var(--color-bg-elevated); border: 1px solid var(--color-neutral-200);
+  box-shadow: 0 8px 24px #14274412; padding: 8px;
+}
+.page-navigation-utilities .page-navigation-popover { left: auto; right: 0; }
+.page-navigation-popover button { display: flex; width: 100%; padding: 9px 12px; text-align: left; }
+.page-navigation-popover button:hover { background: var(--color-neutral-50); }
+.page-navigation-popover p { padding: 8px 12px; font-size: 12px; max-width: 250px; overflow-wrap: anywhere; }
+.navigation-count { font-size: 12px; color: var(--color-neutral-500); }
+.navigation-pin { color: var(--color-accent-500); }
+@media (max-width: 1023px) { .page-navigation { padding-inline: 40px; gap: 6px 14px; } }
+
+/* Quiet desktop footer: the page's own action at left, help at right. */
+.desktop-footer { padding: 24px 56px 32px; font-size: 13px; color: var(--color-neutral-500); }
+.desktop-footer-rule {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 16px;
+  border-top: 1px solid var(--color-neutral-200); padding-top: 14px;
+}
+.desktop-footer-signature {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 10.5px; font-weight: 600; letter-spacing: 0.2em; text-transform: uppercase; color: var(--color-neutral-500);
+}
+.desktop-footer-logo { width: 28px; height: 28px; border-radius: 50%; overflow: hidden; flex-shrink: 0; }
+.desktop-footer-logo img { display: block; width: 138%; height: 138%; max-width: none; margin: -19%; }
+.desktop-footer-action, .desktop-footer-links { display: flex; align-items: center; gap: 20px; }
+.desktop-footer-links { justify-self: end; }
+.desktop-footer button { padding: 4px 0; cursor: pointer; }
+.desktop-footer button:hover { color: var(--color-neutral-950); }
+.desktop-footer button:focus-visible, .desktop-footer-dialog button:focus-visible {
+  outline: 2px solid var(--color-primary-600); outline-offset: 2px;
+}
+.desktop-footer-backdrop {
+  position: fixed; inset: 0; z-index: 60; display: grid; place-items: center;
+  background: #14274422; padding: 16px;
+}
+.desktop-footer-dialog {
+  width: min(440px, 100%); max-height: 80vh; overflow-y: auto;
+  background: var(--color-bg-elevated); border: 1px solid var(--color-neutral-200);
+  box-shadow: 0 12px 32px #14274418; padding: 20px 24px; font-size: 14px; color: var(--color-neutral-700);
+}
+.desktop-footer-dialog:focus { outline: none; }
+.desktop-footer-dialog h2 { font-size: 17px; font-weight: 600; color: var(--color-neutral-950); }
+.desktop-footer-dialog > p { margin-top: 16px; font-size: 13px; color: var(--color-neutral-500); }
+.desktop-footer-dialog a { text-decoration: underline; }
+.desktop-footer-shortcuts { margin-top: 12px; }
+.desktop-footer-shortcuts > div { display: flex; gap: 16px; padding: 7px 0; border-bottom: 1px solid var(--color-neutral-100); }
+.desktop-footer-shortcuts dt { width: 72px; flex-shrink: 0; }
+.desktop-footer-shortcuts kbd { font-family: inherit; font-size: 12px; color: var(--color-neutral-950); }
+.desktop-footer-help { margin-top: 12px; display: grid; gap: 10px; }
+@media (max-width: 1023px) { .desktop-footer { padding-inline: 40px; } }
+
+/* More: three short labelled columns, with the one verb on its own line. */
+.page-navigation-popover:has(.page-navigation-more) { width: min(560px, calc(100vw - 32px)); padding: 16px 8px 12px; }
+.page-navigation-groups { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.page-navigation-group + .page-navigation-group { border-left: 1px solid var(--color-neutral-100); }
+.page-navigation-group h3 {
+  padding: 0 12px 8px; font-size: 11px; font-weight: 600; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--color-neutral-400);
+}
+.page-navigation-popover .page-navigation-group button { justify-content: space-between; padding: 7px 12px; color: var(--color-neutral-700); }
+.page-navigation-popover .page-navigation-group button:hover { color: var(--color-neutral-950); }
+.page-navigation-more-action {
+  display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+  margin: 12px 4px 0; padding: 10px 8px 0; border-top: 1px solid var(--color-neutral-100); font-size: 13px;
+}
+.page-navigation-popover .page-navigation-more-action button { display: inline; width: auto; padding: 0; font-weight: 600; color: var(--color-neutral-950); }
+.page-navigation-popover .page-navigation-more-action button:hover { background: none; text-decoration: underline; }
+.page-navigation-more-action span { color: var(--color-neutral-400); }
+
+/* Review drawer on desktop: a paper sheet in ink. Phones keep their sheet. */
+@media (min-width: 768px) {
+  .review-backdrop { background: #14274422; backdrop-filter: none; }
+  .review-sheet {
+    border-radius: 0; border: 1px solid var(--color-neutral-200);
+    box-shadow: 0 12px 32px #14274418; background: #fff;
+  }
+  .review-sheet .review-icon { width: auto; height: auto; background: none; color: var(--color-neutral-950); }
+  .review-sheet h2 { color: var(--color-neutral-950); }
+  .review-sheet .text-primary-700, .review-sheet .text-primary-600 { color: var(--color-neutral-500); }
+  .review-sheet input, .review-sheet textarea {
+    border-radius: 0; border-width: 0 0 1px; padding-inline: 0; background: transparent;
+  }
+  .review-sheet input:focus, .review-sheet textarea:focus { box-shadow: none; border-color: var(--color-neutral-950); }
+  .review-sheet li {
+    border-radius: 0; border-width: 0 0 1px; border-color: var(--color-neutral-100);
+    background: transparent; padding-inline: 0; padding-block: 12px;
+  }
+  .review-sheet ul { display: grid; gap: 0; }
+  .review-sheet ul > li + li { margin-top: 0; }
+  .review-sheet .triage-title, .review-sheet .review-title {
+    display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden;
+  }
+  .review-sheet li button.text-xs {
+    background: transparent; color: var(--color-neutral-500); border-radius: 0; padding: 2px 6px;
+  }
+  .review-sheet li button.text-xs:hover { background: transparent; color: var(--color-neutral-950); text-decoration: underline; }
+  .review-sheet li button[aria-label^="Complete"].bg-primary-500 { background: var(--color-neutral-950); border-color: var(--color-neutral-950); }
+  .review-sheet li button[aria-label^="Complete"]:hover { border-color: var(--color-neutral-950); }
+  .review-sheet .review-close {
+    background: var(--color-neutral-950); border-radius: 0; box-shadow: none; font-weight: 600;
+  }
+  .review-sheet .review-close:hover { background: var(--color-neutral-700); }
+  .review-sheet .review-close svg { display: none; }
+}
+
+/* Today's masthead on desktop reads as two ruled lines: the month sits on the
+   date bar's line and the numeral on the greeting's baseline. */
+@media (min-width: 768px) {
+  .daybook-masthead-row:has(> .daybook-date) {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    column-gap: 28px;
+    row-gap: 0;
+    align-items: baseline;
+  }
+  .daybook-masthead-row:has(> .daybook-date) > .daybook-date,
+  .daybook-masthead-row:has(> .daybook-date) > .daybook-masthead-text { display: contents; }
+  .daybook-masthead-row > .daybook-date > span { grid-area: 1 / 1; justify-self: center; align-self: center; }
+  .daybook-masthead-row > .daybook-date > strong { grid-area: 2 / 1; justify-self: center; align-self: center; }
+  .daybook-masthead-row:has(> .daybook-date) [data-testid="masthead-eyebrow"] { grid-area: 1 / 2; margin-bottom: 0; align-self: center; display: flex; }
+  .daybook-masthead-row:has(> .daybook-date) .daybook-title { grid-area: 2 / 2; align-self: center; }
+  .daybook-masthead-row:has(> .daybook-date) .daybook-masthead-text > :last-child:not(h1):not([data-testid]) { grid-area: 3 / 2; }
+  .daybook-masthead-row:has(> .daybook-date) > .daybook-masthead-controls { grid-area: 1 / 3 / 4 / 4; align-self: start; }
+}
+

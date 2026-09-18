@@ -48,7 +48,7 @@ export function MastheadCard({ eyebrow, title, subline, controls, footer, motif,
     >
       {variant === 'card' && <PlaceWash motif={motif} />}
       <div className={open ? 'daybook-masthead-inner' : 'relative px-4 py-4 md:px-5'}>
-        <div className="flex items-start justify-between gap-4">
+        <div className="daybook-masthead-row flex items-start justify-between gap-4">
           {variant === 'daybook' && date && (
             <div aria-hidden="true" className="daybook-date">
               <span>{date.toLocaleDateString('en-US', { month: 'short' })}</span>
@@ -62,14 +62,14 @@ export function MastheadCard({ eyebrow, title, subline, controls, footer, motif,
                motif's own label would just be read out twice. */
             <span aria-hidden="true" className="contents"><PageMotif motif={motif} className="daybook-stamp" /></span>
           )}
-          <div className="min-w-0 flex-1">
+          <div className="daybook-masthead-text min-w-0 flex-1">
             {eyebrow && <div data-testid="masthead-eyebrow" className="mb-1 -ml-1.5">{eyebrow}</div>}
             <h1 className={open ? 'daybook-title' : 'font-display text-[28px] font-semibold leading-tight text-neutral-950 md:text-[34px]'}>
               {title}
             </h1>
             {subline && <div className="mt-1 max-w-2xl text-sm text-neutral-500 md:text-[15px]">{subline}</div>}
           </div>
-          {controls && <div className="hidden shrink-0 md:block">{controls}</div>}
+          {controls && <div className="daybook-masthead-controls hidden shrink-0 md:block">{controls}</div>}
         </div>
         {footer && <div className={open ? 'daybook-tools' : 'mt-4 flex flex-wrap items-end justify-end gap-3'}>{footer}</div>}
       </div>

@@ -1,9 +1,11 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import type { ReactNode } from 'react'
 import { DomainProvider } from '@/hooks/useDomain'
 import { DomainGateProvider } from '@/components/domain/DomainGate'
+import { DesktopPageControls } from '@/components/layout/DesktopNavigation'
+import { DesktopFooterAction } from '@/components/layout/DesktopFooter'
 import { deriveActiveView, ShellLayout } from './ShellLayout'
 
 // Regression test for the House sidebar link: it navigated to '/home' but
@@ -68,18 +70,18 @@ vi.mock('@/contexts/PinsContext', () => ({ PinsProvider: ({ children }: { childr
 
 vi.mock('@/components/layout/Sidebar', () => ({ Sidebar: () => <div data-testid="sidebar" /> }))
 vi.mock('@/components/layout/MoreSheet', () => ({ MoreSheet: () => null }))
-vi.mock('@/components/layout/QuickCapture', () => ({ QuickCapture: () => null }))
+vi.mock('@/components/layout/QuickCapture', () => ({ QuickCapture: ({ showFab }: { showFab?: boolean }) => <div data-testid="quick-capture" data-fab={String(showFab)} /> }))
 vi.mock('@/components/layout/NewVersionBanner', () => ({ NewVersionBanner: () => null }))
 vi.mock('@/components/omnibox/OmniboxResults', () => ({ OmniboxResults: () => null }))
 vi.mock('@/components/chat/ChatPanel', () => ({ ChatPanel: () => null }))
 vi.mock('@/components/toast', () => ({ Toast: () => null, ConfirmationToast: () => null }))
 
-function renderAt(path: string) {
+function renderAt(path: string, children: ReactNode = <div data-testid="app-content" />) {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <DomainProvider>
         <DomainGateProvider>
-          <ShellLayout><div data-testid="app-content" /></ShellLayout>
+          <ShellLayout>{children}</ShellLayout>
         </DomainGateProvider>
       </DomainProvider>
     </MemoryRouter>,
@@ -134,6 +136,7 @@ describe('References and the side panels', () => {
     selectionState.selection = { kind: 'task', id: 't1' }
     const withDetail = renderAt('/today')
     expect(screen.queryByRole('complementary', { name: 'Pinned reference lists' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /^Week/ }))
     // The pin is kept and says so, rather than reading as having been dropped.
     expect(screen.getByText(/Lists return when you close the side panel/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Unpin week list' })).toBeInTheDocument()
@@ -161,3 +164,135 @@ describe('Phone execution chrome', () => {
     sessionStorage.clear()
   })
 })
+
+
+describe('Consolidated desktop navigation', () => {
+  beforeEach(() => { mobileState.isMobile = false; selectionState.selection = null; sessionStorage.clear() })
+  it('pins a reference without leaving Today, and opens its page separately', () => {
+    renderAt('/today')
+    expect(screen.queryByTestId('sidebar')).not.toBeInTheDocument()
+    expect(screen.queryByRole('img', { name: 'Symphony' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Week' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Pin week list here' }))
+    expect(screen.getByRole('complementary', { name: 'Pinned reference lists' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Today' })).toHaveAttribute('aria-current', 'page')
+    fireEvent.click(screen.getByRole('button', { name: /^Week/ }))
+    fireEvent.click(screen.getByRole('button', { name: 'Open week page' }))
+    expect(screen.getByRole('button', { name: /^Week/ })).toHaveClass('is-current')
+    expect(screen.queryByRole('complementary', { name: 'Pinned reference lists' })).not.toBeInTheDocument()
+  })
+  it('places page-specific controls in the consolidated navigation', () => {
+    renderAt('/today', <DesktopPageControls><button>Page options</button></DesktopPageControls>)
+    expect(screen.getByRole('navigation', { name: 'Main navigation' })).toContainElement(screen.getByRole('button', { name: 'Page options' }))
+    expect(screen.getAllByRole('button', { name: 'Page options' })).toHaveLength(1)
+  })
+  it('closes a menu with Escape and returns focus to its trigger', () => {
+    renderAt('/today')
+    const more = screen.getByRole('button', { name: /^More/ })
+    fireEvent.click(more)
+    expect(screen.getByRole('button', { name: 'Plan from paper' })).toBeInTheDocument()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('button', { name: 'Plan from paper' })).not.toBeInTheDocument()
+    expect(more).toHaveFocus()
+  })
+})
+
+describe('Centred desktop workspace and footer', () => {
+  beforeEach(() => { mobileState.isMobile = false; selectionState.selection = null; sessionStorage.clear() })
+
+  it('keeps navigation, page, and footer in one column, with a dock column only while a list draws', () => {
+    sessionStorage.setItem('symphony-reference-lists:anonymous', JSON.stringify([{ kind: 'week', date: new Date().toISOString() }]))
+    const today = renderAt('/today')
+    const workspace = screen.getByRole('contentinfo').parentElement!
+    expect(workspace).toHaveClass('desktop-workspace', 'has-references')
+    expect(workspace).toContainElement(screen.getByRole('navigation', { name: 'Main navigation' }))
+    expect(workspace).toContainElement(screen.getByTestId('app-content'))
+    today.unmount()
+    // /week already shows the week list, so no empty dock column is reserved.
+    renderAt('/week')
+    expect(screen.getByRole('contentinfo').parentElement).not.toHaveClass('has-references')
+  })
+
+  it('carries only the page-supplied action at left, so other routes offer no review', () => {
+    const today = renderAt('/today', <DesktopFooterAction><button>Review today</button></DesktopFooterAction>)
+    expect(screen.getByRole('contentinfo')).toContainElement(screen.getByRole('button', { name: 'Review today' }))
+    expect(screen.getAllByRole('button', { name: 'Review today' })).toHaveLength(1)
+    expect(screen.getByRole('contentinfo')).toHaveTextContent('Symphony')
+    today.unmount()
+    renderAt('/routines')
+    expect(screen.queryByRole('button', { name: /Review/ })).not.toBeInTheDocument()
+  })
+
+  it('opens keyboard shortcuts and help as dialogs that close with Escape and return focus', () => {
+    renderAt('/routines')
+    const shortcuts = screen.getByRole('button', { name: 'Keyboard shortcuts' })
+    shortcuts.focus()
+    fireEvent.click(shortcuts)
+    expect(screen.getByRole('dialog', { name: 'Keyboard shortcuts' })).toHaveTextContent('⌘K')
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(shortcuts).toHaveFocus()
+    fireEvent.click(screen.getByRole('button', { name: 'Help' }))
+    expect(screen.getByRole('dialog', { name: 'Help' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('renders no desktop footer on phones', () => {
+    mobileState.isMobile = true
+    renderAt('/today')
+    expect(screen.queryByRole('contentinfo')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Keyboard shortcuts' })).not.toBeInTheDocument()
+  })
+})
+
+describe('Grouped More menu and desktop capture', () => {
+  beforeEach(() => { mobileState.isMobile = false; selectionState.selection = null; sessionStorage.clear() })
+
+  it('groups More into Plan, Home, and Reference with Plan from paper on its own line', () => {
+    renderAt('/today')
+    fireEvent.click(screen.getByRole('button', { name: /^More/ }))
+    const plan = screen.getByRole('group', { name: 'Plan' })
+    expect(plan).toContainElement(screen.getByRole('button', { name: 'Season' }))
+    expect(screen.getByRole('group', { name: 'Home' })).toContainElement(screen.getByRole('button', { name: 'Meals' }))
+    expect(screen.getByRole('group', { name: 'Reference' })).toContainElement(screen.getByRole('button', { name: 'History' }))
+    expect(plan).not.toContainElement(screen.getByRole('button', { name: 'Plan from paper' }))
+  })
+
+  it('shows the floating capture button on phones only', () => {
+    const desktop = renderAt('/today')
+    expect(screen.getByTestId('quick-capture')).toHaveAttribute('data-fab', 'false')
+    desktop.unmount()
+    mobileState.isMobile = true
+    renderAt('/today')
+    expect(screen.getByTestId('quick-capture')).toHaveAttribute('data-fab', 'true')
+  })
+})
+
+describe('Pinned lists on the left', () => {
+  const setWidth = (w: number) => Object.defineProperty(window, 'innerWidth', { configurable: true, value: w })
+  beforeEach(() => {
+    mobileState.isMobile = false; selectionState.selection = null; sessionStorage.clear()
+    sessionStorage.setItem('symphony-reference-lists:anonymous', JSON.stringify([{ kind: 'week', date: new Date().toISOString() }]))
+  })
+  afterEach(() => { setWidth(1024); selectionState.selection = null; sessionStorage.clear() })
+
+  it('keeps the lists open beside a detail pane when the page still has room', () => {
+    setWidth(1600)
+    selectionState.selection = { kind: 'task', id: 't1' }
+    renderAt('/today')
+    expect(screen.getByRole('complementary', { name: 'Pinned reference lists' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /^Week/ }))
+    expect(screen.queryByText(/Lists return when you close the side panel/)).not.toBeInTheDocument()
+  })
+
+  it('lets the detail pane win when the page would be squeezed', () => {
+    setWidth(1280)
+    selectionState.selection = { kind: 'task', id: 't1' }
+    renderAt('/today')
+    expect(screen.queryByRole('complementary', { name: 'Pinned reference lists' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /^Week/ }))
+    expect(screen.getByText(/Lists return when you close the side panel/)).toBeInTheDocument()
+  })
+})
+

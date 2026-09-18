@@ -1,10 +1,13 @@
+import { DesktopNavigation, DesktopControlsContext } from '@/components/layout/DesktopNavigation';
 import { ReferenceListsProvider, useReferenceLists } from '@/components/reference/ReferenceListsContext';
-import { ReferenceListControls, ReferenceListsDock } from '@/components/reference/ReferenceLists';
+import { ReferenceListsDock } from '@/components/reference/ReferenceLists';
+import { pinIsOnPage } from '@/components/reference/periodsOnPage';
+import { DesktopFooter, DesktopFooterActionContext } from '@/components/layout/DesktopFooter';
 // src/shell/ShellLayout.tsx
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Sparkles, Sun, Inbox as InboxIcon, MoreHorizontal } from 'lucide-react';
-import { Sidebar, type ViewType } from '@/components/layout/Sidebar';
+import { type ViewType } from '@/components/layout/Sidebar';
 import { MoreSheet } from '@/components/layout/MoreSheet';
 import { QuickCapture } from '@/components/layout/QuickCapture';
 import { NewVersionBanner } from '@/components/layout/NewVersionBanner';
@@ -30,7 +33,7 @@ import { MOBILE_TAB_BAR_HEIGHT } from './mobileChrome';
 
 /**
  * ShellLayout wraps Shell-mounted apps with the Symphony app chrome — the
- * desktop sidebar, the mobile header + bottom nav, the QuickCapture FAB, the
+ * desktop page navigation, the mobile header + bottom nav, the QuickCapture FAB, the
  * domain switcher / AI / help top-bar buttons, pinned items, and the help
  * overlay.
  *
@@ -51,7 +54,20 @@ import { MOBILE_TAB_BAR_HEIGHT } from './mobileChrome';
  * Shell.tsx's global DetailPanel model is untouched.
  */
 
-const SIDEBAR_STORAGE_KEY = 'symphony-sidebar-collapsed';
+// Left reference dock at its widest, and the narrowest page worth keeping
+// beside it when a right-hand pane is also open.
+const REFERENCE_DOCK_WIDTH = 340;
+const MIN_PAGE_WITH_REFERENCES = 640;
+
+function useViewportWidth() {
+  const [width, setWidth] = useState(() => (typeof window === 'undefined' ? 0 : window.innerWidth));
+  useEffect(() => {
+    const onResize = () => setWidth(window.innerWidth);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+  return width;
+}
 
 // Mirrors Shell.tsx — the AI rail is owned by ShellAssistantHost on these paths.
 const TODAY_PATHS = new Set(['/', '/today', '/tasks-new/today', '/tasks-new']);
@@ -89,13 +105,8 @@ function ShellLayoutInner({ children }: Props) {
   const isMobile = useMobile();
   const { user, signOut } = useAuth();
 
-  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return false;
-    return localStorage.getItem(SIDEBAR_STORAGE_KEY) === 'true';
-  });
-  useEffect(() => {
-    localStorage.setItem(SIDEBAR_STORAGE_KEY, String(sidebarCollapsed));
-  }, [sidebarCollapsed]);
+  const [desktopControls, setDesktopControls] = useState<HTMLDivElement | null>(null);
+  const [desktopFooterAction, setDesktopFooterAction] = useState<HTMLDivElement | null>(null);
 
   const references = useReferenceLists();
   const activeView = useMemo(() => deriveActiveView(location.pathname), [location.pathname]);
@@ -125,9 +136,7 @@ function ShellLayoutInner({ children }: Props) {
   const [quickAddOpen, setQuickAddOpen] = useState(false);
 
   // Global keyboard shortcuts: ⌘K opens the unibox (Quick Add + search + Ask
-  // Symphony); ⌘/ is a legacy alias for the same box; ⌘\ toggles the sidebar.
-  // ⌘\ is ignored while typing in a field (so it doesn't fight text entry);
-  // ⌘K / ⌘/ work anywhere.
+  // Symphony); ⌘/ is a legacy alias. Both work anywhere.
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (!(e.metaKey || e.ctrlKey)) return;
@@ -135,13 +144,7 @@ function ShellLayoutInner({ children }: Props) {
       if (key === 'k' || key === '/') {
         e.preventDefault();
         setQuickAddOpen((o) => !o);
-      } else if (key === '\\') {
-        const el = document.activeElement;
-        const typing = el instanceof HTMLElement &&
-          (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable);
-        if (typing) return;
-        e.preventDefault();
-        setSidebarCollapsed((c) => !c);
+
       }
     };
     window.addEventListener('keydown', onKeyDown);
@@ -227,28 +230,25 @@ function ShellLayoutInner({ children }: Props) {
   // matching ShellAssistantHost which hides the rail while a detail pane is open.)
   const { hidden: scratchpadHidden } = useScratchpadHidden();
   const todayRailVisible = isToday && !scratchpadHidden && !isMobile;
+  // Pinned lists sit on the LEFT, so they no longer compete with the detail
+  // and AI panes on the right: both stay open while the page keeps a readable
+  // width between them. Only when it would not do the panes still win, and
+  // the lists return when the pane closes. The dock column is reserved only
+  // when a pin actually draws here, so the page centres in the width left.
+  const viewportWidth = useViewportWidth();
+  const paneWidth = selection ? 480 : rightRailVisible ? 380 : todayRailVisible ? 420 : 0;
+  const referencesFit = paneWidth === 0 || viewportWidth - paneWidth - REFERENCE_DOCK_WIDTH >= MIN_PAGE_WITH_REFERENCES;
+  const referencesPaused = paneWidth > 0 && !referencesFit;
+  const referencesVisible = !isMobile && referencesFit
+    && !!references?.pins.some((pin) => !pinIsOnPage(location.pathname, pin.kind));
 
   return (
+    <DesktopControlsContext.Provider value={desktopControls}>
+    <DesktopFooterActionContext.Provider value={desktopFooterAction}>
     <div className="h-screen flex overflow-hidden overflow-x-hidden bg-bg-base w-full max-w-[100vw]">
       {/* "New version available — reload" banner: shows when a newer build
           deployed while this tab stayed open (stale-tab guard). */}
       <NewVersionBanner />
-
-      {/* Desktop sidebar (nordic theme — kinetic sidebar is retired) */}
-      {!isMobile && (
-        <Sidebar
-          collapsed={sidebarCollapsed}
-          onToggle={() => setSidebarCollapsed((c) => !c)}
-          userEmail={user?.email ?? undefined}
-          userName={typeof user?.user_metadata?.name === 'string' ? user.user_metadata.name : undefined}
-          onSignOut={signOut}
-          activeView={activeView}
-          onViewChange={handleViewChange}
-          onOpenSearch={() => setQuickAddOpen(true)}
-          inboxCount={inboxCount}
-          discussionsUnread={discussionsUnread}
-        />
-      )}
 
       {/* Content frame — uses <div> (not <main>) because individual apps render
           their own <main>. Avoids invalid nested-main HTML. */}
@@ -267,7 +267,7 @@ function ShellLayoutInner({ children }: Props) {
             : { marginRight: selection ? '480px' : rightRailVisible ? '380px' : todayRailVisible ? '420px' : '0' }
         }
       >
-        {/* Mobile header — logo + domain switcher + sign-out (date nav lives in
+        {/* Mobile header — domain switcher + sign-out (date nav lives in
             HomeHeader on Today). This header is the one piece of chrome every
             mobile Shell route renders, so the switcher lives here and nowhere
             else on phones: HomeHeader hides its copy below md, and the desktop
@@ -278,11 +278,6 @@ function ShellLayoutInner({ children }: Props) {
             style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
           >
             <div className="flex items-center gap-2">
-              <img
-                src="/symphony-logo.jpg"
-                alt="Symphony"
-                className="w-7 h-7 rounded-full shrink-0 object-cover"
-              />
               <div className="flex-1" />
               <div className="flex items-center gap-1 shrink-0">
                 <DomainSwitcher />
@@ -312,12 +307,22 @@ function ShellLayoutInner({ children }: Props) {
           </header>
         )}
 
-        {/* Domain switcher + AI + help on desktop views that don't wear the
-            masthead card. Today and Inbox render these in the card's corner
-            (via AppShellChromeContext); drawing them here too put two pairs
-            on Inbox. */}
-        {!isMobile && activeView !== 'today' && activeView !== 'inbox' && (
-          <div className="absolute top-4 right-6 z-20 flex items-center gap-2">
+        {isMobile ? (
+          <div>
+            <div className="min-w-0">{children}</div>
+          </div>
+        ) : (
+          // Desktop: navigation, page, and footer share one centred column —
+          // centred in the window, or in the space left beside a side pane or
+          // the pinned reference lists.
+          <div className={`desktop-workspace${referencesVisible ? ' has-references' : ''}`}>
+            <div className="desktop-workspace-nav">
+        <DesktopNavigation inboxCount={inboxCount} discussionsUnread={discussionsUnread}
+          onSearch={() => setQuickAddOpen(true)} onSignOut={signOut}
+          userName={user?.user_metadata?.name ?? user?.email}
+          paused={referencesPaused} controlsRef={setDesktopControls}
+          auxiliaryControls={activeView !== 'today' && activeView !== 'inbox' && (
+          <div className="flex items-center gap-2">
             <DomainSwitcher />
             <button
               onClick={() => setChatOpen((o) => !o)}
@@ -330,18 +335,20 @@ function ShellLayoutInner({ children }: Props) {
               <Sparkles className="w-4 h-4" />
             </button>
           </div>
+        )} />
+            </div>
+            <div className="desktop-workspace-page min-w-0">{children}</div>
+            {referencesVisible && <div className="desktop-workspace-dock"><ReferenceListsDock /></div>}
+            <DesktopFooter actionRef={setDesktopFooterAction} />
+          </div>
         )}
-
-        {!isMobile && <ReferenceListControls paused={!!selection || rightRailVisible || todayRailVisible} />}
-        <div className={!isMobile && references?.pins.length && !selection && !rightRailVisible && !todayRailVisible ? 'reference-workspace' : ''}>
-          <div className="min-w-0">{children}</div>
-          {!isMobile && !selection && !rightRailVisible && !todayRailVisible && <ReferenceListsDock />}
-        </div>
       </div>
 
       {/* QuickCapture FAB — all routes except the agent view (which has its own input) */}
       {activeView !== 'agent' && (
         <QuickCapture
+          // Desktop captures through ⌘K and the navigation's search button.
+          showFab={isMobile}
           onAdd={chrome.onQuickAdd}
           onAddRich={chrome.onQuickAddRich}
           onAddNote={chrome.onQuickAddNote}
@@ -487,6 +494,8 @@ function ShellLayoutInner({ children }: Props) {
         />
       )}
     </div>
+    </DesktopFooterActionContext.Provider>
+    </DesktopControlsContext.Provider>
   );
 }
 

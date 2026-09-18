@@ -1,3 +1,5 @@
+import { DesktopPageControls, DesktopControlsContext } from '@/components/layout/DesktopNavigation'
+import { DesktopFooterAction, DesktopFooterActionContext } from '@/components/layout/DesktopFooter'
 /**
  * TodayView — editorial Today shell.
  *
@@ -7,7 +9,7 @@
  *
  * NOT wired to the route yet — that happens in R4.
  */
-import { createElement, useMemo, useCallback, useRef, useState, useEffect } from 'react'
+import { useContext, createElement, useMemo, useCallback, useRef, useState, useEffect } from 'react'
 import type { Task, GroupMemberRef } from '@/types/task'
 import type { Project } from '@/types/project'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
@@ -321,6 +323,10 @@ export function TodayView({
   // the assignee FILTER, which is a different question (Scott, 2026-09-05).
   const { getCurrentUserMember } = useFamilyMembers()
   const meId = getCurrentUserMember()?.id ?? null
+  const desktopControls = useContext(DesktopControlsContext)
+  // In the desktop shell the day's review lives in the page footer, so the
+  // ⋯ menu drops its copy there (phones keep the menu entry).
+  const reviewInFooter = !!useContext(DesktopFooterActionContext) && !isMobile
   const poolMatchMine = useMemo(
     () => (assignedTo: string | null | undefined, assignedToAll?: readonly string[] | null) =>
       !meId || doableBy({ assignedTo: assignedTo ?? undefined, assignedToAll: assignedToAll ? [...assignedToAll] : undefined }, meId),
@@ -1018,7 +1024,7 @@ export function TodayView({
         <Printer className="w-5 h-5" />
         <span>Print list</span>
       </button>
-      {data.isToday && (
+      {data.isToday && !reviewInFooter && (
         <button
           type="button"
           onClick={() => setReviewMode('evening')}
@@ -1055,8 +1061,70 @@ export function TodayView({
   // timeline (px-0), which is why this isn't the constant itself. `mr-auto`,
   // not `mx-auto`: the column starts where every other page's does — see
   // pageLayout.ts.
+  const desktopToolbar = (
+                  <div
+                    data-testid="today-controls"
+                    className="hidden shrink-0 md:flex items-center gap-1"
+                  >
+              {/* The week/month LISTS — separate dropdowns, deliberately OUTSIDE
+                  the review drawer. Always rendered (a place to look must always
+                  be there). Each row leads with the daily gesture — tick, or
+                  "Do today" from the week list / "This week" from the month
+                  list — with the triage verbs behind ⋯ (planning lists, Step 4). */}
+              {!desktopControls && <HorizonPoolDropdown
+                label="This week"
+                referenceKind="week"
+                referenceDate={currentWeekStart}
+                tasks={weekPool}
+                offer={['today', 'tomorrow', 'someday', 'deleted']}
+                lead="today"
+                emptyCopy="Nothing on this week's list."
+                viewedDate={viewedDate}
+                onUpdateTask={(id, u) => onUpdateTask?.(id, u)}
+                onPushTask={ctx.onPushTask}
+                onDeleteTask={ctx.onDeleteTask}
+                onCompleteTask={onToggleTask}
+                benchRoute="/week"
+                benchLabel="Open this week"
+              />}
+              {!desktopControls && <HorizonPoolDropdown
+                label="This month"
+                referenceKind="month"
+                tasks={monthPool}
+                offer={['week', 'today', 'someday', 'deleted']}
+                lead="week"
+                emptyCopy="Nothing on this month's list."
+                placedFor={(t) => placementFate(t, tasks)}
+                viewedDate={viewedDate}
+                onUpdateTask={(id, u) => onUpdateTask?.(id, u)}
+                onPushTask={ctx.onPushTask}
+                onDeleteTask={ctx.onDeleteTask}
+                onCompleteTask={onToggleTask}
+              />}
+
+              {onSelectAssignees && ((assigneesWithTasks?.length ?? 0) > 0 || hasUnassignedTasks) && (
+                <AssigneeFilter
+                  selectedAssignees={selectedAssignees ?? []}
+                  onSelectAssignees={onSelectAssignees}
+                  assigneesWithTasks={assigneesWithTasks ?? []}
+                  hasUnassignedTasks={!!hasUnassignedTasks}
+                />
+              )}
+
+              {!isMobile && overflowMenu}
+            </div>
+  )
+
   return (
-    <div className="w-full max-w-[1152px] mr-auto px-0 py-2 md:px-10 lg:px-14 md:py-8">
+    <div className="w-full max-w-[1152px] mr-auto px-0 py-2 md:px-10 lg:px-14 md:pt-2 md:pb-8">
+      {desktopControls && !isMobile && <DesktopPageControls>{desktopToolbar}</DesktopPageControls>}
+      {reviewInFooter && data.isToday && (
+        <DesktopFooterAction>
+          <button type="button" onClick={() => setReviewMode('evening')} title="Reflect, prep for tomorrow, and close the day">
+            Review today
+          </button>
+        </DesktopFooterAction>
+      )}
       {/* Mounted only while printing. Keeping it permanently in the DOM would
           duplicate every title — invisible to the eye (CSS-hidden) but very
           real to screen readers and to any getByText. */}
@@ -1093,64 +1161,10 @@ export function TodayView({
         subline={heroLine}
         // Domain chooser + assistant toggle, in the card's corner.
         controls={headerControls}
-        // No action buttons on the card. Time-block, Plan week, and Process
-        // inbox all left 2026-09-06: the sidebar's This Week and Inbox rows
-        // and the "N need a decision" strip below already lead there, and
-        // Plan from paper in the sidebar is the day's one verb. What remains
-        // along the foot is the day's lookups and settings.
-        footer={(
-                  <div
-                    data-testid="today-controls"
-                    className="hidden shrink-0 md:flex items-center gap-1"
-                  >
-              {/* The week/month LISTS — separate dropdowns, deliberately OUTSIDE
-                  the review drawer. Always rendered (a place to look must always
-                  be there). Each row leads with the daily gesture — tick, or
-                  "Do today" from the week list / "This week" from the month
-                  list — with the triage verbs behind ⋯ (planning lists, Step 4). */}
-              <HorizonPoolDropdown
-                label="This week"
-                referenceKind="week"
-                referenceDate={currentWeekStart}
-                tasks={weekPool}
-                offer={['today', 'tomorrow', 'someday', 'deleted']}
-                lead="today"
-                emptyCopy="Nothing on this week's list."
-                viewedDate={viewedDate}
-                onUpdateTask={(id, u) => onUpdateTask?.(id, u)}
-                onPushTask={ctx.onPushTask}
-                onDeleteTask={ctx.onDeleteTask}
-                onCompleteTask={onToggleTask}
-                benchRoute="/week"
-                benchLabel="Open this week"
-              />
-              <HorizonPoolDropdown
-                label="This month"
-                referenceKind="month"
-                tasks={monthPool}
-                offer={['week', 'today', 'someday', 'deleted']}
-                lead="week"
-                emptyCopy="Nothing on this month's list."
-                placedFor={(t) => placementFate(t, tasks)}
-                viewedDate={viewedDate}
-                onUpdateTask={(id, u) => onUpdateTask?.(id, u)}
-                onPushTask={ctx.onPushTask}
-                onDeleteTask={ctx.onDeleteTask}
-                onCompleteTask={onToggleTask}
-              />
+        // Shell desktop controls live in the page navigation; standalone
+        // mounts retain the footer controls as a fallback.
+        footer={desktopControls ? undefined : desktopToolbar}
 
-              {onSelectAssignees && ((assigneesWithTasks?.length ?? 0) > 0 || hasUnassignedTasks) && (
-                <AssigneeFilter
-                  selectedAssignees={selectedAssignees ?? []}
-                  onSelectAssignees={onSelectAssignees}
-                  assigneesWithTasks={assigneesWithTasks ?? []}
-                  hasUnassignedTasks={!!hasUnassignedTasks}
-                />
-              )}
-
-              {!isMobile && overflowMenu}
-            </div>
-        )}
       />
 
 

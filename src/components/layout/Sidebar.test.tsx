@@ -141,11 +141,11 @@ describe('Sidebar', () => {
         </PlaceProvider>
       </MemoryRouter>,
     )
-    await user.click(screen.getByRole('button', { name: 'This Month' }))
+    await user.click(screen.getByRole('button', { name: 'Month' }))
     expect(mockNavigate).toHaveBeenCalledWith('/month')
-    await user.click(screen.getByRole('button', { name: 'This Season' }))
+    await user.click(screen.getByRole('button', { name: 'Season' }))
     expect(mockNavigate).toHaveBeenCalledWith('/season')
-    await user.click(screen.getByRole('button', { name: 'This Year' }))
+    await user.click(screen.getByRole('button', { name: 'Year' }))
     expect(mockNavigate).toHaveBeenCalledWith('/year')
     expect(screen.queryByRole('button', { name: 'Goals' })).not.toBeInTheDocument()
   })

@@ -153,20 +153,20 @@ export function ReviewDrawer({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/30 backdrop-blur-sm"
+      className="review-backdrop fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/30 backdrop-blur-sm"
       onClick={close}
       role="dialog"
       aria-modal="true"
       aria-label={mode === 'evening' ? 'End of day review' : 'Start the day review'}
     >
       <div
-        className="w-full md:max-w-lg max-h-[85vh] overflow-auto bg-bg-elevated rounded-t-3xl md:rounded-3xl shadow-2xl border border-neutral-200/60"
+        className="review-sheet w-full md:max-w-lg max-h-[85vh] overflow-auto bg-bg-elevated rounded-t-3xl md:rounded-3xl shadow-2xl border border-neutral-200/60"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-start justify-between px-6 pt-6 pb-2">
           <div className="flex items-center gap-3">
-            <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-primary-50 text-primary-600">
+            <span className="review-icon inline-flex items-center justify-center w-10 h-10 rounded-xl bg-primary-50 text-primary-600">
               {mode === 'evening' ? <Moon className="w-5 h-5" /> : <Sun className="w-5 h-5" />}
             </span>
             <div>
@@ -256,7 +256,7 @@ export function ReviewDrawer({
                               {done && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
                             </button>
                           )}
-                          <span className={`flex-1 min-w-0 text-sm leading-snug ${spent ? 'text-neutral-400' : 'text-neutral-700'} ${done ? 'line-through' : ''}`}>{t.title}</span>
+                          <span className={`review-title flex-1 min-w-0 text-sm leading-snug ${spent ? 'text-neutral-400' : 'text-neutral-700'} ${done ? 'line-through' : ''}`}>{t.title}</span>
                           {spent ? (
                             <span className="shrink-0 inline-flex items-center gap-1 text-xs text-primary-700">
                               <Check className="w-3 h-3" strokeWidth={3} /> {done ? 'done' : 'tomorrow'}
@@ -311,7 +311,7 @@ export function ReviewDrawer({
 
           {/* Close */}
           <button type="button" onClick={close}
-            className="w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-primary-500 to-primary-600 text-white font-medium hover:from-primary-600 hover:to-primary-700 transition-all shadow-sm">
+            className="review-close w-full inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl bg-gradient-to-r from-primary-500 to-primary-600 text-white font-medium hover:from-primary-600 hover:to-primary-700 transition-all shadow-sm">
             <Sparkles className="w-4 h-4" /> {mode === 'evening' ? 'Close the day' : 'Start the day'}
           </button>
         </div>
