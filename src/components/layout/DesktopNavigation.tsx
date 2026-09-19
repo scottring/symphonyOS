@@ -56,6 +56,11 @@ export function DesktopNavigation({ inboxCount, discussionsUnread, onSearch, onS
       const label = kind === 'week' ? 'Week' : 'Month'
       return <div key={kind}>{menu(kind, <>{label}{pinned && <span className="navigation-pin" aria-label="pinned">·</span>}</>, <>
         <button onClick={() => go(`/${kind}`)}>Open {kind} page</button>
+        {kind === 'week' && <>
+          <button onClick={() => go('/week?range=weekend')}>Weekend</button>
+          <button onClick={() => go('/week?range=three')}>3 days</button>
+          <button onClick={() => go('/week?range=custom')}>Custom range…</button>
+        </>}
         <button onClick={() => { if (pinned) references?.unpin(kind); else references?.pin(kind); setOpen(null) }}>{pinned ? 'Unpin' : 'Pin'} {kind} list{!pinned && ' here'}</button>
         {paused && pinned && <p>Lists return when you close the side panel.</p>}
       </>, pathname.startsWith(`/${kind}`))}</div>

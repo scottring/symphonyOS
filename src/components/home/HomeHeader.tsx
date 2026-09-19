@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { ChevronDown } from 'lucide-react'
 
 import type { HomeViewType } from '@/types/homeView'
 import { HomeChromeControls } from './HomeChromeControls'
@@ -23,6 +24,9 @@ interface HomeHeaderProps {
    *  the calendar, never a bucket: picking one changes what is drawn and
    *  writes nothing. Default 7. */
   rangeDays?: number
+  /** A token that changes each time the navigation's "Custom range…" is
+   *  chosen; a new value opens the custom start/end inputs. */
+  customRangeRequest?: string
   /** A preset or a custom start/end, handed over as the whole run of days. */
   onRangeChange?: (range: Date[]) => void
 
@@ -44,28 +48,22 @@ function formatDayShort(d: Date): string {
 }
 
 export function HomeHeader(props: HomeHeaderProps) {
-  const { currentView, viewedDate, onDateChange, weekStart, onWeekChange, rangeDays = 7, onRangeChange, monthStart, onMonthChange } = props
-  const [customOpen, setCustomOpen] = useState(false)
-  // Which preset (if any) produced the range currently on screen — a plain
-  // day-count can't tell "Weekend" (2 days) apart from a custom 2-day range,
-  // so the eyebrow needs to know WHICH button was pressed, not just how many
-  // columns came back. Cleared the moment the range on screen no longer
-  // matches what that preset produced (chevron nav, a custom edit, or any
-  // other caller of onWeekChange/onRangeChange) so a stale "Weekend" label
-  // never survives past the range it named.
-  const [activePreset, setActivePreset] = useState<RangePreset | 'thisWeek' | null>(null)
-  const activePresetRangeRef = useRef<{ start: number; days: number } | null>(null)
+  const { currentView, viewedDate, onDateChange, weekStart, onWeekChange, rangeDays = 7, onRangeChange, customRangeRequest, monthStart, onMonthChange } = props
+  const [customOpen, setCustomOpen] = useState(!!customRangeRequest)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuButtonRef = useRef<HTMLButtonElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    if (!activePresetRangeRef.current) return
-    const stillMatches =
-      activePresetRangeRef.current.start === weekStart.getTime() &&
-      activePresetRangeRef.current.days === rangeDays
-    if (!stillMatches) {
-      activePresetRangeRef.current = null
-      setActivePreset(null)
-    }
-  }, [weekStart, rangeDays])
-
+    if (menuOpen) menuRef.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus()
+  }, [menuOpen])
+  // Arriving from the navigation's "Custom range…" opens the inputs (state
+  // adjusted during render, React's pattern for following a prop); picking a
+  // preset afterwards closes them again.
+  const [seenCustomRequest, setSeenCustomRequest] = useState(customRangeRequest)
+  if (customRangeRequest !== seenCustomRequest) {
+    setSeenCustomRequest(customRangeRequest)
+    if (customRangeRequest) setCustomOpen(true)
+  }
   // Per-view label + chevron handlers
   let label: { short: string; long: string }
   let onPrev: () => void
@@ -101,8 +99,8 @@ export function HomeHeader(props: HomeHeaderProps) {
       ? weekStart.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
       : `${formatDayShort(weekStart)} – ${formatDayShort(lastDay)}`
     label = { short: shortStr, long: shortStr }
-    onPrev = () => { activePresetRangeRef.current = null; setActivePreset(null); onWeekChange(addDays(weekStart, -rangeDays)) }
-    onNext = () => { activePresetRangeRef.current = null; setActivePreset(null); onWeekChange(addDays(weekStart, rangeDays)) }
+    onPrev = () => { onWeekChange(addDays(weekStart, -rangeDays)) }
+    onNext = () => { onWeekChange(addDays(weekStart, rangeDays)) }
     prevLabel = rangeDays === 7 ? 'Previous week' : 'Earlier'
     nextLabel = rangeDays === 7 ? 'Next week' : 'Later'
   } else {
@@ -120,99 +118,125 @@ export function HomeHeader(props: HomeHeaderProps) {
   // above it just put a second empty band on the page.
   if (currentView === 'today') return null
 
-  // /week's range control. "This week" is the calendar week (the week list's
-  // week); the others come from the same presets the time-block grid had, so
-  // nothing was lost when that overlay went. Custom shows a start and an end;
-  // a new start slides the run along, a new end resizes it.
+  // /week's range menu. The week is always the default; the shorter runs are
+  // a choice you make from the eyebrow, not a row of buttons standing under
+  // the dates (Scott, 2026-09-19). "This week" is the calendar week (the week
+  // list's week). Custom shows a start and an end; a new start slides the run
+  // along, a new end resizes it.
   const rangeEnd = addDays(weekStart, rangeDays - 1)
   const toInput = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
   const PRESETS: { key: RangePreset | 'thisWeek'; label: string; pick: () => Date[] }[] = [
     { key: 'thisWeek', label: 'This week', pick: () => weekRange(new Date(), readCadenceConfig().weekStartsOn) },
-    { key: 'today', label: 'Today', pick: () => presetRange('today' as RangePreset, new Date()) },
     { key: 'weekend', label: 'Weekend', pick: () => presetRange('weekend', new Date()) },
     { key: 'three', label: '3 days', pick: () => presetRange('three', new Date()) },
   ]
-  const rangeControl = currentView === 'week' && onRangeChange ? (
-    <div className="flex flex-wrap items-center gap-1" role="group" aria-label="Days on screen">
-      {PRESETS.map((p) => (
-        <button
-          key={p.label}
-          type="button"
-          onClick={() => {
-            setCustomOpen(false)
-            const range = p.pick()
-            activePresetRangeRef.current = range.length > 0 ? { start: range[0].getTime(), days: range.length } : null
-            setActivePreset(p.key)
-            onRangeChange(range)
-          }}
-          className="rounded-md px-2 py-1 text-xs font-medium text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800 transition-colors"
-        >
-          {p.label}
-        </button>
-      ))}
-      <button
-        type="button"
-        aria-pressed={customOpen}
-        onClick={() => { activePresetRangeRef.current = null; setActivePreset(null); setCustomOpen((v) => !v) }}
-        className={`rounded-md px-2 py-1 text-xs font-medium transition-colors ${customOpen ? 'bg-neutral-800 text-white' : 'text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800'}`}
-      >
-        Custom
-      </button>
-      {customOpen && (
-        <span className="ml-1 inline-flex items-center gap-1 text-xs text-neutral-500">
-          <label className="inline-flex items-center gap-1">
-            <span className="sr-only">Start</span>
-            <input
-              type="date"
-              aria-label="Start"
-              value={toInput(weekStart)}
-              onChange={(e) => {
-                if (!e.target.value) return
-                const start = new Date(e.target.value + 'T00:00:00')
-                activePresetRangeRef.current = null
-                setActivePreset(null)
-                onRangeChange(buildRange(start, addDays(start, rangeDays - 1)))
-              }}
-              className="rounded border border-neutral-200 bg-white px-1.5 py-0.5 text-xs text-neutral-700"
-            />
-          </label>
-          <span aria-hidden>–</span>
-          <label className="inline-flex items-center gap-1">
-            <span className="sr-only">End</span>
-            <input
-              type="date"
-              aria-label="End"
-              value={toInput(rangeEnd)}
-              onChange={(e) => {
-                if (!e.target.value) return
-                activePresetRangeRef.current = null
-                setActivePreset(null)
-                onRangeChange(buildRange(weekStart, new Date(e.target.value + 'T00:00:00')))
-              }}
-              className="rounded border border-neutral-200 bg-white px-1.5 py-0.5 text-xs text-neutral-700"
-            />
-          </label>
-        </span>
-      )}
-    </div>
-  ) : null
+  const showCustom = customOpen
 
-  // /week wears the same OPEN masthead Today does (parity pass 2026-09-17):
-  // the run of days in the eyebrow ("Week", "3 days"), the dates as the serif
-  // title, the range presets on the quiet line, chrome in the corner. No date
-  // numeral — a range of days has no single one.
   if (currentView === 'week') {
+    // Named by what is on screen, not by which button produced it: a Sat–Sun
+    // run is a weekend however you got there, and stepping it along to Mon–Tue
+    // makes it "2 days" with nothing to remember or clear.
     const eyebrowLabel =
-      activePreset === 'weekend' ? 'Weekend'
-      : rangeDays === 7 ? 'Week'
+      rangeDays === 7 ? 'Week'
       : rangeDays === 1 ? 'Day'
+      : rangeDays === 2 && weekStart.getDay() === 6 ? 'Weekend'
       : `${rangeDays} days`
+    const closeMenu = (refocus: boolean) => {
+      setMenuOpen(false)
+      if (refocus) menuButtonRef.current?.focus()
+    }
+    const menuButton = onRangeChange ? (
+      <button
+        ref={menuButtonRef}
+        type="button"
+        aria-haspopup="menu"
+        aria-expanded={menuOpen}
+        aria-controls="week-range-menu"
+        onClick={() => setMenuOpen((v) => !v)}
+        onKeyDown={(e) => { if (e.key === 'ArrowDown') { e.preventDefault(); setMenuOpen(true) } }}
+        className="inline-flex items-center gap-1 uppercase tracking-[0.08em] hover:text-neutral-800"
+      >
+        {eyebrowLabel}
+        <ChevronDown className="h-3 w-3" aria-hidden="true" />
+      </button>
+    ) : eyebrowLabel
+    // Rendered beside the label rather than inside it: the label slot
+    // truncates (overflow hidden), which would clip a popover hung inside it.
+    const menu = menuOpen && onRangeChange ? (
+      <div
+        id="week-range-menu"
+        role="menu"
+        aria-label="Days on screen"
+        ref={menuRef}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') { e.preventDefault(); closeMenu(true); return }
+          if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return
+          e.preventDefault()
+          const items = Array.from(e.currentTarget.querySelectorAll<HTMLElement>('[role="menuitem"]'))
+          const at = items.indexOf(document.activeElement as HTMLElement)
+          const next = e.key === 'ArrowDown' ? (at + 1) % items.length : (at - 1 + items.length) % items.length
+          items[next]?.focus()
+        }}
+        onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null) && e.relatedTarget !== menuButtonRef.current) setMenuOpen(false) }}
+        className="absolute left-0 top-full z-30 mt-1 flex min-w-40 flex-col rounded-md border border-neutral-200 bg-bg-elevated py-1 shadow-lg"
+      >
+        {PRESETS.map((p) => (
+          <button
+            key={p.key}
+            type="button"
+            role="menuitem"
+            onClick={() => {
+              setCustomOpen(false)
+              closeMenu(true)
+              onRangeChange(p.pick())
+            }}
+            className="px-3 py-1.5 text-left text-[13px] text-neutral-700 hover:bg-neutral-100 focus:bg-neutral-100 focus:outline-none"
+          >
+            {p.label}
+          </button>
+        ))}
+        <button
+          type="button"
+          role="menuitem"
+          onClick={() => { setCustomOpen(true); closeMenu(false) }}
+          className="px-3 py-1.5 text-left text-[13px] text-neutral-700 hover:bg-neutral-100 focus:bg-neutral-100 focus:outline-none"
+        >
+          Custom range…
+        </button>
+      </div>
+    ) : null
+    const customInputs = showCustom && onRangeChange ? (
+      <span className="flex flex-wrap items-center gap-1 text-xs text-neutral-500">
+        <input
+          type="date"
+          aria-label="Start"
+          value={toInput(weekStart)}
+          onChange={(e) => {
+            if (!e.target.value) return
+            const start = new Date(e.target.value + 'T00:00:00')
+            onRangeChange(buildRange(start, addDays(start, rangeDays - 1)))
+          }}
+          className="rounded border border-neutral-200 bg-white px-1.5 py-0.5 text-xs text-neutral-700"
+        />
+        <span aria-hidden>–</span>
+        <input
+          type="date"
+          aria-label="End"
+          value={toInput(rangeEnd)}
+          onChange={(e) => {
+            if (!e.target.value) return
+            onRangeChange(buildRange(weekStart, new Date(e.target.value + 'T00:00:00')))
+          }}
+          className="rounded border border-neutral-200 bg-white px-1.5 py-0.5 text-xs text-neutral-700"
+        />
+      </span>
+    ) : null
     return (
       <MastheadCard
         variant="page"
-        eyebrow={<PeriodNavEyebrow label={eyebrowLabel} onPrev={onPrev} onNext={onNext} prevLabel={prevLabel} nextLabel={nextLabel} />}
+        eyebrow={<PeriodNavEyebrow label={menuButton} onPrev={onPrev} onNext={onNext} prevLabel={prevLabel} nextLabel={nextLabel} trailing={menu} />}
         title={label.long}
-        subline={rangeControl}
+        subline={customInputs}
         controls={<HomeChromeControls className="flex" />}
       />
     )

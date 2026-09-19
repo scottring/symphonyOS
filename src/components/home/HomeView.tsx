@@ -1,4 +1,6 @@
-import { useState, useMemo, useCallback, useEffect } from 'react'
+import { useLocation } from 'react-router-dom'
+import { presetRange, weekRange } from '@/lib/planning/dateRange'
+import { useState, useMemo, useCallback, useEffect, useRef } from 'react'
 import { useCadenceConfig, readCadenceConfig, weekStartAnchor } from '@/lib/cadence/config'
 import { HomeChromeControls } from './HomeChromeControls'
 import type { HomeViewType } from '@/types/homeView'
@@ -16,7 +18,6 @@ import { useUndo } from '@/hooks/useUndo'
 import { useDomain } from '@/hooks/useDomain'
 import { WeekView } from './WeekView'
 import { WeekViewV2 } from './week/WeekViewV2'
-import { WeekViewMobile } from './week/WeekViewMobile'
 import { MonthView } from './MonthView'
 
 const WEEK_V2_FLAG = 'symphony-week-v2'
@@ -207,6 +208,8 @@ export function HomeView({
   // presets and custom start/end set fewer. A range is a VIEW, never a bucket
   // — it changes what is drawn and writes nothing (Scott, 2026-09-06: the
   // time-block overlay's range picker moved here and the overlay went).
+  const location = useLocation()
+  const rangePreset = new URLSearchParams(location.search).get('range')
   const [rangeDays, setRangeDays] = useState(7)
   const onRangeChange = useCallback((range: Date[]) => {
     setWeekStart(range[0])
@@ -214,11 +217,40 @@ export function HomeView({
     onDateChange(range[0])
   }, [onDateChange])
 
+  // Arriving at /week — from the navigation's Week menu or anywhere else —
+  // opens the seven-day week unless the link names a shorter run
+  // (?range=weekend | three). Keyed on the navigation itself, so choosing
+  // "Weekend" twice, or "Open week page" after a weekend, re-applies.
+  const onDateChangeRef = useRef(onDateChange)
+  const viewedDateRef = useRef(viewedDate)
+  useEffect(() => {
+    onDateChangeRef.current = onDateChange
+    viewedDateRef.current = viewedDate
+  })
+  useEffect(() => {
+    if (fixedView !== 'week') return
+    const range = rangePreset === 'weekend' || rangePreset === 'three'
+      ? presetRange(rangePreset, new Date())
+      : weekRange(new Date(), readCadenceConfig().weekStartsOn)
+    setWeekStart(range[0])
+    setRangeDays(range.length)
+    // The event fetch follows viewedDate (its week and the next); a weekend
+    // chosen on a Sunday sits in next week, so move it along when needed.
+    if (sundayOfWeek(viewedDateRef.current).getTime() !== sundayOfWeek(range[0]).getTime()) {
+      onDateChangeRef.current(range[0])
+    }
+  }, [fixedView, rangePreset, location.key])
+
   // Changing the setting re-anchors the week on screen. Without this the view
   // keeps whatever the initial state captured until a remount, so the setting
-  // appears not to work at the exact moment you change it.
+  // appears not to work at the exact moment you change it. Only on a real
+  // CHANGE: on mount it would re-anchor a weekend back to the week's start.
+  const prevWeekStartsOn = useRef(weekStartsOn)
   useEffect(() => {
+    if (prevWeekStartsOn.current === weekStartsOn) return
+    prevWeekStartsOn.current = weekStartsOn
     setWeekStart((prev) => weekStartAnchor(prev, weekStartsOn))
+    setRangeDays(7)
   }, [weekStartsOn])
 
   const [monthStart, setMonthStart] = useState(() => {
@@ -324,16 +356,6 @@ export function HomeView({
             onPushRoutine={ctx.onPushRoutine}
             pushAction={pushAction}
           />
-          <WeekViewMobile
-            tasks={filteredTasks}
-            events={filteredEvents}
-            routines={allActiveRoutines}
-            weekStart={mondayStart}
-            dayCount={5}
-            selectedAssignees={selectedAssignees}
-            layers={layers}
-            onSelectItem={onSelectItem}
-          />
         </>
       )
     }
@@ -365,9 +387,10 @@ export function HomeView({
             dateInstances={dateInstances}
             weekStart={weekStart}
             dayCount={rangeDays}
-            // A range start is wherever the range starts; only a 7-day step
-            // is re-anchored to the week, so a weekend stays a weekend.
-            onWeekChange={(d) => { setWeekStart(rangeDays === 7 ? sundayOfWeek(d) : d); onDateChange(d) }}
+            // A range start is wherever the range starts: stepping moves the
+            // run by its own length, so a weekend stays a weekend and a
+            // custom Thu–Wed week stays Thu–Wed.
+            onWeekChange={(d) => { setWeekStart(d); onDateChange(d) }}
             selectedAssignee={selectedAssigneeForSchedule}
             selectedAssignees={selectedAssignees}
             layers={layers}
@@ -377,16 +400,6 @@ export function HomeView({
             onUpdateEvent={ctx.onUpdateEvent ?? (() => {})}
             onPushRoutine={ctx.onPushRoutine}
             pushAction={pushAction}
-          />
-          <WeekViewMobile
-            tasks={filteredTasks}
-            events={filteredEvents}
-            routines={allActiveRoutines}
-            weekStart={weekStart}
-            dayCount={rangeDays}
-            selectedAssignees={selectedAssignees}
-            layers={layers}
-            onSelectItem={onSelectItem}
           />
         </>
       )
@@ -481,7 +494,9 @@ export function HomeView({
           the exact same max-w/px column as TodayView's content, keeping the
           date label and controls left/right-aligned with the task rows.
           Week/Month headers stay outside the scroll container (full-width). */}
-      {!isMobile && currentView !== 'today' && (
+      {/* Week keeps its masthead on a phone too: it is the only way to step
+          to another week or pick a shorter run there. */}
+      {(!isMobile || currentView === 'week') && currentView !== 'today' && (
         <div className={`${PAGE_GUTTER_X} pt-4`}>
           <HomeHeader
             currentView={currentView}
@@ -494,6 +509,7 @@ export function HomeView({
             // so a week viewedDate isn't in would render without its events.
             onWeekChange={(d) => { setWeekStart(d); onDateChange(d) }}
             rangeDays={rangeDays}
+            customRangeRequest={rangePreset === 'custom' ? location.key : undefined}
             onRangeChange={onRangeChange}
             monthStart={monthStart}
             onMonthChange={setMonthStart}

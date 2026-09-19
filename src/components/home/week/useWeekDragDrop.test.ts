@@ -336,3 +336,48 @@ describe('useWeekDragDrop — cross-week auto-advance', () => {
     vi.useRealTimers()
   })
 })
+
+// The journal spread's days are all-day drop targets ('journal-day:<iso>'),
+// and a task already given a day drags as 'journal:<id>' with the chip data.
+// Both must ride the existing all-day branch: timed-bucket write, undo, and
+// the past-day refusal.
+describe('useWeekDragDrop — journal day drops', () => {
+  const setup = () => {
+    const onUpdateTask = vi.fn()
+    const pushAction = vi.fn()
+    const task = {
+      id: 't1', title: 'Return library books', completed: false,
+      createdAt: new Date(), updatedAt: new Date(), bucket: 'week',
+    }
+    const { result } = renderHook(() => useWeekDragDrop({
+      weekStart: new Date(2026, 4, 17),
+      onWeekChange: vi.fn(), onUpdateTask, onUpdateEvent: vi.fn(), onUpdateRoutine: vi.fn(),
+      tasks: [task as never], events: [], routines: [], pushAction,
+    }))
+    return { result, onUpdateTask, pushAction }
+  }
+  const dropOn = (dayIso: string, activeId = 'pool:t1') => ({
+    active: { id: activeId, data: { current: { kind: 'chip', taskId: 't1' } } },
+    over: { id: `journal-day:${dayIso}`, data: { current: { kind: 'allDay', dayIso } } },
+  })
+
+  it('a list row dropped on a day gives it that day, untimed, with undo back to the week list', async () => {
+    const { result, onUpdateTask, pushAction } = setup()
+    await act(async () => { result.current.dndHandlers.onDragEnd(dropOn('2026-05-20') as never) })
+    expect(onUpdateTask).toHaveBeenCalledWith('t1', { isAllDay: true, scheduledFor: new Date(2026, 4, 20), bucket: 'timed' })
+    pushAction.mock.calls[0][1]()
+    expect(onUpdateTask).toHaveBeenLastCalledWith('t1', expect.objectContaining({ bucket: 'week', isAllDay: false }))
+  })
+
+  it('a day task moves to another day the same way', async () => {
+    const { result, onUpdateTask } = setup()
+    await act(async () => { result.current.dndHandlers.onDragEnd(dropOn('2026-05-22', 'journal:t1') as never) })
+    expect(onUpdateTask).toHaveBeenCalledWith('t1', expect.objectContaining({ scheduledFor: new Date(2026, 4, 22), isAllDay: true }))
+  })
+
+  it('refuses a day that has passed', async () => {
+    const { result, onUpdateTask } = setup()
+    await act(async () => { result.current.dndHandlers.onDragEnd(dropOn('2026-05-16') as never) })
+    expect(onUpdateTask).not.toHaveBeenCalled()
+  })
+})

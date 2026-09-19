@@ -258,7 +258,10 @@ describe('WeekPoolLane', () => {
     expect(screen.queryByText('Call VW')).not.toBeInTheDocument()
   })
 
-  describe('Last week', () => {
+  // Carryover is deliberate: last week's unfinished rows wait, collapsed, at
+  // the foot of the list, and each one is carried, parked or dropped by hand
+  // (Scott, 2026-09-19).
+  describe('Unfinished last week', () => {
     const thisWeek = new Date(2026, 7, 30) // Sunday Aug 30 (default week start)
     const prev = new Date(2026, 7, 23)
     const onUpdateTask = vi.fn()
@@ -276,38 +279,77 @@ describe('WeekPoolLane', () => {
     )
     beforeEach(() => { onUpdateTask.mockClear(); onDeleteTask.mockClear() })
 
-    it("shows last week's rows, ticked and unticked, and hides this week's", () => {
+    it('starts collapsed beneath this week, counting only what was left undone', () => {
       renderLane()
-      fireEvent.click(screen.getByRole('button', { name: 'Last week' }))
-      expect(screen.getByText('Washed the car')).toHaveClass('line-through')
+      expect(screen.getByText('This week thing')).toBeInTheDocument()
+      // Left behind is not silently this week's: it is not in the list's count.
+      expect(screen.getByRole('button', { name: /This week · 1/ })).toBeInTheDocument()
+      const toggle = screen.getByRole('button', { name: /Unfinished last week · 1/ })
+      expect(toggle).toHaveAttribute('aria-expanded', 'false')
+      expect(screen.queryByText('Call the plumber')).not.toBeInTheDocument()
+      fireEvent.click(toggle)
       expect(screen.getByText('Call the plumber')).toBeInTheDocument()
-      expect(screen.queryByText('This week thing')).not.toBeInTheDocument()
+      expect(screen.queryByText('Washed the car')).not.toBeInTheDocument()
+      // This week's list stays put while the carryover is open.
+      expect(screen.getByText('This week thing')).toBeInTheDocument()
     })
 
     it('carry forward is a MOVE onto this week', () => {
       renderLane()
-      fireEvent.click(screen.getByRole('button', { name: 'Last week' }))
+      fireEvent.click(screen.getByRole('button', { name: /Unfinished last week/ }))
       fireEvent.click(screen.getByRole('button', { name: 'Carry forward Call the plumber' }))
       expect(onUpdateTask).toHaveBeenCalledWith('open', expect.objectContaining({ bucket: 'week', weekStart: thisWeek }))
     })
 
     it('drop deletes; someday writes the explicit someday shape', () => {
       renderLane()
-      fireEvent.click(screen.getByRole('button', { name: 'Last week' }))
+      fireEvent.click(screen.getByRole('button', { name: /Unfinished last week/ }))
       fireEvent.click(screen.getByRole('button', { name: 'Drop Call the plumber' }))
       expect(onDeleteTask).toHaveBeenCalledWith('open')
       fireEvent.click(screen.getByRole('button', { name: 'Someday Call the plumber' }))
       expect(onUpdateTask).toHaveBeenCalledWith('open', { bucket: 'someday', scheduledFor: undefined, isAllDay: undefined })
+    })
+
+    it('carries onto the current week even when the screen starts on a weekend', () => {
+      render(
+        <DndContext>
+          <WeekPoolLane weekStart={new Date(2026, 8, 5)} dayCount={2} onSelectItem={() => {}} onUpdateTask={onUpdateTask}
+            tasks={[task({ id: 'open', title: 'Call the plumber', bucket: 'week', weekStart: prev })]} />
+        </DndContext>,
+      )
+      fireEvent.click(screen.getByRole('button', { name: /Unfinished last week/ }))
+      fireEvent.click(screen.getByRole('button', { name: 'Carry forward Call the plumber' }))
+      expect(onUpdateTask).toHaveBeenCalledWith('open', expect.objectContaining({ weekStart: thisWeek }))
+    })
+
+    it('names older leftovers for what they are', () => {
+      render(
+        <DndContext>
+          <WeekPoolLane weekStart={thisWeek} dayCount={7} onSelectItem={() => {}}
+            tasks={[task({ id: 'old', title: 'Fix the gate', bucket: 'week', weekStart: new Date(2026, 7, 9) })]} />
+        </DndContext>,
+      )
+      expect(screen.getByRole('button', { name: /Unfinished from past weeks · 1/ })).toBeInTheDocument()
+      expect(screen.queryByText('Fix the gate')).not.toBeInTheDocument()
+    })
+
+    it('says nothing at all when last week was finished', () => {
+      render(
+        <DndContext>
+          <WeekPoolLane weekStart={thisWeek} dayCount={7} onSelectItem={() => {}}
+            tasks={[task({ id: 'done', title: 'Washed the car', bucket: 'week', weekStart: prev, completed: true })]} />
+        </DndContext>,
+      )
+      expect(screen.queryByRole('button', { name: /Unfinished last week/ })).not.toBeInTheDocument()
     })
   })
 
   // One list, no view tabs: the month is the rail, the backlog is Inbox.
   it('has no view tabs', () => {
     render(<DndContext><WeekPoolLane weekStart={weekStart} dayCount={5} onSelectItem={() => {}} tasks={[]} /></DndContext>)
-    for (const name of ['This month', 'Everything', 'Routines']) {
+    for (const name of ['This month', 'Everything', 'Routines', 'Last week']) {
       expect(screen.queryByRole('button', { name })).not.toBeInTheDocument()
     }
-    expect(screen.getByRole('button', { name: 'Last week' })).toBeInTheDocument()
   })
 })
 

@@ -41,6 +41,10 @@ import { unhomedRoutines } from '@/lib/week/unhomedRoutines'
 import { buildWeekRoutineItems } from './weekRoutineItems'
 import { useWeekInstances } from './useWeekInstances'
 import { edgeForPointer } from './edgeAdvance'
+import { WeekJournal, type JournalDay, type JournalLine } from './WeekJournal'
+import { eventDays, isMultiDayEvent, layoutContextSpans } from '@/lib/week/journalSpread'
+import { localYmd } from '@/lib/cadence/config'
+import { useMediaQuery } from '@/hooks/useMediaQuery'
 import type { AssigneeFilter } from '@/lib/today/types'
 import type { Layer } from '@/lib/domains'
 
@@ -401,6 +405,12 @@ export function WeekViewV2(props: WeekViewV2Props) {
 
   useEffect(() => onHideRoutinesChange(setHideRoutines), [])
 
+  // Journal is the week; Schedule is the hourly grid, a switch away. The grid
+  // needs desk width to read — below lg the spread stacks and is the only mode.
+  const [mode, setMode] = useState<'journal' | 'schedule'>('journal')
+  const narrow = useMediaQuery('(max-width: 1023px)')
+  const showSchedule = mode === 'schedule' && !narrow
+
   // Instance-level overrides for the whole visible week — what a drag on this
   // grid writes. The container's `dateInstances` covers one column only.
   const weekInstances = useWeekInstances(weekStart, dayCount)
@@ -421,11 +431,13 @@ export function WeekViewV2(props: WeekViewV2Props) {
     [goalTitles],
   )
 
-  const allItems = useMemo(() => {
-    const taskItems = scheduledTasks.map((t) => taskToTimelineItem(t, labelFor(t)))
-    const eventItems = extras.rest.map(eventToTimelineItem)
-    const schoolByDay = new Map<string, (typeof eventItems)[number]>()
-    for (const item of eventItems) {
+  // Calendar events as items, with the day's Specials folded into its School
+  // block subtitle (or kept as their own item on a day without one). Shared by
+  // the grid and the journal so the two modes can never disagree about them.
+  const eventItems = useMemo(() => {
+    const items = extras.rest.map(eventToTimelineItem)
+    const schoolByDay = new Map<string, (typeof items)[number]>()
+    for (const item of items) {
       if (item.startTime && /^school\b/i.test(item.title)) {
         const key = dayKey(item.startTime)
         if (!schoolByDay.has(key)) schoolByDay.set(key, item)
@@ -436,18 +448,26 @@ export function WeekViewV2(props: WeekViewV2Props) {
       if (school) {
         school.subtitle = entries.map((e) => e.label).join(' · ')
       } else {
-        eventItems.push(...entries.map((e) => eventToTimelineItem(e.event)))
+        items.push(...entries.map((e) => eventToTimelineItem(e.event)))
       }
     }
-    const routineItems = buildWeekRoutineItems({
+    return items
+  }, [extras])
+
+  const routineItems = useMemo(
+    () => buildWeekRoutineItems({
       routines,
       weekStart,
       dayCount,
       instances: weekInstances,
       member: selectedAssignees,
       prefs: { hideRoutines, layers },
-    })
+    }),
+    [routines, weekStart, dayCount, weekInstances, selectedAssignees, hideRoutines, layers],
+  )
 
+  const allItems = useMemo(() => {
+    const taskItems = scheduledTasks.map((t) => taskToTimelineItem(t, labelFor(t)))
     const blocks = [...taskItems, ...eventItems, ...routineItems]
 
     // Keep the actively-dragged task/event mounted even if cross-week auto-
@@ -480,7 +500,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
     }
 
     return blocks
-  }, [scheduledTasks, extras, routines, weekStart, weekInstances, hideRoutines, dayCount, drag.activeDragId, tasks, events, selectedAssignees, layers])
+  }, [scheduledTasks, eventItems, routineItems, drag.activeDragId, tasks, events, labelFor])
 
   // Run the lane-placement pass over allItems. Items with a startTime outside
   // the visible week range are filtered out by layoutWeekLanes (dayIdx check).
@@ -516,6 +536,76 @@ export function WeekViewV2(props: WeekViewV2Props) {
 
     return placed
   }, [allItems, weekStart, dayCount, drag.activeDragId])
+
+  // ── Journal spread ────────────────────────────────────────────────────
+  // The same inputs the grid reads (layer-filtered tasks and events, routines
+  // through the one resolver ladder with its instance overrides), laid out as
+  // days instead of hours. Unlike the grid it keeps the whole day: tasks too
+  // early for the grid's first hour, all-day tasks, all-day events, and what
+  // has been done (struck, the way a paper week keeps it).
+  const journalDays = useMemo<JournalDay[]>(() => {
+    const days: JournalDay[] = Array.from({ length: dayCount }, (_, i) => {
+      const date = new Date(weekStart)
+      date.setDate(date.getDate() + i)
+      return { date, key: localYmd(date), notes: [], lines: [], tasks: [], routines: [], dinners: [] }
+    })
+    const byKey = new Map(days.map((d) => [d.key, d]))
+
+    for (const t of tasks) {
+      if (!t.scheduledFor) continue
+      const day = byKey.get(localYmd(t.scheduledFor))
+      if (!day) continue
+      if (t.isAllDay) day.tasks.push(t)
+      else day.lines.push({ id: `task-${t.id}`, time: t.scheduledFor, title: t.title, subtitle: labelFor(t), task: t })
+    }
+
+    for (const item of eventItems) {
+      if (!item.startTime) continue
+      const day = byKey.get(localYmd(item.startTime))
+      if (!day) continue
+      const source = item.originalEvent as CalendarEvent | undefined
+      // A multi-day timed event (on call Mon 9am → Fri 5pm) is drawn once
+      // across the top, not as a line on its first day.
+      if (source && isMultiDayEvent(source)) continue
+      const line: JournalLine = { id: item.id, time: item.startTime, title: item.title, subtitle: item.subtitle }
+      day.lines.push(line)
+    }
+
+    for (const ev of events) {
+      const span = eventDays(ev)
+      if (!span || !span.allDay || span.first !== span.last) continue
+      byKey.get(span.first)?.notes.push(ev)
+    }
+
+    for (const [key, entries] of extras.dinnersByDay) byKey.get(key)?.dinners.push(...entries)
+
+    for (const r of routineItems) {
+      const idx = Number(r.id.match(/-day(\d+)$/)?.[1] ?? -1)
+      days[idx]?.routines.push(r)
+    }
+
+    for (const d of days) {
+      d.lines.sort((a, b) => a.time.getTime() - b.time.getTime())
+      d.routines.sort((a, b) => (a.startTime?.getTime() ?? Infinity) - (b.startTime?.getTime() ?? Infinity))
+      d.tasks.sort((a, b) => Number(a.completed) - Number(b.completed))
+    }
+    return days
+  }, [tasks, events, eventItems, extras, routineItems, weekStart, dayCount, labelFor])
+
+  const journalSpans = useMemo(
+    () => layoutContextSpans(events, journalDays.map((d) => d.date)),
+    [events, journalDays],
+  )
+
+  // Ticking from the spread, with an undo that writes the EXPLICIT prior state
+  // (a second toggle would read a stale snapshot — HomeView's rule).
+  const handleJournalToggle = useCallback((task: Task) => {
+    const was = task.completed
+    void toggleTask(task.id)
+    pushAction?.(was ? 'Task marked incomplete' : 'Task completed', () => {
+      void onUpdateTask(task.id, { completed: was })
+    })
+  }, [toggleTask, onUpdateTask, pushAction])
 
   // Suggested open slots while a POOL pill drags — rules-based paint
   // (dropSmarts); never captures the drop. Only pool pills: an already-placed
@@ -589,9 +679,50 @@ export function WeekViewV2(props: WeekViewV2Props) {
     return () => window.removeEventListener('keydown', handler)
   }, [weekStart, dayCount, onWeekChange])
 
+  const margin = (
+    <>
+      <WeekPoolLane
+        tasks={tasks}
+        routines={shelfRoutines}
+        weekStart={weekStart}
+        dayCount={dayCount}
+        onSelectItem={onSelectItem}
+        onCompleteTask={(id) => { void toggleTask(id) }}
+        onNotThisWeek={handleNotThisWeek}
+        onPushTask={(id, target) => { void gated.pushTask(id, target) }}
+        onUpdateTask={(id, u) => { void onUpdateTask(id, u) }}
+        onDeleteTask={(id) => { void deleteTask(id) }}
+        foldWeeks={foldWeeks}
+        dragEnabled={!narrow}
+        // A routine needs a TIME to land — the journal's days have none, so
+        // routine rows only pick up where there are slots to drop them on.
+        routinesDraggable={showSchedule}
+      />
+      <WeekMonthRail tasks={tasks} meId={meId} onSelectItem={onSelectItem} onAddToWeek={(id) => { void gated.pushTask(id, 'week') }} />
+    </>
+  )
+
   return (
-    <div className="hidden lg:block relative">
-      <div className="flex items-center justify-end mb-2">
+    <div className="relative">
+      <div className="flex items-center justify-end gap-2 mb-2">
+        {!narrow && (
+          <div role="radiogroup" aria-label="Week layout" className="inline-flex items-center gap-3 mr-auto text-xs font-medium">
+            {(['journal', 'schedule'] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                role="radio"
+                aria-checked={mode === m}
+                onClick={() => setMode(m)}
+                className={`border-b py-0.5 transition-colors ${
+                  mode === m ? 'border-neutral-800 text-neutral-900' : 'border-transparent text-neutral-400 hover:text-neutral-700'
+                }`}
+              >
+                {m === 'journal' ? 'Journal' : 'Schedule'}
+              </button>
+            ))}
+          </div>
+        )}
         <RoutinesToggle hidden={hideRoutines} onToggle={() => writeHideRoutines(!hideRoutines)} />
       </div>
 
@@ -603,41 +734,38 @@ export function WeekViewV2(props: WeekViewV2Props) {
         onDragCancel={drag.dndHandlers.onDragCancel}
         onDragMove={handleDragMove}
       >
-        {/* The week list stands LEFT of the grid, the month list folded beneath
+        {/* The week list stands LEFT of the days, the month list folded beneath
             it (Scott, 2026-09-05: chips down the side, not along the top).
-            Inside the DndContext so the pills' useDraggable registers; drops
+            Inside the DndContext so the rows' useDraggable registers; drops
             ride the existing chip branches in useWeekDragDrop. The month is
             the rung above, read-only — the week is planned by looking at it,
-            never by dragging from it. */}
-        <div className="flex items-start gap-3">
+            never by dragging from it. On a narrow screen the list sits above
+            the stacked days instead. */}
+        {narrow ? (
+          <div className="flex flex-col gap-4">
+            <aside aria-label="This week's list" className="flex flex-col gap-2">{margin}</aside>
+            <WeekJournal days={journalDays} spans={journalSpans} onSelectItem={onSelectItem} onToggleTask={handleJournalToggle} narrow dragEnabled={false} />
+          </div>
+        ) : (
+        <div className="flex items-start gap-4">
         {/* The list scrolls on its own (Scott, 2026-09-07): a week with 54
-            things on it is taller than the grid, and reading down the list
-            used to drag the grid off the top of the screen with it. The
+            things on it is taller than the days, and reading down the list
+            used to drag the days off the top of the screen with it. The
             column sticks to the viewport and takes its own scrollbar, so the
             days stay put while you read the list. overscroll-contain keeps a
             flick at the list's end from scrolling the page underneath. */}
         <aside
           aria-label="This week's list"
-          className="shrink-0 w-72 sticky top-2 max-h-[calc(100vh-1rem)] overflow-y-auto overscroll-contain pr-1 flex flex-col gap-2"
+          className={`shrink-0 ${showSchedule ? 'w-72' : 'w-60'} sticky top-2 max-h-[calc(100vh-1rem)] overflow-y-auto overscroll-contain pr-1 flex flex-col gap-2`}
         >
-          <WeekPoolLane
-            tasks={tasks}
-            routines={shelfRoutines}
-            weekStart={weekStart}
-            dayCount={dayCount}
-            onSelectItem={onSelectItem}
-            onCompleteTask={(id) => { void toggleTask(id) }}
-            onNotThisWeek={handleNotThisWeek}
-            onPushTask={(id, target) => { void gated.pushTask(id, target) }}
-            onUpdateTask={(id, u) => { void onUpdateTask(id, u) }}
-            onDeleteTask={(id) => { void deleteTask(id) }}
-            foldWeeks={foldWeeks}
-          />
-          <WeekMonthRail tasks={tasks} meId={meId} onSelectItem={onSelectItem} onAddToWeek={(id) => { void gated.pushTask(id, 'week') }} />
+          {margin}
         </aside>
         {/* Edge auto-advance measures THIS box, not the whole view — with the
-            list column to its left, the view's left edge is no longer the grid's. */}
+            list column to its left, the view's left edge is no longer the days'. */}
         <div ref={gridBoundsRef} data-week-bounds className="flex-1 min-w-0">
+        {!showSchedule ? (
+          <WeekJournal days={journalDays} spans={journalSpans} onSelectItem={onSelectItem} onToggleTask={handleJournalToggle} />
+        ) : (
         <WeekGrid
           weekStart={weekStart}
           dayCount={dayCount}
@@ -710,8 +838,10 @@ export function WeekViewV2(props: WeekViewV2Props) {
             />
           ))}
         </WeekGrid>
+        )}
         </div>
         </div>
+        )}
 
         {placingRoutine && routinePlace && (
           <RoutinePlacePopover
@@ -792,8 +922,8 @@ export function WeekViewV2(props: WeekViewV2Props) {
                     </div>
                   )
                 }
-                if (drag.activeDragId.startsWith('chip:')) {
-                  const taskId = drag.activeDragId.slice('chip:'.length)
+                if (drag.activeDragId.startsWith('chip:') || drag.activeDragId.startsWith('journal:')) {
+                  const taskId = drag.activeDragId.slice(drag.activeDragId.indexOf(':') + 1)
                   const task = tasks.find((t) => t.id === taskId)
                   if (!task) return null
                   return (
