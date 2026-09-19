@@ -37,7 +37,15 @@ import { useSystemHealth, getHealthTextClasses } from '@/hooks/useSystemHealth'
 import { useTimelineInsert } from '@/hooks/useTimelineInsert'
 import { useDomain } from '@/hooks/useDomain'
 
-import { Eye, EyeOff, Repeat, Binoculars, Printer, GripVertical, Moon, Sparkles, NotebookPen, ArrowRight } from 'lucide-react'
+import { Eye, EyeOff, Repeat, Binoculars, Printer, GripVertical, Moon, Sparkles, NotebookPen, ArrowRight, PanelLeft } from 'lucide-react'
+import { DayPlanPanel, panelActionsFor, planSummary } from '@/components/reference/DayPlanPanel'
+import { useReferenceLists } from '@/components/reference/ReferenceListsContext'
+import { makePlanActions } from '@/lib/planning/planActions'
+import { localYmd } from '@/lib/cadence/config'
+import { planDropHandlers } from '@/lib/planning/planDrag'
+import { useActionableInstances } from '@/hooks/useActionableInstances'
+import { findTaskById } from '@/lib/findTaskById'
+import { showToast } from '@/hooks/useToast'
 import { useNavigate } from 'react-router-dom'
 import { AssigneeFilter } from '@/components/home/AssigneeFilter'
 
@@ -314,6 +322,39 @@ export function TodayView({
       currentWeekStart, ctx.eventNotesMap, ctx.eventContextOverrides, ctx.getDomainForCalendar])
 
   const data = useTodayData(todayInput)
+
+  // ── The day's plan (dayPlan.ts) ────────────────────────────────────────
+  // What the main list does not draw — dated-but-unchosen tasks, available
+  // routine occurrences, the week's and month's lists — waits in the Today
+  // pin. Today spends ONE line on it (never a list), so closing the pin can
+  // never make an obligation disappear. Built from this page's own handlers:
+  // no second task fetch.
+  const references = useReferenceLists()
+  const todayPinned = !!references?.pins.some((p) => p.kind === 'today')
+  const { setPlanned, reschedule: rescheduleInstance } = useActionableInstances()
+  const planActions = useMemo(() => makePlanActions({
+    findTask: (id) => findTaskById(tasks, id),
+    updateTask: (id, u) => ctx.onUpdateTask?.(id, u),
+    pushTask: (id, target) => ctx.onPushTask?.(id, target),
+    setRoutinePlanned: (id, day, planned) => setPlanned('routine', id, day, planned),
+    rescheduleRoutine: (id, from, when) => rescheduleInstance('routine', id, from, when),
+    notify: (m) => showToast(m, 'warning'),
+  }), [tasks, ctx, setPlanned, rescheduleInstance])
+  const planPanelActions = useMemo(() => panelActionsFor(viewedDate, {
+    ...planActions,
+    toggleTask: onToggleTask,
+    completeRoutine: async (id, _day, done) => { onCompleteRoutine?.(id, done); return true },
+  }), [viewedDate, planActions, onToggleTask, onCompleteRoutine])
+  const [planOpenDay, setPlanOpenDay] = useState<string | null>(null)
+  const planOpenInline = planOpenDay === localYmd(viewedDate)
+  const planLine = planSummary(data.dayPlan)
+  // The desktop pin is always TODAY's plan; another day, or a phone (which
+  // has no dock), opens the same panel inline instead.
+  const usePin = !isMobile && data.isToday && !!references
+  const [agendaDropOver, setAgendaDropOver] = useState(false)
+  const agendaDrop = planDropHandlers((payload) => {
+    void planActions.drop(payload, { type: 'day', day: viewedDate }, { chooseOnly: true })
+  }, setAgendaDropOver)
 
   // The week/month lists for the header dropdowns — separate from the daily
   // review by decree (Scott, 2026-08-19): look and pick from up here, never
@@ -1190,7 +1231,7 @@ export function TodayView({
             </button>
           )}
       {/* The agenda is part of the page, with no enclosing card. */}
-      <div ref={listRef} className="daybook-agenda">
+      <div ref={listRef} {...agendaDrop} className={`daybook-agenda${agendaDropOver ? ' daybook-agenda-drop' : ''}`}>
         {/* Needed today — hand-curated, silent when empty. Placed first so a
             marked item reads as the day's opening note, not buried under the
             timeline. Safe at the top only because it renders nothing when
@@ -1209,6 +1250,33 @@ export function TodayView({
           onScheduleTask={(id, date, isAllDay) => onUpdateTask?.(id, { bucket: 'timed', scheduledFor: date, isAllDay })}
           onScheduleListItem={ctx.onScheduleListItemAsTask}
         />
+
+        {/* The day's plan: one quiet line, never a list. It says what waits
+            in the Today pin and reopens it, so an unpinned pin can't hide a
+            dated obligation. On a phone (no dock) or another day it opens
+            the same panel inline. */}
+        {planLine && (
+          <div className="mb-3 px-3 md:px-0">
+            <button
+              type="button"
+              aria-expanded={usePin ? todayPinned : planOpenInline}
+              onClick={() => {
+                if (usePin) { if (!todayPinned) references!.pin('today') }
+                else setPlanOpenDay(planOpenInline ? null : localYmd(viewedDate))
+              }}
+              className="inline-flex items-center gap-1.5 text-[13px] text-neutral-500 hover:text-neutral-800"
+            >
+              <PanelLeft className="h-3.5 w-3.5" aria-hidden="true" />
+              <span>{planLine}</span>
+              {usePin && todayPinned && <span className="text-neutral-400">· in the Today pin</span>}
+            </button>
+            {!usePin && planOpenInline && (
+              <div className="mt-2 border-l border-neutral-200 pl-3">
+                <DayPlanPanel plan={data.dayPlan} day={viewedDate} actions={planPanelActions} draggable={false} />
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Assistant lines — the unprompted tier, rendered ONLY when the ⋯
             menu's "Show suggestions" toggle is on (off by default; the menu

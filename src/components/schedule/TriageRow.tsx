@@ -42,17 +42,13 @@ interface VerdictHandlers {
  * mark the row resolved (see ReviewDrawer's `apply`, HorizonPoolDropdown's
  * `onVerdict`). */
 export async function applyTriageVerdict(t: Task, v: Verdict, h: VerdictHandlers): Promise<boolean> {
-  if (v === 'today') {
+  if (v === 'today' || v === 'tomorrow') {
     // All-day, not the clock time the button was pressed at (demo run
     // 2026-09-06: "Do today" at 6:50 AM landed a 6:50 AM task).
     const day = new Date(h.viewedDate)
     day.setHours(0, 0, 0, 0)
-    return wasWritten(h.onPushTask?.(t.id, day))
-  } else if (v === 'tomorrow') {
-    const tomorrow = new Date(h.viewedDate)
-    tomorrow.setHours(0, 0, 0, 0)
-    tomorrow.setDate(tomorrow.getDate() + 1)
-    return wasWritten(h.onPushTask?.(t.id, tomorrow))
+    if (v === 'tomorrow') day.setDate(day.getDate() + 1)
+    return chooseDay(t, day, h)
   } else if (v === 'week') {
     return wasWritten(h.onPushTask?.(t.id, 'week'))
   } else if (v === 'someday') {
@@ -62,6 +58,23 @@ export async function applyTriageVerdict(t: Task, v: Verdict, h: VerdictHandlers
     h.onDeleteTask?.(t.id)
     return true
   }
+}
+
+/**
+ * "Do today" / "Tomorrow" is a CHOICE of day (planned_on), so the task lands on
+ * that day's main list instead of waiting in the Today pin. A week- or month-
+ * list task keeps its list — choosing a day never erases the broader
+ * commitment, and if the day passes undone it is simply back on its list.
+ * Anything else (inbox, someday, another day) is also dated to that day, the
+ * way it always was, so it leaves the pool it was sitting in.
+ */
+async function chooseDay(t: Task, day: Date, h: VerdictHandlers): Promise<boolean> {
+  if (t.bucket === 'week' || t.bucket === 'month') {
+    return wasWritten(h.onUpdateTask(t.id, { plannedOn: day }))
+  }
+  if (!(await wasWritten(h.onPushTask?.(t.id, day)))) return false
+  await h.onUpdateTask(t.id, { plannedOn: day })
+  return true
 }
 
 const LEAD_LABEL: Partial<Record<Verdict, string>> = { today: 'Do today', tomorrow: 'Tomorrow', week: 'This week', someday: 'Someday' }

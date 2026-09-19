@@ -116,6 +116,15 @@ export interface Task {
    * "pin" — `pinned_items` is a different, durable system.
    */
   neededOn?: Date
+  /**
+   * The day this task was deliberately CHOSEN for — Today's main list. A date,
+   * so it expires like neededOn. Distinct from scheduledFor (the day it is
+   * merely dated: a commitment that waits in the Today pin until chosen) and
+   * from bucket/weekStart/monthStart (its broader commitment, which choosing a
+   * day never removes). Not neededOn: that one feeds the wall's kid cards and
+   * homework due dates.
+   */
+  plannedOn?: Date
   // ── Planning-cascade lineage (2026-07-15_task_lineage) ──
   /** The task this one was copied down from (season→month, month→week).
    *  Immediate cascade parent — distinct from parentTaskId (subtask nesting). */

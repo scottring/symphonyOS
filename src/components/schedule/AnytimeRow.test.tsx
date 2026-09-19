@@ -60,10 +60,18 @@ function instance(entityId: string, status: ActionableStatus): ActionableInstanc
   }
 }
 
-/** `n` untimed routines, the first `completed` of them marked done today. */
+const TODAY_YMD = `${TODAY.getFullYear()}-${String(TODAY.getMonth() + 1).padStart(2, '0')}-${String(TODAY.getDate()).padStart(2, '0')}`
+
+/** `n` untimed routines CHOSEN for today (planned_on), the first `completed`
+ *  of them marked done. Chosen, because an untimed occurrence nobody chose
+ *  waits in the Today pin rather than on the main list (dayPlan.ts). */
 function untimedRoutineSet(n: number, completed: number) {
   const routines = Array.from({ length: n }, (_, i) => untimedRoutine(`r${i}`))
-  const dateInstances = Array.from({ length: completed }, (_, i) => instance(`r${i}`, 'completed'))
+  const dateInstances = Array.from({ length: n }, (_, i) => ({
+    ...instance(`r${i}`, i < completed ? 'completed' : 'pending'),
+    date: TODAY_YMD,
+    planned_on: TODAY_YMD,
+  }))
   return { routines, dateInstances }
 }
 

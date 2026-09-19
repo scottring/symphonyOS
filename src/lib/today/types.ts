@@ -6,6 +6,7 @@ import type { DaySection } from '@/lib/timeUtils'
 import type { Contact } from '@/types/contact'
 import type { AttentionItem } from './attention'
 import type { Layer } from '@/lib/domains'
+import type { DayPlan } from './dayPlan'
 
 // A single selected id, an array of selected ids (multi-select / union), or
 // null/undefined/[] meaning "everyone". The pseudo-id 'unassigned' is allowed.
@@ -67,6 +68,9 @@ export interface TodayData {
   attentionItems: AttentionItem[]
   completedInboxTasks: Task[]
   grouped: Record<DaySection, TimelineItem[]>
+  /** What the Today pin holds: dated-but-unchosen tasks, available routine
+   *  occurrences, and this week's/month's lists (dayPlan.ts). */
+  dayPlan: DayPlan
   sectionsOrder: DaySection[]
   counts: TodayCounts
 }
@@ -96,6 +100,11 @@ export const EMPTY_TODAY_DATA: TodayData = {
   attentionItems: [],
   completedInboxTasks: [],
   grouped: emptySections<TimelineItem>(),
+  dayPlan: {
+    scheduled: [], available: [], week: [], month: [],
+    counts: { scheduled: 0, available: 0 },
+    offMainTaskIds: new Set(), offMainRoutineItemIds: new Set(), plannedExtraTasks: [],
+  },
   sectionsOrder: SECTIONS_ORDER,
   counts: { completedCount: 0, incompleteOverdue: 0, actionableCount: 0, totalItems: 0, progressPercent: 0 },
 }

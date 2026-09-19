@@ -58,6 +58,9 @@ import { useFirstWeekSignals } from '@/hooks/useFirstWeekSignals';
 import { firstWeekSteps, shouldShowFirstWeek, FIRST_WEEK_HIDE_KEY, hasSampleIds, readSampleIds, clearSampleIdsRecord, deleteSampleRows } from '@/lib/firstWeek';
 import { getAuthUser } from '@/lib/supabase';
 
+const sameLocalDay = (a: Date, b: Date) =>
+  a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+
 export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' } = {}) {
   // Data hooks
   const { tasks, loading: tasksLoading, addTask, toggleTask, toggleWaiting, deleteTask, updateTask, updateTasksBulk, pushTask, getLinkedTasks, refetch, updateTaskOrders } = useSupabaseTasks();
@@ -387,6 +390,9 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
         // as a timed block at 12:00 AM. No date at all → our default day
         // (today), all-day.
         isAllDay: allDayFromParse(parsed) ?? true,
+        // Added from Today with no other day named: chosen for today, so it
+        // lands on the main list rather than waiting in the pin.
+        plannedOn: sameLocalDay(scheduledFor, today) ? today : undefined,
       });
     },
     [addTask, getCurrentUserMember, projects, contacts, familyMembers],
@@ -447,6 +453,9 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
           // even though a time is present; r.isAllDay carries that when set.
           isAllDay: toInbox ? undefined : r.isAllDay ?? (r.scheduledFor ? false : true),
           phoneNumber: r.phoneNumber,
+          // Typed into Today for today: a choice, so it is on the main list.
+          // A named other day ("for Monday") is only a date until chosen.
+          plannedOn: !toInbox && (!r.scheduledFor || sameLocalDay(r.scheduledFor, today)) ? today : undefined,
         },
       );
       if (toInbox && taskId) showToast('Added to Inbox', 'success');

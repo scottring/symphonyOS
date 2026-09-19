@@ -88,6 +88,9 @@ export interface DbTask {
   discussion_note: string | null
   // Date-only column: which day this was marked "needed today".
   needed_on: string | null
+  // Date-only column: the day this was chosen for Today's main list.
+  // Optional: absent until the 2026-09-19 migration is applied.
+  planned_on?: string | null
   week_deferred_at: string | null
   week_start: string | null
   month_start: string | null
@@ -172,6 +175,7 @@ export function dbTaskToTask(dbTask: DbTask): Task {
     // as UTC and lands on the 18th in US timezones — the note would show the
     // item a day early.
     neededOn: dbTask.needed_on ? parseLocalYmd(dbTask.needed_on) : undefined,
+    plannedOn: dbTask.planned_on ? parseLocalYmd(dbTask.planned_on) : undefined,
     weekDeferredAt: dbTask.week_deferred_at ? new Date(dbTask.week_deferred_at) : undefined,
     // A `date` column — parse to LOCAL midnight, never `new Date(str)` (that's UTC).
     weekStart: dbTask.week_start ? parseLocalYmd(dbTask.week_start) : undefined,
@@ -606,6 +610,8 @@ export function useSupabaseTasks() {
     discussionNote?: string
     /** The day this task was marked "needed today". Carried on restore so undo doesn't drop the mark. */
     neededOn?: Date
+    /** The day this task is chosen for (Today's main list) — "Add to today" writes it. */
+    plannedOn?: Date
   }
 
   const addTask = useCallback(async (
@@ -669,6 +675,7 @@ export function useSupabaseTasks() {
       needsDiscussion: options?.needsDiscussion,
       discussionNote: options?.discussionNote,
       neededOn: options?.neededOn,
+      plannedOn: options?.plannedOn,
     }
     setTasks((prev) => [optimisticTask, ...prev])
 
@@ -719,6 +726,9 @@ export function useSupabaseTasks() {
         needs_discussion: options?.needsDiscussion ?? false,
         discussion_note: options?.discussionNote ?? null,
         needed_on: options?.neededOn ? localYmd(options.neededOn) : null,
+        // Only sent when set, so an insert never names a column a database
+        // without the planned_on migration doesn't have.
+        ...(options?.plannedOn ? { planned_on: localYmd(options.plannedOn) } : {}),
       })
       .select()
       .single()
@@ -1383,6 +1393,8 @@ export function useSupabaseTasks() {
     if ('discussionNote' in updates) dbUpdates.discussion_note = updates.discussionNote ?? null
     // `needed_on` is a DATE column — localYmd, not toISOString (see week_start above).
     if ('neededOn' in updates) dbUpdates.needed_on = updates.neededOn ? localYmd(updates.neededOn) : null
+    // Same `in` rule as needed_on: `{ plannedOn: undefined }` must CLEAR the choice.
+    if ('plannedOn' in updates) dbUpdates.planned_on = updates.plannedOn ? localYmd(updates.plannedOn) : null
     if ('sourceId' in updates) dbUpdates.source_id = updates.sourceId ?? null
     if ('goalId' in updates) dbUpdates.goal_id = updates.goalId ?? null
     if ('goalTaskId' in updates) dbUpdates.goal_task_id = updates.goalTaskId ?? null
@@ -1576,6 +1588,8 @@ export function useSupabaseTasks() {
     if ('discussionNote' in updates) dbUpdates.discussion_note = updates.discussionNote ?? null
     // `needed_on` is a DATE column — localYmd, not toISOString (see week_start above).
     if ('neededOn' in updates) dbUpdates.needed_on = updates.neededOn ? localYmd(updates.neededOn) : null
+    // Same `in` rule as needed_on: `{ plannedOn: undefined }` must CLEAR the choice.
+    if ('plannedOn' in updates) dbUpdates.planned_on = updates.plannedOn ? localYmd(updates.plannedOn) : null
     if ('sourceId' in updates) dbUpdates.source_id = updates.sourceId ?? null
     if ('goalId' in updates) dbUpdates.goal_id = updates.goalId ?? null
     if ('goalTaskId' in updates) dbUpdates.goal_task_id = updates.goalTaskId ?? null

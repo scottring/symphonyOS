@@ -364,9 +364,9 @@ describe('useWeekDragDrop — journal day drops', () => {
   it('a list row dropped on a day gives it that day, untimed, with undo back to the week list', async () => {
     const { result, onUpdateTask, pushAction } = setup()
     await act(async () => { result.current.dndHandlers.onDragEnd(dropOn('2026-05-20') as never) })
-    expect(onUpdateTask).toHaveBeenCalledWith('t1', { isAllDay: true, scheduledFor: new Date(2026, 4, 20), bucket: 'timed' })
+    expect(onUpdateTask).toHaveBeenCalledWith('t1', { isAllDay: true, scheduledFor: new Date(2026, 4, 20), bucket: 'timed', plannedOn: new Date(2026, 4, 20) })
     pushAction.mock.calls[0][1]()
-    expect(onUpdateTask).toHaveBeenLastCalledWith('t1', expect.objectContaining({ bucket: 'week', isAllDay: false }))
+    expect(onUpdateTask).toHaveBeenLastCalledWith('t1', expect.objectContaining({ bucket: 'week', isAllDay: false, plannedOn: undefined }))
   })
 
   it('a day task moves to another day the same way', async () => {

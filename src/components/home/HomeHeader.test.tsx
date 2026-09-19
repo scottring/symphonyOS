@@ -176,3 +176,14 @@ describe('HomeHeader week masthead card', () => {
     expect(within(screen.getByTestId('masthead-eyebrow')).getByText('2 days')).toBeInTheDocument()
   })
 })
+
+describe('HomeHeader — Journal | Schedule sits by the dates', () => {
+  it('draws the switch in the masthead and reports a change; Journal is what is on', () => {
+    const onWeekModeChange = vi.fn()
+    renderWeek({ weekMode: 'journal', onWeekModeChange })
+    const aside = screen.getByTestId('masthead-aside')
+    expect(within(aside).getByRole('radio', { name: 'Journal' })).toHaveAttribute('aria-checked', 'true')
+    fireEvent.click(within(aside).getByRole('radio', { name: 'Schedule' }))
+    expect(onWeekModeChange).toHaveBeenCalledWith('schedule')
+  })
+})

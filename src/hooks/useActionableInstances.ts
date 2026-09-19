@@ -460,6 +460,39 @@ export function useActionableInstances() {
     }
   }, [getOrCreateInstance])
 
+  // Choose (or un-choose) ONE occurrence for its day without giving it a time.
+  // Writes the instance row only — the routine's recurrence rule is never
+  // touched, so planning this Saturday's laundry leaves every other Saturday
+  // exactly as it was. `planned` false clears the choice; the occurrence goes
+  // back to being available, and nothing is deleted.
+  const setPlanned = useCallback(async (
+    entityType: EntityType,
+    entityId: string,
+    date: Date,
+    planned: boolean,
+  ): Promise<boolean> => {
+    setIsLoading(true)
+    setError(null)
+    try {
+      const instance = await getOrCreateInstance(entityType, entityId, date)
+      if (!instance) throw new Error('Failed to get instance')
+      const { error: updateError } = await supabase
+        .from('actionable_instances')
+        .update({ planned_on: planned ? toDateString(date) : null })
+        .eq('id', instance.id)
+      if (updateError) throw updateError
+      emitInstancesChanged()
+      return true
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to plan'
+      setError(message)
+      console.error('setPlanned error:', err)
+      return false
+    } finally {
+      setIsLoading(false)
+    }
+  }, [getOrCreateInstance])
+
   // Reschedule to a new date/time (smart - handles same-day vs different-day)
   // Also handles routines that were deferred FROM another date (finds the correct instance)
   const reschedule = useCallback(async (
@@ -771,6 +804,7 @@ export function useActionableInstances() {
     undoDone,
     skip,
     defer,
+    setPlanned,
     reschedule,
     undoReschedule,
     addProgress,

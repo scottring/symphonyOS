@@ -1,0 +1,41 @@
+import { useCallback, useMemo } from 'react'
+import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
+import { useGatedTaskActions } from '@/hooks/useGatedTaskActions'
+import { useActionableInstances } from '@/hooks/useActionableInstances'
+import { showToast } from '@/hooks/useToast'
+import { makePlanActions, type PlanActions } from '@/lib/planning/planActions'
+
+/**
+ * Plan actions for a surface with no page-level task state of its own (the
+ * Today pin in the shell). Scheduling writes go through the DomainGate like
+ * every other placement; choosing a day does not schedule, so it doesn't ask.
+ */
+export function usePlanActions(pushAction?: (message: string, undo: () => void) => void): PlanActions & {
+  toggleTask: (id: string) => void
+  completeRoutine: (routineId: string, day: Date, done: boolean) => Promise<boolean>
+} {
+  const { tasks, updateTask, updateTasksBulk, pushTask, toggleTask } = useSupabaseTasks()
+  const findTask = useCallback((id: string) =>
+    tasks.find((t) => t.id === id) ?? tasks.flatMap((t) => t.subtasks ?? []).find((t) => t.id === id), [tasks])
+  const gated = useGatedTaskActions(useMemo(() => ({ updateTask, updateTasksBulk, pushTask }), [updateTask, updateTasksBulk, pushTask]), findTask)
+  const { setPlanned, reschedule, markDone, undoDone } = useActionableInstances()
+
+  const actions = useMemo(() => makePlanActions({
+    findTask,
+    // Choosing / un-choosing a day is not a scheduling decision; placing a
+    // time or a date is, and asks "where does this belong?" when needed.
+    updateTask: (id, u) => ('scheduledFor' in u || 'bucket' in u) ? gated.updateTask(id, u) : updateTask(id, u),
+    pushTask: gated.pushTask,
+    setRoutinePlanned: (id, day, planned) => setPlanned('routine', id, day, planned),
+    rescheduleRoutine: (id, from, when) => reschedule('routine', id, from, when),
+    pushAction,
+    notify: (m) => showToast(m, 'warning'),
+  }), [findTask, gated, updateTask, setPlanned, reschedule, pushAction])
+
+  return {
+    ...actions,
+    toggleTask: (id: string) => { void toggleTask(id) },
+    completeRoutine: (routineId: string, day: Date, done: boolean) =>
+      done ? markDone('routine', routineId, day) : undoDone('routine', routineId, day),
+  }
+}

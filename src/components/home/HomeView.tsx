@@ -16,8 +16,9 @@ import { useHomeView } from '@/hooks/useHomeView'
 import { useMobile } from '@/hooks/useMobile'
 import { useUndo } from '@/hooks/useUndo'
 import { useDomain } from '@/hooks/useDomain'
+import { useAssigneeFilter } from '@/hooks/useAssigneeFilter'
 import { WeekView } from './WeekView'
-import { WeekViewV2 } from './week/WeekViewV2'
+import { WeekViewV2, type WeekMode } from './week/WeekViewV2'
 import { MonthView } from './MonthView'
 
 const WEEK_V2_FLAG = 'symphony-week-v2'
@@ -136,19 +137,9 @@ export function HomeView({
   // you reach for. The key is rotated to -v2 so the browsers that already
   // stored a self-filter under the old key adopt the new default once; an
   // explicit choice made after that is stored and wins.
-  const ASSIGNEE_FILTER_KEY = 'symphony-assignee-filter-v2'
-  const [selectedAssignees, setSelectedAssigneesState] = useState<string[]>(() => {
-    if (typeof window === 'undefined') return []
-    try {
-      const raw = window.localStorage.getItem(ASSIGNEE_FILTER_KEY)
-      if (raw !== null) return JSON.parse(raw) as string[]
-    } catch { /* ignore */ }
-    return []
-  })
-  const setSelectedAssignees = useCallback((next: string[]) => {
-    setSelectedAssigneesState(next)
-    try { window.localStorage.setItem(ASSIGNEE_FILTER_KEY, JSON.stringify(next)) } catch { /* ignore */ }
-  }, [])
+  // The lens is shared with the Today pin (useAssigneeFilter), so both narrow
+  // rows and counts identically.
+  const [selectedAssignees, setSelectedAssignees] = useAssigneeFilter()
 
   const showRiverView = useMemo(() => {
     const realMemberCount = selectedAssignees.filter(id => id !== 'unassigned').length
@@ -211,6 +202,9 @@ export function HomeView({
   const location = useLocation()
   const rangePreset = new URLSearchParams(location.search).get('range')
   const [rangeDays, setRangeDays] = useState(7)
+  // Journal (the paper week) or Schedule (the hourly grid). Always opens as
+  // the journal; switching is presentation only — same dates, same data.
+  const [weekMode, setWeekMode] = useState<WeekMode>('journal')
   const onRangeChange = useCallback((range: Date[]) => {
     setWeekStart(range[0])
     setRangeDays(range.length)
@@ -234,6 +228,7 @@ export function HomeView({
       : weekRange(new Date(), readCadenceConfig().weekStartsOn)
     setWeekStart(range[0])
     setRangeDays(range.length)
+    setWeekMode('journal')
     // The event fetch follows viewedDate (its week and the next); a weekend
     // chosen on a Sunday sits in next week, so move it along when needed.
     if (sundayOfWeek(viewedDateRef.current).getTime() !== sundayOfWeek(range[0]).getTime()) {
@@ -355,6 +350,7 @@ export function HomeView({
             onUpdateEvent={ctx.onUpdateEvent ?? (() => {})}
             onPushRoutine={ctx.onPushRoutine}
             pushAction={pushAction}
+            mode={weekMode}
           />
         </>
       )
@@ -400,6 +396,7 @@ export function HomeView({
             onUpdateEvent={ctx.onUpdateEvent ?? (() => {})}
             onPushRoutine={ctx.onPushRoutine}
             pushAction={pushAction}
+            mode={weekMode}
           />
         </>
       )
@@ -510,6 +507,8 @@ export function HomeView({
             onWeekChange={(d) => { setWeekStart(d); onDateChange(d) }}
             rangeDays={rangeDays}
             customRangeRequest={rangePreset === 'custom' ? location.key : undefined}
+            weekMode={currentView === 'week' || currentView === 'workweek' ? weekMode : undefined}
+            onWeekModeChange={setWeekMode}
             onRangeChange={onRangeChange}
             monthStart={monthStart}
             onMonthChange={setMonthStart}

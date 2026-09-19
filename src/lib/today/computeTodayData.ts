@@ -7,8 +7,8 @@ import { buildRoutineStatusMap, buildEventStatusMap, selectVisibleRoutines } fro
 import { buildGroupedSections } from './grouping'
 import { goalTitleMap } from '@/lib/planning/goalSteps'
 import { countRoutineUnits } from './routineCollections'
-import { deferredInRoutineIds } from './deferredRoutines'
-import type { ResolveRoutineCtx } from '@/lib/routineUtils'
+import { selectDayPlan, routineResolveCtx, routinesForMain } from './dayPlan'
+import { localYmd } from '@/lib/cadence/config'
 import { dedupeCalendarEvents } from '@/lib/calendar/dedupeEvents'
 
 function computeIsToday(viewedDate: Date): boolean {
@@ -28,13 +28,27 @@ export function computeTodayData(input: TodayDataInput): TodayData {
   // A date expires. Only work inside the grace window keeps a Today slot;
   // everything older is slipped and belongs to the review queue, so every
   // count and linger filter below correctly describes the carried-over lane.
-  const overdueTasks = selectCarriedOver(input.tasks, isToday, match)
+  // The day's plan decides what the main list draws; everything it moves off
+  // the list waits in the Today pin (dayPlan.ts). Computed first so every
+  // pool and count below describes the same rows.
+  const dayPlan = selectDayPlan(input)
+  const viewedYmd = localYmd(input.viewedDate)
+  const chosenToday = (t: { plannedOn?: Date }) => !!t.plannedOn && localYmd(t.plannedOn) === viewedYmd
+
+  // A carried-over task chosen for today is on the main list already.
+  const overdueTasks = selectCarriedOver(input.tasks, isToday, match).filter((t) => !chosenToday(t))
   const slippedTasks = selectSlipped(input.tasks, isToday, match)
   const attentionItems = isToday
     ? selectNeedsAttention(input.tasks, match, new Date(), input.weekStart)
     : []
   const completedInboxTasks = selectCompletedInbox(input.tasks, input.viewedDate, match)
-  const timedTasks = selectTimed(input.tasks, input.viewedDate, match)
+  // Dated to the day: a time keeps its row; an untimed one needs choosing
+  // first. Chosen tasks from other pools (week list, another day) join.
+  const timedTasks = [
+    ...selectTimed(input.tasks, input.viewedDate, match).filter((t) => !dayPlan.offMainTaskIds.has(t.id)),
+    ...dayPlan.plannedExtraTasks,
+  ]
+  const plannedExtraIds = new Set(dayPlan.plannedExtraTasks.map((t) => t.id))
 
   // Completed-task linger: a checked-off task stays visible briefly, then
   // drops out of the displayed list (counts below still use the full pools).
@@ -49,20 +63,17 @@ export function computeTodayData(input: TodayDataInput): TodayData {
 
   const routineStatusMap = buildRoutineStatusMap(input.dateInstances)
   const eventStatusMap = buildEventStatusMap(input.dateInstances)
-  const routineCtx: ResolveRoutineCtx = {
-    date: input.viewedDate,
-    member: input.selectedAssignee,
-    prefs: { hideRoutines: input.hideRoutines, layers: input.layers },
-    // A routine dragged onto this date from another day keeps its own
-    // recurrence pattern (see routineTime.ts) — rung 2 would otherwise call
-    // it 'not-today' and drop it. deferredInRoutineIds is the same
-    // cross-day-only rule useScheduleFiltering.ts uses.
-    deferredInto: deferredInRoutineIds(input.dateInstances, input.viewedDate),
-  }
+  // A routine dragged onto this date from another day keeps its own
+  // recurrence pattern (see routineTime.ts) — rung 2 would otherwise call it
+  // 'not-today' and drop it; routineResolveCtx carries deferredInto for that.
   // selectVisibleRoutines keeps Steps (and their collection's parent row)
   // alongside independently-visible routines — see its own docstring —
   // so grouping/counting below can reconstruct collections correctly.
-  const visibleRoutines = selectVisibleRoutines(input.routines, routineCtx)
+  // Untimed occurrences not chosen for the day leave for the pin.
+  const visibleRoutines = routinesForMain(
+    selectVisibleRoutines(input.routines, routineResolveCtx(input)),
+    dayPlan.offMainRoutineItemIds,
+  )
 
   // filteredEvents: viewed-date filter + dedupe (ports TodaySchedule ~752-777)
   const vY = input.viewedDate.getFullYear()
@@ -80,7 +91,8 @@ export function computeTodayData(input: TodayDataInput): TodayData {
   const filteredEvents = dedupeCalendarEvents(eventsForDay)
 
   const grouped = buildGroupedSections({
-    timedTasks: displayTimedTasks,
+    timedTasks: displayTimedTasks.filter((t) => !plannedExtraIds.has(t.id)),
+    plannedTasks: displayTimedTasks.filter((t) => plannedExtraIds.has(t.id)),
     events: filteredEvents,
     routines: visibleRoutines,
     viewedDate: input.viewedDate,
@@ -118,6 +130,7 @@ export function computeTodayData(input: TodayDataInput): TodayData {
     attentionItems,
     completedInboxTasks,
     grouped,
+    dayPlan,
     sectionsOrder: SECTIONS_ORDER,
     counts: { completedCount, incompleteOverdue, actionableCount, totalItems, progressPercent },
   }

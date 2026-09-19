@@ -30,6 +30,17 @@ export function scheduleRoutineOnDate(
 }
 
 /**
+ * Is this routine a tracked obligation that keeps its row on Today's main list
+ * even when it has no time (PT exercises — the same routines "hide daily"
+ * never sweeps)? The day plan (lib/today/dayPlan.ts) and the week journal ask
+ * this to decide main-list vs pin placement; they never decide VISIBILITY —
+ * a routine reaches them only after resolveRoutine said it shows.
+ */
+export function isTimelineObligation(routine: Pick<Routine, 'pin_to_timeline'>): boolean {
+  return !!routine.pin_to_timeline
+}
+
+/**
  * True when a routine effectively recurs at least every weekday (>= 5x/week).
  * Covers:
  *   - `daily` (7x/week)

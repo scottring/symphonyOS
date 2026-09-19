@@ -35,6 +35,9 @@ export interface ActionableInstance {
   assignee: string | null
   assigned_to_override: string | null // Family member override for this instance
   deferred_to: string | null // ISO timestamp
+  /** YYYY-MM-DD this occurrence was chosen for, without a time (Today's main
+   *  list). Optional: absent on rows read before the planned_on migration. */
+  planned_on?: string | null
   completed_at: string | null
   skipped_at: string | null
   /** Running total toward the routine's target for this date, in target_unit. Null = untracked. */

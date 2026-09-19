@@ -20,6 +20,10 @@ import { DomainSwitcher } from '@/components/domain/DomainSwitcher'
 import { useAppShellChromeOptional } from '@/contexts/AppShellChromeContext'
 import { PAGE_COLUMN_WIDE } from '@/components/layout/pageLayout'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
+import { useActionableInstances } from '@/hooks/useActionableInstances'
+import { makePlanActions } from '@/lib/planning/planActions'
+import { planDropHandlers } from '@/lib/planning/planDrag'
+import { showToast } from '@/hooks/useToast'
 import { useGatedTaskActions } from '@/hooks/useGatedTaskActions'
 import { useDomain } from '@/hooks/useDomain'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
@@ -193,6 +197,22 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   const railBounds = useMemo(() => (above ? periodBounds(above, aboveStart, seasons) : null), [above, aboveStart, seasons])
 
   // ── Verbs ────────────────────────────────────────────────────────────────
+  // The same plan writes the Today pin uses: a row dragged out of the pin and
+  // dropped on this month's page commits to the month — no day invented.
+  const { setPlanned, reschedule: rescheduleInstance } = useActionableInstances()
+  const planActions = useMemo(() => makePlanActions({
+    findTask: (id) => tasks.find((t) => t.id === id),
+    updateTask: (id, u) => gated.updateTask(id, u),
+    pushTask: (id, target) => gated.pushTask(id, target),
+    setRoutinePlanned: (id, day, planned) => setPlanned('routine', id, day, planned),
+    rescheduleRoutine: (id, from, when) => rescheduleInstance('routine', id, from, when),
+    notify: (m) => showToast(m, 'warning'),
+  }), [tasks, gated, setPlanned, rescheduleInstance])
+  const [planDropOver, setPlanDropOver] = useState(false)
+  const monthDrop = level === 'month'
+    ? planDropHandlers((payload) => { void planActions.drop(payload, { type: 'period', period: 'month' }) }, setPlanDropOver)
+    : {}
+
   const open = useCallback((row: PlanRowModel) => {
     navigate(row.kind === 'goal' ? `/goals/${row.id}` : `/task/${row.id}`)
   }, [navigate])
@@ -225,10 +245,13 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
       if (lower) await gated.pushTask(row.id, lower)
     }
     else if (action === 'today') {
-      await gated.pushTask(row.id, new Date())
+      // Choosing today (planned_on): a month or season row keeps its list —
+      // a day never erases the broader commitment — and lands on Today's main
+      // list, all-day. It used to push with the clock time it was pressed at.
+      await planActions.chooseTaskDay(row.id, new Date(), { date: level === 'season' })
     }
     else if (action === 'under-goal') setPickingGoalFor(row.id)
-  }, [goals, updateGoal, deleteGoal, addGoal, bounds.next, toggleTask, deleteTask, gated, setGoal, keepForward, level])
+  }, [goals, updateGoal, deleteGoal, addGoal, bounds.next, toggleTask, deleteTask, gated, setGoal, keepForward, level, planActions])
 
   // The rail's one verb: copy an open season task down into this month.
   const pullDown = useCallback((row: PlanRowModel) => {
@@ -408,7 +431,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   const daysUntilStart = useMemo(() => Math.round((bounds.start.getTime() - today.getTime()) / 86_400_000), [bounds.start, today])
 
   return (
-    <div className={`${PAGE_COLUMN_WIDE} py-6`}>
+    <div {...monthDrop} className={`${PAGE_COLUMN_WIDE} py-6${planDropOver ? ' reference-list-drop' : ''}`}>
       {/* The same open masthead Today wears: the period in the eyebrow, the
           page name as the title, the look-back cue on the quiet line when the
           period has ended. No date numeral — a month is not a day. */}

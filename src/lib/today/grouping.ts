@@ -26,6 +26,9 @@ export interface GroupingInput {
   /** goalTaskId → the goal's title, for the line a step draws under itself.
    *  Built from the caller's own (RLS-filtered) task list. */
   goalTitles?: Map<string, string>
+  /** Tasks CHOSEN for the day that aren't dated to it (a week-list task,
+   *  or one dated elsewhere). Drawn untimed — choosing a day invents no time. */
+  plannedTasks?: Task[]
 }
 
 /** Ports TodaySchedule.grouped (~830-954) verbatim. */
@@ -33,11 +36,18 @@ export function buildGroupedSections(input: GroupingInput): Record<DaySection, T
   const {
     timedTasks, events, routines, viewedDate,
     routineStatusMap, eventStatusMap, match,
-    eventNotesMap, eventContextOverrides, getDomainForCalendar, goalTitles,
+    eventNotesMap, eventContextOverrides, getDomainForCalendar, goalTitles, plannedTasks = [],
   } = input
 
   const taskItems = timedTasks.map((t) =>
     taskToTimelineItem(t, t.goalTaskId ? goalTitles?.get(t.goalTaskId) : undefined))
+  for (const t of plannedTasks) {
+    const item = taskToTimelineItem(t, t.goalTaskId ? goalTitles?.get(t.goalTaskId) : undefined)
+    item.startTime = null
+    item.endTime = null
+    item.allDay = false
+    taskItems.push(item)
+  }
 
   const eventItems = events
     .map((event) => {
@@ -70,40 +80,8 @@ export function buildGroupedSections(input: GroupingInput): Record<DaySection, T
     })
     .filter((item) => match(item.assignedTo))
 
-  // Partition by collection vs standalone; expand standalone per-dose (unchanged behavior);
-  // collections become one routine-collection item via buildCollectionItem.
   // Assignee matching now happens upstream in selectVisibleRoutines (rung 5).
-  const { collections, standalone } = groupRoutineSteps(routines)
-
-  const standaloneItems = standalone.flatMap((routine) =>
-    expandRoutineDoses(routine).map((dose) => {
-      const item = routineToTimelineItem(routine, viewedDate)
-      item.id = dose.slotId
-      if (dose.time) {
-        const [h, m] = dose.time.split(':').map(Number)
-        const start = new Date(viewedDate)
-        start.setHours(h, m, 0, 0)
-        item.startTime = start
-      }
-      const instance = routineStatusMap.get(routineStatusKey(routine.id, dose.slotIndex))
-      if (instance?.status === 'completed') item.completed = true
-      else if (instance?.status === 'skipped') item.skipped = true
-      // Time override if rescheduled (only applies to non-dosed routines via bare
-      // id). Resolution lives in resolveRoutineTime so this and the time-block
-      // grid cannot disagree about where a dropped routine goes — they did, and
-      // that is what made a drop on the grid silently revert.
-      const resolved = resolveRoutineTime(
-        { time_of_day: dose.time ?? routine.time_of_day },
-        instance,
-        viewedDate,
-      )
-      if (resolved) item.startTime = resolved
-      return item
-    }),
-  )
-
-  const collectionItems = collections.map((c) => buildCollectionItem(c, viewedDate, routineStatusMap))
-  const routineItems = [...standaloneItems, ...collectionItems]
+  const routineItems = buildRoutineDayItems(routines, viewedDate, routineStatusMap)
 
   const allItems = [...taskItems, ...eventItems, ...routineItems]
   const sections = groupByDaySection(allItems)
@@ -181,4 +159,50 @@ export function buildGroupedSections(input: GroupingInput): Record<DaySection, T
   }
 
   return sections
+}
+
+/**
+ * A day's routine rows, exactly as the timeline draws them: standalone routines
+ * expanded per dose, collections folded into one item. Shared by the timeline
+ * and the day plan (dayPlan.ts) so "is this occurrence timed?" is answered from
+ * the same row the page renders — never from `time_of_day` alone.
+ */
+export function buildRoutineDayItems(
+  routines: Routine[],
+  viewedDate: Date,
+  routineStatusMap: Map<string, ActionableInstance>,
+): TimelineItem[] {
+  // Partition by collection vs standalone; expand standalone per-dose (unchanged behavior);
+  // collections become one routine-collection item via buildCollectionItem.
+  const { collections, standalone } = groupRoutineSteps(routines)
+
+  const standaloneItems = standalone.flatMap((routine) =>
+    expandRoutineDoses(routine).map((dose) => {
+      const item = routineToTimelineItem(routine, viewedDate)
+      item.id = dose.slotId
+      if (dose.time) {
+        const [h, m] = dose.time.split(':').map(Number)
+        const start = new Date(viewedDate)
+        start.setHours(h, m, 0, 0)
+        item.startTime = start
+      }
+      const instance = routineStatusMap.get(routineStatusKey(routine.id, dose.slotIndex))
+      if (instance?.status === 'completed') item.completed = true
+      else if (instance?.status === 'skipped') item.skipped = true
+      // Time override if rescheduled (only applies to non-dosed routines via bare
+      // id). Resolution lives in resolveRoutineTime so this and the time-block
+      // grid cannot disagree about where a dropped routine goes — they did, and
+      // that is what made a drop on the grid silently revert.
+      const resolved = resolveRoutineTime(
+        { time_of_day: dose.time ?? routine.time_of_day },
+        instance,
+        viewedDate,
+      )
+      if (resolved) item.startTime = resolved
+      return item
+    }),
+  )
+
+  const collectionItems = collections.map((c) => buildCollectionItem(c, viewedDate, routineStatusMap))
+  return [...standaloneItems, ...collectionItems]
 }

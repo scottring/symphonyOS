@@ -4,6 +4,7 @@ import type { ActionableInstance, Routine } from '@/types/actionable'
 import type { Task, LinkedActivityType } from '@/types/task'
 import type { FamilyMember } from '@/types/family'
 import { onInstancesChanged } from '@/lib/instancesChangedSignal'
+import { routinesForViewedDate } from '@/lib/today/routinesForDate'
 
 interface UseScheduleFilteringParams {
   viewedDate: Date
@@ -89,60 +90,10 @@ export function useScheduleFiltering({
   // 1. Routines that normally occur on this date (by recurrence pattern)
   // 2. Routines that were deferred TO this date (even if not normally scheduled)
   // 3. Filter out routines that are skipped or deferred away from this date
-  const filteredRoutines = useMemo(() => {
-    const routinesForDate = getRoutinesForDate(viewedDate)
-
-    // Build a map of routine_id -> instance for quick lookup
-    const instanceMap = new Map<string, ActionableInstance>()
-    for (const instance of dateInstances) {
-      if (instance.entity_type === 'routine') {
-        instanceMap.set(instance.entity_id, instance)
-      }
-    }
-
-    // Find routines that were deferred TO this date (any status — includes completed/skipped)
-    const deferredToThisDate = new Set<string>()
-    const viewedDateStr = viewedDate.toISOString().split('T')[0]
-    for (const instance of dateInstances) {
-      if (
-        instance.entity_type === 'routine' &&
-        instance.deferred_to &&
-        (instance.date as string) !== viewedDateStr // Only cross-day deferrals
-      ) {
-        const deferredToDateStr = new Date(instance.deferred_to).toISOString().split('T')[0]
-        if (deferredToDateStr === viewedDateStr) {
-          deferredToThisDate.add(instance.entity_id)
-        }
-      }
-    }
-
-    // Get additional routines that were deferred to this date but don't normally occur today
-    const additionalRoutines: Routine[] = []
-    for (const routineId of deferredToThisDate) {
-      // If this routine isn't already in routinesForDate, add it
-      if (!routinesForDate.some(r => r.id === routineId)) {
-        const routine = allRoutines.find(r => r.id === routineId)
-        if (routine) {
-          additionalRoutines.push(routine)
-        }
-      }
-    }
-
-    // Filter out skipped routines and routines deferred AWAY (but not TO this date)
-    const filteredNormalRoutines = routinesForDate.filter((routine) => {
-      const instance = instanceMap.get(routine.id)
-      if (!instance) return true // No instance = pending
-      if (instance.status === 'skipped') return false
-      // If deferred, only hide if NOT deferred to this specific date
-      if (instance.status === 'deferred') {
-        return deferredToThisDate.has(routine.id)
-      }
-      return true
-    })
-
-    // Combine normal routines with deferred-to routines
-    return [...filteredNormalRoutines, ...additionalRoutines]
-  }, [getRoutinesForDate, viewedDate, dateInstances, allRoutines])
+  const filteredRoutines = useMemo(
+    () => routinesForViewedDate(getRoutinesForDate(viewedDate), allRoutines, dateInstances, viewedDate),
+    [getRoutinesForDate, viewedDate, dateInstances, allRoutines],
+  )
 
   // Generate prep tasks from routine templates when routines surface for the day
   // This runs once when filteredRoutines changes for a given date

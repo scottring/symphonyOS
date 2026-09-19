@@ -7,6 +7,7 @@ import { mondayOfWeek } from '@/lib/workweekHelpers'
 import { buildRange, presetRange, weekRange, type RangePreset } from '@/lib/planning/dateRange'
 import { readCadenceConfig } from '@/lib/cadence/config'
 import { MastheadCard, PeriodNavEyebrow } from '@/components/layout/MastheadCard'
+import { WeekModeSwitch, type WeekMode } from './week/WeekViewV2'
 
 interface HomeHeaderProps {
   currentView: HomeViewType
@@ -29,6 +30,10 @@ interface HomeHeaderProps {
   customRangeRequest?: string
   /** A preset or a custom start/end, handed over as the whole run of days. */
   onRangeChange?: (range: Date[]) => void
+
+  /** Journal | Schedule on /week — presentation only; drawn beside the dates. */
+  weekMode?: WeekMode
+  onWeekModeChange?: (mode: WeekMode) => void
 
   /** For currentView === 'month' */
   monthStart: Date
@@ -237,6 +242,10 @@ export function HomeHeader(props: HomeHeaderProps) {
         eyebrow={<PeriodNavEyebrow label={menuButton} onPrev={onPrev} onNext={onNext} prevLabel={prevLabel} nextLabel={nextLabel} trailing={menu} />}
         title={label.long}
         subline={customInputs}
+        // The hourly grid needs desk width; below lg the journal is the week.
+        aside={props.weekMode && props.onWeekModeChange
+          ? <div className="hidden lg:block"><WeekModeSwitch mode={props.weekMode} onChange={props.onWeekModeChange} /></div>
+          : undefined}
         controls={<HomeChromeControls className="flex" />}
       />
     )

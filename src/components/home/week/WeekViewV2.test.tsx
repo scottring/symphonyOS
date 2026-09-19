@@ -6,6 +6,15 @@ import type { Task } from '@/types/task'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import { ALL_LAYERS } from '@/lib/domains'
 
+const instancesMock = vi.hoisted(() => ({ rows: [] as unknown[], markDone: vi.fn(async () => true), undoDone: vi.fn(async () => true) }))
+vi.mock('@/hooks/useActionableInstances', () => ({
+  useActionableInstances: () => ({
+    getInstancesForRange: async () => instancesMock.rows,
+    markDone: instancesMock.markDone, undoDone: instancesMock.undoDone,
+    setPlanned: vi.fn(async () => true), reschedule: vi.fn(async () => null),
+  }),
+}))
+
 const monday = new Date(2026, 4, 18) // Monday
 
 const defaultProps = {
@@ -148,12 +157,14 @@ describe('WeekViewV2 journal spread', () => {
     expect(screen.getByTestId('allday-2026-09-13')).toBeInTheDocument()
   })
 
-  it('keeps the whole day: early, timed and untimed tasks, all-day and timed events', () => {
+  it('keeps the whole day as one row: timed entries in order, then the day\'s untimed work', () => {
     const tasks = [
       createMockTask({ id: 'early', title: 'Gutter quotes', scheduledFor: new Date(2026, 8, 14, 6, 50), isAllDay: false }),
       createMockTask({ id: 'timed', title: 'Call the bank', scheduledFor: new Date(2026, 8, 14, 14, 30), isAllDay: false }),
       createMockTask({ id: 'day', title: 'Return library books', scheduledFor: new Date(2026, 8, 14), isAllDay: true }),
       createMockTask({ id: 'done', title: 'Renew license', scheduledFor: new Date(2026, 8, 14), isAllDay: true, completed: true }),
+      // A week-list task CHOSEN for Monday keeps its list and is Monday's work.
+      createMockTask({ id: 'chosen', title: 'Book the plumber', bucket: 'week', plannedOn: new Date(2026, 8, 14) }),
     ]
     const events = [
       mockEvent({ id: 'pt', title: 'PT appointment', start: '2026-09-14T10:00:00', end: '2026-09-14T11:00:00' }),
@@ -161,29 +172,29 @@ describe('WeekViewV2 journal spread', () => {
     ]
     render(<WeekViewV2 {...defaultProps} routines={[]} weekStart={sunday} tasks={tasks} events={events} />)
     const monday = within(screen.getByTestId('journal-day-2026-09-14'))
-    const appointments = monday.getByRole('list', { name: 'Appointments' })
-    // In time order, each with its small time label.
-    expect(within(appointments).getAllByRole('listitem').map((li) => li.textContent)).toEqual([
+    const entries = monday.getByRole('list', { name: 'Entries' })
+    expect(within(entries).getAllByRole('listitem').map((li) => li.textContent)).toEqual([
       '6:50aGutter quotes',
       '10aPT appointment',
       '2:30pCall the bank',
+      'Return library books',
+      'Book the plumber',
+      'Renew license',
     ])
-    const forDay = monday.getByRole('list', { name: 'For this day' })
-    expect(within(forDay).getByText('Return library books')).toBeInTheDocument()
     // Done stays on the page, struck, the way a paper week keeps it.
-    expect(within(forDay).getByText('Renew license')).toHaveClass('line-through')
+    expect(monday.getByText('Renew license')).toHaveClass('line-through')
     expect(monday.getByText('No school')).toBeInTheDocument()
   })
 
-  it('rules multi-day context across the top — including one that began last week — and not into the days', () => {
+  it('lists multi-day context once above the days — including one that began last week — and not in the days', () => {
     const events = [
       { id: 'brk', title: 'Fall break', start_time: '2026-09-10T12:00:00.000Z', end_time: '2026-09-16T12:00:00.000Z', all_day: true } as unknown as CalendarEvent,
       mockEvent({ id: 'oc', title: 'On call', start: '2026-09-16T09:00:00', end: '2026-09-18T17:00:00' }),
     ]
     render(<WeekViewV2 {...defaultProps} routines={[]} weekStart={sunday} events={events} />)
-    const across = within(screen.getByRole('group', { name: 'Across these days' }))
-    expect(across.getByRole('button', { name: /Fall break.*began earlier/ })).toBeInTheDocument()
-    expect(across.getByRole('button', { name: /On call/ })).toBeInTheDocument()
+    const across = within(screen.getByRole('list', { name: 'Across these days' }))
+    expect(across.getByRole('button', { name: /Sun–Tue Fall break.*began earlier/ })).toBeInTheDocument()
+    expect(across.getByRole('button', { name: /Wed–Fri On call/ })).toBeInTheDocument()
     for (const key of ['2026-09-13', '2026-09-16', '2026-09-17']) {
       const day = within(screen.getByTestId(`journal-day-${key}`))
       expect(day.queryByText('Fall break')).toBeNull()
@@ -233,5 +244,46 @@ describe('WeekViewV2 journal spread', () => {
       // The list is not a sticky side column here.
       expect(screen.getByLabelText("This week's list").className).not.toContain('sticky')
     })
+  })
+})
+
+// Journal | Schedule is presentation only: the same dates, the same data.
+describe('WeekViewV2 — Journal and Schedule agree', () => {
+  const sunday = new Date(2026, 8, 13)
+  beforeEach(() => { instancesMock.rows = []; instancesMock.markDone.mockClear() })
+
+  it('an untimed Saturday placement is a Saturday entry in Journal and sits in Saturday\'s all-day cell in Schedule', () => {
+    const tasks = [createMockTask({ id: 'sat', title: 'Organize kids clothes', bucket: 'timed', isAllDay: true, scheduledFor: new Date(2026, 8, 19), plannedOn: new Date(2026, 8, 19) })]
+    render(<WeekViewV2 {...defaultProps} routines={[]} weekStart={sunday} tasks={tasks} />)
+    expect(within(screen.getByTestId('journal-day-2026-09-19')).getByText('Organize kids clothes')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('radio', { name: 'Schedule' }))
+    expect(within(screen.getByTestId('allday-2026-09-19')).getByText('Organize kids clothes')).toBeInTheDocument()
+  })
+
+  it('a routine occurrence chosen for Saturday (no time) is an entry in both; one nobody chose is only "available"', async () => {
+    instancesMock.rows = [{
+      id: 'i1', user_id: 'u', entity_type: 'routine', entity_id: 'chosen', date: '2026-09-19', status: 'pending',
+      assignee: null, assigned_to_override: null, deferred_to: null, planned_on: '2026-09-19',
+      completed_at: null, skipped_at: null, progress: null, created_at: '', updated_at: '',
+    }]
+    const routines = [
+      createMockRoutine({ id: 'chosen', name: 'Family reading time', time_of_day: null, recurrence_pattern: { type: 'weekly', days: ['sat'] } }),
+      createMockRoutine({ id: 'waiting', name: 'Kids clean rooms', time_of_day: null, recurrence_pattern: { type: 'weekly', days: ['sat'] } }),
+    ]
+    render(<WeekViewV2 {...defaultProps} routines={routines} weekStart={sunday} />)
+    const saturday = within(screen.getByTestId('journal-day-2026-09-19'))
+    const entries = await saturday.findByRole('list', { name: 'Entries' })
+    expect(within(entries).getByText('Family reading time')).toBeInTheDocument()
+    expect(within(entries).queryByText('Kids clean rooms')).toBeNull()
+    expect(saturday.getByLabelText('Available')).toHaveTextContent('Kids clean rooms')
+
+    // Ticking the entry completes THAT occurrence — Saturday's instance.
+    fireEvent.click(saturday.getByRole('button', { name: 'Complete Family reading time' }))
+    expect(instancesMock.markDone).toHaveBeenCalledWith('routine', 'chosen', new Date(2026, 8, 19))
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Schedule' }))
+    const cell = within(screen.getByTestId('allday-2026-09-19'))
+    expect(cell.getByText('Family reading time')).toBeInTheDocument()
+    expect(cell.queryByText('Kids clean rooms')).toBeNull()
   })
 })

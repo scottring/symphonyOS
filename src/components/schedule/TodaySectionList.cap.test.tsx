@@ -31,7 +31,8 @@ const ctxValue = {
   projects: [], contacts: [], familyMembers: [], lists: [],
 }
 
-/** N incomplete all-day tasks on the viewed day. */
+/** N incomplete all-day tasks on the viewed day, CHOSEN for it (plannedOn) —
+ *  a dated-but-unchosen task waits in the Today pin, not the main list. */
 function allDayTasks(n: number) {
   return Array.from({ length: n }, (_, i) => {
     const d = new Date(TODAY)
@@ -43,6 +44,7 @@ function allDayTasks(n: number) {
       bucket: 'timed' as const,
       isAllDay: true,
       scheduledFor: d,
+      plannedOn: d,
       createdAt: new Date(2026, 0, 1, 0, 0, i),
       updatedAt: new Date(2026, 0, 1, 0, 0, i),
       sortOrder: i * 1000,

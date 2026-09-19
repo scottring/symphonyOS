@@ -27,6 +27,7 @@ import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { readCadenceConfig, weekStartAnchor } from '@/lib/cadence/config'
 import { isPlacedOnWeek, isStaleWeekPlacement } from '@/lib/today/weekPlacement'
 import { isMissedPlacement, missedLabel } from '@/lib/week/missedPlacement'
+import { planDropHandlers, type PlanDragPayload } from '@/lib/planning/planDrag'
 
 // Loose pills visible before the "+N more" expander.
 const STRIP_CAP = 8
@@ -188,7 +189,7 @@ function RoutinePill({ routine, onSelect, draggable }: { routine: Routine; onSel
 
 export function WeekPoolLane({
   tasks, routines = [], weekStart, dayCount, onSelectItem, onCompleteTask, onNotThisWeek, onPushTask,
-  onUpdateTask, onDeleteTask, foldWeeks = [], dragEnabled = true, routinesDraggable = true,
+  onUpdateTask, onDeleteTask, foldWeeks = [], dragEnabled = true, routinesDraggable = true, onPlanDrop,
 }: {
   tasks: Task[]
   /** Routines that need a home — ALREADY filtered by the host through
@@ -213,7 +214,12 @@ export function WeekPoolLane({
   /** Routine rows can be picked up — only where there are time slots to
    *  drop them on (a routine needs a time; a journal day has none). */
   routinesDraggable?: boolean
+  /** A row dragged out of the Today pin, dropped on the list: commit it to
+   *  the week (no day invented). */
+  onPlanDrop?: (payload: PlanDragPayload) => void
 }) {
+  const [planOver, setPlanOver] = useState(false)
+  const planProps = onPlanDrop ? planDropHandlers(onPlanDrop, setPlanOver) : {}
   const [open, setOpen] = useState(true)
   const [mealsOpen, setMealsOpen] = useState(false)
   const [showAll, setShowAll] = useState(false)
@@ -285,7 +291,7 @@ export function WeekPoolLane({
 
   return (
     <>
-    <div className="border-t border-neutral-300 pt-2.5">
+    <div {...planProps} className={`border-t border-neutral-300 pt-2.5${planOver ? ' reference-list-drop' : ''}`}>
       <button
         type="button"
         aria-expanded={open}

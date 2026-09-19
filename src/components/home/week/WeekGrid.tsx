@@ -1,5 +1,6 @@
 import { useDroppable } from '@dnd-kit/core'
-import type { ReactNode } from 'react'
+import { useState, type ReactNode } from 'react'
+import { planDropHandlers, type PlanDragPayload } from '@/lib/planning/planDrag'
 import { localYmd } from '@/lib/cadence/config'
 
 export const FIRST_HOUR = 8
@@ -36,9 +37,14 @@ interface WeekGridProps {
   /** Sub-slot ids to tint as suggested drop targets while a pool-pill drag is
    *  active (dropSmarts). Paint only — never captures the drop. */
   suggestedSlotIds?: Set<string> | null
+  /** A row dragged out of the Today pin (native drag, not dnd-kit): dropped
+   *  on the all-day cell it chooses the day; on a sub-slot it takes the time. */
+  onPlanDrop?: (slot: PlanSlot, payload: PlanDragPayload) => void
 }
 
-export function WeekGrid({ weekStart, dayCount = 7, children, onCreateGesture, suppressCreate, renderAllDay, renderDinner, suggestedSlotIds }: WeekGridProps) {
+export interface PlanSlot { dayIso: string; hour?: number; minute?: number }
+
+export function WeekGrid({ weekStart, dayCount = 7, children, onCreateGesture, suppressCreate, renderAllDay, renderDinner, suggestedSlotIds, onPlanDrop }: WeekGridProps) {
   const days = Array.from({ length: dayCount }, (_, i) => {
     const d = new Date(weekStart)
     d.setDate(d.getDate() + i)
@@ -87,7 +93,7 @@ export function WeekGrid({ weekStart, dayCount = 7, children, onCreateGesture, s
       >
         <div className="px-2 py-2 text-[10px] uppercase tracking-wide text-neutral-400">all-day</div>
         {days.map((d, i) => (
-          <AllDaySlot key={i} day={d}>{renderAllDay?.(d)}</AllDaySlot>
+          <AllDaySlot key={i} day={d} onPlanDrop={onPlanDrop}>{renderAllDay?.(d)}</AllDaySlot>
         ))}
       </div>
 
@@ -127,6 +133,7 @@ export function WeekGrid({ weekStart, dayCount = 7, children, onCreateGesture, s
                   onCreateGesture={onCreateGesture}
                   suppressCreate={suppressCreate}
                   suggestedSlotIds={suggestedSlotIds}
+                  onPlanDrop={onPlanDrop}
                 />
               ))}
             </div>
@@ -150,15 +157,19 @@ export function WeekGrid({ weekStart, dayCount = 7, children, onCreateGesture, s
   )
 }
 
-function AllDaySlot({ day, children }: { day: Date; children?: ReactNode }) {
+function AllDaySlot({ day, children, onPlanDrop }: { day: Date; children?: ReactNode; onPlanDrop?: WeekGridProps['onPlanDrop'] }) {
   const id = `slot:${dayKey(day)}:all-day`
-  const { setNodeRef, isOver } = useDroppable({
+  const { setNodeRef, isOver: dndOver } = useDroppable({
     id,
     data: { kind: 'allDay', dayIso: dayKey(day) },
   })
+  const [planOver, setPlanOver] = useState(false)
+  const isOver = dndOver || planOver
+  const planProps = onPlanDrop ? planDropHandlers((p) => onPlanDrop({ dayIso: dayKey(day) }, p), setPlanOver) : {}
   return (
     <div
       ref={setNodeRef}
+      {...planProps}
       data-testid={`allday-${localYmd(day)}`}
       // min-w-0 is essential: grid items default to min-width:auto, so a long
       // chip title would stretch this cell past its 1fr column, misaligning the
@@ -176,9 +187,10 @@ interface HourCellProps {
   onCreateGesture?: CreateGestureHandlers
   suppressCreate?: boolean
   suggestedSlotIds?: Set<string> | null
+  onPlanDrop?: WeekGridProps['onPlanDrop']
 }
 
-function HourCell({ day, hour, onCreateGesture, suppressCreate, suggestedSlotIds }: HourCellProps) {
+function HourCell({ day, hour, onCreateGesture, suppressCreate, suggestedSlotIds, onPlanDrop }: HourCellProps) {
   // Four droppable sub-slots inside one hour cell.
   return (
     <div className="border-l border-neutral-200/60 grid grid-rows-4">
@@ -191,6 +203,7 @@ function HourCell({ day, hour, onCreateGesture, suppressCreate, suggestedSlotIds
           onCreateGesture={onCreateGesture}
           suppressCreate={suppressCreate}
           suggestedSlotIds={suggestedSlotIds}
+          onPlanDrop={onPlanDrop}
         />
       ))}
     </div>
@@ -204,14 +217,18 @@ interface SubSlotProps {
   onCreateGesture?: CreateGestureHandlers
   suppressCreate?: boolean
   suggestedSlotIds?: Set<string> | null
+  onPlanDrop?: WeekGridProps['onPlanDrop']
 }
 
-function SubSlot({ day, hour, minute, onCreateGesture, suppressCreate, suggestedSlotIds }: SubSlotProps) {
+function SubSlot({ day, hour, minute, onCreateGesture, suppressCreate, suggestedSlotIds, onPlanDrop }: SubSlotProps) {
   const id = `slot:${dayKey(day)}:${pad(hour)}:${pad(minute)}`
-  const { setNodeRef, isOver } = useDroppable({
+  const { setNodeRef, isOver: dndOver } = useDroppable({
     id,
     data: { kind: 'timed', dayIso: dayKey(day), hour, minute },
   })
+  const [planOver, setPlanOver] = useState(false)
+  const isOver = dndOver || planOver
+  const planProps = onPlanDrop ? planDropHandlers((p) => onPlanDrop({ dayIso: dayKey(day), hour, minute }, p), setPlanOver) : {}
 
   const slot = { dayIso: dayKey(day), hour, minute }
 
@@ -233,6 +250,7 @@ function SubSlot({ day, hour, minute, onCreateGesture, suppressCreate, suggested
   return (
     <div
       ref={setNodeRef}
+      {...planProps}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}

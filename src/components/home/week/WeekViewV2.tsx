@@ -18,7 +18,7 @@ import type { Routine, ActionableInstance } from '@/types/actionable'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
 import { taskToTimelineItem, eventToTimelineItem } from '@/types/timeline'
 import { goalTitleMap } from '@/lib/planning/goalSteps'
-import { WeekGrid, dayKey } from './WeekGrid'
+import { WeekGrid, dayKey, type PlanSlot } from './WeekGrid'
 import { WeekAllDayChip, WeekAllDayEventChip } from './WeekAllDayChip'
 import { WeekEventBlock } from './WeekEventBlock'
 import { layoutWeekLanes, type PlacedItem } from './layoutLanes'
@@ -41,11 +41,16 @@ import { unhomedRoutines } from '@/lib/week/unhomedRoutines'
 import { buildWeekRoutineItems } from './weekRoutineItems'
 import { useWeekInstances } from './useWeekInstances'
 import { edgeForPointer } from './edgeAdvance'
-import { WeekJournal, type JournalDay, type JournalLine } from './WeekJournal'
+import { WeekJournal, type JournalDay, type JournalEntry } from './WeekJournal'
+import { makePlanActions } from '@/lib/planning/planActions'
+import type { PlanDragPayload } from '@/lib/planning/planDrag'
+import { useActionableInstances } from '@/hooks/useActionableInstances'
+import { showToast } from '@/hooks/useToast'
 import { eventDays, isMultiDayEvent, layoutContextSpans } from '@/lib/week/journalSpread'
 import { localYmd } from '@/lib/cadence/config'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import type { AssigneeFilter } from '@/lib/today/types'
+import { isTimelineObligation } from '@/lib/routineUtils'
 import type { Layer } from '@/lib/domains'
 
 /** Does this calendar event span the whole day? Explicit flags win; otherwise
@@ -110,6 +115,33 @@ interface WeekViewV2Props {
   dayCount?: number
   /** From HomeView's useUndo. Called after successful mutations to surface an undo toast. */
   pushAction?: (message: string, undo: () => void) => void
+  /** Journal (default) or Schedule. When omitted the view keeps its own and
+   *  draws its own switch; HomeView passes it so the switch sits by the dates. */
+  mode?: WeekMode
+}
+
+export type WeekMode = 'journal' | 'schedule'
+
+/** Journal | Schedule — presentation only: same dates, same data. */
+export function WeekModeSwitch({ mode, onChange }: { mode: WeekMode; onChange: (m: WeekMode) => void }) {
+  return (
+    <div role="radiogroup" aria-label="Week layout" className="inline-flex items-center gap-3 text-xs font-medium">
+      {(['journal', 'schedule'] as const).map((m) => (
+        <button
+          key={m}
+          type="button"
+          role="radio"
+          aria-checked={mode === m}
+          onClick={() => onChange(m)}
+          className={`border-b py-0.5 transition-colors ${
+            mode === m ? 'border-neutral-800 text-neutral-900' : 'border-transparent text-neutral-400 hover:text-neutral-700'
+          }`}
+        >
+          {m === 'journal' ? 'Journal' : 'Schedule'}
+        </button>
+      ))}
+    </div>
+  )
 }
 
 export function WeekViewV2(props: WeekViewV2Props) {
@@ -407,7 +439,10 @@ export function WeekViewV2(props: WeekViewV2Props) {
 
   // Journal is the week; Schedule is the hourly grid, a switch away. The grid
   // needs desk width to read — below lg the spread stacks and is the only mode.
-  const [mode, setMode] = useState<'journal' | 'schedule'>('journal')
+  // Controlled from the masthead when HomeView hosts it (the switch sits by
+  // the dates); uncontrolled — with its own switch — when mounted alone.
+  const [ownMode, setOwnMode] = useState<WeekMode>('journal')
+  const mode = props.mode ?? ownMode
   const narrow = useMediaQuery('(max-width: 1023px)')
   const showSchedule = mode === 'schedule' && !narrow
 
@@ -547,28 +582,44 @@ export function WeekViewV2(props: WeekViewV2Props) {
     const days: JournalDay[] = Array.from({ length: dayCount }, (_, i) => {
       const date = new Date(weekStart)
       date.setDate(date.getDate() + i)
-      return { date, key: localYmd(date), notes: [], lines: [], tasks: [], routines: [], dinners: [] }
+      return { date, key: localYmd(date), notes: [], entries: [], available: [], dinners: [] }
     })
     const byKey = new Map(days.map((d) => [d.key, d]))
+    const timed = new Map(days.map((d) => [d.key, [] as JournalEntry[]]))
+    const untimed = new Map(days.map((d) => [d.key, [] as JournalEntry[]]))
 
+    // Tasks: timed ones at their time; untimed ones on the day they are dated
+    // to, or the day they were CHOSEN for (a week-list task chosen for
+    // Thursday keeps its list but is Thursday's work).
+    const seen = new Set<string>()
     for (const t of tasks) {
-      if (!t.scheduledFor) continue
-      const day = byKey.get(localYmd(t.scheduledFor))
-      if (!day) continue
-      if (t.isAllDay) day.tasks.push(t)
-      else day.lines.push({ id: `task-${t.id}`, time: t.scheduledFor, title: t.title, subtitle: labelFor(t), task: t })
+      const entry = (time?: Date): JournalEntry => ({
+        id: `task-${t.id}`, kind: 'task', time, title: t.title, subtitle: labelFor(t), completed: t.completed, task: t,
+      })
+      if (t.scheduledFor) {
+        const key = localYmd(t.scheduledFor)
+        if (byKey.has(key)) {
+          seen.add(t.id)
+          if (t.isAllDay) untimed.get(key)!.push(entry())
+          else timed.get(key)!.push(entry(t.scheduledFor))
+          continue
+        }
+      }
+      if (t.plannedOn && !seen.has(t.id)) {
+        const key = localYmd(t.plannedOn)
+        if (byKey.has(key)) untimed.get(key)!.push(entry())
+      }
     }
 
     for (const item of eventItems) {
       if (!item.startTime) continue
-      const day = byKey.get(localYmd(item.startTime))
-      if (!day) continue
+      const key = localYmd(item.startTime)
+      if (!byKey.has(key)) continue
       const source = item.originalEvent as CalendarEvent | undefined
-      // A multi-day timed event (on call Mon 9am → Fri 5pm) is drawn once
-      // across the top, not as a line on its first day.
+      // A multi-day timed event (on call Mon 9am → Fri 5pm) is listed once
+      // above the days, not as an entry on its first day.
       if (source && isMultiDayEvent(source)) continue
-      const line: JournalLine = { id: item.id, time: item.startTime, title: item.title, subtitle: item.subtitle }
-      day.lines.push(line)
+      timed.get(key)!.push({ id: item.id, kind: 'event', time: item.startTime, title: item.title, subtitle: item.subtitle, completed: false })
     }
 
     for (const ev of events) {
@@ -579,33 +630,99 @@ export function WeekViewV2(props: WeekViewV2Props) {
 
     for (const [key, entries] of extras.dinnersByDay) byKey.get(key)?.dinners.push(...entries)
 
+    // Routine occurrences: with a time, or chosen for the day, they are the
+    // day's entries; an untimed one nobody chose is only available — the same
+    // split Today and its pin make (dayPlan.ts).
     for (const r of routineItems) {
       const idx = Number(r.id.match(/-day(\d+)$/)?.[1] ?? -1)
-      days[idx]?.routines.push(r)
+      const day = days[idx]
+      if (!day) continue
+      const routineId = r.id.slice('routine-'.length).replace(/-day\d+$/, '')
+      const instance = weekInstances.find((i) => i.entity_type === 'routine' && i.entity_id === routineId && i.date === day.key)
+      const completed = instance?.status === 'completed'
+      const planned = instance?.planned_on === day.key
+      const pinned = !!r.originalRoutine && isTimelineObligation(r.originalRoutine)
+      const entry: JournalEntry = {
+        id: r.id, kind: 'routine', time: r.startTime ?? undefined, title: r.title, completed, routineId,
+      }
+      if (r.startTime) timed.get(day.key)!.push(entry)
+      else if (planned || pinned) untimed.get(day.key)!.push(entry)
+      else day.available.push({ ...r, completed })
     }
 
     for (const d of days) {
-      d.lines.sort((a, b) => a.time.getTime() - b.time.getTime())
-      d.routines.sort((a, b) => (a.startTime?.getTime() ?? Infinity) - (b.startTime?.getTime() ?? Infinity))
-      d.tasks.sort((a, b) => Number(a.completed) - Number(b.completed))
+      const t = timed.get(d.key)!.sort((a, b) => a.time!.getTime() - b.time!.getTime())
+      const u = untimed.get(d.key)!.sort((a, b) => Number(a.completed) - Number(b.completed))
+      d.entries = [...t, ...u]
     }
     return days
-  }, [tasks, events, eventItems, extras, routineItems, weekStart, dayCount, labelFor])
+  }, [tasks, events, eventItems, extras, routineItems, weekInstances, weekStart, dayCount, labelFor])
 
   const journalSpans = useMemo(
     () => layoutContextSpans(events, journalDays.map((d) => d.date)),
     [events, journalDays],
   )
 
-  // Ticking from the spread, with an undo that writes the EXPLICIT prior state
-  // (a second toggle would read a stale snapshot — HomeView's rule).
-  const handleJournalToggle = useCallback((task: Task) => {
-    const was = task.completed
-    void toggleTask(task.id)
-    pushAction?.(was ? 'Task marked incomplete' : 'Task completed', () => {
-      void onUpdateTask(task.id, { completed: was })
-    })
-  }, [toggleTask, onUpdateTask, pushAction])
+  // Ticking from the page. A task's undo writes the EXPLICIT prior state (a
+  // second toggle would read a stale snapshot — HomeView's rule). A routine
+  // ticks its OCCURRENCE — that day's instance — so Today, the pin and this
+  // page show the same completion.
+  const { markDone, undoDone, setPlanned, reschedule: rescheduleInstance } = useActionableInstances()
+  const handleJournalToggle = useCallback((entry: JournalEntry, day: JournalDay) => {
+    if (entry.task) {
+      const task = entry.task
+      const was = task.completed
+      void toggleTask(task.id)
+      pushAction?.(was ? 'Task marked incomplete' : 'Task completed', () => {
+        void onUpdateTask(task.id, { completed: was })
+      })
+      return
+    }
+    if (entry.routineId) {
+      const id = entry.routineId
+      const done = !entry.completed
+      void (done ? markDone('routine', id, day.date) : undoDone('routine', id, day.date))
+      pushAction?.(done ? 'Routine completed' : 'Routine marked incomplete', () => {
+        void (done ? undoDone('routine', id, day.date) : markDone('routine', id, day.date))
+      })
+    }
+  }, [toggleTask, onUpdateTask, pushAction, markDone, undoDone])
+
+  // Rows dragged out of the Today pin (native drag): a day chooses the day, a
+  // slot gives the time. Same writes as the pin's own buttons (planActions).
+  const planActions = useMemo(() => makePlanActions({
+    findTask: (id) => tasks.find((t) => t.id === id) ?? tasks.flatMap((t) => t.subtasks ?? []).find((t) => t.id === id),
+    updateTask: (id, u) => onUpdateTask(id, u),
+    pushTask: (id, target) => gated.pushTask(id, target),
+    setRoutinePlanned: (id, day, planned) => setPlanned('routine', id, day, planned),
+    rescheduleRoutine: (id, from, when) => rescheduleInstance('routine', id, from, when),
+    pushAction,
+    notify: (m) => showToast(m, 'warning'),
+  }), [tasks, onUpdateTask, gated, setPlanned, rescheduleInstance, pushAction])
+  const handlePlanDropOnDay = useCallback((day: JournalDay, payload: PlanDragPayload) => {
+    void planActions.drop(payload, { type: 'day', day: day.date })
+  }, [planActions])
+  const handlePlanDropOnSlot = useCallback((slot: PlanSlot, payload: PlanDragPayload) => {
+    const [y, m, d] = slot.dayIso.split('-').map(Number)
+    if (slot.hour === undefined) {
+      void planActions.drop(payload, { type: 'day', day: new Date(y, m - 1, d) })
+    } else {
+      void planActions.drop(payload, { type: 'time', when: new Date(y, m - 1, d, slot.hour, slot.minute ?? 0) })
+    }
+  }, [planActions])
+
+  // Chosen-but-untimed work the grid has no row for: a routine occurrence
+  // chosen for its day, a week-list task chosen for a day. Schedule shows them
+  // in that day's all-day cell, so the two modes never disagree.
+  const plannedAllDay = useMemo(() => {
+    const map = new Map<string, JournalEntry[]>()
+    for (const d of journalDays) {
+      const extra = d.entries.filter((e) =>
+        !e.time && (e.kind === 'routine' || (e.task && !(e.task.scheduledFor && localYmd(e.task.scheduledFor) === d.key))))
+      if (extra.length) map.set(d.key, extra)
+    }
+    return map
+  }, [journalDays])
 
   // Suggested open slots while a POOL pill drags — rules-based paint
   // (dropSmarts); never captures the drop. Only pool pills: an already-placed
@@ -697,6 +814,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
         // A routine needs a TIME to land — the journal's days have none, so
         // routine rows only pick up where there are slots to drop them on.
         routinesDraggable={showSchedule}
+        onPlanDrop={(payload) => { void planActions.drop(payload, { type: 'period', period: 'week' }) }}
       />
       <WeekMonthRail tasks={tasks} meId={meId} onSelectItem={onSelectItem} onAddToWeek={(id) => { void gated.pushTask(id, 'week') }} />
     </>
@@ -705,23 +823,8 @@ export function WeekViewV2(props: WeekViewV2Props) {
   return (
     <div className="relative">
       <div className="flex items-center justify-end gap-2 mb-2">
-        {!narrow && (
-          <div role="radiogroup" aria-label="Week layout" className="inline-flex items-center gap-3 mr-auto text-xs font-medium">
-            {(['journal', 'schedule'] as const).map((m) => (
-              <button
-                key={m}
-                type="button"
-                role="radio"
-                aria-checked={mode === m}
-                onClick={() => setMode(m)}
-                className={`border-b py-0.5 transition-colors ${
-                  mode === m ? 'border-neutral-800 text-neutral-900' : 'border-transparent text-neutral-400 hover:text-neutral-700'
-                }`}
-              >
-                {m === 'journal' ? 'Journal' : 'Schedule'}
-              </button>
-            ))}
-          </div>
+        {!narrow && props.mode === undefined && (
+          <div className="mr-auto"><WeekModeSwitch mode={mode} onChange={setOwnMode} /></div>
         )}
         <RoutinesToggle hidden={hideRoutines} onToggle={() => writeHideRoutines(!hideRoutines)} />
       </div>
@@ -744,7 +847,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
         {narrow ? (
           <div className="flex flex-col gap-4">
             <aside aria-label="This week's list" className="flex flex-col gap-2">{margin}</aside>
-            <WeekJournal days={journalDays} spans={journalSpans} onSelectItem={onSelectItem} onToggleTask={handleJournalToggle} narrow dragEnabled={false} />
+            <WeekJournal days={journalDays} spans={journalSpans} onSelectItem={onSelectItem} onToggleEntry={handleJournalToggle} onPlanDrop={handlePlanDropOnDay} narrow dragEnabled={false} />
           </div>
         ) : (
         <div className="flex items-start gap-4">
@@ -764,7 +867,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
             list column to its left, the view's left edge is no longer the days'. */}
         <div ref={gridBoundsRef} data-week-bounds className="flex-1 min-w-0">
         {!showSchedule ? (
-          <WeekJournal days={journalDays} spans={journalSpans} onSelectItem={onSelectItem} onToggleTask={handleJournalToggle} />
+          <WeekJournal days={journalDays} spans={journalSpans} onSelectItem={onSelectItem} onToggleEntry={handleJournalToggle} onPlanDrop={handlePlanDropOnDay} />
         ) : (
         <WeekGrid
           weekStart={weekStart}
@@ -778,6 +881,15 @@ export function WeekViewV2(props: WeekViewV2Props) {
                 ))}
                 {(allDayByDay.get(key) ?? []).map((t) => (
                   <WeekAllDayChip key={t.id} task={t} onSelect={onSelectItem} />
+                ))}
+                {(plannedAllDay.get(key) ?? []).map((e) => e.task ? (
+                  <WeekAllDayChip key={e.id} task={e.task} onSelect={onSelectItem} />
+                ) : (
+                  <button key={e.id} type="button" onClick={() => onSelectItem(e.id.replace(/-day\d+$/, ''))}
+                    className={`w-full min-w-0 truncate rounded border border-neutral-200 bg-bg-elevated px-1.5 py-0.5 text-left text-[11.5px] text-neutral-600 hover:border-neutral-300 ${e.completed ? 'line-through text-neutral-400' : ''}`}
+                    title={e.title}>
+                    {e.title}
+                  </button>
                 ))}
                 {(earlyTasksByDay.get(key) ?? []).map((t) => (
                   <WeekAllDayChip
@@ -818,6 +930,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
           }
           suppressCreate={!!drag.activeDragId}
           suggestedSlotIds={suggestedSlotIds}
+          onPlanDrop={handlePlanDropOnSlot}
         >
           {placedItems.map((p) => (
             <WeekEventBlock

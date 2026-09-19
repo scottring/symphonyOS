@@ -1,6 +1,8 @@
 import { createContext, useContext, useState, type ReactNode } from 'react'
 
-export type ReferenceKind = 'week' | 'month'
+/** 'today' is the day's plan pin (DayPlanPanel); week/month are the period lists. */
+export type ReferenceKind = 'today' | 'week' | 'month'
+export const REFERENCE_KINDS: ReferenceKind[] = ['today', 'week', 'month']
 export interface ReferencePin { kind: ReferenceKind; date: string }
 interface ReferenceListsState {
   pins: ReferencePin[]
@@ -18,7 +20,7 @@ export function ReferenceListsProvider({ userId, children }: { userId: string; c
       const saved: unknown = JSON.parse(sessionStorage.getItem(key) ?? '[]')
       if (!Array.isArray(saved)) return []
       return saved.filter((p): p is ReferencePin =>
-        p && (p.kind === 'week' || p.kind === 'month') && typeof p.date === 'string' && Number.isFinite(Date.parse(p.date)))
+        p && REFERENCE_KINDS.includes(p.kind) && typeof p.date === 'string' && Number.isFinite(Date.parse(p.date)))
         .filter((p, i, all) => all.findIndex(other => other.kind === p.kind) === i)
     } catch { return [] }
   })

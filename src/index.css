@@ -1698,6 +1698,10 @@ html.desktop-shell a {
   border-right: 1px solid var(--color-neutral-200);
 }
 .reference-list + .reference-list { margin-top: 32px; }
+/* A row from the Today pin hovering over Today's agenda: drop to choose it. */
+.daybook-agenda-drop { outline: 2px dashed var(--color-primary-300); outline-offset: 8px; border-radius: 4px; }
+/* A row from the Today pin hovering over a list it can be committed to. */
+.reference-list-drop { outline: 2px dashed var(--color-primary-300); outline-offset: 6px; border-radius: 4px; }
 .reference-list li { padding-block: 14px; }
 /* A small tablet still has access to the references, below its work. Phones
    never mount these controls or panels. */

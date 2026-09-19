@@ -180,8 +180,10 @@ describe('computeTodayData — progress counts match the rendered timeline', () 
   it('a collection counts as the one row it renders, not parent + every step', () => {
     const parent = routine({ id: 'p', name: 'Morning reset' })
     const steps = [
-      routine({ id: 's1', name: 'Unload dishwasher', parent_routine_id: 'p', step_order: 0 }),
-      routine({ id: 's2', name: 'Pack lunches', parent_routine_id: 'p', step_order: 1 }),
+      // Timed: an untimed collection nobody chose waits in the Today pin
+      // (dayPlan.ts) — these tests are about counts matching the main list.
+      routine({ id: 's1', name: 'Unload dishwasher', parent_routine_id: 'p', step_order: 0, time_of_day: '07:00:00' }),
+      routine({ id: 's2', name: 'Pack lunches', parent_routine_id: 'p', step_order: 1, time_of_day: '07:15:00' }),
     ]
     const d = computeTodayData(baseInput({ viewedDate: NOW, routines: [parent, ...steps] }))
     expect(renderedActionableRows(d)).toHaveLength(1)
@@ -191,8 +193,10 @@ describe('computeTodayData — progress counts match the rendered timeline', () 
   it('a collection reads as done once every step is done (the bar can reach 100%)', () => {
     const parent = routine({ id: 'p', name: 'Morning reset' })
     const steps = [
-      routine({ id: 's1', name: 'Unload dishwasher', parent_routine_id: 'p', step_order: 0 }),
-      routine({ id: 's2', name: 'Pack lunches', parent_routine_id: 'p', step_order: 1 }),
+      // Timed: an untimed collection nobody chose waits in the Today pin
+      // (dayPlan.ts) — these tests are about counts matching the main list.
+      routine({ id: 's1', name: 'Unload dishwasher', parent_routine_id: 'p', step_order: 0, time_of_day: '07:00:00' }),
+      routine({ id: 's2', name: 'Pack lunches', parent_routine_id: 'p', step_order: 1, time_of_day: '07:15:00' }),
     ]
     const d = computeTodayData(baseInput({
       viewedDate: NOW, routines: [parent, ...steps],
@@ -268,8 +272,8 @@ describe('computeTodayData — progress counts match the rendered timeline', () 
   })
 
   it('a routine the assignee filter hides is not counted', () => {
-    const mine = routine({ id: 'r1', name: 'Mine', assigned_to: 'me' })
-    const theirs = routine({ id: 'r2', name: 'Theirs', assigned_to: 'someone-else' })
+    const mine = routine({ id: 'r1', name: 'Mine', assigned_to: 'me', time_of_day: '09:00:00' })
+    const theirs = routine({ id: 'r2', name: 'Theirs', assigned_to: 'someone-else', time_of_day: '09:00:00' })
     const d = computeTodayData(baseInput({
       viewedDate: NOW, routines: [mine, theirs], selectedAssignee: ['me'],
     }))
@@ -278,8 +282,8 @@ describe('computeTodayData — progress counts match the rendered timeline', () 
   })
 
   it('a skipped routine leaves the pool — skipping is how work comes off the day', () => {
-    const a = routine({ id: 'r1', name: 'Iris weekend workout' })
-    const b = routine({ id: 'r2', name: 'Food prep' })
+    const a = routine({ id: 'r1', name: 'Iris weekend workout', time_of_day: '09:00:00' })
+    const b = routine({ id: 'r2', name: 'Food prep', time_of_day: '10:00:00' })
     const d = computeTodayData(baseInput({
       viewedDate: NOW, routines: [a, b], dateInstances: [instance('r1', 'skipped')],
     }))

@@ -28,15 +28,17 @@ describe('HorizonPoolDropdown — the pools live up here, never in the review', 
     expect(screen.getByText('Other month thing')).toBeInTheDocument()
   })
 
-  it('a pick writes through pushTask and resolves the row in place', async () => {
+  it('a Today pick chooses the day (the week task keeps its list) and resolves the row in place', async () => {
     const onPushTask = vi.fn()
+    const onUpdateTask = vi.fn()
     const { user } = render(<HorizonPoolDropdown {...base} label="Week"
-      offer={['today', 'tomorrow', 'someday', 'deleted']} onPushTask={onPushTask}
+      offer={['today', 'tomorrow', 'someday', 'deleted']} onPushTask={onPushTask} onUpdateTask={onUpdateTask}
       tasks={[task({ id: 'w1', title: 'Week thing', bucket: 'week' })]} />)
     await user.click(screen.getByRole('button', { name: /Week/ }))
     const row = screen.getByText('Week thing').closest('li')!
     await user.click(within(row).getByRole('button', { name: 'Today' }))
-    expect(onPushTask).toHaveBeenCalledWith('w1', expect.any(Date))
+    expect(onUpdateTask).toHaveBeenCalledWith('w1', { plannedOn: expect.any(Date) })
+    expect(onPushTask).not.toHaveBeenCalled()
     expect(within(row).getByText('today')).toBeInTheDocument()
   })
 
@@ -211,7 +213,8 @@ describe('HorizonPoolDropdown — the pools live up here, never in the review', 
       expect(within(row).getByRole('button', { name: 'Someday' })).toBeInTheDocument()
       expect(within(row).getByRole('button', { name: 'Delete "Call the plumber"' })).toBeInTheDocument()
       await user.click(within(row).getByRole('button', { name: 'Do today' }))
-      expect(onPushTask).toHaveBeenCalledWith('w1', expect.any(Date))
+      expect(base.onUpdateTask).toHaveBeenCalledWith('w1', { plannedOn: expect.any(Date) })
+      expect(onPushTask).not.toHaveBeenCalled()
     })
 
     it('the month list leads with "This week" — a copy down', async () => {

@@ -21,3 +21,30 @@ describe('applyTriageVerdict — today/tomorrow land all-day, not at the clock t
     expect(onPushTask).toHaveBeenCalledWith('t1', new Date(2026, 8, 7, 0, 0, 0, 0))
   })
 })
+
+// "Do today" is a CHOICE of day (planned_on), so the task lands on Today's
+// main list instead of waiting in the Today pin (2026-09-19).
+describe('applyTriageVerdict — "today" chooses the day', () => {
+  it('an inbox task is dated to the day AND chosen for it', async () => {
+    const onPushTask = vi.fn(async () => true)
+    const onUpdateTask = vi.fn(async () => true)
+    await applyTriageVerdict(task(), 'today', { viewedDate: new Date(2026, 8, 6, 6, 50), onUpdateTask, onPushTask })
+    expect(onPushTask).toHaveBeenCalledWith('t1', new Date(2026, 8, 6))
+    expect(onUpdateTask).toHaveBeenCalledWith('t1', { plannedOn: new Date(2026, 8, 6) })
+  })
+
+  it('a cancelled placement chooses nothing', async () => {
+    const onUpdateTask = vi.fn(async () => true)
+    const ok = await applyTriageVerdict(task(), 'today', { viewedDate: new Date(2026, 8, 6), onUpdateTask, onPushTask: vi.fn(async () => false) })
+    expect(ok).toBe(false)
+    expect(onUpdateTask).not.toHaveBeenCalled()
+  })
+
+  it('a month-list task keeps its list — only the day is chosen', async () => {
+    const onPushTask = vi.fn(async () => true)
+    const onUpdateTask = vi.fn(async () => true)
+    await applyTriageVerdict(task({ bucket: 'month' }), 'today', { viewedDate: new Date(2026, 8, 6), onUpdateTask, onPushTask })
+    expect(onPushTask).not.toHaveBeenCalled()
+    expect(onUpdateTask).toHaveBeenCalledWith('t1', { plannedOn: new Date(2026, 8, 6) })
+  })
+})
