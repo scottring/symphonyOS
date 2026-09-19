@@ -1505,6 +1505,90 @@ html.desktop-shell a {
 @media (max-width: 767px) {
   .daybook-stamp { width: 30px; height: 30px; }
 }
+/* Today's weather: the masthead's ear. Plain text in the subline's voice —
+   no chip, no tint — with the temperature a step darker to lead the eye. On
+   phones it drops under the subline; on desktop it sits at the right of it. */
+.daybook-masthead-aside:empty { display: none; }
+.daybook-masthead-aside {
+  flex-basis: 100%;
+  min-width: 0;
+}
+.daybook-masthead-row:has(> .daybook-masthead-aside:not(:empty)) { row-gap: 6px; }
+.daybook-weather {
+  position: relative;
+  display: inline-flex;
+  max-width: 100%;
+}
+.daybook-weather-line {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 6px;
+  row-gap: 2px;
+  min-width: 0;
+  font-family: var(--font-family-sans);
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--color-neutral-500);
+  text-align: left;
+  transition: color 150ms ease;
+}
+/* Beats the phone-wide `button[aria-label]` padding: the line stays flush
+   with the subline, while the vertical padding keeps a finger-sized target. */
+.daybook-weather .daybook-weather-line {
+  padding: 6px 0;
+  margin: -6px 0;
+  min-height: 0;
+}
+.daybook-weather-line:hover { color: var(--color-neutral-800); }
+.daybook-weather-line:focus-visible {
+  outline: 2px solid var(--color-primary-600);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+.daybook-weather-icon {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  align-self: center;
+  color: var(--color-neutral-600);
+}
+.daybook-weather-temp {
+  font-family: var(--font-family-display);
+  font-size: 17px;
+  color: var(--color-neutral-900);
+  font-variant-numeric: tabular-nums;
+}
+.daybook-weather-range { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.daybook-weather-sep { color: var(--color-neutral-300); }
+.daybook-weather-hours {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 40;
+  display: flex;
+  gap: 16px;
+  padding: 10px 14px;
+  background: var(--color-bg-elevated, #fff);
+  border: 1px solid var(--color-neutral-300);
+  border-top: 2px solid var(--color-neutral-900);
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.06);
+}
+.daybook-weather-hour {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--color-neutral-500);
+}
+@media (min-width: 768px) {
+  .daybook-masthead-aside { flex-basis: auto; flex-shrink: 0; }
+  .daybook-weather-line { font-size: 15px; }
+  .daybook-weather-temp { font-size: 18px; }
+  .daybook-weather-hours { left: auto; right: 0; }
+}
+
 .daybook-tools {
   display: flex;
   flex-wrap: wrap;
@@ -1781,5 +1865,8 @@ html.desktop-shell a {
   .daybook-masthead-row:has(> .daybook-date) .daybook-title { grid-area: 2 / 2; align-self: center; }
   .daybook-masthead-row:has(> .daybook-date) .daybook-masthead-text > :last-child:not(h1):not([data-testid]) { grid-area: 3 / 2; }
   .daybook-masthead-row:has(> .daybook-date) > .daybook-masthead-controls { grid-area: 1 / 3 / 4 / 4; align-self: start; }
+  /* The ear sits on the subline's line, under the corner controls. */
+  .daybook-masthead-row:has(> .daybook-date):has(> .daybook-masthead-aside:not(:empty)) > .daybook-masthead-controls { grid-area: 1 / 3 / 3 / 4; justify-self: end; }
+  .daybook-masthead-row:has(> .daybook-date) > .daybook-masthead-aside { grid-area: 3 / 3; justify-self: end; align-self: baseline; }
 }
 

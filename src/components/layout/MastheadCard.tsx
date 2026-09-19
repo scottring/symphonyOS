@@ -8,6 +8,8 @@
 //             "This Month" on the period pages
 //   subline   one quiet line — Next: …, the range presets, a look-back cue
 //   controls  page chrome in the corner (domain chooser, assistant toggle)
+//   aside     the ear: one quiet line at the right of the subline (Today's
+//             weather); on phones it drops under the subline
 //   footer    the page's own controls along the foot (Today's dropdowns)
 //
 // The masthead is now an OPEN heading rather than a rounded illustrated card
@@ -23,11 +25,14 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { PlaceWash } from '@/components/place/PlaceWash'
 import { PageMotif, type MotifId } from '@/components/place/motifs/PageMotif'
 
-export function MastheadCard({ eyebrow, title, subline, controls, footer, motif, variant = 'card', date, className = '' }: {
+export function MastheadCard({ eyebrow, title, subline, controls, aside, footer, motif, variant = 'card', date, className = '' }: {
   eyebrow?: ReactNode
   title: ReactNode
   subline?: ReactNode
   controls?: ReactNode
+  /** The masthead's ear — a short line that belongs to the heading but not
+   *  to the sentence under it (Today's weather). */
+  aside?: ReactNode
   footer?: ReactNode
   /** The surface's own icon. Omitted on the rhythm pages, which wear the
    *  place — they are one continuous stretch of the same life, not different
@@ -48,7 +53,7 @@ export function MastheadCard({ eyebrow, title, subline, controls, footer, motif,
     >
       {variant === 'card' && <PlaceWash motif={motif} />}
       <div className={open ? 'daybook-masthead-inner' : 'relative px-4 py-4 md:px-5'}>
-        <div className="daybook-masthead-row flex items-start justify-between gap-4">
+        <div className={`daybook-masthead-row flex items-start justify-between gap-4${aside ? ' flex-wrap md:flex-nowrap' : ''}`}>
           {variant === 'daybook' && date && (
             <div aria-hidden="true" className="daybook-date">
               <span>{date.toLocaleDateString('en-US', { month: 'short' })}</span>
@@ -70,6 +75,7 @@ export function MastheadCard({ eyebrow, title, subline, controls, footer, motif,
             {subline && <div className="mt-1 max-w-2xl text-sm text-neutral-500 md:text-[15px]">{subline}</div>}
           </div>
           {controls && <div className="daybook-masthead-controls hidden shrink-0 md:block">{controls}</div>}
+          {aside && <div data-testid="masthead-aside" className="daybook-masthead-aside">{aside}</div>}
         </div>
         {footer && <div className={open ? 'daybook-tools' : 'mt-4 flex flex-wrap items-end justify-end gap-3'}>{footer}</div>}
       </div>

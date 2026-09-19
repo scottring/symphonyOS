@@ -67,6 +67,7 @@ import { ReviewDrawer, type ReviewMode } from './ReviewDrawer'
 import { HorizonPoolDropdown } from './HorizonPoolDropdown'
 import { DayNavCluster } from './DayNavCluster'
 import { MastheadCard } from '@/components/layout/MastheadCard'
+import { WeatherChip } from './WeatherChip'
 import { TodayBacklogFooter } from './TodayBacklogFooter'
 import { EmailReviewSheet } from './EmailReviewSheet'
 import { useUnreviewedCaptures } from '@/hooks/useUnreviewedCaptures'
@@ -1161,6 +1162,10 @@ export function TodayView({
         subline={heroLine}
         // Domain chooser + assistant toggle, in the card's corner.
         controls={headerControls}
+        // The masthead's ear: today's weather, one quiet line. The feed only
+        // knows today, so another day's page says nothing rather than
+        // showing today's sky over Saturday.
+        aside={data.isToday ? <WeatherChip now={nowForDisplay} /> : undefined}
         // Shell desktop controls live in the page navigation; standalone
         // mounts retain the footer controls as a fallback.
         footer={desktopControls ? undefined : desktopToolbar}

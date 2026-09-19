@@ -1,48 +1,82 @@
-import { createElement, useState } from 'react'
+import { createElement, useEffect, useRef, useState } from 'react'
 import { useWeather } from '@/hooks/useWeather'
 import { weatherIcon } from '@/lib/weatherIcon'
+import { conditionWords, precipCue } from '@/lib/today/weatherLine'
 
 /**
- * Compact weather chip for the Today stats row. Replaces the old full-width
- * WeatherCard. Renders nothing while loading or on error (keeps the row calm).
- * Click toggles a small popover with the hourly forecast.
+ * Today's weather, as one quiet line in the masthead's ear:
+ *
+ *   [icon] 63°  Clear · 78° / 58° · Rain from 3 PM
+ *
+ * Plain text in the journal's grammar — no chip, no tint. The rain cue only
+ * appears when the next few hours change the picture. Renders nothing while
+ * loading, on error, or with no location: an absent line is calmer than a
+ * placeholder. Tapping it opens the next few hours.
  */
-export function WeatherChip() {
+export function WeatherChip({ now = new Date() }: { now?: Date }) {
   const { weather, loading, error } = useWeather()
   const [open, setOpen] = useState(false)
+  const rootRef = useRef<HTMLSpanElement>(null)
+
+  useEffect(() => {
+    if (!open) return
+    const close = (e: MouseEvent | KeyboardEvent) => {
+      if (e instanceof KeyboardEvent ? e.key === 'Escape' : !rootRef.current?.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', close)
+    document.addEventListener('keydown', close)
+    return () => {
+      document.removeEventListener('mousedown', close)
+      document.removeEventListener('keydown', close)
+    }
+  }, [open])
 
   if (loading || error || !weather) return null
 
+  const condition = conditionWords(weather.condition)
+  const cue = precipCue(weather, now)
+  const hours = weather.hourlyForecast.filter((h) => h.hour > now.getHours()).slice(0, 5)
+  const summary = [
+    `${Math.round(weather.currentTemp)}°`,
+    condition,
+    `high ${Math.round(weather.highTemp)}°, low ${Math.round(weather.lowTemp)}°`,
+    cue,
+  ].filter(Boolean).join(', ')
+
   return (
-    <span className="relative inline-flex">
+    <span ref={rootRef} className="daybook-weather">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className="inline-flex items-center gap-1.5 text-[13px] text-neutral-500 hover:text-neutral-700 transition-colors"
-        aria-label="Weather"
+        aria-expanded={open}
+        aria-label={`Weather: ${summary}`}
+        className="daybook-weather-line"
       >
-        {createElement(weatherIcon(weather.weatherCode), { className: 'w-4 h-4 text-amber-500' })}
-        <span className="tabular-nums">{Math.round(weather.currentTemp)}°</span>
-        <span className="text-neutral-400">H{Math.round(weather.highTemp)}/L{Math.round(weather.lowTemp)}</span>
+        {createElement(weatherIcon(weather.weatherCode), { className: 'daybook-weather-icon', strokeWidth: 1.5, 'aria-hidden': true })}
+        <span className="daybook-weather-temp">{Math.round(weather.currentTemp)}°</span>
+        {condition && <span>{condition}</span>}
+        <span className="daybook-weather-sep" aria-hidden="true">·</span>
+        <span className="daybook-weather-range">
+          {Math.round(weather.highTemp)}° / {Math.round(weather.lowTemp)}°
+        </span>
+        {cue && (
+          <>
+            <span className="daybook-weather-sep" aria-hidden="true">·</span>
+            <span data-testid="weather-cue">{cue}</span>
+          </>
+        )}
       </button>
 
-      {open && weather.hourlyForecast.length > 0 && (
-        <div
-          data-testid="weather-forecast"
-          className="absolute left-0 top-full mt-2 z-50 bg-white rounded-xl border border-neutral-200 shadow-lg p-2 flex gap-3 overflow-x-auto max-w-[20rem]"
-          onMouseLeave={() => setOpen(false)}
-        >
-          {weather.hourlyForecast.map((h) => {
-            const label = h.hour === 0 ? '12a' : h.hour === 12 ? '12p' : h.hour < 12 ? `${h.hour}a` : `${h.hour - 12}p`
-            return (
-              <div key={h.hour} className="flex flex-col items-center gap-0.5 text-[11px] text-neutral-500 shrink-0">
-                <span>{label}</span>
-                {createElement(weatherIcon(h.code), { className: 'w-4 h-4 text-amber-500' })}
-                <span className="tabular-nums">{Math.round(h.temp)}°</span>
-              </div>
-            )
-          })}
-        </div>
+      {open && hours.length > 0 && (
+        <span data-testid="weather-forecast" className="daybook-weather-hours">
+          {hours.map((h) => (
+            <span key={h.hour} className="daybook-weather-hour">
+              <span>{h.hour === 0 ? '12a' : h.hour === 12 ? '12p' : h.hour < 12 ? `${h.hour}a` : `${h.hour - 12}p`}</span>
+              {createElement(weatherIcon(h.code), { className: 'daybook-weather-icon', strokeWidth: 1.5, 'aria-hidden': true })}
+              <span className="tabular-nums">{Math.round(h.temp)}°</span>
+            </span>
+          ))}
+        </span>
       )}
     </span>
   )

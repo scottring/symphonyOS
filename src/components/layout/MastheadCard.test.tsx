@@ -66,4 +66,10 @@ describe('PeriodNavEyebrow', () => {
     expect(onPrev).toHaveBeenCalledTimes(1)
     expect(onNext).toHaveBeenCalledTimes(1)
   })
+  it('puts the ear (aside) in the masthead row, and omits it when absent', () => {
+    const { rerender } = render(<MastheadCard variant="daybook" date={new Date(2026, 8, 19)} title="Good morning" aside={<span>63°</span>} />)
+    expect(within(screen.getByTestId('masthead-aside')).getByText('63°')).toBeInTheDocument()
+    rerender(<MastheadCard variant="daybook" date={new Date(2026, 8, 19)} title="Good morning" />)
+    expect(screen.queryByTestId('masthead-aside')).not.toBeInTheDocument()
+  })
 })

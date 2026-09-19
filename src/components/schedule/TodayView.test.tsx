@@ -14,7 +14,9 @@ import { DesktopFooterActionContext } from '@/components/layout/DesktopFooter'
 // (reset in afterEach) to reach the desktop paths.
 const mockUseMobile = vi.fn(() => true)
 vi.mock('@/hooks/useMobile', () => ({ useMobile: () => mockUseMobile() }))
-vi.mock('@/hooks/useWeather', () => ({ useWeather: () => ({ weather: null, loading: false, error: 'x', requestLocation: vi.fn() }) }))
+const noWeather = { weather: null, loading: false, error: 'x', requestLocation: vi.fn() }
+const mockUseWeather = vi.fn((): Record<string, unknown> => noWeather)
+vi.mock('@/hooks/useWeather', () => ({ useWeather: () => mockUseWeather() }))
 vi.mock('@/hooks/useProactiveSuggestions', () => ({ useProactiveSuggestions: () => ({ suggestions: [], topSuggestions: [], suggestionsForEntity: () => [], actOnSuggestion: vi.fn(), dismissSuggestion: vi.fn(), isLoading: false }) }))
 vi.mock('@/hooks/useRoutineStats', () => ({ useRoutineStats: () => ({ getStats: () => undefined }) }))
 vi.mock('@/hooks/useRecurringEventDetection', () => ({ useRecurringEventDetection: () => ({ isPromotionSuggested: () => false }) }))
@@ -724,5 +726,30 @@ describe('TodayView — desktop footer review', () => {
     await openOverflow(user)
     expect(screen.getByRole('button', { name: /End of day review/i })).toBeInTheDocument()
     host.remove()
+  })
+})
+
+// ── Weather in the masthead's ear ──
+describe('TodayView weather', () => {
+  afterEach(() => mockUseWeather.mockImplementation(() => noWeather))
+  const reading = { weather: { currentTemp: 63, weatherCode: 0, condition: 'Clear', highTemp: 78, lowTemp: 58, hourlyForecast: [] }, loading: false, error: null, requestLocation: vi.fn() }
+
+  it("rides in the masthead on today's page", () => {
+    mockUseWeather.mockImplementation(() => reading)
+    renderView()
+    const ear = within(screen.getByTestId('masthead-card')).getByTestId('masthead-aside')
+    expect(within(ear).getByText('63°')).toBeInTheDocument()
+    expect(within(ear).getByText('78° / 58°')).toBeInTheDocument()
+  })
+  it('says nothing on another day — the feed only knows today', () => {
+    mockUseWeather.mockImplementation(() => reading)
+    const tomorrow = new Date(TODAY); tomorrow.setDate(tomorrow.getDate() + 1)
+    renderView({ viewedDate: tomorrow })
+    expect(screen.queryByTestId('masthead-aside')).not.toBeInTheDocument()
+  })
+  it('renders no line and no placeholder with no location', () => {
+    renderView()
+    expect(screen.queryByRole('button', { name: /^weather/i })).not.toBeInTheDocument()
+    expect(screen.getByTestId('masthead-aside')).toBeEmptyDOMElement()
   })
 })

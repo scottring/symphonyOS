@@ -66,7 +66,8 @@ function cacheWeather(data: WeatherData) {
 // WMO Weather Code → human-readable condition
 function getCondition(code: number): string {
   if (code === 0) return 'Clear'
-  if (code <= 3) return 'Partly Cloudy'
+  if (code <= 2) return 'Partly Cloudy'
+  if (code === 3) return 'Cloudy'
   if (code <= 48) return 'Foggy'
   if (code <= 55) return 'Drizzle'
   if (code <= 57) return 'Freezing Drizzle'
