@@ -156,7 +156,7 @@ function Group({ title, entries, day, actions, draggable, defaultOpen, empty }: 
           {entries.length === 0 ? (
             <p className="py-2 text-[13px] text-neutral-400">{empty}</p>
           ) : (
-            <ul className="mt-1 border-t border-neutral-200/80">
+            <ul className="day-plan-rows mt-1 border-t border-neutral-200/80">
               {shown.map((e) => <PlanRow key={e.key} entry={e} day={day} actions={actions} draggable={draggable} />)}
             </ul>
           )}

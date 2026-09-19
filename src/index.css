@@ -1718,6 +1718,9 @@ html.desktop-shell a {
   border-radius: 0;
   padding-inline: 0;
 }
+/* The Today pin's rows are one ruled line each, like the week's list — the
+   period lists' roomier triage padding would make a weekend a wall again. */
+.reference-list .day-plan-rows li { padding-block: 7px; }
 
 /* One quiet menu row, aligned with the open page masthead. */
 .page-navigation {
