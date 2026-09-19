@@ -18,7 +18,7 @@
   const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
 
   const CAPTION_BUSY = 'A little of everything, all at once.';
-  const CAPTION_CALM = 'Everything in its place.';
+  const CAPTION_CALM = 'Everything in its place, and ready when it’s time.';
   const TRUNK_TOP = { x: 300, y: 322 };
   const TRUNK_BASE = { x: 300, y: 398 };
 
@@ -55,7 +55,11 @@
   const TRUNK = 0.7;      // down the trunk
   const ROOT = 1.3;       // along the root to its list
   const RAIN_FADE = [4.5, 9];
-  const TOTAL = 5.5 + FALL + 11 * 0.08 + FUNNEL + TRUNK + ROOT + 0.8;
+  const SETTLED = 5.5 + FALL + 11 * 0.08 + FUNNEL + TRUNK + ROOT;
+  const READY_AT = SETTLED + 0.6;   // then one item on Today opens, ready to do
+  const TOTAL = READY_AT + 1.6;
+  const readyCard = document.querySelector('.ready-card');
+  const readyRow = document.querySelector('.ledger li.ready-row');
 
   const clamp = (v, lo = 0, hi = 1) => Math.min(hi, Math.max(lo, v));
   const lerp = (a, b, t) => a + (b - a) * t;
@@ -183,6 +187,8 @@
       p.row.classList.toggle('is-waiting', !arrived);
       p.row.classList.toggle('just-arrived', arrived && t < p.arrives + 1.6);
     });
+    readyCard?.classList.toggle('is-waiting', t < READY_AT);
+    readyRow?.classList.toggle('is-ready', t >= READY_AT);
   }
 
   function showCalm() {
@@ -191,6 +197,8 @@
       p.spark.style.opacity = '0';
       p.row?.classList.remove('is-waiting', 'just-arrived');
     });
+    readyCard?.classList.remove('is-waiting');
+    readyRow?.classList.add('is-ready');
     rainLayer.setAttribute('opacity', '0');
     Object.values(roots).forEach((path) => path.classList.remove('is-flowing'));
   }
@@ -297,9 +305,31 @@
   const NOW = 9 * 60 + 12; // the sample morning is 9:12 AM
   const items = [
     { id: 'walk', list: 'today', at: 8 * 60, time: '8:00 AM', title: 'Morning walk', kind: 'Routine' },
-    { id: 'shop', list: 'today', at: 10 * 60, time: '10:00 AM', title: 'Call the repair shop', kind: 'Task', note: 'Ask about Saturday' },
-    { id: 'soccer', list: 'today', at: 15 * 60 + 30, time: '3:30 PM', title: 'Soccer practice', kind: 'Appointment', note: 'Bring the water bottles' },
-    { id: 'dinner', list: 'today', at: 18 * 60, time: '6:00 PM', title: 'Make dinner together', kind: 'Routine' },
+    {
+      id: 'pharmacy', list: 'today', at: 10 * 60, time: '10:00 AM', title: 'Call the pharmacy', kind: 'Task', open: true,
+      context: [
+        ['Call', 'Maple Street Pharmacy · (555) 010-4477'],
+        ['About', 'Mia’s inhaler refill. Only one of two arrived.'],
+        ['Last time', 'Sep 11: “Should be ready Thursday.”'],
+      ],
+      canRecord: true,
+      followUp: { id: 'pickup', title: 'Pick up the second inhaler', note: 'Follow-up from the pharmacy call' },
+    },
+    {
+      id: 'soccer', list: 'today', at: 15 * 60 + 30, time: '3:30 PM', title: 'Soccer practice', kind: 'Appointment',
+      context: [
+        ['Where', 'Riverside Park, field 2'],
+        ['Bring', 'Water bottles and shin guards'],
+        ['Who', 'Mia · you’re driving'],
+      ],
+    },
+    {
+      id: 'dinner', list: 'today', at: 18 * 60, time: '6:00 PM', title: 'Make dinner together', kind: 'Routine',
+      context: [
+        ['Recipe', 'Lemon chicken with rice'],
+        ['Note', 'Chicken is in the freezer. Thaw it by noon.'],
+      ],
+    },
     { id: 'outing', list: 'week', title: 'Choose a weekend outing' },
     { id: 'library', list: 'week', title: 'Return the library books' },
     { id: 'violin', list: 'week', title: 'Book a violin lesson' },
@@ -411,16 +441,58 @@
     return rows;
   }
 
+  // Opening an item on Today shows what you need to do it.
+  function detailsFor(item) {
+    const id = 'details-' + item.id;
+    const answerKey = 'answer-' + item.id;
+    const followKey = 'follow-' + item.id;
+    const facts = [...item.context];
+    if (item.answer) facts.push(['Today', `“${item.answer}”`]);
+    const followed = item.followUp && items.some((i) => i.id === item.followUp.id);
+    return el('div', { class: 'entry-details', id },
+      el('dl', {}, ...facts.map(([label, value]) => el('div', {}, el('dt', {}, label), el('dd', {}, value)))),
+      item.canRecord ? el('div', { class: 'entry-record' },
+        item.answer ? null : el('form', {
+          class: 'record-form',
+          onsubmit: (event) => {
+            event.preventDefault();
+            const value = event.target.querySelector('input').value.trim();
+            if (!value) return;
+            item.answer = value.slice(0, 80);
+            render(followKey);
+          },
+        },
+          el('label', { class: 'visually-hidden', for: answerKey }, 'Record the answer'),
+          el('input', { id: answerKey, type: 'text', maxlength: '80', placeholder: 'Record the answer…', dataset: { key: answerKey } })),
+        followed
+          ? el('span', { class: 'entry-action', 'aria-disabled': 'true' }, 'Follow-up added')
+          : el('button', {
+            type: 'button', class: 'entry-action follow-action', dataset: { key: followKey },
+            onclick: () => {
+              items.push({ ...item.followUp, list: 'today', origin: 'today', kind: 'Task', done: false, fresh: true });
+              render(followKey);
+            },
+          }, '+ Follow-up')) : null);
+  }
+
   function entryRow(item, context, when) {
     const note = noteFor(item, context);
-    return el('li', { class: 'demo-entry' + (item.fresh ? ' is-new' : '') },
+    const hasDetails = context === 'today' && item.context;
+    const toggleKey = 'toggle-' + item.id;
+    return el('li', { class: 'demo-entry' + (item.fresh ? ' is-new' : '') + (hasDetails && item.open ? ' is-open' : '') },
       context === 'today' ? el('span', { class: 'entry-when' }, when) : null,
       el('label', {},
         checkbox(item, 'main'),
         el('span', { class: 'entry-title' }, item.title, note ? el('span', { class: 'entry-note' }, note) : null)),
       el('span', { class: 'entry-end' },
         context === 'today' && item.kind ? el('span', { class: 'kind' }, item.kind) : null,
-        stepAction(item, context, 'main')));
+        hasDetails ? el('button', {
+          type: 'button', class: 'entry-action details-toggle', dataset: { key: toggleKey },
+          'aria-expanded': String(!!item.open), 'aria-controls': 'details-' + item.id, 'aria-label': `Details: ${item.title}`,
+          onclick: () => { item.open = !item.open; render(toggleKey); },
+        }, item.open ? 'Hide' : 'Details') : null,
+        stepAction(item, context, 'main')),
+      hasDetails && item.open ? detailsFor(item) : null);
   }
 
   function renderPanel() {

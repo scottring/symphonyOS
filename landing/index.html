@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="A place for everything life brings. Symphony gathers your tasks, appointments, routines, and notes into a clear Today, with the week and month close at hand.">
+<meta name="description" content="A place for everything life brings. Symphony connects what matters in your life with what needs doing today, and keeps what you need to do it right beside the work.">
 <meta name="theme-color" content="#ffffff">
 <meta property="og:title" content="Symphony — A place for everything life brings.">
-<meta property="og:description" content="Tasks, appointments, routines, and notes gathered into a clear Today, with the week and month close at hand.">
+<meta property="og:description" content="Connect what matters in your life with what needs doing today, and arrive ready to do it.">
 <title>Symphony — A place for everything life brings.</title>
 <link rel="icon" href="symphony-logo.jpg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -33,7 +33,7 @@
     <div class="hero-copy">
       <p class="eyebrow">For the fullness of everyday life</p>
       <h1 id="hero-title">A place for everything <em>life brings.</em></h1>
-      <p class="intro">The appointments, the practices, the calls to return, the plans you keep meaning to make. Symphony gathers them into one clear Today, with the week and the month close at hand.</p>
+      <p class="intro">Symphony connects what matters in your life with what needs doing today, and keeps what you need to do it right beside the work.</p>
       <div class="hero-actions">
         <a class="primary-button" href="#waitlist">Join the founding households <span aria-hidden="true">↗</span></a>
         <a class="quiet-link" href="#daybook">See a day inside <span aria-hidden="true">↓</span></a>
@@ -43,7 +43,7 @@
 
     <figure class="tree-story" aria-labelledby="tree-caption">
       <div class="illustration-caption">
-        <span id="tree-caption" class="caption-text">Everything in its place.</span>
+        <span id="tree-caption" class="caption-text">Everything in its place, and ready when it’s time.</span>
         <span class="motion-controls">
           <button id="motion-toggle" type="button" aria-controls="life-tree" hidden><span>Pause<span class="motion-word"> animation</span></span></button>
         </span>
@@ -51,7 +51,7 @@
 
       <svg id="life-tree" viewBox="0 70 600 430" role="img" aria-labelledby="tree-title tree-description">
         <title id="tree-title">Everything life brings, finding its place</title>
-        <desc id="tree-description">Sticky notes, phone calls, appointments, a soccer ball, a baseball, a violin, a drawing tablet, colored pencils, conversations, emails, a car, and a bicycle rain down into a tree whose branches open like a funnel. They gather down the trunk, and three roots carry them into Today, This week, and This month.</desc>
+        <desc id="tree-description">Sticky notes, phone calls, appointments, a soccer ball, a baseball, a violin, a drawing tablet, colored pencils, conversations, emails, a car, and a bicycle rain down into a tree whose branches open like a funnel. They gather down the trunk, and three roots carry them into Today, This week, and This month. One item on Today opens with everything needed to do it.</desc>
         <defs>
           <symbol id="note" viewBox="0 0 48 48"><path d="M8 5h32v28L29 44H8Z" fill="#fff2ce"/><path d="M40 33H29v11M15 15h17M15 22h12"/></symbol>
           <symbol id="call" viewBox="0 0 48 48"><path d="m12 5 9 10-6 7c3 6 5 8 11 11l7-6 10 9-5 7C20 45 3 27 5 10Z" fill="#edf2f8"/></symbol>
@@ -160,9 +160,9 @@
           <p class="ledger-title" aria-hidden="true">Today</p>
           <p class="ledger-date">Friday, Sep 18</p>
           <ul>
-            <li data-from="appointment"><svg class="ledger-icon" aria-hidden="true" viewBox="0 0 48 48"><use href="#appointment"/></svg><span><time>10:00</time> Dentist</span></li>
-            <li data-from="call"><svg class="ledger-icon" aria-hidden="true" viewBox="0 0 48 48"><use href="#call"/></svg><span>Call the repair shop</span></li>
+            <li data-from="call" class="ready-row"><svg class="ledger-icon" aria-hidden="true" viewBox="0 0 48 48"><use href="#call"/></svg><span><time>10:00</time> Call the pharmacy</span></li>
             <li data-from="soccer"><svg class="ledger-icon" aria-hidden="true" viewBox="0 0 48 48"><use href="#soccer"/></svg><span><time>3:30</time> Soccer practice</span></li>
+            <li data-from="appointment"><svg class="ledger-icon" aria-hidden="true" viewBox="0 0 48 48"><use href="#appointment"/></svg><span><time>4:30</time> Eye exam</span></li>
             <li data-from="note"><svg class="ledger-icon" aria-hidden="true" viewBox="0 0 48 48"><use href="#note"/></svg><span>Sign the trip form</span></li>
           </ul>
         </section>
@@ -187,30 +187,73 @@
           </ul>
         </section>
       </div>
+      <!-- The point of it all: one item on Today, ready to do. Fictional details. -->
+      <div class="ready-card" aria-label="An item on Today, ready to do">
+        <div class="ready-head">
+          <p class="eyebrow">Today · 10:00 AM</p>
+          <p class="ready-title">Call the pharmacy</p>
+        </div>
+        <dl class="ready-facts">
+          <div><dt>Call</dt><dd>Maple Street Pharmacy · <span class="ready-number">(555) 010-4477</span></dd></div>
+          <div><dt>About</dt><dd>Mia’s inhaler refill. Only one of two arrived.</dd></div>
+          <div><dt>Last time</dt><dd>Sep 11: “Should be ready Thursday.”</dd></div>
+        </dl>
+        <div class="ready-foot"><span class="ready-answer">Record the answer…</span><span class="ready-follow">+ Follow-up</span></div>
+      </div>
     </figure>
   </section>
 
   <section id="how-it-works" class="overview page-width" aria-labelledby="overview-title">
-    <p class="section-index">01 / Gather. Place. Live.</p>
+    <p class="section-index">01 / How it works</p>
     <div class="overview-heading">
-      <h2 id="overview-title">Life comes in pieces.<br>Your plan can hold them together.</h2>
-      <p>A thought captured on the go. A plan written on paper. A calendar full of commitments. Bring them into one place, then decide what belongs today and what can wait.</p>
+      <h2 id="overview-title">Choose the right work.<br><em>Arrive ready to do it.</em></h2>
+      <p>You don’t have to plan your whole life before you start. Begin with what’s on your mind, plan at the pace that suits you, and open Today when it’s time to act.</p>
     </div>
-    <div class="principles">
-      <article>
+
+    <ol class="cadence" aria-label="The planning cadence">
+      <li>Year</li><li>Season</li><li>Month</li><li>Week</li><li class="cadence-today">Today</li>
+    </ol>
+
+    <ol class="steps">
+      <li>
         <span class="number">01</span>
-        <h3>Let it land.</h3>
-        <p>Capture the thought before it disappears. It waits in your Inbox until you decide where it belongs, with its notes, contacts, and links kept close.</p>
-      </article>
-      <article>
+        <h3>Capture it.</h3>
+        <p>Put thoughts, tasks, and things to follow up on into your Inbox. Capture quickly; organize later. “Call the pharmacy about the missing refill” is enough to start.</p>
+      </li>
+      <li>
         <span class="number">02</span>
-        <h3>Give it a place.</h3>
-        <p>Keep a list for the week and one for the month. Make room for what matters without putting everything on today.</p>
+        <h3>Give it a home and context.</h3>
+        <p>Decide what it is: a task, a goal, something to keep for reference, or a someday idea. Choose its domain, like Work, Personal, or Family, and show one, several, or all of them, like calendar layers. Your private items stay private; Family is shared with your household. Add what will make it useful later: notes, links, a phone number, a place, a person.</p>
+      </li>
+      <li>
+        <span class="number">03</span>
+        <h3>Decide what matters over time.</h3>
+        <p>Year, season, and month plans give you room to think beyond today. Add a goal at any horizon; a September goal doesn’t need to have been in January’s plan. Each month keeps the goals you’re working toward apart from the tasks you mean to do.</p>
+      </li>
+      <li>
+        <span class="number">04</span>
+        <h3>Choose the week.</h3>
+        <p>With the month’s plan and your calendar in view, choose commitments for that dated week. They can stay a simple checklist, without a day or time. “Do the kitchen laundry this week” counts.</p>
+      </li>
+      <li class="step-today">
+        <span class="number">05</span>
+        <h3>Arrive ready today.</h3>
+        <p>Look at your appointments and the week’s commitments, then choose what you’ll do. Open “Call the pharmacy” and the number, the details, and your last notes are already there. Record the answer and add the follow-up. It’s still the same task on the week’s list, with one checkmark. And urgent things can go straight to Today.</p>
+      </li>
+    </ol>
+
+    <div class="supporting">
+      <article>
+        <h3>Routines carry the recurring work.</h3>
+        <p>Set up a routine once. Each occurrence gets its own checkmark, and moving this week’s occurrence to another day doesn’t change the pattern.</p>
       </article>
       <article>
-        <span class="number">03</span>
-        <h3>Come back to today.</h3>
-        <p>One clear page for today’s appointments, tasks, and routines. Pin the week or month beside it when you want the bigger picture.</p>
+        <h3>Turn the page deliberately.</h3>
+        <p>At the end of a week or month, look back at the plan. Carry forward what still matters, make it more concrete, park it for someday, or let it go. Past plans stay where you left them.</p>
+      </article>
+      <article>
+        <h3>Already think on paper?</h3>
+        <p>Photograph a written plan with <strong>Plan from paper</strong>, check what it read, and bring it in at the right horizon.</p>
       </article>
     </div>
   </section>
@@ -218,8 +261,8 @@
   <section id="daybook" class="daybook-section page-width" aria-labelledby="daybook-title">
     <p class="section-index">02 / A day with Symphony</p>
     <div class="section-heading">
-      <h2 id="daybook-title">Your day, with room around it.</h2>
-      <p>Try it. Pin the week beside Today, then bring something from the week onto today’s page.</p>
+      <h2 id="daybook-title">The work, and what you need to do it.</h2>
+      <p>Try it. Open an item to see its details, record an answer, add a follow-up. Pin the week beside Today and bring something onto today’s page.</p>
     </div>
 
     <div class="journal-demo">
@@ -260,7 +303,7 @@
 
     <div class="below-demo">
       <p><span class="small-rule" aria-hidden="true"></span>Plan with a wider view on your computer. Carry the day with you on your phone.</p>
-      <p>Already think best on paper? Use <strong>Plan from paper</strong> to photograph a written plan, check what it read, and bring it into Symphony.</p>
+      <p>Choosing something for today doesn’t erase it from the week or month. It’s one task, in one place, with one checkmark.</p>
     </div>
   </section>
 
