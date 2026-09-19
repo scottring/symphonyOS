@@ -81,7 +81,6 @@ describe('taking a routine off Today', () => {
     const onRegisterUndo = vi.fn()
     renderToday({ onUpdateRoutine, onRegisterUndo })
 
-    fireEvent.click(await screen.findByText(/Anytime/))
     await screen.findByText('Kids Bedtime routine')
     fireEvent.click(screen.getByLabelText('Routine options'))
     fireEvent.click(screen.getByText('Remove from Today'))
@@ -98,7 +97,6 @@ describe('taking a routine off Today', () => {
     const onUpdateRoutine = vi.fn()
     renderToday({ onUpdateRoutine })
 
-    fireEvent.click(await screen.findByText(/Anytime/))
     await screen.findByText('Kids Bedtime routine')
     fireEvent.click(screen.getByLabelText('Routine options'))
     fireEvent.click(screen.getByText('Hide for today'))

@@ -117,6 +117,25 @@ export interface TodaySectionListProps {
   onRenameGroupDone?: () => void
   /** Convert a buy-ish task to a "To buy" list item (the host owns the undo toast). */
   onSendToBuy?: (taskId: string) => void
+  /**
+   * Today's journal renders the day in slices (My focus / Still ahead /
+   * Earlier today), each through this same list. Only ONE slice may own a
+   * section's drop targets (band and gap ids are per section); a slice that
+   * doesn't passes false and renders plain rows — still draggable, never a
+   * target, no empty bands while a drag is live, no insert points.
+   */
+  dropTargets?: boolean
+  /** Rows of a section rendered by an EARLIER slice. Gap indices count from
+   *  the full section so the resolver (todayDrop.ts) retimes against it. */
+  gapOffset?: Partial<Record<DaySection, number>>
+  /** The unscheduled section's "Anytime · M of N done" fold. My focus lists
+   *  chosen untimed work plainly, so it turns this off. Default true. */
+  anytimeHeader?: boolean
+}
+
+/** No drop zone: the slice renders its rows plainly. */
+function Plain({ children }: { children: React.ReactNode }) {
+  return <>{children}</>
 }
 
 export function TodaySectionList({
@@ -148,7 +167,12 @@ export function TodaySectionList({
   renamingGroupId,
   onRenameGroupDone,
   onSendToBuy,
+  dropTargets = true,
+  gapOffset,
+  anytimeHeader = true,
 }: TodaySectionListProps) {
+  const Band = dropTargets ? TodayBandDropZone : Plain
+  const Gap = dropTargets ? TodayGapDropZone : Plain
   const ctx = useScheduleActionsContext()
   const { dragging } = useTodayDragState()
 
@@ -226,7 +250,7 @@ export function TodaySectionList({
         // aim: you cannot drop something at 6 AM if the Early morning band
         // isn't on screen. Unscheduled is never a drop target, so it stays
         // hidden either way.
-        if (isEmpty && (!dragging || section === 'unscheduled')) return null
+        if (isEmpty && (!dragging || !dropTargets || section === 'unscheduled')) return null
 
         const items = allSectionItems ?? []
         // The cap bounds what RENDERS. Every count below still comes from the
@@ -264,18 +288,19 @@ export function TodaySectionList({
         // explicit open overrides the auto rule; otherwise auto-collapse when
         // everything is done. `collapsedKeys` and `openedByUser` are
         // independent facts — never derive one from the other.
-        const collapsed = section === 'unscheduled'
+        const collapsed = section === 'unscheduled' && anytimeHeader
           ? collapsedKeys.has(key)
             ? true
             : openedByUser.has(key)
               ? false
               : restAllDone
           : false
-        const showHeader = section === 'unscheduled' || dragging
+        const showHeader = section === 'unscheduled' ? anytimeHeader : (dragging && dropTargets)
+        const offset = gapOffset?.[section] ?? 0
 
         return (
           <section key={section}>
-            <TodayBandDropZone section={section}>
+            <Band section={section}>
             {showHeader && (
               <DaySectionHeader
                 section={section}
@@ -324,7 +349,7 @@ export function TodaySectionList({
                         : ''
                   // Don't offer an insert point between a parent and its
                   // children — a task added there wouldn't be in the group.
-                  const showInsert = !isGroupChild
+                  const showInsert = !isGroupChild && dropTargets
 
                   // The free run that ends where this item begins, if any.
                   const openSpan = openSpans.get(item.id)
@@ -339,7 +364,7 @@ export function TodaySectionList({
                     date: viewedDate,
                   }
                   const insertBefore = (
-                    <TodayGapDropZone section={section} index={itemIndex}>
+                    <Gap section={section} index={itemIndex + offset}>
                     <TimelineInsertPoint
                       onPick={(k) => insert.handlePick(insertCtxBefore, k)}
                       onCreate={(kind, r) => {
@@ -352,7 +377,7 @@ export function TodaySectionList({
                         parserContext,
                       }}
                     />
-                    </TodayGapDropZone>
+                    </Gap>
                   )
 
                   // Evening meal gets a special card (desktop only — on mobile
@@ -665,7 +690,7 @@ export function TodaySectionList({
                   )
                 })}
                 {/* Trailing insert point: after the last item per section */}
-                {(() => {
+                {dropTargets && (() => {
                   const insertCtxTrailing = {
                     before: visible.length > 0 ? (visible[visible.length - 1].startTime ?? null) : null,
                     after: null,
@@ -673,7 +698,7 @@ export function TodaySectionList({
                     date: viewedDate,
                   }
                   return (
-                    <TodayGapDropZone section={section} index={visible.length}>
+                    <Gap section={section} index={visible.length + offset}>
                     <TimelineInsertPoint
                       onPick={(k) => insert.handlePick(insertCtxTrailing, k)}
                       onCreate={(kind, r) => {
@@ -686,7 +711,7 @@ export function TodaySectionList({
                         parserContext,
                       }}
                     />
-                    </TodayGapDropZone>
+                    </Gap>
                   )
                 })()}
                 {/* A cap that hides its own truncation is worse than a long
@@ -702,7 +727,7 @@ export function TodaySectionList({
                 )}
               </div>
             )}
-            </TodayBandDropZone>
+            </Band>
           </section>
         )
       })}

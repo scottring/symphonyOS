@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 import { ALL_LAYERS } from '@/lib/domains'
-import { screen } from '@testing-library/react'
+import { screen, within } from '@testing-library/react'
 import { render } from '@/test/test-utils'
 import { ScheduleActionsProvider } from '@/contexts/ScheduleActionsContext'
 import { TodayView } from './TodayView'
@@ -89,29 +89,31 @@ function renderView(props: Record<string, unknown> = {}) {
   )
 }
 
-describe('Anytime row — the untimed-routine slab collapses to one row', () => {
-  it('collapsed, the untimed routines read as one row with a completion count', () => {
-    const { routines, dateInstances } = untimedRoutineSet(12, 4)
+// Today as a daily journal (2026-09-19): untimed routine occurrences you CHOSE
+// for the day list plainly under My focus — no "Anytime" fold, because they
+// are the work you picked, not a slab. The fixed space budget still holds:
+// the section cap bounds what renders, and the count behind "+N more" is
+// honest at any scale.
+describe('My focus — chosen untimed routines', () => {
+  it('lists them under My focus with no Anytime fold', () => {
+    const { routines, dateInstances } = untimedRoutineSet(3, 1)
     renderView({ routines, dateInstances })
-
-    expect(screen.getByText(/Anytime/)).toBeInTheDocument()
-    expect(screen.getByText(/4 of 12 done/)).toBeInTheDocument()
+    const focus = screen.getByRole('region', { name: 'My focus' })
+    expect(within(focus).getByText('Routine r0')).toBeInTheDocument()
+    expect(within(focus).getByText('Routine r2')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /anytime/i })).toBeNull()
   })
 
-  it('collapsed height does not grow with routine count', () => {
+  it('renders a bounded number of rows however many are chosen', () => {
     const small = untimedRoutineSet(12, 4)
     const { unmount } = renderView({ routines: small.routines, dateInstances: small.dateInstances })
-    // One collapsed row for the Unscheduled section: the header button itself,
-    // and nothing else — the rows underneath stay hidden while collapsed.
-    const smallRows = screen.getAllByRole('button', { name: /anytime/i })
-    expect(smallRows).toHaveLength(1)
+    const smallRows = within(screen.getByRole('region', { name: 'My focus' })).getAllByText(/^Routine r\d+$/).length
     unmount()
 
     const large = untimedRoutineSet(60, 4)
     renderView({ routines: large.routines, dateInstances: large.dateInstances })
-    const largeRows = screen.getAllByRole('button', { name: /anytime/i })
-    expect(largeRows).toHaveLength(1)
-    // Same shape of row regardless of scale — only the number inside changes.
-    expect(screen.getByText(/4 of 60 done/)).toBeInTheDocument()
+    const focus = screen.getByRole('region', { name: 'My focus' })
+    expect(within(focus).getAllByText(/^Routine r\d+$/).length).toBe(smallRows)
+    expect(within(focus).getByRole('button', { name: /\+\d+ more today/ })).toBeInTheDocument()
   })
 })

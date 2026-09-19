@@ -13,6 +13,9 @@ interface DayNavClusterProps {
    * card's header, so the page has one masthead instead of two stacked ones.
    */
   variant?: 'masthead' | 'inline'
+  /** Inline only: what the eyebrow says instead of the full date — "Today",
+   *  "Tomorrow" — when the page title already carries the date. */
+  label?: string
 }
 
 function shift(d: Date, days: number): Date {
@@ -34,7 +37,7 @@ function sameDay(a: Date, b: Date): boolean {
  * headline, flanked by prev/next day carets. The date opens a month picker for
  * jumping to any day; a "Today" chip appears only when viewing another day.
  */
-export function DayNavCluster({ viewedDate, onDateChange, today = new Date(), variant = 'masthead' }: DayNavClusterProps) {
+export function DayNavCluster({ viewedDate, onDateChange, today = new Date(), variant = 'masthead', label }: DayNavClusterProps) {
   const [pickerOpen, setPickerOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -92,11 +95,12 @@ export function DayNavCluster({ viewedDate, onDateChange, today = new Date(), va
           type="button"
           aria-haspopup="dialog"
           aria-expanded={pickerOpen}
+          aria-label={label ? `${label}, ${weekdayLong} ${dateMedium} — choose a date` : undefined}
           onClick={() => setPickerOpen((o) => !o)}
           className="group inline-flex min-w-0 items-center gap-1.5 rounded px-1.5 py-1 transition-colors hover:bg-neutral-100/70"
         >
           <span className="truncate text-[12px] font-semibold uppercase tracking-[0.08em] text-neutral-500">
-            {weekdayLong} · {dateMedium}
+            {label ?? `${weekdayLong} · ${dateMedium}`}
           </span>
           <ChevronDown
             className={`h-3.5 w-3.5 shrink-0 text-neutral-300 transition-all group-hover:text-neutral-500 ${pickerOpen ? 'rotate-180' : ''}`}

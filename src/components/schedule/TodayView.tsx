@@ -37,7 +37,8 @@ import { useSystemHealth, getHealthTextClasses } from '@/hooks/useSystemHealth'
 import { useTimelineInsert } from '@/hooks/useTimelineInsert'
 import { useDomain } from '@/hooks/useDomain'
 
-import { Eye, EyeOff, Repeat, Binoculars, Printer, GripVertical, Moon, Sparkles, NotebookPen, ArrowRight, PanelLeft } from 'lucide-react'
+import { Eye, EyeOff, Repeat, Binoculars, Printer, GripVertical, Moon, Sparkles, NotebookPen, ArrowRight, PanelLeft, ChevronDown, ChevronRight } from 'lucide-react'
+import { splitTodayJournal } from '@/lib/today/journalSplit'
 import { DayPlanPanel, panelActionsFor, planSummary } from '@/components/reference/DayPlanPanel'
 import { useReferenceLists } from '@/components/reference/ReferenceListsContext'
 import { makePlanActions } from '@/lib/planning/planActions'
@@ -142,6 +143,11 @@ interface TodayViewProps {
 }
 
 // ─── Component ─────────────────────────────────────────────────────────────────
+
+/** My focus: chosen untimed work — all-day tasks, then untimed occurrences. */
+const FOCUS_SECTIONS: DaySection[] = ['allday', 'unscheduled']
+/** Still ahead / Earlier today: the timed day, in order. */
+const TIMED_SECTIONS: DaySection[] = ['earlyMorning', 'morning', 'afternoon', 'evening', 'night']
 
 export function TodayView({
   tasks,
@@ -705,12 +711,6 @@ export function TodayView({
     () => viewedDate.toLocaleDateString('en-US', { weekday: 'long' }),
     [viewedDate],
   )
-  const greeting = useMemo(() => {
-    const hour = nowForDisplay.getHours()
-    if (hour < 12) return 'Good morning'
-    if (hour < 17) return 'Good afternoon'
-    return 'Good evening'
-  }, [nowForDisplay])
   const decisionCount = data.attentionItems.length + emailCaptures.length + visibleUnpromptedItems.length
 
   const nextTimeLabel = upNext?.item.allDay
@@ -1157,6 +1157,50 @@ export function TodayView({
             </div>
   )
 
+  // ── The journal split (journalSplit.ts) ──────────────────────────────
+  const journal = useMemo(
+    () => splitTodayJournal(data.grouped, { isToday: data.isToday, now: new Date(nowTick), upNextId }),
+    [data.grouped, data.isToday, nowTick, upNextId],
+  )
+  // Earlier today folds by default, per day: unfolding it is about this
+  // reading of this day, not a standing preference.
+  const [earlierOpenDay, setEarlierOpenDay] = useState<string | null>(null)
+  const earlierOpen = earlierOpenDay === localYmd(viewedDate)
+  const openPlan = () => {
+    if (usePin) { if (!todayPinned) references!.pin('today') }
+    else setPlanOpenDay(planOpenInline ? null : localYmd(viewedDate))
+  }
+  // Everything each slice of the journal shares — the same rows and actions
+  // the one flat list had, handed to three renders of it.
+  const listProps = {
+    isReadOnlyEvent,
+    viewedDate,
+    isMobile,
+    selectedItemId,
+    upNextId,
+    upNextStatus,
+    now: new Date(nowTick),
+    firstSectionItemId,
+    collapsedKeys,
+    openedByUser,
+    onToggleSection: toggleSection,
+    selectedKeys,
+    onToggleBulkSelect: toggleBulkSelect,
+    tasksMap,
+    shareNudgeByEventId,
+    parserContext,
+    insert,
+    onSelectItem: handleSelectItem,
+    onToggleTask,
+    onCompleteRoutine,
+    onCompleteEvent,
+    panelOpen,
+    onClosePanel,
+    renamingGroupId,
+    onRenameGroupDone: () => setRenamingGroupId(null),
+    onSendToBuy: ctx.onSendTaskToBuy ? handleSendToBuy : undefined,
+  }
+
   return (
     <div className="w-full max-w-[1152px] mr-auto px-0 py-2 md:px-10 lg:px-14 md:pt-2 md:pb-8">
       {desktopControls && !isMobile && <DesktopPageControls>{desktopToolbar}</DesktopPageControls>}
@@ -1197,10 +1241,15 @@ export function TodayView({
       {/* An open masthead and continuous agenda give Today the shape of a daybook. */}
       <MastheadCard
         variant="daybook"
-        date={viewedDate}
-        eyebrow={<DayNavCluster viewedDate={viewedDate} onDateChange={onDateChange} variant="inline" />}
-        title={data.isToday ? greeting : relativeDayLabel}
-        subline={heroLine}
+        // The date gives the page its identity; the chosen work gives it its
+        // purpose (2026-09-19). The eyebrow says where the day sits — Today,
+        // Tomorrow, a weekday — and still opens the date picker.
+        eyebrow={<DayNavCluster viewedDate={viewedDate} onDateChange={onDateChange} variant="inline" label={data.isToday ? 'Today' : relativeDayLabel} />}
+        title={viewedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
+        // "Next: …" is the Up next marker's job now, inside Still ahead. The
+        // line stays only when it says something the list can't: a clear day
+        // looking forward, or another day's opener.
+        subline={data.isToday && upNext ? undefined : heroLine}
         // Domain chooser + assistant toggle, in the card's corner.
         controls={headerControls}
         // The masthead's ear: today's weather, one quiet line. The feed only
@@ -1251,33 +1300,6 @@ export function TodayView({
           onScheduleListItem={ctx.onScheduleListItemAsTask}
         />
 
-        {/* The day's plan: one quiet line, never a list. It says what waits
-            in the Today pin and reopens it, so an unpinned pin can't hide a
-            dated obligation. On a phone (no dock) or another day it opens
-            the same panel inline. */}
-        {planLine && (
-          <div className="mb-3 px-3 md:px-0">
-            <button
-              type="button"
-              aria-expanded={usePin ? todayPinned : planOpenInline}
-              onClick={() => {
-                if (usePin) { if (!todayPinned) references!.pin('today') }
-                else setPlanOpenDay(planOpenInline ? null : localYmd(viewedDate))
-              }}
-              className="inline-flex items-center gap-1.5 text-[13px] text-neutral-500 hover:text-neutral-800"
-            >
-              <PanelLeft className="h-3.5 w-3.5" aria-hidden="true" />
-              <span>{planLine}</span>
-              {usePin && todayPinned && <span className="text-neutral-400">· in the Today pin</span>}
-            </button>
-            {!usePin && planOpenInline && (
-              <div className="mt-2 border-l border-neutral-200 pl-3">
-                <DayPlanPanel plan={data.dayPlan} day={viewedDate} actions={planPanelActions} draggable={false} />
-              </div>
-            )}
-          </div>
-        )}
-
         {/* Assistant lines — the unprompted tier, rendered ONLY when the ⋯
             menu's "Show suggestions" toggle is on (off by default; the menu
             entry carries the pending count). Only this tier is gated: chips
@@ -1293,69 +1315,117 @@ export function TodayView({
           />
         )}
 
-        {data.counts.totalItems === 0 ? (
-          <div className="mx-auto max-w-xl text-center py-16">
-            <p className="font-display text-xl text-neutral-700">
-              {/* While the day's data is still in flight, an empty list means
-                  "not loaded yet" — not "clear". Say so, so the user never sees
-                  a false "Your day is clear" flash before items arrive. */}
-              {loading
-                ? 'Loading your day…'
-                : data.isToday && data.counts.completedCount > 0 ? 'All cleared — nicely done' : 'Your day is clear'}
-            </p>
-            {/* No button row here. The sidenav carries Plan from paper, This
-                Week, and Inbox — repeating them under "Your day is clear" made
-                an empty day the busiest screen in the app. */}
-          </div>
+        {loading && data.counts.totalItems === 0 ? (
+          // While the day's data is still in flight, an empty list means "not
+          // loaded yet" — never a false "nothing chosen" flash.
+          <p className="py-16 text-center font-display text-xl text-neutral-700">Loading your day…</p>
         ) : (
-          <div className="space-y-6">
-            {/* Sections — lifted into TodaySectionList so this file stops
-                carrying the whole day list (Stage 2b spec). */}
-            <TodayDragProvider
-              resolve={resolve}
-              onIntents={(intents) => { void applyIntents(intents) }}
-              renderOverlay={(activeId) => {
-                const item = findTimelineItem(data.grouped, activeId)
-                return item ? (
-                  <div className="inline-flex max-w-[22rem] items-center gap-2 rounded-xl border border-primary-200 bg-bg-elevated px-3 py-2 text-sm shadow-lg">
-                    <GripVertical className="h-4 w-4 shrink-0 text-neutral-400" />
-                    <span className="truncate">{item.title}</span>
-                  </div>
-                ) : null
-              }}
-            >
+          <TodayDragProvider
+            resolve={resolve}
+            onIntents={(intents) => { void applyIntents(intents) }}
+            renderOverlay={(activeId) => {
+              const item = findTimelineItem(data.grouped, activeId)
+              return item ? (
+                <div className="inline-flex max-w-[22rem] items-center gap-2 rounded-xl border border-primary-200 bg-bg-elevated px-3 py-2 text-sm shadow-lg">
+                  <GripVertical className="h-4 w-4 shrink-0 text-neutral-400" />
+                  <span className="truncate">{item.title}</span>
+                </div>
+              ) : null
+            }}
+          >
+          {/* Today as a daily journal (2026-09-19): Week arranges the
+              commitments; Today is where you settle into a few of them. The
+              same rows, the same actions — read as what you chose, what is
+              still ahead, and what is already behind you. */}
+          <section aria-labelledby="today-focus-heading" className="daybook-journal-section">
+            <div className="daybook-journal-heading">
+              <h2 id="today-focus-heading">My focus</h2>
+              {planLine && (
+                <button
+                  type="button"
+                  aria-expanded={usePin ? todayPinned : planOpenInline}
+                  onClick={openPlan}
+                  className="inline-flex items-center gap-1.5 text-[13px] text-neutral-500 hover:text-neutral-800"
+                >
+                  <PanelLeft className="h-3.5 w-3.5" aria-hidden="true" />
+                  <span>{planLine}</span>
+                  {usePin && todayPinned && <span className="text-neutral-400">· in the Today pin</span>}
+                </button>
+              )}
+            </div>
+            {!usePin && planOpenInline && (
+              <div className="mt-2 mb-3 border-l border-neutral-200 pl-3">
+                <DayPlanPanel plan={data.dayPlan} day={viewedDate} actions={planPanelActions} draggable={false} />
+              </div>
+            )}
+            {journal.focusCount > 0 ? (
+              <TodaySectionList
+                {...listProps}
+                sectionsOrder={FOCUS_SECTIONS}
+                grouped={journal.focus}
+                anytimeHeader={false}
+              />
+            ) : (
+              <div className="py-4">
+                <p className="font-display text-lg text-neutral-600">Nothing chosen yet.</p>
+                <button type="button" onClick={openPlan} className="mt-1 text-[15px] text-primary-700 hover:text-primary-900">
+                  Choose something for {data.isToday ? 'today' : 'this day'} →
+                </button>
+              </div>
+            )}
+          </section>
+
+          <section aria-labelledby="today-ahead-heading" className="daybook-journal-section">
+            <div className="daybook-journal-heading">
+              <h2 id="today-ahead-heading">{data.isToday ? 'Still ahead' : 'Schedule'}</h2>
+            </div>
+            {journal.allDayEvents.length > 0 && (
+              <ul className="daybook-journal-allday" aria-label="All day">
+                {journal.allDayEvents.map((ev) => (
+                  <li key={ev.id}>
+                    <button type="button" onClick={() => handleSelectItem(ev.id)}>{ev.title}</button>
+                  </li>
+                ))}
+              </ul>
+            )}
             <TodaySectionList
-              isReadOnlyEvent={isReadOnlyEvent}
-              sectionsOrder={data.sectionsOrder}
-              grouped={data.grouped}
-              viewedDate={viewedDate}
-              isMobile={isMobile}
-              selectedItemId={selectedItemId}
-              upNextId={upNextId}
-              upNextStatus={upNextStatus}
-              now={new Date(nowTick)}
-              firstSectionItemId={firstSectionItemId}
-              collapsedKeys={collapsedKeys}
-              openedByUser={openedByUser}
-              onToggleSection={toggleSection}
-              selectedKeys={selectedKeys}
-              onToggleBulkSelect={toggleBulkSelect}
-              tasksMap={tasksMap}
-              shareNudgeByEventId={shareNudgeByEventId}
-              parserContext={parserContext}
-              insert={insert}
-              onSelectItem={handleSelectItem}
-              onToggleTask={onToggleTask}
-              onCompleteRoutine={onCompleteRoutine}
-              onCompleteEvent={onCompleteEvent}
-              panelOpen={panelOpen}
-              onClosePanel={onClosePanel}
-              renamingGroupId={renamingGroupId}
-              onRenameGroupDone={() => setRenamingGroupId(null)}
-              onSendToBuy={ctx.onSendTaskToBuy ? handleSendToBuy : undefined}
+              {...listProps}
+              sectionsOrder={TIMED_SECTIONS}
+              grouped={journal.ahead}
+              gapOffset={journal.earlierCount}
             />
-            </TodayDragProvider>
-          </div>
+            {journal.aheadCount === 0 && (
+              <p className="py-3 text-[15px] text-neutral-500">
+                {data.isToday ? 'Nothing else with a time today.' : 'Nothing with a time on this day.'}
+              </p>
+            )}
+            {journal.earlierSummary.rows > 0 && (
+              <div className="mt-4">
+                <button
+                  type="button"
+                  aria-expanded={earlierOpen}
+                  onClick={() => setEarlierOpenDay(earlierOpen ? null : localYmd(viewedDate))}
+                  className="inline-flex items-center gap-1 text-[13px] text-neutral-500 hover:text-neutral-800"
+                >
+                  {earlierOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+                  Earlier today · {journal.earlierSummary.rows}
+                  {journal.earlierSummary.notDone > 0 && ` · ${journal.earlierSummary.notDone} not done`}
+                </button>
+                {earlierOpen && (
+                  <div className="mt-1 opacity-90">
+                    <TodaySectionList
+                      {...listProps}
+                      sectionsOrder={TIMED_SECTIONS}
+                      grouped={journal.earlier}
+                      dropTargets={false}
+                      upNextId={undefined}
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+          </section>
+          </TodayDragProvider>
         )}
 
         {/* Backlog footer — ONE muted line merging carried-over and

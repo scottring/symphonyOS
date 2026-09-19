@@ -58,6 +58,7 @@ const ctxValue = {
 
 // Use the actual current date so computeIsToday() returns true for today-mode tests
 const TODAY = new Date()
+const TOMORROW = new Date(TODAY.getFullYear(), TODAY.getMonth(), TODAY.getDate() + 1)
 
 /**
  * Today's secondary controls (staging triggers, Clarity, discussion, assignee
@@ -99,7 +100,9 @@ describe('TodayView', () => {
   })
   it('shows the empty state when there are no items', () => {
     renderView()
-    expect(screen.getByText(/your day is clear|nothing scheduled/i)).toBeInTheDocument()
+    // The journal's two empty states: nothing chosen, nothing with a time.
+    expect(screen.getByText(/nothing chosen yet/i)).toBeInTheDocument()
+    expect(screen.getByText(/nothing else with a time today/i)).toBeInTheDocument()
   })
   it('renders NO Day/Week/Month control inside TodayView (HomeViewSwitcher owns it)', () => {
     renderView()
@@ -386,6 +389,8 @@ describe('TodayView', () => {
     // component anymore — that is the point.
   })
 
+  // Another day has no "now", so its timed items are one list under Schedule
+  // (on today, what is over folds into Earlier today — TodayView.journal.test).
   it('renders the flat agenda: no period headings, every timed item in one list', () => {
     // Two items in different periods (8am / 2pm). The old layout wrapped each
     // in an EARLY MORNING/MORNING/AFTERNOON band with a heading, count and
@@ -393,12 +398,13 @@ describe('TodayView', () => {
     // renders the rows; times on the rows say when things are. The band
     // structure survives underneath as drag targets only (headers reappear
     // as labels while a drag is live — covered by the drop-zone machinery).
-    const morningTime = new Date(TODAY)
+    const morningTime = new Date(TOMORROW)
     morningTime.setHours(8, 0, 0)
-    const afternoonTime = new Date(TODAY)
+    const afternoonTime = new Date(TOMORROW)
     afternoonTime.setHours(14, 0, 0)
 
     renderView({
+      viewedDate: TOMORROW,
       tasks: [
         {
           id: 'morning-task',
@@ -435,10 +441,11 @@ describe('TodayView', () => {
     // summary row is covered by AnytimeRow.test.tsx.)
     localStorage.clear()
 
-    const afternoonTime = new Date(TODAY)
+    const afternoonTime = new Date(TOMORROW)
     afternoonTime.setHours(14, 0, 0, 0)
 
     renderView({
+      viewedDate: TOMORROW,
       tasks: [
         {
           id: 'afternoon-done',
@@ -576,11 +583,11 @@ describe('TodayView attention line', () => {
   })
 
   it('points at the queue even when the rest of the day is empty', () => {
-    // counts.totalItems excludes slipped work, so this day renders "Your day
-    // is clear". The attention line must survive that branch or the queue is
-    // invisible exactly when it is all that is left.
+    // counts.totalItems excludes slipped work, so this day renders its empty
+    // journal. The attention line must survive that or the queue is invisible
+    // exactly when it is all that is left.
     renderView({ viewedDate: TODAY, tasks: [mk('s', 'slipped thing', 200)] } as never)
-    expect(screen.getByText(/Your day is clear/i)).toBeInTheDocument()
+    expect(screen.getByText(/nothing chosen yet/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Review' })).toBeInTheDocument()
   })
 
@@ -649,7 +656,11 @@ describe('TodayView — no scoreboard', () => {
         createdAt: TODAY, updatedAt: TODAY, bucket: 'timed' as const, scheduledFor: soon,
       }],
     } as never)
-    expect(screen.getByText(/^Next: Pick up Mia from climbing/)).toBeInTheDocument()
+    // Named in place, in Still ahead, by the Up next marker — the masthead no
+    // longer repeats it as a "Next: …" line.
+    expect(screen.getByTestId('up-next-marker')).toBeInTheDocument()
+    expect(screen.getAllByText('Pick up Mia from climbing')).toHaveLength(1)
+    expect(screen.queryByText(/^Next: /)).not.toBeInTheDocument()
     expect(screen.queryByText(/marked in the timeline/i)).not.toBeInTheDocument()
   })
 
@@ -669,7 +680,10 @@ describe('TodayView — the day card carries the date nav', () => {
     renderView()
     const weekday = TODAY.toLocaleDateString('en-US', { weekday: 'long' })
     const date = TODAY.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })
-    expect(screen.getByText(`${weekday} · ${date}`)).toBeInTheDocument()
+    // The date is the page's title (2026-09-19); the eyebrow says "Today" and
+    // still opens the picker, named with the full date for screen readers.
+    expect(screen.getByRole('heading', { level: 1, name: `${weekday}, ${date}` })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: `Today, ${weekday} ${date} — choose a date` })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /previous day/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /next day/i })).toBeInTheDocument()
   })

@@ -81,7 +81,10 @@ export function buildCollectionItem(
   // The day is finished when every dose is resolved (done or skipped), even
   // if some were skipped — a skipped 7am shouldn't hold the whole block open.
   const allDone = total > 0 && resolved === total
-  const anchor = nextUp?.time ?? earliest?.time ?? null
+  // Steps carry no time of their own in the common shape — the COLLECTION
+  // does ("Kids bedtime routine, 7pm"). Without this fallback a parent-timed
+  // collection had no time on the day and read as untimed work.
+  const anchor = nextUp?.time ?? earliest?.time ?? (collection.time_of_day ? collection.time_of_day.slice(0, 5) : null)
   let startTime: Date | null = null
   if (anchor) {
     const [h, m] = anchor.split(':').map(Number)

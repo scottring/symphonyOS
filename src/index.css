@@ -1698,6 +1698,17 @@ html.desktop-shell a {
   border-right: 1px solid var(--color-neutral-200);
 }
 .reference-list + .reference-list { margin-top: 32px; }
+/* Today as a daily journal: My focus, Still ahead — a serif heading on a
+   fine rule, the rows beneath it unchanged. */
+.daybook-journal-section + .daybook-journal-section { margin-top: 36px; }
+.daybook-journal-heading {
+  display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 16px;
+  border-bottom: 1px solid var(--color-neutral-300); padding-bottom: 8px; margin-bottom: 6px;
+}
+.daybook-journal-heading h2 { margin: 0; font-family: var(--font-family-display); font-weight: 500; font-size: 22px; line-height: 1.2; color: var(--color-neutral-950); }
+.daybook-journal-allday { display: flex; flex-direction: column; gap: 2px; padding: 6px 0 8px; }
+.daybook-journal-allday button { text-align: left; font-style: italic; font-size: 14px; color: var(--color-neutral-600); }
+.daybook-journal-allday button:hover { color: var(--color-neutral-900); }
 /* A row from the Today pin hovering over Today's agenda: drop to choose it. */
 .daybook-agenda-drop { outline: 2px dashed var(--color-primary-300); outline-offset: 8px; border-radius: 4px; }
 /* A row from the Today pin hovering over a list it can be committed to. */
