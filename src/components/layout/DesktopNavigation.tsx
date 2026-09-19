@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { ChevronDown, Inbox, Search, UserRound } from 'lucide-react'
+import { ChevronDown, Inbox, PanelLeft, Plus, Search, UserRound } from 'lucide-react'
 import { useReferenceLists } from '@/components/reference/ReferenceListsContext'
 import { requestPlanFromPaper } from '@/lib/planFromPaperSignal'
 import { appRegistry } from '@/shell/appRegistry'
@@ -12,8 +12,10 @@ export function DesktopPageControls({ children }: { children: ReactNode }) {
   return host ? createPortal(children, host) : <>{children}</>
 }
 
-export function DesktopNavigation({ inboxCount, discussionsUnread, onSearch, onSignOut, userName, paused, controlsRef, auxiliaryControls }: {
+export function DesktopNavigation({ inboxCount, discussionsUnread, onSearch, onQuickAdd, onSignOut, userName, paused, controlsRef, auxiliaryControls }: {
   inboxCount: number; discussionsUnread: number; onSearch: () => void; onSignOut: () => void
+  /** Opens the ⌘K unibox ready to add — the visible twin of the shortcut. Falls back to onSearch. */
+  onQuickAdd?: () => void
   auxiliaryControls?: ReactNode; userName?: string; paused: boolean; controlsRef: (node: HTMLDivElement | null) => void
 }) {
   const references = useReferenceLists()
@@ -50,7 +52,21 @@ export function DesktopNavigation({ inboxCount, discussionsUnread, onSearch, onS
   ]
   const destinations = groups.flatMap(([, items]) => items)
   return <nav ref={root} className="page-navigation" aria-label="Main navigation">
-    <NavLink to="/today" className={pathname === '/' || pathname === '/today' || pathname.startsWith('/tasks-new') ? 'is-current' : ''}>Today</NavLink>
+    <div className="page-navigation-today">
+      <NavLink to="/today" className={pathname === '/' || pathname === '/today' || pathname.startsWith('/tasks-new') ? 'is-current' : ''}>Today</NavLink>
+      {/* Today stays ONE destination; its plan is a pin, like the Week and
+          Month lists — this opens it beside whatever page is showing. */}
+      {references && (() => {
+        const pinned = references.pins.some(p => p.kind === 'today')
+        return <button type="button" aria-pressed={pinned}
+          aria-label={pinned ? "Unpin today's plan" : "Pin today's plan"}
+          title={pinned ? "Close today's plan" : "Today's plan — beside any page"}
+          onClick={() => pinned ? references.unpin('today') : references.pin('today')}
+          className={`page-navigation-pin-toggle${pinned ? ' is-pinned' : ''}`}>
+          <PanelLeft size={14} aria-hidden="true" />
+        </button>
+      })()}
+    </div>
     {(['week', 'month'] as const).map(kind => {
       const pinned = references?.pins.some(p => p.kind === kind)
       const label = kind === 'week' ? 'Week' : 'Month'
@@ -83,6 +99,9 @@ export function DesktopNavigation({ inboxCount, discussionsUnread, onSearch, onS
     <div className="page-navigation-utilities">
       {auxiliaryControls}
       <div ref={controlsRef} className="page-navigation-page-controls" />
+      {/* The visible twin of ⌘K: capture from any page without knowing the shortcut. */}
+      <button type="button" onClick={onQuickAdd ?? onSearch} aria-label="Add — ⌘K" title="Add a task, note or event (⌘K)"
+        className="page-navigation-add"><Plus size={15} aria-hidden="true" /><span>Add</span><kbd>⌘K</kbd></button>
       <NavLink to="/inbox" aria-label={`Inbox${inboxCount ? `, ${inboxCount} items` : ''}`}><Inbox size={16} aria-hidden="true" /><span>Inbox</span>{inboxCount > 0 && <span className="navigation-count">{inboxCount}</span>}</NavLink>
       <button onClick={onSearch} aria-label="Search"><Search size={16} /></button>
       {menu('account', <><UserRound size={16} /><span className="sr-only">Account</span></>, <>

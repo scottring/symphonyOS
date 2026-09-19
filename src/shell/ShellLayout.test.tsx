@@ -70,7 +70,12 @@ vi.mock('@/contexts/PinsContext', () => ({ PinsProvider: ({ children }: { childr
 
 vi.mock('@/components/layout/Sidebar', () => ({ Sidebar: () => <div data-testid="sidebar" /> }))
 vi.mock('@/components/layout/MoreSheet', () => ({ MoreSheet: () => null }))
-vi.mock('@/components/layout/QuickCapture', () => ({ QuickCapture: ({ showFab }: { showFab?: boolean }) => <div data-testid="quick-capture" data-fab={String(showFab)} /> }))
+vi.mock('@/components/layout/QuickCapture', () => ({ QuickCapture: ({ showFab, isOpen }: { showFab?: boolean; isOpen?: boolean }) => <div data-testid="quick-capture" data-fab={String(showFab)} data-open={String(!!isOpen)} /> }))
+vi.mock('@/hooks/useDayPlan', () => ({ useDayPlan: () => ({ loading: false, error: false, plan: {
+  scheduled: [], available: [], week: [], month: [], counts: { scheduled: 0, available: 0 },
+  offMainTaskIds: new Set(), offMainRoutineItemIds: new Set(), plannedExtraTasks: [],
+} }) }))
+vi.mock('@/hooks/usePlanActions', () => ({ usePlanActions: () => ({}) }))
 vi.mock('@/components/layout/NewVersionBanner', () => ({ NewVersionBanner: () => null }))
 vi.mock('@/components/omnibox/OmniboxResults', () => ({ OmniboxResults: () => null }))
 vi.mock('@/components/chat/ChatPanel', () => ({ ChatPanel: () => null }))
@@ -296,3 +301,32 @@ describe('Pinned lists on the left', () => {
   })
 })
 
+
+describe('Capture and the Today pin from every desktop page', () => {
+  beforeEach(() => { mobileState.isMobile = false; selectionState.selection = null; sessionStorage.clear() })
+
+  it.each(['/today', '/week', '/month', '/notes', '/inbox'])('%s has a visible Add button that opens the ⌘K capture', (path) => {
+    renderAt(path)
+    expect(screen.getByTestId('quick-capture')).toHaveAttribute('data-open', 'false')
+    fireEvent.click(screen.getByRole('button', { name: 'Add — ⌘K' }))
+    expect(screen.getByTestId('quick-capture')).toHaveAttribute('data-open', 'true')
+  })
+
+  it('⌘K still toggles the same capture', () => {
+    renderAt('/week')
+    fireEvent.keyDown(window, { key: 'k', metaKey: true })
+    expect(screen.getByTestId('quick-capture')).toHaveAttribute('data-open', 'true')
+  })
+
+  it('the Today pin opens beside any page from the navigation, and closes the same way', () => {
+    renderAt('/notes')
+    const toggle = screen.getByRole('button', { name: "Pin today's plan" })
+    expect(toggle).toHaveAttribute('aria-pressed', 'false')
+    fireEvent.click(toggle)
+    expect(screen.getByRole('region', { name: "Today's plan" })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: "Unpin today's plan", pressed: true }))
+    expect(screen.queryByRole('region', { name: "Today's plan" })).not.toBeInTheDocument()
+    // Today is still one destination.
+    expect(screen.getAllByRole('link', { name: 'Today' })).toHaveLength(1)
+  })
+})

@@ -318,7 +318,7 @@ function ShellLayoutInner({ children }: Props) {
           <div className={`desktop-workspace${referencesVisible ? ' has-references' : ''}`}>
             <div className="desktop-workspace-nav">
         <DesktopNavigation inboxCount={inboxCount} discussionsUnread={discussionsUnread}
-          onSearch={() => setQuickAddOpen(true)} onSignOut={signOut}
+          onSearch={() => setQuickAddOpen(true)} onQuickAdd={() => setQuickAddOpen(true)} onSignOut={signOut}
           userName={user?.user_metadata?.name ?? user?.email}
           paused={referencesPaused} controlsRef={setDesktopControls}
           auxiliaryControls={activeView !== 'today' && activeView !== 'inbox' && (
