@@ -29,6 +29,8 @@ import { WallV2StaleBanner } from './WallV2StaleBanner';
 import { computeFreshness } from './wallFreshness';
 import { useDailyDiscussionPrompt } from '@/hooks/useDailyDiscussionPrompt';
 import { WallV2Gantt } from './WallV2Gantt';
+import { WallV2Weekend } from './WallV2Weekend';
+import { adaptWeekendBoard, isWeekendBoardDay } from './wallWeekend';
 import { adaptGanttBoard, titleForBlockId, TRACK_PX } from './wallGantt';
 import { KidDayView } from './KidDayView';
 import { WallV2WhoSheet } from './WallV2WhoSheet';
@@ -511,6 +513,25 @@ export function WallV2Shell() {
     [wallData.familyMembers, wallData.days, now, wallData.homeworkTasks],
   );
 
+  // ─── Weekend board ───
+  // On Saturday and Sunday the day board is replaced by three DAY columns —
+  // today plus the next two. The reasoning is Scott's own paper page (a ruled
+  // sheet headed SAT / SUN / MON, written Saturday morning and spent by
+  // Monday): on a weekend morning the weekend IS the day's context, so a
+  // board showing only today describes less than the sheet on the counter.
+  //
+  // This reverses, for two days a week, the note on the Gantt above — "a time
+  // axis across several days is a calendar". What makes it a board and not a
+  // calendar is that it has NO axis: three short written lists, the same
+  // `routineEarnsTheWall` filter, no new queries.
+  const weekendBoard = useMemo(
+    () => adaptWeekendBoard(wallData.familyMembers, wallData.days, now, wallData.homeworkTasks),
+    [wallData.familyMembers, wallData.days, now, wallData.homeworkTasks],
+  );
+  // Derived from `now`, which the shell already ticks, so the board swaps
+  // itself at midnight without a reload — the Pi runs for weeks at a time.
+  const showWeekend = isWeekendBoardDay(now) && weekendBoard.columns.length > 0;
+
   // ─── Bottom strip ───
   // Three cheap projections over data the wall already holds: no new queries,
   // which matters on a display that polls all day (see the egress incident).
@@ -811,7 +832,11 @@ export function WallV2Shell() {
             label clipped to five characters. Pinned lists keep their one-tap
             route through the header's list action. */}
         <div className="flex-1 min-h-0 min-w-0 flex flex-col gap-3">
-          <WallV2Gantt board={ganttBoard} onTapItem={handleTapGanttItem} onTapMember={handleTapGanttMember} />
+          {showWeekend ? (
+            <WallV2Weekend board={weekendBoard} onTapItem={handleTapGanttItem} />
+          ) : (
+            <WallV2Gantt board={ganttBoard} onTapItem={handleTapGanttItem} onTapMember={handleTapGanttMember} />
+          )}
         </div>
 
         <WallV2Strip
