@@ -40,6 +40,7 @@ import { useGatedTaskActions } from '@/hooks/useGatedTaskActions'
 import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
 import { partitionWeekExtras } from '@/lib/week/weekExtras'
 import { unhomedRoutines } from '@/lib/week/unhomedRoutines'
+import { explainCopyDownOnce } from '@/lib/planning/copyDownExplainer'
 import { buildWeekRoutineItems } from './weekRoutineItems'
 import { useWeekInstances } from './useWeekInstances'
 import { edgeForPointer } from './edgeAdvance'
@@ -840,7 +841,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
         routinesDraggable={showSchedule}
         onPlanDrop={(payload) => { void planActions.drop(payload, { type: 'period', period: 'week' }) }}
       />
-      <WeekMonthRail tasks={tasks} meId={meId} onSelectItem={onSelectItem} onAddToWeek={(id) => { void gated.pushTask(id, 'week') }} />
+      <WeekMonthRail tasks={tasks} meId={meId} onSelectItem={onSelectItem} onAddToWeek={(id) => { void gated.pushTask(id, 'week').then(() => { explainCopyDownOnce('month', 'week') }) }} />
     </>
   )
 

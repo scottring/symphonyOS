@@ -24,6 +24,7 @@ import { useActionableInstances } from '@/hooks/useActionableInstances'
 import { makePlanActions } from '@/lib/planning/planActions'
 import { planDropHandlers } from '@/lib/planning/planDrag'
 import { showToast } from '@/hooks/useToast'
+import { explainCopyDownOnce } from '@/lib/planning/copyDownExplainer'
 import { useGatedTaskActions } from '@/hooks/useGatedTaskActions'
 import { useDomain } from '@/hooks/useDomain'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
@@ -242,7 +243,10 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
     // the whole plan. That is the whole point of the placement model.
     else if (action === 'to-lower') {
       const lower = lowerLevel(level)
-      if (lower) await gated.pushTask(row.id, lower)
+      if (lower && level !== 'year') {
+        await gated.pushTask(row.id, lower)
+        explainCopyDownOnce(level, lower)
+      }
     }
     else if (action === 'today') {
       // Choosing today (planned_on): a month or season row keeps its list —
@@ -255,7 +259,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
 
   // The rail's one verb: copy an open season task down into this month.
   const pullDown = useCallback((row: PlanRowModel) => {
-    void gated.pushTask(row.id, 'month')
+    void gated.pushTask(row.id, 'month').then(() => { explainCopyDownOnce('season', 'month') })
   }, [gated])
 
   // The calendar is a view you OPEN, not the thing that greets you: the page
