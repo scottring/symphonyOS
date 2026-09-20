@@ -505,14 +505,18 @@ export function WeekViewV2(props: WeekViewV2Props) {
     return items
   }, [extras])
 
+  // The switch says "Routines", so off means NONE: it used to run only the
+  // daily sweep, which left a Sunday-only routine in the journal's Available
+  // line with the switch off (Scott, 2026-09-20). The Today page keeps its
+  // own reading of the preference.
   const routineItems = useMemo(
-    () => buildWeekRoutineItems({
+    () => hideRoutines ? [] : buildWeekRoutineItems({
       routines,
       weekStart,
       dayCount,
       instances: weekInstances,
       member: selectedAssignees,
-      prefs: { hideRoutines, layers },
+      prefs: { hideRoutines: false, layers },
     }),
     [routines, weekStart, dayCount, weekInstances, selectedAssignees, hideRoutines, layers],
   )
@@ -728,6 +732,19 @@ export function WeekViewV2(props: WeekViewV2Props) {
     }),
     [planActions, toggleTask, todayKey],
   )
+  // "+ Add" on a journal day: a dated, all-day task on that day, assigned to
+  // me. Captures never inherit the view's lens, so it lands Unsorted — and
+  // when the current filter would then hide it, the toast says so rather
+  // than letting the row vanish (the walkthrough's silent-filter trap).
+  const handleAddToDay = useCallback(async (day: JournalDay, title: string) => {
+    const id = await addTask(title, undefined, undefined, day.date, { isAllDay: true, assignedTo: meId ?? undefined })
+    if (!id) return
+    const when = day.date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+    const hidden = !layers.has('unsorted')
+    showToast(`Added to ${when} · Unsorted · only you${hidden ? ' · hidden by your current view' : ''}`, hidden ? 'warning' : 'success', hidden ? 8000 : undefined)
+    pushAction?.(`Added "${title}"`, () => { void deleteTask(id) })
+  }, [addTask, deleteTask, meId, layers, pushAction])
+
   const handlePlanDropOnDay = useCallback((day: JournalDay, payload: PlanDragPayload) => {
     void planActions.drop(payload, { type: 'day', day: day.date })
   }, [planActions])
@@ -879,7 +896,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
         {narrow ? (
           <div className="flex flex-col gap-4">
             <aside aria-label="This week's list" className="flex flex-col gap-2">{margin}</aside>
-            <WeekJournal days={journalDays} spans={journalSpans} onSelectItem={onSelectItem} onToggleEntry={handleJournalToggle} onPlanDrop={handlePlanDropOnDay} narrow dragEnabled={false} />
+            <WeekJournal days={journalDays} spans={journalSpans} onSelectItem={onSelectItem} onToggleEntry={handleJournalToggle} onPlanDrop={handlePlanDropOnDay} onAddToDay={handleAddToDay} narrow dragEnabled={false} />
           </div>
         ) : (
         <div className="flex items-start gap-4">
@@ -899,7 +916,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
             list column to its left, the view's left edge is no longer the days'. */}
         <div ref={gridBoundsRef} data-week-bounds className="flex-1 min-w-0">
         {!showSchedule ? (
-          <WeekJournal days={journalDays} spans={journalSpans} onSelectItem={onSelectItem} onToggleEntry={handleJournalToggle} onPlanDrop={handlePlanDropOnDay} />
+          <WeekJournal days={journalDays} spans={journalSpans} onSelectItem={onSelectItem} onToggleEntry={handleJournalToggle} onPlanDrop={handlePlanDropOnDay} onAddToDay={handleAddToDay} />
         ) : (
         <WeekGrid
           weekStart={weekStart}

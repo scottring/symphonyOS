@@ -3,6 +3,7 @@ import { render, screen, within, fireEvent } from '@/test/test-utils'
 import { WeekViewV2 } from './WeekViewV2'
 import { createMockRoutine, createMockTask } from '@/test/mocks/factories'
 import type { Task } from '@/types/task'
+import type { RecurrencePattern } from '@/types/actionable'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import { ALL_LAYERS } from '@/lib/domains'
 
@@ -224,6 +225,18 @@ describe('WeekViewV2 journal spread', () => {
     expect(screen.getAllByText('Morning stretch').length).toBeGreaterThan(0)
     fireEvent.click(screen.getByRole('switch', { name: 'Routines' }))
     expect(screen.queryByText('Morning stretch')).toBeNull()
+    fireEvent.click(screen.getByRole('switch', { name: 'Routines' }))
+  })
+
+  // The switch used to run only the daily sweep, so a Sunday-only routine
+  // stayed in the journal's "Available" line with routines switched off
+  // (Scott, 2026-09-20). Off means none.
+  it('the Routines switch also hides an untimed weekly routine from the Available line', () => {
+    const routines = [createMockRoutine({ name: 'Take out garbage', time_of_day: null, recurrence_pattern: { type: 'weekly', days: ['sun'] } as RecurrencePattern })]
+    render(<WeekViewV2 {...defaultProps} routines={routines} weekStart={sunday} />)
+    expect(screen.getByText('Take out garbage')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('switch', { name: 'Routines' }))
+    expect(screen.queryByText('Take out garbage')).toBeNull()
     fireEvent.click(screen.getByRole('switch', { name: 'Routines' }))
   })
 
