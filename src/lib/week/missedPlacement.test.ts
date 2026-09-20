@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { isMissedPlacement, missedLabel } from './missedPlacement'
+import { isMissedPlacement, isRecentMiss, missedLabel, MISSED_WINDOW_DAYS } from './missedPlacement'
 
 const now = new Date(2026, 8, 10, 14, 0) // Thu Sep 10 2026, 2pm
 
@@ -33,5 +33,22 @@ describe('missedLabel', () => {
 
   it('falls back to a date once the weekday would be ambiguous', () => {
     expect(missedLabel(new Date(2026, 8, 2, 10, 30), now)).toBe("Didn't happen · Sep 2")
+  })
+})
+
+describe('isRecentMiss', () => {
+  const now = new Date(2026, 8, 20, 9)
+  it('keeps a miss inside the window as this week\'s business', () => {
+    expect(isRecentMiss(new Date(2026, 8, 19), false, now)).toBe(true)
+    expect(isRecentMiss(new Date(2026, 8, 7), false, now)).toBe(true) // 13 days
+  })
+  it('hands a miss past the window to the carryover fold', () => {
+    expect(isRecentMiss(new Date(2026, 8, 6), false, now)).toBe(false) // 14 days
+    expect(isRecentMiss(new Date(2026, 7, 15), false, now)).toBe(false)
+    expect(MISSED_WINDOW_DAYS).toBe(14)
+  })
+  it('is never true for a done card or a day still ahead', () => {
+    expect(isRecentMiss(new Date(2026, 8, 19), true, now)).toBe(false)
+    expect(isRecentMiss(new Date(2026, 8, 21), false, now)).toBe(false)
   })
 })

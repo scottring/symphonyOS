@@ -117,7 +117,8 @@ describe('WeekPoolLane', () => {
     expect(screen.queryByText('Call VW')).not.toBeInTheDocument()
   })
 
-  it('caps the strip and expands the rest via "+N more"', () => {
+  // A miss you cannot see is a miss you cannot decide on: no cap, no "+N more".
+  it('lists every miss, uncapped', () => {
     const twelve = Array.from({ length: 12 }, (_, i) =>
       task({ id: `t${i}`, title: `Task number ${i}`, bucket: 'week', scheduledFor: MISSED_DAY }),
     )
@@ -126,11 +127,8 @@ describe('WeekPoolLane', () => {
         <WeekPoolLane weekStart={weekStart} dayCount={5} onSelectItem={() => {}} tasks={twelve} />
       </DndContext>,
     )
-    expect(screen.getByRole('button', { name: '+4 more' })).toBeInTheDocument()
-    expect(screen.getAllByTitle(/Task number/)).toHaveLength(8)
-    fireEvent.click(screen.getByRole('button', { name: '+4 more' }))
     expect(screen.getAllByTitle(/Task number/)).toHaveLength(12)
-    expect(screen.getByRole('button', { name: 'Show less' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /more$/ })).not.toBeInTheDocument()
   })
 
   it('completes a task from its pill', () => {
@@ -188,7 +186,9 @@ describe('WeekPoolLane', () => {
   // A routine with no time needs a slot exactly the way an unscheduled task
   // does, so it rides in the same strip instead of hiding behind its own tab
   // (Scott, 2026-09-05).
-  it('carries routines that need a home into the lane, after the missed rows', () => {
+  // A routine with no day did not fail to happen — it is filed under its own
+  // header, not counted among the misses (the two read as one group on prod).
+  it('files routines that need a day under their own header, not among the misses', () => {
     render(
       <DndContext>
         <WeekPoolLane
@@ -201,38 +201,32 @@ describe('WeekPoolLane', () => {
       </DndContext>,
     )
     expect(screen.getByText('Call VW')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Didn’t happen · 1/ })).toBeInTheDocument()
+    const header = screen.getByRole('button', { name: /Needs a day · 1/ })
+    expect(header).toHaveAttribute('aria-expanded', 'true')
     expect(screen.getByText('Trash night')).toBeInTheDocument()
-    // Both counted in the header
-    expect(screen.getByRole('button', { name: /Didn’t happen · 2/ })).toBeInTheDocument()
+    fireEvent.click(header)
+    expect(screen.queryByText('Trash night')).not.toBeInTheDocument()
   })
 
-  // Routines get their own allowance. Sharing the tasks' budget meant a busy
-  // week (34 loose tasks) spent every slot on tasks and showed no routine at
-  // all — the very segregation this change ends.
-  it('always shows routines on a busy strip, capped separately from the tasks', () => {
+  it('shows every routine on a busy strip — nothing capped on either side', () => {
     const many = Array.from({ length: 20 }, (_, i) =>
       task({ id: `t${i}`, title: `Loose ${i}`, bucket: 'week', scheduledFor: MISSED_DAY }))
     const routines = Array.from({ length: 6 }, (_, i) =>
       createMockRoutine({ id: `r${i}`, name: `Routine ${i}`, time_of_day: null }))
     render(
       <DndContext>
-        <WeekPoolLane
-          weekStart={weekStart}
-          dayCount={5}
-          onSelectItem={() => {}}
-          tasks={many}
-          routines={routines}
-        />
+        <WeekPoolLane weekStart={weekStart} dayCount={5} onSelectItem={() => {}} tasks={many} routines={routines} />
       </DndContext>,
     )
-    // Tasks fill their 8 slots AND four routines still show
-    expect(screen.getAllByTitle(/Loose /)).toHaveLength(8)
-    expect(screen.getByText('Routine 3')).toBeInTheDocument()
-    expect(screen.queryByText('Routine 4')).not.toBeInTheDocument()
-    // One expander opens what both lists are holding back: 12 tasks + 2 routines
-    fireEvent.click(screen.getByRole('button', { name: '+14 more' }))
-    expect(screen.getByText('Routine 5')).toBeInTheDocument()
     expect(screen.getAllByTitle(/Loose /)).toHaveLength(20)
+    expect(screen.getByText('Routine 5')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /more$/ })).not.toBeInTheDocument()
+  })
+
+  it('has no "Needs a day" header when every routine has a day', () => {
+    render(<DndContext><WeekPoolLane weekStart={weekStart} dayCount={5} onSelectItem={() => {}} tasks={[]} /></DndContext>)
+    expect(screen.queryByRole('button', { name: /Needs a day/ })).not.toBeInTheDocument()
   })
 
   it('is titled for what did not happen, and says so when nothing did', () => {
@@ -326,6 +320,28 @@ describe('WeekPoolLane', () => {
       expect(onUpdateTask).toHaveBeenCalledWith('open', expect.objectContaining({ weekStart: thisWeek }))
     })
 
+    // A miss from weeks ago is not this week's failure. It keeps its
+    // "Didn't happen · <date>" line but waits with the other leftovers, where
+    // the verbs are carry forward / someday / drop.
+    it('a miss older than two weeks is a past week\'s business', () => {
+      render(
+        <DndContext>
+          <WeekPoolLane weekStart={thisWeek} dayCount={7} onSelectItem={() => {}} onUpdateTask={onUpdateTask}
+            tasks={[
+              task({ id: 'stale', title: 'Buy mosquito cartridges', bucket: 'timed', scheduledFor: new Date(2026, 7, 10, 9), isAllDay: true }),
+              task({ id: 'fresh', title: 'Yesterday’s errand', bucket: 'week', scheduledFor: MISSED_DAY }),
+            ]} />
+        </DndContext>,
+      )
+      expect(screen.getByRole('button', { name: /Didn’t happen · 1/ })).toBeInTheDocument()
+      expect(screen.queryByText('Buy mosquito cartridges')).not.toBeInTheDocument()
+      fireEvent.click(screen.getByRole('button', { name: /Unfinished from past weeks · 1/ }))
+      expect(screen.getByText('Buy mosquito cartridges')).toBeInTheDocument()
+      expect(screen.getByText('Didn\'t happen · Aug 10')).toBeInTheDocument()
+      fireEvent.click(screen.getByRole('button', { name: /Carry forward/ }))
+      expect(onUpdateTask).toHaveBeenCalledWith('stale', { bucket: 'week', scheduledFor: undefined, weekStart: thisWeek })
+    })
+
     it('names older leftovers for what they are', () => {
       render(
         <DndContext>
@@ -358,6 +374,14 @@ describe('WeekPoolLane', () => {
 })
 
 describe('WeekPoolLane readability', () => {
+  // Same faked "now" as above: MISSED_DAY must stay a fortnight-fresh miss,
+  // or the wall clock walks it into the carryover fold.
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(2026, 7, 31, 9, 0))
+  })
+  afterEach(() => { vi.useRealTimers() })
+
   // The column is read, not hovered: a long title wraps to its full length
   // and the row's actions sit beneath it in plain view (Scott, 2026-09-06,
   // from the "completely readable cards" mockup).

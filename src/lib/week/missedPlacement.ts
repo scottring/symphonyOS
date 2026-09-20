@@ -28,11 +28,25 @@ export function isMissedPlacement(
   return startOfDay(scheduledFor).getTime() < startOfDay(now).getTime()
 }
 
+/** How long a spent placement stays THIS week's business. A miss from five
+ *  weeks ago listed under "Sep 20–26" read as this week's failure (prod,
+ *  2026-09-20); past this it is a past week's leftover and waits in the
+ *  carryover fold with the stale week placements. */
+export const MISSED_WINDOW_DAYS = 14
+
+/** Whole days between the card's day and now. */
+export function missedDaysAgo(scheduledFor: Date, now: Date): number {
+  return Math.round((startOfDay(now).getTime() - startOfDay(scheduledFor).getTime()) / 86_400_000)
+}
+
+/** A missed placement still inside the window — this week's column's to show. */
+export function isRecentMiss(scheduledFor: Date | null | undefined, completed: boolean, now: Date): boolean {
+  return isMissedPlacement(scheduledFor, completed, now) && missedDaysAgo(scheduledFor as Date, now) < MISSED_WINDOW_DAYS
+}
+
 /** The line the card carries in the list. Says the day, never a count. */
 export function missedLabel(scheduledFor: Date, now: Date): string {
-  const days = Math.round(
-    (startOfDay(now).getTime() - startOfDay(scheduledFor).getTime()) / 86_400_000,
-  )
+  const days = missedDaysAgo(scheduledFor, now)
   const when = days < 7
     ? scheduledFor.toLocaleDateString('en-US', { weekday: 'short' })
     : scheduledFor.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })

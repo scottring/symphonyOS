@@ -13,8 +13,10 @@
 //
 // Each pill also carries the overlay drawer's basic triage: complete (the
 // leading circle), "not this week" (→ next week's plan), and the defer
-// dropdown. The column caps at STRIP_CAP loose pills with a "+N more"
-// expander so a deep backlog never runs off the bottom of the grid.
+// dropdown. Nothing is capped: the lane holds only this fortnight's misses
+// and the routines that need a day, and a miss you cannot see is a miss you
+// cannot decide on (the "+N more" cap went 2026-09-20). Older misses are a
+// past week's leftovers and wait in the carryover fold.
 import { useMemo, useState } from 'react'
 import { useDraggable } from '@dnd-kit/core'
 import { Check, ChevronDown, ChevronRight, ChevronsRight, GripVertical, Repeat, Trash2, Archive, ArrowRight } from 'lucide-react'
@@ -26,16 +28,8 @@ import { PushDropdown } from '@/components/triage'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { readCadenceConfig, weekStartAnchor } from '@/lib/cadence/config'
 import { isPlacedOnWeek, isStaleWeekPlacement } from '@/lib/today/weekPlacement'
-import { isMissedPlacement, missedLabel } from '@/lib/week/missedPlacement'
+import { isMissedPlacement, isRecentMiss, missedLabel } from '@/lib/week/missedPlacement'
 import { planDropHandlers, type PlanDragPayload } from '@/lib/planning/planDrag'
-
-// Loose pills visible before the "+N more" expander.
-const STRIP_CAP = 8
-// Routines get their OWN allowance rather than sharing the tasks' budget. With
-// 34 loose tasks a shared cap spent every slot on tasks and showed no routine
-// at all — which is the segregation this change exists to end (Scott,
-// 2026-09-05). Costs at most a few rows; nothing is taken from the tasks.
-const ROUTINE_STRIP_CAP = 4
 
 // A pill is a dnd-kit drag handle end-to-end, so inline buttons must stop the
 // pointer BEFORE the sensor arms a drag (same guard as the overlay cards).
@@ -221,7 +215,7 @@ export function WeekPoolLane({
   const [planOver, setPlanOver] = useState(false)
   const planProps = onPlanDrop ? planDropHandlers(onPlanDrop, setPlanOver) : {}
   const [open, setOpen] = useState(true)
-  const [showAll, setShowAll] = useState(false)
+  const [routinesOpen, setRoutinesOpen] = useState(true)
   const [carryOpen, setCarryOpen] = useState(false)
   // Ticked pills stay, struck, until the strip is collapsed or the view changes
   // — the list reads as a list with things done on it, not one that shrinks.
@@ -252,17 +246,18 @@ export function WeekPoolLane({
     // kept a second, wider copy of it and the two disagreed (Scott,
     // 2026-09-19: "it's redundant to the pinned list"). A spent placement is
     // different news: it had a day, and the day went by.
-    const missed = all.filter((t) => !leftBehind(t) && isMissedPlacement(t.scheduledFor, t.completed, ctx.today))
-    return { missed, currentWeek }
+    // Only this fortnight's misses. An older one (a Sep 11 and an Aug 15 miss
+    // under "Sep 20–26", prod 2026-09-20) is a past week's leftover and joins
+    // the carryover fold below, where the verbs are keep / someday / drop.
+    const missed = all.filter((t) => !leftBehind(t) && isRecentMiss(t.scheduledFor, t.completed, ctx.today))
+    const oldMissed = all.filter((t) => !leftBehind(t) && isMissedPlacement(t.scheduledFor, t.completed, ctx.today) && !isRecentMiss(t.scheduledFor, t.completed, ctx.today))
+    return { missed, oldMissed, currentWeek }
   }, [tasks, weekStart, dayCount, meId])
 
-  // A routine with no time needs a slot the way an unscheduled task does, so
-  // it rides in the same strip. The host hands over only unhomed ones.
+  // A routine with no DAY needs one the way a loose task does, but it did not
+  // fail to happen — it gets its own header. The host hands over only unhomed ones.
   const needsHome = routines
-  const total = pool.missed.length + needsHome.length
-  const visibleMissed = showAll ? pool.missed : pool.missed.slice(0, STRIP_CAP)
-  const visibleRoutines = showAll ? needsHome : needsHome.slice(0, ROUTINE_STRIP_CAP)
-  const overflow = (pool.missed.length - visibleMissed.length) + (needsHome.length - visibleRoutines.length)
+  const total = pool.missed.length
 
   const tick = onCompleteTask
     ? (id: string) => {
@@ -278,7 +273,10 @@ export function WeekPoolLane({
   // What past weeks left unfinished: moves placed on a week that has gone by
   // and never ticked (weekPlacement's "left-behind"). Strict placement on
   // purpose — a legacy row with no week of its own is still this week's.
-  const unfinished = tasks.filter((t) => !t.completed && t.bucket === 'week' && isStaleWeekPlacement(t, pool.currentWeek))
+  const unfinished = [
+    ...tasks.filter((t) => !t.completed && t.bucket === 'week' && isStaleWeekPlacement(t, pool.currentWeek)),
+    ...pool.oldMissed,
+  ]
   const prevWeek = new Date(pool.currentWeek)
   prevWeek.setDate(prevWeek.getDate() - 7)
   const carryLabel = unfinished.every((t) => isPlacedOnWeek(t, prevWeek)) ? 'Unfinished last week' : 'Unfinished from past weeks'
@@ -304,28 +302,27 @@ export function WeekPoolLane({
       </button>
       {open && (
         <div className="mt-1.5 flex flex-col items-stretch border-t border-neutral-200/80">
-          {visibleMissed.map((t) => <PoolPill key={t.id} task={t} {...pillProps} />)}
+          {pool.missed.map((t) => <PoolPill key={t.id} task={t} {...pillProps} />)}
           {struckPills.map((t) => <PoolPill key={`struck-${t.id}`} task={{ ...t, completed: true }} onSelect={onSelectItem} struck />)}
-          {visibleRoutines.map((r) => <RoutinePill key={r.id} routine={r} onSelect={onSelectItem} draggable={dragEnabled && routinesDraggable} />)}
-          {overflow > 0 && (
-            <button
-              type="button"
-              onClick={() => setShowAll(true)}
-              className="py-1.5 text-left text-[13px] text-neutral-500 hover:text-neutral-800 transition-colors"
-            >
-              +{overflow} more
-            </button>
-          )}
-          {showAll && pool.missed.length > STRIP_CAP && (
-            <button
-              type="button"
-              onClick={() => setShowAll(false)}
-              className="py-1.5 text-left text-[13px] text-neutral-400 hover:text-neutral-600 transition-colors"
-            >
-              Show less
-            </button>
-          )}
           {total === 0 && struckPills.length === 0 && <span className="py-1.5 text-sm text-neutral-400">Every day this week got its work.</span>}
+        </div>
+      )}
+      {needsHome.length > 0 && (
+        <div className="mt-3">
+          <button
+            type="button"
+            aria-expanded={routinesOpen}
+            onClick={() => setRoutinesOpen((v) => !v)}
+            className="inline-flex items-center gap-1 text-xs font-semibold tracking-wide uppercase text-neutral-500 hover:text-neutral-700 transition-colors"
+          >
+            {routinesOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+            Needs a day · {needsHome.length}
+          </button>
+          {routinesOpen && (
+            <div className="mt-1.5 flex flex-col items-stretch border-t border-neutral-200/80">
+              {needsHome.map((r) => <RoutinePill key={r.id} routine={r} onSelect={onSelectItem} draggable={dragEnabled && routinesDraggable} />)}
+            </div>
+          )}
         </div>
       )}
       {unfinished.length > 0 && (
