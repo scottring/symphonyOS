@@ -841,7 +841,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
         routinesDraggable={showSchedule}
         onPlanDrop={(payload) => { void planActions.drop(payload, { type: 'period', period: 'week' }) }}
       />
-      <WeekMonthRail tasks={tasks} meId={meId} onSelectItem={onSelectItem} onAddToWeek={(id) => { void gated.pushTask(id, 'week').then(() => { explainCopyDownOnce('month', 'week') }) }} />
+      <WeekMonthRail tasks={tasks} meId={meId} onSelectItem={onSelectItem} onAddToWeek={(id) => { void Promise.resolve(gated.pushTask(id, 'week')).then(() => { explainCopyDownOnce('month', 'week') }) }} />
     </>
   )
 

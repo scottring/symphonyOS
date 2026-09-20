@@ -259,7 +259,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
 
   // The rail's one verb: copy an open season task down into this month.
   const pullDown = useCallback((row: PlanRowModel) => {
-    void gated.pushTask(row.id, 'month').then(() => { explainCopyDownOnce('season', 'month') })
+    void Promise.resolve(gated.pushTask(row.id, 'month')).then(() => { explainCopyDownOnce('season', 'month') })
   }, [gated])
 
   // The calendar is a view you OPEN, not the thing that greets you: the page

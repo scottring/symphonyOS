@@ -1,15 +1,17 @@
 // src/components/home/week/WeekMonthRail.tsx
 //
-// The month list folded beneath the week list — the rung above, read-only.
-// You plan the week by LOOKING at this, never by dragging from it (levels
-// connect by looking, not linking). Goals first, because a goal is what the
-// month is for; tasks after, each carrying its fate (→ placed / → done /
-// struck) so the list reads as the record it is.
+// The month list folded beneath the week list — the rung above. Goals first,
+// because a goal is what the month is for; tasks after, each carrying its
+// fate (→ placed / → done / struck) so the list reads as the record it is.
 //
-// The one action here is "→ this week" on an open task: a one-tap copy-down
-// (the original stays, marked → placed). It replaced the "This month" tab the
-// strip used to have — the weekly gesture is "reference the month, decide
-// what to do this week", and it needs a home that isn't a drag.
+// Two ways to act on an open task, both ending on this week:
+//   "→ this week"  a one-tap copy-down onto the week LIST (the original
+//                  stays, marked → placed) — for deciding without a day yet.
+//   drag to a day  the row is CHOSEN for that day (planned_on) and keeps its
+//                  month list — the same drag the Today pin's month group has.
+// The fold used to be look-only; the first real walkthrough dragged a row
+// onto a day, nothing happened, and the arrow read as "hugely convoluted"
+// (Scott, 2026-09-20).
 //
 // Rendering is PlanRail's — the same fold every planning page uses for the
 // level above it. This file only decides WHICH rows are this month's.
@@ -49,6 +51,7 @@ export function WeekMonthRail({ tasks, onSelectItem, onAddToWeek, meId, now = ne
       subtitle={label}
       rows={rows}
       storageKey={STORAGE_KEY}
+      dragDate={now}
       onOpen={(row) => onSelectItem(`task-${row.id}`)}
       onPullDown={onAddToWeek ? (row) => onAddToWeek(row.id) : undefined}
       pullLabel="Add to this week:"
