@@ -147,6 +147,9 @@ export function recurrenceToRRule(pattern: RecurrencePattern): string[] | null {
       return ['RRULE:FREQ=MONTHLY;INTERVAL=3']
     case 'yearly':
       return [`RRULE:FREQ=YEARLY${interval}`]
+    // A calendar has no window; a weekend series is Saturday and Sunday.
+    case 'weekend':
+      return ['RRULE:FREQ=WEEKLY;BYDAY=SA,SU']
     default:
       return null
   }
@@ -178,6 +181,16 @@ export function nextOccurrence(pattern: RecurrencePattern, time: string | null, 
       const day = new Date(today)
       day.setDate(today.getDate() + offset)
       if (!wanted.has(day.getDay())) continue
+      const candidate = atTime(day, time)
+      if (offset > 0 || stillAhead(candidate)) return candidate
+    }
+  }
+
+  if (pattern.type === 'weekend') {
+    for (let offset = 0; offset < 8; offset++) {
+      const day = new Date(today)
+      day.setDate(today.getDate() + offset)
+      if (day.getDay() !== 0 && day.getDay() !== 6) continue
       const candidate = atTime(day, time)
       if (offset > 0 || stillAhead(candidate)) return candidate
     }
@@ -277,6 +290,8 @@ export function describeRecurrence(pattern: RecurrencePattern): string {
     }
     case 'specific_days':
       return pattern.dates?.length ? `${pattern.dates.length} set dates` : 'On set dates'
+    case 'weekend':
+      return 'Weekends'
     default:
       return 'Repeats'
   }

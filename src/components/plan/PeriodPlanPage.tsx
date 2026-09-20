@@ -243,9 +243,9 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
     // the whole plan. That is the whole point of the placement model.
     else if (action === 'to-lower') {
       const lower = lowerLevel(level)
-      if (lower && level !== 'year') {
-        await gated.pushTask(row.id, lower)
-        explainCopyDownOnce(level, lower)
+      if (lower) {
+        const ok = await gated.pushTask(row.id, lower)
+        if (ok) explainCopyDownOnce(level, lower)
       }
     }
     else if (action === 'today') {
@@ -259,7 +259,9 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
 
   // The rail's one verb: copy an open season task down into this month.
   const pullDown = useCallback((row: PlanRowModel) => {
-    void Promise.resolve(gated.pushTask(row.id, 'month')).then(() => { explainCopyDownOnce('season', 'month') })
+    // Only after a real write: a cancelled DomainGate resolves false, and
+    // explaining a copy that never happened would also burn the once-ever flag.
+    void Promise.resolve(gated.pushTask(row.id, 'month')).then((ok) => { if (ok) explainCopyDownOnce('season', 'month') })
   }, [gated])
 
   // The calendar is a view you OPEN, not the thing that greets you: the page

@@ -6,6 +6,7 @@ import { resolveRoutineTime } from '@/lib/today/routineTime'
 import { addDays, isSameDay, toDateString } from '@/lib/dateUtils'
 import type { AssigneeFilter } from '@/lib/today/types'
 import type { Layer } from '@/lib/domains'
+import { parseLocalDate } from '@/lib/dateUtils'
 
 export interface BuildWeekRoutineItemsArgs {
   routines: Routine[]
@@ -35,6 +36,16 @@ export interface BuildWeekRoutineItemsArgs {
  *   - deferred AWAY from this day → renders nowhere here, leaving no ghost
  *   - retimed within this day → renders at the new time (resolveRoutineTime)
  */
+/** The most recent completed occurrence's day, parsed by parts (local). */
+function latestCompletion(own: ActionableInstance[] | undefined): Date | undefined {
+  let best: string | undefined
+  for (const i of own ?? []) {
+    if (i.status !== 'completed') continue
+    if (!best || i.date > best) best = i.date
+  }
+  return best ? parseLocalDate(best) : undefined
+}
+
 export function buildWeekRoutineItems({
   routines,
   weekStart,
@@ -81,7 +92,11 @@ export function buildWeekRoutineItems({
         continue
       }
 
-      if (!resolveRoutine(routine, { date: day, member, prefs, deferredInto }).shows) continue
+      // The weekend window lives in the lastCompletedAt branch of the
+      // resolver: without it, /week drew a Saturday-ticked routine on Sunday
+      // too — the "asks twice" this branch exists to end.
+      const lastCompletedAt = latestCompletion(own)
+      if (!resolveRoutine(routine, { date: day, member, prefs, deferredInto, lastCompletedAt }).shows) continue
 
       const instance = deferredIn ?? onThisDay
       items.push({

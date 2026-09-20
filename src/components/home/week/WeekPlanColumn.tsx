@@ -43,10 +43,13 @@ export function WeekPlanColumn({ tasks, weekStart, meId, actions, draggable = tr
   // The rows are the week's; the row verbs ("Today", set a time) act on the
   // real current day — choosing work for a day you are not living in is what
   // the day picker is for.
+  // Keyed on today's DATE, so a tab left open past midnight moves on with
+  // the calendar instead of judging "planned today" against yesterday.
+  const todayKey = localYmd(new Date())
   const day = useMemo(() => {
-    const [y, m, d] = localYmd(new Date()).split('-').map(Number)
+    const [y, m, d] = todayKey.split('-').map(Number)
     return new Date(y, m - 1, d)
-  }, [])
+  }, [todayKey])
 
   const plan = useMemo(() => ({
     scheduled: [], available: [], month: [],
