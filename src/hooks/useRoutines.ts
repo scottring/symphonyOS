@@ -1,3 +1,4 @@
+import { parseLocalDate } from '@/lib/dateUtils'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { supabase, getAuthUser } from '@/lib/supabase'
 import type { Routine, RecurrencePattern, RoutineVisibility, PrepFollowupTemplate, TargetUnit } from '@/types/actionable'
@@ -227,7 +228,9 @@ export function useRoutines() {
       const map: LastCompletionMap = new Map()
       for (const row of (data || []) as Array<{ entity_id: string; date: string; updated_at: string }>) {
         if (map.has(row.entity_id)) continue // already have a later date
-        const d = new Date(row.date)
+        // 'YYYY-MM-DD' parsed by parts: new Date('2026-09-19') is UTC midnight,
+        // which is Sep 18 in the US and put a Saturday tick on Friday.
+        const d = parseLocalDate(row.date)
         if (!isNaN(d.getTime())) map.set(row.entity_id, d)
       }
       setLastCompletionByRoutine(map)

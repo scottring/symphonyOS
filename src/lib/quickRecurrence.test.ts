@@ -180,3 +180,22 @@ describe('nextOccurrence past the month', () => {
       .toEqual(new Date(2026, 9, 5))
   })
 })
+
+// 'weekend' is a window in the app; a calendar has no window, so the series
+// is Saturday and Sunday. Without these cases the event path lost its RRULE,
+// nextOccurrence fell to tomorrow, and the chip read "Repeats".
+describe('weekend recurrence', () => {
+  it('becomes a Saturday+Sunday weekly rule for the calendar', () => {
+    expect(recurrenceToRRule({ type: 'weekend' })).toEqual(['RRULE:FREQ=WEEKLY;BYDAY=SA,SU'])
+  })
+  it('starts on the coming Saturday from a weekday', () => {
+    const wed = new Date(2026, 8, 23, 10) // Wed Sep 23
+    const next = nextOccurrence({ type: 'weekend' }, '09:00', wed)
+    expect(next.getDay()).toBe(6)
+    expect(next.getDate()).toBe(26)
+    expect(next.getHours()).toBe(9)
+  })
+  it('is described as Weekends', () => {
+    expect(describeRecurrence({ type: 'weekend' })).toBe('Weekends')
+  })
+})

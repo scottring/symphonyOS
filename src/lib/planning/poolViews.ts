@@ -108,16 +108,19 @@ export function weekList(pool: Task[], ctx: PoolCtx): Task[] {
     // all-day row in this week's list whatever horizon it belonged to — month
     // work under THIS WEEK, and week moves placed on a week still ahead
     // skipping belongsToWeek altogether (Scott, 2026-09-19).
-    if (t.bucket === 'week') return belongsToWeek(t, currentWeek) || isStaleWeekPlacement(t, currentWeek)
-    // A month, season or someday commitment is looked at on its own page.
-    if (t.bucket === 'month' || t.bucket === 'quarter' || t.bucket === 'someday') return false
-    // Undated all-day work with no horizon of its own still rides here.
-    if (t.isAllDay) return true
+    // A slipped TIMED date is a miss whatever list it came from — checked
+    // before the bucket exclusions below, or a month task's 3pm slot that
+    // passed would vanish while the same task marked all-day stays.
     if (t.scheduledFor) {
       const d = new Date(t.scheduledFor)
       d.setHours(0, 0, 0, 0)
       if (d < today) return true // carried over
     }
+    if (t.bucket === 'week') return belongsToWeek(t, currentWeek) || isStaleWeekPlacement(t, currentWeek)
+    // A month, season or someday commitment is looked at on its own page.
+    if (t.bucket === 'month' || t.bucket === 'quarter' || t.bucket === 'someday') return false
+    // Undated all-day work with no horizon of its own still rides here.
+    if (t.isAllDay) return true
     return false
   })
 }

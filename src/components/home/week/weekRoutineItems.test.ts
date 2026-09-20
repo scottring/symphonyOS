@@ -136,3 +136,27 @@ describe('buildWeekRoutineItems', () => {
     expect(items[0].startTime).toBeNull()
   })
 })
+
+// The weekend window lives in the resolver's lastCompletedAt branch. The
+// week page never passed it, so a Saturday tick still drew the routine on
+// Sunday — on the one page the week is planned from (review, 2026-09-20).
+describe('buildWeekRoutineItems — the weekend is one window', () => {
+  const sunday = new Date(2026, 8, 20) // Sun 2026-09-20 → Sat is dayIdx 6
+  const weekend = createMockRoutine({ id: 'w1', name: 'Family walk', time_of_day: null, recurrence_pattern: { type: 'weekend' } })
+
+  it('offers the routine on both weekend days when nothing was done', () => {
+    const items = buildWeekRoutineItems({ routines: [weekend], weekStart: sunday, dayCount: 7, instances: [], prefs: PREFS })
+    expect(items.map((i) => i.id)).toEqual(['routine-w1-day0', 'routine-w1-day6'])
+  })
+
+  it('settles Sunday once Saturday was ticked — the Saturday tick is read as a LOCAL day', () => {
+    const doneSaturday = createMockActionableInstance({
+      entity_type: 'routine', entity_id: 'w1', date: '2026-09-19', status: 'completed',
+    })
+    // Week of Sat Sep 19 – Fri Sep 25: Saturday is dayIdx 0, Sunday dayIdx 1.
+    const items = buildWeekRoutineItems({ routines: [weekend], weekStart: new Date(2026, 8, 19), dayCount: 7, instances: [doneSaturday], prefs: PREFS })
+    const ids = items.map((i) => i.id)
+    expect(ids).toContain('routine-w1-day0') // the day it was done still shows it, ticked
+    expect(ids).not.toContain('routine-w1-day1') // Sunday goes quiet
+  })
+})

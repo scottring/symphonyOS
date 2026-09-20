@@ -1,3 +1,4 @@
+import { parseLocalDate } from '@/lib/dateUtils'
 import { useMemo, useState, useCallback, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -186,10 +187,13 @@ export function WeekViewV2(props: WeekViewV2Props) {
   // Tell the shell which week is on screen, so the Today pin's week list
   // answers the same question this page is asking. Cleared on unmount — the
   // pin falls back to the real current week beside every other page.
-  useEffect(() => {
-    publishViewedWeek(weekStart)
-    return () => publishViewedWeek(null)
-  }, [weekStart])
+  // The prop is a RANGE start (Saturday for ?range=weekend, Monday for the
+  // workweek); the list and the pin key on the week ANCHOR, like belongsToWeek.
+  const weekAnchor = useMemo(() => weekStartAnchor(weekStart, readCadenceConfig().weekStartsOn), [weekStart])
+  useEffect(() => { publishViewedWeek(weekAnchor) }, [weekAnchor])
+  // Only unmount clears it — a cleanup on every change published null → week
+  // and defeated the signal's same-week dedupe.
+  useEffect(() => () => publishViewedWeek(null), [])
 
   const handleNotThisWeek = useCallback((id: string) => {
     const currentWeek = weekStartAnchor(new Date(), readCadenceConfig().weekStartsOn)
@@ -713,13 +717,16 @@ export function WeekViewV2(props: WeekViewV2Props) {
   }), [tasks, onUpdateTask, gated, setPlanned, rescheduleInstance, pushAction])
   // Row verbs for the week list in the margin. The same writes the pin's rows
   // make; the list holds tasks only, so its routine verb never fires here.
+  // Re-keyed per render on today's date, so a tab left open past midnight
+  // does not keep choosing rows for yesterday.
+  const todayKey = localYmd(new Date())
   const weekListActions = useMemo(
-    () => panelActionsFor(new Date(), {
+    () => panelActionsFor(parseLocalDate(todayKey), {
       ...planActions,
       toggleTask: (id: string) => { void toggleTask(id) },
       completeRoutine: () => Promise.resolve(false),
     }),
-    [planActions, toggleTask],
+    [planActions, toggleTask, todayKey],
   )
   const handlePlanDropOnDay = useCallback((day: JournalDay, payload: PlanDragPayload) => {
     void planActions.drop(payload, { type: 'day', day: day.date })
@@ -822,7 +829,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
     <>
       {/* The week's list — the same rows the Today pin draws, in the page's
           own column so it does not depend on a pin being switched on. */}
-      <WeekPlanColumn tasks={tasks} weekStart={weekStart} meId={meId} actions={weekListActions} draggable={!narrow} />
+      <WeekPlanColumn tasks={tasks} weekStart={weekAnchor} meId={meId} actions={weekListActions} draggable={!narrow} />
       <WeekPoolLane
         tasks={tasks}
         routines={shelfRoutines}
@@ -841,7 +848,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
         routinesDraggable={showSchedule}
         onPlanDrop={(payload) => { void planActions.drop(payload, { type: 'period', period: 'week' }) }}
       />
-      <WeekMonthRail tasks={tasks} meId={meId} onSelectItem={onSelectItem} onAddToWeek={(id) => { void Promise.resolve(gated.pushTask(id, 'week')).then(() => { explainCopyDownOnce('month', 'week') }) }} />
+      <WeekMonthRail tasks={tasks} meId={meId} onSelectItem={onSelectItem} onAddToWeek={(id) => { void Promise.resolve(gated.pushTask(id, 'week')).then((ok) => { if (ok) explainCopyDownOnce('month', 'week') }) }} />
     </>
   )
 

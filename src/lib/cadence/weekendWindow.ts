@@ -53,7 +53,18 @@ function observed(d: Date): Date {
 }
 
 /** Every federal day off in `year`, as YYYY-MM-DD → name. */
+const daysOffByYear = new Map<number, Map<string, FederalHoliday>>()
+
 export function federalDaysOff(year: number): Map<string, FederalHoliday> {
+  const cached = daysOffByYear.get(year)
+  if (cached) return cached
+  const built = buildFederalDaysOff(year)
+  daysOffByYear.set(year, built)
+  return built
+}
+
+/** The table changes once a year; build it once a year. */
+function buildFederalDaysOff(year: number): Map<string, FederalHoliday> {
   const thanksgiving = nthWeekday(year, 10, 4, 4) // 4th Thursday in November
   const dayAfter = new Date(year, 10, thanksgiving.getDate() + 1)
   const entries: [Date, FederalHoliday][] = [

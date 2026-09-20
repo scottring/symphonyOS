@@ -18,12 +18,12 @@ function markSeen(): void {
 }
 
 /** The sentence, for tests and for any surface that wants it inline. */
-export function copyDownExplanation(from: 'season' | 'month', to: 'month' | 'week'): string {
+export function copyDownExplanation(from: 'season' | 'month' | 'year', to: 'month' | 'week'): string {
   return `Copied into this ${to}. The ${from} keeps it as a record — it reads “→ placed” there, then “→ done” once you tick the copy.`
 }
 
 /** Say it once, ever. Returns true when it was said. */
-export function explainCopyDownOnce(from: 'season' | 'month', to: 'month' | 'week'): boolean {
+export function explainCopyDownOnce(from: 'season' | 'month' | 'year', to: 'month' | 'week'): boolean {
   if (seen()) return false
   markSeen()
   showToast(copyDownExplanation(from, to), 'info', 12000)

@@ -156,6 +156,20 @@ describe('weekList', () => {
     expect(ids).not.toContain(inboxItem.id)
   })
 
+  // A slipped TIMED date is a miss whatever list it came from. The bucket
+  // exclusion used to run first, so a month task whose 3pm slot passed
+  // vanished from the lane while the same task marked all-day stayed
+  // (review, 2026-09-20).
+  it('keeps a month task whose timed slot already passed — a miss is a miss', () => {
+    const slippedTimedMonth = task({ bucket: 'month', scheduledFor: new Date(2026, 7, 25, 15), isAllDay: false })
+    const slippedAllDayMonth = task({ bucket: 'month', scheduledFor: new Date(2026, 7, 25), isAllDay: true })
+    const futureTimedMonth = task({ bucket: 'month', scheduledFor: new Date(2026, 8, 3, 15), isAllDay: false })
+    const ids = weekList([slippedTimedMonth, slippedAllDayMonth, futureTimedMonth], ctx).map((t) => t.id)
+    expect(ids).toContain(slippedTimedMonth.id)
+    expect(ids).toContain(slippedAllDayMonth.id)
+    expect(ids).not.toContain(futureTimedMonth.id)
+  })
+
   // An all-day flag is not a placement. A month or season commitment is looked
   // at on its own page; before this, the all-day branch ran BEFORE any bucket
   // test, so every undated all-day row landed in this week's list whatever
