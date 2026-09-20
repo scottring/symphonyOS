@@ -106,12 +106,17 @@ export function RoutineCollectionRow({ item, onSelect, onSelectStep, onCompleteS
           {open ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
         </button>
         <button onClick={() => setOpen(o => !o)} className="flex-1 flex items-center gap-2 py-1.5 text-left min-w-0">
-          <span className="text-[16px] leading-snug font-medium text-neutral-800 truncate shrink-0 max-w-[50%]">{item.title}</span>
+          {/* The name takes the room that is left, rather than half of it: at
+              390px the time gutter, chevron and action rail leave ~93px, and
+              `max-w-[50%]` rendered "Kids Bedtime routine" as "K.." (2026-09-19). */}
+          <span className="min-w-0 flex-1 line-clamp-2 break-words text-[16px] leading-snug font-medium text-neutral-800">{item.title}</span>
           <span className="text-xs text-neutral-400 tabular-nums shrink-0">{p.done}/{p.total}</span>
           {item.completed
-            ? <span className="text-xs text-neutral-400 truncate">· done</span>
+            ? <span className="text-xs text-neutral-400 shrink-0">· done</span>
             : nextUp && (
-                <span className="text-xs text-neutral-500 truncate min-w-0">
+                /* The next step is a hint, not the row — it goes before the
+                   name does, and a phone never has room for both. */
+                <span className="hidden sm:inline min-w-0 truncate text-xs text-neutral-500">
                   · {nextUp.stepName}
                 </span>
               )}
