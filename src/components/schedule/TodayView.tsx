@@ -51,6 +51,7 @@ import { findTaskById } from '@/lib/findTaskById'
 import { showToast } from '@/hooks/useToast'
 import { useNavigate } from 'react-router-dom'
 import { useGoogleCalendar } from '@/hooks/useGoogleCalendar'
+import { ALL_LAYERS } from '@/lib/domains'
 import { AssigneeFilter } from '@/components/home/AssigneeFilter'
 
 import { NeededTodayNote } from './NeededTodayNote'
@@ -182,7 +183,7 @@ export function TodayView({
   // ── Context ──────────────────────────────────────────────────────────────────
   const isMobile = useMobile()
   const navigate = useNavigate()
-  const { isConnected: calendarConnected } = useGoogleCalendar()
+  const { isConnected: calendarConnected, error: calendarError } = useGoogleCalendar()
   const ctx = useScheduleActionsContext()
   // Only what THIS file still uses. The row-level handlers moved with the
   // section loop into TodaySectionList, which reads the same context itself.
@@ -1438,8 +1439,15 @@ export function TodayView({
                 {/* A connected calendar with nothing on it must not read like a
                     disconnected one (the calendar status line above covers the
                     other states). */}
+                {/* "Clear" is a claim: connected, synced, and no layer filtered
+                    out. Otherwise say only what is shown — a hidden Personal
+                    calendar under a Family filter is not a clear day. */}
                 {data.isToday
-                  ? (calendarConnected ? 'Nothing else with a time today. Your calendar is clear.' : 'Nothing else with a time today.')
+                  ? (calendarConnected && !calendarError && layers.size === ALL_LAYERS.size
+                      ? 'Nothing else with a time today. Your calendar is clear.'
+                      : calendarConnected
+                        ? 'Nothing else with a time today. No events shown for your current view.'
+                        : 'Nothing else with a time today.')
                   : 'Nothing with a time on this day.'}
               </p>
             )}

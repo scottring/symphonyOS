@@ -26,10 +26,20 @@ vi.mock('@/hooks/useNotes', () => ({ useNotes: () => ({ notes: [], loading: fals
 vi.mock('@/hooks/useSupabaseTasks', () => ({ useSupabaseTasks: () => ({ tasks: [], loading: false, addTask: vi.fn(), updateTask: vi.fn(), deleteTask: vi.fn() }) }))
 vi.mock('@/hooks/usePinnedItems', () => ({ usePinnedItems: () => ({ isPinned: () => false, pin: vi.fn(), unpin: vi.fn() }) }))
 vi.mock('@/hooks/useActionQueue', () => ({ useActionQueue: () => ({ actions: [], loading: false, approveAction: vi.fn(), rejectAction: vi.fn(), pendingCount: 0, refetch: vi.fn() }) }))
+const domainMock = vi.hoisted(() => ({ layers: new Set<string>() as ReadonlySet<string> }))
 vi.mock('@/hooks/useDomain.tsx', async (importOriginal) => {
   const actual = await importOriginal() as Record<string, unknown>
-  return { ...actual, useDomain: () => ({ currentDomain: 'universal', layers: ALL_LAYERS, setDomain: vi.fn() }) }
+  return { ...actual, useDomain: () => ({ currentDomain: 'universal', layers: domainMock.layers, setDomain: vi.fn() }) }
 })
+const calendarMock = vi.hoisted(() => ({ isConnected: false, error: null as string | null }))
+vi.mock('@/hooks/useGoogleCalendar', () => ({
+  useGoogleCalendar: () => ({
+    isConnected: calendarMock.isConnected, needsReconnect: false, isLoading: false, isFetching: false, events: [], error: calendarMock.error,
+    connect: vi.fn(), disconnect: vi.fn(), fetchTodayEvents: vi.fn(), fetchWeekEvents: vi.fn(), fetchEvents: vi.fn(),
+    createEvent: vi.fn(), updateEvent: vi.fn(), moveEvent: vi.fn(), deleteEvent: vi.fn(), removeEventLocal: vi.fn(), restoreEventLocal: vi.fn(),
+    fetchCalendarList: vi.fn(async () => []), defaultCalendarId: null, setDefaultCalendarId: vi.fn(),
+  }),
+}))
 vi.mock('@/hooks/useTimelineInsert', () => ({
   useTimelineInsert: () => ({ handlePick: vi.fn(), noteComposer: null, closeNoteComposer: vi.fn() }),
 }))
@@ -90,6 +100,7 @@ describe('Carried over', () => {
 })
 
 beforeEach(() => {
+  domainMock.layers = ALL_LAYERS
   sessionStorage.clear()
   mobile.value = false
   vi.useFakeTimers({ toFake: ['Date'] })
@@ -140,5 +151,31 @@ describe('Today as a daily journal', () => {
     renderView({ viewedDate: new Date(2026, 8, 20), tasks: [createMockTask({ id: 'sun', title: 'Sunday run', bucket: 'timed', isAllDay: false, scheduledFor: new Date(2026, 8, 20, 8) })] })
     expect(screen.getByRole('region', { name: 'Schedule' })).toHaveTextContent('Sunday run')
     expect(screen.queryByRole('button', { name: /Earlier today/ })).toBeNull()
+  })
+})
+
+describe('the calendar-clear claim', () => {
+  // "Your calendar is clear" only when connected, synced and unfiltered; a
+  // Personal calendar hidden under a Family filter is not a clear day.
+  beforeEach(() => { calendarMock.isConnected = true; calendarMock.error = null })
+  afterEach(() => { calendarMock.isConnected = false })
+
+  it('claims a clear calendar only with every layer showing', () => {
+    renderView({ tasks: [] })
+    expect(screen.getByText(/Your calendar is clear/)).toBeInTheDocument()
+  })
+
+  it('says "no events shown for your current view" when a layer is filtered out', () => {
+    domainMock.layers = new Set(['family'])
+    renderView({ tasks: [] })
+    expect(screen.getByText(/No events shown for your current view/)).toBeInTheDocument()
+    expect(screen.queryByText(/Your calendar is clear/)).toBeNull()
+    domainMock.layers = ALL_LAYERS
+  })
+
+  it('never claims "clear" while a sync error stands', () => {
+    calendarMock.error = 'Google returned 503'
+    renderView({ tasks: [] })
+    expect(screen.queryByText(/Your calendar is clear/)).toBeNull()
   })
 })
