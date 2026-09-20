@@ -50,6 +50,7 @@ import { useActionableInstances } from '@/hooks/useActionableInstances'
 import { findTaskById } from '@/lib/findTaskById'
 import { showToast } from '@/hooks/useToast'
 import { useNavigate } from 'react-router-dom'
+import { useGoogleCalendar } from '@/hooks/useGoogleCalendar'
 import { AssigneeFilter } from '@/components/home/AssigneeFilter'
 
 import { NeededTodayNote } from './NeededTodayNote'
@@ -181,6 +182,7 @@ export function TodayView({
   // ── Context ──────────────────────────────────────────────────────────────────
   const isMobile = useMobile()
   const navigate = useNavigate()
+  const { isConnected: calendarConnected } = useGoogleCalendar()
   const ctx = useScheduleActionsContext()
   // Only what THIS file still uses. The row-level handlers moved with the
   // section loop into TodaySectionList, which reads the same context itself.
@@ -1433,7 +1435,12 @@ export function TodayView({
             />
             {journal.aheadCount === 0 && (
               <p className="py-3 text-[15px] text-neutral-500">
-                {data.isToday ? 'Nothing else with a time today.' : 'Nothing with a time on this day.'}
+                {/* A connected calendar with nothing on it must not read like a
+                    disconnected one (the calendar status line above covers the
+                    other states). */}
+                {data.isToday
+                  ? (calendarConnected ? 'Nothing else with a time today. Your calendar is clear.' : 'Nothing else with a time today.')
+                  : 'Nothing with a time on this day.'}
               </p>
             )}
             {journal.earlierSummary.rows > 0 && (
