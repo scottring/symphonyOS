@@ -245,7 +245,7 @@ export function DayPlanPanel({ plan, day, actions, draggable = true, weekPage = 
    *  reference under the day. */
   weekPage?: Date | null
 }) {
-  const nothing = plan.scheduled.length + plan.available.length + plan.week.length + plan.month.length === 0
+  const nothing = plan.carried.length + plan.scheduled.length + plan.available.length + plan.week.length + plan.month.length === 0
   const weekTitle = weekListTitle(weekPage)
   const weekGroup = (
     <Group
@@ -263,6 +263,9 @@ export function DayPlanPanel({ plan, day, actions, draggable = true, weekPage = 
     <div data-testid="day-plan-panel">
       {nothing && !weekPage && <p className="py-4 text-[14px] text-neutral-500">Nothing waiting — the day is what's on it.</p>}
       {weekPage && weekGroup}
+      {plan.carried.length > 0 && (
+        <Group title="Carried over" entries={plan.carried} day={day} actions={actions} draggable={draggable} defaultOpen={!weekPage} />
+      )}
       <Group title="Scheduled today" entries={plan.scheduled} day={day} actions={actions} draggable={draggable} defaultOpen={!weekPage} />
       <Group title="Available today" entries={plan.available} day={day} actions={actions} draggable={draggable} defaultOpen={!weekPage} />
       {!weekPage && weekGroup}

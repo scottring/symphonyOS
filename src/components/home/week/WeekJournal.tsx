@@ -20,7 +20,7 @@
 // and undo included) and a native drop for rows dragged out of the Today pin.
 import { useState } from 'react'
 import { useDraggable, useDroppable } from '@dnd-kit/core'
-import { Check } from 'lucide-react'
+import { Check, Plus } from 'lucide-react'
 import type { Task } from '@/types/task'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import type { TimelineItem } from '@/types/timeline'
@@ -63,6 +63,10 @@ interface WeekJournalProps {
   onToggleEntry: (entry: JournalEntry, day: JournalDay) => void
   /** A row dragged out of the Today pin, dropped on a day. */
   onPlanDrop?: (day: JournalDay, payload: PlanDragPayload) => void
+  /** "+ Add" on a day: a task straight onto that day. Omitted = no control.
+   *  (Walkthrough 2026-09-20: "there's no way in the UI to add a task
+   *  straight to a day on week" — only ⌘K-with-a-date and the hourly grid.) */
+  onAddToDay?: (day: JournalDay, title: string) => void
   /** Rows can be picked up. Off on touch-width layouts, where a drag handle
    *  would swallow the scroll. */
   dragEnabled?: boolean
@@ -155,11 +159,43 @@ function Entry({ entry, day, onSelect, onToggle, dragEnabled }: {
   )
 }
 
-function DayRow({ day, onSelectItem, onToggleEntry, onPlanDrop, dragEnabled, narrow }: {
+function AddToDay({ day, onAdd }: { day: JournalDay; onAdd: NonNullable<WeekJournalProps['onAddToDay']> }) {
+  const [open, setOpen] = useState(false)
+  const [draft, setDraft] = useState('')
+  const weekday = day.date.toLocaleDateString('en-US', { weekday: 'long' })
+  if (!open) {
+    return (
+      <button type="button" onClick={() => setOpen(true)} aria-label={`Add to ${weekday}`}
+        className="mt-1 inline-flex items-center gap-1 self-start text-[12.5px] text-neutral-400 opacity-0 transition-opacity hover:text-neutral-700 focus-visible:opacity-100 group-hover/day:opacity-100">
+        <Plus className="h-3.5 w-3.5" aria-hidden="true" />Add
+      </button>
+    )
+  }
+  return (
+    <form
+      className="mt-1 flex items-center gap-2"
+      onSubmit={(e) => { e.preventDefault(); const t = draft.trim(); if (!t) return; onAdd(day, t); setDraft(''); setOpen(false) }}
+    >
+      <input
+        autoFocus
+        aria-label={`New task for ${weekday}`}
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Escape') { setDraft(''); setOpen(false) } }}
+        onBlur={() => { if (!draft.trim()) setOpen(false) }}
+        placeholder={`Add to ${weekday}…`}
+        className="min-w-0 flex-1 bg-transparent py-0.5 text-[14px] text-neutral-800 placeholder:text-neutral-400 focus:outline-none"
+      />
+    </form>
+  )
+}
+
+function DayRow({ day, onSelectItem, onToggleEntry, onPlanDrop, onAddToDay, dragEnabled, narrow }: {
   day: JournalDay
   onSelectItem: (id: string) => void
   onToggleEntry: WeekJournalProps['onToggleEntry']
   onPlanDrop?: WeekJournalProps['onPlanDrop']
+  onAddToDay?: WeekJournalProps['onAddToDay']
   dragEnabled: boolean
   narrow: boolean
 }) {
@@ -178,7 +214,7 @@ function DayRow({ day, onSelectItem, onToggleEntry, onPlanDrop, dragEnabled, nar
       {...planProps}
       aria-label={day.date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
       data-testid={`journal-day-${day.key}`}
-      className={`grid min-w-0 border-t border-neutral-300 py-3 text-[14px] transition-colors first:border-t-0 ${
+      className={`group/day grid min-w-0 border-t border-neutral-300 py-3 text-[14px] transition-colors first:border-t-0 ${
         narrow ? 'grid-cols-[2.75rem_minmax(0,1fr)] gap-3' : 'grid-cols-[4rem_minmax(0,1fr)] gap-5 min-h-[5.5rem]'
       } ${dndOver || planOver ? 'bg-primary-50/60' : ''}`}
     >
@@ -244,13 +280,14 @@ function DayRow({ day, onSelectItem, onToggleEntry, onPlanDrop, dragEnabled, nar
           </p>
         )}
 
-        {empty && <span aria-hidden="true" className="text-[12px] text-neutral-300">—</span>}
+        {empty && !onAddToDay && <span aria-hidden="true" className="text-[12px] text-neutral-300">—</span>}
+        {onAddToDay && <AddToDay day={day} onAdd={onAddToDay} />}
       </div>
     </section>
   )
 }
 
-export function WeekJournal({ days, spans, onSelectItem, onToggleEntry, onPlanDrop, dragEnabled = true, narrow = false }: WeekJournalProps) {
+export function WeekJournal({ days, spans, onSelectItem, onToggleEntry, onPlanDrop, onAddToDay, dragEnabled = true, narrow = false }: WeekJournalProps) {
   return (
     <div data-testid="week-journal" className="border-y border-neutral-300">
       {spans.length > 0 && (
@@ -276,7 +313,7 @@ export function WeekJournal({ days, spans, onSelectItem, onToggleEntry, onPlanDr
       )}
       {days.map((day) => (
         <DayRow key={day.key} day={day} onSelectItem={onSelectItem} onToggleEntry={onToggleEntry}
-          onPlanDrop={onPlanDrop} dragEnabled={dragEnabled} narrow={narrow} />
+          onPlanDrop={onPlanDrop} onAddToDay={onAddToDay} dragEnabled={dragEnabled} narrow={narrow} />
       ))}
     </div>
   )

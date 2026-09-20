@@ -72,7 +72,7 @@ vi.mock('@/components/layout/Sidebar', () => ({ Sidebar: () => <div data-testid=
 vi.mock('@/components/layout/MoreSheet', () => ({ MoreSheet: () => null }))
 vi.mock('@/components/layout/QuickCapture', () => ({ QuickCapture: ({ showFab, isOpen }: { showFab?: boolean; isOpen?: boolean }) => <div data-testid="quick-capture" data-fab={String(showFab)} data-open={String(!!isOpen)} /> }))
 vi.mock('@/hooks/useDayPlan', () => ({ useDayPlan: () => ({ loading: false, error: false, plan: {
-  scheduled: [], available: [], week: [], month: [], counts: { scheduled: 0, available: 0 },
+  carried: [], scheduled: [], available: [], week: [], month: [], counts: { scheduled: 0, available: 0 },
   offMainTaskIds: new Set(), offMainRoutineItemIds: new Set(), plannedExtraTasks: [],
 } }) }))
 vi.mock('@/hooks/usePlanActions', () => ({ usePlanActions: () => ({}) }))

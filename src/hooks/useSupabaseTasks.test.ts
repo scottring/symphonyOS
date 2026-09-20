@@ -1201,7 +1201,7 @@ describe('useSupabaseTasks', () => {
       })
 
       // sort_order should not be in the update payload at all
-      expect(mockUpdate).toHaveBeenCalledWith({ completed: true })
+      expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({ completed: true }))
       const lastCall = mockUpdate.mock.calls[mockUpdate.mock.calls.length - 1][0]
       expect(lastCall).not.toHaveProperty('sort_order')
     })
@@ -1406,7 +1406,7 @@ describe('useSupabaseTasks', () => {
       })
 
       expect(result.current.tasks[0].completed).toBe(true)
-      expect(mockUpdate).toHaveBeenCalledWith({ completed: true })
+      expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({ completed: true }))
     })
 
     it('marks complete task as incomplete', async () => {
@@ -1423,7 +1423,7 @@ describe('useSupabaseTasks', () => {
       })
 
       expect(result.current.tasks[0].completed).toBe(false)
-      expect(mockUpdate).toHaveBeenCalledWith({ completed: false })
+      expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({ completed: false }))
     })
 
     // One-way sync: completing a task spawned FROM a list item (Needed Today

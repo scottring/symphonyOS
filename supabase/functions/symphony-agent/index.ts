@@ -665,14 +665,14 @@ async function runTool(
           }
         }
         const { data, error } = await db.from('tasks')
-          .update({ ...updates, updated_at: now() }).eq('id', id).select().single()
+          .update({ ...updates, ...('completed' in updates ? { completed_at: updates.completed ? now() : null } : {}), updated_at: now() }).eq('id', id).select().single()
         if (error) throw error
         return JSON.stringify(data, null, 2)
       }
       case 'symphony_complete_task': {
         const completed = input.completed === undefined ? true : !!input.completed
         const { data, error } = await db.from('tasks')
-          .update({ completed, updated_at: now() }).eq('id', input.id).select().single()
+          .update({ completed, completed_at: completed ? now() : null, updated_at: now() }).eq('id', input.id).select().single()
         if (error) throw error
         return `Task "${data.title}" ${completed ? 'completed' : 'uncompleted'}`
       }

@@ -118,7 +118,8 @@ export function PlanRail({ title, subtitle, rows, onOpen, onPullDown, pullLabel,
         {open ? <ChevronDown className="w-3.5 h-3.5 shrink-0" /> : <ChevronRight className="w-3.5 h-3.5 shrink-0" />}
         <span>{title}</span>
         {subtitle && <span className="font-normal normal-case tracking-normal text-neutral-400">· {subtitle}</span>}
-        {!open && <span className="ml-auto font-normal normal-case tracking-normal text-neutral-400">{rows.length}</span>}
+        {/* The folded count is what is still OPEN — done rows stay in the list, struck, but "This month · 53" counting finished work was a scoreboard for nothing (walkthrough, 2026-09-20). */}
+        {!open && <span className="ml-auto font-normal normal-case tracking-normal text-neutral-400">{rows.filter((r) => !rowIsDone(r.fate)).length}</span>}
       </button>
       {showHint && noun && (
         <p className="mt-1 text-[11px] text-neutral-400">Press → to bring one into this {noun}.</p>

@@ -39,6 +39,8 @@ import { useDomain } from '@/hooks/useDomain'
 
 import { Eye, EyeOff, Repeat, Binoculars, Printer, GripVertical, Moon, Sparkles, NotebookPen, ArrowRight, PanelLeft, ChevronDown, ChevronRight } from 'lucide-react'
 import { splitTodayJournal } from '@/lib/today/journalSplit'
+import { TriageRow, applyTriageVerdict, type Verdict } from './TriageRow'
+import { missedLabel } from '@/lib/week/missedPlacement'
 import { DayPlanPanel, panelActionsFor, planSummary } from '@/components/reference/DayPlanPanel'
 import { useReferenceLists } from '@/components/reference/ReferenceListsContext'
 import { makePlanActions } from '@/lib/planning/planActions'
@@ -48,6 +50,8 @@ import { useActionableInstances } from '@/hooks/useActionableInstances'
 import { findTaskById } from '@/lib/findTaskById'
 import { showToast } from '@/hooks/useToast'
 import { useNavigate } from 'react-router-dom'
+import { useGoogleCalendar } from '@/hooks/useGoogleCalendar'
+import { ALL_LAYERS } from '@/lib/domains'
 import { AssigneeFilter } from '@/components/home/AssigneeFilter'
 
 import { NeededTodayNote } from './NeededTodayNote'
@@ -179,6 +183,7 @@ export function TodayView({
   // ── Context ──────────────────────────────────────────────────────────────────
   const isMobile = useMobile()
   const navigate = useNavigate()
+  const { isConnected: calendarConnected, error: calendarError } = useGoogleCalendar()
   const ctx = useScheduleActionsContext()
   // Only what THIS file still uses. The row-level handlers moved with the
   // section loop into TodaySectionList, which reads the same context itself.
@@ -1375,6 +1380,41 @@ export function TodayView({
             )}
           </section>
 
+          {/* Yesterday's unfinished commitments (the two-day grace window).
+              Computed all along, drawn nowhere since the overdue section was
+              deleted on 2026-09-03 — Week said "Didn't happen · 3" while Today
+              said nothing (walkthrough, 2026-09-20). Same words as Week, same
+              verbs as the review, no count in the heading. */}
+          {data.isToday && data.overdueTasks.length > 0 && (
+            <section aria-labelledby="today-carried-heading" className="daybook-journal-section">
+              <div className="daybook-journal-heading">
+                <h2 id="today-carried-heading">Carried over</h2>
+              </div>
+              <ul aria-label="Carried over" className="flex flex-col">
+                {data.overdueTasks.map((t) => (
+                  <li key={t.id}>
+                    <TriageRow
+                      task={t}
+                      meta={t.scheduledFor ? missedLabel(t.scheduledFor, new Date(nowTick)) : undefined}
+                      lead="today"
+                      offer={['today', 'tomorrow', 'week', 'someday', 'deleted']}
+                      canDelete={!!ctx.onDeleteTask}
+                      onVerdict={(task: Task, v: Verdict) => {
+                        void applyTriageVerdict(task, v, {
+                          viewedDate,
+                          onUpdateTask: (id, u) => onUpdateTask?.(id, u),
+                          onPushTask: ctx.onPushTask,
+                          onDeleteTask: ctx.onDeleteTask,
+                        })
+                      }}
+                      onComplete={(task: Task) => onToggleTask(task.id)}
+                    />
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
           <section aria-labelledby="today-ahead-heading" className="daybook-journal-section">
             <div className="daybook-journal-heading">
               <h2 id="today-ahead-heading">{data.isToday ? 'Still ahead' : 'Schedule'}</h2>
@@ -1396,7 +1436,19 @@ export function TodayView({
             />
             {journal.aheadCount === 0 && (
               <p className="py-3 text-[15px] text-neutral-500">
-                {data.isToday ? 'Nothing else with a time today.' : 'Nothing with a time on this day.'}
+                {/* A connected calendar with nothing on it must not read like a
+                    disconnected one (the calendar status line above covers the
+                    other states). */}
+                {/* "Clear" is a claim: connected, synced, and no layer filtered
+                    out. Otherwise say only what is shown — a hidden Personal
+                    calendar under a Family filter is not a clear day. */}
+                {data.isToday
+                  ? (calendarConnected && !calendarError && layers.size === ALL_LAYERS.size
+                      ? 'Nothing else with a time today. Your calendar is clear.'
+                      : calendarConnected
+                        ? 'Nothing else with a time today. No events shown for your current view.'
+                        : 'Nothing else with a time today.')
+                  : 'Nothing with a time on this day.'}
               </p>
             )}
             {journal.earlierSummary.rows > 0 && (

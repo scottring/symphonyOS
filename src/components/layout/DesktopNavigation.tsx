@@ -43,7 +43,7 @@ export function DesktopNavigation({ inboxCount, discussionsUnread, onSearch, onQ
   const go = (path: string) => { setOpen(null); navigate(path) }
   // Short labelled columns rather than one tall list. Registry apps join Reference.
   const groups: [string, [string, string][]][] = [
-    ['Plan', [['Season', '/season'], ['Year', '/year'], ['Routines', '/routines']]],
+    ['Plan', [['Season', '/season'], ['Year', '/year'], ['Someday', '/someday'], ['Routines', '/routines']]],
     ['Home', [['Meals', '/meals/plan'], ['Meal shelf', '/meals/shelf'], ['Lists', '/lists'], ['House', '/home']]],
     ['Reference', [['Discussions', '/discussions'], ['Contacts', '/contacts'], ['Documents', '/documents'],
       ['Notes', '/notes'], ['History', '/history'],

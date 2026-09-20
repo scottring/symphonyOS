@@ -9,6 +9,7 @@ import { useScratchpadHidden } from '@/hooks/useScratchpadHidden';
 import { HomeViewContainer } from './HomeViewContainer';
 import { InboxViewContainer } from './InboxViewContainer';
 import { TaskViewRoute } from './TaskViewRoute';
+import { SomedayPage } from './SomedayPage';
 
 // TasksApp is the index app at `/` (after the P4.8 cutover). Its inner
 // Routes handle both:
@@ -58,7 +59,8 @@ export function TasksApp() {
             <Route path="month" element={<Navigate to="/today" replace />} />
             <Route path="season" element={<Navigate to="/today" replace />} />
             <Route path="year" element={<Navigate to="/today" replace />} />
-            <Route path="someday" element={<Navigate to="/today" replace />} />
+            {/* Someday has a door again: the shelf you can take things back off (2026-09-20). */}
+            <Route path="someday" element={<SomedayPage />} />
             {/* Legacy parallel paths (always available; planned to remove in P5) */}
             <Route path="tasks-new" element={<Navigate to="/tasks-new/today" replace />} />
             <Route path="tasks-new/today" element={<HomeViewContainer />} />

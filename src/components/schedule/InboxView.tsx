@@ -31,7 +31,7 @@ import { wasWritten } from '@/hooks/useGatedTaskActions'
 import { FocusInboxCard } from './FocusInboxCard'
 import { InboxModeToggle } from './InboxModeToggle'
 import { InboxUndoToast } from './InboxUndoToast'
-import { filterTasksForLayers } from '@/lib/today/domainFilter'
+import { matchesLayers } from '@/lib/today/domainFilter'
 import { isBuyish, isToBuyNudgeDismissed, dismissToBuyNudge } from '@/lib/lists/toBuy'
 import { ToBuyNudge } from './ToBuyNudge'
 import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
@@ -293,15 +293,15 @@ export function InboxView({
 
   // Layer filter — the SHARED helper, not a local copy.
   //
-  // This was a hand-rolled duplicate of filterTasksForLayers that had
-  // drifted from it: it carried the assignee-keyed "privacy" check that the
-  // shared rule has now dropped (RLS is the real gate — see domainFilter.ts),
-  // so the Inbox and Today could disagree about the same task. Untagged
-  // captures are the Unsorted layer — they show iff Unsorted is checked,
-  // same as every other layer; the render below narrows to bucket 'inbox'
-  // anyway.
+  // Tagged rows follow the layer rule like everywhere else. UNTAGGED rows do
+  // not: an Unsorted capture is exactly what the Inbox exists to show, and
+  // hiding it whenever the tag filter happens to exclude "Unsorted" made a
+  // fresh ⌘K capture vanish behind "Inbox zero" (Scott, 2026-09-20 — first
+  // real-data walkthrough). RLS already limits `tasks` to what this user may
+  // see, so "always" here means "always among your own". The render below
+  // narrows to bucket 'inbox' anyway.
   const filteredByDomain = useMemo(
-    () => filterTasksForLayers(tasks, layers),
+    () => tasks.filter((t) => t.context == null || matchesLayers(t.context, layers)),
     [tasks, layers],
   )
 

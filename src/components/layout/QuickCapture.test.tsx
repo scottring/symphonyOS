@@ -688,3 +688,30 @@ describe('QuickCapture', () => {
     })
   })
 })
+
+describe('Destination line', () => {
+  // Said BEFORE Enter: a chip-less capture lands Unsorted and only you; a
+  // Family chip makes it shared. The old "Private until you share it" was
+  // only true for two of the three areas (Scott, 2026-09-20).
+  it('names where a plain capture goes and who will see it', async () => {
+    const { user } = render(<QuickCapture onAdd={vi.fn()} isOpen={true} showFab={false} />)
+    const input = screen.getByPlaceholderText('Try "call the vet tomorrow 2pm"')
+    await user.type(input, 'Plan the reading activity')
+    expect(screen.getByTestId('capture-destination')).toHaveTextContent('→ Inbox · Unsorted · only you')
+    expect(screen.queryByText('Private until you share it')).not.toBeInTheDocument()
+  })
+
+  it('names the calendar an event would be written to', async () => {
+    const { user } = render(
+      <QuickCapture onAdd={vi.fn()} onAddRich={vi.fn()} isOpen={true} showFab={false}
+        eventCalendarName={() => 'Scott Personal'} />,
+    )
+    const input = screen.getByPlaceholderText('Try "call the vet tomorrow 2pm"')
+    await user.type(input, 'Boxing tomorrow 9am')
+    const line = screen.getByTestId('capture-destination').textContent ?? ''
+    // A dated task, or an event if the parser reads it as one — either way the
+    // line names a real destination, never the old privacy platitude.
+    expect(line.startsWith('→ ')).toBe(true)
+    expect(line).not.toMatch(/Private until/)
+  })
+})
