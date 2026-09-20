@@ -352,6 +352,7 @@ function ShellLayoutInner({ children }: Props) {
           onAdd={chrome.onQuickAdd}
           onAddRich={chrome.onQuickAddRich}
           onAddNote={chrome.onQuickAddNote}
+          eventCalendarName={chrome.eventCalendarName}
           projects={chrome.quickAddProjects}
           contacts={chrome.quickAddContacts}
           familyMembers={chrome.quickAddFamilyMembers}

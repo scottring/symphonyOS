@@ -27,6 +27,11 @@ import { useNotesContext } from '@/contexts/NotesContext';
 import { useListsContext } from '@/contexts/ListsContext';
 import { useToast } from '@/hooks/useToast';
 import { useSelection } from './providers/SelectionProvider';
+import { useNavigate } from 'react-router-dom';
+import { useDomain } from '@/hooks/useDomain';
+import { layerOf } from '@/lib/domains';
+import { audienceLabel, contextLabel, hiddenByView } from '@/lib/capture/destination';
+import type { TaskContext } from '@/types/task';
 import { useDesktopBridge } from '@/desktop/useDesktopBridge';
 import type { PinnableEntityType } from '@/types/pin';
 
@@ -58,8 +63,8 @@ export function useShellChrome() {
   const { contacts } = useContacts();
   const { routines: allRoutines, addRoutine } = useRoutines();
   const { members: familyMembers, getCurrentUserMember } = useFamilyMembers();
-  const { isConnected, createEvent, fetchEvents } = useGoogleCalendar();
-  const { getCalendarForDomain } = useCalendarDomainMappings();
+  const { isConnected, createEvent, fetchEvents, defaultCalendarId } = useGoogleCalendar();
+  const { getCalendarForDomain, getDomainForCalendar } = useCalendarDomainMappings();
   // The shell-wide instance, shared with whatever app is routed below —
   // a private copy here would not see a pin made from /lists.
   const pinnedItems = usePinsContext();
@@ -67,6 +72,8 @@ export function useShellChrome() {
   const { lists } = useListsContext();
   const { toast, showToast, dismissToast } = useToast();
   const { setSelection } = useSelection();
+  const navigate = useNavigate();
+  const { layers, toggle: toggleLayer } = useDomain();
 
   // ── Capture confirmation: an inbox capture is otherwise silent, which reads
   // as "did that even save?". Confirm it landed and offer one-tap scheduling
@@ -80,8 +87,12 @@ export function useShellChrome() {
     setConfirmationToast(null);
   }, []);
 
+  // The confirmation says WHERE it went and WHO will see it, offers "View",
+  // and — when the current tag filter would hide it — says so and offers an
+  // explicit "Show" that widens the filter. Never a silent filter or privacy
+  // change (Scott + outside review, 2026-09-20).
   const showCaptureConfirmation = useCallback(
-    (taskId: string) => {
+    (taskId: string, context: TaskContext | null | undefined) => {
       if (confirmTimerRef.current) clearTimeout(confirmTimerRef.current);
       const scheduleFor = (daysFromNow: number) => {
         const d = new Date();
@@ -90,18 +101,22 @@ export function useShellChrome() {
         void pushTask(taskId, d);
         showToast(daysFromNow === 0 ? 'Scheduled for today' : 'Scheduled for tomorrow', 'success');
       };
+      const hidden = hiddenByView(context, layers);
+      const layer = layerOf(context);
       setConfirmationToast({
         id: taskId,
-        message: 'Added to Inbox',
-        hint: 'All set — or schedule it now:',
+        message: `Added to Inbox · ${contextLabel(context)} · ${audienceLabel(context)}`,
+        hint: hidden ? `Hidden by your current view (${contextLabel(context)} is unchecked).` : 'All set — or schedule it now:',
         actions: [
+          { label: 'View', onClick: () => { dismissConfirmationToast(); navigate(`/task/${taskId}`); } },
+          ...(hidden ? [{ label: `Show ${contextLabel(context)}`, onClick: () => { toggleLayer(layer); dismissConfirmationToast(); } }] : []),
           { label: 'Today', onClick: () => scheduleFor(0) },
           { label: 'Tomorrow', onClick: () => scheduleFor(1) },
         ],
       });
-      confirmTimerRef.current = setTimeout(() => setConfirmationToast(null), 8000);
+      confirmTimerRef.current = setTimeout(() => setConfirmationToast(null), 10000);
     },
-    [pushTask, showToast],
+    [pushTask, showToast, layers, toggleLayer, navigate, dismissConfirmationToast],
   );
 
   // ── QuickCapture handlers (mirror App.tsx) ──
@@ -111,7 +126,7 @@ export function useShellChrome() {
         assignedTo: getCurrentUserMember()?.id,
         context: undefined,
       });
-      if (taskId) showCaptureConfirmation(taskId);
+      if (taskId) showCaptureConfirmation(taskId, null);
     },
     [addTask, getCurrentUserMember, showCaptureConfirmation],
   );
@@ -147,7 +162,20 @@ export function useShellChrome() {
           weekLater.setDate(weekLater.getDate() + 7);
           await fetchEvents(today, weekLater);
 
-          showToast(rrule ? 'Recurring event added to Google Calendar' : 'Event added to Google Calendar', 'success');
+          // Name the calendar, and say when the current view will not show it —
+          // the event's life area is its calendar's mapping, and a Family view
+          // hides a Personal calendar (Scott, 2026-09-20).
+          // No chip → the default write calendar (null = Google primary), whose
+          // life area is whatever it is mapped to. An unmapped primary is
+          // unknown, so no warning is invented for it.
+          const calendarLabel = targetCalendar?.calendarName ?? 'your primary calendar';
+          const eventContext = targetCalendar ? (data.context ?? null) : getDomainForCalendar(defaultCalendarId ?? undefined);
+          const hiddenEvent = (targetCalendar || defaultCalendarId) ? hiddenByView(eventContext, layers) : false;
+          showToast(
+            `${rrule ? 'Recurring event' : 'Event'} added to ${calendarLabel}${hiddenEvent ? ` · hidden by your current view (${contextLabel(eventContext)} is unchecked)` : ''}`,
+            hiddenEvent ? 'warning' : 'success',
+            hiddenEvent ? 8000 : undefined,
+          );
           return;
         } catch (err) {
           console.error('Failed to sync event to Google Calendar:', err);
@@ -190,11 +218,18 @@ export function useShellChrome() {
         isAllDay: data.isAllDay,
       });
       if (taskId) {
-        if (data.scheduledFor) showToast('Task scheduled', 'success');
-        else showCaptureConfirmation(taskId);
+        if (data.scheduledFor) {
+          const hidden = hiddenByView(data.context ?? null, layers);
+          const when = data.scheduledFor.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+          showToast(
+            `Scheduled for ${when} · ${contextLabel(data.context ?? null)} · ${audienceLabel(data.context ?? null)}${hidden ? ' · hidden by your current view' : ''}`,
+            hidden ? 'warning' : 'success',
+            hidden ? 8000 : undefined,
+          );
+        } else showCaptureConfirmation(taskId, data.context ?? null);
       }
     },
-    [addTask, addRoutine, isConnected, createEvent, fetchEvents, getCalendarForDomain, getCurrentUserMember, showToast, showCaptureConfirmation],
+    [addTask, addRoutine, isConnected, createEvent, fetchEvents, defaultCalendarId, getCalendarForDomain, getDomainForCalendar, getCurrentUserMember, showToast, showCaptureConfirmation, layers],
   );
 
   const onQuickAddNote = useCallback(
@@ -225,6 +260,12 @@ export function useShellChrome() {
     () => contacts.map((c) => ({ id: c.id, name: c.name })),
     [contacts],
   );
+  // For the ⌘K destination line: which calendar an event would be written to.
+  const eventCalendarName = useCallback(
+    (context: TaskContext | null) => getCalendarForDomain(context)?.calendarName ?? null,
+    [getCalendarForDomain],
+  );
+
   const quickAddFamilyMembers = useMemo(
     () => familyMembers.map((m) => ({ id: m.id, name: m.name })),
     [familyMembers],
@@ -272,6 +313,7 @@ export function useShellChrome() {
     // QuickCapture
     onQuickAdd,
     onQuickAddRich,
+    eventCalendarName,
     onQuickAddNote,
     quickAddProjects,
     quickAddContacts,

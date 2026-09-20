@@ -7,6 +7,7 @@ import type { TaskCategory, TaskContext } from '@/types/task'
 import { DomainChooser } from '@/components/domain/DomainChooser'
 import { domainForHotkey } from '@/lib/domainHotkey'
 import { useQuickParse } from '@/hooks/useQuickParse'
+import { destinationLine } from '@/lib/capture/destination'
 import { ParsedFieldChips } from '@/components/capture/ParsedFieldChips'
 import { ConceptIcon } from '@/lib/conceptIcons'
 import { DictationMicButton } from '@/components/common/DictationMicButton'
@@ -50,6 +51,9 @@ interface QuickCaptureProps {
   resultsSlot?: (query: string, close: () => void) => ReactNode
   /** Unibox: escalate the raw text to the Symphony assistant (⌘↵ or the row). */
   onAskSymphony?: (text: string) => void
+  /** The calendar an EVENT would be written to for a life area (null = the
+   *  primary calendar). Lets the destination line name it before Enter. */
+  eventCalendarName?: (context: TaskContext | null) => string | null
 }
 
 export function QuickCapture({
@@ -65,6 +69,7 @@ export function QuickCapture({
   showFab = true,
   resultsSlot,
   onAskSymphony,
+  eventCalendarName,
 }: QuickCaptureProps) {
   // Support both controlled and uncontrolled modes
   const [internalIsOpen, setInternalIsOpen] = useState(false)
@@ -616,13 +621,23 @@ export function QuickCapture({
                 </button>
               </div>
 
-              {/* Privacy hint */}
-              {!effectiveParsed.isNote && (
-                <p className="text-center text-xs text-neutral-400 mt-3 flex items-center justify-center gap-1">
-                  <svg className="w-3 h-3" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
-                  </svg>
-                  Private until you share it
+              {/* Where this is about to go, and who will see it. Said BEFORE
+                  Enter: a chip-less task lands Unsorted and a chip-less event
+                  lands on the primary calendar, and neither used to say so
+                  (Scott, 2026-09-20). Replaces the old "Private until you
+                  share it", which was only true for two of the three areas. */}
+              {title.trim() && (
+                <p data-testid="capture-destination" className="text-center text-xs text-neutral-500 mt-3">
+                  {destinationLine({
+                    kind: effectiveParsed.isNote ? 'note'
+                      : effectiveParsed.category === 'event' && effectiveParsed.dueDate ? 'event'
+                      : effectiveParsed.recurrence ? 'routine'
+                      : effectiveParsed.dueDate ? 'dated'
+                      : 'inbox',
+                    context: effectiveParsed.context ?? null,
+                    when: effectiveParsed.dueDate,
+                    calendarName: eventCalendarName?.(effectiveParsed.context ?? null) ?? null,
+                  })}
                 </p>
               )}
 
