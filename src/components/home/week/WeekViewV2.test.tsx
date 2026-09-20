@@ -189,12 +189,17 @@ describe('WeekViewV2 journal spread', () => {
   it('lists multi-day context once above the days — including one that began last week — and not in the days', () => {
     const events = [
       { id: 'brk', title: 'Fall break', start_time: '2026-09-10T12:00:00.000Z', end_time: '2026-09-16T12:00:00.000Z', all_day: true } as unknown as CalendarEvent,
-      mockEvent({ id: 'oc', title: 'On call', start: '2026-09-16T09:00:00', end: '2026-09-18T17:00:00' }),
+      mockEvent({ id: 'oc', title: 'On call ', start: '2026-09-16T09:00:00', end: '2026-09-18T17:00:00' }),
+      { id: 'trip', title: 'Trip', start_time: '2026-09-18T12:00:00.000Z', end_time: '2026-09-22T12:00:00.000Z', all_day: true } as unknown as CalendarEvent,
     ]
     render(<WeekViewV2 {...defaultProps} routines={[]} weekStart={sunday} events={events} />)
     const across = within(screen.getByRole('list', { name: 'Across these days' }))
-    expect(across.getByRole('button', { name: /Sun–Tue Fall break.*began earlier/ })).toBeInTheDocument()
-    expect(across.getByRole('button', { name: /Wed–Fri On call/ })).toBeInTheDocument()
+    // A bar cut by the week's edge names the day it really starts or ends on —
+    // never a dangling ", continues on" (seen on prod 2026-09-20).
+    // (textContent, not the accessible name — dom-accessibility-api pads inline spans with a space.)
+    expect(across.getByRole('button', { name: /Fall break/ })).toHaveTextContent(/^Sun–Tue Fall break, from Thu Sep 10$/)
+    expect(across.getByRole('button', { name: /On call/ })).toHaveTextContent(/^Wed–Fri On call$/) // trailing space in the title trimmed
+    expect(across.getByRole('button', { name: /Trip/ })).toHaveTextContent(/^Fri–Sat Trip, through Mon Sep 21$/)
     for (const key of ['2026-09-13', '2026-09-16', '2026-09-17']) {
       const day = within(screen.getByTestId(`journal-day-${key}`))
       expect(day.queryByText('Fall break')).toBeNull()

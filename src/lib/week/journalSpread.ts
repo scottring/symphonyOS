@@ -103,6 +103,10 @@ export interface ContextSpan {
   continuesBefore: boolean
   /** The event runs past the last visible day. */
   continuesAfter: boolean
+  /** The event's first and last calendar days (local YYYY-MM-DD), unclamped —
+   *  so the bar can say WHICH day it runs through, not just that it does. */
+  first: string
+  last: string
 }
 
 /**
@@ -156,6 +160,8 @@ export function layoutContextSpans(events: CalendarEvent[], days: Date[]): Conte
       row,
       continuesBefore: span.first < firstVisible,
       continuesAfter: span.last > lastVisible,
+      first: span.first,
+      last: span.last,
     })
   }
   return out

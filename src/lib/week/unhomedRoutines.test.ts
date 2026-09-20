@@ -7,8 +7,18 @@ import type { RecurrencePattern } from '@/types/actionable'
 const ctx: UnhomedCtx = { prefs: { hideRoutines: false, layers: ALL_LAYERS } }
 
 describe('unhomedRoutines', () => {
-  it('keeps eligible routines missing a time', () => {
-    const r = createMockRoutine({ name: 'Trash night', time_of_day: null })
+  it('a routine with a day but no time has a home: its day', () => {
+    const daily = createMockRoutine({ name: 'Trash night', time_of_day: null })
+    const saturday = createMockRoutine({
+      name: 'Do kitchen laundry',
+      time_of_day: null,
+      recurrence_pattern: { type: 'weekly', days: ['sat'] } as RecurrencePattern,
+    })
+    expect(unhomedRoutines([daily, saturday], ctx)).toEqual([])
+  })
+
+  it('keeps weekly routines with no days and no time', () => {
+    const r = createMockRoutine({ name: 'Trash night', time_of_day: null, recurrence_pattern: { type: 'weekly' } as RecurrencePattern })
     expect(unhomedRoutines([r], ctx)).toEqual([r])
   })
 
@@ -31,7 +41,7 @@ describe('unhomedRoutines', () => {
   })
 
   it('drops routines the resolver ladder would hide (resting)', () => {
-    const r = createMockRoutine({ time_of_day: null, visibility: 'reference' })
+    const r = createMockRoutine({ time_of_day: null, visibility: 'reference', recurrence_pattern: { type: 'weekly' } as RecurrencePattern })
     expect(unhomedRoutines([r], ctx)).toEqual([])
   })
 })

@@ -72,6 +72,14 @@ interface WeekJournalProps {
 
 const eventId = (ev: CalendarEvent) => `event-${ev.google_event_id || ev.id}`
 
+/** "Mon Sep 28" from a local YYYY-MM-DD — parsed by parts, since `new
+ *  Date('2026-09-28')` reads as UTC midnight and lands a day early in the US. */
+function spanDayLabel(ymd: string): string {
+  const [y, m, d] = ymd.split('-').map(Number)
+  const date = new Date(y, m - 1, d)
+  return `${date.toLocaleDateString('en-US', { weekday: 'short' })} ${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+}
+
 function isToday(d: Date): boolean {
   const n = new Date()
   return d.getFullYear() === n.getFullYear() && d.getMonth() === n.getMonth() && d.getDate() === n.getDate()
@@ -254,10 +262,11 @@ export function WeekJournal({ days, spans, onSelectItem, onToggleEntry, onPlanDr
                   {days[s.startCol].date.toLocaleDateString('en-US', { weekday: 'short' })}
                   {s.endCol !== s.startCol && `–${days[s.endCol].date.toLocaleDateString('en-US', { weekday: 'short' })}`}
                 </span>{' '}
-                {s.event.title}
+                {s.event.title.trim()}
                 {(s.continuesBefore || s.continuesAfter) && (
                   <span className="text-neutral-400">
-                    {s.continuesBefore && ', began earlier'}{s.continuesAfter && ', continues on'}
+                    {s.continuesBefore && `, from ${spanDayLabel(s.first)}`}
+                    {s.continuesAfter && `, through ${spanDayLabel(s.last)}`}
                   </span>
                 )}
               </button>

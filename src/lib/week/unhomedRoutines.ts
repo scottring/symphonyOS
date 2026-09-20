@@ -11,12 +11,14 @@ import { resolveRoutineEligible, type ResolveRoutineCtx } from '@/lib/routineUti
 
 export type UnhomedCtx = Omit<ResolveRoutineCtx, 'date' | 'deferredInto' | 'lastCompletedAt'>
 
-/** Eligible routines the week grid cannot place: no time of day, or a weekly
- *  pattern with no days chosen. */
+/** Eligible routines with no DAY to land on: a weekly pattern with no days
+ *  chosen. A routine that names its day has a home — the journal draws it
+ *  there, timed or under "Available" — so listing it here too drew it twice
+ *  ("Do kitchen laundry · Sat · no set time" beside Saturday's Available line,
+ *  seen on prod 2026-09-20). Missing only a TIME is not homeless. */
 export function unhomedRoutines(routines: Routine[], ctx: UnhomedCtx): Routine[] {
   return routines.filter((r) => {
     if (!resolveRoutineEligible(r, ctx).shows) return false
-    if (!r.time_of_day) return true
     return r.recurrence_pattern.type === 'weekly' && !r.recurrence_pattern.days?.length
   })
 }
