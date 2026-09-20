@@ -115,6 +115,7 @@ vi.mock('@/hooks/useDayPlan', () => ({
   useDayPlan: () => ({
     loading: false, error: false,
     plan: {
+      carried: [],
       scheduled: [{ key: 'task:f', kind: 'task', id: 'f', title: 'Pick up foot meds', completed: false, planned: false, group: 'scheduled' }],
       available: [
         { key: 'routine:r1', kind: 'routine', id: 'r1', title: 'Kids clean rooms', completed: false, planned: false, group: 'available' },

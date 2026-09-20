@@ -52,7 +52,7 @@ export function WeekPlanColumn({ tasks, weekStart, meId, actions, draggable = tr
   }, [todayKey])
 
   const plan = useMemo(() => ({
-    scheduled: [], available: [], month: [],
+    carried: [], scheduled: [], available: [], month: [],
     week: weekListEntries(
       tasks,
       (assignedTo: string | null | undefined, assignedToAll?: readonly string[] | null) => !meId || doableBy(

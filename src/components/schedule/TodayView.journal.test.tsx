@@ -71,6 +71,24 @@ function renderView(props: Record<string, unknown> = {}) {
   )
 }
 
+describe('Carried over', () => {
+  // Week says "Didn't happen · Fri"; Today used to say nothing at all.
+  it("draws yesterday's unfinished commitment on Today with the same words as Week", () => {
+    const yesterday = createMockTask({ id: 'yest', title: 'Order Comma 4', bucket: 'timed', isAllDay: true, scheduledFor: new Date(2026, 8, 18) })
+    renderView({ tasks: [...tasks, yesterday] })
+    const section = screen.getByRole('list', { name: 'Carried over' })
+    expect(within(section).getByText('Order Comma 4')).toBeInTheDocument()
+    expect(within(section).getByText("Didn't happen · Fri")).toBeInTheDocument()
+    // No count in the heading — Today keeps no scoreboard.
+    expect(screen.getByRole('heading', { name: 'Carried over' })).toBeInTheDocument()
+  })
+
+  it('says nothing when nothing was left behind', () => {
+    renderView()
+    expect(screen.queryByRole('heading', { name: 'Carried over' })).not.toBeInTheDocument()
+  })
+})
+
 beforeEach(() => {
   sessionStorage.clear()
   mobile.value = false

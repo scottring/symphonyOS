@@ -17,7 +17,7 @@ function entry(n: number): DayPlanEntry {
 
 function plan(weekCount: number): DayPlan {
   return {
-    scheduled: [], available: [],
+    carried: [], scheduled: [], available: [],
     week: Array.from({ length: weekCount }, (_, i) => entry(i + 1)),
     month: [],
     counts: { scheduled: 0, available: 0 },

@@ -36,11 +36,12 @@ import { buildRoutineDayItems } from './grouping'
 import { deferredInRoutineIds } from './deferredRoutines'
 import { groupRoutineSteps } from './routineCollections'
 import { selectHorizonPool } from './horizons'
+import { selectCarriedOver } from './taskPools'
 import { localYmd } from '@/lib/cadence/config'
 import { monthStartOf } from '@/lib/planning/periodPlacement'
 import { isTimelineObligation, type ResolveRoutineCtx } from '@/lib/routineUtils'
 
-export type DayPlanGroup = 'scheduled' | 'available' | 'week' | 'month'
+export type DayPlanGroup = 'carried' | 'scheduled' | 'available' | 'week' | 'month'
 
 export interface DayPlanEntry {
   /** Stable React key and drag id: 'task:<id>' or 'routine:<entityId>'. */
@@ -59,6 +60,12 @@ export interface DayPlanEntry {
 }
 
 export interface DayPlan {
+  /** Yesterday's (and the day before's) unfinished commitments, inside
+   *  Today's grace window and not yet chosen for today. Computed for years
+   *  (selectCarriedOver) but drawn nowhere since 2026-09-03; the walkthrough
+   *  of 2026-09-20 found Week saying "Didn't happen · 3" while Today said
+   *  nothing. Only on the real today. */
+  carried: DayPlanEntry[]
   scheduled: DayPlanEntry[]
   available: DayPlanEntry[]
   week: DayPlanEntry[]
@@ -181,15 +188,18 @@ export function selectDayPlan(input: DayPlanInput): DayPlan {
   }
 
   // ── The week's and month's lists ───────────────────────────────────────
-  const listEntry = (group: 'week' | 'month') => (t: Task): DayPlanEntry => ({
+  const listEntry = (group: 'week' | 'month' | 'carried') => (t: Task): DayPlanEntry => ({
     key: `task:${t.id}`, kind: 'task', id: t.id, title: t.title, completed: t.completed,
     planned: isOn(t.plannedOn, ymd), group, task: t,
   })
   const week = weekListEntries(input.tasks, match, input.weekStart, ymd)
+  const isToday = ymd === localYmd(new Date())
+  const carried = selectCarriedOver(input.tasks, isToday, match).filter((t) => !isOn(t.plannedOn, ymd)).map(listEntry('carried'))
   const month = selectHorizonPool(input.tasks, 'month', match, undefined, monthStartOf(input.viewedDate)).map(listEntry('month'))
 
   const outstanding = (e: DayPlanEntry) => !e.completed && !e.planned
   return {
+    carried,
     scheduled,
     available,
     week,
