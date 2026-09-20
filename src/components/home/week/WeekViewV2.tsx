@@ -48,6 +48,7 @@ import { useActionableInstances } from '@/hooks/useActionableInstances'
 import { showToast } from '@/hooks/useToast'
 import { eventDays, isMultiDayEvent, layoutContextSpans } from '@/lib/week/journalSpread'
 import { localYmd } from '@/lib/cadence/config'
+import { publishViewedWeek } from '@/lib/viewedWeekSignal'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import type { AssigneeFilter } from '@/lib/today/types'
 import { isTimelineObligation } from '@/lib/routineUtils'
@@ -179,6 +180,14 @@ export function WeekViewV2(props: WeekViewV2Props) {
     { updateTask, pushTask, updateTasksBulk },
     (id) => tasks.find((t) => t.id === id),
   )
+  // Tell the shell which week is on screen, so the Today pin's week list
+  // answers the same question this page is asking. Cleared on unmount — the
+  // pin falls back to the real current week beside every other page.
+  useEffect(() => {
+    publishViewedWeek(weekStart)
+    return () => publishViewedWeek(null)
+  }, [weekStart])
+
   const handleNotThisWeek = useCallback((id: string) => {
     const currentWeek = weekStartAnchor(new Date(), readCadenceConfig().weekStartsOn)
     const nextWeek = new Date(currentWeek)

@@ -19,7 +19,13 @@ import { weekStartAnchor, readCadenceConfig, localYmd } from '@/lib/cadence/conf
  * lives in the shell beside any page, so it cannot borrow Today's data — it
  * rebuilds the identical input and runs the identical selector.
  */
-export function useDayPlan(day: Date): { plan: DayPlan | null; loading: boolean; error: boolean } {
+export function useDayPlan(
+  day: Date,
+  /** The week the pin's THIS WEEK group should answer for. Omitted = the week
+   *  `day` falls in. A week page passes the week it is showing so the pin and
+   *  the page are not answering for different weeks. */
+  weekStartOverride?: Date | null,
+): { plan: DayPlan | null; loading: boolean; error: boolean } {
   const { tasks, loading: tasksLoading, error: tasksError } = useSupabaseTasks()
   const { routines: allRoutines, getRoutinesForDate, loading: routinesLoading } = useRoutines()
   const { getInstancesForDate } = useActionableInstances()
@@ -29,6 +35,7 @@ export function useDayPlan(day: Date): { plan: DayPlan | null; loading: boolean;
   useEffect(() => onHideRoutinesChange(setHideRoutines), [])
 
   const dayKey = localYmd(day)
+  const weekKey = weekStartOverride ? localYmd(weekStartOverride) : null
   const [instances, setInstances] = useState<ActionableInstance[] | null>(null)
   const refresh = useCallback(async () => {
     const [y, m, d] = dayKey.split('-').map(Number)
@@ -51,9 +58,11 @@ export function useDayPlan(day: Date): { plan: DayPlan | null; loading: boolean;
       selectedAssignee: selectedAssignees,
       hideRoutines,
       layers,
-      weekStart: weekStartAnchor(viewedDate, readCadenceConfig().weekStartsOn),
+      weekStart: weekKey
+        ? (() => { const [wy, wm, wd] = weekKey.split('-').map(Number); return new Date(wy, wm - 1, wd) })()
+        : weekStartAnchor(viewedDate, readCadenceConfig().weekStartsOn),
     })
-  }, [instances, dayKey, tasks, layers, getRoutinesForDate, allRoutines, selectedAssignees, hideRoutines])
+  }, [instances, dayKey, weekKey, tasks, layers, getRoutinesForDate, allRoutines, selectedAssignees, hideRoutines])
 
   return { plan, loading: tasksLoading || routinesLoading || !instances, error: !!tasksError }
 }
