@@ -122,7 +122,7 @@ function PlanRow({ entry, day, actions, draggable }: {
   )
 }
 
-function Group({ title, entries, day, actions, draggable, defaultOpen, empty, cap = PLAN_GROUP_CAP }: {
+function Group({ title, entries, day, actions, draggable, defaultOpen, empty, cap = PLAN_GROUP_CAP, open: openProp, onOpenChange }: {
   title: string
   entries: DayPlanEntry[]
   day: Date
@@ -133,8 +133,16 @@ function Group({ title, entries, day, actions, draggable, defaultOpen, empty, ca
   /** Rows shown before "+N more". null = show them all: on a week page this
    *  list IS the work, and a cap there is a list pretending to be a summary. */
   cap?: number | null
+  /** Controlled open state, for a host that remembers the fold across visits. */
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }) {
-  const [open, setOpen] = useState(defaultOpen)
+  const [openState, setOpenState] = useState(defaultOpen)
+  const open = openProp ?? openState
+  const setOpen = (next: boolean) => {
+    if (onOpenChange) onOpenChange(next)
+    else setOpenState(next)
+  }
   const [all, setAll] = useState(false)
   const outstanding = entries.filter((e) => !e.completed && !e.planned).length
   if (entries.length === 0 && !empty) return null
@@ -148,7 +156,7 @@ function Group({ title, entries, day, actions, draggable, defaultOpen, empty, ca
         type="button"
         aria-expanded={open}
         aria-controls={id}
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => setOpen(!open)}
         className="inline-flex items-center gap-1 text-[12px] font-semibold uppercase tracking-[0.08em] text-neutral-500 hover:text-neutral-800"
       >
         {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
@@ -179,6 +187,52 @@ function rank(e: DayPlanEntry): number {
   return e.planned ? 1 : 0
 }
 
+/** "This week", or the week's own name when it is not the current one. Don't
+ *  call another week "this week": a week page can page backwards, and a list
+ *  labelled for the wrong week is how you plan into a week that has gone. */
+export function weekListTitle(weekStart: Date | null): string {
+  if (!weekStart) return 'This week'
+  const current = weekStartAnchor(new Date(), readCadenceConfig().weekStartsOn)
+  return localYmd(weekStart) === localYmd(current)
+    ? 'This week'
+    : `Week of ${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+}
+
+/**
+ * The week's list on its own: the same rows, from the same selector, that the
+ * Today pin shows. A week page draws this in its own column rather than
+ * leaning on a pin — pins are opt-in and live in sessionStorage, so a page
+ * that depended on one would come up empty in every new tab.
+ */
+export function DayPlanWeekList({ plan, day, actions, weekStart, draggable = true, open, onOpenChange }: {
+  plan: DayPlan
+  day: Date
+  actions: DayPlanPanelActions
+  /** The week on screen. Names the fold; the rows come from `plan.week`. */
+  weekStart: Date
+  draggable?: boolean
+  /** Controlled so the page can remember the fold between visits. */
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+}) {
+  return (
+    <div data-testid="day-plan-week-list">
+      <Group
+        title={weekListTitle(weekStart)}
+        entries={plan.week}
+        day={day}
+        actions={actions}
+        draggable={draggable}
+        defaultOpen
+        cap={null}
+        open={open}
+        onOpenChange={onOpenChange}
+        empty="Nothing on this week’s list."
+      />
+    </div>
+  )
+}
+
 export function DayPlanPanel({ plan, day, actions, draggable = true, weekPage = null }: {
   plan: DayPlan
   day: Date
@@ -192,12 +246,7 @@ export function DayPlanPanel({ plan, day, actions, draggable = true, weekPage = 
   weekPage?: Date | null
 }) {
   const nothing = plan.scheduled.length + plan.available.length + plan.week.length + plan.month.length === 0
-  // Don't call another week "this week". The pin sits beside a page that can
-  // page backwards, and a list labelled for the wrong week is how you end up
-  // planning into a week that has already gone.
-  const weekTitle = weekPage && localYmd(weekPage) !== localYmd(weekStartAnchor(new Date(), readCadenceConfig().weekStartsOn))
-    ? `Week of ${weekPage.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
-    : 'This week'
+  const weekTitle = weekListTitle(weekPage)
   const weekGroup = (
     <Group
       title={weekTitle}

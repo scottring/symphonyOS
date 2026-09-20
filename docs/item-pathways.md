@@ -168,7 +168,23 @@ list may *not* draw) → `splitTodayJournal` → three sections.
 Group header counts exclude completed and already-planned rows; the panel's
 own emptiness test does not.
 
-### `/week` left pool
+### `/week` left column
+
+Since 2026-09-20 this column is two things, not one:
+
+1. **`WeekPlanColumn`** — this week's list. Calls `weekListEntries`, the same
+   function the Today pin's week group calls, so the two surfaces cannot
+   disagree about what is on the week. Always present (not a pin — pins are
+   opt-in and live in sessionStorage), opens by default, uncapped, and folds to
+   its own header with the fold remembered in `localStorage`.
+2. **`WeekPoolLane`** — only what the list cannot say: **"Didn't happen"**
+   (spent placements), routines that need a day, and the collapsed
+   **"Unfinished last week"**.
+
+What follows describes the pool machinery the lane still runs for (1)'s
+predecessor and for "Didn't happen".
+
+### The pool predicates
 
 `unscheduledPool` → `weekList` → `orderPool` → `groupPool`, then stale
 week-placements are subtracted into the carryover fold.
@@ -227,9 +243,9 @@ events and concatenated. Events never enter the Today pin.
 
 Found during this trace, not fixed:
 
-1. **The all-day wildcard.** `weekList`'s first line admits any `is_all_day`
-   row with no date regardless of bucket, so month and season items appear
-   under "This week".
+1. ~~**The all-day wildcard.**~~ Fixed 2026-09-19: `weekList` tested `isAllDay`
+   before `bucket`, so month and season items appeared under "This week".
+   Bucket decides first now.
 2. **The NULL stamp.** As of this trace, `month_start` and `season_start` are
    set on **zero** rows in production, and `week_start` on 30 of 32 week rows.
    Because `belongsTo…` treats NULL as a member, the month rail is effectively

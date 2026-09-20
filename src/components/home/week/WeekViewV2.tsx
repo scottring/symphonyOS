@@ -29,6 +29,8 @@ import { RoutinePlacePopover } from './RoutinePlacePopover'
 import { RoutinesToggle } from './RoutinesToggle'
 import { foldWeeksFor } from '@/lib/planning/dateRange'
 import { WeekPoolLane } from './WeekPoolLane'
+import { WeekPlanColumn } from './WeekPlanColumn'
+import { panelActionsFor } from '@/components/reference/DayPlanPanel'
 import { WeekMonthRail } from './WeekMonthRail'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { suggestSlots, type BusyInterval } from '@/lib/planning/dropSmarts'
@@ -708,6 +710,16 @@ export function WeekViewV2(props: WeekViewV2Props) {
     pushAction,
     notify: (m) => showToast(m, 'warning'),
   }), [tasks, onUpdateTask, gated, setPlanned, rescheduleInstance, pushAction])
+  // Row verbs for the week list in the margin. The same writes the pin's rows
+  // make; the list holds tasks only, so its routine verb never fires here.
+  const weekListActions = useMemo(
+    () => panelActionsFor(new Date(), {
+      ...planActions,
+      toggleTask: (id: string) => { void toggleTask(id) },
+      completeRoutine: () => Promise.resolve(false),
+    }),
+    [planActions, toggleTask],
+  )
   const handlePlanDropOnDay = useCallback((day: JournalDay, payload: PlanDragPayload) => {
     void planActions.drop(payload, { type: 'day', day: day.date })
   }, [planActions])
@@ -807,6 +819,9 @@ export function WeekViewV2(props: WeekViewV2Props) {
 
   const margin = (
     <>
+      {/* The week's list — the same rows the Today pin draws, in the page's
+          own column so it does not depend on a pin being switched on. */}
+      <WeekPlanColumn tasks={tasks} weekStart={weekStart} meId={meId} actions={weekListActions} draggable={!narrow} />
       <WeekPoolLane
         tasks={tasks}
         routines={shelfRoutines}

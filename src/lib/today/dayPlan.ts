@@ -30,7 +30,7 @@ import type { TimelineItem } from '@/types/timeline'
 import type { AssigneeFilter } from './types'
 import type { Layer } from '@/lib/domains'
 import { makeAssigneeFilter } from './assigneeFilter'
-import { selectTimed } from './taskPools'
+import { selectTimed, type Match } from './taskPools'
 import { buildRoutineStatusMap, selectVisibleRoutines } from './statusMaps'
 import { buildRoutineDayItems } from './grouping'
 import { deferredInRoutineIds } from './deferredRoutines'
@@ -97,6 +97,19 @@ export function routineResolveCtx(input: Pick<DayPlanInput, 'viewedDate' | 'sele
 }
 
 const isOn = (d: Date | undefined | null, ymd: string) => !!d && localYmd(new Date(d)) === ymd
+
+/**
+ * This week's list, as rows. The ONE definition of "on this week's list":
+ * the Today pin and /week's own column both call this, so the two surfaces
+ * cannot disagree about which rows belong to a week (Scott, 2026-09-19).
+ * `ymd` is the day "Planned today" is judged against.
+ */
+export function weekListEntries(tasks: Task[], match: Match, weekStart: Date, ymd: string): DayPlanEntry[] {
+  return selectHorizonPool(tasks, 'week', match, weekStart).map((t) => ({
+    key: `task:${t.id}`, kind: 'task' as const, id: t.id, title: t.title, completed: t.completed,
+    planned: isOn(t.plannedOn, ymd), group: 'week' as const, task: t,
+  }))
+}
 
 /** Tasks and their nested subtasks, flat. */
 function flatten(tasks: Task[]): Task[] {
@@ -172,7 +185,7 @@ export function selectDayPlan(input: DayPlanInput): DayPlan {
     key: `task:${t.id}`, kind: 'task', id: t.id, title: t.title, completed: t.completed,
     planned: isOn(t.plannedOn, ymd), group, task: t,
   })
-  const week = selectHorizonPool(input.tasks, 'week', match, input.weekStart).map(listEntry('week'))
+  const week = weekListEntries(input.tasks, match, input.weekStart, ymd)
   const month = selectHorizonPool(input.tasks, 'month', match, undefined, monthStartOf(input.viewedDate)).map(listEntry('month'))
 
   const outstanding = (e: DayPlanEntry) => !e.completed && !e.planned

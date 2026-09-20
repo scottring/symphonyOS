@@ -17,11 +17,11 @@
 // expander so a deep backlog never runs off the bottom of the grid.
 import { useMemo, useState } from 'react'
 import { useDraggable } from '@dnd-kit/core'
-import { Check, ChevronDown, ChevronRight, ChevronsRight, CookingPot, GripVertical, Repeat, Trash2, Archive, ArrowRight } from 'lucide-react'
+import { Check, ChevronDown, ChevronRight, ChevronsRight, GripVertical, Repeat, Trash2, Archive, ArrowRight } from 'lucide-react'
 import type { Task } from '@/types/task'
 import type { Routine } from '@/types/actionable'
 import { routineTemporalLabel } from '@/lib/planning/routineTemporal'
-import { unscheduledPool, weekList, orderPool, groupPool } from '@/lib/planning/poolViews'
+import { unscheduledPool, weekList, orderPool } from '@/lib/planning/poolViews'
 import { PushDropdown } from '@/components/triage'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { readCadenceConfig, weekStartAnchor } from '@/lib/cadence/config'
@@ -221,7 +221,6 @@ export function WeekPoolLane({
   const [planOver, setPlanOver] = useState(false)
   const planProps = onPlanDrop ? planDropHandlers(onPlanDrop, setPlanOver) : {}
   const [open, setOpen] = useState(true)
-  const [mealsOpen, setMealsOpen] = useState(false)
   const [showAll, setShowAll] = useState(false)
   const [carryOpen, setCarryOpen] = useState(false)
   // Ticked pills stay, struck, until the strip is collapsed or the view changes
@@ -242,26 +241,28 @@ export function WeekPoolLane({
       weekStartsOn: readCadenceConfig().weekStartsOn,
       meId,
     }
-    const grouped = groupPool(orderPool(weekList(unscheduledPool(tasks, ctx), ctx), ctx))
+    const all = orderPool(weekList(unscheduledPool(tasks, ctx), ctx), ctx)
     // A move left behind by a week that has passed is not silently this
     // week's: it waits in the collapsed carryover below until someone carries
     // it forward, parks it or drops it (Scott, 2026-09-19).
     const currentWeek = weekStartAnchor(ctx.today, ctx.weekStartsOn)
     const leftBehind = (t: Task) => t.bucket === 'week' && isStaleWeekPlacement(t, currentWeek)
-    return {
-      meals: grouped.meals.filter((t) => !leftBehind(t)),
-      loose: grouped.loose.filter((t) => !leftBehind(t)),
-      currentWeek,
-    }
+    // Only what the week's list cannot say. The plain week rows moved to
+    // WeekPlanColumn, which draws the SAME list the Today pin does — this lane
+    // kept a second, wider copy of it and the two disagreed (Scott,
+    // 2026-09-19: "it's redundant to the pinned list"). A spent placement is
+    // different news: it had a day, and the day went by.
+    const missed = all.filter((t) => !leftBehind(t) && isMissedPlacement(t.scheduledFor, t.completed, ctx.today))
+    return { missed, currentWeek }
   }, [tasks, weekStart, dayCount, meId])
 
   // A routine with no time needs a slot the way an unscheduled task does, so
   // it rides in the same strip. The host hands over only unhomed ones.
   const needsHome = routines
-  const total = pool.meals.length + pool.loose.length + needsHome.length
-  const visibleLoose = showAll ? pool.loose : pool.loose.slice(0, STRIP_CAP)
+  const total = pool.missed.length + needsHome.length
+  const visibleMissed = showAll ? pool.missed : pool.missed.slice(0, STRIP_CAP)
   const visibleRoutines = showAll ? needsHome : needsHome.slice(0, ROUTINE_STRIP_CAP)
-  const overflow = (pool.loose.length - visibleLoose.length) + (needsHome.length - visibleRoutines.length)
+  const overflow = (pool.missed.length - visibleMissed.length) + (needsHome.length - visibleRoutines.length)
 
   const tick = onCompleteTask
     ? (id: string) => {
@@ -272,7 +273,7 @@ export function WeekPoolLane({
     : undefined
   const pillProps = { onSelect: onSelectItem, onCompleteTask: tick, onNotThisWeek, onPushTask, dragEnabled }
   // Lingering pills are the ones the pool no longer holds (the host completed them).
-  const struckPills = lingering.filter((t) => !pool.loose.some((p) => p.id === t.id) && !pool.meals.some((p) => p.id === t.id))
+  const struckPills = lingering.filter((t) => !pool.missed.some((p) => p.id === t.id))
 
   // What past weeks left unfinished: moves placed on a week that has gone by
   // and never ticked (weekPlacement's "left-behind"). Strict placement on
@@ -299,22 +300,11 @@ export function WeekPoolLane({
         className="inline-flex items-center gap-1 text-xs font-semibold tracking-wide uppercase text-neutral-500 hover:text-neutral-700 transition-colors"
       >
         {open ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-        This week · {total}
+        Didn’t happen · {total}
       </button>
       {open && (
         <div className="mt-1.5 flex flex-col items-stretch border-t border-neutral-200/80">
-          {pool.meals.length > 0 && (
-            <button
-              type="button"
-              aria-expanded={mealsOpen}
-              onClick={() => setMealsOpen((v) => !v)}
-              className="flex w-full items-center gap-1.5 border-b border-neutral-200/80 py-1.5 text-[13px] text-neutral-500 hover:text-neutral-800 transition-colors"
-            >
-              <CookingPot className="w-3.5 h-3.5" /> Meals · {pool.meals.length}
-            </button>
-          )}
-          {mealsOpen && pool.meals.map((t) => <PoolPill key={t.id} task={t} {...pillProps} />)}
-          {visibleLoose.map((t) => <PoolPill key={t.id} task={t} {...pillProps} />)}
+          {visibleMissed.map((t) => <PoolPill key={t.id} task={t} {...pillProps} />)}
           {struckPills.map((t) => <PoolPill key={`struck-${t.id}`} task={{ ...t, completed: true }} onSelect={onSelectItem} struck />)}
           {visibleRoutines.map((r) => <RoutinePill key={r.id} routine={r} onSelect={onSelectItem} draggable={dragEnabled && routinesDraggable} />)}
           {overflow > 0 && (
@@ -326,7 +316,7 @@ export function WeekPoolLane({
               +{overflow} more
             </button>
           )}
-          {showAll && pool.loose.length > STRIP_CAP && (
+          {showAll && pool.missed.length > STRIP_CAP && (
             <button
               type="button"
               onClick={() => setShowAll(false)}
@@ -335,7 +325,7 @@ export function WeekPoolLane({
               Show less
             </button>
           )}
-          {total === 0 && struckPills.length === 0 && <span className="py-1.5 text-sm text-neutral-400">Nothing on the list yet.</span>}
+          {total === 0 && struckPills.length === 0 && <span className="py-1.5 text-sm text-neutral-400">Every day this week got its work.</span>}
         </div>
       )}
       {unfinished.length > 0 && (

@@ -17,6 +17,10 @@ function task(over: Partial<Task>): Task {
 }
 
 const weekStart = new Date(2026, 7, 31)
+// Sun Aug 30 — the day before the faked "now". A row dated here is a spent
+// placement, which is what this lane holds now that the week's LIST lives in
+// WeekPlanColumn (one list, shared with the Today pin).
+const MISSED_DAY = new Date(2026, 7, 30, 10, 30)
 
 describe('WeekPoolLane', () => {
   // The list's membership now turns on which days have PASSED, so "now" can't
@@ -39,7 +43,7 @@ describe('WeekPoolLane', () => {
           dayCount={5}
           onSelectItem={() => {}}
           tasks={[
-            task({ id: 'a', title: 'Call VW', bucket: 'week' }),
+            task({ id: 'a', title: 'Call VW', bucket: 'week', scheduledFor: MISSED_DAY }),
             task({ id: 'b', title: 'Placed', scheduledFor: new Date(2026, 8, 1, 10) }), // tomorrow — still its day
           ]}
         />
@@ -90,7 +94,7 @@ describe('WeekPoolLane', () => {
           weekStart={weekStart}
           dayCount={5}
           onSelectItem={onSelectItem}
-          tasks={[task({ id: 'a', title: 'Call VW', bucket: 'week' })]}
+          tasks={[task({ id: 'a', title: 'Call VW', bucket: 'week', scheduledFor: MISSED_DAY })]}
         />
       </DndContext>,
     )
@@ -105,17 +109,17 @@ describe('WeekPoolLane', () => {
           weekStart={weekStart}
           dayCount={5}
           onSelectItem={() => {}}
-          tasks={[task({ id: 'a', title: 'Call VW', bucket: 'week' })]}
+          tasks={[task({ id: 'a', title: 'Call VW', bucket: 'week', scheduledFor: MISSED_DAY })]}
         />
       </DndContext>,
     )
-    fireEvent.click(screen.getByRole('button', { name: /This week · 1/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Didn’t happen · 1/ }))
     expect(screen.queryByText('Call VW')).not.toBeInTheDocument()
   })
 
   it('caps the strip and expands the rest via "+N more"', () => {
     const twelve = Array.from({ length: 12 }, (_, i) =>
-      task({ id: `t${i}`, title: `Task number ${i}`, bucket: 'week' }),
+      task({ id: `t${i}`, title: `Task number ${i}`, bucket: 'week', scheduledFor: MISSED_DAY }),
     )
     render(
       <DndContext>
@@ -138,7 +142,7 @@ describe('WeekPoolLane', () => {
           dayCount={5}
           onSelectItem={() => {}}
           onCompleteTask={onComplete}
-          tasks={[task({ id: 'a', title: 'Call VW', bucket: 'week' })]}
+          tasks={[task({ id: 'a', title: 'Call VW', bucket: 'week', scheduledFor: MISSED_DAY })]}
         />
       </DndContext>,
     )
@@ -155,7 +159,7 @@ describe('WeekPoolLane', () => {
           dayCount={5}
           onSelectItem={() => {}}
           onNotThisWeek={onNotThisWeek}
-          tasks={[task({ id: 'a', title: 'Call VW', bucket: 'week' })]}
+          tasks={[task({ id: 'a', title: 'Call VW', bucket: 'week', scheduledFor: MISSED_DAY })]}
         />
       </DndContext>,
     )
@@ -172,7 +176,7 @@ describe('WeekPoolLane', () => {
           dayCount={5}
           onSelectItem={() => {}}
           onPushTask={onPushTask}
-          tasks={[task({ id: 'a', title: 'Call VW', bucket: 'week' })]}
+          tasks={[task({ id: 'a', title: 'Call VW', bucket: 'week', scheduledFor: MISSED_DAY })]}
         />
       </DndContext>,
     )
@@ -184,14 +188,14 @@ describe('WeekPoolLane', () => {
   // A routine with no time needs a slot exactly the way an unscheduled task
   // does, so it rides in the same strip instead of hiding behind its own tab
   // (Scott, 2026-09-05).
-  it('carries routines that need a home into the week strip, after the tasks', () => {
+  it('carries routines that need a home into the lane, after the missed rows', () => {
     render(
       <DndContext>
         <WeekPoolLane
           weekStart={weekStart}
           dayCount={5}
           onSelectItem={() => {}}
-          tasks={[task({ id: 'a', title: 'Call VW', bucket: 'week' })]}
+          tasks={[task({ id: 'a', title: 'Call VW', bucket: 'week', scheduledFor: MISSED_DAY })]}
           routines={[createMockRoutine({ name: 'Trash night', time_of_day: null })]}
         />
       </DndContext>,
@@ -199,7 +203,7 @@ describe('WeekPoolLane', () => {
     expect(screen.getByText('Call VW')).toBeInTheDocument()
     expect(screen.getByText('Trash night')).toBeInTheDocument()
     // Both counted in the header
-    expect(screen.getByRole('button', { name: /This week · 2/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Didn’t happen · 2/ })).toBeInTheDocument()
   })
 
   // Routines get their own allowance. Sharing the tasks' budget meant a busy
@@ -207,7 +211,7 @@ describe('WeekPoolLane', () => {
   // all — the very segregation this change ends.
   it('always shows routines on a busy strip, capped separately from the tasks', () => {
     const many = Array.from({ length: 20 }, (_, i) =>
-      task({ id: `t${i}`, title: `Loose ${i}`, bucket: 'week' }))
+      task({ id: `t${i}`, title: `Loose ${i}`, bucket: 'week', scheduledFor: MISSED_DAY }))
     const routines = Array.from({ length: 6 }, (_, i) =>
       createMockRoutine({ id: `r${i}`, name: `Routine ${i}`, time_of_day: null }))
     render(
@@ -231,10 +235,10 @@ describe('WeekPoolLane', () => {
     expect(screen.getAllByTitle(/Loose /)).toHaveLength(20)
   })
 
-  it("is titled as this week's list and says so when empty", () => {
+  it('is titled for what did not happen, and says so when nothing did', () => {
     render(<DndContext><WeekPoolLane weekStart={weekStart} dayCount={5} onSelectItem={() => {}} tasks={[]} /></DndContext>)
-    expect(screen.getByRole('button', { name: /This week · 0/ })).toBeInTheDocument()
-    expect(screen.getByText('Nothing on the list yet.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Didn’t happen · 0/ })).toBeInTheDocument()
+    expect(screen.getByText('Every day this week got its work.')).toBeInTheDocument()
     expect(screen.queryByText(/Everything is placed/)).not.toBeInTheDocument()
     expect(screen.queryByText(/UNSCHEDULED/i)).not.toBeInTheDocument()
   })
@@ -245,16 +249,16 @@ describe('WeekPoolLane', () => {
     const onComplete = vi.fn()
     const { rerender } = render(
       <DndContext><WeekPoolLane weekStart={weekStart} dayCount={5} onSelectItem={() => {}} onCompleteTask={onComplete}
-        tasks={[task({ id: 'a', title: 'Call VW', bucket: 'week' })]} /></DndContext>,
+        tasks={[task({ id: 'a', title: 'Call VW', bucket: 'week', scheduledFor: MISSED_DAY })]} /></DndContext>,
     )
     fireEvent.click(screen.getByRole('button', { name: 'Complete Call VW' }))
     expect(onComplete).toHaveBeenCalledWith('a')
     rerender(<DndContext><WeekPoolLane weekStart={weekStart} dayCount={5} onSelectItem={() => {}} onCompleteTask={onComplete}
-      tasks={[task({ id: 'a', title: 'Call VW', bucket: 'week', completed: true })]} /></DndContext>)
+      tasks={[task({ id: 'a', title: 'Call VW', bucket: 'week', scheduledFor: MISSED_DAY, completed: true })]} /></DndContext>)
     expect(screen.getByText('Call VW')).toHaveClass('line-through')
     // The header (with its count), not the "This week" view tab.
-    fireEvent.click(screen.getByRole('button', { name: /This week · / }))
-    fireEvent.click(screen.getByRole('button', { name: /This week · / }))
+    fireEvent.click(screen.getByRole('button', { name: /Didn’t happen · / }))
+    fireEvent.click(screen.getByRole('button', { name: /Didn’t happen · / }))
     expect(screen.queryByText('Call VW')).not.toBeInTheDocument()
   })
 
@@ -273,17 +277,17 @@ describe('WeekPoolLane', () => {
           tasks={[
             task({ id: 'done', title: 'Washed the car', bucket: 'week', weekStart: prev, completed: true }),
             task({ id: 'open', title: 'Call the plumber', bucket: 'week', weekStart: prev }),
-            task({ id: 'now', title: 'This week thing', bucket: 'week' }),
+            task({ id: 'now', title: 'Yesterday’s errand', bucket: 'week', scheduledFor: MISSED_DAY }),
           ]} />
       </DndContext>,
     )
     beforeEach(() => { onUpdateTask.mockClear(); onDeleteTask.mockClear() })
 
-    it('starts collapsed beneath this week, counting only what was left undone', () => {
+    it('starts collapsed beneath the lane, counting only what was left undone', () => {
       renderLane()
-      expect(screen.getByText('This week thing')).toBeInTheDocument()
+      expect(screen.getByText('Yesterday’s errand')).toBeInTheDocument()
       // Left behind is not silently this week's: it is not in the list's count.
-      expect(screen.getByRole('button', { name: /This week · 1/ })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /Didn’t happen · 1/ })).toBeInTheDocument()
       const toggle = screen.getByRole('button', { name: /Unfinished last week · 1/ })
       expect(toggle).toHaveAttribute('aria-expanded', 'false')
       expect(screen.queryByText('Call the plumber')).not.toBeInTheDocument()
@@ -291,7 +295,7 @@ describe('WeekPoolLane', () => {
       expect(screen.getByText('Call the plumber')).toBeInTheDocument()
       expect(screen.queryByText('Washed the car')).not.toBeInTheDocument()
       // This week's list stays put while the carryover is open.
-      expect(screen.getByText('This week thing')).toBeInTheDocument()
+      expect(screen.getByText('Yesterday’s errand')).toBeInTheDocument()
     })
 
     it('carry forward is a MOVE onto this week', () => {
@@ -364,7 +368,7 @@ describe('WeekPoolLane readability', () => {
           weekStart={weekStart}
           dayCount={5}
           onSelectItem={() => {}}
-          tasks={[task({ id: 'a', title: 'Figure out November school break coverage and sitter options', bucket: 'week' })]}
+          tasks={[task({ id: 'a', title: 'Figure out November school break coverage and sitter options', bucket: 'week', scheduledFor: MISSED_DAY })]}
         />
       </DndContext>,
     )
@@ -381,7 +385,7 @@ describe('WeekPoolLane readability', () => {
           onSelectItem={() => {}}
           onNotThisWeek={() => {}}
           onPushTask={() => {}}
-          tasks={[task({ id: 'a', title: 'Call VW', bucket: 'week' })]}
+          tasks={[task({ id: 'a', title: 'Call VW', bucket: 'week', scheduledFor: MISSED_DAY })]}
         />
       </DndContext>,
     )
