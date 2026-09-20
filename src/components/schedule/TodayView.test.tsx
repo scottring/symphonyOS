@@ -219,14 +219,16 @@ describe('TodayView', () => {
         },
       ],
     } as never)
-    // Carried-over work stays off the page entirely — no count, no inline
-    // list. The footer spends one muted "Review", and the task is reachable
-    // through it, in the same bounded triage that owns the rest of the
-    // backlog.
-    expect(screen.queryByText(/carried over/i)).toBeNull()
-    expect(screen.queryByText('Overdue task title')).not.toBeInTheDocument()
+    // Since 2026-09-20 a two-day-old commitment IS on the page — under
+    // "Carried over", labelled by its day, with no count (the walkthrough had
+    // Week saying "Didn't happen · 3" while Today said nothing). The footer's
+    // muted "Review" still opens the bounded triage that owns the backlog.
+    const carried = screen.getByRole('list', { name: 'Carried over' })
+    expect(within(carried).getByText('Overdue task title')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Carried over' })).toBeInTheDocument()
+    expect(screen.queryByText(/Carried over · \d/)).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Review' }))
-    expect(screen.getByText('Overdue task title')).toBeInTheDocument()
+    expect(screen.getAllByText('Overdue task title').length).toBeGreaterThanOrEqual(2)
   })
 
   it('renders timeline insert (+) slots when create-at handlers are available', () => {
@@ -572,9 +574,10 @@ describe('TodayView attention line', () => {
 
   it('keeps every slipped row off the page and points at them instead', () => {
     renderView({ viewedDate: TODAY, tasks: [mk('c', 'carried thing', 1), mk('s', 'slipped thing', 200)] } as never)
-    // Neither population renders on the day — not the one-day-old carry-over,
-    // not the 200-day-old slip. The page spends one muted link on both.
-    expect(screen.queryByText('carried thing')).toBeNull()
+    // The one-day-old carry-over is on the page (Carried over, since
+    // 2026-09-20); the 200-day-old slip is not — it is reachable through the
+    // muted Review link and the Inbox's Expired fold only.
+    expect(screen.getByText('carried thing')).toBeInTheDocument()
     expect(screen.queryByText('slipped thing')).toBeNull()
     expect(screen.getByRole('button', { name: 'Review' })).toBeInTheDocument()
     // No scoreboard: the footer names neither the size nor the age.
