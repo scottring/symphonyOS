@@ -265,7 +265,7 @@ server.tool(
   async (params) => {
     const { data, error } = await supabase
       .from('tasks')
-      .update({ completed: params.completed, updated_at: new Date().toISOString() })
+      .update({ completed: params.completed, completed_at: params.completed ? new Date().toISOString() : null, updated_at: new Date().toISOString() })
       .eq('id', params.id)
       .select()
       .single()

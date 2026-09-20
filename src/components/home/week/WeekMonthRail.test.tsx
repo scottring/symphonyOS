@@ -108,6 +108,17 @@ describe('WeekMonthRail', () => {
     expect(screen.getByText('Mow').closest('li')).not.toHaveAttribute('draggable')
   })
 
+  it('counts only open rows on the folded header — done ones stay in the list, struck', () => {
+    const open = task({ id: 'o', title: 'Repaint the porch', monthStart: thisMonth })
+    const done = task({ id: 'd', title: 'Mow', monthStart: thisMonth, completed: true })
+    const placedDone = task({ id: 'p', title: 'Book dentist', monthStart: thisMonth })
+    const copyDone = task({ id: 'c', title: 'Book dentist', bucket: 'week', sourceId: 'p', completed: true })
+    render(<WeekMonthRail onSelectItem={() => {}} tasks={[open, done, placedDone, copyDone]} />)
+    expect(screen.getByRole('button', { name: /This month/ })).toHaveTextContent(/1$/)
+    unfold()
+    expect(screen.getByText('Mow')).toBeInTheDocument()
+  })
+
   // The rail plans MY week. Iris's month items — assigned exclusively to her —
   // are rightly VISIBLE elsewhere (shared context), but they aren't mine to
   // put on my week. Same rule the strip already applies (doableBy).

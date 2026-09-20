@@ -50,6 +50,8 @@ export interface Task {
   id: string
   title: string
   completed: boolean
+  /** When it was ticked done. Null when open, and on rows done before 2026-09-20 (unknown). */
+  completedAt?: Date | null
   createdAt: Date
   updatedAt: Date
   /** Owner (`tasks.user_id`) — whose row this is, for "is this MINE" checks

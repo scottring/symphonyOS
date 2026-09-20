@@ -324,7 +324,7 @@ describe('useSupabaseTasks - Subtasks', () => {
       })
 
       // Should have called update for parent
-      expect(mockUpdate).toHaveBeenCalledWith({ completed: true })
+      expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({ completed: true }))
       // Should have called update with 'in' for subtasks
       expect(mockIn).toHaveBeenCalledWith('id', ['subtask-1', 'subtask-2'])
     })

@@ -52,6 +52,7 @@ export interface DbTask {
   user_id: string
   title: string
   completed: boolean
+  completed_at?: string | null
   bucket: TaskBucket
   scheduled_for: string | null
   deferred_until: string | null
@@ -129,6 +130,7 @@ export function dbTaskToTask(dbTask: DbTask): Task {
     id: dbTask.id,
     title: dbTask.title,
     completed: dbTask.completed,
+    completedAt: dbTask.completed_at ? new Date(dbTask.completed_at) : null,
     userId: dbTask.user_id,
     bucket: (dbTask.bucket as TaskBucket) || 'inbox',
     createdAt: new Date(dbTask.created_at),
@@ -911,7 +913,7 @@ export function useSupabaseTasks() {
 
       const { error: updateError } = await supabase
         .from('tasks')
-        .update({ completed: newCompleted })
+        .update({ completed: newCompleted, completed_at: newCompleted ? new Date().toISOString() : null })
         .eq('id', id)
 
       if (updateError) {
@@ -961,7 +963,8 @@ export function useSupabaseTasks() {
       )
 
       // Update parent in DB — also clear waiting state if completing
-      const dbUpdate: Record<string, unknown> = { completed: newCompleted }
+      // completed_at rides every completion write; cleared on reopen.
+      const dbUpdate: Record<string, unknown> = { completed: newCompleted, completed_at: newCompleted ? new Date().toISOString() : null }
       if (newCompleted && task.isWaiting) {
         dbUpdate.is_waiting = false
         dbUpdate.waiting_since = null
@@ -1346,7 +1349,10 @@ export function useSupabaseTasks() {
     // Use 'key in updates' to detect when a field is explicitly set (even to undefined)
     const dbUpdates: Record<string, unknown> = {}
     if ('title' in updates) dbUpdates.title = updates.title
-    if ('completed' in updates) dbUpdates.completed = updates.completed
+    if ('completed' in updates) {
+      dbUpdates.completed = updates.completed
+      dbUpdates.completed_at = updates.completed ? new Date().toISOString() : null
+    }
     if ('bucket' in updates) dbUpdates.bucket = updates.bucket ?? 'inbox'
     if ('scheduledFor' in updates) {
       dbUpdates.scheduled_for = updates.scheduledFor?.toISOString() ?? null
@@ -1543,7 +1549,10 @@ export function useSupabaseTasks() {
     // Convert Task updates to DB format (same logic as updateTask)
     const dbUpdates: Record<string, unknown> = {}
     if ('title' in updates) dbUpdates.title = updates.title
-    if ('completed' in updates) dbUpdates.completed = updates.completed
+    if ('completed' in updates) {
+      dbUpdates.completed = updates.completed
+      dbUpdates.completed_at = updates.completed ? new Date().toISOString() : null
+    }
     if ('bucket' in updates) dbUpdates.bucket = updates.bucket ?? 'inbox'
     if ('scheduledFor' in updates) {
       dbUpdates.scheduled_for = updates.scheduledFor?.toISOString() ?? null
