@@ -435,6 +435,22 @@ describe('PeriodPlanPage', () => {
       expect.objectContaining({ bucket: 'month', isGoal: true }))
   })
 
+  // The first real walkthrough stalled here: a blank /year read as "nothing to
+  // do". An empty period asks its question up front; the link only toggles the
+  // composer once there is a list to keep tidy.
+  it('an empty period opens with the goal question already asked', () => {
+    state.goals = []
+    renderPage('year')
+    const input = screen.getByPlaceholderText('What do you want from this year?')
+    expect(input).toBeInTheDocument()
+    expect(screen.queryByText(/No goals for this year yet/)).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: `Add a goal for ${now.getFullYear()}` }))
+    expect(screen.getByPlaceholderText('What do you want from this year?')).toBeInTheDocument()
+    fireEvent.change(input, { target: { value: 'Move the family to a bigger house' } })
+    fireEvent.submit(input.closest('form')!)
+    expect(goalsApi.addGoal).toHaveBeenCalled()
+  })
+
   it('This Year lists the goals, with the year rail absent and a goal look-back', () => {
     state.goals = [goal({ name: 'Run a half marathon' }), goal({ name: 'Old goal', year: now.getFullYear() - 1, status: 'completed' })]
     renderPage('year')

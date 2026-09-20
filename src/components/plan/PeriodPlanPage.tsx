@@ -328,6 +328,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   const [goalDraft, setGoalDraft] = useState('')
   const [taskDraft, setTaskDraft] = useState('')
   const [addingGoal, setAddingGoal] = useState(false)
+  const goalInputRef = useRef<HTMLInputElement>(null)
 
   const addRow = useCallback(async (title: string, asGoal: boolean) => {
     const t = title.trim()
@@ -400,6 +401,11 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
       steps: (split.stepsByGoal.get(g.id) ?? []).map((st) => taskRow(st, tasks)),
     }))
   }, [split, rows, tasks])
+  // An empty period opens with the question already asked. The first real
+  // walkthrough (Scott, 2026-09-20) stalled on a blank /year: a grey "No goals
+  // for this year yet." and a 13px "+ Add a goal" off to the right read as
+  // "nothing to do here". The composer IS the empty state.
+  const goalComposerOpen = !isPast && (addingGoal || goalRows.length === 0)
 
   const looseRows = useMemo(
     () => (split ? split.loose.map((t) => taskRow(t, tasks)) : rows.filter((r) => !r.isGoal)),
@@ -492,7 +498,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                 <button
                   type="button"
                   aria-label={`Add a goal for ${shortLabel}`}
-                  onClick={() => setAddingGoal((v) => !v)}
+                  onClick={() => { if (goalRows.length === 0) goalInputRef.current?.focus(); else setAddingGoal((v) => !v) }}
                   className="mt-1.5 shrink-0 text-[13px] text-neutral-500 transition-colors hover:text-primary-700"
                 >
                   + Add a goal
@@ -501,9 +507,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
             </div>
             <div className="mt-2 border-t-2 border-primary-700 pt-1">
               {goalRows.length === 0 ? (
-                <p className="px-2 py-2 text-sm text-neutral-400">
-                  {isPast ? `Nothing was on this ${noun}'s goals.` : `No goals for this ${noun} yet.`}
-                </p>
+                isPast && <p className="px-2 py-2 text-sm text-neutral-400">Nothing was on this {noun}'s goals.</p>
               ) : (
                 <ul>
                   {goalRows.map((row) => (
@@ -517,14 +521,15 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                   ))}
                 </ul>
               )}
-              {!isPast && addingGoal && (
+              {goalComposerOpen && (
                 <form
                   className="mt-1 flex items-center gap-2 px-2"
                   onSubmit={(e) => { e.preventDefault(); const t = goalDraft; setGoalDraft(''); void addRow(t, true) }}
                 >
                   <Target className="h-4 w-4 shrink-0 text-accent-600" />
                   <input
-                    autoFocus
+                    ref={goalInputRef}
+                    autoFocus={addingGoal}
                     aria-label={`New goal for ${shortLabel}`}
                     value={goalDraft}
                     onChange={(e) => setGoalDraft(e.target.value)}
