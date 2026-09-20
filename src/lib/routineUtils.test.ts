@@ -208,3 +208,41 @@ describe('effectiveTimeOfDay — a Step happens when its collection happens', ()
     expect(effectiveTimeOfDay(self, new Map([['x', self]]))).toBeNull()
   })
 })
+
+// A weekend routine is ONE commitment with a window, not one per day:
+// "routines that need to happen on the weekend either day, rather than always
+// being shown on Saturday or Sunday" (Scott, 2026-09-20).
+describe('matchesRecurrenceForDate — weekend', () => {
+  const routine = makeRoutine({ type: 'weekend' })
+  const sat = new Date(2026, 8, 19)
+  const sun = new Date(2026, 8, 20)
+  const wed = new Date(2026, 8, 16)
+
+  it('offers itself on both days of the weekend', () => {
+    expect(matchesRecurrenceForDate(routine, sat, null)).toBe(true)
+    expect(matchesRecurrenceForDate(routine, sun, null)).toBe(true)
+  })
+
+  it('stays away on a weekday', () => {
+    expect(matchesRecurrenceForDate(routine, wed, null)).toBe(false)
+  })
+
+  it('is settled for the window once it is done — Saturday does not ask again on Sunday', () => {
+    expect(matchesRecurrenceForDate(routine, sun, sat)).toBe(false)
+    // …but the day it was done still shows it, so it can be seen and undone.
+    expect(matchesRecurrenceForDate(routine, sat, sat)).toBe(true)
+  })
+
+  it('comes back the following weekend', () => {
+    const nextSat = new Date(2026, 8, 26)
+    expect(matchesRecurrenceForDate(routine, nextSat, sat)).toBe(true)
+  })
+
+  // Labor Day, Mon Sep 7 2026: the window is Sat 5 – Mon 7.
+  it('covers a long weekend, and is settled across the whole of it', () => {
+    const laborSat = new Date(2026, 8, 5)
+    const laborMon = new Date(2026, 8, 7)
+    expect(matchesRecurrenceForDate(routine, laborMon, null)).toBe(true)
+    expect(matchesRecurrenceForDate(routine, laborMon, laborSat)).toBe(false)
+  })
+})

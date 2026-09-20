@@ -46,6 +46,10 @@ export function routineTemporalLabel(routine: Routine): string {
     case 'since_last':
       parts.push(`${p.interval ?? 1} ${p.unit ?? 'days'} after last done`)
       break
+    case 'weekend':
+      // Not "Sat, Sun" — that would read as twice. Once, either day.
+      parts.push('Weekend', 'either day')
+      break
   }
 
   parts.push(timeLabel(routine.time_of_day))

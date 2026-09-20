@@ -28,6 +28,9 @@ const DAYS = [
 const RECURRENCE_TYPES: { value: RecurrenceType; label: string }[] = [
   { value: 'daily', label: 'Daily' },
   { value: 'weekly', label: 'Weekly' },
+  // Not a day — a window. Sits beside Weekly because that is where someone
+  // goes looking after ticking Sat and Sun and being asked twice.
+  { value: 'weekend', label: 'Weekend' },
   { value: 'monthly', label: 'Monthly' },
   { value: 'quarterly', label: 'Quarterly' },
   { value: 'since_last', label: 'After completion' },
@@ -136,6 +139,15 @@ export function RoutineScheduleEditor({
           ))}
         </div>
       </div>
+
+      {/* Weekend: no days to pick — that is the whole point. Say what it will
+          do, because "Weekend" alone reads like a Sat+Sun shortcut. */}
+      {type === 'weekend' && (
+        <p className="text-sm text-neutral-600">
+          Once over the weekend, either day. Ticking it on one day settles it for the rest —
+          and a federal holiday on the Friday or Monday counts as part of the weekend.
+        </p>
+      )}
 
       {/* Weekly: days + interval */}
       {type === 'weekly' && (

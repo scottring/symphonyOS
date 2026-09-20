@@ -131,17 +131,25 @@ describe('parseRoutine', () => {
       expect(result.recurrence.type).toBe('weekdays')
     })
 
-    it('parses "every weekend"', () => {
+    // "Every weekend" names one window; "Saturday and Sunday" names two days.
+    // Reading the first as the second is what made a weekend job nag twice
+    // (Scott, 2026-09-20).
+    it('parses "every weekend" as one commitment, either day', () => {
       const result = parseRoutine('relax every weekend')
-      expect(result.recurrence.type).toBe('weekends')
+      expect(result.recurrence.type).toBe('weekend')
     })
 
     it('parses "weekends"', () => {
       const result = parseRoutine('sleep in weekends')
-      expect(result.recurrence.type).toBe('weekends')
+      expect(result.recurrence.type).toBe('weekend')
     })
 
-    it('parses "saturday and sunday"', () => {
+    it('parses "on the weekend"', () => {
+      const result = parseRoutine('water the plants on the weekend')
+      expect(result.recurrence.type).toBe('weekend')
+    })
+
+    it('keeps "saturday and sunday" as both days — two named days, not a window', () => {
       const result = parseRoutine('rest saturday and sunday')
       expect(result.recurrence.type).toBe('weekends')
     })
@@ -436,9 +444,15 @@ describe('parsedRoutineToDb', () => {
     expect(db.recurrence_pattern.days).toEqual(['mon', 'tue', 'wed', 'thu', 'fri'])
   })
 
-  it('converts weekend routine', () => {
+  it('converts a weekend routine to the window, with no days', () => {
     const parsed = parseRoutine('relax weekends')
     const db = parsedRoutineToDb(parsed)
+    expect(db.recurrence_pattern.type).toBe('weekend')
+    expect(db.recurrence_pattern.days).toBeUndefined()
+  })
+
+  it('still converts "saturday and sunday" to both named days', () => {
+    const db = parsedRoutineToDb(parseRoutine('rest saturday and sunday'))
     expect(db.recurrence_pattern.type).toBe('weekly')
     expect(db.recurrence_pattern.days).toEqual(['sat', 'sun'])
   })
