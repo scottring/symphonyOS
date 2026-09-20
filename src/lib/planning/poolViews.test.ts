@@ -155,6 +155,33 @@ describe('weekList', () => {
     expect(ids).not.toContain(monthMove.id)
     expect(ids).not.toContain(inboxItem.id)
   })
+
+  // An all-day flag is not a placement. A month or season commitment is looked
+  // at on its own page; before this, the all-day branch ran BEFORE any bucket
+  // test, so every undated all-day row landed in this week's list whatever
+  // horizon it belonged to — "Work on my LinkedIn page" (bucket month) sat
+  // under THIS WEEK on /week (Scott, 2026-09-19).
+  it('keeps undated all-day MONTH and SEASON work out of this week', () => {
+    const allDayMonth = task({ bucket: 'month', isAllDay: true })
+    const allDaySeason = task({ bucket: 'quarter', isAllDay: true })
+    const allDaySomeday = task({ bucket: 'someday', isAllDay: true })
+    const ids = weekList([allDayMonth, allDaySeason, allDaySomeday], ctx).map((t) => t.id)
+    expect(ids).toEqual([])
+  })
+
+  // Same hole, other side: an all-day row placed on a week still ahead skipped
+  // belongsToWeek entirely and showed up now.
+  it('keeps an all-day move placed on a FUTURE week out of this week', () => {
+    const allDayNextWeek = task({ bucket: 'week', isAllDay: true, weekStart: new Date(2026, 8, 13) })
+    expect(weekList([allDayNextWeek], ctx)).toEqual([])
+  })
+
+  // A date that has passed is a spent placement, and that is week-shaped news
+  // whatever list the card came from — it stays.
+  it('still hands back a month card whose all-day placement slipped', () => {
+    const slippedMonth = task({ bucket: 'month', isAllDay: true, scheduledFor: new Date(2026, 7, 20) })
+    expect(weekList([slippedMonth], ctx).map((t) => t.id)).toEqual([slippedMonth.id])
+  })
 })
 
 describe('orderPool', () => {
