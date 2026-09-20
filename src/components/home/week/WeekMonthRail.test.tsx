@@ -89,6 +89,25 @@ describe('WeekMonthRail', () => {
     expect(onAdd).toHaveBeenCalledWith('o')
   })
 
+  // A row dragged onto a journal day must DO something: it travels by the
+  // Today pin's native plan-drag, so the day's drop target chooses it for
+  // that day. Goals, placed and done rows still don't move.
+  it('an open task drags as a plan row; goals and finished rows do not', () => {
+    const open = task({ id: 'o', title: 'Repaint the porch', monthStart: thisMonth })
+    const goal = task({ id: 'g', title: 'Read more', monthStart: thisMonth, isGoal: true })
+    const done = task({ id: 'd', title: 'Mow', monthStart: thisMonth, completed: true })
+    render(<WeekMonthRail onSelectItem={() => {}} tasks={[open, goal, done]} now={new Date(2026, 8, 20)} />)
+    unfold()
+    const row = screen.getByText('Repaint the porch').closest('li')!
+    expect(row).toHaveAttribute('draggable', 'true')
+    const setData = vi.fn()
+    fireEvent.dragStart(row, { dataTransfer: { setData, effectAllowed: 'none', types: [] } })
+    expect(setData).toHaveBeenCalledWith('application/x-symphony-plan',
+      JSON.stringify({ kind: 'task', id: 'o', date: '2026-09-20', title: 'Repaint the porch' }))
+    expect(screen.getByText('Read more').closest('li')).not.toHaveAttribute('draggable')
+    expect(screen.getByText('Mow').closest('li')).not.toHaveAttribute('draggable')
+  })
+
   // The rail plans MY week. Iris's month items — assigned exclusively to her —
   // are rightly VISIBLE elsewhere (shared context), but they aren't mine to
   // put on my week. Same rule the strip already applies (doableBy).

@@ -13,7 +13,10 @@ export interface ParsedRoutine {
   assigneeName: string | null   // Display name
   action: string                // The core action text
   recurrence: {
-    type: 'daily' | 'weekdays' | 'weekends' | 'weekly' | 'biweekly' | 'monthly' | 'quarterly' | 'yearly'
+    // 'weekend' is once, either day; 'weekends' is both days, because
+    // "Saturday and Sunday" names two days and "every weekend" names one
+    // window (Scott, 2026-09-20).
+    type: 'daily' | 'weekdays' | 'weekend' | 'weekends' | 'weekly' | 'biweekly' | 'monthly' | 'quarterly' | 'yearly'
     days?: number[]             // 0=Sun, 1=Mon, etc. for weekly
     interval?: number           // e.g., 2 for "every other"
     dayOfMonth?: number         // For monthly: 1-31
@@ -176,8 +179,9 @@ export function parseRoutine(input: string, contacts: Contact[] = []): ParsedRou
     { regex: /\bmon(?:day)?\s*(?:-|through|to)\s*fri(?:day)?\b/i, result: { type: 'weekdays' as const } },
     { regex: /\bmonday\s+through\s+friday\b/i, result: { type: 'weekdays' as const } },
     // Weekends
-    { regex: /\bevery\s+weekend\b/i, result: { type: 'weekends' as const } },
-    { regex: /\bweekends\b/i, result: { type: 'weekends' as const } },
+    { regex: /\bevery\s+weekend\b/i, result: { type: 'weekend' as const } },
+    { regex: /\bweekends\b/i, result: { type: 'weekend' as const } },
+    { regex: /\bon\s+the\s+weekend\b/i, result: { type: 'weekend' as const } },
     { regex: /\bsaturday\s+and\s+sunday\b/i, result: { type: 'weekends' as const } },
     { regex: /\bsat(?:urday)?\s+and\s+sun(?:day)?\b/i, result: { type: 'weekends' as const } },
     // Daily
@@ -505,6 +509,8 @@ function getRecurrenceDisplay(recurrence: ParsedRoutine['recurrence']): string {
       return 'DAILY'
     case 'weekdays':
       return 'WEEKDAYS'
+    case 'weekend':
+      return 'WEEKEND · EITHER DAY'
     case 'weekends':
       return 'WEEKENDS'
     case 'biweekly': {
@@ -564,6 +570,10 @@ export function parsedRoutineToDb(parsed: ParsedRoutine): {
       break
     case 'weekdays':
       dbRecurrence = { type: 'weekly', days: ['mon', 'tue', 'wed', 'thu', 'fri'] }
+      break
+    case 'weekend':
+      // One commitment across the window, not one per day.
+      dbRecurrence = { type: 'weekend' }
       break
     case 'weekends':
       dbRecurrence = { type: 'weekly', days: ['sat', 'sun'] }

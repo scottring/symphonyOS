@@ -14,7 +14,7 @@ import { Check, ChevronDown, ChevronRight, Clock, GripVertical, Undo2 } from 'lu
 import { SchedulePopover } from '@/components/triage'
 import type { DayPlan, DayPlanEntry } from '@/lib/today/dayPlan'
 import { writePlanDrag } from '@/lib/planning/planDrag'
-import { localYmd } from '@/lib/cadence/config'
+import { localYmd, weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
 
 /** Rows a group shows before "+N more" — the pin is a fixed-space surface. */
 export const PLAN_GROUP_CAP = 6
@@ -122,7 +122,7 @@ function PlanRow({ entry, day, actions, draggable }: {
   )
 }
 
-function Group({ title, entries, day, actions, draggable, defaultOpen, empty }: {
+function Group({ title, entries, day, actions, draggable, defaultOpen, empty, cap = PLAN_GROUP_CAP, open: openProp, onOpenChange }: {
   title: string
   entries: DayPlanEntry[]
   day: Date
@@ -130,14 +130,25 @@ function Group({ title, entries, day, actions, draggable, defaultOpen, empty }: 
   draggable: boolean
   defaultOpen: boolean
   empty?: ReactNode
+  /** Rows shown before "+N more". null = show them all: on a week page this
+   *  list IS the work, and a cap there is a list pretending to be a summary. */
+  cap?: number | null
+  /** Controlled open state, for a host that remembers the fold across visits. */
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }) {
-  const [open, setOpen] = useState(defaultOpen)
+  const [openState, setOpenState] = useState(defaultOpen)
+  const open = openProp ?? openState
+  const setOpen = (next: boolean) => {
+    if (onOpenChange) onOpenChange(next)
+    else setOpenState(next)
+  }
   const [all, setAll] = useState(false)
   const outstanding = entries.filter((e) => !e.completed && !e.planned).length
   if (entries.length === 0 && !empty) return null
   // Outstanding first, then chosen, then done: the ones asking for a decision lead.
   const ordered = [...entries].sort((a, b) => rank(a) - rank(b))
-  const shown = all ? ordered : ordered.slice(0, PLAN_GROUP_CAP)
+  const shown = all || cap === null ? ordered : ordered.slice(0, cap)
   const id = `plan-group-${title.toLowerCase().replace(/\s+/g, '-')}`
   return (
     <div className="mt-4">
@@ -145,7 +156,7 @@ function Group({ title, entries, day, actions, draggable, defaultOpen, empty }: 
         type="button"
         aria-expanded={open}
         aria-controls={id}
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => setOpen(!open)}
         className="inline-flex items-center gap-1 text-[12px] font-semibold uppercase tracking-[0.08em] text-neutral-500 hover:text-neutral-800"
       >
         {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
@@ -160,9 +171,9 @@ function Group({ title, entries, day, actions, draggable, defaultOpen, empty }: 
               {shown.map((e) => <PlanRow key={e.key} entry={e} day={day} actions={actions} draggable={draggable} />)}
             </ul>
           )}
-          {!all && ordered.length > PLAN_GROUP_CAP && (
+          {!all && cap !== null && ordered.length > cap && (
             <button type="button" onClick={() => setAll(true)} className="py-1.5 text-[13px] text-neutral-500 hover:text-neutral-800">
-              +{ordered.length - PLAN_GROUP_CAP} more
+              +{ordered.length - cap} more
             </button>
           )}
         </div>
@@ -176,20 +187,85 @@ function rank(e: DayPlanEntry): number {
   return e.planned ? 1 : 0
 }
 
-export function DayPlanPanel({ plan, day, actions, draggable = true }: {
+/** "This week", or the week's own name when it is not the current one. Don't
+ *  call another week "this week": a week page can page backwards, and a list
+ *  labelled for the wrong week is how you plan into a week that has gone. */
+export function weekListTitle(weekStart: Date | null): string {
+  if (!weekStart) return 'This week'
+  const current = weekStartAnchor(new Date(), readCadenceConfig().weekStartsOn)
+  return localYmd(weekStart) === localYmd(current)
+    ? 'This week'
+    : `Week of ${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+}
+
+/**
+ * The week's list on its own: the same rows, from the same selector, that the
+ * Today pin shows. A week page draws this in its own column rather than
+ * leaning on a pin — pins are opt-in and live in sessionStorage, so a page
+ * that depended on one would come up empty in every new tab.
+ */
+export function DayPlanWeekList({ plan, day, actions, weekStart, draggable = true, open, onOpenChange }: {
+  plan: DayPlan
+  day: Date
+  actions: DayPlanPanelActions
+  /** The week on screen. Names the fold; the rows come from `plan.week`. */
+  weekStart: Date
+  draggable?: boolean
+  /** Controlled so the page can remember the fold between visits. */
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
+}) {
+  return (
+    <div data-testid="day-plan-week-list">
+      <Group
+        title={weekListTitle(weekStart)}
+        entries={plan.week}
+        day={day}
+        actions={actions}
+        draggable={draggable}
+        defaultOpen
+        cap={null}
+        open={open}
+        onOpenChange={onOpenChange}
+        empty="Nothing on this week’s list."
+      />
+    </div>
+  )
+}
+
+export function DayPlanPanel({ plan, day, actions, draggable = true, weekPage = null }: {
   plan: DayPlan
   day: Date
   actions: DayPlanPanelActions
   /** Rows can be dragged out (desktop). Off on touch layouts. */
   draggable?: boolean
+  /** The week the page beside this panel is showing. Set = the week list is
+   *  the reason the panel is open: it leads, opens, and shows every row. Null
+   *  = the panel is beside some other page and the week stays a closed
+   *  reference under the day. */
+  weekPage?: Date | null
 }) {
   const nothing = plan.scheduled.length + plan.available.length + plan.week.length + plan.month.length === 0
+  const weekTitle = weekListTitle(weekPage)
+  const weekGroup = (
+    <Group
+      title={weekTitle}
+      entries={plan.week}
+      day={day}
+      actions={actions}
+      draggable={draggable}
+      defaultOpen={weekPage !== null}
+      cap={weekPage !== null ? null : PLAN_GROUP_CAP}
+      empty={weekPage !== null ? 'Nothing on this week’s list.' : undefined}
+    />
+  )
   return (
     <div data-testid="day-plan-panel">
-      {nothing && <p className="py-4 text-[14px] text-neutral-500">Nothing waiting — the day is what's on it.</p>}
-      <Group title="Scheduled today" entries={plan.scheduled} day={day} actions={actions} draggable={draggable} defaultOpen />
-      <Group title="Available today" entries={plan.available} day={day} actions={actions} draggable={draggable} defaultOpen />
-      <Group title="This week" entries={plan.week} day={day} actions={actions} draggable={draggable} defaultOpen={false} />
+      {nothing && !weekPage && <p className="py-4 text-[14px] text-neutral-500">Nothing waiting — the day is what's on it.</p>}
+      {weekPage && weekGroup}
+      <Group title="Scheduled today" entries={plan.scheduled} day={day} actions={actions} draggable={draggable} defaultOpen={!weekPage} />
+      <Group title="Available today" entries={plan.available} day={day} actions={actions} draggable={draggable} defaultOpen={!weekPage} />
+      {!weekPage && weekGroup}
       <Group title="This month" entries={plan.month} day={day} actions={actions} draggable={draggable} defaultOpen={false} />
     </div>
   )

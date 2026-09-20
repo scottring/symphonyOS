@@ -1,8 +1,13 @@
 // src/components/plan/PlanRail.tsx
 //
 // The level above, folded beneath the list being written. Levels connect by
-// looking, not linking: nothing drags from here and nothing is linked. It
-// starts closed — a reference you unfold when you want to glance up — and
+// looking, not linking: nothing is linked, and by default nothing drags from
+// here. A host that has DAYS on screen (the week page) can hand in `dragDate`,
+// and then an open task row travels by the same native plan-drag the Today
+// pin uses — dropped on a day it is CHOSEN for that day and keeps its list.
+// The first real walkthrough (Scott, 2026-09-20) tried exactly that drag,
+// nothing happened, and finding the arrow instead was "hugely convoluted".
+// It starts closed — a reference you unfold when you want to glance up — and
 // remembers its state when given a storage key. The one verb is the arrow on
 // an open task (a copy-down: "→ this month" on a season task, "→ this week"
 // on a month task); goals, placed and done rows are look-only. A placed row
@@ -12,6 +17,8 @@ import { useEffect, useState } from 'react'
 import { ArrowRight, ChevronDown, ChevronRight, Target } from 'lucide-react'
 import { rowIsDone, type PlanRowModel } from './PlanRow'
 import { readOpen, writeOpen } from './foldState'
+import { writePlanDrag } from '@/lib/planning/planDrag'
+import { localYmd } from '@/lib/cadence/config'
 
 // The hint is a one-time nudge toward the pull-down arrow (demo run
 // 2026-09-06: the arrow was hover-only AND unlabeled, so no one found it).
@@ -32,7 +39,7 @@ function pullTitle(pullLabel: string | undefined): string | undefined {
   return pullLabel?.replace(/:\s*$/, '')
 }
 
-export function PlanRail({ title, subtitle, rows, onOpen, onPullDown, pullLabel, emptyCopy, storageKey }: {
+export function PlanRail({ title, subtitle, rows, onOpen, onPullDown, pullLabel, emptyCopy, storageKey, dragDate }: {
   title: string
   subtitle?: string
   rows: PlanRowModel[]
@@ -43,6 +50,9 @@ export function PlanRail({ title, subtitle, rows, onOpen, onPullDown, pullLabel,
   emptyCopy: string
   /** localStorage key that remembers whether the fold is open. */
   storageKey?: string
+  /** When set, open task rows drag (native plan-drag) onto the host's day
+   *  targets, dated for this occurrence. Omitted = look only. */
+  dragDate?: Date
 }) {
   const [open, setOpen] = useState(() => readOpen(storageKey))
   const toggle = () => { setOpen((v) => { writeOpen(storageKey, !v); return !v }) }
@@ -63,8 +73,13 @@ export function PlanRail({ title, subtitle, rows, onOpen, onPullDown, pullLabel,
     // Finished is finished, however it was finished — asked of the one helper
     // the list uses, so the two can't drift apart again.
     const rowDone = rowIsDone(row.fate)
+    const canDrag = !!dragDate && !row.isGoal && row.fate === 'open'
     return (
-      <li className="group flex items-start gap-1">
+      <li
+        className={`group flex items-start gap-1${canDrag ? ' cursor-grab active:cursor-grabbing' : ''}`}
+        draggable={canDrag || undefined}
+        onDragStart={canDrag ? (e) => writePlanDrag(e.dataTransfer, { kind: 'task', id: row.id, date: localYmd(dragDate!), title: row.title }) : undefined}
+      >
         <button
           type="button"
           onClick={() => onOpen(row)}

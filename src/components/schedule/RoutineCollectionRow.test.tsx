@@ -246,3 +246,19 @@ describe('RoutineCollectionRow management menu', () => {
     expect(screen.getByRole('menuitem', { name: /edit routine/i })).toBeInTheDocument()
   })
 })
+
+// At 390px the time gutter, chevron and action rail leave the name about 90px.
+// `truncate ... max-w-[50%]` spent half of that and rendered "Kids Bedtime
+// routine" as "K.." (2026-09-19). The name wraps now, as pool pills and pin
+// rows already do, and the next-step hint stands down on a phone.
+describe('RoutineCollectionRow at phone width', () => {
+  it('lets the name wrap instead of truncating it, and hides the step hint', () => {
+    render(<RoutineCollectionRow item={collectionItem()} {...handlers} />)
+    const name = screen.getByText('Shoulder HEP')
+    expect(name.className).toContain('line-clamp-2')
+    expect(name.className).toContain('break-words')
+    expect(name.className).not.toContain('max-w-[50%]')
+    const hint = document.querySelector('.hidden.sm\\:inline')
+    expect(hint).not.toBeNull()
+  })
+})

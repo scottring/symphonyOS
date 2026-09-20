@@ -2,6 +2,7 @@ import type { Routine, RecurrencePattern } from '@/types/actionable'
 import { matchesLayers } from '@/lib/today/domainFilter'
 import type { Layer } from '@/lib/domains'
 import type { AssigneeFilter } from '@/lib/today/types'
+import { isWeekendWindowDay, weekendWindowKeys } from '@/lib/cadence/weekendWindow'
 
 const WEEKDAYS = ['mon', 'tue', 'wed', 'thu', 'fri'] as const
 
@@ -198,6 +199,17 @@ export function matchesRecurrenceForDate(
         }
       }
       return pattern.days?.includes(dayOfWeek) ?? false
+    }
+    // A window, not a day. Every day of the weekend offers it — and doing it
+    // on one of them settles the whole window, so Saturday's job does not ask
+    // again on Sunday. The day it was DONE still shows it, ticked; only the
+    // other days of that window go quiet.
+    case 'weekend': {
+      if (!isWeekendWindowDay(date)) return false
+      if (!lastCompletedAt) return true
+      const doneOn = formatDateString(lastCompletedAt)
+      if (doneOn === dateStr) return true
+      return !weekendWindowKeys(date).includes(doneOn)
     }
     case 'monthly':
       return pattern.day_of_month === dayOfMonth

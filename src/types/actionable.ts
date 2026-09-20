@@ -9,7 +9,10 @@ export type RoutineVisibility = 'active' | 'reference'
 export type TargetUnit = 'minutes' | 'count'
 
 // Recurrence pattern types
-export type RecurrenceType = 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly' | 'specific_days' | 'since_last'
+// 'weekend' is a WINDOW, not a day: the commitment happens once across
+// Saturday and Sunday (and any day off touching them), rather than being
+// pinned to one of them and nagging on the other — Scott, 2026-09-20.
+export type RecurrenceType = 'daily' | 'weekly' | 'monthly' | 'quarterly' | 'yearly' | 'specific_days' | 'since_last' | 'weekend'
 
 export type RecurrenceUnit = 'days' | 'weeks' | 'months'
 

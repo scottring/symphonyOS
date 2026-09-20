@@ -415,7 +415,7 @@ export function useWallData(): UseWallDataReturn {
       const lastCompletionByRoutine: LastCompletionMap = new Map()
       for (const row of (routineCompletionsRes.data || []) as Array<{ entity_id: string; date: string }>) {
         if (lastCompletionByRoutine.has(row.entity_id)) continue
-        const d = new Date(row.date)
+        const d = parseLocalYmd(row.date) // by parts — a UTC parse lands a day early in the US
         if (!isNaN(d.getTime())) lastCompletionByRoutine.set(row.entity_id, d)
       }
 

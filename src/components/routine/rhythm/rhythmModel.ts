@@ -69,6 +69,9 @@ export function zoneOf(p: RecurrencePattern): Zone {
       return every <= 1 ? 'daily' : zoneForDays(every)
     case 'weekly':
       return p.days && p.days.length >= 5 && every <= 1 ? 'daily' : 'week'
+    // Once a week, on a window rather than a named day — still the week rung.
+    case 'weekend':
+      return 'week'
     case 'monthly':
       return zoneForDays(30 * every)
     case 'quarterly':

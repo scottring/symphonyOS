@@ -61,7 +61,7 @@ describe('layoutContextSpans', () => {
   it('clamps a span that runs past the last day, and says so', () => {
     const trip = ev('t', 'Trip', '2026-09-18T12:00:00.000Z', '2026-09-24T12:00:00.000Z', { all_day: true })
     const [span] = layoutContextSpans([trip], week)
-    expect(span).toMatchObject({ startCol: 5, endCol: 6, continuesBefore: false, continuesAfter: true })
+    expect(span).toMatchObject({ startCol: 5, endCol: 6, continuesBefore: false, continuesAfter: true, first: '2026-09-18', last: '2026-09-23' })
   })
 
   it('leaves single-day events and events outside the range to the day columns', () => {

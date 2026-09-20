@@ -1,9 +1,10 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { Pin, X } from 'lucide-react'
 import { useReferenceLists, REFERENCE_KINDS, type ReferenceKind, type ReferencePin } from './ReferenceListsContext'
 import { DayPlanPanel, panelActionsFor } from './DayPlanPanel'
 import { useDayPlan } from '@/hooks/useDayPlan'
+import { readViewedWeek, onViewedWeekChange } from '@/lib/viewedWeekSignal'
 import { usePlanActions } from '@/hooks/usePlanActions'
 import { planDropHandlers } from '@/lib/planning/planDrag'
 import { pinIsOnPage } from './periodsOnPage'
@@ -134,7 +135,11 @@ function TodayPlanList({ onClose }: { onClose: () => void }) {
   // pinned. Keyed on the calendar day so it rolls over at midnight.
   const todayKey = localYmd(new Date())
   const day = useMemo(() => { const [y, m, d] = todayKey.split('-').map(Number); return new Date(y, m - 1, d) }, [todayKey])
-  const { plan, loading, error } = useDayPlan(day)
+  // A week page beside the pin announces the week it is showing, so the pin's
+  // week list is the same list that page is planning into.
+  const [viewedWeek, setViewedWeek] = useState<Date | null>(() => readViewedWeek())
+  useEffect(() => onViewedWeekChange(setViewedWeek), [])
+  const { plan, loading, error } = useDayPlan(day, viewedWeek)
   const planActions = usePlanActions()
   const actions = useMemo(() => panelActionsFor(day, planActions), [day, planActions])
   return <section aria-label="Today's plan" className="reference-list">
@@ -147,6 +152,6 @@ function TodayPlanList({ onClose }: { onClose: () => void }) {
     </header>
     {error ? <p role="alert" className="py-5 text-[15px] text-danger-600">Could not load today's plan.</p>
       : loading || !plan ? <p className="py-5 text-[15px] text-neutral-500">Loading…</p>
-      : <DayPlanPanel plan={plan} day={day} actions={actions} />}
+      : <DayPlanPanel plan={plan} day={day} actions={actions} weekPage={viewedWeek} />}
   </section>
 }
