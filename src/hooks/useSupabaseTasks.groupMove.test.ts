@@ -14,7 +14,7 @@ vi.mock('@/hooks/useFamilyMembers', () => ({
     addMember: vi.fn(), updateMember: vi.fn(), deleteMember: vi.fn(),
   }),
 }))
-vi.mock('@/hooks/useToast', () => ({ useToast: () => ({ showToast: vi.fn() }) }))
+vi.mock('@/hooks/useToast', () => ({ useToast: () => ({ showToast: vi.fn() }), showToast: vi.fn() }))
 
 interface MockDbTask {
   id: string
@@ -32,6 +32,17 @@ interface MockDbTask {
 const mockSupabaseData: MockDbTask[] = []
 /** Every `.update(...).in('id', [...])` — the group-cascade write. */
 const bulkWrites: Array<{ ids: string[]; data: Record<string, unknown> }> = []
+
+/** task_commitments / task_focus: accept every write, return nothing. */
+function recordsStub() {
+  const chain = () => {
+    const c: Record<string, unknown> = {}
+    c.eq = () => c
+    c.then = (resolve: (v: { error: null }) => unknown) => resolve({ error: null })
+    return c
+  }
+  return { select: () => Promise.resolve({ data: [], error: null }), upsert: chain, update: chain, delete: chain }
+}
 /** Every `.update(...).eq('id', ...)` — a single-row write. */
 const rowWrites: Array<{ id: string; data: Record<string, unknown> }> = []
 
@@ -58,7 +69,7 @@ vi.mock('@/lib/supabase', () => ({
       ch.subscribe = vi.fn(() => ch)
       return ch
     }),
-    from: () => ({
+    from: (table: string) => table !== 'tasks' ? recordsStub() : ({
       select: () => ({
         eq: () => ({ order: () => Promise.resolve({ data: mockSupabaseData, error: null }) }),
         order: () => Promise.resolve({ data: mockSupabaseData, error: null }),

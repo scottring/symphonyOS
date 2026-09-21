@@ -93,13 +93,33 @@ export function applyFocusOps(list: readonly TaskFocusEntry[] | undefined, ops: 
 }
 
 /**
+ * A row whose records are UNKNOWN (never loaded — an older client, a test, a
+ * failed records fetch) is read from its cached stamps: each stamp present is
+ * an open commitment. Without this a placement write on such a row would
+ * derive an empty cache and wipe the stamps the row already had.
+ */
+export function bootstrapCommitments(task: Pick<Task, 'commitments' | 'weekStart' | 'monthStart' | 'seasonStart' | 'completed'>): TaskCommitment[] {
+  // Records present: they are the truth. None at all (undefined, or an empty
+  // list on a row that still carries stamps — a legacy row the backfill
+  // could not stamp, or records that did not load): read the stamps.
+  if (task.commitments && task.commitments.length > 0) return task.commitments
+  const status = task.completed ? 'done' : 'open'
+  const out: TaskCommitment[] = []
+  if (task.seasonStart) out.push({ level: 'season', periodStart: task.seasonStart, status })
+  if (task.monthStart) out.push({ level: 'month', periodStart: task.monthStart, status })
+  if (task.weekStart) out.push({ level: 'week', periodStart: task.weekStart, status })
+  return out
+}
+
+/**
  * Translate a legacy `Partial<Task>` write into a placement plan.
  *
  * Non-placement keys (title, notes, completed…) pass straight through to the
  * row. `completed` also marks the open commitments done (or reopens them) so
  * the optimistic state matches what the database trigger will do.
  */
-export function planPlacement(task: Task, updates: Partial<Task>, ctx: PlacementCtx): PlacementPlan {
+export function planPlacement(input: Task, updates: Partial<Task>, ctx: PlacementCtx): PlacementPlan {
+  const task: Task = { ...input, commitments: bootstrapCommitments(input) }
   const row: Partial<Task> = {}
   const commitmentOps: CommitmentOp[] = []
   const focusOps: FocusOp[] = []
@@ -195,12 +215,16 @@ export function planPlacement(task: Task, updates: Partial<Task>, ctx: Placement
   const merged: Task = { ...task, ...row, commitments, focus }
   const cache = deriveCache(merged)
   const local: Task = { ...merged, ...cache }
-  // The cache columns ride along on the row write so a reader between the row
-  // write and the trigger's sync sees the same answer.
-  row.bucket = cache.bucket
-  row.weekStart = cache.weekStart
-  row.monthStart = cache.monthStart
-  row.seasonStart = cache.seasonStart
+  // On a placement the cache columns ride along on the row write, so a reader
+  // between the row write and the trigger's sync sees the same answer. A
+  // title edit does not touch them (or it would read as a move).
+  const movesRow = (['bucket', 'scheduledFor', 'weekStart', 'monthStart', 'seasonStart'] as const).some((k) => k in updates)
+  if (movesRow) {
+    row.bucket = cache.bucket
+    row.weekStart = cache.weekStart
+    row.monthStart = cache.monthStart
+    row.seasonStart = cache.seasonStart
+  }
 
   return { row, commitmentOps, focusOps, local }
 }
@@ -210,7 +234,8 @@ export function planPlacement(task: Task, updates: Partial<Task>, ctx: Placement
  * period's commitment is marked carried (→ "Carried to October"); the next
  * period gets an open one. Nothing else on the row moves.
  */
-export function planKeep(task: Task, level: PlacementLevel, to: Date, from?: Date): PlacementPlan {
+export function planKeep(input: Task, level: PlacementLevel, to: Date, from?: Date): PlacementPlan {
+  const task: Task = { ...input, commitments: bootstrapCommitments(input) }
   const commitmentOps: CommitmentOp[] = []
   const current = from
     ? (task.commitments ?? []).find((c) => c.level === level && sameDay(c.periodStart, from))

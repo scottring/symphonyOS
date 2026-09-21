@@ -67,8 +67,10 @@ vi.mock('@/lib/supabase', () => ({
   supabase: {
     channel: vi.fn(() => {
       const ch: Record<string, unknown> = {
-        on: vi.fn((_event: string, _filter: unknown, cb: (payload: RealtimePayload) => void) => {
-          realtimeHandler = cb
+        on: vi.fn((_event: string, filter: { table?: string }, cb: (payload: RealtimePayload) => void) => {
+          // The channel also carries task_commitments and task_focus; these
+          // tests fire tasks events.
+          if (filter?.table === 'tasks') realtimeHandler = cb
           return ch
         }),
         unsubscribe: vi.fn(),

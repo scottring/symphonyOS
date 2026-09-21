@@ -71,8 +71,10 @@ export function deriveCache(task: Pick<Task, 'commitments' | 'scheduledFor' | 'b
   if (task.scheduledFor) {
     return { bucket: 'timed', weekStart: weekStartAnchor(task.scheduledFor, readCadenceConfig().weekStartsOn), monthStart: month, seasonStart: season }
   }
+  // No day and no open commitment: a period or 'timed' bucket has nothing
+  // left to stand on and falls back to the inbox; inbox/someday stay.
   const bucket: TaskBucket = week ? 'week' : month ? 'month' : season ? 'quarter'
-    : (task.bucket === 'week' || task.bucket === 'month' || task.bucket === 'quarter') ? 'inbox' : (task.bucket ?? 'inbox')
+    : (task.bucket === 'inbox' || task.bucket === 'someday') ? task.bucket : 'inbox'
   return { bucket, weekStart: week, monthStart: month, seasonStart: season }
 }
 

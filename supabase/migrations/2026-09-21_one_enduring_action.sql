@@ -222,7 +222,9 @@ begin
   elsif v_week is not null then v_bucket := 'week';
   elsif v_month is not null then v_bucket := 'month';
   elsif v_season is not null then v_bucket := 'quarter';
-  else v_bucket := case when v_task.bucket in ('week', 'month', 'quarter') then 'inbox' else v_task.bucket end;
+  -- No day, no open commitment: a period or 'timed' bucket has nothing to
+  -- stand on and falls back to the inbox; inbox/someday are states and stay.
+  else v_bucket := case when v_task.bucket in ('inbox', 'someday') then v_task.bucket else 'inbox' end;
   end if;
 
   update public.tasks
@@ -394,6 +396,19 @@ select id, user_id, planned_on
  where planned_on is not null
    and planned_on >= (now() at time zone 'America/New_York')::date - 2
 on conflict do nothing;
+
+-- The app subscribes to both record tables (a commitment or focus row changing
+-- in the other adult's tab, or written by a trigger, patches the task live).
+-- The publication has been empty before (2026-08); add explicitly, once.
+do $$
+begin
+  if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and tablename = 'task_commitments') then
+    alter publication supabase_realtime add table public.task_commitments;
+  end if;
+  if not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and tablename = 'task_focus') then
+    alter publication supabase_realtime add table public.task_focus;
+  end if;
+end $$;
 
 notify pgrst, 'reload schema';
 

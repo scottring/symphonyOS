@@ -142,7 +142,11 @@ describe('let go and complete', () => {
   it('non-placement keys pass through untouched', () => {
     const p = planPlacement(task({ commitments: [c('month', SEP)] }), { title: 'New', notes: 'n' }, ctx)
     expect(p.row).toMatchObject({ title: 'New', notes: 'n' })
+    expect('bucket' in p.row).toBe(false) // a title edit is not a move
     expect(p.commitmentOps).toEqual([])
+    // Choosing a day writes focus, not the row's cache columns.
+    const f = planPlacement(task({ commitments: [c('month', SEP)] }), { plannedOn: new Date(2026, 8, 23) }, ctx)
+    expect('bucket' in f.row).toBe(false)
     expect(isPlacementWrite({ title: 'x' })).toBe(false)
     expect(isPlacementWrite({ weekStart: WK20 })).toBe(true)
   })

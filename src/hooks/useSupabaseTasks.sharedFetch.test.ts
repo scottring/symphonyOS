@@ -33,9 +33,11 @@ vi.mock('@/lib/supabase', () => ({
       ch.subscribe = vi.fn(() => ch)
       return ch
     }),
-    from: () => ({
+    from: (table: string) => ({
       select: () => {
-        selectCalls()
+        // The records tables ride alongside every load; the trip this file
+        // counts is the tasks one.
+        if (table === 'tasks') selectCalls()
         const settle = async () => {
           // Hold the response open so a second mount lands mid-flight, which is
           // exactly how the real app mounts its instances.
