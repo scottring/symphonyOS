@@ -8,7 +8,7 @@ import {
   Navigate,
 } from 'react-router-dom'
 import type { RecurrencePattern } from '@/types/actionable'
-import { useRoutines } from '@/hooks/useRoutines'
+import { useRoutines, type CreateRoutineInput } from '@/hooks/useRoutines'
 import { useContacts } from '@/hooks/useContacts'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { usePinnedItems } from '@/hooks/usePinnedItems'
@@ -93,8 +93,8 @@ function RoutinesIndex() {
   // Stamp the active domain lens on creation: an unstamped routine is
   // invisible in a domain-filtered list the instant it's created — the
   // "New routine button does nothing" bug (it worked; the lens hid it).
-  const handleCreateCollection = useCallback(async (name: string) => {
-    return addRoutine({ name, context: soleDomain ?? undefined })
+  const handleCreateCollection = useCallback(async (name: string, fields?: Omit<CreateRoutineInput, 'name'>) => {
+    return addRoutine({ ...fields, name, context: fields?.context ?? soleDomain ?? undefined })
   }, [addRoutine, soleDomain])
 
   // A slot-created routine carries the slot's recurrence and either the active

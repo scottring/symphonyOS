@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useEscapeKey } from '@/hooks/useEscapeKey'
 import { MastheadCard } from '@/components/layout/MastheadCard'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
@@ -6,7 +6,7 @@ import { Plus, Search, Sparkles, RefreshCw, Wrench, ChevronRight, ChevronDown } 
 import type { RecurrencePattern, Routine } from '@/types/actionable'
 import type { Contact } from '@/types/contact'
 import type { FamilyMember } from '@/types/family'
-import type { UpdateRoutineInput } from '@/hooks/useRoutines'
+import type { CreateRoutineInput, UpdateRoutineInput } from '@/hooks/useRoutines'
 import { groupRoutineSteps } from '@/lib/today/routineCollections'
 import { TapRoutinePanel } from '@/components/surface/TapRoutinePanel'
 import { TapStepPanel } from '@/components/surface/TapStepPanel'
@@ -34,7 +34,9 @@ interface RhythmPageProps {
   onDeleteStep?: (stepId: string) => void
   /** Delete a top-level routine (RoutinesApp already passes this — it was silently dropped before). */
   onDelete?: (id: string) => void
-  onCreateCollection?: (name: string) => Promise<Routine | null> | void
+  /** Create a routine. "New routine" calls it only on Save, with everything
+   *  the user set in the unsaved panel. */
+  onCreateCollection?: (name: string, fields?: Omit<CreateRoutineInput, 'name'>) => Promise<Routine | null> | void
   /** Fold several routines into a NEW collection. Kept on the contract (the
    *  app passes it) but currently unreachable: its only entry point was naming
    *  a cluster on the daily arc, which the uniform list retired. Tend's
@@ -68,11 +70,38 @@ export function RhythmPage(props: RhythmPageProps) {
   // A focused Through-the-week day: the arc shows that day's full picture.
   const [query, setQuery] = useState('')
   const [open, setOpen] = useState<{ kind: 'routine' | 'standalone-step' | 'step'; id: string } | null>(null)
-  // "New routine" writes a row before the user has typed a name, so the panel
-  // has something to edit. If that panel closes with nothing touched, the row
-  // is let go — otherwise every abandoned click leaves a "New routine" behind
-  // (demo walkthrough 2026-09-04). Any edit clears the draft mark.
-  const [draftId, setDraftId] = useState<string | null>(null)
+  // "New routine" opens an UNSAVED routine: nothing is written until Save.
+  // It used to insert a live "New routine" on click, which showed up on the
+  // Daily rung and in the Planning panel while the editor was still open
+  // (walkthrough 2026-09-21, B20). Closing without saving writes nothing.
+  // The ref mirrors the state so Save reads the latest edit even when a title
+  // blur and the Save click land in the same tick.
+  const [newDraft, setNewDraftState] = useState<Routine | null>(null)
+  const newDraftRef = useRef<Routine | null>(null)
+  const setNewDraft = (next: Routine | null) => { newDraftRef.current = next; setNewDraftState(next) }
+  const patchDraft = (patch: Partial<Routine>) => {
+    if (newDraftRef.current) setNewDraft({ ...newDraftRef.current, ...patch })
+  }
+  const startNewRoutine = () => {
+    if (!onCreateCollection) return
+    setOpen(null)
+    setNewDraft(makeNewRoutineDraft())
+  }
+  // Writes the unsaved routine; returns the created row (or null on failure,
+  // in which case the panel stays open with the draft intact).
+  const saveNewRoutine = async (): Promise<Routine | null> => {
+    const d = newDraftRef.current
+    if (!d || !onCreateCollection) return null
+    const created = await onCreateCollection(d.name, createFieldsFromDraft(d))
+    if (!created) return null
+    // Two switches CreateRoutineInput doesn't carry ride a follow-up update.
+    const extra: UpdateRoutineInput = {}
+    if (d.show_on_timeline === false) extra.show_on_timeline = false
+    if (d.paused_until) extra.paused_until = d.paused_until
+    if (Object.keys(extra).length > 0) await onUpdateRoutine(created.id, extra)
+    setNewDraft(null)
+    return created
+  }
   const [restingOpen, setRestingOpen] = useState(false)
   const [tendOpen, setTendOpen] = useState(false)
 
@@ -204,17 +233,14 @@ export function RhythmPage(props: RhythmPageProps) {
     setOpen({ kind: model.stepCounts[r.id] ? 'routine' : 'standalone-step', id: r.id })
 
   const closePanel = () => {
-    if (draftId) { onDelete?.(draftId); setDraftId(null) }
+    setNewDraft(null)
     setOpen(null)
   }
-  const touchDraft = (id: string) => { if (id === draftId) setDraftId(null) }
-  const updateRoutine = (id: string, patch: Parameters<typeof onUpdateRoutine>[1]) => {
-    touchDraft(id)
-    return onUpdateRoutine(id, patch)
-  }
+  const updateRoutine = (id: string, patch: Parameters<typeof onUpdateRoutine>[1]) =>
+    onUpdateRoutine(id, patch)
   // Escape mirrors the open panel's own close: a step panel returns to its
   // routine, a routine panel closes.
-  useEscapeKey(!!open, openStep && parentOfOpenStep
+  useEscapeKey(!!open || !!newDraft, openStep && parentOfOpenStep
     ? () => setOpen({ kind: 'routine', id: parentOfOpenStep.id })
     : closePanel)
 
@@ -263,11 +289,7 @@ export function RhythmPage(props: RhythmPageProps) {
               )}
             </button>
             <button
-              onClick={async () => {
-                if (!onCreateCollection) return
-                const created = await onCreateCollection('New routine')
-                if (created) { setDraftId(created.id); setOpen({ kind: 'standalone-step', id: created.id }) }
-              }}
+              onClick={startNewRoutine}
               className="flex items-center gap-2 rounded-md bg-primary-700 px-4 py-2.5 text-[14px] font-medium text-white
                          transition-colors hover:bg-primary-800 active:bg-primary-900">
               <Plus className="w-5 h-5" />
@@ -310,11 +332,7 @@ export function RhythmPage(props: RhythmPageProps) {
               Capture your first routine and Symphony will start painting your week.
             </p>
             <button
-              onClick={async () => {
-                if (!onCreateCollection) return
-                const created = await onCreateCollection('New routine')
-                if (created) { setDraftId(created.id); setOpen({ kind: 'standalone-step', id: created.id }) }
-              }}
+              onClick={startNewRoutine}
               className="inline-flex items-center gap-2 rounded-md bg-primary-700 px-5 py-2.5 text-[15px] font-medium text-white
                          transition-colors hover:bg-primary-800">
               <Plus className="h-5 w-5" />
@@ -429,7 +447,7 @@ export function RhythmPage(props: RhythmPageProps) {
           PanelShell across every panel type in the app, so the cap lives on
           this wrapper rather than splitting PanelShell into sticky
           header/body/footer regions. */}
-      {(openRoutineItem || openStep) && (
+      {(openRoutineItem || openStep || newDraft) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={closePanel}>
           <div
             data-testid="routine-panel-dialog"
@@ -437,7 +455,38 @@ export function RhythmPage(props: RhythmPageProps) {
             className="flex max-h-[calc(100vh-2rem)] flex-col"
           >
             <div data-testid="routine-panel-body" className="min-h-0 flex-1 overflow-y-auto">
-            {openRoutineItem && (
+            {newDraft && (
+              <TapRoutinePanel
+                key="new-routine"
+                routine={newDraft}
+                familyMembers={familyMembers}
+                unsaved
+                onClose={closePanel}
+                onSave={() => { void saveNewRoutine() }}
+                onRename={name => patchDraft({ name })}
+                onContextChange={context => patchDraft({ context: context ?? null })}
+                onVisibilityChange={visibility => patchDraft({ visibility })}
+                onRestUntilChange={pausedUntil => patchDraft({ paused_until: pausedUntil })}
+                onShowOnTodayChange={next => patchDraft({ show_on_timeline: next })}
+                onAssignChange={memberIds => patchDraft({ assigned_to_all: memberIds })}
+                onScheduleChange={(pattern, timeOfDay) =>
+                  patchDraft({ recurrence_pattern: pattern, time_of_day: timeOfDay || null })}
+                onNotesChange={description => patchDraft({ description })}
+                onTargetChange={t => patchDraft({ target_amount: t?.amount ?? null, target_unit: t?.unit ?? null })}
+                steps={[]}
+                onSelectStep={() => {}}
+                // A first step is a deliberate edit: save the routine, then
+                // add the step to the real row and keep its panel open.
+                onAddStep={async (name: string) => {
+                  const created = await saveNewRoutine()
+                  if (!created) return
+                  props.onAddStep(created.id, name)
+                  setOpen({ kind: 'routine', id: created.id })
+                }}
+                onReorderSteps={props.onReorderSteps}
+              />
+            )}
+            {!newDraft && openRoutineItem && (
               <TapRoutinePanel
                 key={openRoutineItem.id}
                 routine={openRoutineItem}
@@ -453,11 +502,11 @@ export function RhythmPage(props: RhythmPageProps) {
                   updateRoutine(openRoutineItem.id, { recurrence_pattern: pattern, time_of_day: timeOfDay || null })}
                 onNotesChange={description => updateRoutine(openRoutineItem.id, { description })}
                 onTargetChange={t => updateRoutine(openRoutineItem.id, { target_amount: t?.amount ?? null, target_unit: t?.unit ?? null })}
-                onDelete={onDelete ? () => { onDelete(openRoutineItem.id); setDraftId(null); setOpen(null) } : undefined}
-                onAddSteps={props.onAddSteps ? steps => { touchDraft(openRoutineItem.id); return props.onAddSteps!(openRoutineItem.id, steps) } : undefined}
+                onDelete={onDelete ? () => { onDelete(openRoutineItem.id); setOpen(null) } : undefined}
+                onAddSteps={props.onAddSteps ? steps => props.onAddSteps!(openRoutineItem.id, steps) : undefined}
                 steps={openRoutineItem.steps}
                 onSelectStep={(s: Routine) => setOpen({ kind: 'step', id: s.id })}
-                onAddStep={(name: string) => { touchDraft(openRoutineItem.id); return props.onAddStep(openRoutineItem.id, name) }}
+                onAddStep={(name: string) => props.onAddStep(openRoutineItem.id, name)}
                 onReorderSteps={props.onReorderSteps}
                 {...(openRoutineItem.steps.length === 0 && onAddToCollection ? {
                   moveTargets: foldTargets.filter(t => t.id !== openRoutineItem.id),
@@ -490,4 +539,34 @@ export function RhythmPage(props: RhythmPageProps) {
       )}
     </div>
   )
+}
+
+const NEW_ROUTINE_DRAFT_ID = 'new-routine-draft'
+
+/** The unsaved routine "New routine" opens — the same defaults addRoutine writes. */
+function makeNewRoutineDraft(): Routine {
+  const now = new Date().toISOString()
+  return {
+    id: NEW_ROUTINE_DRAFT_ID, user_id: '', name: 'New routine', description: null,
+    default_assignee: null, assigned_to: null, assigned_to_all: null,
+    visibility: 'active', paused_until: null, recurrence_pattern: { type: 'daily' },
+    time_of_day: null, raw_input: null, show_on_timeline: true, context: null,
+    // Display only — the real scope is derived on insert (scopeForDomain).
+    scope: 'individual',
+    created_at: now, updated_at: now,
+  }
+}
+
+function createFieldsFromDraft(d: Routine): Omit<CreateRoutineInput, 'name'> {
+  return {
+    description: d.description ?? undefined,
+    recurrence_pattern: d.recurrence_pattern,
+    time_of_day: d.time_of_day ?? undefined,
+    visibility: d.visibility,
+    assigned_to_all: d.assigned_to_all && d.assigned_to_all.length > 0 ? d.assigned_to_all : undefined,
+    // Unset means "the app decides" (the active domain lens), not Unsorted.
+    context: d.context ?? undefined,
+    target_amount: d.target_amount ?? null,
+    target_unit: d.target_unit ?? null,
+  }
 }

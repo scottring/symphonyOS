@@ -51,6 +51,14 @@ type UndoEntry = {
   undoable: boolean
   /** Optional extra async side-effect to run alongside the task update on undo */
   onUndoExtra?: () => Promise<void>
+  /**
+   * Runs when the entry goes away WITHOUT an undo — the toast timed out or was
+   * dismissed, another action replaced it, or the page unmounted. Delete uses
+   * it: the row is hidden at once and only deleted here, so Undo can bring
+   * back the same row (same id, attachments, commitments, focus) instead of a
+   * re-inserted copy.
+   */
+  onExpire?: () => void
 }
 
 interface InboxViewProps {
@@ -66,7 +74,7 @@ interface InboxViewProps {
 }
 
 export function InboxView({
-  tasks, selectedItemId: _selectedItemId, onSelectItem,
+  tasks: allTasks, selectedItemId: _selectedItemId, onSelectItem,
   panelOpen: _panelOpen, onClosePanel: _onClosePanel,
   loading = false,
 }: InboxViewProps) {
@@ -86,6 +94,29 @@ export function InboxView({
   const { user } = useAuth()
 
   const { soleDomain, layers } = useDomain()
+
+  // Rows deleted from the Inbox but still inside their Undo window. They are
+  // hidden everywhere on this page; the real delete waits for the toast to go
+  // (see UndoEntry.onExpire).
+  const [pendingDeleteIds, setPendingDeleteIds] = useState<ReadonlySet<string>>(new Set())
+  const tasks = useMemo(
+    () => (pendingDeleteIds.size === 0 ? allTasks : allTasks.filter((t) => !pendingDeleteIds.has(t.id))),
+    [allTasks, pendingDeleteIds],
+  )
+
+  const [undo, setUndo] = useState<UndoEntry | null>(null)
+  // Mirrors `undo` so a replacement or unmount can expire the entry it
+  // displaces — a pending delete must not be forgotten just because another
+  // toast took its place.
+  const undoRef = useRef<UndoEntry | null>(null)
+  const pushUndo = useCallback((next: UndoEntry | null) => {
+    const prev = undoRef.current
+    undoRef.current = next
+    if (prev && prev !== next) prev.onExpire?.()
+    setUndo(next)
+  }, [])
+  const dismissUndo = useCallback(() => pushUndo(null), [pushUndo])
+  useEffect(() => () => { undoRef.current?.onExpire?.(); undoRef.current = null }, [])
 
   // Page chrome for the card's corner — only inside an AppShell (tests mount bare).
 
@@ -201,7 +232,7 @@ export function InboxView({
         return
       }
 
-      setUndo({
+      pushUndo({
         taskId: snapshot.id,
         message: `Sent to ${outcome.calendarName}`,
         // Empty: the task is gone, so there is nothing to update — handleUndo
@@ -223,7 +254,7 @@ export function InboxView({
         },
       })
     },
-    [sendToCalendar, undoSend, restoreTask],
+    [sendToCalendar, undoSend, restoreTask, pushUndo],
   )
 
   const handleNoteSelect = useCallback(async (task: Task, selection: NotePickerSelection) => {
@@ -252,7 +283,7 @@ export function InboxView({
       }
 
       if (onDeleteTask) onDeleteTask(task.id)
-      setUndo({
+      pushUndo({
         taskId: task.id,
         message: `Sent to '${target.title ?? 'note'}'`,
         previous: {},
@@ -282,7 +313,7 @@ export function InboxView({
       }
 
       if (onDeleteTask) onDeleteTask(task.id)
-      setUndo({
+      pushUndo({
         taskId: task.id,
         message: `Created '${created.title ?? selection.title}'`,
         previous: {},
@@ -294,7 +325,7 @@ export function InboxView({
       })
     }
     setNotePickerTaskId(null)
-  }, [notes, updateNote, deleteNote, addNote, restoreTask, onDeleteTask])
+  }, [notes, updateNote, deleteNote, addNote, restoreTask, onDeleteTask, pushUndo])
 
   // Layer filter — the SHARED helper, not a local copy.
   //
@@ -371,7 +402,6 @@ export function InboxView({
   const expiredRows = useMemo(() => selectExpired(filteredTasks), [filteredTasks])
 
   const [leavingIds, setLeavingIds] = useState<Set<string>>(new Set())
-  const [undo, setUndo] = useState<UndoEntry | null>(null)
 
   const handleSelect = useCallback((taskId: string) => {
     onSelectItem(`task-${taskId}`)
@@ -412,15 +442,31 @@ export function InboxView({
           if (onUpdateTask) ok = await wasWritten(onUpdateTask(task.id, { completed: true }))
           message = 'Completed'
         } else if (action.kind === 'delete') {
-          if (onDeleteTask) onDeleteTask(task.id)
-          message = 'Deleted'
+          // Hide now, delete when the Undo window closes (onExpire).
+          const id = task.id
+          setPendingDeleteIds((s) => new Set(s).add(id))
+          setLeavingIds((s) => { const next = new Set(s); next.delete(id); return next })
+          pushUndo({
+            taskId: id,
+            message: 'Deleted',
+            previous: {},
+            undoable: true,
+            onUndoExtra: async () => {
+              setPendingDeleteIds((s) => { const next = new Set(s); next.delete(id); return next })
+            },
+            onExpire: () => {
+              onDeleteTask?.(id)
+              setPendingDeleteIds((s) => { const next = new Set(s); next.delete(id); return next })
+            },
+          })
+          return
         }
 
         setLeavingIds((s) => { const next = new Set(s); next.delete(task.id); return next })
-        if (ok) setUndo({ taskId: task.id, message, previous, undoable: action.kind !== 'delete' })
+        if (ok) pushUndo({ taskId: task.id, message, previous, undoable: true })
       })()
     }, 220)
-  }, [onPushTask, onDeleteTask, onUpdateTask])
+  }, [onPushTask, onDeleteTask, onUpdateTask, pushUndo])
 
   // Fan-out triage: route an inbox item to a specific WHEN. Mirrors applyTriage's
   // leaving-animation + undo, but covers the richer temporal vocabulary. Dated
@@ -458,10 +504,10 @@ export function InboxView({
           case 'someday': message = 'Sent to Someday'; if (onUpdateTask) ok = await wasWritten(onUpdateTask(task.id, { bucket: 'someday', scheduledFor: undefined })); break
         }
         setLeavingIds((s) => { const next = new Set(s); next.delete(task.id); return next })
-        if (ok) setUndo({ taskId: task.id, message, previous, undoable: true })
+        if (ok) pushUndo({ taskId: task.id, message, previous, undoable: true })
       })()
     }, 220)
-  }, [onPushTask, onUpdateTask])
+  }, [onPushTask, onUpdateTask, pushUndo])
 
   // Schedule an inbox item to a specific date/time (the "Pick date" triage path).
   const applyDate = useCallback((task: Task, date: Date) => {
@@ -471,13 +517,15 @@ export function InboxView({
       void (async () => {
         const ok = onPushTask ? await wasWritten(onPushTask(task.id, date)) : true
         setLeavingIds((s) => { const next = new Set(s); next.delete(task.id); return next })
-        if (ok) setUndo({ taskId: task.id, message: 'Scheduled', previous, undoable: true })
+        if (ok) pushUndo({ taskId: task.id, message: 'Scheduled', previous, undoable: true })
       })()
     }, 220)
-  }, [onPushTask])
+  }, [onPushTask, pushUndo])
 
   const handleUndo = useCallback(async () => {
     if (!undo) { setUndo(null); return }
+    // Undone, not expired: clear the ref first so onExpire never runs.
+    undoRef.current = null
     // Only call onUpdateTask if there are actual fields to restore
     if (onUpdateTask && Object.keys(undo.previous).length > 0) {
       onUpdateTask(undo.taskId, undo.previous)
@@ -748,7 +796,7 @@ export function InboxView({
         <InboxUndoToast
           message={undo.message}
           onUndo={undo.undoable ? handleUndo : undefined}
-          onDismiss={() => setUndo(null)}
+          onDismiss={dismissUndo}
         />
       )}
       </div>
