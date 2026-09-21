@@ -318,14 +318,15 @@ describe('Capture and the Today pin from every desktop page', () => {
     expect(screen.getByTestId('quick-capture')).toHaveAttribute('data-open', 'true')
   })
 
-  it('the Today pin opens beside any page from the navigation, and closes the same way', () => {
+  it('the Planning panel opens beside any page from its labelled button, and closes the same way', () => {
     renderAt('/notes')
-    const toggle = screen.getByRole('button', { name: "Pin today's plan" })
+    const toggle = screen.getByRole('button', { name: 'Open Planning' })
     expect(toggle).toHaveAttribute('aria-pressed', 'false')
+    expect(toggle).toHaveTextContent('Planning')
     fireEvent.click(toggle)
-    expect(screen.getByRole('region', { name: "Today's plan" })).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: "Unpin today's plan", pressed: true }))
-    expect(screen.queryByRole('region', { name: "Today's plan" })).not.toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Planning' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Close Planning', pressed: true }))
+    expect(screen.queryByRole('region', { name: 'Planning' })).not.toBeInTheDocument()
     // Today is still one destination.
     expect(screen.getAllByRole('link', { name: 'Today' })).toHaveLength(1)
   })

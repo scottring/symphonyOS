@@ -28,11 +28,7 @@ import { useGridCreate } from './useGridCreate'
 import { SlotQuickCreatePopover, type CreateType } from './SlotQuickCreatePopover'
 import { RoutinePlacePopover } from './RoutinePlacePopover'
 import { RoutinesToggle } from './RoutinesToggle'
-import { foldWeeksFor } from '@/lib/planning/dateRange'
-import { WeekPoolLane } from './WeekPoolLane'
-import { WeekPlanColumn } from './WeekPlanColumn'
 import { panelActionsFor } from '@/components/reference/DayPlanPanel'
-import { WeekMonthRail } from './WeekMonthRail'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { suggestSlots, type BusyInterval } from '@/lib/planning/dropSmarts'
 import { FIRST_HOUR, LAST_HOUR } from './WeekGrid'
@@ -40,8 +36,10 @@ import { readHideRoutines, writeHideRoutines, onHideRoutinesChange } from '@/lib
 import { useGatedTaskActions } from '@/hooks/useGatedTaskActions'
 import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
 import { partitionWeekExtras } from '@/lib/week/weekExtras'
-import { unhomedRoutines } from '@/lib/week/unhomedRoutines'
 import { buildWeekRoutineItems } from './weekRoutineItems'
+import { PanelLeft } from 'lucide-react'
+import { useReferenceLists } from '@/components/reference/ReferenceListsContext'
+import { PlanningSheet } from '@/components/reference/PlanningSheet'
 import { useWeekInstances } from './useWeekInstances'
 import { edgeForPointer } from './edgeAdvance'
 import { WeekJournal, type JournalDay, type JournalEntry } from './WeekJournal'
@@ -173,6 +171,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
   // The rail plans MY week — scope it to the current member, as the strip does.
   const { getCurrentUserMember } = useFamilyMembers()
   const meId = getCurrentUserMember()?.id ?? null
+  const references = useReferenceLists()
   const { createEvent, deleteEvent } = useGoogleCalendar()
   const gridCreate = useGridCreate()
 
@@ -194,28 +193,6 @@ export function WeekViewV2(props: WeekViewV2Props) {
   // Only unmount clears it — a cleanup on every change published null → week
   // and defeated the signal's same-week dedupe.
   useEffect(() => () => publishViewedWeek(null), [])
-
-  const handleNotThisWeek = useCallback((id: string) => {
-    const currentWeek = weekStartAnchor(new Date(), readCadenceConfig().weekStartsOn)
-    const nextWeek = new Date(currentWeek)
-    nextWeek.setDate(nextWeek.getDate() + 7)
-    void onUpdateTask(id, { bucket: 'week', scheduledFor: undefined, isAllDay: false, weekStart: nextWeek })
-  }, [onUpdateTask])
-
-  // Shelf Routines view: eligible-but-homeless routines, through the one
-  // resolver ladder (date-agnostic). hideRoutines is a GRID preference — the
-  // shelf still offers homes while the grid hides bands — so it's not passed.
-  // Weeks the range reaches into besides the current one — each folds its
-  // placed rows beneath the list (foldWeeksFor).
-  const foldWeeks = useMemo(
-    () => foldWeeksFor(weekStart, dayCount, new Date(), readCadenceConfig().weekStartsOn),
-    [weekStart, dayCount],
-  )
-
-  const shelfRoutines = useMemo(
-    () => unhomedRoutines(routines, { member: selectedAssignees, prefs: { hideRoutines: false, layers } }),
-    [routines, selectedAssignees, layers],
-  )
 
   // A shelf routine pill dropped on a slot asks the place-scope question
   // before anything is written: the rule ("every Thursday at 5:00" — its new
@@ -727,14 +704,6 @@ export function WeekViewV2(props: WeekViewV2Props) {
   // Re-keyed per render on today's date, so a tab left open past midnight
   // does not keep choosing rows for yesterday.
   const todayKey = localYmd(new Date())
-  const weekListActions = useMemo(
-    () => panelActionsFor(parseLocalDate(todayKey), {
-      ...planActions,
-      toggleTask: (id: string) => { void toggleTask(id) },
-      completeRoutine: () => Promise.resolve(false),
-    }),
-    [planActions, toggleTask, todayKey],
-  )
   // "+ Add" on a journal day: a dated, all-day task on that day, assigned to
   // me. Captures never inherit the view's lens, so it lands Unsorted — and
   // when the current filter would then hide it, the toast says so rather
@@ -845,32 +814,16 @@ export function WeekViewV2(props: WeekViewV2Props) {
     return () => window.removeEventListener('keydown', handler)
   }, [weekStart, dayCount, onWeekChange])
 
-  const margin = (
-    <>
-      {/* The week's list — the same rows the Today pin draws, in the page's
-          own column so it does not depend on a pin being switched on. */}
-      <WeekPlanColumn tasks={tasks} weekStart={weekAnchor} meId={meId} userId={userId} actions={weekListActions} draggable={!narrow} />
-      <WeekPoolLane
-        tasks={tasks}
-        routines={shelfRoutines}
-        weekStart={weekStart}
-        dayCount={dayCount}
-        onSelectItem={onSelectItem}
-        onCompleteTask={(id) => { void toggleTask(id) }}
-        onNotThisWeek={handleNotThisWeek}
-        onPushTask={(id, target) => { void gated.pushTask(id, target) }}
-        onUpdateTask={(id, u) => { void onUpdateTask(id, u) }}
-        onDeleteTask={(id) => { void deleteTask(id) }}
-        foldWeeks={foldWeeks}
-        dragEnabled={!narrow}
-        // A routine needs a TIME to land — the journal's days have none, so
-        // routine rows only pick up where there are slots to drop them on.
-        routinesDraggable={showSchedule}
-        onPlanDrop={(payload) => { void planActions.drop(payload, { type: 'period', period: 'week' }) }}
-      />
-      <WeekMonthRail tasks={tasks} meId={meId} onSelectItem={onSelectItem} onAddToWeek={(id) => { void gated.pushTask(id, 'week') }} />
-    </>
-  )
+  // The week's planning lives in the ONE Planning panel (Scott, 2026-09-21):
+  // the dock beside the page on desktop, a sheet on a phone. The viewport is
+  // the days. When the panel is closed the page offers it in one line, so a
+  // week is never a wall of days with no way to fill them.
+  const planningPinned = !!references?.pins.some((p) => p.kind === 'today')
+  const [sheetOpen, setSheetOpen] = useState(false)
+  const openPlanning = () => {
+    if (narrow || !references) setSheetOpen(true)
+    else references.pin('today')
+  }
 
   return (
     <div className="relative">
@@ -878,8 +831,20 @@ export function WeekViewV2(props: WeekViewV2Props) {
         {!narrow && props.mode === undefined && (
           <div className="mr-auto"><WeekModeSwitch mode={mode} onChange={setOwnMode} /></div>
         )}
+        {(narrow || !planningPinned) && (
+          <button
+            type="button"
+            onClick={openPlanning}
+            aria-expanded={narrow ? sheetOpen : planningPinned}
+            className="inline-flex items-center gap-1.5 rounded-full border border-neutral-300 px-3 py-1 text-[13px] text-neutral-700 hover:bg-neutral-100"
+          >
+            <PanelLeft className="h-3.5 w-3.5" aria-hidden="true" />
+            <span>Planning</span>
+          </button>
+        )}
         <RoutinesToggle hidden={hideRoutines} onToggle={() => writeHideRoutines(!hideRoutines)} />
       </div>
+      {narrow && <PlanningSheet open={sheetOpen} onClose={() => setSheetOpen(false)} weekPage={weekAnchor} />}
 
       <DndContext
         sensors={sensors}
@@ -898,25 +863,11 @@ export function WeekViewV2(props: WeekViewV2Props) {
             the stacked days instead. */}
         {narrow ? (
           <div className="flex flex-col gap-4">
-            <aside aria-label="This week's list" className="flex flex-col gap-2">{margin}</aside>
             <WeekJournal days={journalDays} spans={journalSpans} onSelectItem={onSelectItem} onToggleEntry={handleJournalToggle} onPlanDrop={handlePlanDropOnDay} onAddToDay={handleAddToDay} narrow dragEnabled={false} />
           </div>
         ) : (
         <div className="flex items-start gap-4">
-        {/* The list scrolls on its own (Scott, 2026-09-07): a week with 54
-            things on it is taller than the days, and reading down the list
-            used to drag the days off the top of the screen with it. The
-            column sticks to the viewport and takes its own scrollbar, so the
-            days stay put while you read the list. overscroll-contain keeps a
-            flick at the list's end from scrolling the page underneath. */}
-        <aside
-          aria-label="This week's list"
-          className={`shrink-0 ${showSchedule ? 'w-72' : 'w-60'} sticky top-2 max-h-[calc(100vh-1rem)] overflow-y-auto overscroll-contain pr-1 flex flex-col gap-2`}
-        >
-          {margin}
-        </aside>
-        {/* Edge auto-advance measures THIS box, not the whole view — with the
-            list column to its left, the view's left edge is no longer the days'. */}
+        {/* Edge auto-advance measures THIS box, not the whole view. */}
         <div ref={gridBoundsRef} data-week-bounds className="flex-1 min-w-0">
         {!showSchedule ? (
           <WeekJournal days={journalDays} spans={journalSpans} onSelectItem={onSelectItem} onToggleEntry={handleJournalToggle} onPlanDrop={handlePlanDropOnDay} onAddToDay={handleAddToDay} />

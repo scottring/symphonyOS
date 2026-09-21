@@ -1,14 +1,14 @@
-// The Today pin's contents: what the day holds that Today's main list does
-// not draw — until you choose it.
+// The Planning panel (Scott, 2026-09-21): ONE list, "To plan" — everything
+// that answers "what might I put on a day?" (unfinished work, this week's
+// undated tasks, routines with no day yet), each once, with a line of context
+// instead of another category to learn. Beside Today, "Scheduled today" (dated
+// but not chosen) keeps its own small group; the month plan opens on request
+// ("Browse month plan") rather than standing beside the list.
 //
-//   Scheduled today   untimed tasks DATED today: commitments, not options
-//   Available today   untimed routine occurrences for today: a choice
-//   This week         the week's list (folded)
-//   This month        the month's list (folded)
-//
-// A chosen row stays in its group, marked "Planned today", so nothing reads as
-// unfinished twice. Every drag has a button: Today, Set time…, This week /
-// This month live on the row, so a keyboard or a touchscreen can do all of it.
+// The interaction: pick something here → put it on a day → do it. A chosen
+// row stays, marked "Planned today", so nothing reads as unfinished twice.
+// Every drag has a button: Today and Set a day or time live on the row, so a
+// keyboard or a touchscreen can do all of it.
 import { useState, type ReactNode } from 'react'
 import { Check, ChevronDown, ChevronRight, Clock, GripVertical, Undo2 } from 'lucide-react'
 import { SchedulePopover } from '@/components/triage'
@@ -70,9 +70,11 @@ function PlanRow({ entry, day, actions, draggable }: {
         <span className={`line-clamp-2 break-words leading-snug ${entry.completed ? 'text-neutral-400 line-through' : 'text-neutral-800'}`}>
           {entry.title}
         </span>
-        {entry.planned && !entry.completed && (
+        {entry.planned && !entry.completed ? (
           <span className="block text-[11.5px] text-primary-700">Planned today</span>
-        )}
+        ) : entry.context ? (
+          <span className="block text-[11.5px] text-neutral-500">{entry.context}</span>
+        ) : null}
       </div>
       {!entry.completed && (
         <div className="flex shrink-0 items-center gap-0.5 text-neutral-500">
@@ -201,39 +203,16 @@ export function weekListTitle(weekStart: Date | null): string {
     : `Week of ${weekStart.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
 }
 
-/**
- * The week's list on its own: the same rows, from the same selector, that the
- * Today pin shows. A week page draws this in its own column rather than
- * leaning on a pin — pins are opt-in and live in sessionStorage, so a page
- * that depended on one would come up empty in every new tab.
- */
-export function DayPlanWeekList({ plan, day, actions, weekStart, draggable = true, open, onOpenChange }: {
-  plan: DayPlan
-  day: Date
-  actions: DayPlanPanelActions
-  /** The week on screen. Names the fold; the rows come from `plan.week`. */
-  weekStart: Date
-  draggable?: boolean
-  /** Controlled so the page can remember the fold between visits. */
-  open?: boolean
-  onOpenChange?: (open: boolean) => void
-}) {
-  return (
-    <div data-testid="day-plan-week-list">
-      <Group
-        title={weekListTitle(weekStart)}
-        entries={plan.week}
-        day={day}
-        actions={actions}
-        draggable={draggable}
-        defaultOpen
-        cap={null}
-        open={open}
-        onOpenChange={onOpenChange}
-        empty="Nothing on this week’s list."
-      />
-    </div>
-  )
+/** What the panel is planning: the week on screen, or the day. */
+export function planningSubtitle(day: Date, weekPage: Date | null): string {
+  if (weekPage) {
+    const end = new Date(weekPage)
+    end.setDate(end.getDate() + 6)
+    const a = weekPage.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    const b = end.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    return `${a} – ${b}`
+  }
+  return day.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
 }
 
 export function DayPlanPanel({ plan, day, actions, draggable = true, weekPage = null }: {
@@ -242,49 +221,66 @@ export function DayPlanPanel({ plan, day, actions, draggable = true, weekPage = 
   actions: DayPlanPanelActions
   /** Rows can be dragged out (desktop). Off on touch layouts. */
   draggable?: boolean
-  /** The week the page beside this panel is showing. Set = the week list is
-   *  the reason the panel is open: it leads, opens, and shows every row. Null
-   *  = the panel is beside some other page and the week stays a closed
-   *  reference under the day. */
+  /** The week the page beside this panel is showing. Set = the list is the
+   *  week's work and shows every row; null = the panel is beside a day and
+   *  the list is capped like any reference. */
   weekPage?: Date | null
 }) {
-  const nothing = plan.carried.length + plan.scheduled.length + plan.available.length + plan.week.length + plan.month.length === 0
-  const weekTitle = weekListTitle(weekPage)
-  const weekGroup = (
-    <Group
-      title={weekTitle}
-      entries={plan.week}
-      day={day}
-      actions={actions}
-      draggable={draggable}
-      defaultOpen={weekPage !== null}
-      cap={weekPage !== null ? null : PLAN_GROUP_CAP}
-      empty={weekPage !== null ? 'Nothing on this week’s list.' : undefined}
-    />
-  )
+  const [monthOpen, setMonthOpen] = useState(false)
+  const beside = weekPage ? 'week' : 'day'
   return (
     <div data-testid="day-plan-panel">
-      {nothing && !weekPage && <p className="py-4 text-[14px] text-neutral-500">Nothing waiting — the day is what's on it.</p>}
-      {weekPage && weekGroup}
-      {plan.carried.length > 0 && (
-        <Group title="Carried over" entries={plan.carried} day={day} actions={actions} draggable={draggable} defaultOpen={!weekPage} count={false} />
+      <Group
+        title="To plan"
+        entries={plan.toPlan ?? []}
+        day={day}
+        actions={actions}
+        draggable={draggable}
+        defaultOpen
+        count={false}
+        cap={weekPage !== null ? null : PLAN_GROUP_CAP}
+        empty={beside === 'week' ? 'Nothing to plan — every task has its day.' : 'Nothing to plan.'}
+      />
+      {/* Dated today but not chosen. Left as its own group for now: whether
+          "on its day" means the page or this panel is an open decision
+          (2026-09-21). */}
+      {!weekPage && plan.scheduled.length > 0 && (
+        <Group title="Scheduled today" entries={plan.scheduled} day={day} actions={actions} draggable={draggable} defaultOpen count={false} />
       )}
-      <Group title="Scheduled today" entries={plan.scheduled} day={day} actions={actions} draggable={draggable} defaultOpen={!weekPage} />
-      <Group title="Available today" entries={plan.available} day={day} actions={actions} draggable={draggable} defaultOpen={!weekPage} />
-      {!weekPage && weekGroup}
-      <Group title="This month" entries={plan.month} day={day} actions={actions} draggable={draggable} defaultOpen={false} />
+      <div className="mt-4">
+        <button
+          type="button"
+          aria-expanded={monthOpen}
+          aria-controls="plan-group-this-month"
+          onClick={() => setMonthOpen((o) => !o)}
+          className="inline-flex items-center gap-1 text-[12px] font-semibold uppercase tracking-[0.08em] text-neutral-500 hover:text-neutral-800"
+        >
+          {monthOpen ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
+          Browse month plan
+        </button>
+        {monthOpen && (
+          <Group
+            title="This month"
+            entries={plan.month}
+            day={day}
+            actions={actions}
+            draggable={draggable}
+            defaultOpen
+            count={false}
+            cap={null}
+            empty="Nothing on this month's list."
+          />
+        )}
+      </div>
     </div>
   )
 }
 
-/** The one line Today spends on the pin: "3 scheduled for today · 8 available". */
+/** The one line Today spends on the panel. No counts (Today keeps no
+ *  scoreboard): it says only whether there is anything to plan. */
 export function planSummary(plan: DayPlan): string | null {
-  const parts: string[] = []
-  if (plan.counts.scheduled > 0) parts.push(`${plan.counts.scheduled} scheduled for today`)
-  if (plan.counts.available > 0) parts.push(`${plan.counts.available} available`)
-  if (parts.length > 0) return parts.join(' · ')
-  const lists = [...plan.week, ...plan.month].filter((e) => !e.completed && !e.planned).length
-  return lists > 0 ? 'Choose from this week’s list' : null
+  const waiting = [...plan.toPlan, ...plan.scheduled].some((e) => !e.completed && !e.planned)
+  return waiting ? 'Choose something for today' : null
 }
 
 /** Map the panel's row gestures onto plan actions for `day`. */

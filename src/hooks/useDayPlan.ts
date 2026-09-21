@@ -10,6 +10,7 @@ import { readHideRoutines, onHideRoutinesChange } from '@/lib/hideRoutinesSignal
 import { filterTasksForLayers } from '@/lib/today/domainFilter'
 import { routinesForViewedDate } from '@/lib/today/routinesForDate'
 import { selectDayPlan, type DayPlan } from '@/lib/today/dayPlan'
+import { unhomedRoutines } from '@/lib/week/unhomedRoutines'
 import { weekStartAnchor, readCadenceConfig, localYmd } from '@/lib/cadence/config'
 
 /**
@@ -62,6 +63,9 @@ export function useDayPlan(
         ? (() => { const [wy, wm, wd] = weekKey.split('-').map(Number); return new Date(wy, wm - 1, wd) })()
         : weekStartAnchor(viewedDate, readCadenceConfig().weekStartsOn),
       userId,
+      // Weekly routines with no day of their own join the To plan list. The
+      // hide-daily preference is a grid preference, not a planning one.
+      unhomedRoutines: unhomedRoutines(allRoutines, { member: selectedAssignees, prefs: { hideRoutines: false, layers } }),
     })
   }, [instances, dayKey, weekKey, tasks, layers, getRoutinesForDate, allRoutines, selectedAssignees, hideRoutines, userId])
 

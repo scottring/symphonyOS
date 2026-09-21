@@ -122,19 +122,26 @@ vi.mock('@/hooks/useDayPlan', () => ({
         { key: 'routine:r2', kind: 'routine', id: 'r2', title: 'Family reading time', completed: false, planned: true, group: 'available' },
       ],
       week: [{ key: 'task:w', kind: 'task', id: 'w', title: 'Book the plumber', completed: false, planned: false, group: 'week' }],
-      month: [],
+      month: [{ key: 'task:m', kind: 'task', id: 'm', title: 'Plan the porch', completed: false, planned: false, group: 'month' }],
+      // The ONE list: this week's undated task, then the routines (a chosen one stays, marked).
+      toPlan: [
+        { key: 'task:w', kind: 'task', id: 'w', title: 'Book the plumber', completed: false, planned: false, group: 'plan', context: 'September plan' },
+        { key: 'routine:r1', kind: 'routine', id: 'r1', title: 'Kids clean rooms', completed: false, planned: false, group: 'plan', context: 'Weekly routine' },
+        { key: 'routine:r2', kind: 'routine', id: 'r2', title: 'Family reading time', completed: false, planned: true, group: 'plan', context: 'Daily routine' },
+      ],
       counts: { scheduled: 1, available: 1 },
       offMainTaskIds: new Set(), offMainRoutineItemIds: new Set(), plannedExtraTasks: [],
     },
   }),
 }))
 
-describe('The Today pin', () => {
+describe('The Planning panel', () => {
   it('pins beside any page, next to the Week and Month pins, and writes nothing on pin', () => {
     mount()
-    fireEvent.click(screen.getByRole('button', { name: "Pin today's plan" }))
+    fireEvent.click(screen.getByRole('button', { name: 'Pin Planning' }))
     fireEvent.click(screen.getByRole('button', { name: 'Pin week list' }))
-    const plan = screen.getByRole('region', { name: "Today's plan" })
+    const plan = screen.getByRole('region', { name: 'Planning' })
+    expect(plan).toHaveTextContent('To plan')
     expect(plan).toHaveTextContent('Scheduled today')
     expect(plan).toHaveTextContent('Pick up foot meds')
     expect(screen.getByText('Book a service visit')).toBeInTheDocument()
@@ -143,13 +150,13 @@ describe('The Today pin', () => {
   })
 
   it('restores with the other pins for the same user', () => {
-    const view = mount(); fireEvent.click(screen.getByRole('button', { name: "Pin today's plan" })); view.unmount()
+    const view = mount(); fireEvent.click(screen.getByRole('button', { name: 'Pin Planning' })); view.unmount()
     mount()
-    expect(screen.getByRole('region', { name: "Today's plan" })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Planning' })).toBeInTheDocument()
   })
 
   it('every drag has a button: choose for today, move back, set a day or time', () => {
-    mount(); fireEvent.click(screen.getByRole('button', { name: "Pin today's plan" }))
+    mount(); fireEvent.click(screen.getByRole('button', { name: 'Pin Planning' }))
     fireEvent.click(screen.getByRole('button', { name: 'Plan Pick up foot meds for today' }))
     expect(planMock.chooseTaskDay).toHaveBeenCalledWith('f', expect.any(Date))
     fireEvent.click(screen.getByRole('button', { name: 'Plan Kids clean rooms for today' }))
@@ -161,13 +168,15 @@ describe('The Today pin', () => {
     expect(screen.getByRole('button', { name: 'Set a day or time for Pick up foot meds' })).toBeInTheDocument()
   })
 
-  it('folds the broader lists until asked', () => {
-    mount(); fireEvent.click(screen.getByRole('button', { name: "Pin today's plan" }))
-    const week = screen.getByRole('button', { name: /^This week/ })
-    expect(week).toHaveAttribute('aria-expanded', 'false')
-    expect(screen.queryByText('Book the plumber')).not.toBeInTheDocument()
-    fireEvent.click(week)
+  it('one list, each row with its context; the month plan opens on request', () => {
+    mount(); fireEvent.click(screen.getByRole('button', { name: 'Pin Planning' }))
     expect(screen.getByText('Book the plumber')).toBeInTheDocument()
+    expect(screen.getByText('September plan')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /^This week/ })).toBeNull()
+    expect(screen.queryByText(/Available today|Carried over/)).toBeNull()
+    expect(screen.queryByText('Plan the porch')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Browse month plan/ }))
+    expect(screen.getByText('Plan the porch')).toBeInTheDocument()
   })
 
   it('a row dropped on the pinned week list commits it to the week — no day invented', () => {

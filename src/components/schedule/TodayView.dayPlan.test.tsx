@@ -76,15 +76,18 @@ describe('Today — the day plan line', () => {
     expect(screen.getByText('Call the bank')).toBeInTheDocument()
     expect(screen.queryByText('Pick up foot meds')).not.toBeInTheDocument()
     expect(screen.queryByText('Kids clean rooms')).not.toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /1 scheduled for today · 1 available/ })).toBeInTheDocument()
+    // No count on the line — Today keeps no scoreboard (2026-09-21).
+    expect(screen.getByRole('button', { name: /Choose something for today/ })).toBeInTheDocument()
+    expect(screen.queryByText(/\d scheduled for today/)).toBeNull()
   })
 
-  it('on a phone the line opens the same plan inline, and a tick there is the same completion', () => {
+  it('on a phone the line opens the Planning sheet with the same plan, and a tick there is the same completion', () => {
     const { onToggleTask } = renderView()
-    const line = screen.getByRole('button', { name: /1 scheduled for today/ })
+    const line = screen.getByRole('button', { name: /Choose something for today/ })
     expect(line).toHaveAttribute('aria-expanded', 'false')
     fireEvent.click(line)
-    const panel = screen.getByTestId('day-plan-panel')
+    const sheet = screen.getByRole('dialog', { name: 'Planning' })
+    const panel = within(sheet).getByTestId('day-plan-panel')
     expect(within(panel).getByText('Pick up foot meds')).toBeInTheDocument()
     expect(within(panel).getByText('Kids clean rooms')).toBeInTheDocument()
     // Touch layout: no drag handles, every action is a button.
@@ -93,14 +96,14 @@ describe('Today — the day plan line', () => {
     expect(onToggleTask).toHaveBeenCalledWith('meds')
   })
 
-  it('on desktop the line opens the Today pin (the shared pin system), writing nothing', () => {
+  it('on desktop the line opens the Planning panel (the shared pin system), writing nothing', () => {
     mobile.value = false
     renderView()
     expect(screen.getByTestId('pins')).toHaveTextContent('')
-    fireEvent.click(screen.getByRole('button', { name: /1 scheduled for today/ }))
+    fireEvent.click(screen.getByRole('button', { name: /Choose something for today/ }))
     expect(screen.getByTestId('pins')).toHaveTextContent('today')
     expect(ctxValue.onUpdateTask).not.toHaveBeenCalled()
     // Still there once pinned — it says where the plan is.
-    expect(screen.getByRole('button', { name: /in the Today pin/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /in Planning/ })).toBeInTheDocument()
   })
 })

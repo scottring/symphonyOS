@@ -39,7 +39,8 @@ import { useDomain } from '@/hooks/useDomain'
 
 import { Eye, EyeOff, Repeat, Binoculars, Printer, GripVertical, Moon, Sparkles, NotebookPen, ArrowRight, PanelLeft, ChevronDown, ChevronRight } from 'lucide-react'
 import { splitTodayJournal } from '@/lib/today/journalSplit'
-import { DayPlanPanel, panelActionsFor, planSummary } from '@/components/reference/DayPlanPanel'
+import { panelActionsFor, planSummary } from '@/components/reference/DayPlanPanel'
+import { PlanningSheet } from '@/components/reference/PlanningSheet'
 import { useReferenceLists } from '@/components/reference/ReferenceListsContext'
 import { makePlanActions } from '@/lib/planning/planActions'
 import { localYmd } from '@/lib/cadence/config'
@@ -1356,14 +1357,13 @@ export function TodayView({
                 >
                   <PanelLeft className="h-3.5 w-3.5" aria-hidden="true" />
                   <span>{planLine}</span>
-                  {usePin && todayPinned && <span className="text-neutral-400">· in the Today pin</span>}
+                  {usePin && todayPinned && <span className="text-neutral-400">· in Planning</span>}
                 </button>
               )}
             </div>
-            {!usePin && planOpenInline && (
-              <div className="mt-2 mb-3 border-l border-neutral-200 pl-3">
-                <DayPlanPanel plan={data.dayPlan} day={viewedDate} actions={planPanelActions} draggable={false} />
-              </div>
+            {/* On a phone the Planning panel is a sheet, not an inline fold. */}
+            {!usePin && (
+              <PlanningSheet open={planOpenInline} onClose={() => setPlanOpenDay(null)} plan={data.dayPlan} day={viewedDate} actions={planPanelActions} />
             )}
             {journal.focusCount > 0 ? (
               <TodaySectionList

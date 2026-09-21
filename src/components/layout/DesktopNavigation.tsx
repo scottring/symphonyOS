@@ -54,16 +54,17 @@ export function DesktopNavigation({ inboxCount, discussionsUnread, onSearch, onQ
   return <nav ref={root} className="page-navigation" aria-label="Main navigation">
     <div className="page-navigation-today">
       <NavLink to="/today" className={pathname === '/' || pathname === '/today' || pathname.startsWith('/tasks-new') ? 'is-current' : ''}>Today</NavLink>
-      {/* Today stays ONE destination; its plan is a pin, like the Week and
-          Month lists — this opens it beside whatever page is showing. */}
+      {/* Today stays ONE destination. Planning is the one panel for whichever
+          day or week is showing — this opens it beside any page, and says so. */}
       {references && (() => {
         const pinned = references.pins.some(p => p.kind === 'today')
         return <button type="button" aria-pressed={pinned}
-          aria-label={pinned ? "Unpin today's plan" : "Pin today's plan"}
-          title={pinned ? "Close today's plan" : "Today's plan — beside any page"}
+          aria-label={pinned ? 'Close Planning' : 'Open Planning'}
+          title={pinned ? 'Close the Planning panel' : 'Planning — beside any page'}
           onClick={() => pinned ? references.unpin('today') : references.pin('today')}
           className={`page-navigation-pin-toggle${pinned ? ' is-pinned' : ''}`}>
           <PanelLeft size={14} aria-hidden="true" />
+          <span>Planning</span>
         </button>
       })()}
     </div>
