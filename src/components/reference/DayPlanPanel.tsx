@@ -1,8 +1,8 @@
 // The Planning panel (Scott, 2026-09-21): ONE list, "To plan" — everything
 // that answers "what might I put on a day?" (unfinished work, this week's
 // undated tasks, routines with no day yet), each once, with a line of context
-// instead of another category to learn. Beside Today, "Scheduled today" (dated
-// but not chosen) keeps its own small group; the month plan opens on request
+// instead of another category to learn. A task dated today is on Today's
+// page, not here (scheduling is sufficient); the month plan opens on request
 // ("Browse month plan") rather than standing beside the list.
 //
 // The interaction: pick something here → put it on a day → do it. A chosen
@@ -15,6 +15,7 @@ import { SchedulePopover } from '@/components/triage'
 import type { DayPlan, DayPlanEntry } from '@/lib/today/dayPlan'
 import { writePlanDrag } from '@/lib/planning/planDrag'
 import { localYmd, weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
+import { formatWeekRangeShort } from '@/lib/dateHelpers'
 
 /** Rows a group shows before "+N more" — the pin is a fixed-space surface. */
 export const PLAN_GROUP_CAP = 6
@@ -26,6 +27,9 @@ export interface DayPlanPanelActions {
   /** A date (all-day) or a time; routines: time only. */
   schedule: (entry: DayPlanEntry, when: Date, isAllDay: boolean) => void
   commit: (entry: DayPlanEntry, period: 'week' | 'month') => void
+  /** A routine with no day of its own is given one — its RULE is written
+   *  ("every Thursday at 5:00"), never an occurrence. */
+  placeRoutine?: (entry: DayPlanEntry, when: Date) => void
 }
 
 function PlanRow({ entry, day, actions, draggable }: {
@@ -52,6 +56,9 @@ function PlanRow({ entry, day, actions, draggable }: {
         : <span aria-hidden="true" className="w-3.5 shrink-0" />}
       {progress ? (
         <span className="mt-[1px] w-7 shrink-0 text-[11px] tabular-nums text-neutral-400">{progress.done}/{progress.total}</span>
+      ) : entry.routine ? (
+        // A routine with no day yet has no occurrence to tick.
+        <span aria-hidden="true" className="mt-[3px] h-3.5 w-3.5 shrink-0" />
       ) : (
       <button
         type="button"
@@ -76,7 +83,27 @@ function PlanRow({ entry, day, actions, draggable }: {
           <span className="block text-[11.5px] text-neutral-500">{entry.context}</span>
         ) : null}
       </div>
-      {!entry.completed && (
+      {entry.routine ? (
+        // No day of its own yet: the only verb is to give it one — the rule
+        // ("every Thursday at 5:00"), not an occurrence that no day would draw.
+        <div className="flex shrink-0 items-center gap-0.5 text-neutral-500">
+          <SchedulePopover
+            itemTitle={entry.title}
+            skipToTime
+            value={day}
+            onSchedule={(when) => actions.placeRoutine?.(entry, when)}
+            trigger={
+              <button
+                type="button"
+                aria-label={`Give ${entry.title} a day`}
+                className="rounded px-1.5 py-0.5 text-[12px] font-medium text-primary-700 hover:bg-primary-50"
+              >
+                Give it a day
+              </button>
+            }
+          />
+        </div>
+      ) : !entry.completed && (
         <div className="flex shrink-0 items-center gap-0.5 text-neutral-500">
           {entry.planned ? (
             <button
@@ -205,13 +232,7 @@ export function weekListTitle(weekStart: Date | null): string {
 
 /** What the panel is planning: the week on screen, or the day. */
 export function planningSubtitle(day: Date, weekPage: Date | null): string {
-  if (weekPage) {
-    const end = new Date(weekPage)
-    end.setDate(end.getDate() + 6)
-    const a = weekPage.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-    const b = end.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-    return `${a} – ${b}`
-  }
+  if (weekPage) return formatWeekRangeShort(weekPage)
   return day.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
 }
 
@@ -243,7 +264,13 @@ export function DayPlanPanel({ plan, day, actions, draggable = true, weekPage = 
       />
       {/* A task dated today is on Today's page (scheduling is sufficient,
           focus never gates visibility — Scott, 2026-09-21). Nothing dated
-          waits here. */}
+          waits here. Misses older than the window are not listed either, but
+          they are not lost: one quiet line points at where they live. */}
+      {(plan.olderUnfinished ?? 0) > 0 && (
+        <a href="/inbox" className="mt-2 inline-block text-[12.5px] text-neutral-500 hover:text-neutral-800">
+          Older unfinished work is in Inbox →
+        </a>
+      )}
       <div className="mt-4">
         <button
           type="button"
@@ -274,9 +301,10 @@ export function DayPlanPanel({ plan, day, actions, draggable = true, weekPage = 
 }
 
 /** The one line Today spends on the panel. No counts (Today keeps no
- *  scoreboard): it says only whether there is anything to plan. */
+ *  scoreboard): it says only whether there is anything to plan. Dated work
+ *  is already on the page, so only the To plan list counts. */
 export function planSummary(plan: DayPlan): string | null {
-  const waiting = [...plan.toPlan, ...plan.scheduled].some((e) => !e.completed && !e.planned)
+  const waiting = (plan.toPlan ?? []).some((e) => !e.completed && !e.planned)
   return waiting ? 'Choose something for today' : null
 }
 
@@ -297,5 +325,6 @@ export function panelActionsFor(
       void a.drop(payload(e), isAllDay ? { type: 'day', day: when } : { type: 'time', when })
     },
     commit: (e, period) => { if (e.kind === 'task') void a.commitTask(e.id, period) },
+    placeRoutine: (e, when) => { void a.placeRoutineRule(e.id, when, e.title) },
   }
 }

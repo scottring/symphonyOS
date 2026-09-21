@@ -717,10 +717,22 @@ export function WeekViewV2(props: WeekViewV2Props) {
     const [y, m, d] = slot.dayIso.split('-').map(Number)
     if (slot.hour === undefined) {
       void planActions.drop(payload, { type: 'day', day: new Date(y, m - 1, d) })
-    } else {
-      void planActions.drop(payload, { type: 'time', when: new Date(y, m - 1, d, slot.hour, slot.minute ?? 0) })
+      return
     }
-  }, [planActions])
+    const when = new Date(y, m - 1, d, slot.hour, slot.minute ?? 0)
+    // A routine with no day of its own, dragged from the Planning panel onto a
+    // slot, is asked the place-scope question (the rule, or just this week)
+    // before anything is written — a one-day override would leave it homeless
+    // next week (review, 2026-09-21).
+    if (payload.kind === 'routine') {
+      const r = routines.find((x) => x.id === payload.id)
+      if (r && r.recurrence_pattern.type === 'weekly' && !r.recurrence_pattern.days?.length) {
+        setRoutinePlace({ routineId: r.id, when })
+        return
+      }
+    }
+    void planActions.drop(payload, { type: 'time', when })
+  }, [planActions, routines])
 
   // Chosen-but-untimed work the grid has no row for: a routine occurrence
   // chosen for its day, a week-list task chosen for a day. Schedule shows them

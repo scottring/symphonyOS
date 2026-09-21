@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useLocation } from 'react-router-dom'
 import { Pin, X } from 'lucide-react'
 import { useReferenceLists, REFERENCE_KINDS, type ReferenceKind, type ReferencePin } from './ReferenceListsContext'
@@ -134,7 +134,12 @@ function ReferenceList({ pin, onClose }: { pin: ReferencePin; onClose: () => voi
  * page, or the sheet on a phone): the day's plan for the actual current day,
  * planning into whichever week a week page is showing.
  */
-export function PlanningPanelHost({ draggable = true }: { draggable?: boolean }) {
+export function PlanningPanelHost({ draggable = true, header }: {
+  draggable?: boolean
+  /** Drawn above the panel with the same day and week the panel plans —
+   *  ONE subscription to the viewed-week signal, not one per header. */
+  header?: (day: Date, viewedWeek: Date | null) => ReactNode
+}) {
   // Always the real current day — the pin's stored date is only when it was
   // pinned. Keyed on the calendar day so it rolls over at midnight.
   const todayKey = localYmd(new Date())
@@ -151,31 +156,24 @@ export function PlanningPanelHost({ draggable = true }: { draggable?: boolean })
   const { plan, loading, error } = useDayPlan(day, viewedWeek)
   const planActions = usePlanActions()
   const actions = useMemo(() => panelActionsFor(day, planActions), [day, planActions])
-  if (error) return <p role="alert" className="py-5 text-[15px] text-danger-600">Could not load the plan.</p>
-  if (loading || !plan) return <p className="py-5 text-[15px] text-neutral-500">Loading…</p>
-  return <DayPlanPanel plan={plan} day={day} actions={actions} weekPage={viewedWeek} draggable={draggable} />
+  const body = error ? <p role="alert" className="py-5 text-[15px] text-danger-600">Could not load the plan.</p>
+    : loading || !plan ? <p className="py-5 text-[15px] text-neutral-500">Loading…</p>
+    : <DayPlanPanel plan={plan} day={day} actions={actions} weekPage={viewedWeek} draggable={draggable} />
+  return <>{header?.(day, viewedWeek)}{body}</>
 }
 
 /** The Planning pin: one panel, named for what it does, for whichever day or
  *  week is on screen. */
 function TodayPlanList({ onClose }: { onClose: () => void }) {
-  const todayKey = localYmd(new Date())
-  const day = useMemo(() => { const [y, m, d] = todayKey.split('-').map(Number); return new Date(y, m - 1, d) }, [todayKey])
-  const [viewedWeek, setViewedWeek] = useState<Date | null>(() => readViewedWeek())
-  useEffect(() => {
-    // Re-read on subscribe: a page that published before this listener
-    // existed (both mounting from a stored pin) would otherwise be missed.
-    setViewedWeek(readViewedWeek())
-    return onViewedWeekChange(setViewedWeek)
-  }, [])
   return <section aria-label="Planning" className="reference-list">
-    <header className="flex items-start justify-between gap-3 border-b border-neutral-300 pb-4">
-      <div>
-        <h2 className="font-display text-[22px] leading-tight text-neutral-900">Planning</h2>
-        <p className="mt-1 text-[13px] text-neutral-500">{planningSubtitle(day, viewedWeek)}</p>
-      </div>
-      <button type="button" onClick={onClose} aria-label="Close Planning" className="p-2 text-neutral-500 hover:bg-neutral-100 rounded"><X className="w-4 h-4" /></button>
-    </header>
-    <PlanningPanelHost />
+    <PlanningPanelHost header={(day, viewedWeek) => (
+      <header className="flex items-start justify-between gap-3 border-b border-neutral-300 pb-4">
+        <div>
+          <h2 className="font-display text-[22px] leading-tight text-neutral-900">Planning</h2>
+          <p className="mt-1 text-[13px] text-neutral-500">{planningSubtitle(day, viewedWeek)}</p>
+        </div>
+        <button type="button" onClick={onClose} aria-label="Close Planning" className="p-2 text-neutral-500 hover:bg-neutral-100 rounded"><X className="w-4 h-4" /></button>
+      </header>
+    )} />
   </section>
 }

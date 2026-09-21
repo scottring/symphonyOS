@@ -34,6 +34,7 @@ export function PlanningSheet({ open, onClose, weekPage = null, plan, day: dayPr
         aria-modal="true"
         aria-label="Planning"
         aria-hidden={!open}
+        inert={!open}
         className={`fixed bottom-0 left-0 right-0 z-50 max-h-[85vh] overflow-y-auto rounded-t-2xl bg-bg-elevated px-5 transform transition-transform duration-300 ease-out ${open ? 'translate-y-0' : 'translate-y-full pointer-events-none'}`}
         style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))' }}
       >

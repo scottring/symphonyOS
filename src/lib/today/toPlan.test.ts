@@ -19,6 +19,7 @@ const routine = (over: Partial<Routine> = {}): Routine => ({
 const NOW = new Date(2026, 8, 21, 10) // Monday
 const WEEK = new Date(2026, 8, 20)    // Sunday anchor
 const LAST_WEEK = new Date(2026, 8, 13)
+const WK27 = new Date(2026, 8, 27)
 const SEP = new Date(2026, 8, 1)
 const match = () => true
 const args = (over: Partial<Parameters<typeof toPlanEntries>[0]> = {}) => ({
@@ -54,6 +55,16 @@ describe('toPlanEntries', () => {
   it('older misses fall outside the 14-day window and stay off the list', () => {
     const old = task({ bucket: 'timed', scheduledFor: new Date(2026, 7, 1) })
     expect(toPlanEntries(args({ tasks: [old] }))).toEqual([])
+  })
+
+  // Review, 2026-09-21: "left behind" is judged against the REAL current
+  // week. Paging /week forward must not relabel this week's open placements.
+  it('a placement on the current week is not "unfinished" just because a later week is on screen', () => {
+    const onThisWeek = task({ title: 'This week', bucket: 'week', weekStart: WEEK })
+    const out = toPlanEntries(args({ tasks: [onThisWeek], weekStart: WK27 }))
+    expect(out.map((e) => [e.title, e.context])).toEqual([])
+    // ...and it is still this week's row when this week is on screen.
+    expect(toPlanEntries(args({ tasks: [onThisWeek], weekStart: WEEK })).map((e) => e.context)).toEqual([undefined])
   })
 
   it('a week task with no month says nothing extra; one on a month names the month', () => {

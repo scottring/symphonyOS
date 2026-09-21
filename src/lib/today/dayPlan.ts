@@ -41,9 +41,11 @@ import { localYmd } from '@/lib/cadence/config'
 import { monthStartOf } from '@/lib/planning/periodPlacement'
 import { isTimelineObligation, type ResolveRoutineCtx } from '@/lib/routineUtils'
 import { isFocused, openCommitment } from '@/lib/placement/model'
-import { isStaleWeekPlacement } from './weekPlacement'
-import { isRecentMiss, missedDaysAgo } from '@/lib/week/missedPlacement'
+import { selectStaleWeekPlacements } from './horizons'
+import { isRecentMiss, isMissedPlacement, missedWhen } from '@/lib/week/missedPlacement'
 import { routineTemporalLabel } from '@/lib/planning/routineTemporal'
+import { formatWeekRangeShort } from '@/lib/dateHelpers'
+import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
 
 export type DayPlanGroup = 'carried' | 'scheduled' | 'available' | 'week' | 'month' | 'plan'
 
@@ -94,6 +96,9 @@ export interface DayPlan {
    *  routines with no day yet — each once, with a line of context. Once a row
    *  has a day it leaves this list and appears on that day. */
   toPlan: DayPlanEntry[]
+  /** Open misses older than the 14-day window: not on the list (Inbox ›
+   *  Expired holds them), but the panel says they exist. Count only. */
+  olderUnfinished: number
 }
 
 export interface DayPlanInput {
@@ -139,13 +144,6 @@ export function weekListEntries(tasks: Task[], match: Match, weekStart: Date, ym
     key: `task:${t.id}`, kind: 'task' as const, id: t.id, title: t.title, completed: t.completed,
     planned: isFocused(t, userId, ymd), group: 'week' as const, task: t,
   }))
-}
-
-function originLabel(day: Date, now: Date): string {
-  const days = missedDaysAgo(day, now)
-  return days < 7
-    ? day.toLocaleDateString('en-US', { weekday: 'long' })
-    : day.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
 /**
@@ -197,13 +195,19 @@ export function toPlanEntries(args: {
   // Unfinished, oldest first. A row chosen for the day is on the main list,
   // with Unfocus on its own row (Scott, 2026-09-21) — not kept here as a
   // duplicate just to undo the choice.
-  const unfinished = flatten(tasks)
-    .filter((t) => !t.completed && match(t.assignedTo, t.assignedToAll) && !chosen(t))
-    .filter((t) => isRecentMiss(t.scheduledFor, t.completed, now) || (!t.scheduledFor && isStaleWeekPlacement(t, weekStart)))
+  //
+  // "Left behind" is judged against the REAL current week, never the week on
+  // screen: paging /week forward must not relabel this week's open placements
+  // as unfinished (the old shelf anchored on today for the same reason).
+  const currentWeek = weekStartAnchor(now, readCadenceConfig().weekStartsOn)
+  const missed = flatten(tasks)
+    .filter((t) => !t.completed && match(t.assignedTo, t.assignedToAll) && !chosen(t) && isRecentMiss(t.scheduledFor, t.completed, now))
+  const leftBehind = selectStaleWeekPlacements(tasks, currentWeek, match).filter((t) => !t.scheduledFor && !chosen(t))
+  const unfinished = [...missed, ...leftBehind]
     .sort((a, b) => (a.scheduledFor ?? a.weekStart ?? a.createdAt).getTime() - (b.scheduledFor ?? b.weekStart ?? b.createdAt).getTime())
   for (const t of unfinished) {
     const context = t.scheduledFor
-      ? `Originally ${originLabel(t.scheduledFor, now)}`
+      ? `Originally ${missedWhen(t.scheduledFor, now, 'long')}`
       : t.weekStart ? `Planned for ${formatWeekRangeShort(t.weekStart)}` : 'Unfinished'
     push(taskEntry(t, context))
   }
@@ -234,14 +238,6 @@ function routineCadence(r: Routine): string {
   const t = r.recurrence_pattern?.type
   const word = t === 'daily' ? 'Daily' : t === 'weekly' ? 'Weekly' : t === 'monthly' ? 'Monthly' : t === 'yearly' ? 'Yearly' : null
   return word ? `${word} routine` : `${routineTemporalLabel(r)} routine`
-}
-
-function formatWeekRangeShort(start: Date): string {
-  const end = new Date(start)
-  end.setDate(end.getDate() + 6)
-  const a = start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-  const b = end.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-  return `${a} – ${b}`
 }
 
 /** Tasks and their nested subtasks, flat. */
@@ -328,14 +324,19 @@ export function selectDayPlan(input: DayPlanInput): DayPlan {
   const carried = selectCarriedOver(input.tasks, isToday, match).filter((t) => !chosen(t)).map(listEntry('carried'))
   const month = selectHorizonPool(input.tasks, 'month', match, undefined, monthStartOf(input.viewedDate)).map(listEntry('month'))
 
+  const now = input.now ?? new Date()
   const toPlan = toPlanEntries({
     tasks: input.tasks, match, weekStart: input.weekStart, ymd, userId: input.userId,
-    now: input.now ?? new Date(), available, unhomed: input.unhomedRoutines ?? [], routineById: byId,
+    now, available, unhomed: input.unhomedRoutines ?? [], routineById: byId,
   })
+  const olderUnfinished = flatten(input.tasks).filter((t) =>
+    !t.completed && match(t.assignedTo, t.assignedToAll) && !chosen(t)
+    && isMissedPlacement(t.scheduledFor, t.completed, now) && !isRecentMiss(t.scheduledFor, t.completed, now)).length
 
   const outstanding = (e: DayPlanEntry) => !e.completed && !e.planned
   return {
     toPlan,
+    olderUnfinished,
     carried,
     scheduled,
     available,

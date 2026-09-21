@@ -16,6 +16,7 @@
  *  - Un-choosing never deletes, never un-dates, never touches recurrence.
  */
 import type { Task } from '@/types/task'
+import type { Routine } from '@/types/actionable'
 import type { PlanDragPayload, PlanTarget } from './planDrag'
 import { localYmd } from '@/lib/cadence/config'
 
@@ -27,6 +28,11 @@ export interface PlanActionDeps {
   setRoutinePlanned: (routineId: string, day: Date, planned: boolean) => Promise<boolean>
   /** One-day override: the occurrence on `fromDay` moves to `when`. */
   rescheduleRoutine: (routineId: string, fromDay: Date, when: Date) => Promise<unknown>
+  /** The repeating RULE, for a routine that has no day of its own yet:
+   *  "every Thursday at 5:00". The one place the rule is written from a
+   *  planning surface. Optional — a host without routines omits it. */
+  updateRoutine?: (routineId: string, updates: Partial<Routine>) => Promise<unknown> | void
+  findRoutine?: (routineId: string) => Routine | undefined
   pushAction?: (message: string, undo: () => void) => void
   notify?: (message: string) => void
 }
@@ -121,7 +127,29 @@ export function makePlanActions(deps: PlanActionDeps) {
     deps.notify?.('Routines repeat on their own schedule — they aren\'t added to a list')
   }
 
-  return { chooseTaskDay, unchooseTask, timeTask, commitTask, chooseRoutine, drop }
+  /**
+   * Give a routine with no day of its own a home: a weekly rule gains the
+   * weekday, and the time becomes its time_of_day. Never an occurrence write —
+   * a routine that shows on no day has no occurrence to choose or override.
+   */
+  async function placeRoutineRule(routineId: string, when: Date, title = 'routine') {
+    if (!deps.updateRoutine) { deps.notify?.('Set this routine\'s day on the routine itself'); return }
+    const routine = deps.findRoutine?.(routineId)
+    const weekdayKey = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][when.getDay()]
+    const updates: Partial<Routine> = {
+      time_of_day: `${String(when.getHours()).padStart(2, '0')}:${String(when.getMinutes()).padStart(2, '0')}:00`,
+    }
+    if (routine?.recurrence_pattern.type === 'weekly') {
+      updates.recurrence_pattern = { ...routine.recurrence_pattern, days: [weekdayKey] }
+    }
+    const prev: Partial<Routine> | null = routine
+      ? { time_of_day: routine.time_of_day, recurrence_pattern: routine.recurrence_pattern }
+      : null
+    await deps.updateRoutine(routineId, updates)
+    deps.pushAction?.(`Placed "${routine?.name ?? title}"`, () => { if (prev) void deps.updateRoutine?.(routineId, prev) })
+  }
+
+  return { chooseTaskDay, unchooseTask, timeTask, commitTask, chooseRoutine, placeRoutineRule, drop }
 }
 
 export type PlanActions = ReturnType<typeof makePlanActions>

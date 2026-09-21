@@ -371,7 +371,10 @@ export function TodayView({
   const planLine = planSummary(data.dayPlan)
   // The desktop pin is always TODAY's plan; another day, or a phone (which
   // has no dock), opens the same panel inline instead.
-  const usePin = !isMobile && data.isToday && !!references
+  // Desktop always plans in the dock (it plans the real today, whichever day
+  // is being read); the sheet is the phone's. Keying this on `isToday` sent a
+  // desktop day-browse to the phone sheet (review, 2026-09-21).
+  const usePin = !isMobile && !!references
   const [agendaDropOver, setAgendaDropOver] = useState(false)
   const agendaDrop = planDropHandlers((payload) => {
     void planActions.drop(payload, { type: 'day', day: viewedDate }, { chooseOnly: true })

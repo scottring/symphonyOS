@@ -142,6 +142,15 @@ export function formatDateLabel(date: Date): string {
  *  13–19", or "September 28 – October 4" when it straddles two months. The
  *  label a placement chip shows, so a row says which week it is on rather
  *  than "this week" (Codex, 2026-09-13: use actual labels). */
+/** "Sep 20 – Sep 26": the short form, for subtitles and context lines. */
+export function formatWeekRangeShort(start: Date): string {
+  const end = new Date(start)
+  end.setDate(end.getDate() + 6)
+  const a = start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  const b = end.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  return `${a} – ${b}`
+}
+
 export function formatWeekRange(start: Date): string {
   const end = new Date(start)
   end.setDate(end.getDate() + 6)

@@ -69,6 +69,26 @@ describe('DayPlanPanel — the Planning panel', () => {
     expect(screen.getByText('Repaint the porch')).toBeInTheDocument()
   })
 
+  // Review, 2026-09-21: a routine with no day of its own has no occurrence to
+  // choose or tick — its one verb gives it a day by writing its RULE.
+  it('a routine with no day offers "Give it a day" and nothing else', () => {
+    const p = plan(0)
+    p.toPlan = [{ key: 'routine:v', kind: 'routine', id: 'v', title: 'Vacuum', completed: false, planned: false, group: 'plan',
+      routine: { id: 'v', name: 'Vacuum', recurrence_pattern: { type: 'weekly', days: [] } } as never, context: 'Weekly routine · no set day' }]
+    render(<DayPlanPanel plan={p} day={day} actions={actions} weekPage={thisWeek} />)
+    expect(screen.getByRole('button', { name: 'Give Vacuum a day' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Plan Vacuum for today' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Complete Vacuum' })).toBeNull()
+  })
+
+  it('points at older unfinished work without listing it', () => {
+    const p = plan(1)
+    p.olderUnfinished = 3
+    render(<DayPlanPanel plan={p} day={day} actions={actions} weekPage={thisWeek} />)
+    expect(screen.getByRole('link', { name: /Older unfinished work is in Inbox/ })).toHaveAttribute('href', '/inbox')
+    expect(screen.queryByText(/3/)).toBeNull()
+  })
+
   it('says what it is planning: the week on screen, or the day', () => {
     expect(planningSubtitle(new Date(2026, 8, 21), new Date(2026, 8, 20))).toBe('Sep 20 – Sep 26')
     expect(planningSubtitle(new Date(2026, 8, 21), null)).toBe('Monday, September 21')

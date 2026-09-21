@@ -2,6 +2,7 @@ import { useCallback, useMemo } from 'react'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
 import { useGatedTaskActions } from '@/hooks/useGatedTaskActions'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
+import { useRoutines } from '@/hooks/useRoutines'
 import { showToast } from '@/hooks/useToast'
 import { makePlanActions, type PlanActions } from '@/lib/planning/planActions'
 
@@ -19,6 +20,7 @@ export function usePlanActions(pushAction?: (message: string, undo: () => void) 
     tasks.find((t) => t.id === id) ?? tasks.flatMap((t) => t.subtasks ?? []).find((t) => t.id === id), [tasks])
   const gated = useGatedTaskActions(useMemo(() => ({ updateTask, updateTasksBulk, pushTask }), [updateTask, updateTasksBulk, pushTask]), findTask)
   const { setPlanned, reschedule, markDone, undoDone } = useActionableInstances()
+  const { routines, updateRoutine } = useRoutines()
 
   const actions = useMemo(() => makePlanActions({
     findTask,
@@ -28,9 +30,12 @@ export function usePlanActions(pushAction?: (message: string, undo: () => void) 
     pushTask: gated.pushTask,
     setRoutinePlanned: (id, day, planned) => setPlanned('routine', id, day, planned),
     rescheduleRoutine: (id, from, when) => reschedule('routine', id, from, when),
+    // A routine with no day yet is given one by writing its RULE.
+    updateRoutine: (id, u) => updateRoutine(id, { recurrence_pattern: u.recurrence_pattern, time_of_day: u.time_of_day }),
+    findRoutine: (id) => routines.find((r) => r.id === id),
     pushAction,
     notify: (m) => showToast(m, 'warning'),
-  }), [findTask, gated, updateTask, setPlanned, reschedule, pushAction])
+  }), [findTask, gated, updateTask, setPlanned, reschedule, updateRoutine, routines, pushAction])
 
   return {
     ...actions,
