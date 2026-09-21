@@ -295,9 +295,15 @@ Found during this trace, not fixed:
    for tasks — there is no `end_time` column.
 8. Today's page and the shell pin compute the same plan twice from two
    separately-fetched task arrays. Same selector, different data.
-9. **`tasks` UPDATE policy still has no `WITH CHECK`** (pre-existing, proved
-   2026-09-19): a member can reassign a shared task to themselves and
-   `individual`, erasing it from the other person's view.
+9. **Fixed 2026-09-21** (`supabase/migrations/2026-09-21_owner_immutable.sql`):
+   a member could reassign a shared task to themselves and `individual`,
+   erasing it from the other person's view. The missing `WITH CHECK` was not
+   the cause — Postgres reuses `USING` for the new row, and the new row passed
+   as "you own it". A trigger now makes `user_id` immutable for signed-in
+   writers on tasks, routines, notes, projects, contacts and goals, and each
+   UPDATE policy carries the check explicitly. A non-owner can still edit a
+   shared row but can no longer take it or make it private. Live proof:
+   `supabase/tests/092_owner_immutable.test.sql`.
 
 ---
 
