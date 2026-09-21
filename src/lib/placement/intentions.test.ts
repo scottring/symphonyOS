@@ -227,3 +227,15 @@ describe('planDropCommitment', () => {
     expect(plan.commitmentOps).toEqual([])
   })
 })
+
+describe('planKeep without a source period', () => {
+  it('never carries the destination into itself: an already-open destination is skipped', () => {
+    // A half-failed Keep: the row write opened October (mirror trigger), the carry never landed.
+    const t = task({ bucket: 'month', monthStart: OCT, commitments: [c('month', SEP), c('month', OCT)] })
+    const plan = planKeep(t, 'month', OCT)
+    expect(plan.commitmentOps).toEqual([
+      { op: 'carry', level: 'month', periodStart: SEP, to: OCT },
+      { op: 'ensure', level: 'month', periodStart: OCT },
+    ])
+  })
+})

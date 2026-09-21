@@ -251,7 +251,9 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
     else if (action === 'make-goal') await setGoal(row.id, true)
     else if (action === 'make-task') await setGoal(row.id, false)
     else if (action === 'keep') {
-      await keepForward(row.id, level === 'month' ? { monthStart: bounds.next } : { seasonStart: bounds.next })
+      // Carried FROM this page's period, stated: never inferred from which
+      // commitment happens to be open latest (review 2026-09-21).
+      await keepForward(row.id, level === 'month' ? { monthStart: bounds.next } : { seasonStart: bounds.next }, bounds.start)
     }
     // Taking a row down a rung adds the lower commitment to the SAME row:
     // this period's list keeps it, marked with where the work went, so the

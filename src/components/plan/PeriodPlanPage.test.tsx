@@ -414,7 +414,7 @@ describe('PeriodPlanPage', () => {
     expect(screen.getByText(/Look back/)).toBeInTheDocument()
     expect(screen.getByText('Washed the car')).toHaveClass('line-through')
     fireEvent.click(screen.getByRole('button', { name: 'Keep Call the plumber' }))
-    expect(hook.keepForward).toHaveBeenCalledWith(open.id, { monthStart: thisMonth })
+    expect(hook.keepForward).toHaveBeenCalledWith(open.id, { monthStart: thisMonth }, lastMonth)
     fireEvent.click(screen.getByRole('button', { name: 'Someday Call the plumber' }))
     expect(hook.updateTask).toHaveBeenCalledWith(open.id, { bucket: 'someday', scheduledFor: undefined, isAllDay: undefined })
     fireEvent.click(screen.getByRole('button', { name: 'Drop Call the plumber' }))

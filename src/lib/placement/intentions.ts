@@ -254,9 +254,12 @@ export function planPlacement(input: Task, updates: Partial<Task>, ctx: Placemen
 export function planKeep(input: Task, level: PlacementLevel, to: Date, from?: Date): PlacementPlan {
   const task: Task = { ...input, commitments: bootstrapCommitments(input) }
   const commitmentOps: CommitmentOp[] = []
+  // No stated source: the latest open commitment that is NOT the destination.
+  // After a half-failed Keep the destination is already open (the mirror
+  // trigger opened it) and would otherwise be "carried" into itself.
   const current = from
     ? (task.commitments ?? []).find((c) => c.level === level && sameDay(c.periodStart, from))
-    : openCommitment(task, level)
+    : openCommitment({ commitments: (task.commitments ?? []).filter((c) => !sameDay(c.periodStart, to)) }, level)
   if (current && current.status === 'open') {
     commitmentOps.push({ op: 'carry', level, periodStart: current.periodStart, to })
   }

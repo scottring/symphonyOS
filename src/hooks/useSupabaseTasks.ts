@@ -12,8 +12,9 @@ import { localYmd, parseLocalYmd } from '@/lib/cadence/config'
 import { monthStartOf, isPlacement } from '@/lib/planning/periodPlacement'
 import { stepsThatCarryForward } from '@/lib/planning/goalSteps'
 import { readSeasons, seasonStartFor } from '@/lib/cadence/seasons'
-import { planPlacement, planKeep, planDropCommitment, commitmentRow, type PlacementPlan } from '@/lib/placement/intentions'
+import { planPlacement, planKeep, planDropCommitment, commitmentRow, isPlacementWrite, type PlacementPlan } from '@/lib/placement/intentions'
 import type { TaskCommitment, TaskFocusEntry, PlacementLevel } from '@/types/task'
+import { committedTo, deriveCache } from '@/lib/placement/model'
 import { onRealtimeResumed } from '@/lib/realtime/keepAlive'
 import { announceToBuyChanged } from '@/lib/lists/toBuy'
 // `import type` on purpose: erased at compile time, so it does NOT drag
@@ -537,6 +538,32 @@ export function useSupabaseTasks() {
   const tasksRef = useRef<Task[]>(tasks)
   tasksRef.current = tasks
 
+  // Tasks whose last commitment/focus write failed AND could not be re-read.
+  // Their local state is the pre-write snapshot, which may not be the truth, so
+  // no placement write may plan from it until a re-read succeeds.
+  const unreconciledRef = useRef(new Set<string>())
+
+  /** After a failed commitment/focus write: the database is the truth again.
+   *  Returns the reconciled task (null = could not read), and updates tasksRef
+   *  synchronously so a retry in the same tick plans from it. */
+  const reconcileCommitments = useCallback(async (taskId: string): Promise<Task | null> => {
+    const [{ data: cs, error: ce }, { data: fs, error: fe }] = await Promise.all([
+      supabase.from('task_commitments').select('*').eq('task_id', taskId),
+      supabase.from('task_focus').select('*').eq('task_id', taskId),
+    ])
+    if (ce || !cs) return null   // unread: the caller reverts to its snapshot and blocks retries
+    const commitments = (cs as DbTaskCommitment[]).map(dbCommitmentToCommitment)
+    // A focus read that failed keeps what we had; it is never "no focus".
+    const focus = !fe && fs ? (fs as DbTaskFocus[]).map(dbFocusToFocus) : undefined
+    const base = lookupTaskById(tasksRef.current, taskId)
+    if (!base) return null
+    const merged: Task = { ...base, commitments, ...(focus ? { focus } : {}) }
+    const reconciled: Task = { ...merged, ...deriveCache(merged) }
+    tasksRef.current = patchTaskRecords(tasksRef.current, taskId, () => reconciled)   // visible NOW
+    setTasks((prev) => patchTaskRecords(prev, taskId, () => reconciled))              // and after the render
+    return reconciled
+  }, [])
+
   // Fetch tasks. Exposed as `refetch` so an external write (e.g. the assistant
   // creating a task server-side) can force an immediate refresh, since realtime
   // is not relied upon for those.
@@ -747,6 +774,8 @@ export function useSupabaseTasks() {
     neededOn?: Date
     /** The day this task is chosen for (Today's main list) — "Add to today" writes it. */
     plannedOn?: Date
+    /** Use this id for the new row (idempotent create: a retry finds it). */
+    id?: string
   }
 
   const addTask = useCallback(async (
@@ -767,7 +796,7 @@ export function useSupabaseTasks() {
       : options?.defaultAssigneeId ?? null
 
     // Optimistic update
-    const tempId = crypto.randomUUID()
+    const tempId = options?.id ?? crypto.randomUUID()
     const now = new Date()
     const optimisticTask: Task = {
       id: tempId,
@@ -819,6 +848,7 @@ export function useSupabaseTasks() {
     const { data, error: insertError } = await supabase
       .from('tasks')
       .insert({
+        ...(options?.id ? { id: options.id } : {}),
         user_id: user.id,
         title,
         completed: false,
@@ -868,8 +898,28 @@ export function useSupabaseTasks() {
       .single()
 
     if (insertError) {
-      // Rollback on error
-      setTasks((prev) => prev.filter((t) => t.id !== tempId))
+      if (options?.id && insertError.code === '23505') {
+        // Already created by an earlier attempt (a retried or interrupted save).
+        // The placeholder shares the real id, so REPLACE it with the stored row —
+        // filtering by id would remove the real task too, and no INSERT event
+        // is coming to bring it back (review 2026-09-21).
+        const { data: existing } = await supabase.from('tasks').select('*').eq('id', options.id).maybeSingle()
+        if (existing) {
+          const stored = dbTaskToTask(existing as DbTask)
+          const had = tasksRef.current.find((t) => t.id === options.id && t !== optimisticTask)
+          setTasks((prev) => {
+            const rest = prev.filter((t) => t.id !== options.id)
+            const held = prev.find((t) => t.id === options.id && t !== optimisticTask) ?? had
+            return [{ ...stored, commitments: held?.commitments ?? stored.commitments, focus: held?.focus ?? stored.focus }, ...rest]
+          })
+          // A row this list never held arrives without its period records: read them.
+          if (!had?.commitments) void reconcileCommitments(options.id)
+          return options.id
+        }
+      }
+      // Rollback on error. By identity: with a caller-given id the placeholder
+      // shares its id with any real copy already in the list.
+      setTasks((prev) => prev.filter((t) => t !== optimisticTask))
       setError(insertError.message)
       showToast('Failed to add task', 'error', 4000)
       return undefined
@@ -891,16 +941,18 @@ export function useSupabaseTasks() {
     // Replace optimistic task with real one. Drop any copy the realtime
     // INSERT already delivered (it can land before this response), otherwise
     // the swap leaves the task in the list twice.
+    // By identity, not id: with a caller-given id the placeholder and the
+    // real row share one.
     setTasks((prev) =>
       prev
-        .filter((t) => t.id !== createdTask.id)
-        .map((t) => (t.id === tempId ? createdTask : t))
+        .filter((t) => t.id !== createdTask.id || t === optimisticTask)
+        .map((t) => (t === optimisticTask ? createdTask : t))
     )
 
     announceLocalWrite({ kind: 'insert', task: createdTask })
 
     return createdTask.id
-  }, [user, getCurrentUserMember])
+  }, [user, getCurrentUserMember, reconcileCommitments])
 
   // Add a subtask to a parent task
   const addSubtask = useCallback(async (
@@ -1289,9 +1341,15 @@ export function useSupabaseTasks() {
    * are the completion trigger's job.
    *
    * Sequential on purpose: two ops on the same row race the sync trigger.
+   *
+   * True only when every op wrote. On any failure the task's records are
+   * re-read (the optimistic state never outlives a failed write); if that read
+   * fails too, the task goes back to `before` and is marked unreconciled, so
+   * the next placement write must re-read before it may send.
    */
-  const writePlacementOps = useCallback(async (taskId: string, plan: PlacementPlan): Promise<void> => {
+  const writePlacementOps = useCallback(async (taskId: string, plan: PlacementPlan, before?: Task): Promise<boolean> => {
     const now = new Date().toISOString()
+    let allOk = true
     for (const op of plan.commitmentOps) {
       const key = commitmentRow(taskId, op)
       let error: { message: string } | null | undefined
@@ -1315,6 +1373,7 @@ export function useSupabaseTasks() {
         error = { message: e instanceof Error ? e.message : String(e) }
       }
       if (error) {
+        allOk = false
         console.error('[placement] commitment write failed:', op, error.message)
         showToast('Saved, but its period list may be out of date — refresh to check', 'error', 4000)
       }
@@ -1335,11 +1394,36 @@ export function useSupabaseTasks() {
         error = { message: e instanceof Error ? e.message : String(e) }
       }
       if (error) {
+        allOk = false
         console.error('[placement] focus write failed:', op, error.message)
         showToast("Couldn't save your choice for the day", 'error', 4000)
       }
     }
-  }, [user])
+    if (!allOk) {
+      const read = await reconcileCommitments(taskId)
+      if (!read) {
+        // Unknown ≠ optimistic: go back to what we had before this write, and
+        // make every later placement write re-read before it may send.
+        if (before) setTasks((prev) => patchTaskRecords(prev, taskId, () => before))
+        unreconciledRef.current.add(taskId)
+      }
+    }
+    return allOk
+  }, [user, reconcileCommitments])
+
+  /** A task whose last write failed and could not be re-read may not be written
+   *  from local state. Returns the task to plan from: the RECONCILED one when a
+   *  re-read was needed, the current one otherwise, or null = refuse the write. */
+  const ensureReconciled = useCallback(async (taskId: string): Promise<Task | null> => {
+    if (!unreconciledRef.current.has(taskId)) return findTaskById(taskId) ?? null
+    const fresh = await reconcileCommitments(taskId)
+    if (!fresh) {
+      showToast("Couldn't check this task's plan. Try again in a moment.", 'error', 4000)
+      return null
+    }
+    unreconciledRef.current.delete(taskId)
+    return fresh
+  }, [reconcileCommitments, findTaskById])
 
   /**
    * The look-back's "Keep": the SAME row — task OR goal — carried into the
@@ -1354,17 +1438,25 @@ export function useSupabaseTasks() {
    * steps stay behind: they are September's record. So does a step already
    * placed lower, which is carrying on on its own.
    *
-   * Returns the task's own id (callers used to receive the copy's).
+   * `from` names the period being carried FROM. Without it planKeep carries
+   * the LATEST open commitment — after a half-failed Keep that is the
+   * destination the mirror trigger already opened, so a retry would "carry"
+   * October and leave September open. Callers that know the source pass it.
+   *
+   * Returns the task's own id (callers used to receive the copy's), or
+   * undefined unless the task AND every step it carries were written.
    */
-  const keepForward = useCallback(async (id: string, period: { monthStart?: Date; seasonStart?: Date }): Promise<string | undefined> => {
+  const keepForward = useCallback(async (id: string, period: { monthStart?: Date; seasonStart?: Date }, from?: Date): Promise<string | undefined> => {
     const task = findTaskById(id)
     if (!task) return undefined
     const level: PlacementLevel | null = period.monthStart ? 'month' : period.seasonStart ? 'season' : null
     const to = period.monthStart ?? period.seasonStart
     if (!level || !to) return undefined
 
-    const keepOne = async (t: Task) => {
-      const plan = planKeep(t, level, to)
+    const keepOne = async (taskId: string) => {
+      const t = await ensureReconciled(taskId)
+      if (!t) return false
+      const plan = planKeep(t, level, to, from)
       const before = t
       setTasks((prev) => prev.map((x) => (x.id === t.id ? plan.local : x)))
       const dbRow: Record<string, unknown> = {
@@ -1379,23 +1471,35 @@ export function useSupabaseTasks() {
         showToast('Failed to keep it forward', 'error', 4000)
         return false
       }
-      await writePlacementOps(t.id, plan)
+      if (!(await writePlacementOps(t.id, plan, before))) return false
       announceLocalWrite({ kind: 'update', task: plan.local })
       return true
     }
 
-    if (!(await keepOne(task))) return undefined
+    if (!(await keepOne(id))) return undefined
+    let allStepsOk = true
     if (task.isGoal) {
-      for (const step of stepsThatCarryForward(task.id, tasksRef.current, level)) {
-        await keepOne(step)
-      }
+      // Only steps still OPEN in the source period: a step carried by an earlier
+      // attempt is done, and is not carried again on a retry.
+      // Legacy-aware: committedTo answers from records when a row has them and
+      // from bucket + stamp when it doesn't (a step with September's monthStart
+      // and no commitment rows is still on September) — review 2026-09-21.
+      const steps = stepsThatCarryForward(task.id, tasksRef.current, level).filter((st) => {
+        if (!from) return true
+        const c = committedTo(st, level, from, { isCurrent: false })
+        return c === 'legacy' || (c !== undefined && c.status === 'open')
+      })
+      for (const step of steps) if (!(await keepOne(step.id))) allStepsOk = false
     }
-    return task.id
-  }, [findTaskById, writePlacementOps])
+    // Undefined until the goal AND every step carried: the session keeps the
+    // verdict and retries; the goal's own carry is idempotent (planKeep sees
+    // the source already carried and only ensures the destination).
+    return allStepsOk ? task.id : undefined
+  }, [findTaskById, ensureReconciled, writePlacementOps])
 
   /** Drop: end ONE period commitment. The task is kept (spec: guided planning). */
   const dropCommitment = useCallback(async (id: string, level: PlacementLevel, periodStart: Date): Promise<boolean> => {
-    const task = findTaskById(id)
+    const task = await ensureReconciled(id)
     if (!task) return false
     const plan = planDropCommitment(task, level, periodStart)
     if (plan.commitmentOps.length === 0) return true
@@ -1412,14 +1516,14 @@ export function useSupabaseTasks() {
       showToast("Couldn't drop it from that period", 'error', 4000)
       return false
     }
-    await writePlacementOps(id, plan)
+    if (!(await writePlacementOps(id, plan, before))) return false
     announceLocalWrite({ kind: 'update', task: plan.local })
     return true
-  }, [findTaskById, writePlacementOps])
+  }, [ensureReconciled, writePlacementOps])
 
   const updateTask = useCallback(async (id: string, updates: Partial<Task>) => {
     logger.debug('[updateTask] Called with:', { id, updates })
-    const task = findTaskById(id)
+    let task = findTaskById(id)
     if (!task) {
       // Should be rare now that lookups read tasksRef — surface it loudly so a
       // dropped write is never silent again.
@@ -1436,6 +1540,14 @@ export function useSupabaseTasks() {
       logger.debug('[updateTask] placement refused: row is a goal', { id, updates })
       showToast("Goals aren't scheduled — tick it off when it's done", 'info')
       return false
+    }
+
+    // A placement plans from the database's records when the last write left
+    // them unknown; if they still can't be read, nothing is sent.
+    if (isPlacementWrite(updates)) {
+      const fresh = await ensureReconciled(id)
+      if (!fresh) return false
+      task = fresh
     }
 
     // ONE enduring action (2026-09-21). Whatever dialect the caller speaks —
@@ -1612,6 +1724,7 @@ export function useSupabaseTasks() {
 
     logger.debug('[updateTask] DB response:', { data, status, count, error: updateError?.message })
 
+    let opsOk = true
     if (updateError) {
       console.error('[updateTask] DB error:', updateError.message)
       showToast('Failed to update task', 'error', 3000)
@@ -1634,7 +1747,7 @@ export function useSupabaseTasks() {
     } else if (data && data.length > 0) {
       logger.debug('[updateTask] DB update successful, returned notes:', (data[0] as DbTask).notes)
       // The supporting records follow the row.
-      if (plan.commitmentOps.length || plan.focusOps.length) await writePlacementOps(id, plan)
+      if (plan.commitmentOps.length || plan.focusOps.length) opsOk = await writePlacementOps(id, plan, task)
       // Fan out to other instances. Announce the merged LOCAL object, not the
       // returned flat row — a parent's nested subtasks must survive the swap.
       announceLocalWrite({ kind: 'update', task: { ...task, ...updates } })
@@ -1666,10 +1779,11 @@ export function useSupabaseTasks() {
         }
       }
     }
-    // True only when the row itself was written: callers such as the notes
-    // panel say "Saved" on it. An RLS-filtered UPDATE returns no row.
-    return !updateError && !!data && data.length > 0
-  }, [tasks, familyMembers, findTaskById, findParentOfSubtask, selfMemberIdForOwner, user, writePlacementOps])
+    // True only when the row itself AND its commitment/focus records were
+    // written: callers such as the notes panel say "Saved" on it. An
+    // RLS-filtered UPDATE returns no row.
+    return !updateError && !!data && data.length > 0 && opsOk
+  }, [tasks, familyMembers, findTaskById, findParentOfSubtask, selfMemberIdForOwner, user, writePlacementOps, ensureReconciled])
 
   // Bulk update multiple tasks at once
   const updateTasksBulk = useCallback(async (requestedIds: string[], updates: Partial<Task>) => {
