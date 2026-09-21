@@ -261,6 +261,27 @@ beforeEach(() => {
 
 afterEach(() => { vi.restoreAllMocks() })
 
+/** The week session's writers, as WeekPlanHost wires them: a new task is
+ *  created ON the week, then given its day. A failed day-write reports the
+ *  step unwritten so Save retries it. */
+function weekWriters(h: () => ReturnType<typeof useSupabaseTasks>): SessionWriters {
+  return {
+    keep: async () => true,
+    addTask: async (title, o) => {
+      const made = await h().addTask(title, undefined, undefined, undefined, { id: o.id, bucket: 'week', weekStart: o.periodStart, context: o.context })
+      if (!made) return undefined
+      if (o.day && !(await h().updateTask(made, { scheduledFor: o.day, isAllDay: true }))) return undefined
+      return made
+    },
+    contextOf: () => null,
+    complete: async () => true,
+    someday: async () => true,
+    drop: async () => true,
+    takeInto: async () => true,
+    saveSession: async () => true,
+  }
+}
+
 describe('planning writes report real outcomes', () => {
   it('updateTask returns false when the row wrote but its commitment write errored', async () => {
     db.failOn('task_commitments', { message: 'boom', code: 'XX000' })
@@ -328,58 +349,48 @@ describe('planning writes report real outcomes', () => {
     expect(wk).toMatchObject({ period_start: localYmd(week), status: 'open' })
   })
 
-  it('when the day write fails the new week task stays in the draft, and Save again applies the day to the SAME row', async () => {
+  it('a new week task with a day lands on the FIRST Save', async () => {
+    // addTask puts the new row into tasksRef synchronously, so the day-write
+    // that follows in the same tick finds it (the addTask-then-setBucket race).
+    const week = new Date(2026, 9, 4), day = new Date(2026, 9, 6)
+    const { result } = await mountWith([])
+    const id = '44444444-4444-4444-8444-444444444444'
+    const draft: SessionDraft = { ...emptyDraft('week', week, new Date(2026, 8, 27)),
+      newTasks: [{ id, title: 'Book the sitter', day: localYmd(day), context: null }] }
+    let r: Awaited<ReturnType<typeof applySession>> | undefined
+    await act(async () => { r = await applySession(draft, weekWriters(() => result.current), () => false) })
+    expect(r!.ok).toBe(true)
+    expect(db.rows('tasks').find((x) => x.id === id)!.scheduled_for).toBe(day.toISOString())
+    expect(db.rows('task_commitments').find((c) => c.task_id === id && c.level === 'week')).toMatchObject({ period_start: localYmd(week), status: 'open' })
+  })
+
+  it('when the day write fails the new week task stays in the draft, and the NEXT Save applies the day to the same row', async () => {
     // The week's addTask writer is two steps (create on the week, then the
     // day). A lost day is a lost decision, so the step must report itself
     // unwritten — and the retry must not create a second row.
     const week = new Date(2026, 9, 4), day = new Date(2026, 9, 6)
     const { result } = await mountWith([])
-    const h = () => result.current
+    const w = weekWriters(() => result.current)
     const id = '33333333-3333-4333-8333-333333333333'
-    const weekWriters: SessionWriters = {
-      keep: async () => true,
-      addTask: async (title, o) => {
-        const made = await h().addTask(title, undefined, undefined, undefined, { id: o.id, bucket: 'week', weekStart: o.periodStart, context: o.context })
-        if (!made) return undefined
-        if (o.day && !(await h().updateTask(made, { scheduledFor: o.day, isAllDay: true }))) return undefined
-        return made
-      },
-      contextOf: () => null,
-      complete: async () => true,
-      someday: async () => true,
-      drop: async () => true,
-      takeInto: async () => true,
-      saveSession: async () => true,
-    }
     const draft: SessionDraft = { ...emptyDraft('week', week, new Date(2026, 8, 27)),
       newTasks: [{ id, title: 'Call the plumber', day: localYmd(day), context: null }] }
-    // Every Save after the first finds the row already there (idempotent create).
-    const saveAgain = async (d: SessionDraft) => {
-      db.failInsertWith('tasks', { message: 'duplicate key value violates unique constraint "tasks_pkey"', code: '23505' }, { existing: { id } })
-      let r: Awaited<ReturnType<typeof applySession>> | undefined
-      await act(async () => { r = await applySession(d, weekWriters, () => false) })
-      return r!
-    }
 
     db.failOnce('tasks', 'update', { message: 'boom', code: 'XX000' })
     let first: Awaited<ReturnType<typeof applySession>> | undefined
-    await act(async () => { first = await applySession(draft, weekWriters, () => false) })
+    await act(async () => { first = await applySession(draft, w, () => false) })
     expect(first!.ok).toBe(false)
     expect(first!.remaining.newTasks.map((t) => t.id)).toEqual([id])   // still to do: Save retries exactly this
-    expect(db.rows('tasks').find((r) => r.id === id)!.scheduled_for).toBeNull()
+    expect(db.rows('tasks').find((x) => x.id === id)!.scheduled_for).toBeNull()
 
-    // The hook refuses the FIRST write after a failed one until it has re-read
-    // the row (unreconciled). The day is still not lost: it stays in the draft.
-    const second = await saveAgain(first!.remaining)
-    expect(second.ok).toBe(false)
-    expect(second.remaining.newTasks.map((t) => t.id)).toEqual([id])
-
-    // Once the re-read has landed, Save applies the day to the row that exists.
-    const third = await saveAgain(second.remaining)
-    expect(third.ok).toBe(true)
-    expect(db.rows('tasks').filter((r) => r.id === id)).toHaveLength(1)     // never a second row
+    // Save again: the create is idempotent (the id rides the INSERT), so the
+    // day lands on the row that is already there — on the SECOND round, not a third.
+    db.failInsertWith('tasks', { message: 'duplicate key value violates unique constraint "tasks_pkey"', code: '23505' }, { existing: { id } })
+    let second: Awaited<ReturnType<typeof applySession>> | undefined
+    await act(async () => { second = await applySession(first!.remaining, w, () => false) })
+    expect(second!.ok).toBe(true)
+    expect(db.rows('tasks').filter((x) => x.id === id)).toHaveLength(1)          // never a second row
     expect(db.insertedIds('tasks').filter((x) => x === id)).toHaveLength(1)
-    expect(db.rows('tasks').find((r) => r.id === id)!.scheduled_for).toBe(day.toISOString())
+    expect(db.rows('tasks').find((x) => x.id === id)!.scheduled_for).toBe(day.toISOString())
     expect(db.rows('task_commitments').find((c) => c.task_id === id && c.level === 'week')).toMatchObject({ period_start: localYmd(week), status: 'open' })
   })
 

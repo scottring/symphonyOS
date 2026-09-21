@@ -858,7 +858,11 @@ export function useSupabaseTasks() {
       focus: options?.plannedOn ? [{ userId: user.id, date: options.plannedOn }] : [],
       commitments: [],
     }
-    setTasks((prev) => [optimisticTask, ...prev])
+    // Synchronously into tasksRef too: a caller that writes to the new row in
+    // the same tick (the week session's create-then-give-it-a-day) must find it
+    // — a plain setTasks leaves the ref blind until the next render, and the
+    // follow-up write is dropped as "task not found" (the addTask-then-setBucket race).
+    setTasksNow(tasksRef, setTasks, (prev) => [optimisticTask, ...prev])
 
     const { data, error: insertError } = await supabase
       .from('tasks')
@@ -922,7 +926,7 @@ export function useSupabaseTasks() {
         if (existing) {
           const stored = dbTaskToTask(existing as DbTask)
           const had = tasksRef.current.find((t) => t.id === options.id && t !== optimisticTask)
-          setTasks((prev) => {
+          setTasksNow(tasksRef, setTasks, (prev) => {
             const rest = prev.filter((t) => t.id !== options.id)
             const held = prev.find((t) => t.id === options.id && t !== optimisticTask) ?? had
             return [{ ...stored, commitments: held?.commitments ?? stored.commitments, focus: held?.focus ?? stored.focus }, ...rest]
@@ -934,7 +938,7 @@ export function useSupabaseTasks() {
       }
       // Rollback on error. By identity: with a caller-given id the placeholder
       // shares its id with any real copy already in the list.
-      setTasks((prev) => prev.filter((t) => t !== optimisticTask))
+      setTasksNow(tasksRef, setTasks, (prev) => prev.filter((t) => t !== optimisticTask))
       setError(insertError.message)
       showToast('Failed to add task', 'error', 4000)
       return undefined
@@ -958,7 +962,7 @@ export function useSupabaseTasks() {
     // the swap leaves the task in the list twice.
     // By identity, not id: with a caller-given id the placeholder and the
     // real row share one.
-    setTasks((prev) =>
+    setTasksNow(tasksRef, setTasks, (prev) =>
       prev
         .filter((t) => t.id !== createdTask.id || t === optimisticTask)
         .map((t) => (t === optimisticTask ? createdTask : t))
