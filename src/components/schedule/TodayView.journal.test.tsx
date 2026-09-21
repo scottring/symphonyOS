@@ -15,7 +15,7 @@ import { createMockTask } from '@/test/mocks/factories'
 const mobile = vi.hoisted(() => ({ value: true }))
 vi.mock('@/hooks/useMobile', () => ({ useMobile: () => mobile.value }))
 vi.mock('@/hooks/useActionableInstances', () => ({
-  useActionableInstances: () => ({ setPlanned: vi.fn(async () => true), reschedule: vi.fn(async () => null) }),
+  useActionableInstances: () => ({ setPlanned: vi.fn(async () => true), reschedule: vi.fn(async () => null), getInstancesForRange: vi.fn(async () => []) }),
 }))
 vi.mock('@/hooks/useWeather', () => ({ useWeather: () => ({ weather: null, loading: false, error: 'x', requestLocation: vi.fn() }) }))
 vi.mock('@/hooks/useProactiveSuggestions', () => ({ useProactiveSuggestions: () => ({ suggestions: [], topSuggestions: [], suggestionsForEntity: () => [], actOnSuggestion: vi.fn(), dismissSuggestion: vi.fn(), isLoading: false }) }))
