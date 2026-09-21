@@ -142,8 +142,6 @@ describe('The Planning panel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Pin week list' }))
     const plan = screen.getByRole('region', { name: 'Planning' })
     expect(plan).toHaveTextContent('To plan')
-    expect(plan).toHaveTextContent('Scheduled today')
-    expect(plan).toHaveTextContent('Pick up foot meds')
     expect(screen.getByText('Book a service visit')).toBeInTheDocument()
     expect(planMock.chooseTaskDay).not.toHaveBeenCalled()
     expect(data.update).not.toHaveBeenCalled()
@@ -157,15 +155,17 @@ describe('The Planning panel', () => {
 
   it('every drag has a button: choose for today, move back, set a day or time', () => {
     mount(); fireEvent.click(screen.getByRole('button', { name: 'Pin Planning' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Plan Pick up foot meds for today' }))
-    expect(planMock.chooseTaskDay).toHaveBeenCalledWith('f', expect.any(Date))
+    fireEvent.click(screen.getByRole('button', { name: 'Plan Book the plumber for today' }))
+    expect(planMock.chooseTaskDay).toHaveBeenCalledWith('w', expect.any(Date))
     fireEvent.click(screen.getByRole('button', { name: 'Plan Kids clean rooms for today' }))
     expect(planMock.chooseRoutine).toHaveBeenCalledWith('r1', expect.any(Date), true, 'Kids clean rooms')
     // A chosen occurrence is marked, not listed again as unfinished.
     expect(screen.getByText('Planned today')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Move Family reading time back off today' }))
     expect(planMock.chooseRoutine).toHaveBeenCalledWith('r2', expect.any(Date), false, 'Family reading time')
-    expect(screen.getByRole('button', { name: 'Set a day or time for Pick up foot meds' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Set a day or time for Book the plumber' })).toBeInTheDocument()
+    // A task dated today is on Today's page, not waiting here.
+    expect(screen.queryByText('Pick up foot meds')).not.toBeInTheDocument()
   })
 
   it('one list, each row with its context; the month plan opens on request', () => {

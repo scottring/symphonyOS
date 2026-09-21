@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef } from 'react'
-import { MoreHorizontal, Redo2, Clock, Trash2, CalendarCog, Hourglass, MessageCircle, AlertCircle, EyeOff } from 'lucide-react'
+import { MoreHorizontal, Redo2, Undo2, Clock, Trash2, CalendarCog, Hourglass, MessageCircle, AlertCircle, EyeOff } from 'lucide-react'
 import type { TimelineItem } from '@/types/timeline'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
 import { isSameDay } from '@/lib/dateUtils'
@@ -222,6 +222,21 @@ export function ScheduleItemActionsMenu({ item, onOpenDetail, onUpdateDiscussion
               >
                 <AlertCircle className={`w-4 h-4 ${isNeededToday ? 'text-amber-500' : 'text-neutral-400'}`} />
                 {isNeededToday ? 'Not needed today' : 'Need today'}
+              </button>
+            )}
+
+            {/* Unfocus — a chosen task goes back to the planning candidates
+                (an unscheduled one) or simply loses its lead (a dated one).
+                Nothing else about it changes. */}
+            {isTask && item.focused && ctx.onUpdateTask && item.originalTask && (
+              <button
+                type="button"
+                role="menuitem"
+                onClick={run(() => { void ctx.onUpdateTask?.(item.originalTask!.id, { plannedOn: undefined }) })}
+                className="flex w-full text-left items-center gap-2.5 px-3 py-2.5 text-sm text-neutral-700 hover:bg-neutral-50"
+              >
+                <Undo2 className="w-4 h-4 text-neutral-400" />
+                Unfocus
               </button>
             )}
 

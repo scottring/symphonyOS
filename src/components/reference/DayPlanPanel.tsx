@@ -241,12 +241,9 @@ export function DayPlanPanel({ plan, day, actions, draggable = true, weekPage = 
         cap={weekPage !== null ? null : PLAN_GROUP_CAP}
         empty={beside === 'week' ? 'Nothing to plan — every task has its day.' : 'Nothing to plan.'}
       />
-      {/* Dated today but not chosen. Left as its own group for now: whether
-          "on its day" means the page or this panel is an open decision
-          (2026-09-21). */}
-      {!weekPage && plan.scheduled.length > 0 && (
-        <Group title="Scheduled today" entries={plan.scheduled} day={day} actions={actions} draggable={draggable} defaultOpen count={false} />
-      )}
+      {/* A task dated today is on Today's page (scheduling is sufficient,
+          focus never gates visibility — Scott, 2026-09-21). Nothing dated
+          waits here. */}
       <div className="mt-4">
         <button
           type="button"

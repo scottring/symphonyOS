@@ -194,10 +194,11 @@ export function toPlanEntries(args: {
     planned: chosen(t), group: 'plan', task: t, context,
   })
 
-  // Unfinished, oldest first. A row chosen for the day STAYS here, marked
-  // "Planned today", so the choice can be undone where it was made.
+  // Unfinished, oldest first. A row chosen for the day is on the main list,
+  // with Unfocus on its own row (Scott, 2026-09-21) — not kept here as a
+  // duplicate just to undo the choice.
   const unfinished = flatten(tasks)
-    .filter((t) => !t.completed && match(t.assignedTo, t.assignedToAll))
+    .filter((t) => !t.completed && match(t.assignedTo, t.assignedToAll) && !chosen(t))
     .filter((t) => isRecentMiss(t.scheduledFor, t.completed, now) || (!t.scheduledFor && isStaleWeekPlacement(t, weekStart)))
     .sort((a, b) => (a.scheduledFor ?? a.weekStart ?? a.createdAt).getTime() - (b.scheduledFor ?? b.weekStart ?? b.createdAt).getTime())
   for (const t of unfinished) {
@@ -209,12 +210,13 @@ export function toPlanEntries(args: {
 
   // This week's undated tasks.
   for (const t of selectHorizonPool(tasks, 'week', match, weekStart)) {
-    if (t.scheduledFor) continue
+    if (t.scheduledFor || chosen(t)) continue
     push(taskEntry(t, monthName(t)))
   }
 
   // Routines: the day's flexible occurrences, then routines with no day at all.
   for (const e of args.available) {
+    if (e.planned) continue
     const r = args.routineById.get(e.id)
     push({ ...e, group: 'plan', context: r ? routineCadence(r) : 'Routine' })
   }
@@ -264,10 +266,14 @@ export function selectDayPlan(input: DayPlanInput): DayPlan {
   const scheduled: DayPlanEntry[] = []
   const offMainTaskIds = new Set<string>()
   const chosen = (t: Task) => isFocused(t, input.userId, ymd)
+  // Scott, 2026-09-21: Today shows what you scheduled for today plus what
+  // you chose to focus on. Scheduling is sufficient — a dated task is on its
+  // day; focus orders and highlights, it never gates visibility. So no task
+  // is kept off the main list any more; `scheduled` stays as the record of
+  // what is dated today (counts, tests), and `offMainTaskIds` is empty.
   for (const t of onDay) {
     if (!t.isAllDay) continue // a time is a commitment the main list keeps
     const planned = chosen(t)
-    if (!planned) offMainTaskIds.add(t.id)
     scheduled.push({ key: `task:${t.id}`, kind: 'task', id: t.id, title: t.title, completed: t.completed, planned, group: 'scheduled', task: t })
   }
 

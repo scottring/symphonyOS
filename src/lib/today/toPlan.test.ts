@@ -38,11 +38,11 @@ describe('toPlanEntries', () => {
     expect(out.every((e) => e.group === 'plan')).toBe(true)
   })
 
-  it('a row with a day is on that day, not here; a chosen row stays, marked, so the choice can be undone here', () => {
+  it('a row with a day is on that day, not here; a chosen row is on the main list, not here', () => {
     const dated = task({ bucket: 'timed', scheduledFor: new Date(2026, 8, 23) })
     const chosen = task({ title: 'Chosen', bucket: 'week', weekStart: WEEK, focus: [{ userId: 'me', date: new Date(2026, 8, 21) }] })
-    const out = toPlanEntries(args({ tasks: [dated, chosen] }))
-    expect(out.map((e) => [e.title, e.planned])).toEqual([['Chosen', true]])
+    const chosenMiss = task({ bucket: 'timed', scheduledFor: new Date(2026, 8, 19), focus: [{ userId: 'me', date: new Date(2026, 8, 21) }] })
+    expect(toPlanEntries(args({ tasks: [dated, chosen, chosenMiss] }))).toEqual([])
   })
 
   it('a week placement left behind by an earlier week says which week', () => {
@@ -63,14 +63,14 @@ describe('toPlanEntries', () => {
     expect(out.map((e) => e.context)).toEqual([undefined, 'September plan'])
   })
 
-  it("the day's flexible occurrences ride along with their cadence; a chosen one stays, marked", () => {
+  it("the day's flexible occurrences ride along with their cadence; a chosen one is on the main list, not here", () => {
     const daily = routine({ id: 'd', name: 'Stretch', recurrence_pattern: { type: 'daily' } as Routine['recurrence_pattern'] })
     const available: DayPlanEntry[] = [
       { key: 'routine:d', kind: 'routine', id: 'd', title: 'Stretch', completed: false, planned: false, group: 'available' },
       { key: 'routine:x', kind: 'routine', id: 'x', title: 'Chosen one', completed: false, planned: true, group: 'available' },
     ]
     const out = toPlanEntries(args({ available, routineById: new Map([['d', daily]]) }))
-    expect(out.map((e) => [e.title, e.context, e.planned])).toEqual([['Stretch', 'Daily routine', false], ['Chosen one', 'Routine', true]])
+    expect(out.map((e) => [e.title, e.context])).toEqual([['Stretch', 'Daily routine']])
   })
 
   it('each action appears once', () => {

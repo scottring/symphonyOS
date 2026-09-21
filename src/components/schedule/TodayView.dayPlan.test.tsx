@@ -71,10 +71,13 @@ function renderView(props: Record<string, unknown> = {}) {
 beforeEach(() => { sessionStorage.clear(); mobile.value = true })
 
 describe('Today — the day plan line', () => {
-  it('the main list keeps what was chosen; the dated-only task and the chore are counted, not listed', () => {
+  // Scott, 2026-09-21: Today shows what you scheduled for today plus what you
+  // chose. A dated task is on the page without being chosen again; the
+  // flexible chore still waits in Planning until it is chosen.
+  it('the main list shows the chosen task AND the dated-only task; the chore waits in Planning', () => {
     renderView()
     expect(screen.getByText('Call the bank')).toBeInTheDocument()
-    expect(screen.queryByText('Pick up foot meds')).not.toBeInTheDocument()
+    expect(screen.getByText('Pick up foot meds')).toBeInTheDocument()
     expect(screen.queryByText('Kids clean rooms')).not.toBeInTheDocument()
     // No count on the line — Today keeps no scoreboard (2026-09-21).
     expect(screen.getByRole('button', { name: /Choose something for today/ })).toBeInTheDocument()
@@ -88,12 +91,13 @@ describe('Today — the day plan line', () => {
     fireEvent.click(line)
     const sheet = screen.getByRole('dialog', { name: 'Planning' })
     const panel = within(sheet).getByTestId('day-plan-panel')
-    expect(within(panel).getByText('Pick up foot meds')).toBeInTheDocument()
+    // The dated task is on the page, not in the sheet; the chore waits here.
+    expect(within(panel).queryByText('Pick up foot meds')).not.toBeInTheDocument()
     expect(within(panel).getByText('Kids clean rooms')).toBeInTheDocument()
     // Touch layout: no drag handles, every action is a button.
     expect(panel.querySelector('[draggable="true"]')).toBeNull()
-    fireEvent.click(within(panel).getByRole('button', { name: 'Complete Pick up foot meds' }))
-    expect(onToggleTask).toHaveBeenCalledWith('meds')
+    expect(within(panel).getByRole('button', { name: 'Plan Kids clean rooms for today' })).toBeInTheDocument()
+    expect(onToggleTask).not.toHaveBeenCalled()
   })
 
   it('on desktop the line opens the Planning panel (the shared pin system), writing nothing', () => {
