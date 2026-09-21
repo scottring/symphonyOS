@@ -1,0 +1,170 @@
+import { describe, it, expect } from 'vitest'
+import { planPlacement, planKeep, applyCommitmentOps, isPlacementWrite } from './intentions'
+import type { Task, TaskCommitment } from '@/types/task'
+import { DEFAULT_SEASONS } from '@/lib/cadence/seasons'
+
+let n = 0
+const task = (over: Partial<Task> = {}): Task => ({
+  id: `t${++n}`, title: 'T', completed: false, createdAt: new Date(2026, 8, 1, 0, 0, n), updatedAt: new Date(), bucket: 'inbox', ...over,
+} as Task)
+const c = (level: TaskCommitment['level'], periodStart: Date, status: TaskCommitment['status'] = 'open'): TaskCommitment => ({ level, periodStart, status })
+
+const NOW = new Date(2026, 8, 23, 10) // Wed Sep 23
+const ctx = { now: NOW, userId: 'scott', seasons: DEFAULT_SEASONS }
+const SEP = new Date(2026, 8, 1)
+const OCT = new Date(2026, 9, 1)
+const FALL = new Date(2026, 8, 1)
+const WK20 = new Date(2026, 8, 20)
+const WK27 = new Date(2026, 8, 27)
+
+describe('descend — one enduring action, never a copy', () => {
+  it('month → week ADDS a week commitment and keeps the month', () => {
+    const t = task({ bucket: 'month', monthStart: SEP, commitments: [c('month', SEP)] })
+    const p = planPlacement(t, { bucket: 'week', scheduledFor: undefined, weekStart: WK20, monthStart: undefined }, ctx)
+    expect(p.commitmentOps).toEqual([{ op: 'ensure', level: 'week', periodStart: WK20 }])
+    expect(p.local.commitments).toEqual([c('month', SEP), c('week', WK20)])
+    expect(p.local.bucket).toBe('week')
+    expect(p.local.monthStart).toEqual(SEP) // the higher commitment is still on the row
+    expect(p.row.bucket).toBe('week')
+  })
+  it('season → month keeps the season; month → day keeps both', () => {
+    const t = task({ bucket: 'quarter', commitments: [c('season', FALL)] })
+    const p1 = planPlacement(t, { bucket: 'month', monthStart: SEP }, ctx)
+    expect(p1.local.commitments).toEqual([c('season', FALL), c('month', SEP)])
+    const p2 = planPlacement(p1.local, { bucket: 'timed', scheduledFor: new Date(2026, 8, 25), isAllDay: true }, ctx)
+    expect(p2.commitmentOps).toEqual([])
+    expect(p2.local.commitments).toEqual([c('season', FALL), c('month', SEP)])
+    expect(p2.local.bucket).toBe('timed')
+    expect(p2.local.scheduledFor).toEqual(new Date(2026, 8, 25))
+  })
+  it('the same intention through any control produces identical state', () => {
+    const t = task({ bucket: 'month', commitments: [c('month', SEP)] })
+    const day = new Date(2026, 8, 25)
+    const drag = planPlacement(t, { isAllDay: true, scheduledFor: day, bucket: 'timed' }, ctx)
+    const arrow = planPlacement(t, { bucket: 'timed', scheduledFor: day, isAllDay: true }, ctx)
+    const verb = planPlacement(t, { scheduledFor: day, isAllDay: true }, ctx)
+    expect(arrow.local).toEqual(drag.local)
+    expect(verb.local).toEqual(drag.local)
+  })
+})
+
+describe('ascend and replan', () => {
+  it('week → month takes it off the week and puts it on the month', () => {
+    const t = task({ bucket: 'week', commitments: [c('week', WK20)] })
+    const p = planPlacement(t, { bucket: 'month', scheduledFor: undefined, weekStart: undefined, monthStart: SEP }, ctx)
+    expect(p.commitmentOps).toEqual([
+      { op: 'ensure', level: 'month', periodStart: SEP },
+      { op: 'remove', level: 'week', periodStart: WK20 },
+    ])
+    expect(p.local.bucket).toBe('month')
+    expect(p.local.weekStart).toBeUndefined()
+  })
+  it('"not this week" supersedes this week\'s placement with next week\'s', () => {
+    const t = task({ bucket: 'week', commitments: [c('week', WK20)] })
+    const p = planPlacement(t, { bucket: 'week', weekStart: WK27 }, ctx)
+    expect(p.commitmentOps).toEqual([
+      { op: 'remove', level: 'week', periodStart: WK20 },
+      { op: 'ensure', level: 'week', periodStart: WK27 },
+    ])
+    expect(p.local.weekStart).toEqual(WK27)
+  })
+  it('a stamp alone (no bucket) plans for that period', () => {
+    const t = task({ bucket: 'month', commitments: [c('month', SEP)] })
+    const p = planPlacement(t, { weekStart: WK20 }, ctx)
+    expect(p.commitmentOps).toEqual([{ op: 'ensure', level: 'week', periodStart: WK20 }])
+  })
+  it('with no stamp, the period is the one containing now', () => {
+    const p = planPlacement(task(), { bucket: 'week' }, ctx)
+    expect(p.commitmentOps[0]).toMatchObject({ op: 'ensure', level: 'week' })
+    expect(p.commitmentOps[0].periodStart.getMonth()).toBe(8)
+  })
+})
+
+describe('schedule / unschedule — commitments and focus untouched', () => {
+  it('scheduling a dated task elsewhere changes only the day', () => {
+    const t = task({ bucket: 'timed', scheduledFor: new Date(2026, 8, 23), commitments: [c('month', SEP), c('week', WK20)], focus: [{ userId: 'scott', date: new Date(2026, 8, 23) }] })
+    const p = planPlacement(t, { scheduledFor: new Date(2026, 8, 25) }, ctx)
+    expect(p.commitmentOps).toEqual([])
+    expect(p.focusOps).toEqual([])
+    expect(p.local.focus).toEqual(t.focus)
+    expect(p.row.scheduledFor).toEqual(new Date(2026, 8, 25))
+  })
+  it('unschedule keeps the week and period commitments and the focus', () => {
+    const t = task({ bucket: 'timed', scheduledFor: new Date(2026, 8, 23), commitments: [c('month', SEP), c('week', WK20)], focus: [{ userId: 'iris', date: new Date(2026, 8, 23) }] })
+    const p = planPlacement(t, { scheduledFor: undefined }, ctx)
+    expect(p.commitmentOps).toEqual([])
+    expect(p.local.bucket).toBe('week') // back on "To schedule"
+    expect(p.local.scheduledFor).toBeUndefined()
+    expect(p.local.focus).toEqual(t.focus)
+    expect(p.row.plannedOn).toBeUndefined()
+  })
+})
+
+describe('focus — personal, never a shared column', () => {
+  it('choosing writes only this person\'s focus row and never planned_on', () => {
+    const t = task({ bucket: 'week', commitments: [c('week', WK20)] })
+    const day = new Date(2026, 8, 23)
+    const p = planPlacement(t, { plannedOn: day }, ctx)
+    expect(p.focusOps).toEqual([{ op: 'set', userId: 'scott', date: day }])
+    expect(p.commitmentOps).toEqual([])
+    expect('plannedOn' in p.row).toBe(false)
+    expect(p.local.focus).toEqual([{ userId: 'scott', date: day }])
+    expect(p.local.scheduledFor).toBeUndefined() // choosing never reschedules
+  })
+  it('un-choosing clears only this person\'s rows, and the legacy shared value', () => {
+    const day = new Date(2026, 8, 23)
+    const t = task({ plannedOn: day, focus: [{ userId: 'scott', date: day }, { userId: 'iris', date: day }] })
+    const p = planPlacement(t, { plannedOn: undefined }, ctx)
+    expect(p.focusOps).toEqual([{ op: 'clear', userId: 'scott' }])
+    expect(p.local.focus).toEqual([{ userId: 'iris', date: day }])
+    expect('plannedOn' in p.row && p.row.plannedOn === undefined).toBe(true)
+  })
+})
+
+describe('let go and complete', () => {
+  it('inbox / someday release every open commitment and the day', () => {
+    const t = task({ bucket: 'timed', scheduledFor: new Date(2026, 8, 23), commitments: [c('season', FALL), c('month', SEP)] })
+    const p = planPlacement(t, { bucket: 'someday' }, ctx)
+    expect(p.commitmentOps).toEqual([
+      { op: 'remove', level: 'season', periodStart: FALL },
+      { op: 'remove', level: 'month', periodStart: SEP },
+    ])
+    expect(p.local.bucket).toBe('someday')
+    expect(p.local.scheduledFor).toBeUndefined()
+  })
+  it('completing marks the open commitments done; reopening restores them', () => {
+    const t = task({ commitments: [c('season', FALL), c('month', SEP)] })
+    const p = planPlacement(t, { completed: true }, ctx)
+    expect(p.local.commitments.every((x) => x.status === 'done')).toBe(true)
+    const back = planPlacement(p.local, { completed: false }, ctx)
+    expect(back.local.commitments.every((x) => x.status === 'open')).toBe(true)
+  })
+  it('non-placement keys pass through untouched', () => {
+    const p = planPlacement(task({ commitments: [c('month', SEP)] }), { title: 'New', notes: 'n' }, ctx)
+    expect(p.row).toMatchObject({ title: 'New', notes: 'n' })
+    expect(p.commitmentOps).toEqual([])
+    expect(isPlacementWrite({ title: 'x' })).toBe(false)
+    expect(isPlacementWrite({ weekStart: WK20 })).toBe(true)
+  })
+})
+
+describe('keep — same task, next period', () => {
+  it('carries September and opens October on the SAME row', () => {
+    const t = task({ bucket: 'month', commitments: [c('season', FALL), c('month', SEP)] })
+    const p = planKeep(t, 'month', OCT)
+    expect(p.commitmentOps).toEqual([
+      { op: 'carry', level: 'month', periodStart: SEP, to: OCT },
+      { op: 'ensure', level: 'month', periodStart: OCT },
+    ])
+    expect(p.local.commitments).toEqual([c('season', FALL), { ...c('month', SEP, 'carried'), carriedTo: OCT }, c('month', OCT)])
+    expect(p.local.monthStart).toEqual(OCT)
+    expect(p.local.id).toBe(t.id)
+  })
+})
+
+describe('applyCommitmentOps', () => {
+  it('ensure reopens a removed commitment rather than duplicating it', () => {
+    const out = applyCommitmentOps([c('week', WK20, 'removed')], [{ op: 'ensure', level: 'week', periodStart: WK20 }])
+    expect(out).toEqual([c('week', WK20)])
+  })
+})
