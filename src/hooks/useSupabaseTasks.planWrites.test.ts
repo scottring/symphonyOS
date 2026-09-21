@@ -422,3 +422,55 @@ describe('planning writes report real outcomes', () => {
     expect(a).toBeUndefined()
   })
 })
+
+// The session's Done must do everything a tick does (final review I7).
+describe('completeTask', () => {
+  it('completes the task and its open subtasks, clears waiting/discussion, and reports that it wrote', async () => {
+    db.seed('tasks', dbTaskRow({ id: 't1', title: 'Errand', bucket: 'month', month_start: '2026-09-01', is_waiting: true, needs_discussion: true }))
+    db.seed('tasks', dbTaskRow({ id: 'sub1', title: 'Step', parent_task_id: 't1' }))
+    const { result } = renderHook(() => useSupabaseTasks())
+    await waitFor(() => expect(result.current.tasks.find((x) => x.id === 't1')?.isWaiting).toBe(true))
+    let ok: boolean | undefined
+    await act(async () => { ok = await result.current.completeTask('t1') })
+    expect(ok).toBe(true)
+    const row = db.rows('tasks').find((r) => r.id === 't1')!
+    expect(row.completed).toBe(true)
+    expect(row.completed_at).toEqual(expect.any(String))
+    expect(row.is_waiting).toBe(false)
+    expect(row.needs_discussion).toBe(false)
+    expect(db.rows('tasks').find((r) => r.id === 'sub1')!.completed).toBe(true)
+    const local = result.current.tasks.find((x) => x.id === 't1')!
+    expect(local.completed).toBe(true)
+    expect(local.subtasks?.every((st) => st.completed)).toBe(true)
+  })
+
+  it('returns false when the write failed, and the task stays open', async () => {
+    const { result } = await mountWith([monthTask('t1', sep)])
+    db.failOnce('tasks', 'update', { message: 'boom', code: 'XX000' })
+    let ok: boolean | undefined
+    await act(async () => { ok = await result.current.completeTask('t1') })
+    expect(ok).toBe(false)
+    expect(result.current.tasks.find((x) => x.id === 't1')!.completed).toBe(false)
+  })
+})
+
+// Two instances of the hook (Today and the month page, say) share ONE record of
+// which tasks could not be re-read: a write refused in one is refused in the
+// other until a re-read succeeds (final review M9).
+describe('unreconciled tasks are shared across hook instances', () => {
+  it('a task left unreconciled by one instance is not written from another instance\'s local state', async () => {
+    const a = await mountWith([monthTask('t1', sep)])
+    const b = renderHook(() => useSupabaseTasks())
+    await waitFor(() => expect(b.result.current.tasks).toHaveLength(1))
+    db.failOn('task_commitments', { message: 'boom', code: 'XX000' })            // writes AND reads fail
+    await act(async () => { await a.result.current.dropCommitment('t1', 'month', sep) })
+    const writesBefore = db.writeCount('task_commitments')
+    let r: boolean | undefined
+    await act(async () => { r = await b.result.current.dropCommitment('t1', 'month', sep) })
+    expect(r).toBe(false)
+    expect(db.writeCount('task_commitments')).toBe(writesBefore)
+    db.clearFailures()
+    await act(async () => { r = await b.result.current.dropCommitment('t1', 'month', sep) })
+    expect(r).toBe(true)
+  })
+})

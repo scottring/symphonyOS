@@ -42,6 +42,25 @@ function announceLocalWrite(detail: LocalTaskWrite): void {
   localTaskWrites.dispatchEvent(new CustomEvent<LocalTaskWrite>('write', { detail }))
 }
 
+// Tasks whose last commitment/focus write failed AND could not be re-read.
+// Their local state is the pre-write snapshot, which may not be the truth, so
+// no placement write may plan from it until a re-read succeeds. Module scope,
+// like localTaskWrites: every mounted instance honours it, not only the one
+// whose write failed (final review M9).
+const unreconciledTasks = new Set<string>()
+
+/**
+ * A local write that a LATER write in the same flow plans from: applied to the
+ * always-current ref NOW as well as to state (visible after the next render).
+ * A planning session drops a step and then keeps its goal; the goal's carry
+ * reads the ref and must not find the step still open (final review I1). The
+ * updater is pure, so applying it to both agrees.
+ */
+function setTasksNow(ref: { current: Task[] }, set: (fn: (prev: Task[]) => Task[]) => void, fn: (prev: Task[]) => Task[]): void {
+  ref.current = fn(ref.current)
+  set(fn)
+}
+
 export interface DbTask {
   id: string
   user_id: string
@@ -398,6 +417,7 @@ function patchCache(patch: (rows: Task[]) => Task[]): void {
 export function __resetTasksCache(): void {
   tasksCache = null
   tasksInFlight = null
+  unreconciledTasks.clear()
 }
 
 /** Test seam — age the cache past its TTL without waiting a minute. */
@@ -537,11 +557,6 @@ export function useSupabaseTasks() {
   // go stale.
   const tasksRef = useRef<Task[]>(tasks)
   tasksRef.current = tasks
-
-  // Tasks whose last commitment/focus write failed AND could not be re-read.
-  // Their local state is the pre-write snapshot, which may not be the truth, so
-  // no placement write may plan from it until a re-read succeeds.
-  const unreconciledRef = useRef(new Set<string>())
 
   /** After a failed commitment/focus write: the database is the truth again.
    *  Returns the reconciled task (null = could not read), and updates tasksRef
@@ -1081,19 +1096,22 @@ export function useSupabaseTasks() {
     return undefined
   }, [familyMembers, getCurrentUserMember, user?.id])
 
-  const toggleTask = useCallback(async (id: string) => {
-    const task = findTaskById(id)
-    if (!task) return
-
-    const newCompleted = !task.completed
+  /**
+   * Write a task's completion (or reopening) the way a tick always has:
+   * a parent completes its open subtasks and drops its waiting/discussion
+   * flags, and an errand spawned from a list item checks that item off.
+   * True only when the task (and, on completing, its subtasks) wrote.
+   */
+  const writeCompletion = useCallback(async (task: Task, newCompleted: boolean): Promise<boolean> => {
+    const id = task.id
     const isSubtask = !!task.parentTaskId
 
     if (isSubtask) {
       // Toggle subtask - update within parent's subtasks array
       const parent = findParentOfSubtask(id)
-      if (!parent) return
+      if (!parent) return false
 
-      setTasks((prev) =>
+      setTasksNow(tasksRef, setTasks, (prev) =>
         prev.map((t) =>
           t.id === parent.id
             ? {
@@ -1113,7 +1131,7 @@ export function useSupabaseTasks() {
 
       if (updateError) {
         // Rollback
-        setTasks((prev) =>
+        setTasksNow(tasksRef, setTasks, (prev) =>
           prev.map((t) =>
             t.id === parent.id
               ? {
@@ -1127,9 +1145,10 @@ export function useSupabaseTasks() {
         )
         setError(updateError.message)
         showToast('Failed to update task', 'error', 4000)
-      } else {
-        announceLocalWrite({ kind: 'update', task: { ...task, completed: newCompleted } })
+        return false
       }
+      announceLocalWrite({ kind: 'update', task: { ...task, completed: newCompleted } })
+      return true
     } else {
       // Toggle parent task
       const hasSubtasks = task.subtasks && task.subtasks.length > 0
@@ -1138,7 +1157,7 @@ export function useSupabaseTasks() {
         : []
 
       // Optimistic update - complete parent and all subtasks if completing
-      setTasks((prev) =>
+      setTasksNow(tasksRef, setTasks, (prev) =>
         prev.map((t) => {
           if (t.id === id) {
             return {
@@ -1176,12 +1195,12 @@ export function useSupabaseTasks() {
 
       if (updateError) {
         // Rollback
-        setTasks((prev) =>
+        setTasksNow(tasksRef, setTasks, (prev) =>
           prev.map((t) => (t.id === id ? task : t))
         )
         setError(updateError.message)
         showToast('Failed to update task', 'error', 4000)
-        return
+        return false
       }
 
       // One-way sync for a task spawned FROM a list item (Needed Today's
@@ -1223,10 +1242,28 @@ export function useSupabaseTasks() {
 
         if (subtaskError) {
           setError(subtaskError.message)
+          return false
         }
       }
+      return true
     }
-  }, [findTaskById, findParentOfSubtask])
+  }, [findParentOfSubtask])
+
+  /** Complete a task — everything a tick does (writeCompletion). True only
+   *  when it wrote; an already-completed task is left alone and counts. */
+  const completeTask = useCallback(async (id: string): Promise<boolean> => {
+    const task = findTaskById(id)
+    if (!task) return false
+    if (task.completed) return true
+    return writeCompletion(task, true)
+  }, [findTaskById, writeCompletion])
+
+  const toggleTask = useCallback(async (id: string) => {
+    const task = findTaskById(id)
+    if (!task) return
+    if (!task.completed) { await completeTask(id); return }
+    await writeCompletion(task, false)
+  }, [findTaskById, completeTask, writeCompletion])
 
   const toggleWaiting = useCallback(async (id: string) => {
     const task = findTaskById(id)
@@ -1404,8 +1441,8 @@ export function useSupabaseTasks() {
       if (!read) {
         // Unknown ≠ optimistic: go back to what we had before this write, and
         // make every later placement write re-read before it may send.
-        if (before) setTasks((prev) => patchTaskRecords(prev, taskId, () => before))
-        unreconciledRef.current.add(taskId)
+        if (before) setTasksNow(tasksRef, setTasks, (prev) => patchTaskRecords(prev, taskId, () => before))
+        unreconciledTasks.add(taskId)
       }
     }
     return allOk
@@ -1415,13 +1452,13 @@ export function useSupabaseTasks() {
    *  from local state. Returns the task to plan from: the RECONCILED one when a
    *  re-read was needed, the current one otherwise, or null = refuse the write. */
   const ensureReconciled = useCallback(async (taskId: string): Promise<Task | null> => {
-    if (!unreconciledRef.current.has(taskId)) return findTaskById(taskId) ?? null
+    if (!unreconciledTasks.has(taskId)) return findTaskById(taskId) ?? null
     const fresh = await reconcileCommitments(taskId)
     if (!fresh) {
       showToast("Couldn't check this task's plan. Try again in a moment.", 'error', 4000)
       return null
     }
-    unreconciledRef.current.delete(taskId)
+    unreconciledTasks.delete(taskId)
     return fresh
   }, [reconcileCommitments, findTaskById])
 
@@ -1458,7 +1495,7 @@ export function useSupabaseTasks() {
       if (!t) return false
       const plan = planKeep(t, level, to, from)
       const before = t
-      setTasks((prev) => prev.map((x) => (x.id === t.id ? plan.local : x)))
+      setTasksNow(tasksRef, setTasks, (prev) => prev.map((x) => (x.id === t.id ? plan.local : x)))
       const dbRow: Record<string, unknown> = {
         bucket: plan.row.bucket,
         week_start: plan.row.weekStart ? localYmd(plan.row.weekStart) : null,
@@ -1467,7 +1504,7 @@ export function useSupabaseTasks() {
       }
       const { error } = await supabase.from('tasks').update(dbRow).eq('id', t.id)
       if (error) {
-        setTasks((prev) => prev.map((x) => (x.id === t.id ? before : x)))
+        setTasksNow(tasksRef, setTasks, (prev) => prev.map((x) => (x.id === t.id ? before : x)))
         showToast('Failed to keep it forward', 'error', 4000)
         return false
       }
@@ -1504,7 +1541,7 @@ export function useSupabaseTasks() {
     const plan = planDropCommitment(task, level, periodStart)
     if (plan.commitmentOps.length === 0) return true
     const before = task
-    setTasks((prev) => prev.map((x) => (x.id === id ? plan.local : x)))
+    setTasksNow(tasksRef, setTasks, (prev) => prev.map((x) => (x.id === id ? plan.local : x)))
     const { error } = await supabase.from('tasks').update({
       bucket: plan.row.bucket,
       week_start: plan.row.weekStart ? localYmd(plan.row.weekStart) : null,
@@ -1512,7 +1549,7 @@ export function useSupabaseTasks() {
       season_start: plan.row.seasonStart ? localYmd(plan.row.seasonStart) : null,
     }).eq('id', id)
     if (error) {
-      setTasks((prev) => prev.map((x) => (x.id === id ? before : x)))
+      setTasksNow(tasksRef, setTasks, (prev) => prev.map((x) => (x.id === id ? before : x)))
       showToast("Couldn't drop it from that period", 'error', 4000)
       return false
     }
@@ -1617,7 +1654,7 @@ export function useSupabaseTasks() {
     const isSubtask = !!task.parentTaskId
     if (isSubtask) {
       const parent = findParentOfSubtask(id)
-      setTasks((prev) =>
+      setTasksNow(tasksRef, setTasks, (prev) =>
         prev.map((t) =>
           t.id === parent?.id
             ? { ...t, subtasks: (t.subtasks || []).map((s) => s.id === id ? { ...s, ...updates } : s) }
@@ -1625,7 +1662,7 @@ export function useSupabaseTasks() {
         )
       )
     } else {
-      setTasks((prev) =>
+      setTasksNow(tasksRef, setTasks, (prev) =>
         prev.map((t) => (t.id === id
           ? {
               ...t,
@@ -1731,7 +1768,7 @@ export function useSupabaseTasks() {
       // Rollback on error — handle subtasks correctly
       if (isSubtask) {
         const parent = findParentOfSubtask(id)
-        setTasks((prev) =>
+        setTasksNow(tasksRef, setTasks, (prev) =>
           prev.map((t) =>
             t.id === parent?.id
               ? { ...t, subtasks: (t.subtasks || []).map((s) => s.id === id ? task : s) }
@@ -1739,7 +1776,7 @@ export function useSupabaseTasks() {
           )
         )
       } else {
-        setTasks((prev) =>
+        setTasksNow(tasksRef, setTasks, (prev) =>
           prev.map((t) => (t.id === id ? task : t))
         )
       }
@@ -2250,5 +2287,5 @@ export function useSupabaseTasks() {
   }, [tasks])
 
   // `userId`: whose focus rows count on a day (task_focus is per person).
-  return { tasks, loading, error, refetch, addTask, addSubtask, addPrepTask, getPrepTasks, getLinkedTasks, toggleTask, toggleWaiting, deleteTask, updateTask, updateTasksBulk, updateTaskOrders, scheduleTask, pushTask, setBucket, setGoal, keepForward, dropCommitment, userId: user?.id ?? null }
+  return { tasks, loading, error, refetch, addTask, addSubtask, addPrepTask, getPrepTasks, getLinkedTasks, toggleTask, toggleWaiting, deleteTask, updateTask, updateTasksBulk, updateTaskOrders, scheduleTask, pushTask, setBucket, setGoal, keepForward, dropCommitment, completeTask, userId: user?.id ?? null }
 }
