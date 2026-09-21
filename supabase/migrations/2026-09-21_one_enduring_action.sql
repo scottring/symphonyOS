@@ -247,6 +247,10 @@ begin
   -- Fired by another trigger (the tasks-side mirror): the cache is already right.
   if pg_trigger_depth() > 1 then return null; end if;
   r := coalesce(new, old);
+  -- A cascade from a deleted task: there is no row to log against or sync.
+  if tg_op = 'DELETE' and not exists (select 1 from public.tasks t where t.id = r.task_id) then
+    return null;
+  end if;
   if tg_op = 'INSERT' then
     perform public.log_placement_event(r.task_id, 'committed', null,
       jsonb_build_object('level', r.level, 'period_start', r.period_start));

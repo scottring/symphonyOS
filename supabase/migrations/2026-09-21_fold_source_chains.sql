@@ -20,6 +20,40 @@
 
 begin;
 
+-- The commitments trigger must not log against a task that a cascade is
+-- deleting (first run of this file, 2026-09-21: FK violation on the child's
+-- own commitment rows). Same body as the schema migration's, with that guard.
+create or replace function public.task_commitments_after_change()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  r record;
+begin
+  if pg_trigger_depth() > 1 then return null; end if;
+  r := coalesce(new, old);
+  if tg_op = 'DELETE' and not exists (select 1 from public.tasks t where t.id = r.task_id) then
+    return null;
+  end if;
+  if tg_op = 'INSERT' then
+    perform public.log_placement_event(r.task_id, 'committed', null,
+      jsonb_build_object('level', r.level, 'period_start', r.period_start));
+  elsif tg_op = 'UPDATE' and new.status is distinct from old.status then
+    perform public.log_placement_event(r.task_id,
+      case new.status when 'carried' then 'carried' when 'done' then 'done' when 'removed' then 'removed' else 'committed' end,
+      jsonb_build_object('level', old.level, 'period_start', old.period_start, 'status', old.status),
+      jsonb_build_object('level', new.level, 'period_start', new.period_start, 'status', new.status, 'carried_to', new.carried_to));
+  elsif tg_op = 'DELETE' then
+    perform public.log_placement_event(r.task_id, 'removed',
+      jsonb_build_object('level', r.level, 'period_start', r.period_start), null);
+  end if;
+  perform public.tasks_sync_from_commitments(r.task_id);
+  return null;
+end;
+$$;
+
 create or replace function public.fold_task_into(p_child uuid, p_into uuid, p_opts jsonb default '{}'::jsonb)
 returns void
 language plpgsql
@@ -158,9 +192,13 @@ begin
   update public.gmail_processed_emails set task_id = p_into where task_id = p_child;
   update public.resolution_log set task_id = p_into where task_id = p_child;
 
-  -- 7. Alias, record, retire.
+  -- 7. Alias, record, retire. The child's own history (the backfill's
+  --    'committed' rows) moves onto the enduring row before the cascade
+  --    would drop it; its commitment and focus rows have been re-expressed
+  --    on the target above and go with the cascade.
   insert into public.task_aliases (old_id, task_id, reason)
   values (p_child, p_into, coalesce(p_opts->>'reason', 'D1b fold 2026-09-21'));
+  update public.task_placement_events set task_id = p_into where task_id = p_child;
   perform public.log_placement_event(p_into, 'folded',
     (to_jsonb(c) - 'notes' - 'links' - 'directions'), jsonb_build_object('child', p_child, 'opts', p_opts));
   delete from public.tasks where id = p_child;
