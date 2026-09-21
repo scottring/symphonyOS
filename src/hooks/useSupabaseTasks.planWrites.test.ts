@@ -313,6 +313,21 @@ describe('planning writes report real outcomes', () => {
     expect(db.rows('tasks').find((r) => r.id === 't1')).toMatchObject({ bucket: 'week', week_start: localYmd(week) })
   })
 
+  it('a new week task with a day is on the week AND on its day', async () => {
+    // addTask writes `week_start` only for a bucket='week' insert — a
+    // `scheduledFor` insert lands as 'timed' with no week. So the session
+    // creates the row ON the week first, then gives it its day.
+    const week = new Date(2026, 9, 4), day = new Date(2026, 9, 6)
+    const { result } = await mountWith([])
+    const id = '22222222-2222-4222-8222-222222222222'
+    await act(async () => { await result.current.addTask('Call the plumber', undefined, undefined, undefined, { id, bucket: 'week', weekStart: week }) })
+    await act(async () => { await result.current.updateTask(id, { scheduledFor: day, isAllDay: true }) })
+    const row = db.rows('tasks').find((r) => r.id === id)!
+    expect(row.scheduled_for).toBe(day.toISOString())
+    const wk = db.rows('task_commitments').find((c) => c.task_id === id && c.level === 'week')
+    expect(wk).toMatchObject({ period_start: localYmd(week), status: 'open' })
+  })
+
   it('addTask with a given id creates exactly one row, and a retry returns the same id without a second insert', async () => {
     const { result } = await mountWith([])
     const id = '11111111-1111-4111-8111-111111111111'

@@ -54,6 +54,7 @@ import { useMediaQuery } from '@/hooks/useMediaQuery'
 import type { AssigneeFilter } from '@/lib/today/types'
 import { isTimelineObligation } from '@/lib/routineUtils'
 import type { Layer } from '@/lib/domains'
+import { WeekPlanHost } from './WeekPlanHost'
 
 /** Does this calendar event span the whole day? Explicit flags win; otherwise
  *  a full-day span (midnight start, 24h+ duration — how a holiday reads from
@@ -834,7 +835,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
   }
 
   const weekIsCurrent = sameDay(weekAnchor, weekStartAnchor(new Date(), readCadenceConfig().weekStartsOn))
-  const weekList = (
+  const weekListFor = (onPlan: () => void) => (
     <WeekList
       tasks={tasks}
       weekStart={weekAnchor}
@@ -843,11 +844,16 @@ export function WeekViewV2(props: WeekViewV2Props) {
       isCurrent={weekIsCurrent}
       onToggle={(task) => handleJournalToggle({ id: `task-${task.id}`, kind: 'task', title: task.title, completed: task.completed, task }, journalDays[0])}
       onSelect={(id) => onSelectItem(`task-${id}`)}
-      onPlan={props.onPlanWeek}
+      onPlan={onPlan}
     />
   )
 
+  // A past week is a look-back, not a plan.
+  const weekIsPast = weekAnchor.getTime() + 7 * 86_400_000 <= Date.now()
+
   return (
+    <WeekPlanHost tasks={tasks} weekStart={weekAnchor} meId={meId} isPast={weekIsPast}>
+      {({ openSession }) => (
     <div className="relative">
       <div className="flex items-center justify-end gap-2 mb-2">
         {!narrow && props.mode === undefined && (
@@ -885,7 +891,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
             the stacked days instead. */}
         {narrow ? (
           <div className="flex flex-col gap-4">
-            {weekList}
+            {weekListFor(openSession)}
             <WeekJournal days={journalDays} spans={journalSpans} onSelectItem={onSelectItem} onToggleEntry={handleJournalToggle} onPlanDrop={handlePlanDropOnDay} onAddToDay={handleAddToDay} narrow dragEnabled={false} />
           </div>
         ) : (
@@ -894,7 +900,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
         <div ref={gridBoundsRef} data-week-bounds className="flex-1 min-w-0">
         {!showSchedule ? (
           <>
-            {weekList}
+            {weekListFor(openSession)}
             <WeekJournal days={journalDays} spans={journalSpans} onSelectItem={onSelectItem} onToggleEntry={handleJournalToggle} onPlanDrop={handlePlanDropOnDay} onAddToDay={handleAddToDay} />
           </>
         ) : (
@@ -1097,5 +1103,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
         </DragOverlay>
       </DndContext>
     </div>
+      )}
+    </WeekPlanHost>
   )
 }
