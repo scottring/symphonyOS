@@ -30,6 +30,7 @@ import { useAssistantLaunchRequests, useAssistantLauncher } from '@/contexts/Ass
 import { useShellChrome } from './useShellChrome';
 import { useSelection } from './providers/SelectionProvider';
 import { MOBILE_TAB_BAR_HEIGHT } from './mobileChrome';
+import { onQuickAddRequest } from '@/lib/quickAddSignal';
 
 /**
  * ShellLayout wraps Shell-mounted apps with the Symphony app chrome — the
@@ -134,6 +135,9 @@ function ShellLayoutInner({ children }: Props) {
   // Mobile/UI chrome state
   const [moreSheetOpen, setMoreSheetOpen] = useState(false);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
+  // "Add task" from the Planning panel (dock or sheet) asks the shell to open
+  // the same unibox ⌘K opens — one add box, wherever it is asked for.
+  useEffect(() => onQuickAddRequest(() => setQuickAddOpen(true)), []);
 
   // Global keyboard shortcuts: ⌘K opens the unibox (Quick Add + search + Ask
   // Symphony); ⌘/ is a legacy alias. Both work anywhere.

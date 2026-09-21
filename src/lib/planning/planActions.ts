@@ -94,6 +94,17 @@ export function makePlanActions(deps: PlanActionDeps) {
     if (t.plannedOn) await deps.updateTask(taskId, { plannedOn: undefined })
   }
 
+  /** Someday: let go of every open commitment and the day; the row is kept,
+   *  on the Someday list. Not a delete, not a reschedule — a deferral with a
+   *  name (the panel says "Someday", never "let go"). */
+  async function somedayTask(taskId: string) {
+    const t = deps.findTask(taskId)
+    if (!t) return
+    const prev = snapshot(t)
+    await deps.updateTask(taskId, { bucket: 'someday' })
+    deps.pushAction?.(`Moved "${t.title}" to Someday`, () => { void deps.updateTask(taskId, prev) })
+  }
+
   async function chooseRoutine(routineId: string, occurrence: Date, planned: boolean, title = 'routine') {
     const ok = await deps.setRoutinePlanned(routineId, occurrence, planned)
     if (ok) {
@@ -161,7 +172,7 @@ export function makePlanActions(deps: PlanActionDeps) {
     deps.pushAction?.(`Placed "${routine?.name ?? title}"`, () => { if (prev) void deps.updateRoutine?.(routineId, prev) })
   }
 
-  return { chooseTaskDay, unchooseTask, timeTask, commitTask, chooseRoutine, placeRoutineOnce, placeRoutineRule, drop }
+  return { chooseTaskDay, unchooseTask, timeTask, commitTask, somedayTask, chooseRoutine, placeRoutineOnce, placeRoutineRule, drop }
 }
 
 export type PlanActions = ReturnType<typeof makePlanActions>

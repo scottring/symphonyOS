@@ -1,11 +1,12 @@
 import { describe, it, expect } from 'vitest'
-import { toPlanEntries, type DayPlanEntry } from './dayPlan'
+import { toPlanEntries, unfinishedEntries, type DayPlanEntry } from './dayPlan'
 import type { Task, TaskCommitment } from '@/types/task'
 import type { Routine } from '@/types/actionable'
 
-// The ONE planning list (Scott, 2026-09-21): unfinished work, this week's
-// undated tasks and routines with no day yet — each once, with a line of
-// context, and nothing you already put on a day.
+// The week's list (Scott, 2026-09-21): this week's undated tasks and routines
+// with no day yet — each once, with a line of context, and nothing you already
+// put on a day. Unfinished work from earlier is its own list, on request,
+// newest first — it never floods the week's list (Scott, 2026-09-21 evening).
 
 let n = 0
 const task = (over: Partial<Task> = {}): Task => ({
@@ -23,47 +24,38 @@ const WK27 = new Date(2026, 8, 27)
 const SEP = new Date(2026, 8, 1)
 const match = () => true
 const args = (over: Partial<Parameters<typeof toPlanEntries>[0]> = {}) => ({
-  tasks: [], match, weekStart: WEEK, ymd: '2026-09-21', userId: 'me', now: NOW,
+  tasks: [], match, weekStart: WEEK, ymd: '2026-09-21', userId: 'me',
   available: [], unhomed: [], routineById: new Map<string, Routine>(), ...over,
 })
+const uargs = (over: Partial<Parameters<typeof unfinishedEntries>[0]> = {}) => ({
+  tasks: [], match, ymd: '2026-09-21', userId: 'me', now: NOW, ...over,
+})
 
-describe('toPlanEntries', () => {
-  it('unfinished first (oldest first), then this week, then routines', () => {
-    const sat = task({ title: 'Order Comma 4', bucket: 'timed', scheduledFor: new Date(2026, 8, 19), isAllDay: true })
-    const fri = task({ title: 'Plan reading', bucket: 'timed', scheduledFor: new Date(2026, 8, 18), isAllDay: true })
+const sat = () => task({ title: 'Order Comma 4', bucket: 'timed', scheduledFor: new Date(2026, 8, 19), isAllDay: true })
+const fri = () => task({ title: 'Plan reading', bucket: 'timed', scheduledFor: new Date(2026, 8, 18), isAllDay: true })
+const leftBehind = () => task({ title: 'Left behind', bucket: 'week', weekStart: LAST_WEEK })
+
+describe("toPlanEntries — the week's list", () => {
+  it("this week's undated tasks, then routines — unfinished work from earlier is NOT here", () => {
     const week = task({ title: 'Talk to HEMS', bucket: 'week', weekStart: WEEK, commitments: [c('month', SEP), c('week', WEEK)] })
     const r = routine({ name: 'Take out recycling' })
-    const out = toPlanEntries(args({ tasks: [sat, week, fri], unhomed: [r] }))
-    expect(out.map((e) => e.title)).toEqual(['Plan reading', 'Order Comma 4', 'Talk to HEMS', 'Take out recycling'])
-    expect(out.map((e) => e.context)).toEqual(['Originally Friday', 'Originally Saturday', 'September plan', 'Weekly routine · no set day'])
+    const out = toPlanEntries(args({ tasks: [sat(), week, fri(), leftBehind()], unhomed: [r] }))
+    expect(out.map((e) => e.title)).toEqual(['Talk to HEMS', 'Take out recycling'])
+    expect(out.map((e) => e.context)).toEqual(['September plan', 'Weekly routine · no set day'])
     expect(out.every((e) => e.group === 'plan')).toBe(true)
   })
 
   it('a row with a day is on that day, not here; a chosen row is on the main list, not here', () => {
     const dated = task({ bucket: 'timed', scheduledFor: new Date(2026, 8, 23) })
     const chosen = task({ title: 'Chosen', bucket: 'week', weekStart: WEEK, focus: [{ userId: 'me', date: new Date(2026, 8, 21) }] })
-    const chosenMiss = task({ bucket: 'timed', scheduledFor: new Date(2026, 8, 19), focus: [{ userId: 'me', date: new Date(2026, 8, 21) }] })
-    expect(toPlanEntries(args({ tasks: [dated, chosen, chosenMiss] }))).toEqual([])
+    expect(toPlanEntries(args({ tasks: [dated, chosen] }))).toEqual([])
   })
 
-  it('a week placement left behind by an earlier week says which week', () => {
-    const left = task({ bucket: 'week', weekStart: LAST_WEEK })
-    const [e] = toPlanEntries(args({ tasks: [left] }))
-    expect(e.context).toBe('Planned for Sep 13 – Sep 19')
-  })
-
-  it('older misses fall outside the 14-day window and stay off the list', () => {
-    const old = task({ bucket: 'timed', scheduledFor: new Date(2026, 7, 1) })
-    expect(toPlanEntries(args({ tasks: [old] }))).toEqual([])
-  })
-
-  // Review, 2026-09-21: "left behind" is judged against the REAL current
-  // week. Paging /week forward must not relabel this week's open placements.
-  it('a placement on the current week is not "unfinished" just because a later week is on screen', () => {
+  // Review, 2026-09-21: the list is the week ON SCREEN. This week's placement
+  // is not on next week's list, and is this week's row when this week shows.
+  it('a placement on the current week is on the list only when that week is on screen', () => {
     const onThisWeek = task({ title: 'This week', bucket: 'week', weekStart: WEEK })
-    const out = toPlanEntries(args({ tasks: [onThisWeek], weekStart: WK27 }))
-    expect(out.map((e) => [e.title, e.context])).toEqual([])
-    // ...and it is still this week's row when this week is on screen.
+    expect(toPlanEntries(args({ tasks: [onThisWeek], weekStart: WK27 }))).toEqual([])
     expect(toPlanEntries(args({ tasks: [onThisWeek], weekStart: WEEK })).map((e) => e.context)).toEqual([undefined])
   })
 
@@ -93,7 +85,38 @@ describe('toPlanEntries', () => {
 
   it('respects the assignee lens', () => {
     const theirs = task({ bucket: 'week', weekStart: WEEK, assignedTo: 'iris' })
-    const out = toPlanEntries(args({ tasks: [theirs], match: (a) => a !== 'iris' }))
-    expect(out).toEqual([])
+    expect(toPlanEntries(args({ tasks: [theirs], match: (a) => a !== 'iris' }))).toEqual([])
+  })
+})
+
+describe('unfinishedEntries — unfinished from earlier, on request', () => {
+  it('misses inside the 14-day window and week placements left behind, NEWEST first', () => {
+    const out = unfinishedEntries(uargs({ tasks: [fri(), leftBehind(), sat()] }))
+    expect(out.map((e) => e.title)).toEqual(['Order Comma 4', 'Plan reading', 'Left behind'])
+    expect(out.map((e) => e.context)).toEqual(['Originally Saturday', 'Originally Friday', 'Planned for Sep 13 – Sep 19'])
+    expect(out.every((e) => e.group === 'unfinished' && !e.planned)).toBe(true)
+  })
+
+  it('older misses fall outside the 14-day window and stay off the list', () => {
+    const old = task({ bucket: 'timed', scheduledFor: new Date(2026, 7, 1) })
+    expect(unfinishedEntries(uargs({ tasks: [old] }))).toEqual([])
+  })
+
+  // "Left behind" is judged against the REAL current week, never the week on
+  // screen — there is no week-on-screen input here at all.
+  it('a placement on the current week is not unfinished', () => {
+    const onThisWeek = task({ bucket: 'week', weekStart: WEEK })
+    expect(unfinishedEntries(uargs({ tasks: [onThisWeek] }))).toEqual([])
+  })
+
+  it('a chosen miss is on the main list, not here; a done one is done', () => {
+    const chosenMiss = task({ bucket: 'timed', scheduledFor: new Date(2026, 8, 19), focus: [{ userId: 'me', date: new Date(2026, 8, 21) }] })
+    const done = task({ bucket: 'timed', scheduledFor: new Date(2026, 8, 19), completed: true })
+    expect(unfinishedEntries(uargs({ tasks: [chosenMiss, done] }))).toEqual([])
+  })
+
+  it('respects the assignee lens', () => {
+    const theirs = task({ bucket: 'timed', scheduledFor: new Date(2026, 8, 19), assignedTo: 'iris' })
+    expect(unfinishedEntries(uargs({ tasks: [theirs], match: (a) => a !== 'iris' }))).toEqual([])
   })
 })
