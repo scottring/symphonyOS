@@ -40,7 +40,7 @@ steps that serve it hang underneath it.
 week list, and the Today pin's "This week" group and the column on `/week`
 are the same list. Drag it onto a day and it is dated. Choose it for today
 instead and it keeps its place on the week list and also appears in Today's
-"My focus", in the order you set. Un-choosing removes it from focus and
+"Tasks", in the order you set. Un-choosing removes it from focus and
 nothing else.
 
 **The day.** On its day it is a commitment. Timed work sits in "Still ahead"
@@ -83,7 +83,7 @@ and timed, for a day that never reached the calendar.
 screen, re-reading when you come back to the tab. There is no live feed and no
 polling, so an event added elsewhere appears when you return. On Today, timed
 events sit in "Still ahead"; all-day events are listed above it. An event is
-never in "My focus" and never in the Today pin, because an event is time, not
+never in "Tasks" and never in the Today pin, because an event is time, not
 a decision. On the kitchen wall it lands in a person's lane by the first name
 in its title. Meal-plan dinners are dressed as events and ride alongside.
 
@@ -112,7 +112,7 @@ first rung that matches is the reason: resting, not today, hidden from the
 timeline, another life area, not yours, a step inside a collection, or swept
 by "hide daily routines". Timed routines sit in "Still ahead". Untimed ones
 wait in the Today pin as "Available today" until you choose one, and then it
-joins "My focus". A routine that has a rule but no time and no day rides on
+joins "Tasks". A routine that has a rule but no time and no day rides on
 the `/week` list asking to be dragged somewhere. Dropping it on a day rewrites
 the rule; dropping it on a time writes a one-day exception so one drag cannot
 move every future week.

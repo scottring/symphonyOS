@@ -153,7 +153,7 @@ interface TodayViewProps {
 
 // ─── Component ─────────────────────────────────────────────────────────────────
 
-/** My focus: chosen untimed work — all-day tasks, then untimed occurrences. */
+/** Tasks: the day's untimed work — every task dated today plus what was chosen (chosen rows lead); then untimed occurrences. */
 const FOCUS_SECTIONS: DaySection[] = ['allday', 'unscheduled']
 /** Still ahead / Earlier today: the timed day, in order. */
 const TIMED_SECTIONS: DaySection[] = ['earlyMorning', 'morning', 'afternoon', 'evening', 'night']
@@ -1354,7 +1354,7 @@ export function TodayView({
               still ahead, and what is already behind you. */}
           <section aria-labelledby="today-focus-heading" className="daybook-journal-section">
             <div className="daybook-journal-heading">
-              <h2 id="today-focus-heading">My focus</h2>
+              <h2 id="today-focus-heading">Tasks</h2>
               {planLine && (
                 <button
                   type="button"
