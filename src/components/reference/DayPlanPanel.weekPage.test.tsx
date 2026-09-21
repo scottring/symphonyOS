@@ -123,8 +123,8 @@ describe('DayPlanPanel — the Planning panel', () => {
     const p = plan(0)
     p.unfinished = [entry(9, 'Originally Saturday')]
     render(<DayPlanPanel plan={p} day={day} actions={{ ...actions, addTask }} weekPage={thisWeek} />)
-    expect(screen.getByText('Nothing waiting to be scheduled this week.')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Add task' }))
+    expect(screen.getByText("Nothing on this week's list yet.")).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Add to this week' }))
     expect(addTask).toHaveBeenCalled()
     // The backlog did not flood in.
     expect(screen.queryByText('Item 9')).not.toBeInTheDocument()
@@ -197,5 +197,23 @@ describe('DayPlanPanel — the Planning panel', () => {
   it('says what it is planning: the week on screen, or the day', () => {
     expect(planningSubtitle(new Date(2026, 8, 21), new Date(2026, 8, 20))).toBe('Sep 20 – Sep 26')
     expect(planningSubtitle(new Date(2026, 8, 21), null)).toBe('Monday, September 21')
+  })
+
+  it('a picked row stays on the list, marked "Planned today", with Undo instead of the verb', () => {
+    const p = plan(0)
+    p.toPlan = [{ key: 'task:p', kind: 'task', id: 'p', title: 'Book the plumber', completed: false, planned: true, group: 'plan', context: 'from October' }]
+    render(<DayPlanPanel plan={p} day={day} actions={actions} weekPage={thisWeek} />)
+    expect(screen.getByText('Book the plumber')).toBeInTheDocument()
+    expect(screen.getByText('Planned today')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /move book the plumber back off today/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /plan for today/i })).toBeNull()
+  })
+
+  it('a ticked row stays, struck, with no verb', () => {
+    const p = plan(0)
+    p.toPlan = [{ key: 'task:d', kind: 'task', id: 'd', title: 'Ordered the rack', completed: true, planned: false, group: 'plan' }]
+    render(<DayPlanPanel plan={p} day={day} actions={actions} weekPage={thisWeek} />)
+    expect(screen.getByText('Ordered the rack')).toHaveClass('line-through')
+    expect(screen.queryByRole('button', { name: /plan for/i })).toBeNull()
   })
 })

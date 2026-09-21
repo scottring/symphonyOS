@@ -40,7 +40,8 @@ import { selectCarriedOver } from './taskPools'
 import { localYmd } from '@/lib/cadence/config'
 import { monthStartOf } from '@/lib/planning/periodPlacement'
 import { isTimelineObligation, type ResolveRoutineCtx } from '@/lib/routineUtils'
-import { isFocused, openCommitment } from '@/lib/placement/model'
+import { isFocused } from '@/lib/placement/model'
+import { weekListTasks, weekRowNote, weekRowNoteText } from '@/lib/planning/weekList'
 import { selectStaleWeekPlacements } from './horizons'
 import { isRecentMiss, isMissedPlacement, missedWhen } from '@/lib/week/missedPlacement'
 import { routineTemporalLabel } from '@/lib/planning/routineTemporal'
@@ -144,23 +145,26 @@ export function routineResolveCtx(input: Pick<DayPlanInput, 'viewedDate' | 'sele
  * choice that is (focus is personal).
  */
 export function weekListEntries(tasks: Task[], match: Match, weekStart: Date, ymd: string, userId?: string | null): DayPlanEntry[] {
-  return selectHorizonPool(tasks, 'week', match, weekStart).map((t) => ({
+  return weekListTasks(tasks, weekStart, null).filter((t) => match(t.assignedTo, t.assignedToAll)).map((t) => ({
     key: `task:${t.id}`, kind: 'task' as const, id: t.id, title: t.title, completed: t.completed,
     planned: isFocused(t, userId, ymd), group: 'week' as const, task: t,
   }))
 }
 
 /**
- * The week's list (Scott, 2026-09-21). Two kinds of row answer the same
- * practical question — "what is waiting to be scheduled this week?":
+ * The week's list (Scott, 2026-09-21, Phase 2). It stays WHOLE: a row picked
+ * for today stays, marked planned (the panel shows "Planned today" + Undo);
+ * a ticked row stays, struck; a row given a day this week stays, with its
+ * day as context. The list is what you look at every day, not a queue that
+ * drains as you work it. Two kinds of row:
  *
- *   this week    this week's undated tasks — "September plan" when the row
- *                also sits on a month list, otherwise no line at all
+ *   this week    every task committed to this week (weekListTasks) — "kept
+ *                from last week", "from <Month>", its day, and/or "picked
+ *                for today" as context, whichever apply
  *   routines     flexible occurrences for the day ("Weekly routine") and
  *                weekly routines with no day of their own ("Weekly · no set day")
  *
- * Each action appears once. A row with a day is on that day, not here; a row
- * chosen for the viewed day is on the main list, not here.
+ * Each action appears once. A goal is never on a week's list.
  *
  * Unfinished work from earlier used to lead this list, oldest first. On a
  * real account that was 23 rows of what didn't happen above 0 rows of what
@@ -185,19 +189,16 @@ export function toPlanEntries(args: {
   const out: DayPlanEntry[] = []
   const push = (e: DayPlanEntry) => { if (!seen.has(e.key)) { seen.add(e.key); out.push(e) } }
   const chosen = (t: Task) => isFocused(t, userId, ymd)
-  const monthName = (t: Task): string | undefined => {
-    const m = openCommitment(t, 'month')?.periodStart ?? (t.bucket === 'month' ? t.monthStart : undefined)
-    return m ? `${m.toLocaleDateString('en-US', { month: 'long' })} plan` : undefined
-  }
 
-  // This week's undated tasks. A row chosen for the day is on the main list,
-  // with Unfocus on its own row (Scott, 2026-09-21) — not kept here as a
-  // duplicate just to undo the choice.
-  for (const t of selectHorizonPool(tasks, 'week', match, weekStart)) {
-    if (t.scheduledFor || chosen(t)) continue
+  // This week's list, whole: a row picked for today stays (marked planned, the
+  // panel shows "Planned today" + Undo), a ticked row stays struck, a row with
+  // a day shows it. The list is what you look at every day (Scott, 2026-09-21).
+  for (const t of weekListTasks(tasks, weekStart, null)) {
+    if (!match(t.assignedTo, t.assignedToAll)) continue
+    const note = weekRowNote(t, weekStart, userId, ymd)
     push({
       key: `task:${t.id}`, kind: 'task', id: t.id, title: t.title, completed: t.completed,
-      planned: false, group: 'plan', task: t, context: monthName(t),
+      planned: chosen(t), group: 'plan', task: t, context: weekRowNoteText({ ...note, pickedToday: false }),
     })
   }
 

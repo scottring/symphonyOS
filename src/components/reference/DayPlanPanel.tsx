@@ -11,8 +11,11 @@
 // the one fold, "Unfinished from earlier" — newest missed date first, and an empty
 // week's list says so and offers Add task rather than filling with backlog.
 //
-// The interaction: pick something here → put it on a day → do it. A chosen
-// row stays, marked "Planned today", so nothing reads as unfinished twice.
+// The interaction: pick something here → put it on a day → do it. The list
+// stays WHOLE (guided planning, Phase 2, 2026-09-21): a chosen row stays,
+// marked "Planned today", with Undo instead of the verb; a ticked row stays,
+// struck, with no verb — nothing reads as unfinished twice, and nothing you
+// picked disappears from the list you look at every day.
 // Every drag has a button, and every row answers the same question the same
 // way (2026-09-21): one verb — "Plan for today" beside a day, "Plan for this
 // week" on a week page — and a ⋯ menu holding "Schedule…" and "Someday" (or,
@@ -223,11 +226,8 @@ function PlanRow({ entry, day, actions, draggable, weekPage = null }: {
         <span className={`line-clamp-2 break-words leading-snug ${entry.completed ? 'text-neutral-400 line-through' : 'text-neutral-800'}`}>
           {entry.title}
         </span>
-        {entry.planned && !entry.completed ? (
-          <span className="block text-[11.5px] text-primary-700">Planned today</span>
-        ) : entry.context ? (
-          <span className="block text-[11.5px] text-neutral-500">{entry.context}</span>
-        ) : null}
+        {entry.planned && !entry.completed && <span className="block text-[11.5px] text-primary-700">Planned today</span>}
+        {entry.context && <span className="block text-[11.5px] text-neutral-500">{entry.context}</span>}
       </div>
       {entry.completed ? null : entry.planned ? (
         <button
@@ -443,10 +443,10 @@ export function DayPlanPanel({ plan, day, actions, draggable = true, weekPage = 
           // An empty week's list is an empty week's list — it says so and
           // offers the one thing that fills it, never the backlog.
           <>
-            <span>Nothing waiting to be scheduled this week.</span>
+            <span>Nothing on this week's list yet.</span>
             {actions.addTask && (
               <button type="button" onClick={actions.addTask} className="ml-2 text-primary-700 hover:text-primary-900">
-                Add task
+                Add to this week
               </button>
             )}
           </>

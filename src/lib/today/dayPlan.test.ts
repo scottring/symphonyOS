@@ -241,3 +241,36 @@ describe('computeTodayData — the main list is the chosen day', () => {
     expect(Object.values(d.grouped).flat().filter((i) => i.title === 'Carried')).toHaveLength(1)
   })
 })
+
+describe('toPlan — the week list stays whole (guided planning, Phase 2)', () => {
+  const onWeek = (over: Partial<Task>) => createMockTask({ bucket: 'week', weekStart: WEEK, commitments: [{ level: 'week', periodStart: WEEK, status: 'open' }], ...over })
+
+  it('a row picked for today stays on the list, marked planned', () => {
+    const t = onWeek({ id: 'w1', title: 'Book the plumber', bucket: 'timed', scheduledFor: new Date(2026, 8, 19), isAllDay: true,
+      focus: [{ userId: 'me', date: new Date(2026, 8, 19) }] })
+    const plan = selectDayPlan(input({ tasks: [t], userId: 'me' }))
+    expect(plan.toPlan.map((e) => [e.id, e.planned])).toEqual([['w1', true]])
+  })
+
+  it('a ticked row stays on the list, completed', () => {
+    const t = onWeek({ id: 'w2', title: 'Done thing', completed: true, commitments: [{ level: 'week', periodStart: WEEK, status: 'done' }] })
+    const plan = selectDayPlan(input({ tasks: [t] }))
+    expect(plan.toPlan.map((e) => [e.id, e.completed])).toEqual([['w2', true]])
+  })
+
+  it('a row given a day this week stays, with its day as context', () => {
+    const t = onWeek({ id: 'w3', bucket: 'timed', scheduledFor: new Date(2026, 8, 17), isAllDay: true })
+    const plan = selectDayPlan(input({ tasks: [t] }))
+    expect(plan.toPlan[0]).toMatchObject({ id: 'w3', context: 'Thu' })
+  })
+
+  it('a month task copied down says where it came from', () => {
+    const t = onWeek({ id: 'w4', commitments: [{ level: 'week', periodStart: WEEK, status: 'open' }, { level: 'month', periodStart: new Date(2026, 8, 1), status: 'open' }] })
+    expect(selectDayPlan(input({ tasks: [t] })).toPlan[0].context).toBe('from September')
+  })
+
+  it('a goal is never on the week list', () => {
+    const g = onWeek({ id: 'g', isGoal: true })
+    expect(selectDayPlan(input({ tasks: [g] })).toPlan).toEqual([])
+  })
+})
