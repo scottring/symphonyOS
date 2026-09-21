@@ -102,6 +102,53 @@ begin
 
   execute 'set local role postgres';
 
+  -- ---- the boundary: a NULL uid is not a pass ---------------------------
+  -- anon through the API: RLS keeps the row out of reach (zero rows, no error)
+  perform set_config('request.jwt.claims', '{"role":"anon"}', true);
+  execute 'set local role anon';
+  update public.tasks set user_id = iris where id = shared;
+  get diagnostics n = row_count;
+  assert n = 0, 'anon reached a shared row';
+  execute 'set local role postgres';
+
+  -- the guard on its own, with RLS out of the way (postgres owns the table):
+  -- an anon JWT, and an authenticated JWT with no sub, are both refused
+  perform set_config('request.jwt.claims', '{"role":"anon"}', true);
+  caught := false;
+  begin
+    update public.tasks set user_id = iris where id = shared;
+  exception when insufficient_privilege then caught := true;
+  end;
+  assert caught, 'REJECTED?: an anon JWT (uid NULL) changed an owner';
+  perform set_config('request.jwt.claims', '{"role":"authenticated"}', true);
+  caught := false;
+  begin
+    update public.tasks set user_id = iris where id = shared;
+  exception when insufficient_privilege then caught := true;
+  end;
+  assert caught, 'REJECTED?: an authenticated JWT with no sub (uid NULL) changed an owner';
+
+  -- the intended paths: the service role, and a direct session with no JWT
+  perform set_config('request.jwt.claims', '{"role":"service_role"}', true);
+  execute 'set local role service_role';
+  update public.tasks set user_id = iris where id = private;
+  get diagnostics n = row_count;
+  assert n = 1, 'service role could not change an owner';
+  execute 'set local role postgres';
+  perform set_config('request.jwt.claims', '', true);
+  update public.tasks set user_id = scott where id = private;
+  get diagnostics n = row_count;
+  assert n = 1, 'a direct database session could not change an owner';
+
+  -- nothing callable from a request rewrites owners behind the guard's back
+  select count(*) into n
+    from pg_proc p join pg_namespace ns on ns.oid = p.pronamespace
+    where p.prosecdef and ns.nspname = 'public'
+      and (has_function_privilege('anon', p.oid, 'execute') or has_function_privilege('authenticated', p.oid, 'execute'))
+      and p.prosrc ~* 'update\s+(public\.)?(tasks|routines|notes|projects|contacts|goals)\b'
+      and p.prosrc ~* 'user_id';
+  assert n = 0, format('%s SECURITY DEFINER function(s) callable from a request update user_id on a shared table', n);
+
   -- ---- siblings: same guard, same explicit WITH CHECK, same rejection ---
   foreach t in array array['routines', 'notes', 'projects', 'contacts', 'goals'] loop
     row_id := gen_random_uuid();

@@ -12,12 +12,15 @@
 -- (supabase/tests/092_owner_immutable.test.sql).
 --
 -- A policy can never compare against the old row, so the fix is a trigger:
--- user_id may not change when auth.uid() is set, i.e. on an end-user request.
--- With the owner pinned, the existing predicate does the rest — a non-owner's
--- new row must still be shared, so nobody can make someone else's item private.
--- Assignment is the way to hand work over; ownership is not a field the app
--- ever writes on UPDATE. Service-role paths (edge functions, seeds, migrations)
--- carry no auth.uid() and are untouched.
+-- user_id may not change on a request that arrives through the API as `anon`
+-- or `authenticated`. The boundary is the request ROLE, not auth.uid(): a NULL
+-- uid only means "no signed-in user", it is not proof of a trusted operation.
+-- Owner changes stay possible on exactly two paths — the service role, and a
+-- direct database session with no request JWT at all (migrations, pg_cron,
+-- the SQL editor). With the owner pinned, the existing predicate does the
+-- rest — a non-owner's new row must still be shared, so nobody can make
+-- someone else's item private. Assignment is the way to hand work over;
+-- ownership is not a field the app ever writes on UPDATE.
 --
 -- The WITH CHECK is spelled out explicitly so the intent is visible in
 -- pg_policies rather than implied by an omitted clause. Behaviour is identical.
@@ -28,7 +31,10 @@ language plpgsql
 set search_path = ''
 as $$
 begin
-  if new.user_id is distinct from old.user_id and auth.uid() is not null then
+  -- auth.role() is the request JWT's role: 'anon', 'authenticated',
+  -- 'service_role', or NULL when there is no request JWT (a direct session).
+  if new.user_id is distinct from old.user_id
+     and coalesce(auth.role(), 'service_role') <> 'service_role' then
     raise exception 'user_id is immutable'
       using errcode = '42501',
             hint = 'Assign the item instead of changing its owner.';
