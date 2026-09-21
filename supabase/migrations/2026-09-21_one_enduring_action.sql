@@ -311,6 +311,7 @@ as $$
 declare
   v_level text; v_start date;
   v_old_day date; v_new_day date;
+  v_inserted boolean;
 begin
   if pg_trigger_depth() > 1 then return null; end if;
 
@@ -328,7 +329,14 @@ begin
       values (new.id, v_level, v_start, case when new.completed then 'done' else 'open' end, auth.uid())
       on conflict (task_id, level, period_start) do update
         set status = case when public.task_commitments.status = 'removed' then 'open' else public.task_commitments.status end,
-            ended_at = case when public.task_commitments.status = 'removed' then null else public.task_commitments.ended_at end;
+            ended_at = case when public.task_commitments.status = 'removed' then null else public.task_commitments.ended_at end
+      returning (xmax = 0) into v_inserted;
+      -- The commitments trigger fires at depth 2 for this write and stays
+      -- quiet, so the record is written here (2026-09-21_mirror_logs_commitments).
+      if v_inserted then
+        perform public.log_placement_event(new.id, 'committed', null,
+          jsonb_build_object('level', v_level, 'period_start', v_start));
+      end if;
     end if;
   end if;
 

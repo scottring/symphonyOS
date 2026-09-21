@@ -599,6 +599,24 @@ describe('useSupabaseTasks', () => {
       expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({ bucket: 'timed', month_start: '2026-09-01', season_start: null, week_start: '2026-09-20' }))
     })
 
+    // Found in the first browser walkthrough (2026-09-21): choosing a task for
+    // today names no column on `tasks`, so the empty row UPDATE returned no
+    // data and the focus row was never written.
+    it('choosing a task for today writes this person\'s focus row and nothing on tasks', async () => {
+      mockSupabaseData.push(createMockDbTask({ id: 'task-1', title: 'Task', bucket: 'week', week_start: '2026-09-20' }))
+      const { result } = renderHook(() => useSupabaseTasks())
+      await waitFor(() => expect(result.current.tasks).toHaveLength(1))
+      mockUpdate.mockClear()
+      await act(async () => { await result.current.updateTask('task-1', { plannedOn: new Date(2026, 8, 21) }) })
+      expect(mockUpdate).not.toHaveBeenCalled()
+      expect(mockUpsert).toHaveBeenCalledWith('task_focus', { task_id: 'task-1', user_id: 'test-user-id', date: '2026-09-21' })
+      expect(result.current.tasks[0].focus).toEqual([{ userId: 'test-user-id', date: new Date(2026, 8, 21) }])
+      // Un-choosing deletes only this person's rows.
+      await act(async () => { await result.current.updateTask('task-1', { plannedOn: undefined }) })
+      expect(mockRecordWrites).toContainEqual(expect.objectContaining({ table: 'task_focus', op: 'delete' }))
+      expect(result.current.tasks[0].focus).toEqual([])
+    })
+
     it('inbox lets go of every open commitment', async () => {
       mockSupabaseData.push(createMockDbTask({ id: 'task-1', title: 'Task', bucket: 'month', month_start: '2026-09-01' }))
       const { result } = renderHook(() => useSupabaseTasks())

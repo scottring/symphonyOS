@@ -1572,11 +1572,17 @@ export function useSupabaseTasks() {
     if ('sortOrder' in updates) dbUpdates.sort_order = updates.sortOrder ?? null
 
     logger.debug('[updateTask] Sending to DB:', { id, dbUpdates })
-    const { data, error: updateError, status, count } = await supabase
-      .from('tasks')
-      .update(dbUpdates)
-      .eq('id', id)
-      .select()
+    // A records-only write (choosing a task for today, un-choosing it) names
+    // no column on `tasks`; an empty UPDATE would return no row and the
+    // records would never be written (found in the first walkthrough).
+    const recordsOnly = Object.keys(dbUpdates).length === 0 && (plan.commitmentOps.length > 0 || plan.focusOps.length > 0)
+    const { data, error: updateError, status, count } = recordsOnly
+      ? { data: [{ id }] as unknown[], error: null, status: 200, count: 1 }
+      : await supabase
+        .from('tasks')
+        .update(dbUpdates)
+        .eq('id', id)
+        .select()
 
     logger.debug('[updateTask] DB response:', { data, status, count, error: updateError?.message })
 
