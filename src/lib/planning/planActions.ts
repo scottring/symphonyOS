@@ -3,22 +3,29 @@
  * reopen line, Week day drops — so each surface places work the same way.
  *
  * The rules, stated once:
- *  - Choosing a DAY writes `planned_on`. A week- or month-list task keeps its
- *    list (a day never erases the broader commitment; if the day passes undone
- *    it is back on its list). Anything else is also dated to the day, all-day,
- *    the way a day drop always dated it.
+ *  - Giving a task a DAY dates it, all-day. Its week/month/season
+ *    commitments stay (the placement module never removes a higher
+ *    commitment for a date). Only the "Today" command — a day that IS today,
+ *    from a choose verb or a drop on Today itself — also chooses it for this
+ *    person's focus (spec S4). A drag onto a day, or any other day, is a
+ *    date and nothing else.
  *  - A routine is chosen per OCCURRENCE (its instance row); the repeating rule
  *    is never written. It can be chosen for its own day only — moving it to
  *    another day needs a time, which is the existing one-day override.
  *  - A TIME is the existing scheduling write (a routine: this occurrence only).
- *  - A PERIOD commits a task to the week's or month's list and un-chooses it
- *    for the day; no day or time is invented.
- *  - Un-choosing never deletes, never un-dates, never touches recurrence.
+ *  - A PERIOD commits a task to the week's or month's list; no day or time is
+ *    invented. Personal focus is kept (S13: moving work never silently
+ *    changes focus — un-choosing is its own gesture).
+ *  - Un-choosing clears this person's focus for ONE day. It never deletes,
+ *    never un-dates, never touches recurrence.
+ *  - Undo restores the focus rows themselves (focusSnapshot), not the legacy
+ *    shared planned_on.
  */
 import type { Task } from '@/types/task'
 import type { Routine } from '@/types/actionable'
 import type { PlanDragPayload, PlanTarget } from './planDrag'
 import { localYmd } from '@/lib/cadence/config'
+import { focusSnapshot } from '@/lib/placement/model'
 
 export interface PlanActionDeps {
   findTask: (id: string) => Task | undefined
@@ -52,28 +59,34 @@ function midnight(d: Date): Date {
 
 export function makePlanActions(deps: PlanActionDeps) {
   const snapshot = (t: Task): Partial<Task> => ({
-    bucket: t.bucket, scheduledFor: t.scheduledFor, isAllDay: t.isAllDay, plannedOn: t.plannedOn,
+    bucket: t.bucket, scheduledFor: t.scheduledFor, isAllDay: t.isAllDay,
   })
+  const snapshotWithFocus = (t: Task): Partial<Task> => ({ ...snapshot(t), focus: focusSnapshot(t) })
 
-  /** Choose a task for a day (see the module rules). */
-  async function chooseTaskDay(taskId: string, day: Date, opts: { date?: boolean } = {}) {
+  /**
+   * Give a task a day (see the module rules). `focus` defaults to the Today
+   * command: true when the day is today. Pass `focus: false` for a drag.
+   */
+  async function chooseTaskDay(taskId: string, day: Date, opts: { focus?: boolean } = {}) {
     const t = deps.findTask(taskId)
     if (!t) return
     const d = midnight(day)
-    const prev = snapshot(t)
-    const keepList = (t.bucket === 'week' || t.bucket === 'month') && !opts.date
-    await deps.updateTask(taskId, keepList
-      ? { plannedOn: d }
-      : { bucket: 'timed', scheduledFor: d, isAllDay: true, plannedOn: d })
-    deps.pushAction?.(`Planned "${t.title}"`, () => { void deps.updateTask(taskId, prev) })
+    const focus = (opts.focus ?? true) && localYmd(d) === localYmd(new Date())
+    const prev = focus ? snapshotWithFocus(t) : snapshot(t)
+    await deps.updateTask(taskId, focus
+      ? { bucket: 'timed', scheduledFor: d, isAllDay: true, plannedOn: d }
+      : { bucket: 'timed', scheduledFor: d, isAllDay: true })
+    deps.pushAction?.(focus ? `Planned "${t.title}" for today` : `Moved "${t.title}"`, () => { void deps.updateTask(taskId, prev) })
   }
 
-  async function unchooseTask(taskId: string) {
+  /** Un-choose for ONE day: only this person's focus on `day` goes. */
+  async function unchooseTask(taskId: string, day: Date) {
     const t = deps.findTask(taskId)
     if (!t) return
-    const prev = t.plannedOn
-    await deps.updateTask(taskId, { plannedOn: undefined })
-    deps.pushAction?.(`Moved "${t.title}" back`, () => { void deps.updateTask(taskId, { plannedOn: prev }) })
+    const prev = focusSnapshot(t)
+    const ymd = localYmd(day)
+    await deps.updateTask(taskId, { focus: prev.filter((f) => localYmd(f.date) !== ymd) })
+    deps.pushAction?.(`Moved "${t.title}" back`, () => { void deps.updateTask(taskId, { focus: prev }) })
   }
 
   async function timeTask(taskId: string, when: Date) {
@@ -88,10 +101,8 @@ export function makePlanActions(deps: PlanActionDeps) {
   }
 
   async function commitTask(taskId: string, period: 'week' | 'month') {
-    const t = deps.findTask(taskId)
-    if (!t) return
+    if (!deps.findTask(taskId)) return
     await deps.pushTask(taskId, period)
-    if (t.plannedOn) await deps.updateTask(taskId, { plannedOn: undefined })
   }
 
   /** Someday: let go of every open commitment and the day; the row is kept,
@@ -114,12 +125,12 @@ export function makePlanActions(deps: PlanActionDeps) {
     }
   }
 
-  /** Apply a drop from the pin. `day` targets date tasks unless the drop is
-   *  onto Today itself (`chooseOnly`), where a list task keeps its list. */
+  /** Apply a drop from the pin. A drop on a day is a date only; a drop onto
+   *  Today itself (`chooseOnly`) is the Today command — date + focus. */
   async function drop(payload: PlanDragPayload, target: PlanTarget, opts: { chooseOnly?: boolean } = {}) {
     const occurrence = dayOf(payload.date)
     if (payload.kind === 'task') {
-      if (target.type === 'day') return chooseTaskDay(payload.id, target.day, { date: !opts.chooseOnly })
+      if (target.type === 'day') return chooseTaskDay(payload.id, target.day, { focus: !!opts.chooseOnly })
       if (target.type === 'time') return timeTask(payload.id, target.when)
       return commitTask(payload.id, target.period)
     }

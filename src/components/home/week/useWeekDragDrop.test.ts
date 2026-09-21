@@ -361,12 +361,17 @@ describe('useWeekDragDrop — journal day drops', () => {
     over: { id: `journal-day:${dayIso}`, data: { current: { kind: 'allDay', dayIso } } },
   })
 
-  it('a list row dropped on a day gives it that day, untimed, with undo back to the week list', async () => {
+  it('a list row dropped on a day gets that DATE only — no focus (S4) — with undo back to the week list', async () => {
     const { result, onUpdateTask, pushAction } = setup()
     await act(async () => { result.current.dndHandlers.onDragEnd(dropOn('2026-05-20') as never) })
-    expect(onUpdateTask).toHaveBeenCalledWith('t1', { isAllDay: true, scheduledFor: new Date(2026, 4, 20), bucket: 'timed', plannedOn: new Date(2026, 4, 20) })
+    expect(onUpdateTask).toHaveBeenCalledWith('t1', { isAllDay: true, scheduledFor: new Date(2026, 4, 20), bucket: 'timed' })
     pushAction.mock.calls[0][1]()
-    expect(onUpdateTask).toHaveBeenLastCalledWith('t1', expect.objectContaining({ bucket: 'week', isAllDay: false, plannedOn: undefined }))
+    expect(onUpdateTask).toHaveBeenLastCalledWith('t1', expect.objectContaining({ bucket: 'week', isAllDay: false }))
+    // Neither the drop nor its undo touches focus: undo can't wipe choices.
+    for (const [, u] of onUpdateTask.mock.calls as unknown as [string, object][]) {
+      expect(u).not.toHaveProperty('plannedOn')
+      expect(u).not.toHaveProperty('focus')
+    }
   })
 
   it('a day task moves to another day the same way', async () => {

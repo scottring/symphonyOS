@@ -199,6 +199,23 @@ export function planPlacement(input: Task, updates: Partial<Task>, ctx: Placemen
     // The shared column is never SET any more; clearing it stops the legacy
     // fallback (a row with no focus rows reads planned_on) from re-choosing.
     if (!updates.plannedOn && task.plannedOn) row.plannedOn = undefined
+  } else if ('focus' in updates && ctx.userId) {
+    // A STATED list — an undo snapshot, or "un-choose this one day". Only this
+    // person's rows move; anyone else's in the list are ignored (focus is
+    // personal). An entry with userId '' is a legacy shared choice
+    // (focusSnapshot), read as mine the way isFocused reads it.
+    const me = ctx.userId
+    const want = new Set((updates.focus ?? []).filter((f) => f.userId === me || f.userId === '').map((f) => localYmd(f.date)))
+    const mine = (task.focus ?? []).filter((f) => f.userId === me)
+    const have = new Map(mine.map((f) => [localYmd(f.date), f.date]))
+    const legacyOnly = mine.length === 0 && !(task.focus ?? []).length && task.plannedOn
+    if (legacyOnly) have.set(localYmd(task.plannedOn!), task.plannedOn!)
+    for (const [ymd, date] of have) if (!want.has(ymd)) focusOps.push({ op: 'clear', userId: me, date })
+    for (const f of updates.focus ?? []) {
+      const ymd = localYmd(f.date)
+      if ((f.userId === me || f.userId === '') && !have.has(ymd)) { focusOps.push({ op: 'set', userId: me, date: f.date }); have.set(ymd, f.date) }
+    }
+    if (task.plannedOn && !want.has(localYmd(task.plannedOn))) row.plannedOn = undefined
   }
 
   // ── Completion mirrors onto the commitments (the trigger does the same) ──

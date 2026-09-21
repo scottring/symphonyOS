@@ -48,7 +48,7 @@ export async function applyTriageVerdict(t: Task, v: Verdict, h: VerdictHandlers
     const day = new Date(h.viewedDate)
     day.setHours(0, 0, 0, 0)
     if (v === 'tomorrow') day.setDate(day.getDate() + 1)
-    return chooseDay(t, day, h)
+    return chooseDay(t, day, h, v === 'today')
   } else if (v === 'week') {
     return wasWritten(h.onPushTask?.(t.id, 'week'))
   } else if (v === 'someday') {
@@ -61,19 +61,13 @@ export async function applyTriageVerdict(t: Task, v: Verdict, h: VerdictHandlers
 }
 
 /**
- * "Do today" / "Tomorrow" is a CHOICE of day (planned_on), so the task lands on
- * that day's main list instead of waiting in the Today pin. A week- or month-
- * list task keeps its list — choosing a day never erases the broader
- * commitment, and if the day passes undone it is simply back on its list.
- * Anything else (inbox, someday, another day) is also dated to that day, the
- * way it always was, so it leaves the pool it was sitting in.
+ * "Do today" is the Today command (spec S4): dated today AND chosen for my
+ * focus. "Tomorrow" is a date only. Either way a week- or month-list task
+ * keeps its list — a date never erases the broader commitment.
  */
-async function chooseDay(t: Task, day: Date, h: VerdictHandlers): Promise<boolean> {
-  if (t.bucket === 'week' || t.bucket === 'month') {
-    return wasWritten(h.onUpdateTask(t.id, { plannedOn: day }))
-  }
+async function chooseDay(t: Task, day: Date, h: VerdictHandlers, focus: boolean): Promise<boolean> {
   if (!(await wasWritten(h.onPushTask?.(t.id, day)))) return false
-  await h.onUpdateTask(t.id, { plannedOn: day })
+  if (focus) await h.onUpdateTask(t.id, { plannedOn: day })
   return true
 }
 

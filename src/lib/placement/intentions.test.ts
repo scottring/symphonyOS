@@ -121,6 +121,36 @@ describe('focus — personal, never a shared column', () => {
   })
 })
 
+describe('focus — a stated list (undo restore, one-day un-choose)', () => {
+  const MON = new Date(2026, 8, 21)
+  const WED = new Date(2026, 8, 23)
+  it('a stated focus list clears only the day dropped from it; other days and other people untouched', () => {
+    const t = task({ focus: [{ userId: 'scott', date: MON }, { userId: 'scott', date: WED }, { userId: 'iris', date: WED }] })
+    const p = planPlacement(t, { focus: [{ userId: 'scott', date: MON }, { userId: 'iris', date: WED }] }, ctx)
+    expect(p.focusOps).toEqual([{ op: 'clear', userId: 'scott', date: WED }])
+    expect(p.local.focus).toEqual([{ userId: 'scott', date: MON }, { userId: 'iris', date: WED }])
+  })
+  it('restoring a snapshot sets back the rows that were lost', () => {
+    const t = task({ focus: [] })
+    const p = planPlacement(t, { focus: [{ userId: 'scott', date: MON }, { userId: 'iris', date: MON }] }, ctx)
+    expect(p.focusOps).toEqual([{ op: 'set', userId: 'scott', date: MON }]) // never writes someone else's focus
+  })
+  it('a legacy shared choice counts as mine: dropping its day clears the legacy column', () => {
+    const t = task({ plannedOn: WED, focus: [] })
+    const p = planPlacement(t, { focus: [] }, ctx)
+    expect(p.focusOps).toEqual([{ op: 'clear', userId: 'scott', date: WED }])
+    expect('plannedOn' in p.row && p.row.plannedOn === undefined).toBe(true)
+  })
+  it('rescheduling to another day keeps focus (S13) and leaves the week commitment (S4)', () => {
+    const t = task({ bucket: 'week', commitments: [c('week', WK20)], focus: [{ userId: 'scott', date: WED }] })
+    const p = planPlacement(t, { bucket: 'timed', scheduledFor: new Date(2026, 8, 25), isAllDay: true }, ctx)
+    expect(p.focusOps).toEqual([])
+    expect(p.commitmentOps).toEqual([])
+    expect(p.local.focus).toEqual([{ userId: 'scott', date: WED }])
+    expect(p.local.commitments).toEqual([c('week', WK20)])
+  })
+})
+
 describe('let go and complete', () => {
   it('inbox / someday release every open commitment and the day', () => {
     const t = task({ bucket: 'timed', scheduledFor: new Date(2026, 8, 23), commitments: [c('season', FALL), c('month', SEP)] })

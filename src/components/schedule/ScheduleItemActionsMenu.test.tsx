@@ -263,3 +263,16 @@ describe('ScheduleItemActionsMenu', () => {
     expect(onOpenDetail).toHaveBeenCalled()
   })
 })
+
+describe('ScheduleItemActionsMenu — Unfocus clears one day only', () => {
+  it('drops only the viewed day\'s focus row; a choice for another day is kept', () => {
+    const MON = new Date(2026, 8, 21)
+    const WED = new Date(2026, 8, 23)
+    const originalTask = { id: 't1', title: 'Call CVS', focus: [{ userId: 'scott', date: MON }, { userId: 'scott', date: WED }] }
+    const item = { id: 'task-t1', type: 'task', title: 'Call CVS', completed: false, focused: true, originalTask } as unknown as TimelineItem
+    const onUpdateTask = vi.fn()
+    renderMenu(item, { onUpdateTask, viewedDate: WED } as Partial<ScheduleActionsValue>)
+    fireEvent.click(screen.getByText('Unfocus'))
+    expect(onUpdateTask).toHaveBeenCalledWith('t1', { focus: [{ userId: 'scott', date: MON }] })
+  })
+})
