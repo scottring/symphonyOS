@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { planPlacement, planKeep, applyCommitmentOps, isPlacementWrite } from './intentions'
+import { planPlacement, planKeep, planDropCommitment, applyCommitmentOps, isPlacementWrite } from './intentions'
 import type { Task, TaskCommitment } from '@/types/task'
 import { DEFAULT_SEASONS } from '@/lib/cadence/seasons'
 
@@ -200,5 +200,72 @@ describe('applyCommitmentOps', () => {
   it('ensure reopens a removed commitment rather than duplicating it', () => {
     const out = applyCommitmentOps([c('week', WK20, 'removed')], [{ op: 'ensure', level: 'week', periodStart: WK20 }])
     expect(out).toEqual([c('week', WK20)])
+  })
+})
+
+describe('planDropCommitment', () => {
+  const sep = new Date(2026, 8, 1)
+  const oct = new Date(2026, 9, 1)
+  const base = (commitments: Task['commitments']): Task => ({
+    id: 't1', title: 'Sort photos', completed: false, createdAt: new Date(2026, 8, 2), updatedAt: new Date(2026, 8, 2),
+    bucket: 'month', monthStart: sep, commitments,
+  } as Task)
+
+  it('removes only that period\'s open commitment and keeps the task', () => {
+    const plan = planDropCommitment(base([
+      { level: 'month', periodStart: sep, status: 'open' },
+      { level: 'season', periodStart: new Date(2026, 8, 22), status: 'open' },
+    ]), 'month', sep)
+    expect(plan.commitmentOps).toEqual([{ op: 'remove', level: 'month', periodStart: sep }])
+    expect(plan.local.commitments?.find((c) => c.level === 'month')?.status).toBe('removed')
+    expect(plan.local.commitments?.find((c) => c.level === 'season')?.status).toBe('open')
+    expect(plan.row).not.toHaveProperty('completed')
+  })
+
+  it('is a no-op when that period has no open commitment', () => {
+    const plan = planDropCommitment(base([{ level: 'month', periodStart: sep, status: 'carried', carriedTo: oct }]), 'month', sep)
+    expect(plan.commitmentOps).toEqual([])
+  })
+})
+
+describe('planKeep without a source period', () => {
+  it('never carries the destination into itself: an already-open destination is skipped', () => {
+    // A half-failed Keep: the row write opened October (mirror trigger), the carry never landed.
+    const t = task({ bucket: 'month', monthStart: OCT, commitments: [c('month', SEP), c('month', OCT)] })
+    const plan = planKeep(t, 'month', OCT)
+    expect(plan.commitmentOps).toEqual([
+      { op: 'carry', level: 'month', periodStart: SEP, to: OCT },
+      { op: 'ensure', level: 'month', periodStart: OCT },
+    ])
+  })
+})
+
+// A season commitment can start mid-season (a row committed to the season on
+// Oct 15). The season list matches by RANGE (committedTo); Keep and Drop, given
+// the season's start, must find the same commitment (final review I3).
+describe('season Keep and Drop match the season by range', () => {
+  const fall = new Date(2026, 8, 1), winter = new Date(2026, 11, 1), midFall = new Date(2026, 9, 15)
+  const row = (): Task => ({
+    id: 't1', title: 'Bids', completed: false, createdAt: fall, updatedAt: fall,
+    bucket: 'quarter', seasonStart: midFall, commitments: [{ level: 'season', periodStart: midFall, status: 'open' }],
+  } as Task)
+
+  it('Keep from the season start carries the mid-season commitment', () => {
+    const plan = planKeep(row(), 'season', winter, fall, DEFAULT_SEASONS)
+    expect(plan.commitmentOps).toEqual([
+      { op: 'carry', level: 'season', periodStart: midFall, to: winter },
+      { op: 'ensure', level: 'season', periodStart: winter },
+    ])
+  })
+
+  it('Drop from the season start removes the mid-season commitment', () => {
+    const plan = planDropCommitment(row(), 'season', fall, DEFAULT_SEASONS)
+    expect(plan.commitmentOps).toEqual([{ op: 'remove', level: 'season', periodStart: midFall }])
+    expect(plan.local.commitments?.[0].status).toBe('removed')
+  })
+
+  it('a month still matches its exact start only', () => {
+    const t = { ...row(), bucket: 'month', commitments: [{ level: 'month', periodStart: new Date(2026, 8, 15), status: 'open' }] } as Task
+    expect(planDropCommitment(t, 'month', fall).commitmentOps).toEqual([])
   })
 })
