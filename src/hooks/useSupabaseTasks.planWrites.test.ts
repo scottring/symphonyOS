@@ -3,6 +3,8 @@ import { renderHook, waitFor, act } from '@testing-library/react'
 import { useSupabaseTasks, __resetTasksCache } from './useSupabaseTasks'
 import { localYmd } from '@/lib/cadence/config'
 import type { Task } from '@/types/task'
+import { applySession, type SessionWriters } from '@/lib/planning/applySession'
+import { emptyDraft, lookBackRows, summarize, type SessionDraft } from '@/lib/planning/session'
 
 // Planning writes must report what actually happened (guided planning, phase 1).
 // The harness is the one in useSupabaseTasks.oneRow.test.ts, grown into a small
@@ -474,3 +476,53 @@ describe('unreconciled tasks are shared across hook instances', () => {
     expect(r).toBe(true)
   })
 })
+
+// A goal's Keep carries its open steps; a step's own verdict must hold, in
+// either click order, and the summary must say what was written (final review I1).
+describe('a planning session against the real writers', () => {
+  const goal = () => ({ ...monthTask('g1', sep), title: 'Porch', isGoal: true })
+  const step = (id: string, title: string) => ({ ...monthTask(id, sep), title, goalTaskId: 'g1' })
+
+  async function run(hook: { current: ReturnType<typeof useSupabaseTasks> }, d: SessionDraft) {
+    const h = () => hook.current
+    const w: SessionWriters = {
+      keep: async (id, monthStart, prevStart) => !!(await h().keepForward(id, { monthStart }, prevStart)),
+      addTask: (title, o) => h().addTask(title, undefined, undefined, undefined, { id: o.id, bucket: 'month', monthStart: o.monthStart, isGoal: o.isGoal, goalTaskId: o.goalTaskId, context: o.context }),
+      contextOf: () => null,
+      complete: (id) => h().completeTask(id),
+      someday: (id) => h().updateTask(id, { bucket: 'someday' }),
+      drop: (id, prevStart) => h().dropCommitment(id, 'month', prevStart),
+      takeIntoMonth: (id, monthStart) => h().updateTask(id, { bucket: 'month', monthStart }),
+      saveSession: async () => true,
+    }
+    let ok = false
+    await act(async () => { ok = (await applySession(d, w, (id) => !!h().tasks.find((t) => t.id === id)?.completed)).ok })
+    return ok
+  }
+  const status = (id: string, ymd: string) => db.rows('task_commitments').find((c) => c.task_id === id && c.period_start === ymd)?.status
+
+  for (const order of ['goal first', 'step first'] as const) {
+    it(`goal Keep + step Drop (${order}): the step stays dropped, its sibling is carried, and the summary said so`, async () => {
+      const { result } = await mountWith([goal(), step('s1', 'Buy chairs'), step('s2', 'Paint')])
+      const verdicts: SessionDraft['verdicts'] = order === 'goal first' ? { g1: 'keep', s1: 'drop' } : { s1: 'drop', g1: 'keep' }
+      const d: SessionDraft = { ...emptyDraft(oct, sep), verdicts }
+      const lines = summarize(d, { open: lookBackRows(result.current.tasks, sep, null).open, above: [], aboveGoals: [], periodLabel: 'October', prevLabel: 'September' })
+      expect(await run(result, d)).toBe(true)
+      expect(lines.find((l) => l.title === 'Buy chairs')!.destination).toBe('Dropped from September · the task is kept')
+      expect(status('s1', '2026-09-01')).toBe('removed')
+      expect(status('s1', '2026-10-01')).toBeUndefined()
+      expect(lines.find((l) => l.title === 'Paint')!.destination).toBe('October tasks · carried with Porch')
+      expect(status('s2', '2026-09-01')).toBe('carried')
+      expect(status('s2', '2026-10-01')).toBe('open')
+    })
+  }
+
+  it('a step marked Done or Someday under a kept goal is not carried', async () => {
+    const { result } = await mountWith([goal(), step('s1', 'Buy chairs'), step('s2', 'Paint')])
+    expect(await run(result, { ...emptyDraft(oct, sep), verdicts: { g1: 'keep', s1: 'done', s2: 'someday' } })).toBe(true)
+    expect(status('s1', '2026-10-01')).toBeUndefined()
+    expect(status('s2', '2026-10-01')).toBeUndefined()
+    expect(db.rows('tasks').find((r) => r.id === 's1')!.completed).toBe(true)
+  })
+})
+

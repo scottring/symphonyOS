@@ -37,7 +37,7 @@ import { splitGoalRows } from '@/lib/planning/goalSteps'
 import { parseLocalYmd, localYmd } from '@/lib/cadence/config'
 import { useAuth } from '@/hooks/useAuth'
 import { usePlanningSession, monthToken } from '@/hooks/usePlanningSession'
-import { lookBackRows, emptyDraft, isEmptyDraft, type SessionDraft } from '@/lib/planning/session'
+import { lookBackRows, emptyDraft, isEmptyDraft, pruneDraft, type SessionDraft } from '@/lib/planning/session'
 import { readDraft, writeDraft, clearDraft } from '@/lib/planning/sessionDraft'
 import { applySession } from '@/lib/planning/applySession'
 import { formatShortDate } from '@/lib/dateHelpers'
@@ -110,7 +110,7 @@ function goalRow(g: Goal): PlanRowModel {
 
 function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   const navigate = useNavigate()
-  const { tasks, loading, toggleTask, deleteTask, updateTask, updateTasksBulk, addTask, setGoal, pushTask, keepForward, dropCommitment } = useSupabaseTasks()
+  const { tasks, loading, toggleTask, deleteTask, updateTask, updateTasksBulk, addTask, setGoal, pushTask, keepForward, dropCommitment, completeTask } = useSupabaseTasks()
   const gated = useGatedTaskActions({ updateTask, pushTask, updateTasksBulk }, (id) => tasks.find((t) => t.id === id))
   const { layers, soleDomain } = useDomain()
   const { getCurrentUserMember } = useFamilyMembers()
@@ -468,10 +468,14 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   const userId = user?.id ?? null
   const sessionEnabled = level === 'month'
   const token = monthToken(bounds.start)
-  const { saved: savedSession, mine: myNotes, loadedToken, error: sessionReadError, reload: reloadSession, save: saveSession } = usePlanningSession('monthly', token)
+  const { saved: savedSession, mine: myNotes, loading: sessionLoading, loadedToken, error: sessionReadError, reload: reloadSession, save: saveSession } = usePlanningSession('monthly', token)
   // Open only on THIS month's loaded record — never on a blank or a neighbour's (review 2026-09-21).
   const sessionReady = loadedToken === token
   const periodYmd = localYmd(bounds.start)
+  // The period on screen NOW — a save that finishes after the page has moved
+  // on must not land its result on the new period (final review M2).
+  const periodYmdRef = useRef(periodYmd)
+  periodYmdRef.current = periodYmd
   const [draft, setDraft] = useState<SessionDraft | null>(null)
   const [sessionOpen, setSessionOpen] = useState(false)
   const [savingSession, setSavingSession] = useState(false)
@@ -482,7 +486,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
     setDraft(sessionEnabled ? readDraft(userId, periodYmd) : null)
   }, [periodYmd, sessionEnabled, userId])
 
-  const back = useMemo(() => (sessionEnabled ? lookBackRows(layered, bounds.prev) : { finished: [], open: [] }), [sessionEnabled, layered, bounds.prev])
+  const back = useMemo(() => (sessionEnabled ? lookBackRows(layered, bounds.prev, meId) : { finished: [], open: [] }), [sessionEnabled, layered, bounds.prev, meId])
   const currentMonth = useMemo(
     () => (sessionEnabled ? selectPeriodTasks(layered, 'month', bounds.start, isCurrent, meId, seasons).filter((t) => !t.completed) : []),
     [sessionEnabled, layered, bounds.start, isCurrent, meId, seasons],
@@ -490,6 +494,16 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   const aboveTasks = useMemo(() => (sessionEnabled && above === 'season'
     ? selectPeriodTasks(layered, 'season', aboveStart, isCurrentPeriod(periodBounds('season', aboveStart, seasons), today), meId, seasons).filter((t) => !t.completed)
     : []), [sessionEnabled, above, layered, aboveStart, seasons, today, meId])
+  const aboveItems = useMemo(() => aboveTasks.filter((t) => !t.isGoal), [aboveTasks])
+  const aboveGoalItems = useMemo(() => aboveTasks.filter((t) => t.isGoal), [aboveTasks])
+  // The draft as the session can show it — the ONE draft both the summary and
+  // Save read, so a stale entry (a deleted task, a row the domain in view
+  // hides) is neither written nor an invisible blocker (final review I2).
+  // Not while the lists are still loading: an empty list is not "all gone".
+  const shownDraft = useMemo(
+    () => (draft && !loading && !seasonsLoading ? pruneDraft(draft, { open: back.open, above: aboveItems, current: currentMonth }) : draft),
+    [draft, loading, seasonsLoading, back.open, aboveItems, currentMonth],
+  )
 
   // Reopening a saved plan starts from MY saved notes, so saving again never
   // writes blank reflections over them (review 2026-09-21).
@@ -504,15 +518,18 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   const changeDraft = useCallback((d: SessionDraft) => { setDraft(d); writeDraft(userId, d) }, [userId])
   const closeSession = useCallback(() => setSessionOpen(false), [])
   const saveDraft = useCallback(async () => {
-    if (!draft) return
+    if (!shownDraft) return
+    const savingYmd = periodYmd
     setSavingSession(true)
-    const result = await applySession(draft, {
+    const result = await applySession(shownDraft, {
       keep: async (id, monthStart, prevStart) => !!(await keepForward(id, { monthStart }, prevStart)),
+      // Each item's OWN domain, recorded when it was planned — never the one in view now (I4).
       addTask: (title, o) => addTask(title, undefined, undefined, undefined, {
-        id: o.id, bucket: 'month', monthStart: o.monthStart, isGoal: o.isGoal, goalTaskId: o.goalTaskId, context: soleDomain,
+        id: o.id, bucket: 'month', monthStart: o.monthStart, isGoal: o.isGoal, goalTaskId: o.goalTaskId, context: o.context,
       }),
-      // updateTask reports whether it wrote (and stamps completed_at); toggleTask does not report.
-      complete: (id) => gated.updateTask(id, { completed: true }),
+      contextOf: (id) => tasks.find((t) => t.id === id)?.context ?? null,
+      // Everything a tick does (subtasks, waiting/discussion, a linked list item), and reports whether it wrote.
+      complete: (id) => completeTask(id),
       someday: (id) => gated.updateTask(id, { bucket: 'someday', scheduledFor: undefined, isAllDay: undefined }),
       drop: (id, prevStart) => dropCommitment(id, 'month', prevStart),
       // The SESSION's month — pushTask(id, 'month') would target the month
@@ -523,6 +540,13 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
     // Persist after EVERY write, so a reload mid-save resumes from here.
     (remaining) => writeDraft(userId, remaining))
     setSavingSession(false)
+    if (periodYmdRef.current !== savingYmd) {
+      // The page moved to another period mid-save: the result belongs to the
+      // period it was saving, in storage only — never on the page now shown.
+      if (result.ok) clearDraft(userId, savingYmd)
+      else writeDraft(userId, result.remaining)
+      return
+    }
     if (!result.ok) {
       // Keep only what did not write — Save again retries exactly that.
       setDraft(result.remaining)
@@ -535,7 +559,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
     setSaveError(false)
     setSessionOpen(false)
     setJustSaved(true)
-  }, [draft, keepForward, addTask, soleDomain, gated, dropCommitment, saveSession, tasks, userId, periodYmd])
+  }, [shownDraft, keepForward, addTask, completeTask, gated, dropCommitment, saveSession, tasks, userId, periodYmd])
 
   return (
     <div {...monthDrop} className={`${PAGE_COLUMN_WIDE} py-6${planDropOver ? ' reference-list-drop' : ''}`}>
@@ -599,7 +623,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
           </p>
           <span className="flex-1" />
           {!sessionOpen && (
-            <button type="button" onClick={startSession} disabled={!sessionReady} aria-busy={!sessionReady}
+            <button type="button" onClick={startSession} disabled={!sessionReady} aria-busy={sessionLoading || undefined}
               className={`${savedSession
                 ? 'rounded-md border border-neutral-200 px-3 py-1.5 text-sm text-neutral-700'
                 : 'rounded-md bg-primary-600 px-3 py-1.5 text-sm font-semibold text-white'} disabled:opacity-50`}>
@@ -615,11 +639,11 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
         </div>
       )}
 
-      {sessionEnabled && sessionOpen && draft ? (
+      {sessionEnabled && sessionOpen && shownDraft ? (
         <PlanSession periodLabel={shortLabel} prevLabel={prevPeriodLabel}
           finished={back.finished} open={back.open} current={currentMonth}
-          above={aboveTasks.filter((t) => !t.isGoal)} aboveGoals={aboveTasks.filter((t) => t.isGoal)}
-          draft={draft} onChange={changeDraft} onClose={closeSession} onSave={saveDraft} saving={savingSession} saveError={saveError} />
+          above={aboveItems} aboveGoals={aboveGoalItems} domainInView={soleDomain ?? null}
+          draft={shownDraft} onChange={changeDraft} onClose={closeSession} onSave={saveDraft} saving={savingSession} saveError={saveError} />
       ) : (
       /* The plan on the left, what you consult while writing it on the
           right — the calendar included. Reference sits WITH reference instead

@@ -10,6 +10,7 @@ const writers = (over: Partial<SessionWriters> = {}) => {
   const w: SessionWriters = {
     keep: vi.fn(async (id, _m, from) => { calls.push(`keep:${id}`); expect(from.getMonth()).toBe(8); return true }),   // always FROM September
     addTask: vi.fn(async (title, o) => { calls.push(`add:${title}:${o.isGoal ? 'goal' : 'task'}:${o.goalTaskId ?? '-'}`); if (!rows.has(o.id)) rows.set(o.id, title); return o.id }),
+    contextOf: vi.fn(() => null),
     complete: vi.fn(async (id) => { calls.push(`done:${id}`); return true }),
     someday: vi.fn(async (id) => { calls.push(`someday:${id}`); return true }),
     drop: vi.fn(async (id) => { calls.push(`drop:${id}`); return true }),
@@ -32,7 +33,8 @@ describe('applySession', () => {
     const r = await applySession(full(), w, () => false)
     expect(r.ok).toBe(true)
     expect(calls).toEqual([
-      'keep:g', 'add:Book a PT evaluation:task:g', 'keep:l', 'drop:p', 'someday:s', 'done:x',
+      // Endings first, so a goal's Keep never carries a step the session dropped (final review I1).
+      'drop:p', 'someday:s', 'done:x', 'keep:g', 'add:Book a PT evaluation:task:g', 'keep:l',
       'add:Three bids:goal:-', 'add:Call Hughes:task:G1', 'add:Loose:task:-', 'take:b:9', 'session',
     ])
   })
@@ -95,5 +97,30 @@ describe('applySession', () => {
     const r = await applySession({ ...emptyDraft(oct, sep), verdicts: { b: 'done' } }, w, () => true)
     expect(w.complete).not.toHaveBeenCalled()
     expect(r.ok).toBe(true)
+  })
+
+  it('ends a step before its goal carries, whichever verdict was clicked first', async () => {
+    for (const verdicts of [{ g: 'keep', s1: 'drop' }, { s1: 'drop', g: 'keep' }] as const) {
+      const { w, calls } = writers()
+      await applySession({ ...emptyDraft(oct, sep), verdicts: { ...verdicts } }, w, () => false)
+      expect(calls).toEqual(['drop:s1', 'keep:g', 'session'])
+    }
+    const { w, calls } = writers()
+    await applySession({ ...emptyDraft(oct, sep), verdicts: { g: 'keep-action', s1: 'someday', s2: 'done' }, actionTitles: { g: 'A' }, actionIds: { g: 'A1' } }, w, () => false)
+    expect(calls).toEqual(['someday:s1', 'done:s2', 'keep:g', 'add:A:task:g', 'session'])
+  })
+
+  it('creates each new item in the domain it was planned in; a next action takes its goal\'s', async () => {
+    const { w } = writers({ contextOf: vi.fn((id: string) => (id === 'g' ? 'family' as const : null)) })
+    await applySession({ ...emptyDraft(oct, sep),
+      verdicts: { g: 'keep-action' }, actionTitles: { g: 'Book PT' }, actionIds: { g: 'A1' },
+      newGoals: [{ id: 'G1', title: 'Three bids', context: 'work' }],
+      newTasks: [{ id: 'T1', title: 'Call Hughes', linkId: 'G1', context: 'work' }, { id: 'T2', title: 'Loose', context: null }],
+    }, w, () => false)
+    const ctxOf = (title: string) => (w.addTask as ReturnType<typeof vi.fn>).mock.calls.find((c) => c[0] === title)![1].context
+    expect(ctxOf('Book PT')).toBe('family')
+    expect(ctxOf('Three bids')).toBe('work')
+    expect(ctxOf('Call Hughes')).toBe('work')
+    expect(ctxOf('Loose')).toBeNull()
   })
 })

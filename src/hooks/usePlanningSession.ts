@@ -21,6 +21,10 @@ export function usePlanningSession(horizon: 'monthly', token: string) {
   const [error, setError] = useState<string | null>(null)
   // The latest request wins: a slow answer for the month the page has left is dropped.
   const latest = useRef(0)
+  // The month on screen now: a save that lands after the page moved on must
+  // not mark the NEW month planned.
+  const currentToken = useRef(token)
+  useEffect(() => { currentToken.current = token }, [token])
 
   const load = useCallback(async () => {
     const req = ++latest.current
@@ -58,8 +62,10 @@ export function usePlanningSession(horizon: 'monthly', token: string) {
       { onConflict: 'author_id,horizon,period_token' },
     )
     if (error) return false
-    setSaved({ at: new Date(savedAt), authorId: user.id, notes })
-    setMine(notes)
+    if (currentToken.current === token) {
+      setSaved({ at: new Date(savedAt), authorId: user.id, notes })
+      setMine(notes)
+    }
     return true
   }, [user?.id, horizon, token])
 

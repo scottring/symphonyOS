@@ -1,7 +1,10 @@
 // src/lib/planning/applySession.ts
 //
 // Save = everything at once, in an order where every link resolves: verdicts
-// (a kept goal is in the new month before its next action), new goals, tasks
+// that END a row in the old month (drop, someday, done) first, then keeps (a
+// kept goal carries every step still open there, so a step's own ending must
+// already have landed — final review I1; a kept goal is in the new month
+// before its next action), new goals, tasks
 // under goals that EXIST, pulls from the season into the SESSION's month, and
 // only then the session row. Every writer states whether it wrote. Progress is
 // reported after each success so the page can persist it immediately; every
@@ -9,11 +12,15 @@
 // landed finds the row instead of duplicating it.
 
 import { parseLocalYmd } from '@/lib/cadence/config'
-import type { SessionDraft } from './session'
+import type { DomainId } from '@/lib/domains'
+import type { SessionDraft, Verdict } from './session'
 
 export interface SessionWriters {
   keep: (id: string, monthStart: Date, prevStart: Date) => Promise<boolean>
-  addTask: (title: string, opts: { id: string; monthStart: Date; isGoal?: boolean; goalTaskId?: string }) => Promise<string | undefined>
+  /** `context` is the item's own (recorded when planned), never the domain in view at Save. */
+  addTask: (title: string, opts: { id: string; monthStart: Date; isGoal?: boolean; goalTaskId?: string; context: DomainId | null }) => Promise<string | undefined>
+  /** An existing row's domain — a next action takes its goal's. */
+  contextOf: (id: string) => DomainId | null
   complete: (id: string) => Promise<boolean>
   someday: (id: string) => Promise<boolean>
   drop: (id: string, prevStart: Date) => Promise<boolean>
@@ -41,7 +48,10 @@ export async function applySession(
   const progress = (next: SessionDraft) => { cur = next; onProgress?.(cur) }
   const without = <T,>(o: Record<string, T>, k: string) => { const c = { ...o }; delete c[k]; return c }
 
-  for (const [id, v] of Object.entries(d.verdicts)) {
+  const ends = (v: Verdict) => v === 'drop' || v === 'someday' || v === 'done'
+  const verdicts = Object.entries(d.verdicts)
+  const ordered = [...verdicts.filter(([, v]) => ends(v)), ...verdicts.filter(([, v]) => !ends(v))]
+  for (const [id, v] of ordered) {
     if (v === 'keep-action') {
       if (!cur.keptAlready.includes(id)) {
         if (!(await wrote(() => w.keep(id, monthStart, prevStart)))) continue
@@ -49,7 +59,7 @@ export async function applySession(
       }
       const title = cur.actionTitles[id]?.trim()
       const actionId = cur.actionIds[id]
-      if (title && actionId && !(await wrote(() => w.addTask(title, { id: actionId, monthStart, goalTaskId: id })))) continue
+      if (title && actionId && !(await wrote(() => w.addTask(title, { id: actionId, monthStart, goalTaskId: id, context: w.contextOf(id) })))) continue
       progress({ ...cur, verdicts: without(cur.verdicts, id), actionTitles: without(cur.actionTitles, id),
         actionIds: without(cur.actionIds, id), keptAlready: cur.keptAlready.filter((x) => x !== id) })
       continue
@@ -65,14 +75,14 @@ export async function applySession(
 
   for (const g of d.newGoals) {
     if (cur.created.includes(g.id)) { progress({ ...cur, newGoals: cur.newGoals.filter((x) => x.id !== g.id) }); continue }
-    if (await wrote(() => w.addTask(g.title, { id: g.id, monthStart, isGoal: true }))) {
+    if (await wrote(() => w.addTask(g.title, { id: g.id, monthStart, isGoal: true, context: g.context ?? null }))) {
       progress({ ...cur, created: [...cur.created, g.id], newGoals: cur.newGoals.filter((x) => x.id !== g.id) })
     }
   }
   const pendingGoals = new Set(cur.newGoals.map((g) => g.id))
   for (const t of d.newTasks) {
     if (t.linkId && pendingGoals.has(t.linkId)) continue            // its goal isn't written yet — wait
-    if (await wrote(() => w.addTask(t.title, { id: t.id, monthStart, goalTaskId: t.linkId }))) {
+    if (await wrote(() => w.addTask(t.title, { id: t.id, monthStart, goalTaskId: t.linkId, context: t.context ?? null }))) {
       progress({ ...cur, newTasks: cur.newTasks.filter((x) => x.id !== t.id) })
     }
   }

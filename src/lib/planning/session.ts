@@ -5,11 +5,17 @@
 // (applySession.ts). Month only for now; season/year reuse this shape later.
 
 import type { Task } from '@/types/task'
+import type { DomainId } from '@/lib/domains'
 import { committedTo } from '@/lib/placement/model'
 import { localYmd } from '@/lib/cadence/config'
+import { doableBy } from './poolViews'
+import { stepsThatCarryForward } from './goalSteps'
 
 export type Verdict = 'keep' | 'keep-action' | 'done' | 'someday' | 'drop'
-export interface NewItem { id: string; title: string; linkId?: string }
+/** `context` is the domain the item was planned in (null = none in view), or,
+ *  for a task toward a goal, the goal's — fixed when it is added, never the
+ *  domain in view at Save (final review I4). Absent on a draft from before. */
+export interface NewItem { id: string; title: string; linkId?: string; context?: DomainId | null }
 export interface SessionDraft {
   level: 'month'; periodStart: string; prevStart: string
   verdicts: Record<string, Verdict>
@@ -34,11 +40,14 @@ export function isEmptyDraft(d: SessionDraft): boolean {
 }
 
 /** The previous month's ACTUAL list: what finished, and what is still open on it.
- *  A row carried or dropped already has its answer and is not asked again. */
-export function lookBackRows(tasks: readonly Task[], prevStart: Date): { finished: Task[]; open: Task[] } {
+ *  A row carried or dropped already has its answer and is not asked again.
+ *  Scoped to `meId` exactly as the month page is (selectPeriodTasks): a row
+ *  assigned only to someone else is not on my September, so it is not asked. */
+export function lookBackRows(tasks: readonly Task[], prevStart: Date, meId: string | null): { finished: Task[]; open: Task[] } {
   const finished: Task[] = []
   const open: Task[] = []
   for (const t of tasks) {
+    if (meId && !doableBy(t, meId)) continue
     const c = committedTo(t, 'month', prevStart, { isCurrent: false })
     if (!c) continue
     if (c !== 'legacy' && c.status === 'carried') continue
@@ -57,13 +66,57 @@ export function verdictOptions(isGoal: boolean): Array<{ verdict: Verdict; label
        { verdict: 'someday', label: 'Someday' }, { verdict: 'drop', label: 'Drop' }]
 }
 
+/**
+ * The rows a verdict may name: what the look-back shows now (`open`), plus a
+ * goal a half-finished Save already carried into this month (`keptAlready`,
+ * now on `current`) whose next action is still to write.
+ */
+function verdictRows(d: SessionDraft, ctx: { open: readonly Task[]; current?: readonly Task[] }): Task[] {
+  const openIds = new Set(ctx.open.map((t) => t.id))
+  const kept = new Set(d.keptAlready ?? [])
+  const carried = (ctx.current ?? []).filter((t) => kept.has(t.id) && !openIds.has(t.id) && d.verdicts[t.id] === 'keep-action')
+  return [...ctx.open, ...carried]
+}
+
+/**
+ * The draft as the session can SHOW it. A stored draft outlives the rows it
+ * names — a task deleted since, or hidden by the domain now in view — and an
+ * entry for a row not shown would either fail every Save (an invisible
+ * blocker) or write something the summary never listed. The summary and Save
+ * both read this one pruned draft, so what is shown is what is written
+ * (final review I2). New goals and tasks are the session's own and stay.
+ * Returns `d` itself when nothing is stale.
+ */
+export function pruneDraft(d: SessionDraft, ctx: { open: readonly Task[]; above: readonly Task[]; current?: readonly Task[] }): SessionDraft {
+  const rows = new Set(verdictRows(d, ctx).map((t) => t.id))
+  const aboveIds = new Set(ctx.above.map((t) => t.id))
+  const pick = <T,>(o: Record<string, T>) => Object.fromEntries(Object.entries(o).filter(([k]) => rows.has(k))) as Record<string, T>
+  const keptAlready = d.keptAlready ?? []
+  const actionIds = d.actionIds ?? {}
+  const stale = Object.keys(d.verdicts).some((k) => !rows.has(k)) || Object.keys(d.actionTitles).some((k) => !rows.has(k))
+    || Object.keys(actionIds).some((k) => !rows.has(k)) || keptAlready.some((k) => !rows.has(k))
+    || d.takenFromAbove.some((k) => !aboveIds.has(k))
+  if (!stale) return d
+  return { ...d, verdicts: pick(d.verdicts), actionTitles: pick(d.actionTitles), actionIds: pick(actionIds),
+    keptAlready: keptAlready.filter((k) => rows.has(k)), takenFromAbove: d.takenFromAbove.filter((k) => aboveIds.has(k)) }
+}
+
 export function summarize(
   d: SessionDraft,
-  ctx: { open: Task[]; above: Task[]; aboveGoals: Task[]; periodLabel: string; prevLabel: string },
+  ctx: { open: Task[]; above: Task[]; aboveGoals: Task[]; current?: Task[]; periodLabel: string; prevLabel: string },
 ): SummaryLine[] {
   const P = ctx.periodLabel, Q = ctx.prevLabel
   const lines: SummaryLine[] = []
-  for (const t of ctx.open) {
+  // A kept goal carries its steps still open in the previous month (keepForward).
+  // A step with its own verdict is written first (applySession) and answers
+  // for itself; one without is carried with the goal, and says so.
+  const carriedWith = new Map<string, string>()
+  for (const g of ctx.open) {
+    const v = d.verdicts[g.id]
+    if (!g.isGoal || (v !== 'keep' && v !== 'keep-action')) continue
+    for (const s of stepsThatCarryForward(g.id, ctx.open, 'month')) carriedWith.set(s.id, g.title)
+  }
+  for (const t of verdictRows(d, ctx)) {
     const v = d.verdicts[t.id]
     const list = t.isGoal ? `${P} goals` : `${P} tasks`
     if (v === 'keep') lines.push({ title: t.title, destination: `${list} · kept from ${Q}` })
@@ -75,6 +128,7 @@ export function summarize(
     else if (v === 'done') lines.push({ title: t.title, destination: `Done in ${Q}` })
     else if (v === 'someday') lines.push({ title: t.title, destination: 'Someday page' })
     else if (v === 'drop') lines.push({ title: t.title, destination: `Dropped from ${Q} · the task is kept` })
+    else if (carriedWith.has(t.id)) lines.push({ title: t.title, destination: `${P} tasks · carried with ${carriedWith.get(t.id)}` })
     else lines.push({ title: t.title, destination: `Left open in ${Q}` })
   }
   const goalTitle = new Map(d.newGoals.map((g) => [g.id, g.title]))

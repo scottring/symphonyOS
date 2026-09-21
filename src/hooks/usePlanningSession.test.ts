@@ -82,4 +82,19 @@ describe('usePlanningSession', () => {
       { onConflict: 'author_id,horizon,period_token' },
     )
   })
+
+  it('a save that lands after the page moved to another month does not mark that month planned (M2)', async () => {
+    let finish: (v: { error: null }) => void = () => {}
+    upsert.mockImplementationOnce(() => new Promise((r) => { finish = r }))
+    const { result, rerender } = renderHook(({ token }) => usePlanningSession('monthly', token), { initialProps: { token: '2026-10' } })
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    let saving: Promise<boolean> = Promise.resolve(false)
+    act(() => { saving = result.current.save({ wentWell: 'w', didnt: '' }) })
+    rerender({ token: '2026-11' })
+    await waitFor(() => expect(result.current.loadedToken).toBe('2026-11'))
+    await act(async () => { finish({ error: null }); expect(await saving).toBe(true) })
+    expect(result.current.saved).toBeNull()
+    expect(result.current.mine).toBeNull()
+  })
 })
+

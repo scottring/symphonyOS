@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { Task } from '@/types/task'
-import { emptyDraft, lookBackRows, verdictOptions, summarize, isEmptyDraft } from './session'
+import { emptyDraft, lookBackRows, verdictOptions, summarize, isEmptyDraft, pruneDraft } from './session'
 
 const sep = new Date(2026, 8, 1), oct = new Date(2026, 9, 1)
 const t = (over: Partial<Task>): Task => ({ id: 'x', title: 'X', completed: false, createdAt: sep, updatedAt: sep, bucket: 'month', ...over } as Task)
@@ -14,9 +14,23 @@ describe('lookBackRows', () => {
       t({ id: 'd', title: 'Removed', commitments: [{ level: 'month', periodStart: sep, status: 'removed' }] }),
       t({ id: 'e', title: 'Other month', commitments: [{ level: 'month', periodStart: oct, status: 'open' }] }),
     ]
-    const r = lookBackRows(tasks, sep)
+    const r = lookBackRows(tasks, sep, null)
     expect(r.finished.map((x) => x.id)).toEqual(['a'])
     expect(r.open.map((x) => x.id)).toEqual(['b'])
+  })
+
+  // September's page hides a row assigned only to the partner (selectPeriodTasks'
+  // doableBy); the look-back must not ask about it either (final review I5).
+  it('leaves out rows assigned only to someone else, as the month page does', () => {
+    const on = [{ level: 'month' as const, periodStart: sep, status: 'open' as const }]
+    const tasks = [
+      t({ id: 'mine', commitments: on, assignedTo: 'me' }),
+      t({ id: 'nobody', commitments: on }),
+      t({ id: 'partner', commitments: on, assignedTo: 'partner' }),
+      t({ id: 'both', commitments: on, assignedToAll: ['partner', 'me'] }),
+    ]
+    expect(lookBackRows(tasks, sep, 'me').open.map((x) => x.id)).toEqual(['mine', 'nobody', 'both'])
+    expect(lookBackRows(tasks, sep, null).open.map((x) => x.id)).toEqual(['mine', 'nobody', 'partner', 'both'])
   })
 })
 
@@ -52,6 +66,74 @@ describe('summarize', () => {
       { title: 'Call Hughes', destination: 'October tasks · toward Three bids in hand' },
       { title: 'Get three bids', destination: 'October tasks · stays on the season, marked "in October"' },
     ])
+  })
+})
+
+// A goal's Keep carries its steps still open in September (keepForward). The
+// summary must say so, and a step's own verdict is written BEFORE the goal
+// carries, so it holds (final review I1).
+describe('summarize — steps under a kept goal', () => {
+  const on = [{ level: 'month' as const, periodStart: sep, status: 'open' as const }]
+  const goal = t({ id: 'g', title: 'Porch', isGoal: true, commitments: on })
+  const chairs = t({ id: 's1', title: 'Buy chairs', goalTaskId: 'g', commitments: on })
+  const paint = t({ id: 's2', title: 'Paint', goalTaskId: 'g', commitments: on })
+  const ctx = { open: [goal, chairs, paint], above: [], aboveGoals: [], periodLabel: 'October', prevLabel: 'September' }
+
+  it('a step with no verdict of its own is carried with its goal', () => {
+    for (const v of ['keep', 'keep-action'] as const) {
+      const d = { ...emptyDraft(oct, sep), verdicts: { g: v }, actionTitles: { g: 'Sand' } }
+      expect(summarize(d, ctx).find((l) => l.title === 'Buy chairs')).toEqual({ title: 'Buy chairs', destination: 'October tasks · carried with Porch' })
+    }
+  })
+
+  it('a step with its own Drop stays dropped, whatever order the verdicts were clicked in', () => {
+    for (const verdicts of [{ g: 'keep' as const, s1: 'drop' as const }, { s1: 'drop' as const, g: 'keep' as const }]) {
+      const lines = summarize({ ...emptyDraft(oct, sep), verdicts }, ctx)
+      expect(lines.find((l) => l.title === 'Buy chairs')!.destination).toBe('Dropped from September · the task is kept')
+      expect(lines.find((l) => l.title === 'Paint')!.destination).toBe('October tasks · carried with Porch')
+    }
+  })
+
+  it('a step under a goal that is NOT kept is left open', () => {
+    const lines = summarize({ ...emptyDraft(oct, sep), verdicts: { g: 'drop' } }, ctx)
+    expect(lines.find((l) => l.title === 'Buy chairs')!.destination).toBe('Left open in September')
+  })
+})
+
+// The draft outlives the rows it names (localStorage). Only what the session
+// SHOWS may be written: one pruned draft feeds both summary and Save (I2).
+describe('pruneDraft', () => {
+  const a = t({ id: 'a', title: 'A' }), b = t({ id: 'b', title: 'B', bucket: 'quarter' })
+  it('drops verdicts and season pulls for rows no longer shown, keeps everything else', () => {
+    const d = { ...emptyDraft(oct, sep),
+      verdicts: { a: 'keep' as const, gone: 'drop' as const, g2: 'keep-action' as const },
+      actionTitles: { gone: 'x', g2: 'y' }, actionIds: { gone: 'X', g2: 'Y' }, keptAlready: ['gone'],
+      takenFromAbove: ['b', 'hidden'], newGoals: [{ id: 'n', title: 'N', context: null }], wentWell: 'w' }
+    const p = pruneDraft(d, { open: [a], above: [b] })
+    expect(p.verdicts).toEqual({ a: 'keep' })
+    expect(p.actionTitles).toEqual({})
+    expect(p.actionIds).toEqual({})
+    expect(p.keptAlready).toEqual([])
+    expect(p.takenFromAbove).toEqual(['b'])
+    expect(p.newGoals).toEqual(d.newGoals)
+    expect(p.wentWell).toBe('w')
+  })
+
+  it('keeps a goal already carried by a half-finished save, so its next action is still written and shown', () => {
+    // The goal landed in October (no longer open in September); its action did not.
+    const g = t({ id: 'g', title: 'Strength', isGoal: true })
+    const d = { ...emptyDraft(oct, sep), verdicts: { g: 'keep-action' as const }, actionTitles: { g: 'Book PT' }, actionIds: { g: 'A1' }, keptAlready: ['g'] }
+    const p = pruneDraft(d, { open: [], above: [], current: [g] })
+    expect(p).toEqual(d)
+    expect(summarize(p, { open: [], above: [], aboveGoals: [], current: [g], periodLabel: 'October', prevLabel: 'September' })).toEqual([
+      { title: 'Strength', destination: 'October goals · kept from September' },
+      { title: 'Book PT', destination: 'October tasks · new next action toward Strength' },
+    ])
+  })
+
+  it('returns the same draft object when nothing is stale', () => {
+    const d = { ...emptyDraft(oct, sep), verdicts: { a: 'keep' as const } }
+    expect(pruneDraft(d, { open: [a], above: [] })).toBe(d)
   })
 })
 

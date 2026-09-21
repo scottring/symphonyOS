@@ -3,19 +3,25 @@
 // "Plan October": Look back at September · Plan October · Save — the level
 // above beside you the whole time (spec: guided planning, Phase 1). A pure
 // view over a SessionDraft; the page owns loading, the draft store and Save.
+// The page hands in the PRUNED draft (pruneDraft), the same one it saves, so
+// the summary here is exactly what Save writes.
 
 import { useMemo, useState } from 'react'
 import { Target, Check } from 'lucide-react'
 import type { Task } from '@/types/task'
+import type { DomainId } from '@/lib/domains'
 import { verdictOptions, summarize, type SessionDraft, type Verdict } from '@/lib/planning/session'
+import { stepsThatCarryForward } from '@/lib/planning/goalSteps'
 
 type Step = 'back' | 'plan' | 'save'
 /** The row's REAL id, fixed when it is written into the draft: creating it twice finds the first (idempotent insert, Task 0). */
 const newId = () => crypto.randomUUID()
 
-export function PlanSession({ periodLabel: P, prevLabel: Q, finished, open, current, above, aboveGoals, draft, onChange, onClose, onSave, saving, saveError }: {
+export function PlanSession({ periodLabel: P, prevLabel: Q, finished, open, current, above, aboveGoals, domainInView = null, draft, onChange, onClose, onSave, saving, saveError }: {
   periodLabel: string; prevLabel: string
   finished: Task[]; open: Task[]; current: Task[]; above: Task[]; aboveGoals: Task[]
+  /** The domain in view — a new item is created in it (recorded as it is added, not at Save). */
+  domainInView?: DomainId | null
   draft: SessionDraft; onChange: (d: SessionDraft) => void
   onClose: () => void; onSave: () => Promise<void>; saving: boolean; saveError?: boolean
 }) {
@@ -44,11 +50,19 @@ export function PlanSession({ periodLabel: P, prevLabel: Q, finished, open, curr
   }
 
   // What this month holds in the draft, for the Plan step and the "toward" options.
-  const kept = open.filter((t) => draft.verdicts[t.id] === 'keep' || draft.verdicts[t.id] === 'keep-action')
+  const isKept = (id: string) => draft.verdicts[id] === 'keep' || draft.verdicts[id] === 'keep-action'
+  const kept = open.filter((t) => isKept(t.id))
+  // A kept goal's open steps travel with it (keepForward) unless they have a verdict of their own.
+  const carried = kept.filter((g) => g.isGoal).flatMap((g) => stepsThatCarryForward(g.id, open, 'month')).filter((st) => !draft.verdicts[st.id])
   const monthGoals = [...current.filter((t) => t.isGoal), ...kept.filter((t) => t.isGoal)]
-  const monthTasks = [...current.filter((t) => !t.isGoal), ...kept.filter((t) => !t.isGoal)]
-  const towardOptions = [...monthGoals.map((g) => ({ id: g.id, title: g.title })), ...draft.newGoals.map((g) => ({ id: g.id, title: g.title }))]
-  const lines = useMemo(() => summarize(draft, { open, above, aboveGoals, periodLabel: P, prevLabel: Q }), [draft, open, above, aboveGoals, P, Q])
+  const monthTasks = [...current.filter((t) => !t.isGoal), ...kept.filter((t) => !t.isGoal), ...carried]
+    .filter((t, i, all) => all.findIndex((x) => x.id === t.id) === i)
+  // A task toward a goal belongs to the goal's domain; a loose one to the domain in view.
+  const towardOptions = [
+    ...monthGoals.map((g) => ({ id: g.id, title: g.title, context: g.context ?? null })),
+    ...draft.newGoals.map((g) => ({ id: g.id, title: g.title, context: g.context ?? null })),
+  ]
+  const lines = useMemo(() => summarize(draft, { open, above, aboveGoals, current, periodLabel: P, prevLabel: Q }), [draft, open, above, aboveGoals, current, P, Q])
 
   const steps: Array<[Step, string]> = [['back', `Look back at ${Q}`], ['plan', `Plan ${P}`], ['save', 'Save']]
   const idx = steps.findIndex(([s]) => s === step)
@@ -109,13 +123,14 @@ export function PlanSession({ periodLabel: P, prevLabel: Q, finished, open, curr
                       <label className="mt-2 block pl-6 text-[12.5px] text-neutral-500">Next action for {t.title}
                         <div className="mt-1">
                           <input className="input-base" value={draft.actionTitles[t.id] ?? ''}
+                            aria-invalid={askForActions && unnamedActions.includes(t.id) ? true : undefined}
                             onChange={(e) => set({ actionTitles: { ...draft.actionTitles, [t.id]: e.target.value },
                               actionIds: { ...draft.actionIds, [t.id]: draft.actionIds[t.id] ?? newId() } })} />
                         </div>
                       </label>
                     )}
                     {askForActions && unnamedActions.includes(t.id) && (
-                      <p className="mt-1 pl-6 text-[12.5px] font-semibold text-accent-700">Name the next action, or choose Keep</p>
+                      <p role="alert" className="mt-1 pl-6 text-[12.5px] font-semibold text-accent-700">Name the next action, or choose Keep</p>
                     )}
                   </li>))}</ul>
               </>
@@ -141,7 +156,7 @@ export function PlanSession({ periodLabel: P, prevLabel: Q, finished, open, curr
               e.preventDefault()
               const title = goalText.trim()
               if (!title || [...monthGoals.map((g) => g.title), ...draft.newGoals.map((g) => g.title)].some((x) => x.trim().toLowerCase() === title.toLowerCase())) return
-              set({ newGoals: [...draft.newGoals, { id: newId(), title, linkId: goalFor || undefined }] }); setGoalText(''); setGoalFor('')
+              set({ newGoals: [...draft.newGoals, { id: newId(), title, linkId: goalFor || undefined, context: domainInView }] }); setGoalText(''); setGoalFor('')
             }}>
               <div className="min-w-[200px] flex-1"><input aria-label={`New goal for ${P}`} className="input-base" value={goalText} onChange={(e) => setGoalText(e.target.value)} placeholder={`A goal for ${P}`} /></div>
               {aboveGoals.length > 0 && (
@@ -173,7 +188,8 @@ export function PlanSession({ periodLabel: P, prevLabel: Q, finished, open, curr
               e.preventDefault()
               const title = taskText.trim()
               if (!title) return
-              set({ newTasks: [...draft.newTasks, { id: newId(), title, linkId: taskToward || undefined }] }); setTaskText(''); setTaskToward('')
+              const toward = towardOptions.find((o) => o.id === taskToward)
+              set({ newTasks: [...draft.newTasks, { id: newId(), title, linkId: toward?.id, context: toward ? toward.context : domainInView }] }); setTaskText(''); setTaskToward('')
             }}>
               <div className="min-w-[200px] flex-1"><input aria-label={`New task for ${P}`} className="input-base" value={taskText} onChange={(e) => setTaskText(e.target.value)} placeholder={`A task for ${P}`} /></div>
               {towardOptions.length > 0 && (
@@ -207,7 +223,7 @@ export function PlanSession({ periodLabel: P, prevLabel: Q, finished, open, curr
           {step === 'back' || (step === 'plan' && nothingBack)
             ? <span />
             : <button type="button" className="rounded-md border border-neutral-200 px-3 py-1.5 text-sm" onClick={() => setStep(step === 'save' ? 'plan' : 'back')}>← Back</button>}
-          <button type="button" className="rounded-md border border-neutral-200 px-3 py-1.5 text-sm" onClick={onClose}>Close · keep my draft</button>
+          <button type="button" disabled={saving} className="rounded-md border border-neutral-200 px-3 py-1.5 text-sm disabled:opacity-60" onClick={onClose}>Close · keep my draft</button>
           {step === 'back' && <button type="button" className="rounded-md bg-primary-600 px-3 py-1.5 text-sm font-semibold text-white" onClick={() => goTo('plan')}>Next: plan {P} →</button>}
           {step === 'plan' && <button type="button" className="rounded-md bg-primary-600 px-3 py-1.5 text-sm font-semibold text-white" onClick={() => goTo('save')}>Next: save →</button>}
           {step === 'save' && <button type="button" disabled={saving} className="rounded-md bg-primary-600 px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-60" onClick={() => { void onSave() }}>{saving ? 'Saving…' : `Save ${P}`}</button>}
