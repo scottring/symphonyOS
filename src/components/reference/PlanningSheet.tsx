@@ -32,7 +32,7 @@ export function PlanningSheet({ open, onClose, weekPage = null, plan, day: dayPr
       <div
         role="dialog"
         aria-modal="true"
-        aria-label="Planning"
+        aria-label="Choose tasks"
         aria-hidden={!open}
         inert={!open}
         className={`fixed bottom-0 left-0 right-0 z-50 max-h-[85vh] overflow-y-auto rounded-t-2xl bg-bg-elevated px-5 transform transition-transform duration-300 ease-out ${open ? 'translate-y-0' : 'translate-y-full pointer-events-none'}`}
@@ -43,10 +43,10 @@ export function PlanningSheet({ open, onClose, weekPage = null, plan, day: dayPr
         </div>
         <header className="flex items-start justify-between gap-3 border-b border-neutral-300 pb-3">
           <div>
-            <h2 className="font-display text-[22px] leading-tight text-neutral-900">Planning</h2>
+            <h2 className="font-display text-[22px] leading-tight text-neutral-900">Choose tasks</h2>
             <p className="mt-1 text-[13px] text-neutral-500">{planningSubtitle(day, weekPage)}</p>
           </div>
-          <button type="button" onClick={onClose} aria-label="Close Planning" className="rounded p-2 text-neutral-500 hover:bg-neutral-100"><X className="h-4 w-4" /></button>
+          <button type="button" onClick={onClose} aria-label="Close task chooser" className="rounded p-2 text-neutral-500 hover:bg-neutral-100"><X className="h-4 w-4" /></button>
         </header>
         {open && (plan && actions
           ? <DayPlanPanel plan={plan} day={day} actions={actions} draggable={false} weekPage={weekPage} />

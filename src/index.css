@@ -1909,3 +1909,17 @@ html.desktop-shell a {
   .daybook-masthead-row:has(> .daybook-date) > .daybook-masthead-aside { grid-area: 3 / 3; justify-self: end; align-self: baseline; }
 }
 
+
+/* Destination navigation and page-local planning tools are separate levels. */
+.plan-page-tools { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 0 0 16px; }
+.plan-period-controls { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+.plan-period-navigation { display: flex; flex-wrap: wrap; gap: 4px; }
+.plan-period-navigation a { padding: 8px 10px; color: var(--color-neutral-500); font-size: 14px; border-bottom: 2px solid transparent; }
+.plan-period-navigation a.is-current { color: var(--color-neutral-900); border-bottom-color: currentColor; font-weight: 600; }
+.plan-range-control { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--color-neutral-500); }
+.plan-range-control select { background: transparent; padding: 6px; max-width: 150px; }
+.task-chooser-control { margin-left: auto; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.task-chooser-control button { display: inline-flex; align-items: center; gap: 6px; padding: 8px 10px; border: 1px solid var(--color-neutral-300); border-radius: 6px; font-size: 13px; color: var(--color-neutral-700); }
+.task-chooser-control button[aria-pressed="true"] { background: var(--color-neutral-100); }
+.task-chooser-control span { font-size: 12px; color: var(--color-neutral-500); }
+@media (max-width: 767px) { .plan-page-tools { padding: 8px 16px; } .plan-period-navigation a { min-height: 44px; display: flex; align-items: center; } }
