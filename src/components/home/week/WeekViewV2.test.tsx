@@ -64,12 +64,12 @@ describe('WeekViewV2 layout', () => {
   // Scott, 2026-09-21: the week's viewport is the days. Planning is ONE panel
   // (the dock beside the page), opened from a labelled button, never a
   // second column of lists to understand first.
-  it('gives the viewport to the days and offers Planning from a labelled button', () => {
+  it('gives the desktop viewport to the days; the shell owns the task chooser', () => {
     render(<WeekViewV2 {...defaultProps} routines={[]} />)
     expect(screen.queryByLabelText("This week's list")).toBeNull()
     expect(screen.queryByText(/Didn.t happen/)).toBeNull()
     expect(screen.queryByRole('button', { name: /This month/ })).toBeNull()
-    expect(screen.getByRole('button', { name: 'Planning' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Choose tasks' })).not.toBeInTheDocument()
   })
 })
 
@@ -283,9 +283,9 @@ describe('WeekViewV2 journal spread', () => {
       expect(within(screen.getByTestId('journal-day-2026-09-14')).getByText('Return library books')).toBeInTheDocument()
       // No side column here either: Planning is a sheet behind its button.
       expect(screen.queryByLabelText("This week's list")).toBeNull()
-      expect(screen.queryByRole('dialog', { name: 'Planning' })).toBeNull()
-      fireEvent.click(screen.getByRole('button', { name: 'Planning' }))
-      expect(screen.getByRole('dialog', { name: 'Planning' })).toHaveAttribute('aria-hidden', 'false')
+      expect(screen.queryByRole('dialog', { name: 'Choose tasks' })).toBeNull()
+      fireEvent.click(screen.getByRole('button', { name: 'Choose tasks' }))
+      expect(screen.getByRole('dialog', { name: 'Choose tasks' })).toHaveAttribute('aria-hidden', 'false')
     })
   })
 })

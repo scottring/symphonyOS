@@ -88,10 +88,10 @@ describe('Today — the way to Planning', () => {
 
   it('on a phone the Tasks heading\'s Planning button opens the sheet with the same plan, and a tick there is the same completion', () => {
     const { onToggleTask } = renderView()
-    const line = screen.getByRole('button', { name: 'Planning' })
+    const line = screen.getByRole('button', { name: 'Choose tasks' })
     expect(line).toHaveAttribute('aria-expanded', 'false')
     fireEvent.click(line)
-    const sheet = screen.getByRole('dialog', { name: 'Planning' })
+    const sheet = screen.getByRole('dialog', { name: 'Choose tasks' })
     const panel = within(sheet).getByTestId('day-plan-panel')
     // The dated task is on the page, not in the sheet; the chore waits here.
     expect(within(panel).queryByText('Pick up foot meds')).not.toBeInTheDocument()
@@ -106,7 +106,7 @@ describe('Today — the way to Planning', () => {
     mobile.value = false
     renderView()
     expect(screen.getByTestId('pins')).toHaveTextContent('')
-    expect(screen.queryByRole('button', { name: 'Planning' })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Choose tasks' })).toBeNull()
     expect(screen.queryByRole('button', { name: /Choose something for today/ })).toBeNull()
     expect(ctxValue.onUpdateTask).not.toHaveBeenCalled()
   })

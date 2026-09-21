@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 // Opens from the "More" tab in the bottom nav
 
 import type { ReactElement } from 'react'
-import { MessageCircle, CalendarRange, CalendarDays } from 'lucide-react'
+import { MessageCircle, Archive } from 'lucide-react'
 import type { ViewType } from './Sidebar'
 
 interface MoreSheetProps {
@@ -109,6 +109,8 @@ export function MoreSheet({ isOpen, onClose, onNavigate, activeView, discussions
 
       {/* Sheet */}
       <div
+        inert={!isOpen}
+        aria-hidden={!isOpen}
         className={`fixed bottom-0 left-0 right-0 z-50 bg-bg-elevated rounded-t-2xl
           transform transition-transform duration-300 ease-out
           ${isOpen ? 'translate-y-0' : 'translate-y-full'}
@@ -122,11 +124,7 @@ export function MoreSheet({ isOpen, onClose, onNavigate, activeView, discussions
 
         {/* Grid of items */}
         <div className="grid grid-cols-3 gap-1 px-4 pb-4">
-          {[{ label: 'Week', route: '/week', Icon: CalendarRange }, { label: 'Month', route: '/month', Icon: CalendarDays }].map(({ label, route, Icon }) => (
-            <button key={route} onClick={() => { navigate(route); onClose() }} className="flex flex-col items-center gap-1.5 py-4 px-2 rounded-xl text-neutral-600 hover:bg-neutral-100">
-              <Icon className="w-5 h-5" /><span className="text-sm">{label}</span>
-            </button>
-          ))}
+          <button onClick={() => { navigate('/someday'); onClose() }} className="flex flex-col items-center gap-1.5 py-4 px-2 rounded-xl text-neutral-600 hover:bg-neutral-100"><Archive className="w-5 h-5" /><span className="text-sm">Someday</span></button>
           {items.map(item => (
             <button
               key={item.view}

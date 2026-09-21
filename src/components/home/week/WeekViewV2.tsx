@@ -836,7 +836,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
         {!narrow && props.mode === undefined && (
           <div className="mr-auto"><WeekModeSwitch mode={mode} onChange={setOwnMode} /></div>
         )}
-        {(narrow || !planningPinned) && (
+        {narrow && (
           <button
             type="button"
             onClick={openPlanning}
@@ -844,7 +844,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
             className="inline-flex items-center gap-1.5 rounded-full border border-neutral-300 px-3 py-1 text-[13px] text-neutral-700 hover:bg-neutral-100"
           >
             <PanelLeft className="h-3.5 w-3.5" aria-hidden="true" />
-            <span>Planning</span>
+            <span>Choose tasks</span>
           </button>
         )}
         <RoutinesToggle hidden={hideRoutines} onToggle={() => writeHideRoutines(!hideRoutines)} />
