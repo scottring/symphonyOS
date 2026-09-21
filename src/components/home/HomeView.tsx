@@ -453,6 +453,7 @@ export function HomeView({
         headerControls={<HomeChromeControls className="flex" />}
         tasks={filteredTasks}
         userId={userId}
+        allRoutines={allActiveRoutines}
         events={filteredEvents}
         // Domain-UNfiltered on purpose: TodayView's own pipeline applies
         // layer scoping via resolveRoutine (rung 4), reading `layers` from

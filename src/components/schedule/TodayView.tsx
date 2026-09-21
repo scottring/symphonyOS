@@ -41,6 +41,7 @@ import { Eye, EyeOff, Repeat, Binoculars, Printer, GripVertical, Moon, Sparkles,
 import { splitTodayJournal } from '@/lib/today/journalSplit'
 import { panelActionsFor, planSummary } from '@/components/reference/DayPlanPanel'
 import { PlanningSheet } from '@/components/reference/PlanningSheet'
+import { unhomedRoutines } from '@/lib/week/unhomedRoutines'
 import { useReferenceLists } from '@/components/reference/ReferenceListsContext'
 import { makePlanActions } from '@/lib/planning/planActions'
 import { localYmd } from '@/lib/cadence/config'
@@ -106,6 +107,9 @@ interface TodayViewProps {
   userId?: string | null
   events: CalendarEvent[]
   routines?: Routine[]
+  /** Every active routine, not only the day's: the Planning sheet lists
+   *  weekly routines with no day of their own, which no single day carries. */
+  allRoutines?: Routine[]
   dateInstances?: ActionableInstance[]
   projects?: Project[]
   selectedItemId: string | null
@@ -159,6 +163,7 @@ export function TodayView({
   userId,
   events,
   routines = [],
+  allRoutines,
   dateInstances = [],
   projects = [],
   selectedItemId,
@@ -328,11 +333,13 @@ export function TodayView({
     completedLingerCutoff,
     weekStart: currentWeekStart,
     userId,
+    // The same set the Planning dock draws, so the sheet and the dock agree.
+    unhomedRoutines: unhomedRoutines(allRoutines ?? routines, { member: selectedAssignees ?? [], prefs: { hideRoutines: false, layers } }),
     // Cast: EventNote.notes is string|null; TodayDataInput expects string|undefined — structurally compatible at runtime
     eventNotesMap: ctx.eventNotesMap as unknown as Map<string, { notes?: string; assignedTo?: string | null }> | undefined,
     eventContextOverrides: ctx.eventContextOverrides,
     getDomainForCalendar: ctx.getDomainForCalendar,
-  }), [tasks, userId, events, routines, dateInstances, viewedDate, selectedAssignees, hideRoutines, layers, completedLingerCutoff,
+  }), [tasks, userId, events, routines, allRoutines, dateInstances, viewedDate, selectedAssignees, hideRoutines, layers, completedLingerCutoff,
       currentWeekStart, ctx.eventNotesMap, ctx.eventContextOverrides, ctx.getDomainForCalendar])
 
   const data = useTodayData(todayInput)

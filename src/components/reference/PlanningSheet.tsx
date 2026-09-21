@@ -2,6 +2,7 @@
 // bottom sheet (the MoreSheet recipe — scrim, rounded top, slide-up, safe-area
 // padding, grab handle). Opened by the "Planning" button on Today and Week;
 // no drags here, every row has its buttons.
+import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { PlanningPanelHost } from './ReferenceLists'
 import { DayPlanPanel, planningSubtitle, type DayPlanPanelActions } from './DayPlanPanel'
@@ -20,7 +21,10 @@ export function PlanningSheet({ open, onClose, weekPage = null, plan, day: dayPr
   actions?: DayPlanPanelActions
 }) {
   const day = dayProp ?? new Date()
-  return (
+  // Portalled to <body>: a `position: fixed` sheet inside a transformed
+  // ancestor (the phone shell) would be fixed to that ancestor, not the
+  // viewport, and sit below the fold (found in the 390px check, 2026-09-21).
+  return createPortal(
     <>
       {open && (
         <div className="fixed inset-0 z-40 bg-black/30 backdrop-blur-sm transition-opacity" onClick={onClose} aria-hidden="true" />
@@ -47,6 +51,7 @@ export function PlanningSheet({ open, onClose, weekPage = null, plan, day: dayPr
           ? <DayPlanPanel plan={plan} day={day} actions={actions} draggable={false} weekPage={weekPage} />
           : <PlanningPanelHost draggable={false} />)}
       </div>
-    </>
+    </>,
+    document.body,
   )
 }

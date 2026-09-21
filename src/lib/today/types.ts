@@ -48,6 +48,9 @@ export interface TodayDataInput {
   /** Whose Today this is: focus (task_focus) is personal. Without it, any
    *  person's choice for the day counts. */
   userId?: string | null
+  /** Weekly routines with no day of their own — they join the To plan list
+   *  (lib/week/unhomedRoutines), the same set the Planning dock draws. */
+  unhomedRoutines?: Routine[]
 }
 
 export interface TodayCounts {
