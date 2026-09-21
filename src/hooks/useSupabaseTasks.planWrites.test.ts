@@ -64,6 +64,24 @@ function createFakeDb() {
     else if (have.status === 'removed') Object.assign(have, { status: 'open', ended_at: null })
   }
 
+  /**
+   * tasks_sync_from_commitments (task_commitments_after_change fires it after
+   * EVERY commitment change): the row's bucket and stamps are re-derived from
+   * its open commitments; with none, inbox/someday stay and anything else
+   * falls back to 'inbox'. Approximation: a dated row's week is not
+   * recomputed from its day.
+   */
+  function syncFromCommitments(taskId: string) {
+    const task = rows('tasks').find((r) => r.id === taskId)
+    if (!task) return
+    const open = rows('task_commitments').filter((c) => c.task_id === taskId && c.status === 'open')
+    const latest = (level: string) => open.filter((c) => c.level === level).map((c) => c.period_start as string).sort().at(-1) ?? null
+    const week = latest('week'), month = latest('month'), season = latest('season')
+    const bucket = task.scheduled_for ? 'timed' : week ? 'week' : month ? 'month' : season ? 'quarter'
+      : (task.bucket === 'inbox' || task.bucket === 'someday') ? task.bucket : 'inbox'
+    Object.assign(task, { bucket, week_start: week, month_start: month, season_start: season })
+  }
+
   class Query implements PromiseLike<Result> {
     private op: Op = 'select'
     private payload: Row | null = null
@@ -131,6 +149,10 @@ function createFakeDb() {
         else rows(table).push({ id: `u${++seq}`, carried_to: null, ...p })
       } else if (op === 'delete') {
         tables.set(table, rows(table).filter((r) => !matched.includes(r)))
+      }
+      if (table === 'task_commitments' && isWrite) {
+        const ids = new Set([...matched.map((r) => r.task_id as string), ...(this.payload?.task_id ? [this.payload.task_id as string] : [])])
+        for (const id of ids) syncFromCommitments(id)
       }
       if (landThenError) return { data: null, error: landThenError }
       if (this.one) {
@@ -523,6 +545,44 @@ describe('a planning session against the real writers', () => {
     expect(status('s1', '2026-10-01')).toBeUndefined()
     expect(status('s2', '2026-10-01')).toBeUndefined()
     expect(db.rows('tasks').find((r) => r.id === 's1')!.completed).toBe(true)
+  })
+})
+
+// Live finding (demo account): Someday on a row with TWO open commitments ended
+// as bucket 'inbox'. Each remove fires the sync trigger; after the first the
+// other is still open (bucket → 'month'), after the second 'month' is not a
+// state it keeps, so it falls back to 'inbox'. The client re-asserts the plan's
+// let-go row once the removals are done.
+describe('letting go of a row with several open commitments', () => {
+  it('Someday on a task with season + month open leaves bucket someday and both commitments removed', async () => {
+    const fall = new Date(2026, 8, 1)
+    const t = { ...monthTask('t1', oct), seasonStart: fall, commitments: [
+      { level: 'season' as const, periodStart: fall, status: 'open' as const },
+      { level: 'month' as const, periodStart: oct, status: 'open' as const },
+    ] }
+    const { result } = await mountWith([t])
+    let ok: boolean | undefined
+    await act(async () => { ok = await result.current.updateTask('t1', { bucket: 'someday', scheduledFor: undefined, isAllDay: undefined }) })
+    expect(ok).toBe(true)
+    const row = db.rows('tasks').find((r) => r.id === 't1')!
+    expect(row.bucket).toBe('someday')
+    expect([row.week_start, row.month_start, row.season_start]).toEqual([null, null, null])
+    expect(db.rows('task_commitments').filter((c) => c.task_id === 't1').map((c) => c.status)).toEqual(['removed', 'removed'])
+  })
+
+  it('a failed re-assert is a failed write', async () => {
+    const fall = new Date(2026, 8, 1)
+    const t = { ...monthTask('t1', oct), seasonStart: fall, commitments: [
+      { level: 'season' as const, periodStart: fall, status: 'open' as const },
+      { level: 'month' as const, periodStart: oct, status: 'open' as const },
+    ] }
+    const { result } = await mountWith([t])
+    // The row write succeeds; the re-assert (the only UPDATE with bucket someday after the removals) fails.
+    let n = 0
+    db.failWhen('tasks', 'update', (r) => r.bucket === 'someday' && ++n > 1, { message: 'boom', code: 'XX000' })
+    let ok: boolean | undefined
+    await act(async () => { ok = await result.current.updateTask('t1', { bucket: 'someday', scheduledFor: undefined, isAllDay: undefined }) })
+    expect(ok).toBe(false)
   })
 })
 

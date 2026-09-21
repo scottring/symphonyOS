@@ -1415,6 +1415,31 @@ export function useSupabaseTasks() {
         showToast('Saved, but its period list may be out of date — refresh to check', 'error', 4000)
       }
     }
+    // A let-go (Someday, or back to the Inbox) that removed commitments: the
+    // sync trigger re-derives the row after EACH removal, so with two open
+    // commitments the first removal sets bucket 'month' and the second, seeing
+    // 'month' (not a state it keeps), falls back to 'inbox' — Someday lost.
+    // Re-assert the plan's row once the removals are done. Idempotent; the
+    // plan's cache columns are the whole bucket/stamp set, never a partial row.
+    const letGo = plan.row.bucket === 'someday' || plan.row.bucket === 'inbox'
+    if (allOk && letGo && plan.commitmentOps.some((op) => op.op === 'remove')) {
+      let error: { message: string } | null | undefined
+      try {
+        ;({ error } = await supabase.from('tasks').update({
+          bucket: plan.row.bucket,
+          week_start: plan.row.weekStart ? localYmd(plan.row.weekStart) : null,
+          month_start: plan.row.monthStart ? localYmd(plan.row.monthStart) : null,
+          season_start: plan.row.seasonStart ? localYmd(plan.row.seasonStart) : null,
+        }).eq('id', taskId))
+      } catch (e) {
+        error = { message: e instanceof Error ? e.message : String(e) }
+      }
+      if (error) {
+        allOk = false
+        console.error('[placement] let-go row re-assert failed:', error.message)
+        showToast('Saved, but its period list may be out of date — refresh to check', 'error', 4000)
+      }
+    }
     for (const op of plan.focusOps) {
       let error: { message: string } | null | undefined
       try {
