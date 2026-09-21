@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { Task } from '@/types/task'
-import { emptyDraft, lookBackRows, verdictOptions, summarize, isEmptyDraft, pruneDraft } from './session'
+import { emptyDraft, lookBackRows, verdictOptions, summarize, isEmptyDraft, pruneDraft, goalsWithHiddenSteps } from './session'
 
 const sep = new Date(2026, 8, 1), oct = new Date(2026, 9, 1)
 const t = (over: Partial<Task>): Task => ({ id: 'x', title: 'X', completed: false, createdAt: sep, updatedAt: sep, bucket: 'month', ...over } as Task)
@@ -131,9 +131,52 @@ describe('pruneDraft', () => {
     ])
   })
 
+  // Re-review N1: the goal's own carry landed but a step's failed, so keepForward
+  // reported failure and keptAlready was never set. The goal is now on October
+  // (current), not September (open). Its verdict must survive so Save again
+  // retries the step, and a named next action must not vanish.
+  it('keeps the verdict of a goal already carried whose Keep has not finished (keep and keep-action)', () => {
+    const g = t({ id: 'g', title: 'Porch', isGoal: true })
+    const step = t({ id: 's', title: 'Buy chairs', goalTaskId: 'g', commitments: [{ level: 'month', periodStart: sep, status: 'open' }] })
+    for (const d of [
+      { ...emptyDraft(oct, sep), verdicts: { g: 'keep' as const } },
+      { ...emptyDraft(oct, sep), verdicts: { g: 'keep-action' as const }, actionTitles: { g: 'Sand' }, actionIds: { g: 'A1' } },
+    ]) {
+      const p = pruneDraft(d, { open: [step], above: [], current: [g] })
+      expect(p).toBe(d)
+      const lines = summarize(p, { open: [step], above: [], aboveGoals: [], current: [g], periodLabel: 'October', prevLabel: 'September' })
+      expect(lines.find((l) => l.title === 'Buy chairs')!.destination).toBe('October tasks · carried with Porch')
+    }
+    const d = { ...emptyDraft(oct, sep), verdicts: { g: 'keep-action' as const }, actionTitles: { g: 'Sand' }, actionIds: { g: 'A1' } }
+    expect(summarize(d, { open: [step], above: [], aboveGoals: [], current: [g], periodLabel: 'October', prevLabel: 'September' }))
+      .toContainEqual({ title: 'Sand', destination: 'October tasks · new next action toward Porch' })
+  })
+
   it('returns the same draft object when nothing is stale', () => {
     const d = { ...emptyDraft(oct, sep), verdicts: { a: 'keep' as const } }
     expect(pruneDraft(d, { open: [a], above: [] })).toBe(d)
+  })
+})
+
+// keepForward carries ALL of a kept goal's open steps, including ones this view
+// hides (domain filter, partner-only). The summary says so, without a count.
+describe('steps a kept goal carries that the view does not show', () => {
+  const on = [{ level: 'month' as const, periodStart: sep, status: 'open' as const }]
+  const goal = t({ id: 'g', title: 'Porch', isGoal: true, commitments: on })
+  const shown = t({ id: 's1', title: 'Buy chairs', goalTaskId: 'g', commitments: on })
+  const hidden = t({ id: 's2', title: 'Partner step', goalTaskId: 'g', commitments: on, assignedTo: 'partner' })
+  const doneHidden = t({ id: 's3', title: 'Done', goalTaskId: 'g', completed: true, commitments: [{ level: 'month', periodStart: sep, status: 'done' }] })
+
+  it('finds goals with open source-month steps outside the shown list', () => {
+    expect([...goalsWithHiddenSteps([goal, shown, hidden, doneHidden], [goal, shown], sep)]).toEqual(['g'])
+    expect([...goalsWithHiddenSteps([goal, shown, doneHidden], [goal, shown], sep)]).toEqual([])
+  })
+
+  it('adds one line for a KEPT goal that carries hidden steps', () => {
+    const ctx = { open: [goal, shown], above: [], aboveGoals: [], hiddenStepGoals: new Set(['g']), periodLabel: 'October', prevLabel: 'September' }
+    expect(summarize({ ...emptyDraft(oct, sep), verdicts: { g: 'keep' } }, ctx))
+      .toContainEqual({ title: 'Porch also carries steps not shown in this view', destination: 'October tasks · carried with Porch' })
+    expect(summarize({ ...emptyDraft(oct, sep), verdicts: { g: 'drop' } }, ctx).some((l) => /not shown/.test(l.title))).toBe(false)
   })
 })
 

@@ -68,14 +68,38 @@ export function verdictOptions(isGoal: boolean): Array<{ verdict: Verdict; label
 
 /**
  * The rows a verdict may name: what the look-back shows now (`open`), plus a
- * goal a half-finished Save already carried into this month (`keptAlready`,
- * now on `current`) whose next action is still to write.
+ * goal a half-finished Save already carried into this month (now on
+ * `current`) whose Keep is not finished — a step's carry failed, or its next
+ * action is still to write. Its verdict stays so Save again retries: a Keep
+ * is idempotent (the goal's source is already carried; only what is still
+ * open moves) — re-review N1.
  */
 function verdictRows(d: SessionDraft, ctx: { open: readonly Task[]; current?: readonly Task[] }): Task[] {
   const openIds = new Set(ctx.open.map((t) => t.id))
-  const kept = new Set(d.keptAlready ?? [])
-  const carried = (ctx.current ?? []).filter((t) => kept.has(t.id) && !openIds.has(t.id) && d.verdicts[t.id] === 'keep-action')
+  const carried = (ctx.current ?? []).filter((t) => !openIds.has(t.id) && (d.verdicts[t.id] === 'keep' || d.verdicts[t.id] === 'keep-action'))
   return [...ctx.open, ...carried]
+}
+
+/**
+ * Goals with steps still open in the previous month that the look-back does
+ * NOT show (the domain in view, or a step assigned only to someone else).
+ * keepForward carries every open step of a kept goal — the goal keeps its
+ * work — so the summary must say it carries more than it lists. `all` is the
+ * unfiltered task list; the step rule is keepForward's own.
+ */
+export function goalsWithHiddenSteps(all: readonly Task[], shown: readonly Task[], prevStart: Date): Set<string> {
+  const shownIds = new Set(shown.map((t) => t.id))
+  const goalIds = new Set(all.filter((t) => t.goalTaskId).map((t) => t.goalTaskId!))
+  const out = new Set<string>()
+  for (const g of goalIds) {
+    const hidden = stepsThatCarryForward(g, all, 'month').some((st) => {
+      if (shownIds.has(st.id)) return false
+      const c = committedTo(st, 'month', prevStart, { isCurrent: false })
+      return c === 'legacy' || (c !== undefined && c.status === 'open')
+    })
+    if (hidden) out.add(g)
+  }
+  return out
 }
 
 /**
@@ -103,25 +127,38 @@ export function pruneDraft(d: SessionDraft, ctx: { open: readonly Task[]; above:
 
 export function summarize(
   d: SessionDraft,
-  ctx: { open: Task[]; above: Task[]; aboveGoals: Task[]; current?: Task[]; periodLabel: string; prevLabel: string },
+  ctx: {
+    open: Task[]; above: Task[]; aboveGoals: Task[]; current?: Task[]
+    /** Goals with open steps this view hides (goalsWithHiddenSteps). */
+    hiddenStepGoals?: ReadonlySet<string>
+    periodLabel: string; prevLabel: string
+  },
 ): SummaryLine[] {
   const P = ctx.periodLabel, Q = ctx.prevLabel
   const lines: SummaryLine[] = []
   // A kept goal carries its steps still open in the previous month (keepForward).
   // A step with its own verdict is written first (applySession) and answers
   // for itself; one without is carried with the goal, and says so.
+  const rows = verdictRows(d, ctx)
   const carriedWith = new Map<string, string>()
-  for (const g of ctx.open) {
+  for (const g of rows) {
     const v = d.verdicts[g.id]
     if (!g.isGoal || (v !== 'keep' && v !== 'keep-action')) continue
     for (const s of stepsThatCarryForward(g.id, ctx.open, 'month')) carriedWith.set(s.id, g.title)
   }
-  for (const t of verdictRows(d, ctx)) {
+  // No count: one line says there is more, never how much (no scoreboards).
+  const alsoCarries = (g: Task) => {
+    if (g.isGoal && ctx.hiddenStepGoals?.has(g.id)) {
+      lines.push({ title: `${g.title} also carries steps not shown in this view`, destination: `${P} tasks · carried with ${g.title}` })
+    }
+  }
+  for (const t of rows) {
     const v = d.verdicts[t.id]
     const list = t.isGoal ? `${P} goals` : `${P} tasks`
-    if (v === 'keep') lines.push({ title: t.title, destination: `${list} · kept from ${Q}` })
+    if (v === 'keep') { lines.push({ title: t.title, destination: `${list} · kept from ${Q}` }); alsoCarries(t) }
     else if (v === 'keep-action') {
       lines.push({ title: t.title, destination: `${list} · kept from ${Q}` })
+      alsoCarries(t)
       const a = d.actionTitles[t.id]?.trim()
       if (a) lines.push({ title: a, destination: `${P} tasks · new next action toward ${t.title}` })
     }

@@ -37,7 +37,7 @@ import { splitGoalRows } from '@/lib/planning/goalSteps'
 import { parseLocalYmd, localYmd } from '@/lib/cadence/config'
 import { useAuth } from '@/hooks/useAuth'
 import { usePlanningSession, monthToken } from '@/hooks/usePlanningSession'
-import { lookBackRows, emptyDraft, isEmptyDraft, pruneDraft, type SessionDraft } from '@/lib/planning/session'
+import { lookBackRows, emptyDraft, isEmptyDraft, pruneDraft, goalsWithHiddenSteps, type SessionDraft } from '@/lib/planning/session'
 import { readDraft, writeDraft, clearDraft } from '@/lib/planning/sessionDraft'
 import { applySession } from '@/lib/planning/applySession'
 import { formatShortDate } from '@/lib/dateHelpers'
@@ -487,6 +487,12 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   }, [periodYmd, sessionEnabled, userId])
 
   const back = useMemo(() => (sessionEnabled ? lookBackRows(layered, bounds.prev, meId) : { finished: [], open: [] }), [sessionEnabled, layered, bounds.prev, meId])
+  // Keep carries a goal's steps from the UNFILTERED list (keepForward); the
+  // summary says when some of them are not in this view.
+  const hiddenStepGoals = useMemo(
+    () => (sessionEnabled ? goalsWithHiddenSteps(tasks, back.open, bounds.prev) : new Set<string>()),
+    [sessionEnabled, tasks, back.open, bounds.prev],
+  )
   const currentMonth = useMemo(
     () => (sessionEnabled ? selectPeriodTasks(layered, 'month', bounds.start, isCurrent, meId, seasons).filter((t) => !t.completed) : []),
     [sessionEnabled, layered, bounds.start, isCurrent, meId, seasons],
@@ -642,7 +648,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
       {sessionEnabled && sessionOpen && shownDraft ? (
         <PlanSession periodLabel={shortLabel} prevLabel={prevPeriodLabel}
           finished={back.finished} open={back.open} current={currentMonth}
-          above={aboveItems} aboveGoals={aboveGoalItems} domainInView={soleDomain ?? null}
+          above={aboveItems} aboveGoals={aboveGoalItems} hiddenStepGoals={hiddenStepGoals} domainInView={soleDomain ?? null}
           draft={shownDraft} onChange={changeDraft} onClose={closeSession} onSave={saveDraft} saving={savingSession} saveError={saveError} />
       ) : (
       /* The plan on the left, what you consult while writing it on the

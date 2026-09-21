@@ -17,9 +17,11 @@ type Step = 'back' | 'plan' | 'save'
 /** The row's REAL id, fixed when it is written into the draft: creating it twice finds the first (idempotent insert, Task 0). */
 const newId = () => crypto.randomUUID()
 
-export function PlanSession({ periodLabel: P, prevLabel: Q, finished, open, current, above, aboveGoals, domainInView = null, draft, onChange, onClose, onSave, saving, saveError }: {
+export function PlanSession({ periodLabel: P, prevLabel: Q, finished, open, current, above, aboveGoals, hiddenStepGoals, domainInView = null, draft, onChange, onClose, onSave, saving, saveError }: {
   periodLabel: string; prevLabel: string
   finished: Task[]; open: Task[]; current: Task[]; above: Task[]; aboveGoals: Task[]
+  /** Goals whose open steps this view hides — a Keep carries them too, and the summary says so. */
+  hiddenStepGoals?: ReadonlySet<string>
   /** The domain in view — a new item is created in it (recorded as it is added, not at Save). */
   domainInView?: DomainId | null
   draft: SessionDraft; onChange: (d: SessionDraft) => void
@@ -62,7 +64,7 @@ export function PlanSession({ periodLabel: P, prevLabel: Q, finished, open, curr
     ...monthGoals.map((g) => ({ id: g.id, title: g.title, context: g.context ?? null })),
     ...draft.newGoals.map((g) => ({ id: g.id, title: g.title, context: g.context ?? null })),
   ]
-  const lines = useMemo(() => summarize(draft, { open, above, aboveGoals, current, periodLabel: P, prevLabel: Q }), [draft, open, above, aboveGoals, current, P, Q])
+  const lines = useMemo(() => summarize(draft, { open, above, aboveGoals, current, hiddenStepGoals, periodLabel: P, prevLabel: Q }), [draft, open, above, aboveGoals, current, hiddenStepGoals, P, Q])
 
   const steps: Array<[Step, string]> = [['back', `Look back at ${Q}`], ['plan', `Plan ${P}`], ['save', 'Save']]
   const idx = steps.findIndex(([s]) => s === step)

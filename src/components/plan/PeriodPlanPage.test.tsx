@@ -996,5 +996,44 @@ describe('PeriodPlanPage — Plan <Month>', () => {
     renderPage('month')
     expect(screen.getByRole('button', { name: `Plan ${monthLabel()}` })).not.toHaveAttribute('aria-busy', 'true')
   })
+
+  it('a Keep that carried the goal but not a step is retried by Save again, with its next action (N1)', async () => {
+    const g1 = openOn('g1', { title: 'Strength', isGoal: true })
+    const s1 = openOn('s1', { title: 'Book gym', goalTaskId: 'g1' })
+    state.tasks = [g1, s1]
+    // The goal's carry lands (Sep carried, Oct open); the step's fails → keepForward reports failure.
+    hook.keepForward.mockImplementationOnce(async () => {
+      state.tasks = [{ ...g1, monthStart: thisMonth, commitments: [
+        { level: 'month', periodStart: lastMonth, status: 'carried', carriedTo: thisMonth },
+        { level: 'month', periodStart: thisMonth, status: 'open' }] } as Task, s1]
+      return undefined
+    })
+    renderPage('month')
+    fireEvent.click(screen.getByRole('button', { name: `Plan ${monthLabel()}` }))
+    fireEvent.click(screen.getByRole('button', { name: 'Keep, and add a next action' }))
+    fireEvent.change(screen.getByLabelText(/next action for strength/i), { target: { value: 'Book PT' } })
+    toSave()
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(`save ${monthLabel()}`, 'i') }))
+    expect(await screen.findByRole('alert')).toHaveTextContent(/didn't save/i)
+    expect(hook.addTask).not.toHaveBeenCalled()
+    // Still shown, still to be written.
+    expect(screen.getByText('Book PT')).toBeInTheDocument()
+    expect(screen.getByText(/carried with Strength/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(`save ${monthLabel()}`, 'i') }))
+    await vi.waitFor(() => expect(saveSession).toHaveBeenCalled())
+    expect(hook.keepForward).toHaveBeenCalledTimes(2)
+    expect(hook.keepForward.mock.calls[1][0]).toBe('g1')
+    expect(hook.addTask).toHaveBeenCalledWith('Book PT', undefined, undefined, undefined, expect.objectContaining({ goalTaskId: 'g1' }))
+  })
+
+  it('a kept goal with steps this view hides says it carries them too (no count)', () => {
+    state.tasks = [openOn('g1', { title: 'Strength', isGoal: true }), openOn('s2', { title: 'Partner step', goalTaskId: 'g1', assignedTo: 'partner' })]
+    renderPage('month')
+    fireEvent.click(screen.getByRole('button', { name: `Plan ${monthLabel()}` }))
+    fireEvent.click(screen.getByRole('button', { name: 'Keep' }))
+    toSave()
+    expect(screen.getByText('Strength also carries steps not shown in this view')).toBeInTheDocument()
+    expect(screen.queryByText('Partner step')).toBeNull()
+  })
 })
 
