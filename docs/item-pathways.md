@@ -25,8 +25,11 @@ Traced 2026-09-19 against `main` @ `46aa9280`. Line numbers are from that commit
 > - `tasks.bucket` / `week_start` / `month_start` / `season_start` are a **cache** of the
 >   lowest open commitment (`timed` when dated), kept by DB triggers both ways at trigger
 >   depth 1 and mirrored locally by `lib/placement/model.deriveCache()`. Readers that only
->   need "lowest level" (Today's pools, the week list) keep reading the cache; readers that
->   must see a row on MORE than one list (`selectPeriodTasks`, the month rail) read the
+>   need "lowest level" (Today's pools) keep reading the cache; readers that
+>   must see a row on MORE than one list (`selectPeriodTasks`, the month rail, and since
+>   Phase 2 **the week list** — `lib/planning/weekList.ts`, read by the Week page, Choose
+>   tasks and the week session: a row picked for today or given a day STAYS on the week
+>   list, marked; a ticked row stays, struck) read the
 >   commitments via `committedTo()`. A row with no records answers from its cache with the
 >   NULL rule below.
 > - Every writer goes through `lib/placement/intentions.planPlacement()` inside
