@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ActionableInstance } from '@/types/actionable'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
 import { onInstancesChanged } from '@/lib/instancesChangedSignal'
@@ -24,10 +24,15 @@ export function useWeekInstances(weekStart: Date, dayCount: number): ActionableI
   // week on each one.
   const weekStartMs = weekStart.getTime()
 
+  // Paging to another week while the first week's fetch is still in flight
+  // must not let that late response land on top of the new week's rows: only
+  // the most recent request may set state.
+  const seq = useRef(0)
   const refresh = useCallback(async () => {
+    const mine = ++seq.current
     const start = new Date(weekStartMs)
     const rows = await getInstancesForRange(start, addDays(start, dayCount - 1))
-    setInstances(rows)
+    if (mine === seq.current) setInstances(rows)
   }, [weekStartMs, dayCount, getInstancesForRange])
 
   useEffect(() => {

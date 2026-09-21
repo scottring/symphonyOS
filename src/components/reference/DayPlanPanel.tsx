@@ -34,11 +34,21 @@ export interface DayPlanPanelActions {
   changeRoutineRule?: (entry: DayPlanEntry) => void
 }
 
-function PlanRow({ entry, day, actions, draggable }: {
+/** The day a routine's "Give it a day" picker opens on: today when today is
+ *  in the week being planned, else that week's first day — the occurrence
+ *  lands in the week on screen, never quietly in the current one. */
+export function routinePlaceDay(day: Date, weekPage: Date | null): Date {
+  if (!weekPage) return day
+  const thisWeek = weekStartAnchor(day, readCadenceConfig().weekStartsOn)
+  return thisWeek.getTime() === weekPage.getTime() ? day : weekPage
+}
+
+function PlanRow({ entry, day, actions, draggable, weekPage = null }: {
   entry: DayPlanEntry
   day: Date
   actions: DayPlanPanelActions
   draggable: boolean
+  weekPage?: Date | null
 }) {
   const canDrag = draggable && !entry.completed && !entry.planned
   // A collection is done when its steps are — its steps are ticked where it
@@ -93,7 +103,7 @@ function PlanRow({ entry, day, actions, draggable }: {
           <SchedulePopover
             itemTitle={entry.title}
             skipToTime
-            value={day}
+            value={routinePlaceDay(day, weekPage)}
             onSchedule={(when) => actions.placeRoutine?.(entry, when)}
             trigger={
               <button
@@ -165,8 +175,9 @@ function PlanRow({ entry, day, actions, draggable }: {
   )
 }
 
-function Group({ title, entries, day, actions, draggable, defaultOpen, empty, cap = PLAN_GROUP_CAP, open: openProp, onOpenChange, count = true }: {
+function Group({ title, entries, day, actions, draggable, defaultOpen, empty, cap = PLAN_GROUP_CAP, open: openProp, onOpenChange, count = true, weekPage = null }: {
   title: string
+  weekPage?: Date | null
   /** Show "· N outstanding" after the title. Off for Carried over: unfinished
    *  work is findable here, never scored (Today keeps no scoreboard). */
   count?: boolean
@@ -214,7 +225,7 @@ function Group({ title, entries, day, actions, draggable, defaultOpen, empty, ca
             <p className="py-2 text-[13px] text-neutral-400">{empty}</p>
           ) : (
             <ul className="day-plan-rows mt-1 border-t border-neutral-200/80">
-              {shown.map((e) => <PlanRow key={e.key} entry={e} day={day} actions={actions} draggable={draggable} />)}
+              {shown.map((e) => <PlanRow key={e.key} entry={e} day={day} actions={actions} draggable={draggable} weekPage={weekPage} />)}
             </ul>
           )}
           {!all && cap !== null && ordered.length > cap && (
@@ -271,6 +282,7 @@ export function DayPlanPanel({ plan, day, actions, draggable = true, weekPage = 
         day={day}
         actions={actions}
         draggable={draggable}
+        weekPage={weekPage}
         defaultOpen
         count={false}
         cap={weekPage !== null ? null : PLAN_GROUP_CAP}

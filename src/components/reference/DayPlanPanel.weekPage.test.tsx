@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach, vi } from 'vitest'
 import { render, screen, cleanup, fireEvent } from '@testing-library/react'
-import { DayPlanPanel, PLAN_GROUP_CAP, planningSubtitle, type DayPlanPanelActions } from './DayPlanPanel'
+import { DayPlanPanel, PLAN_GROUP_CAP, planningSubtitle, routinePlaceDay, type DayPlanPanelActions } from './DayPlanPanel'
 import type { DayPlan, DayPlanEntry } from '@/lib/today/dayPlan'
 import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
 
@@ -91,6 +91,17 @@ describe('DayPlanPanel — the Planning panel', () => {
     render(<DayPlanPanel plan={p} day={day} actions={actions} weekPage={thisWeek} />)
     expect(screen.getByRole('link', { name: /Older unfinished work is in Inbox/ })).toHaveAttribute('href', '/inbox#expired')
     expect(screen.queryByText(/3/)).toBeNull()
+  })
+
+  // The occurrence lands in the week on screen: beside a future week the
+  // picker opens on that week's first day, not on today.
+  it('"Give it a day" opens on the viewed week when today is not in it', () => {
+    const today = new Date(2026, 8, 21)
+    const current = weekStartAnchor(today, readCadenceConfig().weekStartsOn)
+    const next = new Date(current); next.setDate(next.getDate() + 7)
+    expect(routinePlaceDay(today, null)).toBe(today)
+    expect(routinePlaceDay(today, current)).toBe(today)
+    expect(routinePlaceDay(today, next)).toBe(next)
   })
 
   it('says what it is planning: the week on screen, or the day', () => {

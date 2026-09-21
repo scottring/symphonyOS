@@ -10,10 +10,14 @@ import type { ActionableInstance } from '@/types/actionable'
  * `resolveRoutine`'s rung 2 needs this set to know when to let the deferral
  * win instead.
  *
- * Mirrors `useScheduleFiltering.ts`'s `deferredToThisDate` derivation
- * exactly — same cross-day-only guard, same "any status counts" rule — so
- * Today and the time-block grid (Task 6) agree on what counts as "placed
- * here by a deferral."
+ * Mirrors `routinesForDate.ts`'s `deferredToThisDate` derivation exactly —
+ * same "any status counts" rule — so Today and the time-block grid agree on
+ * what counts as "placed here."
+ *
+ * A same-day override counts too: "Give it a day" puts a routine with no day
+ * of its own on ONE day as a pending instance dated that day, and its
+ * pattern (which names no day) must not veto the day the user chose. For a
+ * routine whose pattern already covers the day it changes nothing.
  */
 export function deferredInRoutineIds(
   dateInstances: readonly ActionableInstance[],
@@ -23,7 +27,6 @@ export function deferredInRoutineIds(
   const ids = new Set<string>()
   for (const instance of dateInstances) {
     if (instance.entity_type !== 'routine' || !instance.deferred_to) continue
-    if (instance.date === viewedDateStr) continue // same-day retime, not a cross-day deferral
     const deferredToDateStr = new Date(instance.deferred_to).toISOString().split('T')[0]
     if (deferredToDateStr === viewedDateStr) ids.add(instance.entity_id)
   }

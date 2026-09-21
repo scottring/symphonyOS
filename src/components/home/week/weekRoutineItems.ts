@@ -69,9 +69,12 @@ export function buildWeekRoutineItems({
     const dayStr = toDateString(day)
 
     // A deferral moves the instance without moving its `date` column, so
-    // "landed here" is a deferred_to on this day from some OTHER day.
+    // "landed here" is a deferred_to on this day — from some OTHER day, or a
+    // same-day placement: "Give it a day" puts a routine with no day of its
+    // own on ONE day of a week as a pending instance dated that day, and the
+    // pattern (which names no day) must not veto the day the user chose.
     const landedHere = (i: ActionableInstance) =>
-      !!i.deferred_to && i.date !== dayStr && isSameDay(new Date(i.deferred_to), day)
+      !!i.deferred_to && isSameDay(new Date(i.deferred_to), day)
 
     const deferredInto = new Set(routineInstances.filter(landedHere).map((i) => i.entity_id))
 

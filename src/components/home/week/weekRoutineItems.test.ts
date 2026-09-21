@@ -88,6 +88,30 @@ describe('buildWeekRoutineItems', () => {
     expect(items).toHaveLength(1)
   })
 
+  it('draws a routine with no day of its own on the day it was given (a same-day placement)', () => {
+    // "Give it a day" (Scott, 2026-09-21): a pending instance dated the chosen
+    // day with deferred_to that day. The pattern names no day, so rung 2 must
+    // not veto the one the user chose — and the rule stays untouched.
+    const routine = createMockRoutine({
+      id: 'r1',
+      name: 'Take out recycling',
+      time_of_day: null,
+      recurrence_pattern: { type: 'weekly', days: [] },
+    })
+    const placed = createMockActionableInstance({
+      entity_type: 'routine',
+      entity_id: 'r1',
+      date: '2026-05-20',
+      status: 'pending',
+      deferred_to: new Date(2026, 4, 20, 9, 0).toISOString(), // Wednesday 9am
+    })
+
+    expect(build([routine])).toHaveLength(0)
+    const items = build([routine], [placed])
+    expect(items).toHaveLength(1)
+    expect(startOn(items, 'r1', 2)?.getHours()).toBe(9)
+  })
+
   it('still hides a routine the resolver rejects, however it was deferred', () => {
     // A deferral overrides recurrence (rung 2) and nothing else — a routine
     // that belongs to someone else stays hidden wherever it was dropped.
