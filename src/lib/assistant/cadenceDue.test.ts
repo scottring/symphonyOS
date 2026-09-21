@@ -76,6 +76,10 @@ describe('isSessionSubstantive', () => {
     expect(isSessionSubstantive({ stepIndex: 2, review: '   ' })).toBe(false)
   })
 
+  it('rejects a savedAt stamp alone', () => {
+    expect(isSessionSubstantive({ savedAt: 'x' })).toBe(false)
+  })
+
   it('accepts a real answer', () => {
     expect(isSessionSubstantive({ stepIndex: 4, review: 'Shipped the context graph' })).toBe(true)
     expect(isSessionSubstantive({ oneWord: 'steady' })).toBe(true)

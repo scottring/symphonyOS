@@ -46,7 +46,7 @@ const KIND_BY_PLANNING_HORIZON: Record<string, SessionHorizon> = Object.fromEntr
  *
  * Substantive = at least one non-empty answer that isn't bookkeeping.
  */
-const BOOKKEEPING_KEYS = new Set(['stepIndex'])
+const BOOKKEEPING_KEYS = new Set(['stepIndex', 'savedAt'])
 
 export function isSessionSubstantive(notes: unknown): boolean {
   if (!notes || typeof notes !== 'object') return false
