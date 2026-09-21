@@ -1,3 +1,4 @@
+import { PlanNavigation, usePlanDestination, planPeriodForPath } from '@/components/layout/PlanNavigation';
 import { DesktopNavigation, DesktopControlsContext } from '@/components/layout/DesktopNavigation';
 import { ReferenceListsProvider, useReferenceLists } from '@/components/reference/ReferenceListsContext';
 import { ReferenceListsDock } from '@/components/reference/ReferenceLists';
@@ -6,7 +7,7 @@ import { DesktopFooter, DesktopFooterActionContext } from '@/components/layout/D
 // src/shell/ShellLayout.tsx
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Sparkles, Sun, Inbox as InboxIcon, MoreHorizontal } from 'lucide-react';
+import { Sparkles, Sun, CalendarRange, Inbox as InboxIcon, MoreHorizontal } from 'lucide-react';
 import { type ViewType } from '@/components/layout/Sidebar';
 import { MoreSheet } from '@/components/layout/MoreSheet';
 import { QuickCapture } from '@/components/layout/QuickCapture';
@@ -104,6 +105,7 @@ function ShellLayoutInner({ children }: Props) {
   const navigate = useNavigate();
   const location = useLocation();
   const isMobile = useMobile();
+  const planDestination = usePlanDestination();
   const { user, signOut } = useAuth();
 
   const [desktopControls, setDesktopControls] = useState<HTMLDivElement | null>(null);
@@ -295,6 +297,7 @@ function ShellLayoutInner({ children }: Props) {
 
         {isMobile ? (
           <div>
+            <PlanNavigation mobile />
             <div className="min-w-0">{children}</div>
           </div>
         ) : (
@@ -323,7 +326,7 @@ function ShellLayoutInner({ children }: Props) {
           </div>
         )} />
             </div>
-            <div className="desktop-workspace-page min-w-0">{children}</div>
+            <div className="desktop-workspace-page min-w-0"><PlanNavigation paused={referencesPaused} />{children}</div>
             {referencesVisible && <div className="desktop-workspace-dock"><ReferenceListsDock /></div>}
             <DesktopFooter actionRef={setDesktopFooterAction} />
           </div>
@@ -405,7 +408,7 @@ function ShellLayoutInner({ children }: Props) {
         </div>
       )}
 
-      {/* Phone execution: Today, Inbox, More. Week/month lookup lives in More. */}
+      {/* The same four destinations on desktop and phone: Today, Plan, Inbox, More. */}
       {isMobile && (
         <nav
           className="fixed bottom-0 left-0 right-0 z-40 bg-bg-elevated/95 backdrop-blur-lg border-t border-neutral-200/50"
@@ -414,10 +417,12 @@ function ShellLayoutInner({ children }: Props) {
           <div className="flex items-stretch px-1 py-0.5">
             {[
               { label: 'Today', Icon: Sun, route: '/today', active: location.pathname === '/' || location.pathname === '/today' },
+              { label: 'Plan', Icon: CalendarRange, route: planDestination, active: !!planPeriodForPath(location.pathname) },
             ].map((tab) => (
               <button
                 key={tab.route}
                 onClick={() => navigate(tab.route)}
+                aria-current={tab.active ? 'page' : undefined}
                 className={`flex-1 min-w-0 flex flex-col items-center gap-0.5 px-1 py-1.5 rounded-lg transition-all ${
                   tab.active ? 'text-accent-600' : 'text-neutral-400 hover:text-neutral-600'
                 }`}

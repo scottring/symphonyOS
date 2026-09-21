@@ -129,7 +129,7 @@ describe('ShellLayout domain switcher', () => {
 // The brief: a task detail or the assistant takes precedence over the pinned
 // reference panels, and the pins come BACK when that panel closes.
 describe('References and the side panels', () => {
-  beforeEach(() => { mobileState.isMobile = false; selectionState.selection = null; sessionStorage.clear() })
+  beforeEach(() => { mobileState.isMobile = false; selectionState.selection = null; sessionStorage.clear(); localStorage.removeItem('symphony-plan-period') })
 
   it('yields the reference panel to a task detail and returns it when the detail closes', () => {
     sessionStorage.setItem('symphony-reference-lists:anonymous', JSON.stringify([{ kind: 'week', date: new Date().toISOString() }]))
@@ -141,20 +141,34 @@ describe('References and the side panels', () => {
     selectionState.selection = { kind: 'task', id: 't1' }
     const withDetail = renderAt('/today')
     expect(screen.queryByRole('complementary', { name: 'Pinned reference lists' })).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: /^Week/ }))
     // The pin is kept and says so, rather than reading as having been dropped.
     expect(screen.getByText(/Lists return when you close the side panel/)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Unpin week list' })).toBeInTheDocument()
     withDetail.unmount()
 
     selectionState.selection = null
     renderAt('/today')
     expect(screen.getByRole('complementary', { name: 'Pinned reference lists' })).toBeInTheDocument()
-    sessionStorage.clear()
+    sessionStorage.clear(); localStorage.removeItem('symphony-plan-period')
   })
 })
 
 describe('Phone execution chrome', () => {
+  it('opens Plan directly on a phone and keeps every period within Plan', () => {
+    mobileState.isMobile = true
+    localStorage.removeItem('symphony-plan-period')
+    renderAt('/today')
+    fireEvent.click(screen.getByRole('button', { name: 'Plan' }))
+    expect(screen.getByRole('button', { name: 'Plan' })).toHaveAttribute('aria-current', 'page')
+    for (const label of ['Week', 'Month', 'Season', 'Year']) {
+      fireEvent.click(screen.getByRole('link', { name: label }))
+      expect(screen.getByRole('link', { name: label })).toHaveAttribute('aria-current', 'page')
+    }
+    fireEvent.click(screen.getByRole('button', { name: 'Today' }))
+    expect(screen.queryByRole('navigation', { name: 'Planning period' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Plan' }))
+    expect(screen.getByRole('link', { name: 'Year' })).toHaveAttribute('aria-current', 'page')
+  })
+
   it('keeps references off the phone even when desktop lists were pinned', () => {
     mobileState.isMobile = true
     sessionStorage.setItem('symphony-reference-lists:anonymous', JSON.stringify([{ kind: 'week', date: new Date().toISOString() }]))
@@ -166,25 +180,27 @@ describe('Phone execution chrome', () => {
     expect(screen.getByRole('button', { name: 'More' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Week' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Month' })).not.toBeInTheDocument()
-    sessionStorage.clear()
+    sessionStorage.clear(); localStorage.removeItem('symphony-plan-period')
   })
 })
 
 
 describe('Consolidated desktop navigation', () => {
-  beforeEach(() => { mobileState.isMobile = false; selectionState.selection = null; sessionStorage.clear() })
-  it('pins a reference without leaving Today, and opens its page separately', () => {
+  beforeEach(() => { mobileState.isMobile = false; selectionState.selection = null; sessionStorage.clear(); localStorage.removeItem('symphony-plan-period') })
+  it('separates destinations from the task chooser and keeps period links within Plan', () => {
     renderAt('/today')
-    expect(screen.queryByTestId('sidebar')).not.toBeInTheDocument()
-    expect(screen.queryByRole('img', { name: 'Symphony' })).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Week' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Pin week list here' }))
-    expect(screen.getByRole('complementary', { name: 'Pinned reference lists' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Today' })).toHaveAttribute('aria-current', 'page')
-    fireEvent.click(screen.getByRole('button', { name: /^Week/ }))
-    fireEvent.click(screen.getByRole('button', { name: 'Open week page' }))
-    expect(screen.getByRole('button', { name: /^Week/ })).toHaveClass('is-current')
-    expect(screen.queryByRole('complementary', { name: 'Pinned reference lists' })).not.toBeInTheDocument()
+    const nav = screen.getByRole('navigation', { name: 'Main navigation' })
+    const chooser = screen.getByRole('button', { name: 'Choose tasks' })
+    expect(nav).not.toContainElement(chooser)
+    expect(screen.queryByRole('navigation', { name: 'Planning period' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('link', { name: 'Plan' }))
+    expect(screen.getByRole('navigation', { name: 'Planning period' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Week' })).toHaveAttribute('aria-current', 'page')
+    fireEvent.click(screen.getByRole('link', { name: 'Month' }))
+    expect(screen.getByRole('link', { name: 'Month' })).toHaveAttribute('aria-current', 'page')
+    fireEvent.click(screen.getByRole('link', { name: 'Today' }))
+    fireEvent.click(screen.getByRole('link', { name: 'Plan' }))
+    expect(screen.getByRole('link', { name: 'Month' })).toHaveAttribute('aria-current', 'page')
   })
   it('places page-specific controls in the consolidated navigation', () => {
     renderAt('/today', <DesktopPageControls><button>Page options</button></DesktopPageControls>)
@@ -203,7 +219,7 @@ describe('Consolidated desktop navigation', () => {
 })
 
 describe('Centred desktop workspace and footer', () => {
-  beforeEach(() => { mobileState.isMobile = false; selectionState.selection = null; sessionStorage.clear() })
+  beforeEach(() => { mobileState.isMobile = false; selectionState.selection = null; sessionStorage.clear(); localStorage.removeItem('symphony-plan-period') })
 
   it('keeps navigation, page, and footer in one column, with a dock column only while a list draws', () => {
     sessionStorage.setItem('symphony-reference-lists:anonymous', JSON.stringify([{ kind: 'week', date: new Date().toISOString() }]))
@@ -252,13 +268,13 @@ describe('Centred desktop workspace and footer', () => {
 })
 
 describe('Grouped More menu and desktop capture', () => {
-  beforeEach(() => { mobileState.isMobile = false; selectionState.selection = null; sessionStorage.clear() })
+  beforeEach(() => { mobileState.isMobile = false; selectionState.selection = null; sessionStorage.clear(); localStorage.removeItem('symphony-plan-period') })
 
-  it('groups More into Plan, Home, and Reference with Plan from paper on its own line', () => {
+  it('groups More into Organize, Home, and Reference with Plan from paper on its own line', () => {
     renderAt('/today')
     fireEvent.click(screen.getByRole('button', { name: /^More/ }))
-    const plan = screen.getByRole('group', { name: 'Plan' })
-    expect(plan).toContainElement(screen.getByRole('button', { name: 'Season' }))
+    const plan = screen.getByRole('group', { name: 'Organize' })
+    expect(plan).toContainElement(screen.getByRole('button', { name: 'Someday' }))
     expect(screen.getByRole('group', { name: 'Home' })).toContainElement(screen.getByRole('button', { name: 'Meals' }))
     expect(screen.getByRole('group', { name: 'Reference' })).toContainElement(screen.getByRole('button', { name: 'History' }))
     expect(plan).not.toContainElement(screen.getByRole('button', { name: 'Plan from paper' }))
@@ -277,17 +293,16 @@ describe('Grouped More menu and desktop capture', () => {
 describe('Pinned lists on the left', () => {
   const setWidth = (w: number) => Object.defineProperty(window, 'innerWidth', { configurable: true, value: w })
   beforeEach(() => {
-    mobileState.isMobile = false; selectionState.selection = null; sessionStorage.clear()
+    mobileState.isMobile = false; selectionState.selection = null; sessionStorage.clear(); localStorage.removeItem('symphony-plan-period')
     sessionStorage.setItem('symphony-reference-lists:anonymous', JSON.stringify([{ kind: 'week', date: new Date().toISOString() }]))
   })
-  afterEach(() => { setWidth(1024); selectionState.selection = null; sessionStorage.clear() })
+  afterEach(() => { setWidth(1024); selectionState.selection = null; sessionStorage.clear(); localStorage.removeItem('symphony-plan-period') })
 
   it('keeps the lists open beside a detail pane when the page still has room', () => {
     setWidth(1600)
     selectionState.selection = { kind: 'task', id: 't1' }
     renderAt('/today')
     expect(screen.getByRole('complementary', { name: 'Pinned reference lists' })).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: /^Week/ }))
     expect(screen.queryByText(/Lists return when you close the side panel/)).not.toBeInTheDocument()
   })
 
@@ -296,14 +311,13 @@ describe('Pinned lists on the left', () => {
     selectionState.selection = { kind: 'task', id: 't1' }
     renderAt('/today')
     expect(screen.queryByRole('complementary', { name: 'Pinned reference lists' })).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: /^Week/ }))
     expect(screen.getByText(/Lists return when you close the side panel/)).toBeInTheDocument()
   })
 })
 
 
 describe('Capture and the Today pin from every desktop page', () => {
-  beforeEach(() => { mobileState.isMobile = false; selectionState.selection = null; sessionStorage.clear() })
+  beforeEach(() => { mobileState.isMobile = false; selectionState.selection = null; sessionStorage.clear(); localStorage.removeItem('symphony-plan-period') })
 
   it.each(['/today', '/week', '/month', '/notes', '/inbox'])('%s has a visible Add button that opens the ⌘K capture', (path) => {
     renderAt(path)
@@ -320,13 +334,13 @@ describe('Capture and the Today pin from every desktop page', () => {
 
   it('the Planning panel opens beside any page from its labelled button, and closes the same way', () => {
     renderAt('/notes')
-    const toggle = screen.getByRole('button', { name: 'Open Planning' })
+    const toggle = screen.getByRole('button', { name: 'Choose tasks' })
     expect(toggle).toHaveAttribute('aria-pressed', 'false')
-    expect(toggle).toHaveTextContent('Planning')
+    expect(toggle).toHaveTextContent('Choose tasks')
     fireEvent.click(toggle)
-    expect(screen.getByRole('region', { name: 'Planning' })).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Close Planning', pressed: true }))
-    expect(screen.queryByRole('region', { name: 'Planning' })).not.toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Choose tasks' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Close task chooser', pressed: true }))
+    expect(screen.queryByRole('region', { name: 'Choose tasks' })).not.toBeInTheDocument()
     // Today is still one destination.
     expect(screen.getAllByRole('link', { name: 'Today' })).toHaveLength(1)
   })

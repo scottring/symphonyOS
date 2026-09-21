@@ -1406,7 +1406,7 @@ export function TodayView({
                   style={{ paddingLeft: 0, paddingRight: 0 }}
                 >
                   <PanelLeft className="h-4 w-4" aria-hidden="true" />
-                  <span>Planning</span>
+                  <span>Choose tasks</span>
                 </button>
               )}
             </div>

@@ -140,7 +140,7 @@ describe('The Planning panel', () => {
     mount()
     fireEvent.click(screen.getByRole('button', { name: 'Pin Planning' }))
     fireEvent.click(screen.getByRole('button', { name: 'Pin week list' }))
-    const plan = screen.getByRole('region', { name: 'Planning' })
+    const plan = screen.getByRole('region', { name: 'Choose tasks' })
     expect(plan).toHaveTextContent('To plan')
     expect(screen.getByText('Book a service visit')).toBeInTheDocument()
     expect(planMock.chooseTaskDay).not.toHaveBeenCalled()
@@ -150,7 +150,7 @@ describe('The Planning panel', () => {
   it('restores with the other pins for the same user', () => {
     const view = mount(); fireEvent.click(screen.getByRole('button', { name: 'Pin Planning' })); view.unmount()
     mount()
-    expect(screen.getByRole('region', { name: 'Planning' })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Choose tasks' })).toBeInTheDocument()
   })
 
   it('every drag has a button: choose for today, move back, set a day or time', () => {

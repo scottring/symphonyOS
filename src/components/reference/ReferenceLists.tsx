@@ -168,14 +168,14 @@ export function PlanningPanelHost({ draggable = true, header }: {
 /** The Planning pin: one panel, named for what it does, for whichever day or
  *  week is on screen. */
 function TodayPlanList({ onClose }: { onClose: () => void }) {
-  return <section aria-label="Planning" className="reference-list">
+  return <section aria-label="Choose tasks" className="reference-list">
     <PlanningPanelHost header={(day, viewedWeek) => (
       <header className="flex items-start justify-between gap-3 border-b border-neutral-300 pb-4">
         <div>
-          <h2 className="font-display text-[22px] leading-tight text-neutral-900">Planning</h2>
+          <h2 className="font-display text-[22px] leading-tight text-neutral-900">Choose tasks</h2>
           <p className="mt-1 text-[13px] text-neutral-500">{planningSubtitle(day, viewedWeek)}</p>
         </div>
-        <button type="button" onClick={onClose} aria-label="Close Planning" className="p-2 text-neutral-500 hover:bg-neutral-100 rounded"><X className="w-4 h-4" /></button>
+        <button type="button" onClick={onClose} aria-label="Close task chooser" className="p-2 text-neutral-500 hover:bg-neutral-100 rounded"><X className="w-4 h-4" /></button>
       </header>
     )} />
   </section>
