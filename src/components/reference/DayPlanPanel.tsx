@@ -8,7 +8,7 @@
 // Unfinished work from earlier is NOT the default list (Scott, 2026-09-21
 // evening). On a real account it was 23 rows above 0 rows of plan, so the
 // panel said "triage" where it should say "choose". It opens on request —
-// "Include unfinished from earlier" — newest missed date first, and an empty
+// the one fold, "Unfinished from earlier" — newest missed date first, and an empty
 // week's list says so and offers Add task rather than filling with backlog.
 //
 // The interaction: pick something here → put it on a day → do it. A chosen
@@ -49,7 +49,7 @@ export interface DayPlanPanelActions {
   changeRoutineRule?: (entry: DayPlanEntry) => void
 }
 
-/** The day a routine's "Give it a day" picker opens on: today when today is
+/** The day a routine's "Plan for today…" picker opens on: today when today is
  *  in the week being planned, else that week's first day — the occurrence
  *  lands in the week on screen, never quietly in the current one. */
 export function routinePlaceDay(day: Date, weekPage: Date | null): Date {
@@ -161,11 +161,17 @@ function PlanRow({ entry, day, actions, draggable, weekPage = null }: {
   const progress = entry.item?.type === 'routine-collection' ? entry.item.collectionProgress : undefined
   const unfinished = entry.group === 'unfinished' && entry.kind === 'task'
   const unhomed = !!entry.routine
-  // ONE verb per row. Beside a day it plans the row for that day; on a week
-  // page an unfinished row is re-committed to the week (undated), while a
-  // row already on the week's list still goes onto today.
+  // ONE verb per row, with ONE meaning: "Plan for today" puts the row on
+  // today's page. A task on the week list is chosen (into Tasks) and keeps
+  // its list; any other task (an unfinished one included) is dated to today
+  // and chosen; a routine's occurrence is chosen. The one row that cannot go
+  // straight there is a routine with no day of its own — it has no
+  // occurrence until it has a time — so its verb ends in an ellipsis, like
+  // "Schedule…", asks for the time first, and lands in Schedule at that
+  // time. On a week page an unfinished row is re-committed to the week
+  // (undated) instead: "Plan for this week".
   const verbForWeek = unfinished && weekPage !== null
-  const verbLabel = verbForWeek ? 'Plan for this week' : 'Plan for today'
+  const verbLabel = verbForWeek ? 'Plan for this week' : unhomed ? 'Plan for today…' : 'Plan for today'
   const verbAria = verbForWeek ? `Plan ${entry.title} for this week` : `Plan ${entry.title} for today`
   const verbClass = 'shrink-0 rounded-md border border-neutral-200 px-2 py-0.5 text-[12px] font-medium text-neutral-800 hover:bg-neutral-50'
   const onVerb = () => {
@@ -191,17 +197,26 @@ function PlanRow({ entry, day, actions, draggable, weekPage = null }: {
         // A routine with no day yet has no occurrence to tick.
         <span aria-hidden="true" className="mt-[3px] h-3.5 w-3.5 shrink-0" />
       ) : (
+      // The circle is a 14px glyph inside a larger target. On a phone the
+      // global rule grows every labelled button to 48px, and a button that
+      // IS the circle became a 48px ring (2026-09-21); with the ring on an
+      // inner span the target can grow and the circle stays a circle.
       <button
         type="button"
         aria-label={entry.completed ? `Mark ${entry.title} not done` : `Complete ${entry.title}`}
         onClick={() => actions.complete(entry)}
-        className={`mt-[3px] grid h-3.5 w-3.5 shrink-0 place-items-center rounded-full border transition-colors ${
-          entry.completed
-            ? 'border-neutral-400 bg-neutral-400 text-white'
-            : 'border-neutral-400 text-transparent hover:border-primary-500 hover:bg-primary-500 hover:text-white'
-        }`}
+        className="group/tick -m-1 -mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center"
       >
-        <Check className="h-2.5 w-2.5" strokeWidth={3} />
+        <span
+          aria-hidden="true"
+          className={`grid h-3.5 w-3.5 place-items-center rounded-full border transition-colors ${
+            entry.completed
+              ? 'border-neutral-400 bg-neutral-400 text-white'
+              : 'border-neutral-400 text-transparent group-hover/tick:border-primary-500 group-hover/tick:bg-primary-500 group-hover/tick:text-white'
+          }`}
+        >
+          <Check className="h-2.5 w-2.5" strokeWidth={3} />
+        </span>
       </button>
       )}
       <div className="min-w-0 flex-1">

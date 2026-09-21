@@ -86,9 +86,8 @@ describe('Today — the way to Planning', () => {
     expect(screen.queryByText(/\d scheduled for today/)).toBeNull()
   })
 
-  it('on a phone the ⋯ menu\'s Planning entry opens the sheet with the same plan, and a tick there is the same completion', () => {
+  it('on a phone the Tasks heading\'s Planning button opens the sheet with the same plan, and a tick there is the same completion', () => {
     const { onToggleTask } = renderView()
-    fireEvent.click(screen.getByRole('button', { name: /more controls/i }))
     const line = screen.getByRole('button', { name: 'Planning' })
     expect(line).toHaveAttribute('aria-expanded', 'false')
     fireEvent.click(line)

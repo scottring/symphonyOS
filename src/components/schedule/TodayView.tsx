@@ -1046,21 +1046,6 @@ export function TodayView({
   )
   const overflowMenu = (
     <TodayOverflowMenu>
-      {/* The phone's door to Planning — first in the menu. On desktop the
-          page navigation has one; the heading line that used to open it is
-          gone (2026-09-21), and the masthead row has no room for a fourth
-          button at 48px touch targets. */}
-      {isMobile && !usePin && (
-        <button
-          type="button"
-          onClick={openPlan}
-          aria-expanded={planOpenInline}
-          className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[15px] text-neutral-600 transition-all hover:bg-neutral-100"
-        >
-          <PanelLeft className="w-5 h-5" aria-hidden="true" />
-          <span>Planning</span>
-        </button>
-      )}
       <button
         type="button"
         onClick={toggleHideRoutines}
@@ -1408,9 +1393,22 @@ export function TodayView({
           <section aria-labelledby="today-focus-heading" className="daybook-journal-section">
             <div className="daybook-journal-heading">
               {/* No instruction beside the heading (2026-09-21): the Add task
-                  button by the date is the verb, and Planning is a door in
-                  the navigation, not a sentence here. */}
+                  button by the date is the verb. Planning is a door in the
+                  page navigation on desktop; a phone has no navigation row,
+                  so its door sits here, named, on the list it feeds. */}
               <h2 id="today-focus-heading">Tasks</h2>
+              {isMobile && !usePin && (
+                <button
+                  type="button"
+                  onClick={openPlan}
+                  aria-expanded={planOpenInline}
+                  className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-neutral-600 hover:text-neutral-900"
+                  style={{ paddingLeft: 0, paddingRight: 0 }}
+                >
+                  <PanelLeft className="h-4 w-4" aria-hidden="true" />
+                  <span>Planning</span>
+                </button>
+              )}
             </div>
             {/* The add box, at the head of the list it adds to. Mounted only
                 while open; it unmounts itself on Escape or an empty blur. */}

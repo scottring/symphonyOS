@@ -82,7 +82,9 @@ describe('DayPlanPanel — the Planning panel', () => {
       routine: { id: 'v', name: 'Vacuum', recurrence_pattern: { type: 'weekly', days: [] } } as never, context: 'Weekly routine · no set day' }]
     const changeRoutineRule = vi.fn()
     render(<DayPlanPanel plan={p} day={day} actions={{ ...actions, changeRoutineRule }} weekPage={thisWeek} />)
-    expect(screen.getByRole('button', { name: 'Plan Vacuum for today' })).toHaveTextContent('Plan for today')
+    // The ellipsis says a picker follows: a routine with no day has no
+    // occurrence until it has a time. Same verb, same destination.
+    expect(screen.getByRole('button', { name: 'Plan Vacuum for today' })).toHaveTextContent('Plan for today…')
     expect(screen.queryByRole('button', { name: /Give .* a day/ })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'More for Vacuum' }))
     fireEvent.click(screen.getByRole('menuitem', { name: 'Change repeating schedule for Vacuum' }))
