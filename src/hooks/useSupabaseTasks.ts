@@ -1386,7 +1386,7 @@ export function useSupabaseTasks() {
 
     if (!(await keepOne(task))) return undefined
     if (task.isGoal) {
-      for (const step of stepsThatCarryForward(task.id, tasksRef.current)) {
+      for (const step of stepsThatCarryForward(task.id, tasksRef.current, level)) {
         await keepOne(step)
       }
     }
@@ -1395,7 +1395,7 @@ export function useSupabaseTasks() {
 
   const updateTask = useCallback(async (id: string, updates: Partial<Task>) => {
     logger.debug('[updateTask] Called with:', { id, updates })
-    let task = findTaskById(id)
+    const task = findTaskById(id)
     if (!task) {
       // Should be rare now that lookups read tasksRef — surface it loudly so a
       // dropped write is never silent again.
@@ -2096,5 +2096,6 @@ export function useSupabaseTasks() {
     }
   }, [tasks])
 
-  return { tasks, loading, error, refetch, addTask, addSubtask, addPrepTask, getPrepTasks, getLinkedTasks, toggleTask, toggleWaiting, deleteTask, updateTask, updateTasksBulk, updateTaskOrders, scheduleTask, pushTask, setBucket, setGoal, keepForward }
+  // `userId`: whose focus rows count on a day (task_focus is per person).
+  return { tasks, loading, error, refetch, addTask, addSubtask, addPrepTask, getPrepTasks, getLinkedTasks, toggleTask, toggleWaiting, deleteTask, updateTask, updateTasksBulk, updateTaskOrders, scheduleTask, pushTask, setBucket, setGoal, keepForward, userId: user?.id ?? null }
 }

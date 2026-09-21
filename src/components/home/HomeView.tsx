@@ -42,6 +42,8 @@ import { CalendarReconnectBanner } from '@/components/home/CalendarReconnectBann
 
 interface HomeViewProps {
   tasks: Task[]
+  /** Whose day this is — focus (task_focus) is per person. */
+  userId?: string | null
   events: CalendarEvent[]
   routines: Routine[]
   allActiveRoutines: Routine[]
@@ -63,6 +65,7 @@ interface HomeViewProps {
 
 export function HomeView({
   tasks,
+  userId,
   events,
   routines,
   allActiveRoutines,
@@ -449,6 +452,7 @@ export function HomeView({
       <TodayView
         headerControls={<HomeChromeControls className="flex" />}
         tasks={filteredTasks}
+        userId={userId}
         events={filteredEvents}
         // Domain-UNfiltered on purpose: TodayView's own pipeline applies
         // layer scoping via resolveRoutine (rung 4), reading `layers` from

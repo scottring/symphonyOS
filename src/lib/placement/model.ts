@@ -13,7 +13,7 @@
 // on MORE than one list (a season item taken into September is on both) reads
 // the commitments; readers that only need "lowest level" keep reading the cache.
 
-import type { Task, TaskBucket, PlacementLevel, TaskCommitment, TaskFocusEntry } from '@/types/task'
+import type { Task, TaskBucket, PlacementLevel, TaskCommitment } from '@/types/task'
 import { localYmd, readCadenceConfig, weekStartAnchor } from '@/lib/cadence/config'
 import { readSeasons, seasonEndFor, seasonStartFor, type Seasons } from '@/lib/cadence/seasons'
 import { belongsToWeek, isPlacedOnWeek } from '@/lib/today/weekPlacement'
@@ -175,9 +175,19 @@ export function placementFateOf(task: Task, fromLevel: PlacementLevel, periodSta
  */
 export function isFocused(task: Pick<Task, 'focus' | 'plannedOn'>, userId: string | null | undefined, ymd: string): boolean {
   if (task.focus && task.focus.length > 0) {
-    return !!userId && task.focus.some((f) => f.userId === userId && localYmd(f.date) === ymd)
+    // A caller that does not know who is looking (a shared surface, the tray)
+    // reads any person's choice for the day rather than nobody's.
+    return task.focus.some((f) => localYmd(f.date) === ymd && (!userId || f.userId === userId))
   }
   return !!task.plannedOn && localYmd(task.plannedOn) === ymd
+}
+
+/** The days this person chose the task for (legacy plannedOn included). */
+export function focusDays(task: Pick<Task, 'focus' | 'plannedOn'>, userId: string | null | undefined): string[] {
+  if (task.focus && task.focus.length > 0) {
+    return task.focus.filter((f) => !userId || f.userId === userId).map((f) => localYmd(f.date))
+  }
+  return task.plannedOn ? [localYmd(task.plannedOn)] : []
 }
 
 /** Anyone's focus on a day (the pin can say "Iris chose this"). */

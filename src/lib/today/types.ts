@@ -45,6 +45,9 @@ export interface TodayDataInput {
    * boundary (readCadenceConfig touches localStorage — this stays pure).
    */
   weekStart: Date
+  /** Whose Today this is: focus (task_focus) is personal. Without it, any
+   *  person's choice for the day counts. */
+  userId?: string | null
 }
 
 export interface TodayCounts {

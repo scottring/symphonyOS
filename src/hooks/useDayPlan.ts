@@ -26,7 +26,7 @@ export function useDayPlan(
    *  the page are not answering for different weeks. */
   weekStartOverride?: Date | null,
 ): { plan: DayPlan | null; loading: boolean; error: boolean } {
-  const { tasks, loading: tasksLoading, error: tasksError } = useSupabaseTasks()
+  const { tasks, loading: tasksLoading, error: tasksError, userId } = useSupabaseTasks()
   const { routines: allRoutines, getRoutinesForDate, loading: routinesLoading } = useRoutines()
   const { getInstancesForDate } = useActionableInstances()
   const { layers } = useDomain()
@@ -61,8 +61,9 @@ export function useDayPlan(
       weekStart: weekKey
         ? (() => { const [wy, wm, wd] = weekKey.split('-').map(Number); return new Date(wy, wm - 1, wd) })()
         : weekStartAnchor(viewedDate, readCadenceConfig().weekStartsOn),
+      userId,
     })
-  }, [instances, dayKey, weekKey, tasks, layers, getRoutinesForDate, allRoutines, selectedAssignees, hideRoutines])
+  }, [instances, dayKey, weekKey, tasks, layers, getRoutinesForDate, allRoutines, selectedAssignees, hideRoutines, userId])
 
   return { plan, loading: tasksLoading || routinesLoading || !instances, error: !!tasksError }
 }

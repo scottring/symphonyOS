@@ -31,12 +31,14 @@ function readOpen(): boolean {
   try { return localStorage.getItem(OPEN_KEY) !== 'false' } catch { return true }
 }
 
-export function WeekPlanColumn({ tasks, weekStart, meId, actions, draggable = true }: {
+export function WeekPlanColumn({ tasks, weekStart, meId, userId, actions, draggable = true }: {
   tasks: Task[]
   weekStart: Date
   /** The planning member. The list offers what this person could do, as the
    *  pin's does — a task assigned only to someone else is not my candidate. */
   meId: string | null
+  /** The signed-in user: whose focus rows mean "planned today". */
+  userId?: string | null
   actions: DayPlanPanelActions
   draggable?: boolean
 }) {
@@ -61,9 +63,10 @@ export function WeekPlanColumn({ tasks, weekStart, meId, actions, draggable = tr
       ),
       weekStart,
       localYmd(day),
+      userId,
     ),
     counts: { scheduled: 0, available: 0 },
-  } as unknown as DayPlan), [tasks, meId, weekStart, day])
+  } as unknown as DayPlan), [tasks, meId, userId, weekStart, day])
 
   const [open, setOpenState] = useState(readOpen)
   const setOpen = useCallback((next: boolean) => {

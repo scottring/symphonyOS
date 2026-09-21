@@ -123,10 +123,16 @@ describe('PeriodPlanPage', () => {
     expect(screen.queryByText('bathroom and stairs')).not.toBeInTheDocument()
   })
 
+  // One enduring action (2026-09-21): a month row taken into a week is the
+  // SAME row carrying a week commitment. It stays on the month list, says
+  // where the work went, and the status opens the row itself.
   it('a placed row says ONE thing — where the work went — and follows to it', () => {
-    const original = task({ title: 'Repaint the porch', monthStart: thisMonth })
-    const copy = task({ title: 'Repaint the porch', bucket: 'week', sourceId: original.id, weekStart: new Date(now.getFullYear(), now.getMonth(), 13) })
-    state.tasks = [original, copy]
+    const wk = new Date(now.getFullYear(), now.getMonth(), 13)
+    const row = task({ title: 'Repaint the porch', bucket: 'week', weekStart: wk, monthStart: thisMonth, commitments: [
+      { level: 'month', periodStart: thisMonth, status: 'open' },
+      { level: 'week', periodStart: wk, status: 'open' },
+    ] })
+    state.tasks = [row]
     renderPage('month')
     const list = screen.getByRole('region', { name: /list$/ })
     // The competing "→ placed" / "→ done" pair is gone.
@@ -134,22 +140,20 @@ describe('PeriodPlanPage', () => {
     expect(within(list).queryByText('→ done')).not.toBeInTheDocument()
     const status = within(list).getByText(/September 13–19|September 13 – /)
     fireEvent.click(status)
-    expect(mockNavigate).toHaveBeenCalledWith(`/task/${copy.id}`)
+    expect(mockNavigate).toHaveBeenCalledWith(`/task/${row.id}`)
   })
 
-  it('a placed row whose copy is finished reads as finished, and its tick is not clickable', () => {
-    const original = task({ title: 'Trade in the bike', monthStart: thisMonth })
+  it('a placed row that was finished reads as finished, and can be reopened here — it is the row that did the work', () => {
     state.tasks = [
-      original,
-      task({ title: 'Trade in the bike', bucket: 'week', sourceId: original.id, completed: true }),
+      task({ title: 'Trade in the bike', bucket: 'week', monthStart: thisMonth, completed: true, commitments: [
+        { level: 'month', periodStart: thisMonth, status: 'done' },
+        { level: 'week', periodStart: new Date(now.getFullYear(), now.getMonth(), 13), status: 'done' },
+      ] }),
     ]
     renderPage('month')
-    // A placed-and-done row reads as finished, so it waits with the finished
-    // work rather than padding the list you're working from.
     fireEvent.click(screen.getByRole('button', { name: /Completed this month/ }))
     expect(screen.getByText('done')).toBeInTheDocument()
-    // Completion belongs to the copy that did the work.
-    expect(screen.getByRole('button', { name: /Reopen Trade in the bike/ })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /Reopen Trade in the bike/ })).not.toBeDisabled()
   })
 
   it('a task you completed HERE can be reopened from its own tick', () => {
@@ -171,12 +175,12 @@ describe('PeriodPlanPage', () => {
     expect(goalsApi.updateGoal).toHaveBeenCalledWith(state.goals[0].id, { status: 'active' })
   })
 
-  it("never dresses a copy's SCHEDULED date up as the day it was done", () => {
-    const original = task({ title: 'Fix the gate', monthStart: thisMonth })
+  it("never dresses a row's SCHEDULED date up as the day it was done", () => {
     const scheduledFor = new Date(now.getFullYear(), now.getMonth(), 15, 9, 0)
     state.tasks = [
-      original,
-      task({ title: 'Fix the gate', bucket: 'timed', scheduledFor, sourceId: original.id, completed: true }),
+      task({ title: 'Fix the gate', bucket: 'timed', scheduledFor, monthStart: thisMonth, completed: true, commitments: [
+        { level: 'month', periodStart: thisMonth, status: 'done' },
+      ] }),
     ]
     renderPage('month')
     fireEvent.click(screen.getByRole('button', { name: /Completed this month/ }))

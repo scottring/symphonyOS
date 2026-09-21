@@ -10,6 +10,8 @@ import { countRoutineUnits } from './routineCollections'
 import { selectDayPlan, routineResolveCtx, routinesForMain } from './dayPlan'
 import { localYmd } from '@/lib/cadence/config'
 import { dedupeCalendarEvents } from '@/lib/calendar/dedupeEvents'
+import { isFocused } from '@/lib/placement/model'
+import type { Task } from '@/types/task'
 
 function computeIsToday(viewedDate: Date): boolean {
   const today = new Date()
@@ -33,7 +35,7 @@ export function computeTodayData(input: TodayDataInput): TodayData {
   // pool and count below describes the same rows.
   const dayPlan = selectDayPlan(input)
   const viewedYmd = localYmd(input.viewedDate)
-  const chosenToday = (t: { plannedOn?: Date }) => !!t.plannedOn && localYmd(t.plannedOn) === viewedYmd
+  const chosenToday = (t: { plannedOn?: Date; focus?: Task['focus'] }) => isFocused(t, input.userId, viewedYmd)
 
   // A carried-over task chosen for today is on the main list already.
   const overdueTasks = selectCarriedOver(input.tasks, isToday, match).filter((t) => !chosenToday(t))

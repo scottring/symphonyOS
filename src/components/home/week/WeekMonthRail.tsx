@@ -17,8 +17,8 @@
 // level above it. This file only decides WHICH rows are this month's.
 
 import type { Task } from '@/types/task'
-import { belongsToMonth, monthStartOf } from '@/lib/planning/periodPlacement'
-import { placementFate, placedWhere } from '@/lib/planning/lineage'
+import { monthStartOf } from '@/lib/planning/periodPlacement'
+import { committedTo, placementFateOf, lowerPlacement } from '@/lib/placement/model'
 import { doableBy } from '@/lib/planning/poolViews'
 import { PlanRail } from '@/components/plan/PlanRail'
 import type { PlanRowModel } from '@/components/plan/PlanRow'
@@ -38,11 +38,25 @@ export function WeekMonthRail({ tasks, onSelectItem, onAddToWeek, meId, now = ne
   now?: Date
 }) {
   const monthStart = monthStartOf(now)
-  // The current month's list — including done and placed rows. belongsToMonth,
-  // not isPlacedOnMonth: a legacy NULL row is this month's.
+  // The current month's list — including done and placed rows: every row
+  // committed to this month, whatever else it carries (a month item now on
+  // the week or a day is still the month's, marked with where it went). A
+  // legacy row with no records answers from its cache, NULL = this month.
   const rows: PlanRowModel[] = tasks
-    .filter((t) => t.bucket === 'month' && belongsToMonth(t, monthStart) && (!meId || doableBy(t, meId)))
-    .map((t) => ({ id: t.id, title: t.title, isGoal: !!t.isGoal, fate: placementFate(t, tasks), kind: 'task' as const, placed: placedWhere(t, tasks) }))
+    .filter((t) => committedTo(t, 'month', monthStart, { isCurrent: true }) !== undefined && (!meId || doableBy(t, meId)))
+    .map((t) => {
+      // Fate and "→ where it went" are read off the row, from the month's
+      // point of view: a week commitment or a day below it is a placement.
+      const lower = t.completed ? null : lowerPlacement(t, 'month', monthStart)
+      return {
+        id: t.id, title: t.title, isGoal: !!t.isGoal, fate: placementFateOf(t, 'month', monthStart), kind: 'task' as const,
+        placed: t.completed
+          ? { label: 'done', id: t.id, kind: 'done' as const }
+          : lower
+            ? { label: lower.label, id: t.id, kind: (lower.kind === 'date' ? 'date' : lower.kind === 'week' ? 'week' : 'placed') as 'date' | 'week' | 'placed' }
+            : null,
+      }
+    })
   const label = now.toLocaleDateString('en-US', { month: 'long' })
 
   return (

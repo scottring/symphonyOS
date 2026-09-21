@@ -103,6 +103,8 @@ import { useShareToFamilyNudges } from '@/lib/today/shareNudges'
 interface TodayViewProps {
   // View-specific data
   tasks: Task[]
+  /** Whose Today this is — focus (task_focus) is per person. */
+  userId?: string | null
   events: CalendarEvent[]
   routines?: Routine[]
   dateInstances?: ActionableInstance[]
@@ -155,6 +157,7 @@ const TIMED_SECTIONS: DaySection[] = ['earlyMorning', 'morning', 'afternoon', 'e
 
 export function TodayView({
   tasks,
+  userId,
   events,
   routines = [],
   dateInstances = [],
@@ -325,11 +328,12 @@ export function TodayView({
     layers,
     completedLingerCutoff,
     weekStart: currentWeekStart,
+    userId,
     // Cast: EventNote.notes is string|null; TodayDataInput expects string|undefined — structurally compatible at runtime
     eventNotesMap: ctx.eventNotesMap as unknown as Map<string, { notes?: string; assignedTo?: string | null }> | undefined,
     eventContextOverrides: ctx.eventContextOverrides,
     getDomainForCalendar: ctx.getDomainForCalendar,
-  }), [tasks, events, routines, dateInstances, viewedDate, selectedAssignees, hideRoutines, layers, completedLingerCutoff,
+  }), [tasks, userId, events, routines, dateInstances, viewedDate, selectedAssignees, hideRoutines, layers, completedLingerCutoff,
       currentWeekStart, ctx.eventNotesMap, ctx.eventContextOverrides, ctx.getDomainForCalendar])
 
   const data = useTodayData(todayInput)

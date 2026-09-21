@@ -8,9 +8,9 @@
 import type { Task } from '@/types/task'
 import type { Seasons } from '@/lib/cadence/seasons'
 import { seasonStartFor, seasonEndFor, seasonLabel, readSeasons } from '@/lib/cadence/seasons'
-import { monthStartOf, belongsToMonth, isPlacedOnMonth, belongsToSeason, isPlacedOnSeason } from './periodPlacement'
+import { monthStartOf } from './periodPlacement'
+import { committedTo, type PlacementFate } from '@/lib/placement/model'
 import { doableBy } from './poolViews'
-import type { PlacementFate } from './lineage'
 
 export type PlanLevel = 'month' | 'season' | 'year'
 
@@ -96,13 +96,15 @@ export function selectPeriodTasks(
   meId: string | null,
   seasons: Seasons = readSeasons(),
 ): Task[] {
-  const bucket = level === 'month' ? 'month' : 'quarter'
+  // One enduring action: the list is every row COMMITTED to this period,
+  // whatever else it carries — a season item taken into September is on the
+  // season list and the month list; a month item dated Wednesday is still on
+  // the month list, marked "→ Wednesday". A row with no records answers from
+  // its cached bucket + stamp the way it always did (the NULL rule).
   return tasks
     .filter((t) => {
-      if (t.bucket !== bucket) return false
       if (meId && !doableBy(t, meId)) return false
-      if (level === 'month') return isCurrent ? belongsToMonth(t, start) : isPlacedOnMonth(t, start)
-      return isCurrent ? belongsToSeason(t, start, seasons) : isPlacedOnSeason(t, start, seasons)
+      return committedTo(t, level, start, { isCurrent, seasons }) !== undefined
     })
     .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime())
 }

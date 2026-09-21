@@ -63,7 +63,7 @@ const sameLocalDay = (a: Date, b: Date) =>
 
 export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' } = {}) {
   // Data hooks
-  const { tasks, loading: tasksLoading, addTask, toggleTask, toggleWaiting, deleteTask, updateTask, updateTasksBulk, pushTask, getLinkedTasks, refetch, updateTaskOrders } = useSupabaseTasks();
+  const { tasks, loading: tasksLoading, addTask, toggleTask, toggleWaiting, deleteTask, updateTask, updateTasksBulk, pushTask, getLinkedTasks, refetch, updateTaskOrders, userId } = useSupabaseTasks();
   const { isConnected, events, fetchEvents, createEvent, deleteEvent, removeEventLocal, restoreEventLocal } = useGoogleCalendar();
   // Passing the visible event ids opts in to auto-loading notes (context
   // overrides, assignees, shared-with-family, free) + realtime — without it
@@ -810,6 +810,7 @@ export function HomeViewContainer({ fixedView }: { fixedView?: 'today' | 'week' 
 
       <HomeView
         tasks={tasks}
+        userId={userId}
         events={filteredEvents}
         routines={filteredRoutines}
         allActiveRoutines={activeRoutines}

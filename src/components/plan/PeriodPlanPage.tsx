@@ -24,7 +24,6 @@ import { useActionableInstances } from '@/hooks/useActionableInstances'
 import { makePlanActions } from '@/lib/planning/planActions'
 import { planDropHandlers } from '@/lib/planning/planDrag'
 import { showToast } from '@/hooks/useToast'
-import { explainCopyDownOnce } from '@/lib/planning/copyDownExplainer'
 import { useGatedTaskActions } from '@/hooks/useGatedTaskActions'
 import { useDomain } from '@/hooks/useDomain'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
@@ -33,7 +32,7 @@ import { useRoutines } from '@/hooks/useRoutines'
 import { routinePatterns } from '@/lib/planning/routinePatterns'
 import { GoalsProvider, useGoalsContext } from '@/contexts/GoalsContext'
 import { filterTasksForLayers, matchesLayers } from '@/lib/today/domainFilter'
-import { placementFate, placedWhere } from '@/lib/planning/lineage'
+import { placementFateOf, lowerPlacement } from '@/lib/placement/model'
 import { splitGoalRows } from '@/lib/planning/goalSteps'
 import { parseLocalYmd } from '@/lib/cadence/config'
 import { formatShortDate } from '@/lib/dateHelpers'
@@ -79,10 +78,20 @@ function firstLine(notes: string | undefined): string | undefined {
   return undefined
 }
 
-function taskRow(t: Task, all: readonly Task[]): PlanRowModel {
+/** A row as THIS period's list sees it: its fate and "→ where it went" are
+ *  read off the row itself, relative to the level and period being shown
+ *  (a September row kept into October says "carried to October" on
+ *  September's list and nothing on October's). */
+function taskRow(t: Task, level: PlanLevel, periodStart: Date): PlanRowModel {
+  const lvl = level === 'season' ? 'season' : 'month'
+  const lower = t.completed ? null : lowerPlacement(t, lvl, periodStart)
   return {
-    id: t.id, title: t.title, isGoal: !!t.isGoal, fate: placementFate(t, all), kind: 'task',
-    placed: placedWhere(t, all),
+    id: t.id, title: t.title, isGoal: !!t.isGoal, fate: placementFateOf(t, lvl, periodStart), kind: 'task',
+    placed: t.completed
+      ? { label: 'done', id: t.id, kind: 'done' }
+      : lower
+        ? { label: lower.label, id: t.id, kind: lower.kind === 'date' ? 'date' : lower.kind === 'week' ? 'week' : 'placed' }
+        : null,
     subtitle: t.isGoal ? firstLine(t.notes) : undefined,
   }
 }
@@ -157,7 +166,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
       const year = bounds.start.getFullYear()
       return goals.filter((g) => g.year === year && matchesLayers(g.context, layers)).map(goalRow)
     }
-    const list = selectPeriodTasks(layered, level, bounds.start, isCurrent, meId, seasons).map((t) => taskRow(t, tasks))
+    const list = selectPeriodTasks(layered, level, bounds.start, isCurrent, meId, seasons).map((t) => taskRow(t, level, bounds.start))
     // Goals first — a goal is what the period is for — then tasks, each in
     // the order they were written.
     return [...list.filter((r) => r.isGoal), ...list.filter((r) => !r.isGoal)]
@@ -188,7 +197,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
       // every legacy NULL-seasonStart row regardless of which season it
       // opened on (the exact trap periodPlacement.ts warns about).
       const aboveIsCurrent = isCurrentPeriod(periodBounds('season', aboveStart, seasons), today)
-      return selectPeriodTasks(layered, 'season', aboveStart, aboveIsCurrent, meId, seasons).map((t) => taskRow(t, tasks))
+      return selectPeriodTasks(layered, 'season', aboveStart, aboveIsCurrent, meId, seasons).map((t) => taskRow(t, 'season', aboveStart))
     }
     if (above === 'year') {
       return goals.filter((g) => g.year === aboveStart.getFullYear() && matchesLayers(g.context, layers)).map(goalRow)
@@ -238,15 +247,12 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
     else if (action === 'keep') {
       await keepForward(row.id, level === 'month' ? { monthStart: bounds.next } : { seasonStart: bounds.next })
     }
-    // Taking a row down a rung COPIES it (isDescent): the period's list keeps
-    // the row, marked with where the work went, so the look-back still sees
-    // the whole plan. That is the whole point of the placement model.
+    // Taking a row down a rung adds the lower commitment to the SAME row:
+    // this period's list keeps it, marked with where the work went, so the
+    // look-back still sees the whole plan. Nothing is copied.
     else if (action === 'to-lower') {
       const lower = lowerLevel(level)
-      if (lower) {
-        const ok = await gated.pushTask(row.id, lower)
-        if (ok) explainCopyDownOnce(level, lower)
-      }
+      if (lower) await gated.pushTask(row.id, lower)
     }
     else if (action === 'today') {
       // Choosing today (planned_on): a month or season row keeps its list —
@@ -257,11 +263,10 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
     else if (action === 'under-goal') setPickingGoalFor(row.id)
   }, [goals, updateGoal, deleteGoal, addGoal, bounds.next, toggleTask, deleteTask, gated, setGoal, keepForward, level, planActions])
 
-  // The rail's one verb: copy an open season task down into this month.
+  // The rail's one verb: take an open season task into this month — the same
+  // row gains a month commitment; the season keeps it, marked "→ September".
   const pullDown = useCallback((row: PlanRowModel) => {
-    // Only after a real write: a cancelled DomainGate resolves false, and
-    // explaining a copy that never happened would also burn the once-ever flag.
-    void Promise.resolve(gated.pushTask(row.id, 'month')).then((ok) => { if (ok) explainCopyDownOnce('season', 'month') })
+    void gated.pushTask(row.id, 'month')
   }, [gated])
 
   // The calendar is a view you OPEN, not the thing that greets you: the page
@@ -403,8 +408,8 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   const goalRows = useMemo(() => {
     if (!split) return rows.filter((r) => r.isGoal)
     return split.goals.map((g) => ({
-      ...taskRow(g, tasks),
-      steps: (split.stepsByGoal.get(g.id) ?? []).map((st) => taskRow(st, tasks)),
+      ...taskRow(g, level, bounds.start),
+      steps: (split.stepsByGoal.get(g.id) ?? []).map((st) => taskRow(st, level, bounds.start)),
     }))
   }, [split, rows, tasks])
   // An empty period opens with the question already asked. The first real
@@ -414,7 +419,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   const goalComposerOpen = !isPast && (addingGoal || goalRows.length === 0)
 
   const looseRows = useMemo(
-    () => (split ? split.loose.map((t) => taskRow(t, tasks)) : rows.filter((r) => !r.isGoal)),
+    () => (split ? split.loose.map((t) => taskRow(t, level, bounds.start)) : rows.filter((r) => !r.isGoal)),
     [split, rows, tasks],
   )
   // Finished work leaves the working list and waits behind a fold. On a PAST
