@@ -142,7 +142,12 @@ export function PlanningPanelHost({ draggable = true }: { draggable?: boolean })
   // A week page beside the panel announces the week it is showing, so the
   // list is the same list that page is planning into.
   const [viewedWeek, setViewedWeek] = useState<Date | null>(() => readViewedWeek())
-  useEffect(() => onViewedWeekChange(setViewedWeek), [])
+  useEffect(() => {
+    // Re-read on subscribe: a page that published before this listener
+    // existed (both mounting from a stored pin) would otherwise be missed.
+    setViewedWeek(readViewedWeek())
+    return onViewedWeekChange(setViewedWeek)
+  }, [])
   const { plan, loading, error } = useDayPlan(day, viewedWeek)
   const planActions = usePlanActions()
   const actions = useMemo(() => panelActionsFor(day, planActions), [day, planActions])
@@ -157,7 +162,12 @@ function TodayPlanList({ onClose }: { onClose: () => void }) {
   const todayKey = localYmd(new Date())
   const day = useMemo(() => { const [y, m, d] = todayKey.split('-').map(Number); return new Date(y, m - 1, d) }, [todayKey])
   const [viewedWeek, setViewedWeek] = useState<Date | null>(() => readViewedWeek())
-  useEffect(() => onViewedWeekChange(setViewedWeek), [])
+  useEffect(() => {
+    // Re-read on subscribe: a page that published before this listener
+    // existed (both mounting from a stored pin) would otherwise be missed.
+    setViewedWeek(readViewedWeek())
+    return onViewedWeekChange(setViewedWeek)
+  }, [])
   return <section aria-label="Planning" className="reference-list">
     <header className="flex items-start justify-between gap-3 border-b border-neutral-300 pb-4">
       <div>

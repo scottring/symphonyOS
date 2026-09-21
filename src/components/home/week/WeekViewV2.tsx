@@ -1,4 +1,3 @@
-import { parseLocalDate } from '@/lib/dateUtils'
 import { useMemo, useState, useCallback, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
@@ -28,7 +27,6 @@ import { useGridCreate } from './useGridCreate'
 import { SlotQuickCreatePopover, type CreateType } from './SlotQuickCreatePopover'
 import { RoutinePlacePopover } from './RoutinePlacePopover'
 import { RoutinesToggle } from './RoutinesToggle'
-import { panelActionsFor } from '@/components/reference/DayPlanPanel'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { suggestSlots, type BusyInterval } from '@/lib/planning/dropSmarts'
 import { FIRST_HOUR, LAST_HOUR } from './WeekGrid'
@@ -699,11 +697,6 @@ export function WeekViewV2(props: WeekViewV2Props) {
     pushAction,
     notify: (m) => showToast(m, 'warning'),
   }), [tasks, onUpdateTask, gated, setPlanned, rescheduleInstance, pushAction])
-  // Row verbs for the week list in the margin. The same writes the pin's rows
-  // make; the list holds tasks only, so its routine verb never fires here.
-  // Re-keyed per render on today's date, so a tab left open past midnight
-  // does not keep choosing rows for yesterday.
-  const todayKey = localYmd(new Date())
   // "+ Add" on a journal day: a dated, all-day task on that day, assigned to
   // me. Captures never inherit the view's lens, so it lands Unsorted — and
   // when the current filter would then hide it, the toast says so rather
