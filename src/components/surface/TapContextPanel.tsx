@@ -51,7 +51,8 @@ interface TapContextPanelProps {
   // Handlers
   onClose: () => void
   onTitleChange: (next: string) => void
-  onNotesChange: (next: string) => void
+  /** Resolve `true` once written for the Notes section to say Saved. */
+  onNotesChange: (next: string) => unknown
   /** Promote the task's notes into a persisting vault note linked to the task. */
   onSaveNoteToVault?: (content: string) => Promise<{ ok: boolean; url?: string }>
   onToggleComplete: () => void

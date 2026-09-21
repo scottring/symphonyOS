@@ -15,7 +15,7 @@ export interface GroupTasksDeps {
     scheduledFor: Date | undefined,
     options: AddTaskOpts,
   ) => Promise<string | undefined>
-  updateTask: (id: string, updates: Partial<Task>) => Promise<void> | void
+  updateTask: (id: string, updates: Partial<Task>) => Promise<unknown> | void
   /**
    * Rebuild the task tree from the source of truth. Required for the group to
    * appear immediately: `updateTask`'s optimistic path patches a reparented

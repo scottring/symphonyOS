@@ -1,8 +1,9 @@
-import { useEffect, useState, lazy, Suspense } from 'react'
+import { useCallback, useEffect, useRef, useState, lazy, Suspense } from 'react'
 import { Maximize2, Minimize2 } from 'lucide-react'
 import DOMPurify from 'dompurify'
 import { PanelSection } from './PanelSection'
 import { notesToHtml } from '@/lib/notes/notesToHtml'
+import { createLatestWinsSaver, type SaveStatus } from '@/lib/notes/latestWinsSaver'
 
 const TiptapEditor = lazy(() =>
   import('@/components/notes/TiptapEditor').then((m) => ({ default: m.TiptapEditor })),
@@ -13,7 +14,12 @@ const PANEL_W = 380
 
 export interface PanelNotesProps {
   notes: string | undefined
-  onChange?: (next: string) => void
+  /**
+   * Persist the note. Return a promise of `true` once the write is confirmed
+   * (or `false` if it failed) and the section says Saved / Not saved; any
+   * other return shows no status. Calls are serialized — see latestWinsSaver.
+   */
+  onChange?: (next: string) => unknown
   /** Override the default heading (event: "What to bring", step: "Instructions"). */
   label?: string
   /** Collapse key. Defaults to 'notes', so every panel's Notes shares one preference. */
@@ -53,6 +59,24 @@ export function PanelNotes({
 }: PanelNotesProps) {
   const [wide, setWide] = useState(false)
   const [vaultStatus, setVaultStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle')
+
+  // One saver per mount, kept past unmount so a queued save still goes out.
+  const mounted = useRef(true)
+  useEffect(() => {
+    mounted.current = true
+    return () => { mounted.current = false }
+  }, [])
+  const saverRef = useRef<ReturnType<typeof createLatestWinsSaver> | null>(null)
+  if (!saverRef.current) {
+    saverRef.current = createLatestWinsSaver((s) => { if (mounted.current) setSaveStatus(s) })
+  }
+  const onChangeRef = useRef(onChange)
+  useEffect(() => { onChangeRef.current = onChange }, [onChange])
+  const handleChange = useCallback((next: string) => {
+    const write = onChangeRef.current
+    if (write) saverRef.current?.save(() => write(next))
+  }, [])
 
   useEffect(() => {
     if (!wide) return
@@ -95,6 +119,17 @@ export function PanelNotes({
     </button>
   )
 
+  const saveLabel =
+    saveStatus === 'saving' ? 'Saving…' : saveStatus === 'saved' ? 'Saved' : saveStatus === 'error' ? 'Not saved' : null
+  const saveStatusText = onChange && saveLabel && (
+    <span
+      role="status"
+      className={`text-[11px] ${saveStatus === 'error' ? 'text-red-600' : 'text-neutral-400'}`}
+    >
+      {saveLabel}
+    </span>
+  )
+
   const widenButton = onChange && (
     <button
       type="button"
@@ -109,7 +144,7 @@ export function PanelNotes({
 
   const editor = onChange ? (
     <Suspense fallback={null}>
-      <TiptapEditor content={notes ?? ''} onChange={onChange} placeholder="Add notes…" />
+      <TiptapEditor content={notes ?? ''} onChange={handleChange} placeholder="Add notes…" />
     </Suspense>
   ) : (
     <>
@@ -168,6 +203,7 @@ export function PanelNotes({
         actions={(collapsed) =>
           wide || collapsed ? undefined : (
             <>
+              {saveStatusText}
               {saveButton}
               {widenButton}
             </>
@@ -202,6 +238,7 @@ export function PanelNotes({
                 {label}
               </div>
               <div className="flex items-center gap-3">
+                {saveStatusText}
                 {saveButton}
                 {widenButton}
               </div>

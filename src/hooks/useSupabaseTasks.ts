@@ -1400,7 +1400,7 @@ export function useSupabaseTasks() {
       // Should be rare now that lookups read tasksRef — surface it loudly so a
       // dropped write is never silent again.
       console.warn('[updateTask] Task not found, write dropped:', id, updates)
-      return
+      return false
     }
 
     // A goal is an outcome you tick, never a thing you place. Refusing here,
@@ -1411,7 +1411,7 @@ export function useSupabaseTasks() {
     if (task.isGoal && isPlacement(updates)) {
       logger.debug('[updateTask] placement refused: row is a goal', { id, updates })
       showToast("Goals aren't scheduled — tick it off when it's done", 'info')
-      return
+      return false
     }
 
     // ONE enduring action (2026-09-21). Whatever dialect the caller speaks —
@@ -1640,6 +1640,9 @@ export function useSupabaseTasks() {
         }
       }
     }
+    // True only when the row itself was written: callers such as the notes
+    // panel say "Saved" on it. An RLS-filtered UPDATE returns no row.
+    return !updateError && !!data && data.length > 0
   }, [tasks, familyMembers, findTaskById, findParentOfSubtask, selfMemberIdForOwner, user, writePlacementOps])
 
   // Bulk update multiple tasks at once

@@ -10,7 +10,7 @@ export interface ConvertTaskToProjectDeps {
     links?: TaskLink[]
     phoneNumber?: string
   }) => Promise<Project | null>
-  updateTask: (id: string, updates: Partial<Task>) => Promise<void> | void
+  updateTask: (id: string, updates: Partial<Task>) => Promise<unknown> | void
   deleteTask: (id: string) => Promise<void> | void
 }
 
