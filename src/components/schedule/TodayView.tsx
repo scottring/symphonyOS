@@ -365,7 +365,7 @@ export function TodayView({
     ...planActions,
     toggleTask: onToggleTask,
     completeRoutine: async (id, _day, done) => { onCompleteRoutine?.(id, done); return true },
-  }), [viewedDate, planActions, onToggleTask, onCompleteRoutine])
+  }, { changeRoutineRule: () => navigate('/routines') }), [viewedDate, planActions, onToggleTask, onCompleteRoutine, navigate])
   const [planOpenDay, setPlanOpenDay] = useState<string | null>(null)
   const planOpenInline = planOpenDay === localYmd(viewedDate)
   const planLine = planSummary(data.dayPlan)

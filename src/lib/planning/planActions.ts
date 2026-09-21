@@ -128,9 +128,21 @@ export function makePlanActions(deps: PlanActionDeps) {
   }
 
   /**
-   * Give a routine with no day of its own a home: a weekly rule gains the
-   * weekday, and the time becomes its time_of_day. Never an occurrence write —
-   * a routine that shows on no day has no occurrence to choose or override.
+   * Place a routine with no day of its own on ONE day of the week being
+   * planned: the occurrence for that day, as a same-day time override. The
+   * repeating rule is never touched here — that is a separate, explicit
+   * action (placeRoutineRule) — so next week it is back in To plan, which is
+   * the point: a flexible routine is placed week by week (Scott, 2026-09-21).
+   */
+  async function placeRoutineOnce(routineId: string, when: Date, title = 'routine') {
+    await deps.rescheduleRoutine(routineId, midnight(when), when)
+    deps.pushAction?.(`Placed "${title}"`, () => { void deps.rescheduleRoutine(routineId, midnight(when), midnight(when)) })
+  }
+
+  /**
+   * Change the repeating rule itself: a weekly rule gains the weekday, and
+   * the time becomes its time_of_day. Explicit, never the default — placing
+   * work from Planning schedules an occurrence, not every future week.
    */
   async function placeRoutineRule(routineId: string, when: Date, title = 'routine') {
     if (!deps.updateRoutine) { deps.notify?.('Set this routine\'s day on the routine itself'); return }
@@ -149,7 +161,7 @@ export function makePlanActions(deps: PlanActionDeps) {
     deps.pushAction?.(`Placed "${routine?.name ?? title}"`, () => { if (prev) void deps.updateRoutine?.(routineId, prev) })
   }
 
-  return { chooseTaskDay, unchooseTask, timeTask, commitTask, chooseRoutine, placeRoutineRule, drop }
+  return { chooseTaskDay, unchooseTask, timeTask, commitTask, chooseRoutine, placeRoutineOnce, placeRoutineRule, drop }
 }
 
 export type PlanActions = ReturnType<typeof makePlanActions>

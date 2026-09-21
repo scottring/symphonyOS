@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from 'vitest'
+import { describe, it, expect, afterEach, vi } from 'vitest'
 import { render, screen, cleanup, fireEvent } from '@testing-library/react'
 import { DayPlanPanel, PLAN_GROUP_CAP, planningSubtitle, type DayPlanPanelActions } from './DayPlanPanel'
 import type { DayPlan, DayPlanEntry } from '@/lib/today/dayPlan'
@@ -69,23 +69,27 @@ describe('DayPlanPanel — the Planning panel', () => {
     expect(screen.getByText('Repaint the porch')).toBeInTheDocument()
   })
 
-  // Review, 2026-09-21: a routine with no day of its own has no occurrence to
-  // choose or tick — its one verb gives it a day by writing its RULE.
-  it('a routine with no day offers "Give it a day" and nothing else', () => {
+  // Scott, 2026-09-21: a routine with no day of its own has no occurrence to
+  // choose or tick. "Give it a day" places THIS week's occurrence; changing
+  // the repeating schedule is a separate, explicit action.
+  it('a routine with no day offers "Give it a day" (this week) and "Change repeating schedule", nothing else', () => {
     const p = plan(0)
     p.toPlan = [{ key: 'routine:v', kind: 'routine', id: 'v', title: 'Vacuum', completed: false, planned: false, group: 'plan',
       routine: { id: 'v', name: 'Vacuum', recurrence_pattern: { type: 'weekly', days: [] } } as never, context: 'Weekly routine · no set day' }]
-    render(<DayPlanPanel plan={p} day={day} actions={actions} weekPage={thisWeek} />)
+    const changeRoutineRule = vi.fn()
+    render(<DayPlanPanel plan={p} day={day} actions={{ ...actions, changeRoutineRule }} weekPage={thisWeek} />)
     expect(screen.getByRole('button', { name: 'Give Vacuum a day' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Change repeating schedule for Vacuum' }))
+    expect(changeRoutineRule).toHaveBeenCalledWith(expect.objectContaining({ id: 'v' }))
     expect(screen.queryByRole('button', { name: 'Plan Vacuum for today' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Complete Vacuum' })).toBeNull()
   })
 
-  it('points at older unfinished work without listing it', () => {
+  it('points at the Expired list for older unfinished work, without listing or counting it', () => {
     const p = plan(1)
     p.olderUnfinished = 3
     render(<DayPlanPanel plan={p} day={day} actions={actions} weekPage={thisWeek} />)
-    expect(screen.getByRole('link', { name: /Older unfinished work is in Inbox/ })).toHaveAttribute('href', '/inbox')
+    expect(screen.getByRole('link', { name: /Older unfinished work is in Inbox/ })).toHaveAttribute('href', '/inbox#expired')
     expect(screen.queryByText(/3/)).toBeNull()
   })
 

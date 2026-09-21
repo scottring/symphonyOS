@@ -1,11 +1,11 @@
 // src/components/schedule/InboxView.tsx
-import { useMemo, useCallback, useState } from 'react'
+import { useMemo, useCallback, useState, useRef, useEffect } from 'react'
 import { PAGE_COLUMN_WIDE } from '@/components/layout/pageLayout'
 import { MastheadCard } from '@/components/layout/MastheadCard'
 import { HomeChromeControls } from '@/components/home/HomeChromeControls'
 import { useAppShellChromeOptional } from '@/contexts/AppShellChromeContext'
 import { X, CornerDownRight, CalendarDays, Sun } from 'lucide-react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import type { Task, TaskContext } from '@/types/task'
 import { mergeCaptureIntoTask } from '@/lib/captureMerge'
 import type { Project } from '@/types/project'
@@ -71,6 +71,11 @@ export function InboxView({
   loading = false,
 }: InboxViewProps) {
   const navigate = useNavigate()
+  const { hash } = useLocation()
+  const expiredAnchor = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (hash === '#expired') expiredAnchor.current?.scrollIntoView({ block: 'start' })
+  }, [hash])
   const {
     onUpdateTask, onPushTask, onDeleteTask, onUpdateTasksBulk,
     onAssignTaskAll, familyMembers = [], onToggleTask,
@@ -726,8 +731,12 @@ export function InboxView({
         </div>
       )}
 
+      {/* #expired: the Planning panel's "older unfinished work" line lands
+          here open, on the list, not on a fold to find. */}
+      <div id="expired" ref={expiredAnchor} />
       <ExpiredSection
         rows={expiredRows}
+        defaultOpen={hash === '#expired'}
         canDelete={!!onDeleteTask}
         onUpdateTask={(id, updates) => onUpdateTask?.(id, updates)}
         onPushTask={onPushTask}

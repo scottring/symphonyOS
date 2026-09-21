@@ -10,7 +10,7 @@
 // Every drag has a button: Today and Set a day or time live on the row, so a
 // keyboard or a touchscreen can do all of it.
 import { useState, type ReactNode } from 'react'
-import { Check, ChevronDown, ChevronRight, Clock, GripVertical, Undo2 } from 'lucide-react'
+import { Check, ChevronDown, ChevronRight, Clock, GripVertical, Repeat, Undo2 } from 'lucide-react'
 import { SchedulePopover } from '@/components/triage'
 import type { DayPlan, DayPlanEntry } from '@/lib/today/dayPlan'
 import { writePlanDrag } from '@/lib/planning/planDrag'
@@ -27,9 +27,11 @@ export interface DayPlanPanelActions {
   /** A date (all-day) or a time; routines: time only. */
   schedule: (entry: DayPlanEntry, when: Date, isAllDay: boolean) => void
   commit: (entry: DayPlanEntry, period: 'week' | 'month') => void
-  /** A routine with no day of its own is given one — its RULE is written
-   *  ("every Thursday at 5:00"), never an occurrence. */
+  /** A routine with no day of its own is placed on ONE day of the week being
+   *  planned — an occurrence, never the rule. */
   placeRoutine?: (entry: DayPlanEntry, when: Date) => void
+  /** The separate, explicit action: change the routine's repeating schedule. */
+  changeRoutineRule?: (entry: DayPlanEntry) => void
 }
 
 function PlanRow({ entry, day, actions, draggable }: {
@@ -84,8 +86,9 @@ function PlanRow({ entry, day, actions, draggable }: {
         ) : null}
       </div>
       {entry.routine ? (
-        // No day of its own yet: the only verb is to give it one — the rule
-        // ("every Thursday at 5:00"), not an occurrence that no day would draw.
+        // No day of its own yet. "Give it a day" places THIS week's occurrence
+        // (a same-day time override); the repeating rule is a separate,
+        // explicit action (Scott, 2026-09-21).
         <div className="flex shrink-0 items-center gap-0.5 text-neutral-500">
           <SchedulePopover
             itemTitle={entry.title}
@@ -102,6 +105,17 @@ function PlanRow({ entry, day, actions, draggable }: {
               </button>
             }
           />
+          {actions.changeRoutineRule && (
+            <button
+              type="button"
+              aria-label={`Change repeating schedule for ${entry.title}`}
+              title="Change repeating schedule"
+              onClick={() => actions.changeRoutineRule?.(entry)}
+              className="inline-flex rounded p-1 hover:bg-neutral-100 hover:text-neutral-800"
+            >
+              <Repeat className="h-3.5 w-3.5" />
+            </button>
+          )}
         </div>
       ) : !entry.completed && (
         <div className="flex shrink-0 items-center gap-0.5 text-neutral-500">
@@ -267,7 +281,7 @@ export function DayPlanPanel({ plan, day, actions, draggable = true, weekPage = 
           waits here. Misses older than the window are not listed either, but
           they are not lost: one quiet line points at where they live. */}
       {(plan.olderUnfinished ?? 0) > 0 && (
-        <a href="/inbox" className="mt-2 inline-block text-[12.5px] text-neutral-500 hover:text-neutral-800">
+        <a href="/inbox#expired" className="mt-2 inline-block text-[12.5px] text-neutral-500 hover:text-neutral-800">
           Older unfinished work is in Inbox →
         </a>
       )}
@@ -315,6 +329,7 @@ export function panelActionsFor(
     toggleTask: (id: string) => void
     completeRoutine: (routineId: string, day: Date, done: boolean) => Promise<boolean>
   },
+  opts: { changeRoutineRule?: (routineId: string) => void } = {},
 ): DayPlanPanelActions {
   const payload = (e: DayPlanEntry) => ({ kind: e.kind, id: e.id, date: localYmd(day), title: e.title })
   return {
@@ -325,6 +340,7 @@ export function panelActionsFor(
       void a.drop(payload(e), isAllDay ? { type: 'day', day: when } : { type: 'time', when })
     },
     commit: (e, period) => { if (e.kind === 'task') void a.commitTask(e.id, period) },
-    placeRoutine: (e, when) => { void a.placeRoutineRule(e.id, when, e.title) },
+    placeRoutine: (e, when) => { void a.placeRoutineOnce(e.id, when, e.title) },
+    changeRoutineRule: opts.changeRoutineRule ? (e) => opts.changeRoutineRule?.(e.id) : undefined,
   }
 }

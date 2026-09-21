@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { Pin, X } from 'lucide-react'
 import { useReferenceLists, REFERENCE_KINDS, type ReferenceKind, type ReferencePin } from './ReferenceListsContext'
 import { DayPlanPanel, panelActionsFor, planningSubtitle } from './DayPlanPanel'
@@ -155,7 +155,10 @@ export function PlanningPanelHost({ draggable = true, header }: {
   }, [])
   const { plan, loading, error } = useDayPlan(day, viewedWeek)
   const planActions = usePlanActions()
-  const actions = useMemo(() => panelActionsFor(day, planActions), [day, planActions])
+  const navigate = useNavigate()
+  // Changing a routine's repeating schedule is its own explicit action, on
+  // the routine's page — never a side effect of placing it.
+  const actions = useMemo(() => panelActionsFor(day, planActions, { changeRoutineRule: () => navigate('/routines') }), [day, planActions, navigate])
   const body = error ? <p role="alert" className="py-5 text-[15px] text-danger-600">Could not load the plan.</p>
     : loading || !plan ? <p className="py-5 text-[15px] text-neutral-500">Loading…</p>
     : <DayPlanPanel plan={plan} day={day} actions={actions} weekPage={viewedWeek} draggable={draggable} />
