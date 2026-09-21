@@ -25,6 +25,16 @@ export function PlanSession({ periodLabel: P, prevLabel: Q, finished, open, curr
   const [goalFor, setGoalFor] = useState('')
   const [taskText, setTaskText] = useState('')
   const [taskToward, setTaskToward] = useState('')
+  // "Keep, and add a next action" with no action named would save as a plain
+  // Keep and silently lose the action — so the session will not move on
+  // until the row is named or switched to Keep.
+  const unnamedActions = open.filter((t) => draft.verdicts[t.id] === 'keep-action' && !draft.actionTitles[t.id]?.trim()).map((t) => t.id)
+  const [askForActions, setAskForActions] = useState(false)
+  const goTo = (next: Step) => {
+    if (next !== 'back' && unnamedActions.length > 0) { setAskForActions(true); setStep('back'); return }
+    setAskForActions(false)
+    setStep(next)
+  }
   const set = (patch: Partial<SessionDraft>) => onChange({ ...draft, ...patch })
 
   const setVerdict = (id: string, v: Verdict) => {
@@ -103,6 +113,9 @@ export function PlanSession({ periodLabel: P, prevLabel: Q, finished, open, curr
                               actionIds: { ...draft.actionIds, [t.id]: draft.actionIds[t.id] ?? newId() } })} />
                         </div>
                       </label>
+                    )}
+                    {askForActions && unnamedActions.includes(t.id) && (
+                      <p className="mt-1 pl-6 text-[12.5px] font-semibold text-accent-700">Name the next action, or choose Keep</p>
                     )}
                   </li>))}</ul>
               </>
@@ -195,8 +208,8 @@ export function PlanSession({ periodLabel: P, prevLabel: Q, finished, open, curr
             ? <span />
             : <button type="button" className="rounded-md border border-neutral-200 px-3 py-1.5 text-sm" onClick={() => setStep(step === 'save' ? 'plan' : 'back')}>← Back</button>}
           <button type="button" className="rounded-md border border-neutral-200 px-3 py-1.5 text-sm" onClick={onClose}>Close · keep my draft</button>
-          {step === 'back' && <button type="button" className="rounded-md bg-primary-600 px-3 py-1.5 text-sm font-semibold text-white" onClick={() => setStep('plan')}>Next: plan {P} →</button>}
-          {step === 'plan' && <button type="button" className="rounded-md bg-primary-600 px-3 py-1.5 text-sm font-semibold text-white" onClick={() => setStep('save')}>Next: save →</button>}
+          {step === 'back' && <button type="button" className="rounded-md bg-primary-600 px-3 py-1.5 text-sm font-semibold text-white" onClick={() => goTo('plan')}>Next: plan {P} →</button>}
+          {step === 'plan' && <button type="button" className="rounded-md bg-primary-600 px-3 py-1.5 text-sm font-semibold text-white" onClick={() => goTo('save')}>Next: save →</button>}
           {step === 'save' && <button type="button" disabled={saving} className="rounded-md bg-primary-600 px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-60" onClick={() => { void onSave() }}>{saving ? 'Saving…' : `Save ${P}`}</button>}
         </div>
       </div>

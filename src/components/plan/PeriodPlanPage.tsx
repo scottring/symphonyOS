@@ -13,7 +13,7 @@
 
 import { useMemo, useState, useCallback, useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Plus, Target, ChevronDown, ChevronRight, Repeat, ArrowUpRight } from 'lucide-react'
+import { Plus, Target, ChevronDown, ChevronRight, Repeat, ArrowUpRight, Check } from 'lucide-react'
 import { MastheadCard, PeriodNavEyebrow } from '@/components/layout/MastheadCard'
 import { HomeChromeControls } from '@/components/home/HomeChromeControls'
 import { DomainSwitcher } from '@/components/domain/DomainSwitcher'
@@ -34,7 +34,12 @@ import { GoalsProvider, useGoalsContext } from '@/contexts/GoalsContext'
 import { filterTasksForLayers, matchesLayers } from '@/lib/today/domainFilter'
 import { placementFateOf, lowerPlacement } from '@/lib/placement/model'
 import { splitGoalRows } from '@/lib/planning/goalSteps'
-import { parseLocalYmd } from '@/lib/cadence/config'
+import { parseLocalYmd, localYmd } from '@/lib/cadence/config'
+import { useAuth } from '@/hooks/useAuth'
+import { usePlanningSession, monthToken } from '@/hooks/usePlanningSession'
+import { lookBackRows, emptyDraft, isEmptyDraft, type SessionDraft } from '@/lib/planning/session'
+import { readDraft, writeDraft, clearDraft } from '@/lib/planning/sessionDraft'
+import { applySession } from '@/lib/planning/applySession'
 import { formatShortDate } from '@/lib/dateHelpers'
 import {
   periodBounds, isCurrentPeriod, selectPeriodTasks, selectDatedInPeriod, actionsFor, railLevel, lowerLevel, planningPeriod,
@@ -45,6 +50,7 @@ import type { Goal } from '@/types/goal'
 import { PlanRow, rowIsDone, type PlanRowModel } from './PlanRow'
 import { PlanRail } from './PlanRail'
 import { readOpen, readFoldPref, writeOpen } from './foldState'
+import { PlanSession } from './PlanSession'
 
 /** How many tasks a period's list shows before it asks. A long plan is still
  *  a plan, but a page that opens with twenty rows is a page you scroll rather
@@ -455,6 +461,82 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
     : periodBounds(level, bounds.prev, seasons).label
   const daysUntilStart = useMemo(() => Math.round((bounds.start.getTime() - today.getTime()) / 86_400_000), [bounds.start, today])
 
+  // ── Guided planning (Phase 1: month) ────────────────────────────────────
+  // Season and year pages carry no session yet; everything below is inert
+  // there (sessionEnabled false).
+  const { user } = useAuth()
+  const userId = user?.id ?? null
+  const sessionEnabled = level === 'month'
+  const token = monthToken(bounds.start)
+  const { saved: savedSession, mine: myNotes, loadedToken, error: sessionReadError, reload: reloadSession, save: saveSession } = usePlanningSession('monthly', token)
+  // Open only on THIS month's loaded record — never on a blank or a neighbour's (review 2026-09-21).
+  const sessionReady = loadedToken === token
+  const periodYmd = localYmd(bounds.start)
+  const [draft, setDraft] = useState<SessionDraft | null>(null)
+  const [sessionOpen, setSessionOpen] = useState(false)
+  const [savingSession, setSavingSession] = useState(false)
+  const [justSaved, setJustSaved] = useState(false)
+  const [saveError, setSaveError] = useState(false)
+  useEffect(() => {
+    setSessionOpen(false); setJustSaved(false); setSaveError(false)
+    setDraft(sessionEnabled ? readDraft(userId, periodYmd) : null)
+  }, [periodYmd, sessionEnabled, userId])
+
+  const back = useMemo(() => (sessionEnabled ? lookBackRows(layered, bounds.prev) : { finished: [], open: [] }), [sessionEnabled, layered, bounds.prev])
+  const currentMonth = useMemo(
+    () => (sessionEnabled ? selectPeriodTasks(layered, 'month', bounds.start, isCurrent, meId, seasons).filter((t) => !t.completed) : []),
+    [sessionEnabled, layered, bounds.start, isCurrent, meId, seasons],
+  )
+  const aboveTasks = useMemo(() => (sessionEnabled && above === 'season'
+    ? selectPeriodTasks(layered, 'season', aboveStart, isCurrentPeriod(periodBounds('season', aboveStart, seasons), today), meId, seasons).filter((t) => !t.completed)
+    : []), [sessionEnabled, above, layered, aboveStart, seasons, today, meId])
+
+  // Reopening a saved plan starts from MY saved notes, so saving again never
+  // writes blank reflections over them (review 2026-09-21).
+  const startSession = useCallback(() => {
+    if (!sessionReady) return
+    setDraft((d) => d ?? readDraft(userId, periodYmd)
+      ?? { ...emptyDraft(bounds.start, bounds.prev), wentWell: myNotes?.wentWell ?? '', didnt: myNotes?.didnt ?? '' })
+    setSaveError(false)
+    setJustSaved(false)
+    setSessionOpen(true)
+  }, [sessionReady, userId, periodYmd, bounds.start, bounds.prev, myNotes])
+  const changeDraft = useCallback((d: SessionDraft) => { setDraft(d); writeDraft(userId, d) }, [userId])
+  const closeSession = useCallback(() => setSessionOpen(false), [])
+  const saveDraft = useCallback(async () => {
+    if (!draft) return
+    setSavingSession(true)
+    const result = await applySession(draft, {
+      keep: async (id, monthStart, prevStart) => !!(await keepForward(id, { monthStart }, prevStart)),
+      addTask: (title, o) => addTask(title, undefined, undefined, undefined, {
+        id: o.id, bucket: 'month', monthStart: o.monthStart, isGoal: o.isGoal, goalTaskId: o.goalTaskId, context: soleDomain,
+      }),
+      // updateTask reports whether it wrote (and stamps completed_at); toggleTask does not report.
+      complete: (id) => gated.updateTask(id, { completed: true }),
+      someday: (id) => gated.updateTask(id, { bucket: 'someday', scheduledFor: undefined, isAllDay: undefined }),
+      drop: (id, prevStart) => dropCommitment(id, 'month', prevStart),
+      // The SESSION's month — pushTask(id, 'month') would target the month
+      // containing today, i.e. September while planning October.
+      takeIntoMonth: (id, monthStart) => gated.updateTask(id, { bucket: 'month', monthStart }),
+      saveSession: (notes) => saveSession(notes),
+    }, (id) => !!tasks.find((t) => t.id === id)?.completed,
+    // Persist after EVERY write, so a reload mid-save resumes from here.
+    (remaining) => writeDraft(userId, remaining))
+    setSavingSession(false)
+    if (!result.ok) {
+      // Keep only what did not write — Save again retries exactly that.
+      setDraft(result.remaining)
+      writeDraft(userId, result.remaining)
+      setSaveError(true)
+      return
+    }
+    clearDraft(userId, periodYmd)
+    setDraft(null)
+    setSaveError(false)
+    setSessionOpen(false)
+    setJustSaved(true)
+  }, [draft, keepForward, addTask, soleDomain, gated, dropCommitment, saveSession, tasks, userId, periodYmd])
+
   return (
     <div {...monthDrop} className={`${PAGE_COLUMN_WIDE} py-6${planDropOver ? ' reference-list-drop' : ''}`}>
       {/* The same open masthead Today wears: the period in the eyebrow, the
@@ -504,9 +586,44 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
         )}
       </div>
 
-      {/* The plan on the left, what you consult while writing it on the
+      {/* Guided planning: whether this month is planned, and the door into
+          the session. Month only; a past month is a look-back, not a plan. */}
+      {sessionEnabled && !isPast && (
+        <div className="mb-3 flex flex-wrap items-center gap-3">
+          <p className="text-[13px] text-neutral-500">
+            {sessionReadError
+              ? <>Couldn&rsquo;t check whether {shortLabel} is planned. <button type="button" onClick={reloadSession} className="font-semibold text-primary-700 hover:underline">Try again</button></>
+              : savedSession
+                ? <span className="font-semibold text-sage-600">Planned {savedSession.at.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                : 'Not planned yet'}
+          </p>
+          <span className="flex-1" />
+          {!sessionOpen && (
+            <button type="button" onClick={startSession} disabled={!sessionReady} aria-busy={!sessionReady}
+              className={`${savedSession
+                ? 'rounded-md border border-neutral-200 px-3 py-1.5 text-sm text-neutral-700'
+                : 'rounded-md bg-primary-600 px-3 py-1.5 text-sm font-semibold text-white'} disabled:opacity-50`}>
+              {savedSession ? 'Review the plan' : draft && !isEmptyDraft(draft) ? `Continue planning ${shortLabel}` : `Plan ${shortLabel}`}
+            </button>
+          )}
+        </div>
+      )}
+      {sessionEnabled && justSaved && !sessionOpen && (
+        <div className="mb-3 flex flex-wrap items-center gap-3 rounded-lg bg-sage-50 px-3 py-2 text-sm text-neutral-700">
+          <span className="min-w-0 flex-1"><Check className="mb-0.5 mr-1 inline h-4 w-4 text-sage-600" />{shortLabel} is planned. When you&rsquo;re ready, plan the week with {shortLabel} beside you.</span>
+          <button type="button" onClick={() => navigate('/week')} className="rounded-md bg-primary-600 px-3 py-1 text-[13px] font-semibold text-white">Plan the week →</button>
+        </div>
+      )}
+
+      {sessionEnabled && sessionOpen && draft ? (
+        <PlanSession periodLabel={shortLabel} prevLabel={prevPeriodLabel}
+          finished={back.finished} open={back.open} current={currentMonth}
+          above={aboveTasks.filter((t) => !t.isGoal)} aboveGoals={aboveTasks.filter((t) => t.isGoal)}
+          draft={draft} onChange={changeDraft} onClose={closeSession} onSave={saveDraft} saving={savingSession} saveError={saveError} />
+      ) : (
+      /* The plan on the left, what you consult while writing it on the
           right — the calendar included. Reference sits WITH reference instead
-          of interrupting the list (Scott, 2026-09-13). One column on a phone. */}
+          of interrupting the list (Scott, 2026-09-13). One column on a phone. */
       <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
         <div className="min-w-0 flex flex-col gap-4">
           {/* Goals — what you want from the period. */}
@@ -768,6 +885,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
           </aside>
         )}
       </div>
+      )}
     </div>
   )
 }

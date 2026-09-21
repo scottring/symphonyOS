@@ -1,10 +1,11 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, within } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { render, screen, fireEvent, within, cleanup } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import type { Task } from '@/types/task'
 import type { Goal } from '@/types/goal'
 import type { Routine } from '@/types/actionable'
 import { DEFAULT_SEASONS, type Seasons } from '@/lib/cadence/seasons'
+import { periodStartFor } from '@/lib/placement/model'
 
 // ── Hook mocks: the page is a pure function of these ─────────────────────────
 const now = new Date()
@@ -20,9 +21,12 @@ const goal = (over: Partial<Goal>): Goal => ({
 } as Goal)
 
 const state: { tasks: Task[]; goals: Goal[]; loading: boolean } = { tasks: [], goals: [], loading: false }
+const defaultAddTask = async (..._a: unknown[]): Promise<string | undefined> => 'new'
 const hook = {
-  toggleTask: vi.fn(), deleteTask: vi.fn(), updateTask: vi.fn(), updateTasksBulk: vi.fn(),
-  addTask: vi.fn(async () => 'new'), setGoal: vi.fn(), pushTask: vi.fn(), keepForward: vi.fn(), dropCommitment: vi.fn(),
+  toggleTask: vi.fn(), deleteTask: vi.fn(), updateTask: vi.fn(async (..._a: unknown[]) => true), updateTasksBulk: vi.fn(),
+  addTask: vi.fn(defaultAddTask), setGoal: vi.fn(), pushTask: vi.fn(),
+  keepForward: vi.fn(async (id: string, ..._a: unknown[]): Promise<string | undefined> => id),
+  dropCommitment: vi.fn(async (..._a: unknown[]) => true),
 }
 vi.mock('@/hooks/useSupabaseTasks', () => ({ useSupabaseTasks: () => ({ tasks: state.tasks, loading: state.loading, ...hook }) }))
 vi.mock('@/hooks/useGatedTaskActions', () => ({
@@ -57,6 +61,15 @@ vi.mock('@/lib/today/domainFilter', () => ({
   filterTasksForLayers: (t: Task[]) => t,
   matchesLayers: () => true,
 }))
+const sessionState: { saved: null | { at: Date; authorId: string; notes: object }; mine: null | { wentWell: string; didnt: string }; loadedToken: string | null | 'auto'; error: string | null } = { saved: null, mine: null, loadedToken: 'auto', error: null }
+const saveSession = vi.fn(async (..._a: unknown[]) => true)
+const reloadSession = vi.fn()
+vi.mock('@/hooks/usePlanningSession', () => ({
+  usePlanningSession: (_h: string, token: string) => ({ saved: sessionState.saved, mine: sessionState.mine, loading: false,
+    loadedToken: sessionState.loadedToken === 'auto' ? token : sessionState.loadedToken, error: sessionState.error, reload: reloadSession, save: saveSession }),
+  monthToken: (d: Date) => `${d.getFullYear()}-${d.getMonth() + 1}`,
+}))
+vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 'u1' } }) }))
 const mockNavigate = vi.fn()
 vi.mock('react-router-dom', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -660,5 +673,194 @@ describe('steps under a goal', () => {
     renderPage('season')
     fireEvent.click(screen.getByRole('button', { name: /Show steps under Make the house ours/i }))
     expect(screen.getByText('Clear the garage')).toBeInTheDocument()
+  })
+})
+
+// Guided planning, Phase 1: the month planning session hosted on /month.
+// The clock is pinned mid-October so "this month" and "last month" never
+// straddle a boundary (planningPeriod looks ahead near a month's end).
+describe('PeriodPlanPage — Plan <Month>', () => {
+  let thisMonth: Date
+  let lastMonth: Date
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date(2026, 9, 10, 10))           // Sat Oct 10 2026
+    const d = new Date()
+    thisMonth = new Date(d.getFullYear(), d.getMonth(), 1)
+    lastMonth = new Date(d.getFullYear(), d.getMonth() - 1, 1)
+    state.tasks = []; state.goals = []; state.loading = false; routinesState.routines = []
+    domainState.layers = new Set(['work', 'family', 'personal', 'unsorted']); domainState.soleDomain = null
+    seasonsState.seasons = DEFAULT_SEASONS; seasonsState.loading = false
+    localStorage.clear()
+    Object.values(hook).forEach((f) => f.mockClear())
+    hook.addTask.mockImplementation(defaultAddTask)
+    hook.updateTask.mockImplementation(async () => true)
+    hook.keepForward.mockImplementation(async (id: string) => id)
+    hook.dropCommitment.mockImplementation(async () => true)
+    mockNavigate.mockClear()
+    sessionState.saved = null; sessionState.mine = null; sessionState.loadedToken = 'auto'; sessionState.error = null
+    saveSession.mockClear(); reloadSession.mockClear()
+  })
+  afterEach(() => { vi.useRealTimers() })
+
+  it('offers "Plan <Month>" on the current month, and "Planned <date>" once saved', () => {
+    renderPage('month')
+    const label = thisMonth.toLocaleDateString('en-US', { month: 'long' })
+    expect(screen.getByRole('button', { name: `Plan ${label}` })).toBeInTheDocument()
+  })
+
+  it('shows the planned state when a household member saved this month', () => {
+    sessionState.saved = { at: new Date(2026, 8, 29), authorId: 'u2', notes: {} }
+    renderPage('month')
+    expect(screen.getByText(/planned sep 29/i)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /review the plan/i })).toBeInTheDocument()
+  })
+
+  it('runs a session end to end: keep a goal with a next action, save, return to the page with the week line', async () => {
+    state.tasks = [task({ id: 'g1', title: 'Strength', isGoal: true, monthStart: lastMonth, commitments: [{ level: 'month', periodStart: lastMonth, status: 'open' }] })]
+    renderPage('month')
+    const label = thisMonth.toLocaleDateString('en-US', { month: 'long' })
+    fireEvent.click(screen.getByRole('button', { name: `Plan ${label}` }))
+    fireEvent.click(screen.getByRole('button', { name: 'Keep, and add a next action' }))
+    fireEvent.change(screen.getByLabelText(/next action for strength/i), { target: { value: 'Book PT' } })
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(`next: plan ${label}`, 'i') }))
+    fireEvent.click(screen.getByRole('button', { name: /next: save/i }))
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(`save ${label}`, 'i') }))
+    await vi.waitFor(() => expect(saveSession).toHaveBeenCalled())
+    expect(hook.keepForward).toHaveBeenCalledWith('g1', { monthStart: expect.any(Date) }, expect.any(Date))
+    expect((hook.keepForward.mock.calls[0][2] as Date).getMonth()).toBe(lastMonth.getMonth())   // carried FROM last month
+    expect(hook.addTask).toHaveBeenCalledWith('Book PT', undefined, undefined, undefined, expect.objectContaining({ bucket: 'month', goalTaskId: 'g1' }))
+    expect(await screen.findByRole('button', { name: /plan the week/i })).toBeInTheDocument()
+  })
+
+  it('a kept goal with a blank next action cannot move on — its row asks for one', () => {
+    state.tasks = [task({ id: 'g1', title: 'Strength', isGoal: true, monthStart: lastMonth, commitments: [{ level: 'month', periodStart: lastMonth, status: 'open' }] })]
+    renderPage('month')
+    const label = thisMonth.toLocaleDateString('en-US', { month: 'long' })
+    fireEvent.click(screen.getByRole('button', { name: `Plan ${label}` }))
+    fireEvent.click(screen.getByRole('button', { name: 'Keep, and add a next action' }))
+    fireEvent.change(screen.getByLabelText(/next action for strength/i), { target: { value: '   ' } })
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(`next: plan ${label}`, 'i') }))
+    // Still on the look-back, with the reason on the goal's own row.
+    expect(screen.getByText(/name the next action, or choose keep/i)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /next: save/i })).toBeNull()
+    // Naming it lets the plan continue.
+    fireEvent.change(screen.getByLabelText(/next action for strength/i), { target: { value: 'Book PT' } })
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(`next: plan ${label}`, 'i') }))
+    expect(screen.getByRole('button', { name: /next: save/i })).toBeInTheDocument()
+  })
+
+  it('a failed save keeps the unsaved items as the draft, stays open, and does not say planned', async () => {
+    state.tasks = [task({ id: 'p1', title: 'Photos', monthStart: lastMonth, commitments: [{ level: 'month', periodStart: lastMonth, status: 'open' }] })]
+    hook.dropCommitment.mockResolvedValueOnce(false)
+    renderPage('month')
+    const label = thisMonth.toLocaleDateString('en-US', { month: 'long' })
+    fireEvent.click(screen.getByRole('button', { name: `Plan ${label}` }))
+    fireEvent.click(screen.getByRole('button', { name: 'Drop' }))
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(`next: plan ${label}`, 'i') }))
+    fireEvent.click(screen.getByRole('button', { name: /next: save/i }))
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(`save ${label}`, 'i') }))
+    expect(await screen.findByRole('alert')).toHaveTextContent(/didn't save/i)
+    expect(saveSession).not.toHaveBeenCalled()
+    expect(screen.queryByRole('button', { name: /plan the week/i })).toBeNull()
+    const stored = Object.keys(localStorage).find((k) => k.startsWith('symphony.planSession.u1.month.'))
+    expect(JSON.parse(localStorage.getItem(stored!)!).verdicts).toEqual({ p1: 'drop' })
+  })
+
+  it('"Review the plan" reopens with my saved notes, so a re-save never blanks them', () => {
+    sessionState.saved = { at: new Date(2026, 8, 29), authorId: 'u1', notes: { wentWell: 'bike rack', didnt: 'strength slipped' } }
+    sessionState.mine = { wentWell: 'bike rack', didnt: 'strength slipped' }
+    state.tasks = [task({ id: 'o1', title: 'Old', monthStart: lastMonth, commitments: [{ level: 'month', periodStart: lastMonth, status: 'open' }] })]
+    renderPage('month')
+    fireEvent.click(screen.getByRole('button', { name: /review the plan/i }))
+    expect(screen.getByLabelText(/what went well/i)).toHaveValue('bike rack')
+    expect(screen.getByLabelText(/what didn't/i)).toHaveValue('strength slipped')
+  })
+
+  it('planning NEXT month from this one writes the season pull into next month, not today\'s', async () => {
+    vi.useFakeTimers({ toFake: ['Date'] }); vi.setSystemTime(new Date(2026, 8, 20, 10))   // Sun Sep 20 2026
+    try {
+    const seasonStart = periodStartFor('season', new Date(), DEFAULT_SEASONS)
+    state.tasks = [task({ id: 'b1', title: 'Get three bids', bucket: 'quarter', seasonStart, commitments: [{ level: 'season', periodStart: seasonStart, status: 'open' }] })]
+    renderPageAt('month', '/month?start=2026-10-01')                                     // explicitly October
+    const label = 'October'
+    fireEvent.click(screen.getByRole('button', { name: `Plan ${label}` }))
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(`add to ${label}: get three bids`, 'i') }))
+    fireEvent.click(screen.getByRole('button', { name: /next: save/i }))
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(`save ${label}`, 'i') }))
+    await vi.waitFor(() => expect(hook.updateTask).toHaveBeenCalledWith('b1', expect.objectContaining({ bucket: 'month', monthStart: expect.any(Date) })))
+    const monthStart = (hook.updateTask.mock.calls.find((c) => c[0] === 'b1')![1] as { monthStart: Date }).monthStart
+    expect(monthStart.getMonth()).toBe(9)                                                 // October, while "today" is September
+    expect(hook.pushTask).not.toHaveBeenCalledWith('b1', 'month')
+    } finally { vi.useRealTimers() }
+  })
+
+  it('a failed read keeps planning closed and offers Try again', () => {
+    sessionState.loadedToken = null
+    sessionState.error = 'offline'
+    renderPage('month')
+    const label = thisMonth.toLocaleDateString('en-US', { month: 'long' })
+    expect(screen.getByRole('button', { name: `Plan ${label}` })).toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: /try again/i }))
+    expect(reloadSession).toHaveBeenCalled()
+  })
+
+  it('cannot open a session until THIS month\'s saved record has loaded', () => {
+    sessionState.loadedToken = null
+    renderPage('month')
+    const label = thisMonth.toLocaleDateString('en-US', { month: 'long' })
+    expect(screen.getByRole('button', { name: `Plan ${label}` })).toBeDisabled()
+  })
+
+  it('a reload mid-save resumes from the persisted progress without re-creating what landed', async () => {
+    // First save: the goal lands, then the task create fails (as if the page died there).
+    hook.addTask.mockImplementation(async (_t?: unknown, _a?: unknown, _b?: unknown, _c?: unknown, o?: unknown) => {
+      const opts = o as { id: string; isGoal?: boolean } | undefined
+      return opts?.isGoal ? opts.id : undefined
+    })
+    renderPage('month')
+    const label = thisMonth.toLocaleDateString('en-US', { month: 'long' })
+    fireEvent.click(screen.getByRole('button', { name: `Plan ${label}` }))
+    fireEvent.change(screen.getByLabelText(new RegExp(`new goal for ${label}`, 'i')), { target: { value: 'Three bids' } })
+    fireEvent.click(screen.getByRole('button', { name: /add goal/i }))
+    fireEvent.change(screen.getByLabelText(new RegExp(`new task for ${label}`, 'i')), { target: { value: 'Call Hughes' } })
+    fireEvent.change(screen.getByLabelText(new RegExp(`toward a ${label} goal`, 'i')), { target: { value: screen.getByRole('option', { name: 'Three bids' }).getAttribute('value')! } })
+    fireEvent.click(screen.getByRole('button', { name: /add task/i }))
+    fireEvent.click(screen.getByRole('button', { name: /next: save/i }))
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(`save ${label}`, 'i') }))
+    await screen.findByRole('alert')
+    const key = Object.keys(localStorage).find((k) => k.startsWith('symphony.planSession.u1.month.'))!
+    const persisted = JSON.parse(localStorage.getItem(key)!)
+    expect(persisted.newGoals).toEqual([])                       // the goal is recorded as written
+    expect(persisted.created).toHaveLength(1)
+    expect(persisted.newTasks[0].linkId).toBe(persisted.created[0])
+    const goalCreates = hook.addTask.mock.calls.filter((c) => (c[4] as { isGoal?: boolean })?.isGoal).length
+    // "Reload": remount, reopen, save again — only the task is attempted.
+    cleanup()
+    hook.addTask.mockImplementation(async (_t?: unknown, _a?: unknown, _b?: unknown, _c?: unknown, o?: unknown) => (o as { id: string } | undefined)?.id)
+    renderPage('month')
+    fireEvent.click(screen.getByRole('button', { name: `Continue planning ${label}` }))
+    fireEvent.click(screen.getByRole('button', { name: /next: save/i }))
+    fireEvent.click(screen.getByRole('button', { name: new RegExp(`save ${label}`, 'i') }))
+    await vi.waitFor(() => expect(saveSession).toHaveBeenCalled())
+    expect(hook.addTask.mock.calls.filter((c) => (c[4] as { isGoal?: boolean })?.isGoal).length).toBe(goalCreates)
+  })
+
+  it('Close keeps the draft and the button then says Continue', () => {
+    // Something to look back at, so the session opens on the look-back step
+    // (with nothing behind it, it opens straight on Plan).
+    state.tasks = [task({ id: 'o1', title: 'Old', monthStart: lastMonth, commitments: [{ level: 'month', periodStart: lastMonth, status: 'open' }] })]
+    renderPage('month')
+    const label = thisMonth.toLocaleDateString('en-US', { month: 'long' })
+    fireEvent.click(screen.getByRole('button', { name: `Plan ${label}` }))
+    fireEvent.change(screen.getByLabelText(/what went well/i), { target: { value: 'x' } })
+    fireEvent.click(screen.getByRole('button', { name: /close · keep my draft/i }))
+    expect(screen.getByRole('button', { name: `Continue planning ${label}` })).toBeInTheDocument()
+  })
+
+  it('season and year pages carry no planning bar', () => {
+    renderPage('season')
+    expect(screen.queryByRole('button', { name: /^Plan / })).toBeNull()
+    expect(screen.queryByText(/not planned yet/i)).toBeNull()
   })
 })
