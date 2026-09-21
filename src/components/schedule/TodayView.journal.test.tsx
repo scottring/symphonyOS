@@ -5,7 +5,7 @@ import { render } from '@/test/test-utils'
 import { ScheduleActionsProvider } from '@/contexts/ScheduleActionsContext'
 import { ReferenceListsProvider, useReferenceLists } from '@/components/reference/ReferenceListsContext'
 import { TodayView } from './TodayView'
-import { createMockRoutine, createMockTask } from '@/test/mocks/factories'
+import { createMockTask } from '@/test/mocks/factories'
 
 /**
  * Today as a daily journal (2026-09-19): My focus (chosen), Still ahead (the
