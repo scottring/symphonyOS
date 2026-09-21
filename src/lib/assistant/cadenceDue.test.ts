@@ -76,8 +76,10 @@ describe('isSessionSubstantive', () => {
     expect(isSessionSubstantive({ stepIndex: 2, review: '   ' })).toBe(false)
   })
 
-  it('rejects a savedAt stamp alone', () => {
-    expect(isSessionSubstantive({ savedAt: 'x' })).toBe(false)
+  it('a SAVED session counts even with blank reflections (savedAt is set only by Save)', () => {
+    expect(isSessionSubstantive({ savedAt: '2026-09-29T20:00:00Z' })).toBe(true)
+    expect(isSessionSubstantive({ wentWell: '', didnt: '', savedAt: '2026-09-29T20:00:00Z' })).toBe(true)
+    expect(isSessionSubstantive({ wentWell: '', didnt: '', savedAt: '' })).toBe(false)
   })
 
   it('accepts a real answer', () => {

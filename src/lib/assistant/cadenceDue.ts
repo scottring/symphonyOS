@@ -44,12 +44,17 @@ const KIND_BY_PLANNING_HORIZON: Record<string, SessionHorizon> = Object.fromEntr
  * on the first navigation. So "opened it and bailed" would otherwise silence the
  * nudge forever.
  *
- * Substantive = at least one non-empty answer that isn't bookkeeping.
+ * Substantive = a saved session (notes.savedAt), or at least one non-empty
+ * answer that isn't bookkeeping.
  */
-const BOOKKEEPING_KEYS = new Set(['stepIndex', 'savedAt'])
+const BOOKKEEPING_KEYS = new Set(['stepIndex'])
 
 export function isSessionSubstantive(notes: unknown): boolean {
   if (!notes || typeof notes !== 'object') return false
+  // A SAVED session (guided planning stamps savedAt only on Save) is done,
+  // even when both reflections were left blank — the plan itself was made.
+  const savedAt = (notes as { savedAt?: unknown }).savedAt
+  if (typeof savedAt === 'string' && savedAt.trim()) return true
   return Object.entries(notes as Record<string, unknown>).some(([key, value]) => {
     if (BOOKKEEPING_KEYS.has(key)) return false
     if (typeof value === 'string') return value.trim().length > 0
