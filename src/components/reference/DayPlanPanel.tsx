@@ -122,8 +122,11 @@ function PlanRow({ entry, day, actions, draggable }: {
   )
 }
 
-function Group({ title, entries, day, actions, draggable, defaultOpen, empty, cap = PLAN_GROUP_CAP, open: openProp, onOpenChange }: {
+function Group({ title, entries, day, actions, draggable, defaultOpen, empty, cap = PLAN_GROUP_CAP, open: openProp, onOpenChange, count = true }: {
   title: string
+  /** Show "· N outstanding" after the title. Off for Carried over: unfinished
+   *  work is findable here, never scored (Today keeps no scoreboard). */
+  count?: boolean
   entries: DayPlanEntry[]
   day: Date
   actions: DayPlanPanelActions
@@ -160,7 +163,7 @@ function Group({ title, entries, day, actions, draggable, defaultOpen, empty, ca
         className="inline-flex items-center gap-1 text-[12px] font-semibold uppercase tracking-[0.08em] text-neutral-500 hover:text-neutral-800"
       >
         {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-        {title}{outstanding > 0 ? ` · ${outstanding}` : ''}
+        {title}{count && outstanding > 0 ? ` · ${outstanding}` : ''}
       </button>
       {open && (
         <div id={id}>
@@ -264,7 +267,7 @@ export function DayPlanPanel({ plan, day, actions, draggable = true, weekPage = 
       {nothing && !weekPage && <p className="py-4 text-[14px] text-neutral-500">Nothing waiting — the day is what's on it.</p>}
       {weekPage && weekGroup}
       {plan.carried.length > 0 && (
-        <Group title="Carried over" entries={plan.carried} day={day} actions={actions} draggable={draggable} defaultOpen={!weekPage} />
+        <Group title="Carried over" entries={plan.carried} day={day} actions={actions} draggable={draggable} defaultOpen={!weekPage} count={false} />
       )}
       <Group title="Scheduled today" entries={plan.scheduled} day={day} actions={actions} draggable={draggable} defaultOpen={!weekPage} />
       <Group title="Available today" entries={plan.available} day={day} actions={actions} draggable={draggable} defaultOpen={!weekPage} />

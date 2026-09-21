@@ -219,16 +219,15 @@ describe('TodayView', () => {
         },
       ],
     } as never)
-    // Since 2026-09-20 a two-day-old commitment IS on the page — under
-    // "Carried over", labelled by its day, with no count (the walkthrough had
-    // Week saying "Didn't happen · 3" while Today said nothing). The footer's
-    // muted "Review" still opens the bounded triage that owns the backlog.
-    const carried = screen.getByRole('list', { name: 'Carried over' })
-    expect(within(carried).getByText('Overdue task title')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Carried over' })).toBeInTheDocument()
-    expect(screen.queryByText(/Carried over · \d/)).toBeNull()
+    // A two-day-old commitment is NOT drawn on the page: it waits in the
+    // planning panel's "Carried over" group, reached by one quiet line
+    // (Scott, 2026-09-21). The footer's muted "Review" still opens the
+    // bounded triage that owns the backlog.
+    expect(screen.queryByText('Overdue task title')).toBeNull()
+    expect(screen.queryByRole('heading', { name: 'Carried over' })).toBeNull()
+    expect(screen.getByRole('button', { name: /Review unfinished work/ })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Review' }))
-    expect(screen.getAllByText('Overdue task title').length).toBeGreaterThanOrEqual(2)
+    expect(screen.getAllByText('Overdue task title').length).toBeGreaterThanOrEqual(1)
   })
 
   it('renders timeline insert (+) slots when create-at handlers are available', () => {
@@ -574,10 +573,11 @@ describe('TodayView attention line', () => {
 
   it('keeps every slipped row off the page and points at them instead', () => {
     renderView({ viewedDate: TODAY, tasks: [mk('c', 'carried thing', 1), mk('s', 'slipped thing', 200)] } as never)
-    // The one-day-old carry-over is on the page (Carried over, since
-    // 2026-09-20); the 200-day-old slip is not — it is reachable through the
-    // muted Review link and the Inbox's Expired fold only.
-    expect(screen.getByText('carried thing')).toBeInTheDocument()
+    // Neither is drawn on the page. The one-day-old carry-over waits in the
+    // planning panel behind one quiet line (2026-09-21); the 200-day-old slip
+    // is reachable through the muted Review link and the Inbox's Expired fold.
+    expect(screen.queryByText('carried thing')).toBeNull()
+    expect(screen.getByRole('button', { name: /Review unfinished work/ })).toBeInTheDocument()
     expect(screen.queryByText('slipped thing')).toBeNull()
     expect(screen.getByRole('button', { name: 'Review' })).toBeInTheDocument()
     // No scoreboard: the footer names neither the size nor the age.

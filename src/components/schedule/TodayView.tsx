@@ -39,8 +39,6 @@ import { useDomain } from '@/hooks/useDomain'
 
 import { Eye, EyeOff, Repeat, Binoculars, Printer, GripVertical, Moon, Sparkles, NotebookPen, ArrowRight, PanelLeft, ChevronDown, ChevronRight } from 'lucide-react'
 import { splitTodayJournal } from '@/lib/today/journalSplit'
-import { TriageRow, applyTriageVerdict, type Verdict } from './TriageRow'
-import { missedLabel } from '@/lib/week/missedPlacement'
 import { DayPlanPanel, panelActionsFor, planSummary } from '@/components/reference/DayPlanPanel'
 import { useReferenceLists } from '@/components/reference/ReferenceListsContext'
 import { makePlanActions } from '@/lib/planning/planActions'
@@ -1384,39 +1382,23 @@ export function TodayView({
             )}
           </section>
 
-          {/* Yesterday's unfinished commitments (the two-day grace window).
-              Computed all along, drawn nowhere since the overdue section was
-              deleted on 2026-09-03 — Week said "Didn't happen · 3" while Today
-              said nothing (walkthrough, 2026-09-20). Same words as Week, same
-              verbs as the review, no count in the heading. */}
-          {data.isToday && data.overdueTasks.length > 0 && (
-            <section aria-labelledby="today-carried-heading" className="daybook-journal-section">
-              <div className="daybook-journal-heading">
-                <h2 id="today-carried-heading">Carried over</h2>
-              </div>
-              <ul aria-label="Carried over" className="flex flex-col">
-                {data.overdueTasks.map((t) => (
-                  <li key={t.id}>
-                    <TriageRow
-                      task={t}
-                      meta={t.scheduledFor ? missedLabel(t.scheduledFor, new Date(nowTick)) : undefined}
-                      lead="today"
-                      offer={['today', 'tomorrow', 'week', 'someday', 'deleted']}
-                      canDelete={!!ctx.onDeleteTask}
-                      onVerdict={(task: Task, v: Verdict) => {
-                        void applyTriageVerdict(task, v, {
-                          viewedDate,
-                          onUpdateTask: (id, u) => onUpdateTask?.(id, u),
-                          onPushTask: ctx.onPushTask,
-                          onDeleteTask: ctx.onDeleteTask,
-                        })
-                      }}
-                      onComplete={(task: Task) => onToggleTask(task.id)}
-                    />
-                  </li>
-                ))}
-              </ul>
-            </section>
+          {/* Yesterday's unfinished commitments (the two-day grace window)
+              live in the planning panel's "Carried over" group, beside the
+              other things you might choose — Today's main area is the day's
+              scheduled work and chosen focus (Scott, 2026-09-21). They stay
+              findable: one quiet line, only while the panel is closed, no
+              count, no duplicate rows, nothing promoted into today. */}
+          {data.isToday && data.overdueTasks.length > 0 && !(usePin ? todayPinned : planOpenInline) && (
+            <div className="daybook-journal-section">
+              <button
+                type="button"
+                onClick={openPlan}
+                className="inline-flex items-center gap-1.5 text-[13px] text-neutral-500 hover:text-neutral-800"
+              >
+                <PanelLeft className="h-3.5 w-3.5" aria-hidden="true" />
+                <span>Review unfinished work →</span>
+              </button>
+            </div>
           )}
 
           <section aria-labelledby="today-ahead-heading" className="daybook-journal-section">

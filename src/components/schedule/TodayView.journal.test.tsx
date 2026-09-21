@@ -82,20 +82,26 @@ function renderView(props: Record<string, unknown> = {}) {
 }
 
 describe('Carried over', () => {
-  // Week says "Didn't happen · Fri"; Today used to say nothing at all.
-  it("draws yesterday's unfinished commitment on Today with the same words as Week", () => {
+  // Yesterday's unfinished commitment lives in the planning panel, beside
+  // the other things you might choose; Today's main area is the day's
+  // scheduled work and chosen focus (Scott, 2026-09-21). One quiet line keeps
+  // it findable; no rows, no count, nothing promoted into today.
+  it("points at yesterday's unfinished commitment and opens the panel that holds it", () => {
     const yesterday = createMockTask({ id: 'yest', title: 'Order Comma 4', bucket: 'timed', isAllDay: true, scheduledFor: new Date(2026, 8, 18) })
     renderView({ tasks: [...tasks, yesterday] })
-    const section = screen.getByRole('list', { name: 'Carried over' })
-    expect(within(section).getByText('Order Comma 4')).toBeInTheDocument()
-    expect(within(section).getByText("Didn't happen · Fri")).toBeInTheDocument()
-    // No count in the heading — Today keeps no scoreboard.
-    expect(screen.getByRole('heading', { name: 'Carried over' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Carried over' })).not.toBeInTheDocument()
+    expect(screen.queryByText('Order Comma 4')).not.toBeInTheDocument()
+    const link = screen.getByRole('button', { name: /Review unfinished work/ })
+    fireEvent.click(link)
+    // The link opens the panel (here: pins Today, whose panel the shell
+    // draws) and steps aside while it is open — one place, not two.
+    expect(screen.queryByRole('button', { name: /Review unfinished work/ })).not.toBeInTheDocument()
+    expect(screen.queryByText(/Carried over · \d/)).toBeNull()
   })
 
   it('says nothing when nothing was left behind', () => {
     renderView()
-    expect(screen.queryByRole('heading', { name: 'Carried over' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Review unfinished work/ })).not.toBeInTheDocument()
   })
 })
 
