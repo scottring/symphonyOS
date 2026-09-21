@@ -15,6 +15,7 @@ import { PlanningRhythmSettings } from './PlanningRhythmSettings'
 import { SeasonsSettings } from './SeasonsSettings'
 import { DemoControls } from './DemoControls'
 import { SchoolMailCard } from './SchoolMailCard'
+import { SignOutSection } from './SignOutSection'
 import type { FamilyMember } from '@/types/family'
 
 interface SettingsPageProps {
@@ -737,6 +738,8 @@ export function SettingsPage({
             </section>
           </div>
         )}
+
+        <SignOutSection />
       </div>
 
       {/* Delete confirmation modal */}

@@ -271,11 +271,14 @@ function ShellLayoutInner({ children }: Props) {
             : { marginRight: selection ? '480px' : rightRailVisible ? '380px' : todayRailVisible ? '420px' : '0' }
         }
       >
-        {/* Mobile header — domain switcher + sign-out (date nav lives in
+        {/* Mobile header — domain switcher (date nav lives in
             HomeHeader on Today). This header is the one piece of chrome every
             mobile Shell route renders, so the switcher lives here and nowhere
             else on phones: HomeHeader hides its copy below md, and the desktop
-            top-right cluster further down is gated on !isMobile. */}
+            top-right cluster further down is gated on !isMobile. Sign out is
+            NOT here: an unlabelled one-tap door on the page people live in
+            (walkthrough 2026-09-21, C-P1) — it lives in Settings, with a
+            confirm. */}
         {isMobile && (
           <header
             className="sticky top-0 z-10 bg-transparent px-3 py-1"
@@ -285,27 +288,6 @@ function ShellLayoutInner({ children }: Props) {
               <div className="flex-1" />
               <div className="flex items-center gap-1 shrink-0">
                 <DomainSwitcher />
-                {signOut && (
-                  <button
-                    onClick={signOut}
-                    className="p-2 rounded-xl text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100 transition-all"
-                    aria-label="Sign out"
-                  >
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      className="w-5 h-5"
-                      viewBox="0 0 20 20"
-                      fill="currentColor"
-                    >
-                      <path
-                        fillRule="evenodd"
-                        d="M3 3a1 1 0 00-1 1v12a1 1 0 001 1h12a1 1 0 001-1V4a1 1 0 00-1-1H3zm11 4a1 1 0 10-2 0v4a1 1 0 102 0V7z"
-                        clipRule="evenodd"
-                      />
-                      <path d="M7 10a1 1 0 011-1h2a1 1 0 110 2H8a1 1 0 01-1-1z" />
-                    </svg>
-                  </button>
-                )}
               </div>
             </div>
           </header>
