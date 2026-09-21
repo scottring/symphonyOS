@@ -1750,7 +1750,11 @@ export function useSupabaseTasks() {
       if (plan.commitmentOps.length || plan.focusOps.length) opsOk = await writePlacementOps(id, plan, task)
       // Fan out to other instances. Announce the merged LOCAL object, not the
       // returned flat row — a parent's nested subtasks must survive the swap.
-      announceLocalWrite({ kind: 'update', task: { ...task, ...updates } })
+      // Only when the records wrote: after a failed commitment/focus write the
+      // local task has been reconciled (or restored), and announcing the
+      // optimistic records would overwrite that truth here and everywhere
+      // (review 2026-09-21, same rule as keepForward/dropCommitment).
+      if (opsOk) announceLocalWrite({ kind: 'update', task: { ...task, ...updates } })
     } else {
       console.warn('[updateTask] DB update returned no data!')
     }

@@ -246,6 +246,24 @@ describe('planning writes report real outcomes', () => {
     expect(ok).toBe(false)
   })
 
+  it('after a failed updateTask move the local commitments are the database\'s, and a retry of the same move really writes', async () => {
+    const { result } = await mountWith([monthTask('t1', sep)])
+    db.failOnce('task_commitments', 'update', { message: 'boom', code: 'XX000' })   // removing September fails; ensuring October lands
+    let first: boolean | undefined
+    await act(async () => { first = await result.current.updateTask('t1', { bucket: 'month', monthStart: oct }) })
+    expect(first).toBe(false)
+    const fromDb = db.rows('task_commitments').filter((c) => c.task_id === 't1').map((c) => `${c.period_start}:${c.status}`).sort()
+    expect(fromDb).toEqual(['2026-09-01:open', '2026-10-01:open'])
+    const local = result.current.tasks.find((t) => t.id === 't1')!.commitments!.map((c) => `${localYmd(c.periodStart)}:${c.status}`).sort()
+    expect(local).toEqual(fromDb)
+    const updatesBefore = db.writeCount('task_commitments', 'update')
+    let second: boolean | undefined
+    await act(async () => { second = await result.current.updateTask('t1', { bucket: 'month', monthStart: oct }) })
+    expect(second).toBe(true)
+    expect(db.writeCount('task_commitments', 'update')).toBe(updatesBefore + 1)
+    expect(db.rows('task_commitments').find((c) => c.task_id === 't1' && c.period_start === '2026-09-01')!.status).toBe('removed')
+  })
+
   it('keepForward returns undefined when carrying the commitment errored', async () => {
     db.failOn('task_commitments', { message: 'boom', code: 'XX000' })
     const { result } = await mountWith([monthTask('t1', sep)])
