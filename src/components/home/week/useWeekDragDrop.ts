@@ -107,17 +107,16 @@ export function useWeekDragDrop(args: UseWeekDragDropArgs): UseWeekDragDropResul
       // and a scheduled task must never sit in another bucket (timed-bucket
       // invariant). No-op for already-placed chips.
       const prevBucket = task?.bucket
-      const prevPlannedOn = task?.plannedOn
-      // Placing on a day is choosing it: planned_on rides along, so the task
-      // is on that day's main list rather than waiting in the Today pin.
-      void onUpdateTask(taskId, { isAllDay: true, scheduledFor: newDay, bucket: 'timed', plannedOn: newDay })
+      // A drag onto a day is a DATE and nothing else (spec S4): it never
+      // chooses the task for anyone's focus. Dated work shows on its day's
+      // Tasks without focus (S12).
+      void onUpdateTask(taskId, { isAllDay: true, scheduledFor: newDay, bucket: 'timed' })
       args.pushAction?.(`Moved "${task?.title ?? 'task'}"`, () => {
         void onUpdateTask(taskId, {
           isAllDay: prevIsAllDay,
           scheduledFor: prevScheduledFor as Date,
           endTime: prevEndTime,
           bucket: prevBucket,
-          plannedOn: prevPlannedOn,
         })
       })
       return

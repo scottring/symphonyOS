@@ -77,6 +77,14 @@ describe('gateUpdate', () => {
     await expect(gateUpdate(unsorted, { bucket: 'week' }, async () => null, write)).resolves.toBe(false)
     await expect(gateUpdate(unsorted, { bucket: 'week' }, async () => 'family', write)).resolves.toBe(true)
   })
+
+  // The notes panel says "Saved" on this value, so a write the row refused
+  // (DB error, RLS-filtered UPDATE) must not read as success.
+  it('resolves false when the writer reports the row was not written', async () => {
+    const failed = vi.fn(async () => false)
+    await expect(gateUpdate(unsorted, { notes: '<p>x</p>' }, async () => 'family', failed)).resolves.toBe(false)
+    await expect(gateUpdate(unsorted, { bucket: 'week' }, async () => 'family', failed)).resolves.toBe(false)
+  })
 })
 
 describe('useGatedTaskActions setBucket', () => {

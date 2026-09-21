@@ -244,7 +244,7 @@ function TaskPanelBody({ id }: { id: string }) {
         // the real hook logic (defer_count, weekStart, overdue time
         // preservation), and an Unsorted task reschedule here asks first.
         void (async () => {
-          const ok = await applyTriageWhen(when, task.id, { onPushTask: gated.pushTask, onSetBucket: gated.setBucket! });
+          const ok = await applyTriageWhen(when, task.id, { onPushTask: gated.pushTask, onSetBucket: gated.setBucket!, onFocus: (id, day) => gated.updateTask(id, { plannedOn: day }) });
           if (ok) showToast(describeTriageWhen(when), 'success');
         })();
       }}
@@ -279,7 +279,7 @@ function TaskPanelBody({ id }: { id: string }) {
       }}
       onRescheduleSubtask={(sid, when) => {
         void (async () => {
-          const ok = await applyTriageWhen(when, sid, { onPushTask: gated.pushTask, onSetBucket: gated.setBucket! });
+          const ok = await applyTriageWhen(when, sid, { onPushTask: gated.pushTask, onSetBucket: gated.setBucket!, onFocus: (id, day) => gated.updateTask(id, { plannedOn: day }) });
           if (ok) showToast(describeTriageWhen(when), 'success');
         })();
       }}

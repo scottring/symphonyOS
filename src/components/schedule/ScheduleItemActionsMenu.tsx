@@ -3,6 +3,7 @@ import { MoreHorizontal, Redo2, Undo2, Clock, Trash2, CalendarCog, Hourglass, Me
 import type { TimelineItem } from '@/types/timeline'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
 import { isSameDay } from '@/lib/dateUtils'
+import { focusSnapshot } from '@/lib/placement/model'
 import { DiscussionPopover } from '@/components/triage'
 import { WaitingForPopover } from './WaitingForPopover'
 
@@ -232,7 +233,13 @@ export function ScheduleItemActionsMenu({ item, onOpenDetail, onUpdateDiscussion
               <button
                 type="button"
                 role="menuitem"
-                onClick={run(() => { void ctx.onUpdateTask?.(item.originalTask!.id, { plannedOn: undefined }) })}
+                onClick={run(() => {
+                  // Only the viewed day's focus goes (a choice for another
+                  // day is kept); focus rows, not the legacy column.
+                  const day = ctx.viewedDate ?? new Date()
+                  const kept = focusSnapshot(item.originalTask!).filter((f) => !isSameDay(f.date, day))
+                  void ctx.onUpdateTask?.(item.originalTask!.id, { focus: kept })
+                })}
                 className="flex w-full text-left items-center gap-2.5 px-3 py-2.5 text-sm text-neutral-700 hover:bg-neutral-50"
               >
                 <Undo2 className="w-4 h-4 text-neutral-400" />

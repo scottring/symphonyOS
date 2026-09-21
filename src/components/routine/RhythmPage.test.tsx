@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent, within } from '@testing-library/react'
+import { render, screen, fireEvent, within, waitFor } from '@testing-library/react'
 import { RhythmPage } from './RhythmPage'
 import type { Routine } from '@/types/actionable'
 
@@ -257,30 +257,38 @@ describe('first step on a step-less routine', () => {
     expect(onDelete).not.toHaveBeenCalled()
   })
 
-  it('a "New routine" closed untouched is let go, not left behind', async () => {
+  // Walkthrough 2026-09-21, B20: "New routine" used to insert a live row on
+  // click, which showed on Today's rungs and in the Planning panel while the
+  // editor was still open. Nothing is written until Save now.
+  it('"New routine" writes nothing on click, and closing without Save writes nothing', async () => {
+    const onCreateCollection = vi.fn()
+    const onUpdateRoutine = vi.fn()
     const onDelete = vi.fn()
-    const draft = mk('New routine', { id: 'draft' })
     render(
-      <RhythmPage {...noop} onUpdateRoutine={vi.fn()} onDelete={onDelete}
-        onCreateCollection={vi.fn().mockResolvedValue(draft)}
-        routines={[mk('Walk Jax', { id: 'walk', time_of_day: '06:30:00' }), draft]} />
+      <RhythmPage {...noop} onUpdateRoutine={onUpdateRoutine} onDelete={onDelete}
+        onCreateCollection={onCreateCollection}
+        routines={[mk('Walk Jax', { id: 'walk', time_of_day: '06:30:00' })]} />
     )
     fireEvent.click(screen.getAllByRole('button', { name: 'New routine' })[0])
     expect(await screen.findByRole('button', { name: 'Close' })).toBeInTheDocument()
+    expect(screen.getByText(/Not saved yet/)).toBeInTheDocument()
+    expect(onCreateCollection).not.toHaveBeenCalled()
     fireEvent.keyDown(document.body, { key: 'Escape' })
-    expect(onDelete).toHaveBeenCalledWith('draft')
+    expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument()
+    expect(onCreateCollection).not.toHaveBeenCalled()
+    expect(onUpdateRoutine).not.toHaveBeenCalled()
+    expect(onDelete).not.toHaveBeenCalled()
   })
 
-  it('a "New routine" that was edited is kept on close', async () => {
-    const onDelete = vi.fn()
-    const onUpdateRoutine = vi.fn()
-    const draft = mk('New routine', { id: 'draft' })
+  it('"New routine" is created once, on Save, with the name typed in the panel', async () => {
+    const created = mk('Sunday reset', { id: 'created' })
+    const onCreateCollection = vi.fn().mockResolvedValue(created)
     render(
-      <RhythmPage {...noop} onUpdateRoutine={onUpdateRoutine} onDelete={onDelete}
-        onCreateCollection={vi.fn().mockResolvedValue(draft)}
-        routines={[draft]} />
+      <RhythmPage {...noop} onUpdateRoutine={vi.fn()} onDelete={vi.fn()}
+        onCreateCollection={onCreateCollection}
+        routines={[]} />
     )
-    fireEvent.click(screen.getAllByRole('button', { name: 'New routine' })[0])
+    fireEvent.click(screen.getByRole('button', { name: 'New routine' }))
     await screen.findByRole('button', { name: 'Close' })
     // PanelHeader shows the title as a button; click to enter edit mode.
     const titleButtons = screen.getAllByRole('button', { name: 'New routine' })
@@ -288,9 +296,12 @@ describe('first step on a step-less routine', () => {
     const title = screen.getByDisplayValue('New routine')
     fireEvent.change(title, { target: { value: 'Sunday reset' } })
     fireEvent.blur(title)
-    expect(onUpdateRoutine).toHaveBeenCalledWith('draft', { name: 'Sunday reset' })
-    fireEvent.click(screen.getByRole('button', { name: 'Close' }))
-    expect(onDelete).not.toHaveBeenCalled()
+    expect(onCreateCollection).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Save & close' }))
+    await waitFor(() => expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument())
+    expect(onCreateCollection).toHaveBeenCalledTimes(1)
+    expect(onCreateCollection.mock.calls[0][0]).toBe('Sunday reset')
+    expect(onCreateCollection.mock.calls[0][1]).toMatchObject({ recurrence_pattern: { type: 'daily' }, visibility: 'active' })
   })
 
   it('shows the add-step input on a step-less routine panel and adds through it', () => {

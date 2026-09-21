@@ -1400,7 +1400,7 @@ export function useSupabaseTasks() {
       // Should be rare now that lookups read tasksRef — surface it loudly so a
       // dropped write is never silent again.
       console.warn('[updateTask] Task not found, write dropped:', id, updates)
-      return
+      return false
     }
 
     // A goal is an outcome you tick, never a thing you place. Refusing here,
@@ -1411,7 +1411,7 @@ export function useSupabaseTasks() {
     if (task.isGoal && isPlacement(updates)) {
       logger.debug('[updateTask] placement refused: row is a goal', { id, updates })
       showToast("Goals aren't scheduled — tick it off when it's done", 'info')
-      return
+      return false
     }
 
     // ONE enduring action (2026-09-21). Whatever dialect the caller speaks —
@@ -1574,8 +1574,10 @@ export function useSupabaseTasks() {
     logger.debug('[updateTask] Sending to DB:', { id, dbUpdates })
     // A records-only write (choosing a task for today, un-choosing it) names
     // no column on `tasks`; an empty UPDATE would return no row and the
-    // records would never be written (found in the first walkthrough).
-    const recordsOnly = Object.keys(dbUpdates).length === 0 && (plan.commitmentOps.length > 0 || plan.focusOps.length > 0)
+    // records would never be written (found in the first walkthrough). A
+    // stated focus list that changes nothing (un-choosing a day that was not
+    // chosen) names no column either — no empty UPDATE for that.
+    const recordsOnly = Object.keys(dbUpdates).length === 0
     const { data, error: updateError, status, count } = recordsOnly
       ? { data: [{ id }] as unknown[], error: null, status: 200, count: 1 }
       : await supabase
@@ -1640,6 +1642,9 @@ export function useSupabaseTasks() {
         }
       }
     }
+    // True only when the row itself was written: callers such as the notes
+    // panel say "Saved" on it. An RLS-filtered UPDATE returns no row.
+    return !updateError && !!data && data.length > 0
   }, [tasks, familyMembers, findTaskById, findParentOfSubtask, selfMemberIdForOwner, user, writePlacementOps])
 
   // Bulk update multiple tasks at once

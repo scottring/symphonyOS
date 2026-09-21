@@ -35,6 +35,10 @@ interface TapRoutinePanelProps {
   routine: Routine
   familyMembers?: FamilyMember[]
   onClose: () => void
+  /** An unsaved routine ("New routine"): Save calls this, and closing
+   *  without it writes nothing. */
+  unsaved?: boolean
+  onSave?: () => void
   onRename?: (name: string) => void
   onNotesChange: (next: string) => void
   onContextChange: (context: TaskContext | undefined) => void
@@ -373,10 +377,12 @@ export function TapRoutinePanel(props: TapRoutinePanelProps) {
       {/* Explicit save affordance — edits persist as you make them, but a
           panel with no button reads as "did that stick?" */}
       <div className="mt-4 flex items-center justify-between gap-3">
-        <span className="text-xs text-neutral-400">Changes save as you edit</span>
+        <span className="text-xs text-neutral-400">
+          {props.unsaved ? 'Not saved yet — closing discards it' : 'Changes save as you edit'}
+        </span>
         <button
           type="button"
-          onClick={props.onClose}
+          onClick={props.unsaved && props.onSave ? props.onSave : props.onClose}
           className="rounded-xl bg-[var(--color-primary-500,#3d5a44)] px-4 py-2 text-[15px] font-medium text-white
                      hover:opacity-90 transition-opacity"
         >

@@ -40,11 +40,21 @@ describe('applyTriageVerdict — "today" chooses the day', () => {
     expect(onUpdateTask).not.toHaveBeenCalled()
   })
 
-  it('a month-list task keeps its list — only the day is chosen', async () => {
+  // S4: "Today" is date + focus for every task — a month- or week-list task
+  // too. The date never removes its list commitment (placement module).
+  it('a month-list task is dated today AND chosen (S4)', async () => {
     const onPushTask = vi.fn(async () => true)
     const onUpdateTask = vi.fn(async () => true)
     await applyTriageVerdict(task({ bucket: 'month' }), 'today', { viewedDate: new Date(2026, 8, 6), onUpdateTask, onPushTask })
-    expect(onPushTask).not.toHaveBeenCalled()
+    expect(onPushTask).toHaveBeenCalledWith('t1', new Date(2026, 8, 6))
     expect(onUpdateTask).toHaveBeenCalledWith('t1', { plannedOn: new Date(2026, 8, 6) })
+  })
+
+  it('"tomorrow" is a date only — no focus for tomorrow (S4)', async () => {
+    const onPushTask = vi.fn(async () => true)
+    const onUpdateTask = vi.fn(async () => true)
+    await applyTriageVerdict(task({ bucket: 'week' }), 'tomorrow', { viewedDate: new Date(2026, 8, 6), onUpdateTask, onPushTask })
+    expect(onPushTask).toHaveBeenCalledWith('t1', new Date(2026, 8, 7))
+    expect(onUpdateTask).not.toHaveBeenCalled()
   })
 })

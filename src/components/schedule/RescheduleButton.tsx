@@ -54,6 +54,7 @@ export function RescheduleButton({ item }: { item: TimelineItem }) {
         const ok = await applyTriageWhen(when, taskId, {
           onPushTask: (id, target) => ctx.onPushTask?.(id, target),
           onSetBucket: (id, bucket) => ctx.onUpdateTask?.(id, { bucket, scheduledFor: undefined, isAllDay: undefined }),
+          onFocus: (id, day) => ctx.onUpdateTask?.(id, { plannedOn: day }),
         })
         // A cancelled domain gate writes nothing — no confirmation for a move
         // that didn't happen.

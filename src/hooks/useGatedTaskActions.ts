@@ -64,13 +64,14 @@ export async function gateUpdate(
   task: Gatable,
   updates: Partial<Task>,
   ask: Ask,
-  write: (id: string, u: Partial<Task>) => Promise<void> | void,
+  write: (id: string, u: Partial<Task>) => Promise<boolean | void> | boolean | void,
 ): Promise<boolean> {
-  if (!needsDomain(task, updates)) { await write(task.id, updates); return true }
+  // A writer that reports `false` (the row was not written) makes this false
+  // too; a writer that reports nothing counts as written, as before.
+  if (!needsDomain(task, updates)) return (await write(task.id, updates)) !== false
   const context = await ask(task)
   if (!context) return false
-  await write(task.id, { ...updates, context })
-  return true
+  return (await write(task.id, { ...updates, context })) !== false
 }
 
 /** Push/setBucket/assign share one shape: if the task is untagged AND not a
@@ -83,7 +84,7 @@ export async function gateUpdate(
 async function gateThenCall(
   task: Gatable | undefined,
   ask: Ask,
-  writeContext: (id: string, context: DomainId) => Promise<void> | void,
+  writeContext: (id: string, context: DomainId) => Promise<unknown> | unknown,
   call: () => Promise<void> | void,
 ): Promise<boolean> {
   if (task && task.context == null && !isStep(task)) {
@@ -110,7 +111,7 @@ export interface GatedTaskActions {
 }
 
 export function useGatedTaskActions<R extends {
-  updateTask: (id: string, u: Partial<Task>) => Promise<void> | void
+  updateTask: (id: string, u: Partial<Task>) => Promise<boolean | void> | boolean | void
   pushTask: (id: string, target: Date | 'week' | 'month' | 'quarter') => Promise<void> | void
   updateTasksBulk: (ids: string[], u: Partial<Task>) => Promise<void>
   setBucket?: (id: string, bucket: TaskBucket, scheduledFor?: Date, isAllDay?: boolean) => Promise<void> | void
@@ -122,7 +123,7 @@ export function useGatedTaskActions<R extends {
     ...raw,
     updateTask: async (id: string, updates: Partial<Task>) => {
       const t = findTask(id)
-      if (!t) { await raw.updateTask(id, updates); return true }
+      if (!t) return (await raw.updateTask(id, updates)) !== false
       return gateUpdate(t, updates, requireDomain, raw.updateTask)
     },
     pushTask: async (id: string, target: Date | 'week' | 'month' | 'quarter') =>
