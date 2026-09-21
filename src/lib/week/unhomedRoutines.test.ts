@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { unhomedRoutines, type UnhomedCtx } from './unhomedRoutines'
-import { createMockRoutine } from '@/test/mocks/factories'
+import { createMockRoutine, createMockActionableInstance } from '@/test/mocks/factories'
 import { ALL_LAYERS } from '@/lib/domains'
 import type { RecurrencePattern } from '@/types/actionable'
 
@@ -43,5 +43,28 @@ describe('unhomedRoutines', () => {
   it('drops routines the resolver ladder would hide (resting)', () => {
     const r = createMockRoutine({ time_of_day: null, visibility: 'reference', recurrence_pattern: { type: 'weekly' } as RecurrencePattern })
     expect(unhomedRoutines([r], ctx)).toEqual([])
+  })
+
+  // "Give it a day" places ONE week's occurrence. For that week the routine
+  // has a home and leaves the list; next week it is back (Scott, 2026-09-21).
+  describe('placed this week', () => {
+    const r = createMockRoutine({ id: 'r1', name: 'Take out recycling', time_of_day: null, recurrence_pattern: { type: 'weekly' } as RecurrencePattern })
+    const sun = new Date(2026, 8, 27)
+    it('drops a routine placed on a day of the week being planned', () => {
+      const placed = createMockActionableInstance({ entity_id: 'r1', date: '2026-09-27', status: 'pending', deferred_to: new Date(2026, 8, 27, 9).toISOString() })
+      expect(unhomedRoutines([r], ctx, { weekStart: sun, instances: [placed] })).toEqual([])
+    })
+    it('keeps it for a week it was not placed in', () => {
+      const placed = createMockActionableInstance({ entity_id: 'r1', date: '2026-09-27', status: 'pending', deferred_to: new Date(2026, 8, 27, 9).toISOString() })
+      const nextSun = new Date(2026, 9, 4)
+      expect(unhomedRoutines([r], ctx, { weekStart: nextSun, instances: [placed] })).toEqual([r])
+      expect(unhomedRoutines([r], ctx, { weekStart: new Date(2026, 8, 20), instances: [placed] })).toEqual([r])
+    })
+    it('a skip is not a home; a tick is', () => {
+      const skipped = createMockActionableInstance({ entity_id: 'r1', date: '2026-09-29', status: 'skipped', deferred_to: new Date(2026, 8, 29, 9).toISOString() })
+      expect(unhomedRoutines([r], ctx, { weekStart: sun, instances: [skipped] })).toEqual([r])
+      const done = createMockActionableInstance({ entity_id: 'r1', date: '2026-09-29', status: 'completed' })
+      expect(unhomedRoutines([r], ctx, { weekStart: sun, instances: [done] })).toEqual([])
+    })
   })
 })

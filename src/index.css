@@ -1758,7 +1758,7 @@ html.desktop-shell a {
 .page-navigation-menu { position: relative; }
 /* Today + its plan pin: one destination, with the pin toggle tucked beside it. */
 .page-navigation-today { display: inline-flex; align-items: center; gap: 4px; }
-.page-navigation-pin-toggle { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 4px; color: var(--color-neutral-400); cursor: pointer; }
+.page-navigation-pin-toggle { display: inline-flex; align-items: center; gap: 5px; height: 24px; padding: 0 8px; border-radius: 4px; font-size: 13px; color: var(--color-neutral-500); cursor: pointer; }
 .page-navigation-pin-toggle:hover { color: var(--color-neutral-800); background: var(--color-neutral-100); }
 .page-navigation-pin-toggle.is-pinned { color: var(--color-primary-700); background: var(--color-primary-50); }
 .page-navigation-add kbd { font-family: inherit; font-size: 11px; color: var(--color-neutral-400); border: 1px solid var(--color-neutral-200); border-radius: 3px; padding: 0 4px; line-height: 16px; }

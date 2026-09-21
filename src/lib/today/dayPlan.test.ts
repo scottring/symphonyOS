@@ -41,7 +41,7 @@ describe('selectDayPlan — dated vs chosen tasks', () => {
     const plan = selectDayPlan(input({ tasks: [dated()] }))
     expect(plan.scheduled.map((e) => e.title)).toEqual(['Pick up foot meds'])
     expect(plan.scheduled[0]).toMatchObject({ planned: false, group: 'scheduled' })
-    expect(plan.offMainTaskIds.has('d1')).toBe(true)
+    expect(plan.offMainTaskIds.has('d1')).toBe(false)
     expect(plan.counts.scheduled).toBe(1)
   })
 
@@ -54,7 +54,7 @@ describe('selectDayPlan — dated vs chosen tasks', () => {
 
   it('a choice made for yesterday has expired — the date, not a flag, decides', () => {
     const plan = selectDayPlan(input({ tasks: [dated({ plannedOn: new Date(2026, 8, 18) })] }))
-    expect(plan.offMainTaskIds.has('d1')).toBe(true)
+    expect(plan.offMainTaskIds.has('d1')).toBe(false)
     expect(plan.counts.scheduled).toBe(1)
   })
 
@@ -195,7 +195,10 @@ describe('selectDayPlan — filters apply to rows AND counts', () => {
 describe('computeTodayData — the main list is the chosen day', () => {
   const base = { ...input(), events: [], selectedAssignee: [] }
 
-  it('draws dated-and-chosen and timed work; leaves dated-only work to the pin', () => {
+  // Scott, 2026-09-21: Today shows what you scheduled for today plus what you
+  // chose. A dated task is on the page without being chosen again; focus
+  // marks the row and orders it first, it never gates visibility.
+  it('draws dated, chosen and timed work; a dated-only task is on the page too, and chosen rows lead', () => {
     const d = computeTodayData({
       ...base,
       tasks: [
@@ -206,11 +209,16 @@ describe('computeTodayData — the main list is the chosen day', () => {
       ],
     })
     const titles = Object.values(d.grouped).flat().map((i) => i.title)
-    expect(titles).toEqual(expect.arrayContaining(['Chosen', 'At two', 'From the week list']))
-    expect(titles).not.toContain('Dated only')
+    expect(titles).toEqual(expect.arrayContaining(['Chosen', 'Dated only', 'At two', 'From the week list']))
+    // Focus is marked on the row itself, so the journal can lead with it.
+    const chosen = Object.values(d.grouped).flat().find((i) => i.title === 'Chosen')
+    const datedOnly = Object.values(d.grouped).flat().find((i) => i.title === 'Dated only')
+    expect(chosen?.focused).toBe(true)
+    expect(datedOnly?.focused).toBeUndefined()
     // A chosen week-list task has no time invented for it.
     expect(d.grouped.unscheduled.map((i) => i.title)).toContain('From the week list')
-    expect(d.dayPlan.counts.scheduled).toBe(1)
+    // Nothing dated is kept off the page.
+    expect(d.dayPlan.offMainTaskIds.size).toBe(0)
   })
 
   it('an untimed routine occurrence chosen for the day renders once, and the pin marks it planned', () => {

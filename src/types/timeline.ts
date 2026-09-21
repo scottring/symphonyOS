@@ -65,6 +65,9 @@ export interface TimelineItem {
   category?: TaskCategory // Type of task: task, chore, errand, event, activity
   // Subtask support
   isSubtask?: boolean // True if this item is a subtask appearing on the timeline
+  /** Chosen by this person for the viewed day (task_focus). Orders and
+   *  highlights the row on Today; never a condition for showing it. */
+  focused?: boolean
   subtaskCount?: number // Total subtasks
   subtaskCompletedCount?: number // Completed subtasks
   // Event-specific

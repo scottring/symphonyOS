@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { Pin, X } from 'lucide-react'
 import { useReferenceLists, REFERENCE_KINDS, type ReferenceKind, type ReferencePin } from './ReferenceListsContext'
-import { DayPlanPanel, panelActionsFor } from './DayPlanPanel'
+import { DayPlanPanel, panelActionsFor, planningSubtitle } from './DayPlanPanel'
 import { useDayPlan } from '@/hooks/useDayPlan'
 import { readViewedWeek, onViewedWeekChange } from '@/lib/viewedWeekSignal'
 import { usePlanActions } from '@/hooks/usePlanActions'
@@ -21,7 +21,7 @@ import { placementFate } from '@/lib/planning/lineage'
 import { TriageRow, applyTriageVerdict, type Verdict } from '@/components/schedule/TriageRow'
 import type { Task } from '@/types/task'
 
-const KIND_LABEL: Record<ReferenceKind, string> = { today: 'Today', week: 'Week', month: 'Month' }
+const KIND_LABEL: Record<ReferenceKind, string> = { today: 'Planning', week: 'Week', month: 'Month' }
 
 export function ReferenceListControls({ paused = false }: { paused?: boolean }) {
   const ref = useReferenceLists()
@@ -36,7 +36,7 @@ export function ReferenceListControls({ paused = false }: { paused?: boolean }) 
       // draw here. It is kept, and says so, rather than reading as broken.
       const onPage = pinned && pinIsOnPage(pathname, kind)
       return <button key={kind} type="button" aria-pressed={pinned}
-        aria-label={`${pinned ? 'Unpin' : 'Pin'} ${kind === 'today' ? "today's plan" : `${kind} list`}`}
+        aria-label={`${pinned ? 'Unpin' : 'Pin'} ${kind === 'today' ? 'Planning' : `${kind} list`}`}
         onClick={() => pinned ? ref.unpin(kind) : ref.pin(kind)}
         className={`rounded px-3 py-1 ${pinned ? 'bg-primary-50 text-primary-800' : 'hover:bg-neutral-100'}`}>
         {KIND_LABEL[kind]}{onPage ? ' · on this page' : pinned ? ' · pinned' : ''}
@@ -129,29 +129,54 @@ function ReferenceList({ pin, onClose }: { pin: ReferencePin; onClose: () => voi
   </section>
 }
 
-/** The Today pin: the day's plan, always for the actual current day. */
-function TodayPlanList({ onClose }: { onClose: () => void }) {
+/**
+ * The Planning panel's contents, wherever it is drawn (the dock beside a
+ * page, or the sheet on a phone): the day's plan for the actual current day,
+ * planning into whichever week a week page is showing.
+ */
+export function PlanningPanelHost({ draggable = true, header }: {
+  draggable?: boolean
+  /** Drawn above the panel with the same day and week the panel plans —
+   *  ONE subscription to the viewed-week signal, not one per header. */
+  header?: (day: Date, viewedWeek: Date | null) => ReactNode
+}) {
   // Always the real current day — the pin's stored date is only when it was
   // pinned. Keyed on the calendar day so it rolls over at midnight.
   const todayKey = localYmd(new Date())
   const day = useMemo(() => { const [y, m, d] = todayKey.split('-').map(Number); return new Date(y, m - 1, d) }, [todayKey])
-  // A week page beside the pin announces the week it is showing, so the pin's
-  // week list is the same list that page is planning into.
+  // A week page beside the panel announces the week it is showing, so the
+  // list is the same list that page is planning into.
   const [viewedWeek, setViewedWeek] = useState<Date | null>(() => readViewedWeek())
-  useEffect(() => onViewedWeekChange(setViewedWeek), [])
+  useEffect(() => {
+    // Re-read on subscribe: a page that published before this listener
+    // existed (both mounting from a stored pin) would otherwise be missed.
+    setViewedWeek(readViewedWeek())
+    return onViewedWeekChange(setViewedWeek)
+  }, [])
   const { plan, loading, error } = useDayPlan(day, viewedWeek)
   const planActions = usePlanActions()
-  const actions = useMemo(() => panelActionsFor(day, planActions), [day, planActions])
-  return <section aria-label="Today's plan" className="reference-list">
-    <header className="flex items-start justify-between gap-3 border-b border-neutral-300 pb-4">
-      <div>
-        <h2 className="font-display text-[22px] leading-tight text-neutral-900">Today</h2>
-        <p className="mt-1 text-[13px] text-neutral-500">{day.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}</p>
-      </div>
-      <button type="button" onClick={onClose} aria-label="Unpin today's plan" className="p-2 text-neutral-500 hover:bg-neutral-100 rounded"><X className="w-4 h-4" /></button>
-    </header>
-    {error ? <p role="alert" className="py-5 text-[15px] text-danger-600">Could not load today's plan.</p>
-      : loading || !plan ? <p className="py-5 text-[15px] text-neutral-500">Loading…</p>
-      : <DayPlanPanel plan={plan} day={day} actions={actions} weekPage={viewedWeek} />}
+  const navigate = useNavigate()
+  // Changing a routine's repeating schedule is its own explicit action, on
+  // the routine's page — never a side effect of placing it.
+  const actions = useMemo(() => panelActionsFor(day, planActions, { changeRoutineRule: () => navigate('/routines') }), [day, planActions, navigate])
+  const body = error ? <p role="alert" className="py-5 text-[15px] text-danger-600">Could not load the plan.</p>
+    : loading || !plan ? <p className="py-5 text-[15px] text-neutral-500">Loading…</p>
+    : <DayPlanPanel plan={plan} day={day} actions={actions} weekPage={viewedWeek} draggable={draggable} />
+  return <>{header?.(day, viewedWeek)}{body}</>
+}
+
+/** The Planning pin: one panel, named for what it does, for whichever day or
+ *  week is on screen. */
+function TodayPlanList({ onClose }: { onClose: () => void }) {
+  return <section aria-label="Planning" className="reference-list">
+    <PlanningPanelHost header={(day, viewedWeek) => (
+      <header className="flex items-start justify-between gap-3 border-b border-neutral-300 pb-4">
+        <div>
+          <h2 className="font-display text-[22px] leading-tight text-neutral-900">Planning</h2>
+          <p className="mt-1 text-[13px] text-neutral-500">{planningSubtitle(day, viewedWeek)}</p>
+        </div>
+        <button type="button" onClick={onClose} aria-label="Close Planning" className="p-2 text-neutral-500 hover:bg-neutral-100 rounded"><X className="w-4 h-4" /></button>
+      </header>
+    )} />
   </section>
 }

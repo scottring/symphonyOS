@@ -16,6 +16,7 @@
  *  - Un-choosing never deletes, never un-dates, never touches recurrence.
  */
 import type { Task } from '@/types/task'
+import type { Routine } from '@/types/actionable'
 import type { PlanDragPayload, PlanTarget } from './planDrag'
 import { localYmd } from '@/lib/cadence/config'
 
@@ -27,6 +28,11 @@ export interface PlanActionDeps {
   setRoutinePlanned: (routineId: string, day: Date, planned: boolean) => Promise<boolean>
   /** One-day override: the occurrence on `fromDay` moves to `when`. */
   rescheduleRoutine: (routineId: string, fromDay: Date, when: Date) => Promise<unknown>
+  /** The repeating RULE, for a routine that has no day of its own yet:
+   *  "every Thursday at 5:00". The one place the rule is written from a
+   *  planning surface. Optional — a host without routines omits it. */
+  updateRoutine?: (routineId: string, updates: Partial<Routine>) => Promise<unknown> | void
+  findRoutine?: (routineId: string) => Routine | undefined
   pushAction?: (message: string, undo: () => void) => void
   notify?: (message: string) => void
 }
@@ -121,7 +127,41 @@ export function makePlanActions(deps: PlanActionDeps) {
     deps.notify?.('Routines repeat on their own schedule — they aren\'t added to a list')
   }
 
-  return { chooseTaskDay, unchooseTask, timeTask, commitTask, chooseRoutine, drop }
+  /**
+   * Place a routine with no day of its own on ONE day of the week being
+   * planned: the occurrence for that day, as a same-day time override. The
+   * repeating rule is never touched here — that is a separate, explicit
+   * action (placeRoutineRule) — so next week it is back in To plan, which is
+   * the point: a flexible routine is placed week by week (Scott, 2026-09-21).
+   */
+  async function placeRoutineOnce(routineId: string, when: Date, title = 'routine') {
+    await deps.rescheduleRoutine(routineId, midnight(when), when)
+    deps.pushAction?.(`Placed "${title}"`, () => { void deps.rescheduleRoutine(routineId, midnight(when), midnight(when)) })
+  }
+
+  /**
+   * Change the repeating rule itself: a weekly rule gains the weekday, and
+   * the time becomes its time_of_day. Explicit, never the default — placing
+   * work from Planning schedules an occurrence, not every future week.
+   */
+  async function placeRoutineRule(routineId: string, when: Date, title = 'routine') {
+    if (!deps.updateRoutine) { deps.notify?.('Set this routine\'s day on the routine itself'); return }
+    const routine = deps.findRoutine?.(routineId)
+    const weekdayKey = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][when.getDay()]
+    const updates: Partial<Routine> = {
+      time_of_day: `${String(when.getHours()).padStart(2, '0')}:${String(when.getMinutes()).padStart(2, '0')}:00`,
+    }
+    if (routine?.recurrence_pattern.type === 'weekly') {
+      updates.recurrence_pattern = { ...routine.recurrence_pattern, days: [weekdayKey] }
+    }
+    const prev: Partial<Routine> | null = routine
+      ? { time_of_day: routine.time_of_day, recurrence_pattern: routine.recurrence_pattern }
+      : null
+    await deps.updateRoutine(routineId, updates)
+    deps.pushAction?.(`Placed "${routine?.name ?? title}"`, () => { if (prev) void deps.updateRoutine?.(routineId, prev) })
+  }
+
+  return { chooseTaskDay, unchooseTask, timeTask, commitTask, chooseRoutine, placeRoutineOnce, placeRoutineRule, drop }
 }
 
 export type PlanActions = ReturnType<typeof makePlanActions>

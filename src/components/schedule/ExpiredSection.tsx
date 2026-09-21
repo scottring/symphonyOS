@@ -25,10 +25,13 @@ import { TriageRow, applyTriageVerdict, type Verdict } from './TriageRow'
  * the page you opened on purpose.
  */
 export function ExpiredSection({
-  rows, canDelete, onUpdateTask, onPushTask, onDeleteTask, onCompleteTask,
+  rows, canDelete, onUpdateTask, onPushTask, onDeleteTask, onCompleteTask, defaultOpen = false,
 }: {
   rows: ExpiredRow[]
   canDelete: boolean
+  /** Open on arrival — the Planning panel's "older unfinished work" line
+   *  lands here (#expired) meaning to work the list, not to find the fold. */
+  defaultOpen?: boolean
   onUpdateTask: (id: string, updates: Partial<Task>) => void | Promise<void | boolean>
   onPushTask?: (id: string, target: Date | 'week' | 'month' | 'quarter') => void | Promise<void | boolean>
   onDeleteTask?: (id: string) => void
@@ -37,7 +40,7 @@ export function ExpiredSection({
    *  wrong. Same prop, same behavior as the Review drawer. */
   onCompleteTask?: (id: string) => void
 }) {
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(defaultOpen)
   const [verdicts, setVerdicts] = useState<Map<string, Verdict>>(() => new Map())
   // Rows this session has resolved, kept by value.
   //

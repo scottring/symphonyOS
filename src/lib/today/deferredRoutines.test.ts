@@ -22,10 +22,10 @@ describe('deferredInRoutineIds', () => {
     expect(ids.has('r1')).toBe(true)
   })
 
-  it('excludes a same-day deferral (a retime, not a cross-day placement)', () => {
+  it('includes a same-day placement — "Give it a day" on a routine with no day of its own', () => {
     const deferredTo = new Date(`${VIEWED_STR}T15:00:00Z`).toISOString()
-    const ids = deferredInRoutineIds([instance({ entity_id: 'r1', date: VIEWED_STR, deferred_to: deferredTo })], VIEWED)
-    expect(ids.has('r1')).toBe(false)
+    const ids = deferredInRoutineIds([instance({ entity_id: 'r1', date: VIEWED_STR, deferred_to: deferredTo, status: 'pending' })], VIEWED)
+    expect(ids.has('r1')).toBe(true)
   })
 
   it('excludes a routine deferred to some OTHER date', () => {

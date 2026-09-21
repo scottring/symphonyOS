@@ -45,10 +45,15 @@ export function isRecentMiss(scheduledFor: Date | null | undefined, completed: b
 }
 
 /** The line the card carries in the list. Says the day, never a count. */
-export function missedLabel(scheduledFor: Date, now: Date): string {
+/** The missed day, named the way a person would: the weekday inside a week,
+ *  the date beyond it. `long` spells the weekday out ("Saturday"). */
+export function missedWhen(scheduledFor: Date, now: Date, style: 'short' | 'long' = 'short'): string {
   const days = missedDaysAgo(scheduledFor, now)
-  const when = days < 7
-    ? scheduledFor.toLocaleDateString('en-US', { weekday: 'short' })
+  return days < 7
+    ? scheduledFor.toLocaleDateString('en-US', { weekday: style })
     : scheduledFor.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-  return `Didn't happen · ${when}`
+}
+
+export function missedLabel(scheduledFor: Date, now: Date): string {
+  return `Didn't happen · ${missedWhen(scheduledFor, now)}`
 }

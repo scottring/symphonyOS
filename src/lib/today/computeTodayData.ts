@@ -12,6 +12,7 @@ import { localYmd } from '@/lib/cadence/config'
 import { dedupeCalendarEvents } from '@/lib/calendar/dedupeEvents'
 import { isFocused } from '@/lib/placement/model'
 import type { Task } from '@/types/task'
+import type { TimelineItem } from '@/types/timeline'
 
 function computeIsToday(viewedDate: Date): boolean {
   const today = new Date()
@@ -109,6 +110,14 @@ export function computeTodayData(input: TodayDataInput): TodayData {
     // leak a private goal's name onto Today.
     goalTitles: goalTitleMap(input.tasks),
   })
+  // Focus orders and highlights a row; it never decides whether the row is on
+  // the page (Scott, 2026-09-21). Marked here, on the items themselves, so the
+  // journal can order by it and a row can offer Unfocus.
+  for (const items of Object.values(grouped) as TimelineItem[][]) {
+    for (const item of items) {
+      if (item.type === 'task' && item.originalTask && chosenToday(item.originalTask)) item.focused = true
+    }
+  }
 
   // Counts. The denominator has to be the actionable rows the user can see, or
   // the progress band reports on a day that isn't on screen: a flat routine

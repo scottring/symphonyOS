@@ -15,7 +15,7 @@ import { createMockTask } from '@/test/mocks/factories'
 const mobile = vi.hoisted(() => ({ value: true }))
 vi.mock('@/hooks/useMobile', () => ({ useMobile: () => mobile.value }))
 vi.mock('@/hooks/useActionableInstances', () => ({
-  useActionableInstances: () => ({ setPlanned: vi.fn(async () => true), reschedule: vi.fn(async () => null) }),
+  useActionableInstances: () => ({ setPlanned: vi.fn(async () => true), reschedule: vi.fn(async () => null), getInstancesForRange: vi.fn(async () => []) }),
 }))
 vi.mock('@/hooks/useWeather', () => ({ useWeather: () => ({ weather: null, loading: false, error: 'x', requestLocation: vi.fn() }) }))
 vi.mock('@/hooks/useProactiveSuggestions', () => ({ useProactiveSuggestions: () => ({ suggestions: [], topSuggestions: [], suggestionsForEntity: () => [], actOnSuggestion: vi.fn(), dismissSuggestion: vi.fn(), isLoading: false }) }))
@@ -123,7 +123,7 @@ describe('Today as a daily journal', () => {
 
   it('My focus holds what was chosen; Still ahead holds the rest of the timed day', () => {
     renderView()
-    const focus = screen.getByRole('region', { name: 'My focus' })
+    const focus = screen.getByRole('region', { name: 'Tasks' })
     const ahead = screen.getByRole('region', { name: 'Still ahead' })
     expect(within(focus).getByText('Check dryer duct')).toBeInTheDocument()
     expect(within(ahead).getByText('Food planning')).toBeInTheDocument()

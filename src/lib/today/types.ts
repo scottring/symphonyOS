@@ -48,6 +48,9 @@ export interface TodayDataInput {
   /** Whose Today this is: focus (task_focus) is personal. Without it, any
    *  person's choice for the day counts. */
   userId?: string | null
+  /** Weekly routines with no day of their own — they join the To plan list
+   *  (lib/week/unhomedRoutines), the same set the Planning dock draws. */
+  unhomedRoutines?: Routine[]
 }
 
 export interface TodayCounts {
@@ -104,7 +107,7 @@ export const EMPTY_TODAY_DATA: TodayData = {
   completedInboxTasks: [],
   grouped: emptySections<TimelineItem>(),
   dayPlan: {
-    carried: [], scheduled: [], available: [], week: [], month: [],
+    toPlan: [], olderUnfinished: 0, carried: [], scheduled: [], available: [], week: [], month: [],
     counts: { scheduled: 0, available: 0 },
     offMainTaskIds: new Set(), offMainRoutineItemIds: new Set(), plannedExtraTasks: [],
   },

@@ -10,6 +10,8 @@ import { readHideRoutines, onHideRoutinesChange } from '@/lib/hideRoutinesSignal
 import { filterTasksForLayers } from '@/lib/today/domainFilter'
 import { routinesForViewedDate } from '@/lib/today/routinesForDate'
 import { selectDayPlan, type DayPlan } from '@/lib/today/dayPlan'
+import { unhomedRoutines } from '@/lib/week/unhomedRoutines'
+import { useWeekInstances } from '@/components/home/week/useWeekInstances'
 import { weekStartAnchor, readCadenceConfig, localYmd } from '@/lib/cadence/config'
 
 /**
@@ -36,6 +38,14 @@ export function useDayPlan(
 
   const dayKey = localYmd(day)
   const weekKey = weekStartOverride ? localYmd(weekStartOverride) : null
+  const weekStart = useMemo(() => {
+    if (weekKey) { const [wy, wm, wd] = weekKey.split('-').map(Number); return new Date(wy, wm - 1, wd) }
+    const [y, m, d] = dayKey.split('-').map(Number)
+    return weekStartAnchor(new Date(y, m - 1, d), readCadenceConfig().weekStartsOn)
+  }, [dayKey, weekKey])
+  // Every instance touching the planned week: a flexible routine already
+  // placed on one of its days has a home for that week and leaves To plan.
+  const weekInstances = useWeekInstances(weekStart, 7)
   const [instances, setInstances] = useState<ActionableInstance[] | null>(null)
   const refresh = useCallback(async () => {
     const [y, m, d] = dayKey.split('-').map(Number)
@@ -58,12 +68,14 @@ export function useDayPlan(
       selectedAssignee: selectedAssignees,
       hideRoutines,
       layers,
-      weekStart: weekKey
-        ? (() => { const [wy, wm, wd] = weekKey.split('-').map(Number); return new Date(wy, wm - 1, wd) })()
-        : weekStartAnchor(viewedDate, readCadenceConfig().weekStartsOn),
+      weekStart,
       userId,
+      // Weekly routines with no day of their own join the To plan list. The
+      // hide-daily preference is a grid preference, not a planning one.
+      unhomedRoutines: unhomedRoutines(allRoutines, { member: selectedAssignees, prefs: { hideRoutines: false, layers } },
+        { weekStart, instances: weekInstances }),
     })
-  }, [instances, dayKey, weekKey, tasks, layers, getRoutinesForDate, allRoutines, selectedAssignees, hideRoutines, userId])
+  }, [instances, dayKey, weekStart, weekInstances, tasks, layers, getRoutinesForDate, allRoutines, selectedAssignees, hideRoutines, userId])
 
   return { plan, loading: tasksLoading || routinesLoading || !instances, error: !!tasksError }
 }

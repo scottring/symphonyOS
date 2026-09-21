@@ -21,15 +21,15 @@ export function routinesForViewedDate(
     }
   }
 
-  // Find routines that were deferred TO this date (any status — includes completed/skipped)
+  // Find routines that were deferred TO this date (any status — includes
+  // completed/skipped). Cross-day deferrals AND same-day placements: "Give it
+  // a day" puts a routine with no day of its own here as a pending instance
+  // dated today, and its pattern (which names no day) must not veto the day
+  // the user chose.
   const deferredToThisDate = new Set<string>()
   const viewedDateStr = viewedDate.toISOString().split('T')[0]
   for (const instance of dateInstances) {
-    if (
-      instance.entity_type === 'routine' &&
-      instance.deferred_to &&
-      (instance.date as string) !== viewedDateStr // Only cross-day deferrals
-    ) {
+    if (instance.entity_type === 'routine' && instance.deferred_to) {
       const deferredToDateStr = new Date(instance.deferred_to).toISOString().split('T')[0]
       if (deferredToDateStr === viewedDateStr) {
         deferredToThisDate.add(instance.entity_id)

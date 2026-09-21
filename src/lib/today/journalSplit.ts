@@ -67,6 +67,11 @@ export function splitTodayJournal(
     else focus.allday.push(item)
   }
   focus.unscheduled = [...(grouped.unscheduled ?? [])]
+  // Chosen rows lead; a task dated today is on the list either way
+  // (Scott, 2026-09-21). Stable, so the rest keep their order.
+  const focusedFirst = (a: TimelineItem, b: TimelineItem) => Number(!!b.focused) - Number(!!a.focused)
+  focus.allday.sort(focusedFirst)
+  focus.unscheduled.sort(focusedFirst)
 
   // The timed day in render order, and the cut: the first row (not a group
   // child) that is not over yet. Everything before it is earlier.

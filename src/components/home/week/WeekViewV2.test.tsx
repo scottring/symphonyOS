@@ -7,6 +7,26 @@ import type { RecurrencePattern } from '@/types/actionable'
 import type { CalendarEvent } from '@/hooks/useGoogleCalendar'
 import { ALL_LAYERS } from '@/lib/domains'
 
+// The Planning sheet (narrow screens) computes its own plan from the shared
+// sources; these tests are about the week's viewport, so the sources are
+// stubbed rather than mounted.
+vi.mock('@/hooks/useDayPlan', () => ({
+  useDayPlan: () => ({
+    loading: false, error: false,
+    plan: {
+      toPlan: [{ key: 'task:p', kind: 'task', id: 'p', title: 'Something to plan', completed: false, planned: false, group: 'plan' }],
+      carried: [], scheduled: [], available: [], week: [], month: [],
+      counts: { scheduled: 0, available: 0 }, offMainTaskIds: new Set(), offMainRoutineItemIds: new Set(), plannedExtraTasks: [],
+    },
+  }),
+}))
+vi.mock('@/hooks/usePlanActions', () => ({
+  usePlanActions: () => ({
+    chooseTaskDay: vi.fn(), unchooseTask: vi.fn(), timeTask: vi.fn(), commitTask: vi.fn(),
+    chooseRoutine: vi.fn(), drop: vi.fn(), toggleTask: vi.fn(), completeRoutine: vi.fn(async () => true),
+  }),
+}))
+
 const instancesMock = vi.hoisted(() => ({ rows: [] as unknown[], markDone: vi.fn(async () => true), undoDone: vi.fn(async () => true) }))
 vi.mock('@/hooks/useActionableInstances', () => ({
   useActionableInstances: () => ({
@@ -41,13 +61,15 @@ function mockEvent(over: { id: string; title: string; start: string; end: string
 }
 
 describe('WeekViewV2 layout', () => {
-  // Scott, 2026-09-07: "make the this week column individually scrollable...
-  // we can scroll up and down that list while the grid remains in place."
-  it('gives the list column its own scroll, pinned beside the grid', () => {
+  // Scott, 2026-09-21: the week's viewport is the days. Planning is ONE panel
+  // (the dock beside the page), opened from a labelled button, never a
+  // second column of lists to understand first.
+  it('gives the viewport to the days and offers Planning from a labelled button', () => {
     render(<WeekViewV2 {...defaultProps} routines={[]} />)
-    const list = screen.getByLabelText("This week's list")
-    expect(list.className).toContain('overflow-y-auto')
-    expect(list.className).toContain('sticky')
+    expect(screen.queryByLabelText("This week's list")).toBeNull()
+    expect(screen.queryByText(/Didn.t happen/)).toBeNull()
+    expect(screen.queryByRole('button', { name: /This month/ })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Planning' })).toBeInTheDocument()
   })
 })
 
@@ -259,8 +281,11 @@ describe('WeekViewV2 journal spread', () => {
       expect(screen.getByTestId('week-journal')).toBeInTheDocument()
       expect(screen.queryByRole('radio', { name: 'Schedule' })).toBeNull()
       expect(within(screen.getByTestId('journal-day-2026-09-14')).getByText('Return library books')).toBeInTheDocument()
-      // The list is not a sticky side column here.
-      expect(screen.getByLabelText("This week's list").className).not.toContain('sticky')
+      // No side column here either: Planning is a sheet behind its button.
+      expect(screen.queryByLabelText("This week's list")).toBeNull()
+      expect(screen.queryByRole('dialog', { name: 'Planning' })).toBeNull()
+      fireEvent.click(screen.getByRole('button', { name: 'Planning' }))
+      expect(screen.getByRole('dialog', { name: 'Planning' })).toHaveAttribute('aria-hidden', 'false')
     })
   })
 })

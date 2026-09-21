@@ -98,7 +98,7 @@ describe('My focus — chosen untimed routines', () => {
   it('lists them under My focus with no Anytime fold', () => {
     const { routines, dateInstances } = untimedRoutineSet(3, 1)
     renderView({ routines, dateInstances })
-    const focus = screen.getByRole('region', { name: 'My focus' })
+    const focus = screen.getByRole('region', { name: 'Tasks' })
     expect(within(focus).getByText('Routine r0')).toBeInTheDocument()
     expect(within(focus).getByText('Routine r2')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /anytime/i })).toBeNull()
@@ -107,12 +107,12 @@ describe('My focus — chosen untimed routines', () => {
   it('renders a bounded number of rows however many are chosen', () => {
     const small = untimedRoutineSet(12, 4)
     const { unmount } = renderView({ routines: small.routines, dateInstances: small.dateInstances })
-    const smallRows = within(screen.getByRole('region', { name: 'My focus' })).getAllByText(/^Routine r\d+$/).length
+    const smallRows = within(screen.getByRole('region', { name: 'Tasks' })).getAllByText(/^Routine r\d+$/).length
     unmount()
 
     const large = untimedRoutineSet(60, 4)
     renderView({ routines: large.routines, dateInstances: large.dateInstances })
-    const focus = screen.getByRole('region', { name: 'My focus' })
+    const focus = screen.getByRole('region', { name: 'Tasks' })
     expect(within(focus).getAllByText(/^Routine r\d+$/).length).toBe(smallRows)
     expect(within(focus).getByRole('button', { name: /\+\d+ more today/ })).toBeInTheDocument()
   })

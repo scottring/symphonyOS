@@ -40,9 +40,14 @@ import { selectCarriedOver } from './taskPools'
 import { localYmd } from '@/lib/cadence/config'
 import { monthStartOf } from '@/lib/planning/periodPlacement'
 import { isTimelineObligation, type ResolveRoutineCtx } from '@/lib/routineUtils'
-import { isFocused } from '@/lib/placement/model'
+import { isFocused, openCommitment } from '@/lib/placement/model'
+import { selectStaleWeekPlacements } from './horizons'
+import { isRecentMiss, isMissedPlacement, missedWhen } from '@/lib/week/missedPlacement'
+import { routineTemporalLabel } from '@/lib/planning/routineTemporal'
+import { formatWeekRangeShort } from '@/lib/dateHelpers'
+import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
 
-export type DayPlanGroup = 'carried' | 'scheduled' | 'available' | 'week' | 'month'
+export type DayPlanGroup = 'carried' | 'scheduled' | 'available' | 'week' | 'month' | 'plan'
 
 export interface DayPlanEntry {
   /** Stable React key and drag id: 'task:<id>' or 'routine:<entityId>'. */
@@ -58,6 +63,12 @@ export interface DayPlanEntry {
   task?: Task
   /** The routine row as the timeline would draw it (collection progress etc.). */
   item?: TimelineItem
+  /** A routine with no day of its own yet (the "To plan" list carries the
+   *  definition, not an occurrence). */
+  routine?: Routine
+  /** One small line that explains the row without another category to learn:
+   *  "Originally Saturday", "Weekly routine", "September plan". */
+  context?: string
 }
 
 export interface DayPlan {
@@ -80,6 +91,14 @@ export interface DayPlan {
   /** Chosen tasks that no other main-list pool reaches (week/month/inbox rows,
    *  or dated to another day) — the main list adds these. */
   plannedExtraTasks: Task[]
+  /** The ONE planning list (Scott, 2026-09-21): everything that answers "what
+   *  might I put on a day?" — unfinished work, this week's undated tasks and
+   *  routines with no day yet — each once, with a line of context. Once a row
+   *  has a day it leaves this list and appears on that day. */
+  toPlan: DayPlanEntry[]
+  /** Open misses older than the 14-day window: not on the list (Inbox ›
+   *  Expired holds them), but the panel says they exist. Count only. */
+  olderUnfinished: number
 }
 
 export interface DayPlanInput {
@@ -96,6 +115,12 @@ export interface DayPlanInput {
   /** Whose day this is. Focus is personal (task_focus, one row per person);
    *  without it, any person's choice for the day counts. */
   userId?: string | null
+  /** Weekly routines with no day of their own (lib/week/unhomedRoutines) —
+   *  the week page's "needs a day" set. They join the To plan list as
+   *  definition rows. */
+  unhomedRoutines?: Routine[]
+  /** "Now" for the unfinished-work window; defaults to the wall clock. */
+  now?: Date
 }
 
 export function routineResolveCtx(input: Pick<DayPlanInput, 'viewedDate' | 'selectedAssignee' | 'hideRoutines' | 'layers' | 'dateInstances'>): ResolveRoutineCtx {
@@ -121,6 +146,100 @@ export function weekListEntries(tasks: Task[], match: Match, weekStart: Date, ym
   }))
 }
 
+/**
+ * The ONE planning list (Scott, 2026-09-21). Three kinds of row answer the
+ * same practical question — "what might I put on a day?" — and used to be
+ * three or four lists you had to understand first:
+ *
+ *   unfinished   a dated task whose day passed (14-day window, the missed-
+ *                placement rule) or a week placement left behind by an
+ *                earlier week — "Originally Saturday" / "Planned for Sep 6–12"
+ *   this week    this week's undated tasks — "September plan" when the row
+ *                also sits on a month list, otherwise no line at all
+ *   routines     flexible occurrences for the day ("Weekly routine") and
+ *                weekly routines with no day of their own ("Weekly · no set day")
+ *
+ * Each action appears once. A row with a day is on that day, not here; a row
+ * chosen for the viewed day is on the main list, not here. Order: unfinished
+ * first (oldest first — the thing ignored longest asks first), then this
+ * week, then routines.
+ */
+export function toPlanEntries(args: {
+  tasks: Task[]
+  match: Match
+  weekStart: Date
+  ymd: string
+  userId?: string | null
+  now: Date
+  /** The day's flexible routine occurrences (selectDayPlan's `available`). */
+  available: DayPlanEntry[]
+  /** Weekly routines with no day of their own (definition rows). */
+  unhomed: Routine[]
+  /** The visible routines by id, for the occurrence rows' cadence line. */
+  routineById: Map<string, Routine>
+}): DayPlanEntry[] {
+  const { tasks, match, weekStart, ymd, userId, now } = args
+  const seen = new Set<string>()
+  const out: DayPlanEntry[] = []
+  const push = (e: DayPlanEntry) => { if (!seen.has(e.key)) { seen.add(e.key); out.push(e) } }
+  const chosen = (t: Task) => isFocused(t, userId, ymd)
+  const monthName = (t: Task): string | undefined => {
+    const m = openCommitment(t, 'month')?.periodStart ?? (t.bucket === 'month' ? t.monthStart : undefined)
+    return m ? `${m.toLocaleDateString('en-US', { month: 'long' })} plan` : undefined
+  }
+  const taskEntry = (t: Task, context: string | undefined): DayPlanEntry => ({
+    key: `task:${t.id}`, kind: 'task', id: t.id, title: t.title, completed: t.completed,
+    planned: chosen(t), group: 'plan', task: t, context,
+  })
+
+  // Unfinished, oldest first. A row chosen for the day is on the main list,
+  // with Unfocus on its own row (Scott, 2026-09-21) — not kept here as a
+  // duplicate just to undo the choice.
+  //
+  // "Left behind" is judged against the REAL current week, never the week on
+  // screen: paging /week forward must not relabel this week's open placements
+  // as unfinished (the old shelf anchored on today for the same reason).
+  const currentWeek = weekStartAnchor(now, readCadenceConfig().weekStartsOn)
+  const missed = flatten(tasks)
+    .filter((t) => !t.completed && match(t.assignedTo, t.assignedToAll) && !chosen(t) && isRecentMiss(t.scheduledFor, t.completed, now))
+  const leftBehind = selectStaleWeekPlacements(tasks, currentWeek, match).filter((t) => !t.scheduledFor && !chosen(t))
+  const unfinished = [...missed, ...leftBehind]
+    .sort((a, b) => (a.scheduledFor ?? a.weekStart ?? a.createdAt).getTime() - (b.scheduledFor ?? b.weekStart ?? b.createdAt).getTime())
+  for (const t of unfinished) {
+    const context = t.scheduledFor
+      ? `Originally ${missedWhen(t.scheduledFor, now, 'long')}`
+      : t.weekStart ? `Planned for ${formatWeekRangeShort(t.weekStart)}` : 'Unfinished'
+    push(taskEntry(t, context))
+  }
+
+  // This week's undated tasks.
+  for (const t of selectHorizonPool(tasks, 'week', match, weekStart)) {
+    if (t.scheduledFor || chosen(t)) continue
+    push(taskEntry(t, monthName(t)))
+  }
+
+  // Routines: the day's flexible occurrences, then routines with no day at all.
+  for (const e of args.available) {
+    if (e.planned) continue
+    const r = args.routineById.get(e.id)
+    push({ ...e, group: 'plan', context: r ? routineCadence(r) : 'Routine' })
+  }
+  for (const r of args.unhomed) {
+    push({
+      key: `routine:${r.id}`, kind: 'routine', id: r.id, title: r.name, completed: false, planned: false,
+      group: 'plan', routine: r, context: `${routineCadence(r)} · no set day`,
+    })
+  }
+  return out
+}
+
+/** "Daily routine" / "Weekly routine" / "Monthly routine" — the cadence, not the rule. */
+function routineCadence(r: Routine): string {
+  const t = r.recurrence_pattern?.type
+  const word = t === 'daily' ? 'Daily' : t === 'weekly' ? 'Weekly' : t === 'monthly' ? 'Monthly' : t === 'yearly' ? 'Yearly' : null
+  return word ? `${word} routine` : `${routineTemporalLabel(r)} routine`
+}
+
 /** Tasks and their nested subtasks, flat. */
 function flatten(tasks: Task[]): Task[] {
   return tasks.flatMap((t) => [t, ...(t.subtasks ?? [])])
@@ -143,10 +262,14 @@ export function selectDayPlan(input: DayPlanInput): DayPlan {
   const scheduled: DayPlanEntry[] = []
   const offMainTaskIds = new Set<string>()
   const chosen = (t: Task) => isFocused(t, input.userId, ymd)
+  // Scott, 2026-09-21: Today shows what you scheduled for today plus what
+  // you chose to focus on. Scheduling is sufficient — a dated task is on its
+  // day; focus orders and highlights, it never gates visibility. So no task
+  // is kept off the main list any more; `scheduled` stays as the record of
+  // what is dated today (counts, tests), and `offMainTaskIds` is empty.
   for (const t of onDay) {
     if (!t.isAllDay) continue // a time is a commitment the main list keeps
     const planned = chosen(t)
-    if (!planned) offMainTaskIds.add(t.id)
     scheduled.push({ key: `task:${t.id}`, kind: 'task', id: t.id, title: t.title, completed: t.completed, planned, group: 'scheduled', task: t })
   }
 
@@ -201,8 +324,19 @@ export function selectDayPlan(input: DayPlanInput): DayPlan {
   const carried = selectCarriedOver(input.tasks, isToday, match).filter((t) => !chosen(t)).map(listEntry('carried'))
   const month = selectHorizonPool(input.tasks, 'month', match, undefined, monthStartOf(input.viewedDate)).map(listEntry('month'))
 
+  const now = input.now ?? new Date()
+  const toPlan = toPlanEntries({
+    tasks: input.tasks, match, weekStart: input.weekStart, ymd, userId: input.userId,
+    now, available, unhomed: input.unhomedRoutines ?? [], routineById: byId,
+  })
+  const olderUnfinished = flatten(input.tasks).filter((t) =>
+    !t.completed && match(t.assignedTo, t.assignedToAll) && !chosen(t)
+    && isMissedPlacement(t.scheduledFor, t.completed, now) && !isRecentMiss(t.scheduledFor, t.completed, now)).length
+
   const outstanding = (e: DayPlanEntry) => !e.completed && !e.planned
   return {
+    toPlan,
+    olderUnfinished,
     carried,
     scheduled,
     available,

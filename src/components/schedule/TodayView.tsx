@@ -39,7 +39,10 @@ import { useDomain } from '@/hooks/useDomain'
 
 import { Eye, EyeOff, Repeat, Binoculars, Printer, GripVertical, Moon, Sparkles, NotebookPen, ArrowRight, PanelLeft, ChevronDown, ChevronRight } from 'lucide-react'
 import { splitTodayJournal } from '@/lib/today/journalSplit'
-import { DayPlanPanel, panelActionsFor, planSummary } from '@/components/reference/DayPlanPanel'
+import { panelActionsFor, planSummary } from '@/components/reference/DayPlanPanel'
+import { PlanningSheet } from '@/components/reference/PlanningSheet'
+import { unhomedRoutines } from '@/lib/week/unhomedRoutines'
+import { useWeekInstances } from '@/components/home/week/useWeekInstances'
 import { useReferenceLists } from '@/components/reference/ReferenceListsContext'
 import { makePlanActions } from '@/lib/planning/planActions'
 import { localYmd } from '@/lib/cadence/config'
@@ -105,6 +108,9 @@ interface TodayViewProps {
   userId?: string | null
   events: CalendarEvent[]
   routines?: Routine[]
+  /** Every active routine, not only the day's: the Planning sheet lists
+   *  weekly routines with no day of their own, which no single day carries. */
+  allRoutines?: Routine[]
   dateInstances?: ActionableInstance[]
   projects?: Project[]
   selectedItemId: string | null
@@ -148,7 +154,7 @@ interface TodayViewProps {
 
 // ─── Component ─────────────────────────────────────────────────────────────────
 
-/** My focus: chosen untimed work — all-day tasks, then untimed occurrences. */
+/** Tasks: the day's untimed work — every task dated today plus what was chosen (chosen rows lead); then untimed occurrences. */
 const FOCUS_SECTIONS: DaySection[] = ['allday', 'unscheduled']
 /** Still ahead / Earlier today: the timed day, in order. */
 const TIMED_SECTIONS: DaySection[] = ['earlyMorning', 'morning', 'afternoon', 'evening', 'night']
@@ -158,6 +164,7 @@ export function TodayView({
   userId,
   events,
   routines = [],
+  allRoutines,
   dateInstances = [],
   projects = [],
   selectedItemId,
@@ -315,6 +322,9 @@ export function TodayView({
   // The checked layer set — feeds the resolver's rung 4 directly (routines no
   // longer arrive pre-filtered by domain from HomeView).
   const { layers } = useDomain()
+  // Every instance touching this week: a flexible routine already placed on
+  // one of its days has a home for the week and leaves the sheet's To plan.
+  const weekInstances = useWeekInstances(currentWeekStart, 7)
   const todayInput = useMemo(() => ({
     tasks,
     events,
@@ -327,12 +337,15 @@ export function TodayView({
     completedLingerCutoff,
     weekStart: currentWeekStart,
     userId,
+    // The same set the Planning dock draws, so the sheet and the dock agree.
+    unhomedRoutines: unhomedRoutines(allRoutines ?? routines, { member: selectedAssignees ?? [], prefs: { hideRoutines: false, layers } },
+      { weekStart: currentWeekStart, instances: weekInstances }),
     // Cast: EventNote.notes is string|null; TodayDataInput expects string|undefined — structurally compatible at runtime
     eventNotesMap: ctx.eventNotesMap as unknown as Map<string, { notes?: string; assignedTo?: string | null }> | undefined,
     eventContextOverrides: ctx.eventContextOverrides,
     getDomainForCalendar: ctx.getDomainForCalendar,
-  }), [tasks, userId, events, routines, dateInstances, viewedDate, selectedAssignees, hideRoutines, layers, completedLingerCutoff,
-      currentWeekStart, ctx.eventNotesMap, ctx.eventContextOverrides, ctx.getDomainForCalendar])
+  }), [tasks, userId, events, routines, allRoutines, dateInstances, viewedDate, selectedAssignees, hideRoutines, layers, completedLingerCutoff,
+      currentWeekStart, weekInstances, ctx.eventNotesMap, ctx.eventContextOverrides, ctx.getDomainForCalendar])
 
   const data = useTodayData(todayInput)
 
@@ -357,13 +370,16 @@ export function TodayView({
     ...planActions,
     toggleTask: onToggleTask,
     completeRoutine: async (id, _day, done) => { onCompleteRoutine?.(id, done); return true },
-  }), [viewedDate, planActions, onToggleTask, onCompleteRoutine])
+  }, { changeRoutineRule: () => navigate('/routines') }), [viewedDate, planActions, onToggleTask, onCompleteRoutine, navigate])
   const [planOpenDay, setPlanOpenDay] = useState<string | null>(null)
   const planOpenInline = planOpenDay === localYmd(viewedDate)
   const planLine = planSummary(data.dayPlan)
   // The desktop pin is always TODAY's plan; another day, or a phone (which
   // has no dock), opens the same panel inline instead.
-  const usePin = !isMobile && data.isToday && !!references
+  // Desktop always plans in the dock (it plans the real today, whichever day
+  // is being read); the sheet is the phone's. Keying this on `isToday` sent a
+  // desktop day-browse to the phone sheet (review, 2026-09-21).
+  const usePin = !isMobile && !!references
   const [agendaDropOver, setAgendaDropOver] = useState(false)
   const agendaDrop = planDropHandlers((payload) => {
     void planActions.drop(payload, { type: 'day', day: viewedDate }, { chooseOnly: true })
@@ -1346,7 +1362,7 @@ export function TodayView({
               still ahead, and what is already behind you. */}
           <section aria-labelledby="today-focus-heading" className="daybook-journal-section">
             <div className="daybook-journal-heading">
-              <h2 id="today-focus-heading">My focus</h2>
+              <h2 id="today-focus-heading">Tasks</h2>
               {planLine && (
                 <button
                   type="button"
@@ -1356,14 +1372,13 @@ export function TodayView({
                 >
                   <PanelLeft className="h-3.5 w-3.5" aria-hidden="true" />
                   <span>{planLine}</span>
-                  {usePin && todayPinned && <span className="text-neutral-400">· in the Today pin</span>}
+                  {usePin && todayPinned && <span className="text-neutral-400">· in Planning</span>}
                 </button>
               )}
             </div>
-            {!usePin && planOpenInline && (
-              <div className="mt-2 mb-3 border-l border-neutral-200 pl-3">
-                <DayPlanPanel plan={data.dayPlan} day={viewedDate} actions={planPanelActions} draggable={false} />
-              </div>
+            {/* On a phone the Planning panel is a sheet, not an inline fold. */}
+            {!usePin && (
+              <PlanningSheet open={planOpenInline} onClose={() => setPlanOpenDay(null)} plan={data.dayPlan} day={viewedDate} actions={planPanelActions} />
             )}
             {journal.focusCount > 0 ? (
               <TodaySectionList
