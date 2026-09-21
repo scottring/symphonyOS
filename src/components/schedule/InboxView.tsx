@@ -25,6 +25,7 @@ import { SupernotePagesSection } from '@/components/capture/SupernotePagesSectio
 import { NotePicker, type NotePickerSelection } from '@/components/notes/NotePicker'
 import { formatInboxBullet } from '@/lib/inboxBullet'
 import { DenseInboxRow, type QuickAction } from './DenseInboxRow'
+import { focusSnapshot } from '@/lib/placement/model'
 import { TriageWhenMenu, type TriageWhen } from './TriageWhenMenu'
 import { getBaseDate, getThisEvening, getNextWeekend, getWeekendAfterNext, getNextMonday } from '@/lib/dateHelpers'
 import { wasWritten } from '@/hooks/useGatedTaskActions'
@@ -414,6 +415,8 @@ export function InboxView({
       isAllDay: task.isAllDay,
       // Captured so "Done" is undoable — restores the item to the inbox.
       completed: task.completed,
+      // "Today" also chooses it (S4); Undo restores the focus rows themselves.
+      focus: focusSnapshot(task),
     }
 
     setLeavingIds((s) => new Set(s).add(task.id))
@@ -430,6 +433,7 @@ export function InboxView({
           const today = new Date()
           today.setHours(0, 0, 0, 0)
           if (onPushTask) ok = await wasWritten(onPushTask(task.id, today))
+          if (ok && onUpdateTask) await onUpdateTask(task.id, { plannedOn: today })
           message = 'Sent to Today'
         } else if (action.kind === 'week' || action.kind === 'month') {
           if (onPushTask) ok = await wasWritten(onPushTask(task.id, action.kind))
@@ -478,6 +482,7 @@ export function InboxView({
       bucket: task.bucket,
       scheduledFor: task.scheduledFor,
       isAllDay: task.isAllDay,
+      focus: focusSnapshot(task),
     }
     setLeavingIds((s) => new Set(s).add(task.id))
     setTimeout(() => {
@@ -492,7 +497,14 @@ export function InboxView({
           return new Date(d.getFullYear(), d.getMonth() + 1, 1, 0, 0, 0, 0)
         }
         switch (when) {
-          case 'today': message = 'Sent to Today'; if (onPushTask) ok = await wasWritten(onPushTask(task.id, getBaseDate(0))); break
+          case 'today': {
+            // The Today command (S4): dated today AND chosen for my focus.
+            message = 'Sent to Today'
+            const day = getBaseDate(0)
+            if (onPushTask) ok = await wasWritten(onPushTask(task.id, day))
+            if (ok && onUpdateTask) await onUpdateTask(task.id, { plannedOn: day })
+            break
+          }
           case 'tonight': message = 'Sent to Tonight'; if (onPushTask) ok = await wasWritten(onPushTask(task.id, getThisEvening())); break
           case 'tomorrow': message = 'Sent to Tomorrow'; if (onPushTask) ok = await wasWritten(onPushTask(task.id, getBaseDate(1))); break
           case 'this-week': message = 'Sent to This Week'; if (onPushTask) ok = await wasWritten(onPushTask(task.id, 'week')); break

@@ -23,6 +23,9 @@ export interface TriageHandlers {
    *  of the union. */
   onPushTask: (id: string, target: Date | 'week' | 'month' | 'quarter') => void | Promise<void | boolean>
   onSetBucket: (id: string, bucket: TaskBucket) => void | Promise<void | boolean>
+  /** Chooses the task for my focus on `day`. "Today" is the Today command
+   *  (spec S4): dated today AND chosen. Every other when is a date only. */
+  onFocus?: (id: string, day: Date) => unknown
 }
 
 /**
@@ -52,7 +55,12 @@ export function describeTriageWhen(when: TriageWhen): string {
  *  and skip both when it resolves `false`. */
 export async function applyTriageWhen(when: TriageWhen, taskId: string, h: TriageHandlers): Promise<boolean> {
   switch (when) {
-    case 'today': return wasWritten(h.onPushTask(taskId, getBaseDate(0)))
+    case 'today': {
+      const day = getBaseDate(0)
+      if (!(await wasWritten(h.onPushTask(taskId, day)))) return false
+      await h.onFocus?.(taskId, day)
+      return true
+    }
     case 'tonight': return wasWritten(h.onPushTask(taskId, getThisEvening()))
     case 'tomorrow': return wasWritten(h.onPushTask(taskId, getBaseDate(1)))
     case 'this-week': return wasWritten(h.onSetBucket(taskId, 'week'))
