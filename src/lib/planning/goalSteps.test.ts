@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest'
 import { splitGoalRows, stepsThatCarryForward, goalTitleMap } from './goalSteps'
-import { livePlacedCopyOf } from './lineage'
 import type { Task } from '@/types/task'
 
 let n = 0
@@ -66,11 +65,16 @@ describe('stepsThatCarryForward', () => {
   })
 
   // Its copy is carrying on lower down; copying it again would fork the work.
+  // One enduring action: a step placed lower is the SAME row with a week
+  // commitment (or a day) on it — it is carrying on on its own list.
   it('leaves a step behind once it has been placed lower', () => {
     const goal = porch()
-    const placed = task({ id: 's4', title: 'Hang plants', goalTaskId: 'g1' })
-    const copy = task({ id: 'c1', title: 'Hang plants', bucket: 'week', sourceId: 's4', createdAt: new Date(2026, 8, 20) })
-    expect(stepsThatCarryForward('g1', [goal, placed, copy]).map((s) => s.id)).toEqual([])
+    const onWeek = task({ id: 's4', title: 'Hang plants', goalTaskId: 'g1', bucket: 'week', commitments: [
+      { level: 'month', periodStart: new Date(2026, 8, 1), status: 'open' },
+      { level: 'week', periodStart: new Date(2026, 8, 20), status: 'open' },
+    ] })
+    const onDay = task({ id: 's5', title: 'Buy chairs', goalTaskId: 'g1', bucket: 'timed', scheduledFor: new Date(2026, 8, 23) })
+    expect(stepsThatCarryForward('g1', [goal, onWeek, onDay], 'month').map((s) => s.id)).toEqual([])
   })
 
   it('ignores steps belonging to another goal', () => {
@@ -101,17 +105,3 @@ describe('goalTitleMap', () => {
 
 // goal_task_id now carries children explicitly, so lineage's title heuristic
 // must not start claiming a step is a copy of the row it sits under.
-describe('a step is not a copy', () => {
-  it('is not mistaken for a placed copy of its goal', () => {
-    const goal = porch()
-    const step = task({ id: 's1', title: 'Transform the porch', bucket: 'week', goalTaskId: 'g1' })
-    expect(livePlacedCopyOf(goal, [goal, step])).toBeUndefined()
-  })
-
-  it('still finds a genuine copy of a step, so placing twice makes one row', () => {
-    const goal = porch()
-    const placed = task({ id: 's6', title: 'Hang plants', goalTaskId: 'g1' })
-    const copy = task({ id: 'c2', title: 'Hang plants', bucket: 'week', sourceId: 's6', createdAt: new Date(2026, 8, 3) })
-    expect(livePlacedCopyOf(placed, [goal, placed, copy])?.id).toBe('c2')
-  })
-})

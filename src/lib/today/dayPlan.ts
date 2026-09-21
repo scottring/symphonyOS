@@ -40,6 +40,7 @@ import { selectCarriedOver } from './taskPools'
 import { localYmd } from '@/lib/cadence/config'
 import { monthStartOf } from '@/lib/planning/periodPlacement'
 import { isTimelineObligation, type ResolveRoutineCtx } from '@/lib/routineUtils'
+import { isFocused } from '@/lib/placement/model'
 
 export type DayPlanGroup = 'carried' | 'scheduled' | 'available' | 'week' | 'month'
 
@@ -92,6 +93,9 @@ export interface DayPlanInput {
   hideRoutines: boolean
   layers: ReadonlySet<Layer>
   weekStart: Date
+  /** Whose day this is. Focus is personal (task_focus, one row per person);
+   *  without it, any person's choice for the day counts. */
+  userId?: string | null
 }
 
 export function routineResolveCtx(input: Pick<DayPlanInput, 'viewedDate' | 'selectedAssignee' | 'hideRoutines' | 'layers' | 'dateInstances'>): ResolveRoutineCtx {
@@ -103,18 +107,17 @@ export function routineResolveCtx(input: Pick<DayPlanInput, 'viewedDate' | 'sele
   }
 }
 
-const isOn = (d: Date | undefined | null, ymd: string) => !!d && localYmd(new Date(d)) === ymd
-
 /**
  * This week's list, as rows. The ONE definition of "on this week's list":
  * the Today pin and /week's own column both call this, so the two surfaces
  * cannot disagree about which rows belong to a week (Scott, 2026-09-19).
- * `ymd` is the day "Planned today" is judged against.
+ * `ymd` is the day "Planned today" is judged against; `userId` is whose
+ * choice that is (focus is personal).
  */
-export function weekListEntries(tasks: Task[], match: Match, weekStart: Date, ymd: string): DayPlanEntry[] {
+export function weekListEntries(tasks: Task[], match: Match, weekStart: Date, ymd: string, userId?: string | null): DayPlanEntry[] {
   return selectHorizonPool(tasks, 'week', match, weekStart).map((t) => ({
     key: `task:${t.id}`, kind: 'task' as const, id: t.id, title: t.title, completed: t.completed,
-    planned: isOn(t.plannedOn, ymd), group: 'week' as const, task: t,
+    planned: isFocused(t, userId, ymd), group: 'week' as const, task: t,
   }))
 }
 
@@ -139,15 +142,16 @@ export function selectDayPlan(input: DayPlanInput): DayPlan {
   const onDayIds = new Set(onDay.map((t) => t.id))
   const scheduled: DayPlanEntry[] = []
   const offMainTaskIds = new Set<string>()
+  const chosen = (t: Task) => isFocused(t, input.userId, ymd)
   for (const t of onDay) {
     if (!t.isAllDay) continue // a time is a commitment the main list keeps
-    const planned = isOn(t.plannedOn, ymd)
+    const planned = chosen(t)
     if (!planned) offMainTaskIds.add(t.id)
     scheduled.push({ key: `task:${t.id}`, kind: 'task', id: t.id, title: t.title, completed: t.completed, planned, group: 'scheduled', task: t })
   }
 
   const plannedExtraTasks = flatten(input.tasks).filter((t) =>
-    isOn(t.plannedOn, ymd) && !onDayIds.has(t.id) && match(t.assignedTo, t.assignedToAll))
+    chosen(t) && !onDayIds.has(t.id) && match(t.assignedTo, t.assignedToAll))
 
   // ── Routine occurrences ────────────────────────────────────────────────
   const ctx = routineResolveCtx(input)
@@ -190,11 +194,11 @@ export function selectDayPlan(input: DayPlanInput): DayPlan {
   // ── The week's and month's lists ───────────────────────────────────────
   const listEntry = (group: 'week' | 'month' | 'carried') => (t: Task): DayPlanEntry => ({
     key: `task:${t.id}`, kind: 'task', id: t.id, title: t.title, completed: t.completed,
-    planned: isOn(t.plannedOn, ymd), group, task: t,
+    planned: chosen(t), group, task: t,
   })
-  const week = weekListEntries(input.tasks, match, input.weekStart, ymd)
+  const week = weekListEntries(input.tasks, match, input.weekStart, ymd, input.userId)
   const isToday = ymd === localYmd(new Date())
-  const carried = selectCarriedOver(input.tasks, isToday, match).filter((t) => !isOn(t.plannedOn, ymd)).map(listEntry('carried'))
+  const carried = selectCarriedOver(input.tasks, isToday, match).filter((t) => !chosen(t)).map(listEntry('carried'))
   const month = selectHorizonPool(input.tasks, 'month', match, undefined, monthStartOf(input.viewedDate)).map(listEntry('month'))
 
   const outstanding = (e: DayPlanEntry) => !e.completed && !e.planned

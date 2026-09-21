@@ -19,6 +19,25 @@ export interface TaskLink {
 
 export type TaskBucket = 'inbox' | 'week' | 'month' | 'quarter' | 'someday' | 'timed'
 
+export type PlacementLevel = 'season' | 'month' | 'week'
+export type CommitmentStatus = 'open' | 'done' | 'carried' | 'removed'
+
+/** One row of task_commitments: "committed for this period". */
+export interface TaskCommitment {
+  id?: string
+  level: PlacementLevel
+  periodStart: Date
+  status: CommitmentStatus
+  /** status = carried: the period it was carried into ("→ Carried to October"). */
+  carriedTo?: Date
+}
+
+/** One row of task_focus: this person chose the task for this day. */
+export interface TaskFocusEntry {
+  userId: string
+  date: Date
+}
+
 export type TaskContext = 'work' | 'family' | 'personal'
 
 // Category represents what KIND of family item this is
@@ -127,6 +146,14 @@ export interface Task {
    * homework due dates.
    */
   plannedOn?: Date
+  // ── One enduring action (2026-09-21) ──
+  /** The periods this task is committed to — season / month / week rows, each
+   *  with its own status (task_commitments). bucket/weekStart/monthStart/
+   *  seasonStart are a CACHE of the lowest open one. A row with no records is
+   *  a legacy row and is read from the cache alone. */
+  commitments?: TaskCommitment[]
+  /** Who chose this task for which day (task_focus). Personal, per person. */
+  focus?: TaskFocusEntry[]
   // ── Planning-cascade lineage (2026-07-15_task_lineage) ──
   /** The task this one was copied down from (season→month, month→week).
    *  Immediate cascade parent — distinct from parentTaskId (subtask nesting). */

@@ -32,18 +32,21 @@ describe('WeekMonthRail', () => {
     expect(screen.getByText('Legacy row')).toBeInTheDocument()
   })
 
-  it('says where a placed original went and strikes done ones', () => {
-    const placed = task({ title: 'Repaint the porch', monthStart: thisMonth })
-    const copy = task({ title: 'Repaint the porch', bucket: 'week', sourceId: placed.id })
+  // One enduring action: a month row taken into a week is the SAME row with
+  // a week commitment on it. It stays on the month list and says where it went.
+  it('says where a placed row went and strikes done ones', () => {
+    const wk = new Date(2026, 8, 13)
+    const placed = task({ title: 'Repaint the porch', bucket: 'week', weekStart: wk, monthStart: thisMonth, commitments: [
+      { level: 'month', periodStart: thisMonth, status: 'open' },
+      { level: 'week', periodStart: wk, status: 'open' },
+    ] })
     const done = task({ title: 'Book dentist', monthStart: thisMonth, completed: true })
-    render(<WeekMonthRail onSelectItem={() => {}} tasks={[placed, copy, done]} />)
+    render(<WeekMonthRail onSelectItem={() => {}} tasks={[placed, done]} />)
     unfold()
     // The same one status the list shows — not a second "→ placed" vocabulary.
-    // No week_start on the copy, so it can only say which week generically.
-    expect(screen.getByText('This week')).toBeInTheDocument()
+    expect(screen.getByText('September 13–19')).toBeInTheDocument()
     expect(screen.queryByText('→ placed')).not.toBeInTheDocument()
     expect(screen.getByText('Book dentist')).toHaveClass('line-through')
-    // The copy itself (a week row) is not on the month list.
     expect(screen.getAllByText('Repaint the porch')).toHaveLength(1)
   })
 
@@ -76,10 +79,12 @@ describe('WeekMonthRail', () => {
     const onAdd = vi.fn()
     const open = task({ id: 'o', title: 'Repaint the porch', monthStart: thisMonth })
     const goal = task({ id: 'g', title: 'Read more', monthStart: thisMonth, isGoal: true })
-    const placed = task({ id: 'p', title: 'Book dentist', monthStart: thisMonth })
-    const copy = task({ id: 'c', title: 'Book dentist', bucket: 'week', sourceId: 'p' })
+    const placed = task({ id: 'p', title: 'Book dentist', bucket: 'week', monthStart: thisMonth, commitments: [
+      { level: 'month', periodStart: thisMonth, status: 'open' },
+      { level: 'week', periodStart: new Date(2026, 8, 13), status: 'open' },
+    ] })
     const done = task({ id: 'd', title: 'Mow', monthStart: thisMonth, completed: true })
-    render(<WeekMonthRail onSelectItem={() => {}} onAddToWeek={onAdd} tasks={[open, goal, placed, copy, done]} />)
+    render(<WeekMonthRail onSelectItem={() => {}} onAddToWeek={onAdd} tasks={[open, goal, placed, done]} />)
     unfold()
     expect(screen.getByRole('button', { name: 'Add to this week: Repaint the porch' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Add to this week: Read more' })).not.toBeInTheDocument()
@@ -111,9 +116,12 @@ describe('WeekMonthRail', () => {
   it('counts only open rows on the folded header — done ones stay in the list, struck', () => {
     const open = task({ id: 'o', title: 'Repaint the porch', monthStart: thisMonth })
     const done = task({ id: 'd', title: 'Mow', monthStart: thisMonth, completed: true })
-    const placedDone = task({ id: 'p', title: 'Book dentist', monthStart: thisMonth })
-    const copyDone = task({ id: 'c', title: 'Book dentist', bucket: 'week', sourceId: 'p', completed: true })
-    render(<WeekMonthRail onSelectItem={() => {}} tasks={[open, done, placedDone, copyDone]} />)
+    // A row placed on the week and finished there is one row, done.
+    const placedDone = task({ id: 'p', title: 'Book dentist', bucket: 'week', monthStart: thisMonth, completed: true, commitments: [
+      { level: 'month', periodStart: thisMonth, status: 'done' },
+      { level: 'week', periodStart: new Date(2026, 8, 13), status: 'done' },
+    ] })
+    render(<WeekMonthRail onSelectItem={() => {}} tasks={[open, done, placedDone]} />)
     expect(screen.getByRole('button', { name: /This month/ })).toHaveTextContent(/1$/)
     unfold()
     expect(screen.getByText('Mow')).toBeInTheDocument()

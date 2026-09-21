@@ -2,6 +2,40 @@
 
 Traced 2026-09-19 against `main` @ `46aa9280`. Line numbers are from that commit.
 
+> **2026-09-21 — one enduring action.** The placement model in §1 and §3 changed
+> (decided in the D1 sitting, 2026-09-20). A task is ONE row for its whole life:
+>
+> | Record | Table | Meaning |
+> | --- | --- | --- |
+> | commitments | `task_commitments` | "committed for" a season / month / week — one row per period, each with its own status (`open` / `done` / `carried` / `removed`, `carried_to`) |
+> | the day | `tasks.scheduled_for` + `is_all_day` | scheduled on a day |
+> | focus | `task_focus` | this PERSON chose it for this day (one row per person, task, date) |
+> | history | `task_placement_events` | every commitment and schedule change, written by triggers |
+> | aliases | `task_aliases` | ids retired by the 2026-09-21 chain fold → the enduring row |
+>
+> - **Nothing is copied any more.** Taking a month/season task lower ADDS the lower
+>   commitment (or the day) on the same row; the higher commitment stays, so the
+>   period's look-back still sees the whole list, marked "→ Wednesday, September 23"
+>   / "→ September 13–19". Moving UP releases the lower commitments. "Keep" carries the
+>   SAME id: this period's row → `carried`, next period → `open`.
+> - **Scheduling touches only the day** (and aligns the cached `week_start` with it);
+>   unscheduling keeps the week and period commitments and the focus.
+> - **Focus is personal.** `tasks.planned_on` is no longer written for tasks; it is read
+>   only as a legacy fallback on rows with no focus rows (iOS still writes it).
+> - `tasks.bucket` / `week_start` / `month_start` / `season_start` are a **cache** of the
+>   lowest open commitment (`timed` when dated), kept by DB triggers both ways at trigger
+>   depth 1 and mirrored locally by `lib/placement/model.deriveCache()`. Readers that only
+>   need "lowest level" (Today's pools, the week list) keep reading the cache; readers that
+>   must see a row on MORE than one list (`selectPeriodTasks`, the month rail) read the
+>   commitments via `committedTo()`. A row with no records answers from its cache with the
+>   NULL rule below.
+> - Every writer goes through `lib/placement/intentions.planPlacement()` inside
+>   `updateTask`: the same intention through drag, arrow, pin or verb produces the same
+>   state. `lib/planning/lineage.ts` is a thin shim over the row; `copyDown`,
+>   `isDescent`, `livePlacedCopyOf` and the copy-down explainer are gone.
+> - `source_id` survives only as the "came from" thread on steps (different-title
+>   children of a season item) and as history on rows the fold left alone.
+
 This document answers one question: **for any task, event or routine on screen,
 why is it there?** It covers where items are born, which columns decide where
 they live, and which predicate each surface uses to decide membership.

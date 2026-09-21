@@ -9,7 +9,7 @@
 // non-goal row is ignored and the row stays loose.
 
 import type { Task } from '@/types/task'
-import { placementFate } from './lineage'
+import { placementFateOf, type PlacementLevel } from '@/lib/placement/model'
 
 const byCreation = (a: Task, b: Task) => a.createdAt.getTime() - b.createdAt.getTime()
 
@@ -49,12 +49,13 @@ export function splitGoalRows(rows: readonly Task[]): {
  * The steps that travel with a goal when it is kept into the next period.
  *
  * Open work only. A finished step is this period's record and stays where it
- * was done; a step already placed lower has a copy carrying on without it, and
- * copying it again would fork the same work into two rows.
+ * was done; a step already placed lower (on a week, or a day) is carrying on
+ * on its own list and is not re-decided here. `level` is the goal's level —
+ * "placed lower" is judged from there.
  */
-export function stepsThatCarryForward(goalId: string, tasks: readonly Task[]): Task[] {
+export function stepsThatCarryForward(goalId: string, tasks: readonly Task[], level: PlacementLevel = 'month'): Task[] {
   return tasks
-    .filter((t) => t.goalTaskId === goalId && !t.completed && placementFate(t, tasks) === 'open')
+    .filter((t) => t.goalTaskId === goalId && !t.completed && placementFateOf(t, level) === 'open')
     .sort(byCreation)
 }
 

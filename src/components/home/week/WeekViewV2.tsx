@@ -41,12 +41,12 @@ import { useGatedTaskActions } from '@/hooks/useGatedTaskActions'
 import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
 import { partitionWeekExtras } from '@/lib/week/weekExtras'
 import { unhomedRoutines } from '@/lib/week/unhomedRoutines'
-import { explainCopyDownOnce } from '@/lib/planning/copyDownExplainer'
 import { buildWeekRoutineItems } from './weekRoutineItems'
 import { useWeekInstances } from './useWeekInstances'
 import { edgeForPointer } from './edgeAdvance'
 import { WeekJournal, type JournalDay, type JournalEntry } from './WeekJournal'
 import { makePlanActions } from '@/lib/planning/planActions'
+import { focusDays } from '@/lib/placement/model'
 import type { PlanDragPayload } from '@/lib/planning/planDrag'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
 import { showToast } from '@/hooks/useToast'
@@ -169,7 +169,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
 
   // Create-gesture wiring
   const navigate = useNavigate()
-  const { addTask, deleteTask, toggleTask, updateTask, updateTasksBulk, pushTask } = useSupabaseTasks()
+  const { addTask, deleteTask, toggleTask, updateTask, updateTasksBulk, pushTask, userId } = useSupabaseTasks()
   // The rail plans MY week — scope it to the current member, as the strip does.
   const { getCurrentUserMember } = useFamilyMembers()
   const meId = getCurrentUserMember()?.id ?? null
@@ -625,9 +625,12 @@ export function WeekViewV2(props: WeekViewV2Props) {
           continue
         }
       }
-      if (t.plannedOn && !seen.has(t.id)) {
-        const key = localYmd(t.plannedOn)
-        if (byKey.has(key)) untimed.get(key)!.push(entry())
+      // Chosen for a day (this person's focus; legacy planned_on when the row
+      // has no focus rows) — drawn on that day, untimed.
+      if (!seen.has(t.id)) {
+        for (const key of focusDays(t, userId)) {
+          if (byKey.has(key)) { untimed.get(key)!.push(entry()); break }
+        }
       }
     }
 
@@ -676,7 +679,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
       d.entries = [...t, ...u]
     }
     return days
-  }, [tasks, events, eventItems, extras, routineItems, weekInstances, weekStart, dayCount, labelFor])
+  }, [tasks, userId, events, eventItems, extras, routineItems, weekInstances, weekStart, dayCount, labelFor])
 
   const journalSpans = useMemo(
     () => layoutContextSpans(events, journalDays.map((d) => d.date)),
@@ -846,7 +849,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
     <>
       {/* The week's list — the same rows the Today pin draws, in the page's
           own column so it does not depend on a pin being switched on. */}
-      <WeekPlanColumn tasks={tasks} weekStart={weekAnchor} meId={meId} actions={weekListActions} draggable={!narrow} />
+      <WeekPlanColumn tasks={tasks} weekStart={weekAnchor} meId={meId} userId={userId} actions={weekListActions} draggable={!narrow} />
       <WeekPoolLane
         tasks={tasks}
         routines={shelfRoutines}
@@ -865,7 +868,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
         routinesDraggable={showSchedule}
         onPlanDrop={(payload) => { void planActions.drop(payload, { type: 'period', period: 'week' }) }}
       />
-      <WeekMonthRail tasks={tasks} meId={meId} onSelectItem={onSelectItem} onAddToWeek={(id) => { void Promise.resolve(gated.pushTask(id, 'week')).then((ok) => { if (ok) explainCopyDownOnce('month', 'week') }) }} />
+      <WeekMonthRail tasks={tasks} meId={meId} onSelectItem={onSelectItem} onAddToWeek={(id) => { void gated.pushTask(id, 'week') }} />
     </>
   )
 

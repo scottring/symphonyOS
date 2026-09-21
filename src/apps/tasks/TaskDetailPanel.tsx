@@ -233,8 +233,11 @@ function TaskPanelBody({ id }: { id: string }) {
           if (ok) showToast(describeTriageWhen(when), 'success');
         })();
       }}
+      // Unschedule clears the day only: the row's week and period commitments
+      // stay (D1c.1), and the placement module picks the bucket from them —
+      // back to its week list, or the inbox when it has no list at all.
       onClearSchedule={() =>
-        updateTask(task.id, { bucket: 'inbox', scheduledFor: undefined, isAllDay: undefined })
+        updateTask(task.id, { scheduledFor: undefined, isAllDay: undefined })
       }
       isPinned={pinnedItems.isPinned('task', task.id)}
       onTogglePin={() => {

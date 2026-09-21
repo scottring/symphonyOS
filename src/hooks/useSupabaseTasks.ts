@@ -8,12 +8,12 @@ import { findTaskById as lookupTaskById } from '@/lib/findTaskById'
 import type { Task, TaskBucket, TaskLink, TaskContext, TaskCategory, TaskCaptureMeta, LinkedActivity, LinkType, LinkedActivityType, GroupMemberRef } from '@/types/task'
 import type { TaskDirections } from '@/types/directions'
 import { scopeForDomain, memberForAuthUser, type Scope } from '@/lib/scope'
-import { localYmd, parseLocalYmd, weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
-import { weekStartForBucket } from '@/lib/today/weekPlacement'
-import { monthStartOf, monthStartForBucket, seasonStartForBucket, isPlacement } from '@/lib/planning/periodPlacement'
-import { isDescent, livePlacedCopyOf } from '@/lib/planning/lineage'
+import { localYmd, parseLocalYmd } from '@/lib/cadence/config'
+import { monthStartOf, isPlacement } from '@/lib/planning/periodPlacement'
 import { stepsThatCarryForward } from '@/lib/planning/goalSteps'
 import { readSeasons, seasonStartFor } from '@/lib/cadence/seasons'
+import { planPlacement, planKeep, commitmentRow, type PlacementPlan } from '@/lib/placement/intentions'
+import type { TaskCommitment, TaskFocusEntry, PlacementLevel } from '@/types/task'
 import { onRealtimeResumed } from '@/lib/realtime/keepAlive'
 import { announceToBuyChanged } from '@/lib/lists/toBuy'
 // `import type` on purpose: erased at compile time, so it does NOT drag
@@ -22,12 +22,6 @@ import type { OrderWrite } from '@/lib/today/taskOrdering'
 
 // Monotonic suffix so every hook instance gets its own realtime channel topic.
 let tasksChannelSeq = 0
-
-/** Start of the week we're in now, per the user's weekStartsOn. What "this
- *  week" resolves to for every triage surface that says those words. */
-function currentWeekStart(): Date {
-  return weekStartAnchor(new Date(), readCadenceConfig().weekStartsOn)
-}
 
 // Same-tab write fan-out. Every hook instance keeps its own copy of the tasks
 // state, and cross-instance sync (detail panel → Today list, QuickCapture →
@@ -200,6 +194,96 @@ export function dbTaskToTask(dbTask: DbTask): Task {
   }
 }
 
+// ── The supporting records: commitments and focus ────────────────────────────
+// One enduring action (2026-09-21): a task's period commitments and personal
+// focus live in their own tables and ride on the Task as arrays. The tasks
+// row's bucket/stamps are a cache of them (see lib/placement/model).
+
+export interface DbTaskCommitment {
+  id: string
+  task_id: string
+  level: PlacementLevel
+  period_start: string
+  status: TaskCommitment['status']
+  carried_to: string | null
+}
+
+export interface DbTaskFocus {
+  task_id: string
+  user_id: string
+  date: string
+}
+
+export function dbCommitmentToCommitment(r: DbTaskCommitment): TaskCommitment {
+  return {
+    id: r.id, level: r.level, status: r.status,
+    periodStart: parseLocalYmd(r.period_start),
+    carriedTo: r.carried_to ? parseLocalYmd(r.carried_to) : undefined,
+  }
+}
+
+export function dbFocusToFocus(r: DbTaskFocus): TaskFocusEntry {
+  return { userId: r.user_id, date: parseLocalYmd(r.date) }
+}
+
+/** Hang each task's records on it. A task with none gets an empty array (so
+ *  the legacy fallback in lib/placement/model applies only to rows that truly
+ *  predate the tables — those arrive with `commitments` undefined only when
+ *  the records could not be loaded at all). */
+export function attachRecords(rows: Task[], commitments: DbTaskCommitment[] | null, focus: DbTaskFocus[] | null): Task[] {
+  if (!commitments && !focus) return rows
+  const cById = new Map<string, TaskCommitment[]>()
+  for (const r of commitments ?? []) {
+    const list = cById.get(r.task_id) ?? []
+    list.push(dbCommitmentToCommitment(r))
+    cById.set(r.task_id, list)
+  }
+  const fById = new Map<string, TaskFocusEntry[]>()
+  for (const r of focus ?? []) {
+    const list = fById.get(r.task_id) ?? []
+    list.push(dbFocusToFocus(r))
+    fById.set(r.task_id, list)
+  }
+  const attach = (t: Task): Task => ({
+    ...t,
+    ...(commitments ? { commitments: cById.get(t.id) ?? [] } : {}),
+    ...(focus ? { focus: fById.get(t.id) ?? [] } : {}),
+    ...(t.subtasks ? { subtasks: t.subtasks.map((s) => ({
+      ...s,
+      ...(commitments ? { commitments: cById.get(s.id) ?? [] } : {}),
+      ...(focus ? { focus: fById.get(s.id) ?? [] } : {}),
+    })) } : {}),
+  })
+  return rows.map(attach)
+}
+
+/** Patch one task (top-level or nested) with a record change. Pure. */
+function patchTaskRecords(rows: Task[], taskId: string, patch: (t: Task) => Task): Task[] {
+  return rows.map((t) => {
+    if (t.id === taskId) return patch(t)
+    if (t.subtasks?.some((s) => s.id === taskId)) {
+      return { ...t, subtasks: t.subtasks.map((s) => (s.id === taskId ? patch(s) : s)) }
+    }
+    return t
+  })
+}
+
+function applyCommitmentEvent(rows: Task[], event: 'INSERT' | 'UPDATE' | 'DELETE', row: DbTaskCommitment): Task[] {
+  return patchTaskRecords(rows, row.task_id, (t) => {
+    const list = (t.commitments ?? []).filter((c) => c.id !== row.id && !(c.level === row.level && localYmd(c.periodStart) === row.period_start))
+    if (event !== 'DELETE') list.push(dbCommitmentToCommitment(row))
+    return { ...t, commitments: list }
+  })
+}
+
+function applyFocusEvent(rows: Task[], event: 'INSERT' | 'UPDATE' | 'DELETE', row: DbTaskFocus): Task[] {
+  return patchTaskRecords(rows, row.task_id, (t) => {
+    const list = (t.focus ?? []).filter((f) => !(f.userId === row.user_id && localYmd(f.date) === row.date))
+    if (event !== 'DELETE') list.push(dbFocusToFocus(row))
+    return { ...t, focus: list }
+  })
+}
+
 // ── One first load, shared ───────────────────────────────────────────────────
 // Every instance of this hook used to fetch the whole table on mount, and a
 // single route mounts several (ShellLayout, ShellSearch, useShellChrome, the
@@ -267,9 +351,16 @@ function applyUpdate(rows: Task[], updatedTask: Task): Task[] {
     // this list already holds survives the swap (same principle as the
     // post-updateTask swap, which announces the merged local object).
     if (t.id === updatedTask.id) {
+      // The commitment and focus records live in their own tables and reach
+      // this list through their own events; a flat tasks row never carries
+      // them, so the ones already held survive the swap too.
+      const records = {
+        commitments: updatedTask.commitments ?? t.commitments,
+        focus: updatedTask.focus ?? t.focus,
+      }
       return updatedTask.subtasks || !t.subtasks?.length
-        ? updatedTask
-        : { ...updatedTask, subtasks: t.subtasks }
+        ? { ...updatedTask, ...records }
+        : { ...updatedTask, ...records, subtasks: t.subtasks }
     }
     if (t.subtasks) {
       const updatedSubtasks = t.subtasks.map((st) =>
@@ -336,7 +427,24 @@ async function loadTasks(
       return null
     }
 
-    const rows = nestSubtasks((data as DbTask[]).map(dbTaskToTask))
+    // The records ride alongside. A failure here degrades to the cached
+    // columns (legacy read path) rather than failing the whole load.
+    let commitments: DbTaskCommitment[] | null = null
+    let focus: DbTaskFocus[] | null = null
+    try {
+      const [cRes, fRes] = await Promise.all([
+        supabase.from('task_commitments').select('*'),
+        supabase.from('task_focus').select('*'),
+      ])
+      commitments = Array.isArray(cRes?.data) ? (cRes.data as DbTaskCommitment[]) : null
+      focus = Array.isArray(fRes?.data) ? (fRes.data as DbTaskFocus[]) : null
+      if (cRes?.error) logger.warn('[useSupabaseTasks] commitments failed to load:', cRes.error.message)
+      if (fRes?.error) logger.warn('[useSupabaseTasks] focus failed to load:', fRes.error.message)
+    } catch (e) {
+      logger.warn('[useSupabaseTasks] records failed to load:', e instanceof Error ? e.message : String(e))
+    }
+
+    const rows = attachRecords(nestSubtasks((data as DbTask[]).map(dbTaskToTask)), commitments, focus)
     tasksCache = { userId, rows, at: Date.now() }
     return rows
   })()
@@ -535,6 +643,31 @@ export function useSupabaseTasks() {
           }
         }
       )
+      // The supporting records: a commitment or focus row changing anywhere
+      // (the other adult's tab, the DB trigger, the fold) patches the task
+      // it belongs to. A DELETE payload carries only the key columns.
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'task_commitments' },
+        (payload) => {
+          const row = (payload.eventType === 'DELETE' ? payload.old : payload.new) as DbTaskCommitment
+          if (!row?.task_id) return
+          const patch = (rows: Task[]) => applyCommitmentEvent(rows, payload.eventType, row)
+          setTasks(patch)
+          patchCache(patch)
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'task_focus' },
+        (payload) => {
+          const row = (payload.eventType === 'DELETE' ? payload.old : payload.new) as DbTaskFocus
+          if (!row?.task_id) return
+          const patch = (rows: Task[]) => applyFocusEvent(rows, payload.eventType, row)
+          setTasks(patch)
+          patchCache(patch)
+        }
+      )
       .subscribe()
 
     // Same-tab writes from OTHER hook instances (see localTaskWrites above).
@@ -677,7 +810,9 @@ export function useSupabaseTasks() {
       needsDiscussion: options?.needsDiscussion,
       discussionNote: options?.discussionNote,
       neededOn: options?.neededOn,
-      plannedOn: options?.plannedOn,
+      // Chosen for a day = this person's focus row, never the shared column.
+      focus: options?.plannedOn ? [{ userId: user.id, date: options.plannedOn }] : [],
+      commitments: [],
     }
     setTasks((prev) => [optimisticTask, ...prev])
 
@@ -728,9 +863,6 @@ export function useSupabaseTasks() {
         needs_discussion: options?.needsDiscussion ?? false,
         discussion_note: options?.discussionNote ?? null,
         needed_on: options?.neededOn ? localYmd(options.neededOn) : null,
-        // Only sent when set, so an insert never names a column a database
-        // without the planned_on migration doesn't have.
-        ...(options?.plannedOn ? { planned_on: localYmd(options.plannedOn) } : {}),
       })
       .select()
       .single()
@@ -743,7 +875,18 @@ export function useSupabaseTasks() {
       return undefined
     }
 
-    const createdTask = dbTaskToTask(data as DbTask)
+    // The DB mirror trigger has already written the period commitment the
+    // bucket implies; it reaches this list through realtime. Focus is ours
+    // to write: one row for this person and this day.
+    let focus: TaskFocusEntry[] = []
+    if (options?.plannedOn) {
+      const { error: focusError } = await supabase
+        .from('task_focus')
+        .upsert({ task_id: (data as DbTask).id, user_id: user.id, date: localYmd(options.plannedOn) }, { onConflict: 'task_id,user_id,date' })
+      if (focusError) logger.warn('[addTask] focus row failed:', focusError.message)
+      else focus = [{ userId: user.id, date: options.plannedOn }]
+    }
+    const createdTask: Task = { ...dbTaskToTask(data as DbTask), commitments: optimisticTask.commitments, focus }
 
     // Replace optimistic task with real one. Drop any copy the realtime
     // INSERT already delivered (it can land before this response), otherwise
@@ -1138,80 +1281,121 @@ export function useSupabaseTasks() {
   }, [findTaskById, findParentOfSubtask])
 
   /**
-   * Copy-down. Placing a month or season TASK lower does not move it — it
-   * inserts a copy carrying the placement and leaves the original on its list,
-   * so the period's look-back sees everything that was on it (a moved row
-   * would have shown only what you DIDN'T do). The copy carries everything but
-   * the placement: domain (or it lands Unsorted and re-asks DomainGate),
-   * assignees (or the partner is narrowed out), notes, links, contact, project.
-   * `source_id` is the only thread between them; lineage.ts reads it.
+   * Write a placement plan's supporting records (task_commitments, task_focus)
+   * after the row itself has been written. The row write already carried the
+   * cached bucket/stamps, and the DB mirror trigger has ensured the commitment
+   * that bucket implies — so `ensure` is a harmless upsert here and `remove` /
+   * `carry` are the writes that only the app can express. `done` / `reopen`
+   * are the completion trigger's job.
+   *
+   * Sequential on purpose: two ops on the same row race the sync trigger.
    */
-  const copyDown = useCallback(async (original: Task, updates: Partial<Task>): Promise<string | undefined> => {
-    const to = updates.bucket
-    const scheduledFor = to === 'timed' ? updates.scheduledFor : undefined
-    return addTask(original.title, original.contactId, original.projectId, scheduledFor, {
-      bucket: to !== 'timed' ? to : undefined,
-      weekStart: updates.weekStart,
-      monthStart: updates.monthStart,
-      seasonStart: updates.seasonStart,
-      isAllDay: to === 'timed' ? updates.isAllDay : undefined,
-      // A copy that stays on its own level (the look-back's Keep) keeps its
-      // kind; a copy that descends is a task — a goal never goes down.
-      isGoal: to === original.bucket ? original.isGoal === true : false,
-      sourceId: original.id,
-      goalId: original.goalId,
-      // A copy serves the same goal as the row it came from — that is how a
-      // step taken down to a week still knows what it is for. An explicit
-      // override wins, so a goal's Keep can re-point its steps at the copy.
-      goalTaskId: updates.goalTaskId ?? original.goalTaskId,
-      context: original.context ?? null,
-      assignedTo: original.assignedTo ?? null,
-      assignedToAll: original.assignedToAll ?? undefined,
-      category: original.category,
-      notes: original.notes,
-      links: original.links,
-      phoneNumber: original.phoneNumber,
-      email: original.email,
-      location: original.location,
-      locationPlaceId: original.locationPlaceId,
-    })
-  }, [addTask])
+  const writePlacementOps = useCallback(async (taskId: string, plan: PlacementPlan): Promise<void> => {
+    const now = new Date().toISOString()
+    for (const op of plan.commitmentOps) {
+      const key = commitmentRow(taskId, op)
+      let error: { message: string } | null | undefined
+      try {
+        if (op.op === 'ensure') {
+          ;({ error } = await supabase
+            .from('task_commitments')
+            .upsert({ ...key, status: 'open', ended_at: null, created_by: user?.id ?? null }, { onConflict: 'task_id,level,period_start' }))
+        } else if (op.op === 'remove') {
+          ;({ error } = await supabase
+            .from('task_commitments')
+            .update({ status: 'removed', ended_at: now })
+            .eq('task_id', key.task_id).eq('level', key.level).eq('period_start', key.period_start).eq('status', 'open'))
+        } else if (op.op === 'carry') {
+          ;({ error } = await supabase
+            .from('task_commitments')
+            .update({ status: 'carried', carried_to: localYmd(op.to), ended_at: now })
+            .eq('task_id', key.task_id).eq('level', key.level).eq('period_start', key.period_start).eq('status', 'open'))
+        }
+      } catch (e) {
+        error = { message: e instanceof Error ? e.message : String(e) }
+      }
+      if (error) {
+        console.error('[placement] commitment write failed:', op, error.message)
+        showToast('Saved, but its period list may be out of date — refresh to check', 'error', 4000)
+      }
+    }
+    for (const op of plan.focusOps) {
+      let error: { message: string } | null | undefined
+      try {
+        if (op.op === 'set') {
+          ;({ error } = await supabase
+            .from('task_focus')
+            .upsert({ task_id: taskId, user_id: op.userId, date: localYmd(op.date) }, { onConflict: 'task_id,user_id,date' }))
+        } else {
+          let q = supabase.from('task_focus').delete().eq('task_id', taskId).eq('user_id', op.userId)
+          if (op.date) q = q.eq('date', localYmd(op.date))
+          ;({ error } = await q)
+        }
+      } catch (e) {
+        error = { message: e instanceof Error ? e.message : String(e) }
+      }
+      if (error) {
+        console.error('[placement] focus write failed:', op, error.message)
+        showToast("Couldn't save your choice for the day", 'error', 4000)
+      }
+    }
+  }, [user])
 
   /**
-   * The look-back's "Keep": copy a month/season row — task OR goal — into the
-   * next period, leaving the original on the list it was reviewed from. Same
-   * copy as copyDown, same lineage (source_id), no descent: the bucket stays.
+   * The look-back's "Keep": the SAME row — task OR goal — carried into the
+   * next period. This period's commitment is marked carried ("→ Carried to
+   * October"); the next period gets an open one. The id never changes, so
+   * notes, steps, attachments and threads all stay put.
    *
    * A GOAL keeps its open steps too. Carrying "Transform the porch" into
    * October and leaving "buy new chairs" behind in September would empty the
    * goal of the work that defines it, and re-deciding four steps one at a time
-   * is deliberation the cadence already spent on the goal itself. The steps
-   * attach to the COPY, not the original — otherwise October's goal would show
-   * nothing and September's would grow a second set.
+   * is deliberation the cadence already spent on the goal itself. Finished
+   * steps stay behind: they are September's record. So does a step already
+   * placed lower, which is carrying on on its own.
    *
-   * Finished steps stay behind: they are September's record. So does a step
-   * already placed lower, whose copy is carrying on without it.
+   * Returns the task's own id (callers used to receive the copy's).
    */
   const keepForward = useCallback(async (id: string, period: { monthStart?: Date; seasonStart?: Date }): Promise<string | undefined> => {
     const task = findTaskById(id)
-    if (!task || (task.bucket !== 'month' && task.bucket !== 'quarter')) return undefined
-    const copyId = await copyDown(task, { bucket: task.bucket, monthStart: period.monthStart, seasonStart: period.seasonStart })
-    if (copyId && task.isGoal) {
-      for (const step of stepsThatCarryForward(task.id, tasksRef.current)) {
-        await copyDown(step, {
-          bucket: step.bucket,
-          monthStart: period.monthStart,
-          seasonStart: period.seasonStart,
-          goalTaskId: copyId,
-        })
+    if (!task) return undefined
+    const level: PlacementLevel | null = period.monthStart ? 'month' : period.seasonStart ? 'season' : null
+    const to = period.monthStart ?? period.seasonStart
+    if (!level || !to) return undefined
+
+    const keepOne = async (t: Task) => {
+      const plan = planKeep(t, level, to)
+      const before = t
+      setTasks((prev) => prev.map((x) => (x.id === t.id ? plan.local : x)))
+      const dbRow: Record<string, unknown> = {
+        bucket: plan.row.bucket,
+        week_start: plan.row.weekStart ? localYmd(plan.row.weekStart) : null,
+        month_start: plan.row.monthStart ? localYmd(plan.row.monthStart) : null,
+        season_start: plan.row.seasonStart ? localYmd(plan.row.seasonStart) : null,
+      }
+      const { error } = await supabase.from('tasks').update(dbRow).eq('id', t.id)
+      if (error) {
+        setTasks((prev) => prev.map((x) => (x.id === t.id ? before : x)))
+        showToast('Failed to keep it forward', 'error', 4000)
+        return false
+      }
+      await writePlacementOps(t.id, plan)
+      announceLocalWrite({ kind: 'update', task: plan.local })
+      return true
+    }
+
+    if (!(await keepOne(task))) return undefined
+    if (task.isGoal) {
+      for (const step of stepsThatCarryForward(task.id, tasksRef.current, level)) {
+        await keepOne(step)
       }
     }
-    return copyId
-  }, [findTaskById, copyDown])
+    return task.id
+  }, [findTaskById, writePlacementOps])
 
   const updateTask = useCallback(async (id: string, updates: Partial<Task>) => {
     logger.debug('[updateTask] Called with:', { id, updates })
-    let task = findTaskById(id)
+    const task = findTaskById(id)
     if (!task) {
       // Should be rare now that lookups read tasksRef — surface it loudly so a
       // dropped write is never silent again.
@@ -1230,25 +1414,12 @@ export function useSupabaseTasks() {
       return
     }
 
-    // A month/season TASK stepping down the ladder is copied, not moved — see
-    // copyDown. The original is untouched: no bucket change, no defer_count,
-    // not even updated_at.
-    //
-    // But only the FIRST descent copies. Re-place a row that already has an
-    // open copy — dragged to another day, dropped on another week, the pool
-    // chip clicked twice — and we move that copy instead of leaving another
-    // twin behind. Without this every drag minted a row: ten identical
-    // potluck tasks (and ten identical notes) inside twenty seconds.
-    if (isDescent(task.bucket, updates.bucket)) {
-      const openCopy = livePlacedCopyOf(task, tasksRef.current)
-      if (!openCopy) {
-        await copyDown(task, updates)
-        return
-      }
-      // Re-place the copy itself: same id, same lineage, one row.
-      id = openCopy.id
-      task = openCopy
-    }
+    // ONE enduring action (2026-09-21). Whatever dialect the caller speaks —
+    // `{ bucket: 'week', weekStart }`, `{ scheduledFor }`, `{ plannedOn }` —
+    // the placement module turns it into commitment and focus records on this
+    // same row, plus the cached columns the row must carry. Nothing is copied.
+    const plan = planPlacement(task, updates, { now: new Date(), userId: user?.id ?? null })
+    updates = { ...plan.row, commitments: plan.local.commitments, focus: plan.local.focus }
 
     // Scope is DERIVED. Recompute whenever anything it depends on moves; a
     // caller-supplied `scope` is ignored on purpose (it is not a choice — the
@@ -1287,23 +1458,9 @@ export function useSupabaseTasks() {
       updates = { ...updates, scope: derived }
     }
 
-    // Invariant: bucket 'timed' requires a scheduled date (the timed pool only
-    // shows tasks with a date; the inbox pool only shows bucket 'inbox'). A
-    // clear-date update would otherwise strand the task invisible until a
-    // refetch — send it back to the inbox instead.
-    if (
-      'scheduledFor' in updates && !updates.scheduledFor &&
-      (updates.bucket === 'timed' || (!('bucket' in updates) && task.bucket === 'timed'))
-    ) {
-      updates = { ...updates, bucket: 'inbox', isAllDay: false }
-    }
-    // Inverse invariant: a scheduled date implies bucket 'timed' (types/task.ts
-    // documents scheduledFor as "only set when bucket='timed'"). A caller that
-    // sets a date without flipping the bucket would leave the task dated but
-    // absent from every day view.
-    if ('scheduledFor' in updates && updates.scheduledFor && !('bucket' in updates) && task.bucket !== 'timed') {
-      updates = { ...updates, bucket: 'timed' }
-    }
+    // The date ⇄ bucket invariants (a date means 'timed'; no date, no 'timed')
+    // now live in planPlacement's deriveCache: an unscheduled row falls back to
+    // its week or period list, not to the inbox.
 
     // A group moves as a UNIT: rescheduling a parent carries its children.
     //
@@ -1415,11 +1572,17 @@ export function useSupabaseTasks() {
     if ('sortOrder' in updates) dbUpdates.sort_order = updates.sortOrder ?? null
 
     logger.debug('[updateTask] Sending to DB:', { id, dbUpdates })
-    const { data, error: updateError, status, count } = await supabase
-      .from('tasks')
-      .update(dbUpdates)
-      .eq('id', id)
-      .select()
+    // A records-only write (choosing a task for today, un-choosing it) names
+    // no column on `tasks`; an empty UPDATE would return no row and the
+    // records would never be written (found in the first walkthrough).
+    const recordsOnly = Object.keys(dbUpdates).length === 0 && (plan.commitmentOps.length > 0 || plan.focusOps.length > 0)
+    const { data, error: updateError, status, count } = recordsOnly
+      ? { data: [{ id }] as unknown[], error: null, status: 200, count: 1 }
+      : await supabase
+        .from('tasks')
+        .update(dbUpdates)
+        .eq('id', id)
+        .select()
 
     logger.debug('[updateTask] DB response:', { data, status, count, error: updateError?.message })
 
@@ -1444,6 +1607,8 @@ export function useSupabaseTasks() {
       setError(updateError.message)
     } else if (data && data.length > 0) {
       logger.debug('[updateTask] DB update successful, returned notes:', (data[0] as DbTask).notes)
+      // The supporting records follow the row.
+      if (plan.commitmentOps.length || plan.focusOps.length) await writePlacementOps(id, plan)
       // Fan out to other instances. Announce the merged LOCAL object, not the
       // returned flat row — a parent's nested subtasks must survive the swap.
       announceLocalWrite({ kind: 'update', task: { ...task, ...updates } })
@@ -1475,7 +1640,7 @@ export function useSupabaseTasks() {
         }
       }
     }
-  }, [tasks, familyMembers, findTaskById, findParentOfSubtask, selfMemberIdForOwner, copyDown])
+  }, [tasks, familyMembers, findTaskById, findParentOfSubtask, selfMemberIdForOwner, user, writePlacementOps])
 
   // Bulk update multiple tasks at once
   const updateTasksBulk = useCallback(async (requestedIds: string[], updates: Partial<Task>) => {
@@ -1490,25 +1655,17 @@ export function useSupabaseTasks() {
         showToast(`${goals.length} goal${goals.length === 1 ? '' : 's'} stay${goals.length === 1 ? 's' : ''} on the list — goals aren't scheduled`, 'info')
       }
     }
-    // Descending rows are copied one by one (copyDown) and leave the bulk write.
-    if (isPlacement(updates) && updates.bucket) {
-      const descending = taskIds.filter((id) => { const t = findTaskById(id); return !!t && isDescent(t.bucket, updates.bucket) })
-      if (descending.length) {
-        for (const id of descending) { const t = findTaskById(id); if (t) await copyDown(t, updates) }
-        taskIds = taskIds.filter((id) => !descending.includes(id))
-      }
-    }
     if (taskIds.length === 0) return
 
-    logger.debug('[updateTasksBulk] Called with:', { taskIds, updates })
+    // A placement is per ROW: each task's commitments differ, so one payload
+    // cannot express it. Route each through updateTask (the one placement
+    // funnel); the bulk path below is for the fields a selection shares.
+    if (isPlacement(updates) || 'plannedOn' in updates) {
+      for (const id of taskIds) await updateTask(id, updates)
+      return
+    }
 
-    // Same schedule/bucket invariants as updateTask (see comments there).
-    if (updates.bucket === 'timed' && 'scheduledFor' in updates && !updates.scheduledFor) {
-      updates = { ...updates, bucket: 'inbox', isAllDay: false }
-    }
-    if ('scheduledFor' in updates && updates.scheduledFor && !('bucket' in updates)) {
-      updates = { ...updates, bucket: 'timed' }
-    }
+    logger.debug('[updateTasksBulk] Called with:', { taskIds, updates })
 
     // Save original tasks for rollback
     const tasksToUpdate = tasks.filter(t => taskIds.includes(t.id))
@@ -1665,7 +1822,7 @@ export function useSupabaseTasks() {
     for (const t of tasksToUpdate) {
       announceLocalWrite({ kind: 'update', task: merged(t) })
     }
-  }, [tasks, selfMemberIdForOwner, copyDown])
+  }, [tasks, selfMemberIdForOwner, findTaskById, updateTask])
 
   /**
    * Write a different sort_order to each of several tasks. `updateTasksBulk`
@@ -1778,15 +1935,9 @@ export function useSupabaseTasks() {
   }, [])
 
   // Schedule a task to a specific date — sets bucket to 'timed'
+  // Scheduling a day touches only the day; the row's period commitments stay.
   const scheduleTask = useCallback(async (id: string, date: Date, isAllDay?: boolean) => {
-    await updateTask(id, {
-      bucket: 'timed',
-      scheduledFor: date,
-      isAllDay: isAllDay ?? true,
-      weekStart: undefined,
-      monthStart: undefined,
-      seasonStart: undefined,
-    })
+    await updateTask(id, { scheduledFor: date, isAllDay: isAllDay ?? true })
   }, [updateTask])
 
   // Move a task to a bucket (week, month, quarter) or reschedule to a date
@@ -1801,16 +1952,10 @@ export function useSupabaseTasks() {
     const deferCount = (task?.deferCount ?? 0) + 1
 
     if (target === 'week' || target === 'month' || target === 'quarter') {
-      // Move to pool — clear scheduled date, and settle the week (see setBucket:
-      // "to the week" means THIS week; every other bucket has no week at all).
-      await updateTask(id, {
-        bucket: target,
-        scheduledFor: undefined,
-        weekStart: weekStartForBucket(target, currentWeekStart()),
-        monthStart: monthStartForBucket(target, new Date()),
-        seasonStart: seasonStartForBucket(target, new Date()),
-        deferCount,
-      })
+      // Commit to the period that contains now (planPlacement stamps it) and
+      // take it off its day. Descending keeps the higher commitments;
+      // ascending releases the lower ones.
+      await updateTask(id, { bucket: target, scheduledFor: undefined, deferCount })
     } else {
       // Reschedule to a specific date
       const newScheduledFor = new Date(target)
@@ -1836,11 +1981,6 @@ export function useSupabaseTasks() {
         bucket: 'timed',
         scheduledFor: newScheduledFor,
         isAllDay: !hasSpecificTime,
-        // A date implies 'timed'; a period stamp left behind would haunt that
-        // period's pool (week) or look-back (month/season).
-        weekStart: undefined,
-        monthStart: undefined,
-        seasonStart: undefined,
         deferCount,
       })
     }
@@ -1862,10 +2002,8 @@ export function useSupabaseTasks() {
     } else if (bucket !== 'timed') {
       updates.scheduledFor = undefined
     }
-    updates.weekStart = weekStartForBucket(bucket, currentWeekStart())
-    // Same rule for the month and the season: stamp the one entered, clear the rest.
-    updates.monthStart = monthStartForBucket(bucket, new Date())
-    updates.seasonStart = seasonStartForBucket(bucket, new Date())
+    // The period is the one containing now; planPlacement stamps it and keeps
+    // or releases the other commitments by direction (see lib/placement).
     await updateTask(id, updates)
   }, [updateTask])
 
@@ -1964,5 +2102,6 @@ export function useSupabaseTasks() {
     }
   }, [tasks])
 
-  return { tasks, loading, error, refetch, addTask, addSubtask, addPrepTask, getPrepTasks, getLinkedTasks, toggleTask, toggleWaiting, deleteTask, updateTask, updateTasksBulk, updateTaskOrders, scheduleTask, pushTask, setBucket, setGoal, keepForward }
+  // `userId`: whose focus rows count on a day (task_focus is per person).
+  return { tasks, loading, error, refetch, addTask, addSubtask, addPrepTask, getPrepTasks, getLinkedTasks, toggleTask, toggleWaiting, deleteTask, updateTask, updateTasksBulk, updateTaskOrders, scheduleTask, pushTask, setBucket, setGoal, keepForward, userId: user?.id ?? null }
 }
