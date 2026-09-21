@@ -525,13 +525,13 @@ describe('a planning session against the real writers', () => {
   async function run(hook: { current: ReturnType<typeof useSupabaseTasks> }, d: SessionDraft) {
     const h = () => hook.current
     const w: SessionWriters = {
-      keep: async (id, monthStart, prevStart) => !!(await h().keepForward(id, { monthStart }, prevStart)),
-      addTask: (title, o) => h().addTask(title, undefined, undefined, undefined, { id: o.id, bucket: 'month', monthStart: o.monthStart, isGoal: o.isGoal, goalTaskId: o.goalTaskId, context: o.context }),
+      keep: async (id, periodStart, prevStart) => !!(await h().keepForward(id, { monthStart: periodStart }, prevStart)),
+      addTask: (title, o) => h().addTask(title, undefined, undefined, undefined, { id: o.id, bucket: 'month', monthStart: o.periodStart, isGoal: o.isGoal, goalTaskId: o.goalTaskId, context: o.context }),
       contextOf: () => null,
       complete: (id) => h().completeTask(id),
       someday: (id) => h().updateTask(id, { bucket: 'someday' }),
       drop: (id, prevStart) => h().dropCommitment(id, 'month', prevStart),
-      takeIntoMonth: (id, monthStart) => h().updateTask(id, { bucket: 'month', monthStart }),
+      takeInto: (id, periodStart) => h().updateTask(id, { bucket: 'month', monthStart: periodStart }),
       saveSession: async () => true,
     }
     let ok = false
@@ -545,7 +545,7 @@ describe('a planning session against the real writers', () => {
       const { result } = await mountWith([goal(), step('s1', 'Buy chairs'), step('s2', 'Paint')])
       const verdicts: SessionDraft['verdicts'] = order === 'goal first' ? { g1: 'keep', s1: 'drop' } : { s1: 'drop', g1: 'keep' }
       const d: SessionDraft = { ...emptyDraft('month', oct, sep), verdicts }
-      const lines = summarize(d, { open: lookBackRows(result.current.tasks, sep, null).open, above: [], aboveGoals: [], periodLabel: 'October', prevLabel: 'September' })
+      const lines = summarize(d, { open: lookBackRows(result.current.tasks, sep, null).open, above: [], aboveGoals: [], periodLabel: 'October', prevLabel: 'September', aboveLabel: 'the season' })
       expect(await run(result, d)).toBe(true)
       expect(lines.find((l) => l.title === 'Buy chairs')!.destination).toBe('Dropped from September · the task is kept')
       expect(status('s1', '2026-09-01')).toBe('removed')

@@ -528,10 +528,10 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
     const savingYmd = periodYmd
     setSavingSession(true)
     const result = await applySession(shownDraft, {
-      keep: async (id, monthStart, prevStart) => !!(await keepForward(id, { monthStart }, prevStart)),
+      keep: async (id, periodStart, prevStart) => !!(await keepForward(id, { monthStart: periodStart }, prevStart)),
       // Each item's OWN domain, recorded when it was planned — never the one in view now (I4).
       addTask: (title, o) => addTask(title, undefined, undefined, undefined, {
-        id: o.id, bucket: 'month', monthStart: o.monthStart, isGoal: o.isGoal, goalTaskId: o.goalTaskId, context: o.context,
+        id: o.id, bucket: 'month', monthStart: o.periodStart, isGoal: o.isGoal, goalTaskId: o.goalTaskId, context: o.context,
       }),
       contextOf: (id) => tasks.find((t) => t.id === id)?.context ?? null,
       // Everything a tick does (subtasks, waiting/discussion, a linked list item), and reports whether it wrote.
@@ -540,7 +540,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
       drop: (id, prevStart) => dropCommitment(id, 'month', prevStart),
       // The SESSION's month — pushTask(id, 'month') would target the month
       // containing today, i.e. September while planning October.
-      takeIntoMonth: (id, monthStart) => gated.updateTask(id, { bucket: 'month', monthStart }),
+      takeInto: (id, periodStart) => gated.updateTask(id, { bucket: 'month', monthStart: periodStart }),
       saveSession: (notes) => saveSession(notes),
     }, (id) => !!tasks.find((t) => t.id === id)?.completed,
     // Persist after EVERY write, so a reload mid-save resumes from here.
@@ -646,7 +646,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
       )}
 
       {sessionEnabled && sessionOpen && shownDraft ? (
-        <PlanSession periodLabel={shortLabel} prevLabel={prevPeriodLabel}
+        <PlanSession level="month" aboveLabel="the season" periodLabel={shortLabel} prevLabel={prevPeriodLabel}
           finished={back.finished} open={back.open} current={currentMonth}
           above={aboveItems} aboveGoals={aboveGoalItems} hiddenStepGoals={hiddenStepGoals} domainInView={soleDomain ?? null}
           draft={shownDraft} onChange={changeDraft} onClose={closeSession} onSave={saveDraft} saving={savingSession} saveError={saveError} />

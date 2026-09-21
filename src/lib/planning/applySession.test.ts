@@ -14,7 +14,7 @@ const writers = (over: Partial<SessionWriters> = {}) => {
     complete: vi.fn(async (id) => { calls.push(`done:${id}`); return true }),
     someday: vi.fn(async (id) => { calls.push(`someday:${id}`); return true }),
     drop: vi.fn(async (id) => { calls.push(`drop:${id}`); return true }),
-    takeIntoMonth: vi.fn(async (id, m) => { calls.push(`take:${id}:${m.getMonth()}`); return true }),
+    takeInto: vi.fn(async (id, m) => { calls.push(`take:${id}:${m.getMonth()}`); return true }),
     saveSession: vi.fn(async () => { calls.push('session'); return true }),
     ...over,
   }
@@ -108,6 +108,18 @@ describe('applySession', () => {
     const { w, calls } = writers()
     await applySession({ ...emptyDraft('month', oct, sep), verdicts: { g: 'keep-action', s1: 'someday', s2: 'done' }, actionTitles: { g: 'A' }, actionIds: { g: 'A1' } }, w, () => false)
     expect(calls).toEqual(['someday:s1', 'done:s2', 'keep:g', 'add:A:task:g', 'session'])
+  })
+
+  it('a week draft: keep carries into the week, a new task with a day is created on that day, a month task is taken into the week', async () => {
+    const LAST = new Date(2026, 8, 27), WEEK = new Date(2026, 9, 4)
+    const d: SessionDraft = { ...emptyDraft('week', WEEK, LAST), verdicts: { o: 'keep' },
+      newTasks: [{ id: 'n1', title: 'Call the plumber', day: '2026-10-08', context: null }], takenFromAbove: ['m1'] }
+    const { w } = writers()
+    const r = await applySession(d, w, () => false)
+    expect(r.ok).toBe(true)
+    expect(w.keep).toHaveBeenCalledWith('o', WEEK, LAST)
+    expect(w.addTask).toHaveBeenCalledWith('Call the plumber', expect.objectContaining({ id: 'n1', periodStart: WEEK, day: new Date(2026, 9, 8) }))
+    expect(w.takeInto).toHaveBeenCalledWith('m1', WEEK)
   })
 
   it('creates each new item in the domain it was planned in; a next action takes its goal\'s', async () => {

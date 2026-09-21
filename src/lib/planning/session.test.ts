@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { Task } from '@/types/task'
-import { emptyDraft, lookBackRows, verdictOptions, summarize, isEmptyDraft, pruneDraft, goalsWithHiddenSteps } from './session'
+import { emptyDraft, lookBackRows, verdictOptions, summarize, isEmptyDraft, pruneDraft, goalsWithHiddenSteps, type SessionDraft } from './session'
 
 const sep = new Date(2026, 8, 1), oct = new Date(2026, 9, 1)
 const t = (over: Partial<Task>): Task => ({ id: 'x', title: 'X', completed: false, createdAt: sep, updatedAt: sep, bucket: 'month', ...over } as Task)
@@ -55,7 +55,7 @@ describe('summarize', () => {
       newTasks: [{ id: 'n2', title: 'Call Hughes', linkId: 'n1' }],
       takenFromAbove: ['b'] }
     const sg = t({ id: 'sg', title: 'Sign a contractor', isGoal: true, bucket: 'quarter' })
-    const lines = summarize(d, { open: [goal, lib, photos, saw], above: [bids], aboveGoals: [sg], periodLabel: 'October', prevLabel: 'September' })
+    const lines = summarize(d, { open: [goal, lib, photos, saw], above: [bids], aboveGoals: [sg], periodLabel: 'October', prevLabel: 'September', aboveLabel: 'the season' })
     expect(lines).toEqual([
       { title: 'Strength 2x/week', destination: 'October goals · kept from September' },
       { title: 'Book a PT evaluation', destination: 'October tasks · new next action toward Strength 2x/week' },
@@ -77,7 +77,7 @@ describe('summarize — steps under a kept goal', () => {
   const goal = t({ id: 'g', title: 'Porch', isGoal: true, commitments: on })
   const chairs = t({ id: 's1', title: 'Buy chairs', goalTaskId: 'g', commitments: on })
   const paint = t({ id: 's2', title: 'Paint', goalTaskId: 'g', commitments: on })
-  const ctx = { open: [goal, chairs, paint], above: [], aboveGoals: [], periodLabel: 'October', prevLabel: 'September' }
+  const ctx = { open: [goal, chairs, paint], above: [], aboveGoals: [], periodLabel: 'October', prevLabel: 'September', aboveLabel: 'the season' }
 
   it('a step with no verdict of its own is carried with its goal', () => {
     for (const v of ['keep', 'keep-action'] as const) {
@@ -125,7 +125,7 @@ describe('pruneDraft', () => {
     const d = { ...emptyDraft('month', oct, sep), verdicts: { g: 'keep-action' as const }, actionTitles: { g: 'Book PT' }, actionIds: { g: 'A1' }, keptAlready: ['g'] }
     const p = pruneDraft(d, { open: [], above: [], current: [g] })
     expect(p).toEqual(d)
-    expect(summarize(p, { open: [], above: [], aboveGoals: [], current: [g], periodLabel: 'October', prevLabel: 'September' })).toEqual([
+    expect(summarize(p, { open: [], above: [], aboveGoals: [], current: [g], periodLabel: 'October', prevLabel: 'September', aboveLabel: 'the season' })).toEqual([
       { title: 'Strength', destination: 'October goals · kept from September' },
       { title: 'Book PT', destination: 'October tasks · new next action toward Strength' },
     ])
@@ -144,11 +144,11 @@ describe('pruneDraft', () => {
     ]) {
       const p = pruneDraft(d, { open: [step], above: [], current: [g] })
       expect(p).toBe(d)
-      const lines = summarize(p, { open: [step], above: [], aboveGoals: [], current: [g], periodLabel: 'October', prevLabel: 'September' })
+      const lines = summarize(p, { open: [step], above: [], aboveGoals: [], current: [g], periodLabel: 'October', prevLabel: 'September', aboveLabel: 'the season' })
       expect(lines.find((l) => l.title === 'Buy chairs')!.destination).toBe('October tasks · carried with Porch')
     }
     const d = { ...emptyDraft('month', oct, sep), verdicts: { g: 'keep-action' as const }, actionTitles: { g: 'Sand' }, actionIds: { g: 'A1' } }
-    expect(summarize(d, { open: [step], above: [], aboveGoals: [], current: [g], periodLabel: 'October', prevLabel: 'September' }))
+    expect(summarize(d, { open: [step], above: [], aboveGoals: [], current: [g], periodLabel: 'October', prevLabel: 'September', aboveLabel: 'the season' }))
       .toContainEqual({ title: 'Sand', destination: 'October tasks · new next action toward Porch' })
   })
 
@@ -173,7 +173,7 @@ describe('steps a kept goal carries that the view does not show', () => {
   })
 
   it('adds one line for a KEPT goal that carries hidden steps', () => {
-    const ctx = { open: [goal, shown], above: [], aboveGoals: [], hiddenStepGoals: new Set(['g']), periodLabel: 'October', prevLabel: 'September' }
+    const ctx = { open: [goal, shown], above: [], aboveGoals: [], hiddenStepGoals: new Set(['g']), periodLabel: 'October', prevLabel: 'September', aboveLabel: 'the season' }
     expect(summarize({ ...emptyDraft('month', oct, sep), verdicts: { g: 'keep' } }, ctx))
       .toContainEqual({ title: 'Porch also carries steps not shown in this view', destination: 'October tasks · carried with Porch' })
     expect(summarize({ ...emptyDraft('month', oct, sep), verdicts: { g: 'drop' } }, ctx).some((l) => /not shown/.test(l.title))).toBe(false)
@@ -186,5 +186,45 @@ describe('isEmptyDraft', () => {
     expect(isEmptyDraft(d)).toBe(true)
     expect(isEmptyDraft({ ...d, wentWell: 'x' })).toBe(false)
     expect(isEmptyDraft({ ...d, verdicts: { a: 'keep' } })).toBe(false)
+  })
+})
+
+describe('week sessions', () => {
+  const LAST = new Date(2026, 8, 27), WEEK = new Date(2026, 9, 4)
+  const onLast = (over: Partial<Task>) => t({ bucket: 'week', weekStart: LAST, commitments: [{ level: 'week', periodStart: LAST, status: 'open' }], ...over })
+
+  it('lookBackRows at the week level reads last week\'s actual list, tasks only', () => {
+    const done = onLast({ id: 'd', completed: true, commitments: [{ level: 'week', periodStart: LAST, status: 'done' }] })
+    const open = onLast({ id: 'o' })
+    const goal = onLast({ id: 'g', isGoal: true })
+    const carried = onLast({ id: 'c', commitments: [{ level: 'week', periodStart: LAST, status: 'carried', carriedTo: WEEK }] })
+    const r = lookBackRows([done, open, goal, carried], LAST, null, 'week')
+    expect(r.finished.map((x) => x.id)).toEqual(['d'])
+    expect(r.open.map((x) => x.id)).toEqual(['o'])
+  })
+
+  it('a week row never offers "Keep, and add a next action"', () => {
+    expect(verdictOptions(false, 'week').map((o) => o.verdict)).toEqual(['keep', 'done', 'someday', 'drop'])
+    expect(verdictOptions(true, 'week').map((o) => o.verdict)).toEqual(['keep', 'done', 'someday', 'drop'])
+  })
+
+  it('summarize says where each week item lands, in week words', () => {
+    const d: SessionDraft = { ...emptyDraft('week', WEEK, LAST),
+      verdicts: { o: 'keep', x: 'drop' },
+      newTasks: [{ id: 'n1', title: 'Call the plumber', day: '2026-10-08' }, { id: 'n2', title: 'Sort the garage' }],
+      takenFromAbove: ['m1'] }
+    const lines = summarize(d, { open: [onLast({ id: 'o', title: 'Bike rack' }), onLast({ id: 'x', title: 'Old thing' })],
+      above: [t({ id: 'm1', title: 'Three bids', bucket: 'month' })], aboveGoals: [], periodLabel: 'this week', prevLabel: 'last week', aboveLabel: 'October' })
+    expect(lines).toEqual([
+      { title: 'Bike rack', destination: "This week's tasks · kept from last week" },
+      { title: 'Old thing', destination: 'Dropped from last week · the task is kept' },
+      { title: 'Call the plumber', destination: "This week's tasks, on Thu" },
+      { title: 'Sort the garage', destination: "This week's tasks" },
+      { title: 'Three bids', destination: 'This week\'s tasks · stays on October, marked "on this week"' },
+    ])
+  })
+
+  it('goalsWithHiddenSteps is empty at the week level', () => {
+    expect(goalsWithHiddenSteps([onLast({ id: 'g', isGoal: true })], [], LAST, 'week').size).toBe(0)
   })
 })
