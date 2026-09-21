@@ -41,8 +41,9 @@ import { PlanningSheet } from '@/components/reference/PlanningSheet'
 import { useWeekInstances } from './useWeekInstances'
 import { edgeForPointer } from './edgeAdvance'
 import { WeekJournal, type JournalDay, type JournalEntry } from './WeekJournal'
+import { WeekList } from './WeekList'
 import { makePlanActions } from '@/lib/planning/planActions'
-import { focusDays } from '@/lib/placement/model'
+import { focusDays, sameDay } from '@/lib/placement/model'
 import type { PlanDragPayload } from '@/lib/planning/planDrag'
 import { useActionableInstances } from '@/hooks/useActionableInstances'
 import { showToast } from '@/hooks/useToast'
@@ -119,6 +120,8 @@ interface WeekViewV2Props {
   /** Journal (default) or Schedule. When omitted the view keeps its own and
    *  draws its own switch; HomeView passes it so the switch sits by the dates. */
   mode?: WeekMode
+  /** Opens the week session; passed through to WeekList's empty state and link. */
+  onPlanWeek?: () => void
 }
 
 export type WeekMode = 'journal' | 'schedule'
@@ -830,6 +833,20 @@ export function WeekViewV2(props: WeekViewV2Props) {
     else references.pin('today')
   }
 
+  const weekIsCurrent = sameDay(weekAnchor, weekStartAnchor(new Date(), readCadenceConfig().weekStartsOn))
+  const weekList = (
+    <WeekList
+      tasks={tasks}
+      weekStart={weekAnchor}
+      meId={meId}
+      userId={userId}
+      isCurrent={weekIsCurrent}
+      onToggle={(task) => handleJournalToggle({ id: `task-${task.id}`, kind: 'task', title: task.title, completed: task.completed, task }, journalDays[0])}
+      onSelect={(id) => onSelectItem(`task-${id}`)}
+      onPlan={props.onPlanWeek}
+    />
+  )
+
   return (
     <div className="relative">
       <div className="flex items-center justify-end gap-2 mb-2">
@@ -868,6 +885,7 @@ export function WeekViewV2(props: WeekViewV2Props) {
             the stacked days instead. */}
         {narrow ? (
           <div className="flex flex-col gap-4">
+            {weekList}
             <WeekJournal days={journalDays} spans={journalSpans} onSelectItem={onSelectItem} onToggleEntry={handleJournalToggle} onPlanDrop={handlePlanDropOnDay} onAddToDay={handleAddToDay} narrow dragEnabled={false} />
           </div>
         ) : (
@@ -875,7 +893,10 @@ export function WeekViewV2(props: WeekViewV2Props) {
         {/* Edge auto-advance measures THIS box, not the whole view. */}
         <div ref={gridBoundsRef} data-week-bounds className="flex-1 min-w-0">
         {!showSchedule ? (
-          <WeekJournal days={journalDays} spans={journalSpans} onSelectItem={onSelectItem} onToggleEntry={handleJournalToggle} onPlanDrop={handlePlanDropOnDay} onAddToDay={handleAddToDay} />
+          <>
+            {weekList}
+            <WeekJournal days={journalDays} spans={journalSpans} onSelectItem={onSelectItem} onToggleEntry={handleJournalToggle} onPlanDrop={handlePlanDropOnDay} onAddToDay={handleAddToDay} />
+          </>
         ) : (
         <WeekGrid
           weekStart={weekStart}
