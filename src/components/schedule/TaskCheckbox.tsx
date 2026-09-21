@@ -9,6 +9,10 @@ interface TaskCheckboxProps {
   isRoutine?: boolean
   contextColor?: string
   className?: string
+  /** One completion control for every kind of row (Today, 2026-09-21): a
+   *  circle, whatever the item is. Unset keeps the older square-for-tasks
+   *  shape the Inbox still draws. */
+  shape?: 'circle' | 'square'
 }
 
 export const TaskCheckbox = memo(function TaskCheckbox({
@@ -19,7 +23,9 @@ export const TaskCheckbox = memo(function TaskCheckbox({
   isRoutine,
   contextColor,
   className = '',
+  shape,
 }: TaskCheckboxProps) {
+  const round = shape ? shape === 'circle' : !!isRoutine
   const { pressing, handlers } = useLongPress({
     threshold: 1500,
     onLongPress: onToggleWaiting,
@@ -41,7 +47,7 @@ export const TaskCheckbox = memo(function TaskCheckbox({
       <span
         className={`
           w-5 h-5 border-2 flex items-center justify-center transition-colors relative bg-bg-base
-          ${isRoutine ? 'rounded-full' : 'rounded-md'}
+          ${round ? 'rounded-full' : 'rounded-md'}
           ${pressing ? 'long-press-ring' : ''}
           ${completed
             ? 'bg-primary-500 border-primary-500 text-white'

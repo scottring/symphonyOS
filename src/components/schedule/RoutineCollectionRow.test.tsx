@@ -252,13 +252,15 @@ describe('RoutineCollectionRow management menu', () => {
 // routine" as "K.." (2026-09-19). The name wraps now, as pool pills and pin
 // rows already do, and the next-step hint stands down on a phone.
 describe('RoutineCollectionRow at phone width', () => {
-  it('lets the name wrap instead of truncating it, and hides the step hint', () => {
+  it('lets the name wrap instead of truncating it; the steps and the next one read on one line beneath', () => {
     render(<RoutineCollectionRow item={collectionItem()} {...handlers} />)
     const name = screen.getByText('Shoulder HEP')
     expect(name.className).toContain('line-clamp-2')
     expect(name.className).toContain('break-words')
     expect(name.className).not.toContain('max-w-[50%]')
-    const hint = document.querySelector('.hidden.sm\\:inline')
-    expect(hint).not.toBeNull()
+    // The progress fraction no longer trails the name at the far end of the
+    // row (2026-09-21): one muted subline, the same slot every other row uses.
+    expect(screen.getByText('2 steps · next: Chin Tuck')).toBeInTheDocument()
+    expect(screen.queryByText('0/2')).toBeNull()
   })
 })

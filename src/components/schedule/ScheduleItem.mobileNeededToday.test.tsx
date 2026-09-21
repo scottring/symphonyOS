@@ -41,13 +41,15 @@ function renderItem(item: Partial<TimelineItem>, ctxOverrides: Partial<ScheduleA
 }
 
 describe('ScheduleItem — mobile needed today control', () => {
-  it('marks the task as needed today, stamping the viewed day', () => {
+  // The mark is STATE (2026-09-21): the row shows it when it is set and
+  // clears it on tap. It no longer draws a grey "set" control on every row —
+  // setting it is the detail sheet's job.
+  it('draws no control on an unmarked row', () => {
     const viewedDate = new Date(2026, 7, 19)
-    const { onSetNeededToday } = renderItem({ neededOn: undefined }, { viewedDate })
+    renderItem({ neededOn: undefined }, { viewedDate })
 
-    fireEvent.click(screen.getByLabelText('Need today'))
-
-    expect(onSetNeededToday).toHaveBeenCalledWith('1', viewedDate)
+    expect(screen.queryByLabelText('Need today')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('Not needed today')).not.toBeInTheDocument()
   })
 
   it('clears the mark when already marked on the viewed day', () => {
@@ -65,17 +67,14 @@ describe('ScheduleItem — mobile needed today control', () => {
   // Regression guard — the same bug that bit the desktop chip/menu twice:
   // "marked" must be isSameDay(neededOn, viewedDate), not bare truthiness of
   // neededOn. A mark left over from a different day must read as UNMARKED, so
-  // tapping the control marks it (viewedDate), not clears it (null).
+  // the row shows no mark at all.
   it('treats a task marked on a DIFFERENT day as unmarked', () => {
     const yesterday = new Date(2026, 7, 18)
     const viewedDate = new Date(2026, 7, 19)
-    const { onSetNeededToday } = renderItem({ neededOn: yesterday }, { viewedDate })
+    renderItem({ neededOn: yesterday }, { viewedDate })
 
-    expect(screen.getByLabelText('Need today')).toBeInTheDocument()
     expect(screen.queryByLabelText('Not needed today')).not.toBeInTheDocument()
-
-    fireEvent.click(screen.getByLabelText('Need today'))
-    expect(onSetNeededToday).toHaveBeenCalledWith('1', viewedDate)
+    expect(screen.queryByLabelText('Need today')).not.toBeInTheDocument()
   })
 
   // The desktop chip has always carried `!item.completed`; the mobile control
@@ -91,12 +90,12 @@ describe('ScheduleItem — mobile needed today control', () => {
   })
 
   it('falls back to "now" when no viewedDate is supplied by the provider', () => {
-    const { onSetNeededToday } = renderItem({ neededOn: undefined }, { viewedDate: undefined })
+    // Marked today, with no viewedDate from the provider: the row reads
+    // "now" as the day and shows the mark.
+    const { onSetNeededToday } = renderItem({ neededOn: new Date() }, { viewedDate: undefined })
 
-    fireEvent.click(screen.getByLabelText('Need today'))
+    fireEvent.click(screen.getByLabelText('Not needed today'))
 
-    expect(onSetNeededToday).toHaveBeenCalledTimes(1)
-    const [, arg] = onSetNeededToday.mock.calls[0]
-    expect(arg).toBeInstanceOf(Date)
+    expect(onSetNeededToday).toHaveBeenCalledWith('1', null)
   })
 })

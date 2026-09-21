@@ -10,7 +10,7 @@
  * handler props — it is the same context TodayView reads, and threading it
  * through would be a second copy of the same wiring.
  */
-import { useCallback, useMemo, useReducer, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import type { Task } from '@/types/task'
 import type { TimelineItem } from '@/types/timeline'
 import type { DaySection } from '@/lib/timeUtils'
@@ -21,16 +21,12 @@ import { parseRoutineTimelineId } from '@/lib/today/doseExpansion'
 import { sectionKey } from '@/lib/today/sectionCollapse'
 import { useScheduleActionsContext } from '@/contexts/ScheduleActionsContext'
 import { computeAnchorTime } from '@/lib/timelineAnchor'
-import { parseMealTitle } from '@/lib/mealTitle'
 
 import { DaySectionHeader } from '@/components/schedule/DaySectionHeader'
 import { TimelineInsertPoint } from './TimelineInsertPoint'
-import { EveningMealCard } from './EveningMealCard'
 import { ScheduleItem } from './ScheduleItem'
 import { RoutineCollectionRow } from './RoutineCollectionRow'
 import { ShareToFamilyNudge } from './ShareToFamilyNudge'
-import { ToBuyNudge } from './ToBuyNudge'
-import { isBuyish, isToBuyNudgeDismissed, dismissToBuyNudge } from '@/lib/lists/toBuy'
 import { TodayBandDropZone, TodayGapDropZone } from './TodayDropZones'
 import { TodayDraggableRow } from './TodayDraggableRow'
 import { GroupNameInput } from './GroupNameInput'
@@ -82,6 +78,13 @@ export function findTimelineItem(
   return null
 }
 
+/** The dish as the row says it: "Dinner: Tofu + Edamame Soba Noodle Bowl".
+ *  A synthesized meal event may lead with an emoji; the row's type is what
+ *  the words say, so the glyph goes. */
+export function mealRowTitle(raw: string): string {
+  return raw.replace(/^[^\p{L}\p{N}(["']+/u, '').trim()
+}
+
 export interface TodaySectionListProps {
   sectionsOrder: DaySection[]
   grouped: Record<DaySection, TimelineItem[]>
@@ -115,8 +118,8 @@ export interface TodaySectionListProps {
   /** Raw task id of a just-created group, rendered as an inline name field. */
   renamingGroupId?: string | null
   onRenameGroupDone?: () => void
-  /** Convert a buy-ish task to a "To buy" list item (the host owns the undo toast). */
-  onSendToBuy?: (taskId: string) => void
+  /** The signed-in member — rows show initials only for someone ELSE's work. */
+  currentMemberId?: string | null
   /**
    * Today's journal renders the day in slices (My focus / Still ahead /
    * Earlier today), each through this same list. Only ONE slice may own a
@@ -166,7 +169,7 @@ export function TodaySectionList({
   isReadOnlyEvent,
   renamingGroupId,
   onRenameGroupDone,
-  onSendToBuy,
+  currentMemberId = null,
   dropTargets = true,
   gapOffset,
   anytimeHeader = true,
@@ -175,10 +178,6 @@ export function TodaySectionList({
   const Gap = dropTargets ? TodayGapDropZone : Plain
   const ctx = useScheduleActionsContext()
   const { dragging } = useTodayDragState()
-
-  // Dismissing a To buy nudge writes localStorage, which React can't see —
-  // this tick exists purely to re-render so the dismissed nudge disappears.
-  const [, bumpToBuyDismissals] = useReducer((x: number) => x + 1, 0)
 
   // Which sections the user has expanded past the cap. Not persisted: a cap is
   // about this reading of the page, not a standing preference.
@@ -201,22 +200,11 @@ export function TodaySectionList({
   const onCreateEventAt = ctx.onCreateEventAt
   const onCreateRoutineAt = ctx.onCreateRoutineAt
 
-  // Names the "To buy" nudge consults so it stops offering to shop for a
-  // child. Household members and contacts both count — "pick up Michael" and
-  // "pick up Dr. Smith" are equally not purchases.
-  const knownPeopleNames = useMemo(
-    () => [...familyMembers.map((m) => m.name), ...Array.from(contactsMap?.values() ?? []).map((c) => c.name)],
-    [familyMembers, contactsMap],
-  )
-
-  // Core members act as default diners on the evening meal card until per-meal
-  // diner assignment lands.
-  const { diners, servesCount } = useMemo(() => {
-    const coreMembers = familyMembers.filter((m) => m.member_type === 'core')
-    return {
-      diners: coreMembers.map((m) => ({ id: m.id, initials: m.initials, color: m.color })),
-      servesCount: coreMembers.length > 0 ? coreMembers.length : undefined,
-    }
+  // Core members are the default diners until per-meal diner assignment
+  // lands; the row says how many, the meal's details say who.
+  const servesCount = useMemo(() => {
+    const core = familyMembers.filter((m) => m.member_type === 'core').length
+    return core > 0 ? core : undefined
   }, [familyMembers])
 
   // Open space is a property of the whole day, not of one band: the gap that
@@ -403,13 +391,6 @@ export function TodaySectionList({
                           minute: '2-digit',
                         })
                       : ''
-                    const parsed = parseMealTitle(item.title)
-                    // For synthesized meal events, MealEventsProvider stores
-                    // the recipe source URL in `description` → maps onto
-                    // `googleDescription` on the timeline item.
-                    const recipeUrl = item.googleDescription?.startsWith('http')
-                      ? item.googleDescription
-                      : undefined
                     const fromPlan = String(item.id).startsWith('meal:')
                     return (
                       <div key={item.id}>
@@ -417,17 +398,19 @@ export function TodaySectionList({
                         {showInsert && insertBefore}
                         <TodayDraggableRow itemId={item.id} disabled={dragRefused}>
                         <div {...(isFirstItem ? { 'data-today-first': '' } : {})}>
-                          {/* The meal sits on the agenda's row grid like
-                              everything else — px-3 wrapper, pl-5 gutter, w-16
-                              time, w-5 marker — so the spine runs through
-                              dinner instead of breaking at it. Before this the
-                              card started flush at the card's left edge, a
-                              misalignment that was merely untidy without a
-                              spine and reads as a bug with one. The time moves
-                              to the gutter where every other row keeps it, so
-                              the card's own eyebrow carries only what the
-                              gutter can't say. */}
-                          <div className="rounded-xl border border-transparent px-3 py-2 md:py-1">
+                          {/* Dinner is a row like every other row (Today,
+                              2026-09-21): time in the gutter, a circle, the
+                              dish, one muted line. The peach card, the
+                              serif, the diner avatars and the recipe button
+                              made it the largest object on the page; who is
+                              eating and the recipe are in its details. */}
+                          <div
+                            role="button"
+                            tabIndex={0}
+                            onClick={() => onSelectItem(item.id)}
+                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelectItem(item.id) } }}
+                            className={`group cursor-pointer rounded-xl border border-transparent px-3 py-2 md:py-1 transition-all duration-200 hover:bg-primary-50/50 hover:border-primary-100 ${selectedItemId === item.id ? 'bg-primary-50 border-primary-200 shadow-md ring-1 ring-primary-200' : ''}`}
+                          >
                             <div className="relative flex items-center gap-3 pl-5">
                               <TimelineSpine above={spineSegments?.above} below={spineSegments?.below} />
                               <div className="w-16 shrink-0 text-xs font-medium tabular-nums text-neutral-500">
@@ -436,19 +419,18 @@ export function TodaySectionList({
                               <div className="w-5 shrink-0 flex items-center justify-center relative z-[1]">
                                 <span
                                   aria-hidden
-                                  className="w-[18px] h-[18px] rounded-full border-2 border-accent-300"
+                                  className="w-5 h-5 rounded-full border-2 border-neutral-300 bg-bg-base"
                                 />
                               </div>
                               <div className="flex-1 min-w-0">
-                                <EveningMealCard
-                                  title={parsed.title}
-                                  sides={parsed.sides}
-                                  recipeUrl={recipeUrl}
-                                  fromPlan={fromPlan}
-                                  servesCount={servesCount}
-                                  diners={diners}
-                                  onSelect={() => onSelectItem(item.id)}
-                                />
+                                <div className="text-[16px] leading-snug font-medium text-neutral-800 line-clamp-2 break-words">
+                                  {mealRowTitle(item.title)}
+                                </div>
+                                {(servesCount != null || fromPlan) && (
+                                  <div className="text-[12px] text-neutral-500 leading-tight mt-0.5">
+                                    {[servesCount != null ? `Serves ${servesCount}` : null, fromPlan ? 'Meal plan' : null].filter(Boolean).join(' · ')}
+                                  </div>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -561,7 +543,9 @@ export function TodaySectionList({
                     <ScheduleItem
                       spineAbove={spineSegments?.above}
                       spineBelow={spineSegments?.below}
-                      item={item}
+                      // On a phone dinner is an ordinary row too; it reads
+                      // the dish, not the glyph the meal event was given.
+                      item={isMobile && isMealItem(item.id, item.type, item.title) ? { ...item, title: mealRowTitle(item.title) } : item}
                       selected={selectedItemId === item.id}
                       bulkSelectable={true}
                       bulkSelected={selectedKeys.has(item.id)}
@@ -662,6 +646,7 @@ export function TodaySectionList({
                       panelOpen={panelOpen}
                       onClosePanel={onClosePanel}
                       variant={item.type === 'routine' ? 'minimal' : 'full'}
+                      currentMemberId={currentMemberId}
                     />
                     {item.type === 'event' && (() => {
                       const nudge = shareNudgeByEventId.get(item.id.replace('event-', ''))
@@ -674,13 +659,6 @@ export function TodaySectionList({
                         />
                       )
                     })()}
-                    {item.type === 'task' && taskId && onSendToBuy && !item.completed &&
-                      isBuyish(item.title, knownPeopleNames) && !isToBuyNudgeDismissed(taskId) && (
-                      <ToBuyNudge
-                        onSend={() => onSendToBuy(taskId)}
-                        onDismiss={() => { dismissToBuyNudge(taskId); bumpToBuyDismissals() }}
-                      />
-                    )}
                         </>
                       )
                     })()}

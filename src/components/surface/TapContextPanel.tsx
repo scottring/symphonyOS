@@ -25,6 +25,7 @@ import { PanelReach } from './sections/PanelReach'
 import { PanelMightBeRelevant } from './sections/PanelMightBeRelevant'
 import { PanelClassify } from './sections/PanelClassify'
 import { PanelFooter } from './sections/PanelFooter'
+import { PanelToBuySuggestion } from './sections/PanelToBuySuggestion'
 import { useLinkedEntities } from './hooks/useLinkedEntities'
 import { useMightBeRelevant } from './hooks/useMightBeRelevant'
 import { AssistDrawer } from '@/components/assist/AssistDrawer'
@@ -97,6 +98,10 @@ interface TapContextPanelProps {
   onAssistMutate?: () => void
   /** Open the Discussion on mount (deep link from the Discussions inbox). */
   autoOpenDiscussion?: boolean
+  /** Convert a buy-ish task into a "To buy" list item. When wired, the panel
+   *  offers it as one quiet line under the actions — the suggestion lives
+   *  here, not on Today's page. */
+  onSendToBuy?: () => void
 }
 
 export function TapContextPanel(props: TapContextPanelProps) {
@@ -251,6 +256,15 @@ export function TapContextPanel(props: TapContextPanelProps) {
             }
           />
           <PanelAssistant taskId={task.id} />
+          {props.onSendToBuy && (
+            <PanelToBuySuggestion
+              taskId={task.id}
+              title={task.title}
+              completed={!!task.completed}
+              knownPeople={[...props.familyMembers.map((m) => m.name), ...props.contacts.map((c) => c.name)]}
+              onSend={props.onSendToBuy}
+            />
+          )}
         </>
       }
       classify={

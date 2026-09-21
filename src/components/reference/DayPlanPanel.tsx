@@ -13,11 +13,13 @@
 //
 // The interaction: pick something here → put it on a day → do it. A chosen
 // row stays, marked "Planned today", so nothing reads as unfinished twice.
-// Every drag has a button, and every verb says what it does: Today, Schedule…,
-// Plan for this week, Someday — so a keyboard or a touchscreen can do all of
-// it, and nothing is called "let go" (deferred? dropped? deleted?).
+// Every drag has a button, and every row answers the same question the same
+// way (2026-09-21): one verb — "Plan for today" beside a day, "Plan for this
+// week" on a week page — and a ⋯ menu holding "Schedule…" and "Someday" (or,
+// for a routine with no day, "Change repeating schedule"). No clock glyphs,
+// no "Give it a day", nothing called "let go" (deferred? dropped? deleted?).
 import { useEffect, useState, type ReactNode } from 'react'
-import { Check, ChevronDown, ChevronRight, Clock, GripVertical, Repeat, Undo2 } from 'lucide-react'
+import { Check, ChevronDown, ChevronRight, GripVertical, MoreHorizontal } from 'lucide-react'
 import { SchedulePopover } from '@/components/triage'
 import type { DayPlan, DayPlanEntry } from '@/lib/today/dayPlan'
 import { writePlanDrag } from '@/lib/planning/planDrag'
@@ -56,6 +58,96 @@ export function routinePlaceDay(day: Date, weekPage: Date | null): Date {
   return thisWeek.getTime() === weekPage.getTime() ? day : weekPage
 }
 
+/** The row's ⋯ menu: the moves that are not the one verb. "Schedule…" is a
+ *  date picker anchored to the menu item; picking a date closes both. */
+function RowMenu({ entry, day, actions }: { entry: DayPlanEntry; day: Date; actions: DayPlanPanelActions }) {
+  const [open, setOpen] = useState(false)
+  const unhomed = !!entry.routine
+  const items: ReactNode[] = []
+  if (unhomed) {
+    if (actions.changeRoutineRule) {
+      items.push(
+        <button
+          key="rule"
+          type="button"
+          role="menuitem"
+          aria-label={`Change repeating schedule for ${entry.title}`}
+          onClick={() => { setOpen(false); actions.changeRoutineRule?.(entry) }}
+          className="w-full px-3 py-1.5 text-left text-[13px] text-neutral-700 hover:bg-neutral-50"
+        >
+          Change repeating schedule
+        </button>,
+      )
+    }
+  } else {
+    items.push(
+      <SchedulePopover
+        key="schedule"
+        itemTitle={entry.title}
+        // A routine occurrence moves to another day only with a time (the
+        // one-day override); a task may take a day or a time.
+        skipToTime={entry.kind === 'routine'}
+        value={entry.kind === 'routine' ? day : undefined}
+        onSchedule={(when, isAllDay) => { setOpen(false); actions.schedule(entry, when, isAllDay) }}
+        onDefer={entry.kind === 'task'
+          ? (target) => { setOpen(false); if (target === 'week' || target === 'month') actions.commit(entry, target) }
+          : undefined}
+        trigger={
+          <button
+            type="button"
+            role="menuitem"
+            aria-label={`Schedule ${entry.title}`}
+            className="w-full px-3 py-1.5 text-left text-[13px] text-neutral-700 hover:bg-neutral-50"
+          >
+            Schedule…
+          </button>
+        }
+      />,
+    )
+    if (entry.kind === 'task' && actions.someday) {
+      items.push(
+        <button
+          key="someday"
+          type="button"
+          role="menuitem"
+          aria-label={`Move ${entry.title} to Someday`}
+          onClick={() => { setOpen(false); actions.someday?.(entry) }}
+          className="w-full px-3 py-1.5 text-left text-[13px] text-neutral-700 hover:bg-neutral-50"
+        >
+          Someday
+        </button>,
+      )
+    }
+  }
+  if (items.length === 0) return null
+  return (
+    <div className="relative shrink-0">
+      <button
+        type="button"
+        aria-label={`More for ${entry.title}`}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => setOpen((o) => !o)}
+        className="rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-800"
+      >
+        <MoreHorizontal className="h-3.5 w-3.5" />
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" aria-hidden onClick={() => setOpen(false)} />
+          <div
+            role="menu"
+            aria-label={`Moves for ${entry.title}`}
+            className="absolute right-0 top-full z-20 mt-1 w-52 rounded-xl border border-neutral-200 bg-white py-1 shadow-lg"
+          >
+            {items}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 function PlanRow({ entry, day, actions, draggable, weekPage = null }: {
   entry: DayPlanEntry
   day: Date
@@ -68,6 +160,19 @@ function PlanRow({ entry, day, actions, draggable, weekPage = null }: {
   // is worked (the main list), so the pin shows its progress, not a tick.
   const progress = entry.item?.type === 'routine-collection' ? entry.item.collectionProgress : undefined
   const unfinished = entry.group === 'unfinished' && entry.kind === 'task'
+  const unhomed = !!entry.routine
+  // ONE verb per row. Beside a day it plans the row for that day; on a week
+  // page an unfinished row is re-committed to the week (undated), while a
+  // row already on the week's list still goes onto today.
+  const verbForWeek = unfinished && weekPage !== null
+  const verbLabel = verbForWeek ? 'Plan for this week' : 'Plan for today'
+  const verbAria = verbForWeek ? `Plan ${entry.title} for this week` : `Plan ${entry.title} for today`
+  const verbClass = 'shrink-0 rounded-md border border-neutral-200 px-2 py-0.5 text-[12px] font-medium text-neutral-800 hover:bg-neutral-50'
+  const onVerb = () => {
+    if (verbForWeek) actions.commit(entry, 'week')
+    else if (unfinished) actions.schedule(entry, day, true)
+    else actions.choose(entry)
+  }
   return (
     <li
       className="group flex items-start gap-2 border-b border-neutral-200/80 py-2 text-[14px]"
@@ -82,7 +187,7 @@ function PlanRow({ entry, day, actions, draggable, weekPage = null }: {
         : <span aria-hidden="true" className="w-3.5 shrink-0" />}
       {progress ? (
         <span className="mt-[1px] w-7 shrink-0 text-[11px] tabular-nums text-neutral-400">{progress.done}/{progress.total}</span>
-      ) : entry.routine ? (
+      ) : unhomed ? (
         // A routine with no day yet has no occurrence to tick.
         <span aria-hidden="true" className="mt-[3px] h-3.5 w-3.5 shrink-0" />
       ) : (
@@ -108,116 +213,35 @@ function PlanRow({ entry, day, actions, draggable, weekPage = null }: {
         ) : entry.context ? (
           <span className="block text-[11.5px] text-neutral-500">{entry.context}</span>
         ) : null}
-        {unfinished && !entry.completed && (
-          // An unfinished row's three precise moves, on their own line so the
-          // words fit beside a title: re-commit it to the week (undated),
-          // give it a date, or defer it by name.
-          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[12px]">
-            <button
-              type="button"
-              aria-label={`Plan ${entry.title} for this week`}
-              onClick={() => actions.commit(entry, 'week')}
-              className="font-medium text-primary-700 hover:underline"
-            >
-              Plan for this week
-            </button>
+      </div>
+      {entry.completed ? null : entry.planned ? (
+        <button
+          type="button"
+          aria-label={`Move ${entry.title} back off today`}
+          title="Move back — it stays here, unplanned"
+          onClick={() => actions.unchoose(entry)}
+          className="shrink-0 rounded px-1.5 py-0.5 text-[12px] text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800"
+        >
+          Undo
+        </button>
+      ) : (
+        <div className="flex shrink-0 items-center gap-0.5">
+          {unhomed ? (
+            // No day of its own yet: the verb reads the same, and the click
+            // asks for a time — this week's occurrence lands on the day being
+            // planned (a same-day override), never the repeating rule, which
+            // is the menu's separate, explicit move (Scott, 2026-09-21).
             <SchedulePopover
               itemTitle={entry.title}
-              onSchedule={(when, isAllDay) => actions.schedule(entry, when, isAllDay)}
-              trigger={
-                <button type="button" aria-label={`Schedule ${entry.title}`} className="text-neutral-600 hover:text-neutral-900">
-                  Schedule…
-                </button>
-              }
+              skipToTime
+              value={routinePlaceDay(day, weekPage)}
+              onSchedule={(when) => actions.placeRoutine?.(entry, when)}
+              trigger={<button type="button" aria-label={verbAria} className={verbClass}>{verbLabel}</button>}
             />
-            {actions.someday && (
-              <button
-                type="button"
-                aria-label={`Move ${entry.title} to Someday`}
-                onClick={() => actions.someday?.(entry)}
-                className="text-neutral-600 hover:text-neutral-900"
-              >
-                Someday
-              </button>
-            )}
-          </div>
-        )}
-      </div>
-      {entry.routine ? (
-        // No day of its own yet. "Give it a day" places THIS week's occurrence
-        // (a same-day time override); the repeating rule is a separate,
-        // explicit action (Scott, 2026-09-21).
-        <div className="flex shrink-0 items-center gap-0.5 text-neutral-500">
-          <SchedulePopover
-            itemTitle={entry.title}
-            skipToTime
-            value={routinePlaceDay(day, weekPage)}
-            onSchedule={(when) => actions.placeRoutine?.(entry, when)}
-            trigger={
-              <button
-                type="button"
-                aria-label={`Give ${entry.title} a day`}
-                className="rounded px-1.5 py-0.5 text-[12px] font-medium text-primary-700 hover:bg-primary-50"
-              >
-                Give it a day
-              </button>
-            }
-          />
-          {actions.changeRoutineRule && (
-            <button
-              type="button"
-              aria-label={`Change repeating schedule for ${entry.title}`}
-              title="Change repeating schedule"
-              onClick={() => actions.changeRoutineRule?.(entry)}
-              className="inline-flex rounded p-1 hover:bg-neutral-100 hover:text-neutral-800"
-            >
-              <Repeat className="h-3.5 w-3.5" />
-            </button>
-          )}
-        </div>
-      ) : unfinished ? null : !entry.completed && (
-        <div className="flex shrink-0 items-center gap-0.5 text-neutral-500">
-          {entry.planned ? (
-            <button
-              type="button"
-              aria-label={`Move ${entry.title} back off today`}
-              title="Move back — it stays here, unplanned"
-              onClick={() => actions.unchoose(entry)}
-              className="rounded p-1 hover:bg-neutral-100 hover:text-neutral-800"
-            >
-              <Undo2 className="h-3.5 w-3.5" />
-            </button>
           ) : (
-            <button
-              type="button"
-              aria-label={`Plan ${entry.title} for today`}
-              onClick={() => actions.choose(entry)}
-              className="rounded px-1.5 py-0.5 text-[12px] font-medium text-primary-700 hover:bg-primary-50"
-            >
-              Today
-            </button>
+            <button type="button" aria-label={verbAria} onClick={onVerb} className={verbClass}>{verbLabel}</button>
           )}
-          <SchedulePopover
-            itemTitle={entry.title}
-            // A routine occurrence moves to another day only with a time (the
-            // one-day override); a task may take a day or a time.
-            skipToTime={entry.kind === 'routine'}
-            value={entry.kind === 'routine' ? day : undefined}
-            onSchedule={(when, isAllDay) => actions.schedule(entry, when, isAllDay)}
-            onDefer={entry.kind === 'task'
-              ? (target) => { if (target === 'week' || target === 'month') actions.commit(entry, target) }
-              : undefined}
-            trigger={
-              <button
-                type="button"
-                aria-label={`Schedule ${entry.title}`}
-                title="Schedule…"
-                className="inline-flex rounded p-1 hover:bg-neutral-100 hover:text-neutral-800"
-              >
-                <Clock className="h-3.5 w-3.5" />
-              </button>
-            }
-          />
+          <RowMenu entry={entry} day={day} actions={actions} />
         </div>
       )}
     </li>
@@ -245,7 +269,7 @@ function Rows({ entries, day, actions, draggable, weekPage, cap }: {
       </ul>
       {!all && cap !== null && ordered.length > cap && (
         <button type="button" onClick={() => setAll(true)} className="py-1.5 text-[13px] text-neutral-500 hover:text-neutral-800">
-          +{ordered.length - cap} more
+          Show {ordered.length - cap} more
         </button>
       )}
     </>
@@ -305,12 +329,15 @@ function Group({ title, entries, day, actions, draggable, defaultOpen, empty, ca
   )
 }
 
-/** Unfinished work from earlier, on request. The fold's state is shared
- *  through planningPanelSignal so Today's "Review unfinished work" line opens
- *  the panel already expanded; it is session-scoped, so tomorrow the list is
- *  the week's own work again. No count on the toggle — no scoreboard. */
-function UnfinishedFold({ entries, day, actions, draggable, weekPage, cap }: {
+/** Unfinished work from earlier, on request — the ONE entrance to it. The
+ *  fold's state is shared through planningPanelSignal and session-scoped, so
+ *  tomorrow the list is the week's own work again. No count on the toggle —
+ *  no scoreboard. Misses older than the window are not listed, but they are
+ *  not lost: the fold's last line points at where they live, so there is no
+ *  second door beside the first. */
+function UnfinishedFold({ entries, older, day, actions, draggable, weekPage, cap }: {
   entries: DayPlanEntry[]
+  older: number
   day: Date
   actions: DayPlanPanelActions
   draggable: boolean
@@ -319,7 +346,7 @@ function UnfinishedFold({ entries, day, actions, draggable, weekPage, cap }: {
 }) {
   const [open, setOpen] = useState(() => readUnfinishedOpen())
   useEffect(() => onUnfinishedOpenChange(setOpen), [])
-  if (entries.length === 0) return null
+  if (entries.length === 0 && older === 0) return null
   const id = 'plan-group-unfinished'
   const toggle = () => { setOpen(!open); writeUnfinishedOpen(!open) }
   return (
@@ -329,14 +356,21 @@ function UnfinishedFold({ entries, day, actions, draggable, weekPage, cap }: {
         aria-expanded={open}
         aria-controls={id}
         onClick={toggle}
-        className="inline-flex items-center gap-1 text-[12.5px] text-neutral-500 hover:text-neutral-800"
+        className="inline-flex items-center gap-1 text-[12px] font-semibold uppercase tracking-[0.08em] text-neutral-500 hover:text-neutral-800"
       >
         {open ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronRight className="h-3.5 w-3.5" />}
-        {open ? 'Hide unfinished from earlier' : 'Include unfinished from earlier'}
+        Unfinished from earlier
       </button>
       {open && (
         <div id={id}>
-          <Rows entries={entries} day={day} actions={actions} draggable={draggable} weekPage={weekPage} cap={cap} />
+          {entries.length > 0 && (
+            <Rows entries={entries} day={day} actions={actions} draggable={draggable} weekPage={weekPage} cap={cap} />
+          )}
+          {older > 0 && (
+            <a href="/inbox#expired" className="mt-2 block w-fit text-[12.5px] text-neutral-500 hover:text-neutral-800">
+              Older unfinished work is in Inbox →
+            </a>
+          )}
         </div>
       )}
     </div>
@@ -403,16 +437,10 @@ export function DayPlanPanel({ plan, day, actions, draggable = true, weekPage = 
           </>
         }
       />
-      <UnfinishedFold entries={plan.unfinished ?? []} day={day} actions={actions} draggable={draggable} weekPage={weekPage} cap={cap} />
       {/* A task dated today is on Today's page (scheduling is sufficient,
           focus never gates visibility — Scott, 2026-09-21). Nothing dated
-          waits here. Misses older than the window are not listed either, but
-          they are not lost: one quiet line points at where they live. */}
-      {(plan.olderUnfinished ?? 0) > 0 && (
-        <a href="/inbox#expired" className="mt-2 inline-block text-[12.5px] text-neutral-500 hover:text-neutral-800">
-          Older unfinished work is in Inbox →
-        </a>
-      )}
+          waits here. */}
+      <UnfinishedFold entries={plan.unfinished ?? []} older={plan.olderUnfinished ?? 0} day={day} actions={actions} draggable={draggable} weekPage={weekPage} cap={cap} />
       <div className="mt-4">
         <button
           type="button"
@@ -440,15 +468,6 @@ export function DayPlanPanel({ plan, day, actions, draggable = true, weekPage = 
       </div>
     </div>
   )
-}
-
-/** The one line Today spends on the panel. No counts (Today keeps no
- *  scoreboard): it says only whether there is anything to plan. Dated work
- *  is already on the page, so only the week's list counts; unfinished work
- *  from earlier has its own line ("Review unfinished work"). */
-export function planSummary(plan: DayPlan): string | null {
-  const waiting = (plan.toPlan ?? []).some((e) => !e.completed && !e.planned)
-  return waiting ? 'Choose something for today' : null
 }
 
 /** Map the panel's row gestures onto plan actions for `day`. */

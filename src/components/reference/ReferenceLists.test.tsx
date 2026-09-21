@@ -163,7 +163,8 @@ describe('The Planning panel', () => {
     expect(screen.getByText('Planned today')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Move Family reading time back off today' }))
     expect(planMock.chooseRoutine).toHaveBeenCalledWith('r2', expect.any(Date), false, 'Family reading time')
-    expect(screen.getByRole('button', { name: 'Schedule Book the plumber' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'More for Book the plumber' }))
+    expect(screen.getByRole('menuitem', { name: 'Schedule Book the plumber' })).toBeInTheDocument()
     // A task dated today is on Today's page, not waiting here.
     expect(screen.queryByText('Pick up foot meds')).not.toBeInTheDocument()
   })

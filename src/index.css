@@ -1489,6 +1489,11 @@ html.desktop-shell a {
   color: var(--color-neutral-950);
 }
 .daybook-title { font-size: clamp(30px, 3.5vw, 46px); }
+/* The title and the page's one verb on a line: the date, then "Add task"
+   beside it, at every width. */
+.daybook-title-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px 20px; flex-wrap: wrap; }
+.daybook-title-row > h1 { min-width: 0; }
+.daybook-title-action { flex-shrink: 0; padding-bottom: 6px; }
 .symphony-wordmark { font-size: 25px; }
 /* A library page or a period page is not the day: same rule, same serif, one
    step down, and no date numeral in the margin. */

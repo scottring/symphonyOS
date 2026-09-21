@@ -20,7 +20,10 @@ interface RowActionRailProps {
   familyMembers: FamilyMember[]
   assignedTo?: string | null
   assignedToAll: string[]
-  /** Events the system suggests promoting — tints the overflow trigger amber. */
+  /** The row involves someone other than the reader. Only then do initials
+   *  stay lit at rest; your own work says nothing about who, and the picker
+   *  waits under hover like the other controls (Today, 2026-09-21). */
+  involvesOthers?: boolean
 }
 
 /** An icon cell — 28px, on every row, always. */
@@ -156,6 +159,7 @@ export function RowActionRail({
   familyMembers,
   assignedTo,
   assignedToAll,
+  involvesOthers = true,
 }: RowActionRailProps) {
   const isTask = item.type === 'task'
   const isRoutine = item.type === 'routine'
@@ -222,7 +226,9 @@ export function RowActionRail({
   // INFORMATION, not a control, and it is half the reason to look at the row
   // at all. Everything after it is something you do, not something you read.
   const cells: Array<{ node: React.ReactNode; className: string; quiet?: boolean }> = [
-    { node: who, className: WHO_SLOT },
+    // …unless the only person it involves is you: then it is a control, not
+    // information, and it waits with the others.
+    { node: who, className: WHO_SLOT, quiet: !involvesOthers },
     { node: context, className: SLOT },
     { node: verb, className: SLOT, quiet: true },
     { node: menu, className: SLOT, quiet: true },

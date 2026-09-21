@@ -37,6 +37,8 @@ import { useEventDiscussionFlags } from '@/hooks/useEventDiscussionFlags';
 import { useActionableInstances } from '@/hooks/useActionableInstances';
 import { useRoutines } from '@/hooks/useRoutines';
 import { useFamilyMembers } from '@/hooks/useFamilyMembers';
+import { useListsContext } from '@/contexts/ListsContext';
+import { useSendTaskToBuy } from '@/hooks/useSendTaskToBuy';
 import { usePinnedItems } from '@/hooks/usePinnedItems';
 import { useMealEventsForDate } from '@/shell/providers/MealEventsProvider';
 import { removeFromGroup, ungroupTasks, deleteTaskGroup } from '@/lib/today/groupTasks';
@@ -151,8 +153,13 @@ function TaskPanelBody({ id }: { id: string }) {
   const { clearSelection } = useSelection();
   const navigate = useNavigate();
 
-  const { tasks, addSubtask, deleteTask, toggleTask, updateTask: rawUpdateTask, updateTasksBulk, pushTask, setBucket, refetch } = useSupabaseTasks();
+  const { tasks, addTask, addSubtask, deleteTask, toggleTask, updateTask: rawUpdateTask, updateTasksBulk, pushTask, setBucket, refetch } = useSupabaseTasks();
   const { contacts, addContact, searchContacts } = useContacts();
+  // The "To buy" conversion the row's strip used to offer on Today. The task
+  // is deleted when it moves (an item lives in one place), so the panel
+  // closes with it; the toast names where it went.
+  const { lists, addList } = useListsContext();
+  const sendTaskToBuy = useSendTaskToBuy({ tasks, lists, addList, deleteTask, addTask });
   const { projects } = useProjects();
   const { events } = useGoogleCalendar();
   const { members: familyMembers } = useFamilyMembers();
@@ -204,6 +211,14 @@ function TaskPanelBody({ id }: { id: string }) {
       // createdByName not tracked in current data model
       onAssistMutate={refetch}
       autoOpenDiscussion={autoOpenDiscussion}
+      onSendToBuy={() => {
+        void (async () => {
+          const result = await sendTaskToBuy(task.id);
+          if (!result) return;
+          showToast(`"${result.itemText}" moved to To buy`, 'success');
+          handleClose();
+        })();
+      }}
       onClose={handleClose}
       onTitleChange={(t) => updateTask(task.id, { title: t })}
       onNotesChange={(n) => updateTask(task.id, { notes: n })}

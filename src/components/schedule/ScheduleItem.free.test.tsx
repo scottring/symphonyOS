@@ -53,19 +53,23 @@ describe('ScheduleItem — free events (desktop)', () => {
   it('a free event renders the Free chip and no checkbox', () => {
     renderRow({ isFree: true })
     expect(screen.getByText('Free')).toBeInTheDocument()
-    expect(screen.queryByLabelText('Mark complete')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/^Mark complete/)).not.toBeInTheDocument()
     expect(screen.queryByLabelText('Mark incomplete')).not.toBeInTheDocument()
   })
 
   it('a non-free event still renders the checkbox and no Free chip', () => {
     renderRow({ isFree: false })
     expect(screen.queryByText('Free')).not.toBeInTheDocument()
-    expect(screen.getByLabelText('Mark complete')).toBeInTheDocument()
+    expect(screen.getByLabelText(/^Mark complete/)).toBeInTheDocument()
   })
 
-  it('clicking the calendar icon on a non-free event calls onToggleComplete', () => {
+  it('pressing the circle on a non-free event calls onToggleComplete', () => {
+    // The event's circle is the same press-to-complete control every row
+    // has (2026-09-21) — a press, not a click.
     const { onToggleComplete } = renderRow({ isFree: false })
-    screen.getByLabelText('Mark complete').click()
+    const circle = screen.getByLabelText(/^Mark complete/)
+    fireEvent.mouseDown(circle)
+    fireEvent.mouseUp(circle)
     expect(onToggleComplete).toHaveBeenCalled()
   })
 })

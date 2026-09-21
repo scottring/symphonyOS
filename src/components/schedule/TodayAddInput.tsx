@@ -43,6 +43,12 @@ interface TodayAddInputProps {
   parserContext: ParserContext
   resolver: ResolverContext
   getRecentTaskForContact?: (contactId: string) => { title: string; date: Date } | null
+  /** Mount open and focused — the host's own "Add task" button opened it, so
+   *  there is no pill to click. */
+  defaultExpanded?: boolean
+  /** The box closed itself (Escape, or blurred empty). Lets a host that
+   *  mounts it on demand unmount it again. */
+  onCollapse?: () => void
 }
 
 /** Debounce a value — used to keep the suggestion line from flickering per keystroke. */
@@ -61,8 +67,8 @@ const DESTINATIONS: { key: CaptureDestination; label: string; placeholder: strin
   { key: 'note', label: 'Note', placeholder: 'Jot a note...' },
 ]
 
-export function TodayAddInput({ onAdd, parserContext, resolver, getRecentTaskForContact }: TodayAddInputProps) {
-  const [expanded, setExpanded] = useState(false)
+export function TodayAddInput({ onAdd, parserContext, resolver, getRecentTaskForContact, defaultExpanded = false, onCollapse }: TodayAddInputProps) {
+  const [expanded, setExpanded] = useState(defaultExpanded)
   const [value, setValue] = useState('')
   const [destination, setDestination] = useState<CaptureDestination>('today')
   const inputRef = useRef<HTMLInputElement>(null)
@@ -89,14 +95,23 @@ export function TodayAddInput({ onAdd, parserContext, resolver, getRecentTaskFor
     setExpanded(true)
     setTimeout(() => inputRef.current?.focus(), 0)
   }, [])
+  // Mounted open: take focus the way a click on the pill would have.
+  useEffect(() => {
+    if (defaultExpanded) setTimeout(() => inputRef.current?.focus(), 0)
+  }, [defaultExpanded])
+
+  const collapse = useCallback(() => {
+    setExpanded(false)
+    onCollapse?.()
+  }, [onCollapse])
 
   const reset = useCallback(() => {
     setValue('')
-    setExpanded(false)
+    collapse()
     setDestination('today')
     qp.resetOverrides()
     qp.resetSuggestion()
-  }, [qp])
+  }, [qp, collapse])
 
   // Escalation: hand the raw text to the fenced assistant, which can set up
   // something bigger than one task (project, subtasks, schedule) and verify it.
@@ -159,8 +174,8 @@ export function TodayAddInput({ onAdd, parserContext, resolver, getRecentTaskFor
   }, [handleSubmit, suggestion, suggestionState, qp, reset])
 
   const handleBlur = useCallback(() => {
-    if (!value.trim()) setExpanded(false)
-  }, [value])
+    if (!value.trim()) collapse()
+  }, [value, collapse])
 
   if (!expanded) {
     return (

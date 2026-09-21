@@ -70,6 +70,12 @@ async function openOverflow(user: { click: (el: Element) => Promise<void> }) {
   await user.click(screen.getByRole('button', { name: /more controls/i }))
 }
 
+/** The morning review's door — in the ⋯ menu, off the page (2026-09-21). */
+function reviewDoor() {
+  fireEvent.click(screen.getAllByRole('button', { name: /more controls/i })[0])
+  return screen.getByRole('button', { name: 'Review carried-over work' })
+}
+
 function renderView(props: Record<string, unknown> = {}, ctxOverrides: Record<string, unknown> = {}) {
   return render(
     <ScheduleActionsProvider value={{ ...ctxValue, ...ctxOverrides } as never}>
@@ -150,7 +156,8 @@ describe('TodayView', () => {
     // Scott reaches for assignee filtering far more than "Plan today" — it's the
     // one visible control now; "Plan today" moved into the overflow instead.
     renderView({ assigneesWithTasks: [{ id: 'm1', name: 'Iris' } as never], hasUnassignedTasks: true, onSelectAssignees: vi.fn() })
-    expect(screen.getByRole('button', { name: /filter by assignee/i })).toBeInTheDocument()
+    // jsdom draws both the desktop strip and the phone masthead; each holds one.
+    expect(screen.getAllByRole('button', { name: /filter by assignee/i }).length).toBeGreaterThan(0)
   })
 
   it('offers no "Plan today" anywhere (guided sessions left with the analog-planning pivot)', async () => {
@@ -183,22 +190,28 @@ describe('TodayView', () => {
     expect(screen.getByRole('button', { name: /show daily/i })).toBeInTheDocument()
   })
 
-  it('renders the inline "Add to today" pill and expanding+submitting fires onCreateTaskParsed', async () => {
+  it('"Add task" beside the date opens the add box at the head of Tasks; submitting fires onCreateTaskParsed', async () => {
     const onCreateTaskParsed = vi.fn()
     const { user } = renderView({}, { onCreateTaskParsed })
-    // TodayAddInput starts collapsed — shows an "Add to today" button pill.
-    // jsdom renders both desktop (hidden md:block) and mobile (md:hidden) variants
-    // since CSS media queries are not applied; click the first one to expand.
-    const pills = screen.getAllByRole('button', { name: /add to today/i })
-    expect(pills.length).toBeGreaterThan(0)
-    await user.click(pills[0])
-    // Now the input should be visible
-    const inputs = screen.getAllByPlaceholderText(/add to today/i)
-    expect(inputs.length).toBeGreaterThan(0)
-    await user.type(inputs[0], 'New thing{Enter}')
+    // Nothing to add with until you ask: no pill below the schedule, no box.
+    expect(screen.queryByRole('button', { name: /add to today/i })).toBeNull()
+    expect(screen.queryByPlaceholderText(/add to today/i)).toBeNull()
+    const add = screen.getByRole('button', { name: 'Add task' })
+    expect(add).toHaveAttribute('aria-expanded', 'false')
+    await user.click(add)
+    const input = screen.getByPlaceholderText(/add to today/i)
+    await user.type(input, 'New thing{Enter}')
     expect(onCreateTaskParsed).toHaveBeenCalledWith(
       expect.objectContaining({ title: 'New thing' }),
     )
+  })
+
+  it('offers no "Add task" without a create handler, and none on another day', () => {
+    renderView()
+    expect(screen.queryByRole('button', { name: 'Add task' })).toBeNull()
+    const tomorrow = new Date(TODAY); tomorrow.setDate(tomorrow.getDate() + 1)
+    renderView({ viewedDate: tomorrow }, { onCreateTaskParsed: vi.fn() })
+    expect(screen.queryByRole('button', { name: 'Add task' })).toBeNull()
   })
 
   it('carried-over tasks live in the backlog footer: one line, expanding to the list', () => {
@@ -220,13 +233,15 @@ describe('TodayView', () => {
       ],
     } as never)
     // A two-day-old commitment is NOT drawn on the page: it waits in the
-    // planning panel's "Carried over" group, reached by one quiet line
-    // (Scott, 2026-09-21). The footer's muted "Review" still opens the
+    // planning panel's fold (Scott, 2026-09-21), and the page spends no line
+    // pointing at it. The ⋯ menu's "Review carried-over work" opens the
     // bounded triage that owns the backlog.
     expect(screen.queryByText('Overdue task title')).toBeNull()
     expect(screen.queryByRole('heading', { name: 'Carried over' })).toBeNull()
-    expect(screen.getByRole('button', { name: /Review unfinished work/ })).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Review' }))
+    expect(screen.queryByRole('button', { name: /Review unfinished work/ })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Review' })).toBeNull()
+    fireEvent.click(screen.getAllByRole('button', { name: /more controls/i })[0])
+    fireEvent.click(screen.getByRole('button', { name: 'Review carried-over work' }))
     expect(screen.getAllByText('Overdue task title').length).toBeGreaterThanOrEqual(1)
   })
 
@@ -573,13 +588,15 @@ describe('TodayView attention line', () => {
 
   it('keeps every slipped row off the page and points at them instead', () => {
     renderView({ viewedDate: TODAY, tasks: [mk('c', 'carried thing', 1), mk('s', 'slipped thing', 200)] } as never)
-    // Neither is drawn on the page. The one-day-old carry-over waits in the
-    // planning panel behind one quiet line (2026-09-21); the 200-day-old slip
-    // is reachable through the muted Review link and the Inbox's Expired fold.
+    // Neither is drawn on the page, and no line points at them (2026-09-21).
+    // The one-day-old carry-over waits in the planning panel's fold; the
+    // 200-day-old slip is reachable through the ⋯ menu's review and the
+    // Inbox's Expired fold.
     expect(screen.queryByText('carried thing')).toBeNull()
-    expect(screen.getByRole('button', { name: /Review unfinished work/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Review unfinished work/ })).toBeNull()
     expect(screen.queryByText('slipped thing')).toBeNull()
-    expect(screen.getByRole('button', { name: 'Review' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Review' })).toBeNull()
+    expect(reviewDoor()).toBeInTheDocument()
     // No scoreboard: the footer names neither the size nor the age.
     expect(screen.queryByText(/need attention/)).toBeNull()
     expect(screen.queryByText(/oldest/)).toBeNull()
@@ -591,7 +608,7 @@ describe('TodayView attention line', () => {
     // exactly when it is all that is left.
     renderView({ viewedDate: TODAY, tasks: [mk('s', 'slipped thing', 200)] } as never)
     expect(screen.getByText(/nothing chosen yet/i)).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Review' })).toBeInTheDocument()
+    expect(reviewDoor()).toBeInTheDocument()
   })
 
   it('Review opens the morning Review drawer with the slipped item triageable', () => {
@@ -601,7 +618,7 @@ describe('TodayView attention line', () => {
     const back = window.location.pathname + window.location.search
     try {
       renderView({ viewedDate: TODAY, tasks: [mk('s', 'slipped thing', 200)] } as never)
-      fireEvent.click(screen.getByRole('button', { name: 'Review' }))
+      fireEvent.click(reviewDoor())
       expect(window.location.pathname).toBe(back.split('?')[0])
       expect(screen.getByRole('dialog', { name: /start the day/i })).toBeInTheDocument()
       // The slipped item appears INSIDE the drawer, with a fate on offer.
@@ -612,21 +629,22 @@ describe('TodayView attention line', () => {
     }
   })
 
-  it('still shows the pointer when the carried-over lane is empty', () => {
+  it('still offers the review when the carried-over lane is empty', () => {
     renderView({ viewedDate: TODAY, tasks: [mk('s', 'slipped thing', 200)] } as never)
-    expect(screen.getByRole('button', { name: 'Review' })).toBeInTheDocument()
+    expect(reviewDoor()).toBeInTheDocument()
   })
 
-  it('still shows the pointer when only the carried-over lane has work', () => {
+  it('still offers the review when only the carried-over lane has work', () => {
     // Carried-over tasks have no other home on the page now that the inline
     // list is gone, so the door must open for them too.
     renderView({ viewedDate: TODAY, tasks: [mk('c', 'carried thing', 1)] } as never)
-    expect(screen.getByRole('button', { name: 'Review' })).toBeInTheDocument()
+    expect(reviewDoor()).toBeInTheDocument()
   })
 
-  it('renders no pointer when neither lane has work', () => {
+  it('offers no review when neither lane has work', () => {
     renderView({ viewedDate: TODAY, tasks: [] } as never)
-    expect(screen.queryByRole('button', { name: 'Review' })).toBeNull()
+    fireEvent.click(screen.getAllByRole('button', { name: /more controls/i })[0])
+    expect(screen.queryByRole('button', { name: 'Review carried-over work' })).toBeNull()
   })
 })
 

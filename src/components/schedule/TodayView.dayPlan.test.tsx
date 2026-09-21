@@ -70,7 +70,7 @@ function renderView(props: Record<string, unknown> = {}) {
 
 beforeEach(() => { sessionStorage.clear(); mobile.value = true })
 
-describe('Today — the day plan line', () => {
+describe('Today — the way to Planning', () => {
   // Scott, 2026-09-21: Today shows what you scheduled for today plus what you
   // chose. A dated task is on the page without being chosen again; the
   // flexible chore still waits in Planning until it is chosen.
@@ -79,14 +79,17 @@ describe('Today — the day plan line', () => {
     expect(screen.getByText('Call the bank')).toBeInTheDocument()
     expect(screen.getByText('Pick up foot meds')).toBeInTheDocument()
     expect(screen.queryByText('Kids clean rooms')).not.toBeInTheDocument()
-    // No count on the line — Today keeps no scoreboard (2026-09-21).
-    expect(screen.getByRole('button', { name: /Choose something for today/ })).toBeInTheDocument()
+    // No instruction beside the heading, and no count — Today keeps no
+    // scoreboard and explains nothing (2026-09-21).
+    expect(screen.queryByRole('button', { name: /Choose something for today/ })).toBeNull()
+    expect(screen.queryByText(/in Planning/)).toBeNull()
     expect(screen.queryByText(/\d scheduled for today/)).toBeNull()
   })
 
-  it('on a phone the line opens the Planning sheet with the same plan, and a tick there is the same completion', () => {
+  it('on a phone the ⋯ menu\'s Planning entry opens the sheet with the same plan, and a tick there is the same completion', () => {
     const { onToggleTask } = renderView()
-    const line = screen.getByRole('button', { name: /Choose something for today/ })
+    fireEvent.click(screen.getByRole('button', { name: /more controls/i }))
+    const line = screen.getByRole('button', { name: 'Planning' })
     expect(line).toHaveAttribute('aria-expanded', 'false')
     fireEvent.click(line)
     const sheet = screen.getByRole('dialog', { name: 'Planning' })
@@ -100,14 +103,12 @@ describe('Today — the day plan line', () => {
     expect(onToggleTask).not.toHaveBeenCalled()
   })
 
-  it('on desktop the line opens the Planning panel (the shared pin system), writing nothing', () => {
+  it('on desktop the page draws no Planning line of its own — the navigation\'s toggle is the door', () => {
     mobile.value = false
     renderView()
     expect(screen.getByTestId('pins')).toHaveTextContent('')
-    fireEvent.click(screen.getByRole('button', { name: /Choose something for today/ }))
-    expect(screen.getByTestId('pins')).toHaveTextContent('today')
+    expect(screen.queryByRole('button', { name: 'Planning' })).toBeNull()
+    expect(screen.queryByRole('button', { name: /Choose something for today/ })).toBeNull()
     expect(ctxValue.onUpdateTask).not.toHaveBeenCalled()
-    // Still there once pinned — it says where the plan is.
-    expect(screen.getByRole('button', { name: /in Planning/ })).toBeInTheDocument()
   })
 })

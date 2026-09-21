@@ -105,24 +105,31 @@ export function RoutineCollectionRow({ item, onSelect, onSelectStep, onCompleteS
         >
           {open ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
         </button>
-        <button onClick={() => setOpen(o => !o)} className="flex-1 flex items-center gap-2 py-1.5 text-left min-w-0">
+        {/* Inline padding: a phone-wide rule pads every button 25px a side for
+            touch, which left this name 42px of its 93px column (2026-09-21).
+            The row itself is the target; the name needs no padding. */}
+        <button onClick={() => setOpen(o => !o)} className="flex-1 min-w-0 py-1.5 text-left" style={{ paddingLeft: 0, paddingRight: 0 }}>
           {/* The name takes the room that is left, rather than half of it: at
               390px the time gutter, chevron and action rail leave ~93px, and
               `max-w-[50%]` rendered "Kids Bedtime routine" as "K.." (2026-09-19). */}
-          <span className="min-w-0 flex-1 line-clamp-2 break-words text-[16px] leading-snug font-medium text-neutral-800">{item.title}</span>
-          <span className="text-xs text-neutral-400 tabular-nums shrink-0">{p.done}/{p.total}</span>
-          {item.completed
-            ? <span className="text-xs text-neutral-400 shrink-0">· done</span>
-            : nextUp && (
-                /* The next step is a hint, not the row — it goes before the
-                   name does, and a phone never has room for both. */
-                <span className="hidden sm:inline min-w-0 truncate text-xs text-neutral-500">
-                  · {nextUp.stepName}
-                </span>
-              )}
+          <span className="min-w-0 line-clamp-2 break-words text-[16px] leading-snug font-medium text-neutral-800">{item.title}</span>
+          {/* One muted line under the name, the same place every other row
+              keeps its context: how many steps, and the next one. The
+              progress fraction used to sit at the far end of the row with the
+              next step trailing it — read as two more labels competing with
+              the name (2026-09-21). */}
+          <span className="block truncate text-[12px] leading-tight text-neutral-500 mt-0.5">
+            {p.total} {p.total === 1 ? 'step' : 'steps'}
+            {item.completed
+              ? ' · done'
+              : p.done > 0
+                ? ` · ${p.done} done${nextUp ? ` · next: ${nextUp.stepName}` : ''}`
+                : nextUp ? ` · next: ${nextUp.stepName}` : ''}
+          </span>
         </button>
-        {/* Management menu: hide-for-today / edit / archive, mirroring task rows. */}
-        <div className="relative shrink-0 pr-2">
+        {/* Management menu: hide-for-today / edit / archive, mirroring task
+            rows — and like theirs, quiet until you reach for it on desktop. */}
+        <div className="relative shrink-0 pr-2 transition-opacity md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100">
           <button
             aria-label="Routine options"
             onClick={() => setMgmtOpen(o => !o)}

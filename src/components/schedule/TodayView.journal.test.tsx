@@ -8,7 +8,7 @@ import { TodayView } from './TodayView'
 import { createMockTask } from '@/test/mocks/factories'
 
 /**
- * Today as a daily journal (2026-09-19): My focus (chosen), Still ahead (the
+ * Today as a daily journal (2026-09-19): Tasks (chosen), Schedule (the
  * timed day from now), Earlier today (folded). The decisions column, the
  * detail pane and every row action are unchanged.
  */
@@ -82,26 +82,28 @@ function renderView(props: Record<string, unknown> = {}) {
 }
 
 describe('Carried over', () => {
-  // Yesterday's unfinished commitment lives in the planning panel, beside
-  // the other things you might choose; Today's main area is the day's
-  // scheduled work and chosen focus (Scott, 2026-09-21). One quiet line keeps
-  // it findable; no rows, no count, nothing promoted into today.
-  it("points at yesterday's unfinished commitment and opens the panel that holds it", () => {
+  // Yesterday's unfinished commitment lives in the planning panel's fold,
+  // beside the other things you might choose; Today's main area is the day's
+  // scheduled work and chosen focus (Scott, 2026-09-21). The page spends no
+  // line on it at all — no rows, no count, no second door (2026-09-21): the
+  // fold is the one entrance, and the morning review waits in the ⋯ menu.
+  it("draws neither yesterday's unfinished commitment nor a line pointing at it", () => {
     const yesterday = createMockTask({ id: 'yest', title: 'Order Comma 4', bucket: 'timed', isAllDay: true, scheduledFor: new Date(2026, 8, 18) })
     renderView({ tasks: [...tasks, yesterday] })
     expect(screen.queryByRole('heading', { name: 'Carried over' })).not.toBeInTheDocument()
     expect(screen.queryByText('Order Comma 4')).not.toBeInTheDocument()
-    const link = screen.getByRole('button', { name: /Review unfinished work/ })
-    fireEvent.click(link)
-    // The link opens the panel (here: pins Today, whose panel the shell
-    // draws) and steps aside while it is open — one place, not two.
     expect(screen.queryByRole('button', { name: /Review unfinished work/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Review' })).not.toBeInTheDocument()
     expect(screen.queryByText(/Carried over · \d/)).toBeNull()
+    // The door, off the page: the ⋯ menu.
+    fireEvent.click(screen.getAllByRole('button', { name: /more controls/i })[0])
+    expect(screen.getByRole('button', { name: 'Review carried-over work' })).toBeInTheDocument()
   })
 
-  it('says nothing when nothing was left behind', () => {
+  it('offers no review when nothing was left behind', () => {
     renderView()
-    expect(screen.queryByRole('button', { name: /Review unfinished work/ })).not.toBeInTheDocument()
+    fireEvent.click(screen.getAllByRole('button', { name: /more controls/i })[0])
+    expect(screen.queryByRole('button', { name: 'Review carried-over work' })).not.toBeInTheDocument()
   })
 })
 
@@ -121,10 +123,10 @@ describe('Today as a daily journal', () => {
     expect(screen.queryByText(/good (morning|afternoon|evening)/i)).toBeNull()
   })
 
-  it('My focus holds what was chosen; Still ahead holds the rest of the timed day', () => {
+  it('Tasks holds what was chosen; Schedule holds the rest of the timed day', () => {
     renderView()
     const focus = screen.getByRole('region', { name: 'Tasks' })
-    const ahead = screen.getByRole('region', { name: 'Still ahead' })
+    const ahead = screen.getByRole('region', { name: 'Schedule' })
     expect(within(focus).getByText('Check dryer duct')).toBeInTheDocument()
     expect(within(ahead).getByText('Food planning')).toBeInTheDocument()
     expect(within(ahead).queryByText('Check dryer duct')).toBeNull()

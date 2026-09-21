@@ -50,7 +50,7 @@ describe('DayPlanPanel — the Planning panel', () => {
     render(<DayPlanPanel plan={plan(n)} day={day} actions={actions} />)
     expect(screen.getByRole('button', { name: /^To plan$/ })).toHaveAttribute('aria-expanded', 'true')
     expect(screen.queryByText(`Item ${n}`)).not.toBeInTheDocument()
-    expect(screen.getByText(/\+4 more/)).toBeInTheDocument()
+    expect(screen.getByText(/Show 4 more/)).toBeInTheDocument()
   })
 
   it('a row carries its context line, never a second category', () => {
@@ -73,32 +73,39 @@ describe('DayPlanPanel — the Planning panel', () => {
   })
 
   // Scott, 2026-09-21: a routine with no day of its own has no occurrence to
-  // choose or tick. "Give it a day" places THIS week's occurrence; changing
-  // the repeating schedule is a separate, explicit action.
-  it('a routine with no day offers "Give it a day" (this week) and "Change repeating schedule", nothing else', () => {
+  // choose or tick. Its verb reads like every other row's — "Plan for today"
+  // — and places THIS week's occurrence; changing the repeating schedule is
+  // the ⋯ menu's separate, explicit move.
+  it('a routine with no day offers "Plan for today" (this week\'s occurrence) and, behind ⋯, "Change repeating schedule" — nothing else', () => {
     const p = plan(0)
     p.toPlan = [{ key: 'routine:v', kind: 'routine', id: 'v', title: 'Vacuum', completed: false, planned: false, group: 'plan',
       routine: { id: 'v', name: 'Vacuum', recurrence_pattern: { type: 'weekly', days: [] } } as never, context: 'Weekly routine · no set day' }]
     const changeRoutineRule = vi.fn()
     render(<DayPlanPanel plan={p} day={day} actions={{ ...actions, changeRoutineRule }} weekPage={thisWeek} />)
-    expect(screen.getByRole('button', { name: 'Give Vacuum a day' })).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Change repeating schedule for Vacuum' }))
+    expect(screen.getByRole('button', { name: 'Plan Vacuum for today' })).toHaveTextContent('Plan for today')
+    expect(screen.queryByRole('button', { name: /Give .* a day/ })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'More for Vacuum' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Change repeating schedule for Vacuum' }))
     expect(changeRoutineRule).toHaveBeenCalledWith(expect.objectContaining({ id: 'v' }))
-    expect(screen.queryByRole('button', { name: 'Plan Vacuum for today' })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Complete Vacuum' })).toBeNull()
+    expect(screen.queryByRole('menuitem', { name: 'Move Vacuum to Someday' })).toBeNull()
   })
 
-  it('points at the Expired list for older unfinished work, without listing or counting it', () => {
+  it('points at the Expired list for older unfinished work — inside the one fold, without listing or counting it', () => {
     const p = plan(1)
     p.olderUnfinished = 3
     render(<DayPlanPanel plan={p} day={day} actions={actions} weekPage={thisWeek} />)
+    // One entrance to unfinished work: the pointer is the fold's last line,
+    // not a second door beside it.
+    expect(screen.queryByRole('link', { name: /Older unfinished work is in Inbox/ })).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Unfinished from earlier' }))
     expect(screen.getByRole('link', { name: /Older unfinished work is in Inbox/ })).toHaveAttribute('href', '/inbox#expired')
     expect(screen.queryByText(/3/)).toBeNull()
   })
 
   // The occurrence lands in the week on screen: beside a future week the
   // picker opens on that week's first day, not on today.
-  it('"Give it a day" opens on the viewed week when today is not in it', () => {
+  it("a routine's \"Plan for today\" picker opens on the viewed week when today is not in it", () => {
     const today = new Date(2026, 8, 21)
     const current = weekStartAnchor(today, readCadenceConfig().weekStartsOn)
     const next = new Date(current); next.setDate(next.getDate() + 7)
@@ -121,7 +128,7 @@ describe('DayPlanPanel — the Planning panel', () => {
     expect(screen.queryByText('Item 9')).not.toBeInTheDocument()
   })
 
-  it('"Include unfinished from earlier" expands older work on request, in the order given (newest first), without a count', () => {
+  it('"Unfinished from earlier" expands older work on request, in the order given (newest first), without a count', () => {
     const p = plan(1)
     p.unfinished = [
       { ...entry(8, 'Originally Saturday'), group: 'unfinished' },
@@ -129,12 +136,12 @@ describe('DayPlanPanel — the Planning panel', () => {
       { ...entry(6, 'Planned for Sep 6 – Sep 12'), group: 'unfinished' },
     ]
     render(<DayPlanPanel plan={p} day={day} actions={actions} weekPage={thisWeek} />)
-    const toggle = screen.getByRole('button', { name: 'Include unfinished from earlier' })
+    const toggle = screen.getByRole('button', { name: 'Unfinished from earlier' })
     expect(toggle).toHaveAttribute('aria-expanded', 'false')
     expect(toggle.textContent).not.toMatch(/\d/)
     expect(screen.queryByText('Item 8')).not.toBeInTheDocument()
     fireEvent.click(toggle)
-    expect(screen.getByRole('button', { name: 'Hide unfinished from earlier' })).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('button', { name: 'Unfinished from earlier' })).toHaveAttribute('aria-expanded', 'true')
     const rows = screen.getAllByText(/^Item [678]$/).map((el) => el.textContent)
     expect(rows).toEqual(['Item 8', 'Item 7', 'Item 6'])
   })
@@ -144,27 +151,45 @@ describe('DayPlanPanel — the Planning panel', () => {
     expect(screen.queryByRole('button', { name: /unfinished from earlier/ })).not.toBeInTheDocument()
   })
 
-  // Precise verbs: "Plan for this week" re-commits (undated), "Schedule…" gives
-  // a date, "Someday" defers by name. Nothing is called "let go".
-  it('an unfinished row offers Plan for this week, Schedule… and Someday', () => {
+  // Precise verbs: "Plan for this week" re-commits (undated); behind ⋯,
+  // "Schedule…" gives a date and "Someday" defers by name. Nothing is called
+  // "let go".
+  it('an unfinished row offers Plan for this week, and Schedule… and Someday behind ⋯', () => {
     const commit = vi.fn(); const someday = vi.fn()
     const p = plan(0)
     p.unfinished = [{ ...entry(5, 'Originally Saturday'), group: 'unfinished' }]
     render(<DayPlanPanel plan={p} day={day} actions={{ ...actions, commit, someday }} weekPage={thisWeek} />)
-    fireEvent.click(screen.getByRole('button', { name: 'Include unfinished from earlier' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Unfinished from earlier' }))
     fireEvent.click(screen.getByRole('button', { name: 'Plan Item 5 for this week' }))
     expect(commit).toHaveBeenCalledWith(expect.objectContaining({ id: 'w5' }), 'week')
-    expect(screen.getByRole('button', { name: 'Schedule Item 5' })).toHaveTextContent('Schedule…')
-    fireEvent.click(screen.getByRole('button', { name: 'Move Item 5 to Someday' }))
+    fireEvent.click(screen.getByRole('button', { name: 'More for Item 5' }))
+    expect(screen.getByRole('menuitem', { name: 'Schedule Item 5' })).toHaveTextContent('Schedule…')
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Move Item 5 to Someday' }))
     expect(someday).toHaveBeenCalledWith(expect.objectContaining({ id: 'w5' }))
     expect(screen.queryByRole('button', { name: /let go/i })).toBeNull()
     expect(screen.queryByRole('button', { name: 'Plan Item 5 for today' })).toBeNull()
   })
 
-  it("a week row's date control is called Schedule", () => {
+  // Beside a day the same row's verb is "Plan for today", and it dates the
+  // task to that day — the one enduring action, no second verb to learn.
+  it('beside a day an unfinished row says Plan for today, and that schedules it onto the day', () => {
+    const schedule = vi.fn()
+    const p = plan(0)
+    p.unfinished = [{ ...entry(5, 'Originally Saturday'), group: 'unfinished' }]
+    render(<DayPlanPanel plan={p} day={day} actions={{ ...actions, schedule }} weekPage={null} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Unfinished from earlier' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Plan Item 5 for today' }))
+    expect(schedule).toHaveBeenCalledWith(expect.objectContaining({ id: 'w5' }), day, true)
+    expect(screen.queryByRole('button', { name: /for this week/ })).toBeNull()
+  })
+
+  it("a week row's date control is called Schedule, behind ⋯; its verb is Plan for today", () => {
     render(<DayPlanPanel plan={plan(1)} day={day} actions={actions} weekPage={thisWeek} />)
-    expect(screen.getByRole('button', { name: 'Schedule Item 1' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Plan Item 1 for today' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Plan Item 1 for today' })).toHaveTextContent('Plan for today')
+    fireEvent.click(screen.getByRole('button', { name: 'More for Item 1' }))
+    expect(screen.getByRole('menuitem', { name: 'Schedule Item 1' })).toHaveTextContent('Schedule…')
+    // No clock glyph, no second control to interpret.
+    expect(screen.queryByTitle('Schedule…')).toBeNull()
   })
 
   it('says what it is planning: the week on screen, or the day', () => {

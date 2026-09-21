@@ -5,7 +5,7 @@ import { DesktopFooterAction, DesktopFooterActionContext } from '@/components/la
  *
  * Drop-in replacement for TodaySchedule (same TodayScheduleProps interface).
  * Composes: TodayHeader, TodayOverflowMenu, WeatherChip,
- *           EveningMealCard, ScheduleItem.
+ *           ScheduleItem.
  *
  * NOT wired to the route yet — that happens in R4.
  */
@@ -37,11 +37,10 @@ import { useSystemHealth, getHealthTextClasses } from '@/hooks/useSystemHealth'
 import { useTimelineInsert } from '@/hooks/useTimelineInsert'
 import { useDomain } from '@/hooks/useDomain'
 
-import { Eye, EyeOff, Repeat, Binoculars, Printer, GripVertical, Moon, Sparkles, NotebookPen, ArrowRight, PanelLeft, ChevronDown, ChevronRight } from 'lucide-react'
+import { Eye, EyeOff, Binoculars, Printer, GripVertical, Moon, Sparkles, NotebookPen, ArrowRight, PanelLeft, ChevronDown, ChevronRight, Plus, History } from 'lucide-react'
 import { splitTodayJournal } from '@/lib/today/journalSplit'
-import { panelActionsFor, planSummary } from '@/components/reference/DayPlanPanel'
+import { panelActionsFor } from '@/components/reference/DayPlanPanel'
 import { PlanningSheet } from '@/components/reference/PlanningSheet'
-import { writeUnfinishedOpen } from '@/lib/planningPanelSignal'
 import { unhomedRoutines } from '@/lib/week/unhomedRoutines'
 import { useWeekInstances } from '@/components/home/week/useWeekInstances'
 import { useReferenceLists } from '@/components/reference/ReferenceListsContext'
@@ -374,13 +373,18 @@ export function TodayView({
   }, { changeRoutineRule: () => navigate('/routines') }), [viewedDate, planActions, onToggleTask, onCompleteRoutine, navigate])
   const [planOpenDay, setPlanOpenDay] = useState<string | null>(null)
   const planOpenInline = planOpenDay === localYmd(viewedDate)
-  const planLine = planSummary(data.dayPlan)
   // The desktop pin is always TODAY's plan; another day, or a phone (which
   // has no dock), opens the same panel inline instead.
   // Desktop always plans in the dock (it plans the real today, whichever day
   // is being read); the sheet is the phone's. Keying this on `isToday` sent a
   // desktop day-browse to the phone sheet (review, 2026-09-21).
   const usePin = !isMobile && !!references
+  // Opens the plan: the shell's dock on desktop (pin Today), the sheet on a
+  // phone. Declared here because the ⋯ menu, built above the return, uses it.
+  const openPlan = () => {
+    if (usePin) { if (!todayPinned) references!.pin('today') }
+    else setPlanOpenDay(planOpenInline ? null : localYmd(viewedDate))
+  }
   const [agendaDropOver, setAgendaDropOver] = useState(false)
   const agendaDrop = planDropHandlers((payload) => {
     void planActions.drop(payload, { type: 'day', day: viewedDate }, { chooseOnly: true })
@@ -434,15 +438,7 @@ export function TodayView({
     const incomplete = data.overdueTasks.filter((t) => !t.completed).length
     return incomplete || data.overdueTasks.length
   }, [data.overdueTasks])
-
-  // ── "To buy" conversion toast — the page owns it because nudges fire from
-  // deep inside the row tree (sections + carried-over) and the undo must
-  // outlive the row that triggered it (the task is gone the moment it fires).
-  const [toBuyToast, setToBuyToast] = useState<{ message: string; undo: () => Promise<void> } | null>(null)
-  const handleSendToBuy = useCallback(async (taskId: string) => {
-    const result = await ctx.onSendTaskToBuy?.(taskId)
-    if (result) setToBuyToast({ message: `"${result.itemText}" moved to To buy`, undo: result.undo })
-  }, [ctx])
+  const hasBacklog = carriedCount > 0 || data.attentionItems.length > 0
 
   // ── "New from email": the quiet door, and the sheet behind it ──────────────
   // The census gates the footer link — Today never shows a count, so the link's
@@ -1042,7 +1038,7 @@ export function TodayView({
       type="button"
       onClick={onOpenPlanFromPaper}
       title="Plan from paper — photograph your written plan and place its items"
-      className="flex items-center gap-1.5 rounded-lg border border-primary-500/40 bg-primary-50 px-2.5 py-1.5 text-[13px] font-semibold text-primary-700 transition-colors hover:bg-primary-100"
+      className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border border-primary-500/40 bg-primary-50 px-2.5 py-1.5 text-[13px] font-semibold text-primary-700 transition-colors hover:bg-primary-100"
     >
       <NotebookPen className="w-4 h-4" />
       <span>Plan from paper</span>
@@ -1050,6 +1046,21 @@ export function TodayView({
   )
   const overflowMenu = (
     <TodayOverflowMenu>
+      {/* The phone's door to Planning — first in the menu. On desktop the
+          page navigation has one; the heading line that used to open it is
+          gone (2026-09-21), and the masthead row has no room for a fourth
+          button at 48px touch targets. */}
+      {isMobile && !usePin && (
+        <button
+          type="button"
+          onClick={openPlan}
+          aria-expanded={planOpenInline}
+          className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[15px] text-neutral-600 transition-all hover:bg-neutral-100"
+        >
+          <PanelLeft className="w-5 h-5" aria-hidden="true" />
+          <span>Planning</span>
+        </button>
+      )}
       <button
         type="button"
         onClick={toggleHideRoutines}
@@ -1090,6 +1101,22 @@ export function TodayView({
         <Printer className="w-5 h-5" />
         <span>Print list</span>
       </button>
+      {/* The door to the morning review — carried-over and slipped work,
+          triaged in a bounded drawer. Off the page and into the menu
+          (2026-09-21): Today spends no line on the backlog, and the Planning
+          panel's fold is the page's one entrance to unfinished work. Present
+          whenever either backlog population is non-empty, and never a count. */}
+      {data.isToday && hasBacklog && (
+        <button
+          type="button"
+          onClick={() => setReviewMode('morning')}
+          title="Decide what to do with work that slipped past its day"
+          className="flex items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[15px] text-neutral-600 transition-all hover:bg-neutral-100"
+        >
+          <History className="w-5 h-5" />
+          <span>Review carried-over work</span>
+        </button>
+      )}
       {data.isToday && !reviewInFooter && (
         <button
           type="button"
@@ -1190,10 +1217,22 @@ export function TodayView({
   // reading of this day, not a standing preference.
   const [earlierOpenDay, setEarlierOpenDay] = useState<string | null>(null)
   const earlierOpen = earlierOpenDay === localYmd(viewedDate)
-  const openPlan = () => {
-    if (usePin) { if (!todayPinned) references!.pin('today') }
-    else setPlanOpenDay(planOpenInline ? null : localYmd(viewedDate))
-  }
+  // "Add task" beside the date opens the add box at the head of Tasks; the
+  // box unmounts when it closes itself. Keyed by day so a day change closes it.
+  const [addOpenDay, setAddOpenDay] = useState<string | null>(null)
+  const addOpen = addOpenDay === localYmd(viewedDate)
+  const canAdd = data.isToday && !!(ctx.onCreateTaskParsed ?? ctx.onCreateTask)
+  const addTaskButton = canAdd ? (
+    <button
+      type="button"
+      onClick={() => setAddOpenDay(addOpen ? null : localYmd(viewedDate))}
+      aria-expanded={addOpen}
+      className="daybook-add-task inline-flex items-center gap-1.5 rounded-lg border border-sage-200 bg-sage-50 px-3 py-1.5 text-[14px] font-medium text-sage-600 transition-colors hover:bg-sage-100"
+    >
+      <Plus className="h-4 w-4" aria-hidden="true" />
+      Add task
+    </button>
+  ) : undefined
   // Everything each slice of the journal shares — the same rows and actions
   // the one flat list had, handed to three renders of it.
   const listProps = {
@@ -1222,7 +1261,7 @@ export function TodayView({
     onClosePanel,
     renamingGroupId,
     onRenameGroupDone: () => setRenamingGroupId(null),
-    onSendToBuy: ctx.onSendTaskToBuy ? handleSendToBuy : undefined,
+    currentMemberId: meId,
   }
 
   return (
@@ -1248,8 +1287,16 @@ export function TodayView({
       )}
       {/* Mobile-only action row. The date nav that used to live here moved into
           the day card below, which now carries it on every breakpoint. */}
-      <div data-testid="today-mobile-masthead" className="md:hidden px-3 mb-2 flex items-center justify-end gap-2">
+      <div data-testid="today-mobile-masthead" className="md:hidden px-3 mb-2 flex flex-wrap items-center justify-end gap-2">
         {isMobile && planFromPaperButton}
+        {isMobile && onSelectAssignees && ((assigneesWithTasks?.length ?? 0) > 0 || hasUnassignedTasks) && (
+          <AssigneeFilter
+            selectedAssignees={selectedAssignees ?? []}
+            onSelectAssignees={onSelectAssignees}
+            assigneesWithTasks={assigneesWithTasks ?? []}
+            hasUnassignedTasks={!!hasUnassignedTasks}
+          />
+        )}
         {isMobile && overflowMenu}
       </div>
 
@@ -1270,7 +1317,10 @@ export function TodayView({
         // Tomorrow, a weekday — and still opens the date picker.
         eyebrow={<DayNavCluster viewedDate={viewedDate} onDateChange={onDateChange} variant="inline" label={data.isToday ? 'Today' : relativeDayLabel} />}
         title={viewedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-        // "Next: …" is the Up next marker's job now, inside Still ahead. The
+        // The page's one verb, beside the date (2026-09-21). Adding never
+        // means hunting below the schedule.
+        action={addTaskButton}
+        // "Next: …" is the Up next marker's job now, inside Schedule. The
         // line stays only when it says something the list can't: a clear day
         // looking forward, or another day's opener.
         subline={data.isToday && upNext ? undefined : heroLine}
@@ -1357,20 +1407,26 @@ export function TodayView({
               still ahead, and what is already behind you. */}
           <section aria-labelledby="today-focus-heading" className="daybook-journal-section">
             <div className="daybook-journal-heading">
+              {/* No instruction beside the heading (2026-09-21): the Add task
+                  button by the date is the verb, and Planning is a door in
+                  the navigation, not a sentence here. */}
               <h2 id="today-focus-heading">Tasks</h2>
-              {planLine && (
-                <button
-                  type="button"
-                  aria-expanded={usePin ? todayPinned : planOpenInline}
-                  onClick={openPlan}
-                  className="inline-flex items-center gap-1.5 text-[13px] text-neutral-500 hover:text-neutral-800"
-                >
-                  <PanelLeft className="h-3.5 w-3.5" aria-hidden="true" />
-                  <span>{planLine}</span>
-                  {usePin && todayPinned && <span className="text-neutral-400">· in Planning</span>}
-                </button>
-              )}
             </div>
+            {/* The add box, at the head of the list it adds to. Mounted only
+                while open; it unmounts itself on Escape or an empty blur. */}
+            {addOpen && canAdd && (
+              <div className="mt-2 mb-1">
+                <TodayAddInput
+                  key={localYmd(viewedDate)}
+                  defaultExpanded
+                  onCollapse={() => setAddOpenDay(null)}
+                  onAdd={ctx.onCreateTaskParsed!}
+                  parserContext={ctx.parserContext!}
+                  resolver={ctx.resolverContext!}
+                  getRecentTaskForContact={ctx.getRecentTaskForContact}
+                />
+              </div>
+            )}
             {/* On a phone the Planning panel is a sheet, not an inline fold. */}
             {!usePin && (
               <PlanningSheet open={planOpenInline} onClose={() => setPlanOpenDay(null)} plan={data.dayPlan} day={viewedDate} actions={planPanelActions} />
@@ -1392,28 +1448,12 @@ export function TodayView({
             )}
           </section>
 
-          {/* Unfinished work from earlier (the 14-day window) lives in the
-              planning panel behind "Include unfinished from earlier" — Today's
-              main area is the day's scheduled work and chosen focus (Scott,
-              2026-09-21). It stays findable: one quiet line, only while the
-              panel is closed, no count, no duplicate rows, nothing promoted
-              into today. The line opens the panel with that list expanded. */}
-          {data.isToday && (data.dayPlan.unfinished?.length ?? 0) > 0 && !(usePin ? todayPinned : planOpenInline) && (
-            <div className="daybook-journal-section">
-              <button
-                type="button"
-                onClick={() => { writeUnfinishedOpen(true); openPlan() }}
-                className="inline-flex items-center gap-1.5 text-[13px] text-neutral-500 hover:text-neutral-800"
-              >
-                <PanelLeft className="h-3.5 w-3.5" aria-hidden="true" />
-                <span>Review unfinished work →</span>
-              </button>
-            </div>
-          )}
-
+          {/* Unfinished work from earlier has ONE entrance: the Planning
+              panel's fold. The quiet line that used to sit here was a second
+              door (2026-09-21). */}
           <section aria-labelledby="today-ahead-heading" className="daybook-journal-section">
             <div className="daybook-journal-heading">
-              <h2 id="today-ahead-heading">{data.isToday ? 'Still ahead' : 'Schedule'}</h2>
+              <h2 id="today-ahead-heading">Schedule</h2>
             </div>
             {journal.allDayEvents.length > 0 && (
               <ul className="daybook-journal-allday" aria-label="All day">
@@ -1490,71 +1530,9 @@ export function TodayView({
             passive navigate-to-/week gave way to a bounded triage ritual.
             The page itself still spends only this one line: the drawer is a
             modal you summon, not furniture. */}
-        {/* Inline "Add to today" — BELOW the day's content (you add after
-            you've seen the day), above the meta lines. Today-only, when
-            onCreateTask is wired. Desktop: full-width add input. Mobile: same
-            input but flanked by the assignee + show-daily filters on the
-            right, so the whole filter row is folded into this one to save
-            vertical space. */}
-        {data.isToday && (ctx.onCreateTaskParsed ?? ctx.onCreateTask) && (
-          <>
-            {/* Desktop: just the add input */}
-            <div className="hidden md:block mt-3">
-              <TodayAddInput
-                onAdd={ctx.onCreateTaskParsed!}
-                parserContext={ctx.parserContext!}
-                resolver={ctx.resolverContext!}
-                getRecentTaskForContact={ctx.getRecentTaskForContact}
-              />
-            </div>
-            {/* Mobile: combined add + filters */}
-            <div className="md:hidden mt-2 px-3 flex items-center gap-2">
-              <div className="flex-1 min-w-0">
-                <TodayAddInput
-                  onAdd={ctx.onCreateTaskParsed!}
-                  parserContext={ctx.parserContext!}
-                  resolver={ctx.resolverContext!}
-                  getRecentTaskForContact={ctx.getRecentTaskForContact}
-                />
-              </div>
-              {onSelectAssignees && ((assigneesWithTasks?.length ?? 0) > 0 || hasUnassignedTasks) && (
-                <AssigneeFilter
-                  selectedAssignees={selectedAssignees ?? []}
-                  onSelectAssignees={onSelectAssignees}
-                  assigneesWithTasks={assigneesWithTasks ?? []}
-                  hasUnassignedTasks={!!hasUnassignedTasks}
-                />
-              )}
-              <button
-                type="button"
-                onClick={toggleHideRoutines}
-                title={hideRoutines ? 'Show daily activities' : 'Hide daily activities'}
-                aria-label={hideRoutines ? 'Show daily activities' : 'Hide daily activities'}
-                aria-pressed={!hideRoutines}
-                className={`shrink-0 p-2 rounded-lg transition-colors ${hideRoutines ? 'text-neutral-400 hover:text-neutral-600 hover:bg-neutral-100' : 'text-primary-600 hover:bg-primary-50'}`}
-              >
-                <Repeat className="w-4 h-4" />
-              </button>
-            </div>
-          </>
-        )}
-
         {data.isToday && (
           <TodayBacklogFooter
-            carriedCount={carriedCount}
-            attentionItems={data.attentionItems}
-            onReview={() => setReviewMode('morning')}
             onReviewEmail={emailCaptures.length > 0 ? () => setEmailReviewOpen(true) : undefined}
-          />
-        )}
-
-        {/* Undo toast for a To buy conversion — the task was deleted, so this
-            is the only way back for ten seconds. */}
-        {toBuyToast && (
-          <InboxUndoToast
-            message={toBuyToast.message}
-            onUndo={() => { void toBuyToast.undo(); setToBuyToast(null) }}
-            onDismiss={() => setToBuyToast(null)}
           />
         )}
 

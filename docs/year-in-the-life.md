@@ -43,7 +43,7 @@ instead and it keeps its place on the week list and also appears in Today's
 "Tasks", in the order you set. Un-choosing removes it from focus and
 nothing else.
 
-**The day.** On its day it is a commitment. Timed work sits in "Still ahead"
+**The day.** On its day it is a commitment. Timed work sits in "Schedule"
 until its time passes, then rolls into "Earlier today". Untimed work you
 merely dated waits in the Today pin as "Scheduled today" until you choose it.
 Tick it and it is done. Nothing records when. A finished task stays on the
@@ -82,7 +82,7 @@ and timed, for a day that never reached the calendar.
 **Where it shows.** Google is the truth and Symphony reads it for the days on
 screen, re-reading when you come back to the tab. There is no live feed and no
 polling, so an event added elsewhere appears when you return. On Today, timed
-events sit in "Still ahead"; all-day events are listed above it. An event is
+events sit in "Schedule"; all-day events are listed above it. An event is
 never in "Tasks" and never in the Today pin, because an event is time, not
 a decision. On the kitchen wall it lands in a person's lane by the first name
 in its title. Meal-plan dinners are dressed as events and ride alongside.
@@ -110,7 +110,7 @@ the parent carries the hour and the steps inherit it.
 **Each morning.** Every day the same ladder decides whether it shows, and the
 first rung that matches is the reason: resting, not today, hidden from the
 timeline, another life area, not yours, a step inside a collection, or swept
-by "hide daily routines". Timed routines sit in "Still ahead". Untimed ones
+by "hide daily routines". Timed routines sit in "Schedule". Untimed ones
 wait in the Today pin as "Available today" until you choose one, and then it
 joins "Tasks". A routine that has a rule but no time and no day rides on
 the `/week` list asking to be dragged somewhere. Dropping it on a day rewrites

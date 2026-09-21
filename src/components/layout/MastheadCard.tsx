@@ -25,9 +25,12 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { PlaceWash } from '@/components/place/PlaceWash'
 import { PageMotif, type MotifId } from '@/components/place/motifs/PageMotif'
 
-export function MastheadCard({ eyebrow, title, subline, controls, aside, footer, motif, variant = 'card', date, className = '' }: {
+export function MastheadCard({ eyebrow, title, subline, controls, aside, footer, motif, variant = 'card', date, className = '', action }: {
   eyebrow?: ReactNode
   title: ReactNode
+  /** The page's one primary action, beside the title at every width —
+   *  Today's "Add task". `controls` is desktop chrome; this is the verb. */
+  action?: ReactNode
   subline?: ReactNode
   controls?: ReactNode
   /** The masthead's ear — a short line that belongs to the heading but not
@@ -69,9 +72,12 @@ export function MastheadCard({ eyebrow, title, subline, controls, aside, footer,
           )}
           <div className="daybook-masthead-text min-w-0 flex-1">
             {eyebrow && <div data-testid="masthead-eyebrow" className="mb-1 -ml-1.5">{eyebrow}</div>}
-            <h1 className={open ? 'daybook-title' : 'font-display text-[28px] font-semibold leading-tight text-neutral-950 md:text-[34px]'}>
-              {title}
-            </h1>
+            <div className={action ? 'daybook-title-row' : undefined}>
+              <h1 className={open ? 'daybook-title' : 'font-display text-[28px] font-semibold leading-tight text-neutral-950 md:text-[34px]'}>
+                {title}
+              </h1>
+              {action && <div className="daybook-title-action">{action}</div>}
+            </div>
             {subline && <div className="mt-1 max-w-2xl text-sm text-neutral-500 md:text-[15px]">{subline}</div>}
           </div>
           {controls && <div className="daybook-masthead-controls hidden shrink-0 md:block">{controls}</div>}

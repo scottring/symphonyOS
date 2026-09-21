@@ -13,90 +13,12 @@ import { RowActionRail } from './RowActionRail'
 import { useMobile } from '@/hooks/useMobile'
 import { TaskCheckbox } from './TaskCheckbox'
 import { ExpandingPanel } from './ExpandingPanel'
-import { MobileTypeTile } from './MobileTypeTile'
 import { DOMAIN_COLORS } from '@/lib/domainColors'
 import { rowSubtitle } from '@/lib/rowSubtitle'
 import { TimelineSpine } from './TimelineSpine'
 import { locationLink } from '@/lib/locationLink'
 import { useTravelTime } from '@/hooks/useTravelTime'
 
-// Nordic Journal calendar icon - minimal, elegant design
-// Uses the event's context color (Work/Family/Personal) or falls back to primary teal-forest
-function CalendarIcon({
-  context,
-  completed
-}: {
-  context?: 'work' | 'family' | 'personal' | null
-  completed?: boolean
-}) {
-  // Primary forest-teal from design system: hsl(168 45% 30%) ≈ #2a6b5e
-  const primaryColor = '#2a6b5e'
-  const primaryLight = '#e8f4f1' // ~primary-50
-  const completedColor = '#2a6b5e'
-
-  // Context color mapping - matches domain switcher
-  const contextColorMap = {
-    work: 'rgb(37 99 235)',      // Blue-600
-    family: 'rgb(217 119 6)',    // Amber-600
-    personal: 'rgb(147 51 234)', // Purple-600
-  }
-
-  // Use context color if provided, otherwise use primary
-  const accentColor = context ? contextColorMap[context] : primaryColor
-
-  return (
-    <div className="w-5 h-5 relative" title="Calendar event">
-      <svg
-        viewBox="0 0 20 20"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-        className="w-full h-full"
-      >
-        {/* Calendar outline - clean rounded rectangle */}
-        <rect
-          x="2.5"
-          y="4"
-          width="15"
-          height="13"
-          rx="2"
-          fill={completed ? completedColor : primaryLight}
-          stroke={completed ? completedColor : primaryColor}
-          strokeWidth="1.5"
-          className="transition-colors"
-        />
-        {/* Calendar header line */}
-        <line
-          x1="2.5"
-          y1="7.5"
-          x2="17.5"
-          y2="7.5"
-          stroke={completed ? primaryLight : primaryColor}
-          strokeWidth="1.5"
-          className="transition-colors"
-        />
-        {/* Small color dot showing the context color */}
-        {!completed && context && (
-          <circle
-            cx="10"
-            cy="12"
-            r="2.5"
-            fill={accentColor}
-          />
-        )}
-        {/* Checkmark when completed */}
-        {completed && (
-          <path
-            d="M6.5 11.5L9 14L13.5 9.5"
-            stroke="white"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        )}
-      </svg>
-    </div>
-  )
-}
 
 interface ScheduleItemProps {
   item: TimelineItem
@@ -169,6 +91,10 @@ interface ScheduleItemProps {
    * `ml-[6.5rem]` default was tuned for one layout and was wrong everywhere else.
    */
   belowTitleAccessory?: React.ReactNode
+  /** The signed-in member. Initials are household INFORMATION only when they
+   *  say something the reader doesn't know — someone else's work. Work that
+   *  is yours carries none (Today, 2026-09-21). */
+  currentMemberId?: string | null
 }
 
 // Warm muted color tokens for overdue styling
@@ -216,6 +142,7 @@ export const ScheduleItem = memo(function ScheduleItem({
   spineAbove,
   spineBelow,
   belowTitleAccessory,
+  currentMemberId = null,
 }: ScheduleItemProps) {
   const isMobile = useMobile()
   // Needed-today mark: STATE, so it lives with the title chips. The '...' menu
@@ -269,7 +196,12 @@ export const ScheduleItem = memo(function ScheduleItem({
     || !!(item.isWaiting && item.waitingFor && !item.completed)
     || hasPerPersonItems
     || fromEmail
-  const contextColor = item.context ? DOMAIN_COLORS[item.context]?.dot : undefined
+  /** Who this involves, other than you. Empty for your own work — and for an
+   *  unassigned row, which is everyone's and no one's. */
+  const others = Array.from(new Set([assignedTo, ...assignedToAll].filter(
+    (id): id is string => !!id && id !== currentMemberId,
+  )))
+  const involvesOthers = others.length > 0
 
   const handleCheckboxClick = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -371,7 +303,9 @@ export const ScheduleItem = memo(function ScheduleItem({
     const renderStackedTime = () => {
       if (!timeDisplay) return null
       if (timeDisplay.type === 'allday') {
-        return <span className="text-[11px] font-medium text-neutral-400">All day</span>
+        // An ordinary untimed task has no time to show; the column is simply
+        // empty. Only an all-day EVENT says so.
+        return isTask ? null : <span className="text-[11px] font-medium text-neutral-400">All day</span>
       }
       if (timeDisplay.type === 'range') {
         const [s1, p1] = splitTime(timeDisplay.start)
@@ -398,7 +332,6 @@ export const ScheduleItem = memo(function ScheduleItem({
     // Small context line: category, then location. (Project was the first
     // preference until Projects was hidden — 2026-09-02, see Sidebar.tsx.)
     const contextLabel = (item.category && item.category !== 'task' ? item.category : null) || item.location || null
-    const dotColor = contextColor || null
 
     // Swipe gestures: right → complete, left → edit (open detail panel).
     // The card translates with the finger; coloured action panels behind it
@@ -425,23 +358,45 @@ export const ScheduleItem = memo(function ScheduleItem({
         `}
         ariaPressed={selected}
       >
-        {/* Left time column — stacked */}
-        <div className="w-10 shrink-0 text-[11px] font-medium text-neutral-500 leading-tight tabular-nums text-left">
-          {renderStackedTime()}
-        </div>
+        {/* Left time column — stacked. An untimed task leaves it empty rather
+            than reserving a column of "All day" down the page. */}
+        {(timeDisplay && !(timeDisplay.type === 'allday' && isTask)) && (
+          <div className="w-10 shrink-0 text-[11px] font-medium text-neutral-500 leading-tight tabular-nums text-left">
+            {renderStackedTime()}
+          </div>
+        )}
 
-        {/* Tinted type tile — anchors the row's left side and carries domain
-            color. The parent card owns the completed/skipped opacity-60, so
-            the tile must not re-apply opacity itself. */}
-        <MobileTypeTile
-          type={item.type}
-          context={item.context ?? null}
-        />
+        {/* The one completion control every row shares — a circle you can tap,
+            the same on a phone as on the desktop. It replaced the tinted type
+            tile (Today, 2026-09-21): the tile drew a different glyph per kind
+            of thing, and none of them did anything. A chosen row carries a
+            small dot beside it. */}
+        {/* The cell is the touch target's full 48px both ways. A phone-wide
+            rule makes every block hide its x-overflow, which turns a smaller
+            cell into a scroll container: a 20px-wide one showed half a
+            circle, a 31px-tall one grew a scrollbar beside it. The negative
+            margin keeps the circle itself where the time column's text
+            starts. */}
+        <div className="w-12 h-12 -ml-3 shrink-0 flex items-center justify-center relative">
+          {item.focused && (
+            <span aria-hidden="true" className="absolute left-1 top-1/2 -translate-y-1/2 h-1.5 w-1.5 rounded-full bg-sage-500" />
+          )}
+          {isActionable ? (
+            <TaskCheckbox
+              completed={item.completed}
+              isWaiting={isTask ? item.isWaiting : undefined}
+              onToggleComplete={() => handleCheckboxClick({ stopPropagation: () => {} } as React.MouseEvent)}
+              onToggleWaiting={() => onToggleWaiting?.()}
+              shape="circle"
+            />
+          ) : null}
+        </div>
 
         {/* Title + context line */}
         <div className="flex-1 min-w-0">
-          <div className={`text-[16px] font-semibold leading-snug line-clamp-2 break-words ${item.completed || item.skipped ? 'line-through text-neutral-400' : 'text-neutral-800'}`}>
+          <div className={`text-[16px] font-medium leading-snug line-clamp-2 break-words ${item.completed || item.skipped ? 'line-through text-neutral-400' : 'text-neutral-800'}`}>
             {item.title}
+            {item.focused && <span className="sr-only"> · Chosen for today</span>}
           </div>
           {(contextLabel || isFree) && (
             <div className="flex items-center gap-1.5 text-[12px] text-neutral-500 mt-0.5 truncate">
@@ -452,7 +407,6 @@ export const ScheduleItem = memo(function ScheduleItem({
                   Free
                 </span>
               )}
-              {dotColor && <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: dotColor }} />}
               {contextLabel && <span className="truncate">{contextLabel}</span>}
               {travelLabel && (
                 <span className="shrink-0 inline-flex items-center gap-1 text-neutral-500">
@@ -491,22 +445,26 @@ export const ScheduleItem = memo(function ScheduleItem({
             definition of "marked" as the desktop chip/menu — bare truthiness
             of item.neededOn was a bug already fixed once there. */}
         <div className="flex items-center gap-1 shrink-0">
-          {/* `!item.completed` matches the desktop chip: a done task is not
-              still "needed today", and an amber marker on it is a lie. */}
-          {isTask && onSetNeededToday && item.originalTask && !item.completed && (
+          {/* The needed-today mark is STATE: it shows when set (and clears on
+              tap), never as a grey control on every row. Setting it lives in
+              the row's detail sheet. `!item.completed` matches the desktop
+              chip: a done task is not still "needed today". */}
+          {isTask && onSetNeededToday && item.originalTask && !item.completed && isNeededToday && (
             <button
               type="button"
-              aria-label={isNeededToday ? 'Not needed today' : 'Need today'}
+              aria-label="Not needed today"
               onClick={(e) => {
                 e.stopPropagation()
-                onSetNeededToday(item.originalTask!.id, isNeededToday ? null : (viewedDate ?? new Date()))
+                onSetNeededToday(item.originalTask!.id, null)
               }}
               className="p-1.5 rounded-lg"
             >
-              <AlertCircle className={`w-4 h-4 ${isNeededToday ? 'text-amber-500' : 'text-neutral-300'}`} />
+              <AlertCircle className="w-4 h-4 text-amber-500" />
             </button>
           )}
-          {familyMembers.length > 0 && onAssignAll ? (
+          {/* Initials only when the row involves someone else; your own work
+              says nothing about who. The sheet still assigns. */}
+          {!involvesOthers ? null : familyMembers.length > 0 && onAssignAll ? (
             <div onClick={(e) => e.stopPropagation()}>
               <MultiAssigneeDropdown
                 members={familyMembers}
@@ -621,7 +579,10 @@ export const ScheduleItem = memo(function ScheduleItem({
                     </span>
                   ) : timeDisplay ? (
                     timeDisplay.type === 'allday' ? (
-                      <span className="text-neutral-400">All day</span>
+                      // An untimed task's column is empty on the page (the
+                      // label is for a reader who can't see the column);
+                      // an all-day event still says so.
+                      <span className={isTask ? 'sr-only' : 'text-neutral-400'}>All day</span>
                     ) : timeDisplay.type === 'range' ? (
                       <div className="leading-tight text-neutral-400">
                         <div>{timeDisplay.start}</div>
@@ -645,7 +606,7 @@ export const ScheduleItem = memo(function ScheduleItem({
               </span>
             ) : timeDisplay ? (
               timeDisplay.type === 'allday' ? (
-                <span className="text-neutral-400">All day</span>
+                <span className={isTask ? 'sr-only' : 'text-neutral-400'}>All day</span>
               ) : timeDisplay.type === 'range' ? (
                 <div className="leading-tight text-neutral-400">
                   <div>{timeDisplay.start}</div>
@@ -670,23 +631,23 @@ export const ScheduleItem = memo(function ScheduleItem({
           <div className={`w-5 shrink-0 flex items-center justify-center relative z-[1] ${
             hasBelowTitleContent ? `self-start ${variant === 'minimal' ? '' : 'mt-0.5'}` : ''
           }`}>
+            {/* Chosen for today: a small dot beside the circle, and a label a
+                screen reader hears. Nothing louder — the row is already on
+                the page because you chose it. */}
+            {item.focused && (
+              <>
+                <span aria-hidden="true" className="absolute -left-3 top-1/2 -translate-y-1/2 h-1.5 w-1.5 rounded-full bg-sage-500" />
+                <span className="sr-only">Chosen for today</span>
+              </>
+            )}
             {isEvent && isFree ? (
               // Free events carry no check circle — nothing for a parent to do.
               null
-            ) : isEvent ? (
-              // Calendar events show a calendar icon with the context color
-              <button
-                onClick={handleCheckboxClick}
-                className="touch-target flex items-center justify-center -m-2 p-2 rounded-full"
-                aria-label={item.completed ? 'Mark incomplete' : 'Mark complete'}
-              >
-                <CalendarIcon
-                  context={item.context}
-                  completed={item.completed}
-                />
-              </button>
             ) : isActionable ? (
-              // Tasks and routines show checkbox (square for tasks, circle for routines)
+              // One completion control for every kind of row — task, routine
+              // or event — a plain circle. The square-for-tasks shape and the
+              // domain-tinted ring made the circles the loudest things on the
+              // page; the kind of thing a row is belongs to its details.
               <TaskCheckbox
                 completed={item.completed}
                 isWaiting={isTask ? item.isWaiting : undefined}
@@ -696,7 +657,7 @@ export const ScheduleItem = memo(function ScheduleItem({
                   onToggleWaiting?.()
                 }}
                 isRoutine={isRoutine}
-                contextColor={contextColor}
+                shape="circle"
               />
             ) : null}
           </div>
@@ -864,6 +825,7 @@ export const ScheduleItem = memo(function ScheduleItem({
           familyMembers={familyMembers}
           assignedTo={assignedTo}
           assignedToAll={assignedToAll}
+          involvesOthers={involvesOthers}
         />
       </div>
 

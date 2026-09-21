@@ -184,9 +184,9 @@ list may *not* draw) → `splitTodayJournal` → three sections.
 | Section | Membership |
 | --- | --- |
 | **Tasks** | Every untimed task dated today (scheduling is sufficient — Scott, 2026-09-21), plus any task chosen for today from another list, plus chosen untimed routine occurrences and routines pinned to the timeline. Chosen rows lead the list; focus never gates visibility. |
-| **Still ahead** | The timed rows, cut by **index**: the first row that hasn't ended yet, and everything after it. Not a per-row time test. |
+| **Schedule** (was "Still ahead" until 2026-09-21) | The timed rows, cut by **index**: the first row that hasn't ended yet, and everything after it. Not a per-row time test. |
 | **Earlier today** | The complementary prefix. A row with no start time can never land here. |
-| **All-day events** | Peeled out of `allday` and drawn above Still ahead — they never enter Tasks. |
+| **All-day events** | Peeled out of `allday` and drawn above the Schedule's timed rows under one "All day" label — they never enter Tasks. |
 | **"N need a decision"** | `slipped` (dated > 2 days ago) + `stranded-week` (stale `week_start`) + `aging-month` (created > 45 days) + `aging-inbox` (created > 14 days), plus unreviewed email captures and suggestions. `someday` and `quarter` are deliberately excluded. |
 | **Review footer** | Overdue within the 2-day grace window, minus anything chosen for today. No counts, ever. |
 

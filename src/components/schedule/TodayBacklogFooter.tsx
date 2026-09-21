@@ -1,11 +1,6 @@
 import { ChevronRight } from 'lucide-react'
-import type { AttentionItem } from '@/lib/today/attention'
 
 interface TodayBacklogFooterProps {
-  /** Incomplete carried-over tasks (falls back to total while all complete). */
-  carriedCount: number
-  attentionItems: AttentionItem[]
-  onReview: () => void
   /**
    * Opens the "New from email" review sheet. Passed only while the household
    * actually has unreviewed email captures — the link's presence IS the
@@ -16,10 +11,14 @@ interface TodayBacklogFooterProps {
 }
 
 /**
- * The quiet door back to the backlog: one muted "Review" link closing Today.
+ * The foot of Today. The "Review" door that stood here moved into the page's
+ * ⋯ menu (2026-09-21): unfinished work has ONE entrance on the page — the
+ * Planning panel's fold — and the morning review ritual is reached from the
+ * menu, not from a second line under the day. Only "New from email" remains,
+ * because it is perishable: a one-time look at what arrived on its own.
  *
- * It used to be a readout — "8 carried over · 24 need attention · oldest 248
- * days" — with the carried-over segment expanding its own list inline. That
+ * History, kept for the reasoning. It used to be a readout — "8 carried over
+ * · 24 need attention · oldest 248 days" — with the carried-over segment expanding its own list inline. That
  * scoreboard was the problem. The counts never drained fast enough to feel
  * like progress, "oldest 248 days" read as an accusation rather than a
  * pointer, and the inline list re-imported the backlog into the day. Today is
@@ -33,13 +32,13 @@ interface TodayBacklogFooterProps {
  * no dismiss control, and it is one row at three items and one row at three
  * hundred. What changed is that the row no longer says how bad it is.
  *
- * Both populations now resolve in one place: ReviewDrawer already merges
- * carried-over + attention, deduped and oldest-first, so "Review" is the only
- * handle either set needs.
+ * Both populations resolve in one place: ReviewDrawer merges carried-over +
+ * attention, deduped and oldest-first; the ⋯ menu's "Review carried-over
+ * work" is the handle, and TodayInvariant.test.tsx pins that it is there at
+ * 5 items and at 500 alike.
  */
-export function TodayBacklogFooter({ carriedCount, attentionItems, onReview, onReviewEmail }: TodayBacklogFooterProps) {
-  const hasBacklog = carriedCount > 0 || attentionItems.length > 0
-  if (!hasBacklog && !onReviewEmail) return null
+export function TodayBacklogFooter({ onReviewEmail }: TodayBacklogFooterProps) {
+  if (!onReviewEmail) return null
 
   return (
     // mb-[7.5rem] (mobile only): this is the last block on the mobile Today
@@ -60,16 +59,6 @@ export function TodayBacklogFooter({ carriedCount, attentionItems, onReview, onR
           className="ml-auto flex items-center gap-0.5 text-[13px] text-neutral-400 hover:text-neutral-600 transition-colors"
         >
           New from email
-          <ChevronRight className="w-3.5 h-3.5 shrink-0" />
-        </button>
-      )}
-      {hasBacklog && (
-        <button
-          type="button"
-          onClick={onReview}
-          className={`${onReviewEmail ? '' : 'ml-auto '}flex items-center gap-0.5 text-[13px] text-neutral-400 hover:text-neutral-600 transition-colors`}
-        >
-          Review
           <ChevronRight className="w-3.5 h-3.5 shrink-0" />
         </button>
       )}
