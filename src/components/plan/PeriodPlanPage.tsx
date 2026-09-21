@@ -483,7 +483,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   const [saveError, setSaveError] = useState(false)
   useEffect(() => {
     setSessionOpen(false); setJustSaved(false); setSaveError(false)
-    setDraft(sessionEnabled ? readDraft(userId, periodYmd) : null)
+    setDraft(sessionEnabled ? readDraft(userId, 'month', periodYmd) : null)
   }, [periodYmd, sessionEnabled, userId])
 
   const back = useMemo(() => (sessionEnabled ? lookBackRows(layered, bounds.prev, meId) : { finished: [], open: [] }), [sessionEnabled, layered, bounds.prev, meId])
@@ -515,8 +515,8 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   // writes blank reflections over them (review 2026-09-21).
   const startSession = useCallback(() => {
     if (!sessionReady) return
-    setDraft((d) => d ?? readDraft(userId, periodYmd)
-      ?? { ...emptyDraft(bounds.start, bounds.prev), wentWell: myNotes?.wentWell ?? '', didnt: myNotes?.didnt ?? '' })
+    setDraft((d) => d ?? readDraft(userId, 'month', periodYmd)
+      ?? { ...emptyDraft('month', bounds.start, bounds.prev), wentWell: myNotes?.wentWell ?? '', didnt: myNotes?.didnt ?? '' })
     setSaveError(false)
     setJustSaved(false)
     setSessionOpen(true)
@@ -549,7 +549,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
     if (periodYmdRef.current !== savingYmd) {
       // The page moved to another period mid-save: the result belongs to the
       // period it was saving, in storage only — never on the page now shown.
-      if (result.ok) clearDraft(userId, savingYmd)
+      if (result.ok) clearDraft(userId, 'month', savingYmd)
       else writeDraft(userId, result.remaining)
       return
     }
@@ -560,7 +560,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
       setSaveError(true)
       return
     }
-    clearDraft(userId, periodYmd)
+    clearDraft(userId, 'month', periodYmd)
     setDraft(null)
     setSaveError(false)
     setSessionOpen(false)

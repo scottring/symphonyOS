@@ -296,6 +296,23 @@ describe('planning writes report real outcomes', () => {
     expect(kept).toBeUndefined()
   })
 
+  it('keepForward carries a task from last week into this week: last week carried, this week open, month untouched', async () => {
+    const last = new Date(2026, 8, 27), week = new Date(2026, 9, 4), month = new Date(2026, 9, 1)
+    db.seed('tasks', dbTaskRow({ id: 't1', title: 'Plumber', bucket: 'week', week_start: localYmd(last), month_start: localYmd(month), completed: false }))
+    db.seed('task_commitments', { id: 'c1', task_id: 't1', level: 'week', period_start: localYmd(last), status: 'open', carried_to: null, ended_at: null })
+    db.seed('task_commitments', { id: 'c2', task_id: 't1', level: 'month', period_start: localYmd(month), status: 'open', carried_to: null, ended_at: null })
+    const { result } = renderHook(() => useSupabaseTasks())
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    let id: string | undefined
+    await act(async () => { id = await result.current.keepForward('t1', { weekStart: week }, last) })
+    expect(id).toBe('t1')
+    const cs = db.rows('task_commitments').filter((c) => c.task_id === 't1')
+    expect(cs.find((c) => c.level === 'week' && c.period_start === localYmd(last))).toMatchObject({ status: 'carried', carried_to: localYmd(week) })
+    expect(cs.find((c) => c.level === 'week' && c.period_start === localYmd(week))).toMatchObject({ status: 'open' })
+    expect(cs.find((c) => c.level === 'month')).toMatchObject({ status: 'open' })
+    expect(db.rows('tasks').find((r) => r.id === 't1')).toMatchObject({ bucket: 'week', week_start: localYmd(week) })
+  })
+
   it('addTask with a given id creates exactly one row, and a retry returns the same id without a second insert', async () => {
     const { result } = await mountWith([])
     const id = '11111111-1111-4111-8111-111111111111'
@@ -527,7 +544,7 @@ describe('a planning session against the real writers', () => {
     it(`goal Keep + step Drop (${order}): the step stays dropped, its sibling is carried, and the summary said so`, async () => {
       const { result } = await mountWith([goal(), step('s1', 'Buy chairs'), step('s2', 'Paint')])
       const verdicts: SessionDraft['verdicts'] = order === 'goal first' ? { g1: 'keep', s1: 'drop' } : { s1: 'drop', g1: 'keep' }
-      const d: SessionDraft = { ...emptyDraft(oct, sep), verdicts }
+      const d: SessionDraft = { ...emptyDraft('month', oct, sep), verdicts }
       const lines = summarize(d, { open: lookBackRows(result.current.tasks, sep, null).open, above: [], aboveGoals: [], periodLabel: 'October', prevLabel: 'September' })
       expect(await run(result, d)).toBe(true)
       expect(lines.find((l) => l.title === 'Buy chairs')!.destination).toBe('Dropped from September · the task is kept')
@@ -541,7 +558,7 @@ describe('a planning session against the real writers', () => {
 
   it('a step marked Done or Someday under a kept goal is not carried', async () => {
     const { result } = await mountWith([goal(), step('s1', 'Buy chairs'), step('s2', 'Paint')])
-    expect(await run(result, { ...emptyDraft(oct, sep), verdicts: { g1: 'keep', s1: 'done', s2: 'someday' } })).toBe(true)
+    expect(await run(result, { ...emptyDraft('month', oct, sep), verdicts: { g1: 'keep', s1: 'done', s2: 'someday' } })).toBe(true)
     expect(status('s1', '2026-10-01')).toBeUndefined()
     expect(status('s2', '2026-10-01')).toBeUndefined()
     expect(db.rows('tasks').find((r) => r.id === 's1')!.completed).toBe(true)

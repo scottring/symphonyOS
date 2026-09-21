@@ -48,7 +48,7 @@ describe('summarize', () => {
     const photos = t({ id: 'p', title: 'Photos' })
     const saw = t({ id: 's', title: 'Tile saw' })
     const bids = t({ id: 'b', title: 'Get three bids', bucket: 'quarter' })
-    const d = { ...emptyDraft(oct, sep),
+    const d = { ...emptyDraft('month', oct, sep),
       verdicts: { g: 'keep-action' as const, l: 'keep' as const, p: 'drop' as const },
       actionTitles: { g: 'Book a PT evaluation' },
       newGoals: [{ id: 'n1', title: 'Three bids in hand', linkId: 'sg' }],
@@ -81,21 +81,21 @@ describe('summarize — steps under a kept goal', () => {
 
   it('a step with no verdict of its own is carried with its goal', () => {
     for (const v of ['keep', 'keep-action'] as const) {
-      const d = { ...emptyDraft(oct, sep), verdicts: { g: v }, actionTitles: { g: 'Sand' } }
+      const d = { ...emptyDraft('month', oct, sep), verdicts: { g: v }, actionTitles: { g: 'Sand' } }
       expect(summarize(d, ctx).find((l) => l.title === 'Buy chairs')).toEqual({ title: 'Buy chairs', destination: 'October tasks · carried with Porch' })
     }
   })
 
   it('a step with its own Drop stays dropped, whatever order the verdicts were clicked in', () => {
     for (const verdicts of [{ g: 'keep' as const, s1: 'drop' as const }, { s1: 'drop' as const, g: 'keep' as const }]) {
-      const lines = summarize({ ...emptyDraft(oct, sep), verdicts }, ctx)
+      const lines = summarize({ ...emptyDraft('month', oct, sep), verdicts }, ctx)
       expect(lines.find((l) => l.title === 'Buy chairs')!.destination).toBe('Dropped from September · the task is kept')
       expect(lines.find((l) => l.title === 'Paint')!.destination).toBe('October tasks · carried with Porch')
     }
   })
 
   it('a step under a goal that is NOT kept is left open', () => {
-    const lines = summarize({ ...emptyDraft(oct, sep), verdicts: { g: 'drop' } }, ctx)
+    const lines = summarize({ ...emptyDraft('month', oct, sep), verdicts: { g: 'drop' } }, ctx)
     expect(lines.find((l) => l.title === 'Buy chairs')!.destination).toBe('Left open in September')
   })
 })
@@ -105,7 +105,7 @@ describe('summarize — steps under a kept goal', () => {
 describe('pruneDraft', () => {
   const a = t({ id: 'a', title: 'A' }), b = t({ id: 'b', title: 'B', bucket: 'quarter' })
   it('drops verdicts and season pulls for rows no longer shown, keeps everything else', () => {
-    const d = { ...emptyDraft(oct, sep),
+    const d = { ...emptyDraft('month', oct, sep),
       verdicts: { a: 'keep' as const, gone: 'drop' as const, g2: 'keep-action' as const },
       actionTitles: { gone: 'x', g2: 'y' }, actionIds: { gone: 'X', g2: 'Y' }, keptAlready: ['gone'],
       takenFromAbove: ['b', 'hidden'], newGoals: [{ id: 'n', title: 'N', context: null }], wentWell: 'w' }
@@ -122,7 +122,7 @@ describe('pruneDraft', () => {
   it('keeps a goal already carried by a half-finished save, so its next action is still written and shown', () => {
     // The goal landed in October (no longer open in September); its action did not.
     const g = t({ id: 'g', title: 'Strength', isGoal: true })
-    const d = { ...emptyDraft(oct, sep), verdicts: { g: 'keep-action' as const }, actionTitles: { g: 'Book PT' }, actionIds: { g: 'A1' }, keptAlready: ['g'] }
+    const d = { ...emptyDraft('month', oct, sep), verdicts: { g: 'keep-action' as const }, actionTitles: { g: 'Book PT' }, actionIds: { g: 'A1' }, keptAlready: ['g'] }
     const p = pruneDraft(d, { open: [], above: [], current: [g] })
     expect(p).toEqual(d)
     expect(summarize(p, { open: [], above: [], aboveGoals: [], current: [g], periodLabel: 'October', prevLabel: 'September' })).toEqual([
@@ -139,21 +139,21 @@ describe('pruneDraft', () => {
     const g = t({ id: 'g', title: 'Porch', isGoal: true })
     const step = t({ id: 's', title: 'Buy chairs', goalTaskId: 'g', commitments: [{ level: 'month', periodStart: sep, status: 'open' }] })
     for (const d of [
-      { ...emptyDraft(oct, sep), verdicts: { g: 'keep' as const } },
-      { ...emptyDraft(oct, sep), verdicts: { g: 'keep-action' as const }, actionTitles: { g: 'Sand' }, actionIds: { g: 'A1' } },
+      { ...emptyDraft('month', oct, sep), verdicts: { g: 'keep' as const } },
+      { ...emptyDraft('month', oct, sep), verdicts: { g: 'keep-action' as const }, actionTitles: { g: 'Sand' }, actionIds: { g: 'A1' } },
     ]) {
       const p = pruneDraft(d, { open: [step], above: [], current: [g] })
       expect(p).toBe(d)
       const lines = summarize(p, { open: [step], above: [], aboveGoals: [], current: [g], periodLabel: 'October', prevLabel: 'September' })
       expect(lines.find((l) => l.title === 'Buy chairs')!.destination).toBe('October tasks · carried with Porch')
     }
-    const d = { ...emptyDraft(oct, sep), verdicts: { g: 'keep-action' as const }, actionTitles: { g: 'Sand' }, actionIds: { g: 'A1' } }
+    const d = { ...emptyDraft('month', oct, sep), verdicts: { g: 'keep-action' as const }, actionTitles: { g: 'Sand' }, actionIds: { g: 'A1' } }
     expect(summarize(d, { open: [step], above: [], aboveGoals: [], current: [g], periodLabel: 'October', prevLabel: 'September' }))
       .toContainEqual({ title: 'Sand', destination: 'October tasks · new next action toward Porch' })
   })
 
   it('returns the same draft object when nothing is stale', () => {
-    const d = { ...emptyDraft(oct, sep), verdicts: { a: 'keep' as const } }
+    const d = { ...emptyDraft('month', oct, sep), verdicts: { a: 'keep' as const } }
     expect(pruneDraft(d, { open: [a], above: [] })).toBe(d)
   })
 })
@@ -174,15 +174,15 @@ describe('steps a kept goal carries that the view does not show', () => {
 
   it('adds one line for a KEPT goal that carries hidden steps', () => {
     const ctx = { open: [goal, shown], above: [], aboveGoals: [], hiddenStepGoals: new Set(['g']), periodLabel: 'October', prevLabel: 'September' }
-    expect(summarize({ ...emptyDraft(oct, sep), verdicts: { g: 'keep' } }, ctx))
+    expect(summarize({ ...emptyDraft('month', oct, sep), verdicts: { g: 'keep' } }, ctx))
       .toContainEqual({ title: 'Porch also carries steps not shown in this view', destination: 'October tasks · carried with Porch' })
-    expect(summarize({ ...emptyDraft(oct, sep), verdicts: { g: 'drop' } }, ctx).some((l) => /not shown/.test(l.title))).toBe(false)
+    expect(summarize({ ...emptyDraft('month', oct, sep), verdicts: { g: 'drop' } }, ctx).some((l) => /not shown/.test(l.title))).toBe(false)
   })
 })
 
 describe('isEmptyDraft', () => {
   it('is true for a fresh draft and false once anything is decided or written', () => {
-    const d = emptyDraft(oct, sep)
+    const d = emptyDraft('month', oct, sep)
     expect(isEmptyDraft(d)).toBe(true)
     expect(isEmptyDraft({ ...d, wentWell: 'x' })).toBe(false)
     expect(isEmptyDraft({ ...d, verdicts: { a: 'keep' } })).toBe(false)

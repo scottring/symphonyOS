@@ -6,7 +6,7 @@ import { PlanSession } from './PlanSession'
 
 const t = (over: Partial<Task>): Task => ({ id: 'x', title: 'X', completed: false, createdAt: new Date(), updatedAt: new Date(), bucket: 'month', ...over } as Task)
 function setup(over: Partial<Parameters<typeof PlanSession>[0]> = {}) {
-  let draft: SessionDraft = emptyDraft(new Date(2026, 9, 1), new Date(2026, 8, 1))
+  let draft: SessionDraft = emptyDraft('month', new Date(2026, 9, 1), new Date(2026, 8, 1))
   const onChange = vi.fn((d: SessionDraft) => { draft = d; view.rerender(el()) })
   const onSave = vi.fn(async () => {})
   const el = () => (

@@ -1498,7 +1498,9 @@ export function useSupabaseTasks() {
    * goal of the work that defines it, and re-deciding four steps one at a time
    * is deliberation the cadence already spent on the goal itself. Finished
    * steps stay behind: they are September's record. So does a step already
-   * placed lower, which is carrying on on its own.
+   * placed lower, which is carrying on on its own. A week Keep of a goal is
+   * not a case — goals are not on weeks — so this branch is gated on
+   * `task.isGoal` and simply is not reached for a week.
    *
    * `from` names the period being carried FROM. Without it planKeep carries
    * the LATEST open commitment — after a half-failed Keep that is the
@@ -1508,11 +1510,11 @@ export function useSupabaseTasks() {
    * Returns the task's own id (callers used to receive the copy's), or
    * undefined unless the task AND every step it carries were written.
    */
-  const keepForward = useCallback(async (id: string, period: { monthStart?: Date; seasonStart?: Date }, from?: Date): Promise<string | undefined> => {
+  const keepForward = useCallback(async (id: string, period: { weekStart?: Date; monthStart?: Date; seasonStart?: Date }, from?: Date): Promise<string | undefined> => {
     const task = findTaskById(id)
     if (!task) return undefined
-    const level: PlacementLevel | null = period.monthStart ? 'month' : period.seasonStart ? 'season' : null
-    const to = period.monthStart ?? period.seasonStart
+    const level: PlacementLevel | null = period.weekStart ? 'week' : period.monthStart ? 'month' : period.seasonStart ? 'season' : null
+    const to = period.weekStart ?? period.monthStart ?? period.seasonStart
     if (!level || !to) return undefined
 
     const keepOne = async (taskId: string) => {

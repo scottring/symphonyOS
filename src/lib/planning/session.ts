@@ -16,8 +16,9 @@ export type Verdict = 'keep' | 'keep-action' | 'done' | 'someday' | 'drop'
  *  for a task toward a goal, the goal's — fixed when it is added, never the
  *  domain in view at Save (final review I4). Absent on a draft from before. */
 export interface NewItem { id: string; title: string; linkId?: string; context?: DomainId | null }
+export type SessionLevel = 'month' | 'week'
 export interface SessionDraft {
-  level: 'month'; periodStart: string; prevStart: string
+  level: SessionLevel; periodStart: string; prevStart: string
   verdicts: Record<string, Verdict>
   actionTitles: Record<string, string>
   wentWell: string; didnt: string
@@ -29,8 +30,8 @@ export interface SessionDraft {
 }
 export interface SummaryLine { title: string; destination: string }
 
-export function emptyDraft(periodStart: Date, prevStart: Date): SessionDraft {
-  return { level: 'month', periodStart: localYmd(periodStart), prevStart: localYmd(prevStart),
+export function emptyDraft(level: SessionLevel, periodStart: Date, prevStart: Date): SessionDraft {
+  return { level, periodStart: localYmd(periodStart), prevStart: localYmd(prevStart),
     verdicts: {}, actionTitles: {}, wentWell: '', didnt: '', newGoals: [], newTasks: [], takenFromAbove: [], keptAlready: [], actionIds: {}, created: [] }
 }
 

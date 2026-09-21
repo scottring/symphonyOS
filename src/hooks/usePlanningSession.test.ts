@@ -14,13 +14,24 @@ vi.mock('@/lib/supabase', () => ({
 }))
 vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 'u1' } }) }))
 
-import { usePlanningSession, monthToken } from './usePlanningSession'
+import { usePlanningSession, monthToken, weekToken } from './usePlanningSession'
 
 describe('usePlanningSession', () => {
   beforeEach(() => { rows.length = 0; upsert.mockClear(); orderImpl = async () => ({ data: rows, error: null }) })
 
   it('builds the month token the cadence code uses', () => {
     expect(monthToken(new Date(2026, 9, 1))).toBe('2026-10')
+  })
+
+  it('builds the week token from the week\'s first day', () => {
+    expect(weekToken(new Date(2026, 9, 4))).toBe('2026-10-4')
+  })
+
+  it('reads and saves a weekly session under the weekly horizon', async () => {
+    const { result } = renderHook(() => usePlanningSession('weekly', '2026-10-4'))
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    await act(async () => { await result.current.save({ wentWell: 'w', didnt: 'd' }) })
+    expect(upsert).toHaveBeenCalledWith(expect.objectContaining({ horizon: 'weekly', period_token: '2026-10-4' }), expect.anything())
   })
 
   it('reads the latest saved session visible to me, from anyone in the household', async () => {
