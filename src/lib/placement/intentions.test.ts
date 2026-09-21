@@ -239,3 +239,33 @@ describe('planKeep without a source period', () => {
     ])
   })
 })
+
+// A season commitment can start mid-season (a row committed to the season on
+// Oct 15). The season list matches by RANGE (committedTo); Keep and Drop, given
+// the season's start, must find the same commitment (final review I3).
+describe('season Keep and Drop match the season by range', () => {
+  const fall = new Date(2026, 8, 1), winter = new Date(2026, 11, 1), midFall = new Date(2026, 9, 15)
+  const row = (): Task => ({
+    id: 't1', title: 'Bids', completed: false, createdAt: fall, updatedAt: fall,
+    bucket: 'quarter', seasonStart: midFall, commitments: [{ level: 'season', periodStart: midFall, status: 'open' }],
+  } as Task)
+
+  it('Keep from the season start carries the mid-season commitment', () => {
+    const plan = planKeep(row(), 'season', winter, fall, DEFAULT_SEASONS)
+    expect(plan.commitmentOps).toEqual([
+      { op: 'carry', level: 'season', periodStart: midFall, to: winter },
+      { op: 'ensure', level: 'season', periodStart: winter },
+    ])
+  })
+
+  it('Drop from the season start removes the mid-season commitment', () => {
+    const plan = planDropCommitment(row(), 'season', fall, DEFAULT_SEASONS)
+    expect(plan.commitmentOps).toEqual([{ op: 'remove', level: 'season', periodStart: midFall }])
+    expect(plan.local.commitments?.[0].status).toBe('removed')
+  })
+
+  it('a month still matches its exact start only', () => {
+    const t = { ...row(), bucket: 'month', commitments: [{ level: 'month', periodStart: new Date(2026, 8, 15), status: 'open' }] } as Task
+    expect(planDropCommitment(t, 'month', fall).commitmentOps).toEqual([])
+  })
+})

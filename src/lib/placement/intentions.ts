@@ -17,7 +17,7 @@
 // commitment and focus rows to write, and the optimistic local task.
 
 import type { Task, TaskBucket, PlacementLevel, TaskCommitment, TaskFocusEntry } from '@/types/task'
-import type { Seasons } from '@/lib/cadence/seasons'
+import { readSeasons, seasonEndFor, type Seasons } from '@/lib/cadence/seasons'
 import { localYmd } from '@/lib/cadence/config'
 import { deriveCache, openCommitment, periodStartFor, levelForBucket, isLowerLevel } from './model'
 
@@ -56,6 +56,20 @@ export function isPlacementWrite(updates: Partial<Task>): boolean {
 }
 
 function sameDay(a: Date, b: Date): boolean { return localYmd(a) === localYmd(b) }
+
+/**
+ * The commitment a look-back verdict is about: the one for the period starting
+ * at `from`. A month or week is one exact start. A SEASON is matched by range,
+ * as the season list itself matches (committedTo): a row committed mid-season
+ * is on that season's list, and Keep or Drop from the list must find it
+ * (final review I3). An open one wins over an ended one in the same period.
+ */
+function sourceCommitment(list: readonly TaskCommitment[], level: PlacementLevel, from: Date, seasons: Seasons): TaskCommitment | undefined {
+  const end = level === 'season' ? seasonEndFor(from, seasons) : null
+  const inPeriod = list.filter((c) => c.level === level && c.status !== 'removed'
+    && (end ? c.periodStart >= from && c.periodStart < end : sameDay(c.periodStart, from)))
+  return inPeriod.find((c) => c.status === 'open') ?? inPeriod[0]
+}
 
 function stampFor(level: PlacementLevel, updates: Partial<Task>): Date | undefined {
   return level === 'week' ? updates.weekStart : level === 'month' ? updates.monthStart : updates.seasonStart
@@ -251,14 +265,14 @@ export function planPlacement(input: Task, updates: Partial<Task>, ctx: Placemen
  * period's commitment is marked carried (→ "Carried to October"); the next
  * period gets an open one. Nothing else on the row moves.
  */
-export function planKeep(input: Task, level: PlacementLevel, to: Date, from?: Date): PlacementPlan {
+export function planKeep(input: Task, level: PlacementLevel, to: Date, from?: Date, seasons: Seasons = readSeasons()): PlacementPlan {
   const task: Task = { ...input, commitments: bootstrapCommitments(input) }
   const commitmentOps: CommitmentOp[] = []
   // No stated source: the latest open commitment that is NOT the destination.
   // After a half-failed Keep the destination is already open (the mirror
   // trigger opened it) and would otherwise be "carried" into itself.
   const current = from
-    ? (task.commitments ?? []).find((c) => c.level === level && sameDay(c.periodStart, from))
+    ? sourceCommitment(task.commitments ?? [], level, from, seasons)
     : openCommitment({ commitments: (task.commitments ?? []).filter((c) => !sameDay(c.periodStart, to)) }, level)
   if (current && current.status === 'open') {
     commitmentOps.push({ op: 'carry', level, periodStart: current.periodStart, to })
@@ -272,13 +286,14 @@ export function planKeep(input: Task, level: PlacementLevel, to: Date, from?: Da
 
 /**
  * The look-back's Drop: THIS period's commitment ends. The task itself stays,
- * with every other commitment, its notes and its history. It is still
- * reachable from search and from Inbox › Expired if nothing else holds it.
+ * with every other commitment, its notes and its history. If nothing else
+ * holds it, it returns to the Inbox (the derived bucket is 'inbox'); it is
+ * still reachable from search.
  */
-export function planDropCommitment(input: Task, level: PlacementLevel, periodStart: Date): PlacementPlan {
+export function planDropCommitment(input: Task, level: PlacementLevel, periodStart: Date, seasons: Seasons = readSeasons()): PlacementPlan {
   const task: Task = { ...input, commitments: bootstrapCommitments(input) }
   const commitmentOps: CommitmentOp[] = []
-  const current = (task.commitments ?? []).find((c) => c.level === level && sameDay(c.periodStart, periodStart))
+  const current = sourceCommitment(task.commitments ?? [], level, periodStart, seasons)
   if (current && current.status === 'open') commitmentOps.push({ op: 'remove', level, periodStart: current.periodStart })
   const commitments = applyCommitmentOps(task.commitments, commitmentOps)
   const merged: Task = { ...task, commitments }
