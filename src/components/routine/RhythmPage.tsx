@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { scopeForDomain } from '@/lib/scope'
 import { useEscapeKey } from '@/hooks/useEscapeKey'
 import { MastheadCard } from '@/components/layout/MastheadCard'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
@@ -551,8 +552,8 @@ function makeNewRoutineDraft(): Routine {
     default_assignee: null, assigned_to: null, assigned_to_all: null,
     visibility: 'active', paused_until: null, recurrence_pattern: { type: 'daily' },
     time_of_day: null, raw_input: null, show_on_timeline: true, context: null,
-    // Display only — the real scope is derived on insert (scopeForDomain).
-    scope: 'individual',
+    // Display only — the real scope is derived again on insert.
+    scope: scopeForDomain(null, null, null),
     created_at: now, updated_at: now,
   }
 }
