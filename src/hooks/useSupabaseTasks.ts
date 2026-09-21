@@ -12,7 +12,7 @@ import { localYmd, parseLocalYmd } from '@/lib/cadence/config'
 import { monthStartOf, isPlacement } from '@/lib/planning/periodPlacement'
 import { stepsThatCarryForward } from '@/lib/planning/goalSteps'
 import { readSeasons, seasonStartFor } from '@/lib/cadence/seasons'
-import { planPlacement, planKeep, commitmentRow, type PlacementPlan } from '@/lib/placement/intentions'
+import { planPlacement, planKeep, planDropCommitment, commitmentRow, type PlacementPlan } from '@/lib/placement/intentions'
 import type { TaskCommitment, TaskFocusEntry, PlacementLevel } from '@/types/task'
 import { onRealtimeResumed } from '@/lib/realtime/keepAlive'
 import { announceToBuyChanged } from '@/lib/lists/toBuy'
@@ -1393,6 +1393,30 @@ export function useSupabaseTasks() {
     return task.id
   }, [findTaskById, writePlacementOps])
 
+  /** Drop: end ONE period commitment. The task is kept (spec: guided planning). */
+  const dropCommitment = useCallback(async (id: string, level: PlacementLevel, periodStart: Date): Promise<boolean> => {
+    const task = findTaskById(id)
+    if (!task) return false
+    const plan = planDropCommitment(task, level, periodStart)
+    if (plan.commitmentOps.length === 0) return true
+    const before = task
+    setTasks((prev) => prev.map((x) => (x.id === id ? plan.local : x)))
+    const { error } = await supabase.from('tasks').update({
+      bucket: plan.row.bucket,
+      week_start: plan.row.weekStart ? localYmd(plan.row.weekStart) : null,
+      month_start: plan.row.monthStart ? localYmd(plan.row.monthStart) : null,
+      season_start: plan.row.seasonStart ? localYmd(plan.row.seasonStart) : null,
+    }).eq('id', id)
+    if (error) {
+      setTasks((prev) => prev.map((x) => (x.id === id ? before : x)))
+      showToast("Couldn't drop it from that period", 'error', 4000)
+      return false
+    }
+    await writePlacementOps(id, plan)
+    announceLocalWrite({ kind: 'update', task: plan.local })
+    return true
+  }, [findTaskById, writePlacementOps])
+
   const updateTask = useCallback(async (id: string, updates: Partial<Task>) => {
     logger.debug('[updateTask] Called with:', { id, updates })
     const task = findTaskById(id)
@@ -2108,5 +2132,5 @@ export function useSupabaseTasks() {
   }, [tasks])
 
   // `userId`: whose focus rows count on a day (task_focus is per person).
-  return { tasks, loading, error, refetch, addTask, addSubtask, addPrepTask, getPrepTasks, getLinkedTasks, toggleTask, toggleWaiting, deleteTask, updateTask, updateTasksBulk, updateTaskOrders, scheduleTask, pushTask, setBucket, setGoal, keepForward, userId: user?.id ?? null }
+  return { tasks, loading, error, refetch, addTask, addSubtask, addPrepTask, getPrepTasks, getLinkedTasks, toggleTask, toggleWaiting, deleteTask, updateTask, updateTasksBulk, updateTaskOrders, scheduleTask, pushTask, setBucket, setGoal, keepForward, dropCommitment, userId: user?.id ?? null }
 }

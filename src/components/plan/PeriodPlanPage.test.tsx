@@ -22,7 +22,7 @@ const goal = (over: Partial<Goal>): Goal => ({
 const state: { tasks: Task[]; goals: Goal[]; loading: boolean } = { tasks: [], goals: [], loading: false }
 const hook = {
   toggleTask: vi.fn(), deleteTask: vi.fn(), updateTask: vi.fn(), updateTasksBulk: vi.fn(),
-  addTask: vi.fn(async () => 'new'), setGoal: vi.fn(), pushTask: vi.fn(), keepForward: vi.fn(),
+  addTask: vi.fn(async () => 'new'), setGoal: vi.fn(), pushTask: vi.fn(), keepForward: vi.fn(), dropCommitment: vi.fn(),
 }
 vi.mock('@/hooks/useSupabaseTasks', () => ({ useSupabaseTasks: () => ({ tasks: state.tasks, loading: state.loading, ...hook }) }))
 vi.mock('@/hooks/useGatedTaskActions', () => ({
@@ -418,7 +418,9 @@ describe('PeriodPlanPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Someday Call the plumber' }))
     expect(hook.updateTask).toHaveBeenCalledWith(open.id, { bucket: 'someday', scheduledFor: undefined, isAllDay: undefined })
     fireEvent.click(screen.getByRole('button', { name: 'Drop Call the plumber' }))
-    expect(hook.deleteTask).toHaveBeenCalledWith(open.id)
+    // A past month's Drop ends that month's commitment; the task is kept.
+    expect(hook.dropCommitment).toHaveBeenCalledWith(open.id, 'month', lastMonth)
+    expect(hook.deleteTask).not.toHaveBeenCalled()
     // no composer on a past period
     expect(screen.queryByLabelText('Add to this month')).not.toBeInTheDocument()
   })
@@ -479,6 +481,14 @@ describe('PeriodPlanPage', () => {
     expect(within(rail).getByText('Run a half marathon')).toBeInTheDocument()
     // the year rail is look-only
     expect(within(rail).queryByRole('button', { name: /Add to/ })).not.toBeInTheDocument()
+  })
+
+  it('Drop on a past month ends that month\'s commitment and never deletes the task', async () => {
+    state.tasks = [task({ id: 'p1', title: 'Sort photos', monthStart: lastMonth, commitments: [{ level: 'month', periodStart: lastMonth, status: 'open' }] })]
+    renderPageAt('month', `/month?start=${lastMonth.getFullYear()}-${String(lastMonth.getMonth() + 1).padStart(2, '0')}-01`)
+    fireEvent.click(await screen.findByRole('button', { name: /drop/i }))
+    expect(hook.dropCommitment).toHaveBeenCalledWith('p1', 'month', expect.any(Date))
+    expect(hook.deleteTask).not.toHaveBeenCalled()
   })
 })
 

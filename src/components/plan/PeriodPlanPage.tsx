@@ -104,7 +104,7 @@ function goalRow(g: Goal): PlanRowModel {
 
 function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   const navigate = useNavigate()
-  const { tasks, loading, toggleTask, deleteTask, updateTask, updateTasksBulk, addTask, setGoal, pushTask, keepForward } = useSupabaseTasks()
+  const { tasks, loading, toggleTask, deleteTask, updateTask, updateTasksBulk, addTask, setGoal, pushTask, keepForward, dropCommitment } = useSupabaseTasks()
   const gated = useGatedTaskActions({ updateTask, pushTask, updateTasksBulk }, (id) => tasks.find((t) => t.id === id))
   const { layers, soleDomain } = useDomain()
   const { getCurrentUserMember } = useFamilyMembers()
@@ -240,7 +240,13 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
       return
     }
     if (action === 'complete') await toggleTask(row.id)
-    else if (action === 'drop') await deleteTask(row.id)
+    else if (action === 'drop') {
+      // A past period's Drop ends THAT period's commitment; the task lives on
+      // (guided planning spec). In the current period Drop still means
+      // "delete this row I just wrote".
+      if (isPast && level !== 'year') await dropCommitment(row.id, level === 'month' ? 'month' : 'season', bounds.start)
+      else await deleteTask(row.id)
+    }
     else if (action === 'someday') await gated.updateTask(row.id, { bucket: 'someday', scheduledFor: undefined, isAllDay: undefined })
     else if (action === 'make-goal') await setGoal(row.id, true)
     else if (action === 'make-task') await setGoal(row.id, false)
@@ -261,7 +267,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
       await planActions.chooseTaskDay(row.id, new Date())
     }
     else if (action === 'under-goal') setPickingGoalFor(row.id)
-  }, [goals, updateGoal, deleteGoal, addGoal, bounds.next, toggleTask, deleteTask, gated, setGoal, keepForward, level, planActions])
+  }, [goals, updateGoal, deleteGoal, addGoal, bounds.next, bounds.start, isPast, toggleTask, deleteTask, dropCommitment, gated, setGoal, keepForward, level, planActions])
 
   // The rail's one verb: take an open season task into this month — the same
   // row gains a month commitment; the season keeps it, marked "→ September".

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { planPlacement, planKeep, applyCommitmentOps, isPlacementWrite } from './intentions'
+import { planPlacement, planKeep, planDropCommitment, applyCommitmentOps, isPlacementWrite } from './intentions'
 import type { Task, TaskCommitment } from '@/types/task'
 import { DEFAULT_SEASONS } from '@/lib/cadence/seasons'
 
@@ -200,5 +200,30 @@ describe('applyCommitmentOps', () => {
   it('ensure reopens a removed commitment rather than duplicating it', () => {
     const out = applyCommitmentOps([c('week', WK20, 'removed')], [{ op: 'ensure', level: 'week', periodStart: WK20 }])
     expect(out).toEqual([c('week', WK20)])
+  })
+})
+
+describe('planDropCommitment', () => {
+  const sep = new Date(2026, 8, 1)
+  const oct = new Date(2026, 9, 1)
+  const base = (commitments: Task['commitments']): Task => ({
+    id: 't1', title: 'Sort photos', completed: false, createdAt: new Date(2026, 8, 2), updatedAt: new Date(2026, 8, 2),
+    bucket: 'month', monthStart: sep, commitments,
+  } as Task)
+
+  it('removes only that period\'s open commitment and keeps the task', () => {
+    const plan = planDropCommitment(base([
+      { level: 'month', periodStart: sep, status: 'open' },
+      { level: 'season', periodStart: new Date(2026, 8, 22), status: 'open' },
+    ]), 'month', sep)
+    expect(plan.commitmentOps).toEqual([{ op: 'remove', level: 'month', periodStart: sep }])
+    expect(plan.local.commitments?.find((c) => c.level === 'month')?.status).toBe('removed')
+    expect(plan.local.commitments?.find((c) => c.level === 'season')?.status).toBe('open')
+    expect(plan.row).not.toHaveProperty('completed')
+  })
+
+  it('is a no-op when that period has no open commitment', () => {
+    const plan = planDropCommitment(base([{ level: 'month', periodStart: sep, status: 'carried', carriedTo: oct }]), 'month', sep)
+    expect(plan.commitmentOps).toEqual([])
   })
 })

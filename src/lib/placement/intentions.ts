@@ -267,6 +267,22 @@ export function planKeep(input: Task, level: PlacementLevel, to: Date, from?: Da
   return { row: { ...cache }, commitmentOps, focusOps: [], local: { ...merged, ...cache } }
 }
 
+/**
+ * The look-back's Drop: THIS period's commitment ends. The task itself stays,
+ * with every other commitment, its notes and its history. It is still
+ * reachable from search and from Inbox › Expired if nothing else holds it.
+ */
+export function planDropCommitment(input: Task, level: PlacementLevel, periodStart: Date): PlacementPlan {
+  const task: Task = { ...input, commitments: bootstrapCommitments(input) }
+  const commitmentOps: CommitmentOp[] = []
+  const current = (task.commitments ?? []).find((c) => c.level === level && sameDay(c.periodStart, periodStart))
+  if (current && current.status === 'open') commitmentOps.push({ op: 'remove', level, periodStart: current.periodStart })
+  const commitments = applyCommitmentOps(task.commitments, commitmentOps)
+  const merged: Task = { ...task, commitments }
+  const cache = deriveCache(merged)
+  return { row: { ...cache }, commitmentOps, focusOps: [], local: { ...merged, ...cache } }
+}
+
 /** The DB row shape for a commitment op (task_commitments). */
 export function commitmentRow(taskId: string, op: CommitmentOp): { task_id: string; level: PlacementLevel; period_start: string } {
   return { task_id: taskId, level: op.level, period_start: localYmd(op.periodStart) }
