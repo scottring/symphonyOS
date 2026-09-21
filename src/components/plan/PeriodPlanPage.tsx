@@ -34,12 +34,11 @@ import { GoalsProvider, useGoalsContext } from '@/contexts/GoalsContext'
 import { filterTasksForLayers, matchesLayers } from '@/lib/today/domainFilter'
 import { placementFateOf, lowerPlacement } from '@/lib/placement/model'
 import { splitGoalRows } from '@/lib/planning/goalSteps'
-import { parseLocalYmd, localYmd } from '@/lib/cadence/config'
-import { useAuth } from '@/hooks/useAuth'
-import { usePlanningSession, monthToken } from '@/hooks/usePlanningSession'
-import { lookBackRows, emptyDraft, isEmptyDraft, pruneDraft, goalsWithHiddenSteps, type SessionDraft } from '@/lib/planning/session'
-import { readDraft, writeDraft, clearDraft } from '@/lib/planning/sessionDraft'
-import { applySession } from '@/lib/planning/applySession'
+import { parseLocalYmd } from '@/lib/cadence/config'
+import { monthToken } from '@/hooks/usePlanningSession'
+import { usePlanSessionHost } from '@/hooks/usePlanSessionHost'
+import { lookBackRows, isEmptyDraft, goalsWithHiddenSteps } from '@/lib/planning/session'
+import type { DomainId } from '@/lib/domains'
 import { formatShortDate } from '@/lib/dateHelpers'
 import {
   periodBounds, isCurrentPeriod, selectPeriodTasks, selectDatedInPeriod, actionsFor, railLevel, lowerLevel, planningPeriod,
@@ -464,27 +463,8 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   // ── Guided planning (Phase 1: month) ────────────────────────────────────
   // Season and year pages carry no session yet; everything below is inert
   // there (sessionEnabled false).
-  const { user } = useAuth()
-  const userId = user?.id ?? null
   const sessionEnabled = level === 'month'
   const token = monthToken(bounds.start)
-  const { saved: savedSession, mine: myNotes, loading: sessionLoading, loadedToken, error: sessionReadError, reload: reloadSession, save: saveSession } = usePlanningSession('monthly', token)
-  // Open only on THIS month's loaded record — never on a blank or a neighbour's (review 2026-09-21).
-  const sessionReady = loadedToken === token
-  const periodYmd = localYmd(bounds.start)
-  // The period on screen NOW — a save that finishes after the page has moved
-  // on must not land its result on the new period (final review M2).
-  const periodYmdRef = useRef(periodYmd)
-  periodYmdRef.current = periodYmd
-  const [draft, setDraft] = useState<SessionDraft | null>(null)
-  const [sessionOpen, setSessionOpen] = useState(false)
-  const [savingSession, setSavingSession] = useState(false)
-  const [justSaved, setJustSaved] = useState(false)
-  const [saveError, setSaveError] = useState(false)
-  useEffect(() => {
-    setSessionOpen(false); setJustSaved(false); setSaveError(false)
-    setDraft(sessionEnabled ? readDraft(userId, 'month', periodYmd) : null)
-  }, [periodYmd, sessionEnabled, userId])
 
   const back = useMemo(() => (sessionEnabled ? lookBackRows(layered, bounds.prev, meId) : { finished: [], open: [] }), [sessionEnabled, layered, bounds.prev, meId])
   // Keep carries a goal's steps from the UNFILTERED list (keepForward); the
@@ -502,70 +482,35 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
     : []), [sessionEnabled, above, layered, aboveStart, seasons, today, meId])
   const aboveItems = useMemo(() => aboveTasks.filter((t) => !t.isGoal), [aboveTasks])
   const aboveGoalItems = useMemo(() => aboveTasks.filter((t) => t.isGoal), [aboveTasks])
-  // The draft as the session can show it — the ONE draft both the summary and
-  // Save read, so a stale entry (a deleted task, a row the domain in view
-  // hides) is neither written nor an invisible blocker (final review I2).
-  // Not while the lists are still loading: an empty list is not "all gone".
-  const shownDraft = useMemo(
-    () => (draft && !loading && !seasonsLoading ? pruneDraft(draft, { open: back.open, above: aboveItems, current: currentMonth }) : draft),
-    [draft, loading, seasonsLoading, back.open, aboveItems, currentMonth],
-  )
 
-  // Reopening a saved plan starts from MY saved notes, so saving again never
-  // writes blank reflections over them (review 2026-09-21).
-  const startSession = useCallback(() => {
-    if (!sessionReady) return
-    setDraft((d) => d ?? readDraft(userId, 'month', periodYmd)
-      ?? { ...emptyDraft('month', bounds.start, bounds.prev), wentWell: myNotes?.wentWell ?? '', didnt: myNotes?.didnt ?? '' })
-    setSaveError(false)
-    setJustSaved(false)
-    setSessionOpen(true)
-  }, [sessionReady, userId, periodYmd, bounds.start, bounds.prev, myNotes])
-  const changeDraft = useCallback((d: SessionDraft) => { setDraft(d); writeDraft(userId, d) }, [userId])
-  const closeSession = useCallback(() => setSessionOpen(false), [])
-  const saveDraft = useCallback(async () => {
-    if (!shownDraft) return
-    const savingYmd = periodYmd
-    setSavingSession(true)
-    const result = await applySession(shownDraft, {
-      keep: async (id, periodStart, prevStart) => !!(await keepForward(id, { monthStart: periodStart }, prevStart)),
-      // Each item's OWN domain, recorded when it was planned — never the one in view now (I4).
-      addTask: (title, o) => addTask(title, undefined, undefined, undefined, {
-        id: o.id, bucket: 'month', monthStart: o.periodStart, isGoal: o.isGoal, goalTaskId: o.goalTaskId, context: o.context,
+  const sessionWriters = useMemo(() => ({
+    keep: async (id: string, periodStart: Date, prevStart: Date) => !!(await keepForward(id, { monthStart: periodStart }, prevStart)),
+    // Each item's OWN domain, recorded when it was planned — never the one in view now (I4).
+    addTask: (title: string, o: { id: string; periodStart: Date; day?: Date; isGoal?: boolean; goalTaskId?: string; context: DomainId | null }) =>
+      addTask(title, undefined, undefined, undefined, {
+        id: o.id, bucket: 'month' as const, monthStart: o.periodStart, isGoal: o.isGoal, goalTaskId: o.goalTaskId, context: o.context,
       }),
-      contextOf: (id) => tasks.find((t) => t.id === id)?.context ?? null,
-      // Everything a tick does (subtasks, waiting/discussion, a linked list item), and reports whether it wrote.
-      complete: (id) => completeTask(id),
-      someday: (id) => gated.updateTask(id, { bucket: 'someday', scheduledFor: undefined, isAllDay: undefined }),
-      drop: (id, prevStart) => dropCommitment(id, 'month', prevStart),
-      // The SESSION's month — pushTask(id, 'month') would target the month
-      // containing today, i.e. September while planning October.
-      takeInto: (id, periodStart) => gated.updateTask(id, { bucket: 'month', monthStart: periodStart }),
-      saveSession: (notes) => saveSession(notes),
-    }, (id) => !!tasks.find((t) => t.id === id)?.completed,
-    // Persist after EVERY write, so a reload mid-save resumes from here.
-    (remaining) => writeDraft(userId, remaining))
-    setSavingSession(false)
-    if (periodYmdRef.current !== savingYmd) {
-      // The page moved to another period mid-save: the result belongs to the
-      // period it was saving, in storage only — never on the page now shown.
-      if (result.ok) clearDraft(userId, 'month', savingYmd)
-      else writeDraft(userId, result.remaining)
-      return
-    }
-    if (!result.ok) {
-      // Keep only what did not write — Save again retries exactly that.
-      setDraft(result.remaining)
-      writeDraft(userId, result.remaining)
-      setSaveError(true)
-      return
-    }
-    clearDraft(userId, 'month', periodYmd)
-    setDraft(null)
-    setSaveError(false)
-    setSessionOpen(false)
-    setJustSaved(true)
-  }, [shownDraft, keepForward, addTask, completeTask, gated, dropCommitment, saveSession, tasks, userId, periodYmd])
+    contextOf: (id: string) => tasks.find((t) => t.id === id)?.context ?? null,
+    // Everything a tick does (subtasks, waiting/discussion, a linked list item), and reports whether it wrote.
+    complete: (id: string) => completeTask(id),
+    someday: (id: string) => gated.updateTask(id, { bucket: 'someday', scheduledFor: undefined, isAllDay: undefined }),
+    drop: (id: string, prevStart: Date) => dropCommitment(id, 'month', prevStart),
+    // The SESSION's month — pushTask(id, 'month') would target the month
+    // containing today, i.e. September while planning October.
+    takeInto: (id: string, periodStart: Date) => gated.updateTask(id, { bucket: 'month', monthStart: periodStart }),
+  }), [keepForward, addTask, tasks, completeTask, gated, dropCommitment])
+
+  const host = usePlanSessionHost({
+    enabled: sessionEnabled, level: 'month', horizon: 'monthly', token,
+    periodStart: bounds.start, prevStart: bounds.prev,
+    listsLoading: loading || seasonsLoading,
+    back, current: currentMonth, above: aboveItems,
+    writers: sessionWriters,
+    isCompleted: (id) => !!tasks.find((t) => t.id === id)?.completed,
+  })
+  const { saved: savedSession, loading: sessionLoading, error: sessionReadError, reload: reloadSession } = host.session
+  const { sessionReady, draft, shownDraft, sessionOpen, savingSession, justSaved, saveError,
+    startSession, changeDraft, closeSession, saveDraft } = host
 
   return (
     <div {...monthDrop} className={`${PAGE_COLUMN_WIDE} py-6${planDropOver ? ' reference-list-drop' : ''}`}>
