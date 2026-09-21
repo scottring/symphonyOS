@@ -46,6 +46,25 @@ describe('WeekPlanHost', () => {
     expect(screen.getByText('the days')).toBeInTheDocument()
   })
 
+  it('a new task whose day could not be written is not reported as saved', async () => {
+    // Two steps make one decision: on the week AND on its day. If the day is
+    // lost the step is unwritten, so it stays in the draft for the next Save.
+    hook.updateTask.mockResolvedValueOnce(false)
+    mount()
+    fireEvent.click(screen.getByRole('button', { name: 'Plan this week' }))
+    fireEvent.click(screen.getByRole('button', { name: /next: plan this week/i }))
+    fireEvent.change(screen.getByLabelText(/new task for this week/i), { target: { value: 'Call the plumber' } })
+    fireEvent.change(screen.getByLabelText(/day for this task/i), { target: { value: '2026-10-06' } })
+    fireEvent.click(screen.getByRole('button', { name: /add task/i }))
+    fireEvent.click(screen.getByRole('button', { name: /next: save/i }))
+    fireEvent.click(screen.getByRole('button', { name: /save this week/i }))
+    await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent(/didn't save/i))
+    expect(screen.queryByText(/the week is planned/i)).toBeNull()
+    expect(session.save).not.toHaveBeenCalled()
+    // Still on the summary, still offered for the next Save.
+    expect(screen.getByText('Call the plumber')).toBeInTheDocument()
+  })
+
   it('shows Planned <date> and "Review the plan" once a session is saved', () => {
     session.saved = { at: new Date(2026, 9, 4), authorId: 'u2', notes: {} }
     mount()

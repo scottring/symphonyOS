@@ -121,8 +121,6 @@ interface WeekViewV2Props {
   /** Journal (default) or Schedule. When omitted the view keeps its own and
    *  draws its own switch; HomeView passes it so the switch sits by the dates. */
   mode?: WeekMode
-  /** Opens the week session; passed through to WeekList's empty state and link. */
-  onPlanWeek?: () => void
 }
 
 export type WeekMode = 'journal' | 'schedule'

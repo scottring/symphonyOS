@@ -78,7 +78,11 @@ export function WeekPlanHost({ tasks, weekStart, meId, isPast, children }: {
       const id = await addTask(title, undefined, undefined, undefined, {
         id: o.id, bucket: 'week' as const, weekStart: o.periodStart, goalTaskId: o.goalTaskId, context: o.context,
       })
-      if (id && o.day) await gated.updateTask(id, { scheduledFor: o.day, isAllDay: true })
+      if (!id) return undefined
+      // A lost day is a lost decision: report the step as unwritten so it stays
+      // in the draft and Save retries it. The create is idempotent (the id rides
+      // the INSERT), so the retry finds the row and applies the day to it.
+      if (o.day && !(await gated.updateTask(id, { scheduledFor: o.day, isAllDay: true }))) return undefined
       return id
     },
     contextOf: (id: string) => tasks.find((t) => t.id === id)?.context ?? null,
