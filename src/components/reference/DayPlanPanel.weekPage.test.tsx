@@ -1,10 +1,12 @@
-import { describe, it, expect, afterEach, vi } from 'vitest'
+import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest'
 import { render, screen, cleanup, fireEvent } from '@testing-library/react'
 import { DayPlanPanel, PLAN_GROUP_CAP, planningSubtitle, routinePlaceDay, type DayPlanPanelActions } from './DayPlanPanel'
 import type { DayPlan, DayPlanEntry } from '@/lib/today/dayPlan'
 import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
 
 afterEach(cleanup)
+// The unfinished fold remembers itself for the session; each test starts closed.
+beforeEach(() => { try { sessionStorage.clear() } catch { /* jsdom */ } })
 
 const actions: DayPlanPanelActions = {
   choose: () => {}, unchoose: () => {}, complete: () => {},
@@ -18,6 +20,7 @@ function entry(n: number, context?: string): DayPlanEntry {
 function plan(toPlanCount: number, month: DayPlanEntry[] = []): DayPlan {
   return {
     toPlan: Array.from({ length: toPlanCount }, (_, i) => entry(i + 1)),
+    unfinished: [],
     carried: [], scheduled: [], available: [], week: [],
     month,
     counts: { scheduled: 0, available: 0 },
@@ -102,6 +105,66 @@ describe('DayPlanPanel — the Planning panel', () => {
     expect(routinePlaceDay(today, null)).toBe(today)
     expect(routinePlaceDay(today, current)).toBe(today)
     expect(routinePlaceDay(today, next)).toBe(next)
+  })
+
+  // Scott, 2026-09-21 evening: the default list is the week's own work. An
+  // empty week says so and offers Add task; it is never filled with backlog.
+  it('an empty week says "Nothing waiting to be scheduled this week" and offers Add task', () => {
+    const addTask = vi.fn()
+    const p = plan(0)
+    p.unfinished = [entry(9, 'Originally Saturday')]
+    render(<DayPlanPanel plan={p} day={day} actions={{ ...actions, addTask }} weekPage={thisWeek} />)
+    expect(screen.getByText('Nothing waiting to be scheduled this week.')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Add task' }))
+    expect(addTask).toHaveBeenCalled()
+    // The backlog did not flood in.
+    expect(screen.queryByText('Item 9')).not.toBeInTheDocument()
+  })
+
+  it('"Include unfinished from earlier" expands older work on request, in the order given (newest first), without a count', () => {
+    const p = plan(1)
+    p.unfinished = [
+      { ...entry(8, 'Originally Saturday'), group: 'unfinished' },
+      { ...entry(7, 'Originally Friday'), group: 'unfinished' },
+      { ...entry(6, 'Planned for Sep 6 – Sep 12'), group: 'unfinished' },
+    ]
+    render(<DayPlanPanel plan={p} day={day} actions={actions} weekPage={thisWeek} />)
+    const toggle = screen.getByRole('button', { name: 'Include unfinished from earlier' })
+    expect(toggle).toHaveAttribute('aria-expanded', 'false')
+    expect(toggle.textContent).not.toMatch(/\d/)
+    expect(screen.queryByText('Item 8')).not.toBeInTheDocument()
+    fireEvent.click(toggle)
+    expect(screen.getByRole('button', { name: 'Hide unfinished from earlier' })).toHaveAttribute('aria-expanded', 'true')
+    const rows = screen.getAllByText(/^Item [678]$/).map((el) => el.textContent)
+    expect(rows).toEqual(['Item 8', 'Item 7', 'Item 6'])
+  })
+
+  it('no toggle at all when nothing is unfinished', () => {
+    render(<DayPlanPanel plan={plan(1)} day={day} actions={actions} weekPage={thisWeek} />)
+    expect(screen.queryByRole('button', { name: /unfinished from earlier/ })).not.toBeInTheDocument()
+  })
+
+  // Precise verbs: "Plan for this week" re-commits (undated), "Schedule…" gives
+  // a date, "Someday" defers by name. Nothing is called "let go".
+  it('an unfinished row offers Plan for this week, Schedule… and Someday', () => {
+    const commit = vi.fn(); const someday = vi.fn()
+    const p = plan(0)
+    p.unfinished = [{ ...entry(5, 'Originally Saturday'), group: 'unfinished' }]
+    render(<DayPlanPanel plan={p} day={day} actions={{ ...actions, commit, someday }} weekPage={thisWeek} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Include unfinished from earlier' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Plan Item 5 for this week' }))
+    expect(commit).toHaveBeenCalledWith(expect.objectContaining({ id: 'w5' }), 'week')
+    expect(screen.getByRole('button', { name: 'Schedule Item 5' })).toHaveTextContent('Schedule…')
+    fireEvent.click(screen.getByRole('button', { name: 'Move Item 5 to Someday' }))
+    expect(someday).toHaveBeenCalledWith(expect.objectContaining({ id: 'w5' }))
+    expect(screen.queryByRole('button', { name: /let go/i })).toBeNull()
+    expect(screen.queryByRole('button', { name: 'Plan Item 5 for today' })).toBeNull()
+  })
+
+  it("a week row's date control is called Schedule", () => {
+    render(<DayPlanPanel plan={plan(1)} day={day} actions={actions} weekPage={thisWeek} />)
+    expect(screen.getByRole('button', { name: 'Schedule Item 1' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Plan Item 1 for today' })).toBeInTheDocument()
   })
 
   it('says what it is planning: the week on screen, or the day', () => {

@@ -47,7 +47,7 @@ import { routineTemporalLabel } from '@/lib/planning/routineTemporal'
 import { formatWeekRangeShort } from '@/lib/dateHelpers'
 import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
 
-export type DayPlanGroup = 'carried' | 'scheduled' | 'available' | 'week' | 'month' | 'plan'
+export type DayPlanGroup = 'carried' | 'scheduled' | 'available' | 'week' | 'month' | 'plan' | 'unfinished'
 
 export interface DayPlanEntry {
   /** Stable React key and drag id: 'task:<id>' or 'routine:<entityId>'. */
@@ -91,11 +91,15 @@ export interface DayPlan {
   /** Chosen tasks that no other main-list pool reaches (week/month/inbox rows,
    *  or dated to another day) — the main list adds these. */
   plannedExtraTasks: Task[]
-  /** The ONE planning list (Scott, 2026-09-21): everything that answers "what
-   *  might I put on a day?" — unfinished work, this week's undated tasks and
-   *  routines with no day yet — each once, with a line of context. Once a row
-   *  has a day it leaves this list and appears on that day. */
+  /** The week's list (Scott, 2026-09-21): what is waiting to be scheduled in
+   *  the week being planned — its undated tasks and routines with no day yet —
+   *  each once, with a line of context. Once a row has a day it leaves this
+   *  list and appears on that day. Unfinished work from earlier is NOT here. */
   toPlan: DayPlanEntry[]
+  /** Unfinished work from earlier — misses inside the 14-day window and week
+   *  placements left behind — newest first, shown only on request ("Include
+   *  unfinished from earlier"). It never floods the week's list. */
+  unfinished: DayPlanEntry[]
   /** Open misses older than the 14-day window: not on the list (Inbox ›
    *  Expired holds them), but the panel says they exist. Count only. */
   olderUnfinished: number
@@ -147,22 +151,21 @@ export function weekListEntries(tasks: Task[], match: Match, weekStart: Date, ym
 }
 
 /**
- * The ONE planning list (Scott, 2026-09-21). Three kinds of row answer the
- * same practical question — "what might I put on a day?" — and used to be
- * three or four lists you had to understand first:
+ * The week's list (Scott, 2026-09-21). Two kinds of row answer the same
+ * practical question — "what is waiting to be scheduled this week?":
  *
- *   unfinished   a dated task whose day passed (14-day window, the missed-
- *                placement rule) or a week placement left behind by an
- *                earlier week — "Originally Saturday" / "Planned for Sep 6–12"
  *   this week    this week's undated tasks — "September plan" when the row
  *                also sits on a month list, otherwise no line at all
  *   routines     flexible occurrences for the day ("Weekly routine") and
  *                weekly routines with no day of their own ("Weekly · no set day")
  *
  * Each action appears once. A row with a day is on that day, not here; a row
- * chosen for the viewed day is on the main list, not here. Order: unfinished
- * first (oldest first — the thing ignored longest asks first), then this
- * week, then routines.
+ * chosen for the viewed day is on the main list, not here.
+ *
+ * Unfinished work from earlier used to lead this list, oldest first. On a
+ * real account that was 23 rows of what didn't happen above 0 rows of what
+ * was intended (2026-09-21): the list said "triage" where it should say
+ * "choose". It now has its own list, `unfinishedEntries`, opened on request.
  */
 export function toPlanEntries(args: {
   tasks: Task[]
@@ -170,7 +173,6 @@ export function toPlanEntries(args: {
   weekStart: Date
   ymd: string
   userId?: string | null
-  now: Date
   /** The day's flexible routine occurrences (selectDayPlan's `available`). */
   available: DayPlanEntry[]
   /** Weekly routines with no day of their own (definition rows). */
@@ -178,7 +180,7 @@ export function toPlanEntries(args: {
   /** The visible routines by id, for the occurrence rows' cadence line. */
   routineById: Map<string, Routine>
 }): DayPlanEntry[] {
-  const { tasks, match, weekStart, ymd, userId, now } = args
+  const { tasks, match, weekStart, ymd, userId } = args
   const seen = new Set<string>()
   const out: DayPlanEntry[] = []
   const push = (e: DayPlanEntry) => { if (!seen.has(e.key)) { seen.add(e.key); out.push(e) } }
@@ -187,35 +189,16 @@ export function toPlanEntries(args: {
     const m = openCommitment(t, 'month')?.periodStart ?? (t.bucket === 'month' ? t.monthStart : undefined)
     return m ? `${m.toLocaleDateString('en-US', { month: 'long' })} plan` : undefined
   }
-  const taskEntry = (t: Task, context: string | undefined): DayPlanEntry => ({
-    key: `task:${t.id}`, kind: 'task', id: t.id, title: t.title, completed: t.completed,
-    planned: chosen(t), group: 'plan', task: t, context,
-  })
 
-  // Unfinished, oldest first. A row chosen for the day is on the main list,
+  // This week's undated tasks. A row chosen for the day is on the main list,
   // with Unfocus on its own row (Scott, 2026-09-21) — not kept here as a
   // duplicate just to undo the choice.
-  //
-  // "Left behind" is judged against the REAL current week, never the week on
-  // screen: paging /week forward must not relabel this week's open placements
-  // as unfinished (the old shelf anchored on today for the same reason).
-  const currentWeek = weekStartAnchor(now, readCadenceConfig().weekStartsOn)
-  const missed = flatten(tasks)
-    .filter((t) => !t.completed && match(t.assignedTo, t.assignedToAll) && !chosen(t) && isRecentMiss(t.scheduledFor, t.completed, now))
-  const leftBehind = selectStaleWeekPlacements(tasks, currentWeek, match).filter((t) => !t.scheduledFor && !chosen(t))
-  const unfinished = [...missed, ...leftBehind]
-    .sort((a, b) => (a.scheduledFor ?? a.weekStart ?? a.createdAt).getTime() - (b.scheduledFor ?? b.weekStart ?? b.createdAt).getTime())
-  for (const t of unfinished) {
-    const context = t.scheduledFor
-      ? `Originally ${missedWhen(t.scheduledFor, now, 'long')}`
-      : t.weekStart ? `Planned for ${formatWeekRangeShort(t.weekStart)}` : 'Unfinished'
-    push(taskEntry(t, context))
-  }
-
-  // This week's undated tasks.
   for (const t of selectHorizonPool(tasks, 'week', match, weekStart)) {
     if (t.scheduledFor || chosen(t)) continue
-    push(taskEntry(t, monthName(t)))
+    push({
+      key: `task:${t.id}`, kind: 'task', id: t.id, title: t.title, completed: t.completed,
+      planned: false, group: 'plan', task: t, context: monthName(t),
+    })
   }
 
   // Routines: the day's flexible occurrences, then routines with no day at all.
@@ -231,6 +214,46 @@ export function toPlanEntries(args: {
     })
   }
   return out
+}
+
+/**
+ * Unfinished work from earlier, on request: a dated task whose day passed
+ * inside the 14-day window (the missed-placement rule) — "Originally Saturday"
+ * — or a week placement left behind by an earlier week — "Planned for
+ * Sep 6–12". NEWEST first: what slipped on Saturday is more actionable than
+ * what slipped two weeks ago. Misses older than the window are not here
+ * (Inbox › Expired holds them). A row chosen for the viewed day is on the
+ * main list, not here.
+ *
+ * "Left behind" is judged against the REAL current week, never the week on
+ * screen: paging /week forward must not relabel this week's open placements
+ * as unfinished (the old shelf anchored on today for the same reason).
+ */
+export function unfinishedEntries(args: {
+  tasks: Task[]
+  match: Match
+  ymd: string
+  userId?: string | null
+  now: Date
+}): DayPlanEntry[] {
+  const { tasks, match, ymd, userId, now } = args
+  const chosen = (t: Task) => isFocused(t, userId, ymd)
+  const currentWeek = weekStartAnchor(now, readCadenceConfig().weekStartsOn)
+  const missed = flatten(tasks)
+    .filter((t) => !t.completed && match(t.assignedTo, t.assignedToAll) && !chosen(t) && isRecentMiss(t.scheduledFor, t.completed, now))
+  const leftBehind = selectStaleWeekPlacements(tasks, currentWeek, match).filter((t) => !t.scheduledFor && !chosen(t))
+  const seen = new Set<string>()
+  const when = (t: Task) => (t.scheduledFor ?? t.weekStart ?? t.createdAt).getTime()
+  return [...missed, ...leftBehind]
+    .filter((t) => { if (seen.has(t.id)) return false; seen.add(t.id); return true })
+    .sort((a, b) => when(b) - when(a))
+    .map((t) => ({
+      key: `task:${t.id}`, kind: 'task' as const, id: t.id, title: t.title, completed: t.completed,
+      planned: false, group: 'unfinished' as const, task: t,
+      context: t.scheduledFor
+        ? `Originally ${missedWhen(t.scheduledFor, now, 'long')}`
+        : t.weekStart ? `Planned for ${formatWeekRangeShort(t.weekStart)}` : 'Unfinished',
+    }))
 }
 
 /** "Daily routine" / "Weekly routine" / "Monthly routine" — the cadence, not the rule. */
@@ -327,8 +350,9 @@ export function selectDayPlan(input: DayPlanInput): DayPlan {
   const now = input.now ?? new Date()
   const toPlan = toPlanEntries({
     tasks: input.tasks, match, weekStart: input.weekStart, ymd, userId: input.userId,
-    now, available, unhomed: input.unhomedRoutines ?? [], routineById: byId,
+    available, unhomed: input.unhomedRoutines ?? [], routineById: byId,
   })
+  const unfinished = unfinishedEntries({ tasks: input.tasks, match, ymd, userId: input.userId, now })
   const olderUnfinished = flatten(input.tasks).filter((t) =>
     !t.completed && match(t.assignedTo, t.assignedToAll) && !chosen(t)
     && isMissedPlacement(t.scheduledFor, t.completed, now) && !isRecentMiss(t.scheduledFor, t.completed, now)).length
@@ -336,6 +360,7 @@ export function selectDayPlan(input: DayPlanInput): DayPlan {
   const outstanding = (e: DayPlanEntry) => !e.completed && !e.planned
   return {
     toPlan,
+    unfinished,
     olderUnfinished,
     carried,
     scheduled,

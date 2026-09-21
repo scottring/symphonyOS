@@ -41,6 +41,7 @@ import { Eye, EyeOff, Repeat, Binoculars, Printer, GripVertical, Moon, Sparkles,
 import { splitTodayJournal } from '@/lib/today/journalSplit'
 import { panelActionsFor, planSummary } from '@/components/reference/DayPlanPanel'
 import { PlanningSheet } from '@/components/reference/PlanningSheet'
+import { writeUnfinishedOpen } from '@/lib/planningPanelSignal'
 import { unhomedRoutines } from '@/lib/week/unhomedRoutines'
 import { useWeekInstances } from '@/components/home/week/useWeekInstances'
 import { useReferenceLists } from '@/components/reference/ReferenceListsContext'
@@ -1290,18 +1291,12 @@ export function TodayView({
           the full width instead of a 320px empty gutter. */}
       <div className={`px-3 md:px-0 ${decisionCount > 0 ? '@[62rem]:grid @[62rem]:grid-cols-[minmax(0,1fr)_320px] @[62rem]:items-start @[62rem]:gap-8' : ''}`}>
         <main className="min-w-0">
-          {decisionCount > 0 && (
-            <button
-              type="button"
-              onClick={() => navigate('/inbox')}
-              className="mb-5 flex w-full items-center justify-between gap-3 border-l-2 border-accent-500 bg-accent-50/40 px-3 py-3 text-left text-sm text-neutral-800 transition-colors hover:bg-accent-50 @[62rem]:hidden"
-            >
-              <span className="min-w-0 truncate">
-                {decisionCount} need{decisionCount === 1 ? 's' : ''} a decision
-              </span>
-              <ArrowRight className="h-4 w-4 shrink-0 text-neutral-400" />
-            </button>
-          )}
+          {/* The "N need a decision" banner that stood here at narrow widths
+              is gone (Scott, 2026-09-21): a count on Today is a scoreboard,
+              and it sent you to the Inbox. Unfinished work now has one quiet
+              line below Tasks — "Review unfinished work" — that opens the
+              Planning panel with that list expanded; email captures keep the
+              footer's "New from email", suggestions the ⋯ menu. */}
       {/* The agenda is part of the page, with no enclosing card. */}
       <div ref={listRef} {...agendaDrop} className={`daybook-agenda${agendaDropOver ? ' daybook-agenda-drop' : ''}`}>
         {/* Needed today — hand-curated, silent when empty. Placed first so a
@@ -1397,17 +1392,17 @@ export function TodayView({
             )}
           </section>
 
-          {/* Yesterday's unfinished commitments (the two-day grace window)
-              live in the planning panel's "Carried over" group, beside the
-              other things you might choose — Today's main area is the day's
-              scheduled work and chosen focus (Scott, 2026-09-21). They stay
-              findable: one quiet line, only while the panel is closed, no
-              count, no duplicate rows, nothing promoted into today. */}
-          {data.isToday && data.overdueTasks.length > 0 && !(usePin ? todayPinned : planOpenInline) && (
+          {/* Unfinished work from earlier (the 14-day window) lives in the
+              planning panel behind "Include unfinished from earlier" — Today's
+              main area is the day's scheduled work and chosen focus (Scott,
+              2026-09-21). It stays findable: one quiet line, only while the
+              panel is closed, no count, no duplicate rows, nothing promoted
+              into today. The line opens the panel with that list expanded. */}
+          {data.isToday && (data.dayPlan.unfinished?.length ?? 0) > 0 && !(usePin ? todayPinned : planOpenInline) && (
             <div className="daybook-journal-section">
               <button
                 type="button"
-                onClick={openPlan}
+                onClick={() => { writeUnfinishedOpen(true); openPlan() }}
                 className="inline-flex items-center gap-1.5 text-[13px] text-neutral-500 hover:text-neutral-800"
               >
                 <PanelLeft className="h-3.5 w-3.5" aria-hidden="true" />
