@@ -497,7 +497,7 @@ export function panelActionsFor(
   const payload = (e: DayPlanEntry) => ({ kind: e.kind, id: e.id, date: localYmd(day), title: e.title })
   return {
     choose: (e) => { void (e.kind === 'task' ? a.chooseTaskDay(e.id, day) : a.chooseRoutine(e.id, day, true, e.title)) },
-    unchoose: (e) => { void (e.kind === 'task' ? a.unchooseTask(e.id) : a.chooseRoutine(e.id, day, false, e.title)) },
+    unchoose: (e) => { void (e.kind === 'task' ? a.unchooseTask(e.id, day) : a.chooseRoutine(e.id, day, false, e.title)) },
     complete: (e) => { if (e.kind === 'task') a.toggleTask(e.id); else void a.completeRoutine(e.id, day, !e.completed) },
     schedule: (e, when, isAllDay) => {
       void a.drop(payload(e), isAllDay ? { type: 'day', day: when } : { type: 'time', when })

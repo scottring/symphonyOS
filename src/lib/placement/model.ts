@@ -13,7 +13,7 @@
 // on MORE than one list (a season item taken into September is on both) reads
 // the commitments; readers that only need "lowest level" keep reading the cache.
 
-import type { Task, TaskBucket, PlacementLevel, TaskCommitment } from '@/types/task'
+import type { Task, TaskBucket, PlacementLevel, TaskCommitment, TaskFocusEntry } from '@/types/task'
 import { localYmd, readCadenceConfig, weekStartAnchor } from '@/lib/cadence/config'
 import { readSeasons, seasonEndFor, seasonStartFor, type Seasons } from '@/lib/cadence/seasons'
 import { belongsToWeek, isPlacedOnWeek } from '@/lib/today/weekPlacement'
@@ -188,6 +188,17 @@ export function focusDays(task: Pick<Task, 'focus' | 'plannedOn'>, userId: strin
     return task.focus.filter((f) => !userId || f.userId === userId).map((f) => localYmd(f.date))
   }
   return task.plannedOn ? [localYmd(task.plannedOn)] : []
+}
+
+/**
+ * The focus rows as they stand, for an undo snapshot or a one-day un-choose
+ * written back as `{ focus }`. A row known only by the legacy shared
+ * `plannedOn` becomes one entry with userId '' — "whoever is writing", the
+ * way isFocused reads it.
+ */
+export function focusSnapshot(task: Pick<Task, 'focus' | 'plannedOn'>): TaskFocusEntry[] {
+  if (task.focus && task.focus.length > 0) return [...task.focus]
+  return task.plannedOn ? [{ userId: '', date: task.plannedOn }] : []
 }
 
 /** Anyone's focus on a day (the pin can say "Iris chose this"). */

@@ -255,10 +255,10 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
       if (lower) await gated.pushTask(row.id, lower)
     }
     else if (action === 'today') {
-      // Choosing today (planned_on): a month or season row keeps its list —
-      // a day never erases the broader commitment — and lands on Today's main
-      // list, all-day. It used to push with the clock time it was pressed at.
-      await planActions.chooseTaskDay(row.id, new Date(), { date: level === 'season' })
+      // The Today command (S4): dated today, all-day, and chosen for my
+      // focus. The month or season commitment stays — a date never erases the
+      // broader commitment.
+      await planActions.chooseTaskDay(row.id, new Date())
     }
     else if (action === 'under-goal') setPickingGoalFor(row.id)
   }, [goals, updateGoal, deleteGoal, addGoal, bounds.next, toggleTask, deleteTask, gated, setGoal, keepForward, level, planActions])

@@ -1574,8 +1574,10 @@ export function useSupabaseTasks() {
     logger.debug('[updateTask] Sending to DB:', { id, dbUpdates })
     // A records-only write (choosing a task for today, un-choosing it) names
     // no column on `tasks`; an empty UPDATE would return no row and the
-    // records would never be written (found in the first walkthrough).
-    const recordsOnly = Object.keys(dbUpdates).length === 0 && (plan.commitmentOps.length > 0 || plan.focusOps.length > 0)
+    // records would never be written (found in the first walkthrough). A
+    // stated focus list that changes nothing (un-choosing a day that was not
+    // chosen) names no column either — no empty UPDATE for that.
+    const recordsOnly = Object.keys(dbUpdates).length === 0
     const { data, error: updateError, status, count } = recordsOnly
       ? { data: [{ id }] as unknown[], error: null, status: 200, count: 1 }
       : await supabase

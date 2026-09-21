@@ -320,11 +320,12 @@ describe('PeriodPlanPage', () => {
     // still sees the whole plan.
     fireEvent.click(screen.getByRole('button', { name: 'Take it into this week Fix the back door' }))
     expect(hook.pushTask).toHaveBeenCalledWith(t.id, 'week')
-    // Today CHOOSES the day (planned_on); the row keeps its month list.
+    // Today (S4) dates it today AND chooses it; the placement module keeps
+    // its month commitment.
     hook.pushTask.mockClear()
     fireEvent.click(screen.getByRole('button', { name: 'Do it today Fix the back door' }))
     const midnight = new Date(); midnight.setHours(0, 0, 0, 0)
-    expect(hook.updateTask).toHaveBeenLastCalledWith(t.id, { plannedOn: midnight })
+    expect(hook.updateTask).toHaveBeenLastCalledWith(t.id, { bucket: 'timed', scheduledFor: midnight, isAllDay: true, plannedOn: midnight })
     expect(hook.pushTask).not.toHaveBeenCalled()
   })
 

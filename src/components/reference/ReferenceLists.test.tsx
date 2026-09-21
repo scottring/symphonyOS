@@ -50,15 +50,15 @@ describe('Pinned reference lists', () => {
     expect(screen.queryByText('Someone else')).not.toBeInTheDocument()
     expect(screen.queryByText('Future month')).not.toBeInTheDocument()
   })
-  // "Do today" CHOOSES the day (planned_on); the task keeps its week list,
-  // because choosing a day never erases the broader commitment (2026-09-19).
+  // "Do today" is the Today command (S4): dated today AND chosen. The week
+  // commitment stays — a date never erases it (placement module).
   it('chooses actual today only on explicit action, keeps the week list, and stays on the current page', async () => {
     mount(); fireEvent.click(screen.getByRole('button', { name: 'Pin week list' })); fireEvent.click(screen.getByText('Notes page'))
     fireEvent.click(screen.getByRole('button', { name: 'Do today' }))
     await waitFor(() => expect(data.update).toHaveBeenCalledTimes(1))
     const today = new Date(); today.setHours(0, 0, 0, 0)
+    expect(data.push).toHaveBeenCalledWith('Book a service visit', today)
     expect(data.update).toHaveBeenCalledWith('Book a service visit', { plannedOn: today })
-    expect(data.push).not.toHaveBeenCalled()
     expect(screen.getByText('/notes')).toBeInTheDocument()
   })
   it('does not resolve a cancelled placement, and reports failed saves', async () => {
