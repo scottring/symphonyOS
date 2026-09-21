@@ -23,14 +23,19 @@ Default: `demo`, wiped, from step 0. `real` never wipes and skips step 0.
 | `~/Documents/scotts-world/projects/symphony-os/briefs/<date>-walkthrough.md` | Auditor | §1 Setup · §2 Findings log · §3 Ranked · §4 Batches |
 | `docs/onboarding.md` (repo) | New user | One section per step: Where you are · Why it exists · Do this · You'll see · Status |
 
-Create both at pre-flight (or open them on `resume`). Append after every step.
-Never hold entries in your head for a later dump.
+Create both at pre-flight (or open them on `resume`): the brief with §1 filled and §2–§4
+as empty headings; `docs/onboarding.md` with every step's section already present,
+its four lines drafted from the path table and `Status: pending`. A second run on the
+same day appends to the same brief. Append after every step. Never hold entries in your
+head for a later dump. Reuse the step text already in `docs/onboarding.md` on later runs;
+edit it only when a finding says the step itself was wrong.
 
 ## Pre-flight (once per session)
 
 In this order — the surface is confirmed before anything is wiped.
 
-1. **Surface.** Ask which URL Scott is on and who the header greets. Prod
+1. **Surface.** Ask which URL Scott is on, who the header greets, and what device he
+   is on (Mac, phone, both). Prod
    `app.symphony-os.com` runs `origin/main` after `git fetch` (`git rev-parse --short=8
    origin/main`; `npx vercel ls` shows the latest Production build Ready). A worktree dev
    server runs that worktree's HEAD. Greeting "Symphonygoals" = demo; "Smkaufman" = real
@@ -46,7 +51,9 @@ In this order — the surface is confirmed before anything is wiped.
    ```
    The script is hard-wired to the demo uid and keeps family_members, user_profiles
    and the Chen household. It cannot touch Scott's account. `no-wipe` skips this.
-   Scott reloads after the wipe; the tab holds the old rows until he does.
+   A "go" said before the counts were on screen does not count: show the counts, ask
+   again, wipe on the second "go". Scott reloads after the wipe; the tab holds the old
+   rows until he does.
 3. **Follow along.** Open the same route in the Chrome automation tab and look at what
    Scott looks at; screenshot findings into the vault `assets/` and embed with `![[…]]`.
    If that tab is not signed in as the demo account, ask Scott once to sign it in.
@@ -77,6 +84,8 @@ give the workaround in one line and put it in the entry's recommendation slot.
 If the observation is about a route other than the step on the table, log it under
 that route's own step number, then bring Scott back to the open step. The walk stays
 in path order; a detour is logged, not followed, unless Scott says "continue from here".
+When the walk later reaches a step that already has a detour entry, present the step
+in full anyway and cite the earlier entry by number in the new one.
 
 **Every log entry has this shape** (append to §2 the moment it happens):
 
