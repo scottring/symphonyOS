@@ -11,7 +11,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { usePlanningSession, type SessionHorizon } from '@/hooks/usePlanningSession'
 import { localYmd } from '@/lib/cadence/config'
 import { emptyDraft, lookBackRows, pruneDraft, type SessionDraft, type SessionLevel } from '@/lib/planning/session'
-import { readDraft, writeDraft, clearDraft } from '@/lib/planning/sessionDraft'
+import { readDraft, writeDraft, clearDraft, DRAFT_CHANGED_EVENT, type DraftChangedDetail } from '@/lib/planning/sessionDraft'
 import { applySession, type SessionWriters } from '@/lib/planning/applySession'
 import type { Task } from '@/types/task'
 
@@ -76,6 +76,23 @@ export function usePlanSessionHost(input: PlanSessionHostInput): PlanSessionHost
     setDraft(enabled ? readDraft(userId, level, periodYmd) : null)
   }, [periodYmd, enabled, userId, level])
 
+  // Something else in this tab wrote THIS draft — a page from paper joining
+  // the plan. Storage wins: the in-memory copy predates it, and saving it
+  // back would drop what the page just added. Never mid-save, which is
+  // already writing from a decided draft.
+  const savingRef = useRef(false)
+  useEffect(() => {
+    const onChanged = (e: Event) => {
+      const d = (e as CustomEvent<DraftChangedDetail>).detail
+      if (!enabled || savingRef.current) return
+      if (!d || d.level !== level || d.periodStart !== periodYmdRef.current) return
+      const fresh = readDraft(userId, level, periodYmdRef.current)
+      if (fresh) setDraft(fresh)
+    }
+    window.addEventListener(DRAFT_CHANGED_EVENT, onChanged)
+    return () => window.removeEventListener(DRAFT_CHANGED_EVENT, onChanged)
+  }, [enabled, level, userId])
+
   // The draft as the session can show it — the ONE draft both the summary and
   // Save read, so a stale entry (a deleted task, a row the domain in view
   // hides) is neither written nor an invisible blocker (final review I2).
@@ -106,11 +123,13 @@ export function usePlanSessionHost(input: PlanSessionHostInput): PlanSessionHost
     const draftForSave = prepareDraft ? prepareDraft(shownDraft) : shownDraft
     if (draftForSave !== shownDraft) { setDraft(draftForSave); writeDraft(userId, draftForSave) }
     setSavingSession(true)
+    savingRef.current = true
     const result = await applySession(draftForSave, { ...writers, saveSession: (notes) => saveSession(notes) },
       isCompleted,
       // Persist after EVERY write, so a reload mid-save resumes from here.
       (remaining) => writeDraft(userId, remaining))
     setSavingSession(false)
+    savingRef.current = false
     if (periodYmdRef.current !== savingYmd) {
       // The page moved to another period mid-save: the result belongs to the
       // period it was saving, in storage only — never on the page now shown.

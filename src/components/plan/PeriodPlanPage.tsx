@@ -46,6 +46,7 @@ import {
   periodBounds, isCurrentPeriod, selectPeriodTasks, selectDatedInPeriod, actionsFor, railLevel, lowerLevel, planningPeriod, offerableFromAbove,
   type PlanLevel, type RowAction,
 } from '@/lib/planning/periodPage'
+import { firstNoteLine } from '@/lib/planning/goalsReference'
 import type { Task } from '@/types/task'
 import type { Goal } from '@/types/goal'
 import { PlanRow, rowIsDone, type PlanRowModel } from './PlanRow'
@@ -70,22 +71,6 @@ function periodTitle(level: PlanLevel, label: string) {
   return <>{parts[1]} <span className="text-neutral-400">{parts[2]}</span></>
 }
 
-/** The first line of a note, as one quiet line of intent. Notes render
- *  markdown: a HEADING is structure rather than intent ("## Why" is a label
- *  for the sentence under it), so headings are skipped and the first real
- *  line wins. Bullet and number markers come off the line they lead.
- *  Anything long is left for the row's own page. */
-function firstLine(notes: string | undefined): string | undefined {
-  if (!notes) return undefined
-  for (const raw of notes.split(/\r?\n/)) {
-    const bare = raw.replace(/<[^>]*>/g, '').trim()
-    if (!bare || /^#{1,6}\s/.test(bare)) continue
-    const line = bare.replace(/^\s*([-*+]|\d+\.)\s*/, '').trim()
-    if (line) return line.length > 120 ? `${line.slice(0, 119)}…` : line
-  }
-  return undefined
-}
-
 /** A row as THIS period's list sees it: its fate and "→ where it went" are
  *  read off the row itself, relative to the level and period being shown
  *  (a September row kept into October says "carried to October" on
@@ -100,13 +85,13 @@ function taskRow(t: Task, level: PlanLevel, periodStart: Date): PlanRowModel {
       : lower
         ? { label: lower.label, id: t.id, kind: lower.kind === 'date' ? 'date' : lower.kind === 'week' ? 'week' : 'placed' }
         : null,
-    subtitle: t.isGoal ? firstLine(t.notes) : undefined,
+    subtitle: t.isGoal ? firstNoteLine(t.notes) : undefined,
   }
 }
 function goalRow(g: Goal): PlanRowModel {
   return {
     id: g.id, title: g.name, isGoal: true, fate: g.status === 'completed' ? 'done' : 'open', kind: 'goal',
-    subtitle: g.strategy?.trim() || firstLine(g.notes),
+    subtitle: g.strategy?.trim() || firstNoteLine(g.notes),
   }
 }
 

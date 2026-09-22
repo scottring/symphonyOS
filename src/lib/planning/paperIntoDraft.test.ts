@@ -137,14 +137,35 @@ describe('draftTargetFor', () => {
     expect(draftTargetFor('season', monday, seasons, 'u1')?.periodStart).toBe('2026-09-01')
   })
 
-  it('a year page plans this year, and next year from Nov 20', () => {
+  it('a year page plans the CURRENT year, even in late November', () => {
+    // The Nov 20 turn belongs to the nudge; the year PAGE stays on this year.
     writeDraft('u1', draftFor('year', '2026-01-01'))
     expect(draftTargetFor('year', monday, seasons, 'u1')).toEqual({ level: 'year', periodStart: '2026-01-01', label: '2026' })
-
     const nov20 = new Date(2026, 10, 20, 9, 0)
-    expect(draftTargetFor('year', nov20, seasons, 'u1')).toBeNull()
-    writeDraft('u1', draftFor('year', '2027-01-01'))
-    expect(draftTargetFor('year', nov20, seasons, 'u1')).toEqual({ level: 'year', periodStart: '2027-01-01', label: '2027' })
+    expect(draftTargetFor('year', nov20, seasons, 'u1')?.periodStart).toBe('2026-01-01')
+  })
+
+  it('falls back to the neighbouring period when the draft is on that one', () => {
+    // Only NEXT month is being planned: the offer is for next month.
+    writeDraft('u1', draftFor('month', '2026-11-01'))
+    expect(draftTargetFor('month', monday, seasons, 'u1')).toEqual({ level: 'month', periodStart: '2026-11-01', label: 'November' })
+
+    // Midweek, with only next week's draft open.
+    writeDraft('u1', draftFor('week', '2026-10-11'))
+    expect(draftTargetFor('week', monday, seasons, 'u1')?.periodStart).toBe('2026-10-11')
+
+    // On the weekend the week ahead is the first guess; this week is the fallback.
+    const saturday = new Date(2026, 9, 10, 9, 0)
+    localStorage.clear()
+    writeDraft('u1', draftFor('week', '2026-10-04'))
+    expect(draftTargetFor('week', saturday, seasons, 'u1')?.periodStart).toBe('2026-10-04')
+  })
+
+  it('the sheet’s chip decides the period, and a chip off every draft has no offer', () => {
+    writeDraft('u1', draftFor('month', '2026-10-01'))
+    expect(draftTargetFor('month', monday, seasons, 'u1', new Date(2026, 9, 1))?.periodStart).toBe('2026-10-01')
+    // The chip moved to November, where nothing is being planned.
+    expect(draftTargetFor('month', monday, seasons, 'u1', new Date(2026, 10, 1))).toBeNull()
   })
 
   it('a draft belonging to another user is not this user’s offer', () => {

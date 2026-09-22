@@ -5,6 +5,8 @@
 // (the part that writes data) are unit-testable without a DOM.
 
 import type { TaskBucket, TaskContext } from '@/types/task'
+import type { PageNote } from '@/lib/pageParse'
+import type { DomainId } from '@/lib/domains'
 import { localYmd, parseLocalYmd } from '@/lib/cadence/config'
 import { seasonStartFor, seasonEndFor, nextSeasonStart, readSeasons, normalizeSeasons, type Seasons } from '@/lib/cadence/seasons'
 
@@ -352,4 +354,22 @@ export function planItemToAddTaskArgs(item: PlanItem, ctx: PlanCommitContext): P
         options: { ...base, bucket: 'inbox' },
       }
   }
+}
+
+/**
+ * What the review sheet hands on: the checked rows, as edited, plus the one
+ * domain the page belongs to and the period its chip settled on. Lives here,
+ * beside `PlanItem`, so the pure modules that consume a reviewed page
+ * (paperIntoDraft) need not reach into a component for a type.
+ */
+export interface PageReviewPayload {
+  items: PlanItem[]
+  notes: PageNote[]
+  /** Which layer the whole page belongs to — asked once, on the sheet, and
+   *  stamped on everything the page writes. Family is the sharing switch. */
+  domain: DomainId
+  /** The month a MONTH page is for (its 1st) — the chip's choice. */
+  monthStart?: Date
+  /** The season a SEASON page is for (its start) — the chip's choice. */
+  seasonStart?: Date
 }
