@@ -14,13 +14,16 @@ import { makePlanActions, type PlanActions } from '@/lib/planning/planActions'
 export function usePlanActions(pushAction?: (message: string, undo: () => void) => void): PlanActions & {
   toggleTask: (id: string) => void
   completeRoutine: (routineId: string, day: Date, done: boolean) => Promise<boolean>
+  /** Deletes, for the chooser's Delete (held behind an Undo window by the host). */
+  deleteTask: (id: string) => Promise<unknown>
+  deleteRoutine: (id: string) => Promise<unknown>
 } {
-  const { tasks, updateTask, updateTasksBulk, pushTask, toggleTask } = useSupabaseTasks()
+  const { tasks, updateTask, updateTasksBulk, pushTask, toggleTask, deleteTask } = useSupabaseTasks()
   const findTask = useCallback((id: string) =>
     tasks.find((t) => t.id === id) ?? tasks.flatMap((t) => t.subtasks ?? []).find((t) => t.id === id), [tasks])
   const gated = useGatedTaskActions(useMemo(() => ({ updateTask, updateTasksBulk, pushTask }), [updateTask, updateTasksBulk, pushTask]), findTask)
   const { setPlanned, reschedule, markDone, undoDone } = useActionableInstances()
-  const { routines, updateRoutine } = useRoutines()
+  const { routines, updateRoutine, deleteRoutine } = useRoutines()
 
   const actions = useMemo(() => makePlanActions({
     findTask,
@@ -42,5 +45,7 @@ export function usePlanActions(pushAction?: (message: string, undo: () => void) 
     toggleTask: (id: string) => { void toggleTask(id) },
     completeRoutine: (routineId: string, day: Date, done: boolean) =>
       done ? markDone('routine', routineId, day) : undoDone('routine', routineId, day),
+    deleteTask,
+    deleteRoutine,
   }
 }

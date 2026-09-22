@@ -22,7 +22,7 @@
 // for a routine with no day, "Change repeating schedule"). No clock glyphs,
 // no "Give it a day", nothing called "let go" (deferred? dropped? deleted?).
 import { useEffect, useState, type ReactNode } from 'react'
-import { Check, ChevronDown, ChevronRight, GripVertical, MoreHorizontal } from 'lucide-react'
+import { Check, ChevronDown, ChevronRight, GripVertical, MoreHorizontal, Repeat } from 'lucide-react'
 import { SchedulePopover } from '@/components/triage'
 import type { DayPlan, DayPlanEntry } from '@/lib/today/dayPlan'
 import { writePlanDrag } from '@/lib/planning/planDrag'
@@ -30,8 +30,6 @@ import { localYmd, weekStartAnchor, readCadenceConfig } from '@/lib/cadence/conf
 import { formatWeekRangeShort } from '@/lib/dateHelpers'
 import { onUnfinishedOpenChange, readUnfinishedOpen, writeUnfinishedOpen } from '@/lib/planningPanelSignal'
 import { requestQuickAdd } from '@/lib/quickAddSignal'
-import { useAuth } from '@/hooks/useAuth'
-import { Hint } from '@/components/plan/Hint'
 
 /** Rows a group shows before "+N more" — the pin is a fixed-space surface. */
 export const PLAN_GROUP_CAP = 6
@@ -52,6 +50,12 @@ export interface DayPlanPanelActions {
   placeRoutine?: (entry: DayPlanEntry, when: Date) => void
   /** The separate, explicit action: change the routine's repeating schedule. */
   changeRoutineRule?: (entry: DayPlanEntry) => void
+  /** Opens the row's detail pane (Scott, 2026-09-22: "clicking on the task
+   *  should open its detail pane"). The title is the door. */
+  open?: (entry: DayPlanEntry) => void
+  /** Deletes the row's task or routine, behind ⋯ — the host holds it for an
+   *  Undo window. */
+  remove?: (entry: DayPlanEntry) => void
 }
 
 /** The day a routine's "Plan for today…" picker opens on: today when today is
@@ -65,22 +69,32 @@ export function routinePlaceDay(day: Date, weekPage: Date | null): Date {
 
 /** The row's ⋯ menu: the moves that are not the one verb. "Schedule…" is a
  *  date picker anchored to the menu item; picking a date closes both. */
-function RowMenu({ entry, day, actions }: { entry: DayPlanEntry; day: Date; actions: DayPlanPanelActions }) {
+function RowMenu({ entry, day, actions, inline = false }: { entry: DayPlanEntry; day: Date; actions: DayPlanPanelActions; inline?: boolean }) {
   const [open, setOpen] = useState(false)
   const unhomed = !!entry.routine
   const items: ReactNode[] = []
-  if (unhomed) {
+  // In the wide "triage" chooser every move is a visible pill (Scott,
+  // 2026-09-22: "full control and visibility"); narrow, they sit behind ⋯.
+  const itemClass = inline
+    ? 'chooser-inline-action'
+    : 'w-full px-3 py-1.5 text-left text-[13px] text-neutral-700 hover:bg-neutral-50'
+  const dangerClass = inline
+    ? 'chooser-inline-action chooser-inline-action-danger'
+    : 'w-full px-3 py-1.5 text-left text-[13px] text-red-600 hover:bg-red-50'
+  if (entry.completed) {
+    // A done row has no moves left but Delete.
+  } else if (unhomed) {
     if (actions.changeRoutineRule) {
       items.push(
         <button
           key="rule"
           type="button"
-          role="menuitem"
+          role={inline ? undefined : 'menuitem'}
           aria-label={`Change repeating schedule for ${entry.title}`}
           onClick={() => { setOpen(false); actions.changeRoutineRule?.(entry) }}
-          className="w-full px-3 py-1.5 text-left text-[13px] text-neutral-700 hover:bg-neutral-50"
+          className={itemClass}
         >
-          Change repeating schedule
+          {inline ? 'Repeat…' : 'Change repeating schedule'}
         </button>,
       )
     }
@@ -100,9 +114,9 @@ function RowMenu({ entry, day, actions }: { entry: DayPlanEntry; day: Date; acti
         trigger={
           <button
             type="button"
-            role="menuitem"
+            role={inline ? undefined : 'menuitem'}
             aria-label={`Schedule ${entry.title}`}
-            className="w-full px-3 py-1.5 text-left text-[13px] text-neutral-700 hover:bg-neutral-50"
+            className={itemClass}
           >
             Schedule…
           </button>
@@ -114,17 +128,36 @@ function RowMenu({ entry, day, actions }: { entry: DayPlanEntry; day: Date; acti
         <button
           key="someday"
           type="button"
-          role="menuitem"
+          role={inline ? undefined : 'menuitem'}
           aria-label={`Move ${entry.title} to Someday`}
           onClick={() => { setOpen(false); actions.someday?.(entry) }}
-          className="w-full px-3 py-1.5 text-left text-[13px] text-neutral-700 hover:bg-neutral-50"
+          className={itemClass}
         >
           Someday
         </button>,
       )
     }
   }
+  // Delete, on every row (Scott, 2026-09-22: "need to be able to delete
+  // items from the chooser"). A task row deletes the task; a routine row
+  // deletes the routine — its rule, not just today's occurrence — and says so.
+  if (actions.remove) {
+    const label = entry.kind === 'routine' ? 'Delete routine' : 'Delete'
+    items.push(
+      <button
+        key="delete"
+        type="button"
+        role={inline ? undefined : 'menuitem'}
+        aria-label={`${label}: ${entry.title}`}
+        onClick={() => { setOpen(false); actions.remove?.(entry) }}
+        className={dangerClass}
+      >
+        {label}
+      </button>,
+    )
+  }
   if (items.length === 0) return null
+  if (inline) return <div className="chooser-inline-actions" aria-label={`Moves for ${entry.title}`}>{items}</div>
   return (
     <div className="relative shrink-0">
       <button
@@ -153,12 +186,26 @@ function RowMenu({ entry, day, actions }: { entry: DayPlanEntry; day: Date; acti
   )
 }
 
-function PlanRow({ entry, day, actions, draggable, weekPage = null }: {
+/** The row's title wraps in full — a chooser is not a place for "…" (Scott,
+ *  2026-09-22: "titles are truncated because of the space squeeze") — and,
+ *  when the host can open a detail pane, it is the door to it. */
+function RowTitle({ entry, open }: { entry: DayPlanEntry; open?: (entry: DayPlanEntry) => void }) {
+  const cls = `block break-words text-left leading-snug ${entry.completed ? 'text-neutral-400 line-through' : 'text-neutral-800'}`
+  if (!open) return <span className={cls}>{entry.title}</span>
+  return (
+    <button type="button" onClick={() => open(entry)} aria-label={`Open ${entry.title}`} className={`${cls} hover:text-primary-800 hover:underline`}>
+      {entry.title}
+    </button>
+  )
+}
+
+function PlanRow({ entry, day, actions, draggable, weekPage = null, wide = false }: {
   entry: DayPlanEntry
   day: Date
   actions: DayPlanPanelActions
   draggable: boolean
   weekPage?: Date | null
+  wide?: boolean
 }) {
   const canDrag = draggable && !entry.completed && !entry.planned
   // A collection is done when its steps are — its steps are ticked where it
@@ -186,7 +233,7 @@ function PlanRow({ entry, day, actions, draggable, weekPage = null }: {
   }
   return (
     <li
-      className="group flex items-start gap-2 border-b border-neutral-200/80 py-2 text-[14px]"
+      className={`group flex items-start gap-2 border-b border-neutral-200/80 py-2 text-[14px]${entry.kind === 'routine' ? ' chooser-row-routine' : ''}`}
       draggable={canDrag}
       onDragStart={canDrag ? (e) => writePlanDrag(e.dataTransfer, {
         kind: entry.kind, id: entry.id, date: localYmd(day), title: entry.title,
@@ -225,24 +272,32 @@ function PlanRow({ entry, day, actions, draggable, weekPage = null }: {
       </button>
       )}
       <div className="min-w-0 flex-1">
-        <span className={`line-clamp-2 break-words leading-snug ${entry.completed ? 'text-neutral-400 line-through' : 'text-neutral-800'}`}>
-          {entry.title}
+        <span className="flex items-start gap-1.5">
+          {/* A routine is told apart from a task by its repeat mark and a
+              sage tint (Scott, 2026-09-22), never by a separate list. */}
+          {entry.kind === 'routine' && <Repeat aria-hidden="true" className="mt-[4px] h-3.5 w-3.5 shrink-0 text-sage-600" />}
+          <RowTitle entry={entry} open={actions.open} />
         </span>
         {entry.planned && !entry.completed && <span className="block text-[11.5px] text-primary-700">Planned today</span>}
-        {entry.context && <span className="block text-[11.5px] text-neutral-500">{entry.context}</span>}
+        {entry.context && <span className={`block text-[11.5px] ${entry.kind === 'routine' ? 'text-sage-600' : 'text-neutral-500'}`}>{entry.context}</span>}
       </div>
-      {entry.completed ? null : entry.planned ? (
-        <button
-          type="button"
-          aria-label={`Move ${entry.title} back off today`}
-          title="Move back — it stays here, unplanned"
-          onClick={() => actions.unchoose(entry)}
-          className="shrink-0 rounded px-1.5 py-0.5 text-[12px] text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800"
-        >
-          Undo
-        </button>
+      {entry.completed ? (
+        <RowMenu entry={entry} day={day} actions={actions} inline={wide} />
+      ) : entry.planned ? (
+        <div className={wide ? 'chooser-row-actions' : 'flex shrink-0 items-center gap-0.5'}>
+          <button
+            type="button"
+            aria-label={`Move ${entry.title} back off today`}
+            title="Move back — it stays here, unplanned"
+            onClick={() => actions.unchoose(entry)}
+            className="shrink-0 rounded px-1.5 py-0.5 text-[12px] text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800"
+          >
+            Undo
+          </button>
+          <RowMenu entry={entry} day={day} actions={actions} inline={wide} />
+        </div>
       ) : (
-        <div className="flex shrink-0 items-center gap-0.5">
+        <div className={wide ? 'chooser-row-actions' : 'flex shrink-0 items-center gap-0.5'}>
           {unhomed ? (
             // No day of its own yet: the verb reads the same, and the click
             // asks for a time — this week's occurrence lands on the day being
@@ -258,33 +313,183 @@ function PlanRow({ entry, day, actions, draggable, weekPage = null }: {
           ) : (
             <button type="button" aria-label={verbAria} onClick={onVerb} className={verbClass}>{verbLabel}</button>
           )}
-          <RowMenu entry={entry} day={day} actions={actions} />
+          <RowMenu entry={entry} day={day} actions={actions} inline={wide} />
         </div>
       )}
     </li>
   )
 }
 
+/**
+ * One row of Today's chooser (approved white journal, 2026-09-22): the
+ * title, a routine's cadence and time beneath it, and one pill — "Choose",
+ * or "Today ✓" pressed, which pressed again removes only today's choice.
+ * A routine occurrence already on the day by its own time says "On today's
+ * schedule" instead of a pill; a done row says "Completed". Choosing a
+ * routine selects this occurrence, never the repeating rule, and completion
+ * is the Today list's checkbox, not a control here. The ⋯ menu keeps the
+ * row's other moves (a day or time, Someday).
+ */
+function ChooserRow({ entry, day, actions, draggable, wide = false }: {
+  entry: DayPlanEntry
+  day: Date
+  actions: DayPlanPanelActions
+  draggable: boolean
+  wide?: boolean
+}) {
+  const canDrag = draggable && !entry.completed && !entry.planned && !entry.onToday
+  const unhomed = !!entry.routine
+  const picked = entry.planned && !entry.onToday
+  const pillAria = `${picked ? 'Unchoose' : 'Choose'} ${entry.title} for today`
+  return (
+    <li
+      className={`group flex items-start gap-2.5 text-[14px]${entry.kind === 'routine' ? ' chooser-row-routine' : ''}`}
+      draggable={canDrag}
+      onDragStart={canDrag ? (e) => writePlanDrag(e.dataTransfer, {
+        kind: entry.kind, id: entry.id, date: localYmd(day), title: entry.title,
+      }) : undefined}
+      data-plan-key={entry.key}
+    >
+      {canDrag
+        ? <GripVertical aria-hidden="true" className="mt-[3px] h-3.5 w-3.5 shrink-0 cursor-grab text-neutral-300 opacity-0 transition-opacity group-hover:opacity-100" />
+        : <span aria-hidden="true" className="w-3.5 shrink-0" />}
+      {entry.kind === 'routine' && (
+        <Repeat aria-hidden="true" className="mt-[4px] h-3.5 w-3.5 shrink-0 text-sage-600" />
+      )}
+      <div className="min-w-0 flex-1">
+        <RowTitle entry={entry} open={actions.open} />
+        {entry.context && <span className={`chooser-cadence${entry.kind === 'routine' ? ' chooser-cadence-routine' : ''}`}>{entry.context}</span>}
+        {entry.onToday && !entry.completed && <span className="chooser-status">On today's schedule</span>}
+        {entry.completed && <span className="chooser-status">Completed</span>}
+      </div>
+      {entry.completed || entry.onToday ? (
+        <RowMenu entry={entry} day={day} actions={actions} inline={wide} />
+      ) : (
+        <div className={wide ? 'chooser-row-actions' : 'flex shrink-0 items-center gap-0.5'}>
+          {unhomed ? (
+            // No day of its own yet: the pill asks for a time, and this
+            // week's occurrence lands on today (a same-day override), never
+            // the repeating rule, which is the menu's separate move.
+            <SchedulePopover
+              itemTitle={entry.title}
+              skipToTime
+              value={day}
+              onSchedule={(when) => actions.placeRoutine?.(entry, when)}
+              trigger={<button type="button" aria-label={pillAria} className="chooser-pill">Choose…</button>}
+            />
+          ) : (
+            <button
+              type="button"
+              aria-label={pillAria}
+              aria-pressed={picked}
+              onClick={() => (picked ? actions.unchoose(entry) : actions.choose(entry))}
+              className="chooser-pill"
+            >
+              {picked ? 'Today ✓' : 'Choose'}
+            </button>
+          )}
+          <RowMenu entry={entry} day={day} actions={actions} inline={wide} />
+        </div>
+      )}
+    </li>
+  )
+}
+
+/** Remembered per browser: which chooser sections are folded, and whether
+ *  completed rows are hidden (Scott, 2026-09-22: fold "This week's tasks"
+ *  without closing the chooser; hide what is done). */
+const CHOOSER_FOLDS_KEY = 'symphony.chooser.folded'
+const CHOOSER_HIDE_DONE_KEY = 'symphony.chooser.hideCompleted'
+function readFolded(): Record<string, boolean> {
+  try { return JSON.parse(localStorage.getItem(CHOOSER_FOLDS_KEY) ?? '{}') as Record<string, boolean> } catch { return {} }
+}
+function readHideCompleted(): boolean {
+  try { return localStorage.getItem(CHOOSER_HIDE_DONE_KEY) === '1' } catch { return false }
+}
+
+/** One section of Today's chooser: a small ruled heading with a note at its
+ *  right — the heading folds the section, leaving the chooser open — then the
+ *  rows, outstanding first. */
+function ChooserSection({ id, title, note, icon, entries, day, actions, draggable, empty, open, onToggle, hideCompleted, allDone, wide = false }: {
+  id: string
+  /** The wide "triage" chooser: every row, every move visible. */
+  wide?: boolean
+  title: string
+  note?: string
+  icon?: ReactNode
+  entries: DayPlanEntry[]
+  day: Date
+  actions: DayPlanPanelActions
+  draggable: boolean
+  /** Drawn when the section has no rows at all. */
+  empty?: ReactNode
+  open: boolean
+  onToggle: () => void
+  hideCompleted: boolean
+  /** Drawn when every row is completed and completed rows are hidden. */
+  allDone?: ReactNode
+}) {
+  const [all, setAll] = useState(false)
+  const kept = hideCompleted ? entries.filter((e) => !e.completed) : entries
+  const ordered = [...kept].sort((a, b) => rank(a) - rank(b))
+  const shown = all || wide ? ordered : ordered.slice(0, PLAN_GROUP_CAP)
+  const headingId = `chooser-${id}-heading`
+  const bodyId = `chooser-${id}`
+  return (
+    <section aria-labelledby={headingId} className="chooser-section">
+      <h3 className="chooser-section-heading">
+        <button type="button" id={headingId} aria-expanded={open} aria-controls={bodyId} onClick={onToggle} className="chooser-section-toggle">
+          {open ? <ChevronDown aria-hidden="true" className="h-3.5 w-3.5" /> : <ChevronRight aria-hidden="true" className="h-3.5 w-3.5" />}
+          {icon}
+          {title}
+        </button>
+        {note && <span>{note}</span>}
+      </h3>
+      {open && (
+        <div id={bodyId}>
+          {entries.length === 0 ? (
+            <div className="chooser-empty">{empty}</div>
+          ) : kept.length === 0 ? (
+            <div className="chooser-empty">{allDone}</div>
+          ) : (
+            <>
+              <ul className="chooser-rows">
+                {shown.map((e) => <ChooserRow key={e.key} entry={e} day={day} actions={actions} draggable={draggable} wide={wide} />)}
+              </ul>
+              {!all && !wide && ordered.length > PLAN_GROUP_CAP && (
+                <button type="button" onClick={() => setAll(true)} className="py-1.5 text-[13px] text-neutral-500 hover:text-neutral-800">
+                  Show {ordered.length - PLAN_GROUP_CAP} more
+                </button>
+              )}
+            </>
+          )}
+        </div>
+      )}
+    </section>
+  )
+}
+
 /** The rows of one list, outstanding first, capped with "+N more" unless
  *  `cap` is null (on a week page the list IS the work). */
-function Rows({ entries, day, actions, draggable, weekPage, cap }: {
+function Rows({ entries, day, actions, draggable, weekPage, cap, wide = false }: {
   entries: DayPlanEntry[]
   day: Date
   actions: DayPlanPanelActions
   draggable: boolean
   weekPage: Date | null
   cap: number | null
+  wide?: boolean
 }) {
   const [all, setAll] = useState(false)
   // Outstanding first, then chosen, then done: the ones asking for a decision lead.
   const ordered = [...entries].sort((a, b) => rank(a) - rank(b))
-  const shown = all || cap === null ? ordered : ordered.slice(0, cap)
+  const shown = all || wide || cap === null ? ordered : ordered.slice(0, cap)
   return (
     <>
       <ul className="day-plan-rows mt-1 border-t border-neutral-200/80">
-        {shown.map((e) => <PlanRow key={e.key} entry={e} day={day} actions={actions} draggable={draggable} weekPage={weekPage} />)}
+        {shown.map((e) => <PlanRow key={e.key} entry={e} day={day} actions={actions} draggable={draggable} weekPage={weekPage} wide={wide} />)}
       </ul>
-      {!all && cap !== null && ordered.length > cap && (
+      {!all && !wide && cap !== null && ordered.length > cap && (
         <button type="button" onClick={() => setAll(true)} className="py-1.5 text-[13px] text-neutral-500 hover:text-neutral-800">
           Show {ordered.length - cap} more
         </button>
@@ -293,8 +498,9 @@ function Rows({ entries, day, actions, draggable, weekPage, cap }: {
   )
 }
 
-function Group({ title, entries, day, actions, draggable, defaultOpen, empty, cap = PLAN_GROUP_CAP, open: openProp, onOpenChange, count = true, weekPage = null }: {
+function Group({ title, entries, day, actions, draggable, defaultOpen, empty, cap = PLAN_GROUP_CAP, open: openProp, onOpenChange, count = true, weekPage = null, wide = false }: {
   title: string
+  wide?: boolean
   weekPage?: Date | null
   /** Show "· N outstanding" after the title. Off for the planning lists:
    *  unfinished work is findable here, never scored (Today keeps no scoreboard). */
@@ -320,7 +526,7 @@ function Group({ title, entries, day, actions, draggable, defaultOpen, empty, ca
   }
   const outstanding = entries.filter((e) => !e.completed && !e.planned).length
   if (entries.length === 0 && !empty) return null
-  const id = `plan-group-${title.toLowerCase().replace(/\s+/g, '-')}`
+  const id = `plan-group-${title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
   return (
     <div className="mt-4">
       <button
@@ -338,7 +544,7 @@ function Group({ title, entries, day, actions, draggable, defaultOpen, empty, ca
           {entries.length === 0 ? (
             <div className="py-2 text-[13px] text-neutral-400">{empty}</div>
           ) : (
-            <Rows entries={entries} day={day} actions={actions} draggable={draggable} weekPage={weekPage} cap={cap} />
+            <Rows entries={entries} day={day} actions={actions} draggable={draggable} weekPage={weekPage} cap={cap} wide={wide} />
           )}
         </div>
       )}
@@ -352,7 +558,7 @@ function Group({ title, entries, day, actions, draggable, defaultOpen, empty, ca
  *  no scoreboard. Misses older than the window are not listed, but they are
  *  not lost: the fold's last line points at where they live, so there is no
  *  second door beside the first. */
-function UnfinishedFold({ entries, older, day, actions, draggable, weekPage, cap }: {
+function UnfinishedFold({ entries, older, day, actions, draggable, weekPage, cap, wide = false }: {
   entries: DayPlanEntry[]
   older: number
   day: Date
@@ -360,6 +566,7 @@ function UnfinishedFold({ entries, older, day, actions, draggable, weekPage, cap
   draggable: boolean
   weekPage: Date | null
   cap: number | null
+  wide?: boolean
 }) {
   const [open, setOpen] = useState(() => readUnfinishedOpen())
   useEffect(() => onUnfinishedOpenChange(setOpen), [])
@@ -381,7 +588,7 @@ function UnfinishedFold({ entries, older, day, actions, draggable, weekPage, cap
       {open && (
         <div id={id}>
           {entries.length > 0 && (
-            <Rows entries={entries} day={day} actions={actions} draggable={draggable} weekPage={weekPage} cap={cap} />
+            <Rows entries={entries} day={day} actions={actions} draggable={draggable} weekPage={weekPage} cap={cap} wide={wide} />
           )}
           {older > 0 && (
             <a href="/inbox#expired" className="mt-2 block w-fit text-[12.5px] text-neutral-500 hover:text-neutral-800">
@@ -416,12 +623,105 @@ export function planningSubtitle(day: Date, weekPage: Date | null): string {
   return day.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
 }
 
-export function DayPlanPanel({ plan, day, actions, draggable = true, weekPage = null }: {
+/**
+ * Today's chooser (Scott via Codex, 2026-09-22): two sections, told apart by
+ * eye. "This week's tasks" is the week's list, whole; a chosen row stays,
+ * marked, and choosing again removes only today's choice. "Routines" is the
+ * day's occurrences — choosing one selects an occurrence for today, never a
+ * new task and never the repeating rule; one already on the day by its own
+ * time says so instead of being offered twice; and the section stays even
+ * when the week's list is empty. Month-to-week selection belongs on the
+ * Week page, so there is no month browser here. An empty week offers "Plan
+ * your week"; urgent work still goes straight to Today through Add task.
+ * Each section folds on its heading without closing the chooser, and
+ * completed rows can be hidden; both are remembered per browser.
+ */
+function TodayChooser({ plan, day, actions, draggable, cap, wide }: {
+  plan: DayPlan
+  day: Date
+  actions: DayPlanPanelActions
+  draggable: boolean
+  cap: number | null
+  wide: boolean
+}) {
+  const tasks = plan.chooserTasks ?? (plan.toPlan ?? []).filter((e) => e.kind === 'task')
+  const routines = plan.chooserRoutines ?? []
+  const weekStart = weekStartAnchor(day, readCadenceConfig().weekStartsOn)
+  const [folded, setFolded] = useState<Record<string, boolean>>(() => readFolded())
+  const [hideCompleted, setHideCompleted] = useState<boolean>(() => readHideCompleted())
+  const toggle = (id: string) => setFolded((f) => {
+    const next = { ...f, [id]: !f[id] }
+    try { localStorage.setItem(CHOOSER_FOLDS_KEY, JSON.stringify(next)) } catch { /* remembered only while mounted */ }
+    return next
+  })
+  const toggleHide = () => setHideCompleted((h) => {
+    try { localStorage.setItem(CHOOSER_HIDE_DONE_KEY, h ? '0' : '1') } catch { /* remembered only while mounted */ }
+    return !h
+  })
+  const anyDone = tasks.some((e) => e.completed) || routines.some((e) => e.completed)
+  return (
+    <div data-testid="day-plan-panel">
+      {(anyDone || hideCompleted) && (
+        <div className="chooser-toolbar">
+          <button type="button" aria-pressed={hideCompleted} onClick={toggleHide} className="chooser-toggle">
+            {hideCompleted ? 'Show completed' : 'Hide completed'}
+          </button>
+        </div>
+      )}
+      <ChooserSection
+        id="week"
+        title="This week's tasks"
+        note={formatWeekRangeShort(weekStart)}
+        entries={tasks}
+        day={day}
+        actions={actions}
+        draggable={draggable}
+        open={!folded.week}
+        onToggle={() => toggle('week')}
+        hideCompleted={hideCompleted}
+        wide={wide}
+        empty={
+          <>
+            <span>No tasks on this week's list yet.</span>
+            {/* A plain anchor, like the fold's Inbox link: this panel is
+                drawn inside and outside the router. */}
+            <a href="/week">Plan your week →</a>
+          </>
+        }
+        allDone={<span>Everything on this week's list is done.</span>}
+      />
+      {routines.length > 0 && (
+        <ChooserSection
+          id="routines"
+          title="Routines"
+          note="For today"
+          icon={<Repeat aria-hidden="true" className="h-3.5 w-3.5" />}
+          entries={routines}
+          day={day}
+          actions={actions}
+          draggable={draggable}
+          open={!folded.routines}
+          onToggle={() => toggle('routines')}
+          hideCompleted={hideCompleted}
+          wide={wide}
+          allDone={<span>Every routine for today is done.</span>}
+        />
+      )}
+      <UnfinishedFold entries={plan.unfinished ?? []} older={plan.olderUnfinished ?? 0} day={day} actions={actions} draggable={draggable} weekPage={null} cap={cap} />
+      <p className="chooser-foot">Choices stay on your week's list.<br />Routine choices apply to this occurrence only.</p>
+    </div>
+  )
+}
+
+export function DayPlanPanel({ plan, day, actions, draggable = true, weekPage = null, wide = false }: {
   plan: DayPlan
   day: Date
   actions: DayPlanPanelActions
   /** Rows can be dragged out (desktop). Off on touch layouts. */
   draggable?: boolean
+  /** The wide "triage" chooser (Scott, 2026-09-22): half the screen, every
+   *  row shown, every move a visible pill instead of a ⋯ menu. */
+  wide?: boolean
   /** The week the page beside this panel is showing. Set = the list is the
    *  week's work and shows every row; null = the panel is beside a day and
    *  the list is capped like any reference. */
@@ -429,12 +729,11 @@ export function DayPlanPanel({ plan, day, actions, draggable = true, weekPage = 
 }) {
   const [monthOpen, setMonthOpen] = useState(false)
   const cap = weekPage !== null ? null : PLAN_GROUP_CAP
-  const { user } = useAuth()
+  if (weekPage === null) {
+    return <TodayChooser plan={plan} day={day} actions={actions} draggable={draggable} cap={cap} wide={wide} />
+  }
   return (
     <div data-testid="day-plan-panel">
-      {weekPage === null && (
-        <Hint name="day-pick" uid={user?.id ?? null}>The week list stays whole. Picking only marks what you mean to do today.</Hint>
-      )}
       <Group
         title="To plan"
         entries={plan.toPlan ?? []}
@@ -445,6 +744,7 @@ export function DayPlanPanel({ plan, day, actions, draggable = true, weekPage = 
         defaultOpen
         count={false}
         cap={cap}
+        wide={wide}
         empty={
           // An empty week's list is an empty week's list — it says so and
           // offers the one thing that fills it, never the backlog.
@@ -461,7 +761,7 @@ export function DayPlanPanel({ plan, day, actions, draggable = true, weekPage = 
       {/* A task dated today is on Today's page (scheduling is sufficient,
           focus never gates visibility — Scott, 2026-09-21). Nothing dated
           waits here. */}
-      <UnfinishedFold entries={plan.unfinished ?? []} older={plan.olderUnfinished ?? 0} day={day} actions={actions} draggable={draggable} weekPage={weekPage} cap={cap} />
+      <UnfinishedFold entries={plan.unfinished ?? []} older={plan.olderUnfinished ?? 0} day={day} actions={actions} draggable={draggable} weekPage={weekPage} cap={cap} wide={wide} />
       <div className="mt-4">
         <button
           type="button"
@@ -483,6 +783,7 @@ export function DayPlanPanel({ plan, day, actions, draggable = true, weekPage = 
             defaultOpen
             count={false}
             cap={null}
+            wide={wide}
             empty="Nothing on this month's list."
           />
         )}
@@ -498,7 +799,11 @@ export function panelActionsFor(
     toggleTask: (id: string) => void
     completeRoutine: (routineId: string, day: Date, done: boolean) => Promise<boolean>
   },
-  opts: { changeRoutineRule?: (routineId: string) => void } = {},
+  opts: {
+    changeRoutineRule?: (routineId: string) => void
+    open?: (kind: 'task' | 'routine', id: string) => void
+    remove?: (kind: 'task' | 'routine', id: string, title: string) => void
+  } = {},
 ): DayPlanPanelActions {
   const payload = (e: DayPlanEntry) => ({ kind: e.kind, id: e.id, date: localYmd(day), title: e.title })
   return {
@@ -513,5 +818,7 @@ export function panelActionsFor(
     addTask: () => requestQuickAdd(),
     placeRoutine: (e, when) => { void a.placeRoutineOnce(e.id, when, e.title) },
     changeRoutineRule: opts.changeRoutineRule ? (e) => opts.changeRoutineRule?.(e.id) : undefined,
+    open: opts.open ? (e) => opts.open?.(e.kind, e.id) : undefined,
+    remove: opts.remove ? (e) => opts.remove?.(e.kind, e.id, e.title) : undefined,
   }
 }

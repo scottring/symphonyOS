@@ -137,6 +137,10 @@ interface TodayViewProps {
    *  top-right corner. Passed in rather than read from context so TodayView
    *  stays renderable without an AppShell around it. */
   headerControls?: React.ReactNode
+  /** Drawn after the Schedule block — the quiet place for a planning
+   *  reminder (Scott via Codex, 2026-09-22: weekly planning is secondary,
+   *  so its line sits below the day, never above the date). */
+  afterSchedule?: React.ReactNode
   // Bulk actions (managed by HomeView)
   onUpdateTasksBulk?: (taskIds: string[], updates: Partial<Task>) => Promise<void>
   // Timeline insert points — fall back to context
@@ -183,6 +187,7 @@ export function TodayView({
   onClosePanel,
   onOpenPlanFromPaper,
   headerControls,
+  afterSchedule,
   onCreateNoteAt: onCreateNoteAtProp,
   onAppendNoteAt: onAppendNoteAtProp,
   onLinkNote: onLinkNoteProp,
@@ -370,7 +375,11 @@ export function TodayView({
     ...planActions,
     toggleTask: onToggleTask,
     completeRoutine: async (id, _day, done) => { onCompleteRoutine?.(id, done); return true },
-  }, { changeRoutineRule: () => navigate('/routines') }), [viewedDate, planActions, onToggleTask, onCompleteRoutine, navigate])
+  }, {
+    changeRoutineRule: () => navigate('/routines'),
+    // The sheet's row titles open the same detail pane the page's rows do.
+    open: (kind, id) => onSelectItem(`${kind}-${id}`),
+  }), [viewedDate, planActions, onToggleTask, onCompleteRoutine, navigate, onSelectItem])
   const [planOpenDay, setPlanOpenDay] = useState<string | null>(null)
   const planOpenInline = planOpenDay === localYmd(viewedDate)
   // The desktop pin is always TODAY's plan; another day, or a phone (which
@@ -381,10 +390,13 @@ export function TodayView({
   const usePin = !isMobile && !!references
   // Opens the plan: the shell's dock on desktop (pin Today), the sheet on a
   // phone. Declared here because the ⋯ menu, built above the return, uses it.
+  // One control, open or closed (2026-09-22): the chooser is closable from
+  // the same button that opened it.
   const openPlan = () => {
-    if (usePin) { if (!todayPinned) references!.pin('today') }
+    if (usePin) { if (todayPinned) references!.unpin('today'); else references!.pin('today') }
     else setPlanOpenDay(planOpenInline ? null : localYmd(viewedDate))
   }
+  const chooserOpen = usePin ? todayPinned : planOpenInline
   const [agendaDropOver, setAgendaDropOver] = useState(false)
   const agendaDrop = planDropHandlers((payload) => {
     void planActions.drop(payload, { type: 'day', day: viewedDate }, { chooseOnly: true })
@@ -1207,14 +1219,16 @@ export function TodayView({
   const [addOpenDay, setAddOpenDay] = useState<string | null>(null)
   const addOpen = addOpenDay === localYmd(viewedDate)
   const canAdd = data.isToday && !!(ctx.onCreateTaskParsed ?? ctx.onCreateTask)
+  // The page's two controls sit on the "For today" heading (approved white
+  // journal, 2026-09-22): one Choose, one Add task. Nothing by the date.
   const addTaskButton = canAdd ? (
     <button
       type="button"
       onClick={() => setAddOpenDay(addOpen ? null : localYmd(viewedDate))}
       aria-expanded={addOpen}
-      className="daybook-add-task inline-flex items-center gap-1.5 rounded-lg border border-sage-200 bg-sage-50 px-3 py-1.5 text-[14px] font-medium text-sage-600 transition-colors hover:bg-sage-100"
+      className="daybook-add-task inline-flex items-center gap-1 py-1.5 text-[13px] font-medium text-sage-600 transition-colors hover:text-sage-700"
     >
-      <Plus className="h-4 w-4" aria-hidden="true" />
+      <Plus className="h-3.5 w-3.5" aria-hidden="true" />
       Add task
     </button>
   ) : undefined
@@ -1302,9 +1316,8 @@ export function TodayView({
         // Tomorrow, a weekday — and still opens the date picker.
         eyebrow={<DayNavCluster viewedDate={viewedDate} onDateChange={onDateChange} variant="inline" label={data.isToday ? 'Today' : relativeDayLabel} />}
         title={viewedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
-        // The page's one verb, beside the date (2026-09-21). Adding never
-        // means hunting below the schedule.
-        action={addTaskButton}
+        // Adding moved to the "For today" heading with Choose (2026-09-22):
+        // the date is the page's identity, the heading holds its two verbs.
         // "Next: …" is the Up next marker's job now, inside Schedule. The
         // line stays only when it says something the list can't: a clear day
         // looking forward, or another day's opener.
@@ -1392,23 +1405,24 @@ export function TodayView({
               still ahead, and what is already behind you. */}
           <section aria-labelledby="today-focus-heading" className="daybook-journal-section">
             <div className="daybook-journal-heading">
-              {/* No instruction beside the heading (2026-09-21): the Add task
-                  button by the date is the verb. Planning is a door in the
-                  page navigation on desktop; a phone has no navigation row,
-                  so its door sits here, named, on the list it feeds. */}
-              <h2 id="today-focus-heading">Tasks</h2>
-              {isMobile && !usePin && (
+              {/* "For today" holds the page's two verbs (approved white
+                  journal, 2026-09-22): Choose opens and closes the chooser —
+                  the dock beside the page, or the sheet on a phone — and Add
+                  task opens the add box at the head of this list. */}
+              <h2 id="today-focus-heading">For today</h2>
+              <div className="daybook-heading-actions">
                 <button
                   type="button"
                   onClick={openPlan}
-                  aria-expanded={planOpenInline}
-                  className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-neutral-600 hover:text-neutral-900"
-                  style={{ paddingLeft: 0, paddingRight: 0 }}
+                  aria-expanded={chooserOpen}
+                  aria-label={chooserOpen ? 'Close chooser' : 'Choose tasks'}
+                  className={`daybook-choose${chooserOpen ? ' is-open' : ''}`}
                 >
-                  <PanelLeft className="h-4 w-4" aria-hidden="true" />
-                  <span>Choose tasks</span>
+                  <PanelLeft className="h-3.5 w-3.5" aria-hidden="true" />
+                  <span>Choose</span>
                 </button>
-              )}
+                {addTaskButton}
+              </div>
             </div>
             {/* The add box, at the head of the list it adds to. Mounted only
                 while open; it unmounts itself on Escape or an empty blur. */}
@@ -1437,11 +1451,15 @@ export function TodayView({
                 anytimeHeader={false}
               />
             ) : (
+              // One door to the chooser (the labelled Choose tasks button),
+              // one to adding (Add task by the date) — the empty list says
+              // what those are for and offers no third prompt (Scott via
+              // Codex, 2026-09-22).
               <div className="py-4">
                 <p className="font-display text-lg text-neutral-600">Nothing chosen yet.</p>
-                <button type="button" onClick={openPlan} className="mt-1 text-[15px] text-primary-700 hover:text-primary-900">
-                  Choose something for {data.isToday ? 'today' : 'this day'} →
-                </button>
+                <p className="mt-1 text-[14px] text-neutral-500">
+                  Choose from this week's tasks, or add something for {data.isToday ? 'today' : 'this day'}.
+                </p>
               </div>
             )}
           </section>
@@ -1511,6 +1529,9 @@ export function TodayView({
               </div>
             )}
           </section>
+          {/* Below the schedule, not above the date: the one planning
+              reminder Today carries (2026-09-22). */}
+          {data.isToday && afterSchedule}
           </TodayDragProvider>
         )}
 

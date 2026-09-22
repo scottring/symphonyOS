@@ -1,10 +1,17 @@
 // src/components/plan/PlanningNudge.tsx
 //
-// "Which period should I plan next" — the one quiet line on Today, decided by
+// "Which period should I plan next" — the one quiet line decided by
 // `planningNudge` (src/lib/planning/nudges.ts) from the household's saved
 // planning_sessions. Guidance only: the cta navigates, it never writes, and
 // "Not now" dismisses THIS PERIOD'S TOKEN — the dismissal key mirrors
 // `FIRST_WEEK_HIDE_KEY`'s try/catch pattern.
+//
+// On Today it sits BELOW the schedule and speaks only for the week (Scott via
+// Codex, 2026-09-22): weekly planning is secondary and optional, so the
+// reminder is a quiet line after the day's content, with a clear "Plan the
+// week →" link and a separately spaced "Not now". The word "optional" is
+// gone — the placement says it. Opening the week or dismissing the line
+// never moves a task or marks a plan saved.
 //
 // No separate "hidden" flag: the memo (dismissedToken in, plus everything
 // else planningNudge reads) is the only thing that decides whether a line
@@ -21,7 +28,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useHouseholdSeasons } from '@/hooks/useHouseholdSeasons'
 import { usePlanningSessionsIndex } from '@/hooks/usePlanningSessionsIndex'
 import { readCadenceConfig, localYmd } from '@/lib/cadence/config'
-import { planningNudge } from '@/lib/planning/nudges'
+import { planningNudge, type NudgeKind } from '@/lib/planning/nudges'
 
 export const PLAN_NUDGE_DISMISSED_KEY = (uid: string) => `symphony.planNudge.dismissed.${uid}`
 
@@ -29,9 +36,13 @@ const REFRESH_MS = 60_000
 
 interface PlanningNudgeProps {
   uid: string
+  /** Show only this kind of nudge — the module skips the others, so a year
+   *  candidate above the week in precedence does not silence it. Today
+   *  passes `week`. */
+  only?: Exclude<NudgeKind, 'first-use'>
 }
 
-export function PlanningNudge({ uid }: PlanningNudgeProps) {
+export function PlanningNudge({ uid, only }: PlanningNudgeProps) {
   const { seasons } = useHouseholdSeasons()
   const { completed, neverPlanned, loading, error } = usePlanningSessionsIndex()
 
@@ -64,9 +75,10 @@ export function PlanningNudge({ uid }: PlanningNudgeProps) {
       completed,
       neverPlanned,
       dismissedToken,
+      only,
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps -- `today` stands in for `new Date()`; the Date itself is deliberately not a dep.
-  }, [loading, error, seasons, completed, neverPlanned, dismissedToken, today])
+  }, [loading, error, seasons, completed, neverPlanned, dismissedToken, only, today])
 
   const handleDismiss = useCallback(() => {
     if (!nudge) return
@@ -77,25 +89,23 @@ export function PlanningNudge({ uid }: PlanningNudgeProps) {
   if (loading || error || !nudge) return null
 
   return (
-    // Own wrapper (mirrors the first-week card's column) so this renders
-    // ONLY when there's a nudge to show — HomeViewContainer no longer owns
-    // a shared wrapper that would otherwise leave an empty padded band above
-    // Today when both the card and this are null.
-    <div className="w-full max-w-[1152px] mr-auto px-0 pt-2 md:px-10 md:pt-8 lg:px-14">
-      <p role="status" className="mx-3 mb-4 text-[13px] text-neutral-600 md:mx-0">
+    // Renders ONLY when there's a nudge to show, so it never leaves an empty
+    // band on the page. A quiet line: the sentence and its link at the left,
+    // the dismissal on its own at the right.
+    <p role="status" className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-neutral-200 pt-4 text-[13px] text-neutral-500">
+      <span>
         {nudge.text}{' '}
-        <Link to={nudge.to} className="font-semibold text-primary-700">
+        <Link to={nudge.to} className="font-semibold text-primary-700 hover:text-primary-900">
           {nudge.cta}
-        </Link>{' '}
-        <span className="text-neutral-400">optional</span>{' '}
-        <button
-          type="button"
-          onClick={handleDismiss}
-          className="text-neutral-400 hover:text-neutral-600 transition-colors"
-        >
-          Not now
-        </button>
-      </p>
-    </div>
+        </Link>
+      </span>
+      <button
+        type="button"
+        onClick={handleDismiss}
+        className="ml-auto text-neutral-400 transition-colors hover:text-neutral-600"
+      >
+        Not now
+      </button>
+    </p>
   )
 }

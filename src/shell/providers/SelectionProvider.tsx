@@ -112,3 +112,9 @@ export function useSelection(): SelectionContextValue {
   }
   return ctx;
 }
+
+/** The selection when a provider is present, else null — for a panel that is
+ *  also drawn outside the shell (tests, standalone mounts). */
+export function useSelectionOptional(): SelectionContextValue | null {
+  return useContext(SelectionContext);
+}

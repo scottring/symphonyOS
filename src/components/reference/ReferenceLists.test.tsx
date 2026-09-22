@@ -1,13 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Link, useLocation } from 'react-router-dom'
 import { ReferenceListsProvider } from './ReferenceListsContext'
 import { ReferenceListControls, ReferenceListsDock } from './ReferenceLists'
 import type { Task } from '@/types/task'
 import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
 
-const data = vi.hoisted(() => ({ tasks: [] as Task[], allow: true, push: vi.fn(), update: vi.fn(), complete: vi.fn() }))
-vi.mock('@/hooks/useSupabaseTasks', () => ({ useSupabaseTasks: () => ({ tasks: data.tasks, loading: false, updateTask: data.update, updateTasksBulk: vi.fn(), pushTask: data.push, toggleTask: data.complete }) }))
+const data = vi.hoisted(() => ({ tasks: [] as Task[], allow: true, push: vi.fn(), update: vi.fn(), complete: vi.fn(), remove: vi.fn(async () => {}), removeRoutine: vi.fn(async () => true) }))
+vi.mock('@/hooks/useSupabaseTasks', () => ({ useSupabaseTasks: () => ({ tasks: data.tasks, loading: false, updateTask: data.update, updateTasksBulk: vi.fn(), pushTask: data.push, toggleTask: data.complete, deleteTask: data.remove }) }))
 vi.mock('@/hooks/useFamilyMembers', () => ({ useFamilyMembers: () => ({ getCurrentUserMember: () => ({ id: 'me' }) }) }))
 vi.mock('@/hooks/useDomain', () => ({ useDomain: () => ({ layers: new Set(['personal']) }) }))
 vi.mock('@/hooks/useGatedTaskActions', async (importOriginal) => ({ ...await importOriginal<typeof import('@/hooks/useGatedTaskActions')>(), useGatedTaskActions: () => ({ updateTask: data.update, pushTask: async (...args: unknown[]) => { if (!data.allow) return false; await data.push(...args); return true } }) }))
@@ -122,6 +122,7 @@ describe('Pinned reference lists', () => {
 const planMock = vi.hoisted(() => ({
   chooseTaskDay: vi.fn(), unchooseTask: vi.fn(), timeTask: vi.fn(), commitTask: vi.fn(),
   chooseRoutine: vi.fn(), drop: vi.fn(), toggleTask: vi.fn(), completeRoutine: vi.fn(async () => true),
+  deleteTask: vi.fn(async () => {}), deleteRoutine: vi.fn(async () => true),
 }))
 vi.mock('@/hooks/usePlanActions', () => ({ usePlanActions: () => planMock }))
 vi.mock('@/hooks/useDayPlan', () => ({
@@ -144,6 +145,14 @@ vi.mock('@/hooks/useDayPlan', () => ({
       ],
       counts: { scheduled: 1, available: 1 },
       offMainTaskIds: new Set(), offMainRoutineItemIds: new Set(), plannedExtraTasks: [],
+      // Today's chooser (2026-09-22): the week's tasks, then the routines.
+      chooserTasks: [
+        { key: 'task:w', kind: 'task', id: 'w', title: 'Book the plumber', completed: false, planned: false, group: 'plan', context: 'September plan' },
+      ],
+      chooserRoutines: [
+        { key: 'routine:r1', kind: 'routine', id: 'r1', title: 'Kids clean rooms', completed: false, planned: false, group: 'available', context: 'Weekly routine' },
+        { key: 'routine:r2', kind: 'routine', id: 'r2', title: 'Family reading time', completed: false, planned: true, group: 'available', context: 'Daily routine' },
+      ],
     },
   }),
 }))
@@ -154,7 +163,8 @@ describe('The Planning panel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Pin Planning' }))
     fireEvent.click(screen.getByRole('button', { name: 'Pin week list' }))
     const plan = screen.getByRole('region', { name: 'Choose tasks' })
-    expect(plan).toHaveTextContent('To plan')
+    expect(plan).toHaveTextContent("This week's tasks")
+    expect(plan).toHaveTextContent('Routines')
     expect(screen.getByText('Book a service visit')).toBeInTheDocument()
     expect(planMock.chooseTaskDay).not.toHaveBeenCalled()
     expect(data.update).not.toHaveBeenCalled()
@@ -166,15 +176,18 @@ describe('The Planning panel', () => {
     expect(screen.getByRole('region', { name: 'Choose tasks' })).toBeInTheDocument()
   })
 
-  it('every drag has a button: choose for today, move back, set a day or time', () => {
+  it('every drag has a button: choose for today, unchoose, set a day or time', () => {
     mount(); fireEvent.click(screen.getByRole('button', { name: 'Pin Planning' }))
-    fireEvent.click(screen.getByRole('button', { name: 'Plan Book the plumber for today' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Choose Book the plumber for today' }))
     expect(planMock.chooseTaskDay).toHaveBeenCalledWith('w', expect.any(Date))
-    fireEvent.click(screen.getByRole('button', { name: 'Plan Kids clean rooms for today' }))
+    // Choosing a routine selects this occurrence, never a new task and never
+    // the repeating rule.
+    fireEvent.click(screen.getByRole('button', { name: 'Choose Kids clean rooms for today' }))
     expect(planMock.chooseRoutine).toHaveBeenCalledWith('r1', expect.any(Date), true, 'Kids clean rooms')
-    // A chosen occurrence is marked, not listed again as unfinished.
-    expect(screen.getByText('Planned today')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Move Family reading time back off today' }))
+    // A chosen occurrence reads "Today ✓"; pressing it again removes only today's choice.
+    const chosen = screen.getByRole('button', { name: 'Unchoose Family reading time for today' })
+    expect(chosen).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(chosen)
     expect(planMock.chooseRoutine).toHaveBeenCalledWith('r2', expect.any(Date), false, 'Family reading time')
     fireEvent.click(screen.getByRole('button', { name: 'More for Book the plumber' }))
     expect(screen.getByRole('menuitem', { name: 'Schedule Book the plumber' })).toBeInTheDocument()
@@ -182,15 +195,61 @@ describe('The Planning panel', () => {
     expect(screen.queryByText('Pick up foot meds')).not.toBeInTheDocument()
   })
 
-  it('one list, each row with its context; the month plan opens on request', () => {
+  // Scott, 2026-09-22: "also need to be able to delete items from the chooser".
+  it('Delete behind ⋯ hides the row behind an Undo line; Undo brings it back, the window closing deletes it', () => {
+    vi.useFakeTimers()
+    try {
+      mount(); fireEvent.click(screen.getByRole('button', { name: 'Pin Planning' }))
+      fireEvent.click(screen.getByRole('button', { name: 'More for Book the plumber' }))
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Delete: Book the plumber' }))
+      expect(screen.queryByText('Book the plumber')).not.toBeInTheDocument()
+      expect(screen.getByRole('status')).toHaveTextContent(/Deleted “Book the plumber”/)
+      expect(planMock.deleteTask).not.toHaveBeenCalled()
+      fireEvent.click(screen.getByRole('button', { name: 'Undo' }))
+      expect(screen.getByText('Book the plumber')).toBeInTheDocument()
+      expect(planMock.deleteTask).not.toHaveBeenCalled()
+      fireEvent.click(screen.getByRole('button', { name: 'More for Book the plumber' }))
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Delete: Book the plumber' }))
+      act(() => { vi.advanceTimersByTime(8500) })
+      expect(planMock.deleteTask).toHaveBeenCalledWith('w')
+      expect(screen.queryByRole('status')).not.toBeInTheDocument()
+      // A routine row deletes the routine the same way.
+      fireEvent.click(screen.getByRole('button', { name: 'More for Kids clean rooms' }))
+      fireEvent.click(screen.getByRole('menuitem', { name: 'Delete routine: Kids clean rooms' }))
+      expect(screen.queryByText('Kids clean rooms')).not.toBeInTheDocument()
+      act(() => { vi.advanceTimersByTime(8500) })
+      expect(planMock.deleteRoutine).toHaveBeenCalledWith('r1')
+    } finally { vi.useRealTimers() }
+  })
+
+  it('the header widens the chooser to half the screen for triage, and remembers it', () => {
+    localStorage.removeItem('symphony.chooser.wide')
+    const view = mount(); fireEvent.click(screen.getByRole('button', { name: 'Pin Planning' }))
+    const dock = screen.getByRole('complementary', { name: 'Pinned reference lists' })
+    expect(dock).not.toHaveClass('is-wide')
+    const widen = screen.getByRole('button', { name: 'Widen the chooser for triage' })
+    expect(widen).toHaveAttribute('aria-pressed', 'false')
+    fireEvent.click(widen)
+    expect(dock).toHaveClass('is-wide')
+    // Wide: the row's moves are visible pills, not a ⋯ menu.
+    expect(screen.queryByRole('button', { name: 'More for Book the plumber' })).toBeNull()
+    expect(screen.getByRole('button', { name: 'Delete: Book the plumber' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Narrow the chooser' })).toHaveAttribute('aria-pressed', 'true')
+    view.unmount()
+    mount()
+    expect(screen.getByRole('complementary', { name: 'Pinned reference lists' })).toHaveClass('is-wide')
+    localStorage.removeItem('symphony.chooser.wide')
+  })
+
+  it('two sections, each row with its context; no month browser beside Today', () => {
     mount(); fireEvent.click(screen.getByRole('button', { name: 'Pin Planning' }))
     expect(screen.getByText('Book the plumber')).toBeInTheDocument()
     expect(screen.getByText('September plan')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /^This week/ })).toBeNull()
+    expect(screen.getByText('Weekly routine')).toBeInTheDocument()
     expect(screen.queryByText(/Available today|Carried over/)).toBeNull()
+    // Month-to-week selection belongs on the Week page (2026-09-22).
     expect(screen.queryByText('Plan the porch')).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: /Browse month plan/ }))
-    expect(screen.getByText('Plan the porch')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Browse month plan/ })).toBeNull()
   })
 
   it('a row dropped on the pinned week list commits it to the week — no day invented', () => {

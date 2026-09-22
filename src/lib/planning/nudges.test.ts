@@ -164,3 +164,17 @@ describe('planningNudge', () => {
     expect(r).toBeNull()
   })
 })
+
+describe('planningNudge — only one kind', () => {
+  it('only: "week" skips first-use and the higher candidates, and returns the week when its window is open', () => {
+    const base = { seasons: DEFAULT_SEASONS, weekStartsOn: 0 as const, completed: new Set<string>(), dismissedToken: null }
+    // Monday Dec 21 2026: year (Nov 20+) and week (Mon/Tue) windows both open.
+    const monday = new Date(2026, 11, 21, 9)
+    expect(planningNudge({ ...base, now: monday, neverPlanned: false })?.kind).toBe('year')
+    expect(planningNudge({ ...base, now: monday, neverPlanned: false, only: 'week' })?.kind).toBe('week')
+    // Never planned: first-use would win; with only: 'week' it is the week.
+    expect(planningNudge({ ...base, now: monday, neverPlanned: true, only: 'week' })?.kind).toBe('week')
+    // Wednesday: no week window → nothing, even though the year is open.
+    expect(planningNudge({ ...base, now: new Date(2026, 11, 23, 9), neverPlanned: false, only: 'week' })).toBeNull()
+  })
+})

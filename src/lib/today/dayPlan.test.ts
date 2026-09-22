@@ -269,8 +269,70 @@ describe('toPlan — the week list stays whole (guided planning, Phase 2)', () =
     expect(selectDayPlan(input({ tasks: [t] })).toPlan[0].context).toBe('from September')
   })
 
+  // Scott, 2026-09-22: "the week tasks are very old (hence most are
+  // completed)" — legacy bucket-week rows with no week of their own read as
+  // the current week's forever; once done they are history, not this week's.
+  it('a completed legacy row with no week of its own is not on this week\'s list; an open one still is', () => {
+    const doneLegacy = createMockTask({ id: 'old', title: 'Hang up hooks', bucket: 'week', weekStart: undefined, completed: true, commitments: [] })
+    const openLegacy = createMockTask({ id: 'cur', title: 'Call the plumber', bucket: 'week', weekStart: undefined, completed: false, commitments: [] })
+    const doneThisWeek = onWeek({ id: 'w2', title: 'Done this week', completed: true, commitments: [{ level: 'week', periodStart: WEEK, status: 'done' }] })
+    const plan = selectDayPlan(input({ tasks: [doneLegacy, openLegacy, doneThisWeek] }))
+    expect(plan.toPlan.map((e) => e.id)).toEqual(['cur', 'w2'])
+    expect(plan.chooserTasks.map((e) => e.id)).toEqual(['cur', 'w2'])
+  })
+
   it('a goal is never on the week list', () => {
     const g = onWeek({ id: 'g', isGoal: true })
     expect(selectDayPlan(input({ tasks: [g] })).toPlan).toEqual([])
+  })
+})
+
+// Today's chooser (Scott via Codex, 2026-09-22): this week's tasks, and the
+// day's routine occurrences in their own section — the flexible ones to
+// choose, the timed ones already on the day (marked, never offered twice),
+// and weekly routines with no day yet. Present even when the week is empty.
+describe('chooser — this week\'s tasks and today\'s routines', () => {
+  const onWeek = (over: Partial<Task>) => createMockTask({ bucket: 'week', weekStart: WEEK, commitments: [{ level: 'week', periodStart: WEEK, status: 'open' }], ...over })
+
+  it('the tasks are the week list, whole — chosen and ticked rows stay', () => {
+    const chosen = onWeek({ id: 'w1', title: 'Book the plumber', focus: [{ userId: 'me', date: SAT }] })
+    const done = onWeek({ id: 'w2', title: 'Done thing', completed: true, commitments: [{ level: 'week', periodStart: WEEK, status: 'done' }] })
+    const plan = selectDayPlan(input({ tasks: [chosen, done], userId: 'me' }))
+    expect(plan.chooserTasks.map((e) => [e.id, e.planned, e.completed])).toEqual([['w1', true, false], ['w2', false, true]])
+    expect(plan.chooserTasks.every((e) => e.kind === 'task')).toBe(true)
+  })
+
+  it('a flexible occurrence is offered with its cadence; a chosen one stays, marked', () => {
+    const plan = selectDayPlan(input({
+      routines: [weekend({ id: 'r1', name: 'Kids clean rooms' }), weekend({ id: 'r2', name: 'Family reading time' })],
+      dateInstances: [inst('r2', { planned_on: SAT_YMD })],
+    }))
+    expect(plan.chooserRoutines.map((e) => [e.id, e.planned, e.onToday ?? false, e.context])).toEqual([
+      ['r1', false, false, 'Weekly routine'],
+      ['r2', true, false, 'Weekly routine'],
+    ])
+  })
+
+  it('a timed occurrence is on today by its own rule: listed once, marked, with its time — never offered', () => {
+    const plan = selectDayPlan(input({
+      routines: [
+        weekend({ id: 't', name: 'Boxing', time_of_day: '09:00:00' }),
+        weekend({ id: 'pt', name: 'PT exercises', pin_to_timeline: true }),
+      ],
+    }))
+    const boxing = plan.chooserRoutines.find((e) => e.id === 't')
+    expect(boxing).toMatchObject({ onToday: true, planned: true, context: 'Weekly routine · 9a' })
+    expect(plan.chooserRoutines.filter((e) => e.id === 't')).toHaveLength(1)
+    expect(plan.chooserRoutines.find((e) => e.id === 'pt')).toMatchObject({ onToday: true })
+    // The main list still draws them; the available (choosable) list does not.
+    expect(plan.available).toEqual([])
+  })
+
+  it('routines stay when the week\'s list is empty; a routine with no day of its own is last', () => {
+    const unhomed = createMockRoutine({ id: 'u', name: 'Pack the bike bags', time_of_day: null, recurrence_pattern: { type: 'weekly', days: [] } })
+    const plan = selectDayPlan(input({ routines: [weekend({ id: 'r1', name: 'Kids clean rooms' })], unhomedRoutines: [unhomed] }))
+    expect(plan.chooserTasks).toEqual([])
+    expect(plan.chooserRoutines.map((e) => e.id)).toEqual(['r1', 'u'])
+    expect(plan.chooserRoutines[1]).toMatchObject({ routine: unhomed, context: 'Weekly routine · no set day' })
   })
 })

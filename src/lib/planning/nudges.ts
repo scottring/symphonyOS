@@ -45,6 +45,10 @@ export interface PlanningNudgeInput {
   /** true when the household has never saved a session (any horizon). */
   neverPlanned: boolean
   dismissedToken: string | null
+  /** Restrict to one kind: Today asks only for the week (Scott via Codex,
+   *  2026-09-22), so a year or season candidate above it in precedence is
+   *  not the answer there. The first-use nudge counts as not-the-week. */
+  only?: Exclude<NudgeKind, 'first-use'>
 }
 
 const DAY_MS = 86_400_000
@@ -91,12 +95,12 @@ function isPlanned(
 
 /** The one nudge to show right now, or null. */
 export function planningNudge(input: PlanningNudgeInput): PlanningNudgeResult | null {
-  const { now, seasons, weekStartsOn, completed, neverPlanned, dismissedToken } = input
+  const { now, seasons, weekStartsOn, completed, neverPlanned, dismissedToken, only } = input
 
   // A dismissed first-use nudge falls through to the ordinary candidates
   // below rather than reappearing forever — "Not now" has to stay dismissed
   // here too, the same as any other token.
-  if (neverPlanned && dismissedToken !== 'first-use') {
+  if (!only && neverPlanned && dismissedToken !== 'first-use') {
     const year = now.getFullYear()
     return {
       kind: 'first-use',
@@ -116,6 +120,7 @@ export function planningNudge(input: PlanningNudgeInput): PlanningNudgeResult | 
 
   for (const candidate of candidates) {
     if (!candidate) continue
+    if (only && candidate.kind !== only) continue
     if (isPlanned(completed, candidate.kind, candidate.token)) continue
     if (dismissedToken !== null && dismissedToken === candidate.token) continue
     return candidate

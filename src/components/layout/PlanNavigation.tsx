@@ -37,9 +37,15 @@ export function PlanNavigation({ mobile = false, paused = false }: { mobile?: bo
   // component; a desktop pinned panel is a follow-up).
   const [goalsOpen, setGoalsOpen] = useState(false)
   const sheetOpen = sheetPath === pathname
-  // Today and Week already own mobile choosers with their actual viewed date.
-  const showChooser = !mobile || (period && period !== 'week')
-  if (!period && !showChooser) return null
+  // Today draws its ONE chooser control on its "For today" heading (Scott via
+  // Codex, 2026-09-22), at every width; Week owns a mobile chooser with its
+  // actual viewed date. Elsewhere this row is the door.
+  const onToday = pathname === '/' || pathname === '/today' || pathname.startsWith('/tasks-new')
+  const showChooser = !onToday && (!mobile || (period && period !== 'week'))
+  // The kept-pins note ("Lists return when you close the side panel") is
+  // still said on Today, even though its chooser button lives on the page.
+  const pausedNote = !mobile && paused && !!references && references.pins.length > 0
+  if (!period && !showChooser && !pausedNote) return null
   const range = new URLSearchParams(search).get('range') ?? 'week'
   return <div className="plan-page-tools">
     {period && <div className="plan-period-controls">
@@ -55,13 +61,13 @@ export function PlanNavigation({ mobile = false, paused = false }: { mobile?: bo
         </select>
       </label>}
     </div>}
-    {showChooser && references && <div className="task-chooser-control">
-      <button type="button" aria-label={pinned && !mobile ? 'Close task chooser' : 'Choose tasks'}
+    {(showChooser || pausedNote) && references && <div className="task-chooser-control">
+      {showChooser && <button type="button" aria-label={pinned && !mobile ? 'Close task chooser' : 'Choose tasks'}
         aria-pressed={mobile ? sheetOpen : pinned}
         onClick={() => mobile ? setSheetPath(sheetOpen ? null : pathname) : pinned ? references.unpin('today') : references.pin('today')}>
         <PanelLeft size={15} aria-hidden="true" />Choose tasks
-      </button>
-      {paused && references.pins.length > 0 && <span>Lists return when you close the side panel.</span>}
+      </button>}
+      {pausedNote && <span>Lists return when you close the side panel.</span>}
     </div>}
     {period && <div className="goals-reference-control">
       <button type="button" aria-label="Goals" aria-expanded={goalsOpen} onClick={() => setGoalsOpen(open => !open)}>
