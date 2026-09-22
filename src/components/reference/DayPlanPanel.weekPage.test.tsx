@@ -81,6 +81,49 @@ describe('DayPlanPanel — the Planning panel', () => {
     expect(screen.getByRole('button', { name: 'Choose Take a walk for today' })).toHaveAttribute('aria-pressed', 'false')
   })
 
+  it('beside a day, a section folds on its heading without closing the chooser, and the fold is remembered', () => {
+    localStorage.removeItem('symphony.chooser.folded')
+    const p = plan(2)
+    p.chooserRoutines = [{ key: 'routine:r1', kind: 'routine', id: 'r1', title: 'Take a walk', completed: false, planned: false, group: 'available', context: 'Daily routine' }]
+    const view = render(<DayPlanPanel plan={p} day={day} actions={actions} />)
+    const tasksHeading = screen.getByRole('button', { name: /This week's tasks/ })
+    expect(tasksHeading).toHaveAttribute('aria-expanded', 'true')
+    fireEvent.click(tasksHeading)
+    expect(tasksHeading).toHaveAttribute('aria-expanded', 'false')
+    expect(screen.queryByText('Item 1')).not.toBeInTheDocument()
+    // The other section and the foot are untouched — the chooser is still open.
+    expect(screen.getByText('Take a walk')).toBeInTheDocument()
+    expect(screen.getByText(/Choices stay on your week's list/)).toBeInTheDocument()
+    view.unmount()
+    render(<DayPlanPanel plan={p} day={day} actions={actions} />)
+    expect(screen.getByRole('button', { name: /This week's tasks/ })).toHaveAttribute('aria-expanded', 'false')
+    localStorage.removeItem('symphony.chooser.folded')
+  })
+
+  it('beside a day, "Hide completed" hides done rows in both sections and is remembered; all-done says so', () => {
+    localStorage.removeItem('symphony.chooser.hideCompleted')
+    const p = plan(0)
+    p.chooserTasks = [
+      { key: 'task:a', kind: 'task', id: 'a', title: 'Open task', completed: false, planned: false, group: 'plan' },
+      { key: 'task:b', kind: 'task', id: 'b', title: 'Done task', completed: true, planned: false, group: 'plan' },
+    ]
+    p.chooserRoutines = [{ key: 'routine:d', kind: 'routine', id: 'd', title: 'Done routine', completed: true, planned: true, group: 'available', context: 'Daily routine' }]
+    const view = render(<DayPlanPanel plan={p} day={day} actions={actions} />)
+    expect(screen.getByText('Done task')).toBeInTheDocument()
+    const toggle = screen.getByRole('button', { name: 'Hide completed' })
+    expect(toggle).toHaveAttribute('aria-pressed', 'false')
+    fireEvent.click(toggle)
+    expect(screen.queryByText('Done task')).not.toBeInTheDocument()
+    expect(screen.getByText('Open task')).toBeInTheDocument()
+    expect(screen.queryByText('Done routine')).not.toBeInTheDocument()
+    expect(screen.getByText('Every routine for today is done.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Show completed' })).toHaveAttribute('aria-pressed', 'true')
+    view.unmount()
+    render(<DayPlanPanel plan={p} day={day} actions={actions} />)
+    expect(screen.queryByText('Done task')).not.toBeInTheDocument()
+    localStorage.removeItem('symphony.chooser.hideCompleted')
+  })
+
   it('beside a day, a routine already on the schedule is marked, not offered; a chosen one reads "Today ✓" and unchooses', () => {
     const choose = vi.fn(); const unchoose = vi.fn()
     const p = plan(0)

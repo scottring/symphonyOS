@@ -269,6 +269,18 @@ describe('toPlan — the week list stays whole (guided planning, Phase 2)', () =
     expect(selectDayPlan(input({ tasks: [t] })).toPlan[0].context).toBe('from September')
   })
 
+  // Scott, 2026-09-22: "the week tasks are very old (hence most are
+  // completed)" — legacy bucket-week rows with no week of their own read as
+  // the current week's forever; once done they are history, not this week's.
+  it('a completed legacy row with no week of its own is not on this week\'s list; an open one still is', () => {
+    const doneLegacy = createMockTask({ id: 'old', title: 'Hang up hooks', bucket: 'week', weekStart: undefined, completed: true, commitments: [] })
+    const openLegacy = createMockTask({ id: 'cur', title: 'Call the plumber', bucket: 'week', weekStart: undefined, completed: false, commitments: [] })
+    const doneThisWeek = onWeek({ id: 'w2', title: 'Done this week', completed: true, commitments: [{ level: 'week', periodStart: WEEK, status: 'done' }] })
+    const plan = selectDayPlan(input({ tasks: [doneLegacy, openLegacy, doneThisWeek] }))
+    expect(plan.toPlan.map((e) => e.id)).toEqual(['cur', 'w2'])
+    expect(plan.chooserTasks.map((e) => e.id)).toEqual(['cur', 'w2'])
+  })
+
   it('a goal is never on the week list', () => {
     const g = onWeek({ id: 'g', isGoal: true })
     expect(selectDayPlan(input({ tasks: [g] })).toPlan).toEqual([])

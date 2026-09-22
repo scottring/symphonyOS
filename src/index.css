@@ -1751,6 +1751,11 @@ html.desktop-shell a {
   font-size: 12px; font-weight: 600; letter-spacing: 0.035em; color: var(--color-neutral-800);
 }
 .chooser-section-heading > span:last-child { margin-left: auto; letter-spacing: 0; font-weight: 400; font-size: 11px; color: var(--color-neutral-500); }
+.chooser-section-toggle { display: inline-flex; align-items: center; gap: 6px; padding: 0; background: none; border: 0; font: inherit; letter-spacing: inherit; color: inherit; cursor: pointer; text-align: left; }
+.chooser-section-toggle:hover { color: var(--color-neutral-950); }
+.chooser-toolbar { display: flex; justify-content: flex-end; margin-bottom: -6px; }
+.chooser-toggle { padding: 2px 0; background: none; border: 0; font-size: 11px; color: var(--color-neutral-500); cursor: pointer; }
+.chooser-toggle:hover, .chooser-toggle[aria-pressed="true"] { color: var(--color-sage-600); }
 .chooser-section-heading svg { color: var(--color-neutral-500); }
 .chooser-rows { margin-top: 2px; }
 /* Unscoped on purpose: the same rows draw in the dock (.reference-list) and in
