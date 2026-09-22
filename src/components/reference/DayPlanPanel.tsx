@@ -22,7 +22,7 @@
 // for a routine with no day, "Change repeating schedule"). No clock glyphs,
 // no "Give it a day", nothing called "let go" (deferred? dropped? deleted?).
 import { useEffect, useState, type ReactNode } from 'react'
-import { Check, ChevronDown, ChevronRight, GripVertical, MoreHorizontal } from 'lucide-react'
+import { Check, ChevronDown, ChevronRight, GripVertical, MoreHorizontal, Repeat } from 'lucide-react'
 import { SchedulePopover } from '@/components/triage'
 import type { DayPlan, DayPlanEntry } from '@/lib/today/dayPlan'
 import { writePlanDrag } from '@/lib/planning/planDrag'
@@ -30,8 +30,6 @@ import { localYmd, weekStartAnchor, readCadenceConfig } from '@/lib/cadence/conf
 import { formatWeekRangeShort } from '@/lib/dateHelpers'
 import { onUnfinishedOpenChange, readUnfinishedOpen, writeUnfinishedOpen } from '@/lib/planningPanelSignal'
 import { requestQuickAdd } from '@/lib/quickAddSignal'
-import { useAuth } from '@/hooks/useAuth'
-import { Hint } from '@/components/plan/Hint'
 
 /** Rows a group shows before "+N more" — the pin is a fixed-space surface. */
 export const PLAN_GROUP_CAP = 6
@@ -265,6 +263,121 @@ function PlanRow({ entry, day, actions, draggable, weekPage = null }: {
   )
 }
 
+/**
+ * One row of Today's chooser (approved white journal, 2026-09-22): the
+ * title, a routine's cadence and time beneath it, and one pill — "Choose",
+ * or "Today ✓" pressed, which pressed again removes only today's choice.
+ * A routine occurrence already on the day by its own time says "On today's
+ * schedule" instead of a pill; a done row says "Completed". Choosing a
+ * routine selects this occurrence, never the repeating rule, and completion
+ * is the Today list's checkbox, not a control here. The ⋯ menu keeps the
+ * row's other moves (a day or time, Someday).
+ */
+function ChooserRow({ entry, day, actions, draggable }: {
+  entry: DayPlanEntry
+  day: Date
+  actions: DayPlanPanelActions
+  draggable: boolean
+}) {
+  const canDrag = draggable && !entry.completed && !entry.planned && !entry.onToday
+  const unhomed = !!entry.routine
+  const picked = entry.planned && !entry.onToday
+  const pillAria = `${picked ? 'Unchoose' : 'Choose'} ${entry.title} for today`
+  return (
+    <li
+      className="group flex items-start gap-2.5 text-[14px]"
+      draggable={canDrag}
+      onDragStart={canDrag ? (e) => writePlanDrag(e.dataTransfer, {
+        kind: entry.kind, id: entry.id, date: localYmd(day), title: entry.title,
+      }) : undefined}
+      data-plan-key={entry.key}
+    >
+      {canDrag
+        ? <GripVertical aria-hidden="true" className="mt-[3px] h-3.5 w-3.5 shrink-0 cursor-grab text-neutral-300 opacity-0 transition-opacity group-hover:opacity-100" />
+        : <span aria-hidden="true" className="w-3.5 shrink-0" />}
+      {entry.kind === 'routine' && (
+        <Repeat aria-hidden="true" className="mt-[4px] h-3.5 w-3.5 shrink-0 text-neutral-400" />
+      )}
+      <div className="min-w-0 flex-1">
+        <span className={`line-clamp-2 break-words leading-snug ${entry.completed ? 'text-neutral-400 line-through' : 'text-neutral-800'}`}>
+          {entry.title}
+        </span>
+        {entry.context && <span className="chooser-cadence">{entry.context}</span>}
+        {entry.onToday && !entry.completed && <span className="chooser-status">On today's schedule</span>}
+        {entry.completed && <span className="chooser-status">Completed</span>}
+      </div>
+      {entry.completed || entry.onToday ? null : (
+        <div className="flex shrink-0 items-center gap-0.5">
+          {unhomed ? (
+            // No day of its own yet: the pill asks for a time, and this
+            // week's occurrence lands on today (a same-day override), never
+            // the repeating rule, which is the menu's separate move.
+            <SchedulePopover
+              itemTitle={entry.title}
+              skipToTime
+              value={day}
+              onSchedule={(when) => actions.placeRoutine?.(entry, when)}
+              trigger={<button type="button" aria-label={pillAria} className="chooser-pill">Choose…</button>}
+            />
+          ) : (
+            <button
+              type="button"
+              aria-label={pillAria}
+              aria-pressed={picked}
+              onClick={() => (picked ? actions.unchoose(entry) : actions.choose(entry))}
+              className="chooser-pill"
+            >
+              {picked ? 'Today ✓' : 'Choose'}
+            </button>
+          )}
+          <RowMenu entry={entry} day={day} actions={actions} />
+        </div>
+      )}
+    </li>
+  )
+}
+
+/** One section of Today's chooser: a small ruled heading with a note at its
+ *  right, then the rows, outstanding first. */
+function ChooserSection({ title, note, icon, entries, day, actions, draggable, empty }: {
+  title: string
+  note?: string
+  icon?: ReactNode
+  entries: DayPlanEntry[]
+  day: Date
+  actions: DayPlanPanelActions
+  draggable: boolean
+  empty?: ReactNode
+}) {
+  const [all, setAll] = useState(false)
+  const ordered = [...entries].sort((a, b) => rank(a) - rank(b))
+  const shown = all ? ordered : ordered.slice(0, PLAN_GROUP_CAP)
+  const id = `chooser-${title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
+  return (
+    <section aria-labelledby={id} className="chooser-section">
+      <h3 id={id} className="chooser-section-heading">
+        {icon}
+        {title}
+        {note && <span>{note}</span>}
+      </h3>
+      {entries.length === 0 ? (
+        <div className="chooser-empty">{empty}</div>
+      ) : (
+        <>
+          <ul className="chooser-rows">
+            {shown.map((e) => <ChooserRow key={e.key} entry={e} day={day} actions={actions} draggable={draggable} />)}
+          </ul>
+          {!all && ordered.length > PLAN_GROUP_CAP && (
+            <button type="button" onClick={() => setAll(true)} className="py-1.5 text-[13px] text-neutral-500 hover:text-neutral-800">
+              Show {ordered.length - PLAN_GROUP_CAP} more
+            </button>
+          )}
+        </>
+      )}
+    </section>
+  )
+}
+
 /** The rows of one list, outstanding first, capped with "+N more" unless
  *  `cap` is null (on a week page the list IS the work). */
 function Rows({ entries, day, actions, draggable, weekPage, cap }: {
@@ -320,7 +433,7 @@ function Group({ title, entries, day, actions, draggable, defaultOpen, empty, ca
   }
   const outstanding = entries.filter((e) => !e.completed && !e.planned).length
   if (entries.length === 0 && !empty) return null
-  const id = `plan-group-${title.toLowerCase().replace(/\s+/g, '-')}`
+  const id = `plan-group-${title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`
   return (
     <div className="mt-4">
       <button
@@ -429,12 +542,56 @@ export function DayPlanPanel({ plan, day, actions, draggable = true, weekPage = 
 }) {
   const [monthOpen, setMonthOpen] = useState(false)
   const cap = weekPage !== null ? null : PLAN_GROUP_CAP
-  const { user } = useAuth()
+  if (weekPage === null) {
+    // Today's chooser (Scott via Codex, 2026-09-22): two sections, told
+    // apart by eye. "This week's tasks" is the week's list, whole; a chosen
+    // row stays, marked, and choosing again removes only today's choice.
+    // "Routines" is the day's occurrences — choosing one selects an
+    // occurrence for today, never a new task and never the repeating rule;
+    // one already on the day by its own time says so instead of being
+    // offered twice; and the section stays even when the week's list is
+    // empty. Month-to-week selection belongs on the Week page, so there is
+    // no month browser here. An empty week offers "Plan your week"; urgent
+    // work still goes straight to Today through Add task.
+    const tasks = plan.chooserTasks ?? (plan.toPlan ?? []).filter((e) => e.kind === 'task')
+    const routines = plan.chooserRoutines ?? []
+    const weekStart = weekStartAnchor(day, readCadenceConfig().weekStartsOn)
+    return (
+      <div data-testid="day-plan-panel">
+        <ChooserSection
+          title="This week's tasks"
+          note={formatWeekRangeShort(weekStart)}
+          entries={tasks}
+          day={day}
+          actions={actions}
+          draggable={draggable}
+          empty={
+            <>
+              <span>No tasks on this week's list yet.</span>
+              {/* A plain anchor, like the fold's Inbox link: this panel is
+                  drawn inside and outside the router. */}
+              <a href="/week">Plan your week →</a>
+            </>
+          }
+        />
+        {routines.length > 0 && (
+          <ChooserSection
+            title="Routines"
+            note="For today"
+            icon={<Repeat aria-hidden="true" className="h-3.5 w-3.5" />}
+            entries={routines}
+            day={day}
+            actions={actions}
+            draggable={draggable}
+          />
+        )}
+        <UnfinishedFold entries={plan.unfinished ?? []} older={plan.olderUnfinished ?? 0} day={day} actions={actions} draggable={draggable} weekPage={null} cap={cap} />
+        <p className="chooser-foot">Choices stay on your week's list.<br />Routine choices apply to this occurrence only.</p>
+      </div>
+    )
+  }
   return (
     <div data-testid="day-plan-panel">
-      {weekPage === null && (
-        <Hint name="day-pick" uid={user?.id ?? null}>The week list stays whole. Picking only marks what you mean to do today.</Hint>
-      )}
       <Group
         title="To plan"
         entries={plan.toPlan ?? []}

@@ -43,7 +43,7 @@ export function PlanningSheet({ open, onClose, weekPage = null, plan, day: dayPr
         </div>
         <header className="flex items-start justify-between gap-3 border-b border-neutral-300 pb-3">
           <div>
-            <h2 className="font-display text-[22px] leading-tight text-neutral-900">Choose tasks</h2>
+            <h2 className="font-display text-[22px] leading-tight text-neutral-900">{weekPage ? 'Choose tasks' : 'Choose for today'}</h2>
             <p className="mt-1 text-[13px] text-neutral-500">{planningSubtitle(day, weekPage)}</p>
           </div>
           <button type="button" onClick={onClose} aria-label="Close task chooser" className="rounded p-2 text-neutral-500 hover:bg-neutral-100"><X className="h-4 w-4" /></button>

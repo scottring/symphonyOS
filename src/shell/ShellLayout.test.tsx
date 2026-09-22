@@ -188,7 +188,9 @@ describe('Phone execution chrome', () => {
 describe('Consolidated desktop navigation', () => {
   beforeEach(() => { mobileState.isMobile = false; selectionState.selection = null; sessionStorage.clear(); localStorage.removeItem('symphony-plan-period') })
   it('separates destinations from the task chooser and keeps period links within Plan', () => {
-    renderAt('/today')
+    // Today draws its own Choose control on its "For today" heading
+    // (2026-09-22); the page-tools chooser is every other page's door.
+    renderAt('/notes')
     const nav = screen.getByRole('navigation', { name: 'Main navigation' })
     const chooser = screen.getByRole('button', { name: 'Choose tasks' })
     expect(nav).not.toContainElement(chooser)

@@ -1741,6 +1741,39 @@ html.desktop-shell a {
    period lists' roomier triage padding would make a weekend a wall again. */
 .reference-list .day-plan-rows li { padding-block: 7px; }
 
+/* Today's chooser (approved white journal, 2026-09-22): white paper, navy
+   serif heading, fine rules, restrained green — the same page, not a tinted
+   sidebar. Two sections told apart by eye: this week's tasks, then routines. */
+.chooser-section + .chooser-section { margin-top: 30px; }
+.chooser-section-heading {
+  display: flex; align-items: center; gap: 7px; padding-bottom: 9px; margin-top: 4px;
+  border-bottom: 1px solid var(--color-neutral-200);
+  font-size: 12px; font-weight: 600; letter-spacing: 0.035em; color: var(--color-neutral-800);
+}
+.chooser-section-heading > span:last-child { margin-left: auto; letter-spacing: 0; font-weight: 400; font-size: 11px; color: var(--color-neutral-500); }
+.chooser-section-heading svg { color: var(--color-neutral-500); }
+.reference-list .chooser-rows li { padding-block: 12px; border-bottom: 1px solid var(--color-neutral-100); }
+.chooser-cadence, .chooser-status { display: block; margin-top: 3px; font-size: 11px; color: var(--color-neutral-500); }
+.chooser-pill {
+  flex-shrink: 0; padding: 4px 8px; border: 1px solid var(--color-neutral-200); border-radius: 4px;
+  font-size: 12px; color: var(--color-neutral-800); background: white;
+}
+.chooser-pill:hover { background: var(--color-neutral-50); }
+.chooser-pill[aria-pressed="true"] { background: var(--color-sage-50); border-color: var(--color-sage-200); color: var(--color-sage-600); }
+.chooser-empty { padding: 17px 0; font-size: 13px; color: var(--color-neutral-500); }
+.chooser-empty a { display: block; margin-top: 9px; font-size: 12px; color: var(--color-sage-600); }
+.chooser-empty a:hover { color: var(--color-sage-600); }
+.chooser-foot { margin-top: 25px; font-size: 11px; line-height: 1.5; color: var(--color-neutral-500); }
+
+/* "For today" carries the page's two verbs: Choose (open or closed) and Add task. */
+.daybook-heading-actions { display: flex; align-items: center; gap: 14px; font-size: 12px; }
+.daybook-choose {
+  display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px;
+  border: 1px solid var(--color-neutral-300); border-radius: 5px; font-size: 12px; color: var(--color-neutral-800);
+}
+.daybook-choose:hover { background: var(--color-neutral-50); }
+.daybook-choose.is-open { background: var(--color-neutral-50); }
+
 /* One quiet menu row, aligned with the open page masthead. */
 .page-navigation {
   max-width: 1152px;

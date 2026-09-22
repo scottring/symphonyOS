@@ -45,9 +45,15 @@ describe('DayPlanPanel — the Planning panel', () => {
     expect(list.textContent).toBe('To plan')
   })
 
-  it('shows the day-pick hint above "To plan"', () => {
+  // Beside a day the panel is Today's chooser (approved white journal,
+  // 2026-09-22): two ruled sections, and a quiet foot line instead of a
+  // dismissible hint.
+  it('beside a day, is the chooser: "This week\'s tasks" with the week\'s range, a foot line, no dismissible hint', () => {
     render(<DayPlanPanel plan={plan(1)} day={day} actions={actions} />)
-    expect(screen.getByRole('note')).toHaveTextContent(/The week list stays whole/)
+    expect(screen.getByRole('heading', { name: /This week's tasks/ })).toBeInTheDocument()
+    expect(screen.queryByRole('note')).not.toBeInTheDocument()
+    expect(screen.getByText(/Choices stay on your week's list/)).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Browse month plan/ })).toBeNull()
   })
 
   // The hint explains picking a day's work from the week's list — meaningless
@@ -60,9 +66,41 @@ describe('DayPlanPanel — the Planning panel', () => {
   it('beside a day, stays a capped reference', () => {
     const n = PLAN_GROUP_CAP + 4
     render(<DayPlanPanel plan={plan(n)} day={day} actions={actions} />)
-    expect(screen.getByRole('button', { name: /^To plan$/ })).toHaveAttribute('aria-expanded', 'true')
+    expect(screen.getByRole('heading', { name: /This week's tasks/ })).toBeInTheDocument()
     expect(screen.queryByText(`Item ${n}`)).not.toBeInTheDocument()
     expect(screen.getByText(/Show 4 more/)).toBeInTheDocument()
+  })
+
+  it('beside a day, an empty week offers "Plan your week" and the routines stay', () => {
+    const p = plan(0)
+    p.chooserRoutines = [{ key: 'routine:r1', kind: 'routine', id: 'r1', title: 'Take a walk', completed: false, planned: false, group: 'available', context: 'Daily routine' }]
+    render(<DayPlanPanel plan={p} day={day} actions={actions} />)
+    expect(screen.getByText(/No tasks on this week's list yet/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Plan your week →' })).toHaveAttribute('href', '/week')
+    expect(screen.getByRole('heading', { name: /Routines/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Choose Take a walk for today' })).toHaveAttribute('aria-pressed', 'false')
+  })
+
+  it('beside a day, a routine already on the schedule is marked, not offered; a chosen one reads "Today ✓" and unchooses', () => {
+    const choose = vi.fn(); const unchoose = vi.fn()
+    const p = plan(0)
+    p.chooserRoutines = [
+      { key: 'routine:b', kind: 'routine', id: 'b', title: 'Boxing', completed: false, planned: true, onToday: true, group: 'available', context: 'Weekly routine · 9a' },
+      { key: 'routine:w', kind: 'routine', id: 'w', title: 'Take a walk', completed: false, planned: true, group: 'available', context: 'Daily routine' },
+      { key: 'routine:d', kind: 'routine', id: 'd', title: 'Evening reset', completed: true, planned: true, group: 'available', context: 'Daily routine' },
+    ]
+    render(<DayPlanPanel plan={p} day={day} actions={{ ...actions, choose, unchoose }} />)
+    expect(screen.getByText("On today's schedule")).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Boxing for today/ })).toBeNull()
+    expect(screen.getByText('Weekly routine · 9a')).toBeInTheDocument()
+    const walk = screen.getByRole('button', { name: 'Unchoose Take a walk for today' })
+    expect(walk).toHaveAttribute('aria-pressed', 'true')
+    expect(walk).toHaveTextContent('Today ✓')
+    fireEvent.click(walk)
+    expect(unchoose).toHaveBeenCalledWith(expect.objectContaining({ id: 'w' }))
+    expect(choose).not.toHaveBeenCalled()
+    expect(screen.getByText('Completed')).toBeInTheDocument()
+    expect(screen.getByText('Evening reset')).toHaveClass('line-through')
   })
 
   it('a row carries its context line, never a second category', () => {

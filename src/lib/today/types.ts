@@ -107,7 +107,8 @@ export const EMPTY_TODAY_DATA: TodayData = {
   completedInboxTasks: [],
   grouped: emptySections<TimelineItem>(),
   dayPlan: {
-    toPlan: [], unfinished: [], olderUnfinished: 0, carried: [], scheduled: [], available: [], week: [], month: [],
+    toPlan: [], unfinished: [], olderUnfinished: 0, chooserTasks: [], chooserRoutines: [],
+    carried: [], scheduled: [], available: [], week: [], month: [],
     counts: { scheduled: 0, available: 0 },
     offMainTaskIds: new Set(), offMainRoutineItemIds: new Set(), plannedExtraTasks: [],
   },

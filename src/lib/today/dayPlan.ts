@@ -45,7 +45,7 @@ import { weekListTasks, weekRowNote, weekRowNoteText } from '@/lib/planning/week
 import { selectStaleWeekPlacements } from './horizons'
 import { isRecentMiss, isMissedPlacement, missedWhen } from '@/lib/week/missedPlacement'
 import { routineTemporalLabel } from '@/lib/planning/routineTemporal'
-import { formatWeekRangeShort } from '@/lib/dateHelpers'
+import { formatWeekRangeShort, formatTimeCompact } from '@/lib/dateHelpers'
 import { weekStartAnchor, readCadenceConfig } from '@/lib/cadence/config'
 
 export type DayPlanGroup = 'carried' | 'scheduled' | 'available' | 'week' | 'month' | 'plan' | 'unfinished'
@@ -70,6 +70,10 @@ export interface DayPlanEntry {
   /** One small line that explains the row without another category to learn:
    *  "Originally Saturday", "Weekly routine", "September plan". */
   context?: string
+  /** A routine occurrence that is on today by its own rule — it has a time,
+   *  or is pinned to the timeline — so the chooser shows it as "Already on
+   *  today" instead of offering it a second time (Scott, 2026-09-22). */
+  onToday?: boolean
 }
 
 export interface DayPlan {
@@ -104,6 +108,14 @@ export interface DayPlan {
   /** Open misses older than the 14-day window: not on the list (Inbox ›
    *  Expired holds them), but the panel says they exist. Count only. */
   olderUnfinished: number
+  /** Today's chooser (Scott via Codex, 2026-09-22), in two sections. The
+   *  tasks are this week's list, whole — the same rows `toPlan` carries. */
+  chooserTasks: DayPlanEntry[]
+  /** The day's routine occurrences: the flexible ones to choose (a chosen one
+   *  stays, marked), the timed or pinned ones already on the day (`onToday`,
+   *  never offered twice), then weekly routines with no day of their own.
+   *  Present even when the week's list is empty. */
+  chooserRoutines: DayPlanEntry[]
 }
 
 export interface DayPlanInput {
@@ -319,17 +331,30 @@ export function selectDayPlan(input: DayPlanInput): DayPlan {
   )
   const byId = new Map(visible.map((r) => [r.id, r]))
   const available: DayPlanEntry[] = []
+  // Occurrences on today by their own rule (a time, a pinned obligation):
+  // the main list draws them; the chooser lists them as "Already on today".
+  const onDayRoutines: DayPlanEntry[] = []
+  const onDaySeen = new Set<string>()
   const offMainRoutineItemIds = new Set<string>()
   for (const item of buildRoutineDayItems(visible, input.viewedDate, statusMap)) {
-    if (item.startTime) continue // timed: the main list's
     const rid = routineIdOf(item)
     if (!rid || movedAway.has(rid)) continue
     const routine = byId.get(rid)
-    // Tracked obligations (PT exercises) are pinned to the timeline on purpose.
-    if (routine && isTimelineObligation(routine)) continue
-    // A collection whose time lives on its parent row ("Kids bedtime routine,
-    // 7pm", steps untimed) is a timed commitment even when no step has a time.
-    if (routine?.time_of_day) continue
+    // Timed: the main list's. Tracked obligations (PT exercises) are pinned to
+    // the timeline on purpose. A collection whose time lives on its parent row
+    // ("Kids bedtime routine, 7pm", steps untimed) is a timed commitment even
+    // when no step has a time.
+    if (item.startTime || (routine && isTimelineObligation(routine)) || routine?.time_of_day) {
+      if (onDaySeen.has(rid)) continue
+      onDaySeen.add(rid)
+      const cadence = routine ? routineCadence(routine) : 'Routine'
+      onDayRoutines.push({
+        key: `routine:${rid}`, kind: 'routine', id: rid, title: item.title,
+        completed: item.completed, planned: true, group: 'available', item, onToday: true,
+        context: item.startTime ? `${cadence} · ${formatTimeCompact(item.startTime)}` : cadence,
+      })
+      continue
+    }
     const planned = plannedEntities.has(rid)
     if (!planned) offMainRoutineItemIds.add(item.id)
     available.push({
@@ -358,11 +383,29 @@ export function selectDayPlan(input: DayPlanInput): DayPlan {
     !t.completed && match(t.assignedTo, t.assignedToAll) && !chosen(t)
     && isMissedPlacement(t.scheduledFor, t.completed, now) && !isRecentMiss(t.scheduledFor, t.completed, now)).length
 
+  // Today's chooser: this week's tasks, then every routine occurrence of the
+  // day — choosable ones (chosen ones stay, marked), the ones already on the
+  // day by rule, and weekly routines with no day yet.
+  const chooserTasks = toPlan.filter((e) => e.kind === 'task')
+  const chooserRoutines: DayPlanEntry[] = [
+    ...available.map((e) => {
+      const r = byId.get(e.id)
+      return { ...e, context: r ? routineCadence(r) : 'Routine' }
+    }),
+    ...onDayRoutines,
+    ...(input.unhomedRoutines ?? []).map((r): DayPlanEntry => ({
+      key: `routine:${r.id}`, kind: 'routine', id: r.id, title: r.name, completed: false, planned: false,
+      group: 'plan', routine: r, context: `${routineCadence(r)} · no set day`,
+    })),
+  ]
+
   const outstanding = (e: DayPlanEntry) => !e.completed && !e.planned
   return {
     toPlan,
     unfinished,
     olderUnfinished,
+    chooserTasks,
+    chooserRoutines,
     carried,
     scheduled,
     available,
