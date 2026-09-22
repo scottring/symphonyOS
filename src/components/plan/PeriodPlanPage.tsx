@@ -13,7 +13,7 @@
 
 import { useMemo, useState, useCallback, useEffect, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { Plus, Target, ChevronDown, ChevronRight, Repeat, ArrowUpRight, Check } from 'lucide-react'
+import { Plus, Target, ChevronDown, ChevronRight, Repeat, ArrowUpRight } from 'lucide-react'
 import { MastheadCard, PeriodNavEyebrow } from '@/components/layout/MastheadCard'
 import { HomeChromeControls } from '@/components/home/HomeChromeControls'
 import { DomainSwitcher } from '@/components/domain/DomainSwitcher'
@@ -51,6 +51,7 @@ import { PlanRow, rowIsDone, type PlanRowModel } from './PlanRow'
 import { PlanRail } from './PlanRail'
 import { readOpen, readFoldPref, writeOpen } from './foldState'
 import { PlanSession } from './PlanSession'
+import { PlanNextLine } from './PlanNextLine'
 
 /** How many tasks a period's list shows before it asks. A long plan is still
  *  a plan, but a page that opens with twenty rows is a page you scroll rather
@@ -191,11 +192,16 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   const above = railLevel(level)
   const aboveStart = useMemo(() => {
     if (!above) return today
+    // The season page's year rail anchors on the year containing the SEASON
+    // on screen, not whichever year `planningPeriod` would currently offer —
+    // a season starting next January (Fall/Winter crossing the boundary)
+    // reads next year's goals, never this year's (Phase 3 final review).
+    if (above === 'year') return new Date(bounds.start.getFullYear(), 0, 1)
     return planningPeriod({
       level: above, today, seasons,
       countFor: (s) => (above === 'season' ? selectPeriodTasks(layered, 'season', s, isCurrentPeriod(periodBounds('season', s, seasons), today), meId, seasons).length : 0),
     }).start
-  }, [above, today, seasons, layered, meId])
+  }, [above, today, seasons, layered, meId, bounds.start])
   const railRows = useMemo<PlanRowModel[]>(() => {
     if (above === 'season') {
       // The fold can look ahead to a season that ISN'T actually current
@@ -604,7 +610,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   })
   const { saved: savedSession, loading: sessionLoading, error: sessionReadError, reload: reloadSession } = host.session
   const { sessionReady, draft, shownDraft, sessionOpen, savingSession, justSaved, saveError,
-    startSession, changeDraft, closeSession, saveDraft } = host
+    startSession, changeDraft, closeSession, saveDraft, dismissJustSaved } = host
   // The year's Keep reads the draft being saved for the id it must re-use;
   // the host owns it, so it arrives here.
   draftRef.current = shownDraft
@@ -681,10 +687,13 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
         </div>
       )}
       {justSaved && !sessionOpen && (
-        <div className="mb-3 flex flex-wrap items-center gap-3 rounded-lg bg-sage-50 px-3 py-2 text-sm text-neutral-700">
-          <span className="min-w-0 flex-1"><Check className="mb-0.5 mr-1 inline h-4 w-4 text-sage-600" />{shortLabel} is planned. When you&rsquo;re ready, plan the {nextRung} with {shortLabel} beside you.</span>
-          <button type="button" onClick={() => navigate(`/${nextRung}`)} className="rounded-md bg-primary-600 px-3 py-1 text-[13px] font-semibold text-white">Plan the {nextRung} →</button>
-        </div>
+        <PlanNextLine
+          planned={shortLabel}
+          message={`When you’re ready, plan the ${nextRung} with ${shortLabel} beside you.`}
+          nextLabel={`the ${nextRung}`}
+          to={`/${nextRung}`}
+          onDismiss={dismissJustSaved}
+        />
       )}
 
       {sessionOpen && shownDraft ? (

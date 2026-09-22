@@ -14,6 +14,7 @@ import { useFamilyMembers } from '@/hooks/useFamilyMembers'
 import { useGatedTaskActions } from '@/hooks/useGatedTaskActions'
 import { filterTasksForLayers } from '@/lib/today/domainFilter'
 import { selectHorizonPool } from '@/lib/today/horizons'
+import { weekListTasks } from '@/lib/planning/weekList'
 import { doableBy } from '@/lib/planning/poolViews'
 import { monthStartOf } from '@/lib/planning/periodPlacement'
 import { weekStartAnchor, readCadenceConfig, localYmd } from '@/lib/cadence/config'
@@ -77,9 +78,17 @@ function ReferenceList({ pin, onClose }: { pin: ReferencePin; onClose: () => voi
   const visible = useMemo(() => filterTasksForLayers(tasks, layers), [tasks, layers])
   const date = new Date(pin.date)
   const week = weekStartAnchor(date, readCadenceConfig().weekStartsOn)
-  const pool = selectHorizonPool(visible, pin.kind,
-    (assignedTo, assignedToAll) => !me || doableBy({ assignedTo: assignedTo ?? undefined, assignedToAll: assignedToAll ? [...assignedToAll] : undefined }, me),
-    week, monthStartOf(date))
+  // The week list reads the same definition the week page and the week
+  // session do (`weekListTasks`) so a row picked for today (bucket: 'timed',
+  // a week commitment record) stays on this pin instead of vanishing the
+  // moment it's placed — the old `selectHorizonPool` pool question was
+  // bucket==='week' only, which dropped it. Completed rows are still
+  // dropped here: this panel is a pin, not the week page's whole record.
+  const pool = pin.kind === 'week'
+    ? weekListTasks(visible, week, me ?? null).filter(t => !t.completed)
+    : selectHorizonPool(visible, pin.kind,
+      (assignedTo, assignedToAll) => !me || doableBy({ assignedTo: assignedTo ?? undefined, assignedToAll: assignedToAll ? [...assignedToAll] : undefined }, me),
+      week, monthStartOf(date))
   const label = pin.kind === 'week' ? 'Week list' : 'Month list'
   const period = pin.kind === 'month'
     ? date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
