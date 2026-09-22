@@ -721,6 +721,29 @@ describe('PeriodPlanPage — Plan <Month>', () => {
     expect(screen.getByRole('button', { name: /review the plan/i })).toBeInTheDocument()
   })
 
+  it('an empty, unplanned month invites the session from its empty list, and opens it', () => {
+    renderPage('month')
+    const label = thisMonth.toLocaleDateString('en-US', { month: 'long' })
+    const list = screen.getByRole('region', { name: /list$/ })
+    const button = within(list).getByRole('button', { name: /^Plan .* →$/ })
+    expect(button).toHaveAccessibleName(`Plan ${label} →`)
+    fireEvent.click(button)
+    expect(screen.getByLabelText('Planning steps')).toBeInTheDocument()
+  })
+
+  it('an empty but already-planned month stays plain — no button', () => {
+    sessionState.saved = { at: new Date(2026, 8, 29), authorId: 'u2', notes: {} }
+    renderPage('month')
+    const list = screen.getByRole('region', { name: /list$/ })
+    expect(within(list).queryByRole('button', { name: /^Plan .* →$/ })).toBeNull()
+    expect(within(list).getByText(`Nothing on this month's list yet.`)).toBeInTheDocument()
+  })
+
+  it('a past month\'s empty list never offers a session button', () => {
+    renderPageAt('month', `/month?start=${lastMonth.getFullYear()}-${String(lastMonth.getMonth() + 1).padStart(2, '0')}-01`)
+    expect(screen.queryByRole('button', { name: /^Plan .* →$/ })).toBeNull()
+  })
+
   it('runs a session end to end: keep a goal with a next action, save, return to the page with the week line', async () => {
     state.tasks = [task({ id: 'g1', title: 'Strength', isGoal: true, monthStart: lastMonth, commitments: [{ level: 'month', periodStart: lastMonth, status: 'open' }] })]
     renderPage('month')
@@ -861,6 +884,13 @@ describe('PeriodPlanPage — Plan <Month>', () => {
     fireEvent.change(screen.getByLabelText(/what went well/i), { target: { value: 'x' } })
     fireEvent.click(screen.getByRole('button', { name: /close · keep my draft/i }))
     expect(screen.getByRole('button', { name: `Continue planning ${label}` })).toBeInTheDocument()
+  })
+
+  it('an empty, unplanned year invites the session from its empty goals list', () => {
+    vi.setSystemTime(new Date(2026, 11, 20))
+    renderPageAt('year', '/year?start=2027-01-01')
+    expect(screen.getByText(/Nothing yet\./)).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Plan 2027 →' })).toBeInTheDocument()
   })
 
   it('the season page and the year page each carry a planning bar', () => {

@@ -711,7 +711,17 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
             </div>
             <div className="mt-2 border-t-2 border-primary-700 pt-1">
               {goalRows.length === 0 ? (
-                isPast && <p className="px-2 py-2 text-sm text-neutral-400">Nothing was on this {noun}'s goals.</p>
+                isPast ? (
+                  <p className="px-2 py-2 text-sm text-neutral-400">Nothing was on this {noun}'s goals.</p>
+                ) : !savedSession ? (
+                  <p className="px-2 py-2 text-sm text-neutral-400">
+                    Nothing yet.{' '}
+                    <button type="button" onClick={startSession} disabled={!sessionReady}
+                      className="font-semibold text-primary-700 hover:underline disabled:opacity-50">
+                      Plan {shortLabel} →
+                    </button>
+                  </p>
+                ) : null
               ) : (
                 <ul>
                   {goalRows.map((row) => (
@@ -754,7 +764,21 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
                   <p className="px-2 py-2 text-sm text-neutral-400">
                     {doneTaskRows.length > 0
                       ? `Everything on this ${noun}'s list is done.`
-                      : isPast ? `Nothing was on this ${noun}'s list.` : `Nothing on this ${noun}'s list yet.`}
+                      : isPast
+                        ? `Nothing was on this ${noun}'s list.`
+                        : (
+                          <>
+                            Nothing on this {noun}'s list yet.{!savedSession && (
+                              <>
+                                {' '}
+                                <button type="button" onClick={startSession} disabled={!sessionReady}
+                                  className="font-semibold text-primary-700 hover:underline disabled:opacity-50">
+                                  Plan {shortLabel} →
+                                </button>
+                              </>
+                            )}
+                          </>
+                        )}
                   </p>
                 ) : (
                   <ul>
