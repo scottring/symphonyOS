@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import { computeCadenceOverdue, completedCadenceTokens, isSessionSubstantive } from './cadenceDue'
 import { DEFAULT_CADENCE, weekToken } from '@/lib/cadence/config'
+import { DEFAULT_SEASONS, seasonToken } from '@/lib/cadence/seasons'
 
 // Thursday 2026-07-30. Week anchor (Sunday start) is 2026-07-26.
 const thu = new Date(2026, 6, 30, 9, 0, 0)
@@ -113,5 +114,28 @@ describe('completedCadenceTokens', () => {
       { horizon: 'daily', period_token: '2026-07-30', notes: { oneWord: 'steady' } },
     ])
     expect(set.size).toBe(0)
+  })
+})
+
+// The guided season and year sessions save under 'seasonal'/'annual' with
+// seasonToken / String(year). The nudge must read those same tokens back, or a
+// planned season keeps nagging (guided planning, Phase 3).
+describe('the season and year tokens the guided sessions save', () => {
+  it('a saved seasonal row silences the season nudge', () => {
+    const now = new Date(2026, 9, 15, 9, 0, 0)
+    const done = completedCadenceTokens([
+      { horizon: 'seasonal', period_token: seasonToken(now, DEFAULT_SEASONS), notes: { savedAt: '2026-10-15T12:00:00Z' } },
+    ])
+    expect(done.has(`season:${seasonToken(now, DEFAULT_SEASONS)}`)).toBe(true)
+    expect(computeCadenceOverdue(DEFAULT_CADENCE, now, done)?.kind).not.toBe('season')
+  })
+
+  it('a saved annual row silences the year nudge', () => {
+    const now = new Date(2026, 9, 15, 9, 0, 0)
+    const done = completedCadenceTokens([
+      { horizon: 'annual', period_token: String(now.getFullYear()), notes: { savedAt: '2026-10-15T12:00:00Z' } },
+    ])
+    expect(done.has(`year:${String(now.getFullYear())}`)).toBe(true)
+    expect(computeCadenceOverdue(DEFAULT_CADENCE, now, done)?.kind).not.toBe('year')
   })
 })

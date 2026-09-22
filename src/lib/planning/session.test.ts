@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import type { Task } from '@/types/task'
-import { emptyDraft, lookBackRows, verdictOptions, summarize, isEmptyDraft, pruneDraft, goalsWithHiddenSteps, type SessionDraft } from './session'
+import type { Goal } from '@/types/goal'
+import type { Layer } from '@/lib/domains'
+import { DEFAULT_SEASONS } from '@/lib/cadence/seasons'
+import { emptyDraft, lookBackRows, verdictOptions, summarize, isEmptyDraft, pruneDraft, goalsWithHiddenSteps, goalAsRow, yearLookBack, type SessionDraft } from './session'
 
 const sep = new Date(2026, 8, 1), oct = new Date(2026, 9, 1)
 const t = (over: Partial<Task>): Task => ({ id: 'x', title: 'X', completed: false, createdAt: sep, updatedAt: sep, bucket: 'month', ...over } as Task)
@@ -236,5 +239,72 @@ describe('week sessions', () => {
 
   it('goalsWithHiddenSteps is empty at the week level', () => {
     expect(goalsWithHiddenSteps([onLast({ id: 'g', isGoal: true })], [], LAST, 'week').size).toBe(0)
+  })
+})
+
+describe('season and year sessions', () => {
+  it('lookBackRows at the season level matches the previous season by RANGE, using the seasons given', () => {
+    const fall = new Date(2026, 8, 1), winter = new Date(2026, 11, 1)
+    const midFall = t({ id: 'a', bucket: 'quarter', seasonStart: new Date(2026, 9, 15), commitments: [{ level: 'season', periodStart: new Date(2026, 9, 15), status: 'open' }] })
+    expect(lookBackRows([midFall], fall, null, 'season', DEFAULT_SEASONS).open.map((x) => x.id)).toEqual(['a'])
+    expect(lookBackRows([midFall], winter, null, 'season', DEFAULT_SEASONS).open).toEqual([])
+  })
+
+  it('year verdicts are Keep, Done, Drop', () => {
+    expect(verdictOptions(true, 'year').map((o) => o.verdict)).toEqual(['keep', 'done', 'drop'])
+    expect(verdictOptions(true, 'year').map((o) => o.label)).toEqual(['Keep', 'Done', 'Drop'])
+  })
+
+  const g = (over: Partial<Goal>): Goal => ({ id: 'x', areaId: null, name: 'G', year: 2026, status: 'active', sortOrder: 0, actions: [], milestones: [], createdAt: new Date(2026, 0, 1), updatedAt: new Date(), context: null, ...over } as Goal)
+
+  it('yearLookBack lists last year\'s goals: finished, open, archived excluded, in the layers in view', () => {
+    const r = yearLookBack(
+      [g({ id: 'd', status: 'completed' }), g({ id: 'o' }), g({ id: 'ar', status: 'archived' }), g({ id: 'n', year: 2025 }), g({ id: 'w', context: 'work' })],
+      2026,
+      new Set(['family', 'personal', 'unsorted']) as ReadonlySet<Layer>,
+    )
+    expect(r.finished.map((x) => x.id)).toEqual(['d'])
+    expect(r.open.map((x) => x.id)).toEqual(['o'])
+    expect(r.open[0]).toMatchObject({ title: 'G', isGoal: true, completed: false })
+  })
+
+  it('goalAsRow carries only the fields the session reads', () => {
+    const row = goalAsRow(g({ id: 'r', name: 'Get strong', context: 'family' }))
+    expect(row).toMatchObject({ id: 'r', title: 'Get strong', isGoal: true, completed: false, context: 'family' })
+    expect(row.createdAt).toBeInstanceOf(Date)
+  })
+
+  // The season speaks in month words, with the season's own label; there is no
+  // level above to pull from, so "stays on …" never occurs.
+  it('summarize for the season uses the month wording with the season label', () => {
+    const d: SessionDraft = { ...emptyDraft('season', new Date(2026, 11, 1), new Date(2026, 8, 1)), verdicts: { k: 'keep', dn: 'done', dr: 'drop' } }
+    const rows = [t({ id: 'k', title: 'Porch', isGoal: true }), t({ id: 'dn', title: 'Bids' }), t({ id: 'dr', title: 'Old' })]
+    expect(summarize(d, { open: rows, above: [], aboveGoals: [], periodLabel: 'Winter 2026', prevLabel: 'Fall 2026', aboveLabel: '2026' })).toEqual([
+      { title: 'Porch', destination: 'Winter 2026 goals · kept from Fall 2026' },
+      { title: 'Bids', destination: 'Done in Fall 2026' },
+      { title: 'Old', destination: 'Dropped from Fall 2026 · the task is kept' },
+    ])
+  })
+
+  it('summarize for the year says kept / done / archived in year words', () => {
+    const d: SessionDraft = { ...emptyDraft('year', new Date(2027, 0, 1), new Date(2026, 0, 1)), verdicts: { k: 'keep', dn: 'done', dr: 'drop' }, newGoals: [{ id: 'n1', title: 'Run a 10k' }] }
+    const rows = [t({ id: 'k', title: 'Get strong', isGoal: true }), t({ id: 'dn', title: 'Kitchen', isGoal: true }), t({ id: 'dr', title: 'Old', isGoal: true })]
+    expect(summarize(d, { open: rows, above: [], aboveGoals: [], periodLabel: '2027', prevLabel: '2026', aboveLabel: '' })).toEqual([
+      { title: 'Get strong', destination: '2027 goals · kept from 2026' },
+      { title: 'Kitchen', destination: 'Done in 2026' },
+      { title: 'Old', destination: 'Dropped from 2026 · the goal is archived' },
+      { title: 'Run a 10k', destination: '2027 goals' },
+    ])
+  })
+
+  // keptIds names the id the kept copy will be created with, so a half-finished
+  // Save retries with the SAME id instead of making a second goal (Task 2/4).
+  it('pruneDraft drops keptIds for rows no longer shown', () => {
+    const a = t({ id: 'a', title: 'A', isGoal: true })
+    const d = { ...emptyDraft('year', new Date(2027, 0, 1), new Date(2026, 0, 1)),
+      verdicts: { a: 'keep' as const }, keptIds: { a: 'new-a', gone: 'new-gone' } }
+    const p = pruneDraft(d, { open: [a], above: [] })
+    expect(p.keptIds).toEqual({ a: 'new-a' })
+    expect(pruneDraft({ ...d, keptIds: { a: 'new-a' } }, { open: [a], above: [] }).keptIds).toEqual({ a: 'new-a' })
   })
 })

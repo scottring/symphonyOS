@@ -10,7 +10,7 @@ import { useMemo, useState } from 'react'
 import { Target, Check } from 'lucide-react'
 import type { Task } from '@/types/task'
 import type { DomainId } from '@/lib/domains'
-import { verdictOptions, summarize, weekTaskListLabel, type SessionDraft, type SessionLevel, type Verdict } from '@/lib/planning/session'
+import { verdictOptions, summarize, weekTaskListLabel, placementLevelOf, type SessionDraft, type SessionLevel, type Verdict } from '@/lib/planning/session'
 import { stepsThatCarryForward } from '@/lib/planning/goalSteps'
 
 type Step = 'back' | 'plan' | 'save'
@@ -76,7 +76,7 @@ export function PlanSession({ level, aboveLabel, dayOptions = [], periodLabel: P
   const isKept = (id: string) => draft.verdicts[id] === 'keep' || draft.verdicts[id] === 'keep-action'
   const kept = open.filter((t) => isKept(t.id))
   // A kept goal's open steps travel with it (keepForward) unless they have a verdict of their own.
-  const carried = kept.filter((g) => g.isGoal).flatMap((g) => stepsThatCarryForward(g.id, open, level)).filter((st) => !draft.verdicts[st.id])
+  const carried = kept.filter((g) => g.isGoal).flatMap((g) => stepsThatCarryForward(g.id, open, placementLevelOf(level))).filter((st) => !draft.verdicts[st.id])
   const monthGoals = week ? [] : [...current.filter((t) => t.isGoal), ...kept.filter((t) => t.isGoal)]
   const monthTasks = [...current.filter((t) => !t.isGoal), ...kept.filter((t) => !t.isGoal), ...carried]
     .filter((t, i, all) => all.findIndex((x) => x.id === t.id) === i)
