@@ -329,7 +329,7 @@ export function TodayView({
   )
   // The checked layer set — feeds the resolver's rung 4 directly (routines no
   // longer arrive pre-filtered by domain from HomeView).
-  const { layers } = useDomain()
+  const { layers, all: showAllDomains } = useDomain()
   // Every instance touching this week: a flexible routine already placed on
   // one of its days has a home for the week and leaves the sheet's To plan.
   const weekInstances = useWeekInstances(currentWeekStart, 7)
@@ -1216,6 +1216,11 @@ export function TodayView({
   // Earlier today folds by default, per day: unfolding it is about this
   // reading of this day, not a standing preference.
   const focusWork = useMemo(() => splitCompletedFocus(journal.focus), [journal.focus])
+  const filtersNarrowing = layers.size < ALL_LAYERS.size || (selectedAssignees?.length ?? 0) > 0
+  const showEverything = useCallback(() => {
+    showAllDomains()
+    onSelectAssignees?.([])
+  }, [showAllDomains, onSelectAssignees])
   const [completedOpenDay, setCompletedOpenDay] = useState<string | null>(null)
   const completedOpen = completedOpenDay === localYmd(viewedDate)
   const [earlierOpenDay, setEarlierOpenDay] = useState<string | null>(null)
@@ -1485,6 +1490,16 @@ export function TodayView({
                 <p className="mt-1 text-[14px] text-neutral-500">
                   Choose from this week's tasks, or add something for {data.isToday ? 'today' : 'this day'}.
                 </p>
+                {/* Say when the view is narrowed, so an empty filtered list
+                    isn't read as an empty day. No hidden counts. */}
+                {filtersNarrowing && (
+                  <p className="mt-2 text-[14px] text-neutral-500">
+                    Domain or person filters are on.{' '}
+                    <button type="button" onClick={showEverything} className="font-medium text-primary-600 underline-offset-2 hover:underline">
+                      Show everything
+                    </button>
+                  </p>
+                )}
               </div>
             )}
             {focusWork.completedCount > 0 && <div className="today-completed">

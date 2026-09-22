@@ -52,7 +52,7 @@ export function DesktopNavigation({ inboxCount, discussionsUnread, onSearch, onQ
   return <nav ref={root} className="page-navigation" aria-label="Main navigation">
     <NavLink to={planDestination} aria-current={planPeriodForPath(pathname) ? 'page' : undefined} className={planPeriodForPath(pathname) ? 'is-current' : ''}>Planner</NavLink>
     <NavLink to="/routines">Routines</NavLink>
-    <NavLink to="/inbox" aria-label={`Inbox${inboxCount ? `, ${inboxCount} items` : ''}`}><Inbox size={16} aria-hidden="true" /><span>Inbox</span>{inboxCount > 0 && <span className="navigation-count">{inboxCount}</span>}</NavLink>
+    <NavLink to="/inbox" aria-label={`Inbox${inboxCount ? `, ${inboxCount} ${inboxCount === 1 ? 'item' : 'items'}` : ''}`}><Inbox size={16} aria-hidden="true" /><span>Inbox</span>{inboxCount > 0 && <span className="navigation-count">{inboxCount}</span>}</NavLink>
     {menu('more', <>More{discussionsUnread > 0 && <span className="navigation-count">{discussionsUnread}</span>}</>, <div className="page-navigation-more">
       <div className="page-navigation-groups">
         {groups.map(([group, items]) => <div key={group} role="group" aria-labelledby={`navigation-group-${group}`} className="page-navigation-group">
