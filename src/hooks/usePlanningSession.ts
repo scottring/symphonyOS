@@ -11,10 +11,13 @@ import { useAuth } from '@/hooks/useAuth'
 export function monthToken(start: Date): string { return `${start.getFullYear()}-${start.getMonth() + 1}` }
 /** The week's first day, unpadded like monthToken: 2026-10-4. */
 export function weekToken(weekStart: Date): string { return `${weekStart.getFullYear()}-${weekStart.getMonth() + 1}-${weekStart.getDate()}` }
+/** The plain year, matching cadenceDue's `year:2027`. The season's token is
+ *  seasonToken() in lib/cadence/seasons — one definition, not two. */
+export function yearToken(year: number): string { return String(year) }
 
 type Saved = { at: Date; authorId: string; notes: { wentWell?: string; didnt?: string } }
 
-export type SessionHorizon = 'weekly' | 'monthly'
+export type SessionHorizon = 'weekly' | 'monthly' | 'seasonal' | 'annual'
 
 export function usePlanningSession(horizon: SessionHorizon, token: string) {
   const { user } = useAuth()

@@ -35,9 +35,10 @@ import { filterTasksForLayers, matchesLayers } from '@/lib/today/domainFilter'
 import { placementFateOf, lowerPlacement } from '@/lib/placement/model'
 import { splitGoalRows } from '@/lib/planning/goalSteps'
 import { parseLocalYmd } from '@/lib/cadence/config'
-import { monthToken } from '@/hooks/usePlanningSession'
+import { monthToken, yearToken, type SessionHorizon } from '@/hooks/usePlanningSession'
+import { seasonToken } from '@/lib/cadence/seasons'
 import { usePlanSessionHost } from '@/hooks/usePlanSessionHost'
-import { lookBackRows, isEmptyDraft, goalsWithHiddenSteps } from '@/lib/planning/session'
+import { lookBackRows, isEmptyDraft, goalsWithHiddenSteps, goalAsRow, yearLookBack, type SessionDraft } from '@/lib/planning/session'
 import type { DomainId } from '@/lib/domains'
 import { formatShortDate } from '@/lib/dateHelpers'
 import {
@@ -116,7 +117,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   const meId = getCurrentUserMember()?.id ?? null
   const { seasons, loading: seasonsLoading } = useHouseholdSeasons()
   const { activeRoutines } = useRoutines()
-  const { goals, areas, addGoal, updateGoal, deleteGoal, addArea } = useGoalsContext()
+  const { goals, areas, addGoal, updateGoal, addArea } = useGoalsContext()
 
   const [searchParams] = useSearchParams()
   const startParam = searchParams.get('start')
@@ -169,7 +170,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   const rows = useMemo<PlanRowModel[]>(() => {
     if (level === 'year') {
       const year = bounds.start.getFullYear()
-      return goals.filter((g) => g.year === year && matchesLayers(g.context, layers)).map(goalRow)
+      return goals.filter((g) => g.year === year && g.status !== 'archived' && matchesLayers(g.context, layers)).map(goalRow)
     }
     const list = selectPeriodTasks(layered, level, bounds.start, isCurrent, meId, seasons).map((t) => taskRow(t, level, bounds.start))
     // Goals first — a goal is what the period is for — then tasks, each in
@@ -205,7 +206,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
       return selectPeriodTasks(layered, 'season', aboveStart, aboveIsCurrent, meId, seasons).map((t) => taskRow(t, 'season', aboveStart))
     }
     if (above === 'year') {
-      return goals.filter((g) => g.year === aboveStart.getFullYear() && matchesLayers(g.context, layers)).map(goalRow)
+      return goals.filter((g) => g.year === aboveStart.getFullYear() && g.status !== 'archived' && matchesLayers(g.context, layers)).map(goalRow)
     }
     return []
   }, [above, layered, aboveStart, seasons, today, meId, tasks, goals, layers])
@@ -237,7 +238,9 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
       const g = goals.find((x) => x.id === row.id)
       if (!g) return
       if (action === 'complete') await updateGoal(g.id, { status: g.status === 'completed' ? 'active' : 'completed' })
-      else if (action === 'drop') await deleteGoal(g.id)
+      // Drop lets a goal GO, it does not erase the year it was held in: the
+      // year's session and its look-back still need the record (Task 4).
+      else if (action === 'drop') await updateGoal(g.id, { status: 'archived' })
       else if (action === 'keep') {
         const kept = await addGoal(g.areaId, g.name, g.context ?? undefined)
         if (kept) await updateGoal(kept.id, { year: bounds.next.getFullYear() })
@@ -274,7 +277,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
       await planActions.chooseTaskDay(row.id, new Date())
     }
     else if (action === 'under-goal') setPickingGoalFor(row.id)
-  }, [goals, updateGoal, deleteGoal, addGoal, bounds.next, bounds.start, isPast, toggleTask, deleteTask, dropCommitment, gated, setGoal, keepForward, level, planActions])
+  }, [goals, updateGoal, addGoal, bounds.next, bounds.start, isPast, toggleTask, deleteTask, dropCommitment, gated, setGoal, keepForward, level, planActions])
 
   // The rail's one verb: take an open season task into this month — the same
   // row gains a month commitment; the season keeps it, marked "→ September".
@@ -460,63 +463,151 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
     : periodBounds(level, bounds.prev, seasons).label
   const daysUntilStart = useMemo(() => Math.round((bounds.start.getTime() - today.getTime()) / 86_400_000), [bounds.start, today])
 
-  // ── Guided planning (Phase 1: month) ────────────────────────────────────
-  // Season and year pages carry no session yet; everything below is inert
-  // there (sessionEnabled false).
-  const sessionEnabled = level === 'month'
-  const token = monthToken(bounds.start)
+  // ── Guided planning (Phase 1: month; Phase 3: the season and the year) ──
+  // ONE session block, parameterised by the level.
+  const isSeasonSession = level === 'season'
+  // The year plans in GOALS: no placed tasks, so no placement level applies —
+  // every placeLevel path below is guarded by !isYearSession.
+  const isYearSession = level === 'year'
+  const placeLevel: 'month' | 'season' = isSeasonSession ? 'season' : 'month'
+  const periodYear = bounds.start.getFullYear()
+  const token = isYearSession ? yearToken(periodYear) : isSeasonSession ? seasonToken(bounds.start, seasons) : monthToken(bounds.start)
+  const horizon: SessionHorizon = isYearSession ? 'annual' : isSeasonSession ? 'seasonal' : 'monthly'
+  // Where a finished plan sends you next: the rung below, one page down.
+  const nextRung = isYearSession ? 'season' : isSeasonSession ? 'month' : 'week'
 
-  const back = useMemo(() => (sessionEnabled ? lookBackRows(layered, bounds.prev, meId) : { finished: [], open: [] }), [sessionEnabled, layered, bounds.prev, meId])
+  const back = useMemo(() => (isYearSession
+    ? yearLookBack(goals, periodYear - 1, layers)
+    : lookBackRows(layered, bounds.prev, meId, placeLevel, seasons)), [isYearSession, goals, periodYear, layers, layered, bounds.prev, meId, placeLevel, seasons])
   // Keep carries a goal's steps from the UNFILTERED list (keepForward); the
   // summary says when some of them are not in this view.
   const hiddenStepGoals = useMemo(
-    () => (sessionEnabled ? goalsWithHiddenSteps(tasks, back.open, bounds.prev) : new Set<string>()),
-    [sessionEnabled, tasks, back.open, bounds.prev],
+    () => (isYearSession ? new Set<string>() : goalsWithHiddenSteps(tasks, back.open, bounds.prev, placeLevel, seasons)),
+    [isYearSession, tasks, back.open, bounds.prev, placeLevel, seasons],
   )
-  const currentMonth = useMemo(
-    () => (sessionEnabled ? selectPeriodTasks(layered, 'month', bounds.start, isCurrent, meId, seasons).filter((t) => !t.completed) : []),
-    [sessionEnabled, layered, bounds.start, isCurrent, meId, seasons],
+  // The year's "current" list is this year's live goals, as rows.
+  const currentPeriodTasks = useMemo(
+    () => (isYearSession
+      ? goals.filter((g) => g.year === periodYear && g.status === 'active' && matchesLayers(g.context, layers)).map(goalAsRow)
+      : selectPeriodTasks(layered, placeLevel, bounds.start, isCurrent, meId, seasons).filter((t) => !t.completed)),
+    [isYearSession, goals, periodYear, layers, layered, placeLevel, bounds.start, isCurrent, meId, seasons],
   )
   const aboveIsCurrent = useMemo(() => isCurrentPeriod(periodBounds('season', aboveStart, seasons), today), [aboveStart, seasons, today])
-  const aboveTasks = useMemo(() => (sessionEnabled && above === 'season'
+  const aboveTasks = useMemo(() => (above === 'season'
     ? selectPeriodTasks(layered, 'season', aboveStart, aboveIsCurrent, meId, seasons).filter((t) => !t.completed)
-    : []), [sessionEnabled, above, layered, aboveStart, seasons, aboveIsCurrent, meId])
+    : []), [above, layered, aboveStart, seasons, aboveIsCurrent, meId])
   // Only season work still OPEN on that season is offered down; a row already
   // carried on (or dropped) is reference, as the goals beside it are.
   const aboveItems = useMemo(
     () => offerableFromAbove(aboveTasks, 'season', aboveStart, aboveIsCurrent, seasons),
     [aboveTasks, aboveStart, aboveIsCurrent, seasons],
   )
-  const aboveGoalItems = useMemo(() => aboveTasks.filter((t) => t.isGoal), [aboveTasks])
+  // A season's rail is the YEAR: goals to write beside, never tasks to take
+  // down (the year plans in goals alone).
+  const aboveGoalItems = useMemo(() => (above === 'year'
+    ? goals.filter((g) => g.year === aboveStart.getFullYear() && g.status !== 'archived' && matchesLayers(g.context, layers)).map(goalAsRow)
+    : aboveTasks.filter((t) => t.isGoal)), [above, goals, aboveStart, layers, aboveTasks])
+  // The year has nothing above it: no rail, and no label for one.
+  const aboveLabel = isYearSession ? '' : isSeasonSession ? String(aboveStart.getFullYear()) : 'the season'
 
-  const sessionWriters = useMemo(() => ({
-    keep: async (id: string, periodStart: Date, prevStart: Date) => !!(await keepForward(id, { monthStart: periodStart }, prevStart)),
+  // ── The year's writers. A year row is a GOAL, so every verb is a goal
+  //    write: Keep copies the goal whole into the new year and links it back;
+  //    Done and Drop change its status. Nothing is ever deleted — the year
+  //    just gone stays readable.
+  //
+  //    The id a Keep will create with is fixed in the draft BEFORE the save
+  //    starts (prepareDraft, below), so a half-failed Save retried lands on
+  //    the SAME row rather than a second copy; `addGoal` has no other
+  //    idempotent path. The writers only read that id, through a ref, because
+  //    the host that owns the draft is constructed below, from these writers.
+  const draftRef = useRef<SessionDraft | null>(null)
+  const yearWriters = useMemo(() => {
+    // prepareDraft has already filled every `keep` verdict's id; the fallback
+    // is only for a draft that somehow reached a writer unprepared.
+    const keptIdFor = (sourceId: string): string =>
+      draftRef.current?.keptIds?.[sourceId] ?? crypto.randomUUID()
+    const setStatus = async (id: string, status: 'completed' | 'archived') => {
+      try { await updateGoal(id, { status }); return true } catch { return false }
+    }
+    return {
+      keep: async (id: string, periodStart: Date) => {
+        const src = goals.find((g) => g.id === id)
+        if (!src) return false
+        const year = periodStart.getFullYear()
+        // A retry finds the goal the first attempt already carried.
+        if (goals.find((g) => g.carriedFrom === id && g.year === year)) return true
+        // goals RLS shares on scope: a copy that dropped it would turn a shared
+        // goal private. An area from a year whose areas are gone is no area.
+        const areaId = areas.some((a) => a.id === src.areaId) ? src.areaId : null
+        const kept = await addGoal(areaId ?? null, src.name, src.context ?? undefined, {
+          id: keptIdFor(id), year, notes: src.notes ?? null, strategy: src.strategy ?? null,
+          scope: src.scope, carriedFrom: id,
+        })
+        return !!kept
+      },
+      // At the year everything written is a goal — the session offers no task list.
+      addTask: async (title: string, o: { id: string; periodStart: Date; context: DomainId | null }) =>
+        (await addGoal(null, title, o.context ?? undefined, { id: o.id, year: o.periodStart.getFullYear() }))?.id,
+      contextOf: (id: string) => goals.find((g) => g.id === id)?.context ?? null,
+      complete: (id: string) => setStatus(id, 'completed'),
+      someday: async () => false,                                   // never offered at the year
+      drop: (id: string) => setStatus(id, 'archived'),
+      takeInto: async () => true,                                   // nothing sits above the year
+    }
+  }, [goals, areas, addGoal, updateGoal])
+
+  const monthOrSeasonWriters = useMemo(() => ({
+    keep: async (id: string, periodStart: Date, prevStart: Date) =>
+      !!(await keepForward(id, isSeasonSession ? { seasonStart: periodStart } : { monthStart: periodStart }, prevStart)),
     // Each item's OWN domain, recorded when it was planned — never the one in view now (I4).
     addTask: (title: string, o: { id: string; periodStart: Date; day?: Date; isGoal?: boolean; goalTaskId?: string; context: DomainId | null }) =>
-      addTask(title, undefined, undefined, undefined, {
-        id: o.id, bucket: 'month' as const, monthStart: o.periodStart, isGoal: o.isGoal, goalTaskId: o.goalTaskId, context: o.context,
-      }),
+      addTask(title, undefined, undefined, undefined, isSeasonSession
+        ? { id: o.id, bucket: 'quarter' as const, seasonStart: o.periodStart, isGoal: o.isGoal, goalTaskId: o.goalTaskId, context: o.context }
+        : { id: o.id, bucket: 'month' as const, monthStart: o.periodStart, isGoal: o.isGoal, goalTaskId: o.goalTaskId, context: o.context }),
     contextOf: (id: string) => tasks.find((t) => t.id === id)?.context ?? null,
     // Everything a tick does (subtasks, waiting/discussion, a linked list item), and reports whether it wrote.
     complete: (id: string) => completeTask(id),
     someday: (id: string) => gated.updateTask(id, { bucket: 'someday', scheduledFor: undefined, isAllDay: undefined }),
-    drop: (id: string, prevStart: Date) => dropCommitment(id, 'month', prevStart),
+    drop: (id: string, prevStart: Date) => dropCommitment(id, placeLevel, prevStart),
     // The SESSION's month — pushTask(id, 'month') would target the month
-    // containing today, i.e. September while planning October.
-    takeInto: (id: string, periodStart: Date) => gated.updateTask(id, { bucket: 'month', monthStart: periodStart }),
-  }), [keepForward, addTask, tasks, completeTask, gated, dropCommitment])
+    // containing today, i.e. September while planning October. A season takes
+    // nothing down from the year (its rail is goals), so nothing calls this.
+    takeInto: (id: string, periodStart: Date) => (isSeasonSession
+      ? Promise.resolve(true)
+      : gated.updateTask(id, { bucket: 'month', monthStart: periodStart })),
+  }), [keepForward, addTask, tasks, completeTask, gated, dropCommitment, isSeasonSession, placeLevel])
+  const sessionWriters = isYearSession ? yearWriters : monthOrSeasonWriters
+
+  // Fix the ids every Keep will create with, once, before the first write: the
+  // host persists the result, so a retry after a half-failed Save re-uses them.
+  const prepareYearDraft = useCallback((d: SessionDraft): SessionDraft => {
+    const kept = { ...(d.keptIds ?? {}) }
+    let added = false
+    for (const [id, verdict] of Object.entries(d.verdicts)) {
+      if (verdict !== 'keep' || kept[id]) continue
+      kept[id] = crypto.randomUUID()
+      added = true
+    }
+    return added ? { ...d, keptIds: kept } : d
+  }, [])
 
   const host = usePlanSessionHost({
-    enabled: sessionEnabled, level: 'month', horizon: 'monthly', token,
+    enabled: true, level, horizon, token,
     periodStart: bounds.start, prevStart: bounds.prev,
     listsLoading: loading || seasonsLoading,
-    back, current: currentMonth, above: aboveItems,
+    back, current: currentPeriodTasks, above: aboveItems,
     writers: sessionWriters,
-    isCompleted: (id) => !!tasks.find((t) => t.id === id)?.completed,
+    prepareDraft: isYearSession ? prepareYearDraft : undefined,
+    isCompleted: (id) => (isYearSession
+      ? goals.find((g) => g.id === id)?.status === 'completed'
+      : !!tasks.find((t) => t.id === id)?.completed),
   })
   const { saved: savedSession, loading: sessionLoading, error: sessionReadError, reload: reloadSession } = host.session
   const { sessionReady, draft, shownDraft, sessionOpen, savingSession, justSaved, saveError,
     startSession, changeDraft, closeSession, saveDraft } = host
+  // The year's Keep reads the draft being saved for the id it must re-use;
+  // the host owns it, so it arrives here.
+  draftRef.current = shownDraft
 
   return (
     <div {...monthDrop} className={`${PAGE_COLUMN_WIDE} py-6${planDropOver ? ' reference-list-drop' : ''}`}>
@@ -568,8 +659,8 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
       </div>
 
       {/* Guided planning: whether this month is planned, and the door into
-          the session. Month only; a past month is a look-back, not a plan. */}
-      {sessionEnabled && !isPast && (
+          the session. Month and season; a past period is a look-back. */}
+      {!isPast && (
         <div className="mb-3 flex flex-wrap items-center gap-3">
           <p className="text-[13px] text-neutral-500">
             {sessionReadError
@@ -589,16 +680,16 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
           )}
         </div>
       )}
-      {sessionEnabled && justSaved && !sessionOpen && (
+      {justSaved && !sessionOpen && (
         <div className="mb-3 flex flex-wrap items-center gap-3 rounded-lg bg-sage-50 px-3 py-2 text-sm text-neutral-700">
-          <span className="min-w-0 flex-1"><Check className="mb-0.5 mr-1 inline h-4 w-4 text-sage-600" />{shortLabel} is planned. When you&rsquo;re ready, plan the week with {shortLabel} beside you.</span>
-          <button type="button" onClick={() => navigate('/week')} className="rounded-md bg-primary-600 px-3 py-1 text-[13px] font-semibold text-white">Plan the week →</button>
+          <span className="min-w-0 flex-1"><Check className="mb-0.5 mr-1 inline h-4 w-4 text-sage-600" />{shortLabel} is planned. When you&rsquo;re ready, plan the {nextRung} with {shortLabel} beside you.</span>
+          <button type="button" onClick={() => navigate(`/${nextRung}`)} className="rounded-md bg-primary-600 px-3 py-1 text-[13px] font-semibold text-white">Plan the {nextRung} →</button>
         </div>
       )}
 
-      {sessionEnabled && sessionOpen && shownDraft ? (
-        <PlanSession level="month" aboveLabel="the season" periodLabel={shortLabel} prevLabel={prevPeriodLabel}
-          finished={back.finished} open={back.open} current={currentMonth}
+      {sessionOpen && shownDraft ? (
+        <PlanSession level={level} aboveLabel={aboveLabel} periodLabel={shortLabel} prevLabel={prevPeriodLabel}
+          finished={back.finished} open={back.open} current={currentPeriodTasks}
           above={aboveItems} aboveGoals={aboveGoalItems} hiddenStepGoals={hiddenStepGoals} domainInView={soleDomain ?? null}
           draft={shownDraft} onChange={changeDraft} onClose={closeSession} onSave={saveDraft} saving={savingSession} saveError={saveError} />
       ) : (

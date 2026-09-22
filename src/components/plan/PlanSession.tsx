@@ -10,7 +10,7 @@ import { useMemo, useState } from 'react'
 import { Target, Check } from 'lucide-react'
 import type { Task } from '@/types/task'
 import type { DomainId } from '@/lib/domains'
-import { verdictOptions, summarize, weekTaskListLabel, type SessionDraft, type SessionLevel, type Verdict } from '@/lib/planning/session'
+import { verdictOptions, summarize, weekTaskListLabel, placementLevelOf, type SessionDraft, type SessionLevel, type Verdict } from '@/lib/planning/session'
 import { stepsThatCarryForward } from '@/lib/planning/goalSteps'
 
 type Step = 'back' | 'plan' | 'save'
@@ -41,18 +41,28 @@ export function PlanSession({ level, aboveLabel, dayOptions = [], periodLabel: P
   const [taskToward, setTaskToward] = useState('')
   const [taskDay, setTaskDay] = useState('')
   const week = level === 'week'
+  const season = level === 'season'
+  const year = level === 'year'
   const copy = {
     backSub: week
       ? `This is ${Q}'s actual list. Keep what still matters; a ticked row is already done.`
+      : year
+      ? `This is ${Q}'s goals. Keep what still matters into ${P}; Done marks it finished; Drop archives it.`
       : `This is ${Q}'s actual list. A next action is a new task toward the goal; the goal itself stays.`,
     finished: week ? `Finished ${Q}` : `Finished in ${Q}`,
-    planHead: week ? `What will you get done ${P}?` : `What will ${P} add up to, and what will you do?`,
+    planHead: week ? `What will you get done ${P}?` : year ? `What will ${P} add up to?` : `What will ${P} add up to, and what will you do?`,
     planSub: week
       ? `Look at ${aboveLabel} beside you. Add what ${P} can take; most things don't need a day.`
+      : year
+      ? 'Goals only. Seasons and months plan the work.'
+      : season
+      ? `Write ${P}'s goals with ${aboveLabel} beside you, then the tasks that move them. Goals are never scheduled.`
       : `Write ${P}'s goals with the season beside you, then the tasks that move them. Goals are never scheduled.`,
-    saveHead: week ? 'Here\'s the week' : `Here's ${P}'s plan`,
+    saveHead: week ? 'Here\'s the week' : year ? `Here's ${P}` : `Here's ${P}'s plan`,
     taskHead: week ? weekTaskListLabel(P) : `${P} tasks`,
     marker: week ? `· on ${P}` : `· in ${P}`,
+    aboveEmpty: season ? `${aboveLabel} has no goals yet.` : `${aboveLabel} has no list yet.`,
+    goalForWord: season ? aboveLabel : 'season',
   }
   // "Keep, and add a next action" with no action named would save as a plain
   // Keep and silently lose the action — so the session will not move on
@@ -69,14 +79,21 @@ export function PlanSession({ level, aboveLabel, dayOptions = [], periodLabel: P
   const setVerdict = (id: string, v: Verdict) => {
     const verdicts = { ...draft.verdicts }
     if (verdicts[id] === v) delete verdicts[id]; else verdicts[id] = v
-    set({ verdicts })
+    const patch: Partial<SessionDraft> = { verdicts }
+    // A year Keep needs the id the kept copy will be created with, fixed once
+    // so a retried Save re-uses it (Task 2/4). A toggle off or away leaves a
+    // stale id in place — harmless, and keeps a later retry idempotent.
+    if (level === 'year' && verdicts[id] === 'keep' && !draft.keptIds?.[id]) {
+      patch.keptIds = { ...(draft.keptIds ?? {}), [id]: newId() }
+    }
+    set(patch)
   }
 
   // What this month holds in the draft, for the Plan step and the "toward" options.
   const isKept = (id: string) => draft.verdicts[id] === 'keep' || draft.verdicts[id] === 'keep-action'
   const kept = open.filter((t) => isKept(t.id))
   // A kept goal's open steps travel with it (keepForward) unless they have a verdict of their own.
-  const carried = kept.filter((g) => g.isGoal).flatMap((g) => stepsThatCarryForward(g.id, open, level)).filter((st) => !draft.verdicts[st.id])
+  const carried = kept.filter((g) => g.isGoal).flatMap((g) => stepsThatCarryForward(g.id, open, placementLevelOf(level))).filter((st) => !draft.verdicts[st.id])
   const monthGoals = week ? [] : [...current.filter((t) => t.isGoal), ...kept.filter((t) => t.isGoal)]
   const monthTasks = [...current.filter((t) => !t.isGoal), ...kept.filter((t) => !t.isGoal), ...carried]
     .filter((t, i, all) => all.findIndex((x) => x.id === t.id) === i)
@@ -91,7 +108,7 @@ export function PlanSession({ level, aboveLabel, dayOptions = [], periodLabel: P
   const idx = steps.findIndex(([s]) => s === step)
 
   return (
-    <div className="grid grid-cols-1 items-start gap-5 lg:grid-cols-[minmax(0,1fr)_320px]">
+    <div className={`grid grid-cols-1 items-start gap-5 ${year ? 'lg:grid-cols-1' : 'lg:grid-cols-[minmax(0,1fr)_320px]'}`}>
       <div className="min-w-0">
         <ol className="mb-4 flex overflow-hidden rounded-lg border border-neutral-200 text-[13px] font-semibold" aria-label="Planning steps">
           {steps.map(([s, label], i) => (
@@ -184,8 +201,8 @@ export function PlanSession({ level, aboveLabel, dayOptions = [], periodLabel: P
             }}>
               <div className="min-w-[200px] flex-1"><input aria-label={`New goal for ${P}`} className="input-base" value={goalText} onChange={(e) => setGoalText(e.target.value)} placeholder={`A goal for ${P}`} /></div>
               {aboveGoals.length > 0 && (
-                <select aria-label="For a season goal" className="rounded-md border border-neutral-200 px-2 text-sm" value={goalFor} onChange={(e) => setGoalFor(e.target.value)}>
-                  <option value="">For a season goal? (optional)</option>
+                <select aria-label={`For a ${copy.goalForWord} goal`} className="rounded-md border border-neutral-200 px-2 text-sm" value={goalFor} onChange={(e) => setGoalFor(e.target.value)}>
+                  <option value="">{`For a ${copy.goalForWord} goal? (optional)`}</option>
                   {aboveGoals.map((g) => <option key={g.id} value={g.id}>{g.title}</option>)}
                 </select>
               )}
@@ -193,6 +210,7 @@ export function PlanSession({ level, aboveLabel, dayOptions = [], periodLabel: P
             </form>
             </>)}
 
+            {!year && (<>
             <h3 className="mt-5 border-b border-neutral-300 pb-1 font-display text-lg text-neutral-800">{copy.taskHead}</h3>
             <ul>
               {monthTasks.map((x) => <li key={x.id} className="border-b border-neutral-100 py-2 text-sm">{x.title}</li>)}
@@ -231,6 +249,7 @@ export function PlanSession({ level, aboveLabel, dayOptions = [], periodLabel: P
               )}
               <button type="submit" className="rounded-md border border-neutral-200 px-3 text-sm font-semibold">Add task</button>
             </form>
+            </>)}
           </section>
         )}
 
@@ -261,21 +280,23 @@ export function PlanSession({ level, aboveLabel, dayOptions = [], periodLabel: P
         </div>
       </div>
 
-      <aside className="min-w-0 rounded-xl bg-neutral-50 p-3 lg:sticky lg:top-3">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-400">{aboveLabel}</p>
-        <ul className="mt-1">
-          {aboveGoals.map((g) => <li key={g.id} className="flex items-center gap-1.5 border-t border-neutral-200 py-1.5 text-[13px] text-neutral-700"><Target className="h-3.5 w-3.5 text-accent-600" />{g.title}</li>)}
-          {above.map((a) => (
-            <li key={a.id} className="border-t border-neutral-200 py-1.5 text-[13px] text-neutral-700">
-              {a.title}
-              {step === 'plan' && (draft.takenFromAbove.includes(a.id)
-                ? <span className="ml-1 text-[12px] font-semibold text-sage-600">{copy.marker}</span>
-                : <button type="button" aria-label={`Add to ${P}: ${a.title}`} className="block text-[12px] font-semibold text-primary-700"
-                    onClick={() => set({ takenFromAbove: [...draft.takenFromAbove, a.id] })}>+ Add to {P}</button>)}
-            </li>))}
-          {aboveGoals.length === 0 && above.length === 0 && <li className="py-1.5 text-[13px] text-neutral-400">{aboveLabel} has no list yet.</li>}
-        </ul>
-      </aside>
+      {!year && (
+        <aside className="min-w-0 rounded-xl bg-neutral-50 p-3 lg:sticky lg:top-3">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-neutral-400">{aboveLabel}</p>
+          <ul className="mt-1">
+            {aboveGoals.map((g) => <li key={g.id} className="flex items-center gap-1.5 border-t border-neutral-200 py-1.5 text-[13px] text-neutral-700"><Target className="h-3.5 w-3.5 text-accent-600" />{g.title}</li>)}
+            {above.map((a) => (
+              <li key={a.id} className="border-t border-neutral-200 py-1.5 text-[13px] text-neutral-700">
+                {a.title}
+                {step === 'plan' && (draft.takenFromAbove.includes(a.id)
+                  ? <span className="ml-1 text-[12px] font-semibold text-sage-600">{copy.marker}</span>
+                  : <button type="button" aria-label={`Add to ${P}: ${a.title}`} className="block text-[12px] font-semibold text-primary-700"
+                      onClick={() => set({ takenFromAbove: [...draft.takenFromAbove, a.id] })}>+ Add to {P}</button>)}
+              </li>))}
+            {aboveGoals.length === 0 && above.length === 0 && <li className="py-1.5 text-[13px] text-neutral-400">{copy.aboveEmpty}</li>}
+          </ul>
+        </aside>
+      )}
     </div>
   )
 }

@@ -30,6 +30,11 @@ export interface PlanSessionHostInput {
   above: Task[]
   writers: Omit<SessionWriters, 'saveSession'>
   isCompleted: (id: string) => boolean
+  /** Run ONCE on the draft about to be saved, before the first write, and
+   *  persisted before `applySession` reads it. The year uses it to fix the ids
+   *  its Keeps will create with: a writer cannot fill them in mid-save, because
+   *  every later `changeDraft` spreads the pre-save draft and would drop them. */
+  prepareDraft?: (d: SessionDraft) => SessionDraft
 }
 
 export interface PlanSessionHost {
@@ -49,7 +54,7 @@ export interface PlanSessionHost {
 }
 
 export function usePlanSessionHost(input: PlanSessionHostInput): PlanSessionHost {
-  const { enabled, level, horizon, token, periodStart, prevStart, listsLoading, back, current, above, writers, isCompleted } = input
+  const { enabled, level, horizon, token, periodStart, prevStart, listsLoading, back, current, above, writers, isCompleted, prepareDraft } = input
   const { user } = useAuth()
   const userId = user?.id ?? null
   const session = usePlanningSession(horizon, token)
@@ -96,8 +101,12 @@ export function usePlanSessionHost(input: PlanSessionHostInput): PlanSessionHost
   const saveDraft = useCallback(async () => {
     if (!shownDraft) return
     const savingYmd = periodYmd
+    // Everything the writers will need decided is decided here, once, and is in
+    // storage before the first write — so a retry resumes on the same rows.
+    const draftForSave = prepareDraft ? prepareDraft(shownDraft) : shownDraft
+    if (draftForSave !== shownDraft) { setDraft(draftForSave); writeDraft(userId, draftForSave) }
     setSavingSession(true)
-    const result = await applySession(shownDraft, { ...writers, saveSession: (notes) => saveSession(notes) },
+    const result = await applySession(draftForSave, { ...writers, saveSession: (notes) => saveSession(notes) },
       isCompleted,
       // Persist after EVERY write, so a reload mid-save resumes from here.
       (remaining) => writeDraft(userId, remaining))
@@ -121,7 +130,7 @@ export function usePlanSessionHost(input: PlanSessionHostInput): PlanSessionHost
     setSaveError(false)
     setSessionOpen(false)
     setJustSaved(true)
-  }, [shownDraft, writers, saveSession, isCompleted, userId, level, periodYmd])
+  }, [shownDraft, writers, saveSession, isCompleted, userId, level, periodYmd, prepareDraft])
 
   return {
     session, sessionReady, draft, shownDraft, sessionOpen, savingSession, justSaved, saveError,

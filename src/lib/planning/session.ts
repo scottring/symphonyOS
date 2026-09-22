@@ -2,11 +2,15 @@
 //
 // A planning session, as data (spec: guided planning, Phase 1). Nothing here
 // writes — the draft is decided in full, summarised, and only then applied
-// (applySession.ts). Month only for now; season/year reuse this shape later.
+// (applySession.ts). One shape for all four levels: week, month, season and
+// year differ only in the rows they look back at and the words they use.
 
-import type { Task } from '@/types/task'
-import type { DomainId } from '@/lib/domains'
+import type { Task, PlacementLevel } from '@/types/task'
+import type { Goal } from '@/types/goal'
+import type { DomainId, Layer } from '@/lib/domains'
+import type { Seasons } from '@/lib/cadence/seasons'
 import { committedTo } from '@/lib/placement/model'
+import { matchesLayers } from '@/lib/today/domainFilter'
 import { localYmd, parseLocalYmd } from '@/lib/cadence/config'
 import { doableBy } from './poolViews'
 import { stepsThatCarryForward } from './goalSteps'
@@ -18,7 +22,14 @@ export type Verdict = 'keep' | 'keep-action' | 'done' | 'someday' | 'drop'
 export interface NewItem { id: string; title: string; linkId?: string; context?: DomainId | null
   /** Week only: an optional day (local YYYY-MM-DD) for a time-sensitive task. */
   day?: string }
-export type SessionLevel = 'month' | 'week'
+export type SessionLevel = 'month' | 'week' | 'season' | 'year'
+
+/** The placement level a session's rows live on. A year row is a GOAL, not a
+ *  placed task — it has no commitments — so nothing asks placement about it;
+ *  'month' is the harmless stand-in for the step helpers, which find nothing. */
+export function placementLevelOf(level: SessionLevel): PlacementLevel {
+  return level === 'year' ? 'month' : level
+}
 export interface SessionDraft {
   level: SessionLevel; periodStart: string; prevStart: string
   verdicts: Record<string, Verdict>
@@ -28,13 +39,16 @@ export interface SessionDraft {
   takenFromAbove: string[]
   keptAlready: string[]
   actionIds: Record<string, string>
+  /** Year only: source goal id → the id the kept copy will be created with, so
+   *  a retried Save re-uses it instead of making a second goal (Task 2/4). */
+  keptIds?: Record<string, string>
   created: string[]
 }
 export interface SummaryLine { title: string; destination: string }
 
 export function emptyDraft(level: SessionLevel, periodStart: Date, prevStart: Date): SessionDraft {
   return { level, periodStart: localYmd(periodStart), prevStart: localYmd(prevStart),
-    verdicts: {}, actionTitles: {}, wentWell: '', didnt: '', newGoals: [], newTasks: [], takenFromAbove: [], keptAlready: [], actionIds: {}, created: [] }
+    verdicts: {}, actionTitles: {}, wentWell: '', didnt: '', newGoals: [], newTasks: [], takenFromAbove: [], keptAlready: [], actionIds: {}, keptIds: {}, created: [] }
 }
 
 export function isEmptyDraft(d: SessionDraft): boolean {
@@ -46,14 +60,16 @@ export function isEmptyDraft(d: SessionDraft): boolean {
  *  A row carried or dropped already has its answer and is not asked again.
  *  Scoped to `meId` exactly as the month page is (selectPeriodTasks): a row
  *  assigned only to someone else is not on my September, so it is not asked. */
-export function lookBackRows(tasks: readonly Task[], prevStart: Date, meId: string | null, level: SessionLevel = 'month'): { finished: Task[]; open: Task[] } {
+export function lookBackRows(tasks: readonly Task[], prevStart: Date, meId: string | null, level: SessionLevel = 'month', seasons?: Seasons): { finished: Task[]; open: Task[] } {
   const finished: Task[] = []
   const open: Task[] = []
+  // A year's look-back is over GOALS, not placed tasks — yearLookBack answers it.
+  if (level === 'year') return { finished, open }
   for (const t of tasks) {
     if (meId && !doableBy(t, meId)) continue
     // The week plans tasks only; goals live a level up.
     if (level === 'week' && t.isGoal) continue
-    const c = committedTo(t, level, prevStart, { isCurrent: false })
+    const c = committedTo(t, placementLevelOf(level), prevStart, { isCurrent: false, seasons })
     if (!c) continue
     if (c !== 'legacy' && c.status === 'carried') continue
     if (t.completed || (c !== 'legacy' && c.status === 'done')) finished.push(t)
@@ -64,6 +80,12 @@ export function lookBackRows(tasks: readonly Task[], prevStart: Date, meId: stri
 }
 
 export function verdictOptions(isGoal: boolean, level: SessionLevel = 'month'): Array<{ verdict: Verdict; label: string }> {
+  // A year row is a goal with no task list of its own to hang an action on,
+  // and no Someday page above the year: it is kept, finished, or let go.
+  if (level === 'year') {
+    return [{ verdict: 'keep', label: 'Keep' }, { verdict: 'done', label: 'Done' },
+      { verdict: 'drop', label: 'Drop' }]
+  }
   // A week row is a task: there is no goal to add a next action to.
   if (level === 'week') {
     return [{ verdict: 'keep', label: 'Keep' }, { verdict: 'done', label: 'Done' },
@@ -97,15 +119,16 @@ function verdictRows(d: SessionDraft, ctx: { open: readonly Task[]; current?: re
  * work — so the summary must say it carries more than it lists. `all` is the
  * unfiltered task list; the step rule is keepForward's own.
  */
-export function goalsWithHiddenSteps(all: readonly Task[], shown: readonly Task[], prevStart: Date, level: SessionLevel = 'month'): Set<string> {
-  if (level === 'week') return new Set()
+export function goalsWithHiddenSteps(all: readonly Task[], shown: readonly Task[], prevStart: Date, level: SessionLevel = 'month', seasons?: Seasons): Set<string> {
+  // A week plans tasks, and a year plans goals: neither carries steps here.
+  if (level === 'week' || level === 'year') return new Set()
   const shownIds = new Set(shown.map((t) => t.id))
   const goalIds = new Set(all.filter((t) => t.goalTaskId).map((t) => t.goalTaskId!))
   const out = new Set<string>()
   for (const g of goalIds) {
-    const hidden = stepsThatCarryForward(g, all, 'month').some((st) => {
+    const hidden = stepsThatCarryForward(g, all, level).some((st) => {
       if (shownIds.has(st.id)) return false
-      const c = committedTo(st, 'month', prevStart, { isCurrent: false })
+      const c = committedTo(st, level, prevStart, { isCurrent: false, seasons })
       return c === 'legacy' || (c !== undefined && c.status === 'open')
     })
     if (hidden) out.add(g)
@@ -128,11 +151,13 @@ export function pruneDraft(d: SessionDraft, ctx: { open: readonly Task[]; above:
   const pick = <T,>(o: Record<string, T>) => Object.fromEntries(Object.entries(o).filter(([k]) => rows.has(k))) as Record<string, T>
   const keptAlready = d.keptAlready ?? []
   const actionIds = d.actionIds ?? {}
+  const keptIds = d.keptIds ?? {}
   const stale = Object.keys(d.verdicts).some((k) => !rows.has(k)) || Object.keys(d.actionTitles).some((k) => !rows.has(k))
-    || Object.keys(actionIds).some((k) => !rows.has(k)) || keptAlready.some((k) => !rows.has(k))
+    || Object.keys(actionIds).some((k) => !rows.has(k)) || Object.keys(keptIds).some((k) => !rows.has(k))
+    || keptAlready.some((k) => !rows.has(k))
     || d.takenFromAbove.some((k) => !aboveIds.has(k))
   if (!stale) return d
-  return { ...d, verdicts: pick(d.verdicts), actionTitles: pick(d.actionTitles), actionIds: pick(actionIds),
+  return { ...d, verdicts: pick(d.verdicts), actionTitles: pick(d.actionTitles), actionIds: pick(actionIds), keptIds: pick(keptIds),
     keptAlready: keptAlready.filter((k) => rows.has(k)), takenFromAbove: d.takenFromAbove.filter((k) => aboveIds.has(k)) }
 }
 
@@ -156,12 +181,14 @@ export function summarize(
 ): SummaryLine[] {
   const P = ctx.periodLabel, Q = ctx.prevLabel
   const week = d.level === 'week'
+  const year = d.level === 'year'
   const L = {
     list: week ? weekTaskListLabel(P) : `${P} tasks`,
     goals: `${P} goals`,
     kept: `kept from ${Q}`,
     done: week ? `Done ${Q}` : `Done in ${Q}`,
-    dropped: `Dropped from ${Q} · the task is kept`,
+    // A year row is a goal: dropping it archives the goal; there is no task to keep.
+    dropped: year ? `Dropped from ${Q} · the goal is archived` : `Dropped from ${Q} · the task is kept`,
     left: week ? `Left open ${Q}` : `Left open in ${Q}`,
     stays: `stays on ${ctx.aboveLabel}, marked "${week ? `on ${P}` : `in ${P}`}"`,
   }
@@ -174,7 +201,7 @@ export function summarize(
   for (const g of rows) {
     const v = d.verdicts[g.id]
     if (!g.isGoal || (v !== 'keep' && v !== 'keep-action')) continue
-    for (const s of stepsThatCarryForward(g.id, ctx.open, d.level)) carriedWith.set(s.id, g.title)
+    for (const s of stepsThatCarryForward(g.id, ctx.open, placementLevelOf(d.level))) carriedWith.set(s.id, g.title)
   }
   // No count: one line says there is more, never how much (no scoreboards).
   const alsoCarries = (g: Task) => {
@@ -215,4 +242,31 @@ export function summarize(
     if (t) lines.push({ title: t.title, destination: `${L.list} · ${L.stays}` })
   }
   return lines
+}
+
+/**
+ * A Goal as the session's row shape. PlanSession and `summarize` read only
+ * `id, title, isGoal, completed, createdAt, updatedAt, context` off a row, so
+ * one documented cast is honest here: the object is a Task for every field
+ * either of them touches, and nothing else is invented.
+ */
+export function goalAsRow(g: Goal): Task {
+  return {
+    id: g.id, title: g.name, isGoal: true, completed: g.status === 'completed',
+    createdAt: g.createdAt, updatedAt: g.updatedAt, context: g.context ?? null, bucket: 'inbox',
+  } as Task
+}
+
+/**
+ * The year's look-back: last year's goals, as rows. An archived goal was
+ * already let go and is not asked about again. Scoped to the layers in view
+ * exactly as the year page is (PeriodPlanPage's year rows).
+ */
+export function yearLookBack(goals: readonly Goal[], year: number, layers: ReadonlySet<Layer>): { finished: Task[]; open: Task[] } {
+  const byCreated = (a: Task, b: Task) => a.createdAt.getTime() - b.createdAt.getTime()
+  const mine = goals.filter((g) => g.year === year && matchesLayers(g.context, layers))
+  return {
+    finished: mine.filter((g) => g.status === 'completed').map(goalAsRow).sort(byCreated),
+    open: mine.filter((g) => g.status === 'active').map(goalAsRow).sort(byCreated),
+  }
 }

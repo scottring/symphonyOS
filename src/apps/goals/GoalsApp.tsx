@@ -30,7 +30,10 @@ function GoalsIndex() {
     addArea, updateArea, deleteArea, addGoal, updateGoal,
   } = useGoalsContext()
 
-  const filteredGoals = goals.filter((g) => matchesLayers(g.context, layers))
+  // THIS year's goals — the context now holds every year (the year page plans
+  // next year and looks back at last), and the heading below names one year.
+  const year = new Date().getFullYear()
+  const filteredGoals = goals.filter((g) => g.year === year && matchesLayers(g.context, layers))
 
   return (
     <Suspense fallback={<LoadingFallback />}>
@@ -38,7 +41,7 @@ function GoalsIndex() {
         areas={areas}
         goals={filteredGoals}
         loading={loading}
-        year={new Date().getFullYear()}
+        year={year}
         onSelectGoal={(id) => navigate(`/goals/${id}`)}
         onAddArea={addArea}
         onRenameArea={(areaId, name) => updateArea(areaId, { name })}

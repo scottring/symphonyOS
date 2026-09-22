@@ -14,7 +14,7 @@ vi.mock('@/lib/supabase', () => ({
 }))
 vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 'u1' } }) }))
 
-import { usePlanningSession, monthToken, weekToken } from './usePlanningSession'
+import { usePlanningSession, monthToken, weekToken, yearToken } from './usePlanningSession'
 
 describe('usePlanningSession', () => {
   beforeEach(() => { rows.length = 0; upsert.mockClear(); orderImpl = async () => ({ data: rows, error: null }) })
@@ -25,6 +25,22 @@ describe('usePlanningSession', () => {
 
   it('builds the week token from the week\'s first day', () => {
     expect(weekToken(new Date(2026, 9, 4))).toBe('2026-10-4')
+  })
+
+  it('builds the year token as the plain year', () => {
+    expect(yearToken(2027)).toBe('2027')
+  })
+
+  it('saves a season and a year session under their own horizons', async () => {
+    const season = renderHook(() => usePlanningSession('seasonal', '2026-fall'))
+    await waitFor(() => expect(season.result.current.loading).toBe(false))
+    await act(async () => { await season.result.current.save({ wentWell: 'w', didnt: 'd' }) })
+    expect(upsert).toHaveBeenCalledWith(expect.objectContaining({ horizon: 'seasonal', period_token: '2026-fall' }), expect.anything())
+
+    const year = renderHook(() => usePlanningSession('annual', yearToken(2027)))
+    await waitFor(() => expect(year.result.current.loading).toBe(false))
+    await act(async () => { await year.result.current.save({ wentWell: 'w', didnt: 'd' }) })
+    expect(upsert).toHaveBeenCalledWith(expect.objectContaining({ horizon: 'annual', period_token: '2027' }), expect.anything())
   })
 
   it('reads and saves a weekly session under the weekly horizon', async () => {
