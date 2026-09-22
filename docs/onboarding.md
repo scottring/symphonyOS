@@ -2,7 +2,7 @@
 
 A first pass through the app, one step at a time. Each step tells you where you are, why the page exists, one thing to do, and what you should see when it worked.
 
-The planning chain — Steps 4 to 8, year to today — is the guided path; everything else here is optional. Each step carries a Status. Steps marked *reads cleanly* are ready to follow; a step marked *needs* points at a known gap listed under it.
+The planning chain — Steps 4 to 8, year to today — is the guided path; everything else here is optional. Each step carries a Status. Steps marked *reads cleanly* are ready to follow; a step marked *needs* points at a known gap listed under it; *pending* means not yet walked on this build.
 
 ---
 
@@ -12,7 +12,7 @@ The planning chain — Steps 4 to 8, year to today — is the guided path; every
 **Why it exists:** Symphony is for a household, not just one person. Naming the people first means everything you add later can belong to someone.
 **Do this:** Sign in, name your household, and add the people in it.
 **You'll see:** Today opens, greeting you by name.
-**Status:** reads cleanly (Claude note #2 on the prefilled name)
+**Status:** reads cleanly
 
 ## Step 1 · Today, empty
 
@@ -54,7 +54,7 @@ The planning chain — Steps 4 to 8, year to today — is the guided path; every
 **Why it exists:** A year is too far away to act on. A season is the stretch where you commit to a few goals under the year's, and the tasks that move them.
 **Do this:** Press **Plan Fall 2026**. The session runs "Look back at Summer 2026 · Plan Fall 2026 · Save". If last season had a list, give each open row a verdict: a goal offers **Keep**, **Keep, and add a next action**, **Someday** or **Drop**; a task offers **Keep**, **Done**, **Someday** or **Drop**. Then add a season goal, choosing the year goal it is "for", and a task "toward" it. **Save Fall 2026**.
 **You'll see:** The goal and the task on the season page, and the year's goals in the column beside the session while you write. A hint says once: "Goals are what this period should add up to. They stay on this list; you look at them when you plan a week or a day." **Close · keep my draft** leaves the session without losing what you wrote.
-**Status:** reads cleanly (Phase 3; B5–B10 closed — the year's goals sit beside the session rather than in a rail that cannot take a step)
+**Status:** reads cleanly (Phase 3; the year's goals sit beside the session)
 
 ## Step 6 · Month
 
@@ -62,15 +62,15 @@ The planning chain — Steps 4 to 8, year to today — is the guided path; every
 **Why it exists:** The month pulls from the season. Choosing what to carry into this month is a deliberate decision, not an automatic cascade.
 **Do this:** Press **Plan October**. Look back at September and give its rows their verdicts — goals take **Keep** / **Keep, and add a next action** / **Someday** / **Drop**, tasks take **Keep** / **Done** / **Someday** / **Drop**; then, in the column beside you, press **+ Add to October** on a season task, or type a task of your own. **Save October**.
 **You'll see:** "Planned Sep 21" in the status row; the save summary saying the season task 'stays on Fall 2026, marked "in October"'; and afterwards "October is planned. When you're ready, plan the week with October beside you. Plan the week → optional".
-**Status:** reads cleanly (Phase 1; B9, B11, B12 and B25 closed — the pull is "+ Add to October" inside the session, and an empty list points at the session rather than drawing before the data)
+**Status:** reads cleanly (Phase 1; the pull is "+ Add to October" inside the session, and an empty list points at the session)
 
 ## Step 7 · Week
 
 **Where you are:** `/week`.
 **Why it exists:** The week is where the plan meets real days. The week has a list of its own, and the days pick from it.
-**Do this:** Press **Plan this week**. Look back at last week's list, then press **+ Add to this week** on an October task. Give a time-sensitive task a day with the day menu ("Any day" until you choose one). **Save this week**.
+**Do this:** Press **Plan this week**. Look back at last week's list — each open row offers **Keep**, **Done**, **Someday** or **Drop** — then press **+ Add to this week** on an October task. Give a time-sensitive task a day with the day menu ("Any day" until you choose one). **Save this week**.
 **You'll see:** "This week's list" above the days at every width, each row saying where it came from ("from October", "kept from last week"), and "The week is planned. Each day, pick from this list. Go to Today → optional". A hint says once: "Adding a month task here puts it on this week's list too. The month keeps it and shows 'on this week'."
-**Status:** reads cleanly (Phase 2; B13 closed — the week has its own list). An empty list reads "Nothing on this week's list yet. Plan this week →".
+**Status:** reads cleanly (Phase 2; the week has its own list). An empty list reads "Nothing on this week's list yet. Plan this week →".
 
 ## Step 8 · Today
 
@@ -85,7 +85,7 @@ The planning chain — Steps 4 to 8, year to today — is the guided path; every
 **Where you are:** Today, on a weekend or a Monday, or around the turn of a month, season or year.
 **Why it exists:** The chain is a habit, not a chore. One quiet line offers the next rung when its moment comes, and never more than one at a time.
 **Do this:** Read it, and either follow it or press **Not now**.
-**You'll see:** One line — "The week of Sep 22–28 isn't planned yet. Plan the week → optional · Not now" — and nothing at all once that period is planned or dismissed. Before you have ever planned, it reads "Start with the year: plan 2026, then the season, the month and the week." The windows are narrow: Saturday or Sunday for the coming week and Monday or Tuesday for the week just started; the last six days of a month and its first seven; from Nov 20 the nudge offers next year.
+**You'll see:** One line — "The week of Sep 22–28 isn't planned yet. Plan the week → optional Not now" — and nothing at all once that period is planned or dismissed. Before you have ever planned, it reads "Start with the year: plan 2026, then the season, the month and the week." The windows are narrow: Saturday or Sunday for the coming week and Monday or Tuesday for the week just started; the last six days of a month and its first seven; from Nov 20 the nudge offers next year.
 **Status:** reads cleanly (Phase 4)
 
 ## Step 8b · Week, the schedule
