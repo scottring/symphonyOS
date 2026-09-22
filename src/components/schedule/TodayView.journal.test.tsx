@@ -26,10 +26,10 @@ vi.mock('@/hooks/useNotes', () => ({ useNotes: () => ({ notes: [], loading: fals
 vi.mock('@/hooks/useSupabaseTasks', () => ({ useSupabaseTasks: () => ({ tasks: [], loading: false, addTask: vi.fn(), updateTask: vi.fn(), deleteTask: vi.fn() }) }))
 vi.mock('@/hooks/usePinnedItems', () => ({ usePinnedItems: () => ({ isPinned: () => false, pin: vi.fn(), unpin: vi.fn() }) }))
 vi.mock('@/hooks/useActionQueue', () => ({ useActionQueue: () => ({ actions: [], loading: false, approveAction: vi.fn(), rejectAction: vi.fn(), pendingCount: 0, refetch: vi.fn() }) }))
-const domainMock = vi.hoisted(() => ({ layers: new Set<string>() as ReadonlySet<string> }))
+const domainMock = vi.hoisted(() => ({ layers: new Set<string>() as ReadonlySet<string>, all: vi.fn() }))
 vi.mock('@/hooks/useDomain.tsx', async (importOriginal) => {
   const actual = await importOriginal() as Record<string, unknown>
-  return { ...actual, useDomain: () => ({ currentDomain: 'universal', layers: domainMock.layers, setDomain: vi.fn() }) }
+  return { ...actual, useDomain: () => ({ currentDomain: 'universal', layers: domainMock.layers, setDomain: vi.fn(), all: domainMock.all }) }
 })
 const calendarMock = vi.hoisted(() => ({ isConnected: false, error: null as string | null }))
 vi.mock('@/hooks/useGoogleCalendar', () => ({
@@ -150,6 +150,23 @@ describe('Today as a daily journal', () => {
     expect(screen.queryByRole('button', { name: /Choose something for today/ })).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Shelves' }))
     expect(screen.getByTestId('pins')).toHaveTextContent('today')
+  })
+
+  it('an empty list under filters says the filters are on and offers Show everything', () => {
+    const onSelectAssignees = vi.fn()
+    domainMock.layers = new Set(['work'])
+    domainMock.all.mockClear()
+    renderView({ tasks: [], selectedAssignees: ['m1'], onSelectAssignees })
+    fireEvent.click(screen.getByRole('button', { name: 'Show everything' }))
+    expect(domainMock.all).toHaveBeenCalledOnce()
+    expect(onSelectAssignees).toHaveBeenCalledWith([])
+    domainMock.layers = ALL_LAYERS
+  })
+
+  it('an unfiltered empty list does not mention filters', () => {
+    renderView({ tasks: [] })
+    expect(screen.getByText('Nothing chosen yet.')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Show everything' })).toBeNull()
   })
 
   it('keeps the decisions column when there is something to decide', () => {

@@ -410,7 +410,7 @@ function ShellLayoutInner({ children }: Props) {
             <button
               onClick={() => navigate('/inbox')}
               aria-current={location.pathname.startsWith('/inbox') ? 'page' : undefined}
-              aria-label={`Inbox${inboxCount ? `, ${inboxCount} items` : ''}`}
+              aria-label={`Inbox${inboxCount ? `, ${inboxCount} ${inboxCount === 1 ? 'item' : 'items'}` : ''}`}
               className={`relative flex-1 min-w-0 flex flex-col items-center gap-0.5 px-1 py-1.5 rounded-lg transition-all ${
                 location.pathname.startsWith('/inbox') ? 'text-accent-600' : 'text-neutral-400 hover:text-neutral-600'
               }`}
