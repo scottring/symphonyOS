@@ -118,6 +118,19 @@ marked *verify* must be confirmed before the phase that uses them.)
      take a day; it is created on the week and then dated, so it is on both.
 3. **Season and Year sessions.** The same shape, with the Year Keep fix.
    Year's look-back is skipped when last year has no goals.
+   *Shipped 2026-09-21 (plan:
+   `docs/superpowers/plans/2026-09-21-guided-planning-phase-3-season-year.md`).*
+   - As built: one parameterised session block on `PeriodPlanPage` hosts
+     month, season and year. The season looks back by season range and plans
+     with the year's goals beside it (reference only; nothing is taken down
+     from a year). The year session holds goals only: verdicts are **Keep ·
+     Done · Drop** (no next action, no Someday at the year); **Drop archives
+     the goal** (`status: 'archived'`), never deletes; Keep creates next
+     year's goal in one insert carrying notes, strategy, area and context and
+     records `goals.carried_from` (new nullable column, migration
+     `2026-09-22_goals_carried_from.sql`). Tokens agree with the cadence
+     nudge: `seasonal` = `seasonToken(start)` (`2026-fall`), `annual` = the
+     year (`2027`). The year rail on the season page hides archived goals.
 4. **Guidance and reference.**
    - Today nudges: first use ("start with the year"), a new season, a new
      month, a new week.
