@@ -69,6 +69,7 @@ vi.mock('@/hooks/usePlanningSession', () => ({
   usePlanningSession: (_h: string, token: string) => ({ saved: sessionState.saved, mine: sessionState.mine, loading: sessionState.loading,
     loadedToken: sessionState.loadedToken === 'auto' ? token : sessionState.loadedToken, error: sessionState.error, reload: reloadSession, save: saveSession }),
   monthToken: (d: Date) => `${d.getFullYear()}-${d.getMonth() + 1}`,
+  yearToken: (y: number) => String(y),
 }))
 vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ user: { id: 'u1' } }) }))
 const mockNavigate = vi.fn()
@@ -700,6 +701,8 @@ describe('PeriodPlanPage — Plan <Month>', () => {
     hook.dropCommitment.mockImplementation(async () => true)
     hook.completeTask.mockImplementation(async () => true)
     mockNavigate.mockClear()
+    Object.values(goalsApi).forEach((f) => f.mockClear())
+    goalsApi.addGoal.mockImplementation(async (_a: string, name: string) => goal({ name }))
     sessionState.saved = null; sessionState.mine = null; sessionState.loadedToken = 'auto'; sessionState.error = null; sessionState.loading = false
     saveSession.mockClear(); reloadSession.mockClear()
   })
@@ -860,14 +863,14 @@ describe('PeriodPlanPage — Plan <Month>', () => {
     expect(screen.getByRole('button', { name: `Continue planning ${label}` })).toBeInTheDocument()
   })
 
-  it('the season page carries a planning bar; the year page does not yet', () => {
+  it('the season page and the year page each carry a planning bar', () => {
     const view = renderPage('season')
     expect(screen.getByRole('button', { name: 'Plan Fall 2026' })).toBeInTheDocument()
     expect(screen.getByText(/not planned yet/i)).toBeInTheDocument()
     view.unmount()
     renderPage('year')
-    expect(screen.queryByRole('button', { name: /^Plan / })).toBeNull()
-    expect(screen.queryByText(/not planned yet/i)).toBeNull()
+    expect(screen.getByRole('button', { name: 'Plan 2026' })).toBeInTheDocument()
+    expect(screen.getByText(/not planned yet/i)).toBeInTheDocument()
   })
 
   it('the season page plans the season: look back at the previous season, keep into this one, add a task toward a season goal, save once', async () => {
@@ -897,6 +900,50 @@ describe('PeriodPlanPage — Plan <Month>', () => {
     expect(screen.getByRole('button', { name: /plan the month/i })).toBeInTheDocument()
     // A season takes nothing down from the year: nothing was ever offered.
     expect(hook.pushTask).not.toHaveBeenCalled()
+  })
+
+  it("the year page plans the year from last year's goals: Keep copies notes, strategy, area, context and links the goal; Done and Drop change status; nothing is deleted", async () => {
+    vi.setSystemTime(new Date(2026, 11, 20))
+    state.goals = [
+      goal({ id: 'k', name: 'Get strong again', year: 2026, areaId: 'a1', notes: 'PT twice a week', strategy: 'Coach', context: 'personal' }),
+      goal({ id: 'dn', name: 'Kitchen', year: 2026 }),
+      goal({ id: 'dr', name: 'Old', year: 2026 }),
+      goal({ id: 'fin', name: 'Bike', year: 2026, status: 'completed' }),
+    ]
+    renderPageAt('year', '/year?start=2027-01-01')
+    fireEvent.click(await screen.findByRole('button', { name: /^Plan 2027$/ }))
+    expect(screen.getByText('Bike')).toBeInTheDocument()                                    // finished
+    const rows = screen.getAllByRole('listitem').filter((li) => within(li).queryByRole('button', { name: 'Keep' }))
+    fireEvent.click(within(rows.find((li) => li.textContent?.includes('Get strong again'))!).getByRole('button', { name: 'Keep' }))
+    fireEvent.click(within(rows.find((li) => li.textContent?.includes('Kitchen'))!).getByRole('button', { name: 'Done' }))
+    fireEvent.click(within(rows.find((li) => li.textContent?.includes('Old'))!).getByRole('button', { name: 'Drop' }))
+    fireEvent.click(screen.getByRole('button', { name: /next: plan 2027/i }))
+    fireEvent.click(screen.getByRole('button', { name: /next: save/i }))
+    fireEvent.click(screen.getByRole('button', { name: /save 2027/i }))
+    await vi.waitFor(() => expect(saveSession).toHaveBeenCalledTimes(1))
+    expect(goalsApi.addGoal).toHaveBeenCalledWith('a1', 'Get strong again', 'personal', expect.objectContaining({
+      year: 2027, notes: 'PT twice a week', strategy: 'Coach', carriedFrom: 'k', id: expect.any(String),
+    }))
+    expect(goalsApi.updateGoal).toHaveBeenCalledWith('dn', { status: 'completed' })
+    expect(goalsApi.updateGoal).toHaveBeenCalledWith('dr', { status: 'archived' })
+    expect(goalsApi.deleteGoal).not.toHaveBeenCalled()
+    expect(screen.getByRole('button', { name: /plan the season/i })).toBeInTheDocument()
+  })
+
+  it('the year look-back is skipped when last year has no goals', async () => {
+    vi.setSystemTime(new Date(2026, 11, 20))
+    state.goals = []
+    renderPageAt('year', '/year?start=2027-01-01')
+    fireEvent.click(await screen.findByRole('button', { name: /^Plan 2027$/ }))
+    expect(screen.getByText(/nothing to look back at/i)).toBeInTheDocument()
+  })
+
+  it("the year page's Drop verb archives, never deletes", async () => {
+    state.goals = [goal({ id: 'y1', name: 'Run a half marathon', year: 2026 })]
+    renderPage('year')
+    fireEvent.click(await screen.findByRole('button', { name: 'Drop Run a half marathon' }))
+    expect(goalsApi.updateGoal).toHaveBeenCalledWith('y1', { status: 'archived' })
+    expect(goalsApi.deleteGoal).not.toHaveBeenCalled()
   })
 
   // ── Final review fixes ─────────────────────────────────────────────────────
