@@ -19,15 +19,17 @@ import type { Task } from '@/types/task'
 
 export function SomedayPage() {
   const { tasks, loading, toggleTask, updateTask, deleteTask, pushTask, updateTasksBulk } = useSupabaseTasks()
-  const { layers } = useDomain()
+  const { layers, all: showAllDomains } = useDomain()
   const gated = useGatedTaskActions({ updateTask, pushTask, updateTasksBulk }, (id) => tasks.find((t) => t.id === id))
 
+  const setAside = useMemo(() => tasks.filter((t) => t.bucket === 'someday' && !t.completed), [tasks])
   const rows = useMemo(
-    () => filterTasksForLayers(tasks, layers)
-      .filter((t) => t.bucket === 'someday' && !t.completed)
+    () => filterTasksForLayers(setAside, layers)
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()),
-    [tasks, layers],
+    [setAside, layers],
   )
+  // Empty because of the domain filter, not because nothing was set aside.
+  const hiddenByFilter = rows.length === 0 && setAside.length > 0
 
   const viewedDate = useMemo(() => new Date(), [])
   const onVerdict = (t: Task, v: Verdict) => {
@@ -51,6 +53,13 @@ export function SomedayPage() {
         <section aria-label="Someday" className="mt-4">
           {loading && rows.length === 0 ? (
             <p className="py-6 text-[15px] text-neutral-500">Loading…</p>
+          ) : hiddenByFilter ? (
+            <p className="py-6 text-[15px] text-neutral-500">
+              Nothing set aside in the domains you're viewing.{' '}
+              <button type="button" onClick={showAllDomains} className="font-medium text-primary-600 underline-offset-2 hover:underline">
+                Show all domains
+              </button>
+            </p>
           ) : rows.length === 0 ? (
             <p className="py-6 text-[15px] text-neutral-500">Nothing set aside.</p>
           ) : (
