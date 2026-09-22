@@ -43,6 +43,13 @@ export function filterTasksForLayers(tasks: Task[], layers: ReadonlySet<Layer>):
   return filterByLayers(tasks, layers)
 }
 
+/** The Inbox's layer rule, shared by the page and the nav badge so the two
+ *  can't disagree. Tagged rows follow the layers; UNTAGGED rows always show —
+ *  an Unsorted capture is exactly what the Inbox exists for (2026-09-20). */
+export function filterInboxTasksForLayers(tasks: Task[], layers: ReadonlySet<Layer>): Task[] {
+  return tasks.filter((t) => t.context == null || matchesLayers(t.context, layers))
+}
+
 export function filterRoutinesForLayers<T extends { context?: TaskContext | null }>(routines: T[], layers: ReadonlySet<Layer>): T[] {
   return filterByLayers(routines, layers)
 }

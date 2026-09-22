@@ -32,7 +32,7 @@ import { wasWritten } from '@/hooks/useGatedTaskActions'
 import { FocusInboxCard } from './FocusInboxCard'
 import { InboxModeToggle } from './InboxModeToggle'
 import { InboxUndoToast } from './InboxUndoToast'
-import { matchesLayers } from '@/lib/today/domainFilter'
+import { filterInboxTasksForLayers } from '@/lib/today/domainFilter'
 import { isBuyish, isToBuyNudgeDismissed, dismissToBuyNudge } from '@/lib/lists/toBuy'
 import { ToBuyNudge } from './ToBuyNudge'
 import { makeAssigneeFilter } from '@/lib/today/assigneeFilter'
@@ -360,7 +360,7 @@ export function InboxView({
   // see, so "always" here means "always among your own". The render below
   // narrows to bucket 'inbox' anyway.
   const filteredByDomain = useMemo(
-    () => tasks.filter((t) => t.context == null || matchesLayers(t.context, layers)),
+    () => filterInboxTasksForLayers(tasks, layers),
     [tasks, layers],
   )
 
