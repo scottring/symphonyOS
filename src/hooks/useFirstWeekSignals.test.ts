@@ -43,6 +43,7 @@ beforeEach(() => {
 
 describe('useFirstWeekSignals', () => {
   it('derives signals from the counts the account already has', async () => {
+    h.results.planning_sessions = { data: [{ savedAt: '2026-01-05T00:00:00.000Z' }], error: null }
     h.results.family_members = { count: 4, data: null, error: null }
     h.results.attachments = { count: 1, data: null, error: null }
     h.results.household_members = { count: 2, data: { household_id: 'hh-1' }, error: null }
@@ -54,6 +55,7 @@ describe('useFirstWeekSignals', () => {
     await waitFor(() => expect(result.current.signals).not.toBeNull())
 
     expect(result.current.signals).toEqual({
+      yearPlanned: true,
       memberCount: 4,
       pageCommitted: true,
       partnerInvited: true,
@@ -63,6 +65,23 @@ describe('useFirstWeekSignals', () => {
     // The page signal reads attachments filtered to the page-capture path.
     const attachmentsCall = h.calls.find((c) => c.table === 'attachments' && c.op === 'ilike')
     expect(attachmentsCall?.args).toEqual(['storage_path', '%/page/%'])
+  })
+
+  it('an unsaved annual row — no notes.savedAt — does not count as planned', async () => {
+    h.results.planning_sessions = { data: [{ savedAt: null }], error: null }
+    h.results.family_members = { count: 1, data: null, error: null }
+    h.results.attachments = { count: 0, data: null, error: null }
+    h.results.household_members = { count: 1, data: null, error: null }
+    h.results.household_invitations = { count: 0, data: null, error: null }
+    h.results.routines = { count: 0, data: null, error: null }
+
+    const { result } = renderHook(() => useFirstWeekSignals())
+
+    await waitFor(() => expect(result.current.signals).not.toBeNull())
+    expect(result.current.signals?.yearPlanned).toBe(false)
+
+    const yearCall = h.calls.find((c) => c.table === 'planning_sessions' && c.op === 'eq' && c.args[0] === 'horizon')
+    expect(yearCall?.args).toEqual(['horizon', 'annual'])
   })
 
   it('scopes the household count to the caller — a global count is not "your partner"', async () => {

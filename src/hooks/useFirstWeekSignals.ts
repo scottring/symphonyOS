@@ -41,7 +41,12 @@ export function useFirstWeekSignals() {
     }
 
     const nowIso = new Date().toISOString()
-    const [members, attachments, ownRow, invitations, routines] = await Promise.all([
+    const yearToken = String(new Date().getFullYear())
+    const [yearSessions, members, attachments, ownRow, invitations, routines] = await Promise.all([
+      // Household-visible rows for the current year — few, so select the
+      // savedAt field rather than just a head count.
+      supabase.from('planning_sessions').select('savedAt:notes->>savedAt')
+        .eq('horizon', 'annual').eq('period_token', yearToken),
       supabase.from('family_members').select('id', { count: 'exact', head: true }),
       // `useCommitPage` writes one `attachments` row per committed page at
       // `<uid>/page/<uuid>.ext` — the same signal for a sample page or a
@@ -61,7 +66,9 @@ export function useFirstWeekSignals() {
       ? (await supabase.from('household_members').select('id', { count: 'exact', head: true }).eq('household_id', householdId)).count ?? 0
       : 0
 
+    const yearRows = (yearSessions.data as { savedAt: string | null }[] | null) ?? []
     const next: FirstWeekSignals = {
+      yearPlanned: yearRows.some((r) => !!r.savedAt),
       memberCount: members.count ?? 0,
       pageCommitted: (attachments.count ?? 0) > 0,
       partnerInvited: householdCount >= 2 || (invitations.count ?? 0) >= 1,

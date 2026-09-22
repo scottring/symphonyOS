@@ -8,9 +8,13 @@
 
 import { supabase } from '@/lib/supabase'
 
-export type FirstWeekStepId = 'people' | 'page' | 'partner' | 'routine'
+export type FirstWeekStepId = 'plan-year' | 'people' | 'page' | 'partner' | 'routine'
 
 export interface FirstWeekSignals {
+  /** A `planning_sessions` row for the current calendar year (`horizon =
+   *  'annual'`, `period_token = String(currentYear)`) has been saved —
+   *  `notes.savedAt` is set — by anyone in the household. */
+  yearPlanned: boolean
   /** family_members rows visible to this account. */
   memberCount: number
   /** A page has been committed at least once — an `attachments` row whose
@@ -33,6 +37,13 @@ export interface FirstWeekStep {
 
 export function firstWeekSteps(s: FirstWeekSignals): FirstWeekStep[] {
   return [
+    {
+      id: 'plan-year',
+      title: 'Plan your year',
+      done: s.yearPlanned,
+      doneLine: s.yearPlanned ? 'see Year' : null,
+      to: '/year',
+    },
     {
       id: 'people',
       title: 'Name your people',
