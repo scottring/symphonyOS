@@ -72,7 +72,7 @@ export function ConfirmationToast({ toast, onDismiss }: ConfirmationToastProps) 
           <span className="text-sm font-medium flex-1">{toast?.message}</span>
           <button
             onClick={handleDismiss}
-            className="p-1 rounded-lg hover:bg-white/10 transition-colors
+            className="p-2 -m-1 rounded-lg hover:bg-white/10 transition-colors
                        text-neutral-400 hover:text-white flex-shrink-0"
             aria-label="Dismiss"
           >

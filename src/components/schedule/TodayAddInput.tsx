@@ -204,6 +204,7 @@ export function TodayAddInput({ onAdd, parserContext, resolver, getRecentTaskFor
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={handleKeyDown}
           onBlur={handleBlur}
+          aria-label={DESTINATIONS.find((d) => d.key === destination)!.placeholder.split(' — ')[0].replace(/\.{3}$/, '')}
           placeholder={DESTINATIONS.find((d) => d.key === destination)!.placeholder}
           className="flex-1 bg-transparent text-sm text-neutral-800 placeholder:text-neutral-400 outline-none"
         />

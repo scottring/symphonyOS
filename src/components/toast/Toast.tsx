@@ -85,7 +85,7 @@ export function Toast({ toast, onDismiss }: ToastProps) {
             setIsLeaving(true)
             setTimeout(onDismiss, 200)
           }}
-          className="p-1 rounded-lg hover:bg-white/10 transition-colors
+          className="p-2 -m-1 rounded-lg hover:bg-white/10 transition-colors
                      text-neutral-400 hover:text-white"
           aria-label="Dismiss"
         >

@@ -51,8 +51,8 @@ export function MedManageList(props: Props) {
                 onClick={() => onLogDose(m.id)} title="Log a dose now">
                 <Check className="w-4 h-4" /> Take now
               </button>
-              <button className="card px-2 py-1" onClick={() => setEditingId(m.id)}><Pencil className="w-4 h-4" /></button>
-              <button className="card px-2 py-1" onClick={() => {
+              <button className="card px-2 py-1" aria-label={`Edit ${m.name}`} onClick={() => setEditingId(m.id)}><Pencil className="w-4 h-4" /></button>
+              <button className="card px-2 py-1" aria-label={`Delete ${m.name}`} onClick={() => {
                 if (window.confirm('Delete this medication and all its logged doses?')) onDelete(m.id)
               }}><Trash2 className="w-4 h-4" /></button>
             </div>

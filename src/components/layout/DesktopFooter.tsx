@@ -23,13 +23,17 @@ const SHORTCUTS: [keys: string, action: string][] = [
 
 function FooterDialog({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
   const panel = useRef<HTMLDivElement>(null)
+  // Held in a ref: the footer passes a fresh onClose each render, and re-running
+  // this effect on every parent render yanked focus back to the dialog frame.
+  const onCloseRef = useRef(onClose)
+  useEffect(() => { onCloseRef.current = onClose })
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null
     panel.current?.focus()
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.stopPropagation(); onClose() } }
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); onCloseRef.current() } }
     document.addEventListener('keydown', onKey)
     return () => { document.removeEventListener('keydown', onKey); previous?.focus() }
-  }, [onClose])
+  }, [])
   return createPortal(
     <div className="desktop-footer-backdrop" onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}>
       <div ref={panel} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby="desktop-footer-dialog-title" className="desktop-footer-dialog">

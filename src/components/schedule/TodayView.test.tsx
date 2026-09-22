@@ -476,7 +476,10 @@ describe('TodayView', () => {
     } as never)
 
     expect(screen.getByText('Afternoon task, already done')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /afternoon/i })).not.toBeInTheDocument()
+    // No "Afternoon" section toggle — the only such button is the row's own
+    // title (the phone row's keyboard way into the detail).
+    expect(screen.queryAllByRole('button', { name: /afternoon/i })
+      .filter((b) => b.textContent !== 'Afternoon task, already done')).toHaveLength(0)
 
     localStorage.clear()
   })

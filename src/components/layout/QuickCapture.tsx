@@ -148,6 +148,21 @@ export function QuickCapture({
     }, 200) // Match the animation duration
   }
 
+  // Return focus to whatever opened the modal (the Add button, a row) when it
+  // closes — unless the close handed focus somewhere on purpose (a result
+  // opening its detail panel).
+  const openerRef = useRef<HTMLElement | null>(null)
+  useEffect(() => {
+    if (!isOpen) return
+    openerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
+    return () => {
+      const opener = openerRef.current
+      const active = document.activeElement
+      const focusLost = !active || active === document.body || !active.isConnected
+      if (focusLost && opener?.isConnected && opener !== document.body) opener.focus({ preventScroll: true })
+    }
+  }, [isOpen])
+
   // Focus input when modal opens, and run the one-tick entrance animation.
   useEffect(() => {
     if (isOpen) {
@@ -295,6 +310,7 @@ export function QuickCapture({
       return
     }
     if (e.key === 'Escape') {
+      e.preventDefault()
       handleClose()
     } else if (e.key === 'Enter') {
       e.preventDefault()
@@ -341,6 +357,14 @@ export function QuickCapture({
           {/* Sheet / Modal Content */}
           <div
             data-testid="quick-capture-sheet"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="quick-capture-title"
+            // Escape closes from anywhere in the modal (the photo button, a
+            // chip, Close) — not only from the text field.
+            onKeyDown={(e) => {
+              if (e.key === 'Escape' && !e.defaultPrevented) { e.preventDefault(); handleClose() }
+            }}
             className={`
               bg-bg-elevated shadow-xl
               w-full md:w-1/2 md:max-w-lg
@@ -368,7 +392,7 @@ export function QuickCapture({
             />
             {/* Header with keyboard hint and close button */}
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-neutral-800">
+              <h2 id="quick-capture-title" className="text-lg font-semibold text-neutral-800">
                 Quick Add
               </h2>
               <div className="flex items-center gap-2">
@@ -397,6 +421,7 @@ export function QuickCapture({
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   onKeyDown={handleKeyDown}
+                  aria-label="Add a task, note or event"
                   placeholder='Try "call the vet tomorrow 2pm"'
                   className="w-full pl-4 pr-14 py-3 rounded-xl border border-neutral-200 bg-neutral-50
                              text-neutral-800 placeholder:text-neutral-400 text-lg md:text-2xl font-display

@@ -140,7 +140,16 @@ export function FileUpload({ onFileSelect, isUploading = false, error, compact =
         disabled={isUploading}
       />
       <div
+        // The file input is hidden, so this drop zone is the only way in —
+        // it must be reachable and operable from the keyboard.
+        role="button"
+        tabIndex={isUploading ? -1 : 0}
+        aria-disabled={isUploading || undefined}
+        aria-label={isUploading ? 'Uploading…' : 'Upload a file'}
         onClick={handleClick}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleClick() }
+        }}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}

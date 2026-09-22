@@ -92,7 +92,7 @@ vi.mock('@/hooks/usePlanActions', () => ({ usePlanActions: () => ({}) }))
 vi.mock('@/components/layout/NewVersionBanner', () => ({ NewVersionBanner: () => null }))
 vi.mock('@/components/omnibox/OmniboxResults', () => ({ OmniboxResults: () => null }))
 vi.mock('@/components/chat/ChatPanel', () => ({ ChatPanel: () => null }))
-vi.mock('@/components/toast', () => ({ Toast: () => null, ConfirmationToast: () => null }))
+vi.mock('@/components/toast', () => ({ Toast: () => null, ConfirmationToast: () => null, ToastLiveRegion: () => null }))
 
 function renderAt(path: string, children: ReactNode = <div data-testid="app-content" />) {
   return render(

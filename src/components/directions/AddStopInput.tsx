@@ -120,6 +120,7 @@ export function AddStopInput({ onAddStop, onSearch, onGetDetails }: AddStopInput
             setQuery('')
             setResults([])
           }}
+          aria-label="Cancel adding a stop"
           className="p-2 text-neutral-400 hover:text-neutral-600"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">

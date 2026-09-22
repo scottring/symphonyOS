@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
+import { usePopoverFocus } from '@/hooks/usePopoverFocus'
 import { AssigneeAvatar } from './AssigneeAvatar'
 import type { FamilyMember } from '@/types/family'
 import { FAMILY_COLORS, type FamilyMemberColor } from '@/types/family'
@@ -57,17 +58,9 @@ export function AssigneeDropdown({ members, selectedId, onSelect, size = 'md' }:
     }
   }, [isOpen])
 
-  // Close on escape
-  useEffect(() => {
-    function handleEscape(event: KeyboardEvent) {
-      if (event.key === 'Escape') setIsOpen(false)
-    }
-
-    if (isOpen) {
-      document.addEventListener('keydown', handleEscape)
-      return () => document.removeEventListener('keydown', handleEscape)
-    }
-  }, [isOpen])
+  // Keyboard: focus into the portalled menu, arrows between people, Escape
+  // closes it (without also closing the detail panel) and returns to the trigger.
+  usePopoverFocus(isOpen, triggerRef, menuRef, () => setIsOpen(false))
 
   const handleSelect = (memberId: string | null) => {
     onSelect(memberId)

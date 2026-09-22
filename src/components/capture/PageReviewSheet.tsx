@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
+import { useDialogFocus } from '@/hooks/useDialogFocus'
 import { X, NotebookPen, HelpCircle, Target, ChevronLeft, ChevronRight, CalendarCheck2 } from 'lucide-react'
 import { parseLocalYmd } from '@/lib/cadence/config'
 import { pageMonthStart, pageSeasonStart, planWindowDates, rewindowPlanItems, type PlanDay, type PlanItem, type PlanPlacement, type PageAltitude, type PageReviewPayload } from '@/lib/planParse'
@@ -154,6 +155,9 @@ export function PageReviewSheet({
   // A caller's boundaries may be hand-written and out of calendar order; the
   // season maths below assume ordered ones.
   const seasonsOrdered = useMemo(() => normalizeSeasons(seasons), [seasons])
+  // Focus in, Escape closes (the first Escape just leaves a field being edited).
+  const dialogRef = useRef<HTMLDivElement>(null)
+  useDialogFocus(true, dialogRef, onClose)
   // Day-facts the calendar already knows are set aside before anything else:
   // "No school Monday" written on a page whose event is already on the day is
   // a confirmation, not a task.
@@ -289,7 +293,9 @@ export function PageReviewSheet({
       <div
         className="bg-bg-elevated rounded-2xl shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col"
         onClick={(e) => e.stopPropagation()}
+        ref={dialogRef}
         role="dialog"
+        aria-modal="true"
         aria-label="Review page items"
       >
         <div className="flex items-center justify-between gap-4 px-5 py-4 border-b border-neutral-200/60">

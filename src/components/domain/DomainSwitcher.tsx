@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { Check, type LucideIcon } from 'lucide-react'
 import { ConceptIcon } from '@/lib/conceptIcons'
 import { useDomain } from '@/hooks/useDomain'
+import { usePopoverFocus } from '@/hooks/usePopoverFocus'
 import { DOMAINS, UNSORTED, UNSORTED_ICON, LAYER_LABELS, type Layer } from '@/lib/domains'
 
 // Why this is a click-to-open menu and not a hover-to-fan strip:
@@ -44,7 +45,8 @@ export function DomainSwitcher() {
     })
   }, [isOpen])
 
-  // Close on outside click / Escape.
+  // Close on outside click. Keyboard: focus moves into the portalled menu,
+  // arrows move between rows, Escape closes and returns to the trigger.
   useEffect(() => {
     if (!isOpen) return
     function handlePointerDown(event: MouseEvent | TouchEvent) {
@@ -52,18 +54,14 @@ export function DomainSwitcher() {
       if (triggerRef.current?.contains(target) || menuRef.current?.contains(target)) return
       setIsOpen(false)
     }
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === 'Escape') setIsOpen(false)
-    }
     document.addEventListener('mousedown', handlePointerDown)
     document.addEventListener('touchstart', handlePointerDown)
-    document.addEventListener('keydown', handleKeyDown)
     return () => {
       document.removeEventListener('mousedown', handlePointerDown)
       document.removeEventListener('touchstart', handlePointerDown)
-      document.removeEventListener('keydown', handleKeyDown)
     }
   }, [isOpen])
+  usePopoverFocus(isOpen, triggerRef, menuRef, () => setIsOpen(false))
 
   const label = triggerLabel(layers)
   const checked = ROWS.filter((r) => layers.has(r.id))
@@ -73,6 +71,7 @@ export function DomainSwitcher() {
     <div
       ref={menuRef}
       role="menu"
+      aria-label="Layers"
       className="fixed z-[9999] bg-white rounded-xl border border-neutral-200 shadow-lg p-2 min-w-[200px] animate-fade-in-up"
       style={{ top: menuPosition.top, bottom: menuPosition.bottom, right: menuPosition.right }}
     >

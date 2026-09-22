@@ -157,6 +157,7 @@ export function ChatInput({ onSend, loading = false, placeholder = 'Ask about th
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={handleKeyDown}
           onPaste={handlePaste}
+          aria-label="Message"
           placeholder={placeholder}
           disabled={loading || uploading}
           rows={4}

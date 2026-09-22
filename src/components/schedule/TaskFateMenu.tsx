@@ -19,6 +19,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { MoreHorizontal, ChevronDown, ChevronRight, PanelRight } from 'lucide-react'
 import { TriageWhenMenu, type TriageWhen } from './TriageWhenMenu'
+import { usePopoverFocus } from '@/hooks/usePopoverFocus'
 
 export interface TaskFateMenuProps {
   /** Route to a when — callers map it through applyTriageWhen. */
@@ -44,6 +45,7 @@ export function TaskFateMenu({ onPickWhen, onPickDate, onComplete, onDelete, onO
   const [picksOpen, setPicksOpen] = useState(false)
   const containerRef = useRef<HTMLSpanElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
+  const triggerRef = useRef<HTMLButtonElement>(null)
 
   // Portal + fixed positioning (the PushDropdown pattern): a pill can sit at
   // either edge of a wrap lane, so an absolutely-positioned panel clips under
@@ -76,18 +78,13 @@ export function TaskFateMenu({ onPickWhen, onPickDate, onComplete, onDelete, onO
       if (containerRef.current?.contains(t) || panelRef.current?.contains(t)) return
       setOpen(false); setPicksOpen(false)
     }
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') { e.preventDefault(); setOpen(false); setPicksOpen(false) }
-    }
     document.addEventListener('mousedown', onDown)
-    document.addEventListener('keydown', onKey)
-    return () => {
-      document.removeEventListener('mousedown', onDown)
-      document.removeEventListener('keydown', onKey)
-    }
+    return () => document.removeEventListener('mousedown', onDown)
   }, [open])
 
   const close = () => { setOpen(false); setPicksOpen(false) }
+  // Focus into the portalled menu, arrow keys between items, Escape back to ⋯.
+  usePopoverFocus(open, triggerRef, panelRef, close)
 
   return (
     // Hosts are often draggable (dnd-kit pills, native-drag pills) — the menu
@@ -100,6 +97,7 @@ export function TaskFateMenu({ onPickWhen, onPickDate, onComplete, onDelete, onO
       onClick={(e) => e.stopPropagation()}
     >
       <button
+        ref={triggerRef}
         type="button"
         aria-label="Task actions"
         aria-haspopup="menu"

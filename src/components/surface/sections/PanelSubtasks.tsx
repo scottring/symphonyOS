@@ -152,6 +152,7 @@ export function PanelSubtasks({ subtasks, onToggleSubtask, onAddSubtask, onOpenS
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter') commit() }}
             onBlur={commit}
+            aria-label="Add a subtask"
             placeholder="+ Add a subtask…"
             className="text-[15px] px-2 py-1.5 rounded-md bg-transparent text-neutral-500 placeholder:text-neutral-400 focus:outline-none focus:bg-neutral-50 hover:bg-neutral-50"
           />

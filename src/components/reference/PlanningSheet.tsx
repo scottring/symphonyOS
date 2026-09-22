@@ -2,7 +2,8 @@
 // bottom sheet (the MoreSheet recipe — scrim, rounded top, slide-up, safe-area
 // padding, grab handle). Opened by the "Planning" button on Today and Week;
 // no drags here, every row has its buttons.
-import { useEffect } from 'react'
+import { useDialogFocus } from '@/hooks/useDialogFocus'
+import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useReferenceLists } from './ReferenceListsContext'
 import { X } from 'lucide-react'
@@ -30,6 +31,9 @@ export function PlanningSheet({ open, onClose, weekPage = null, plan, day: dayPr
     target.addEventListener('close-period-shelves', onClose)
     return () => target.removeEventListener('close-period-shelves', onClose)
   }, [references?.shelvesTarget, periodShelves, open, onClose])
+  // Focus into the sheet on open, Escape closes, focus returns to Shelves.
+  const sheetRef = useRef<HTMLDivElement>(null)
+  useDialogFocus(open, sheetRef, onClose)
   const day = dayProp ?? new Date()
   // Portalled to <body>: a `position: fixed` sheet inside a transformed
   // ancestor (the phone shell) would be fixed to that ancestor, not the
@@ -41,6 +45,7 @@ export function PlanningSheet({ open, onClose, weekPage = null, plan, day: dayPr
         <div className="fixed inset-0 z-40 bg-black/30 backdrop-blur-sm transition-opacity" onClick={onClose} aria-hidden="true" />
       )}
       <div
+        ref={sheetRef}
         role="dialog"
         aria-modal="true"
         aria-label="Shelves"

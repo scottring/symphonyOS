@@ -1,6 +1,7 @@
 import { MastheadCard } from '@/components/layout/MastheadCard'
 import { PAGE_COLUMN_WIDE } from '@/components/layout/pageLayout'
 import { useState } from 'react'
+import { showToast } from '@/hooks/useToast'
 import { useIsAppAdmin } from '@/hooks/useIsAppAdmin'
 import { useWaitlistAdmin } from '@/hooks/useWaitlistAdmin'
 import { useFamilyMembers } from '@/hooks/useFamilyMembers'
@@ -154,6 +155,7 @@ export function SettingsPage({
       onFamilyMembersChanged?.()
     } catch (err) {
       console.error('Failed to add member:', err)
+      showToast(`Couldn't add ${newName.trim()}. Please try again.`, 'error')
     } finally {
       setIsSubmitting(false)
     }
@@ -176,6 +178,7 @@ export function SettingsPage({
       onFamilyMembersChanged?.()
     } catch (err) {
       console.error('Failed to delete member:', err)
+      showToast(`Couldn't remove ${deletingMember.name}. Nothing was changed.`, 'error')
     } finally {
       setIsDeleting(false)
       setDeletingMember(null)
@@ -211,6 +214,7 @@ export function SettingsPage({
       cancelEditing()
     } catch (err) {
       console.error('Failed to update member:', err)
+      showToast("Couldn't save that change. Your edit is still open.", 'error')
     } finally {
       setIsSubmitting(false)
     }
@@ -379,6 +383,7 @@ export function SettingsPage({
                         type="text"
                         value={editName}
                         onChange={(e) => setEditName(e.target.value)}
+                        aria-label="Your name"
                         placeholder="Name"
                         className="input-base w-full mb-3"
                         autoFocus
@@ -393,6 +398,7 @@ export function SettingsPage({
                               editColor === color.value ? 'ring-2 ring-offset-2 ring-neutral-400 scale-110' : ''
                             }`}
                             title={color.label}
+                            aria-label={`Color: ${color.label}`}
                           />
                         ))}
                       </div>
@@ -449,6 +455,7 @@ export function SettingsPage({
                               type="text"
                               value={editName}
                               onChange={(e) => setEditName(e.target.value)}
+                              aria-label={`${member.name}'s name`}
                               placeholder="Name"
                               className="input-base w-full mb-3"
                               autoFocus
@@ -463,6 +470,7 @@ export function SettingsPage({
                                     editColor === color.value ? 'ring-2 ring-offset-2 ring-neutral-400 scale-110' : ''
                                   }`}
                                   title={color.label}
+                                  aria-label={`Color: ${color.label}`}
                                 />
                               ))}
                             </div>
@@ -526,6 +534,7 @@ export function SettingsPage({
                       type="text"
                       value={newName}
                       onChange={(e) => setNewName(e.target.value)}
+                      aria-label="New family member's name"
                       placeholder="Name"
                       className="input-base w-full mb-3"
                       autoFocus
@@ -540,6 +549,7 @@ export function SettingsPage({
                             newColor === color.value ? 'ring-2 ring-offset-2 ring-neutral-400 scale-110' : ''
                           }`}
                           title={color.label}
+                          aria-label={`Color: ${color.label}`}
                         />
                       ))}
                     </div>
@@ -587,6 +597,7 @@ export function SettingsPage({
                       type="email"
                       value={inviteEmail}
                       onChange={(e) => { setInviteEmail(e.target.value); setInviteError(null) }}
+                      aria-label="Partner's email"
                       placeholder="partner@email.com"
                       className="input-base w-full mb-3"
                       autoFocus

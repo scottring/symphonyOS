@@ -5,6 +5,7 @@
 // name, schedule, ordered steps with reps/details — and confirm to create
 // the whole tree (parent + steps) with the source document attached.
 // The invariant everywhere today: AI proposes, only your tap writes.
+import { useDialogFocus } from '@/hooks/useDialogFocus'
 import { useState, useCallback, useRef } from 'react'
 import { X, Sparkles, FileText, Trash2, Plus, Loader2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
@@ -76,6 +77,9 @@ export function RoutineBuilderModal({ onClose, onCreated }: {
     onCreated(parentId)
   }, [proposal, soleDomain, addRoutine, file, uploadAttachment, onCreated])
 
+  const dialogRef = useRef<HTMLDivElement>(null)
+  useDialogFocus(true, dialogRef, onClose)
+
   const patchStep = (i: number, name: string) =>
     setProposal((p) => p && { ...p, steps: p.steps.map((s, j) => (j === i ? { ...s, name } : s)) })
   const removeStep = (i: number) =>
@@ -85,8 +89,8 @@ export function RoutineBuilderModal({ onClose, onCreated }: {
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-neutral-900/30 p-4" onClick={onClose}>
-      <div className="w-full max-w-lg max-h-[85vh] overflow-y-auto rounded-2xl bg-white shadow-xl p-5"
-        role="dialog" aria-label="Build routine with AI" onClick={(e) => e.stopPropagation()}>
+      <div ref={dialogRef} className="w-full max-w-lg max-h-[85vh] overflow-y-auto rounded-2xl bg-white shadow-xl p-5"
+        role="dialog" aria-modal="true" aria-label="Build routine with AI" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-3">
           <h2 className="font-display text-xl text-neutral-800 inline-flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-amber-500" /> Build a routine

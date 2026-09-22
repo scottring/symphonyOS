@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { MoreHorizontal, Pin, PinOff, Trash2, FolderMinus } from 'lucide-react'
+import { usePopoverFocus } from '@/hooks/usePopoverFocus'
 
 interface PanelMoreMenuProps {
   isPinned: boolean
@@ -51,6 +52,7 @@ export function PanelMoreMenu({ isPinned, onTogglePin, onDelete, onUngroup, onDe
     setConfirming(false)
     setConfirmingGroup(false)
   }
+  usePopoverFocus(open, buttonRef, menuRef, close)
 
   return (
     <>
@@ -58,6 +60,8 @@ export function PanelMoreMenu({ isPinned, onTogglePin, onDelete, onUngroup, onDe
         ref={buttonRef}
         onClick={() => setOpen(prev => !prev)}
         aria-label="More actions"
+        aria-haspopup="true"
+        aria-expanded={open}
         className="px-3 py-1.5 rounded-lg text-[15px] font-medium bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition-colors"
       >
         <MoreHorizontal className="w-4 h-4" />
@@ -66,6 +70,8 @@ export function PanelMoreMenu({ isPinned, onTogglePin, onDelete, onUngroup, onDe
       {open && createPortal(
         <div
           ref={menuRef}
+          role="group"
+          aria-label="More actions"
           className="fixed z-[100] bg-white rounded-xl border border-neutral-200 shadow-lg p-1.5 min-w-[170px]"
           style={{ top: pos.top, right: pos.right }}
         >
@@ -95,6 +101,7 @@ export function PanelMoreMenu({ isPinned, onTogglePin, onDelete, onUngroup, onDe
             onDeleteGroup && (
               confirmingGroup ? (
                 <button
+                  autoFocus
                   onClick={() => { onDeleteGroup(); close() }}
                   className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-[15px] text-rose-700 bg-rose-50 hover:bg-rose-100 transition-colors font-semibold"
                 >
@@ -113,6 +120,7 @@ export function PanelMoreMenu({ isPinned, onTogglePin, onDelete, onUngroup, onDe
             )
           ) : confirming ? (
             <button
+              autoFocus
               onClick={() => { onDelete(); close() }}
               className="w-full flex items-center gap-2 px-2.5 py-2 rounded-lg text-[15px] text-rose-700 bg-rose-50 hover:bg-rose-100 transition-colors font-semibold"
             >

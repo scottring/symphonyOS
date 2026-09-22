@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useDialogFocus } from '@/hooks/useDialogFocus'
 import { Sparkles, Check, ArrowRight, Moon, Sun, X } from 'lucide-react'
 import type { Task } from '@/types/task'
 import type { AttentionItem } from '@/lib/today/attention'
@@ -116,10 +117,14 @@ export function ReviewDrawer({
   const close = useCallback(async () => { if (mode === 'evening') await save(); onClose() }, [mode, save, onClose])
   useEffect(() => {
     if (!isOpen) return
-    const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') { event.preventDefault(); void close() } }
+    const escape = (event: KeyboardEvent) => { if (event.key === 'Escape' && !event.defaultPrevented) { event.preventDefault(); void close() } }
     document.addEventListener('keydown', escape)
     return () => document.removeEventListener('keydown', escape)
   }, [isOpen, close])
+  // Focus moves into the review and back to its opener; Escape stays above
+  // (it closes even from the reflection field, keeping the reflection).
+  const sheetRef = useRef<HTMLDivElement>(null)
+  useDialogFocus(isOpen, sheetRef)
 
   if (!isOpen) return null
 
@@ -168,6 +173,7 @@ export function ReviewDrawer({
       aria-label={mode === 'evening' ? 'End of day review' : 'Start the day review'}
     >
       <div
+        ref={sheetRef}
         className="review-sheet w-full md:max-w-lg max-h-[85vh] overflow-auto bg-bg-elevated rounded-t-3xl md:rounded-3xl shadow-2xl border border-neutral-200/60"
         onClick={(e) => e.stopPropagation()}
       >
@@ -213,8 +219,9 @@ export function ReviewDrawer({
 
               {/* Highlight */}
               <section className="space-y-2">
-                <label className="block text-sm font-medium text-neutral-700">The best part of today?</label>
+                <label htmlFor="review-highlight" className="block text-sm font-medium text-neutral-700">The best part of today?</label>
                 <input
+                  id="review-highlight"
                   type="text"
                   value={highlight}
                   onChange={(e) => setHighlight(e.target.value)}
@@ -222,6 +229,7 @@ export function ReviewDrawer({
                   className="w-full rounded-xl border border-neutral-200 bg-white px-3.5 py-2.5 text-sm text-neutral-800 placeholder:text-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-400"
                 />
                 <textarea
+                  aria-label="Anything else worth remembering"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder="Anything else worth remembering… (optional)"

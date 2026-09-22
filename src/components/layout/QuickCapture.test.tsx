@@ -714,4 +714,28 @@ describe('Destination line', () => {
     expect(line.startsWith('→ ')).toBe(true)
     expect(line).not.toMatch(/Private until/)
   })
+
+  describe('dialog semantics', () => {
+    it('is a modal dialog named by its heading, with a labelled input', () => {
+      render(<QuickCapture onAdd={vi.fn()} isOpen={true} showFab={false} />)
+      const dialog = screen.getByRole('dialog', { name: 'Quick Add' })
+      expect(dialog).toHaveAttribute('aria-modal', 'true')
+      expect(screen.getByRole('textbox', { name: 'Add a task, note or event' })).toBeInTheDocument()
+    })
+
+    it('Escape closes it from any control inside, not only the text field', async () => {
+      vi.useFakeTimers()
+      try {
+        const onClose = vi.fn()
+        render(<QuickCapture onAdd={vi.fn()} isOpen={true} onClose={onClose} showFab={false} />)
+        const close = screen.getByRole('button', { name: 'Close' })
+        close.focus()
+        fireEvent.keyDown(close, { key: 'Escape' })
+        await act(async () => { vi.advanceTimersByTime(250) })
+        expect(onClose).toHaveBeenCalledOnce()
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+  })
 })

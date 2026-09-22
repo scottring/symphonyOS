@@ -20,6 +20,7 @@ export function PanelHeader({ title, onTitleChange, onClose }: PanelHeaderProps)
       {editing ? (
         <input
           autoFocus
+          aria-label="Title"
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
           onBlur={commit}
@@ -41,7 +42,7 @@ export function PanelHeader({ title, onTitleChange, onClose }: PanelHeaderProps)
       <button
         onClick={onClose}
         aria-label="Close"
-        className="mt-1 text-xl leading-none text-neutral-400 hover:text-neutral-700"
+        className="-mt-1 -mx-2 -mb-2 p-2 text-xl leading-none text-neutral-400 hover:text-neutral-700"
       >
         ×
       </button>

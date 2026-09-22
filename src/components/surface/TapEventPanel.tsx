@@ -440,6 +440,7 @@ export function TapEventPanel(props: TapEventPanelProps) {
                     props.onDiscussionNoteChange?.(e.target.value)
                   }
                 }}
+                aria-label="What's the question?"
                 placeholder="What's the question?"
                 rows={2}
                 className="w-full px-2 py-1.5 text-[15px] rounded-md bg-white text-neutral-700 placeholder:text-neutral-400 shadow-[inset_0_0_0_1px_#e5e7eb] focus:outline-none focus:shadow-[inset_0_0_0_1px_#d97706] resize-none"
@@ -470,6 +471,7 @@ export function TapEventPanel(props: TapEventPanelProps) {
                   onChange={(e) => setPrepDraft(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') commitPrepTask() }}
                   onBlur={commitPrepTask}
+                  aria-label="Add a prep task"
                   placeholder="+ Add a prep task…"
                   className="text-[15px] px-2 py-1.5 rounded-md bg-transparent text-neutral-500 placeholder:text-neutral-400 focus:outline-none focus:bg-neutral-50 hover:bg-neutral-50"
                 />

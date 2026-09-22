@@ -7,7 +7,8 @@
 // because a fixed sheet inside the transformed phone shell is fixed to that
 // ancestor, not the viewport.
 
-import { useEffect, useMemo } from 'react'
+import { useDialogFocus } from '@/hooks/useDialogFocus'
+import { useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { Link } from 'react-router-dom'
 import { Target, X } from 'lucide-react'
@@ -65,12 +66,8 @@ function GoalsSheetBody({ onClose }: { onClose: () => void }) {
 }
 
 export function GoalsSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
-  useEffect(() => {
-    if (!open) return
-    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose() }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [open, onClose])
+  const sheetRef = useRef<HTMLDivElement>(null)
+  useDialogFocus(open, sheetRef, onClose)
 
   if (!open) return null
   return createPortal(
@@ -79,6 +76,7 @@ export function GoalsSheet({ open, onClose }: { open: boolean; onClose: () => vo
         <div className="fixed inset-0 z-40 bg-black/30 backdrop-blur-sm transition-opacity" onClick={onClose} aria-hidden="true" />
       )}
       <div
+        ref={sheetRef}
         role="dialog"
         aria-modal="true"
         aria-label="Goals"

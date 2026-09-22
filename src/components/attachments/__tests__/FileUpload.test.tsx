@@ -239,4 +239,18 @@ describe('FileUpload', () => {
       expect(button).toBeDisabled()
     })
   })
+
+  describe('keyboard', () => {
+    it('opens the file chooser from the keyboard — the input itself is hidden', () => {
+      render(<FileUpload onFileSelect={vi.fn()} />)
+      const zone = screen.getByRole('button', { name: 'Upload a file' })
+      const input = document.querySelector('input[type="file"]') as HTMLInputElement
+      const click = vi.spyOn(input, 'click')
+      zone.focus()
+      expect(zone).toHaveFocus()
+      fireEvent.keyDown(zone, { key: 'Enter' })
+      fireEvent.keyDown(zone, { key: ' ' })
+      expect(click).toHaveBeenCalledTimes(2)
+    })
+  })
 })
