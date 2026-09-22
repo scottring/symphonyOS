@@ -166,7 +166,10 @@ marked *verify* must be confirmed before the phase that uses them.)
      list yet. Plan October →"); `docs/onboarding.md` Steps 4–8a walk Year →
      Season → Month → Week → Today (plus the nudge) in the shipped strings,
      with Status lines that say which steps read cleanly and which carry a
-     known gap.
+     known gap. Known edge: the first-week step checks the CURRENT year's
+     session, while the nudge sends a household to next year from Nov 20;
+     a household that signs up in December and plans next year keeps an
+     unticked "Plan your year" until January.
 
 ## Testing
 
