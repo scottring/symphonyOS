@@ -45,6 +45,11 @@ describe('DayPlanPanel — the Planning panel', () => {
     expect(list.textContent).toBe('To plan')
   })
 
+  it('shows the day-pick hint above "To plan"', () => {
+    render(<DayPlanPanel plan={plan(1)} day={day} actions={actions} />)
+    expect(screen.getByRole('note')).toHaveTextContent(/The week list stays whole/)
+  })
+
   it('beside a day, stays a capped reference', () => {
     const n = PLAN_GROUP_CAP + 4
     render(<DayPlanPanel plan={plan(n)} day={day} actions={actions} />)

@@ -9,6 +9,7 @@
 import { useCallback, useMemo, type ReactNode } from 'react'
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks'
 import { useGatedTaskActions } from '@/hooks/useGatedTaskActions'
+import { useAuth } from '@/hooks/useAuth'
 import { useDomain } from '@/hooks/useDomain'
 import { useHouseholdSeasons } from '@/hooks/useHouseholdSeasons'
 import { weekToken } from '@/hooks/usePlanningSession'
@@ -115,6 +116,7 @@ export function WeekPlanHost({ tasks, weekStart, meId, isPast, children }: {
   const { saved: savedSession, loading: sessionLoading, error: sessionReadError, reload: reloadSession } = host.session
   const { sessionReady, draft, shownDraft, sessionOpen, savingSession, justSaved, saveError, dismissJustSaved,
     startSession, changeDraft, closeSession, saveDraft } = host
+  const { user } = useAuth()
 
   return (
     <>
@@ -154,7 +156,7 @@ export function WeekPlanHost({ tasks, weekStart, meId, isPast, children }: {
           <PlanSession level="week" aboveLabel={aboveLabel} dayOptions={dayOptions}
             periodLabel={periodLabel} prevLabel={prevLabel}
             finished={back.finished} open={back.open} current={current}
-            above={above} aboveGoals={aboveGoals} hiddenStepGoals={undefined} domainInView={soleDomain ?? null}
+            above={above} aboveGoals={aboveGoals} hiddenStepGoals={undefined} domainInView={soleDomain ?? null} uid={user?.id ?? null}
             draft={shownDraft} onChange={changeDraft} onClose={closeSession} onSave={saveDraft} saving={savingSession} saveError={saveError} />
         )
         : children({ openSession: startSession })}

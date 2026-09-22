@@ -30,6 +30,8 @@ import { localYmd, weekStartAnchor, readCadenceConfig } from '@/lib/cadence/conf
 import { formatWeekRangeShort } from '@/lib/dateHelpers'
 import { onUnfinishedOpenChange, readUnfinishedOpen, writeUnfinishedOpen } from '@/lib/planningPanelSignal'
 import { requestQuickAdd } from '@/lib/quickAddSignal'
+import { useAuth } from '@/hooks/useAuth'
+import { Hint } from '@/components/plan/Hint'
 
 /** Rows a group shows before "+N more" — the pin is a fixed-space surface. */
 export const PLAN_GROUP_CAP = 6
@@ -427,8 +429,10 @@ export function DayPlanPanel({ plan, day, actions, draggable = true, weekPage = 
 }) {
   const [monthOpen, setMonthOpen] = useState(false)
   const cap = weekPage !== null ? null : PLAN_GROUP_CAP
+  const { user } = useAuth()
   return (
     <div data-testid="day-plan-panel">
+      <Hint name="day-pick" uid={user?.id ?? null}>The week list stays whole. Picking only marks what you mean to do today.</Hint>
       <Group
         title="To plan"
         entries={plan.toPlan ?? []}

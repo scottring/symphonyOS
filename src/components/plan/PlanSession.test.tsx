@@ -45,6 +45,11 @@ describe('PlanSession', () => {
     expect(screen.getByRole('heading', { name: /what will october add up to/i })).toBeInTheDocument()
   })
 
+  it('shows the month-goals hint under the Goals heading', () => {
+    setup({ finished: [], open: [] })
+    expect(screen.getByRole('note')).toHaveTextContent(/Goals are what this period should add up to/)
+  })
+
   it('writes nothing until Save, then saves once', async () => {
     const s = setup()
     fireEvent.click(screen.getByRole('button', { name: /next: plan october/i }))
@@ -97,6 +102,12 @@ describe('PlanSession — week', () => {
     fireEvent.click(screen.getByRole('button', { name: /next: save/i }))
     expect(screen.getByText(/stays on October/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /save this week/i })).toBeInTheDocument()
+  })
+
+  it('shows the week-list hint on the Plan step', () => {
+    week()
+    fireEvent.click(screen.getByRole('button', { name: /next: plan this week/i }))
+    expect(screen.getByRole('note')).toHaveTextContent(/Adding a month task here puts it on this week's list too/)
   })
 })
 

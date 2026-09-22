@@ -38,6 +38,7 @@ import { parseLocalYmd } from '@/lib/cadence/config'
 import { monthToken, yearToken, type SessionHorizon } from '@/hooks/usePlanningSession'
 import { seasonToken } from '@/lib/cadence/seasons'
 import { usePlanSessionHost } from '@/hooks/usePlanSessionHost'
+import { useAuth } from '@/hooks/useAuth'
 import { lookBackRows, isEmptyDraft, goalsWithHiddenSteps, goalAsRow, yearLookBack, type SessionDraft } from '@/lib/planning/session'
 import type { DomainId } from '@/lib/domains'
 import { formatShortDate } from '@/lib/dateHelpers'
@@ -611,6 +612,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
   const { saved: savedSession, loading: sessionLoading, error: sessionReadError, reload: reloadSession } = host.session
   const { sessionReady, draft, shownDraft, sessionOpen, savingSession, justSaved, saveError,
     startSession, changeDraft, closeSession, saveDraft, dismissJustSaved } = host
+  const { user } = useAuth()
   // The year's Keep reads the draft being saved for the id it must re-use;
   // the host owns it, so it arrives here.
   draftRef.current = shownDraft
@@ -699,7 +701,7 @@ function PeriodPlanPageInner({ level }: { level: PlanLevel }) {
       {sessionOpen && shownDraft ? (
         <PlanSession level={level} aboveLabel={aboveLabel} periodLabel={shortLabel} prevLabel={prevPeriodLabel}
           finished={back.finished} open={back.open} current={currentPeriodTasks}
-          above={aboveItems} aboveGoals={aboveGoalItems} hiddenStepGoals={hiddenStepGoals} domainInView={soleDomain ?? null}
+          above={aboveItems} aboveGoals={aboveGoalItems} hiddenStepGoals={hiddenStepGoals} domainInView={soleDomain ?? null} uid={user?.id ?? null}
           draft={shownDraft} onChange={changeDraft} onClose={closeSession} onSave={saveDraft} saving={savingSession} saveError={saveError} />
       ) : (
       /* The plan on the left, what you consult while writing it on the
