@@ -57,6 +57,8 @@ export interface Goal {
   sortOrder: number
   actions: GoalAction[]
   milestones: GoalMilestone[]
+  /** The previous year's goal this one was kept from (guided planning, Phase 3). */
+  carriedFrom?: string | null
   createdAt: Date
   updatedAt: Date
 }
@@ -86,6 +88,7 @@ export interface DbGoal {
   context: string | null
   status: GoalStatus
   sort_order: number
+  carried_from: string | null
   created_at: string
   updated_at: string
 }

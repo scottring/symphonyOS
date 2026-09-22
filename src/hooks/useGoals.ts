@@ -53,6 +53,7 @@ function dbGoalToGoal(db: DbGoal, actions: GoalAction[], milestones: GoalMilesto
     sortOrder: db.sort_order,
     actions: actions.filter(a => a.goalId === db.id),
     milestones: milestones.filter(m => m.goalId === db.id),
+    carriedFrom: db.carried_from ?? undefined,
     createdAt: new Date(db.created_at),
     updatedAt: new Date(db.updated_at),
   }
@@ -239,22 +240,25 @@ export function useGoals(year?: number) {
     areaId: string | null,
     name: string,
     context?: 'work' | 'family' | 'personal',
-    extra?: { notes?: string | null; scope?: Scope },
+    extra?: { notes?: string | null; scope?: Scope; id?: string; year?: number; strategy?: string | null; carriedFrom?: string | null },
   ) => {
     if (!user) return null
 
-    const tempId = crypto.randomUUID()
+    const tempId = extra?.id ?? crypto.randomUUID()
+    const goalYear = extra?.year ?? currentYear
     const optimistic: Goal = {
       id: tempId,
       areaId: areaId ?? '',
       name,
-      year: currentYear,
+      year: goalYear,
       notes: extra?.notes ?? undefined,
+      strategy: extra?.strategy ?? undefined,
       context: context ?? undefined,
       status: 'active',
       sortOrder: goals.filter(g => g.areaId === areaId).length,
       actions: [],
       milestones: [],
+      carriedFrom: extra?.carriedFrom ?? undefined,
       createdAt: new Date(),
       updatedAt: new Date(),
     }
@@ -263,13 +267,16 @@ export function useGoals(year?: number) {
     const { data, error: insertError } = await supabase
       .from('goals')
       .insert({
+        ...(extra?.id ? { id: extra.id } : {}),
         user_id: user.id,
         area_id: areaId,
         name,
-        year: currentYear,
+        year: goalYear,
         sort_order: optimistic.sortOrder,
         context: context ?? null,
         notes: extra?.notes ?? null,
+        strategy: extra?.strategy ?? null,
+        carried_from: extra?.carriedFrom ?? null,
         // goals RLS shares on scope, not context — a family goal without this
         // stays private to its author despite looking shared. It is DERIVED,
         // never chosen (scope.ts).
@@ -279,6 +286,22 @@ export function useGoals(year?: number) {
       .single()
 
     if (insertError) {
+      // Idempotent create: a duplicate on a caller-given id means another
+      // attempt already landed the row — read it back rather than failing
+      // (mirrors addTask({ id }), useSupabaseTasks.ts).
+      if (extra?.id && (insertError as { code?: string }).code === '23505') {
+        setGoals(prev => prev.filter(g => g.id !== tempId))
+        const { data: existing } = await supabase
+          .from('goals')
+          .select()
+          .eq('id', extra.id)
+          .single()
+        if (existing) {
+          const real = dbGoalToGoal(existing as DbGoal, [], [])
+          setGoals(prev => prev.some(g => g.id === real.id) ? prev : [...prev, real])
+          return real
+        }
+      }
       setGoals(prev => prev.filter(g => g.id !== tempId))
       setError(insertError.message)
       return null
@@ -289,7 +312,7 @@ export function useGoals(year?: number) {
     return real
   }, [user, currentYear, goals])
 
-  const updateGoal = useCallback(async (id: string, updates: Partial<Pick<Goal, 'name' | 'notes' | 'status' | 'areaId' | 'sortOrder' | 'strategy' | 'domainSlug' | 'layerId' | 'context' | 'year'>>) => {
+  const updateGoal = useCallback(async (id: string, updates: Partial<Pick<Goal, 'name' | 'notes' | 'status' | 'areaId' | 'sortOrder' | 'strategy' | 'domainSlug' | 'layerId' | 'context' | 'year' | 'carriedFrom'>>) => {
     const goal = goals.find(g => g.id === id)
     if (!goal) return
 
@@ -306,6 +329,7 @@ export function useGoals(year?: number) {
     if (updates.layerId !== undefined) dbUpdates.layer_id = updates.layerId ?? null
     if (updates.context !== undefined) dbUpdates.context = updates.context ?? null
     if (updates.year !== undefined) dbUpdates.year = updates.year
+    if (updates.carriedFrom !== undefined) dbUpdates.carried_from = updates.carriedFrom ?? null
 
     const { error: updateError } = await supabase
       .from('goals')
