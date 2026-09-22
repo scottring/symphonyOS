@@ -25,6 +25,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { showToast } from '@/hooks/useToast';
 import { useEscapeKey } from '@/hooks/useEscapeKey';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { useSelection } from '@/shell/providers/SelectionProvider';
 import type { SelectionRef } from '@/shell/types';
 import { useSupabaseTasks } from '@/hooks/useSupabaseTasks';
@@ -115,8 +116,32 @@ function PanelChrome({ children }: { children: React.ReactNode }) {
       document.removeEventListener('mousedown', onDown);
     };
   }, [clearSelection]);
+  // Keyboard/screen-reader users land in the panel they just opened, and go
+  // back to the row that opened it on close. A child that autofocuses its own
+  // field (a fresh title) keeps that focus.
+  useEffect(() => {
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const panel = panelRef.current;
+    if (panel && !panel.contains(document.activeElement)) panel.focus({ preventScroll: true });
+    return () => {
+      const active = document.activeElement;
+      const focusWasInPanel = !active || active === document.body || !!panel?.contains(active) || !active.isConnected;
+      if (focusWasInPanel && opener?.isConnected && opener !== document.body) opener.focus({ preventScroll: true });
+    };
+  }, []);
+  // Full-screen on phones, so it is a modal dialog there; a side panel beside
+  // the page on wider screens.
+  const fullScreen = useMediaQuery('(max-width: 767px)');
   return (
-    <aside ref={panelRef} data-testid="task-detail-panel" className={panelClassName}>
+    <aside
+      ref={panelRef}
+      data-testid="task-detail-panel"
+      className={panelClassName}
+      tabIndex={-1}
+      aria-label="Details"
+      role={fullScreen ? 'dialog' : undefined}
+      aria-modal={fullScreen ? true : undefined}
+    >
       {children}
     </aside>
   );

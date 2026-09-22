@@ -345,6 +345,7 @@ export const ScheduleItem = memo(function ScheduleItem({
         swipeCommitPx={SWIPE_COMMIT_PX}
         onCompleteSwipe={() => { if (!isFree) handleCheckboxClick({ stopPropagation: () => {} } as React.MouseEvent) }}
         onEditSwipe={onSelect}
+        onTap={onSelect}
         // Centred is right for a one-line row and wrong the moment the inline
         // per-person items (or the "From an email" line) make the title column
         // tall — the time and the type tile drift to the vertical middle of the
@@ -356,7 +357,6 @@ export const ScheduleItem = memo(function ScheduleItem({
           ${selected ? 'ring-2 ring-primary-300 shadow-md' : ''}
           ${item.completed || item.skipped || isFree ? 'opacity-60' : ''}
         `}
-        ariaPressed={selected}
       >
         {/* Left time column — stacked. An untimed task leaves it empty rather
             than reserving a column of "All day" down the page. */}
@@ -377,7 +377,8 @@ export const ScheduleItem = memo(function ScheduleItem({
             circle, a 31px-tall one grew a scrollbar beside it. The negative
             margin keeps the circle itself where the time column's text
             starts. */}
-        <div className="w-12 h-12 -ml-3 shrink-0 flex items-center justify-center relative">
+        {/* Completing is not opening: the checkbox's click stays out of the card's tap. */}
+        <div className="w-12 h-12 -ml-3 shrink-0 flex items-center justify-center relative" onClick={(e) => e.stopPropagation()}>
           {item.focused && (
             <span aria-hidden="true" className="absolute left-1 top-1/2 -translate-y-1/2 h-1.5 w-1.5 rounded-full bg-sage-500" />
           )}
@@ -392,12 +393,18 @@ export const ScheduleItem = memo(function ScheduleItem({
           ) : null}
         </div>
 
-        {/* Title + context line */}
+        {/* Title + context line. The title is the row's keyboard/screen-reader
+            way in (VoiceOver takes over swipes); its click bubbles to the
+            card's tap handler, which opens the detail. */}
         <div className="flex-1 min-w-0">
-          <div className={`text-[16px] font-medium leading-snug line-clamp-2 break-words ${item.completed || item.skipped ? 'line-through text-neutral-400' : 'text-neutral-800'}`}>
+          <button
+            type="button"
+            aria-pressed={selected}
+            className={`block w-full text-left text-[16px] font-medium leading-snug line-clamp-2 break-words ${item.completed || item.skipped ? 'line-through text-neutral-400' : 'text-neutral-800'}`}
+          >
             {item.title}
             {item.focused && <span className="sr-only"> · Chosen for today</span>}
-          </div>
+          </button>
           {(contextLabel || isFree) && (
             <div className="flex items-center gap-1.5 text-[12px] text-neutral-500 mt-0.5 truncate">
               {/* Free chip — a dimmed mobile row needs its own explanation;
@@ -935,14 +942,15 @@ export const ScheduleItem = memo(function ScheduleItem({
 //   • drag right past commit threshold → fire onEditSwipe (open detail)
 // Coloured action panels reveal underneath as the card slides. Touches that
 // move primarily vertically don't engage the swipe (so page scroll still
-// works). A small tap (delta < 6px) falls through to onClickCard.
+// works). A tap (no swipe) opens the detail through onTap.
 
 interface ScheduleItemMobileCardProps {
   swipeCommitPx: number
   swipeMaxPx: number
   onCompleteSwipe: () => void
   onEditSwipe: () => void
-  ariaPressed?: boolean
+  /** A plain tap (not the end of a swipe) — opens the detail. */
+  onTap: () => void
   cardClassName: string
   children: React.ReactNode
 }
@@ -952,7 +960,7 @@ function ScheduleItemMobileCard({
   swipeMaxPx,
   onCompleteSwipe,
   onEditSwipe,
-  ariaPressed,
+  onTap,
   cardClassName,
   children,
 }: ScheduleItemMobileCardProps) {
@@ -1011,6 +1019,7 @@ function ScheduleItemMobileCard({
     decided.current = null
     dxRef.current = 0
     haptic.current = false
+    swiped.current = false
     setDragging(true)
   }
 
@@ -1027,9 +1036,13 @@ function ScheduleItemMobileCard({
     requestPaint()
   }
 
+  // A swipe's touchend can still produce a click; that click is not a tap.
+  const swiped = useRef(false)
+
   const commit = () => {
     const dx = dxRef.current
     if (decided.current === 'horizontal') {
+      swiped.current = true
       // Right-to-left (dx < 0) → Complete. Left-to-right (dx > 0) → Edit.
       if (dx <= -swipeCommitPx) {
         onCompleteSwipe()
@@ -1071,7 +1084,10 @@ function ScheduleItemMobileCard({
       <div
         ref={cardEl}
         data-selectable
-        aria-pressed={ariaPressed}
+        onClick={() => {
+          if (swiped.current) { swiped.current = false; return }
+          onTap()
+        }}
         onTouchStart={onTouchStart}
         onTouchMove={onTouchMove}
         onTouchEnd={commit}

@@ -129,6 +129,7 @@ export function CompletedTasksView({
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              aria-label="Search completed tasks"
               placeholder="Search completed tasks..."
               className="w-full rounded-md border border-neutral-300 bg-bg-elevated py-3 pl-10 pr-4
                          text-[15px] placeholder:text-neutral-400
@@ -137,6 +138,7 @@ export function CompletedTasksView({
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery('')}
+                aria-label="Clear search"
                 className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-neutral-400 hover:text-neutral-600"
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

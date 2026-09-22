@@ -1,4 +1,5 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useDialogFocus } from '@/hooks/useDialogFocus'
+import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import type { Task } from '@/types/task'
 import type { DomainId } from '@/lib/domains'
@@ -31,21 +32,17 @@ export function DomainGateProvider({ children }: { children: ReactNode }) {
     pendingRef.current = null
     setPending((prev) => { prev?.resolve(d); return null })
   }, [])
-  // Focus rarely lands inside the portalled dialog (the trigger that opened it
-  // usually keeps it), so a plain onKeyDown on the dialog would miss Escape.
-  // Listen on the document instead, same pattern DomainSwitcher's menu uses.
-  useEffect(() => {
-    if (!pending) return
-    const handleKeyDown = (e: KeyboardEvent) => { if (e.key === 'Escape') settle(null) }
-    document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [pending, settle])
+  // Focus moves into the portalled dialog (it used to stay on the trigger) and
+  // Escape cancels — consumed, so the detail panel underneath stays open.
+  const dialogRef = useRef<HTMLDivElement>(null)
+  const cancel = useCallback(() => settle(null), [settle])
+  useDialogFocus(!!pending, dialogRef, cancel)
   const value = useMemo(() => ({ requireDomain }), [requireDomain])
   return (
     <Ctx.Provider value={value}>
       {children}
       {pending && createPortal(
-        <div role="dialog" aria-modal="true" aria-label="Which domain?" className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/20"
+        <div ref={dialogRef} role="dialog" aria-modal="true" aria-label="Which domain?" className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/20"
           onMouseDown={(e) => { if (e.target === e.currentTarget) settle(null) }}>
           <div className="card p-5 max-w-sm w-[92vw]">
             <p className="text-sm text-neutral-500">Where does this belong?</p>

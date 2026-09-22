@@ -15,12 +15,15 @@ import { formatDateLabel } from '@/lib/dateHelpers'
 import { showToast } from '@/hooks/useToast'
 import type { TriageWhen } from './TriageWhenMenu'
 import { RescheduleGrid } from './RescheduleGrid'
+import { usePopoverFocus } from '@/hooks/usePopoverFocus'
 
 export function RescheduleButton({ item }: { item: TimelineItem }) {
   const ctx = useScheduleActionsContext()
   const [open, setOpen] = useState(false)
   const triggerRef = useRef<HTMLButtonElement>(null)
   const panelRef = useRef<HTMLDivElement>(null)
+  const close = useCallback(() => setOpen(false), [])
+  usePopoverFocus(open, triggerRef, panelRef, close)
 
   // Portal + fixed positioning (the PushDropdown/TaskFateMenu pattern). An
   // absolutely-positioned grid is clipped by any scrolling ancestor, and this
@@ -86,7 +89,7 @@ export function RescheduleButton({ item }: { item: TimelineItem }) {
         type="button"
         aria-label="Reschedule"
         title="Reschedule"
-        aria-haspopup="menu"
+        aria-haspopup="dialog"
         aria-expanded={open}
         onClick={(e) => { e.stopPropagation(); setOpen((o) => !o) }}
         className="shrink-0 p-1.5 rounded-lg text-neutral-400 hover:text-primary-600 hover:bg-primary-50 transition-colors"
@@ -105,7 +108,8 @@ export function RescheduleButton({ item }: { item: TimelineItem }) {
           />
           <div
             ref={panelRef}
-            role="menu"
+            role="dialog"
+            aria-label="Reschedule to"
             style={{ top: 0, left: 0, visibility: 'hidden' }}
             className="fixed z-[100] w-80 p-2 bg-white rounded-xl border border-neutral-200 shadow-lg"
             onClick={(e) => e.stopPropagation()}

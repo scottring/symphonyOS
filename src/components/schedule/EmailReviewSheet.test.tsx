@@ -151,7 +151,7 @@ describe('EmailReviewSheet', () => {
     const row = screen.getByTestId('email-review-row-p1')
     await user.click(within(row).getByRole('button', { name: 'Reschedule' }))
 
-    const menu = screen.getByRole('menu')
+    const menu = screen.getByRole('dialog', { name: 'Reschedule to' })
     expect(row.contains(menu)).toBe(false)
     for (let el: HTMLElement | null = menu.parentElement; el; el = el.parentElement) {
       expect(typeof el.className === 'string' ? el.className : '').not.toMatch(/overflow-/)

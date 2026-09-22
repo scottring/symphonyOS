@@ -3,6 +3,8 @@
 // gate: it highlights the single next step, shows what's already settled, and
 // rests on a calm "you're clear" state when there's nothing to do.
 
+import { useDialogFocus } from '@/hooks/useDialogFocus'
+import { useRef } from 'react'
 import { ChevronUp, Check, Sparkles, ArrowRight } from 'lucide-react'
 import type { ClarityResult, ClarityStep, ClarityStepId } from '@/lib/clarity/claritySteps'
 
@@ -14,12 +16,14 @@ interface ClarityCurtainProps {
 }
 
 export function ClarityCurtain({ open, onClose, result, onStepAction }: ClarityCurtainProps) {
+  const curtainRef = useRef<HTMLDivElement>(null)
+  useDialogFocus(open, curtainRef, onClose)
   if (!open) return null
 
   const act = (id: ClarityStepId) => { onStepAction(id); onClose() }
 
   return (
-    <div className="fixed inset-0 z-[60] flex flex-col" role="dialog" aria-label="Clarity">
+    <div ref={curtainRef} className="fixed inset-0 z-[60] flex flex-col" role="dialog" aria-modal="true" aria-label="Clarity">
       <div className="flex flex-col h-full bg-bg-base animate-curtain-down">
         {/* Pull-up handle / close */}
         <button

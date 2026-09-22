@@ -86,7 +86,14 @@ export function OmniboxResults({ query, onNavigate }: OmniboxResultsProps) {
         <span className="text-[10px] uppercase tracking-wider text-neutral-400">Existing items</span>
         <span className="text-[10px] text-neutral-300">↑↓ select · ↵ open</span>
       </div>
-      <ul>
+      {/* Arrow-key highlighting is visual; say it too, since focus stays in
+          the capture field. */}
+      <p className="sr-only" aria-live="polite" aria-atomic="true">
+        {selectedIndex >= 0 && flat[selectedIndex]
+          ? `${flat[selectedIndex].title}, ${flat[selectedIndex].type}, ${selectedIndex + 1} of ${flat.length}. Enter to open.`
+          : ''}
+      </p>
+      <ul aria-label="Existing items">
         {flat.map((r, i) => (
           <li key={`${r.type}-${r.id}`}>
             <SearchResultItem

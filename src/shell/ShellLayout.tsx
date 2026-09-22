@@ -14,7 +14,7 @@ import { QuickCapture } from '@/components/layout/QuickCapture';
 import { NewVersionBanner } from '@/components/layout/NewVersionBanner';
 import { OmniboxResults } from '@/components/omnibox/OmniboxResults';
 import { DomainSwitcher } from '@/components/domain/DomainSwitcher';
-import { Toast, ConfirmationToast } from '@/components/toast';
+import { Toast, ConfirmationToast, ToastLiveRegion } from '@/components/toast';
 import { ChatPanel } from '@/components/chat/ChatPanel';
 import { NotesProvider } from '@/contexts/NotesContext';
 import { ListsProvider } from '@/contexts/ListsContext';
@@ -447,6 +447,12 @@ function ShellLayoutInner({ children }: Props) {
           discussionsUnread={discussionsUnread}
         />
       )}
+
+      {/* Always mounted, so toast text is announced to screen readers. */}
+      <ToastLiveRegion
+        message={chrome.toast?.message ?? chrome.confirmationToast?.message}
+        urgent={chrome.toast?.type === 'error'}
+      />
 
       {/* Toast — surfaces QuickCapture note-save feedback */}
       {chrome.toast && (

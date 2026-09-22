@@ -221,12 +221,13 @@ export function RoutineCollectionRow({ item, onSelect, onSelectStep, onCompleteS
             return (
               <div key={group.stepId}>
                 <div className="flex items-center justify-between gap-2">
-                  <span
-                    className={`text-[15px] leading-snug truncate cursor-pointer ${stepDone ? 'text-neutral-400' : 'text-neutral-700'}`}
+                  <button
+                    type="button"
+                    className={`min-w-0 text-left text-[15px] leading-snug truncate cursor-pointer ${stepDone ? 'text-neutral-400' : 'text-neutral-700'}`}
                     onClick={() => onSelectStep(`routine-${group.stepId}`)}
                   >
                     {group.name}
-                  </span>
+                  </button>
                   <span className="text-xs text-neutral-400 flex-none">{group.progress.done}/{group.progress.total}</span>
                 </div>
                 <div className="flex flex-wrap gap-1 mt-1">

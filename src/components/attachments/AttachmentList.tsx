@@ -109,15 +109,16 @@ export function AttachmentList({ attachments, onDelete, onOpen, isDeleting = fal
               <FileIcon type={iconType} />
             </div>
 
-            {/* File info */}
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-neutral-800 truncate">
+            {/* File info — a button so the row opens from the keyboard too;
+                its click bubbles to the row's open handler. */}
+            <button type="button" className="flex-1 min-w-0 text-left">
+              <span className="block text-sm font-medium text-neutral-800 truncate">
                 {attachment.fileName}
-              </p>
-              <p className="text-xs text-neutral-500">
+              </span>
+              <span className="block text-xs text-neutral-500">
                 {formatFileSize(attachment.fileSize)}
-              </p>
-            </div>
+              </span>
+            </button>
 
             {/* Delete button */}
             <button
