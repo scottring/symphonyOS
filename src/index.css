@@ -1922,9 +1922,4 @@ html.desktop-shell a {
 .task-chooser-control button { display: inline-flex; align-items: center; gap: 6px; padding: 8px 10px; border: 1px solid var(--color-neutral-300); border-radius: 6px; font-size: 13px; color: var(--color-neutral-700); }
 .task-chooser-control button[aria-pressed="true"] { background: var(--color-neutral-100); }
 .task-chooser-control span { font-size: 12px; color: var(--color-neutral-500); }
-/* The ◎ Goals reference sits beside "Choose tasks", in the same row and the
-   same shape — it opens a reference sheet, it never changes the page. */
-.goals-reference-control { display: flex; align-items: center; }
-.goals-reference-control button { display: inline-flex; align-items: center; gap: 6px; padding: 8px 10px; border: 1px solid var(--color-neutral-300); border-radius: 6px; font-size: 13px; color: var(--color-neutral-700); }
-.goals-reference-control button[aria-expanded="true"] { background: var(--color-neutral-100); }
 @media (max-width: 767px) { .plan-page-tools { padding: 8px 16px; } .plan-period-navigation a { min-height: 44px; display: flex; align-items: center; } }

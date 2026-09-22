@@ -51,6 +51,11 @@ export interface PageReviewSheetProps {
   committing: boolean
   /** Called with only the checked rows, as edited. */
   onCommit: (payload: PageReviewPayload) => void
+  /** The plan being written right now that this page could join ("this week",
+   *  "October"). Absent = no session in progress; the offer is not made. */
+  draftLabel?: string
+  /** Same payload as onCommit, taken into that draft instead of committed. */
+  onAddToDraft?: (payload: PageReviewPayload) => void
   onClose: () => void
 }
 
@@ -151,7 +156,7 @@ function rememberedDomain(altitude: PageAltitude): DomainId | null {
 export function PageReviewSheet({
   items, notes, unclear, windowDates, altitude = 'week', seasons = readSeasons(), today = new Date(),
   titlePeriod = null, pageTitle = null, existingTasks = [], calendarTitlesByDay,
-  initialDomain, members, committing, onCommit, onClose,
+  initialDomain, members, committing, onCommit, onClose, draftLabel, onAddToDraft,
 }: PageReviewSheetProps) {
   // A caller's boundaries may be hand-written and out of calendar order; the
   // season maths below assume ordered ones.
@@ -242,10 +247,10 @@ export function PageReviewSheet({
     setUnread((prev) => prev.filter((l) => l !== line))
   }
 
-  const commit = () => {
+  const buildPayload = (): PageReviewPayload => {
     // The house remembers what kind of page this altitude usually is.
     try { localStorage.setItem(DOMAIN_KEY(altitude), domain) } catch { /* private mode */ }
-    onCommit({
+    return {
       domain,
       items: itemRows
         .filter((r) => r.included && r.title.trim())
@@ -255,8 +260,13 @@ export function PageReviewSheet({
         .map(({ included: _included, ...note }) => ({ title: note.title.trim(), content: note.content.trim() })),
       ...(altitude === 'month' ? { monthStart } : {}),
       ...(altitude === 'season' ? { seasonStart } : {}),
-    })
+    }
   }
+
+  const commit = () => onCommit(buildPayload())
+  // The page joins the plan being written instead of landing on the list
+  // directly — the same rows, one destination up the flow.
+  const addToDraft = () => onAddToDraft?.(buildPayload())
 
   // The period chip: ‹ September › / ‹ Fall 2026 › — which list this page fills.
   const periodChip = (altitude === 'month' || altitude === 'season') && (
@@ -558,6 +568,16 @@ export function PageReviewSheet({
           <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg text-[14px] text-neutral-600 hover:bg-neutral-100 transition-colors">
             Cancel
           </button>
+          {!isEmpty && draftLabel && onAddToDraft && (
+            <button
+              type="button"
+              onClick={addToDraft}
+              disabled={committing || includedCount === 0}
+              className="btn-primary px-4 py-2 rounded-lg text-[14px] disabled:opacity-50"
+            >
+              {`Add to the plan I’m writing (${draftLabel})`}
+            </button>
+          )}
           {!isEmpty && (
             <button
               type="button"

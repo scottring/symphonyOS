@@ -1,9 +1,8 @@
 import { useEffect, useState } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { PanelLeft, Target } from 'lucide-react'
+import { PanelLeft } from 'lucide-react'
 import { useReferenceLists } from '@/components/reference/ReferenceListsContext'
 import { PlanningSheet } from '@/components/reference/PlanningSheet'
-import { GoalsSheet } from '@/components/plan/GoalsSheet'
 
 const PERIODS = ['week', 'month', 'season', 'year'] as const
 const STORAGE_KEY = 'symphony-plan-period'
@@ -33,9 +32,6 @@ export function PlanNavigation({ mobile = false, paused = false }: { mobile?: bo
   const references = useReferenceLists()
   const pinned = !!references?.pins.some(pin => pin.kind === 'today')
   const [sheetPath, setSheetPath] = useState<string | null>(null)
-  // The ◎ Goals reference opens the same sheet at every width (ruling: one
-  // component; a desktop pinned panel is a follow-up).
-  const [goalsOpen, setGoalsOpen] = useState(false)
   const sheetOpen = sheetPath === pathname
   // Today and Week already own mobile choosers with their actual viewed date.
   const showChooser = !mobile || (period && period !== 'week')
@@ -63,12 +59,6 @@ export function PlanNavigation({ mobile = false, paused = false }: { mobile?: bo
       </button>
       {paused && references.pins.length > 0 && <span>Lists return when you close the side panel.</span>}
     </div>}
-    {period && <div className="goals-reference-control">
-      <button type="button" aria-label="Goals" aria-expanded={goalsOpen} onClick={() => setGoalsOpen(open => !open)}>
-        <Target size={15} aria-hidden="true" />Goals
-      </button>
-    </div>}
-    {period && <GoalsSheet open={goalsOpen} onClose={() => setGoalsOpen(false)} />}
     {mobile && showChooser && <PlanningSheet open={sheetOpen} onClose={() => setSheetPath(null)} />}
   </div>
 }

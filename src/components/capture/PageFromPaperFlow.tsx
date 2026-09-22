@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Loader2, LogIn, RotateCcw, X } from 'lucide-react'
 import { CameraCaptureModal } from '@/components/capture/CameraCaptureModal'
@@ -8,6 +8,10 @@ import { useCommitPage } from '@/hooks/useCommitPage'
 import { isSessionExpired } from '@/lib/authErrors'
 import { getAuthUser } from '@/lib/supabase'
 import { readSampleIds, writeSampleIds } from '@/lib/firstWeek'
+import { draftTargetFor, mergePaperIntoDraft } from '@/lib/planning/paperIntoDraft'
+import { readDraft, writeDraft } from '@/lib/planning/sessionDraft'
+import { readSeasons } from '@/lib/cadence/seasons'
+import { showToast } from '@/hooks/useToast'
 import type { ExistingTask } from '@/lib/planDuplicates'
 import type { DomainId } from '@/lib/domains'
 import type { FamilyMember } from '@/types/family'
@@ -57,6 +61,8 @@ export function PageFromPaperFlow({ members, onClose, existingTasks, calendarTit
   const { status, result, error, parseFromBlob, parseFromStoragePath, retry, reset } = usePageFromPaper(members)
   const { commitPage } = useCommitPage()
   const navigate = useNavigate()
+  const [userId, setUserId] = useState<string | null>(null)
+  useEffect(() => { void getAuthUser().then(({ data: { user } }) => setUserId(user?.id ?? null)) }, [])
   const [camera, setCamera] = useState(!initialBlob)
   // Which page is being snapped. Chosen in the camera modal; the client owns
   // the window, so it must own the altitude too. Week = the old behaviour.
@@ -115,6 +121,35 @@ export function PageFromPaperFlow({ members, onClose, existingTasks, calendarTit
       setCommitting(false)
     }
   }, [commitPage, reset, onClose, navigate, result.storagePath, result.altitude, sample])
+
+  // The plan being written right now that a page of this altitude would join.
+  // Recomputed when the parse lands, so the offer matches the page actually read.
+  const draftTarget = useMemo(
+    () => (status === 'ready' ? draftTargetFor(result.altitude, new Date(), readSeasons(), userId) : null),
+    [status, result.altitude, userId],
+  )
+
+  // "Add to the plan I'm writing": the page's goal and task lines join the
+  // open draft — matched first, so nothing it already holds is added twice —
+  // and everything else (day-facts, routines, notes) commits as usual.
+  const handleAddToDraft = useCallback(async (payload: PageReviewPayload) => {
+    if (!draftTarget) return
+    const draft = readDraft(userId, draftTarget.level, draftTarget.periodStart)
+    if (!draft) return
+    setCommitting(true)
+    try {
+      const merged = mergePaperIntoDraft(draft, payload, { open: [], above: [], current: existingTasks ?? [] })
+      writeDraft(userId, merged.draft)
+      if (merged.rest.items.length || merged.rest.notes.length) {
+        await commitPage({ ...merged.rest, storagePath: result.storagePath, altitude: result.altitude })
+      }
+      showToast(`Added to the ${draftTarget.label} draft. Open it to review.`, 'success', 4000)
+      reset()
+      onClose()
+    } finally {
+      setCommitting(false)
+    }
+  }, [draftTarget, userId, existingTasks, commitPage, result.storagePath, result.altitude, reset, onClose])
 
   return (
     <>
@@ -194,6 +229,8 @@ export function PageFromPaperFlow({ members, onClose, existingTasks, calendarTit
           members={members}
           committing={committing}
           onCommit={(payload) => void handleCommit(payload)}
+          draftLabel={draftTarget?.label}
+          onAddToDraft={draftTarget ? (payload) => void handleAddToDraft(payload) : undefined}
           onClose={close}
         />
       )}
